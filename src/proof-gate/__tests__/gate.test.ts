@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import {
   runProofGate,
   assertProofPassed,
+  formatProofGateFailure,
   requiresFounderApproval,
   ProofGateError,
   APPROVAL_GATES,
@@ -154,7 +155,7 @@ describe('runProofGate — failure cases', () => {
 });
 
 // ---------------------------------------------------------------------------
-// assertProofPassed
+// assertProofPassed / failure formatting
 // ---------------------------------------------------------------------------
 
 describe('assertProofPassed', () => {
@@ -169,9 +170,11 @@ describe('assertProofPassed', () => {
     expect(() => assertProofPassed(result)).toThrow(ProofGateError);
   });
 
-  it('ProofGateError includes the gateId and failure list', () => {
+  it('ProofGateError uses the canonical formatted gate message', () => {
     const evidence: ProofEvidence = { ...validEvidence, filesChanged: [], checksRun: [] };
     const result = runProofGate('deploy', evidence);
+    const expectedMessage = formatProofGateFailure(result);
+
     try {
       assertProofPassed(result);
       expect.fail('Expected ProofGateError to be thrown');
@@ -180,6 +183,7 @@ describe('assertProofPassed', () => {
       const gateErr = err as ProofGateError;
       expect(gateErr.gateId).toBe('deploy');
       expect(gateErr.failures.length).toBeGreaterThan(0);
+      expect(gateErr.message).toBe(expectedMessage);
       expect(gateErr.message).toContain('PROOF GATE FAILED');
     }
   });
