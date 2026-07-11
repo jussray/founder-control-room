@@ -2,8 +2,9 @@
  * MissionController
  *
  * Evaluates current evidence against the mission's required checks.
- * Advances mission status when evidence is complete and all required
- * checks pass. Blocks or flags when evidence is missing or failing.
+ * Advances mission status when evidence is complete, all required
+ * checks pass, AND the proof gate clears.
+ * Blocks or flags when evidence is missing, failing, or the gate rejects.
  *
  * Does NOT automatically approve, merge, or deploy.
  * Those transitions require explicit founder approval.
@@ -11,12 +12,14 @@
 
 import { supabase } from '../lib/supabaseClient.js';
 import { BaseController } from './base.js';
+import { runProofGate } from '../proof-gate/gate.js';
 import type {
   ReconcileRequest,
   ReconcileResult,
   ProposedAction,
   EvidenceKind,
 } from '../reconciliation/types.js';
+import type { ProofEvidence } from '../proof-gate/types.js';
 
 type MissionStatus =
   | 'scoping'
@@ -36,7 +39,7 @@ export class MissionController extends BaseController {
   protected async reconcile(req: ReconcileRequest): Promise<ReconcileResult> {
     const { projectId, resourceId: missionId } = req;
 
-    if (!missionId) return this.done('converged', 'No missionId');
+    if (!missionId) return this.noOp('No missionId');
 
     // Load mission with its required checks
     const { data: mission, error: missionError } = await supabase
@@ -47,14 +50,14 @@ export class MissionController extends BaseController {
       .single();
 
     if (missionError || !mission) {
-      return this.done('retry', `Mission ${missionId} not found`);
+      return this.noOp(`Mission ${missionId} not found`, 'retry');
     }
 
     const requiredChecks: EvidenceKind[] =
       mission.required_checks ?? mission.policy_snapshot?.requiredChecks ?? [];
 
     if (!requiredChecks.length) {
-      return this.done('converged', 'No required checks defined for mission');
+      return this.noOp('No required checks defined for mission');
     }
 
     // Load latest evidence per kind for this mission
@@ -73,12 +76,8 @@ export class MissionController extends BaseController {
     }
 
     const missing = requiredChecks.filter((k) => !latestByKind.has(k));
-    const failing = requiredChecks.filter(
-      (k) => latestByKind.get(k) === 'fail',
-    );
-    const passing = requiredChecks.filter(
-      (k) => latestByKind.get(k) === 'pass',
-    );
+    const failing = requiredChecks.filter((k) => latestByKind.get(k) === 'fail');
+    const passing = requiredChecks.filter((k) => latestByKind.get(k) === 'pass');
     const allPass = passing.length === requiredChecks.length;
 
     this.log('info', 'Mission evidence evaluated', {
@@ -92,49 +91,112 @@ export class MissionController extends BaseController {
     const observedChanges = [];
     const proposedActions: ProposedAction[] = [];
 
-    // Determine next status
-    let nextStatus: MissionStatus | null = null;
+    // -------------------------------------------------------------------------
+    // Status machine: implementing → awaiting_approval
+    // -------------------------------------------------------------------------
     const currentStatus = mission.status as MissionStatus;
+    let nextStatus: MissionStatus | null = null;
 
     if (currentStatus === 'implementing') {
       if (allPass) {
-        nextStatus = 'awaiting_approval';
-        proposedActions.push({
-          actionType: 'request_approval',
-          resourceType: 'mission',
-          resourceId: missionId,
-          requiresApproval: true,
-          idempotencyKey: this.idempotencyKey(
-            projectId,
-            missionId,
-            'request_approval',
-            'evidence-complete',
-          ),
-          payload: { evidenceSummary: Object.fromEntries(latestByKind) },
+        // All checks pass — run the proof gate before advancing
+        const evidence: ProofEvidence = {
+          filesChanged: mission.manifest_version_id
+            ? [`manifest@${mission.manifest_version_id}`]
+            : [`mission:${missionId}`],
+          behaviorChanged:
+            `Mission ${missionId} evidence complete — all ${requiredChecks.length} required checks pass.`,
+          checksRun: passing,
+          failures: failing,
+          securityImpact: mission.policy_snapshot?.securityImpact ?? 'none',
+          deploymentImpact: mission.policy_snapshot?.deploymentImpact ?? 'none',
+          rollbackPath:
+            mission.policy_snapshot?.rollbackPath ??
+            `Revert mission ${missionId} to status 'implementing' and re-run checks.`,
+          unresolvedRisks: mission.policy_snapshot?.unresolvedRisks ?? [],
+        };
+
+        // Note: approvedBy is intentionally absent here.
+        // This is the pre-approval gate — it verifies evidence quality, NOT founder sign-off.
+        // Founder sign-off arrives separately via the approval engine on the
+        // 'awaiting_approval' → 'deploying' transition (an APPROVAL_GATE).
+        const gateResult = runProofGate('evidence-complete', evidence);
+
+        this.log('info', 'Proof gate evaluated', {
+          missionId,
+          gateStatus: gateResult.status,
+          failures: gateResult.evidence.failures,
         });
+
+        if (gateResult.status === 'pass') {
+          nextStatus = 'awaiting_approval';
+          proposedActions.push({
+            actionType: 'request_approval',
+            resourceType: 'mission',
+            resourceId: missionId,
+            requiresApproval: true,
+            idempotencyKey: this.idempotencyKey(
+              projectId,
+              missionId,
+              'request_approval',
+              'evidence-complete',
+            ),
+            payload: {
+              evidenceSummary: Object.fromEntries(latestByKind),
+              proofGate: {
+                status: gateResult.status,
+                timestamp: gateResult.timestamp,
+              },
+            },
+          });
+        } else {
+          // Gate failed — surface failures without advancing status
+          proposedActions.push({
+            actionType: 'proof_gate_failed',
+            resourceType: 'mission',
+            resourceId: missionId,
+            requiresApproval: false,
+            idempotencyKey: this.idempotencyKey(
+              projectId,
+              missionId,
+              'proof_gate_failed',
+              gateResult.timestamp,
+            ),
+            payload: {
+              failures: gateResult.evidence.failures,
+              timestamp: gateResult.timestamp,
+            },
+          });
+        }
       } else if (failing.length > 0) {
-        // Stay in implementing; evidence failures are surfaced via proposedActions
         proposedActions.push({
           actionType: 'flag_failing_checks',
           resourceType: 'mission',
           resourceId: missionId,
           requiresApproval: false,
-          idempotencyKey: this.idempotencyKey(projectId, missionId, 'flag_failing', failing.join(',')),
+          idempotencyKey: this.idempotencyKey(
+            projectId,
+            missionId,
+            'flag_failing',
+            failing.join(','),
+          ),
           payload: { failing },
         });
       }
     }
 
-    // Apply status transition
+    // -------------------------------------------------------------------------
+    // Apply status transition (optimistic concurrency)
+    // -------------------------------------------------------------------------
     if (nextStatus && nextStatus !== currentStatus) {
       const { error: updateError } = await supabase
         .from('missions')
         .update({ status: nextStatus, updated_at: new Date().toISOString() })
         .eq('id', missionId)
-        .eq('status', currentStatus); // optimistic concurrency
+        .eq('status', currentStatus);
 
       if (updateError) {
-        return this.done('retry', `Status transition failed: ${updateError.message}`);
+        return this.noOp(`Status transition failed: ${updateError.message}`, 'retry');
       }
 
       observedChanges.push({
@@ -161,7 +223,10 @@ export class MissionController extends BaseController {
     };
   }
 
-  private done(status: ReconcileResult['status'], message: string): ReconcileResult {
+  private noOp(
+    message: string,
+    status: ReconcileResult['status'] = 'converged',
+  ): ReconcileResult {
     return {
       status,
       observedChanges: [],
