@@ -1,8 +1,16 @@
 /**
  * GitHub webhook endpoint.
  *
- * Validates HMAC-SHA256 signature → persists to inbox → enqueues targeted
- * reconciliation. Responds 200 immediately; all processing is async.
+ * Mount order in server.ts (CRITICAL — do not change):
+ *   app.post('/webhooks/github', express.raw({ type: 'application/json' }), handleGitHubWebhook)
+ *
+ * The route receives a raw Buffer. We:
+ *   1. Verify HMAC-SHA256 on the Buffer (must happen before JSON.parse)
+ *   2. Parse the Buffer to JSON
+ *   3. Persist the parsed payload to provider_events
+ *   4. Enqueue targeted reconciliation
+ *
+ * Responds 200 immediately; all downstream processing is async.
  *
  * Supported events:
  *   check_run, pull_request, push, workflow_run, deployment, deployment_status
@@ -24,8 +32,12 @@ const SUPPORTED_EVENTS = new Set([
   'deployment_status',
 ]);
 
-function verifySignature(secret: string, body: Buffer, sig: string): boolean {
-  const expected = `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
+/**
+ * Verify GitHub's HMAC-SHA256 signature against the raw request body.
+ * Must be called before JSON.parse — the signature is over the raw bytes.
+ */
+function verifySignature(secret: string, rawBody: Buffer, sig: string): boolean {
+  const expected = `sha256=${createHmac('sha256', secret).update(rawBody).digest('hex')}`;
   try {
     return timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
   } catch {
@@ -33,10 +45,22 @@ function verifySignature(secret: string, body: Buffer, sig: string): boolean {
   }
 }
 
+/**
+ * Parse the raw Buffer to JSON.
+ * Returns null if the body is not valid JSON.
+ */
+function parseWebhookBody(rawBody: Buffer): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(rawBody.toString('utf8'));
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 /** Resolve project_id from the repository full_name stored in connections */
-async function resolveProject(
-  repoFullName: string,
-): Promise<string | null> {
+async function resolveProject(repoFullName: string): Promise<string | null> {
   const { data } = await supabase
     .from('project_connections')
     .select('project_id')
@@ -80,9 +104,23 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
     return;
   }
 
+  // req.body is a Buffer here (express.raw middleware)
+  const rawBody = req.body as Buffer;
+  if (!Buffer.isBuffer(rawBody) || rawBody.length === 0) {
+    res.status(400).json({ error: 'Empty or non-buffer body' });
+    return;
+  }
+
   const sig = req.headers['x-hub-signature-256'] as string | undefined;
-  if (!sig || !verifySignature(secret, req.body as Buffer, sig)) {
+  if (!sig || !verifySignature(secret, rawBody, sig)) {
     res.status(401).json({ error: 'Invalid signature' });
+    return;
+  }
+
+  // Parse AFTER signature verification
+  const payload = parseWebhookBody(rawBody);
+  if (!payload) {
+    res.status(400).json({ error: 'Invalid JSON body' });
     return;
   }
 
@@ -94,7 +132,6 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
     return;
   }
 
-  const payload = req.body as Record<string, unknown>;
   const repo = payload['repository'] as Record<string, unknown> | undefined;
   const repoFullName = repo?.['full_name'] as string | undefined;
 
@@ -105,7 +142,6 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
 
   const projectId = await resolveProject(repoFullName);
   if (!projectId) {
-    // Not a registered project – silently accept to avoid GitHub retries
     res.status(200).json({ accepted: false, reason: 'unregistered repository' });
     return;
   }
@@ -139,7 +175,7 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
     return;
   }
 
-  // 2. Enqueue targeted reconciliation (with 500ms debounce for burst events)
+  // 2. Enqueue targeted reconciliation (500ms debounce for burst events)
   try {
     await enqueueReconcile(
       {
@@ -153,7 +189,7 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
     );
   } catch (err) {
     console.error('Outbox enqueue failed', err);
-    // Still 200 – event is safely in inbox and can be replayed
+    // Still 200 — event is safely in inbox and can be replayed
   }
 
   res.status(200).json({ accepted: true, eventId: inboxResult.id });
