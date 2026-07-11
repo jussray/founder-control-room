@@ -13,6 +13,21 @@ and without living inside the Bip app repo it manages.
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design and the
 phased no-GitHub migration plan.
 
+## AI operating contracts
+
+- [`GLOBAL_AI.md`](GLOBAL_AI.md) — provider-neutral founder contract
+- [`CLAUDE.md`](CLAUDE.md) — Claude / Claude Code repository instructions
+- [`AGENTS.md`](AGENTS.md) — Codex, ChatGPT, and repository-agent instructions
+- [`docs/PROVIDERS.md`](docs/PROVIDERS.md) — OpenAI, Anthropic, Perplexity, GitHub, Supabase, and tool handoffs
+
+The shared founder stack is:
+
+```text
+/garyvee lindymode redteam l99 redteam ooda
+```
+
+The first redteam attacks the premise. The second attacks the selected plan. Provider instructions may become stricter for this repository, but they may not weaken founder approval, privacy, security, provenance, rollback, or truthfulness.
+
 ## Current phase
 
 **Phase 1 — GitHub-compatible, not GitHub-dependent.**
