@@ -1,0 +1,105 @@
+name: Quality Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - staging
+
+jobs:
+  typecheck:
+    name: "Typecheck"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  lint:
+    name: "Lint"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
+
+  unit-tests:
+    name: "Unit Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm test -- --coverage --reporter=json --outputFile=test-results.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: test-results.json
+
+  qodo-contracts:
+    name: "Qodo – Workflow Contract Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Run Qodo tests
+        run: npx qodo test --coverage --reporter=json --output=qodo-results.json
+        env:
+          QODO_API_KEY: ${{ secrets.QODO_API_KEY }}
+      - name: Evaluate Qodo gate
+        run: |
+          node -e "
+            const r = require('./qodo-results.json');
+            const failed = r.failures ?? [];
+            const contracts = r.contractViolations ?? [];
+            if (failed.length > 0 || contracts.length > 0) {
+              console.error('Qodo gate failed:');
+              [...failed, ...contracts].forEach(f => console.error(' •', f.message));
+              process.exit(1);
+            }
+            console.log('Qodo gate passed.');
+          "
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qodo-results
+          path: qodo-results.json
+
+  sonarqube:
+    name: "SonarQube – Orchestrator Latency Safe"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=founder-control-room
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info

@@ -1,0 +1,47 @@
+language: "en-US"
+tone_instructions: >
+  Be direct. Flag any change that could affect mission state transitions,
+  approval semantics, or provider adapter contracts. Do not soften concerns
+  about control flow, sequencing, or error handling.
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+
+  path_filters:
+    - "!**/*.lock"
+    - "!**/dist/**"
+
+  path_instructions:
+    - path: "src/missions/**"
+      instructions: >
+        This is the mission state machine. Flag any state transition that is
+        not atomic, any missing error path, or any approval bypass.
+        Latency: flag any synchronous call that could block mission progression.
+    - path: "src/providers/**"
+      instructions: >
+        Provider adapters must not leak vendor concepts into the domain layer.
+        Flag any import of provider-specific types into missions/, approvals/,
+        or evidence/.
+    - path: "src/approvals/**"
+      instructions: >
+        Approval logic is safety-critical. Flag any change that could allow
+        an approval to be skipped, bypassed, or silently ignored.
+    - path: "supabase/migrations/**"
+      instructions: >
+        Flag any destructive migration (DROP, ALTER without fallback,
+        data-loss operations). Require rollback path to be documented.
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "main"
+      - "staging"
+
+chat:
+  auto_reply: true
