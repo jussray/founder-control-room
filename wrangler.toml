@@ -1,0 +1,50 @@
+# wrangler.toml — Cloudflare Workers configuration
+#
+# Deploy:  npx wrangler deploy
+# Dev:     npx wrangler dev
+# Secrets: npx wrangler secret put SUPABASE_URL  (etc — see .env.example)
+#
+# The existing Node/Express server (src/index.ts) continues to work as-is
+# for local development and non-CF deployments.
+# The Workers entry point is src/worker/cf-entry.ts.
+
+name       = "founder-control-room"
+main       = "src/worker/cf-entry.ts"
+compatibility_date = "2026-07-11"
+compatibility_flags = ["nodejs_compat"]
+
+# ---------------------------------------------------------------------------
+# Environments
+# ---------------------------------------------------------------------------
+
+[env.production]
+name = "founder-control-room"
+route = { pattern = "api.control.example.com/*", custom_domain = true }
+
+# ---------------------------------------------------------------------------
+# Vars (non-secret, safe to commit)
+# ---------------------------------------------------------------------------
+
+[vars]
+NODE_ENV = "production"
+
+# ---------------------------------------------------------------------------
+# Secrets (DO NOT commit values — use `wrangler secret put`)
+# ---------------------------------------------------------------------------
+# Required secrets:
+#   wrangler secret put SUPABASE_URL
+#   wrangler secret put SUPABASE_ANON_KEY
+#   wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+#   wrangler secret put GITHUB_WEBHOOK_SECRET
+#   wrangler secret put GITHUB_APP_ID
+#   wrangler secret put GITHUB_PRIVATE_KEY
+#   wrangler secret put FOUNDER_ALLOWED_ORIGINS
+#   wrangler secret put FOUNDER_API_URL
+
+# ---------------------------------------------------------------------------
+# Observability
+# ---------------------------------------------------------------------------
+
+[observability]
+enabled = true
+head_sampling_rate = 1
