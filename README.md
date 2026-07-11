@@ -34,10 +34,21 @@ src/
     changeProposal.ts        # Change Proposal (PR-equivalent) types
     mission.ts                # Mission / verification-run types
   lib/
-    supabaseClient.ts         # Control Room's own Supabase project (NOT Bip's)
+    supabaseClient.ts         # Control Room's own Supabase project (NOT Bip's), service-role key
+    supabaseAuthClient.ts     # same project, publishable/anon key — auth-only calls
+  http/
+    server.ts                 # Express app: mounts /auth and /projects
+    middleware/
+      requireFounder.ts        # verifies session JWT + founder_users allowlist
+    routes/
+      auth.ts                  # POST /auth/magic-link, GET /auth/callback
+      projects.ts               # GET /projects/:slug (founder-only)
+  index.ts                     # bootstraps the HTTP server
 supabase/
   migrations/
     0001_init.sql              # founder Control Room schema
+    0002_enable_rls_and_founder_policy.sql  # RLS on all tables + founder_users + is_founder()
+    0003_harden_functions.sql   # search_path pin + tighter execute grants on is_founder()
 docs/
   ARCHITECTURE.md              # full design doc + L99 authority model
 ```
@@ -53,8 +64,45 @@ queries Bip's database directly with broad credentials.
 
 ```bash
 npm install
-cp .env.example .env   # fill in GITHUB_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+cp .env.example .env   # fill in GITHUB_TOKEN and SUPABASE_SERVICE_ROLE_KEY (secrets — not committed)
+npm run dev            # starts the API on :8787 (or $PORT)
 ```
+
+`SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` are already filled in `.env.example` —
+they're public-safe values for this project (ref `oojzfmmywbvficgybaxd`), not secrets.
+
+**One manual dashboard step required before magic links work:** in the Supabase
+dashboard for this project, go to Authentication → URL Configuration → Redirect
+URLs, and add `http://localhost:8787/**` (and your real deployed URL once you have
+one). Supabase silently drops `emailRedirectTo` if it isn't on this allowlist.
+
+## Founder sign-in (magic link)
+
+```bash
+# 1. Request a magic link (only sends if the email is in founder_users)
+curl -X POST http://localhost:8787/auth/magic-link \
+  -H 'content-type: application/json' \
+  -d '{"email":"mcgill.raylene@gmail.com"}'
+
+# 2. Click the link in the email. It redirects to:
+#    http://localhost:8787/auth/callback?token_hash=...&type=magiclink
+#    which responds with { access_token, refresh_token, founder: { email } }
+
+# 3. Use the access_token as a Bearer token on founder-only routes
+curl http://localhost:8787/projects/sekret-bip \
+  -H 'authorization: Bearer <access_token>'
+```
+
+`GET /projects/:slug`:
+- requires a valid founder session (checked against `founder_users`, not just any
+  logged-in Supabase user)
+- reads the project's own registry row from the `projects` table
+- fetches live repo state through whatever `RepositoryProvider` that project's
+  `repo_provider` maps to (GitHub today, via `GITHUB_TOKEN`)
+- logs the read to `project_events` as an audited `project_read` event
+
+There's no Control Room frontend yet, so `/auth/callback` returns the session as
+JSON instead of redirecting into a UI — swap that once one exists.
 
 ## L99 authority model (summary)
 
