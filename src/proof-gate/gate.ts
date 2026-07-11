@@ -1,12 +1,30 @@
 /**
  * Proof Gate — core engine.
  *
- * runProofGate()   — validates evidence and returns a ProofGateResult.
- * assertProofPassed() — throws if the gate did not pass (use in CI / action handlers).
+ * runProofGate()      — validates evidence and returns a ProofGateResult.
+ * assertProofPassed() — throws ProofGateError if the gate did not pass.
+ * ProofGateError      — structured error with gateId + failures for instanceof checks.
  */
 
 import type { ProofEvidence, ProofGateResult, ProofStatus } from './types.js';
 import { isApprovalGate } from './types.js';
+
+// ── Structured error ──────────────────────────────────────────────────────────
+
+export class ProofGateError extends Error {
+  constructor(
+    public readonly gateId: string,
+    public readonly failures: string[],
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ProofGateError';
+    // Maintain proper prototype chain in transpiled environments
+    Object.setPrototypeOf(this, ProofGateError.prototype);
+  }
+}
+
+// ── Core engine ───────────────────────────────────────────────────────────────
 
 export function runProofGate(
   gateId: string,
@@ -64,8 +82,9 @@ export function runProofGate(
 }
 
 /**
- * Throws a structured error when a gate did not pass.
- * Use this inside action handlers so execution is hard-stopped.
+ * Throws a ProofGateError when a gate did not pass.
+ * Use this inside action handlers so execution is hard-stopped
+ * and callers can catch by type (instanceof ProofGateError).
  */
 export function assertProofPassed(result: ProofGateResult): void {
   if (result.status !== 'pass') {
@@ -74,6 +93,10 @@ export function assertProofPassed(result: ProofGateResult): void {
       ...result.allFailures.map((f) => `  • ${f}`),
       `\nResolve every item above before proceeding.`,
     ];
-    throw new Error(lines.join('\n'));
+    throw new ProofGateError(
+      result.gateId,
+      result.allFailures,
+      lines.join('\n'),
+    );
   }
 }

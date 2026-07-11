@@ -10,6 +10,10 @@
  *   - Accepts an approvedBy reference in req.meta for APPROVAL_GATES
  *   - Persists the gate result to the 'proof_gate_results' table
  *   - Returns 'blocked' if the gate fails so the caller can halt
+ *
+ * Column alignment with migration 20260711_proof_gate_results.sql:
+ *   mission_id, gate_id, status, all_failures, evidence, approved_by, created_at
+ *   (no project_id or ran_at — those columns do not exist in the table)
  */
 
 import { supabase } from '../lib/supabaseClient.js';
@@ -43,17 +47,17 @@ export class ProofGateController extends BaseController {
 
     const gateResult = runProofGate(meta.gateId, meta.evidence, meta.approvedBy);
 
-    // Persist result — fail silently so a DB error doesn't halt the gate
+    // Persist result — aligned to migration schema (no project_id / ran_at columns).
+    // Fail silently: a DB error should surface as a warn, not halt the gate itself.
     await supabase
       .from('proof_gate_results')
       .insert({
         mission_id: missionId,
-        project_id: projectId,
         gate_id: gateResult.gateId,
         status: gateResult.status,
+        all_failures: gateResult.allFailures,
         evidence: gateResult.evidence,
         approved_by: gateResult.approvedBy ?? null,
-        ran_at: gateResult.timestamp,
       })
       .then(({ error }) => {
         if (error) {
@@ -61,6 +65,7 @@ export class ProofGateController extends BaseController {
         }
       });
 
+    // projectId retained for idempotency keys even though it's not persisted to the table
     if (gateResult.status === 'pass') {
       this.log('info', 'Proof gate passed', { missionId, gateId: meta.gateId });
       return {
@@ -85,7 +90,7 @@ export class ProofGateController extends BaseController {
     this.log('warn', 'Proof gate failed', {
       missionId,
       gateId: meta.gateId,
-      failures: gateResult.evidence.failures,
+      failures: gateResult.allFailures,
     });
 
     let assertError: ProofGateError | null = null;
@@ -107,7 +112,7 @@ export class ProofGateController extends BaseController {
           idempotencyKey: `${projectId}:${missionId}:proof_gate_failed:${gateResult.timestamp}`,
           payload: {
             gateId: meta.gateId,
-            failures: gateResult.evidence.failures,
+            failures: gateResult.allFailures,
             message: assertError?.message ?? 'Proof gate failed',
           },
         },
