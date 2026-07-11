@@ -14,6 +14,13 @@ export interface ProofEvidence {
 export interface ProofGateResult {
   status: ProofStatus;
   evidence: ProofEvidence;
+  /**
+   * Flat list of all failures detected by runProofGate().
+   * Combines caller-reported evidence.failures with gate-generated
+   * structural failures. Use this for persistence and HTTP responses;
+   * evidence.failures retains only the caller-supplied subset.
+   */
+  allFailures: string[];
   timestamp: string;
   gateId: string;
   approvedBy?: string;

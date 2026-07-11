@@ -1,15 +1,17 @@
 {
   "name": "founder-control-room",
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "worker": "tsx src/worker/scheduler.ts",
     "cf:dev": "wrangler dev src/worker/cf-entry.ts --port 8787",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "lint": "eslint 'src/**/*.ts' --max-warnings 0",
+    "test": "vitest run"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
@@ -21,8 +23,15 @@
     "@cloudflare/workers-types": "^4.20250620.0",
     "@types/express": "^4.17.21",
     "@types/node": "^22.5.4",
+    "@types/supertest": "^6.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "eslint": "^9.0.0",
+    "supertest": "^7.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.5.4",
+    "vitest": "^2.0.0",
     "wrangler": "^3.114.7"
   },
   "engines": {

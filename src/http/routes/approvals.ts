@@ -1,12 +1,20 @@
 /**
  * Approvals route — founder-gated action execution.
  *
+ * POST /approvals/:missionId/run-proof-gate
+ *   Body: { gateId, evidence: ProofEvidence }
+ *   Runs a proof gate check against the mission and persists the result.
+ *   approvedBy is set automatically from the authenticated founder JWT.
+ *   Persistence failure returns 500 — never silently passes.
+ *
  * POST /approvals/:missionId/execute
  *   Body: { actionType, idempotencyKey, payload? }
+ *   For merge and create_branch: requires a passing, non-expired
+ *   proof_gate_results record before execution proceeds.
  *
  * Supported actionTypes in Milestone B:
- *   - create_branch
- *   - merge
+ *   - create_branch  (proof gate required)
+ *   - merge          (proof gate required)
  *
  * Explicitly NOT supported:
  *   - deploy  (returns 501 — no provider adapter yet)
@@ -18,11 +26,113 @@ import type { FounderRequest } from '../middleware/requireFounder.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { GitHubProvider } from '../../providers/GitHubProvider.js';
 import { enqueueReconcile } from '../../events/outbox.js';
+import { ProofGateController } from '../../controllers/ProofGateController.js';
+import type { ProofEvidence } from '../../proof-gate/index.js';
 import type { Response } from 'express';
+
+/** Actions that must have a passing proof_gate_results record before execution. */
+const PROOF_GATED_ACTIONS = new Set(['merge', 'create_branch']);
+
+/** Gate results expire after 15 minutes. */
+const PROOF_GATE_TTL_MS = 15 * 60 * 1_000;
 
 export const approvalsRouter = Router();
 
 approvalsRouter.use(requireFounder);
+
+// ---------------------------------------------------------------------------
+// Runtime evidence validation
+// ---------------------------------------------------------------------------
+
+function validateEvidence(body: unknown): { ok: true; evidence: ProofEvidence } | { ok: false; error: string } {
+  if (!body || typeof body !== 'object') {
+    return { ok: false, error: 'evidence must be an object' };
+  }
+  const e = body as Record<string, unknown>;
+
+  const strArrayFields = ['filesChanged', 'checksRun', 'failures', 'unresolvedRisks'] as const;
+  for (const field of strArrayFields) {
+    if (!Array.isArray(e[field]) || !( e[field] as unknown[]).every((v) => typeof v === 'string')) {
+      return { ok: false, error: `evidence.${field} must be a string array` };
+    }
+  }
+
+  const strFields = ['behaviorChanged', 'securityImpact', 'deploymentImpact', 'rollbackPath'] as const;
+  for (const field of strFields) {
+    if (typeof e[field] !== 'string' || (e[field] as string).trim() === '') {
+      return { ok: false, error: `evidence.${field} must be a non-empty string` };
+    }
+  }
+
+  return { ok: true, evidence: e as unknown as ProofEvidence };
+}
+
+// ---------------------------------------------------------------------------
+// POST /approvals/:missionId/run-proof-gate
+// ---------------------------------------------------------------------------
+
+approvalsRouter.post(
+  '/:missionId/run-proof-gate',
+  async (req: FounderRequest, res: Response) => {
+    const { missionId } = req.params as { missionId: string };
+    const body = req.body as Record<string, unknown>;
+    const gateId = body['gateId'];
+
+    if (typeof gateId !== 'string' || gateId.trim() === '') {
+      return res.status(400).json({ error: '`gateId` must be a non-empty string' });
+    }
+
+    const evidenceValidation = validateEvidence(body['evidence']);
+    if (!evidenceValidation.ok) {
+      return res.status(400).json({ error: evidenceValidation.error });
+    }
+
+    const { data: mission, error: missionErr } = await supabase
+      .from('missions')
+      .select('id, project_id')
+      .eq('id', missionId)
+      .single();
+
+    if (missionErr || !mission) {
+      return res.status(404).json({ error: 'Mission not found' });
+    }
+
+    const controller = new ProofGateController();
+    const result = await controller.run({
+      projectId: mission.project_id as string,
+      controller: 'ProofGateController',
+      resourceId: missionId,
+      reason: 'founder_triggered',
+      meta: {
+        gateId,
+        evidence: evidenceValidation.evidence,
+        // approvedBy sourced from verified JWT — not caller-supplied.
+        approvedBy: req.founder!.email,
+      },
+    });
+
+    if (result.status === 'blocked' && result.message?.includes('could not be persisted')) {
+      return res.status(500).json({
+        ok: false,
+        error: 'Failed to persist proof gate result — gate cannot authorize execution',
+        detail: result.message,
+      });
+    }
+
+    const status = result.status === 'converged' ? 200 : 422;
+    return res.status(status).json({
+      ok: result.status === 'converged',
+      gateStatus: result.status,
+      attestationType: 'manual',
+      actions: result.proposedActions,
+      message: result.message,
+    });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// POST /approvals/:missionId/execute
+// ---------------------------------------------------------------------------
 
 approvalsRouter.post(
   '/:missionId/execute',
@@ -57,6 +167,43 @@ approvalsRouter.post(
 
     const projectId = mission.project_id as string;
 
+    // -------------------------------------------------------------------------
+    // Proof gate enforcement — required for merge and create_branch.
+    // Must have a passing, non-expired proof_gate_results record.
+    // A gate beside the door is decorative architecture.
+    // -------------------------------------------------------------------------
+    if (PROOF_GATED_ACTIONS.has(actionType)) {
+      const proofCutoff = new Date(Date.now() - PROOF_GATE_TTL_MS).toISOString();
+      const { data: proofRecord, error: proofErr } = await supabase
+        .from('proof_gate_results')
+        .select('id, status, created_at, gate_id')
+        .eq('mission_id', missionId)
+        .eq('gate_id', actionType)
+        .eq('status', 'pass')
+        .gte('created_at', proofCutoff)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (proofErr) {
+        return res.status(500).json({
+          error: 'Failed to verify proof gate — cannot proceed',
+          detail: proofErr.message,
+        });
+      }
+
+      if (!proofRecord) {
+        return res.status(403).json({
+          error: `Action '${actionType}' requires a passing proof gate result (gate_id: '${actionType}') within the last 15 minutes.`,
+          code: 'PROOF_GATE_REQUIRED',
+          hint: `Call POST /approvals/${missionId}/run-proof-gate with gateId: "${actionType}" first.`,
+        });
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Idempotency check
+    // -------------------------------------------------------------------------
     const { data: existing } = await supabase
       .from('approval_executions')
       .select('id, result')
