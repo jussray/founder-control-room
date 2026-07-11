@@ -1,38 +1,29 @@
 {
   "name": "founder-control-room",
   "version": "0.1.0",
-  "private": true,
-  "description": "Standalone, provider-independent Control Room backend for Se'kret Bip and future projects.",
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint 'src/**/*.ts' --max-warnings 0",
-    "test": "vitest run",
-    "test:watch": "vitest",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "worker": "tsx src/worker/scheduler.ts"
+    "worker": "tsx src/worker/scheduler.ts",
+    "cf:dev": "wrangler dev src/worker/cf-entry.ts --port 8787",
+    "deploy": "wrangler deploy"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
     "@supabase/supabase-js": "^2.45.4",
-    "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.21.2",
-    "express-rate-limit": "^7.4.1",
-    "helmet": "^8.0.0"
+    "express": "^4.21.2"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.17",
+    "@cloudflare/workers-types": "^4.20250620.0",
     "@types/express": "^4.17.21",
     "@types/node": "^22.5.4",
-    "@typescript-eslint/eslint-plugin": "^8.0.0",
-    "@typescript-eslint/parser": "^8.0.0",
-    "eslint": "^9.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.5.4",
-    "vitest": "^2.0.0"
+    "wrangler": "^3.114.7"
   },
   "engines": {
     "node": ">=20"

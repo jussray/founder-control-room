@@ -1,0 +1,20 @@
+name = "founder-control-room"
+main = "src/worker/cf-entry.ts"
+compatibility_date = "2025-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+# Secrets (set via `wrangler secret put <NAME>`):
+#   SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+#   SUPABASE_ANON_KEY
+#   GITHUB_WEBHOOK_SECRET
+#   GITHUB_APP_ID
+#   GITHUB_PRIVATE_KEY
+#   FOUNDER_ALLOWED_ORIGINS
+#   FOUNDER_API_URL
+
+[triggers]
+crons = ["* * * * *"]
