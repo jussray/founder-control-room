@@ -1,109 +1,115 @@
 /**
- * Proof Gate
+ * Proof Gate — core engine.
  *
- * Enforces the evidence-completeness rule from the operating contract:
- * "Never report 'all good' when only one happy-path click was tested."
- *
- * Two tiers:
- *   1. Evidence gates  (gateId not in APPROVAL_GATES) — verify evidence
- *      quality only. No founder sign-off required.
- *   2. Approval gates  (gateId in APPROVAL_GATES) — require explicit
- *      founder sign-off via `approvedBy` before proceeding.
+ * runProofGate()      — validates evidence and returns a ProofGateResult.
+ * assertProofPassed() — throws ProofGateError if the gate did not pass.
+ * ProofGateError      — structured error with gateId + failures for instanceof checks.
+ * requiresFounderApproval() — re-exported convenience wrapper over isApprovalGate.
  */
 
 import type { ProofEvidence, ProofGateResult, ProofStatus } from './types.js';
+import { isApprovalGate, APPROVAL_GATES } from './types.js';
 
-export const APPROVAL_GATES = [
-  'merge',
-  'deploy',
-  'rollback',
-  'billing-change',
-  'auth-change',
-  'secrets-change',
-  'db-destructive',
-  'dns-change',
-] as const;
+export { isApprovalGate, APPROVAL_GATES };
 
-type ApprovalGateId = typeof APPROVAL_GATES[number];
+/** Convenience alias used in tests and controllers. */
+export const requiresFounderApproval = isApprovalGate;
 
-export function requiresFounderApproval(gateId: string): gateId is ApprovalGateId {
-  return (APPROVAL_GATES as readonly string[]).includes(gateId);
-}
+// ── Structured error ──────────────────────────────────────────────────────────
 
-/**
- * Typed error thrown by assertProofPassed().
- * Carries the gateId and structured failure list for callers that need
- * to handle gate failures programmatically.
- */
 export class ProofGateError extends Error {
   constructor(
     public readonly gateId: string,
     public readonly failures: string[],
+    message: string,
   ) {
-    const lines = [
-      `\n\u274c PROOF GATE FAILED [${gateId}]`,
-      ...failures.map((f) => `  \u2022 ${f}`),
-      `\nResolve the above before proceeding.`,
-    ];
-    super(lines.join('\n'));
+    super(message);
     this.name = 'ProofGateError';
+    // Maintain proper prototype chain in transpiled environments
+    Object.setPrototypeOf(this, ProofGateError.prototype);
   }
 }
+
+// ── Core engine ───────────────────────────────────────────────────────────────
 
 export function runProofGate(
   gateId: string,
   evidence: ProofEvidence,
   approvedBy?: string,
 ): ProofGateResult {
-  const failures: string[] = [];
+  const detectedFailures: string[] = [];
 
-  // 1. Caller-reported check failures block the gate immediately
+  // ── 1. Scope evidence must exist ──────────────────────────────────────────
+  if (!evidence.filesChanged.length) {
+    detectedFailures.push(
+      'No files reported as changed — gate cannot verify scope.',
+    );
+  }
+
+  // ── 2. At least one check must have been run ──────────────────────────────
+  if (!evidence.checksRun.length) {
+    detectedFailures.push(
+      'No checks reported — happy-path-only claim rejected.',
+    );
+  }
+
+  // ── 3. Rollback path is mandatory before any material change ─────────────
+  if (!evidence.rollbackPath?.trim()) {
+    detectedFailures.push(
+      'Rollback path is missing — required before any material change.',
+    );
+  }
+
+  // ── 4. Approval gates require founder sign-off ───────────────────────────
+  if (isApprovalGate(gateId) && !approvedBy) {
+    detectedFailures.push(
+      `Gate '${gateId}' is an approval gate and requires explicit founder approval before proceeding.`,
+    );
+  }
+
+  // ── 5. Unresolved risks must be acknowledged by the founder ──────────────
+  if (evidence.unresolvedRisks.length > 0 && !approvedBy) {
+    detectedFailures.push(
+      `${evidence.unresolvedRisks.length} unresolved risk(s) present without founder acknowledgement.`,
+    );
+  }
+
+  // ── 6. Caller-reported failures block the gate ───────────────────────────
   if (evidence.failures.length > 0) {
-    failures.push(
+    detectedFailures.push(
       `${evidence.failures.length} caller-reported check failure(s): ${evidence.failures.join('; ')}`,
     );
   }
 
-  // 2. Reject empty evidence
-  if (!evidence.filesChanged.length) {
-    failures.push('No files reported as changed — gate cannot verify scope.');
-  }
-
-  if (!evidence.checksRun.length) {
-    failures.push('No checks reported — happy-path-only claim rejected.');
-  }
-
-  if (!evidence.rollbackPath || evidence.rollbackPath.trim() === '') {
-    failures.push('Rollback path is missing — required before any material change.');
-  }
-
-  // 3. Approval gates require founder sign-off
-  if (requiresFounderApproval(gateId) && !approvedBy) {
-    failures.push(
-      `Gate '${gateId}' is an approval gate and requires explicit founder sign-off (approvedBy).`,
-    );
-  }
-
-  // 4. Unresolved risks require founder acknowledgement
-  if (evidence.unresolvedRisks.length > 0 && !approvedBy) {
-    failures.push(
-      `${evidence.unresolvedRisks.length} unresolved risk(s) present without founder acknowledgement: ${evidence.unresolvedRisks.join('; ')}`,
-    );
-  }
-
-  const status: ProofStatus = failures.length === 0 ? 'pass' : 'fail';
+  const allFailures = [...detectedFailures];
+  const status: ProofStatus = allFailures.length === 0 ? 'pass' : 'fail';
 
   return {
     status,
-    evidence: { ...evidence, failures: [...evidence.failures, ...failures.filter((f) => !evidence.failures.includes(f))] },
+    allFailures,
+    evidence,
     timestamp: new Date().toISOString(),
     gateId,
     approvedBy,
   };
 }
 
+/**
+ * Throws a ProofGateError when a gate did not pass.
+ * Use inside action handlers to hard-stop execution.
+ * Callers can catch by type: instanceof ProofGateError.
+ */
 export function assertProofPassed(result: ProofGateResult): void {
   if (result.status !== 'pass') {
-    throw new ProofGateError(result.gateId, result.evidence.failures);
+    const lines = [
+      `\n❌  PROOF GATE FAILED [${result.gateId}] at ${result.timestamp}`,
+      ...result.allFailures.map((f) => `  • ${f}`),
+      `\nResolve every item above before proceeding.`,
+    ];
+    throw new ProofGateError(
+      result.gateId,
+      result.allFailures,
+      lines.join('\n'),
+    );
   }
 }

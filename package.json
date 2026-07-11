@@ -1,19 +1,19 @@
 {
   "name": "founder-control-room",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "test": "vitest run",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "worker": "tsx src/worker/scheduler.ts",
     "cf:dev": "wrangler dev src/worker/cf-entry.ts --port 8787",
     "deploy": "wrangler deploy"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
-    "@supabase/supabase-js": "^2.45.4",
+    "@supabase/supabase-js": "^2.47.2",
     "dotenv": "^16.4.5",
     "express": "^4.21.2"
   },

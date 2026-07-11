@@ -54,7 +54,7 @@ describe('runProofGate — passing cases', () => {
   it('passes a non-approval gate with valid evidence', () => {
     const result = runProofGate('schema-change', validEvidence);
     expect(result.status).toBe('pass');
-    expect(result.evidence.failures).toHaveLength(0);
+    expect(result.allFailures).toHaveLength(0);
   });
 
   it('passes an approval gate when approvedBy is set', () => {
@@ -87,21 +87,21 @@ describe('runProofGate — failure cases', () => {
     const evidence: ProofEvidence = { ...validEvidence, filesChanged: [] };
     const result = runProofGate('schema-change', evidence);
     expect(result.status).toBe('fail');
-    expect(result.evidence.failures.some((f) => f.includes('No files reported'))).toBe(true);
+    expect(result.allFailures.some((f) => f.includes('No files reported'))).toBe(true);
   });
 
   it('fails when checksRun is empty (happy-path-only)', () => {
     const evidence: ProofEvidence = { ...validEvidence, checksRun: [] };
     const result = runProofGate('schema-change', evidence);
     expect(result.status).toBe('fail');
-    expect(result.evidence.failures.some((f) => f.includes('No checks reported'))).toBe(true);
+    expect(result.allFailures.some((f) => f.includes('No checks reported'))).toBe(true);
   });
 
   it('fails when rollbackPath is empty', () => {
     const evidence: ProofEvidence = { ...validEvidence, rollbackPath: '' };
     const result = runProofGate('schema-change', evidence);
     expect(result.status).toBe('fail');
-    expect(result.evidence.failures.some((f) => f.includes('Rollback path'))).toBe(true);
+    expect(result.allFailures.some((f) => f.includes('Rollback path'))).toBe(true);
   });
 
   it('fails when rollbackPath is whitespace only', () => {
@@ -114,7 +114,7 @@ describe('runProofGate — failure cases', () => {
     const result = runProofGate('deploy', validEvidence);
     expect(result.status).toBe('fail');
     expect(
-      result.evidence.failures.some((f) => f.includes("Gate 'deploy' is an approval gate")),
+      result.allFailures.some((f) => f.includes("Gate 'deploy' is an approval gate")),
     ).toBe(true);
   });
 
@@ -125,7 +125,7 @@ describe('runProofGate — failure cases', () => {
     };
     const result = runProofGate('schema-change', evidence);
     expect(result.status).toBe('fail');
-    expect(result.evidence.failures.some((f) => f.includes('check failure'))).toBe(true);
+    expect(result.allFailures.some((f) => f.includes('check failure'))).toBe(true);
   });
 
   it('fails when unresolvedRisks are present without founder acknowledgement', () => {
@@ -136,7 +136,7 @@ describe('runProofGate — failure cases', () => {
     const result = runProofGate('schema-change', evidence);
     expect(result.status).toBe('fail');
     expect(
-      result.evidence.failures.some((f) => f.includes('unresolved risk')),
+      result.allFailures.some((f) => f.includes('unresolved risk')),
     ).toBe(true);
   });
 
@@ -149,7 +149,7 @@ describe('runProofGate — failure cases', () => {
     };
     const result = runProofGate('schema-change', evidence);
     expect(result.status).toBe('fail');
-    expect(result.evidence.failures.length).toBeGreaterThanOrEqual(3);
+    expect(result.allFailures.length).toBeGreaterThanOrEqual(3);
   });
 });
 
