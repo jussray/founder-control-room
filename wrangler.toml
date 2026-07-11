@@ -1,25 +1,25 @@
 # wrangler.toml — Cloudflare Workers configuration
 #
-# Deploy:  npx wrangler deploy
-# Dev:     npx wrangler dev
+# Deploy:  npm run deploy
+# Dev:     npm run cf:dev
 # Secrets: npx wrangler secret put SUPABASE_URL  (etc — see .env.example)
 #
-# The existing Node/Express server (src/index.ts) continues to work as-is
-# for local development and non-CF deployments.
-# The Workers entry point is src/worker/cf-entry.ts.
+# Live URL (auto-assigned by Cloudflare):
+#   https://founder-control-room.<your-cf-subdomain>.workers.dev
+#
+# To add a custom domain later:
+#   1. Add your domain to Cloudflare
+#   2. Replace [env.production] below with:
+#      route = { pattern = "api.yourdomain.com/*", custom_domain = true }
 
 name       = "founder-control-room"
 main       = "src/worker/cf-entry.ts"
 compatibility_date = "2026-07-11"
 compatibility_flags = ["nodejs_compat"]
 
-# ---------------------------------------------------------------------------
-# Environments
-# ---------------------------------------------------------------------------
-
-[env.production]
-name = "founder-control-room"
-route = { pattern = "api.control.example.com/*", custom_domain = true }
+# workers.dev subdomain is enabled by default — no route config needed.
+# Cloudflare will assign:
+#   https://founder-control-room.<your-subdomain>.workers.dev
 
 # ---------------------------------------------------------------------------
 # Vars (non-secret, safe to commit)
