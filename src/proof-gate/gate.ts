@@ -1,10 +1,11 @@
 /**
  * Proof Gate — core engine.
  *
- * runProofGate()      — validates evidence and returns a ProofGateResult.
- * assertProofPassed() — throws ProofGateError if the gate did not pass.
- * ProofGateError      — structured error with gateId + failures for instanceof checks.
- * requiresFounderApproval() — re-exported convenience wrapper over isApprovalGate.
+ * runProofGate()             — validates evidence and returns a ProofGateResult.
+ * formatProofGateFailure()   — renders one canonical human-readable failure message.
+ * assertProofPassed()        — throws ProofGateError if the gate did not pass.
+ * ProofGateError             — structured error with gateId + failures for instanceof checks.
+ * requiresFounderApproval()  — re-exported convenience wrapper over isApprovalGate.
  */
 
 import type { ProofEvidence, ProofGateResult, ProofStatus } from './types.js';
@@ -95,21 +96,31 @@ export function runProofGate(
 }
 
 /**
+ * Render the canonical failure message used by both throwing and non-throwing
+ * callers. Keeping this formatting in one place prevents controller responses
+ * and ProofGateError messages from drifting apart.
+ */
+export function formatProofGateFailure(result: ProofGateResult): string {
+  const lines = [
+    `\n❌  PROOF GATE FAILED [${result.gateId}] at ${result.timestamp}`,
+    ...result.allFailures.map((failure) => `  • ${failure}`),
+    `\nResolve every item above before proceeding.`,
+  ];
+
+  return lines.join('\n');
+}
+
+/**
  * Throws a ProofGateError when a gate did not pass.
  * Use inside action handlers to hard-stop execution.
  * Callers can catch by type: instanceof ProofGateError.
  */
 export function assertProofPassed(result: ProofGateResult): void {
   if (result.status !== 'pass') {
-    const lines = [
-      `\n❌  PROOF GATE FAILED [${result.gateId}] at ${result.timestamp}`,
-      ...result.allFailures.map((f) => `  • ${f}`),
-      `\nResolve every item above before proceeding.`,
-    ];
     throw new ProofGateError(
       result.gateId,
       result.allFailures,
-      lines.join('\n'),
+      formatProofGateFailure(result),
     );
   }
 }
