@@ -75,6 +75,7 @@ create or replace function claim_outbox_work(p_limit int default 10)
 returns setof controller_outbox
 language sql
 security definer
+set search_path = public
 as $$
   update controller_outbox
   set claimed_at = now()
@@ -95,6 +96,7 @@ create or replace function fail_outbox_work(p_id uuid, p_error text)
 returns void
 language sql
 security definer
+set search_path = public
 as $$
   update controller_outbox
   set
@@ -110,11 +112,25 @@ create or replace function increment_attempt_count(row_id uuid)
 returns void
 language sql
 security definer
+set search_path = public
 as $$
   update provider_events
   set attempt_count = attempt_count + 1
   where id = row_id;
 $$;
+
+-- These are security definer functions meant only for the trusted backend
+-- (which connects with the service_role key). Supabase's default privileges
+-- grant EXECUTE on new functions to anon/authenticated explicitly (not via
+-- PUBLIC), so anon/authenticated must be revoked by name or they can call
+-- these directly via PostgREST RPC and bypass RLS entirely.
+revoke execute on function claim_outbox_work(int) from public, anon, authenticated;
+revoke execute on function fail_outbox_work(uuid, text) from public, anon, authenticated;
+revoke execute on function increment_attempt_count(uuid) from public, anon, authenticated;
+
+grant execute on function claim_outbox_work(int) to service_role;
+grant execute on function fail_outbox_work(uuid, text) to service_role;
+grant execute on function increment_attempt_count(uuid) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- 3. provider_observations  (latest normalized observed state per resource)

@@ -92,5 +92,7 @@ export async function markEventFailed(
       processing_status: 'failed',
       last_error: error,
     })
-    .rpc('increment_attempt_count', { row_id: eventId });
+    .eq('id', eventId);
+
+  await supabase.rpc('increment_attempt_count', { row_id: eventId });
 }
