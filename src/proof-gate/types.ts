@@ -1,75 +1,68 @@
 /**
- * Proof Gate — types
+ * Proof Gate — type contracts.
  *
- * The Proof step sits at position 5 of the operating contract's 6-step
- * response format:
- *   Reality → Risk → Decision → Action → Proof → Next gate
+ * The proof gate enforces the rule from chief-ai-machine CLAUDE.md:
+ * "Never report 'all good' when only one happy-path click was tested."
  *
- * A ProofGateResult is the machine-readable record that a change actually
- * worked (or why it didn't). It must be produced before the work is
- * considered done and before any downstream gate (e.g. merge, deploy) opens.
+ * It sits between any material action (merge, deploy, rollback, schema change)
+ * and the Approval Engine.  An action cannot be approved until a ProofGateResult
+ * with status "pass" has been recorded against the same mission + gateId.
  */
 
 export type ProofStatus = 'pass' | 'fail' | 'skipped';
 
 /**
- * The evidence payload that the caller assembles after completing a change.
- * Every field is required — omitting them is itself a gate failure.
+ * The IDs that require explicit founder approval AND a passing proof gate
+ * before execution.  Must stay in sync with the `action` column on `approvals`.
+ */
+export const APPROVAL_GATE_IDS = [
+  'merge',
+  'deploy',
+  'rollback',
+  'billing-change',
+  'auth-change',
+  'secrets-change',
+  'db-destructive',
+  'dns-change',
+] as const;
+
+export type ApprovalGateId = (typeof APPROVAL_GATE_IDS)[number];
+
+export function isApprovalGate(id: string): id is ApprovalGateId {
+  return APPROVAL_GATE_IDS.includes(id as ApprovalGateId);
+}
+
+/**
+ * Evidence the caller must supply.  Every field is required so the gate
+ * cannot be trivially bypassed by omission.
  */
 export interface ProofEvidence {
-  /** Relative paths of every file that was created, modified, or deleted. */
+  /** List of files added / modified / deleted in this change. */
   filesChanged: string[];
-
-  /** Human-readable description of the observable behaviour change. */
+  /** One-sentence description of what behaviour changed and why. */
   behaviorChanged: string;
-
-  /**
-   * Every check that was run (e.g. 'tsc --noEmit', 'vitest run',
-   * 'supabase db lint'). An empty array means only the happy path was
-   * tested — the gate rejects this.
-   */
+  /** CLI commands or test suites that were actually executed, e.g. ["tsc --noEmit", "vitest run"]. */
   checksRun: string[];
-
-  /**
-   * Names of any checks that failed. Empty = all checks passed.
-   * Populated by the caller; the gate appends its own structural failures.
-   */
+  /** Any checks that failed.  Empty array = all passed. */
   failures: string[];
-
-  /** How security posture changed (or 'none' if unchanged). */
+  /** Narrative of security surface affected, or "none". */
   securityImpact: string;
-
-  /** Deployment ordering requirements, env-var changes, migration steps. */
+  /** Narrative of deployment dependencies or ordering constraints, or "none". */
   deploymentImpact: string;
-
-  /**
-   * Exact steps to undo this change (e.g. 'supabase migration revert X +
-   * redeploy prior Workers revision'). Required — empty string fails the gate.
-   */
+  /** Exact steps to undo this change if something goes wrong. */
   rollbackPath: string;
-
-  /**
-   * Risks that are known but not yet resolved. May be non-empty only if the
-   * founder has acknowledged them (approvedBy must be set).
-   */
+  /** Risks that are known but not yet resolved.  Empty = none. */
   unresolvedRisks: string[];
 }
 
-/** The result record produced by runProofGate(). */
 export interface ProofGateResult {
   status: ProofStatus;
+  /** All failures — both those from the caller's own `evidence.failures` and those detected by the gate. */
+  allFailures: string[];
   evidence: ProofEvidence;
-  /** ISO-8601 timestamp of when the gate ran. */
   timestamp: string;
-  /**
-   * Identifies which gate this is (e.g. 'merge', 'deploy', 'schema-change').
-   * Gates in APPROVAL_GATES require an approvedBy value.
-   */
+  /** Matches the `action` column on `approvals`, e.g. "merge", "deploy". */
   gateId: string;
-  /**
-   * Free-text founder approval reference — e.g.
-   * 'jussray — approved 2026-07-11 via Slack'.
-   * Required for gates in APPROVAL_GATES and when unresolvedRisks is non-empty.
-   */
+  /** Free-form reference — e.g. "founder — approved 2026-07-11 via Slack". */
   approvedBy?: string;
 }
