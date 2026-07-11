@@ -19,7 +19,7 @@
 
 import { supabase } from '../lib/supabaseClient.js';
 import { BaseController } from './base.js';
-import { runProofGate, assertProofPassed, ProofGateError } from '../proof-gate/gate.js';
+import { formatProofGateFailure, runProofGate } from '../proof-gate/gate.js';
 import { persistProofResult } from '../proof-gate/persist.js';
 import type { ReconcileRequest, ReconcileResult } from '../reconciliation/types.js';
 import type { ProofEvidence } from '../proof-gate/types.js';
@@ -87,19 +87,13 @@ export class ProofGateController extends BaseController {
       };
     }
 
-    // Gate failed — surface failures and block
+    // Gate failed — surface failures and block without throwing only to catch.
+    const failureMessage = formatProofGateFailure(gateResult);
     this.log('warn', 'Proof gate failed', {
       missionId,
       gateId: meta.gateId,
       failures: gateResult.allFailures,
     });
-
-    let assertError: ProofGateError | null = null;
-    try {
-      assertProofPassed(gateResult);
-    } catch (err) {
-      if (err instanceof ProofGateError) assertError = err;
-    }
 
     return {
       status: 'blocked',
@@ -115,13 +109,13 @@ export class ProofGateController extends BaseController {
             gateId: meta.gateId,
             failures: gateResult.allFailures,
             resultId,
-            message: assertError?.message ?? 'Proof gate failed',
+            message: failureMessage,
           },
         },
       ],
       evidenceIds: [],
       requiresApproval: false,
-      message: assertError?.message ?? 'Proof gate failed',
+      message: failureMessage,
     };
   }
 
