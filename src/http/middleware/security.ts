@@ -1,34 +1,30 @@
 /**
  * Security middleware.
  *
- * Applied globally in server.ts, before any route handler.
+ * ENVIRONMENT VARIABLES
+ * ---------------------
+ * FOUNDER_API_URL        (required in production)
+ *   The public base URL of THIS backend server.
+ *   Used only to construct the magic-link emailRedirectTo callback.
+ *   Must resolve to this server's own /auth/callback endpoint.
+ *   Example: https://api.control.example.com
  *
- * What each piece does:
+ * FOUNDER_ALLOWED_ORIGINS  (required in production)
+ *   Comma-separated list of browser frontend origins allowed to make
+ *   cross-origin requests to this API.
+ *   Normalized via URL().origin so trailing slashes never cause mismatches.
+ *   Example: https://control.example.com,https://staging.control.example.com
  *
- * helmet()
- *   Sets 11 security-related response headers in one call:
- *   Content-Security-Policy, X-Frame-Options, X-Content-Type-Options,
- *   Referrer-Policy, Strict-Transport-Security, etc.
- *   No config needed for an API-only server.
+ * These MUST be separate values. FOUNDER_API_URL is the backend URL.
+ * FOUNDER_ALLOWED_ORIGINS is the frontend origin. They will differ in any
+ * split-origin deployment. Conflating them causes either broken CORS or
+ * broken magic-link callbacks.
  *
- * cors()
- *   Restricts cross-origin requests to the known FOUNDER_APP_URL.
- *   In development (no FOUNDER_APP_URL set), allows localhost:3000 and
- *   localhost:8787 only. The wildcard is never used.
- *
- * express.json({ limit: '256kb' })
- *   Caps the request body so a large payload can't OOM the process.
- *   256kb is generous for any API payload this server will ever receive.
- *
- * rateLimitMagicLink
- *   Rate-limits POST /auth/magic-link to 5 requests per 15 minutes per IP.
- *   Without this, anyone who knows your email can spam Supabase OTP sends.
- *   Exported separately so server.ts can mount it only on the magic-link route.
- *
- * requestAudit
- *   Structured JSON access log for every request.
- *   Logs: method, path, status, duration, founder email if authenticated.
- *   Does not log request bodies (they may contain tokens).
+ * STARTUP VALIDATION
+ * ------------------
+ * In production (NODE_ENV=production), missing or malformed required env vars
+ * will throw synchronously during module load and crash the process.
+ * This is intentional: a misconfigured server should not silently start.
  */
 
 import helmet from 'helmet';
@@ -37,19 +33,105 @@ import rateLimit from 'express-rate-limit';
 import type { Request, Response, NextFunction } from 'express';
 import type { FounderRequest } from './requireFounder.js';
 
+const IS_PRODUCTION = process.env['NODE_ENV'] === 'production';
+
 // ---------------------------------------------------------------------------
-// CORS origins
+// Startup validation
 // ---------------------------------------------------------------------------
-const ALLOWED_ORIGINS: string[] = (() => {
-  const configured = process.env['FOUNDER_APP_URL'];
-  if (configured) return [configured];
-  // Development fallback — never allow wildcard
-  return ['http://localhost:3000', 'http://localhost:8787'];
-})();
+
+/**
+ * Parse a comma-separated origins string into normalized origin strings.
+ * URL().origin strips paths, normalizes scheme+host+port, removes trailing slash.
+ * Throws if any entry is not a valid absolute URL.
+ */
+function parseOrigins(raw: string, varName: string): string[] {
+  return raw.split(',').map((entry) => {
+    const trimmed = entry.trim();
+    try {
+      return new URL(trimmed).origin;
+    } catch {
+      throw new Error(
+        `${varName} contains an invalid URL: "${trimmed}". ` +
+        'Each entry must be an absolute URL (e.g. https://control.example.com).',
+      );
+    }
+  });
+}
+
+/**
+ * Parse a single URL string, returning its origin.
+ * Throws if the value is not a valid absolute URL.
+ */
+function parseOrigin(raw: string, varName: string): string {
+  try {
+    return new URL(raw).origin;
+  } catch {
+    throw new Error(
+      `${varName} is not a valid absolute URL: "${raw}". ` +
+      'Example: https://api.control.example.com',
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// FOUNDER_API_URL — backend callback base URL
+// ---------------------------------------------------------------------------
+
+const DEFAULT_API_URL = 'http://localhost:8787';
+
+const rawApiUrl = process.env['FOUNDER_API_URL'];
+
+if (!rawApiUrl) {
+  if (IS_PRODUCTION) {
+    throw new Error(
+      'FOUNDER_API_URL is required in production. ' +
+      'Set it to the public base URL of this backend server ' +
+      '(e.g. https://api.control.example.com).',
+    );
+  }
+}
+
+/**
+ * The public base URL of this backend server.
+ * Used to construct magic-link emailRedirectTo.
+ * Exported so auth.ts can import it instead of reading env directly.
+ */
+export const FOUNDER_API_URL: string = rawApiUrl
+  ? parseOrigin(rawApiUrl, 'FOUNDER_API_URL')
+  : DEFAULT_API_URL;
+
+// ---------------------------------------------------------------------------
+// FOUNDER_ALLOWED_ORIGINS — browser frontend origins
+// ---------------------------------------------------------------------------
+
+const DEFAULT_ALLOWED_ORIGINS = 'http://localhost:3000,http://localhost:8787';
+
+const rawAllowedOrigins = process.env['FOUNDER_ALLOWED_ORIGINS'];
+
+if (!rawAllowedOrigins) {
+  if (IS_PRODUCTION) {
+    throw new Error(
+      'FOUNDER_ALLOWED_ORIGINS is required in production. ' +
+      'Set it to a comma-separated list of allowed browser frontend origins ' +
+      '(e.g. https://control.example.com).',
+    );
+  }
+}
+
+const ALLOWED_ORIGINS: string[] = parseOrigins(
+  rawAllowedOrigins ?? DEFAULT_ALLOWED_ORIGINS,
+  'FOUNDER_ALLOWED_ORIGINS',
+);
+
+// ---------------------------------------------------------------------------
+// CORS
+// ---------------------------------------------------------------------------
 
 export const corsMiddleware = cors({
   origin: (origin, callback) => {
-    // Allow server-to-server calls (no Origin header) and known origins
+    // Allow server-to-server requests (no Origin header) and known origins.
+    // origin is already normalized by the browser; ALLOWED_ORIGINS are
+    // normalized by parseOrigins above, so comparison is exact-string safe.
     if (!origin || ALLOWED_ORIGINS.includes(origin)) {
       callback(null, true);
     } else {
@@ -67,7 +149,7 @@ export const corsMiddleware = cors({
 export const helmetMiddleware = helmet();
 
 // ---------------------------------------------------------------------------
-// Body size cap — applied in server.ts via express.json({ limit })
+// Body size cap
 // ---------------------------------------------------------------------------
 export const BODY_LIMIT = '256kb';
 
@@ -79,10 +161,9 @@ export const BODY_LIMIT = '256kb';
 export const rateLimitMagicLink = rateLimit({
   windowMs: 15 * 60 * 1_000,
   max: 5,
-  standardHeaders: true,   // Return rate limit info in RateLimit-* headers
+  standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many magic-link requests, please try again later.' },
-  // Use X-Forwarded-For if behind a proxy/load balancer
   keyGenerator: (req) => req.ip ?? req.socket.remoteAddress ?? 'unknown',
 });
 
@@ -125,8 +206,7 @@ export function requestAudit(
 }
 
 // ---------------------------------------------------------------------------
-// Centralized error handler
-// Must be registered last in server.ts (after all routes).
+// Centralized error handler — must be last in server.ts
 // ---------------------------------------------------------------------------
 export function errorHandler(
   err: unknown,
@@ -137,7 +217,6 @@ export function errorHandler(
 ): void {
   const message = err instanceof Error ? err.message : 'Internal server error';
 
-  // CORS errors surface here
   if (message.startsWith('CORS:')) {
     res.status(403).json({ error: message });
     return;
