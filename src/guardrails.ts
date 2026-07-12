@@ -34,14 +34,16 @@ export function publicGuardrailSnapshot() {
   });
 }
 
+const HTML_ENTITIES: Readonly<Record<string, string>> = Object.freeze({
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  "'": "&#39;",
+  '"': "&quot;",
+});
+
 function escapeHtml(value: string) {
-  return value.replace(/[&<>'"]/g, character => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    "'": "&#39;",
-    '"': "&quot;",
-  })[character] ?? character);
+  return value.replace(/[&<>'"]/g, character => HTML_ENTITIES[character] ?? character);
 }
 
 export function renderGuardrailStatusPage() {
