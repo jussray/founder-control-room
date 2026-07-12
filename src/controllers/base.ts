@@ -64,14 +64,26 @@ export abstract class BaseController {
   }
 
   private async acquireLease(key: string): Promise<boolean> {
-    const expiresAt = new Date(Date.now() + 60_000).toISOString(); // 60s TTL
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 60_000).toISOString(); // 60s TTL
+
+    // Reap a stale lease first (safety net for crashed workers that never
+    // reached releaseLease) so a dead worker doesn't block this resource
+    // forever.
+    await supabase
+      .from('controller_leases')
+      .delete()
+      .eq('lease_key', key)
+      .lt('expires_at', now.toISOString());
+
+    // Plain insert, not upsert: with `ignoreDuplicates: true` Postgrest
+    // returns no error on a conflicting row, so `!error` was always true —
+    // the "lease" never actually excluded anyone. A unique-constraint
+    // violation here is the only reliable signal the lease is held.
     const { error } = await supabase
       .from('controller_leases')
-      .upsert(
-        { lease_key: key, claimed_at: new Date().toISOString(), expires_at: expiresAt },
-        { onConflict: 'lease_key', ignoreDuplicates: true },
-      );
-    // If upsert was ignored, the row already exists → lease held
+      .insert({ lease_key: key, claimed_at: now.toISOString(), expires_at: expiresAt });
+
     return !error;
   }
 

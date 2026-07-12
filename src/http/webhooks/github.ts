@@ -94,7 +94,14 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
     return;
   }
 
-  const payload = req.body as Record<string, unknown>;
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse((req.body as Buffer).toString('utf8')) as Record<string, unknown>;
+  } catch {
+    res.status(400).json({ error: 'Invalid JSON payload' });
+    return;
+  }
+
   const repo = payload['repository'] as Record<string, unknown> | undefined;
   const repoFullName = repo?.['full_name'] as string | undefined;
 
@@ -103,7 +110,14 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
     return;
   }
 
-  const projectId = await resolveProject(repoFullName);
+  let projectId: string | null;
+  try {
+    projectId = await resolveProject(repoFullName);
+  } catch (err) {
+    console.error('resolveProject failed', err);
+    res.status(500).json({ error: 'Failed to resolve project' });
+    return;
+  }
   if (!projectId) {
     // Not a registered project – silently accept to avoid GitHub retries
     res.status(200).json({ accepted: false, reason: 'unregistered repository' });
