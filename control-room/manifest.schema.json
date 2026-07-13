@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://control-room.invalid/schemas/manifest-v1.json",
+  "title": "Founder Control Room Project Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "repository",
+    "portfolioHub",
+    "role",
+    "authority",
+    "controlRoom",
+    "evidence",
+    "risk",
+    "nextGate"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "repository": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+    "portfolioHub": { "const": "jussray/founder-control-room" },
+    "role": {
+      "enum": [
+        "portfolio-control-plane",
+        "product-control-room",
+        "runtime-control-room",
+        "product-workbench",
+        "commerce-surface",
+        "demo-non-authoritative"
+      ]
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceOfTruth", "portfolioMode", "productionMutation"],
+      "properties": {
+        "sourceOfTruth": { "type": "string", "minLength": 1 },
+        "portfolioMode": { "enum": ["authoritative-index", "sanitized-read-only-observer"] },
+        "productionMutation": { "enum": ["separate-founder-gate", "not-allowed"] }
+      }
+    },
+    "controlRoom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["localSurface", "surfaces", "privateContentAllowed"],
+      "properties": {
+        "localSurface": { "type": "boolean" },
+        "surfaces": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "privateContentAllowed": { "const": false }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "commit", "observedAt", "proofRefs"],
+      "properties": {
+        "status": { "enum": ["planned", "integrated", "verified", "released", "blocked", "at-risk", "demo"] },
+        "commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "observedAt": { "type": "string", "format": "date" },
+        "proofRefs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      }
+    },
+    "risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "blockers"],
+      "properties": {
+        "level": { "enum": ["low", "medium", "high", "critical"] },
+        "blockers": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      }
+    },
+    "nextGate": { "type": "string", "minLength": 1 }
+  }
+}
