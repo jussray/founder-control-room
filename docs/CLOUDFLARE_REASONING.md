@@ -8,10 +8,10 @@ The command-shaped contract is:
 :cloudflare reason <project>
 ```
 
-It runs the operating sequence:
+It runs the implementation sequence:
 
 ```text
-Goal → Redteam I → Lindy → L99 → Redteam II → OODA → Bill Gates
+Goal → Reality → Redteam I → Lindy → L99 → Redteam II → OODA → Bill Gates → Elon Musk → Proof → Rollback → Next gate
 ```
 
 The engine is deterministic. It does not call a model, execute Wrangler, deploy a Worker, change DNS, rotate secrets, or roll back production.
@@ -45,7 +45,7 @@ Raw provider payloads, tokens, private keys, service-role values, user content, 
 
 ## Output contract
 
-Every report contains:
+Every version `1.1.0` report contains:
 
 1. **Reality** — observed desired, built, deployed, and healthy states.
 2. **Redteam I** — challenges to the premise, including whether the failing path should exist.
@@ -54,6 +54,9 @@ Every report contains:
 5. **Redteam II** — attacks on the selected recovery plan.
 6. **OODA** — observe, orient, decide, typed actions, and verification requirements.
 7. **Bill Gates** — bottleneck, highest-leverage system change, standardization, and what not to scale yet.
+8. **Elon Musk** — questioned requirement, deletion target, simplified system, accelerated feedback loop, and automation boundary.
+
+The Elon pass is not permission to delete guardrails. It may delete duplicated deployment paths, stale assumptions, and unnecessary workflow layers. It may not delete founder approval, privacy boundaries, auditability, rollback, or evidence requirements.
 
 Possible outcomes:
 
@@ -120,15 +123,19 @@ It writes one sanitized `cloudflare_reasoning_completed` event. If that audit wr
 
 When native Git deployment succeeds while an old token-upload workflow reports Cloudflare code `9109`, the reasoner should not immediately demand another token. It should first detect two deployment authorities and propose reducing the system to one authority through a separately approved repository change.
 
-That is the same reasoning pattern that turned a supposed credential problem into a deployment-authority correction:
+The complete reasoning path becomes:
 
 ```text
 Observe the contradiction
 → attack the assumption that the token path is required
 → inspect authority and provenance
-→ choose one deployment authority
-→ verify the exact deployed commit
+→ identify the bottleneck and leverage point
+→ question why two authorities exist
+→ delete the obsolete path before optimizing credentials
+→ simplify to one authority and one evidence contract
+→ verify the exact deployed commit and runtime health
 → retain rollback and approval boundaries
+→ automate only repeated read-only evidence refresh
 ```
 
 ## Verification
@@ -140,4 +147,4 @@ npm run lint
 npx playwright test e2e/cloudflare-reasoning.spec.ts
 ```
 
-The browser/API suite verifies the public-safe contract, founder protection, absence of credential leakage, and absence of an accidental deployment endpoint. Unit tests verify exact-commit reasoning, stale evidence, duplicate authority, authentication failures, runtime failure, rollback preparation, and approval boundaries.
+The browser/API suite verifies the public-safe contract, founder protection, absence of credential leakage, presence of the implementation stack, and absence of an accidental deployment endpoint. Unit tests verify exact-commit reasoning, stale evidence, duplicate authority, authentication failures, runtime failure, rollback preparation, first-principles deletion/simplification output, and approval boundaries.
