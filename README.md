@@ -41,7 +41,8 @@ phased no-GitHub migration plan.
 
 ## Strategy and research
 
-- [`docs/strategy/PORTFOLIO_SIGNALS_2026.md`](docs/strategy/PORTFOLIO_SIGNALS_2026.md) — evidence-ranked Beauty, AI Tooling, Mobile Dev, and agentic-commerce signals mapped to the active portfolio
+- [`docs/industry-signals/ai-tooling-under-the-radar-2026.md`](docs/industry-signals/ai-tooling-under-the-radar-2026.md) — canonical ten-trend AI-tooling research brief
+- [`docs/strategy/PORTFOLIO_SIGNALS_2026.md`](docs/strategy/PORTFOLIO_SIGNALS_2026.md) — repo-by-repo portfolio map spanning Beauty, AI Tooling, Mobile Dev, and agentic commerce
 
 The shared founder stack is:
 
