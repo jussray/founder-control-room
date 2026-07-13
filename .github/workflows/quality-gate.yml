@@ -8,61 +8,66 @@ on:
 
 jobs:
   typecheck:
-    name: "Typecheck"
+    name: Typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - run: npx tsc --noEmit
 
   lint:
-    name: "Lint"
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - run: npm run lint
 
   unit-tests:
-    name: "Unit Tests"
+    name: Unit Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - run: npm test -- --coverage --reporter=json --outputFile=test-results.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
           path: test-results.json
+          if-no-files-found: warn
 
   qodo-contracts:
-    name: "Qodo – Workflow Contract Tests"
+    name: Qodo – Workflow Contract Tests
     runs-on: ubuntu-latest
+    env:
+      QODO_API_KEY: ${{ secrets.QODO_API_KEY }}
     steps:
+      - name: Explain skipped gate
+        if: env.QODO_API_KEY == ''
+        run: echo "Qodo gate skipped because QODO_API_KEY is not configured."
       - uses: actions/checkout@v4
+        if: env.QODO_API_KEY != ''
       - uses: actions/setup-node@v4
+        if: env.QODO_API_KEY != ''
         with:
           node-version: '20'
-          cache: 'npm'
-      - run: npm ci
+      - if: env.QODO_API_KEY != ''
+        run: npm install --no-audit --no-fund
       - name: Run Qodo tests
+        if: env.QODO_API_KEY != ''
         run: npx qodo test --coverage --reporter=json --output=qodo-results.json
-        env:
-          QODO_API_KEY: ${{ secrets.QODO_API_KEY }}
       - name: Evaluate Qodo gate
+        if: env.QODO_API_KEY != ''
         run: |
           node -e "
             const r = require('./qodo-results.json');
@@ -76,28 +81,35 @@ jobs:
             console.log('Qodo gate passed.');
           "
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: env.QODO_API_KEY != '' && always()
         with:
           name: qodo-results
           path: qodo-results.json
+          if-no-files-found: warn
 
   sonarqube:
-    name: "SonarQube – Orchestrator Latency Safe"
+    name: SonarQube – Orchestrator Latency Safe
     runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
     steps:
+      - name: Explain skipped gate
+        if: env.SONAR_TOKEN == '' || env.SONAR_HOST_URL == ''
+        run: echo "SonarQube gate skipped because its secrets are not configured."
       - uses: actions/checkout@v4
+        if: env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != ''
         with:
           fetch-depth: 0
       - uses: actions/setup-node@v4
+        if: env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != ''
         with:
           node-version: '20'
-          cache: 'npm'
-      - run: npm ci
+      - if: env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != ''
+        run: npm install --no-audit --no-fund
       - name: SonarQube Scan
+        if: env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != ''
         uses: SonarSource/sonarqube-scan-action@master
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         with:
           args: >
             -Dsonar.projectKey=founder-control-room
