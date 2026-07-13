@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "1.0",
+  "repository": "jussray/founder-control-room",
+  "portfolioHub": "jussray/founder-control-room",
+  "role": "portfolio-control-plane",
+  "authority": {
+    "sourceOfTruth": "This repository plus its isolated Supabase project oojzfmmywbvficgybaxd",
+    "portfolioMode": "authoritative-index",
+    "productionMutation": "separate-founder-gate"
+  },
+  "controlRoom": {
+    "localSurface": true,
+    "surfaces": [
+      "src/http/server.ts",
+      "src/controllers",
+      "src/reconciliation",
+      "src/proof-gate"
+    ],
+    "privateContentAllowed": false
+  },
+  "evidence": {
+    "status": "at-risk",
+    "commit": "9d32ddc415d29e4e145e3b559fe8f62296237241",
+    "observedAt": "2026-07-12",
+    "proofRefs": [
+      "supabase/probes/server_owned_control_room_phase1.sql",
+      "control-room/portfolio-registry.json"
+    ]
+  },
+  "risk": {
+    "level": "high",
+    "blockers": [
+      "GitHub Actions jobs currently fail before runner steps are allocated",
+      "guardrail PR #7 and Cloudflare reasoning PR #9 remain unmerged",
+      "production auth callback and frontend shell are not end-to-end verified"
+    ]
+  },
+  "nextGate": "Pass exact-head CI and Playwright, merge the consolidated portfolio contract, then deploy and verify founder-only access."
+}
