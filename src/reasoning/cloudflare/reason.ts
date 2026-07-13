@@ -9,6 +9,7 @@ import type {
 } from './types.js';
 
 const DEFAULT_MAX_EVIDENCE_AGE_MINUTES = 20;
+const MAX_EVIDENCE_AGE_MINUTES = 24 * 60;
 const AUTH_FAILURE_CODES = new Set(['10000', '9109', '10502']);
 
 function normalizeSha(value: string | undefined): string | null {
@@ -36,6 +37,19 @@ function latestByKind(
   return newest(signals.filter((signal) => signal.kind === kind));
 }
 
+function latestPagesProof(signals: CloudflareSignal[]): CloudflareSignal | undefined {
+  return newest(signals.filter(
+    (signal) => signal.kind === 'pages_deployment' || signal.kind === 'release_marker',
+  ));
+}
+
+function boundedEvidenceAge(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value)) {
+    return DEFAULT_MAX_EVIDENCE_AGE_MINUTES;
+  }
+  return Math.max(1, Math.min(value, MAX_EVIDENCE_AGE_MINUTES));
+}
+
 function commitMatches(signal: CloudflareSignal | undefined, desiredCommit: string | null): boolean {
   if (!signal || !desiredCommit) return false;
   return normalizeSha(signal.commitSha) === desiredCommit;
@@ -49,9 +63,7 @@ function pending(signal: CloudflareSignal | undefined): boolean {
   return signal?.status === 'pending';
 }
 
-function action(
-  value: CloudflareReasoningAction,
-): CloudflareReasoningAction {
+function action(value: CloudflareReasoningAction): CloudflareReasoningAction {
   return value;
 }
 
@@ -79,10 +91,7 @@ export const CLOUDFLARE_REASONING_CONTRACT = Object.freeze({
 export function reasonAboutCloudflare(input: CloudflareReasoningInput): CloudflareReasoningReport {
   const nowMs = timestampMs(input.now ?? new Date().toISOString()) ?? Date.now();
   const generatedAt = new Date(nowMs).toISOString();
-  const maxAgeMinutes = Math.max(
-    1,
-    Math.min(input.maxEvidenceAgeMinutes ?? DEFAULT_MAX_EVIDENCE_AGE_MINUTES, 24 * 60),
-  );
+  const maxAgeMinutes = boundedEvidenceAge(input.maxEvidenceAgeMinutes);
   const maxAgeMs = maxAgeMinutes * 60_000;
 
   const freshSignals: CloudflareSignal[] = [];
@@ -99,10 +108,13 @@ export function reasonAboutCloudflare(input: CloudflareReasoningInput): Cloudfla
 
   const desiredCommit = normalizeSha(input.desired.commitSha);
   const worker = latestByKind(freshSignals, 'worker_deployment');
-  const pages = latestByKind(freshSignals, 'pages_deployment')
-    ?? latestByKind(freshSignals, 'release_marker');
+  const pages = latestPagesProof(freshSignals);
   const health = latestByKind(freshSignals, 'runtime_health');
-  const credential = latestByKind(freshSignals, 'credential');
+  const authFailureSignal = newest(freshSignals.filter(
+    (signal) => signal.kind === 'credential'
+      && signal.status === 'failure'
+      && AUTH_FAILURE_CODES.has(signal.detailCode ?? ''),
+  ));
 
   const authorities = new Set(
     freshSignals
@@ -113,11 +125,7 @@ export function reasonAboutCloudflare(input: CloudflareReasoningInput): Cloudfla
   authorities.delete('unknown');
 
   const freshFailures = freshSignals.filter((signal) => signal.status === 'failure');
-  const authFailure = freshSignals.some(
-    (signal) => signal.kind === 'credential'
-      && signal.status === 'failure'
-      && AUTH_FAILURE_CODES.has(signal.detailCode ?? ''),
-  );
+  const authFailure = Boolean(authFailureSignal);
   const duplicateAuthority = authorities.size > 1;
   const workerMismatch = Boolean(desiredCommit && worker?.commitSha && !commitMatches(worker, desiredCommit));
   const pagesMismatch = Boolean(desiredCommit && pages?.commitSha && !commitMatches(pages, desiredCommit));
@@ -174,7 +182,7 @@ export function reasonAboutCloudflare(input: CloudflareReasoningInput): Cloudfla
     reality.push(`Multiple deployment authorities are visible: ${[...authorities].sort().join(', ')}.`);
   }
   if (authFailure) {
-    reality.push(`Cloudflare authentication failure code ${credential?.detailCode ?? 'unknown'} is present.`);
+    reality.push(`Cloudflare authentication failure code ${authFailureSignal?.detailCode ?? 'unknown'} is present.`);
   }
 
   const redteamPremise = [
