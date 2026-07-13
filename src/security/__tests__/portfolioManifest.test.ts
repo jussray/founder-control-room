@@ -19,7 +19,8 @@ const registry = JSON.parse(
     repository: string;
     role: string;
     observedCommit: string;
-    manifestState: string;
+    manifestState: 'proposed' | 'merged';
+    manifestPr: number;
     status: string;
     riskLevel: string;
   }>;
@@ -39,6 +40,12 @@ const expectedRepositories = [
   'jussray/untold-stories-storefront',
 ];
 
+const expectedMerged = new Map([
+  ['jussray/Sekret-Bip', 'adcadba26c86297fbff8193d21a480f1305e405f'],
+  ['jussray/l99-', 'e7fff69bc54ae27a923a29f27eb93be1e94842f2'],
+  ['jussray/sekret-bip-demo', '153371cdde54932a2fb5a63e0c390065bdb82aba'],
+]);
+
 describe('portfolio Control Room contract', () => {
   it('registers exactly the active portfolio repositories', () => {
     expect(registry.schemaVersion).toBe('1.0');
@@ -55,12 +62,20 @@ describe('portfolio Control Room contract', () => {
     expect(registry.policy.productionMutationRequiresSeparateFounderGate).toBe(true);
   });
 
-  it('uses immutable commit evidence and non-empty risk posture', () => {
+  it('uses immutable commit evidence, PR references, and non-empty risk posture', () => {
     for (const project of registry.projects) {
       expect(project.observedCommit).toMatch(/^[a-f0-9]{40}$/);
-      expect(project.manifestState).toBe('proposed');
+      expect(project.manifestPr).toBeGreaterThan(0);
       expect(project.status.length).toBeGreaterThan(0);
       expect(['low', 'medium', 'high', 'critical']).toContain(project.riskLevel);
+
+      const mergedCommit = expectedMerged.get(project.repository);
+      if (mergedCommit) {
+        expect(project.manifestState).toBe('merged');
+        expect(project.observedCommit).toBe(mergedCommit);
+      } else {
+        expect(project.manifestState).toBe('proposed');
+      }
     }
   });
 
