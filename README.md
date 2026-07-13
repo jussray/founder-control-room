@@ -1,5 +1,9 @@
 # Founder Control Room
 
+> **Copyright © 2024–2026 Juss Ray. All rights reserved.**
+> This is proprietary software. No license to use, copy, modify, distribute,
+> sublicense, or create derivative works is granted. See [LICENSE](LICENSE).
+
 ---
 
 ## The real story
@@ -34,6 +38,10 @@ phased no-GitHub migration plan.
 - [`AGENTS.md`](AGENTS.md) — Codex, ChatGPT, and repository-agent instructions
 - [`docs/PROVIDERS.md`](docs/PROVIDERS.md) — OpenAI, Anthropic, Perplexity, GitHub, Supabase, and tool handoffs
 - [`docs/CLOUDFLARE_REASONING.md`](docs/CLOUDFLARE_REASONING.md) — deterministic Cloudflare OODA/L99 recovery contract
+
+## Strategy and research
+
+- [`docs/strategy/PORTFOLIO_SIGNALS_2026.md`](docs/strategy/PORTFOLIO_SIGNALS_2026.md) — evidence-ranked Beauty, AI Tooling, Mobile Dev, and agentic-commerce signals mapped to the active portfolio
 
 The shared founder stack is:
 
@@ -239,3 +247,7 @@ check immediately before integration.
 | Rollback | Separate founder approval |
 
 No approval carries forward to the next step.
+
+## License
+
+Copyright © 2024–2026 Juss Ray. All rights reserved. Proprietary software — see [LICENSE](LICENSE).
