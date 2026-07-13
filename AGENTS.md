@@ -189,27 +189,6 @@ Before triggering a deploy, verify the full checklist in that file. Key secrets 
 | `RECONCILE_SHARED_SECRET` | `deploy.yml / reconcile`, `POST /api/reconcile` | Authenticates inbound DriftReports. Minimum 32 random hex chars. Must be set in GitHub Secrets AND in Sekret-Bip and l99-StoryEngine for cross-service reconciliation. Generate with `openssl rand -hex 32`. |
 
 > Never commit, log, or expose `RECONCILE_SHARED_SECRET`. Never put it in a `NEXT_PUBLIC_*` var.
-=======
-1. Inspect the repository, branch, provider state, auth boundaries, migrations, tests, and relevant runtime evidence.
-2. Attack the premise before designing a solution.
-3. Map authority, provenance, project boundaries, event history, and rollback.
-4. Attack the selected plan before implementation.
-5. Make the smallest coherent change and verify it.
-6. Run the Bill Gates pass: identify the bottleneck, highest-leverage correction, reusable standard, and what must not be scaled yet.
-7. Report proof and the next founder approval gate.
-
-## Implementation rule
-
-The reasoning loop continues while code is being written. It is not a decorative preamble pasted above a diff after the interesting mistakes have already happened.
-
-For material implementation, maintain this sequence:
-
-```text
-Goal → Reality → Redteam I → Lindy → L99 → Redteam II → OODA → Bill Gates → Proof → Rollback → Next gate
-```
-
-Re-observe after meaningful edits, schema changes, workflow changes, and test results. Compilation, unit tests, CI, and runtime proof are separate evidence layers. Do not convert one into a claim about the others.
->>>>>>> e572bed (docs: apply reasoning loop during code implementation)
 
 ## Non-negotiable boundaries
 
