@@ -86,6 +86,36 @@ describe('reasonAboutCloudflare', () => {
     expect(report.approvalCarryForward).toBe(false);
   });
 
+  it('uses the freshest Pages proof across deployment checks and release markers', () => {
+    const report = reasonAboutCloudflare({
+      projectId: 'project-1',
+      desired: { commitSha: SHA, deploymentAuthority: 'native_git' },
+      signals: [
+        ...verifiedSignals().filter((item) => item.id !== 'pages'),
+        signal({
+          id: 'old-pages-check',
+          kind: 'pages_deployment',
+          status: 'pending',
+          commitSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+          observedAt: '2026-07-13T11:52:00.000Z',
+          authority: 'native_git',
+        }),
+        signal({
+          id: 'new-release-marker',
+          kind: 'release_marker',
+          status: 'success',
+          commitSha: SHA,
+          observedAt: '2026-07-13T11:58:00.000Z',
+          authority: 'native_git',
+        }),
+      ],
+      now: NOW,
+    });
+
+    expect(report.outcome).toBe('verified');
+    expect(report.reality).toContain(`Latest Pages evidence is success at ${SHA}.`);
+  });
+
   it('blocks a desired-versus-deployed commit mismatch and prepares rollback without executing it', () => {
     const signals = verifiedSignals().map((item) => item.id === 'worker'
       ? { ...item, commitSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' }
@@ -161,6 +191,23 @@ describe('reasonAboutCloudflare', () => {
       'pages_deployment_or_release_marker',
       'runtime_health',
     ]);
+  });
+
+  it('falls back to the safe default evidence age when an invalid numeric value is supplied', () => {
+    const report = reasonAboutCloudflare({
+      projectId: 'project-1',
+      desired: { commitSha: SHA },
+      signals: verifiedSignals().map((item) => ({
+        ...item,
+        observedAt: '2026-07-13T11:00:00.000Z',
+      })),
+      now: NOW,
+      maxEvidenceAgeMinutes: Number.NaN,
+    });
+
+    expect(report.outcome).toBe('degraded');
+    expect(report.freshSignalIds).toEqual([]);
+    expect(report.staleSignalIds).toHaveLength(4);
   });
 
   it('orients toward runtime bindings when deployment succeeded but health failed', () => {
