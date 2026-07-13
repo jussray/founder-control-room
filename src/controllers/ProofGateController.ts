@@ -3,27 +3,22 @@
  *
  * Dedicated controller for explicit proof-gate runs on a mission.
  * Invoked by the approval engine when a founder-triggered gate check
- * is needed (e.g. before the 'deploying' transition).
+ * is needed before a gated transition.
  *
- * Unlike MissionController (which runs the gate implicitly as part of
- * reconciliation), this controller:
- *   - Accepts gateId / evidence / approvedBy via req.meta
- *   - Persists the gate result to proof_gate_results — MANDATORY.
- *     If persistence fails, the gate returns 'blocked'. It never
- *     silently passes when there is no audit record.
- *   - Returns 'blocked' if the gate fails so the caller can halt.
+ * Unlike MissionController, this controller:
+ *   - accepts gateId / evidence / approvedBy via req.meta;
+ *   - persists every result before reporting success;
+ *   - blocks or retries when persistence fails;
+ *   - returns the same canonical failure message used by ProofGateError.
  *
- * Live proof_gate_results columns (as of 2026-07-11):
- *   id, mission_id, project_id, gate_id, status, evidence, approved_by, ran_at, created_at
- *
- * Note: all_failures is NOT a live column. Gate failure detail lives inside
- * the evidence JSONB payload. Do not write it as a top-level column until
- * the reconcile migration (PR #6) lands and is deployed.
+ * Expected proof_gate_results columns after the reconciliation migration:
+ *   id, mission_id, project_id, gate_id, status, all_failures,
+ *   evidence, approved_by, ran_at, created_at
  */
 
-import { supabase } from '../lib/supabaseClient.js';
 import { BaseController } from './base.js';
-import { runProofGate, assertProofPassed, ProofGateError } from '../proof-gate/gate.js';
+import { formatProofGateFailure, runProofGate } from '../proof-gate/gate.js';
+import { persistProofResult } from '../proof-gate/persist.js';
 import type { ReconcileRequest, ReconcileResult } from '../reconciliation/types.js';
 import type { ProofEvidence } from '../proof-gate/types.js';
 
@@ -43,6 +38,10 @@ export class ProofGateController extends BaseController {
       return this.noOp('Missing missionId, gateId, or evidence in request meta', 'retry');
     }
 
+    if (!projectId) {
+      return this.noOp('Missing projectId — required for proof_gate_results insert', 'retry');
+    }
+
     this.log('info', 'Running proof gate', {
       missionId,
       gateId: meta.gateId,
@@ -51,30 +50,23 @@ export class ProofGateController extends BaseController {
 
     const gateResult = runProofGate(meta.gateId, meta.evidence, meta.approvedBy);
 
-    // Persistence is MANDATORY. A failed insert blocks the gate.
-    // We must never return a passing response without a durable record.
-    const { error: insertError } = await supabase
-      .from('proof_gate_results')
-      .insert({
-        mission_id: missionId,
-        project_id: projectId,
-        gate_id: gateResult.gateId,
-        status: gateResult.status,
-        evidence: gateResult.evidence,
-        approved_by: gateResult.approvedBy ?? null,
-      });
-
-    if (insertError) {
+    let resultId: string;
+    try {
+      resultId = await persistProofResult(missionId, projectId, gateResult);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       this.log('error', 'Failed to persist proof gate result — blocking', {
-        error: insertError.message,
+        error: message,
         missionId,
         gateId: meta.gateId,
       });
-      return this.noOp(
-        `Proof gate result could not be persisted: ${insertError.message}`,
-        'blocked',
-      );
+      return this.noOp(`Proof gate persistence failed: ${message}`, 'retry');
     }
+
+    this.log('info', 'Proof gate result persisted', {
+      resultId,
+      status: gateResult.status,
+    });
 
     if (gateResult.status === 'pass') {
       this.log('info', 'Proof gate passed', { missionId, gateId: meta.gateId });
@@ -91,6 +83,7 @@ export class ProofGateController extends BaseController {
             payload: {
               gateId: meta.gateId,
               timestamp: gateResult.timestamp,
+              resultId,
               attestationType: 'manual',
             },
           },
@@ -100,18 +93,12 @@ export class ProofGateController extends BaseController {
       };
     }
 
+    const failureMessage = formatProofGateFailure(gateResult);
     this.log('warn', 'Proof gate failed', {
       missionId,
       gateId: meta.gateId,
       failures: gateResult.allFailures,
     });
-
-    let assertError: ProofGateError | null = null;
-    try {
-      assertProofPassed(gateResult);
-    } catch (err) {
-      if (err instanceof ProofGateError) assertError = err;
-    }
 
     return {
       status: 'blocked',
@@ -126,13 +113,28 @@ export class ProofGateController extends BaseController {
           payload: {
             gateId: meta.gateId,
             failures: gateResult.allFailures,
-            timestamp: gateResult.timestamp,
+            resultId,
+            message: failureMessage,
           },
         },
       ],
       evidenceIds: [],
       requiresApproval: false,
-      message: assertError?.message ?? `Proof gate failed: ${gateResult.allFailures.join('; ')}`,
+      message: failureMessage,
+    };
+  }
+
+  private noOp(
+    message: string,
+    status: ReconcileResult['status'] = 'converged',
+  ): ReconcileResult {
+    return {
+      status,
+      observedChanges: [],
+      proposedActions: [],
+      evidenceIds: [],
+      requiresApproval: false,
+      message,
     };
   }
 }
