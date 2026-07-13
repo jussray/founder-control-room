@@ -10,17 +10,17 @@ jobs:
   typecheck:
     name: Type check
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          # cache: 'npm' removed — requires package-lock.json to hash.
+          # Re-enable once lockfile is committed.
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Type check
         run: npm run typecheck
@@ -28,17 +28,15 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Lint
         run: npm run lint
@@ -46,17 +44,15 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Run tests
         run: npm test
@@ -66,7 +62,6 @@ jobs:
   migration-lint:
     name: Migration lint
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -76,6 +71,4 @@ jobs:
 
       - name: Lint migrations
         run: supabase db lint --local
-        # Runs offline against the migration files — no live Supabase project needed.
-        # For a full migration smoke-test, add SUPABASE_ACCESS_TOKEN + project-ref secrets.
         continue-on-error: true

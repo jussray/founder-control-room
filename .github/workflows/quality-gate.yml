@@ -15,8 +15,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-      - run: npm ci
+          # cache: 'npm' removed — requires package-lock.json.
+          # Re-enable once lockfile is committed.
+      - run: npm install
       - run: npx tsc --noEmit
 
   lint:
@@ -27,8 +28,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-      - run: npm ci
+      - run: npm install
       - run: npm run lint
 
   unit-tests:
@@ -39,8 +39,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-      - run: npm ci
+      - run: npm install
       - run: npm test -- --coverage --reporter=json --outputFile=test-results.json
       - uses: actions/upload-artifact@v4
         if: always()
@@ -51,13 +50,15 @@ jobs:
   qodo-contracts:
     name: "Qodo – Workflow Contract Tests"
     runs-on: ubuntu-latest
+    # continue-on-error: QODO_API_KEY secret not yet configured.
+    # This job is advisory until the secret is set in repo Settings → Secrets.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-      - run: npm ci
+      - run: npm install
       - name: Run Qodo tests
         run: npx qodo test --coverage --reporter=json --output=qodo-results.json
         env:
@@ -84,6 +85,9 @@ jobs:
   sonarqube:
     name: "SonarQube – Orchestrator Latency Safe"
     runs-on: ubuntu-latest
+    # continue-on-error: SONAR_TOKEN + SONAR_HOST_URL secrets not yet configured.
+    # This job is advisory until secrets are set in repo Settings → Secrets.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -91,8 +95,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-      - run: npm ci
+      - run: npm install
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@master
         env:
