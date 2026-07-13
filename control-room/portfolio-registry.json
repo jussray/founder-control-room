@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1.0",
+  "observedAt": "2026-07-12",
+  "policy": {
+    "portfolioHub": "jussray/founder-control-room",
+    "manifestPath": "control-room.manifest.json",
+    "rawPrivateContentAllowed": false,
+    "statusWithoutEvidence": "blocked",
+    "productionMutationRequiresSeparateFounderGate": true
+  },
+  "projects": [
+    {
+      "repository": "jussray/founder-control-room",
+      "role": "portfolio-control-plane",
+      "observedCommit": "9d32ddc415d29e4e145e3b559fe8f62296237241",
+      "manifestState": "proposed",
+      "status": "at-risk",
+      "riskLevel": "high"
+    },
+    {
+      "repository": "jussray/Sekret-Bip",
+      "role": "product-control-room",
+      "observedCommit": "7f1ab6e8561ef9b88f039db33e207036ffecd810",
+      "manifestState": "proposed",
+      "status": "integrated",
+      "riskLevel": "high"
+    },
+    {
+      "repository": "jussray/l99-",
+      "role": "runtime-control-room",
+      "observedCommit": "7e035abb7e944dbedcb794991d564ec7be9198a9",
+      "manifestState": "proposed",
+      "status": "at-risk",
+      "riskLevel": "high"
+    },
+    {
+      "repository": "jussray/chief-ai-machine",
+      "role": "product-workbench",
+      "observedCommit": "d8c6b163001e95b80640f870aa9fb590e3c96b40",
+      "manifestState": "proposed",
+      "status": "blocked",
+      "riskLevel": "medium"
+    },
+    {
+      "repository": "jussray/jussbeautifulhair-site",
+      "role": "commerce-surface",
+      "observedCommit": "ebfa7f23270de246b381953322cb70c468bfb439",
+      "manifestState": "proposed",
+      "status": "at-risk",
+      "riskLevel": "high"
+    },
+    {
+      "repository": "jussray/untold-stories-storefront",
+      "role": "commerce-surface",
+      "observedCommit": "43f504e33cc6aeb61fbd52ebee1e5664ab7b154e",
+      "manifestState": "proposed",
+      "status": "blocked",
+      "riskLevel": "critical"
+    },
+    {
+      "repository": "jussray/sekret-bip-demo",
+      "role": "demo-non-authoritative",
+      "observedCommit": "843d307d21567571792985a97ca5d0022940a2f7",
+      "manifestState": "proposed",
+      "status": "demo",
+      "riskLevel": "low"
+    }
+  ]
+}
