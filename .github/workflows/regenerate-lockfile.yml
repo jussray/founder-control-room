@@ -1,9 +1,11 @@
 name: Regenerate lockfile
 
 on:
-  push:
+  pull_request:
     branches:
-      - fix/proof-gate-followups
+      - main
+    types:
+      - reopened
 
 permissions:
   contents: write
