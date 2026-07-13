@@ -33,6 +33,7 @@ phased no-GitHub migration plan.
 - [`CLAUDE.md`](CLAUDE.md) — Claude / Claude Code repository instructions
 - [`AGENTS.md`](AGENTS.md) — Codex, ChatGPT, and repository-agent instructions
 - [`docs/PROVIDERS.md`](docs/PROVIDERS.md) — OpenAI, Anthropic, Perplexity, GitHub, Supabase, and tool handoffs
+- [`docs/CLOUDFLARE_REASONING.md`](docs/CLOUDFLARE_REASONING.md) — deterministic Cloudflare OODA/L99 recovery contract
 
 The shared founder stack is:
 
@@ -41,6 +42,23 @@ The shared founder stack is:
 ```
 
 The first redteam attacks the premise. The second attacks the selected plan. Provider instructions may become stricter for this repository, but they may not weaken founder approval, privacy, security, provenance, rollback, or truthfulness.
+
+## Cloudflare reasoning
+
+The Control Room now exposes a read-only provider reasoning contract:
+
+```text
+:cloudflare reason <project>
+```
+
+```http
+GET  /cloudflare/contract
+POST /cloudflare/:slug/reason   # founder session required
+```
+
+It evaluates desired commit, Worker deployment, Pages deployment or release marker, runtime health, credential errors, evidence freshness, and deployment authority. It returns Reality, Redteam I, Lindy, L99, Redteam II, OODA, and Bill Gates views.
+
+It cannot deploy, change DNS, rotate secrets, merge, or roll back. Those remain separate founder gates. A reasoning engine with production write access would merely be a command-line séance with billing consequences.
 
 ## Current phase
 
@@ -62,6 +80,8 @@ src/
   terminal/
     registry.ts              # project-specific executable + argument allowlist
     runner.ts                # shell-free, exact-head process runner
+  reasoning/
+    cloudflare/              # deterministic provider evidence + OODA reasoning
   types/
     changeProposal.ts        # Change Proposal (PR-equivalent) types
     mission.ts               # Mission / verification-run types
@@ -69,7 +89,7 @@ src/
     supabaseClient.ts         # Control Room's own Supabase project (NOT Bip's), service-role key
     supabaseAuthClient.ts     # same project, publishable/anon key — auth-only calls
   http/
-    server.ts                 # Express app
+    server.ts                 # Express app: mounts auth, projects, approvals, and Cloudflare reasoning
     middleware/
       requireFounder.ts       # verifies session JWT + founder_users allowlist
     routes/
@@ -77,6 +97,7 @@ src/
       projects.ts             # GET /projects/:slug (founder-only)
       approvals.ts            # reservation-first, exact-head approved actions
       terminal.ts             # guarded mission verification terminal
+      cloudflareReasoning.ts  # provider reasoning contract + founder-protected reports
   index.ts                    # bootstraps the HTTP server
 supabase/
   migrations/
@@ -91,6 +112,8 @@ artifacts/
   billgates/CONTROL_ROOM_TERMINAL_FIX.md
 docs/
   LOCAL_WORKSPACE.md
+  ARCHITECTURE.md              # full design doc + L99 authority model
+  CLOUDFLARE_REASONING.md      # Cloudflare evidence, recovery, and approval contract
 ```
 
 The timestamped reconciliation migration upgrades the live legacy
