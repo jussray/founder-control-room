@@ -14,22 +14,25 @@
       "role": "portfolio-control-plane",
       "observedCommit": "9d32ddc415d29e4e145e3b559fe8f62296237241",
       "manifestState": "proposed",
+      "manifestPr": 10,
       "status": "at-risk",
       "riskLevel": "high"
     },
     {
       "repository": "jussray/Sekret-Bip",
       "role": "product-control-room",
-      "observedCommit": "7f1ab6e8561ef9b88f039db33e207036ffecd810",
-      "manifestState": "proposed",
+      "observedCommit": "adcadba26c86297fbff8193d21a480f1305e405f",
+      "manifestState": "merged",
+      "manifestPr": 371,
       "status": "integrated",
       "riskLevel": "high"
     },
     {
       "repository": "jussray/l99-",
       "role": "runtime-control-room",
-      "observedCommit": "7e035abb7e944dbedcb794991d564ec7be9198a9",
-      "manifestState": "proposed",
+      "observedCommit": "e7fff69bc54ae27a923a29f27eb93be1e94842f2",
+      "manifestState": "merged",
+      "manifestPr": 15,
       "status": "at-risk",
       "riskLevel": "high"
     },
@@ -38,6 +41,7 @@
       "role": "product-workbench",
       "observedCommit": "d8c6b163001e95b80640f870aa9fb590e3c96b40",
       "manifestState": "proposed",
+      "manifestPr": 5,
       "status": "blocked",
       "riskLevel": "medium"
     },
@@ -46,6 +50,7 @@
       "role": "commerce-surface",
       "observedCommit": "ebfa7f23270de246b381953322cb70c468bfb439",
       "manifestState": "proposed",
+      "manifestPr": 4,
       "status": "at-risk",
       "riskLevel": "high"
     },
@@ -54,14 +59,16 @@
       "role": "commerce-surface",
       "observedCommit": "43f504e33cc6aeb61fbd52ebee1e5664ab7b154e",
       "manifestState": "proposed",
+      "manifestPr": 6,
       "status": "blocked",
       "riskLevel": "critical"
     },
     {
       "repository": "jussray/sekret-bip-demo",
       "role": "demo-non-authoritative",
-      "observedCommit": "843d307d21567571792985a97ca5d0022940a2f7",
-      "manifestState": "proposed",
+      "observedCommit": "153371cdde54932a2fb5a63e0c390065bdb82aba",
+      "manifestState": "merged",
+      "manifestPr": 3,
       "status": "demo",
       "riskLevel": "low"
     }
