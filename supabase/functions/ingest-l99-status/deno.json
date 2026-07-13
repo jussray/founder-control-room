@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "lib": ["deno.window", "dom", "dom.iterable"]
+  },
+  "tasks": {
+    "test": "deno test contract_test.ts",
+    "check": "deno check index.ts"
+  }
+}
