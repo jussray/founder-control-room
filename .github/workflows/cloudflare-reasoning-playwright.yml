@@ -1,0 +1,73 @@
+name: Cloudflare Reasoning Playwright
+
+on:
+  pull_request:
+    paths:
+      - 'src/reasoning/cloudflare/**'
+      - 'src/http/routes/cloudflareReasoning.ts'
+      - 'src/http/server.ts'
+      - 'src/test-server.ts'
+      - 'e2e/cloudflare-reasoning.spec.ts'
+      - 'playwright.config.ts'
+      - 'docs/CLOUDFLARE_REASONING.md'
+      - '.github/workflows/cloudflare-reasoning-playwright.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-cloudflare-reasoning:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out current PR head
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+        env:
+          NODE_ENV: test
+          SUPABASE_URL: https://example.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
+          SUPABASE_PUBLISHABLE_KEY: test-publishable-key
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Install Playwright without changing the lockfile
+        run: npm install --no-save --package-lock=false @playwright/test@1.61.1
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Cloudflare API Playwright checks
+        run: npx playwright test e2e/cloudflare-reasoning.spec.ts
+        env:
+          NODE_ENV: test
+          SUPABASE_URL: https://example.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
+          SUPABASE_PUBLISHABLE_KEY: test-publishable-key
+          GITHUB_TOKEN: test-github-token
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-reasoning-playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
