@@ -38,10 +38,11 @@ select
     select 1
     from pg_tables t
     where t.schemaname = 'public'
-      and not has_table_privilege(
-        'service_role',
-        format('%I.%I', t.schemaname, t.tablename),
-        'SELECT,INSERT,UPDATE,DELETE'
+      and (
+        not has_table_privilege('service_role', format('%I.%I', t.schemaname, t.tablename), 'SELECT')
+        or not has_table_privilege('service_role', format('%I.%I', t.schemaname, t.tablename), 'INSERT')
+        or not has_table_privilege('service_role', format('%I.%I', t.schemaname, t.tablename), 'UPDATE')
+        or not has_table_privilege('service_role', format('%I.%I', t.schemaname, t.tablename), 'DELETE')
       )
   ),
   'Trusted backend service role retains operational table access';
@@ -72,7 +73,7 @@ insert into control_room_boundary_results
 select
   'founder_helper_rejects_anonymous_claims',
   position('is_anonymous' in pg_get_functiondef(p.oid)) > 0
-    and position("auth.role()" in pg_get_functiondef(p.oid)) > 0,
+    and position('auth.role()' in pg_get_functiondef(p.oid)) > 0,
   'Founder helper contains explicit anonymous-session and authenticated-role predicates'
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
