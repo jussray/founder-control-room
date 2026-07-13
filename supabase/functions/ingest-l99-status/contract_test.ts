@@ -14,7 +14,7 @@ const NOW = Date.parse('2026-07-13T05:00:00.000Z');
 function validEnvelope() {
   return {
     schema_version: '1.0',
-    repository: 'jussray/l99-',
+    repository: 'jussray/l99-StoryEngine',
     commit: COMMIT,
     observed_at: '2026-07-13T04:59:00.000Z',
     status: 'at-risk',
@@ -34,10 +34,20 @@ function validEnvelope() {
 
 Deno.test('accepts a bounded sanitized exact-commit envelope', () => {
   const envelope = validateStatusEnvelope(validEnvelope(), COMMIT, NOW);
-  assertEquals(envelope.repository, 'jussray/l99-');
+  assertEquals(envelope.repository, 'jussray/l99-StoryEngine');
   assertEquals(envelope.gate_status, 'pass');
   assertEquals(eventSeverity(envelope), 'warning');
   assertEquals(evidenceStatus(envelope), 'warn');
+});
+
+Deno.test('rejects the pre-rename repository identity', () => {
+  const payload = validEnvelope();
+  payload.repository = 'jussray/l99-';
+  assertThrows(
+    () => validateStatusEnvelope(payload, COMMIT, NOW),
+    Error,
+    'repository_invalid',
+  );
 });
 
 Deno.test('rejects commit claims that do not match GitHub OIDC', () => {
