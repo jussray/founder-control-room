@@ -47,6 +47,7 @@ Goal
 → Redteam II
 → OODA
 → Bill Gates
+→ Elon Musk
 → Proof
 → Rollback
 → Next gate
@@ -59,7 +60,17 @@ The **Bill Gates implementation pass** is appended after OODA. It must identify:
 - what should be standardized for reuse;
 - what must not be scaled or automated yet.
 
-This extension does not replace or weaken the exact founder stack. It forces the selected code path to survive one final operating-system and scale review before completion is claimed.
+The **Elon Musk implementation pass** follows Bill Gates and must apply first-principles pressure to the selected implementation:
+
+1. Question every requirement and identify who or what evidence created it.
+2. Delete unnecessary components, paths, approvals, or duplicated authority before optimizing them.
+3. Simplify the remaining system and reduce interfaces, state transitions, and failure surfaces.
+4. Shorten the observe → implement → verify feedback loop without weakening proof.
+5. Automate only after the simplified manual path has succeeded repeatedly with rollback evidence.
+
+This pass may recommend deleting code or workflow complexity. It may never delete an approval boundary, safety control, audit trail, privacy boundary, rollback path, or evidence requirement merely to move faster.
+
+These extensions do not replace or weaken the exact founder stack. They force the selected code path to survive operating-system, scale, and first-principles reviews before completion is claimed.
 
 Implementation rules:
 
@@ -68,6 +79,7 @@ Implementation rules:
 - Map code paths to explicit guardrails, evidence sources, and approval boundaries.
 - Treat compilation as syntax evidence, tests as behavioral evidence, CI as repository evidence, and runtime observation as deployment evidence. None substitutes for all the others.
 - Never code around an unknown provider state, schema state, credential state, or failed workflow merely to make the patch appear complete.
+- Delete duplicate authority and dead workflow paths before adding another abstraction, credential, retry, or dashboard.
 - Report the exact behavior changed, tests actually run, failures or skips, security and provider impact, rollback path, unresolved risk, and next approval gate.
 
 ## Truth order
@@ -143,8 +155,9 @@ For material work, report:
 7. Risk II: chosen plan
 8. OODA action
 9. Bill Gates bottleneck and leverage pass
-10. Proof
-11. Rollback
-12. Next approval gate
+10. Elon Musk requirement, deletion, simplification, feedback, and automation pass
+11. Proof
+12. Rollback
+13. Next approval gate
 
 The Control Room exists to preserve founder authority, not automate it out of existence because a workflow diagram became excited.
