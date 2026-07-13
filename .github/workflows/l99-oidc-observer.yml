@@ -1,0 +1,33 @@
+name: L99 OIDC Observer
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/ingest-l99-status/**'
+      - 'supabase/migrations/20260713050000_l99_oidc_status_idempotency.sql'
+      - '.github/workflows/l99-oidc-observer.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/ingest-l99-status/**'
+      - 'supabase/migrations/20260713050000_l99_oidc_status_idempotency.sql'
+      - '.github/workflows/l99-oidc-observer.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Format check
+        run: deno fmt --check supabase/functions/ingest-l99-status
+      - name: Type check Edge Function
+        run: deno check supabase/functions/ingest-l99-status/index.ts
+      - name: Run contract tests
+        run: deno test supabase/functions/ingest-l99-status/contract_test.ts
