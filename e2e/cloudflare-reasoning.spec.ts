@@ -11,6 +11,7 @@ test('publishes a public-safe Cloudflare reasoning contract', async ({ request }
   const contract = JSON.parse(body);
   expect(contract).toMatchObject({
     id: 'cloudflare-ooda-reasoner',
+    version: '1.1.0',
     command: ':cloudflare reason <project>',
     mode: 'read_only_reasoning',
     sensitiveFieldsIncluded: false,
@@ -23,6 +24,19 @@ test('publishes a public-safe Cloudflare reasoning contract', async ({ request }
     'rollback',
     'secrets-change',
     'dns-change',
+  ]);
+  expect(contract.implementationStack).toEqual([
+    'reality',
+    'redteam-premise',
+    'lindy',
+    'l99',
+    'redteam-plan',
+    'ooda',
+    'bill-gates',
+    'elon-musk',
+    'proof',
+    'rollback',
+    'next-gate',
   ]);
 });
 
