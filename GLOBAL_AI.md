@@ -32,6 +32,44 @@ Repeated `redteam` tokens are intentional.
 
 Do not collapse the two redteam passes. The first attacks the task. The second attacks the proposed solution.
 
+## Implementation discipline
+
+The operating stack governs implementation, not merely planning or final summaries. Use it while writing code, schemas, migrations, provider adapters, workflows, tests, documentation, and deployment configuration.
+
+For every material implementation, keep this sequence visible in the working decision record:
+
+```text
+Goal
+→ Reality
+→ Redteam I
+→ Lindy
+→ L99
+→ Redteam II
+→ OODA
+→ Bill Gates
+→ Proof
+→ Rollback
+→ Next gate
+```
+
+The **Bill Gates implementation pass** is appended after OODA. It must identify:
+
+- the current bottleneck;
+- the highest-leverage correction;
+- what should be standardized for reuse;
+- what must not be scaled or automated yet.
+
+This extension does not replace or weaken the exact founder stack. It forces the selected code path to survive one final operating-system and scale review before completion is claimed.
+
+Implementation rules:
+
+- Do not stop reasoning when code generation begins.
+- Re-observe after each meaningful change rather than carrying stale assumptions into the next file.
+- Map code paths to explicit guardrails, evidence sources, and approval boundaries.
+- Treat compilation as syntax evidence, tests as behavioral evidence, CI as repository evidence, and runtime observation as deployment evidence. None substitutes for all the others.
+- Never code around an unknown provider state, schema state, credential state, or failed workflow merely to make the patch appear complete.
+- Report the exact behavior changed, tests actually run, failures or skips, security and provider impact, rollback path, unresolved risk, and next approval gate.
+
 ## Truth order
 
 1. Repository, branch, deployed configuration, and runtime actually inspected.
@@ -96,14 +134,17 @@ An audit authorizes inspection, not mutation.
 
 For material work, report:
 
-1. Reality
-2. Risk I: premise
-3. L99 system view
-4. Decision
-5. Risk II: chosen plan
-6. Action
-7. Proof
-8. Rollback
-9. Next approval gate
+1. Goal
+2. Reality
+3. Risk I: premise
+4. Lindy screen
+5. L99 system view
+6. Decision
+7. Risk II: chosen plan
+8. OODA action
+9. Bill Gates bottleneck and leverage pass
+10. Proof
+11. Rollback
+12. Next approval gate
 
 The Control Room exists to preserve founder authority, not automate it out of existence because a workflow diagram became excited.
