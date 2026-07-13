@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "observedAt": "2026-07-12",
+  "observedAt": "2026-07-13",
   "policy": {
     "portfolioHub": "jussray/founder-control-room",
     "manifestPath": "control-room.manifest.json",
@@ -28,9 +28,9 @@
       "riskLevel": "high"
     },
     {
-      "repository": "jussray/l99-",
+      "repository": "jussray/l99-StoryEngine",
       "role": "runtime-control-room",
-      "observedCommit": "e7fff69bc54ae27a923a29f27eb93be1e94842f2",
+      "observedCommit": "7fc160fd08284381074766ef79d64fc21ecdaaa3",
       "manifestState": "merged",
       "manifestPr": 15,
       "status": "at-risk",
