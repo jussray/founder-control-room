@@ -96,8 +96,16 @@ export interface CloudflareBillGatesReport {
   doNotScaleYet: string;
 }
 
+export interface CloudflareElonMuskReport {
+  questionRequirements: string;
+  deleteBeforeOptimize: string;
+  simplify: string;
+  accelerateFeedback: string;
+  automateLast: string;
+}
+
 export interface CloudflareReasoningReport {
-  version: '1.0.0';
+  version: '1.1.0';
   mode: 'read_only_reasoning';
   projectId: string;
   generatedAt: string;
@@ -109,6 +117,7 @@ export interface CloudflareReasoningReport {
   l99: CloudflareL99Report;
   redteamPlan: string[];
   billGates: CloudflareBillGatesReport;
+  elonMusk: CloudflareElonMuskReport;
   ooda: CloudflareOodaReport;
   freshSignalIds: string[];
   staleSignalIds: string[];
