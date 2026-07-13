@@ -78,10 +78,23 @@ function desiredSummary(desired: CloudflareDesiredState): string {
 
 export const CLOUDFLARE_REASONING_CONTRACT = Object.freeze({
   id: 'cloudflare-ooda-reasoner',
-  version: '1.0.0',
+  version: '1.1.0',
   command: ':cloudflare reason <project>',
   mode: 'read_only_reasoning',
-  promise: 'Convert sanitized Cloudflare evidence into an OODA decision without deploying, changing DNS, rotating secrets, or carrying approval forward.',
+  promise: 'Convert sanitized Cloudflare evidence into a first-principles implementation decision without deploying, changing DNS, rotating secrets, or carrying approval forward.',
+  implementationStack: [
+    'reality',
+    'redteam-premise',
+    'lindy',
+    'l99',
+    'redteam-plan',
+    'ooda',
+    'bill-gates',
+    'elon-musk',
+    'proof',
+    'rollback',
+    'next-gate',
+  ],
   automaticActions: ['read evidence', 'classify drift', 'record sanitized reasoning evidence'],
   approvalGates: ['create_branch', 'merge', 'deploy', 'rollback', 'secrets-change', 'dns-change'],
   sensitiveFieldsIncluded: false,
@@ -295,8 +308,16 @@ export function reasonAboutCloudflare(input: CloudflareReasoningInput): Cloudfla
         ? 'Wait for the current deployment to reach a terminal state, then refresh evidence.'
         : 'Remain in degraded read-only mode and gather missing evidence.';
 
+  const deletionTarget = duplicateAuthority
+    ? 'Delete the obsolete deployment authority from the automatic release path; do not optimize two competing systems.'
+    : authFailure && input.desired.deploymentAuthority !== 'token_upload'
+      ? 'Delete the assumption that a failing API token must be repaired when token upload is not the chosen authority.'
+      : missingEvidence.length > 0
+        ? 'Delete release-complete claims that are not backed by fresh exact-commit and runtime evidence.'
+        : 'Delete no functioning production path; the current evidence does not justify removal.';
+
   return {
-    version: '1.0.0',
+    version: '1.1.0',
     mode: 'read_only_reasoning',
     projectId: input.projectId,
     generatedAt,
@@ -335,6 +356,15 @@ export function reasonAboutCloudflare(input: CloudflareReasoningInput): Cloudfla
         : 'Make exact commit and runtime evidence machine-readable and reusable across releases.',
       standardize: 'Use the same desired → built → deployed → healthy → verified state model for every project.',
       doNotScaleYet: 'Do not automate Cloudflare mutations until one project completes deploy, verify, rollback, and recovery drills end to end.',
+    },
+    elonMusk: {
+      questionRequirements: duplicateAuthority
+        ? 'Why are two deployment authorities required? Preserve both only if independent evidence proves each is necessary.'
+        : 'Which release requirement is directly tied to production truth, and which exists only because a provider workflow once made it convenient?',
+      deleteBeforeOptimize: deletionTarget,
+      simplify: 'Use one deployment authority, one exact-commit evidence contract, one runtime health proof, and separate approval gates for every mutation.',
+      accelerateFeedback: 'Collect sanitized provider state and runtime health in one short observe → reason → verify loop before editing credentials, DNS, or deployment code.',
+      automateLast: 'Automate only the evidence refresh and classification loop until repeated deploy, rollback, and recovery drills prove the mutation path is stable.',
     },
     ooda: {
       observe: reality,
