@@ -50,6 +50,7 @@ function verifiedSignals(): CloudflareSignal[] {
 
 describe('Cloudflare reasoning contract', () => {
   it('is read-only and keeps every material action separately gated', () => {
+    expect(CLOUDFLARE_REASONING_CONTRACT.version).toBe('1.1.0');
     expect(CLOUDFLARE_REASONING_CONTRACT.mode).toBe('read_only_reasoning');
     expect(CLOUDFLARE_REASONING_CONTRACT.command).toBe(':cloudflare reason <project>');
     expect(CLOUDFLARE_REASONING_CONTRACT.approvalCarryForward).toBe(false);
@@ -60,6 +61,19 @@ describe('Cloudflare reasoning contract', () => {
       'rollback',
       'secrets-change',
       'dns-change',
+    ]);
+    expect(CLOUDFLARE_REASONING_CONTRACT.implementationStack).toEqual([
+      'reality',
+      'redteam-premise',
+      'lindy',
+      'l99',
+      'redteam-plan',
+      'ooda',
+      'bill-gates',
+      'elon-musk',
+      'proof',
+      'rollback',
+      'next-gate',
     ]);
   });
 });
@@ -78,12 +92,14 @@ describe('reasonAboutCloudflare', () => {
       now: NOW,
     });
 
+    expect(report.version).toBe('1.1.0');
     expect(report.outcome).toBe('verified');
     expect(report.confidence).toBe('high');
     expect(report.missingEvidence).toEqual([]);
     expect(report.ooda.act.some((item) => item.id === 'record-verified-cloudflare-release')).toBe(true);
     expect(report.sensitiveFieldsIncluded).toBe(false);
     expect(report.approvalCarryForward).toBe(false);
+    expect(report.elonMusk.automateLast).toContain('Automate only the evidence refresh');
   });
 
   it('uses the freshest Pages proof across deployment checks and release markers', () => {
@@ -166,6 +182,9 @@ describe('reasonAboutCloudflare', () => {
       }),
     ]));
     expect(report.ooda.act.some((item) => item.id === 'repair-cloudflare-credential')).toBe(false);
+    expect(report.elonMusk.questionRequirements).toContain('two deployment authorities');
+    expect(report.elonMusk.deleteBeforeOptimize).toContain('obsolete deployment authority');
+    expect(report.elonMusk.simplify).toContain('one deployment authority');
   });
 
   it('enters degraded mode when evidence is stale instead of recycling an old conclusion', () => {
@@ -191,6 +210,7 @@ describe('reasonAboutCloudflare', () => {
       'pages_deployment_or_release_marker',
       'runtime_health',
     ]);
+    expect(report.elonMusk.deleteBeforeOptimize).toContain('Delete release-complete claims');
   });
 
   it('falls back to the safe default evidence age when an invalid numeric value is supplied', () => {
@@ -254,5 +274,6 @@ describe('reasonAboutCloudflare', () => {
     const material = report.ooda.act.filter((item) => item.approvalGate);
     expect(material.length).toBeGreaterThan(0);
     expect(material.every((item) => item.requiresFounderApproval && !item.safeToAutoRun)).toBe(true);
+    expect(report.elonMusk.automateLast).toContain('mutation path is stable');
   });
 });
