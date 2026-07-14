@@ -8,6 +8,10 @@
         "X-MCP-Lockdown": "true"
       }
     },
+    "microsoft-learn": {
+      "type": "http",
+      "url": "https://learn.microsoft.com/api/mcp"
+    },
     "supabase": {
       "type": "http",
       "url": "https://mcp.supabase.com/mcp?project_ref=oojzfmmywbvficgybaxd&read_only=true&features=database%2Cdocs"
