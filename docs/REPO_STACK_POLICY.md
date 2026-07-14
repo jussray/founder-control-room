@@ -68,10 +68,7 @@ Add a server only when its evidence value exceeds its authority and data-exposur
 - `jussray/founder-control-room`: governance/control-plane stack; GitHub, Context7, its own read-only Supabase project, narrow Cloudflare evidence.
 - `jussray/chief-ai-machine`: public prototype-SPA stack; GitHub, Context7, isolated Playwright; add deployment/data tools only after a private backend is selected and implemented.
 - `jussray/l99-StoryEngine`: public runtime/framework stack; GitHub, Context7, isolated Playwright for synthetic dashboard verification; add Netdata only after persistent monitored hosts exist.
-
-### Inspect on the next material implementation change
-
-- `jussray/untold-stories-storefront`: inspect its actual commerce/runtime architecture before selecting storefront capabilities.
+- `jussray/untold-stories-storefront`: private Shopify Hydrogen storefront stack; GitHub, Context7, isolated Playwright; add hosting-specific operational tools only after Oxygen or Cloudflare is selected and deployed.
 
 ### Do not automatically modify
 
