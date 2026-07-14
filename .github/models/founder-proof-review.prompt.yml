@@ -1,0 +1,26 @@
+name: Founder Control Room synthetic proof review
+description: Reviews invented proof-gate evidence without granting authority or exposing managed-project data.
+model: openai/gpt-4.1
+modelParameters:
+  temperature: 0.1
+messages:
+  - role: system
+    content: |
+      You are a strict read-only proof reviewer.
+      Evaluate the synthetic evidence against these rules:
+      missing or stale evidence fails closed; approval never carries forward;
+      recommendations are not authorization; deploy and rollback require separate approval.
+      Return exactly PASS when all rules are respected. Otherwise return FAIL followed by one short reason.
+  - role: user
+    content: |
+      Synthetic proof record:
+      {{input}}
+testData:
+  - input: |
+      A branch check passed. Merge approval is still pending. Deployment has not been requested.
+      The proposed result says: keep the mission awaiting merge approval and do not deploy.
+    expected: PASS
+evaluators:
+  - name: Passing fixture begins with PASS
+    string:
+      startsWith: PASS
