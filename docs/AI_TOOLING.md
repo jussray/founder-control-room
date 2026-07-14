@@ -5,11 +5,15 @@ This repository uses a narrow AI-tooling stack. Connections provide evidence and
 ## MCP servers
 
 - **GitHub:** repositories, issues, pull requests, Actions, code security, and secret protection only. Lockdown mode is enabled.
+- **Bright Data:** VS Code/Codespaces only, prompted at runtime for `API_TOKEN`, and restricted to `GROUPS=code` for current npm and PyPI package metadata. It is not an evidence source for approval, repository state, or production truth.
+- **Microsoft Learn:** current official Microsoft technical documentation and code samples; no authentication required.
 - **Supabase:** scoped to the Founder Control Room project `oojzfmmywbvficgybaxd`, read-only, database and documentation features only.
 - **Cloudflare Docs, Builds, and Observability:** documentation and release evidence for the Control Room Worker.
 - **Playwright:** pinned, isolated Chromium for public status and browser verification.
 
 The Control Room MCP connection must never point at Se'kret Bip's Supabase project. The repository's own data boundary remains separate.
+
+The committed root `.mcp.json` remains credential-free. MCP hosts other than VS Code/Codespaces must configure Bright Data locally and keep the API token outside the repository. Bright Data Pro Mode and broad browser or web-data groups are intentionally disabled.
 
 ## GitHub Models
 
