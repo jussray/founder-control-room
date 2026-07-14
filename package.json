@@ -11,7 +11,8 @@
     "cf:dev": "wrangler dev src/worker/cf-entry.ts --port 8787",
     "deploy": "wrangler deploy",
     "lint": "eslint 'src/**/*.ts' --max-warnings 0",
-    "test": "vitest run"
+    "test": "vitest run",
+    "verify:mcp": "node scripts/verify-mcp-config.mjs"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
