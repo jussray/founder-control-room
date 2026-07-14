@@ -60,17 +60,17 @@ Add a server only when its evidence value exceeds its authority and data-exposur
 
 ## Current repository classification
 
-### Live products and control planes
+### Live products, frameworks, and control planes
 
 - `jussray/Sekret-Bip`: full guarded product stack; app, Supabase, Cloudflare, Figma, Playwright, Context7.
 - `jussray/jussbeautifulhair-site`: public storefront stack; GitHub, Context7, narrow Cloudflare evidence, isolated Playwright.
 - `jussray/jbh-private`: private admin stack; GitHub, Context7, isolated Playwright; no standing deployment or database MCP.
 - `jussray/founder-control-room`: governance/control-plane stack; GitHub, Context7, its own read-only Supabase project, narrow Cloudflare evidence.
+- `jussray/chief-ai-machine`: public prototype-SPA stack; GitHub, Context7, isolated Playwright; add deployment/data tools only after a private backend is selected and implemented.
+- `jussray/l99-StoryEngine`: public runtime/framework stack; GitHub, Context7, isolated Playwright for synthetic dashboard verification; add Netdata only after persistent monitored hosts exist.
 
-### Add a minimal stack on the next material implementation change
+### Inspect on the next material implementation change
 
-- `jussray/chief-ai-machine`: prototype SPA. Candidate stack: GitHub, Context7, isolated Playwright. Add deployment/data tools only after the private backend is chosen.
-- `jussray/l99-StoryEngine`: runtime and operational framework. Candidate stack: GitHub and Context7; add Playwright only for an actively maintained dashboard test path and Netdata only after persistent monitored hosts exist.
 - `jussray/untold-stories-storefront`: inspect its actual commerce/runtime architecture before selecting storefront capabilities.
 
 ### Do not automatically modify
