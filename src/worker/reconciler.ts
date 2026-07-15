@@ -20,6 +20,7 @@ import { supabase } from '../lib/supabaseClient.js';
 import { BaseController } from '../controllers/base.js';
 import { CheckRunController } from '../controllers/CheckRunController.js';
 import { ChangeProposalController } from '../controllers/ChangeProposalController.js';
+import { ManifestController } from '../controllers/ManifestController.js';
 import { MissionController } from '../controllers/MissionController.js';
 import { ProjectController } from '../controllers/ProjectController.js';
 import { ReleaseController } from '../controllers/ReleaseController.js';
@@ -27,16 +28,15 @@ import { ProofGateController } from '../controllers/ProofGateController.js';
 import type { ReconcileReason, ReconcileResult } from '../reconciliation/types.js';
 
 const CONTROLLERS = new Map<string, BaseController>([
-  ['CheckRunController',        new CheckRunController()],
-  ['ChangeProposalController',  new ChangeProposalController()],
-  ['MissionController',         new MissionController()],
-  ['ProjectController',         new ProjectController()],
-  ['ReleaseController',         new ReleaseController()],
-  ['ProofGateController',       new ProofGateController()],
-  // ManifestController added in Milestone C
+  ["CheckRunController", new CheckRunController()],
+  ["ChangeProposalController", new ChangeProposalController()],
+  ["ManifestController", new ManifestController()],
+  ["MissionController", new MissionController()],
+  ["ProjectController", new ProjectController()],
+  ["ReleaseController", new ReleaseController()],
+  ["ProofGateController", new ProofGateController()],
 ]);
 
-const MAX_ATTEMPTS = 5;
 let running = false;
 
 async function writeReconciliationRun(
@@ -45,7 +45,7 @@ async function writeReconciliationRun(
   startedAt: Date,
 ): Promise<void> {
   try {
-    await supabase.from('reconciliation_runs').insert({
+    await supabase.from("reconciliation_runs").insert({
       project_id: item.projectId,
       controller: item.controller,
       resource_id: item.resourceId,
