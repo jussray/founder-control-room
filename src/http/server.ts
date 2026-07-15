@@ -3,6 +3,7 @@ import { authRouter } from './routes/auth.js';
 import { projectsRouter } from './routes/projects.js';
 import { approvalsRouter } from './routes/approvals.js';
 import { l99Router } from './routes/l99.js';
+import { mcpRouter } from './routes/mcp.js';
 import { handleGitHubWebhook } from './webhooks/github.js';
 
 export function createServer() {
@@ -15,7 +16,7 @@ export function createServer() {
     handleGitHubWebhook,
   );
 
-  app.use(express.json());
+  app.use(express.json({ limit: '256kb' }));
 
   app.get('/health', (_req, res) => res.json({ ok: true }));
 
@@ -23,6 +24,7 @@ export function createServer() {
   app.use('/projects', projectsRouter);
   app.use('/approvals', approvalsRouter);
   app.use('/l99', l99Router);
+  app.use('/mcp', mcpRouter);
 
   return app;
 }
