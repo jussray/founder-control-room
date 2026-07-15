@@ -5,7 +5,11 @@ import { describe, expect, it } from "vitest";
 const read = (path: string): string => readFileSync(resolve(process.cwd(), path), "utf8");
 
 const scheduler = read("src/services/portfolioVerificationScheduler.ts");
-const controller = read("src/controllers/ManifestController.ts");
+const manifestController = read("src/controllers/ManifestController.ts");
+const projectController = read("src/controllers/ProjectController.ts");
+const providerFactory = read("src/providers/providerFactory.ts");
+const appAuth = read("src/providers/githubAppAuth.ts");
+const webhook = read("src/http/webhooks/github.ts");
 const reconciler = read("src/worker/reconciler.ts");
 const worker = read("src/worker/cf-entry.ts");
 const outbox = read("src/events/outbox.ts");
@@ -35,6 +39,31 @@ describe("scheduled portfolio repository verification", () => {
   });
 });
 
+describe("provider and schema truth", () => {
+  it("prefers repository-scoped GitHub App installation auth", () => {
+    expect(providerFactory).toContain("getGitHubInstallationToken");
+    expect(providerFactory).toContain("GITHUB_APP_ID");
+    expect(providerFactory).toContain("GITHUB_PRIVATE_KEY");
+    expect(providerFactory).toContain("GITHUB_TOKEN remains a local/development fallback only");
+    expect(appAuth).toContain("apps.getRepoInstallation");
+    expect(appAuth).toContain("apps.createInstallationAccessToken");
+    expect(appAuth).toContain("repositories: [repo]");
+  });
+
+  it("observes projects through the live registry instead of obsolete connection columns", () => {
+    expect(projectController).toContain('.from("projects")');
+    expect(projectController).toContain("providerForProject");
+    expect(projectController).toContain('.from("provider_observations")');
+    expect(projectController).not.toContain("project_connections");
+    expect(projectController).not.toContain("connection_status");
+  });
+
+  it("sanitizes GitHub events before the provider inbox persists them", () => {
+    expect(webhook).toContain("sanitizeGitHubEvent(eventType, payload)");
+    expect(webhook).not.toContain("payload,\n    });");
+  });
+});
+
 describe("reconciliation reliability", () => {
   it("reactivates completed coalesced rows and preserves delayed retries", () => {
     expect(outbox).toContain("completed_at: null");
@@ -51,11 +80,11 @@ describe("reconciliation reliability", () => {
   });
 
   it("retries provider failures and never grants automatic write authority", () => {
-    expect(controller).toContain('return this.retry(message)');
-    expect(controller).toContain('actionType: "propose_repository_repair_mission"');
-    expect(controller).toContain("requiresApproval: true");
-    expect(controller).not.toContain("createBranch(");
-    expect(controller).not.toContain("integrate(");
-    expect(controller).not.toContain("deploy(");
+    expect(manifestController).toContain('return this.retry(message)');
+    expect(manifestController).toContain('actionType: "propose_repository_repair_mission"');
+    expect(manifestController).toContain("requiresApproval: true");
+    expect(manifestController).not.toContain("createBranch(");
+    expect(manifestController).not.toContain("integrate(");
+    expect(manifestController).not.toContain("deploy(");
   });
 });
