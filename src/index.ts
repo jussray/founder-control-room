@@ -13,6 +13,10 @@ app.listen(port, () => {
   console.log(`  GET  /projects/:slug`);
   console.log(`  POST /webhooks/github`);
   console.log(`  POST /approvals/:missionId/execute`);
+  console.log(`  GET  /mcp/servers`);
+  console.log(`  GET  /mcp/servers/:serverId/capabilities`);
+  console.log(`  POST /mcp/servers/:serverId/tools/:toolName/preview`);
+  console.log(`  POST /mcp/servers/:serverId/tools/:toolName/invoke`);
 
   // Start the outbox worker and all periodic safety resyncs
   startScheduler();
