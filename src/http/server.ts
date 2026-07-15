@@ -17,6 +17,7 @@ import { commandBridgeRouter } from './routes/commandBridge.js';
 import { designOsRouter } from './routes/designOs.js';
 import { cloudflareReasoningRouter } from './routes/cloudflareReasoning.js';
 import { mcpRouter } from './routes/mcp.js';
+import { portfolioVerificationRouter } from './routes/portfolioVerification.js';
 import {
   handleRepositoryVerificationIngest,
   repositoryVerificationRouter,
@@ -103,6 +104,7 @@ export function createServer(options: CreateServerOptions = {}) {
 
   app.use('/', onboardingRouter);
   app.use('/auth', authRouter);
+  app.use('/portfolio', portfolioVerificationRouter);
   app.use('/projects', repositoryVerificationRouter);
   app.use('/projects', projectsRouter);
   app.use('/approvals', approvalsRouter);
