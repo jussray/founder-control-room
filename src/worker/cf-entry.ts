@@ -3,7 +3,8 @@
  *
  * Express runs behind Cloudflare's supported Node HTTP server adapter. The
  * scheduled handler shares the same Worker entry point and lazily loads the
- * reconciliation loop only when a cron event arrives.
+ * reconciliation loop only when a cron event arrives. HTTP routes include
+ * signed provider webhooks and repository verification pings.
  */
 
 import { httpServerHandler } from 'cloudflare:node';
