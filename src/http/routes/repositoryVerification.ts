@@ -337,12 +337,13 @@ function parsePacket(raw: unknown): RepositoryVerificationPacket {
 }
 
 /**
- * POST /ingest/repository-verification
- *
  * Raw-body, HMAC-authenticated endpoint for repo-local runners. Only the
  * hardcoded sanitized packet shape is retained. Unknown fields are discarded.
  */
-export async function handleRepositoryVerificationIngest(req: Request, res: Response) {
+export async function handleRepositoryVerificationIngest(
+  req: Request,
+  res: Response,
+): Promise<Response> {
   try {
     const body = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body ?? "");
     if (body.length === 0 || body.length > 512_000) {
