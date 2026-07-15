@@ -1,9 +1,8 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { supabase } from "../../lib/supabaseClient.js";
-import { GitHubProvider } from "../../providers/GitHubProvider.js";
+import { providerForProject } from "../../providers/providerFactory.js";
 import type { RepositoryProvider } from "../../providers/RepositoryProvider.js";
-import { createRepositoryProvider } from "../../providers/RepositoryProviderFactory.js";
 import { requireFounder, type FounderRequest } from "../middleware/requireFounder.js";
 import { AUTHORITY_LEVEL_IDS } from "../../lib/authorityLevels.js";
 
@@ -384,33 +383,10 @@ projectsRouter.post("/:slug/missions", requireFounder, async (req: FounderReques
 });
 
 /**
- * Builds a RepositoryProvider for a single project row on demand, rather
- * than hardcoding a global projectMap. This is the multi-project-shaped
- * version: any project in the registry with repo_provider = "github" gets
- * a GitHubProvider constructed from ITS OWN repo_identifier, not Bip's.
- *
- * Still used by routes below that construct a provider straight from the
- * `projects` row (no project_connections lookup). GET /:slug uses the
- * connection-aware `createRepositoryProvider` factory instead.
- */
-function providerForProject(repoProvider: string, slug: string, repoIdentifier: string): RepositoryProvider {
-  if (repoProvider === "github") {
-    const token = process.env.GITHUB_TOKEN;
-    if (!token) throw new Error("GITHUB_TOKEN is not set");
-    return new GitHubProvider({
-      token,
-      projectMap: { [slug]: repoIdentifier },
-      baseUrl: process.env.GITHUB_API_BASE_URL,
-    });
-  }
-  throw new Error(`No RepositoryProvider implementation for "${repoProvider}" yet`);
-}
-
-/**
  * GET /projects/:slug
  *
- * Founder-only. Reads the Control Room registry and live repository state
- * through the provider-agnostic factory. Every read remains an audited event.
+ * Founder-only. Reads both the Control Room registry row and live repository
+ * identity through the provider abstraction. Every read remains audited.
  */
 projectsRouter.get("/:slug", requireFounder, async (req: FounderRequest, res) => {
   const { slug } = req.params;
@@ -429,15 +405,17 @@ projectsRouter.get("/:slug", requireFounder, async (req: FounderRequest, res) =>
   let live: unknown = null;
   let liveError: string | null = null;
 
-  try {
-    const provider = createRepositoryProvider({
-      slug: project.slug,
-      repoProvider: project.repo_provider,
-      repoIdentifier: project.repo_identifier,
-    });
-    live = await provider.getProject(project.slug);
-  } catch (err) {
-    liveError = err instanceof Error ? err.message : String(err);
+  if (project.repo_identifier) {
+    try {
+      const provider = providerForProject({
+        repo_provider: project.repo_provider,
+        slug: project.slug,
+        repo_identifier: project.repo_identifier,
+      });
+      live = await provider.getProject(project.slug);
+    } catch (error) {
+      liveError = error instanceof Error ? error.message : String(error);
+    }
   }
 
   await supabase.from("project_events").insert({
@@ -483,7 +461,7 @@ projectsRouter.get("/:slug/files", requireFounder, async (req: FounderRequest, r
 
   let provider: RepositoryProvider;
   try {
-    provider = providerForProject(project.repo_provider, project.slug, project.repo_identifier);
+    provider = providerForProject({ repo_provider: project.repo_provider, slug: project.slug, repo_identifier: project.repo_identifier });
   } catch (err) {
     return res.status(503).json({ error: err instanceof Error ? err.message : "Repository provider unavailable" });
   }
@@ -536,7 +514,7 @@ projectsRouter.get("/:slug/file", requireFounder, async (req: FounderRequest, re
 
   let provider: RepositoryProvider;
   try {
-    provider = providerForProject(project.repo_provider, project.slug, project.repo_identifier);
+    provider = providerForProject({ repo_provider: project.repo_provider, slug: project.slug, repo_identifier: project.repo_identifier });
   } catch (err) {
     return res.status(503).json({ error: err instanceof Error ? err.message : "Repository provider unavailable" });
   }

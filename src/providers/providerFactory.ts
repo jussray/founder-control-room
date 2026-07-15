@@ -18,6 +18,7 @@ export function providerForProject(project: ProviderProjectConfig): RepositoryPr
     return new GitHubProvider({
       token,
       projectMap: { [project.slug]: project.repo_identifier },
+      baseUrl: process.env.GITHUB_API_BASE_URL,
     });
   }
   throw new Error(`No RepositoryProvider implementation for "${project.repo_provider}" yet`);
