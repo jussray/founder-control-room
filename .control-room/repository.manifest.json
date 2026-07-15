@@ -28,12 +28,14 @@
   "capabilities": [
     {
       "id": "provider-agnostic-repository-control",
-      "description": "Reads and changes repositories through a provider-neutral interface instead of direct GitHub coupling.",
+      "description": "Reads and changes repositories through a provider-neutral interface and uses repository-scoped GitHub App installation credentials instead of making a personal token authoritative.",
       "status": "active",
       "evidencePaths": [
         "src/providers/RepositoryProvider.ts",
         "src/providers/GitHubProvider.ts",
-        "src/providers/providerFactory.ts"
+        "src/providers/providerFactory.ts",
+        "src/providers/githubAppAuth.ts",
+        "src/providers/githubAppAuth.test.ts"
       ],
       "requiredSignals": [
         "typecheck",
@@ -50,6 +52,8 @@
         "src/services/repositoryEvidenceStore.ts",
         "src/http/routes/repositoryVerification.ts",
         "src/http/routes/portfolioVerification.ts",
+        "schemas/repository-manifest.schema.json",
+        "docs/REPOSITORY_FEDERATION.md",
         "supabase/migrations/20260715070000_federated_repository_verification.sql",
         "supabase/migrations/20260715071000_fix_repository_verification_packet_dedupe.sql"
       ],
@@ -80,6 +84,7 @@
       "status": "active",
       "evidencePaths": [
         "src/controllers/ManifestController.ts",
+        "src/controllers/ProjectController.ts",
         "src/services/portfolioVerificationScheduler.ts",
         "src/services/portfolioVerificationContract.test.ts",
         "src/worker/reconciler.ts",
@@ -117,6 +122,7 @@
       "evidencePaths": [
         "src/lib/supabaseClient.ts",
         "docs/ARCHITECTURE.md",
+        "docs/REPOSITORY_FEDERATION.md",
         "supabase/migrations/0001_init.sql"
       ],
       "requiredSignals": [
