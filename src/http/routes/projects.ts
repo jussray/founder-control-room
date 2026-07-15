@@ -423,16 +423,8 @@ projectsRouter.get("/:slug", requireFounder, async (req: FounderRequest, res) =>
 
   if (projectError) return res.status(500).json({ error: projectError.message });
   if (!project) {
-    return res.status(404).json({ error: `No project registered with slug "${slug}"` });
+    return res.status(404).json({ error: `No project registered with slug ${slug}` });
   }
-
-  const { data: connection } = await supabase
-    .from("project_connections")
-    .select("provider, connection_config, status")
-    .eq("project_id", project.id)
-    .eq("provider", "github")
-    .eq("status", "active")
-    .maybeSingle();
 
   let live: unknown = null;
   let liveError: string | null = null;
@@ -442,8 +434,6 @@ projectsRouter.get("/:slug", requireFounder, async (req: FounderRequest, res) =>
       slug: project.slug,
       repoProvider: project.repo_provider,
       repoIdentifier: project.repo_identifier,
-      provider: connection?.provider,
-      connectionConfig: connection?.connection_config as Record<string, unknown> | null,
     });
     live = await provider.getProject(project.slug);
   } catch (err) {
@@ -460,7 +450,7 @@ projectsRouter.get("/:slug", requireFounder, async (req: FounderRequest, res) =>
       route: `GET /projects/${slug}`,
       read_by: req.founder?.email,
       live_fetch_ok: !liveError,
-      provider: connection?.provider ?? project.repo_provider ?? null,
+      provider: project.repo_provider ?? null,
     },
   });
 
