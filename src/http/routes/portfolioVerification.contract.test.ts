@@ -11,7 +11,7 @@ describe("portfolio verification read model", () => {
   it("returns signature and runner provenance with the latest run", () => {
     expect(source).toContain("signature_verified,runner");
     expect(source).toContain('"none" | "signed" | "manual_preview" | "unsigned"');
-    expect(source).toContain('run.runner?.mode === "preview_branch_bootstrap"');
+    expect(source).toContain('run.runner.mode.startsWith("preview_branch_")');
     expect(source).toContain("signatureVerified");
     expect(source).toContain("manualPreview");
   });
