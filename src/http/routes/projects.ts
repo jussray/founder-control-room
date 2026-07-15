@@ -407,7 +407,7 @@ projectsRouter.get("/:slug", requireFounder, async (req: FounderRequest, res) =>
 
   if (project.repo_identifier) {
     try {
-      const provider = providerForProject({
+      const provider = await providerForProject({
         repo_provider: project.repo_provider,
         slug: project.slug,
         repo_identifier: project.repo_identifier,
