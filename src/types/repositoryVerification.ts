@@ -11,6 +11,17 @@ export interface RequiredSignalDeclaration {
   required?: boolean;
 }
 
+/**
+ * Proves that declared code is wired into another repository file. `marker`
+ * must be a short symbol/import/route identifier, never source contents.
+ */
+export interface UsageAssertionDeclaration {
+  id: string;
+  path: string;
+  marker: string;
+  description?: string;
+}
+
 export interface CapabilityDeclaration {
   id: string;
   description: string;
@@ -19,6 +30,8 @@ export interface CapabilityDeclaration {
   evidencePaths: string[];
   /** IDs from verification.requiredSignals required to prove this capability. */
   requiredSignals?: string[];
+  /** Short marker checks proving the evidence is actually wired into the repo. */
+  usageAssertions?: UsageAssertionDeclaration[];
 }
 
 export interface RepositoryManifest {
@@ -62,6 +75,13 @@ export interface CheckObservation {
   signal: VerificationSignal | null;
 }
 
+export interface UsageAssertionObservation {
+  id: string;
+  path: string;
+  passed: boolean;
+  reason: "matched" | "file_missing" | "marker_missing";
+}
+
 export interface CapabilityObservation {
   id: string;
   claimedStatus: CapabilityDeclaration["status"];
@@ -70,6 +90,9 @@ export interface CapabilityObservation {
   missingEvidencePaths: string[];
   requiredSignalIds: string[];
   failedSignalIds: string[];
+  usageAssertionIds: string[];
+  failedUsageAssertionIds: string[];
+  usageAssertions: UsageAssertionObservation[];
   reason: string | null;
 }
 
@@ -98,6 +121,8 @@ export interface IngestedCapability {
   claimedStatus: "active" | "planned" | "retired";
   observedStatus: "verified" | "drifted" | "unverified" | "retired";
   evidencePaths: string[];
+  usageAssertionIds?: string[];
+  failedUsageAssertionIds?: string[];
   reason?: string;
 }
 
