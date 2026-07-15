@@ -5,7 +5,7 @@ export interface PortfolioProject {
   name: string;
   repository: string;
   status: PortfolioProjectStatus;
-  capabilities: string[];
+  capabilities: readonly string[];
 }
 
 /**
