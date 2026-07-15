@@ -8,12 +8,12 @@ import type {
   RepositoryRef,
   VerificationSignal,
 } from "../providers/RepositoryProvider.js";
+import { REPOSITORY_MANIFEST_PATH } from "../types/repositoryVerification.js";
 import {
   inspectRepositoryManifest,
   parseRepositoryManifest,
   type RegistryProjectIdentity,
 } from "./repositoryVerification.js";
-import { REPOSITORY_MANIFEST_PATH } from "../types/repositoryVerification.js";
 
 const project: RegistryProjectIdentity = {
   slug: "example-project",
@@ -21,7 +21,10 @@ const project: RegistryProjectIdentity = {
   repo_identifier: "founder/example-project",
 };
 
-function manifest(evidencePaths = ["src/index.ts"]): string {
+function manifest(
+  evidencePaths = ["src/index.ts"],
+  usageAssertions: Array<Record<string, string>> = [],
+): string {
   return JSON.stringify({
     schemaVersion: "1.0",
     projectId: project.slug,
@@ -39,8 +42,13 @@ function manifest(evidencePaths = ["src/index.ts"]): string {
       status: "active",
       evidencePaths,
       requiredSignals: ["typecheck"],
+      usageAssertions,
     }],
-    buildAssist: { enabled: true, preferredBuilder: "codex", riskLevel: "medium" },
+    buildAssist: {
+      enabled: true,
+      preferredBuilder: "codex",
+      riskLevel: "medium",
+    },
     privacy: {
       allowlistedPacketFields: ["commitSha", "checks.status"],
       forbiddenData: ["user content", "secrets"],
@@ -67,25 +75,55 @@ class FakeProvider implements RepositoryProvider {
     };
   }
 
-  async listFiles(): Promise<FileEntry[]> { return []; }
+  async listFiles(): Promise<FileEntry[]> {
+    return [];
+  }
 
-  async readFile(_projectId: string, _ref: string, path: string): Promise<string> {
+  async readFile(
+    _projectId: string,
+    _ref: string,
+    path: string,
+  ): Promise<string> {
     const content = this.files[path];
     if (content === undefined) throw new Error(`missing:${path}`);
     return content;
   }
 
   async getRef(): Promise<RepositoryRef> {
-    return { name: "main", commitSha: "a".repeat(40), committedAt: "2026-07-15T00:00:00Z" };
+    return {
+      name: "main",
+      commitSha: "a".repeat(40),
+      committedAt: "2026-07-15T00:00:00Z",
+    };
   }
 
-  async listVerificationSignals(): Promise<VerificationSignal[]> { return this.signals; }
+  async listVerificationSignals(): Promise<VerificationSignal[]> {
+    return this.signals;
+  }
 
-  async createBranch(): Promise<string> { throw new Error("not used"); }
-  async commitPatch(_projectId: string, _branch: string, _patch: Patch): Promise<string> { throw new Error("not used"); }
-  async compare(): Promise<Diff> { throw new Error("not used"); }
-  async integrate(): Promise<string> { throw new Error("not used"); }
-  async deleteBranch(): Promise<void> { throw new Error("not used"); }
+  async createBranch(): Promise<string> {
+    throw new Error("not used");
+  }
+
+  async commitPatch(
+    _projectId: string,
+    _branch: string,
+    _patch: Patch,
+  ): Promise<string> {
+    throw new Error("not used");
+  }
+
+  async compare(): Promise<Diff> {
+    throw new Error("not used");
+  }
+
+  async integrate(): Promise<string> {
+    throw new Error("not used");
+  }
+
+  async deleteBranch(): Promise<void> {
+    throw new Error("not used");
+  }
 }
 
 const passingSignal: VerificationSignal = {
@@ -118,19 +156,45 @@ describe("repository manifest contract", () => {
     expect(parsed.valid).toBe(false);
     expect(parsed.errors.join(" ")).toContain("unknown signal");
   });
+
+  it("rejects unsafe or multiline usage assertions", () => {
+    const unsafe = parseRepositoryManifest(manifest(
+      ["src/index.ts"],
+      [{ id: "wired", path: "../secret.ts", marker: "ready" }],
+    ), project);
+    expect(unsafe.valid).toBe(false);
+    expect(unsafe.errors.join(" ")).toContain("safe repository-relative path");
+
+    const multiline = parseRepositoryManifest(manifest(
+      ["src/index.ts"],
+      [{ id: "wired", path: "src/app.ts", marker: "line one\nline two" }],
+    ), project);
+    expect(multiline.valid).toBe(false);
+    expect(multiline.errors.join(" ")).toContain("single-line value");
+  });
 });
 
 describe("exact-commit repository inspection", () => {
-  it("verifies a capability only when its code path and required check both exist", async () => {
+  it("verifies a capability when evidence, check, and usage marker all match", async () => {
     const provider = new FakeProvider({
-      [REPOSITORY_MANIFEST_PATH]: manifest(),
+      [REPOSITORY_MANIFEST_PATH]: manifest(
+        ["src/index.ts"],
+        [{ id: "entrypoint-import", path: "src/app.ts", marker: "./index.js" }],
+      ),
       "src/index.ts": "export const ready = true;",
+      "src/app.ts": 'import { ready } from "./index.js";',
     }, [passingSignal]);
 
     const result = await inspectRepositoryManifest(provider, project);
     expect(result.overallStatus).toBe("passed");
     expect(result.commitSha).toBe("a".repeat(40));
     expect(result.capabilities[0]?.observedStatus).toBe("verified");
+    expect(result.capabilities[0]?.usageAssertions).toEqual([{
+      id: "entrypoint-import",
+      path: "src/app.ts",
+      passed: true,
+      reason: "matched",
+    }]);
   });
 
   it("pings drift when a claimed active capability has no code evidence", async () => {
@@ -142,5 +206,24 @@ describe("exact-commit repository inspection", () => {
     expect(result.overallStatus).toBe("failed");
     expect(result.capabilities[0]?.observedStatus).toBe("drifted");
     expect(result.capabilities[0]?.missingEvidencePaths).toEqual(["src/missing.ts"]);
+  });
+
+  it("pings drift when evidence exists but is not wired into its entrypoint", async () => {
+    const provider = new FakeProvider({
+      [REPOSITORY_MANIFEST_PATH]: manifest(
+        ["src/index.ts"],
+        [{ id: "entrypoint-import", path: "src/app.ts", marker: "./index.js" }],
+      ),
+      "src/index.ts": "export const ready = true;",
+      "src/app.ts": "export const unrelated = true;",
+    }, [passingSignal]);
+
+    const result = await inspectRepositoryManifest(provider, project);
+    expect(result.overallStatus).toBe("failed");
+    expect(result.capabilities[0]?.observedStatus).toBe("drifted");
+    expect(result.capabilities[0]?.failedUsageAssertionIds).toEqual([
+      "entrypoint-import",
+    ]);
+    expect(result.capabilities[0]?.reason).toContain("failed usage assertions");
   });
 });
