@@ -53,6 +53,24 @@ Capability:
 - `unverified`: planned or pending proof;
 - `retired`: intentionally no longer active.
 
+## Provider authentication
+
+Production GitHub reads use the GitHub App already owned by Founder Control Room:
+
+```text
+GITHUB_APP_ID
+GITHUB_PRIVATE_KEY
+```
+
+For each repository read, the provider layer:
+
+1. creates a short-lived RS256 App JWT;
+2. resolves the GitHub App installation that owns the repository;
+3. requests a token scoped to that repository installation;
+4. caches the token only until five minutes before expiration.
+
+`GITHUB_TOKEN` is a local/development fallback only. It is not the production authority and must not be placed in product manifests or operational packets.
+
 ## Observation paths
 
 Founder Control Room learns about repositories through two paths.
@@ -120,18 +138,20 @@ Approval for one action never authorizes the next.
 ## Adding a repository
 
 1. Register the project and provider identifier in Founder Control Room.
-2. Add `.control-room/repository.manifest.json` in the product repository.
-3. Use exact visible provider check names.
-4. Mark unfinished capability claims `planned`, not `active`.
-5. List only stable repository paths as evidence.
-6. Declare forbidden product/user data explicitly.
-7. Open a draft PR and keep it draft until the declared checks execute at the exact commit.
-8. Enable scheduled verification only after the manifest reaches the default branch.
-9. Configure repository webhook or signed runner pings for faster refresh, while retaining scheduled scans as reconciliation backup.
+2. Install/authorize the Founder Control Room GitHub App for that repository.
+3. Add `.control-room/repository.manifest.json` in the product repository.
+4. Use exact visible provider check names.
+5. Mark unfinished capability claims `planned`, not `active`.
+6. List only stable repository paths as evidence.
+7. Declare forbidden product/user data explicitly.
+8. Open a draft PR and keep it draft until the declared checks execute at the exact commit.
+9. Merge the manifest through that repository's normal approval process.
+10. Enable scheduled verification only after the manifest reaches the default branch.
+11. Configure repository webhook or signed runner pings for faster refresh, while retaining scheduled scans as reconciliation backup.
 
 ## Failure handling
 
-- Missing provider token or transient provider failure returns `retry` with backoff.
+- Missing App installation/credentials or a transient provider failure returns `retry` with backoff.
 - Coalesced outbox rows are reactivated after completion.
 - A delayed retry is not accidentally marked complete.
 - Controller leases are acquired atomically and expired leases may be reclaimed.
