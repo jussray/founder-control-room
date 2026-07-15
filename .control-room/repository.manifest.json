@@ -1,0 +1,126 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "founder-control-room",
+  "repository": {
+    "provider": "github",
+    "identifier": "jussray/founder-control-room",
+    "defaultBranch": "main"
+  },
+  "verification": {
+    "requiredSignals": [
+      {
+        "id": "typecheck",
+        "name": "Type check",
+        "required": true
+      },
+      {
+        "id": "lint",
+        "name": "Lint",
+        "required": true
+      },
+      {
+        "id": "tests",
+        "name": "Test",
+        "required": true
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "id": "provider-agnostic-repository-control",
+      "description": "Reads and changes repositories through a provider-neutral interface instead of direct GitHub coupling.",
+      "status": "active",
+      "evidencePaths": [
+        "src/providers/RepositoryProvider.ts",
+        "src/providers/GitHubProvider.ts",
+        "src/providers/providerFactory.ts"
+      ],
+      "requiredSignals": [
+        "typecheck",
+        "tests"
+      ]
+    },
+    {
+      "id": "federated-repository-verification",
+      "description": "Identifies exact repo commits, checks manifest claims against code paths and CI signals, and stores sanitized drift evidence.",
+      "status": "active",
+      "evidencePaths": [
+        "src/types/repositoryVerification.ts",
+        "src/services/repositoryVerification.ts",
+        "src/services/repositoryEvidenceStore.ts",
+        "src/http/routes/repositoryVerification.ts",
+        "supabase/migrations/20260715070000_federated_repository_verification.sql"
+      ],
+      "requiredSignals": [
+        "typecheck",
+        "lint",
+        "tests"
+      ]
+    },
+    {
+      "id": "approval-gated-build-assist",
+      "description": "Converts verified drift into proposed missions without carrying approval into branch, integration, deploy, or rollback actions.",
+      "status": "active",
+      "evidencePaths": [
+        "src/http/routes/repositoryVerification.ts",
+        "src/http/routes/approvals.ts",
+        "src/types/mission.ts"
+      ],
+      "requiredSignals": [
+        "typecheck",
+        "tests"
+      ]
+    },
+    {
+      "id": "separate-founder-data-boundary",
+      "description": "Uses a dedicated founder-operations Supabase project and accepts only sanitized operational evidence from product repos.",
+      "status": "active",
+      "evidencePaths": [
+        "src/lib/supabaseClient.ts",
+        "docs/ARCHITECTURE.md",
+        "supabase/migrations/0001_init.sql"
+      ],
+      "requiredSignals": [
+        "typecheck"
+      ]
+    }
+  ],
+  "buildAssist": {
+    "enabled": true,
+    "preferredBuilder": "codex",
+    "riskLevel": "high"
+  },
+  "privacy": {
+    "allowlistedPacketFields": [
+      "projectId",
+      "repository.provider",
+      "repository.identifier",
+      "commitSha",
+      "branch",
+      "manifestHash",
+      "generatedAt",
+      "runner.provider",
+      "runner.runId",
+      "runner.detailsUrl",
+      "checks.id",
+      "checks.name",
+      "checks.required",
+      "checks.status",
+      "checks.detailsUrl",
+      "capabilities.id",
+      "capabilities.claimedStatus",
+      "capabilities.observedStatus",
+      "capabilities.evidencePaths",
+      "capabilities.reason"
+    ],
+    "forbiddenData": [
+      "source code contents",
+      "secrets or credentials",
+      "raw logs containing secrets",
+      "customer or user content",
+      "names or email addresses",
+      "voice transcripts",
+      "private product database rows"
+    ]
+  }
+}
