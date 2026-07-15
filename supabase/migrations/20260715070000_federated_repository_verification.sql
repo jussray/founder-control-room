@@ -29,12 +29,9 @@ create table if not exists public.repository_verification_runs (
   runner jsonb not null default '{}'::jsonb,
   signature_verified boolean not null default false,
   scanned_at timestamptz not null,
-  received_at timestamptz not null default now()
+  received_at timestamptz not null default now(),
+  unique(project_id, source, delivery_id)
 );
-
-create unique index if not exists repository_verification_delivery_dedupe
-  on public.repository_verification_runs(project_id, source, delivery_id)
-  where delivery_id is not null;
 
 create index if not exists repository_verification_project_received_idx
   on public.repository_verification_runs(project_id, received_at desc);
