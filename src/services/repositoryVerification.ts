@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
-import type { RepositoryProvider, VerificationSignal } from "../providers/RepositoryProvider.js";
+import type {
+  RepositoryProvider,
+  VerificationSignal,
+} from "../providers/RepositoryProvider.js";
 import {
   REPOSITORY_MANIFEST_PATH,
   REPOSITORY_MANIFEST_SCHEMA_VERSION,
@@ -10,6 +13,8 @@ import {
   type RepositoryManifest,
   type RepositoryManifestInspection,
   type RequiredSignalDeclaration,
+  type UsageAssertionDeclaration,
+  type UsageAssertionObservation,
 } from "../types/repositoryVerification.js";
 
 export interface RegistryProjectIdentity {
@@ -34,7 +39,23 @@ function unique(values: string[]): boolean {
   return new Set(values).size === values.length;
 }
 
-function parseRequiredSignals(value: unknown, errors: string[]): RequiredSignalDeclaration[] {
+function safeRepositoryPath(value: string): boolean {
+  return !value.startsWith("/")
+    && !value.includes("\\")
+    && !value.split("/").includes("..");
+}
+
+function validMarker(value: string): boolean {
+  return value.length <= 160
+    && !value.includes("\n")
+    && !value.includes("\r")
+    && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value);
+}
+
+function parseRequiredSignals(
+  value: unknown,
+  errors: string[],
+): RequiredSignalDeclaration[] {
   if (!Array.isArray(value)) {
     errors.push("verification.requiredSignals must be an array");
     return [];
@@ -71,6 +92,55 @@ function parseRequiredSignals(value: unknown, errors: string[]): RequiredSignalD
   return signals;
 }
 
+function parseUsageAssertions(
+  value: unknown,
+  capabilityIndex: number,
+  errors: string[],
+): UsageAssertionDeclaration[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) {
+    errors.push(`capabilities[${capabilityIndex}].usageAssertions must be an array`);
+    return [];
+  }
+
+  const assertions: UsageAssertionDeclaration[] = [];
+  value.forEach((candidate, index) => {
+    const prefix = `capabilities[${capabilityIndex}].usageAssertions[${index}]`;
+    if (!isRecord(candidate)) {
+      errors.push(`${prefix} must be an object`);
+      return;
+    }
+    if (!nonEmptyString(candidate.id)) {
+      errors.push(`${prefix}.id is required`);
+      return;
+    }
+    if (!nonEmptyString(candidate.path) || !safeRepositoryPath(candidate.path)) {
+      errors.push(`${prefix}.path must be a safe repository-relative path`);
+      return;
+    }
+    if (!nonEmptyString(candidate.marker) || !validMarker(candidate.marker)) {
+      errors.push(`${prefix}.marker must be a single-line value of at most 160 characters`);
+      return;
+    }
+    if (candidate.description !== undefined && !nonEmptyString(candidate.description)) {
+      errors.push(`${prefix}.description must be a non-empty string when present`);
+      return;
+    }
+
+    assertions.push({
+      id: candidate.id,
+      path: candidate.path,
+      marker: candidate.marker,
+      description: candidate.description as string | undefined,
+    });
+  });
+
+  if (!unique(assertions.map((assertion) => assertion.id))) {
+    errors.push(`capabilities[${capabilityIndex}].usageAssertions ids must be unique`);
+  }
+  return assertions;
+}
+
 function parseCapabilities(
   value: unknown,
   signalIds: Set<string>,
@@ -103,22 +173,34 @@ function parseCapabilities(
       errors.push(`capabilities[${index}].evidencePaths must be a string array`);
       return;
     }
+    if (!candidate.evidencePaths.every(safeRepositoryPath)) {
+      errors.push(`capabilities[${index}].evidencePaths must be repository-relative and traversal-free`);
+    }
+    if (!unique(candidate.evidencePaths)) {
+      errors.push(`capabilities[${index}].evidencePaths must be unique`);
+    }
+
     const requiredSignals = candidate.requiredSignals ?? [];
     if (!stringArray(requiredSignals)) {
       errors.push(`capabilities[${index}].requiredSignals must be a string array`);
       return;
+    }
+    if (!unique(requiredSignals)) {
+      errors.push(`capabilities[${index}].requiredSignals must be unique`);
     }
     for (const signalId of requiredSignals) {
       if (!signalIds.has(signalId)) {
         errors.push(`capabilities[${index}] references unknown signal "${signalId}"`);
       }
     }
+
     capabilities.push({
       id: candidate.id,
       description: candidate.description,
       status: candidate.status as CapabilityDeclaration["status"],
       evidencePaths: candidate.evidencePaths,
       requiredSignals,
+      usageAssertions: parseUsageAssertions(candidate.usageAssertions, index, errors),
     });
   });
 
@@ -196,7 +278,10 @@ export function parseRepositoryManifest(
     if (typeof buildAssist.enabled !== "boolean") {
       errors.push("buildAssist.enabled must be boolean");
     }
-    if (buildAssist.preferredBuilder !== undefined && !nonEmptyString(buildAssist.preferredBuilder)) {
+    if (
+      buildAssist.preferredBuilder !== undefined
+      && !nonEmptyString(buildAssist.preferredBuilder)
+    ) {
       errors.push("buildAssist.preferredBuilder must be a non-empty string");
     }
     if (
@@ -237,7 +322,9 @@ export function parseRepositoryManifest(
   return { valid: true, errors: [], manifest };
 }
 
-function latestSignalsByName(signals: VerificationSignal[]): Map<string, VerificationSignal> {
+function latestSignalsByName(
+  signals: VerificationSignal[],
+): Map<string, VerificationSignal> {
   const result = new Map<string, VerificationSignal>();
   for (const signal of signals) {
     const current = result.get(signal.name);
@@ -265,49 +352,71 @@ function checkObservations(
   });
 }
 
-async function inspectEvidencePaths(
+async function inspectRepositoryFiles(
   provider: RepositoryProvider,
   projectId: string,
   commitSha: string,
   paths: string[],
-): Promise<Map<string, boolean>> {
-  const observations = new Map<string, boolean>();
+): Promise<Map<string, string | null>> {
+  const observations = new Map<string, string | null>();
   await Promise.all(
     [...new Set(paths)].map(async (path) => {
       try {
-        await provider.readFile(projectId, commitSha, path);
-        observations.set(path, true);
+        observations.set(path, await provider.readFile(projectId, commitSha, path));
       } catch {
-        observations.set(path, false);
+        observations.set(path, null);
       }
     }),
   );
   return observations;
 }
 
+function usageObservations(
+  declarations: UsageAssertionDeclaration[],
+  files: Map<string, string | null>,
+): UsageAssertionObservation[] {
+  return declarations.map((assertion) => {
+    const content = files.get(assertion.path) ?? null;
+    if (content === null) {
+      return {
+        id: assertion.id,
+        path: assertion.path,
+        passed: false,
+        reason: "file_missing",
+      };
+    }
+    if (!content.includes(assertion.marker)) {
+      return {
+        id: assertion.id,
+        path: assertion.path,
+        passed: false,
+        reason: "marker_missing",
+      };
+    }
+    return {
+      id: assertion.id,
+      path: assertion.path,
+      passed: true,
+      reason: "matched",
+    };
+  });
+}
+
 function capabilityObservations(
   declarations: CapabilityDeclaration[],
   checks: CheckObservation[],
-  pathObservations: Map<string, boolean>,
+  files: Map<string, string | null>,
 ): CapabilityObservation[] {
   const checksById = new Map(checks.map((check) => [check.id, check]));
 
   return declarations.map((capability) => {
-    if (capability.status === "retired") {
-      return {
-        id: capability.id,
-        claimedStatus: capability.status,
-        observedStatus: "retired",
-        evidencePaths: capability.evidencePaths,
-        missingEvidencePaths: [],
-        requiredSignalIds: capability.requiredSignals ?? [],
-        failedSignalIds: [],
-        reason: null,
-      };
-    }
-
+    const assertions = usageObservations(capability.usageAssertions ?? [], files);
+    const usageAssertionIds = assertions.map((assertion) => assertion.id);
+    const failedUsageAssertionIds = assertions
+      .filter((assertion) => !assertion.passed)
+      .map((assertion) => assertion.id);
     const missingEvidencePaths = capability.evidencePaths.filter(
-      (path) => pathObservations.get(path) !== true,
+      (path) => files.get(path) === null || !files.has(path),
     );
     const requiredSignalIds = capability.requiredSignals ?? [];
     const signalObservations = requiredSignalIds.map((id) => checksById.get(id));
@@ -319,20 +428,39 @@ function capabilityObservations(
       (check) => check && ["queued", "running", "unknown"].includes(check.status),
     );
 
+    const common = {
+      id: capability.id,
+      claimedStatus: capability.status,
+      evidencePaths: capability.evidencePaths,
+      missingEvidencePaths,
+      requiredSignalIds,
+      failedSignalIds,
+      usageAssertionIds,
+      failedUsageAssertionIds,
+      usageAssertions: assertions,
+    };
+
+    if (capability.status === "retired") {
+      return {
+        ...common,
+        observedStatus: "retired",
+        reason: null,
+      };
+    }
+
     if (capability.status === "planned") {
       return {
-        id: capability.id,
-        claimedStatus: capability.status,
+        ...common,
         observedStatus: "unverified",
-        evidencePaths: capability.evidencePaths,
-        missingEvidencePaths,
-        requiredSignalIds,
-        failedSignalIds,
         reason: "capability is declared as planned",
       };
     }
 
-    if (missingEvidencePaths.length > 0 || failedSignalIds.length > 0) {
+    if (
+      missingEvidencePaths.length > 0
+      || failedSignalIds.length > 0
+      || failedUsageAssertionIds.length > 0
+    ) {
       const reasons = [
         missingEvidencePaths.length > 0
           ? `missing evidence: ${missingEvidencePaths.join(", ")}`
@@ -340,40 +468,28 @@ function capabilityObservations(
         failedSignalIds.length > 0
           ? `failed or missing signals: ${failedSignalIds.join(", ")}`
           : null,
-      ].filter(Boolean);
+        failedUsageAssertionIds.length > 0
+          ? `failed usage assertions: ${failedUsageAssertionIds.join(", ")}`
+          : null,
+      ].filter((reason): reason is string => Boolean(reason));
       return {
-        id: capability.id,
-        claimedStatus: capability.status,
+        ...common,
         observedStatus: "drifted",
-        evidencePaths: capability.evidencePaths,
-        missingEvidencePaths,
-        requiredSignalIds,
-        failedSignalIds,
         reason: reasons.join("; "),
       };
     }
 
     if (pendingSignal) {
       return {
-        id: capability.id,
-        claimedStatus: capability.status,
+        ...common,
         observedStatus: "unverified",
-        evidencePaths: capability.evidencePaths,
-        missingEvidencePaths,
-        requiredSignalIds,
-        failedSignalIds,
         reason: "required verification is still pending",
       };
     }
 
     return {
-      id: capability.id,
-      claimedStatus: capability.status,
+      ...common,
       observedStatus: "verified",
-      evidencePaths: capability.evidencePaths,
-      missingEvidencePaths,
-      requiredSignalIds,
-      failedSignalIds,
       reason: null,
     };
   });
@@ -387,7 +503,8 @@ function overallStatus(
   if (!validation.valid) return "failed";
   if (
     checks.some(
-      (check) => check.required && ["missing", "failed", "cancelled", "skipped"].includes(check.status),
+      (check) => check.required
+        && ["missing", "failed", "cancelled", "skipped"].includes(check.status),
     )
     || capabilities.some((capability) => capability.observedStatus === "drifted")
   ) {
@@ -429,12 +546,20 @@ export async function inspectRepositoryManifest(
   const checks = validation.manifest
     ? checkObservations(validation.manifest.verification.requiredSignals, signals)
     : [];
-  const evidencePaths = validation.manifest
-    ? validation.manifest.capabilities.flatMap((capability) => capability.evidencePaths)
+  const paths = validation.manifest
+    ? validation.manifest.capabilities.flatMap((capability) => [
+        ...capability.evidencePaths,
+        ...(capability.usageAssertions ?? []).map((assertion) => assertion.path),
+      ])
     : [];
-  const paths = await inspectEvidencePaths(provider, project.slug, ref.commitSha, evidencePaths);
+  const files = await inspectRepositoryFiles(
+    provider,
+    project.slug,
+    ref.commitSha,
+    paths,
+  );
   const capabilities = validation.manifest
-    ? capabilityObservations(validation.manifest.capabilities, checks, paths)
+    ? capabilityObservations(validation.manifest.capabilities, checks, files)
     : [];
 
   return {
