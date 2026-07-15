@@ -1,116 +1,135 @@
 /**
  * ProjectController
  *
- * Refreshes normalized, read-only repository state through RepositoryProvider.
- * Both event-triggered and periodic safety resync paths use this controller.
+ * Refreshes exact repository identity, default branch SHA, and latest provider
+ * verification signals. It reads the canonical project registry directly and
+ * never depends on stale connection-column names.
  */
 
-import { supabase } from '../lib/supabaseClient.js';
-import { createRepositoryProvider, normalizeRepositoryConnection } from '../providers/RepositoryProviderFactory.js';
-import { BaseController } from './base.js';
-import type { ReconcileRequest, ReconcileResult } from '../reconciliation/types.js';
+import { supabase } from "../lib/supabaseClient.js";
+import { providerForProject } from "../providers/providerFactory.js";
+import type { ReconcileRequest, ReconcileResult } from "../reconciliation/types.js";
+import { BaseController } from "./base.js";
+
+interface ProjectRow {
+  id: string;
+  slug: string;
+  name: string;
+  repo_provider: string;
+  repo_identifier: string | null;
+  status: "active" | "paused" | "archived";
+}
 
 export class ProjectController extends BaseController {
-  readonly name = 'ProjectController';
+  readonly name = "ProjectController";
 
   protected async reconcile(req: ReconcileRequest): Promise<ReconcileResult> {
-    const { projectId } = req;
+    const { data, error } = await supabase
+      .from("projects")
+      .select("id,slug,name,repo_provider,repo_identifier,status")
+      .eq("id", req.projectId)
+      .maybeSingle();
 
-    const { data: project } = await supabase
-      .from('projects')
-      .select('id, slug, name, repo_provider, repo_identifier')
-      .eq('id', projectId)
-      .single();
+    if (error) return this.retry(`Project lookup failed: ${error.message}`);
+    if (!data) return this.retry(`Project ${req.projectId} not found`);
 
-    if (!project) return this.done('retry', `Project ${projectId} not found`);
+    const project = data as ProjectRow;
+    if (project.status !== "active") {
+      return this.done("converged", `Project ${project.slug} is ${project.status}`);
+    }
+    if (!project.repo_identifier) {
+      return this.done("blocked", `Project ${project.slug} has no repository identifier`);
+    }
 
     try {
-      // `projects.repo_provider` + `projects.repo_identifier` are the canonical
-      // Phase 1 repository locator. `project_connections` remains the generic
-      // plugin-slot table and its initial schema is connection_type/config,
-      // not provider/connection_config.
-      const input = {
+      const provider = providerForProject({
+        repo_provider: project.repo_provider,
         slug: project.slug,
-        repoProvider: project.repo_provider,
-        repoIdentifier: project.repo_identifier,
-      };
-      const normalized = normalizeRepositoryConnection(input);
-      const provider = createRepositoryProvider(input);
-      const liveProject = await provider.getProject(project.slug);
-      const rootEntries = await provider.listFiles(
-        project.slug,
-        liveProject.defaultBranch,
-      );
-      const rootFileNames = rootEntries.map((entry) => entry.path).sort();
-      const manifestCandidates = [
-        'README.md',
-        'package.json',
-        'pyproject.toml',
-        'requirements.txt',
-        'Cargo.toml',
-        'AGENTS.md',
-        'CLAUDE.md',
-      ].filter((path) => rootFileNames.includes(path));
-
+        repo_identifier: project.repo_identifier,
+      });
+      const live = await provider.getProject(project.slug);
+      const ref = await provider.getRef(project.slug, live.defaultBranch);
+      const signals = await provider.listVerificationSignals(project.slug, ref.commitSha);
       const observedAt = new Date().toISOString();
       const observedState = {
-        repository: normalized.repository,
-        provider: normalized.provider,
-        defaultBranch: liveProject.defaultBranch,
-        active: liveProject.isActive,
-        rootEntryCount: rootEntries.length,
-        rootFiles: rootFileNames.slice(0, 200),
-        manifests: manifestCandidates,
+        projectId: project.slug,
+        repository: {
+          provider: live.provider,
+          identifier: live.locator,
+          name: live.name,
+          active: live.isActive,
+        },
+        defaultBranch: live.defaultBranch,
+        commitSha: ref.commitSha,
+        committedAt: ref.committedAt ?? null,
+        verificationSignals: signals.map((signal) => ({
+          id: signal.id,
+          name: signal.name,
+          status: signal.status,
+          commitSha: signal.commitSha,
+          provider: signal.provider,
+          startedAt: signal.startedAt ?? null,
+          completedAt: signal.completedAt ?? null,
+          detailsUrl: signal.detailsUrl ?? null,
+        })),
         observedAt,
-        source: 'project_controller_repository_provider',
       };
 
-      const { data: observation, error: observationError } = await supabase
-        .from('provider_observations')
-        .upsert(
-          {
-            project_id: projectId,
-            provider: normalized.provider,
-            resource_type: 'repository',
-            resource_id: normalized.repository,
-            observed_state: observedState,
-            observed_at: observedAt,
-            source_event_id: req.sourceEventId ?? null,
-          },
-          { onConflict: 'project_id,provider,resource_type,resource_id' },
-        )
-        .select('id')
-        .single();
+      const { error: observationError } = await supabase
+        .from("provider_observations")
+        .upsert({
+          project_id: project.id,
+          provider: live.provider,
+          resource_type: "repository",
+          resource_id: live.locator,
+          observed_state: observedState,
+          observed_at: observedAt,
+          source_event_id: req.sourceEventId ?? null,
+        }, { onConflict: "project_id,provider,resource_type,resource_id" });
+      if (observationError) {
+        return this.retry(`Repository observation persistence failed: ${observationError.message}`);
+      }
 
-      if (observationError) throw new Error(observationError.message);
-
-      this.log('info', 'Project observation refreshed', {
-        projectId,
-        repo: normalized.repository,
-        rootEntries: rootEntries.length,
+      this.log("info", "Project observation refreshed", {
+        projectId: project.id,
+        projectSlug: project.slug,
+        repository: live.locator,
+        commitSha: ref.commitSha,
+        signalCount: signals.length,
       });
 
       return {
-        status: 'converged',
+        status: "converged",
         observedChanges: [{
-          resourceType: 'repository',
-          resourceId: normalized.repository,
-          field: 'observed_state',
+          resourceType: "repository",
+          resourceId: live.locator,
+          field: "commitSha",
           previousValue: null,
-          newValue: observedState,
+          newValue: ref.commitSha,
         }],
         proposedActions: [],
-        evidenceIds: observation?.id ? [observation.id] : [],
+        evidenceIds: [],
         requiresApproval: false,
+        message: `Observed ${live.locator}@${ref.commitSha}`,
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.log('warn', 'Project observation failed', { projectId, message });
-      return this.done('retry', message);
+      return this.retry(error instanceof Error ? error.message : String(error));
     }
   }
 
-  private done(status: ReconcileResult['status'], message: string): ReconcileResult {
+  private retry(message: string): ReconcileResult {
+    return {
+      status: "retry",
+      observedChanges: [],
+      proposedActions: [],
+      evidenceIds: [],
+      requiresApproval: false,
+      retryAfter: new Date(Date.now() + 5 * 60_000).toISOString(),
+      message,
+    };
+  }
+
+  private done(status: ReconcileResult["status"], message: string): ReconcileResult {
     return {
       status,
       observedChanges: [],
