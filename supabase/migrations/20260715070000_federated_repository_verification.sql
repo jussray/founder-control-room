@@ -8,6 +8,8 @@ alter table public.project_manifests
   add column if not exists validation_errors jsonb not null default '[]'::jsonb,
   add column if not exists observed_at timestamptz not null default now();
 
+create unique index if not exists project_manifests_identity_uq
+  on public.project_manifests(project_id, commit_sha, content_hash);
 create index if not exists project_manifests_project_observed_idx
   on public.project_manifests(project_id, observed_at desc);
 
