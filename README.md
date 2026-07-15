@@ -79,26 +79,51 @@ where a repository actually lives. Later providers (`InternalGitProvider`,
 `ForgejoProvider`, `LocalGitProvider`) can be swapped in without touching
 callers.
 
+### MCP Hub Phase 1
+
+Founder Control Room now includes a zero-budget, read-only MCP policy layer for
+active portfolio projects. It declares GitHub, Playwright, Figma, and Supabase
+Development capability slots; every server remains disabled until its endpoint
+is configured locally.
+
+The Hub provides founder-only server discovery, capability inspection, policy
+preview, and read-only invocation. It records redacted hashes and structural
+evidence rather than raw tool payloads. Repository writes, database mutations,
+publishing, integration, deployment, and rollback remain separately approval-
+gated.
+
+See [`docs/MCP_HUB_PHASE_1.md`](docs/MCP_HUB_PHASE_1.md).
+
 ## Structure
 
 ```text
 src/
+  config/
+    portfolio.ts             # active portfolio and quarantine registry
   providers/
-    RepositoryProvider.ts   # provider-agnostic interface
-    GitHubProvider.ts        # first implementation (Octokit-based)
+    RepositoryProvider.ts    # provider-agnostic interface
+    GitHubProvider.ts         # first implementation (Octokit-based)
+    RepositoryProviderFactory.ts # central provider normalization/construction
   terminal/
     registry.ts              # project-specific executable + argument allowlist
     runner.ts                # shell-free, exact-head process runner
   reasoning/
     cloudflare/              # deterministic provider evidence + OODA reasoning
+  mcp/
+    defaultRegistry.ts        # credential-free server declarations
+    registry.ts               # server resolution and public views
+    policy.ts                 # project/tool/risk/cost enforcement
+    client.ts                 # constrained remote HTTP client
+    hub.ts                    # capability cache, invocation, evidence
+    safety.ts                 # stable hashes and secret-key rejection
   types/
-    changeProposal.ts        # Change Proposal (PR-equivalent) types
-    mission.ts               # Mission / verification-run types
+    changeProposal.ts         # Change Proposal (PR-equivalent) types
+    mission.ts                # Mission / verification-run types
   lib/
     supabaseClient.ts         # Control Room's own Supabase project (NOT Bip's), service-role key
     supabaseAuthClient.ts     # same project, publishable/anon key — auth-only calls
   http/
-    server.ts                 # Express app: mounts auth, projects, approvals, and Cloudflare reasoning
+    server.ts                 # Express app: mounts founder-only routes (auth, projects, approvals, Cloudflare reasoning, MCP)
     middleware/
       requireFounder.ts       # verifies session JWT + founder_users allowlist
     routes/
@@ -107,12 +132,14 @@ src/
       approvals.ts            # reservation-first, exact-head approved actions
       terminal.ts             # guarded mission verification terminal
       cloudflareReasoning.ts  # provider reasoning contract + founder-protected reports
+      mcp.ts                  # MCP discovery, preview, and invocation
   index.ts                    # bootstraps the HTTP server
 supabase/
   migrations/
     0001_init.sql
     0002_enable_rls_and_founder_policy.sql
     0003_harden_functions.sql
+    20260715_mcp_hub_phase1.sql # MCP declarations, policy, evidence
     20260717195000_guarded_terminal_and_schema_reconciliation.sql
 scripts/
   verify-guarded-terminal-contract.mjs
@@ -123,6 +150,7 @@ docs/
   LOCAL_WORKSPACE.md
   ARCHITECTURE.md              # full design doc + L99 authority model
   CLOUDFLARE_REASONING.md      # Cloudflare evidence, recovery, and approval contract
+  MCP_HUB_PHASE_1.md           # least-authority MCP contract
 ```
 
 The timestamped reconciliation migration upgrades the live legacy
