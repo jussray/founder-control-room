@@ -35,12 +35,15 @@ repositoryVerificationRouter.post(
   async (req: FounderRequest, res) => {
     try {
       const project = await loadProject(req.params.slug);
-      if (!project) return res.status(404).json({ error: "project_not_registered_or_missing_repository" });
+      if (!project) {
+        return res.status(404).json({
+          error: "project_not_registered_or_missing_repository",
+        });
+      }
 
       const provider = providerForProject(project);
       const inspection = await inspectRepositoryManifest(provider, project);
       const runId = await persistActiveInspection(project, inspection);
-
       return res.status(200).json({ runId, project: project.slug, inspection });
     } catch (error) {
       return res.status(500).json({
@@ -57,7 +60,11 @@ repositoryVerificationRouter.get(
   async (req: FounderRequest, res) => {
     try {
       const project = await loadProject(req.params.slug);
-      if (!project) return res.status(404).json({ error: "project_not_registered_or_missing_repository" });
+      if (!project) {
+        return res.status(404).json({
+          error: "project_not_registered_or_missing_repository",
+        });
+      }
 
       const [runs, capabilities, findings, manifest] = await Promise.all([
         supabase
@@ -86,7 +93,10 @@ repositoryVerificationRouter.get(
           .maybeSingle(),
       ]);
 
-      const firstError = runs.error ?? capabilities.error ?? findings.error ?? manifest.error;
+      const firstError = runs.error
+        ?? capabilities.error
+        ?? findings.error
+        ?? manifest.error;
       if (firstError) throw new Error(firstError.message);
 
       return res.json({
@@ -112,10 +122,16 @@ repositoryVerificationRouter.post(
   async (req: FounderRequest, res) => {
     try {
       const project = await loadProject(req.params.slug);
-      if (!project) return res.status(404).json({ error: "project_not_registered_or_missing_repository" });
+      if (!project) {
+        return res.status(404).json({
+          error: "project_not_registered_or_missing_repository",
+        });
+      }
 
       const requestedIds = Array.isArray(req.body?.findingIds)
-        ? req.body.findingIds.filter((id: unknown): id is string => typeof id === "string")
+        ? req.body.findingIds.filter(
+            (id: unknown): id is string => typeof id === "string",
+          )
         : null;
 
       let query = supabase
@@ -124,7 +140,9 @@ repositoryVerificationRouter.post(
         .eq("project_id", project.id)
         .eq("status", "open")
         .is("mission_id", null);
-      if (requestedIds && requestedIds.length > 0) query = query.in("id", requestedIds);
+      if (requestedIds && requestedIds.length > 0) {
+        query = query.in("id", requestedIds);
+      }
 
       const { data: findings, error: findingError } = await query;
       if (findingError) throw new Error(findingError.message);
@@ -149,7 +167,8 @@ repositoryVerificationRouter.post(
         .maybeSingle();
 
       const buildAssist = manifest?.parsed_manifest?.buildAssist;
-      const highestRisk = findings.some((finding) => ["critical", "high"].includes(String(finding.severity)))
+      const highestRisk = findings.some((finding) =>
+        ["critical", "high"].includes(String(finding.severity)))
         ? "high"
         : "medium";
       const description = [
@@ -169,20 +188,30 @@ repositoryVerificationRouter.post(
           description,
           status: "proposed",
           base_ref: latestRun?.branch ?? "main",
-          builder_agent: buildAssist?.enabled ? buildAssist.preferredBuilder ?? null : null,
+          builder_agent: buildAssist?.enabled
+            ? buildAssist.preferredBuilder ?? null
+            : null,
           risk_level: buildAssist?.riskLevel ?? highestRisk,
           required_checks: findings.map((finding) => finding.fingerprint),
           policy_snapshot: {
             source: "repository_verification",
             source_commit: latestRun?.commit_sha ?? null,
             finding_ids: findings.map((finding) => finding.id),
-            requested_by: req.founder?.email ?? "founder",
-            approvals_required: ["create_sandbox_workspace", "create_branch", "integrate", "deploy", "rollback"],
+            requested_by_user_id: req.founder?.userId ?? null,
+            approvals_required: [
+              "create_sandbox_workspace",
+              "create_branch",
+              "integrate",
+              "deploy",
+              "rollback",
+            ],
           },
         })
         .select("*")
         .single();
-      if (missionError || !mission) throw new Error(missionError?.message ?? "mission_insert_failed");
+      if (missionError || !mission) {
+        throw new Error(missionError?.message ?? "mission_insert_failed");
+      }
 
       const { error: assignError } = await supabase
         .from("repository_findings")
@@ -190,7 +219,7 @@ repositoryVerificationRouter.post(
         .in("id", findings.map((finding) => finding.id));
       if (assignError) throw new Error(assignError.message);
 
-      await supabase.from("project_events").insert({
+      const { error: eventError } = await supabase.from("project_events").insert({
         project_id: project.id,
         event_type: "repository_repair_mission_proposed",
         severity: "warning",
@@ -199,8 +228,10 @@ repositoryVerificationRouter.post(
           mission_id: mission.id,
           finding_ids: findings.map((finding) => finding.id),
           source_commit: latestRun?.commit_sha ?? null,
+          requested_by_user_id: req.founder?.userId ?? null,
         },
       });
+      if (eventError) throw new Error(eventError.message);
 
       return res.status(201).json({ mission, findings });
     } catch (error) {
@@ -213,7 +244,9 @@ repositoryVerificationRouter.post(
 );
 
 function secretForProject(projectId: string): string {
-  const key = `REPOSITORY_INGEST_SECRET_${projectId.replace(/[^a-z0-9]/gi, "_").toUpperCase()}`;
+  const key = `REPOSITORY_INGEST_SECRET_${projectId
+    .replace(/[^a-z0-9]/gi, "_")
+    .toUpperCase()}`;
   return process.env[key] ?? process.env.REPOSITORY_INGEST_SECRET ?? "";
 }
 
@@ -226,7 +259,11 @@ function verifySignature(body: Buffer, signature: string, secret: string): boole
 }
 
 function safeString(value: unknown, field: string, max = 300): string {
-  if (typeof value !== "string" || value.trim().length === 0 || value.length > max) {
+  if (
+    typeof value !== "string"
+    || value.trim().length === 0
+    || value.length > max
+  ) {
     throw new Error(`${field}_invalid`);
   }
   return value.trim();
@@ -234,10 +271,29 @@ function safeString(value: unknown, field: string, max = 300): string {
 
 function safePath(value: unknown, field: string): string {
   const path = safeString(value, field, 500);
-  if (path.startsWith("/") || path.includes("..") || path.includes("\\")) {
+  if (
+    path.startsWith("/")
+    || path.includes("\\")
+    || path.split("/").includes("..")
+  ) {
     throw new Error(`${field}_unsafe`);
   }
   return path;
+}
+
+function safeIdArray(
+  value: unknown,
+  field: string,
+  maxItems = 200,
+): string[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > maxItems) {
+    throw new Error(`${field}_invalid`);
+  }
+  const ids = value.map((candidate, index) =>
+    safeString(candidate, `${field}_${index}`, 100));
+  if (new Set(ids).size !== ids.length) throw new Error(`${field}_duplicates`);
+  return ids;
 }
 
 function safeUrl(value: unknown): string | undefined {
@@ -252,19 +308,31 @@ function safeUrl(value: unknown): string | undefined {
 }
 
 function parsePacket(raw: unknown): RepositoryVerificationPacket {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error("packet_root_invalid");
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    throw new Error("packet_root_invalid");
+  }
   const value = raw as Record<string, unknown>;
-  if (value.schemaVersion !== REPOSITORY_PACKET_SCHEMA_VERSION) throw new Error("packet_schema_unsupported");
+  if (value.schemaVersion !== REPOSITORY_PACKET_SCHEMA_VERSION) {
+    throw new Error("packet_schema_unsupported");
+  }
 
   const repository = value.repository as Record<string, unknown> | undefined;
   const runner = value.runner as Record<string, unknown> | undefined;
-  if (!repository || typeof repository !== "object") throw new Error("packet_repository_invalid");
-  if (!runner || typeof runner !== "object") throw new Error("packet_runner_invalid");
+  if (!repository || typeof repository !== "object") {
+    throw new Error("packet_repository_invalid");
+  }
+  if (!runner || typeof runner !== "object") {
+    throw new Error("packet_runner_invalid");
+  }
 
   const checksRaw = Array.isArray(value.checks) ? value.checks : [];
   if (checksRaw.length > 200) throw new Error("packet_checks_too_large");
   const checks: IngestedCheck[] = checksRaw.map((candidate, index) => {
-    if (typeof candidate !== "object" || candidate === null || Array.isArray(candidate)) {
+    if (
+      typeof candidate !== "object"
+      || candidate === null
+      || Array.isArray(candidate)
+    ) {
       throw new Error(`check_${index}_invalid`);
     }
     const check = candidate as Record<string, unknown>;
@@ -282,45 +350,94 @@ function parsePacket(raw: unknown): RepositoryVerificationPacket {
   });
 
   const capabilitiesRaw = Array.isArray(value.capabilities) ? value.capabilities : [];
-  if (capabilitiesRaw.length > 200) throw new Error("packet_capabilities_too_large");
-  const capabilities: IngestedCapability[] = capabilitiesRaw.map((candidate, index) => {
-    if (typeof candidate !== "object" || candidate === null || Array.isArray(candidate)) {
-      throw new Error(`capability_${index}_invalid`);
-    }
-    const capability = candidate as Record<string, unknown>;
-    const claimedStatus = safeString(capability.claimedStatus, `capability_${index}_claimed`, 20);
-    const observedStatus = safeString(capability.observedStatus, `capability_${index}_observed`, 20);
-    if (!["active", "planned", "retired"].includes(claimedStatus)) {
-      throw new Error(`capability_${index}_claimed_invalid`);
-    }
-    if (!["verified", "drifted", "unverified", "retired"].includes(observedStatus)) {
-      throw new Error(`capability_${index}_observed_invalid`);
-    }
-    const paths = Array.isArray(capability.evidencePaths)
-      ? capability.evidencePaths.map((path, pathIndex) => safePath(path, `capability_${index}_path_${pathIndex}`))
-      : [];
-    return {
-      id: safeString(capability.id, `capability_${index}_id`, 100),
-      claimedStatus: claimedStatus as IngestedCapability["claimedStatus"],
-      observedStatus: observedStatus as IngestedCapability["observedStatus"],
-      evidencePaths: paths,
-      reason: capability.reason === undefined ? undefined : safeString(capability.reason, `capability_${index}_reason`, 1000),
-    };
-  });
+  if (capabilitiesRaw.length > 200) {
+    throw new Error("packet_capabilities_too_large");
+  }
+  const capabilities: IngestedCapability[] = capabilitiesRaw.map(
+    (candidate, index) => {
+      if (
+        typeof candidate !== "object"
+        || candidate === null
+        || Array.isArray(candidate)
+      ) {
+        throw new Error(`capability_${index}_invalid`);
+      }
+      const capability = candidate as Record<string, unknown>;
+      const claimedStatus = safeString(
+        capability.claimedStatus,
+        `capability_${index}_claimed`,
+        20,
+      );
+      const observedStatus = safeString(
+        capability.observedStatus,
+        `capability_${index}_observed`,
+        20,
+      );
+      if (!["active", "planned", "retired"].includes(claimedStatus)) {
+        throw new Error(`capability_${index}_claimed_invalid`);
+      }
+      if (!["verified", "drifted", "unverified", "retired"].includes(observedStatus)) {
+        throw new Error(`capability_${index}_observed_invalid`);
+      }
+
+      const evidencePaths = Array.isArray(capability.evidencePaths)
+        ? capability.evidencePaths.map((path, pathIndex) =>
+            safePath(path, `capability_${index}_path_${pathIndex}`))
+        : [];
+      const usageAssertionIds = safeIdArray(
+        capability.usageAssertionIds,
+        `capability_${index}_usage_assertions`,
+      );
+      const failedUsageAssertionIds = safeIdArray(
+        capability.failedUsageAssertionIds,
+        `capability_${index}_failed_usage_assertions`,
+      );
+      if (
+        failedUsageAssertionIds.some(
+          (assertionId) => !usageAssertionIds.includes(assertionId),
+        )
+      ) {
+        throw new Error(`capability_${index}_failed_usage_not_declared`);
+      }
+
+      return {
+        id: safeString(capability.id, `capability_${index}_id`, 100),
+        claimedStatus: claimedStatus as IngestedCapability["claimedStatus"],
+        observedStatus: observedStatus as IngestedCapability["observedStatus"],
+        evidencePaths,
+        usageAssertionIds,
+        failedUsageAssertionIds,
+        reason: capability.reason === undefined
+          ? undefined
+          : safeString(capability.reason, `capability_${index}_reason`, 1000),
+      };
+    },
+  );
 
   const commitSha = safeString(value.commitSha, "commit_sha", 64).toLowerCase();
-  const manifestHash = safeString(value.manifestHash, "manifest_hash", 64).toLowerCase();
-  if (!/^[a-f0-9]{7,64}$/.test(commitSha)) throw new Error("commit_sha_invalid");
-  if (!/^[a-f0-9]{64}$/.test(manifestHash)) throw new Error("manifest_hash_invalid");
+  const manifestHash = safeString(value.manifestHash, "manifest_hash", 64)
+    .toLowerCase();
+  if (!/^[a-f0-9]{7,64}$/.test(commitSha)) {
+    throw new Error("commit_sha_invalid");
+  }
+  if (!/^[a-f0-9]{64}$/.test(manifestHash)) {
+    throw new Error("manifest_hash_invalid");
+  }
   const generatedAt = safeString(value.generatedAt, "generated_at", 50);
-  if (!Number.isFinite(Date.parse(generatedAt))) throw new Error("generated_at_invalid");
+  if (!Number.isFinite(Date.parse(generatedAt))) {
+    throw new Error("generated_at_invalid");
+  }
 
   return {
     schemaVersion: REPOSITORY_PACKET_SCHEMA_VERSION,
     projectId: safeString(value.projectId, "project_id", 100),
     repository: {
       provider: safeString(repository.provider, "repository_provider", 50),
-      identifier: safeString(repository.identifier, "repository_identifier", 300),
+      identifier: safeString(
+        repository.identifier,
+        "repository_identifier",
+        300,
+      ),
     },
     commitSha,
     branch: safeString(value.branch, "branch", 200),
@@ -328,7 +445,9 @@ function parsePacket(raw: unknown): RepositoryVerificationPacket {
     generatedAt: new Date(generatedAt).toISOString(),
     runner: {
       provider: safeString(runner.provider, "runner_provider", 100),
-      runId: runner.runId === undefined ? undefined : safeString(runner.runId, "runner_id", 200),
+      runId: runner.runId === undefined
+        ? undefined
+        : safeString(runner.runId, "runner_id", 200),
       detailsUrl: safeUrl(runner.detailsUrl),
     },
     checks,
@@ -345,23 +464,41 @@ export async function handleRepositoryVerificationIngest(
   res: Response,
 ): Promise<Response> {
   try {
-    const body = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body ?? "");
+    const body = Buffer.isBuffer(req.body)
+      ? req.body
+      : Buffer.from(req.body ?? "");
     if (body.length === 0 || body.length > 512_000) {
       return res.status(400).json({ error: "invalid_body_size" });
     }
 
-    const projectSlug = safeString(req.header("x-control-room-project"), "project_header", 100);
-    const deliveryId = safeString(req.header("x-control-room-delivery"), "delivery_header", 200);
-    const signature = safeString(req.header("x-control-room-signature"), "signature_header", 100);
+    const projectSlug = safeString(
+      req.header("x-control-room-project"),
+      "project_header",
+      100,
+    );
+    const deliveryId = safeString(
+      req.header("x-control-room-delivery"),
+      "delivery_header",
+      200,
+    );
+    const signature = safeString(
+      req.header("x-control-room-signature"),
+      "signature_header",
+      100,
+    );
     const project = await loadProject(projectSlug);
-    if (!project) return res.status(404).json({ error: "project_not_registered" });
+    if (!project) {
+      return res.status(404).json({ error: "project_not_registered" });
+    }
 
     if (!verifySignature(body, signature, secretForProject(projectSlug))) {
       return res.status(401).json({ error: "invalid_signature" });
     }
 
     const packet = parsePacket(JSON.parse(body.toString("utf8")));
-    if (packet.projectId !== project.slug) return res.status(409).json({ error: "project_identity_mismatch" });
+    if (packet.projectId !== project.slug) {
+      return res.status(409).json({ error: "project_identity_mismatch" });
+    }
     if (
       packet.repository.provider !== project.repo_provider
       || packet.repository.identifier !== project.repo_identifier
