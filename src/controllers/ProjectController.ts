@@ -100,7 +100,9 @@ export class ProjectController extends BaseController {
         observedChanges: [{
           resourceType: 'repository',
           resourceId: normalized.repository,
-          change: 'observation_refreshed',
+          field: 'observed_state',
+          previousValue: null,
+          newValue: observedState,
         }],
         proposedActions: [],
         evidenceIds: observation?.id ? [observation.id] : [],
