@@ -29,14 +29,18 @@ function checkFindings(checks: CheckObservation[]): FindingInput[] {
     .map((check) => ({
       fingerprint: `check:${check.id}`,
       category: "check" as const,
-      severity: ["failed", "missing", "cancelled"].includes(check.status) ? "high" as const : "medium" as const,
+      severity: ["failed", "missing", "cancelled"].includes(check.status)
+        ? "high" as const
+        : "medium" as const,
       title: `${check.name} is not proven`,
       detail: `Required signal ${check.id} is ${check.status}.`,
       suggestedAction: `Inspect the ${check.name} workflow at the exact commit and prepare a repair mission.`,
     }));
 }
 
-function capabilityFindings(capabilities: CapabilityObservation[]): FindingInput[] {
+function capabilityFindings(
+  capabilities: CapabilityObservation[],
+): FindingInput[] {
   return capabilities
     .filter((capability) => capability.observedStatus === "drifted")
     .map((capability) => ({
@@ -45,11 +49,13 @@ function capabilityFindings(capabilities: CapabilityObservation[]): FindingInput
       severity: "high" as const,
       title: `Capability ${capability.id} drifted from its code contract`,
       detail: capability.reason,
-      suggestedAction: `Compare the declared evidence paths and required signals for ${capability.id}, then prepare a bounded repair mission.`,
+      suggestedAction: `Compare evidence paths, required checks, and code-usage assertions for ${capability.id}, then prepare a bounded repair mission.`,
     }));
 }
 
-function inspectionFindings(inspection: RepositoryManifestInspection): FindingInput[] {
+function inspectionFindings(
+  inspection: RepositoryManifestInspection,
+): FindingInput[] {
   const manifestFindings = inspection.validation.valid
     ? []
     : [{
@@ -100,7 +106,9 @@ async function syncFindings(
     .eq("project_id", project.id)
     .in("category", ["manifest", "check", "capability"])
     .eq("status", "open");
-  if (existingError) throw new Error(`repository_finding_read_failed:${existingError.message}`);
+  if (existingError) {
+    throw new Error(`repository_finding_read_failed:${existingError.message}`);
+  }
 
   for (const finding of existing ?? []) {
     if (active.has(String(finding.fingerprint))) continue;
@@ -130,12 +138,16 @@ async function upsertCapabilities(
         missing_evidence_paths: capability.missingEvidencePaths,
         required_signal_ids: capability.requiredSignalIds,
         failed_signal_ids: capability.failedSignalIds,
+        usage_assertion_ids: capability.usageAssertionIds,
+        failed_usage_assertion_ids: capability.failedUsageAssertionIds,
         reason: capability.reason,
         commit_sha: commitSha,
         last_verified_at: scannedAt,
         updated_at: new Date().toISOString(),
       }, { onConflict: "project_id,capability_id" });
-    if (error) throw new Error(`repository_capability_upsert_failed:${error.message}`);
+    if (error) {
+      throw new Error(`repository_capability_upsert_failed:${error.message}`);
+    }
   }
 }
 
@@ -145,14 +157,14 @@ export async function persistActiveInspection(
 ): Promise<string> {
   const manifest = inspection.validation.manifest;
 
-  // Supersede every previously active observation. The exact row below is then
-  // inserted or reactivated, guaranteeing one current manifest per project.
   const { error: supersedeError } = await supabase
     .from("project_manifests")
     .update({ superseded_at: inspection.scannedAt })
     .eq("project_id", project.id)
     .is("superseded_at", null);
-  if (supersedeError) throw new Error(`manifest_supersede_failed:${supersedeError.message}`);
+  if (supersedeError) {
+    throw new Error(`manifest_supersede_failed:${supersedeError.message}`);
+  }
 
   const { error: manifestError } = await supabase
     .from("project_manifests")
@@ -193,24 +205,46 @@ export async function persistActiveInspection(
     })
     .select("id")
     .single();
-  if (runError || !run) throw new Error(`verification_run_store_failed:${runError?.message ?? "missing row"}`);
+  if (runError || !run) {
+    throw new Error(`verification_run_store_failed:${runError?.message ?? "missing row"}`);
+  }
 
-  await upsertCapabilities(project, inspection.commitSha, inspection.scannedAt, inspection.capabilities);
+  await upsertCapabilities(
+    project,
+    inspection.commitSha,
+    inspection.scannedAt,
+    inspection.capabilities,
+  );
   await syncFindings(project, String(run.id), inspectionFindings(inspection));
 
   const { error: eventError } = await supabase.from("project_events").insert({
     project_id: project.id,
     source_event_id: `repo-scan:${inspection.commitSha}:${inspection.manifestHash}`,
     event_type: `repository_verification_${inspection.overallStatus}`,
-    severity: inspection.overallStatus === "failed" ? "error" : inspection.overallStatus === "warning" ? "warning" : "info",
+    severity: inspection.overallStatus === "failed"
+      ? "error"
+      : inspection.overallStatus === "warning"
+        ? "warning"
+        : "info",
     provider: project.repo_provider,
-    decision: inspection.overallStatus === "passed" ? "verified" : "attention_required",
+    decision: inspection.overallStatus === "passed"
+      ? "verified"
+      : "attention_required",
     metadata: {
       commit_sha: inspection.commitSha,
       branch: inspection.branch,
       manifest_hash: inspection.manifestHash,
-      failed_checks: inspection.checks.filter((check) => check.required && check.status !== "passed").map((check) => check.id),
-      drifted_capabilities: inspection.capabilities.filter((capability) => capability.observedStatus === "drifted").map((capability) => capability.id),
+      failed_checks: inspection.checks
+        .filter((check) => check.required && check.status !== "passed")
+        .map((check) => check.id),
+      drifted_capabilities: inspection.capabilities
+        .filter((capability) => capability.observedStatus === "drifted")
+        .map((capability) => capability.id),
+      failed_usage_assertions: inspection.capabilities.flatMap(
+        (capability) => capability.failedUsageAssertionIds.map(
+          (assertionId) => `${capability.id}:${assertionId}`,
+        ),
+      ),
     },
   });
   if (eventError && eventError.code !== "23505") {
@@ -220,14 +254,22 @@ export async function persistActiveInspection(
   return String(run.id);
 }
 
-function packetOverallStatus(packet: RepositoryVerificationPacket): "passed" | "warning" | "failed" {
+function packetOverallStatus(
+  packet: RepositoryVerificationPacket,
+): "passed" | "warning" | "failed" {
   if (
-    packet.checks.some((check) => check.required && ["failed", "cancelled"].includes(check.status))
-    || packet.capabilities.some((capability) => capability.observedStatus === "drifted")
+    packet.checks.some(
+      (check) => check.required && ["failed", "cancelled"].includes(check.status),
+    )
+    || packet.capabilities.some(
+      (capability) => capability.observedStatus === "drifted",
+    )
   ) return "failed";
   if (
     packet.checks.some((check) => check.required && check.status !== "passed")
-    || packet.capabilities.some((capability) => capability.observedStatus === "unverified")
+    || packet.capabilities.some(
+      (capability) => capability.observedStatus === "unverified",
+    )
   ) return "warning";
   return "passed";
 }
@@ -246,6 +288,9 @@ export async function persistRepositoryPacket(
     missingEvidencePaths: [],
     requiredSignalIds: [],
     failedSignalIds: [],
+    usageAssertionIds: capability.usageAssertionIds ?? [],
+    failedUsageAssertionIds: capability.failedUsageAssertionIds ?? [],
+    usageAssertions: [],
     reason: capability.reason ?? null,
   }));
 
@@ -269,7 +314,9 @@ export async function persistRepositoryPacket(
     }, { onConflict: "project_id,source,delivery_id" })
     .select("id")
     .single();
-  if (runError || !run) throw new Error(`verification_packet_store_failed:${runError?.message ?? "missing row"}`);
+  if (runError || !run) {
+    throw new Error(`verification_packet_store_failed:${runError?.message ?? "missing row"}`);
+  }
 
   await upsertCapabilities(project, packet.commitSha, packet.generatedAt, capabilities);
 
@@ -289,7 +336,11 @@ export async function persistRepositoryPacket(
     project_id: project.id,
     source_event_id: `repo-ping:${deliveryId}`,
     event_type: `repository_ping_${overallStatus}`,
-    severity: overallStatus === "failed" ? "error" : overallStatus === "warning" ? "warning" : "info",
+    severity: overallStatus === "failed"
+      ? "error"
+      : overallStatus === "warning"
+        ? "warning"
+        : "info",
     provider: packet.runner.provider,
     decision: overallStatus === "passed" ? "verified" : "attention_required",
     metadata: {
@@ -298,6 +349,11 @@ export async function persistRepositoryPacket(
       manifest_hash: packet.manifestHash,
       runner_id: packet.runner.runId ?? null,
       runner_url: packet.runner.detailsUrl ?? null,
+      failed_usage_assertions: packet.capabilities.flatMap(
+        (capability) => (capability.failedUsageAssertionIds ?? []).map(
+          (assertionId) => `${capability.id}:${assertionId}`,
+        ),
+      ),
     },
   });
   if (eventError && eventError.code !== "23505") {
