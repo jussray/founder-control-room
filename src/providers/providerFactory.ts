@@ -18,14 +18,16 @@ export interface ProviderProjectConfig {
 
 class LazyRepositoryProvider implements RepositoryProvider {
   readonly name: string;
-  private readonly delegatePromise: Promise<RepositoryProvider>;
+  private readonly factory: () => Promise<RepositoryProvider>;
+  private delegatePromise: Promise<RepositoryProvider> | null = null;
 
   constructor(name: string, factory: () => Promise<RepositoryProvider>) {
     this.name = name;
-    this.delegatePromise = factory();
+    this.factory = factory;
   }
 
   private delegate(): Promise<RepositoryProvider> {
+    this.delegatePromise ??= this.factory();
     return this.delegatePromise;
   }
 
@@ -97,7 +99,7 @@ async function githubProvider(project: ProviderProjectConfig): Promise<Repositor
  *
  * Production prefers a repository-scoped GitHub App installation token.
  * GITHUB_TOKEN remains a local/development fallback only. Authentication is
- * lazy so callers keep the same provider-neutral synchronous factory contract.
+ * demand-driven and cached so callers retain the synchronous factory contract.
  */
 export function providerForProject(project: ProviderProjectConfig): RepositoryProvider {
   if (project.repo_provider === "github") {
