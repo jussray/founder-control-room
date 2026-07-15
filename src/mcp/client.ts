@@ -35,6 +35,13 @@ function parseSsePayload(text: string): unknown {
   return JSON.parse(dataLines[dataLines.length - 1]);
 }
 
+interface CompletedResponse {
+  ok: boolean;
+  status: number;
+  contentType: string;
+  text: string;
+}
+
 export class McpHttpClient {
   private sessionId?: string;
   private connected = false;
@@ -65,9 +72,13 @@ export class McpHttpClient {
     };
   }
 
-  private async post(body: Record<string, unknown>): Promise<Response> {
+  private async post(
+    body: Record<string, unknown>,
+    readBody: boolean,
+  ): Promise<CompletedResponse> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs());
+
     try {
       const response = await fetch(endpointFor(this.server, this.env), {
         method: "POST",
@@ -77,7 +88,19 @@ export class McpHttpClient {
       });
       const returnedSessionId = response.headers.get("mcp-session-id");
       if (returnedSessionId) this.sessionId = returnedSessionId;
-      return response;
+
+      const text = readBody ? await response.text() : "";
+      if (!readBody) await response.body?.cancel();
+      if (Buffer.byteLength(text, "utf8") > MAX_RESPONSE_BYTES) {
+        throw new Error(`MCP response exceeded ${MAX_RESPONSE_BYTES} bytes`);
+      }
+
+      return {
+        ok: response.ok,
+        status: response.status,
+        contentType: response.headers.get("content-type") ?? "",
+        text,
+      };
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         throw new Error(`MCP ${this.server.id} request timed out`);
@@ -90,21 +113,20 @@ export class McpHttpClient {
 
   private async rpc<T>(method: string, params?: Record<string, unknown>): Promise<T> {
     const id = randomUUID();
-    const response = await this.post({ jsonrpc: "2.0", id, method, params });
-    const text = await response.text();
-    if (Buffer.byteLength(text, "utf8") > MAX_RESPONSE_BYTES) {
-      throw new Error(`MCP response exceeded ${MAX_RESPONSE_BYTES} bytes`);
-    }
+    const response = await this.post(
+      { jsonrpc: "2.0", id, method, params },
+      true,
+    );
     if (!response.ok) {
       throw new Error(`MCP ${this.server.id} returned HTTP ${response.status}`);
     }
-    if (!text.trim()) {
+    if (!response.text.trim()) {
       throw new Error(`MCP ${this.server.id} returned an empty response for ${method}`);
     }
 
-    const payload = response.headers.get("content-type")?.includes("text/event-stream")
-      ? parseSsePayload(text)
-      : JSON.parse(text);
+    const payload = response.contentType.includes("text/event-stream")
+      ? parseSsePayload(response.text)
+      : JSON.parse(response.text);
     const rpc = payload as JsonRpcResponse<T>;
     if (rpc.error) {
       throw new Error(`MCP ${this.server.id} error ${rpc.error.code}: ${rpc.error.message}`);
@@ -116,12 +138,15 @@ export class McpHttpClient {
   }
 
   private async notify(method: string, params?: Record<string, unknown>): Promise<void> {
-    const response = await this.post({ jsonrpc: "2.0", method, params });
+    const response = await this.post(
+      { jsonrpc: "2.0", method, params },
+      false,
+    );
     if (!response.ok) {
-      throw new Error(`MCP ${this.server.id} notification returned HTTP ${response.status}`);
+      throw new Error(
+        `MCP ${this.server.id} notification returned HTTP ${response.status}`,
+      );
     }
-    // Notifications commonly return 202 with no body. Do not parse or persist it.
-    await response.body?.cancel();
   }
 
   async initialize(): Promise<Record<string, unknown>> {
