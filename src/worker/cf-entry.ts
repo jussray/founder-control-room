@@ -3,8 +3,10 @@
  *
  * Express runs behind Cloudflare's supported Node HTTP server adapter. The
  * scheduled handler shares the same Worker entry point and lazily loads the
- * reconciliation loop only when a cron event arrives. HTTP routes include
- * signed provider webhooks and repository verification pings.
+ * reconciliation loop only when a cron event arrives, enqueueing due
+ * portfolio repository verification first so the same cycle picks it up.
+ * HTTP routes include signed provider webhooks and repository verification
+ * pings.
  */
 
 import { httpServerHandler } from 'cloudflare:node';
@@ -31,5 +33,13 @@ const httpHandler = httpServerHandler(nodeServer) as ExportedHandler<ControlRoom
 
 export default composeWorkerHandler(
   httpHandler,
-  () => import('./reconciler.js'),
+  async () => {
+    const [{ runReconcilerCycle }] = await Promise.all([
+      import('./reconciler.js'),
+      import('../services/portfolioVerificationScheduler.js').then((mod) =>
+        mod.enqueueDuePortfolioVerification(),
+      ),
+    ]);
+    return { runReconcilerCycle };
+  },
 );
