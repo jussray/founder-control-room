@@ -24,21 +24,15 @@ export class ProjectController extends BaseController {
 
     if (!project) return this.done('retry', `Project ${projectId} not found`);
 
-    const { data: connection } = await supabase
-      .from('project_connections')
-      .select('provider, connection_config, status')
-      .eq('project_id', projectId)
-      .eq('provider', 'github')
-      .eq('status', 'active')
-      .maybeSingle();
-
     try {
+      // `projects.repo_provider` + `projects.repo_identifier` are the canonical
+      // Phase 1 repository locator. `project_connections` remains the generic
+      // plugin-slot table and its initial schema is connection_type/config,
+      // not provider/connection_config.
       const input = {
         slug: project.slug,
         repoProvider: project.repo_provider,
         repoIdentifier: project.repo_identifier,
-        provider: connection?.provider,
-        connectionConfig: connection?.connection_config as Record<string, unknown> | null,
       };
       const normalized = normalizeRepositoryConnection(input);
       const provider = createRepositoryProvider(input);
