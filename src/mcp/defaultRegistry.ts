@@ -1,0 +1,105 @@
+import { ACTIVE_PROJECT_SLUGS } from "../config/portfolio.js";
+import type { McpServerDefinition } from "./types.js";
+
+const ALL_ACTIVE_PROJECTS = [...ACTIVE_PROJECT_SLUGS];
+
+/**
+ * Phase 1 is deliberately read-only. A server is unavailable until its URL is
+ * supplied locally through the declared environment variable. Tokens are never
+ * stored in this registry or returned by the API.
+ */
+export const DEFAULT_MCP_SERVERS: readonly McpServerDefinition[] = [
+  {
+    id: "github",
+    label: "GitHub MCP",
+    role: "repository-read-and-review",
+    endpointEnv: "MCP_GITHUB_URL",
+    authTokenEnv: "MCP_GITHUB_TOKEN",
+    enabledProjects: ALL_ACTIVE_PROJECTS,
+    allowedToolPatterns: [
+      "get_*",
+      "list_*",
+      "search_*",
+      "read_*",
+      "fetch_*",
+      "view_*",
+      "show_*",
+      "inspect_*",
+      "status_*",
+      "*_get",
+      "*_list",
+      "*_search",
+      "*_read",
+    ],
+    deniedToolPatterns: [
+      "*create*",
+      "*update*",
+      "*delete*",
+      "*merge*",
+      "*push*",
+      "*dispatch*",
+      "*rerun*",
+      "*cancel*",
+      "*submit*",
+      "*write*",
+      "*commit*",
+      "*approve*",
+      "*close*",
+      "*reopen*",
+      "*lock*",
+      "*unlock*",
+      "*add*",
+      "*remove*",
+    ],
+    defaultRisk: "read",
+    monthlyBudgetUsd: 0,
+  },
+  {
+    id: "playwright",
+    label: "Playwright MCP",
+    role: "qa-investigation-and-evidence",
+    endpointEnv: "MCP_PLAYWRIGHT_URL",
+    authTokenEnv: "MCP_PLAYWRIGHT_TOKEN",
+    enabledProjects: [
+      "sekret-bip",
+      "jussbeautifulhair-site",
+      "untold-stories-storefront",
+      "founder-control-room",
+    ],
+    allowedToolPatterns: [
+      "browser_snapshot",
+      "browser_console_messages",
+      "browser_network_requests",
+      "browser_take_screenshot",
+      "browser_tabs",
+    ],
+    deniedToolPatterns: ["browser_*click*", "browser_*type*", "browser_*fill*", "browser_*upload*", "browser_*navigate*", "browser_*press*", "browser_*select*", "browser_*drag*"],
+    defaultRisk: "read",
+    monthlyBudgetUsd: 0,
+  },
+  {
+    id: "figma",
+    label: "Figma MCP",
+    role: "design-context-and-specification-read",
+    endpointEnv: "MCP_FIGMA_URL",
+    authTokenEnv: "MCP_FIGMA_TOKEN",
+    enabledProjects: ["sekret-bip", "untold-stories-storefront", "founder-control-room"],
+    allowedToolPatterns: ["get_*", "list_*", "read_*", "inspect_*", "view_*"],
+    deniedToolPatterns: ["*create*", "*update*", "*delete*", "*write*", "*publish*", "*apply*"],
+    defaultRisk: "read",
+    monthlyBudgetUsd: 0,
+  },
+  {
+    id: "supabase-dev",
+    label: "Supabase Development MCP",
+    role: "development-schema-inspection",
+    endpointEnv: "MCP_SUPABASE_DEV_URL",
+    authTokenEnv: "MCP_SUPABASE_DEV_TOKEN",
+    enabledProjects: ALL_ACTIVE_PROJECTS,
+    allowedToolPatterns: ["list_*", "get_*", "read_*", "inspect_*", "generate_typescript_types"],
+    deniedToolPatterns: ["*execute*", "*apply*", "*create*", "*update*", "*delete*", "*deploy*", "*write*", "*branch*", "*merge*", "*restore*"],
+    defaultRisk: "read",
+    developmentOnly: true,
+    monthlyBudgetUsd: 0,
+  },
+] as const;
