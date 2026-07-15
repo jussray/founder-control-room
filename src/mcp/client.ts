@@ -7,6 +7,7 @@ import type {
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const MAX_RESPONSE_BYTES = 1_000_000;
+const PROTOCOL_VERSION = "2025-06-18";
 
 function endpointFor(
   server: McpServerDefinition,
@@ -15,10 +16,10 @@ function endpointFor(
   const raw = env[server.endpointEnv]?.trim();
   if (!raw) throw new Error(`MCP endpoint ${server.endpointEnv} is not configured`);
   const url = new URL(raw);
-  if (!['https:', 'http:'].includes(url.protocol)) {
+  if (!["https:", "http:"].includes(url.protocol)) {
     throw new Error(`MCP endpoint for ${server.id} must use http or https`);
   }
-  if (env.NODE_ENV === 'production' && url.protocol !== 'https:') {
+  if (env.NODE_ENV === "production" && url.protocol !== "https:") {
     throw new Error(`MCP endpoint for ${server.id} must use https in production`);
   }
   return url;
@@ -27,14 +28,17 @@ function endpointFor(
 function parseSsePayload(text: string): unknown {
   const dataLines = text
     .split(/\r?\n/)
-    .filter((line) => line.startsWith('data:'))
+    .filter((line) => line.startsWith("data:"))
     .map((line) => line.slice(5).trim())
     .filter(Boolean);
-  if (!dataLines.length) throw new Error('MCP server returned an empty event stream');
+  if (!dataLines.length) throw new Error("MCP server returned an empty event stream");
   return JSON.parse(dataLines[dataLines.length - 1]);
 }
 
 export class McpHttpClient {
+  private sessionId?: string;
+  private connected = false;
+
   constructor(
     private readonly server: McpServerDefinition,
     private readonly env: NodeJS.ProcessEnv = process.env,
@@ -48,48 +52,34 @@ export class McpHttpClient {
     return configured;
   }
 
-  private async rpc<T>(method: string, params?: Record<string, unknown>): Promise<T> {
-    const endpoint = endpointFor(this.server, this.env);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs());
+  private headers(): Record<string, string> {
     const token = this.server.authTokenEnv
       ? this.env[this.server.authTokenEnv]?.trim()
       : undefined;
-    const id = randomUUID();
+    return {
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+      "mcp-protocol-version": PROTOCOL_VERSION,
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...(this.sessionId ? { "mcp-session-id": this.sessionId } : {}),
+    };
+  }
 
+  private async post(body: Record<string, unknown>): Promise<Response> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs());
     try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          accept: 'application/json, text/event-stream',
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+      const response = await fetch(endpointFor(this.server, this.env), {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify(body),
         signal: controller.signal,
       });
-
-      const text = await response.text();
-      if (Buffer.byteLength(text, 'utf8') > MAX_RESPONSE_BYTES) {
-        throw new Error(`MCP response exceeded ${MAX_RESPONSE_BYTES} bytes`);
-      }
-      if (!response.ok) {
-        throw new Error(`MCP ${this.server.id} returned HTTP ${response.status}`);
-      }
-
-      const payload = response.headers.get('content-type')?.includes('text/event-stream')
-        ? parseSsePayload(text)
-        : JSON.parse(text);
-      const rpc = payload as JsonRpcResponse<T>;
-      if (rpc.error) {
-        throw new Error(`MCP ${this.server.id} error ${rpc.error.code}: ${rpc.error.message}`);
-      }
-      if (rpc.result === undefined) {
-        throw new Error(`MCP ${this.server.id} returned no result for ${method}`);
-      }
-      return rpc.result;
+      const returnedSessionId = response.headers.get("mcp-session-id");
+      if (returnedSessionId) this.sessionId = returnedSessionId;
+      return response;
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
+      if (error instanceof Error && error.name === "AbortError") {
         throw new Error(`MCP ${this.server.id} request timed out`);
       }
       throw error;
@@ -98,16 +88,57 @@ export class McpHttpClient {
     }
   }
 
+  private async rpc<T>(method: string, params?: Record<string, unknown>): Promise<T> {
+    const id = randomUUID();
+    const response = await this.post({ jsonrpc: "2.0", id, method, params });
+    const text = await response.text();
+    if (Buffer.byteLength(text, "utf8") > MAX_RESPONSE_BYTES) {
+      throw new Error(`MCP response exceeded ${MAX_RESPONSE_BYTES} bytes`);
+    }
+    if (!response.ok) {
+      throw new Error(`MCP ${this.server.id} returned HTTP ${response.status}`);
+    }
+    if (!text.trim()) {
+      throw new Error(`MCP ${this.server.id} returned an empty response for ${method}`);
+    }
+
+    const payload = response.headers.get("content-type")?.includes("text/event-stream")
+      ? parseSsePayload(text)
+      : JSON.parse(text);
+    const rpc = payload as JsonRpcResponse<T>;
+    if (rpc.error) {
+      throw new Error(`MCP ${this.server.id} error ${rpc.error.code}: ${rpc.error.message}`);
+    }
+    if (rpc.result === undefined) {
+      throw new Error(`MCP ${this.server.id} returned no result for ${method}`);
+    }
+    return rpc.result;
+  }
+
+  private async notify(method: string, params?: Record<string, unknown>): Promise<void> {
+    const response = await this.post({ jsonrpc: "2.0", method, params });
+    if (!response.ok) {
+      throw new Error(`MCP ${this.server.id} notification returned HTTP ${response.status}`);
+    }
+    // Notifications commonly return 202 with no body. Do not parse or persist it.
+    await response.body?.cancel();
+  }
+
   async initialize(): Promise<Record<string, unknown>> {
-    return this.rpc('initialize', {
-      protocolVersion: '2025-06-18',
+    if (this.connected) return {};
+    const result = await this.rpc<Record<string, unknown>>("initialize", {
+      protocolVersion: PROTOCOL_VERSION,
       capabilities: {},
-      clientInfo: { name: 'founder-control-room', version: '0.1.0' },
+      clientInfo: { name: "founder-control-room", version: "0.1.0" },
     });
+    await this.notify("notifications/initialized");
+    this.connected = true;
+    return result;
   }
 
   async listTools(): Promise<McpToolDefinition[]> {
-    const result = await this.rpc<{ tools?: McpToolDefinition[] }>('tools/list');
+    await this.initialize();
+    const result = await this.rpc<{ tools?: McpToolDefinition[] }>("tools/list");
     return Array.isArray(result.tools) ? result.tools : [];
   }
 
@@ -115,6 +146,7 @@ export class McpHttpClient {
     toolName: string,
     args: Record<string, unknown>,
   ): Promise<unknown> {
-    return this.rpc('tools/call', { name: toolName, arguments: args });
+    await this.initialize();
+    return this.rpc("tools/call", { name: toolName, arguments: args });
   }
 }
