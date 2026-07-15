@@ -16,6 +16,7 @@
     "lint:design-os": "eslint 'src/design-os/**/*.ts' 'src/http/routes/designOs.ts' 'src/http/routes/designOs.test.ts' --max-warnings 0",
     "test": "vitest run",
     "test:e2e": "npm run build && node e2e/run.mjs",
+    "preview:evidence": "node scripts/import-preview-evidence.mjs",
     "verify:mcp": "node scripts/verify-mcp-config.mjs",
     "verify:terminal-contract": "node scripts/verify-guarded-terminal-contract.mjs",
     "verify:ai-skills": "node scripts/verify-ai-skill-contract.mjs",
