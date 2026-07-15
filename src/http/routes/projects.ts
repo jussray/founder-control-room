@@ -430,6 +430,7 @@ projectsRouter.get("/:slug", requireFounder, async (req: FounderRequest, res) =>
     .from("project_connections")
     .select("provider, connection_config, status")
     .eq("project_id", project.id)
+    .eq("provider", "github")
     .eq("status", "active")
     .maybeSingle();
 
