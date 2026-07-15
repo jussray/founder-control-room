@@ -16,6 +16,7 @@ import { pluginCenterRouter } from './routes/pluginCenter.js';
 import { commandBridgeRouter } from './routes/commandBridge.js';
 import { designOsRouter } from './routes/designOs.js';
 import { cloudflareReasoningRouter } from './routes/cloudflareReasoning.js';
+import { mcpRouter } from './routes/mcp.js';
 import { handleGitHubWebhook } from './webhooks/github.js';
 import { debugRouter } from './routes/debug.js';
 import { publicGuardrailSnapshot, renderGuardrailStatusPage } from '../guardrails.js';
@@ -105,6 +106,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/command-bridge', commandBridgeRouter);
   app.use('/design-os', designOsRouter);
   app.use('/cloudflare', cloudflareReasoningRouter);
+  app.use('/mcp', mcpRouter);
 
   // Debug routes — CI and founder inspection only (no secrets exposed).
   app.use('/_debug', debugRouter);
