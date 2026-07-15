@@ -145,12 +145,13 @@ export async function persistActiveInspection(
 ): Promise<string> {
   const manifest = inspection.validation.manifest;
 
+  // Supersede every previously active observation. The exact row below is then
+  // inserted or reactivated, guaranteeing one current manifest per project.
   const { error: supersedeError } = await supabase
     .from("project_manifests")
     .update({ superseded_at: inspection.scannedAt })
     .eq("project_id", project.id)
-    .is("superseded_at", null)
-    .neq("content_hash", inspection.manifestHash);
+    .is("superseded_at", null);
   if (supersedeError) throw new Error(`manifest_supersede_failed:${supersedeError.message}`);
 
   const { error: manifestError } = await supabase
