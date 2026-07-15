@@ -4,6 +4,8 @@ import { requireFounder, type FounderRequest } from "../middleware/requireFounde
 
 export const portfolioVerificationRouter = Router();
 
+const ACTIVE_MISSION_STATUSES = ["proposed", "sandboxed", "in_review", "approved"];
+
 portfolioVerificationRouter.get(
   "/repositories",
   requireFounder,
@@ -17,7 +19,9 @@ portfolioVerificationRouter.get(
       if (projectError) throw new Error(projectError.message);
 
       const projectIds = (projects ?? []).map((project) => String(project.id));
-      if (projectIds.length === 0) return res.json({ repositories: [], generatedAt: new Date().toISOString() });
+      if (projectIds.length === 0) {
+        return res.json({ repositories: [], generatedAt: new Date().toISOString() });
+      }
 
       const [runs, findings, capabilities, missions] = await Promise.all([
         supabase
@@ -39,7 +43,7 @@ portfolioVerificationRouter.get(
           .from("missions")
           .select("id,project_id,status,risk_level,created_at")
           .in("project_id", projectIds)
-          .in("status", ["proposed", "approved", "running", "awaiting_review"]),
+          .in("status", ACTIVE_MISSION_STATUSES),
       ]);
 
       const firstError = runs.error ?? findings.error ?? capabilities.error ?? missions.error;
