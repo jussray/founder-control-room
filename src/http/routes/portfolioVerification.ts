@@ -34,12 +34,17 @@ interface CapabilityRow {
   last_verified_at: string;
 }
 
+function isManualPreview(run: VerificationRunRow | null): boolean {
+  return typeof run?.runner?.mode === "string"
+    && run.runner.mode.startsWith("preview_branch_");
+}
+
 function evidenceKind(
   run: VerificationRunRow | null,
 ): "none" | "signed" | "manual_preview" | "unsigned" {
   if (!run) return "none";
   if (run.signature_verified) return "signed";
-  if (run.runner?.mode === "preview_branch_bootstrap") return "manual_preview";
+  if (isManualPreview(run)) return "manual_preview";
   return "unsigned";
 }
 
@@ -151,8 +156,7 @@ portfolioVerificationRouter.get(
           evidence: {
             kind: evidenceKind(latestRun),
             signatureVerified: latestRun?.signature_verified ?? false,
-            manualPreview:
-              latestRun?.runner?.mode === "preview_branch_bootstrap",
+            manualPreview: isManualPreview(latestRun),
             source: latestRun?.source ?? null,
             branch: latestRun?.branch ?? null,
           },
