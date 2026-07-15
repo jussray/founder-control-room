@@ -1,16 +1,12 @@
 /**
  * ProjectController
  *
- * Refreshes normalized project observed state from GitHub:
- * - open PRs
- * - default branch SHA
- * - recent check run summary
- *
- * Persists result to provider_observations.
- * Used by both event-triggered and periodic safety resync paths.
+ * Refreshes normalized, read-only repository state through RepositoryProvider.
+ * Both event-triggered and periodic safety resync paths use this controller.
  */
 
 import { supabase } from '../lib/supabaseClient.js';
+import { createRepositoryProvider, normalizeRepositoryConnection } from '../providers/RepositoryProviderFactory.js';
 import { BaseController } from './base.js';
 import type { ReconcileRequest, ReconcileResult } from '../reconciliation/types.js';
 
@@ -20,70 +16,101 @@ export class ProjectController extends BaseController {
   protected async reconcile(req: ReconcileRequest): Promise<ReconcileResult> {
     const { projectId } = req;
 
-    // Load project's GitHub connection
     const { data: project } = await supabase
       .from('projects')
-      .select('id, slug, name')
+      .select('id, slug, name, repo_provider, repo_identifier')
       .eq('id', projectId)
       .single();
 
-    if (!project) {
-      return this.done('retry', `Project ${projectId} not found`);
-    }
+    if (!project) return this.done('retry', `Project ${projectId} not found`);
 
     const { data: connection } = await supabase
       .from('project_connections')
       .select('provider, connection_config, status')
       .eq('project_id', projectId)
-      .eq('provider', 'github')
       .eq('status', 'active')
-      .single();
+      .maybeSingle();
 
-    if (!connection) {
-      return this.done('converged', 'No active GitHub connection for project');
-    }
-
-    const config = connection.connection_config as Record<string, unknown>;
-    const repoFullName = config['repository'] as string | undefined;
-
-    if (!repoFullName) {
-      return this.done('converged', 'No repository configured in connection');
-    }
-
-    // Fetch current default branch state from GitHub via stored provider token
-    // (Token resolution is deferred to the provider adapter layer – stub here)
-    const observedState = {
-      repository: repoFullName,
-      observedAt: new Date().toISOString(),
-      source: 'project_controller_resync',
-      // Real GitHub API calls will be added when GitHubProvider adapter is wired
-    };
-
-    // Upsert observed state
-    await supabase
-      .from('provider_observations')
-      .upsert(
-        {
-          project_id: projectId,
-          provider: 'github',
-          resource_type: 'repository',
-          resource_id: repoFullName,
-          observed_state: observedState,
-          observed_at: new Date().toISOString(),
-          source_event_id: req.sourceEventId ?? null,
-        },
-        { onConflict: 'project_id,provider,resource_type,resource_id' },
+    try {
+      const input = {
+        slug: project.slug,
+        repoProvider: project.repo_provider,
+        repoIdentifier: project.repo_identifier,
+        provider: connection?.provider,
+        connectionConfig: connection?.connection_config as Record<string, unknown> | null,
+      };
+      const normalized = normalizeRepositoryConnection(input);
+      const provider = createRepositoryProvider(input);
+      const liveProject = await provider.getProject(project.slug);
+      const rootEntries = await provider.listFiles(
+        project.slug,
+        liveProject.defaultBranch,
       );
+      const rootFileNames = rootEntries.map((entry) => entry.path).sort();
+      const manifestCandidates = [
+        'README.md',
+        'package.json',
+        'pyproject.toml',
+        'requirements.txt',
+        'Cargo.toml',
+        'AGENTS.md',
+        'CLAUDE.md',
+      ].filter((path) => rootFileNames.includes(path));
 
-    this.log('info', 'Project observation refreshed', { projectId, repo: repoFullName });
+      const observedAt = new Date().toISOString();
+      const observedState = {
+        repository: normalized.repository,
+        provider: normalized.provider,
+        defaultBranch: liveProject.defaultBranch,
+        active: liveProject.isActive,
+        rootEntryCount: rootEntries.length,
+        rootFiles: rootFileNames.slice(0, 200),
+        manifests: manifestCandidates,
+        observedAt,
+        source: 'project_controller_repository_provider',
+      };
 
-    return {
-      status: 'converged',
-      observedChanges: [],
-      proposedActions: [],
-      evidenceIds: [],
-      requiresApproval: false,
-    };
+      const { data: observation, error: observationError } = await supabase
+        .from('provider_observations')
+        .upsert(
+          {
+            project_id: projectId,
+            provider: normalized.provider,
+            resource_type: 'repository',
+            resource_id: normalized.repository,
+            observed_state: observedState,
+            observed_at: observedAt,
+            source_event_id: req.sourceEventId ?? null,
+          },
+          { onConflict: 'project_id,provider,resource_type,resource_id' },
+        )
+        .select('id')
+        .single();
+
+      if (observationError) throw new Error(observationError.message);
+
+      this.log('info', 'Project observation refreshed', {
+        projectId,
+        repo: normalized.repository,
+        rootEntries: rootEntries.length,
+      });
+
+      return {
+        status: 'converged',
+        observedChanges: [{
+          resourceType: 'repository',
+          resourceId: normalized.repository,
+          change: 'observation_refreshed',
+        }],
+        proposedActions: [],
+        evidenceIds: observation?.id ? [observation.id] : [],
+        requiresApproval: false,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log('warning', 'Project observation failed', { projectId, message });
+      return this.done('retry', message);
+    }
   }
 
   private done(status: ReconcileResult['status'], message: string): ReconcileResult {
