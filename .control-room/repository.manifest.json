@@ -49,8 +49,24 @@
         "src/services/repositoryVerification.ts",
         "src/services/repositoryEvidenceStore.ts",
         "src/http/routes/repositoryVerification.ts",
+        "src/http/routes/portfolioVerification.ts",
         "supabase/migrations/20260715070000_federated_repository_verification.sql",
         "supabase/migrations/20260715071000_fix_repository_verification_packet_dedupe.sql"
+      ],
+      "requiredSignals": [
+        "typecheck",
+        "lint",
+        "tests"
+      ]
+    },
+    {
+      "id": "sanitized-provider-event-ingestion",
+      "description": "Routes GitHub events using the raw body in memory but persists only allowlisted operational fields without messages, PR text, people, emails, secrets, or unknown payload fields.",
+      "status": "active",
+      "evidencePaths": [
+        "src/http/webhooks/github.ts",
+        "src/providers/githubEventSanitizer.ts",
+        "src/providers/githubEventSanitizer.test.ts"
       ],
       "requiredSignals": [
         "typecheck",
@@ -65,6 +81,7 @@
       "evidencePaths": [
         "src/controllers/ManifestController.ts",
         "src/services/portfolioVerificationScheduler.ts",
+        "src/services/portfolioVerificationContract.test.ts",
         "src/worker/reconciler.ts",
         "src/worker/cf-entry.ts",
         "src/events/outbox.ts",
@@ -83,6 +100,7 @@
       "description": "Converts verified drift into proposed missions without carrying approval into branch, integration, deploy, or rollback actions.",
       "status": "active",
       "evidencePaths": [
+        "src/controllers/ManifestController.ts",
         "src/http/routes/repositoryVerification.ts",
         "src/http/routes/approvals.ts",
         "src/types/mission.ts"
@@ -136,10 +154,13 @@
     ],
     "forbiddenData": [
       "source code contents",
+      "commit messages",
+      "pull request title or body",
+      "provider sender, user, author, reviewer, or committer identities",
+      "email addresses",
       "secrets or credentials",
       "raw logs containing secrets",
       "customer or user content",
-      "names or email addresses",
       "voice transcripts",
       "private product database rows"
     ]
