@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 
 /**
- * Import a sanitized founder-reviewed preview evidence packet into the
- * standalone Founder Control Room Supabase project.
+ * Imports one sanitized manual preview packet into Founder Control Room.
  *
- * This is a temporary/manual bridge for repositories whose Worker or private
- * GitHub-hosted runner is not yet available. It never marks evidence signed,
- * never stores source/marker text, never creates a mission, and never performs
- * repository writes.
+ * Guarantees:
+ * - registry identity is verified before any write;
+ * - evidence is always unsigned/manual preview;
+ * - source code and usage-marker text are not accepted;
+ * - no mission, repository write, merge, deploy, secret action, or paid action;
+ * - existing findings are never resolved implicitly. Resolution requires an
+ *   explicit fingerprint in resolvedFindingFingerprints.
  */
 
 import { readFile } from "node:fs/promises";
@@ -27,55 +29,73 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
 }
 
 const REST_URL = `${SUPABASE_URL}/rest/v1`;
-const ALLOWED_CHECK_STATUSES = new Set([
+const CHECK_STATUSES = new Set([
   "passed",
   "failed",
   "skipped",
   "pending",
   "cancelled",
 ]);
-const ALLOWED_CLAIMED_STATUSES = new Set(["active", "planned", "retired"]);
-const ALLOWED_OBSERVED_STATUSES = new Set([
+const CLAIMED_STATUSES = new Set(["active", "planned", "retired"]);
+const OBSERVED_STATUSES = new Set([
   "verified",
   "drifted",
   "unverified",
   "retired",
 ]);
-const ALLOWED_RUN_STATUSES = new Set(["passed", "warning", "failed"]);
-const ALLOWED_FINDING_CATEGORIES = new Set([
+const RUN_STATUSES = new Set(["passed", "warning", "failed"]);
+const FINDING_CATEGORIES = new Set([
   "manifest",
   "check",
   "capability",
   "runtime",
   "provider",
 ]);
-const ALLOWED_SEVERITIES = new Set(["low", "medium", "high", "critical"]);
+const SEVERITIES = new Set(["low", "medium", "high", "critical"]);
+const RISK_LEVELS = new Set(["low", "medium", "high"]);
 
 function fail(message) {
   throw new Error(message);
 }
 
-function record(value, field) {
+function object(value, field) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     fail(`${field} must be an object`);
   }
   return value;
 }
 
-function text(value, field, max = 500) {
+function string(value, field, max = 500) {
   if (typeof value !== "string" || !value.trim() || value.length > max) {
     fail(`${field} must be a non-empty string of at most ${max} characters`);
   }
   return value.trim();
 }
 
-function optionalText(value, field, max = 1000) {
+function optionalString(value, field, max = 1000) {
   if (value === undefined || value === null || value === "") return null;
-  return text(value, field, max);
+  return string(value, field, max);
 }
 
-function safePath(value, field) {
-  const candidate = text(value, field, 500);
+function enumValue(value, field, allowed) {
+  const candidate = string(value, field, 100);
+  if (!allowed.has(candidate)) fail(`${field} has unsupported value: ${candidate}`);
+  return candidate;
+}
+
+function stringList(value, field, itemMax = 100) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 200) {
+    fail(`${field} must be an array with at most 200 items`);
+  }
+  const values = value.map((item, index) =>
+    string(item, `${field}[${index}]`, itemMax));
+  if (new Set(values).size !== values.length) fail(`${field} contains duplicates`);
+  return values;
+}
+
+function repositoryPath(value, field) {
+  const candidate = string(value, field, 500);
   if (
     candidate.startsWith("/")
     || candidate.includes("\\")
@@ -86,91 +106,84 @@ function safePath(value, field) {
   return candidate;
 }
 
-function idList(value, field) {
-  if (value === undefined) return [];
-  if (!Array.isArray(value) || value.length > 200) {
-    fail(`${field} must be an array with at most 200 items`);
-  }
-  const result = value.map((item, index) => text(item, `${field}[${index}]`, 100));
-  if (new Set(result).size !== result.length) fail(`${field} contains duplicates`);
-  return result;
-}
-
 function pathList(value, field) {
-  if (value === undefined) return [];
-  if (!Array.isArray(value) || value.length > 200) {
-    fail(`${field} must be an array with at most 200 items`);
-  }
-  const result = value.map((item, index) => safePath(item, `${field}[${index}]`));
-  if (new Set(result).size !== result.length) fail(`${field} contains duplicates`);
-  return result;
+  return stringList(value, field, 500).map((item, index) =>
+    repositoryPath(item, `${field}[${index}]`));
 }
 
-function isoTimestamp(value, field) {
-  const candidate = text(value, field, 60);
-  const timestamp = Date.parse(candidate);
-  if (!Number.isFinite(timestamp)) fail(`${field} must be an ISO timestamp`);
-  return new Date(timestamp).toISOString();
-}
-
-function enumValue(value, field, allowed) {
-  const candidate = text(value, field, 100);
-  if (!allowed.has(candidate)) fail(`${field} has unsupported value: ${candidate}`);
-  return candidate;
+function timestamp(value, field) {
+  const candidate = string(value, field, 60);
+  const parsed = Date.parse(candidate);
+  if (!Number.isFinite(parsed)) fail(`${field} must be an ISO timestamp`);
+  return new Date(parsed).toISOString();
 }
 
 function parsePacket(raw) {
-  const packet = record(raw, "packet");
+  const packet = object(raw, "packet");
   if (packet.schemaVersion !== "1.0") fail("schemaVersion must equal 1.0");
 
-  const repository = record(packet.repository, "repository");
-  const manifest = record(packet.manifest, "manifest");
+  const repository = object(packet.repository, "repository");
+  const manifest = object(packet.manifest, "manifest");
   const buildAssist = packet.buildAssist === undefined
     ? { enabled: false }
-    : record(packet.buildAssist, "buildAssist");
+    : object(packet.buildAssist, "buildAssist");
 
-  const commitSha = text(packet.commitSha, "commitSha", 64).toLowerCase();
+  const commitSha = string(packet.commitSha, "commitSha", 64).toLowerCase();
   if (!/^[a-f0-9]{7,64}$/.test(commitSha)) fail("commitSha must be hexadecimal");
-  const manifestValue = text(manifest.value, "manifest.value", 100).toLowerCase();
-  if (!/^[a-f0-9]{40,64}$/.test(manifestValue)) {
-    fail("manifest.value must be a GitHub blob SHA or SHA-256 hex digest");
-  }
+
   const manifestKind = enumValue(
     manifest.kind,
     "manifest.kind",
     new Set(["github_blob_sha", "sha256"]),
   );
+  const manifestValue = string(manifest.value, "manifest.value", 64).toLowerCase();
+  const expectedLength = manifestKind === "github_blob_sha" ? 40 : 64;
+  if (!new RegExp(`^[a-f0-9]{${expectedLength}}$`).test(manifestValue)) {
+    fail(`manifest.value must be ${expectedLength} hexadecimal characters`);
+  }
 
-  const checksRaw = Array.isArray(packet.checks) ? packet.checks : fail("checks must be an array");
-  if (checksRaw.length > 200) fail("checks has more than 200 items");
-  const checks = checksRaw.map((item, index) => {
-    const check = record(item, `checks[${index}]`);
+  if (typeof buildAssist.enabled !== "boolean") {
+    fail("buildAssist.enabled must be boolean");
+  }
+  const preferredBuilder = optionalString(
+    buildAssist.preferredBuilder,
+    "buildAssist.preferredBuilder",
+    100,
+  );
+  const riskLevel = buildAssist.riskLevel === undefined
+    ? "medium"
+    : enumValue(buildAssist.riskLevel, "buildAssist.riskLevel", RISK_LEVELS);
+
+  if (!Array.isArray(packet.checks) || packet.checks.length > 200) {
+    fail("checks must be an array with at most 200 items");
+  }
+  const checks = packet.checks.map((rawCheck, index) => {
+    const check = object(rawCheck, `checks[${index}]`);
     return {
-      id: text(check.id, `checks[${index}].id`, 100),
-      name: text(check.name, `checks[${index}].name`, 200),
+      id: string(check.id, `checks[${index}].id`, 100),
+      name: string(check.name, `checks[${index}].name`, 200),
       required: check.required !== false,
       status: enumValue(
         check.status,
         `checks[${index}].status`,
-        ALLOWED_CHECK_STATUSES,
+        CHECK_STATUSES,
       ),
-      ...(optionalText(check.reason, `checks[${index}].reason`, 500)
-        ? { reason: optionalText(check.reason, `checks[${index}].reason`, 500) }
+      ...(optionalString(check.reason, `checks[${index}].reason`, 500)
+        ? { reason: optionalString(check.reason, `checks[${index}].reason`, 500) }
         : {}),
     };
   });
 
-  const capabilitiesRaw = Array.isArray(packet.capabilities)
-    ? packet.capabilities
-    : fail("capabilities must be an array");
-  if (capabilitiesRaw.length > 200) fail("capabilities has more than 200 items");
-  const capabilities = capabilitiesRaw.map((item, index) => {
-    const capability = record(item, `capabilities[${index}]`);
-    const usageAssertionIds = idList(
+  if (!Array.isArray(packet.capabilities) || packet.capabilities.length > 200) {
+    fail("capabilities must be an array with at most 200 items");
+  }
+  const capabilities = packet.capabilities.map((rawCapability, index) => {
+    const capability = object(rawCapability, `capabilities[${index}]`);
+    const usageAssertionIds = stringList(
       capability.usageAssertionIds,
       `capabilities[${index}].usageAssertionIds`,
     );
-    const failedUsageAssertionIds = idList(
+    const failedUsageAssertionIds = stringList(
       capability.failedUsageAssertionIds,
       `capabilities[${index}].failedUsageAssertionIds`,
     );
@@ -181,17 +194,18 @@ function parsePacket(raw) {
     ) {
       fail(`capabilities[${index}] failed usage IDs must be declared usage IDs`);
     }
+
     return {
-      id: text(capability.id, `capabilities[${index}].id`, 100),
+      id: string(capability.id, `capabilities[${index}].id`, 100),
       claimedStatus: enumValue(
         capability.claimedStatus,
         `capabilities[${index}].claimedStatus`,
-        ALLOWED_CLAIMED_STATUSES,
+        CLAIMED_STATUSES,
       ),
       observedStatus: enumValue(
         capability.observedStatus,
         `capabilities[${index}].observedStatus`,
-        ALLOWED_OBSERVED_STATUSES,
+        OBSERVED_STATUSES,
       ),
       evidencePaths: pathList(
         capability.evidencePaths,
@@ -201,41 +215,49 @@ function parsePacket(raw) {
         capability.missingEvidencePaths,
         `capabilities[${index}].missingEvidencePaths`,
       ),
-      requiredSignalIds: idList(
+      requiredSignalIds: stringList(
         capability.requiredSignalIds,
         `capabilities[${index}].requiredSignalIds`,
       ),
-      failedSignalIds: idList(
+      failedSignalIds: stringList(
         capability.failedSignalIds,
         `capabilities[${index}].failedSignalIds`,
       ),
       usageAssertionIds,
       failedUsageAssertionIds,
-      reason: optionalText(capability.reason, `capabilities[${index}].reason`, 1000),
+      reason: optionalString(
+        capability.reason,
+        `capabilities[${index}].reason`,
+        1000,
+      ),
     };
   });
 
-  const findingsRaw = packet.findings === undefined ? [] : packet.findings;
-  if (!Array.isArray(findingsRaw) || findingsRaw.length > 200) {
+  const rawFindings = packet.findings ?? [];
+  if (!Array.isArray(rawFindings) || rawFindings.length > 200) {
     fail("findings must be an array with at most 200 items");
   }
-  const findings = findingsRaw.map((item, index) => {
-    const finding = record(item, `findings[${index}]`);
+  const findings = rawFindings.map((rawFinding, index) => {
+    const finding = object(rawFinding, `findings[${index}]`);
     return {
-      fingerprint: text(finding.fingerprint, `findings[${index}].fingerprint`, 200),
+      fingerprint: string(
+        finding.fingerprint,
+        `findings[${index}].fingerprint`,
+        200,
+      ),
       category: enumValue(
         finding.category,
         `findings[${index}].category`,
-        ALLOWED_FINDING_CATEGORIES,
+        FINDING_CATEGORIES,
       ),
       severity: enumValue(
         finding.severity,
         `findings[${index}].severity`,
-        ALLOWED_SEVERITIES,
+        SEVERITIES,
       ),
-      title: text(finding.title, `findings[${index}].title`, 300),
-      detail: optionalText(finding.detail, `findings[${index}].detail`, 2000),
-      suggestedAction: optionalText(
+      title: string(finding.title, `findings[${index}].title`, 300),
+      detail: optionalString(finding.detail, `findings[${index}].detail`, 2000),
+      suggestedAction: optionalString(
         finding.suggestedAction,
         `findings[${index}].suggestedAction`,
         2000,
@@ -243,52 +265,51 @@ function parsePacket(raw) {
     };
   });
 
-  if (typeof buildAssist.enabled !== "boolean") {
-    fail("buildAssist.enabled must be boolean");
-  }
-  if (
-    buildAssist.riskLevel !== undefined
-    && !new Set(["low", "medium", "high"]).has(buildAssist.riskLevel)
-  ) {
-    fail("buildAssist.riskLevel must be low, medium, or high");
+  const resolvedFindingFingerprints = stringList(
+    packet.resolvedFindingFingerprints,
+    "resolvedFindingFingerprints",
+    200,
+  );
+  const activeFingerprints = new Set(findings.map((finding) => finding.fingerprint));
+  for (const fingerprint of resolvedFindingFingerprints) {
+    if (activeFingerprints.has(fingerprint)) {
+      fail(`finding ${fingerprint} cannot be both active and resolved`);
+    }
   }
 
   return {
     schemaVersion: "1.0",
-    projectId: text(packet.projectId, "projectId", 100),
+    projectId: string(packet.projectId, "projectId", 100),
     repository: {
-      provider: text(repository.provider, "repository.provider", 50),
-      identifier: text(repository.identifier, "repository.identifier", 300),
+      provider: string(repository.provider, "repository.provider", 50),
+      identifier: string(repository.identifier, "repository.identifier", 300),
     },
-    branch: text(packet.branch, "branch", 200),
+    branch: string(packet.branch, "branch", 200),
     commitSha,
     manifest: {
       kind: manifestKind,
       value: manifestValue,
-      path: safePath(
+      path: repositoryPath(
         manifest.path ?? ".control-room/repository.manifest.json",
         "manifest.path",
       ),
     },
-    generatedAt: isoTimestamp(packet.generatedAt, "generatedAt"),
+    generatedAt: timestamp(packet.generatedAt, "generatedAt"),
     overallStatus: enumValue(
       packet.overallStatus,
       "overallStatus",
-      ALLOWED_RUN_STATUSES,
+      RUN_STATUSES,
     ),
-    evidence: text(packet.evidence, "evidence", 1000),
+    evidence: string(packet.evidence, "evidence", 1000),
     buildAssist: {
       enabled: buildAssist.enabled,
-      preferredBuilder: optionalText(
-        buildAssist.preferredBuilder,
-        "buildAssist.preferredBuilder",
-        100,
-      ),
-      riskLevel: buildAssist.riskLevel ?? "medium",
+      preferredBuilder,
+      riskLevel,
     },
     checks,
     capabilities,
     findings,
+    resolvedFindingFingerprints,
   };
 }
 
@@ -303,23 +324,32 @@ async function api(path, options = {}) {
     },
   });
   const raw = await response.text();
-  const payload = raw ? JSON.parse(raw) : null;
+  let payload = null;
+  if (raw) {
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      payload = raw;
+    }
+  }
   if (!response.ok) {
-    fail(`Supabase ${response.status}: ${payload?.message ?? payload?.error ?? raw}`);
+    const detail = typeof payload === "object"
+      ? payload?.message ?? payload?.error ?? JSON.stringify(payload)
+      : payload;
+    fail(`Supabase ${response.status}: ${detail}`);
   }
   return payload;
 }
 
-function eq(value) {
+function filterValue(value) {
   return encodeURIComponent(value);
 }
 
 const packet = parsePacket(
   JSON.parse(await readFile(resolve(packetPath), "utf8")),
 );
-
 const projectRows = await api(
-  `/projects?slug=eq.${eq(packet.projectId)}&select=id,slug,name,repo_provider,repo_identifier&limit=1`,
+  `/projects?slug=eq.${filterValue(packet.projectId)}&select=id,slug,name,repo_provider,repo_identifier&limit=1`,
 );
 const project = projectRows?.[0];
 if (!project) fail(`No registered project found for slug ${packet.projectId}`);
@@ -335,13 +365,12 @@ const deliveryId = `manual-preview-${packet.projectId}-${packet.commitSha.slice(
 const now = new Date().toISOString();
 
 await api(
-  `/project_manifests?project_id=eq.${eq(project.id)}&superseded_at=is.null`,
+  `/project_manifests?project_id=eq.${filterValue(project.id)}&superseded_at=is.null`,
   {
     method: "PATCH",
     body: JSON.stringify({ superseded_at: packet.generatedAt }),
   },
 );
-
 await api(
   "/project_manifests?on_conflict=project_id,commit_sha,content_hash",
   {
@@ -429,7 +458,6 @@ for (const capability of packet.capabilities) {
   );
 }
 
-const activeFingerprints = packet.findings.map((finding) => finding.fingerprint);
 for (const finding of packet.findings) {
   await api(
     "/repository_findings?on_conflict=project_id,fingerprint",
@@ -453,19 +481,18 @@ for (const finding of packet.findings) {
   );
 }
 
-const existingOpen = await api(
-  `/repository_findings?project_id=eq.${eq(project.id)}&status=eq.open&select=id,fingerprint`,
-);
-for (const finding of existingOpen ?? []) {
-  if (activeFingerprints.includes(finding.fingerprint)) continue;
-  await api(`/repository_findings?id=eq.${eq(finding.id)}`, {
-    method: "PATCH",
-    body: JSON.stringify({
-      status: "resolved",
-      resolved_at: now,
-      last_seen_at: now,
-    }),
-  });
+for (const fingerprint of packet.resolvedFindingFingerprints) {
+  await api(
+    `/repository_findings?project_id=eq.${filterValue(project.id)}&fingerprint=eq.${filterValue(fingerprint)}&status=eq.open`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        status: "resolved",
+        resolved_at: now,
+        last_seen_at: now,
+      }),
+    },
+  );
 }
 
 await api(
@@ -503,6 +530,7 @@ console.log(JSON.stringify({
   evidenceKind: "manual_preview",
   signatureVerified: false,
   runId,
-  findings: packet.findings.length,
+  findingsOpenedOrUpdated: packet.findings.length,
+  findingsExplicitlyResolved: packet.resolvedFindingFingerprints.length,
   missionsCreated: 0,
 }, null, 2));
