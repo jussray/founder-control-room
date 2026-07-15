@@ -49,7 +49,28 @@
         "src/services/repositoryVerification.ts",
         "src/services/repositoryEvidenceStore.ts",
         "src/http/routes/repositoryVerification.ts",
-        "supabase/migrations/20260715070000_federated_repository_verification.sql"
+        "supabase/migrations/20260715070000_federated_repository_verification.sql",
+        "supabase/migrations/20260715071000_fix_repository_verification_packet_dedupe.sql"
+      ],
+      "requiredSignals": [
+        "typecheck",
+        "lint",
+        "tests"
+      ]
+    },
+    {
+      "id": "scheduled-portfolio-reconciliation",
+      "description": "Enqueues only due main-portfolio repositories, preserves provider retry backoff, verifies them through ManifestController, and excludes the demo project.",
+      "status": "active",
+      "evidencePaths": [
+        "src/controllers/ManifestController.ts",
+        "src/services/portfolioVerificationScheduler.ts",
+        "src/worker/reconciler.ts",
+        "src/worker/cf-entry.ts",
+        "src/events/outbox.ts",
+        "src/controllers/base.ts",
+        "supabase/migrations/20260715072000_schedule_portfolio_repository_verification.sql",
+        "supabase/migrations/20260715073000_harden_reconciliation_queue_and_leases.sql"
       ],
       "requiredSignals": [
         "typecheck",
