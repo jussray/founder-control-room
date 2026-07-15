@@ -48,6 +48,10 @@ app.listen(port, () => {
   console.log(`  GET  /dashboard/costs`);
   console.log(`  POST /dashboard/manual-analysis`);
   console.log(`  POST /api/reconcile             (inbound drift reports)`);
+  console.log(`  GET  /mcp/servers`);
+  console.log(`  GET  /mcp/servers/:serverId/capabilities`);
+  console.log(`  POST /mcp/servers/:serverId/tools/:toolName/preview`);
+  console.log(`  POST /mcp/servers/:serverId/tools/:toolName/invoke`);
 
   // Start the outbox worker and all periodic safety resyncs
   startScheduler();
