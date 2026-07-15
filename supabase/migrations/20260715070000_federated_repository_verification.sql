@@ -30,7 +30,8 @@ create table if not exists public.repository_verification_runs (
   signature_verified boolean not null default false,
   scanned_at timestamptz not null,
   received_at timestamptz not null default now(),
-  unique(project_id, source, delivery_id)
+  constraint repository_verification_runs_delivery_key
+    unique(project_id, source, delivery_id)
 );
 
 create index if not exists repository_verification_project_received_idx
