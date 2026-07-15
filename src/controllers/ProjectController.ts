@@ -28,6 +28,7 @@ export class ProjectController extends BaseController {
       .from('project_connections')
       .select('provider, connection_config, status')
       .eq('project_id', projectId)
+      .eq('provider', 'github')
       .eq('status', 'active')
       .maybeSingle();
 
@@ -110,7 +111,7 @@ export class ProjectController extends BaseController {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.log('warning', 'Project observation failed', { projectId, message });
+      this.log('warn', 'Project observation failed', { projectId, message });
       return this.done('retry', message);
     }
   }
