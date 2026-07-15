@@ -138,7 +138,12 @@ describe('GitHub webhook ingestion', () => {
       { availableAt: expect.any(String) },
     );
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({ accepted: true, eventId: 'event-123' });
+    expect(res.json).toHaveBeenCalledWith({
+      accepted: true,
+      eventId: 'event-123',
+      controllers: ['ChangeProposalController'],
+      enqueueFailures: [],
+    });
   });
 
   it('strips fields the controllers never read — sender, organization, installation, review bodies', async () => {
