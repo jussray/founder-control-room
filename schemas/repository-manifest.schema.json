@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://founder-control-room.local/schemas/repository-manifest.schema.json",
   "title": "Founder Control Room Repository Manifest",
-  "description": "A repo-owned, provider-neutral declaration of identity, verifiable capabilities, required checks, build-assist policy, and portfolio privacy boundaries.",
+  "description": "A repo-owned, provider-neutral declaration of identity, verifiable capabilities, required checks, code-use assertions, build-assist policy, and portfolio privacy boundaries.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -121,6 +121,43 @@
               "maxLength": 100
             },
             "default": []
+          },
+          "usageAssertions": {
+            "type": "array",
+            "maxItems": 100,
+            "uniqueItems": true,
+            "default": [],
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "path", "marker"],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100,
+                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                },
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500,
+                  "pattern": "^(?!/)(?!.*(?:^|/)\.\.(?:/|$))(?!.*\\\\).+$"
+                },
+                "marker": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[^\\r\\n]+$",
+                  "description": "A short symbol, import path, route name, command, or workflow marker. Never source contents or secrets."
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              }
+            }
           }
         }
       }
