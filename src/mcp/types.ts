@@ -12,9 +12,9 @@ export interface McpServerDefinition {
   role: string;
   endpointEnv: string;
   authTokenEnv?: string;
-  enabledProjects: string[];
-  allowedToolPatterns: string[];
-  deniedToolPatterns: string[];
+  enabledProjects: readonly string[];
+  allowedToolPatterns: readonly string[];
+  deniedToolPatterns: readonly string[];
   defaultRisk: McpRisk;
   developmentOnly?: boolean;
   monthlyBudgetUsd: number;
