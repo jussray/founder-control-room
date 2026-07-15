@@ -1,8 +1,9 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { supabase } from "../lib/supabaseClient.js";
 import { McpHttpClient } from "./client.js";
 import { evaluateMcpPolicy } from "./policy.js";
 import { McpRegistry } from "./registry.js";
+import { assertNoSecretArguments, requestHash } from "./safety.js";
 import type {
   McpCapabilitySnapshot,
   McpEvidenceInput,
@@ -13,40 +14,6 @@ import type {
 } from "./types.js";
 
 const CAPABILITY_CACHE_MS = 5 * 60_000;
-const SECRET_KEY_PATTERN = /(authorization|password|passwd|secret|token|api[_-]?key|service[_-]?role)/i;
-
-function stableValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([key, item]) => [key, stableValue(item)]),
-    );
-  }
-  return value;
-}
-
-export function requestHash(value: unknown): string {
-  return createHash("sha256")
-    .update(JSON.stringify(stableValue(value)))
-    .digest("hex");
-}
-
-export function assertNoSecretArguments(value: unknown, path = "arguments"): void {
-  if (Array.isArray(value)) {
-    value.forEach((item, index) => assertNoSecretArguments(item, `${path}[${index}]`));
-    return;
-  }
-  if (!value || typeof value !== "object") return;
-
-  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-    if (SECRET_KEY_PATTERN.test(key)) {
-      throw new Error(`Secret-bearing argument key is not allowed: ${path}.${key}`);
-    }
-    assertNoSecretArguments(item, `${path}.${key}`);
-  }
-}
 
 function summarizeRequest(request: McpInvocationRequest): Record<string, unknown> {
   const serialized = JSON.stringify(request.arguments);
@@ -73,8 +40,12 @@ async function writeEvidence(input: McpEvidenceInput): Promise<string> {
     .eq("slug", input.projectId)
     .maybeSingle();
 
-  if (projectError) throw new Error(`MCP evidence project lookup failed: ${projectError.message}`);
-  if (!project) throw new Error(`MCP evidence project is not registered: ${input.projectId}`);
+  if (projectError) {
+    throw new Error(`MCP evidence project lookup failed: ${projectError.message}`);
+  }
+  if (!project) {
+    throw new Error(`MCP evidence project is not registered: ${input.projectId}`);
+  }
 
   const evidenceId = randomUUID();
   const { error } = await supabase.from("mcp_tool_calls").insert({
@@ -127,19 +98,15 @@ export class McpHub {
       toolName: server.allowedToolPatterns[0] ?? "list_tools",
       env: this.env,
     });
-    if (probe.decision === "deny" && probe.reason.includes("project")) {
-      throw new Error(probe.reason);
-    }
-    if (!this.registry.isConfigured(serverId, this.env)) {
-      throw new Error(`MCP server ${serverId} is not configured`);
-    }
+    if (probe.decision !== "allow") throw new Error(probe.reason);
 
     const key = this.cacheKey(serverId, projectId);
     const cached = this.cache.get(key);
-    if (!force && cached && Date.parse(cached.expiresAt) > Date.now()) return cached;
+    if (!force && cached && Date.parse(cached.expiresAt) > Date.now()) {
+      return cached;
+    }
 
     const client = new McpHttpClient(server, this.env);
-    await client.initialize();
     const tools = await client.listTools();
     const discoveredAt = new Date();
     const snapshot: McpCapabilitySnapshot = {
@@ -147,7 +114,9 @@ export class McpHub {
       projectId,
       tools,
       discoveredAt: discoveredAt.toISOString(),
-      expiresAt: new Date(discoveredAt.getTime() + CAPABILITY_CACHE_MS).toISOString(),
+      expiresAt: new Date(
+        discoveredAt.getTime() + CAPABILITY_CACHE_MS,
+      ).toISOString(),
     };
     this.cache.set(key, snapshot);
     return snapshot;
@@ -232,8 +201,14 @@ export class McpHub {
         request.serverId,
         request.projectId,
       );
-      const tool = capabilities.tools.find((candidate) => candidate.name === request.toolName);
-      if (!tool) throw new Error(`Tool ${request.toolName} was not advertised by ${request.serverId}`);
+      const tool = capabilities.tools.find(
+        (candidate) => candidate.name === request.toolName,
+      );
+      if (!tool) {
+        throw new Error(
+          `Tool ${request.toolName} was not advertised by ${request.serverId}`,
+        );
+      }
 
       const client = new McpHttpClient(server, this.env);
       const result = await client.callTool(request.toolName, request.arguments);
@@ -277,7 +252,9 @@ export class McpHub {
         status: "failed",
         requestHash: hash,
         requestSummary: summarizeRequest(request),
-        responseSummary: { errorType: error instanceof Error ? error.name : typeof error },
+        responseSummary: {
+          errorType: error instanceof Error ? error.name : typeof error,
+        },
         durationMs,
         estimatedCostUsd: 0,
         errorCode: requestHash(message).slice(0, 16),
