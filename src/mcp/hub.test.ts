@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertNoSecretArguments, requestHash } from "./hub.js";
+import { assertNoSecretArguments, requestHash } from "./safety.js";
 
 describe("MCP evidence safety", () => {
   it("produces stable hashes regardless of object key order", () => {
