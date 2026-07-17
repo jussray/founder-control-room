@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
-import { basename, dirname, join } from 'node:path';
+import { basename, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GuardedTerminalRunner } from '../runner.js';
-import { TerminalRunnerError, type TerminalCommandSpec } from '../types.js';
+import { type TerminalCommandSpec } from '../types.js';
 
 const PROJECT = 'test-project';
 const COMMAND = 'verify.test';
@@ -80,7 +80,7 @@ describe('GuardedTerminalRunner', () => {
       projectSlug: PROJECT,
       commandId: 'bash',
       expectedCommitSha: headSha,
-    })).rejects.toMatchObject<TerminalRunnerError>({ code: 'UNKNOWN_COMMAND' });
+    })).rejects.toMatchObject({ code: 'UNKNOWN_COMMAND' });
   });
 
   it('rejects stale or incorrect commit identities', async () => {
@@ -91,7 +91,7 @@ describe('GuardedTerminalRunner', () => {
       projectSlug: PROJECT,
       commandId: COMMAND,
       expectedCommitSha: 'a'.repeat(40),
-    })).rejects.toMatchObject<TerminalRunnerError>({ code: 'HEAD_MISMATCH' });
+    })).rejects.toMatchObject({ code: 'HEAD_MISMATCH' });
   });
 
   it('blocks working-directory traversal outside the configured workspace', async () => {
@@ -106,7 +106,7 @@ describe('GuardedTerminalRunner', () => {
         projectSlug: PROJECT,
         commandId: COMMAND,
         expectedCommitSha: headSha,
-      })).rejects.toMatchObject<TerminalRunnerError>({ code: 'WORKSPACE_ESCAPE' });
+      })).rejects.toMatchObject({ code: 'WORKSPACE_ESCAPE' });
     } finally {
       await rm(outside, { recursive: true, force: true });
     }
@@ -184,7 +184,7 @@ describe('GuardedTerminalRunner', () => {
       projectSlug: PROJECT,
       commandId: COMMAND,
       expectedCommitSha: headSha,
-    })).rejects.toMatchObject<TerminalRunnerError>({ code: 'PROJECT_BUSY' });
+    })).rejects.toMatchObject({ code: 'PROJECT_BUSY' });
 
     expect(runner.cancel('run-first')).toBe(true);
     const result = await first;
