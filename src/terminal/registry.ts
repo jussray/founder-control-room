@@ -3,6 +3,7 @@ import type { TerminalCommandSpec } from './types.js';
 const VERIFY_TIMEOUT = 10 * 60_000;
 const INSTALL_TIMEOUT = 15 * 60_000;
 const OUTPUT_CAP = 512 * 1024;
+const PLAYWRIGHT_VERSION = '1.61.1';
 
 function spec(
   projectSlug: string,
@@ -36,6 +37,38 @@ const gitReadCommands = (projectSlug: string, relativeCwd: string): TerminalComm
   spec(projectSlug, relativeCwd, 'git.diff-stat', 'Read working-tree diff summary', 'git', ['diff', '--stat'], 'read'),
 ];
 
+const playwrightSetupCommands = (
+  projectSlug: string,
+  relativeCwd: string,
+): TerminalCommandSpec[] => [
+  spec(
+    projectSlug,
+    relativeCwd,
+    'deps.playwright-package',
+    `Install Playwright ${PLAYWRIGHT_VERSION} without mutating manifests`,
+    'npm',
+    [
+      'install',
+      '--no-save',
+      '--package-lock=false',
+      '--ignore-scripts',
+      `playwright@${PLAYWRIGHT_VERSION}`,
+    ],
+    'write',
+    { timeoutMs: INSTALL_TIMEOUT },
+  ),
+  spec(
+    projectSlug,
+    relativeCwd,
+    'deps.playwright-browser',
+    'Install the pinned Playwright Chromium browser',
+    'npm',
+    ['exec', '--', 'playwright', 'install', 'chromium'],
+    'write',
+    { timeoutMs: INSTALL_TIMEOUT },
+  ),
+];
+
 export const TERMINAL_COMMANDS: readonly TerminalCommandSpec[] = [
   ...gitReadCommands('founder-control-room', 'founder-control-room'),
   spec('founder-control-room', 'founder-control-room', 'deps.install', 'Install locked dependencies', 'npm', ['ci', '--no-audit', '--no-fund'], 'write', {timeoutMs: INSTALL_TIMEOUT}),
@@ -46,6 +79,7 @@ export const TERMINAL_COMMANDS: readonly TerminalCommandSpec[] = [
 
   ...gitReadCommands('juss-beautiful-hair-private', 'jbh-private'),
   spec('juss-beautiful-hair-private', 'jbh-private/admin', 'deps.install', 'Install private hair dependencies', 'npm', ['ci', '--no-audit', '--no-fund'], 'write', {timeoutMs: INSTALL_TIMEOUT}),
+  ...playwrightSetupCommands('juss-beautiful-hair-private', 'jbh-private/admin'),
   spec('juss-beautiful-hair-private', 'jbh-private/admin', 'verify.mcp', 'Verify private repository boundaries', 'npm', ['run', 'verify:mcp'], 'verify', {evidenceKind: 'security_scan'}),
   spec('juss-beautiful-hair-private', 'jbh-private/admin', 'verify.typecheck', 'Typecheck private hair control layer', 'npm', ['run', 'check'], 'verify', {evidenceKind: 'typecheck'}),
   spec('juss-beautiful-hair-private', 'jbh-private/admin', 'verify.build', 'Build private hair control layer', 'npm', ['run', 'build'], 'verify', {evidenceKind: 'integration_test'}),
@@ -53,6 +87,7 @@ export const TERMINAL_COMMANDS: readonly TerminalCommandSpec[] = [
 
   ...gitReadCommands('juss-beautiful-hair', 'jussbeautifulhair-site'),
   spec('juss-beautiful-hair', 'jussbeautifulhair-site', 'deps.install', 'Install public hair dependencies', 'npm', ['ci', '--no-audit', '--no-fund'], 'write', {timeoutMs: INSTALL_TIMEOUT}),
+  ...playwrightSetupCommands('juss-beautiful-hair', 'jussbeautifulhair-site'),
   spec('juss-beautiful-hair', 'jussbeautifulhair-site', 'verify.typecheck', 'Typecheck public hair storefront', 'npm', ['run', 'check'], 'verify', {evidenceKind: 'typecheck'}),
   spec('juss-beautiful-hair', 'jussbeautifulhair-site', 'verify.lint', 'Lint public hair storefront', 'npm', ['run', 'lint'], 'verify', {evidenceKind: 'lint'}),
   spec('juss-beautiful-hair', 'jussbeautifulhair-site', 'verify.unit', 'Run public hair unit tests', 'npm', ['test'], 'verify', {evidenceKind: 'unit_test'}),
@@ -62,6 +97,7 @@ export const TERMINAL_COMMANDS: readonly TerminalCommandSpec[] = [
 
   ...gitReadCommands('untold-stories', 'untold-stories-storefront'),
   spec('untold-stories', 'untold-stories-storefront', 'deps.install', 'Install Untold Stories dependencies', 'npm', ['ci', '--no-audit', '--no-fund'], 'write', {timeoutMs: INSTALL_TIMEOUT}),
+  ...playwrightSetupCommands('untold-stories', 'untold-stories-storefront'),
   spec('untold-stories', 'untold-stories-storefront', 'verify.mcp', 'Verify Untold Stories repository boundaries', 'npm', ['run', 'verify:mcp'], 'verify', {evidenceKind: 'security_scan'}),
   spec('untold-stories', 'untold-stories-storefront', 'verify.typecheck', 'Typecheck Untold Stories', 'npm', ['run', 'typecheck'], 'verify', {evidenceKind: 'typecheck'}),
   spec('untold-stories', 'untold-stories-storefront', 'verify.build', 'Build Untold Stories', 'npm', ['run', 'build'], 'verify', {evidenceKind: 'integration_test'}),
