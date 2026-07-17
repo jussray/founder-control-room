@@ -139,8 +139,27 @@ export class GuardedTerminalRunner {
     const child = this.childrenByRun.get(runId);
     if (!child) return false;
     this.cancelledRuns.add(runId);
-    child.kill('SIGTERM');
-    return true;
+    return this.terminate(child, 'SIGTERM');
+  }
+
+  private terminate(child: ChildProcessWithoutNullStreams, signal: NodeJS.Signals): boolean {
+    const pid = child.pid;
+    if (!pid) return false;
+
+    // npm scripts and Playwright launch child processes. On POSIX, each run is
+    // started as its own process group so cancellation and timeout clean up the
+    // whole command tree rather than leaving a Vite server or browser behind.
+    if (process.platform !== 'win32') {
+      try {
+        process.kill(-pid, signal);
+        return true;
+      } catch {
+        // The group may have exited between lookup and signal; fall back to the
+        // direct child so the operation still fails closed.
+      }
+    }
+
+    return child.kill(signal);
   }
 
   private async resolveCommandCwd(relativeCwd: string): Promise<string> {
@@ -214,6 +233,7 @@ export class GuardedTerminalRunner {
           env,
           shell: false,
           windowsHide: true,
+          detached: process.platform !== 'win32',
           stdio: 'pipe',
         });
         child.stdin.end();
@@ -255,8 +275,8 @@ export class GuardedTerminalRunner {
       const forceKillTimer = { current: null as NodeJS.Timeout | null };
       const timeout = setTimeout(() => {
         timedOut = true;
-        child.kill('SIGTERM');
-        forceKillTimer.current = setTimeout(() => child.kill('SIGKILL'), 2_000);
+        this.terminate(child, 'SIGTERM');
+        forceKillTimer.current = setTimeout(() => this.terminate(child, 'SIGKILL'), 2_000);
       }, timeoutMs);
 
       child.once('error', (error) => {
