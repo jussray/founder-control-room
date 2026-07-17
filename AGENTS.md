@@ -31,6 +31,12 @@ Use the exact stack:
 - Do not expose provider tokens or service-role keys.
 - Do not merge, deploy, roll back, alter auth/RLS, or perform destructive writes without explicit founder approval.
 
+## Figma build and implementation
+
+For every Figma, dashboard design, design-system, design-to-code, Code Connect, prototype, or visual QA task, also read `.agents/skills/figma-build-implement/SKILL.md` and `.figma/repository-profile.json`.
+
+Figma is a founder specification and review surface. It cannot create mission truth, evidence provenance, provider truth, approval authority, migration state, integration proof, deployment proof, or rollback authority. Use only synthetic or sanitized operational data.
+
 ## Evidence report
 
 List files changed, behavior changed, tests run, failures or skips, security impact, provider impact, rollback, unresolved risk, and next gate.
