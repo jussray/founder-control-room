@@ -13,7 +13,8 @@
     "lint": "eslint 'src/**/*.ts' --max-warnings 0",
     "test": "vitest run",
     "verify:mcp": "node scripts/verify-mcp-config.mjs",
-    "verify:terminal-contract": "node scripts/verify-guarded-terminal-contract.mjs"
+    "verify:terminal-contract": "node scripts/verify-guarded-terminal-contract.mjs",
+    "verify:ai-skills": "node scripts/verify-ai-skill-contract.mjs"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
