@@ -149,7 +149,7 @@ export function createTerminalRouter(runnerOverride?: TerminalExecutor) {
 
     const { data: mission, error: missionError } = await supabase
       .from('missions')
-      .select('id, project_id, status')
+      .select('id, project_id, status, policy_snapshot')
       .eq('id', missionId)
       .eq('project_id', project.id)
       .maybeSingle();
@@ -157,6 +157,29 @@ export function createTerminalRouter(runnerOverride?: TerminalExecutor) {
     if (missionError) return res.status(500).json({ error: missionError.message });
     if (!mission) {
       return res.status(404).json({ error: 'Mission not found for this project.' });
+    }
+
+    const missionExpectedHeadSha = typeof mission.policy_snapshot?.expectedHeadSha === 'string'
+      ? mission.policy_snapshot.expectedHeadSha.toLowerCase()
+      : '';
+    if (!missionExpectedHeadSha || missionExpectedHeadSha !== expectedCommitSha) {
+      return res.status(409).json({
+        error: 'The requested commit does not match the mission policy snapshot.',
+        code: 'MISSION_HEAD_MISMATCH',
+        missionExpectedHeadSha: missionExpectedHeadSha || null,
+        requestedHeadSha: expectedCommitSha,
+      });
+    }
+
+    const allowedStatuses = command.risk === 'write'
+      ? new Set(['sandboxed'])
+      : new Set(['sandboxed', 'in_review']);
+    if (!allowedStatuses.has(mission.status)) {
+      return res.status(409).json({
+        error: `Command risk '${command.risk}' is not allowed while mission is '${mission.status}'.`,
+        code: 'COMMAND_NOT_ALLOWED_IN_MISSION_STATE',
+        allowedStatuses: [...allowedStatuses],
+      });
     }
 
     // Recover from a process crash without allowing two live runs. Fresh runs
