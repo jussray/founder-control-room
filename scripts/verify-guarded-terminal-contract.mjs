@@ -6,6 +6,7 @@ const files = {
   terminalRoute: await readFile(new URL('../src/http/routes/terminal.ts', import.meta.url), 'utf8'),
   runner: await readFile(new URL('../src/terminal/runner.ts', import.meta.url), 'utf8'),
   registry: await readFile(new URL('../src/terminal/registry.ts', import.meta.url), 'utf8'),
+  githubProvider: await readFile(new URL('../src/providers/GitHubProvider.ts', import.meta.url), 'utf8'),
   evidenceTypes: await readFile(new URL('../src/reconciliation/types.ts', import.meta.url), 'utf8'),
   migration: await readFile(new URL('../supabase/migrations/20260717_guarded_terminal.sql', import.meta.url), 'utf8'),
 };
@@ -39,8 +40,8 @@ forbidText('Approvals', files.approvals, 'connection_config');
 forbidText('Approvals', files.approvals, "eq('provider'");
 forbidText('Approvals', files.approvals, 'branch_name');
 
-requireText('Terminal route', files.terminalRoute, "CONTROL_ROOM_TERMINAL_ENABLED");
-requireText('Terminal route', files.terminalRoute, "CONTROL_ROOM_TERMINAL_ALLOW_REMOTE");
+requireText('Terminal route', files.terminalRoute, 'CONTROL_ROOM_TERMINAL_ENABLED');
+requireText('Terminal route', files.terminalRoute, 'CONTROL_ROOM_TERMINAL_ALLOW_REMOTE');
 requireText('Terminal route', files.terminalRoute, 'expectedCommitSha');
 requireText('Terminal route', files.terminalRoute, 'outputTruncated');
 requireText('Terminal route', files.terminalRoute, "status: proofEligible ? 'pass'");
@@ -57,6 +58,11 @@ requireText('Terminal registry', files.registry, "'deps.playwright-browser'");
 forbidText('Terminal registry', files.registry, "'bash'");
 forbidText('Terminal registry', files.registry, "'sh'");
 forbidText('Terminal registry', files.registry, "'powershell'");
+
+requireText('GitHub provider', files.githubProvider, 'resolvedRefs');
+requireText('GitHub provider', files.githubProvider, 'head: exactHeadSha');
+requireText('GitHub provider', files.githubProvider, 'this.resolvedRefs.delete(key)');
+requireText('GitHub provider', files.githubProvider, 'requires resolveRef');
 
 requireText('Evidence types', files.evidenceTypes, "'browser_test'");
 
