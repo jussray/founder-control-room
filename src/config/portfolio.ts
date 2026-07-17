@@ -15,6 +15,10 @@ export interface PortfolioProject {
  * Control Room database remains the runtime source of truth once a project is
  * registered there. Legacy and duplicate repositories are explicitly kept out
  * of every MCP allowlist.
+ *
+ * Slugs intentionally match the existing Control Room database registry. Do
+ * not rename a product here without an explicit data migration; a second slug
+ * would create a second project identity and split evidence provenance.
  */
 export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
   {
@@ -25,7 +29,7 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     capabilities: ["mobile-app", "companion-runtime", "playwright", "figma"],
   },
   {
-    slug: "jussbeautifulhair-site",
+    slug: "juss-beautiful-hair",
     name: "Juss Beautiful Hair Storefront",
     repository: "jussray/jussbeautifulhair-site",
     status: "active",
@@ -39,7 +43,7 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     capabilities: ["commerce-admin", "private-operations"],
   },
   {
-    slug: "l99-story-engine",
+    slug: "l99",
     name: "L99 StoryEngine",
     repository: "jussray/l99-StoryEngine",
     status: "active",
@@ -53,7 +57,7 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     capabilities: ["prompt-operations", "provider-routing"],
   },
   {
-    slug: "untold-stories-storefront",
+    slug: "untold-stories",
     name: "Untold Stories Storefront",
     repository: "jussray/untold-stories-storefront",
     status: "active",
