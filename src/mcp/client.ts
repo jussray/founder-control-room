@@ -35,6 +35,40 @@ function parseSsePayload(text: string): unknown {
   return JSON.parse(dataLines[dataLines.length - 1]);
 }
 
+async function readTextWithLimit(response: Response): Promise<string> {
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
+    await response.body?.cancel();
+    throw new Error(`MCP response exceeded ${MAX_RESPONSE_BYTES} bytes`);
+  }
+
+  if (!response.body) return "";
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let totalBytes = 0;
+  let text = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new Error(`MCP response exceeded ${MAX_RESPONSE_BYTES} bytes`);
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+    return text;
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 interface CompletedResponse {
   ok: boolean;
   status: number;
@@ -89,11 +123,8 @@ export class McpHttpClient {
       const returnedSessionId = response.headers.get("mcp-session-id");
       if (returnedSessionId) this.sessionId = returnedSessionId;
 
-      const text = readBody ? await response.text() : "";
+      const text = readBody ? await readTextWithLimit(response) : "";
       if (!readBody) await response.body?.cancel();
-      if (Buffer.byteLength(text, "utf8") > MAX_RESPONSE_BYTES) {
-        throw new Error(`MCP response exceeded ${MAX_RESPONSE_BYTES} bytes`);
-      }
 
       return {
         ok: response.ok,
