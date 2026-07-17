@@ -1,0 +1,133 @@
+{
+  "schemaVersion": "1.0",
+  "asOfDate": "2026-07-16",
+  "policy": {
+    "greenRequires": "exact-commit executable repository-owned checks",
+    "stepsNullMeaning": "runner_not_provisioned_not_code_evidence",
+    "externalVendorChecks": "advisory_unless_configured_and_explicitly_required",
+    "approvalCarryForward": false
+  },
+  "repositories": [
+    {
+      "repository": "jussray/Sekret-Bip",
+      "latestMainCommit": "b213a116dec378ae3d8334df115b8372841b5dd6",
+      "state": "verified",
+      "lastExactProof": {
+        "pullRequest": 455,
+        "commit": "7a7cacd9c05288ce1c13864cb6905add2ca84fa4",
+        "signals": [
+          "Type Check",
+          "Quality Gate",
+          "Regression Tests",
+          "Pre-Push Checks",
+          "CI/export",
+          "Playwright Smoke and Guardrails"
+        ]
+      },
+      "openBlocker": null
+    },
+    {
+      "repository": "jussray/jussbeautifulhair-site",
+      "latestMainCommit": "8a0066530c54e8fee6f439fa3f6f00bb9eee28bd",
+      "state": "verified",
+      "lastExactProof": {
+        "pullRequest": 14,
+        "commit": "0b862fa457bd2ad86bdbe2e591c11ee9a7671fb5",
+        "signals": [
+          "Quality Gate",
+          "Security Build",
+          "Deployment Boundary"
+        ]
+      },
+      "postProofChange": "PR #16 added required MCP validation to the Security Build workflow only",
+      "openBlocker": null
+    },
+    {
+      "repository": "jussray/chief-ai-machine",
+      "latestKnownMainCommit": "56e2a5b228846c0f159db7292accc2eb9d115273",
+      "state": "verified",
+      "lastExactProof": {
+        "pullRequest": 14,
+        "commit": "8d312b15d97b9914ac062711e3ce2f9b20c8d31d",
+        "signals": [
+          "Typecheck",
+          "Lint",
+          "Unit Tests",
+          "Playwright prompt-library smoke"
+        ]
+      },
+      "openBlocker": null
+    },
+    {
+      "repository": "jussray/l99-StoryEngine",
+      "latestKnownMainCommit": "e3b8d016d33485af15c5d9851917011b798f40ca",
+      "state": "verified",
+      "lastExactProof": {
+        "pullRequest": 24,
+        "commit": "cf9376d288771c9ee3fc301c1c2796d42eba614f",
+        "signals": [
+          "L99 Promotion Gates"
+        ]
+      },
+      "openBlocker": null
+    },
+    {
+      "repository": "jussray/untold-stories-storefront",
+      "latestMainCommit": "8e74e5954b070d49b1de0c49f8c651bce46b20db",
+      "state": "blocked_external_runner",
+      "repositorySideRepair": "merged PR #15",
+      "requiredSignals": [
+        "Typecheck",
+        "Production Build"
+      ],
+      "openBlocker": {
+        "issue": 13,
+        "workflowRun": 29318608092,
+        "evidence": "fresh rerun returned steps:null for every job and no logs"
+      },
+      "additionalGap": "no committed package-lock.json"
+    },
+    {
+      "repository": "jussray/jbh-private",
+      "latestMainCommit": "ab39f10e74085d8f9463690916d76eda421f095e",
+      "state": "blocked_external_runner",
+      "repositorySideRepair": "merged PR #7",
+      "requiredSignals": [
+        "Locked dependency install",
+        "MCP verification",
+        "Typecheck",
+        "Build"
+      ],
+      "openBlocker": {
+        "issue": 6,
+        "workflowRun": 29317893985,
+        "evidence": "fresh rerun returned steps:null and no logs"
+      },
+      "protectedDraft": "PR #4 remains unmerged"
+    },
+    {
+      "repository": "jussray/founder-control-room",
+      "latestMainCommit": "05bcc3bc1420c57a29140ce302dea00c082ff3f0",
+      "state": "repair_draft_blocked",
+      "repositorySideRepair": "draft PR #30",
+      "requiredSignals": [
+        "Synchronized package lock",
+        "MCP verification",
+        "Typecheck",
+        "Lint",
+        "Tests",
+        "Migration lint"
+      ],
+      "openBlocker": {
+        "issue": 22,
+        "workflowRun": 29553106151,
+        "evidence": "fresh rerun returned steps:null for all independent jobs and no logs"
+      },
+      "protectedDrafts": [
+        20,
+        21,
+        30
+      ]
+    }
+  ]
+}
