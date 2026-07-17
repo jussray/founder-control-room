@@ -85,6 +85,9 @@ export interface RepositoryProvider {
 
   readFile(projectId: string, ref: string, path: string): Promise<string>;
 
+  /** Resolves a mutable ref to the exact immutable commit SHA it currently names. */
+  resolveRef(projectId: string, ref: string): Promise<string>;
+
   /** Creates a new branch from `baseRef`. Returns the created branch name. */
   createBranch(projectId: string, baseRef: string, name: string): Promise<string>;
 
@@ -96,7 +99,8 @@ export interface RepositoryProvider {
 
   /**
    * Integrates `head` into `base` (the "merge", stripped of GitHub
-   * branding). Returns the resulting commit SHA on `base`.
+   * branding). Callers must resolve and validate the expected head SHA
+   * immediately before invoking this method. Returns the resulting commit SHA.
    */
   integrate(projectId: string, base: string, head: string): Promise<string>;
 
