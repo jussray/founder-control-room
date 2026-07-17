@@ -1,6 +1,6 @@
 # Founder Control Room Claude Instructions
 
-Read [`GLOBAL_AI.md`](./GLOBAL_AI.md) before any nontrivial work.
+Read [`GLOBAL_AI.md`](./GLOBAL_AI.md) and [`skills/portfolio-control-plane/SKILL.md`](./skills/portfolio-control-plane/SKILL.md) before any nontrivial work.
 
 Use the exact founder stack:
 
@@ -15,8 +15,9 @@ The first redteam attacks the premise. The second attacks the selected plan.
 1. Confirm repository, branch, environment, and requested outcome.
 2. Inspect the current provider interfaces, HTTP routes, auth middleware, schemas, migrations, tests, and recent changes.
 3. Read `docs/ARCHITECTURE.md` and preserve the provider-independent authority model.
-4. Separate verified facts, inference, and unknowns.
-5. Identify the next approval gate before mutation.
+4. Apply the portfolio skill and then the managed repository's local skill when crossing project boundaries.
+5. Separate verified facts, inference, and unknowns.
+6. Identify the next approval gate before mutation.
 
 ## Project rules
 
