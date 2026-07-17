@@ -89,6 +89,8 @@ jobs:
     name: "Qodo – Workflow Contract Tests"
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      QODO_API_KEY: ${{ secrets.QODO_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -97,12 +99,10 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Run Qodo tests
-        if: ${{ secrets.QODO_API_KEY != '' }}
+        if: env.QODO_API_KEY != ''
         run: npx qodo test --coverage --reporter=json --output=qodo-results.json
-        env:
-          QODO_API_KEY: ${{ secrets.QODO_API_KEY }}
       - name: Record missing optional Qodo configuration
-        if: ${{ secrets.QODO_API_KEY == '' }}
+        if: env.QODO_API_KEY == ''
         run: echo "Qodo is not configured; required repository gates remain enforced separately."
       - uses: actions/upload-artifact@v4
         if: ${{ always() && hashFiles('qodo-results.json') != '' }}
