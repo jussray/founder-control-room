@@ -1,5 +1,10 @@
 # Founder Control Room Agent Instructions
 
+## Required repository skill
+
+Read `.agents/skills/founder-control-room-operator/SKILL.md` before nontrivial work. Use its 5W1H contract as active reasoning: establish who, what, where, when, why, and how; inspect missing answers; and ask only when an unknown materially changes the safe action or authority.
+
+
 Read [`GLOBAL_AI.md`](./GLOBAL_AI.md) before changing code, configuration, schemas, providers, or documentation.
 
 Use the exact stack:
