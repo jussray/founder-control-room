@@ -33,24 +33,127 @@ function summarizeResponse(result: unknown): Record<string, unknown> {
   };
 }
 
-async function writeEvidence(input: McpEvidenceInput): Promise<string> {
+async function missionForProject(
+  missionId: string,
+  projectUuid: string,
+): Promise<{ id: string; project_id: string }> {
+  const { data, error } = await supabase
+    .from("missions")
+    .select("id, project_id")
+    .eq("id", missionId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`MCP mission lookup failed: ${error.message}`);
+  }
+  if (!data) {
+    throw new Error(`MCP mission is not registered: ${missionId}`);
+  }
+  if (data.project_id !== projectUuid) {
+    throw new Error(`MCP mission ${missionId} does not belong to the requested project`);
+  }
+  return data;
+}
+
+async function approvalForProject(
+  approvalId: string,
+  projectUuid: string,
+  requestedMissionId?: string,
+): Promise<void> {
+  const { data: approval, error: approvalError } = await supabase
+    .from("approvals")
+    .select("id, mission_id, change_proposal_id")
+    .eq("id", approvalId)
+    .maybeSingle();
+
+  if (approvalError) {
+    throw new Error(`MCP approval lookup failed: ${approvalError.message}`);
+  }
+  if (!approval) {
+    throw new Error(`MCP approval is not registered: ${approvalId}`);
+  }
+
+  let approvalMissionId = approval.mission_id ?? undefined;
+
+  if (approval.change_proposal_id) {
+    const { data: proposal, error: proposalError } = await supabase
+      .from("change_proposals")
+      .select("id, project_id, mission_id")
+      .eq("id", approval.change_proposal_id)
+      .maybeSingle();
+
+    if (proposalError) {
+      throw new Error(`MCP approval proposal lookup failed: ${proposalError.message}`);
+    }
+    if (!proposal) {
+      throw new Error(
+        `MCP approval ${approvalId} references a missing change proposal`,
+      );
+    }
+    if (proposal.project_id !== projectUuid) {
+      throw new Error(
+        `MCP approval ${approvalId} does not belong to the requested project`,
+      );
+    }
+    if (approvalMissionId && approvalMissionId !== proposal.mission_id) {
+      throw new Error(
+        `MCP approval ${approvalId} has inconsistent mission provenance`,
+      );
+    }
+    approvalMissionId = approvalMissionId ?? proposal.mission_id;
+  }
+
+  if (!approvalMissionId) {
+    throw new Error(
+      `MCP approval ${approvalId} has no project-verifiable mission or change proposal`,
+    );
+  }
+
+  await missionForProject(approvalMissionId, projectUuid);
+
+  if (requestedMissionId && requestedMissionId !== approvalMissionId) {
+    throw new Error(
+      `MCP approval ${approvalId} does not belong to mission ${requestedMissionId}`,
+    );
+  }
+}
+
+export async function validateEvidenceReferences(
+  projectId: string,
+  missionId?: string,
+  approvalId?: string,
+): Promise<string> {
   const { data: project, error: projectError } = await supabase
     .from("projects")
     .select("id")
-    .eq("slug", input.projectId)
+    .eq("slug", projectId)
     .maybeSingle();
 
   if (projectError) {
     throw new Error(`MCP evidence project lookup failed: ${projectError.message}`);
   }
   if (!project) {
-    throw new Error(`MCP evidence project is not registered: ${input.projectId}`);
+    throw new Error(`MCP evidence project is not registered: ${projectId}`);
   }
 
+  if (missionId) {
+    await missionForProject(missionId, project.id);
+  }
+  if (approvalId) {
+    await approvalForProject(approvalId, project.id, missionId);
+  }
+
+  return project.id;
+}
+
+async function writeEvidence(
+  input: McpEvidenceInput,
+  projectUuid: string,
+): Promise<string> {
   const evidenceId = randomUUID();
   const { error } = await supabase.from("mcp_tool_calls").insert({
     id: evidenceId,
-    project_id: project.id,
+    project_id: projectUuid,
     mission_id: input.missionId ?? null,
     approval_id: input.approvalId ?? null,
     server_id: input.serverId,
@@ -128,6 +231,11 @@ export class McpHub {
     evidenceId: string;
   }> {
     assertNoSecretArguments(request.arguments);
+    const projectUuid = await validateEvidenceReferences(
+      request.projectId,
+      request.missionId,
+      request.approvalId,
+    );
     const server = this.registry.get(request.serverId);
     const policy = evaluateMcpPolicy({
       server,
@@ -153,7 +261,7 @@ export class McpHub {
       requestHash: hash,
       requestSummary: summarizeRequest(request),
       estimatedCostUsd: 0,
-    });
+    }, projectUuid);
 
     return {
       policy,
@@ -164,6 +272,11 @@ export class McpHub {
 
   async invoke(request: McpInvocationRequest): Promise<McpInvocationResult> {
     assertNoSecretArguments(request.arguments);
+    const projectUuid = await validateEvidenceReferences(
+      request.projectId,
+      request.missionId,
+      request.approvalId,
+    );
     const server = this.registry.get(request.serverId);
     const policy = evaluateMcpPolicy({
       server,
@@ -191,7 +304,7 @@ export class McpHub {
         requestHash: hash,
         requestSummary: summarizeRequest(request),
         estimatedCostUsd: 0,
-      });
+      }, projectUuid);
       throw new Error(`MCP invocation blocked (${evidenceId}): ${policy.reason}`);
     }
 
@@ -227,7 +340,7 @@ export class McpHub {
         responseSummary: summarizeResponse(result),
         durationMs,
         estimatedCostUsd: 0,
-      });
+      }, projectUuid);
 
       return {
         serverId: request.serverId,
@@ -258,7 +371,7 @@ export class McpHub {
         durationMs,
         estimatedCostUsd: 0,
         errorCode: requestHash(message).slice(0, 16),
-      });
+      }, projectUuid);
       throw error;
     }
   }
