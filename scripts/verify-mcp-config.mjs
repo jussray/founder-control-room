@@ -7,6 +7,7 @@ const expectedServerNames = [
   'cloudflare-docs',
   'cloudflare-observability',
   'context7',
+  'figma',
   'github',
   'supabase',
 ];
@@ -14,6 +15,7 @@ const expectedServerNames = [
 const expectedRemoteUrls = {
   github: 'https://api.githubcopilot.com/mcp/',
   context7: 'https://mcp.context7.com/mcp',
+  figma: 'https://mcp.figma.com/mcp',
   'cloudflare-docs': 'https://docs.mcp.cloudflare.com/mcp',
   'cloudflare-builds': 'https://builds.mcp.cloudflare.com/mcp',
   'cloudflare-observability': 'https://observability.mcp.cloudflare.com/mcp',
@@ -61,6 +63,9 @@ function validateRemoteServers(relativePath, servers) {
     githubHeaders['X-MCP-Insiders'] !== 'true',
     `${relativePath}:GitHub Insiders is private opt-in only`,
   );
+
+  assert(!servers.figma?.headers, `${relativePath}:figma must authenticate through the supported client`);
+  assert(!servers.figma?.env, `${relativePath}:figma must not commit environment credentials`);
 }
 
 function validateSupabase(relativePath, server, expectedProjectRef) {
@@ -88,15 +93,56 @@ function assertNoCommittedSecrets(relativePath, parsed) {
     /Bearer\s+[A-Za-z0-9._-]{12,}/i,
     /SUPABASE_SERVICE_ROLE_KEY/,
     /CLOUDFLARE_API_TOKEN/,
+    /FIGMA_API_KEY/,
+    /FIGMA_ACCESS_TOKEN/,
   ];
   for (const pattern of patterns) {
     assert(!pattern.test(serialized), `${relativePath} appears to contain a committed credential`);
   }
 }
 
+function validateSkillRouting(routing) {
+  assert(routing?.schemaVersion === 1, 'config/mcp-skill-routing.json schemaVersion must be 1');
+  assert(
+    Array.isArray(routing.alwaysLoad) && routing.alwaysLoad.includes('control-room-repo-contract'),
+    'MCP routing must always load control-room-repo-contract',
+  );
+
+  const routedServers = routing.servers ?? {};
+  assert(
+    JSON.stringify(Object.keys(routedServers).sort()) === JSON.stringify(expectedServerNames),
+    'MCP skill routing must cover every configured server exactly once',
+  );
+
+  const allSkills = new Set(routing.alwaysLoad);
+  for (const [serverName, route] of Object.entries(routedServers)) {
+    assert(Array.isArray(route.skills) && route.skills.length > 0, `${serverName} must load at least one skill`);
+    assert(typeof route.boundary === 'string' && route.boundary.length >= 24, `${serverName} boundary is missing or too weak`);
+    for (const skill of route.skills) allSkills.add(skill);
+  }
+
+  const figmaSkills = routedServers.figma?.skills ?? [];
+  for (const required of [
+    'control-room-repo-contract',
+    'control-room-figma-builder',
+    'control-room-design-implementation',
+  ]) {
+    assert(figmaSkills.includes(required), `figma routing must include ${required}`);
+  }
+
+  for (const skill of allSkills) {
+    const skillPath = path.join(root, '.agents', 'skills', skill, 'SKILL.md');
+    assert(fs.existsSync(skillPath), `mapped skill is missing: .agents/skills/${skill}/SKILL.md`);
+  }
+
+  const figmaSource = path.join(root, 'docs', 'FIGMA_SOURCE_OF_TRUTH.md');
+  assert(fs.existsSync(figmaSource), 'docs/FIGMA_SOURCE_OF_TRUTH.md must exist while Figma is enabled');
+}
+
 const projectConfig = readJson('.mcp.json');
 const exampleConfig = readJson('.mcp.example.json');
 const vscodeConfig = readJson('.vscode/mcp.json');
+const skillRouting = readJson('config/mcp-skill-routing.json');
 
 const projectServers = projectConfig.mcpServers;
 const exampleServers = exampleConfig.mcpServers;
@@ -113,6 +159,7 @@ validateRemoteServers('.vscode/mcp.json', vscodeServers);
 validateSupabase('.mcp.json', projectServers.supabase, 'oojzfmmywbvficgybaxd');
 validateSupabase('.mcp.example.json', exampleServers.supabase, 'YOUR_CONTROL_ROOM_PROJECT_REF');
 validateSupabase('.vscode/mcp.json', vscodeServers.supabase, 'oojzfmmywbvficgybaxd');
+validateSkillRouting(skillRouting);
 
 for (const [relativePath, parsed] of [
   ['.mcp.json', projectConfig],
@@ -121,7 +168,7 @@ for (const [relativePath, parsed] of [
 ]) {
   assertNoCommittedSecrets(relativePath, parsed);
   const servers = parsed.mcpServers ?? parsed.servers;
-  for (const forbidden of ['playwright', 'figma', 'dbhub', 'netdata-cloud']) {
+  for (const forbidden of ['playwright', 'dbhub', 'netdata-cloud']) {
     assert(!servers[forbidden], `${relativePath}:${forbidden} is not justified in the current Control Room phase`);
   }
   assert(
@@ -130,4 +177,4 @@ for (const [relativePath, parsed] of [
   );
 }
 
-console.log('[verify:mcp] Control Room MCP configuration is scoped, read-only, and credential-free.');
+console.log('[verify:mcp] Control Room MCP configuration and skill routing are scoped, credential-free, and repository-bound.');
