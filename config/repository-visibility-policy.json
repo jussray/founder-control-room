@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-07-17",
+  "default_policy": "private_by_default_sanitized_always_public_by_deliberate_export",
+  "repositories": [
+    {
+      "repository": "jussray/Sekret-Bip",
+      "current_visibility": "public",
+      "target_visibility": "private",
+      "classification": "canonical",
+      "action": "privatize_then_create_clean_showcase_export",
+      "priority": "critical"
+    },
+    {
+      "repository": "jussray/chief-ai-machine",
+      "current_visibility": "public",
+      "target_visibility": "private",
+      "classification": "canonical",
+      "action": "privatize_and_publish_selected_docs_only",
+      "priority": "critical"
+    },
+    {
+      "repository": "jussray/l99-StoryEngine",
+      "current_visibility": "public",
+      "target_visibility": "private",
+      "classification": "canonical",
+      "action": "privatize_and_publish_whitepaper_only",
+      "priority": "critical"
+    },
+    {
+      "repository": "jussray/jussbeautifulhair-site",
+      "current_visibility": "public",
+      "target_visibility": "conditional_public",
+      "classification": "sanitized_storefront",
+      "action": "retain_public_only_with_named_business_value",
+      "priority": "high"
+    },
+    {
+      "repository": "jussray/sekret-bip-demo",
+      "current_visibility": "public",
+      "target_visibility": "private",
+      "classification": "quarantine",
+      "action": "privatize_and_rebuild_clean_fake_data_demo",
+      "priority": "critical"
+    },
+    {
+      "repository": "jussray/do-not-use",
+      "current_visibility": "public",
+      "target_visibility": "private_archived",
+      "classification": "legacy",
+      "action": "privatize_verify_unique_value_archive",
+      "priority": "high"
+    },
+    {
+      "repository": "jussray/founder-control-room",
+      "current_visibility": "private",
+      "target_visibility": "private",
+      "classification": "canonical",
+      "action": "retain_private_and_sanitize",
+      "priority": "critical"
+    },
+    {
+      "repository": "jussray/promptos",
+      "current_visibility": "private",
+      "target_visibility": "private",
+      "classification": "canonical",
+      "action": "retain_private_and_sanitize",
+      "priority": "critical"
+    },
+    {
+      "repository": "jussray/jbh-private",
+      "current_visibility": "private",
+      "target_visibility": "private",
+      "classification": "canonical_private_business",
+      "action": "retain_private_and_sanitize",
+      "priority": "critical"
+    },
+    {
+      "repository": "jussray/untold-stories-storefront",
+      "current_visibility": "private",
+      "target_visibility": "private",
+      "classification": "active_development",
+      "action": "retain_private_until_public_export_gate_passes",
+      "priority": "high"
+    },
+    {
+      "repository": "jussray/SekretBip_refactor_start",
+      "current_visibility": "private",
+      "target_visibility": "private_archived",
+      "classification": "legacy_refactor",
+      "action": "reconcile_unique_content_then_archive",
+      "priority": "medium"
+    },
+    {
+      "repository": "jussray/Se-kretBip",
+      "current_visibility": "private",
+      "target_visibility": "private_archived",
+      "classification": "legacy",
+      "action": "reconcile_unique_content_then_archive",
+      "priority": "medium"
+    },
+    {
+      "repository": "jussray/Juss-beautiful-hair-",
+      "current_visibility": "private",
+      "target_visibility": "private_archived",
+      "classification": "duplicate_business_repo",
+      "action": "confirm_canonical_repo_then_archive",
+      "priority": "medium"
+    },
+    {
+      "repository": "jussray/jussbeautifulhair1",
+      "current_visibility": "private",
+      "target_visibility": "private_archived",
+      "classification": "duplicate_business_repo",
+      "action": "confirm_canonical_repo_then_archive",
+      "priority": "medium"
+    }
+  ],
+  "manual_visibility_change_required": true,
+  "sanitation_required_for_all": true,
+  "public_export_requires_clean_history": true
+}
