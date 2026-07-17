@@ -1,0 +1,57 @@
+name: Economic Intelligence Playwright
+
+on:
+  pull_request:
+    paths:
+      - 'src/economic-intelligence/**'
+      - 'src/http/routes/economicIntelligence.ts'
+      - 'src/http/server.ts'
+      - 'scripts/economic-intelligence-test-server.ts'
+      - 'e2e/economic-intelligence-city-agnostic.spec.ts'
+      - 'playwright.economic-intelligence.config.ts'
+      - 'supabase/migrations/*economic_intelligence*'
+      - '.github/workflows/economic-intelligence-playwright.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  city-agnostic-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked repository dependencies
+        run: npm ci
+
+      - name: Install pinned Playwright proof dependency
+        run: npm install --no-save --package-lock=false @playwright/test@1.61.1
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Typecheck repository source
+        run: npm run typecheck
+
+      - name: Run city-agnostic Redteam Playwright proof
+        run: npx playwright test -c playwright.economic-intelligence.config.ts
+
+      - name: Upload Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: economic-intelligence-playwright-${{ github.sha }}
+          path: |
+            playwright-report/economic-intelligence/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
