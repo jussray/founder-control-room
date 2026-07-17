@@ -45,7 +45,7 @@ export class MissionController extends BaseController {
 
     const { data: mission, error: missionError } = await supabase
       .from('missions')
-      .select('id, status, required_checks, manifest_version_id, policy_snapshot, branch_ref')
+      .select('id, status, base_ref, required_checks, manifest_version_id, policy_snapshot, branch_ref')
       .eq('id', missionId)
       .eq('project_id', projectId)
       .single();
