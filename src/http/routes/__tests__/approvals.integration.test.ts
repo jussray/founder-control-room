@@ -19,7 +19,8 @@ vi.mock('../../../providers/GitHubProvider.js', () => ({
   })),
 }));
 
-vi.mock('../../../events/outbox.js', () => ({ enqueueReconcile: vi.fn() }));
+const mockEnqueue = vi.fn();
+vi.mock('../../../events/outbox.js', () => ({ enqueueReconcile: mockEnqueue }));
 
 const mockControllerRun = vi.fn();
 vi.mock('../../../controllers/ProofGateController.js', () => ({
@@ -32,6 +33,7 @@ import { approvalsRouter } from '../approvals.js';
 
 const MISSION_ID = 'mission-uuid-001';
 const PROJECT_ID = 'project-uuid-001';
+const EXECUTION_ID = 'execution-uuid-001';
 const FOUNDER_EMAIL = 'founder@example.com';
 const FOUNDER_USER_ID = 'user-uuid-001';
 const BEARER = 'Bearer test-token';
@@ -72,6 +74,14 @@ function founderUsersRow() {
   };
 }
 
+function twoEqUpdate(error: { message: string } | null = null) {
+  return {
+    eq: () => ({
+      eq: () => Promise.resolve({ error }),
+    }),
+  };
+}
+
 function proofGateMission() {
   authSuccess();
   supabaseMock.from.mockImplementation((table: string) => {
@@ -86,27 +96,39 @@ function proofGateMission() {
             }),
           }),
         }),
-        update: () => ({
-          eq: () => ({ eq: () => Promise.resolve({ error: null }) }),
-        }),
+        update: () => twoEqUpdate(),
       };
     }
-    return { insert: vi.fn().mockResolvedValue({ error: null }) };
+    return {};
   });
 }
 
-interface ExecuteOptions {
-  proofRecord: unknown;
-  missionStatus?: 'proposed' | 'approved';
-  evidenceRows?: Array<{ kind: string; status: string; commit_sha: string; created_at: string }>;
-  currentHead?: string;
+interface ExecutionRecord {
+  id: string;
+  status: 'pending' | 'succeeded' | 'failed';
+  result: Record<string, unknown>;
+  success: boolean | null;
 }
 
-function executeStack(options: ExecuteOptions) {
+interface ExecuteOptions {
+  proofRecord?: unknown;
+  missionStatus?: 'proposed' | 'approved';
+  existingExecution?: ExecutionRecord | null;
+  racedExecution?: ExecutionRecord | null;
+  reservationError?: { message: string } | null;
+  auditUpdateError?: { message: string } | null;
+  missionUpdateError?: { message: string } | null;
+  evidenceRows?: Array<{ kind: string; status: string; commit_sha: string; created_at: string }>;
+  currentHead?: string;
+  integrateError?: Error | null;
+}
+
+function executeStack(options: ExecuteOptions = {}) {
   authSuccess();
   mockResolveRef.mockResolvedValue(options.currentHead ?? EXPECTED_SHA);
-  mockIntegrate.mockResolvedValue('merge-commit-sha');
   mockCreateBranch.mockResolvedValue('mission/test');
+  if (options.integrateError) mockIntegrate.mockRejectedValue(options.integrateError);
+  else mockIntegrate.mockResolvedValue('merge-commit-sha');
 
   const missionStatus = options.missionStatus ?? 'approved';
   const mission = {
@@ -121,6 +143,18 @@ function executeStack(options: ExecuteOptions) {
     },
   };
 
+  let executionLookupCount = 0;
+  const auditUpdate = vi.fn(() => twoEqUpdate(options.auditUpdateError ?? null));
+  const reservationInsert = vi.fn(() => ({
+    select: () => ({
+      single: () => Promise.resolve(
+        options.reservationError
+          ? { data: null, error: options.reservationError }
+          : { data: { id: EXECUTION_ID }, error: null },
+      ),
+    }),
+  }));
+
   supabaseMock.from.mockImplementation((table: string) => {
     if (table === 'founder_users') return founderUsersRow();
     if (table === 'missions') {
@@ -128,9 +162,7 @@ function executeStack(options: ExecuteOptions) {
         select: () => ({
           eq: () => ({ single: () => Promise.resolve({ data: mission, error: null }) }),
         }),
-        update: () => ({
-          eq: () => ({ eq: () => Promise.resolve({ error: null }) }),
-        }),
+        update: () => twoEqUpdate(options.missionUpdateError ?? null),
       };
     }
     if (table === 'proof_gate_results') {
@@ -142,7 +174,12 @@ function executeStack(options: ExecuteOptions) {
                 gte: () => ({
                   order: () => ({
                     limit: () => ({
-                      maybeSingle: () => Promise.resolve({ data: options.proofRecord, error: null }),
+                      maybeSingle: () => Promise.resolve({
+                        data: options.proofRecord === undefined
+                          ? { id: 'proof', status: 'pass' }
+                          : options.proofRecord,
+                        error: null,
+                      }),
                     }),
                   }),
                 }),
@@ -155,9 +192,18 @@ function executeStack(options: ExecuteOptions) {
     if (table === 'approval_executions') {
       return {
         select: () => ({
-          eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
+          eq: () => ({
+            maybeSingle: () => {
+              const data = executionLookupCount === 0
+                ? options.existingExecution ?? null
+                : options.racedExecution ?? options.existingExecution ?? null;
+              executionLookupCount += 1;
+              return Promise.resolve({ data, error: null });
+            },
+          }),
         }),
-        insert: () => Promise.resolve({ error: null }),
+        insert: reservationInsert,
+        update: auditUpdate,
       };
     }
     if (table === 'projects') {
@@ -194,8 +240,10 @@ function executeStack(options: ExecuteOptions) {
         }),
       };
     }
-    return { insert: vi.fn().mockResolvedValue({ error: null }) };
+    return {};
   });
+
+  return { auditUpdate, reservationInsert };
 }
 
 describe('approval proof gates', () => {
@@ -262,14 +310,14 @@ describe('approval proof gates', () => {
   });
 });
 
-describe('exact-head action execution', () => {
+describe('reservation-first exact-head execution', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.GITHUB_TOKEN = 'test-token';
   });
 
-  it('rejects merge without a fresh proof record', async () => {
-    executeStack({ proofRecord: null });
+  it('rejects merge without a fresh proof record before reserving or calling GitHub', async () => {
+    const { reservationInsert } = executeStack({ proofRecord: null });
     const response = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/execute`)
       .set('Authorization', BEARER)
@@ -280,11 +328,71 @@ describe('exact-head action execution', () => {
       });
     expect(response.status).toBe(403);
     expect(response.body.code).toBe('PROOF_GATE_REQUIRED');
+    expect(reservationInsert).not.toHaveBeenCalled();
+    expect(mockIntegrate).not.toHaveBeenCalled();
   });
 
-  it('rejects stale or wrong-SHA machine evidence', async () => {
+  it('returns a prior succeeded execution without repeating the provider action', async () => {
     executeStack({
-      proofRecord: { id: 'proof', status: 'pass' },
+      existingExecution: {
+        id: EXECUTION_ID,
+        status: 'succeeded',
+        result: { mergeCommitSha: 'already-merged' },
+        success: true,
+      },
+    });
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'merge',
+        idempotencyKey: 'merge-existing',
+        payload: { head: 'codex/test', base: 'main', expectedHeadSha: EXPECTED_SHA },
+      });
+    expect(response.status).toBe(200);
+    expect(response.body.idempotent).toBe(true);
+    expect(mockIntegrate).not.toHaveBeenCalled();
+  });
+
+  it('blocks a pending reservation because the provider may already have mutated state', async () => {
+    executeStack({
+      existingExecution: {
+        id: EXECUTION_ID,
+        status: 'pending',
+        result: {},
+        success: null,
+      },
+    });
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'merge',
+        idempotencyKey: 'merge-pending',
+        payload: { head: 'codex/test', base: 'main', expectedHeadSha: EXPECTED_SHA },
+      });
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('ACTION_ALREADY_PENDING');
+    expect(mockIntegrate).not.toHaveBeenCalled();
+  });
+
+  it('does not call the provider when reservation persistence fails', async () => {
+    executeStack({ reservationError: { message: 'database unavailable' } });
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'merge',
+        idempotencyKey: 'merge-reservation-failed',
+        payload: { head: 'codex/test', base: 'main', expectedHeadSha: EXPECTED_SHA },
+      });
+    expect(response.status).toBe(500);
+    expect(response.body.code).toBe('ACTION_RESERVATION_FAILED');
+    expect(mockIntegrate).not.toHaveBeenCalled();
+  });
+
+  it('records stale exact-head evidence as a failed reserved action', async () => {
+    const { auditUpdate } = executeStack({
       evidenceRows: [
         { kind: 'typecheck', status: 'pass', commit_sha: 'b'.repeat(40), created_at: new Date().toISOString() },
         { kind: 'browser_test', status: 'pass', commit_sha: EXPECTED_SHA, created_at: new Date().toISOString() },
@@ -302,14 +410,11 @@ describe('exact-head action execution', () => {
     expect(response.status).toBe(409);
     expect(response.body.error).toMatch(/Exact-head machine evidence/);
     expect(mockIntegrate).not.toHaveBeenCalled();
+    expect(auditUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
   });
 
-  it('rejects a branch that moved after verification', async () => {
-    executeStack({
-      proofRecord: { id: 'proof', status: 'pass' },
-      currentHead: 'c'.repeat(40),
-    });
-
+  it('rejects a branch that moved after verification and finalizes the reservation as failed', async () => {
+    const { auditUpdate } = executeStack({ currentHead: 'c'.repeat(40) });
     const response = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/execute`)
       .set('Authorization', BEARER)
@@ -321,11 +426,11 @@ describe('exact-head action execution', () => {
     expect(response.status).toBe(409);
     expect(response.body.error).toMatch(/Branch moved/);
     expect(mockIntegrate).not.toHaveBeenCalled();
+    expect(auditUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
   });
 
-  it('integrates only after fresh proof, exact-head evidence, and ref confirmation', async () => {
-    executeStack({ proofRecord: { id: 'proof', status: 'pass' } });
-
+  it('integrates only after reservation, exact-head proof, and immutable ref confirmation', async () => {
+    const { auditUpdate, reservationInsert } = executeStack();
     const response = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/execute`)
       .set('Authorization', BEARER)
@@ -336,16 +441,46 @@ describe('exact-head action execution', () => {
       });
 
     expect(response.status).toBe(200);
+    expect(reservationInsert).toHaveBeenCalled();
     expect(mockResolveRef).toHaveBeenCalledWith('test-project', 'codex/test');
     expect(mockIntegrate).toHaveBeenCalledWith('test-project', 'main', 'codex/test');
+    expect(auditUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'succeeded' }));
   });
 
-  it('creates a branch only from a proposed mission with fresh branch proof', async () => {
-    executeStack({
-      proofRecord: { id: 'proof', status: 'pass' },
-      missionStatus: 'proposed',
-    });
+  it('leaves the reservation pending and forbids automatic retry when audit finalization fails', async () => {
+    executeStack({ auditUpdateError: { message: 'write interrupted' } });
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'merge',
+        idempotencyKey: 'merge-audit-incomplete',
+        payload: { head: 'codex/test', base: 'main', expectedHeadSha: EXPECTED_SHA },
+      });
 
+    expect(mockIntegrate).toHaveBeenCalled();
+    expect(response.status).toBe(500);
+    expect(response.body.code).toBe('ACTION_AUDIT_INCOMPLETE');
+  });
+
+  it('records provider failure and does not silently retry it', async () => {
+    const { auditUpdate } = executeStack({ integrateError: new Error('merge conflict') });
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'merge',
+        idempotencyKey: 'merge-provider-failed',
+        payload: { head: 'codex/test', base: 'main', expectedHeadSha: EXPECTED_SHA },
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toMatch(/merge conflict/);
+    expect(auditUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
+  });
+
+  it('creates a branch only after reserving a proposed mission action', async () => {
+    const { reservationInsert, auditUpdate } = executeStack({ missionStatus: 'proposed' });
     const response = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/execute`)
       .set('Authorization', BEARER)
@@ -356,6 +491,8 @@ describe('exact-head action execution', () => {
       });
 
     expect(response.status).toBe(200);
+    expect(reservationInsert).toHaveBeenCalled();
     expect(mockCreateBranch).toHaveBeenCalledWith('test-project', 'main', 'mission/test');
+    expect(auditUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'succeeded' }));
   });
 });
