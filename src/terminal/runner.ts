@@ -1,7 +1,7 @@
 import { realpath } from 'node:fs/promises';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { resolve, sep } from 'node:path';
-import { getTerminalCommand } from './registry.js';
+import { getTerminalCommand, listTerminalCommands } from './registry.js';
 import {
   TerminalRunnerError,
   type TerminalCommandSpec,
@@ -30,6 +30,11 @@ const TOKEN_PATTERNS = [
   /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g,
 ];
 
+type CommandResolver = (
+  projectSlug: string,
+  commandId: string,
+) => TerminalCommandSpec | undefined;
+
 interface CaptureResult {
   exitCode: number | null;
   signal: NodeJS.Signals | null;
@@ -45,31 +50,17 @@ export class GuardedTerminalRunner {
   private readonly childrenByRun = new Map<string, ChildProcessWithoutNullStreams>();
   private readonly cancelledRuns = new Set<string>();
 
-  constructor(private readonly workspaceRoot: string) {}
+  constructor(
+    private readonly workspaceRoot: string,
+    private readonly commandResolver: CommandResolver = getTerminalCommand,
+  ) {}
 
   list(projectSlug: string): TerminalCommandSpec[] {
-    const commands: TerminalCommandSpec[] = [];
-    for (const commandId of [
-      'git.head',
-      'git.status',
-      'git.diff-stat',
-      'deps.install',
-      'verify.mcp',
-      'verify.typecheck',
-      'verify.lint',
-      'verify.unit',
-      'verify.build',
-      'verify.deploy-boundary',
-      'verify.playwright',
-    ]) {
-      const command = getTerminalCommand(projectSlug, commandId);
-      if (command) commands.push(command);
-    }
-    return commands;
+    return listTerminalCommands(projectSlug);
   }
 
   async run(request: TerminalRunRequest): Promise<TerminalRunResult> {
-    const command = getTerminalCommand(request.projectSlug, request.commandId);
+    const command = this.commandResolver(request.projectSlug, request.commandId);
     if (!command) {
       throw new TerminalRunnerError(
         'UNKNOWN_COMMAND',
@@ -223,8 +214,9 @@ export class GuardedTerminalRunner {
           env,
           shell: false,
           windowsHide: true,
-          stdio: ['ignore', 'pipe', 'pipe'],
+          stdio: 'pipe',
         });
+        child.stdin.end();
       } catch (error) {
         rejectPromise(
           new TerminalRunnerError(
