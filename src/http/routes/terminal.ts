@@ -237,6 +237,7 @@ export function createTerminalRouter(runnerOverride?: TerminalExecutor) {
         });
       }
 
+      const proofEligible = result.status === 'passed' && !result.outputTruncated;
       let evidenceId: string | null = null;
       if (command.evidenceKind) {
         const { data: evidence, error: evidenceError } = await supabase
@@ -246,7 +247,7 @@ export function createTerminalRouter(runnerOverride?: TerminalExecutor) {
             mission_id: mission.id,
             subject: `terminal:${command.id}`,
             kind: command.evidenceKind,
-            status: result.status === 'passed' ? 'pass' : 'fail',
+            status: proofEligible ? 'pass' : result.status === 'passed' ? 'warn' : 'fail',
             provider: 'custom',
             commit_sha: result.observedCommitSha,
             details_ref: `terminal-run:${runId}`,
@@ -273,6 +274,7 @@ export function createTerminalRouter(runnerOverride?: TerminalExecutor) {
 
       return res.status(result.status === 'passed' ? 200 : 422).json({
         ok: result.status === 'passed',
+        proofEligible,
         run: result,
         evidenceId,
       });
