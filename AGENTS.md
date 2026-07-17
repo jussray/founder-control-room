@@ -3,6 +3,7 @@
 Read these before changing code, configuration, schemas, providers, verification contracts, commercial plans, launch surfaces, or documentation:
 
 - [`Juss Founder OS`](.ai/skills/juss-founder-os/SKILL.md) first
+- [`founder-control-room-operator`](.agents/skills/founder-control-room-operator/SKILL.md) for the repository-scoped 5W1H operating contract
 - [`GLOBAL_AI.md`](./GLOBAL_AI.md)
 - [`Founder Merge Authority`](./docs/FOUNDER_MERGE_AUTHORITY.md)
 - [`skills/portfolio-control-plane/SKILL.md`](./skills/portfolio-control-plane/SKILL.md)
