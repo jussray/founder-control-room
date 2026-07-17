@@ -254,10 +254,10 @@ export function createTerminalRouter(runnerOverride?: TerminalExecutor) {
           .select('id')
           .single();
 
-        if (evidenceError) {
+        if (evidenceError || !evidence) {
           return res.status(500).json({
             error: 'Terminal result persisted, but evidence could not be recorded.',
-            detail: evidenceError.message,
+            detail: evidenceError?.message ?? 'Evidence insert returned no record.',
             runId,
           });
         }
