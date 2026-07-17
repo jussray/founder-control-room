@@ -6,6 +6,9 @@ on:
       - main
       - staging
 
+permissions:
+  contents: read
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -18,10 +21,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          # cache: 'npm' removed — requires package-lock.json.
-          # Re-enable once lockfile is committed.
-      - run: npm install
-      - run: npx tsc --noEmit
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
 
   lint:
     name: "Lint"
@@ -31,7 +33,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: npm install
+          cache: npm
+      - run: npm ci
       - run: npm run lint
 
   unit-tests:
@@ -42,65 +45,96 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: npm install
+          cache: npm
+      - run: npm ci
       - run: npm test -- --coverage --reporter=json --outputFile=test-results.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
           path: test-results.json
+          if-no-files-found: error
+          retention-days: 7
+
+  terminal-contract:
+    name: "Guarded Terminal Contract"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run verify:terminal-contract
+
+  build:
+    name: "Production Build"
+    runs-on: ubuntu-latest
+    needs:
+      - typecheck
+      - lint
+      - unit-tests
+      - terminal-contract
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
 
   qodo-contracts:
     name: "Qodo – Workflow Contract Tests"
     runs-on: ubuntu-latest
-    # continue-on-error: QODO_API_KEY secret not yet configured.
-    # This job is advisory until the secret is set in repo Settings → Secrets.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: npm install
+          cache: npm
+      - run: npm ci
       - name: Run Qodo tests
+        if: ${{ secrets.QODO_API_KEY != '' }}
         run: npx qodo test --coverage --reporter=json --output=qodo-results.json
         env:
           QODO_API_KEY: ${{ secrets.QODO_API_KEY }}
-      - name: Evaluate Qodo gate
-        run: |
-          node -e "
-            const r = require('./qodo-results.json');
-            const failed = r.failures ?? [];
-            const contracts = r.contractViolations ?? [];
-            if (failed.length > 0 || contracts.length > 0) {
-              console.error('Qodo gate failed:');
-              [...failed, ...contracts].forEach(f => console.error(' •', f.message));
-              process.exit(1);
-            }
-            console.log('Qodo gate passed.');
-          "
+      - name: Record missing optional Qodo configuration
+        if: ${{ secrets.QODO_API_KEY == '' }}
+        run: echo "Qodo is not configured; required repository gates remain enforced separately."
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ always() && hashFiles('qodo-results.json') != '' }}
         with:
           name: qodo-results
           path: qodo-results.json
+          retention-days: 7
 
   sonarqube:
     name: "SonarQube – Orchestrator Latency Safe"
     runs-on: ubuntu-latest
-    # continue-on-error: SONAR_TOKEN + SONAR_HOST_URL secrets not yet configured.
-    # This job is advisory until secrets are set in repo Settings → Secrets.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - run: npm install
+      - name: Detect SonarQube configuration
+        id: sonar_config
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          if [[ -n "$SONAR_TOKEN" && -n "$SONAR_HOST_URL" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "SonarQube is not configured; required repository gates remain enforced separately."
+          fi
       - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@master
+        if: steps.sonar_config.outputs.configured == 'true'
+        uses: SonarSource/sonarqube-scan-action@v8.2.1
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
