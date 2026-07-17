@@ -93,6 +93,16 @@ export class GitHubProvider implements RepositoryProvider {
     return Buffer.from(data.content, "base64").toString("utf-8");
   }
 
+  async resolveRef(projectId: string, ref: string): Promise<string> {
+    const { owner, repo } = this.locate(projectId);
+    const { data } = await this.octokit.repos.getBranch({
+      owner,
+      repo,
+      branch: ref,
+    });
+    return data.commit.sha.toLowerCase();
+  }
+
   async createBranch(
     projectId: string,
     baseRef: string,
