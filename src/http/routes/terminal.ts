@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Router, type Request, type Response } from 'express';
+import { Router, type NextFunction, type Request, type Response } from 'express';
 import { supabase } from '../../lib/supabaseClient.js';
 import { enqueueReconcile } from '../../events/outbox.js';
 import { getTerminalCommand, listTerminalCommands } from '../../terminal/registry.js';
@@ -7,9 +7,11 @@ import { GuardedTerminalRunner } from '../../terminal/runner.js';
 import { TerminalRunnerError } from '../../terminal/types.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
+type TerminalExecutor = Pick<GuardedTerminalRunner, 'run' | 'cancel'>;
+
 let sharedRunner: GuardedTerminalRunner | null = null;
 
-function resolveRunner(override?: GuardedTerminalRunner): GuardedTerminalRunner {
+function resolveRunner(override?: TerminalExecutor): TerminalExecutor {
   if (override) return override;
   if (!sharedRunner) {
     sharedRunner = new GuardedTerminalRunner(process.env['CONTROL_ROOM_WORKSPACE_ROOT'] ?? '');
@@ -22,7 +24,7 @@ function isLoopback(req: Request): boolean {
   return remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';
 }
 
-function terminalBoundary(req: Request, res: Response, next: () => void) {
+function terminalBoundary(req: Request, res: Response, next: NextFunction) {
   if (process.env['CONTROL_ROOM_TERMINAL_ENABLED'] !== 'true') {
     return res.status(503).json({
       error: 'Guarded terminal is disabled.',
@@ -37,10 +39,10 @@ function terminalBoundary(req: Request, res: Response, next: () => void) {
       code: 'TERMINAL_LOOPBACK_ONLY',
     });
   }
-  next();
+  return next();
 }
 
-export function createTerminalRouter(runnerOverride?: GuardedTerminalRunner) {
+export function createTerminalRouter(runnerOverride?: TerminalExecutor) {
   const router = Router();
   const runner = resolveRunner(runnerOverride);
 
@@ -108,6 +110,12 @@ export function createTerminalRouter(runnerOverride?: GuardedTerminalRunner) {
         error: 'commandId, missionId, and expectedCommitSha are required.',
       });
     }
+    if (!/^[0-9a-f]{40}$/.test(expectedCommitSha)) {
+      return res.status(400).json({
+        error: 'expectedCommitSha must be a full 40-character Git commit SHA.',
+        code: 'INVALID_HEAD_SHA',
+      });
+    }
 
     const command = getTerminalCommand(projectSlug, commandId);
     if (!command) {
@@ -149,6 +157,28 @@ export function createTerminalRouter(runnerOverride?: GuardedTerminalRunner) {
     if (missionError) return res.status(500).json({ error: missionError.message });
     if (!mission) {
       return res.status(404).json({ error: 'Mission not found for this project.' });
+    }
+
+    // Recover from a process crash without allowing two live runs. Fresh runs
+    // remain protected by both the DB partial unique index and the runner map.
+    const staleCutoff = new Date(Date.now() - 60 * 60_000).toISOString();
+    const { error: staleCleanupError } = await supabase
+      .from('terminal_runs')
+      .update({
+        status: 'failed',
+        error_code: 'ORPHANED_RUN',
+        stderr_excerpt: 'The terminal process ended before this run completed.',
+        finished_at: new Date().toISOString(),
+      })
+      .eq('project_id', project.id)
+      .eq('status', 'running')
+      .lt('started_at', staleCutoff);
+
+    if (staleCleanupError) {
+      return res.status(500).json({
+        error: 'Unable to reconcile stale terminal runs; command was not started.',
+        detail: staleCleanupError.message,
+      });
     }
 
     const runId = randomUUID();
@@ -261,9 +291,11 @@ export function createTerminalRouter(runnerOverride?: GuardedTerminalRunner) {
 
       const status = runnerError?.code === 'HEAD_MISMATCH' || runnerError?.code === 'PROJECT_BUSY'
         ? 409
-        : runnerError?.code === 'WORKSPACE_NOT_CONFIGURED' || runnerError?.code === 'WORKSPACE_MISSING'
-          ? 503
-          : 500;
+        : runnerError?.code === 'INVALID_HEAD_SHA' || runnerError?.code === 'UNKNOWN_COMMAND'
+          ? 400
+          : runnerError?.code === 'WORKSPACE_NOT_CONFIGURED' || runnerError?.code === 'WORKSPACE_MISSING'
+            ? 503
+            : 500;
 
       return res.status(status).json({
         ok: false,
