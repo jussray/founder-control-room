@@ -8,7 +8,10 @@ const files = {
   registry: await readFile(new URL('../src/terminal/registry.ts', import.meta.url), 'utf8'),
   githubProvider: await readFile(new URL('../src/providers/GitHubProvider.ts', import.meta.url), 'utf8'),
   evidenceTypes: await readFile(new URL('../src/reconciliation/types.ts', import.meta.url), 'utf8'),
-  migration: await readFile(new URL('../supabase/migrations/20260717_guarded_terminal.sql', import.meta.url), 'utf8'),
+  migration: await readFile(
+    new URL('../supabase/migrations/20260717195000_guarded_terminal_and_schema_reconciliation.sql', import.meta.url),
+    'utf8',
+  ),
 };
 
 const failures = [];
@@ -36,6 +39,9 @@ requireText('Approvals', files.approvals, 'verifyExactHeadEvidence');
 requireText('Approvals', files.approvals, 'resolveRef');
 requireText('Approvals', files.approvals, 'expectedHeadSha');
 requireText('Approvals', files.approvals, "mission.status !== 'approved'");
+requireText('Approvals', files.approvals, "status: 'pending'");
+requireText('Approvals', files.approvals, "status: executionError ? 'failed' : 'succeeded'");
+requireText('Approvals', files.approvals, 'ACTION_AUDIT_INCOMPLETE');
 forbidText('Approvals', files.approvals, 'connection_config');
 forbidText('Approvals', files.approvals, "eq('provider'");
 forbidText('Approvals', files.approvals, 'branch_name');
@@ -43,6 +49,9 @@ forbidText('Approvals', files.approvals, 'branch_name');
 requireText('Terminal route', files.terminalRoute, 'CONTROL_ROOM_TERMINAL_ENABLED');
 requireText('Terminal route', files.terminalRoute, 'CONTROL_ROOM_TERMINAL_ALLOW_REMOTE');
 requireText('Terminal route', files.terminalRoute, 'expectedCommitSha');
+requireText('Terminal route', files.terminalRoute, 'missionExpectedHeadSha');
+requireText('Terminal route', files.terminalRoute, 'MISSION_HEAD_MISMATCH');
+requireText('Terminal route', files.terminalRoute, 'COMMAND_NOT_ALLOWED_IN_MISSION_STATE');
 requireText('Terminal route', files.terminalRoute, 'outputTruncated');
 requireText('Terminal route', files.terminalRoute, "status: proofEligible ? 'pass'");
 
@@ -66,6 +75,10 @@ requireText('GitHub provider', files.githubProvider, 'requires resolveRef');
 
 requireText('Evidence types', files.evidenceTypes, "'browser_test'");
 
+requireText('Migration', files.migration, 'create table if not exists approval_executions');
+requireText('Migration', files.migration, "status in ('pending', 'succeeded', 'failed')");
+requireText('Migration', files.migration, 'change_proposals_provider_pr_dedup');
+requireText('Migration', files.migration, 'releases_provider_deployment_dedup');
 requireText('Migration', files.migration, 'create table if not exists terminal_runs');
 requireText('Migration', files.migration, 'terminal_runs_one_active_per_project');
 requireText('Migration', files.migration, "'juss-beautiful-hair-private'");
