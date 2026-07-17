@@ -5,11 +5,11 @@
  * deployment_status webhook events.
  *
  * Persists normalized deployment state into releases.
- * On deployment success: stores evidence + advances mission to 'verifying'.
- * On deployment failure: advances mission to 'failed', surfaces evidence.
+ * On deployment success: stores evidence + advances an integrated mission to deployed.
+ * On deployment failure: stores failing evidence and leaves mission integrated so
+ * rollback or retry remains an explicit founder decision.
  *
  * Does NOT trigger, approve, or record intent for deployments.
- * Deployment execution is out of scope for Milestone B.
  */
 
 import { supabase } from '../lib/supabaseClient.js';
@@ -31,12 +31,12 @@ type DeploymentState =
   | 'inactive';
 
 function mapDeployState(state: string): DeploymentState {
-  const s = state.toLowerCase();
-  if (s === 'success') return 'success';
-  if (s === 'failure' || s === 'error') return 'failure';
-  if (s === 'in_progress') return 'in_progress';
-  if (s === 'queued') return 'queued';
-  if (s === 'inactive') return 'inactive';
+  const normalized = state.toLowerCase();
+  if (normalized === 'success') return 'success';
+  if (normalized === 'failure' || normalized === 'error') return 'failure';
+  if (normalized === 'in_progress') return 'in_progress';
+  if (normalized === 'queued') return 'queued';
+  if (normalized === 'inactive') return 'inactive';
   return 'pending';
 }
 
@@ -47,7 +47,6 @@ export class ReleaseController extends BaseController {
     const { projectId, resourceId, sourceEventId } = req;
 
     if (!resourceId) return this.done('converged', 'No resourceId');
-
     if (!sourceEventId) {
       return this.done(
         'converged',
@@ -61,9 +60,7 @@ export class ReleaseController extends BaseController {
       .eq('id', sourceEventId)
       .single();
 
-    if (!event) {
-      return this.done('retry', `Provider event ${sourceEventId} not found`);
-    }
+    if (!event) return this.done('retry', `Provider event ${sourceEventId} not found`);
 
     const payload = event.payload as Record<string, unknown>;
     const eventType = event.event_type as string;
@@ -73,24 +70,24 @@ export class ReleaseController extends BaseController {
     let environment: string | null = null;
     let state: DeploymentState = 'pending';
     let deployUrl: string | null = null;
-    let providerUpdatedAt: string = new Date().toISOString();
+    let providerUpdatedAt = new Date().toISOString();
 
     if (eventType === 'deployment_status') {
-      const ds = payload['deployment_status'] as Record<string, unknown>;
-      const dep = payload['deployment'] as Record<string, unknown>;
-      deploymentId = String(dep?.['id'] ?? resourceId);
-      commitSha = (dep?.['sha'] as string) ?? null;
-      environment = (dep?.['environment'] as string) ?? null;
-      state = mapDeployState((ds?.['state'] as string) ?? 'pending');
-      deployUrl = (ds?.['environment_url'] as string) ?? null;
-      providerUpdatedAt = (ds?.['updated_at'] as string) ?? providerUpdatedAt;
+      const deploymentStatus = payload['deployment_status'] as Record<string, unknown>;
+      const deployment = payload['deployment'] as Record<string, unknown>;
+      deploymentId = String(deployment?.['id'] ?? resourceId);
+      commitSha = (deployment?.['sha'] as string) ?? null;
+      environment = (deployment?.['environment'] as string) ?? null;
+      state = mapDeployState((deploymentStatus?.['state'] as string) ?? 'pending');
+      deployUrl = (deploymentStatus?.['environment_url'] as string) ?? null;
+      providerUpdatedAt = (deploymentStatus?.['updated_at'] as string) ?? providerUpdatedAt;
     } else if (eventType === 'deployment') {
-      const dep = payload['deployment'] as Record<string, unknown>;
-      deploymentId = String(dep?.['id'] ?? resourceId);
-      commitSha = (dep?.['sha'] as string) ?? null;
-      environment = (dep?.['environment'] as string) ?? null;
+      const deployment = payload['deployment'] as Record<string, unknown>;
+      deploymentId = String(deployment?.['id'] ?? resourceId);
+      commitSha = (deployment?.['sha'] as string) ?? null;
+      environment = (deployment?.['environment'] as string) ?? null;
       state = 'pending';
-      providerUpdatedAt = (dep?.['created_at'] as string) ?? providerUpdatedAt;
+      providerUpdatedAt = (deployment?.['created_at'] as string) ?? providerUpdatedAt;
     } else {
       return this.done('converged', `Unhandled event type: ${eventType}`);
     }
@@ -120,13 +117,11 @@ export class ReleaseController extends BaseController {
       return this.done('retry', upsertError.message);
     }
 
-    this.log('info', 'Release observed', { projectId, state, environment, commitSha });
-
     const { data: mission } = await supabase
       .from('missions')
       .select('id, status')
       .eq('project_id', projectId)
-      .in('status', ['implementing', 'awaiting_approval', 'verifying'])
+      .in('status', ['integrated', 'deployed'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -164,14 +159,15 @@ export class ReleaseController extends BaseController {
 
       if (inserted) evidenceIds.push(inserted.id);
 
-      if (mission) {
-        const nextMissionStatus = state === 'success' ? 'verifying' : 'failed';
+      if (mission && state === 'success' && mission.status === 'integrated') {
         await supabase
           .from('missions')
-          .update({ status: nextMissionStatus, updated_at: new Date().toISOString() })
+          .update({ status: 'deployed', updated_at: new Date().toISOString() })
           .eq('id', mission.id)
-          .eq('status', mission.status);
+          .eq('status', 'integrated');
+      }
 
+      if (mission) {
         await enqueueReconcile(
           {
             projectId,
