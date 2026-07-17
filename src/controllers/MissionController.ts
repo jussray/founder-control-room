@@ -2,14 +2,11 @@
  * MissionController
  *
  * Evaluates current evidence against the mission's required checks.
- * Advances mission status when evidence is complete, all required
- * checks pass, AND the proof gate clears.
- * Blocks or flags when evidence is missing, failing, or the gate rejects.
+ * Advances a sandboxed mission to in_review only when exact-head evidence is
+ * complete and the evidence-quality proof gate clears.
  *
  * Does NOT automatically approve, merge, or deploy.
  * Those transitions require explicit founder approval.
- *
- * Proposes create_branch when a mission enters 'implementing' without a branch.
  */
 
 import { supabase } from '../lib/supabaseClient.js';
@@ -24,16 +21,19 @@ import type {
 import type { ProofEvidence } from '../proof-gate/types.js';
 
 type MissionStatus =
-  | 'scoping'
-  | 'planned'
-  | 'implementing'
-  | 'preview_ready'
-  | 'awaiting_approval'
-  | 'deploying'
-  | 'verifying'
-  | 'completed'
-  | 'rolled_back'
-  | 'failed';
+  | 'proposed'
+  | 'sandboxed'
+  | 'in_review'
+  | 'approved'
+  | 'integrated'
+  | 'deployed'
+  | 'rejected'
+  | 'rolled_back';
+
+interface LatestEvidence {
+  status: string;
+  commitSha: string | null;
+}
 
 export class MissionController extends BaseController {
   readonly name = 'MissionController';
@@ -45,7 +45,7 @@ export class MissionController extends BaseController {
 
     const { data: mission, error: missionError } = await supabase
       .from('missions')
-      .select('id, status, required_checks, manifest_version_id, policy_snapshot, branch_name')
+      .select('id, status, required_checks, manifest_version_id, policy_snapshot, branch_ref')
       .eq('id', missionId)
       .eq('project_id', projectId)
       .single();
@@ -58,13 +58,8 @@ export class MissionController extends BaseController {
     const observedChanges = [];
     const proposedActions: ProposedAction[] = [];
 
-    // -------------------------------------------------------------------------
-    // Branch proposal — planned/implementing with no branch yet
-    // -------------------------------------------------------------------------
-    if (
-      (currentStatus === 'planned' || currentStatus === 'implementing') &&
-      !mission.branch_name
-    ) {
+    // A mission branch is a separately approved L99 action.
+    if (currentStatus === 'proposed' && !mission.branch_ref) {
       const branchName = `mission/${missionId.slice(0, 8)}`;
       proposedActions.push({
         actionType: 'create_branch',
@@ -72,10 +67,8 @@ export class MissionController extends BaseController {
         resourceId: missionId,
         requiresApproval: true,
         idempotencyKey: this.idempotencyKey(projectId, missionId, 'create_branch', 'initial'),
-        payload: { branchName, baseRef: 'main' },
+        payload: { branchName, baseRef: mission.base_ref ?? 'main' },
       });
-
-      this.log('info', 'Proposing branch creation', { missionId, branchName });
 
       return {
         status: 'drifted',
@@ -83,84 +76,83 @@ export class MissionController extends BaseController {
         proposedActions,
         evidenceIds: [],
         requiresApproval: true,
-        message: 'Branch not yet created — awaiting approval',
+        message: 'Branch not yet created — awaiting founder approval',
       };
     }
 
-    // -------------------------------------------------------------------------
-    // Evidence evaluation
-    // -------------------------------------------------------------------------
-    const requiredChecks: EvidenceKind[] =
-      mission.required_checks ?? mission.policy_snapshot?.requiredChecks ?? [];
-
+    const requiredChecks = (mission.required_checks ?? []) as EvidenceKind[];
     if (!requiredChecks.length) {
       return this.noOp('No required checks defined for mission');
     }
 
+    const expectedHeadSha = typeof mission.policy_snapshot?.expectedHeadSha === 'string'
+      ? mission.policy_snapshot.expectedHeadSha.toLowerCase()
+      : null;
+
     const { data: evidenceRows } = await supabase
       .from('evidence')
-      .select('kind, status, created_at')
+      .select('kind, status, commit_sha, created_at')
       .eq('mission_id', missionId)
       .order('created_at', { ascending: false });
 
-    const latestByKind = new Map<string, string>();
+    const latestByKind = new Map<string, LatestEvidence>();
     for (const row of evidenceRows ?? []) {
-      if (!latestByKind.has(row.kind)) {
-        latestByKind.set(row.kind, row.status);
-      }
+      if (latestByKind.has(row.kind)) continue;
+      latestByKind.set(row.kind, {
+        status: row.status,
+        commitSha: row.commit_sha ? String(row.commit_sha).toLowerCase() : null,
+      });
     }
 
-    const missing = requiredChecks.filter((k) => !latestByKind.has(k));
-    const failing = requiredChecks.filter((k) => latestByKind.get(k) === 'fail');
-    const passing = requiredChecks.filter((k) => latestByKind.get(k) === 'pass');
+    const missing = requiredChecks.filter((kind) => !latestByKind.has(kind));
+    const wrongHead = expectedHeadSha
+      ? requiredChecks.filter((kind) => {
+          const evidence = latestByKind.get(kind);
+          return evidence && evidence.commitSha !== expectedHeadSha;
+        })
+      : [];
+    const failing = requiredChecks.filter((kind) => latestByKind.get(kind)?.status === 'fail');
+    const passing = requiredChecks.filter((kind) => {
+      const evidence = latestByKind.get(kind);
+      return evidence?.status === 'pass' && (!expectedHeadSha || evidence.commitSha === expectedHeadSha);
+    });
     const allPass = passing.length === requiredChecks.length;
 
     this.log('info', 'Mission evidence evaluated', {
       missionId,
+      expectedHeadSha,
       required: requiredChecks.length,
       passing: passing.length,
       failing: failing.length,
       missing: missing.length,
+      wrongHead: wrongHead.length,
     });
 
     let nextStatus: MissionStatus | null = null;
 
-    // -------------------------------------------------------------------------
-    // Status machine: implementing → awaiting_approval (via proof gate)
-    // -------------------------------------------------------------------------
-    if (currentStatus === 'implementing') {
+    // sandboxed → in_review means machine evidence is complete. It does not
+    // mean the founder approved merge.
+    if (currentStatus === 'sandboxed') {
       if (allPass) {
-        // All checks pass — run the proof gate before advancing.
-        // Note: approvedBy is intentionally absent here.
-        // This is the pre-approval gate — it verifies evidence quality, NOT founder sign-off.
-        // Founder sign-off arrives separately via the approval engine on the
-        // 'awaiting_approval' → 'deploying' transition (an APPROVAL_GATE).
         const evidence: ProofEvidence = {
           filesChanged: mission.manifest_version_id
             ? [`manifest@${mission.manifest_version_id}`]
             : [`mission:${missionId}`],
           behaviorChanged:
-            `Mission ${missionId} evidence complete — all ${requiredChecks.length} required checks pass.`,
+            `Mission ${missionId} exact-head evidence complete — all ${requiredChecks.length} required checks pass.`,
           checksRun: passing,
           failures: failing,
           securityImpact: mission.policy_snapshot?.securityImpact ?? 'none',
           deploymentImpact: mission.policy_snapshot?.deploymentImpact ?? 'none',
           rollbackPath:
             mission.policy_snapshot?.rollbackPath ??
-            `Revert mission ${missionId} to status 'implementing' and re-run checks.`,
+            `Revert the integration commit and return mission ${missionId} to sandboxed.`,
           unresolvedRisks: mission.policy_snapshot?.unresolvedRisks ?? [],
         };
 
         const gateResult = runProofGate('evidence-complete', evidence);
-
-        this.log('info', 'Proof gate evaluated', {
-          missionId,
-          gateStatus: gateResult.status,
-          failures: gateResult.evidence.failures,
-        });
-
         if (gateResult.status === 'pass') {
-          nextStatus = 'awaiting_approval';
+          nextStatus = 'in_review';
           proposedActions.push({
             actionType: 'request_approval',
             resourceType: 'mission',
@@ -170,10 +162,13 @@ export class MissionController extends BaseController {
               projectId,
               missionId,
               'request_approval',
-              'evidence-complete',
+              expectedHeadSha ?? gateResult.timestamp,
             ),
             payload: {
-              evidenceSummary: Object.fromEntries(latestByKind),
+              expectedHeadSha,
+              evidenceSummary: Object.fromEntries(
+                [...latestByKind.entries()].map(([kind, value]) => [kind, value.status]),
+              ),
               proofGate: {
                 status: gateResult.status,
                 timestamp: gateResult.timestamp,
@@ -181,7 +176,6 @@ export class MissionController extends BaseController {
             },
           });
         } else {
-          // Gate failed — surface failures without advancing status
           proposedActions.push({
             actionType: 'proof_gate_failed',
             resourceType: 'mission',
@@ -199,7 +193,7 @@ export class MissionController extends BaseController {
             },
           });
         }
-      } else if (failing.length > 0) {
+      } else if (failing.length > 0 || wrongHead.length > 0) {
         proposedActions.push({
           actionType: 'flag_failing_checks',
           resourceType: 'mission',
@@ -209,23 +203,13 @@ export class MissionController extends BaseController {
             projectId,
             missionId,
             'flag_failing',
-            failing.join(','),
+            [...failing, ...wrongHead].join(','),
           ),
-          payload: { failing },
+          payload: { failing, missing, wrongHead, expectedHeadSha },
         });
       }
     }
 
-    // -------------------------------------------------------------------------
-    // Status machine: verifying → completed
-    // -------------------------------------------------------------------------
-    if (currentStatus === 'verifying' && allPass) {
-      nextStatus = 'completed';
-    }
-
-    // -------------------------------------------------------------------------
-    // Apply status transition (optimistic concurrency)
-    // -------------------------------------------------------------------------
     if (nextStatus && nextStatus !== currentStatus) {
       const { error: updateError } = await supabase
         .from('missions')
@@ -244,16 +228,14 @@ export class MissionController extends BaseController {
         previousValue: currentStatus,
         newValue: nextStatus,
       });
-
-      this.log('info', 'Mission status advanced', { missionId, from: currentStatus, to: nextStatus });
     }
 
     return {
-      status: allPass ? 'converged' : missing.length > 0 ? 'drifted' : 'blocked',
+      status: allPass ? 'converged' : missing.length > 0 || wrongHead.length > 0 ? 'drifted' : 'blocked',
       observedChanges,
       proposedActions,
       evidenceIds: [],
-      requiresApproval: proposedActions.some((a) => a.requiresApproval),
+      requiresApproval: proposedActions.some((action) => action.requiresApproval),
     };
   }
 
