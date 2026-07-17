@@ -50,16 +50,17 @@ function founderUsersRow() {
   };
 }
 
-function updateChain() {
-  const chain: {
-    eq: () => typeof chain;
-    lt: () => Promise<{ error: null }>;
-    then: Promise<{ error: null }>['then'];
-  } = {
-    eq: () => chain,
-    lt: () => Promise.resolve({ error: null }),
-    then: Promise.resolve({ error: null }).then.bind(Promise.resolve({ error: null })),
-  };
+interface UpdateChain extends PromiseLike<{ error: null }> {
+  eq(): UpdateChain;
+  lt(): Promise<{ error: null }>;
+}
+
+function updateChain(): UpdateChain {
+  const resolved = Promise.resolve({ error: null });
+  const chain = {} as UpdateChain;
+  chain.eq = () => chain;
+  chain.lt = () => resolved;
+  chain.then = resolved.then.bind(resolved);
   return chain;
 }
 
