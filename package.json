@@ -29,6 +29,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260708.1",
+    "@playwright/test": "^1.45.0",
     "@types/express": "^4.17.21",
     "@types/node": "^22.5.4",
     "@types/supertest": "^6.0.0",
@@ -41,6 +42,7 @@
     "tsx": "^4.19.0",
     "typescript": "^5.5.4",
     "vitest": "^4.1.10",
+    "wait-on": "^7.2.0",
     "wrangler": "^4.110.0"
   },
   "engines": {
