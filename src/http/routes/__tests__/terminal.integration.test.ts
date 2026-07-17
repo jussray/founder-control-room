@@ -64,8 +64,19 @@ function updateChain(): UpdateChain {
   return chain;
 }
 
-function successfulDatabase() {
+interface DatabaseOptions {
+  missionStatus?: string;
+  missionHead?: string | null;
+}
+
+function successfulDatabase(options: DatabaseOptions = {}) {
   authSuccess();
+  const evidenceInsert = vi.fn(() => ({
+    select: () => ({
+      single: () => Promise.resolve({ data: { id: 'evidence-uuid' }, error: null }),
+    }),
+  }));
+
   supabaseMock.from.mockImplementation((table: string) => {
     if (table === 'founder_users') return founderUsersRow();
     if (table === 'projects') {
@@ -86,7 +97,14 @@ function successfulDatabase() {
           eq: () => ({
             eq: () => ({
               maybeSingle: () => Promise.resolve({
-                data: { id: MISSION_ID, project_id: PROJECT_ID, status: 'sandboxed' },
+                data: {
+                  id: MISSION_ID,
+                  project_id: PROJECT_ID,
+                  status: options.missionStatus ?? 'sandboxed',
+                  policy_snapshot: {
+                    expectedHeadSha: options.missionHead === undefined ? HEAD : options.missionHead,
+                  },
+                },
                 error: null,
               }),
             }),
@@ -101,16 +119,30 @@ function successfulDatabase() {
       };
     }
     if (table === 'evidence') {
-      return {
-        insert: () => ({
-          select: () => ({
-            single: () => Promise.resolve({ data: { id: 'evidence-uuid' }, error: null }),
-          }),
-        }),
-      };
+      return { insert: evidenceInsert };
     }
     return {};
   });
+
+  return { evidenceInsert };
+}
+
+function passingRun(overrides: Record<string, unknown> = {}) {
+  return {
+    runId: 'runtime-generated',
+    projectSlug: 'untold-stories',
+    commandId: 'verify.playwright',
+    status: 'passed',
+    observedCommitSha: HEAD,
+    startedAt: new Date().toISOString(),
+    finishedAt: new Date().toISOString(),
+    exitCode: 0,
+    signal: null,
+    stdout: 'passed',
+    stderr: '',
+    outputTruncated: false,
+    ...overrides,
+  };
 }
 
 describe('guarded terminal route', () => {
@@ -174,22 +206,38 @@ describe('guarded terminal route', () => {
     expect(response.body.code).toBe('WRITE_CONFIRMATION_REQUIRED');
   });
 
-  it('persists bounded exact-head evidence for a passing command', async () => {
+  it('rejects a caller SHA that does not match the mission policy snapshot', async () => {
+    successfulDatabase({ missionHead: 'b'.repeat(40) });
+    const response = await request(app())
+      .post('/terminal/untold-stories/run')
+      .set('Authorization', BEARER)
+      .send({ missionId: MISSION_ID, commandId: 'verify.playwright', expectedCommitSha: HEAD });
+
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('MISSION_HEAD_MISMATCH');
+    expect(mockRun).not.toHaveBeenCalled();
+  });
+
+  it('does not allow dependency writes after a mission enters review', async () => {
+    successfulDatabase({ missionStatus: 'in_review' });
+    const response = await request(app())
+      .post('/terminal/untold-stories/run')
+      .set('Authorization', BEARER)
+      .send({
+        missionId: MISSION_ID,
+        commandId: 'deps.install',
+        expectedCommitSha: HEAD,
+        confirmWrite: true,
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('COMMAND_NOT_ALLOWED_IN_MISSION_STATE');
+    expect(mockRun).not.toHaveBeenCalled();
+  });
+
+  it('persists bounded exact-head evidence for a passing verification command', async () => {
     successfulDatabase();
-    mockRun.mockResolvedValue({
-      runId: 'runtime-generated',
-      projectSlug: 'untold-stories',
-      commandId: 'verify.playwright',
-      status: 'passed',
-      observedCommitSha: HEAD,
-      startedAt: new Date().toISOString(),
-      finishedAt: new Date().toISOString(),
-      exitCode: 0,
-      signal: null,
-      stdout: 'passed',
-      stderr: '',
-      outputTruncated: false,
-    });
+    mockRun.mockResolvedValue(passingRun());
 
     const response = await request(app())
       .post('/terminal/untold-stories/run')
@@ -197,6 +245,7 @@ describe('guarded terminal route', () => {
       .send({ missionId: MISSION_ID, commandId: 'verify.playwright', expectedCommitSha: HEAD });
 
     expect(response.status).toBe(200);
+    expect(response.body.proofEligible).toBe(true);
     expect(response.body.evidenceId).toBe('evidence-uuid');
     expect(mockRun).toHaveBeenCalledWith(expect.objectContaining({
       projectSlug: 'untold-stories',
@@ -206,7 +255,21 @@ describe('guarded terminal route', () => {
     expect(mockEnqueue).toHaveBeenCalled();
   });
 
-  it('records and returns a head mismatch without producing passing evidence', async () => {
+  it('marks truncated successful output as warning evidence rather than proof', async () => {
+    const { evidenceInsert } = successfulDatabase();
+    mockRun.mockResolvedValue(passingRun({ outputTruncated: true }));
+
+    const response = await request(app())
+      .post('/terminal/untold-stories/run')
+      .set('Authorization', BEARER)
+      .send({ missionId: MISSION_ID, commandId: 'verify.playwright', expectedCommitSha: HEAD });
+
+    expect(response.status).toBe(200);
+    expect(response.body.proofEligible).toBe(false);
+    expect(evidenceInsert).toHaveBeenCalledWith(expect.objectContaining({ status: 'warn' }));
+  });
+
+  it('records and returns a workspace head mismatch without producing passing evidence', async () => {
     successfulDatabase();
     mockRun.mockRejectedValue(new TerminalRunnerError('HEAD_MISMATCH', 'branch moved'));
 
