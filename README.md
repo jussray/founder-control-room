@@ -61,7 +61,7 @@ src/
     routes/
       auth.ts                 # POST /auth/magic-link, GET /auth/callback
       projects.ts             # GET /projects/:slug (founder-only)
-      approvals.ts            # exact-head proof gates and approved actions
+      approvals.ts            # reservation-first, exact-head approved actions
       terminal.ts             # guarded mission verification terminal
   index.ts                    # bootstraps the HTTP server
 supabase/
@@ -69,12 +69,17 @@ supabase/
     0001_init.sql
     0002_enable_rls_and_founder_policy.sql
     0003_harden_functions.sql
-    20260717_guarded_terminal.sql
-docs/
-  ARCHITECTURE.md
+    20260717195000_guarded_terminal_and_schema_reconciliation.sql
+scripts/
+  verify-guarded-terminal-contract.mjs
 artifacts/
   billgates/CONTROL_ROOM_TERMINAL_FIX.md
 ```
+
+The timestamped reconciliation migration upgrades the live legacy
+`change_proposals` and `releases` tables in place, creates the action-idempotency
+ledger and terminal audit table, and registers the private hair control repository.
+It must not be applied until the exact Control Room PR head passes all required gates.
 
 ## Data boundary
 
@@ -135,7 +140,9 @@ The terminal is disabled unless all of these are true:
 - the request comes from loopback, unless remote access was separately enabled;
 - `CONTROL_ROOM_WORKSPACE_ROOT` contains the reviewed project checkout;
 - the command ID is present in the project-specific registry;
-- the supplied expected commit is a full SHA and equals the checkout's current HEAD.
+- the requested commit matches the mission policy snapshot;
+- the checkout's current HEAD still equals that exact commit;
+- the command risk is allowed in the mission's current state.
 
 It never accepts shell strings, caller-provided executables, caller-provided
 arguments, pipes, redirects, or caller-provided environment variables.
@@ -158,8 +165,14 @@ curl -X POST http://localhost:8787/terminal/untold-stories/run \
 
 Each run records the founder, project, mission, approved command, exact commit,
 start/end time, exit status, bounded redacted output, and evidence kind. One run
-per project may be active at a time. Merge still requires a separate fresh proof
-gate and re-checks both machine evidence and the branch's current SHA.
+per project may be active at a time. Truncated output is retained as warning
+evidence but cannot satisfy a proof gate.
+
+Approved branch or merge actions are reserved in `approval_executions` before the
+provider call. A pending reservation blocks automatic replay when the provider may
+have succeeded but ledger finalization was interrupted. Merge separately requires
+a fresh proof gate, complete exact-head machine evidence, and a final immutable-ref
+check immediately before integration.
 
 ## L99 authority model (summary)
 
@@ -167,9 +180,10 @@ gate and re-checks both machine evidence and the branch's current SHA.
 |---|---|
 | Read project or approved command list | Founder-authenticated read |
 | Run a mission verification command | Explicit founder request |
+| Install dependencies or browsers | Explicit write-risk confirmation |
 | Create sandbox workspace | Separate founder approval |
-| Create internal branch | Separate founder approval |
-| Integrate into main | Separate founder approval + exact-head machine proof |
+| Create internal branch | Separate founder approval + reservation |
+| Integrate into main | Separate founder approval + exact-head machine proof + reservation |
 | Deploy | Separate founder approval |
 | Rollback | Separate founder approval |
 
