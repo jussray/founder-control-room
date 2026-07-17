@@ -57,7 +57,7 @@ jobs:
           retention-days: 7
 
   terminal-contract:
-    name: "Guarded Terminal Contract"
+    name: "Guarded Terminal and AI Skill Contracts"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -67,6 +67,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run verify:terminal-contract
+      - run: npm run verify:ai-skills
 
   build:
     name: "Production Build"
