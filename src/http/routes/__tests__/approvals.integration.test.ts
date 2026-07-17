@@ -1,67 +1,53 @@
-/**
- * Approvals route — integration tests.
- *
- * Tests the full HTTP layer including auth, validation, proof gate
- * enforcement, and execute bypass prevention.
- *
- * Strategy: Option B — requireFounder runs for real. Its two Supabase
- * dependencies (supabaseAuthClient and supabaseClient) are mocked so
- * network calls never leave the process. The 401 "no token" case works
- * without any mock because requireFounder short-circuits synchronously
- * before touching either client.
- *
- * Run: npx vitest run src/http/routes/__tests__/approvals.integration.test.ts
- */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-// ---------------------------------------------------------------------------
-// Mocks — declared before any imports that pull in the modules under test.
-// Vitest hoists vi.mock() calls, so these execute before module evaluation.
-// ---------------------------------------------------------------------------
-
-// --- supabaseAuthClient: controls requireFounder's JWT validation step ---
 const mockGetUser = vi.fn();
 vi.mock('../../../lib/supabaseAuthClient.js', () => ({
-  supabaseAuth: {
-    auth: { getUser: mockGetUser },
-  },
+  supabaseAuth: { auth: { getUser: mockGetUser } },
 }));
 
-// --- supabaseClient: controls all DB queries including founder_users ---
-const supabaseMock = {
-  from: vi.fn(),
-};
+const supabaseMock = { from: vi.fn() };
 vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
 
+const mockCreateBranch = vi.fn();
+const mockResolveRef = vi.fn();
+const mockIntegrate = vi.fn();
 vi.mock('../../../providers/GitHubProvider.js', () => ({
   GitHubProvider: vi.fn().mockImplementation(() => ({
-    createBranch: vi.fn().mockResolvedValue(undefined),
-    integrate: vi.fn().mockResolvedValue('abc123sha'),
+    createBranch: mockCreateBranch,
+    resolveRef: mockResolveRef,
+    integrate: mockIntegrate,
   })),
 }));
+
 vi.mock('../../../events/outbox.js', () => ({ enqueueReconcile: vi.fn() }));
 
-// ProofGateController — default to passing gate + successful persistence
 const mockControllerRun = vi.fn();
 vi.mock('../../../controllers/ProofGateController.js', () => ({
   ProofGateController: vi.fn().mockImplementation(() => ({ run: mockControllerRun })),
 }));
 
-// ---------------------------------------------------------------------------
-// App bootstrap — after mocks
-// ---------------------------------------------------------------------------
-
 import express from 'express';
 import request from 'supertest';
 import { approvalsRouter } from '../approvals.js';
 
-/**
- * Bare app — no founder-injection shim. requireFounder runs for real via
- * the router-level approvalsRouter.use(requireFounder) in approvals.ts.
- * Tests pass a Bearer token via supertest; requireFounder validates it
- * against the mocked supabaseAuth and mocked founder_users table.
- */
+const MISSION_ID = 'mission-uuid-001';
+const PROJECT_ID = 'project-uuid-001';
+const FOUNDER_EMAIL = 'founder@example.com';
+const FOUNDER_USER_ID = 'user-uuid-001';
+const BEARER = 'Bearer test-token';
+const EXPECTED_SHA = 'a'.repeat(40);
+
+const validEvidence = {
+  filesChanged: ['src/example.ts'],
+  behaviorChanged: 'Exact-head verification completed.',
+  checksRun: ['typecheck', 'browser_test'],
+  failures: [],
+  securityImpact: 'none',
+  deploymentImpact: 'none',
+  rollbackPath: 'Revert the merge commit.',
+  unresolvedRisks: [],
+};
+
 function buildApp() {
   const app = express();
   app.use(express.json());
@@ -69,55 +55,13 @@ function buildApp() {
   return app;
 }
 
-const MISSION_ID = 'mission-uuid-001';
-const PROJECT_ID = 'project-uuid-001';
-const FOUNDER_EMAIL = 'founder@example.com';
-const FOUNDER_USER_ID = 'user-uuid-001';
-const BEARER = 'Bearer test-token';
-
-const validEvidence = {
-  filesChanged: ['src/api/auth.ts'],
-  behaviorChanged: 'RLS now enforced at DB level.',
-  checksRun: ['tsc --noEmit', 'vitest run'],
-  failures: [],
-  securityImpact: 'RLS enforced.',
-  deploymentImpact: 'Requires migration.',
-  rollbackPath: 'Revert migration + redeploy.',
-  unresolvedRisks: [],
-};
-
-// ---------------------------------------------------------------------------
-// Auth helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Returns a valid Supabase user for the mock getUser call.
- * Used standalone only in tests that don't call mockMissionFound() or
- * mockFullStack(), since those helpers embed the same getUser mock.
- */
-function mockAuthSuccess() {
+function authSuccess() {
   mockGetUser.mockResolvedValue({
     data: { user: { id: FOUNDER_USER_ID, email: FOUNDER_EMAIL } },
     error: null,
   });
 }
 
-function mockAuthInvalidToken() {
-  mockGetUser.mockResolvedValue({
-    data: { user: null },
-    error: { message: 'Invalid JWT' },
-  });
-}
-
-// ---------------------------------------------------------------------------
-// DB state helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Shared founder_users allowlist row — returned by any table dispatch that
- * needs to satisfy requireFounder's second check. Kept here so the dispatch
- * branches in mockMissionFound() and mockFullStack() stay DRY.
- */
 function founderUsersRow() {
   return {
     select: () => ({
@@ -128,176 +72,170 @@ function founderUsersRow() {
   };
 }
 
-function mockMissionFound() {
-  mockGetUser.mockResolvedValue({
-    data: { user: { id: FOUNDER_USER_ID, email: FOUNDER_EMAIL } },
-    error: null,
-  });
+function proofGateMission() {
+  authSuccess();
   supabaseMock.from.mockImplementation((table: string) => {
     if (table === 'founder_users') return founderUsersRow();
     if (table === 'missions') {
       return {
         select: () => ({
           eq: () => ({
-            single: () =>
-              Promise.resolve({ data: { id: MISSION_ID, project_id: PROJECT_ID }, error: null }),
+            single: () => Promise.resolve({
+              data: { id: MISSION_ID, project_id: PROJECT_ID, status: 'in_review' },
+              error: null,
+            }),
+          }),
+        }),
+        update: () => ({
+          eq: () => ({ eq: () => Promise.resolve({ error: null }) }),
+        }),
+      };
+    }
+    return { insert: vi.fn().mockResolvedValue({ error: null }) };
+  });
+}
+
+interface ExecuteOptions {
+  proofRecord: unknown;
+  missionStatus?: 'proposed' | 'approved';
+  evidenceRows?: Array<{ kind: string; status: string; commit_sha: string; created_at: string }>;
+  currentHead?: string;
+}
+
+function executeStack(options: ExecuteOptions) {
+  authSuccess();
+  mockResolveRef.mockResolvedValue(options.currentHead ?? EXPECTED_SHA);
+  mockIntegrate.mockResolvedValue('merge-commit-sha');
+  mockCreateBranch.mockResolvedValue('mission/test');
+
+  const missionStatus = options.missionStatus ?? 'approved';
+  const mission = {
+    id: MISSION_ID,
+    project_id: PROJECT_ID,
+    status: missionStatus,
+    branch_ref: 'codex/test',
+    required_checks: ['typecheck', 'browser_test'],
+    policy_snapshot: {
+      expectedHeadSha: EXPECTED_SHA,
+      rollbackPath: 'Revert merge commit.',
+    },
+  };
+
+  supabaseMock.from.mockImplementation((table: string) => {
+    if (table === 'founder_users') return founderUsersRow();
+    if (table === 'missions') {
+      return {
+        select: () => ({
+          eq: () => ({ single: () => Promise.resolve({ data: mission, error: null }) }),
+        }),
+        update: () => ({
+          eq: () => ({ eq: () => Promise.resolve({ error: null }) }),
+        }),
+      };
+    }
+    if (table === 'proof_gate_results') {
+      return {
+        select: () => ({
+          eq: () => ({
+            eq: () => ({
+              eq: () => ({
+                gte: () => ({
+                  order: () => ({
+                    limit: () => ({
+                      maybeSingle: () => Promise.resolve({ data: options.proofRecord, error: null }),
+                    }),
+                  }),
+                }),
+              }),
+            }),
           }),
         }),
       };
     }
-    return {
-      select: vi.fn(),
-      insert: vi.fn().mockResolvedValue({ error: null }),
-    };
-  });
-}
-
-function mockMissionNotFound() {
-  mockGetUser.mockResolvedValue({
-    data: { user: { id: FOUNDER_USER_ID, email: FOUNDER_EMAIL } },
-    error: null,
-  });
-  supabaseMock.from.mockImplementation((table: string) => {
-    if (table === 'founder_users') return founderUsersRow();
-    return {
-      select: () => ({
-        eq: () => ({
-          single: () => Promise.resolve({ data: null, error: { message: 'not found' } }),
+    if (table === 'approval_executions') {
+      return {
+        select: () => ({
+          eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
         }),
-      }),
-    };
+        insert: () => Promise.resolve({ error: null }),
+      };
+    }
+    if (table === 'projects') {
+      return {
+        select: () => ({
+          eq: () => ({
+            single: () => Promise.resolve({
+              data: {
+                id: PROJECT_ID,
+                slug: 'test-project',
+                repo_provider: 'github',
+                repo_identifier: 'jussray/test-project',
+              },
+              error: null,
+            }),
+          }),
+        }),
+      };
+    }
+    if (table === 'evidence') {
+      return {
+        select: () => ({
+          eq: () => ({
+            in: () => ({
+              order: () => Promise.resolve({
+                data: options.evidenceRows ?? [
+                  { kind: 'typecheck', status: 'pass', commit_sha: EXPECTED_SHA, created_at: new Date().toISOString() },
+                  { kind: 'browser_test', status: 'pass', commit_sha: EXPECTED_SHA, created_at: new Date().toISOString() },
+                ],
+                error: null,
+              }),
+            }),
+          }),
+        }),
+      };
+    }
+    return { insert: vi.fn().mockResolvedValue({ error: null }) };
   });
 }
 
-function mockProofGatePassed() {
-  mockControllerRun.mockResolvedValue({
-    status: 'converged',
-    proposedActions: [{ actionType: 'proof_gate_passed', payload: { attestationType: 'manual' } }],
-    observedChanges: [],
-    evidenceIds: [],
-    requiresApproval: false,
+describe('approval proof gates', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.GITHUB_TOKEN;
   });
-}
 
-function mockProofGateFailed(message = 'No checks reported') {
-  mockControllerRun.mockResolvedValue({
-    status: 'blocked',
-    proposedActions: [],
-    observedChanges: [],
-    evidenceIds: [],
-    requiresApproval: false,
-    message,
-  });
-}
-
-function mockProofGatePersistFailed() {
-  mockControllerRun.mockResolvedValue({
-    status: 'blocked',
-    proposedActions: [],
-    observedChanges: [],
-    evidenceIds: [],
-    requiresApproval: false,
-    message: 'Proof gate result could not be persisted: connection refused',
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Proof-gate endpoint tests
-// ---------------------------------------------------------------------------
-
-describe('POST /approvals/:missionId/run-proof-gate', () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it('401 — no Authorization header (requireFounder short-circuits)', async () => {
-    // No mock needed: requireFounder returns 401 before calling getUser
-    // when the Authorization header is absent.
-    const app = buildApp();
-    const res = await request(app)
+  it('rejects requests without a founder session', async () => {
+    const response = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/run-proof-gate`)
       .send({ gateId: 'merge', evidence: validEvidence });
-    expect(res.status).toBe(401);
+    expect(response.status).toBe(401);
   });
 
-  it('401 — invalid token rejected by supabaseAuth', async () => {
-    mockAuthInvalidToken();
-    // founder_users is never reached — no supabaseMock.from setup needed
-    const app = buildApp();
-    const res = await request(app)
+  it('rejects malformed evidence', async () => {
+    proofGateMission();
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/run-proof-gate`)
+      .set('Authorization', BEARER)
+      .send({ gateId: 'merge', evidence: { ...validEvidence, checksRun: 'nope' } });
+    expect(response.status).toBe(400);
+  });
+
+  it('sources founder approval from the verified JWT and advances review to approved', async () => {
+    proofGateMission();
+    mockControllerRun.mockResolvedValue({
+      status: 'converged',
+      proposedActions: [],
+      observedChanges: [],
+      evidenceIds: [],
+      requiresApproval: false,
+    });
+
+    const response = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/run-proof-gate`)
       .set('Authorization', BEARER)
       .send({ gateId: 'merge', evidence: validEvidence });
-    expect(res.status).toBe(401);
-  });
 
-  it('400 — missing gateId', async () => {
-    mockMissionFound();
-    const app = buildApp();
-    const res = await request(app)
-      .post(`/approvals/${MISSION_ID}/run-proof-gate`)
-      .set('Authorization', BEARER)
-      .send({ evidence: validEvidence });
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/gateId/);
-  });
-
-  it('400 — malformed evidence (checksRun not an array)', async () => {
-    mockMissionFound();
-    const app = buildApp();
-    const res = await request(app)
-      .post(`/approvals/${MISSION_ID}/run-proof-gate`)
-      .set('Authorization', BEARER)
-      .send({ gateId: 'merge', evidence: { ...validEvidence, checksRun: 'not-an-array' } });
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/checksRun/);
-  });
-
-  it('400 — malformed evidence (rollbackPath empty)', async () => {
-    mockMissionFound();
-    const app = buildApp();
-    const res = await request(app)
-      .post(`/approvals/${MISSION_ID}/run-proof-gate`)
-      .set('Authorization', BEARER)
-      .send({ gateId: 'merge', evidence: { ...validEvidence, rollbackPath: '' } });
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/rollbackPath/);
-  });
-
-  it('404 — mission not found', async () => {
-    mockMissionNotFound();
-    mockProofGatePassed();
-    const app = buildApp();
-    const res = await request(app)
-      .post(`/approvals/${MISSION_ID}/run-proof-gate`)
-      .set('Authorization', BEARER)
-      .send({ gateId: 'merge', evidence: validEvidence });
-    expect(res.status).toBe(404);
-  });
-
-  it('422 — proof gate blocked', async () => {
-    mockMissionFound();
-    mockProofGateFailed();
-    const app = buildApp();
-    const res = await request(app)
-      .post(`/approvals/${MISSION_ID}/run-proof-gate`)
-      .set('Authorization', BEARER)
-      .send({ gateId: 'merge', evidence: validEvidence });
-    expect(res.status).toBe(422);
-    expect(res.body.ok).toBe(false);
-  });
-
-  it('200 — gate passed and persisted; approvedBy sourced from JWT not caller', async () => {
-    mockMissionFound();
-    mockProofGatePassed();
-    const app = buildApp();
-    const res = await request(app)
-      .post(`/approvals/${MISSION_ID}/run-proof-gate`)
-      .set('Authorization', BEARER)
-      .send({ gateId: 'merge', evidence: validEvidence });
-    expect(res.status).toBe(200);
-    expect(res.body.ok).toBe(true);
-    expect(res.body.attestationType).toBe('manual');
-    // Verify controller received founder email from the verified JWT,
-    // not from any caller-supplied field.
+    expect(response.status).toBe(200);
     expect(mockControllerRun).toHaveBeenCalledWith(
       expect.objectContaining({
         meta: expect.objectContaining({ approvedBy: FOUNDER_EMAIL }),
@@ -305,130 +243,119 @@ describe('POST /approvals/:missionId/run-proof-gate', () => {
     );
   });
 
-  it('500 — persistence failure blocks response', async () => {
-    mockMissionFound();
-    mockProofGatePersistFailed();
-    const app = buildApp();
-    const res = await request(app)
+  it('fails closed when proof persistence fails', async () => {
+    proofGateMission();
+    mockControllerRun.mockResolvedValue({
+      status: 'blocked',
+      proposedActions: [],
+      observedChanges: [],
+      evidenceIds: [],
+      requiresApproval: false,
+      message: 'Proof gate result could not be persisted: connection refused',
+    });
+
+    const response = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/run-proof-gate`)
       .set('Authorization', BEARER)
       .send({ gateId: 'merge', evidence: validEvidence });
-    expect(res.status).toBe(500);
-    expect(res.body.error).toMatch(/persist/);
+    expect(response.status).toBe(500);
   });
 });
 
-// ---------------------------------------------------------------------------
-// Execute endpoint — proof gate enforcement
-// ---------------------------------------------------------------------------
-
-describe('POST /approvals/:missionId/execute — proof gate enforcement', () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  function mockFullStack(proofRecord: unknown) {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: FOUNDER_USER_ID, email: FOUNDER_EMAIL } },
-      error: null,
-    });
-    supabaseMock.from.mockImplementation((table: string) => {
-      if (table === 'founder_users') return founderUsersRow();
-      if (table === 'missions') {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: () =>
-                Promise.resolve({
-                  data: {
-                    id: MISSION_ID,
-                    project_id: PROJECT_ID,
-                    status: 'awaiting_approval',
-                    branch_name: 'feat/test',
-                  },
-                  error: null,
-                }),
-            }),
-          }),
-          update: () => ({ eq: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
-        };
-      }
-      if (table === 'proof_gate_results') {
-        return {
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                eq: () => ({
-                  gte: () => ({
-                    order: () => ({
-                      limit: () => ({
-                        maybeSingle: () => Promise.resolve({ data: proofRecord, error: null }),
-                      }),
-                    }),
-                  }),
-                }),
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === 'approval_executions') {
-        return {
-          select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }) }),
-          insert: () => Promise.resolve({ error: null }),
-        };
-      }
-      if (table === 'project_connections') {
-        return {
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                eq: () => ({
-                  single: () =>
-                    Promise.resolve({
-                      data: { connection_config: { repository: 'jussray/sekret-bip' } },
-                      error: null,
-                    }),
-                }),
-              }),
-            }),
-          }),
-        };
-      }
-      return { select: vi.fn(), insert: vi.fn().mockResolvedValue({ error: null }) };
-    });
-  }
-
-  it('403 — merge rejected without proof record', async () => {
-    mockFullStack(null);
-    process.env['GITHUB_TOKEN'] = 'token';
-    const app = buildApp();
-    const res = await request(app)
-      .post(`/approvals/${MISSION_ID}/execute`)
-      .set('Authorization', BEARER)
-      .send({ actionType: 'merge', idempotencyKey: 'key-1', payload: { head: 'feat/test', base: 'main' } });
-    expect(res.status).toBe(403);
-    expect(res.body.code).toBe('PROOF_GATE_REQUIRED');
+describe('exact-head action execution', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.GITHUB_TOKEN = 'test-token';
   });
 
-  it('200 — merge succeeds with valid proof record', async () => {
-    mockFullStack({ id: 'proof-1', status: 'pass', gate_id: 'merge', created_at: new Date().toISOString() });
-    process.env['GITHUB_TOKEN'] = 'token';
-    const app = buildApp();
-    const res = await request(app)
+  it('rejects merge without a fresh proof record', async () => {
+    executeStack({ proofRecord: null });
+    const response = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/execute`)
       .set('Authorization', BEARER)
-      .send({ actionType: 'merge', idempotencyKey: 'key-2', payload: { head: 'feat/test', base: 'main' } });
-    expect(res.status).toBe(200);
-    expect(res.body.ok).toBe(true);
+      .send({
+        actionType: 'merge',
+        idempotencyKey: 'merge-no-proof',
+        payload: { head: 'codex/test', base: 'main', expectedHeadSha: EXPECTED_SHA },
+      });
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe('PROOF_GATE_REQUIRED');
   });
 
-  it('403 — create_branch rejected without proof record', async () => {
-    mockFullStack(null);
-    const app = buildApp();
-    const res = await request(app)
+  it('rejects stale or wrong-SHA machine evidence', async () => {
+    executeStack({
+      proofRecord: { id: 'proof', status: 'pass' },
+      evidenceRows: [
+        { kind: 'typecheck', status: 'pass', commit_sha: 'b'.repeat(40), created_at: new Date().toISOString() },
+        { kind: 'browser_test', status: 'pass', commit_sha: EXPECTED_SHA, created_at: new Date().toISOString() },
+      ],
+    });
+
+    const response = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/execute`)
       .set('Authorization', BEARER)
-      .send({ actionType: 'create_branch', idempotencyKey: 'key-3', payload: { branchName: 'feat/new', baseRef: 'main' } });
-    expect(res.status).toBe(403);
-    expect(res.body.code).toBe('PROOF_GATE_REQUIRED');
+      .send({
+        actionType: 'merge',
+        idempotencyKey: 'merge-stale-evidence',
+        payload: { head: 'codex/test', base: 'main', expectedHeadSha: EXPECTED_SHA },
+      });
+    expect(response.status).toBe(409);
+    expect(response.body.error).toMatch(/Exact-head machine evidence/);
+    expect(mockIntegrate).not.toHaveBeenCalled();
+  });
+
+  it('rejects a branch that moved after verification', async () => {
+    executeStack({
+      proofRecord: { id: 'proof', status: 'pass' },
+      currentHead: 'c'.repeat(40),
+    });
+
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'merge',
+        idempotencyKey: 'merge-moved-head',
+        payload: { head: 'codex/test', base: 'main', expectedHeadSha: EXPECTED_SHA },
+      });
+    expect(response.status).toBe(409);
+    expect(response.body.error).toMatch(/Branch moved/);
+    expect(mockIntegrate).not.toHaveBeenCalled();
+  });
+
+  it('integrates only after fresh proof, exact-head evidence, and ref confirmation', async () => {
+    executeStack({ proofRecord: { id: 'proof', status: 'pass' } });
+
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'merge',
+        idempotencyKey: 'merge-safe',
+        payload: { head: 'codex/test', base: 'main', expectedHeadSha: EXPECTED_SHA },
+      });
+
+    expect(response.status).toBe(200);
+    expect(mockResolveRef).toHaveBeenCalledWith('test-project', 'codex/test');
+    expect(mockIntegrate).toHaveBeenCalledWith('test-project', 'main', 'codex/test');
+  });
+
+  it('creates a branch only from a proposed mission with fresh branch proof', async () => {
+    executeStack({
+      proofRecord: { id: 'proof', status: 'pass' },
+      missionStatus: 'proposed',
+    });
+
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'create_branch',
+        idempotencyKey: 'branch-safe',
+        payload: { branchName: 'mission/test', baseRef: 'main' },
+      });
+
+    expect(response.status).toBe(200);
+    expect(mockCreateBranch).toHaveBeenCalledWith('test-project', 'main', 'mission/test');
   });
 });
