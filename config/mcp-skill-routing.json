@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "alwaysLoad": [
+    "control-room-repo-contract"
+  ],
+  "servers": {
+    "github": {
+      "skills": [
+        "control-room-repo-contract"
+      ],
+      "boundary": "Repository, pull-request, Actions, and security evidence. Exact branch, commit, and approval state remain mandatory for writes."
+    },
+    "context7": {
+      "skills": [
+        "control-room-repo-contract"
+      ],
+      "boundary": "Current public library documentation only; never runtime or release proof."
+    },
+    "supabase": {
+      "skills": [
+        "control-room-repo-contract"
+      ],
+      "boundary": "Control Room project-scoped read-only inspection by default. DDL remains migration-first and separately approved."
+    },
+    "cloudflare-docs": {
+      "skills": [
+        "control-room-repo-contract"
+      ],
+      "boundary": "Public Cloudflare documentation only."
+    },
+    "cloudflare-builds": {
+      "skills": [
+        "control-room-repo-contract"
+      ],
+      "boundary": "Read build evidence only. Deployment is a separate approval gate."
+    },
+    "cloudflare-observability": {
+      "skills": [
+        "control-room-repo-contract"
+      ],
+      "boundary": "Read minimized operational telemetry only; do not copy raw sensitive payloads."
+    },
+    "figma": {
+      "skills": [
+        "control-room-repo-contract",
+        "control-room-figma-builder",
+        "control-room-design-implementation"
+      ],
+      "boundary": "Canonical design creation, inspection, and implementation handoff only. Figma cannot authorize code changes, migrations, integration, deployment, spending, or external action."
+    }
+  }
+}
