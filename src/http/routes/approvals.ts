@@ -5,26 +5,29 @@
  *   1. a fresh founder-approved proof_gate_results record; and
  *   2. complete machine evidence bound to the exact current head SHA.
  *
- * Supported actionTypes:
- *   - create_branch
- *   - merge
- *
- * Deployment remains unsupported here and requires its own adapter + approval.
+ * Every external mutation is reserved in approval_executions BEFORE the
+ * provider call. A pending reservation blocks replay if the provider succeeds
+ * but the final audit update is interrupted.
  */
 
-import { Router } from 'express';
-import { requireFounder } from '../middleware/requireFounder.js';
-import type { FounderRequest } from '../middleware/requireFounder.js';
+import { Router, type Response } from 'express';
+import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { GitHubProvider } from '../../providers/GitHubProvider.js';
 import { enqueueReconcile } from '../../events/outbox.js';
 import { ProofGateController } from '../../controllers/ProofGateController.js';
 import type { ProofEvidence } from '../../proof-gate/index.js';
 import type { EvidenceKind } from '../../reconciliation/types.js';
-import type { Response } from 'express';
 
 const PROOF_GATED_ACTIONS = new Set(['merge', 'create_branch']);
 const PROOF_GATE_TTL_MS = 15 * 60 * 1_000;
+
+interface ExecutionRecord {
+  id: string;
+  status: 'pending' | 'succeeded' | 'failed';
+  result: Record<string, unknown> | null;
+  success: boolean | null;
+}
 
 export const approvalsRouter = Router();
 approvalsRouter.use(requireFounder);
@@ -101,6 +104,32 @@ async function verifyExactHeadEvidence(
       requiredChecks.map((kind) => [kind, `${latest.get(kind)!.status}@${latest.get(kind)!.commitSha}`]),
     ),
   };
+}
+
+async function requireFreshProof(missionId: string, actionType: string) {
+  const proofCutoff = new Date(Date.now() - PROOF_GATE_TTL_MS).toISOString();
+  return supabase
+    .from('proof_gate_results')
+    .select('id, status, created_at, gate_id')
+    .eq('mission_id', missionId)
+    .eq('gate_id', actionType)
+    .eq('status', 'pass')
+    .gte('created_at', proofCutoff)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+}
+
+async function findExecution(idempotencyKey: string): Promise<{
+  data: ExecutionRecord | null;
+  error: { message: string } | null;
+}> {
+  const { data, error } = await supabase
+    .from('approval_executions')
+    .select('id, status, result, success')
+    .eq('idempotency_key', idempotencyKey)
+    .maybeSingle();
+  return { data: data as ExecutionRecord | null, error };
 }
 
 approvalsRouter.post(
@@ -198,6 +227,10 @@ approvalsRouter.post(
       });
     }
 
+    if (!PROOF_GATED_ACTIONS.has(actionType)) {
+      return res.status(400).json({ error: `Unknown actionType: ${actionType}` });
+    }
+
     const { data: mission, error: missionError } = await supabase
       .from('missions')
       .select('id, project_id, status, branch_ref, required_checks, policy_snapshot')
@@ -210,43 +243,46 @@ approvalsRouter.post(
 
     const projectId = mission.project_id as string;
 
-    if (PROOF_GATED_ACTIONS.has(actionType)) {
-      const proofCutoff = new Date(Date.now() - PROOF_GATE_TTL_MS).toISOString();
-      const { data: proofRecord, error: proofError } = await supabase
-        .from('proof_gate_results')
-        .select('id, status, created_at, gate_id')
-        .eq('mission_id', missionId)
-        .eq('gate_id', actionType)
-        .eq('status', 'pass')
-        .gte('created_at', proofCutoff)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (proofError) {
-        return res.status(500).json({
-          error: 'Failed to verify proof gate — cannot proceed',
-          detail: proofError.message,
-        });
-      }
-
-      if (!proofRecord) {
-        return res.status(403).json({
-          error: `Action '${actionType}' requires a passing proof gate result within the last 15 minutes.`,
-          code: 'PROOF_GATE_REQUIRED',
-          hint: `Call POST /approvals/${missionId}/run-proof-gate with gateId: "${actionType}" first.`,
-        });
-      }
+    const { data: proofRecord, error: proofError } = await requireFreshProof(missionId, actionType);
+    if (proofError) {
+      return res.status(500).json({
+        error: 'Failed to verify proof gate — cannot proceed',
+        detail: proofError.message,
+      });
+    }
+    if (!proofRecord) {
+      return res.status(403).json({
+        error: `Action '${actionType}' requires a passing proof gate result within the last 15 minutes.`,
+        code: 'PROOF_GATE_REQUIRED',
+        hint: `Call POST /approvals/${missionId}/run-proof-gate with gateId: "${actionType}" first.`,
+      });
     }
 
-    const { data: existing } = await supabase
-      .from('approval_executions')
-      .select('id, result')
-      .eq('idempotency_key', idempotencyKey)
-      .maybeSingle();
-
-    if (existing) {
-      return res.json({ ok: true, idempotent: true, result: existing.result });
+    const existingLookup = await findExecution(idempotencyKey);
+    if (existingLookup.error) {
+      return res.status(500).json({
+        error: 'Unable to inspect the action idempotency ledger.',
+        detail: existingLookup.error.message,
+      });
+    }
+    if (existingLookup.data) {
+      if (existingLookup.data.status === 'succeeded') {
+        return res.json({ ok: true, idempotent: true, result: existingLookup.data.result });
+      }
+      if (existingLookup.data.status === 'pending') {
+        return res.status(409).json({
+          ok: false,
+          code: 'ACTION_ALREADY_PENDING',
+          error: 'This approved action is already reserved or may have executed. Reconcile it before retrying.',
+          executionId: existingLookup.data.id,
+        });
+      }
+      return res.status(409).json({
+        ok: false,
+        code: 'ACTION_PREVIOUSLY_FAILED',
+        error: 'This idempotency key is bound to a prior failed action. Use a new approval and key after review.',
+        result: existingLookup.data.result,
+      });
     }
 
     const { data: project, error: projectError } = await supabase
@@ -267,107 +303,165 @@ approvalsRouter.post(
         })
       : null;
 
+    if (!provider) {
+      return res.status(503).json({
+        error: 'Repository provider is not configured.',
+        code: 'REPOSITORY_PROVIDER_UNAVAILABLE',
+      });
+    }
+
+    // Reserve before external mutation. The unique idempotency key is the final
+    // race barrier if two requests pass the preceding lookup concurrently.
+    const { data: reservation, error: reservationError } = await supabase
+      .from('approval_executions')
+      .insert({
+        mission_id: missionId,
+        project_id: projectId,
+        action_type: actionType,
+        idempotency_key: idempotencyKey,
+        executed_by: req.founder!.email,
+        status: 'pending',
+        request: payload,
+        result: {},
+        success: null,
+        started_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (reservationError || !reservation) {
+      const racedLookup = await findExecution(idempotencyKey);
+      if (racedLookup.data?.status === 'succeeded') {
+        return res.json({ ok: true, idempotent: true, result: racedLookup.data.result });
+      }
+      if (racedLookup.data) {
+        return res.status(409).json({
+          ok: false,
+          code: 'ACTION_ALREADY_RESERVED',
+          error: 'Another request reserved this action. Reconcile that execution before retrying.',
+          executionId: racedLookup.data.id,
+        });
+      }
+      return res.status(500).json({
+        error: 'Unable to reserve the approved action; no provider mutation was attempted.',
+        code: 'ACTION_RESERVATION_FAILED',
+        detail: reservationError?.message ?? 'Reservation insert returned no record.',
+      });
+    }
+
     let executionResult: Record<string, unknown> = {};
     let executionError: string | null = null;
+    const warnings: string[] = [];
 
     try {
-      switch (actionType) {
-        case 'create_branch': {
-          if (mission.status !== 'proposed') {
-            throw new Error(`Mission must be proposed before branch creation; current status is ${mission.status}.`);
-          }
-          if (!provider) throw new Error('Repository provider is not configured');
-          const branchName = (payload['branchName'] as string) ?? `mission/${missionId.slice(0, 8)}`;
-          const baseRef = (payload['baseRef'] as string) ?? 'main';
-          await provider.createBranch(project.slug, baseRef, branchName);
-          await supabase
-            .from('missions')
-            .update({
-              branch_ref: branchName,
-              status: 'sandboxed',
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', missionId)
-            .eq('status', 'proposed');
-          executionResult = { branchName, baseRef };
-          break;
+      if (actionType === 'create_branch') {
+        if (mission.status !== 'proposed') {
+          throw new Error(`Mission must be proposed before branch creation; current status is ${mission.status}.`);
+        }
+        const branchName = (payload['branchName'] as string) ?? `mission/${missionId.slice(0, 8)}`;
+        const baseRef = (payload['baseRef'] as string) ?? 'main';
+        await provider.createBranch(project.slug, baseRef, branchName);
+        executionResult = { branchName, baseRef };
+
+        const { error: missionUpdateError } = await supabase
+          .from('missions')
+          .update({
+            branch_ref: branchName,
+            status: 'sandboxed',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', missionId)
+          .eq('status', 'proposed');
+        if (missionUpdateError) {
+          warnings.push(`Branch was created, but mission state update failed: ${missionUpdateError.message}`);
+        }
+      } else {
+        if (mission.status !== 'approved') {
+          throw new Error(`Mission must be approved before merge; current status is ${mission.status}.`);
         }
 
-        case 'merge': {
-          if (mission.status !== 'approved') {
-            throw new Error(`Mission must be approved before merge; current status is ${mission.status}.`);
-          }
-          if (!provider) throw new Error('Repository provider is not configured');
+        const head = (payload['head'] as string) ?? mission.branch_ref;
+        const base = (payload['base'] as string) ?? 'main';
+        const expectedHeadSha = typeof payload['expectedHeadSha'] === 'string'
+          ? payload['expectedHeadSha'].toLowerCase()
+          : '';
+        if (!head) throw new Error('No head branch to merge');
+        if (!/^[0-9a-f]{40}$/.test(expectedHeadSha)) {
+          throw new Error('Merge requires expectedHeadSha as a full 40-character commit SHA.');
+        }
 
-          const head = (payload['head'] as string) ?? mission.branch_ref;
-          const base = (payload['base'] as string) ?? 'main';
-          const expectedHeadSha = typeof payload['expectedHeadSha'] === 'string'
-            ? payload['expectedHeadSha'].toLowerCase()
-            : '';
-          if (!head) throw new Error('No head branch to merge');
-          if (!/^[0-9a-f]{40}$/.test(expectedHeadSha)) {
-            throw new Error('Merge requires expectedHeadSha as a full 40-character commit SHA.');
-          }
+        const missionExpectedHead = typeof mission.policy_snapshot?.expectedHeadSha === 'string'
+          ? mission.policy_snapshot.expectedHeadSha.toLowerCase()
+          : '';
+        if (!missionExpectedHead || missionExpectedHead !== expectedHeadSha) {
+          throw new Error('Merge SHA does not match the mission policy snapshot.');
+        }
 
-          const missionExpectedHead = typeof mission.policy_snapshot?.expectedHeadSha === 'string'
-            ? mission.policy_snapshot.expectedHeadSha.toLowerCase()
-            : '';
-          if (!missionExpectedHead || missionExpectedHead !== expectedHeadSha) {
-            throw new Error('Merge SHA does not match the mission policy snapshot.');
-          }
+        const evidenceResult = await verifyExactHeadEvidence(
+          missionId,
+          (mission.required_checks ?? []) as EvidenceKind[],
+          expectedHeadSha,
+        );
+        if (!evidenceResult.ok) {
+          throw new Error(`${evidenceResult.error} ${JSON.stringify(evidenceResult.details ?? {})}`);
+        }
 
-          const evidenceResult = await verifyExactHeadEvidence(
-            missionId,
-            (mission.required_checks ?? []) as EvidenceKind[],
-            expectedHeadSha,
+        const currentHeadSha = await provider.resolveRef(project.slug, head);
+        if (currentHeadSha !== expectedHeadSha) {
+          throw new Error(
+            `Branch moved after verification: current ${currentHeadSha}, approved ${expectedHeadSha}.`,
           );
-          if (!evidenceResult.ok) {
-            throw new Error(`${evidenceResult.error} ${JSON.stringify(evidenceResult.details ?? {})}`);
-          }
-
-          const currentHeadSha = await provider.resolveRef(project.slug, head);
-          if (currentHeadSha !== expectedHeadSha) {
-            throw new Error(
-              `Branch moved after verification: current ${currentHeadSha}, approved ${expectedHeadSha}.`,
-            );
-          }
-
-          const mergeCommitSha = await provider.integrate(project.slug, base, head);
-          executionResult = {
-            mergeCommitSha,
-            head,
-            base,
-            expectedHeadSha,
-            evidence: evidenceResult.summary,
-          };
-          await supabase
-            .from('missions')
-            .update({ status: 'integrated', updated_at: new Date().toISOString() })
-            .eq('id', missionId)
-            .eq('status', 'approved');
-          break;
         }
 
-        default:
-          return res.status(400).json({ error: `Unknown actionType: ${actionType}` });
+        const mergeCommitSha = await provider.integrate(project.slug, base, head);
+        executionResult = {
+          mergeCommitSha,
+          head,
+          base,
+          expectedHeadSha,
+          evidence: evidenceResult.summary,
+        };
+
+        const { error: missionUpdateError } = await supabase
+          .from('missions')
+          .update({ status: 'integrated', updated_at: new Date().toISOString() })
+          .eq('id', missionId)
+          .eq('status', 'approved');
+        if (missionUpdateError) {
+          warnings.push(`Merge succeeded, but mission state update failed: ${missionUpdateError.message}`);
+        }
       }
     } catch (error) {
       executionError = error instanceof Error ? error.message : String(error);
     }
 
-    await supabase.from('approval_executions').insert({
-      mission_id: missionId,
-      project_id: projectId,
-      action_type: actionType,
-      idempotency_key: idempotencyKey,
-      executed_by: req.founder!.email,
-      result: executionError ? { error: executionError } : executionResult,
-      success: !executionError,
-      executed_at: new Date().toISOString(),
-    });
+    if (warnings.length) executionResult.warnings = warnings;
+
+    const finalResult = executionError ? { error: executionError } : executionResult;
+    const { error: auditUpdateError } = await supabase
+      .from('approval_executions')
+      .update({
+        status: executionError ? 'failed' : 'succeeded',
+        result: finalResult,
+        success: !executionError,
+        executed_at: new Date().toISOString(),
+      })
+      .eq('id', reservation.id)
+      .eq('status', 'pending');
+
+    if (auditUpdateError) {
+      return res.status(500).json({
+        ok: false,
+        code: 'ACTION_AUDIT_INCOMPLETE',
+        error: 'The provider action finished, but the execution ledger could not be finalized. Do not retry automatically.',
+        executionId: reservation.id,
+        providerOutcome: finalResult,
+        detail: auditUpdateError.message,
+      });
+    }
 
     if (executionError) {
-      return res.status(409).json({ ok: false, error: executionError });
+      return res.status(409).json({ ok: false, error: executionError, executionId: reservation.id });
     }
 
     await enqueueReconcile({
@@ -377,6 +471,6 @@ approvalsRouter.post(
       reason: 'dependency_changed',
     });
 
-    return res.json({ ok: true, result: executionResult });
+    return res.json({ ok: true, result: executionResult, executionId: reservation.id });
   },
 );
