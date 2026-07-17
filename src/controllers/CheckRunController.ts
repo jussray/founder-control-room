@@ -78,7 +78,6 @@ export class CheckRunController extends BaseController {
       return this.done('converged', 'No resourceId – nothing to reconcile');
     }
 
-    // Fetch the stored event payload from the inbox
     const { data: event } = await supabase
       .from('provider_events')
       .select('payload, project_id')
@@ -108,24 +107,23 @@ export class CheckRunController extends BaseController {
       detailsRef: detailsUrl,
     };
 
-    // Find mission associated with this commit. A mission with an explicit
-    // policy snapshot can additionally bind its expected head SHA; the exact
-    // SHA is enforced again at merge time.
     const { data: mission } = await supabase
       .from('missions')
       .select('id, status, policy_snapshot')
       .eq('project_id', projectId)
-      .in('status', ['implementing', 'preview_ready', 'awaiting_approval'])
+      .in('status', ['sandboxed', 'in_review'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     const expectedHeadSha = mission?.policy_snapshot?.expectedHeadSha as string | undefined;
-    if (mission && (!expectedHeadSha || !headSha || expectedHeadSha.toLowerCase() === headSha.toLowerCase())) {
+    const headMatches = !expectedHeadSha || (
+      Boolean(headSha) && expectedHeadSha.toLowerCase() === headSha!.toLowerCase()
+    );
+    if (mission && headMatches) {
       evidenceRecord.missionId = mission.id;
     }
 
-    // Persist evidence
     const { data: inserted, error } = await supabase
       .from('evidence')
       .insert({
@@ -154,8 +152,6 @@ export class CheckRunController extends BaseController {
       headSha,
     });
 
-    // If there is an active mission and the evidence matched its expected SHA,
-    // enqueue MissionController to re-evaluate.
     if (evidenceRecord.missionId) {
       await enqueueReconcile(
         {
@@ -165,7 +161,6 @@ export class CheckRunController extends BaseController {
           reason: 'dependency_changed',
           sourceEventId,
         },
-        // Small debounce – coalesce burst check_run events
         { availableAt: new Date(Date.now() + 3_000).toISOString() },
       );
     }
