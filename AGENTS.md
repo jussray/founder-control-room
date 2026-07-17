@@ -1,6 +1,6 @@
 # Founder Control Room Agent Instructions
 
-Read [`GLOBAL_AI.md`](./GLOBAL_AI.md) before changing code, configuration, schemas, providers, or documentation.
+Read [`GLOBAL_AI.md`](./GLOBAL_AI.md) and [`skills/portfolio-control-plane/SKILL.md`](./skills/portfolio-control-plane/SKILL.md) before changing code, configuration, schemas, providers, verification contracts, or documentation.
 
 Use the exact stack:
 
@@ -25,6 +25,7 @@ Use the exact stack:
 - Preserve founder allowlist authorization, audit events, and separate approval gates.
 - Do not expose provider tokens or service-role keys.
 - Do not merge, deploy, roll back, alter auth/RLS, or perform destructive writes without explicit founder approval.
+- Apply repository-specific skills when acting on managed projects; portfolio rules never replace local product, privacy, verification, or rollback contracts.
 
 ## Evidence report
 
