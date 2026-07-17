@@ -31,6 +31,7 @@ export type EvidenceKind =
   | 'lint'
   | 'unit_test'
   | 'integration_test'
+  | 'browser_test'
   | 'security_scan'
   | 'preview_health'
   | 'deployment_result'
