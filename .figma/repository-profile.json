@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "repository": "jussray/founder-control-room",
+  "role": "founder-only portfolio control and economic-intelligence system",
+  "figmaMode": "desktop_control_surface_and_design_system",
+  "runtime": ["TypeScript", "Express", "Supabase", "Cloudflare Workers", "repository-specific web surfaces"],
+  "designTargets": ["mission review", "approval gates", "verification evidence", "portfolio status", "release state", "economic intelligence", "opportunity scoring"],
+  "implementationTargets": ["current HTTP routes", "current dashboard/frontend paths", "shared types", "schema-backed view models"],
+  "requiredSkills": ["figma-use", "figma-generate-library"],
+  "conditionalSkills": ["figma-generate-design", "figma-code-connect", "product-design-design-qa"],
+  "prohibitedData": ["service-role keys", "provider tokens", "raw webhook payloads", "raw product content", "teen or family content", "customer data", "vendor data", "unpublished founder strategy"],
+  "codeConnectPolicy": "published_reusable_components_only",
+  "verification": ["typecheck", "lint", "unit and contract tests", "Playwright", "exact-head evidence policy"],
+  "truthBoundary": "Figma cannot create mission truth, approval authority, provider truth, deployment proof, or database state."
+}
