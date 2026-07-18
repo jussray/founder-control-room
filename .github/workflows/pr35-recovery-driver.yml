@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  TARGET_SHA: ccda9ddc62a125abff881514206c554a0a860472
+  TARGET_SHA: ba0e166ac1b6f914f9bdeaaf98573c0633190f2a
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
