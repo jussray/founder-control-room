@@ -43,4 +43,4 @@ Return:
 - risks, rollback, and next approval gate;
 - exact sources, repository, branch, and head when code or operational state is involved.
 
-A plan is not a sale, a click is not revenue, a merge is not deployment, and model output is not customer consent.
+A sales plan is not authorization. A click is not revenue, a merge is not deployment, and model output is not customer consent.
