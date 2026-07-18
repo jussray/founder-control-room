@@ -32,8 +32,14 @@ const state = {
   selectedTemplateId: null,
   selectedTemplate: null,
   costs: null,
+  agents: [],
   banner: null, // { kind: 'error'|'notice', text }
 };
+
+/** Renders a <datalist> of registered multitool agents — free text still allowed, per the API. */
+function agentDatalist(id) {
+  return `<datalist id="${id}">${state.agents.map((a) => `<option value="${escapeHtml(a.id)}">${escapeHtml(a.label)}</option>`).join('')}</datalist>`;
+}
 
 // ─── session plumbing ────────────────────────────────────────────────────────
 
@@ -135,6 +141,11 @@ function formValues(form) {
   return Object.fromEntries(new FormData(form).entries());
 }
 
+/** Drops blank string fields so an empty optional input means "unset", not "set to ''". */
+function withoutBlanks(values) {
+  return Object.fromEntries(Object.entries(values).filter(([, v]) => v !== ''));
+}
+
 // ─── render: sign-in ─────────────────────────────────────────────────────────
 
 function renderSignIn() {
@@ -220,6 +231,11 @@ function renderTabContent() {
   if (state.tab === 'terminal') return renderTerminalTab(mount);
 }
 
+async function loadAgents() {
+  const data = await api('/agents');
+  state.agents = data.agents ?? [];
+}
+
 // ─── Projects tab ────────────────────────────────────────────────────────────
 
 async function loadProjects() {
@@ -249,7 +265,7 @@ function renderProjectsTab(mount) {
 
   root.querySelector('#new-project-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const values = formValues(e.target);
+    const values = withoutBlanks(formValues(e.target));
     guarded(async () => {
       await api('/projects', { method: 'POST', body: JSON.stringify(values) });
       await loadProjects();
@@ -329,6 +345,11 @@ function renderProjectDetail(mount) {
       <input name="title" required placeholder="Fix the checkout race condition" />
       <label>Description</label>
       <textarea name="description" rows="2"></textarea>
+      <div class="row">
+        <div><label>Builder agent</label><input name="builderAgent" list="agent-options-new-mission" placeholder="claude-code" /></div>
+        <div><label>Reviewer agent</label><input name="reviewerAgent" list="agent-options-new-mission" placeholder="codex" /></div>
+      </div>
+      ${agentDatalist('agent-options-new-mission')}
       <div style="margin-top:0.5rem"><button class="primary" type="submit">Create mission</button></div>
     </form>
 
@@ -391,7 +412,7 @@ function renderProjectDetail(mount) {
 
   panel.querySelector('#new-mission-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const values = formValues(e.target);
+    const values = withoutBlanks(formValues(e.target));
     guarded(async () => {
       await api(`/projects/${encodeURIComponent(p.project.slug)}/missions`, {
         method: 'POST',
@@ -404,7 +425,7 @@ function renderProjectDetail(mount) {
 
   panel.querySelector('#new-connection-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const values = formValues(e.target);
+    const values = withoutBlanks(formValues(e.target));
     guarded(async () => {
       await api(`/projects/${encodeURIComponent(p.project.slug)}/connections`, {
         method: 'POST',
@@ -485,6 +506,17 @@ function renderMissionDetail(mount) {
     <p class="muted">${escapeHtml(mission.project?.slug ?? '')} · <span class="badge">${escapeHtml(mission.status)}</span> · branch: <span class="mono">${escapeHtml(mission.branch_ref ?? '—')}</span></p>
     ${mission.description ? `<p>${escapeHtml(mission.description)}</p>` : ''}
 
+    <h3>Multitool assignment</h3>
+    <p class="muted">Builder: <strong>${escapeHtml(mission.builder_agent ?? 'unassigned')}</strong> · Reviewer: <strong>${escapeHtml(mission.reviewer_agent ?? 'unassigned')}</strong></p>
+    <form id="assign-agents-form">
+      <div class="row">
+        <div><label>Builder agent</label><input name="builderAgent" list="agent-options-assign" value="${escapeHtml(mission.builder_agent ?? '')}" /></div>
+        <div><label>Reviewer agent</label><input name="reviewerAgent" list="agent-options-assign" value="${escapeHtml(mission.reviewer_agent ?? '')}" /></div>
+      </div>
+      ${agentDatalist('agent-options-assign')}
+      <div style="margin-top:0.5rem"><button type="submit">Save assignment</button></div>
+    </form>
+
     ${mission.status === 'proposed' ? `
       <h3>Create sandbox branch</h3>
       <form id="create-branch-form">
@@ -540,8 +572,15 @@ function renderMissionDetail(mount) {
         <div class="title">${escapeHtml(c.outcome ?? 'in progress')}</div>
       </div>
     `).join('')}
+    <form id="log-council-form">
+      <label>Participants (comma-separated)</label>
+      <input name="participants" list="agent-options-council" placeholder="claude-code, codex, redteam" required />
+      ${agentDatalist('agent-options-council')}
+      <label>Outcome</label><input name="outcome" placeholder="approved" />
+      <div style="margin-top:0.5rem"><button type="submit">Log council round</button></div>
+    </form>
 
-    <h3>Bench — runner/CI checks</h3>
+    <h3>Bench — runner/CI checks <span class="muted">(read-only, produced by the guarded terminal + proof gate)</span></h3>
     ${state.missionRuns.length === 0 ? '<p class="muted">No runner checks recorded for this mission.</p>' : state.missionRuns.map((r) => `
       <div class="card" style="cursor:default">
         <div class="meta">${escapeHtml(r.runner_profile ?? 'default')} · ${r.started_at ? escapeHtml(new Date(r.started_at).toLocaleString()) : ''}</div>
@@ -553,6 +592,15 @@ function renderMissionDetail(mount) {
     ${state.missionCosts && state.missionCosts.costs.length > 0
       ? `<p class="muted">Total: $${state.missionCosts.totalUsd.toFixed(4)}</p>`
       : '<p class="muted">No agent cost records for this mission.</p>'}
+    <form id="log-cost-form">
+      <div class="row">
+        <div><label>Agent</label><input name="agentName" list="agent-options-cost" required /></div>
+        <div><label>Provider</label><input name="provider" placeholder="anthropic" /></div>
+        <div><label>Cost (USD)</label><input name="costUsd" type="number" step="0.0001" min="0" /></div>
+      </div>
+      ${agentDatalist('agent-options-cost')}
+      <div style="margin-top:0.5rem"><button type="submit">Log cost</button></div>
+    </form>
   `;
 
   panel.querySelector('#create-branch-form')?.addEventListener('submit', (e) => {
@@ -569,6 +617,41 @@ function renderMissionDetail(mount) {
       });
       await loadMissions();
       setBanner('notice', 'Branch created.');
+    });
+  });
+
+  panel.querySelector('#assign-agents-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const values = withoutBlanks(formValues(e.target));
+    guarded(async () => {
+      await api(`/missions/${mission.id}`, { method: 'PATCH', body: JSON.stringify(values) });
+      await loadMissions();
+      setBanner('notice', 'Agent assignment saved.');
+    });
+  });
+
+  panel.querySelector('#log-council-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const values = formValues(e.target);
+    const participants = values.participants.split(',').map((p) => p.trim()).filter(Boolean);
+    guarded(async () => {
+      await api(`/missions/${mission.id}/council`, {
+        method: 'POST',
+        body: JSON.stringify({ participants, outcome: values.outcome || undefined }),
+      });
+      state.missionCouncil = (await api(`/missions/${mission.id}/council`)).conversations ?? [];
+      e.target.reset();
+    });
+  });
+
+  panel.querySelector('#log-cost-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const values = withoutBlanks(formValues(e.target));
+    if (values.costUsd) values.costUsd = Number(values.costUsd);
+    guarded(async () => {
+      await api(`/missions/${mission.id}/costs`, { method: 'POST', body: JSON.stringify(values) });
+      state.missionCosts = await api(`/missions/${mission.id}/costs`);
+      e.target.reset();
     });
   });
 
@@ -920,7 +1003,7 @@ async function boot() {
   if (!state.session) return;
 
   await guarded(async () => {
-    await Promise.all([loadProjects(), loadMissions(), loadActivity(), loadL99(), loadPromptTemplates(), loadCosts()]);
+    await Promise.all([loadProjects(), loadMissions(), loadActivity(), loadL99(), loadPromptTemplates(), loadCosts(), loadAgents()]);
   });
 }
 

@@ -23,9 +23,13 @@ app.listen(port, () => {
   console.log(`  POST /webhooks/github`);
   console.log(`  POST /approvals/:missionId/execute`);
   console.log(`  POST /approvals/:missionId/patch`);
+  console.log(`  PATCH /missions/:missionId          (assign builder/reviewer agent)`);
   console.log(`  GET  /missions/:missionId/council`);
+  console.log(`  POST /missions/:missionId/council`);
   console.log(`  GET  /missions/:missionId/runs`);
   console.log(`  GET  /missions/:missionId/costs`);
+  console.log(`  POST /missions/:missionId/costs`);
+  console.log(`  GET  /agents`);
   console.log(`  GET  /promptos`);
   console.log(`  POST /promptos`);
   console.log(`  GET  /promptos/:id`);

@@ -9,6 +9,7 @@ import { terminalRouter } from './routes/terminal.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { missionsRouter } from './routes/missions.js';
 import { promptosRouter } from './routes/promptos.js';
+import { agentsRouter } from './routes/agents.js';
 import { handleGitHubWebhook } from './webhooks/github.js';
 import {
   corsMiddleware,
@@ -65,6 +66,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/dashboard', dashboardRouter);
   app.use('/missions', missionsRouter);
   app.use('/promptos', promptosRouter);
+  app.use('/agents', agentsRouter);
 
   app.use(errorHandler);
 

@@ -215,12 +215,13 @@ projectsRouter.post("/:slug/connections", requireFounder, async (req: FounderReq
 
 /**
  * POST /projects/:slug/missions
- * Body: { title, description?, riskLevel? }
+ * Body: { title, description?, riskLevel?, builderAgent?, reviewerAgent? }
  *
  * Creates a new mission (the Issues/task-equivalent) under a project,
  * status 'proposed'. This is the founder-initiated entry point into the
  * mission lifecycle — everything else (sandbox branch, patch, proof gate,
- * merge) acts on a mission that already exists.
+ * merge) acts on a mission that already exists. builderAgent/reviewerAgent
+ * can also be set later via PATCH /missions/:missionId.
  */
 projectsRouter.post("/:slug/missions", requireFounder, async (req: FounderRequest, res) => {
   const { slug } = req.params;
@@ -240,6 +241,8 @@ projectsRouter.post("/:slug/missions", requireFounder, async (req: FounderReques
 
   const description = typeof body["description"] === "string" ? body["description"] : null;
   const riskLevel = typeof body["riskLevel"] === "string" ? body["riskLevel"] : "medium";
+  const builderAgent = typeof body["builderAgent"] === "string" ? body["builderAgent"] : null;
+  const reviewerAgent = typeof body["reviewerAgent"] === "string" ? body["reviewerAgent"] : null;
 
   const { data: mission, error } = await supabase
     .from("missions")
@@ -248,6 +251,8 @@ projectsRouter.post("/:slug/missions", requireFounder, async (req: FounderReques
       title,
       description,
       risk_level: riskLevel,
+      builder_agent: builderAgent,
+      reviewer_agent: reviewerAgent,
       status: "proposed",
     })
     .select()
