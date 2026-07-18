@@ -87,6 +87,18 @@ The live Supabase migration ledger was inspected read-only. It records the autho
 
 The recovery branch now uses those full versions, restores the missing execute-grant hardening migration, and removes the two truncated duplicate files. No live migration was applied or modified.
 
+A third immutable verification run, `29626592585`, checked payload head `688eb7484664d80f9d2471caf3f6769e9b00a30b`:
+
+- Exact Target Metadata `88032138663` passed.
+- Typecheck `88032138639` passed.
+- Lint `88032138638` passed.
+- Unit Tests `88032138652` passed.
+- Guarded Terminal and AI Contracts `88032138657` passed.
+- Production Build `88032138665` passed.
+- Migration Lint Evidence `88032138650` executed and failed after successfully applying the aligned reconciliation and proof-gate migrations. The guarded-terminal migration inserted repository verification settings before defining `projects.verification_enabled` and `projects.verification_cadence_minutes` in a fresh database.
+
+The guarded-terminal migration is now self-contained: it creates those columns with the deployed defaults and cadence constraint before registering the repository. The live project was inspected read-only to preserve the exact boolean, integer, default, and constraint contract.
+
 The guarded terminal contract passed throughout. The evidence does not support rewriting terminal runtime behavior.
 
 ## Recovery slice
@@ -111,6 +123,7 @@ The slice now:
 - keeps ESLint warnings visible but non-blocking while preserving all error-level enforcement;
 - aligns duplicate migration filenames to the deployed full-timestamp lineage;
 - restores service-role-only execute grants for reconciliation RPCs;
+- makes the guarded-terminal migration fresh-database-safe for repository verification fields;
 - preserves authentication, exact-head, idempotency, fail-closed, and no-carry-forward approval behavior.
 
 Every new commit creates a new exact head and invalidates older verification for merge purposes.
