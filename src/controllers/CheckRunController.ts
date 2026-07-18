@@ -27,9 +27,14 @@ const CHECK_NAME_TO_KIND: Record<string, EvidenceKind> = {
   'unit tests': 'unit_test',
   vitest: 'unit_test',
   jest: 'unit_test',
+  playwright: 'browser_test',
+  'playwright brand moat': 'browser_test',
   'rls-audit': 'rls_audit',
   'security-scan': 'security_scan',
   sonarqube: 'security_scan',
+  'deployment boundary': 'security_scan',
+  'production build': 'integration_test',
+  build: 'integration_test',
   'qodo-contracts': 'integration_test',
 };
 
@@ -42,7 +47,25 @@ function mapConclusion(conclusion: string | null): EvidenceStatus {
 
 function resolveKind(checkName: string): EvidenceKind {
   const normalized = checkName.toLowerCase().trim();
-  return CHECK_NAME_TO_KIND[normalized] ?? 'unit_test';
+  const exact = CHECK_NAME_TO_KIND[normalized];
+  if (exact) return exact;
+
+  if (normalized.includes('playwright') || normalized.includes('browser')) return 'browser_test';
+  if (normalized.includes('typecheck') || normalized.includes('type check') || normalized.includes('tsc')) {
+    return 'typecheck';
+  }
+  if (normalized.includes('lint')) return 'lint';
+  if (normalized.includes('unit') || normalized.includes('vitest') || normalized.includes('jest')) {
+    return 'unit_test';
+  }
+  if (normalized.includes('security') || normalized.includes('sonar') || normalized.includes('boundary')) {
+    return 'security_scan';
+  }
+  if (normalized.includes('build') || normalized.includes('compile')) return 'integration_test';
+
+  // Unknown checks are retained as provenance but cannot accidentally satisfy
+  // a concrete required check such as typecheck or Playwright.
+  return 'artifact_provenance';
 }
 
 export class CheckRunController extends BaseController {
@@ -55,7 +78,6 @@ export class CheckRunController extends BaseController {
       return this.done('converged', 'No resourceId – nothing to reconcile');
     }
 
-    // Fetch the stored event payload from the inbox
     const { data: event } = await supabase
       .from('provider_events')
       .select('payload, project_id')
@@ -85,19 +107,23 @@ export class CheckRunController extends BaseController {
       detailsRef: detailsUrl,
     };
 
-    // Find mission associated with this commit
     const { data: mission } = await supabase
       .from('missions')
-      .select('id, status')
+      .select('id, status, policy_snapshot')
       .eq('project_id', projectId)
-      .in('status', ['implementing', 'preview_ready', 'awaiting_approval'])
+      .in('status', ['sandboxed', 'in_review'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (mission) evidenceRecord.missionId = mission.id;
+    const expectedHeadSha = mission?.policy_snapshot?.expectedHeadSha as string | undefined;
+    const headMatches = !expectedHeadSha || (
+      Boolean(headSha) && expectedHeadSha.toLowerCase() === headSha!.toLowerCase()
+    );
+    if (mission && headMatches) {
+      evidenceRecord.missionId = mission.id;
+    }
 
-    // Persist evidence
     const { data: inserted, error } = await supabase
       .from('evidence')
       .insert({
@@ -123,19 +149,18 @@ export class CheckRunController extends BaseController {
       kind: evidenceRecord.kind,
       status: evidenceRecord.status,
       missionId: evidenceRecord.missionId,
+      headSha,
     });
 
-    // If there is an active mission, enqueue MissionController to re-evaluate
-    if (mission) {
+    if (evidenceRecord.missionId) {
       await enqueueReconcile(
         {
           projectId,
           controller: 'MissionController',
-          resourceId: mission.id,
+          resourceId: evidenceRecord.missionId,
           reason: 'dependency_changed',
           sourceEventId,
         },
-        // Small debounce – coalesce burst check_run events
         { availableAt: new Date(Date.now() + 3_000).toISOString() },
       );
     }

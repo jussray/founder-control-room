@@ -3,7 +3,7 @@
  *
  * Triggered by GitHub pull_request events.
  * Persists normalized PR state into change_proposals.
- * On merge: enqueues ReleaseController.
+ * On merge: marks the related mission integrated and enqueues release observation.
  * On any update: enqueues MissionController with dependency_changed.
  */
 
@@ -114,23 +114,27 @@ export class ChangeProposalController extends BaseController {
       return this.done('retry', upsertError.message);
     }
 
-    this.log('info', 'Change proposal updated', {
-      projectId,
-      prNumber: pr.number,
-      status: proposalStatus,
-      action: pr.action,
-    });
-
     const { data: mission } = await supabase
       .from('missions')
-      .select('id, status')
+      .select('id, status, policy_snapshot')
       .eq('project_id', projectId)
-      .in('status', ['implementing', 'preview_ready', 'awaiting_approval', 'deploying'])
+      .in('status', ['sandboxed', 'in_review', 'approved'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
+    const expectedHeadSha = mission?.policy_snapshot?.expectedHeadSha as string | undefined;
+    const matchesMission = !expectedHeadSha || expectedHeadSha.toLowerCase() === pr.headSha.toLowerCase();
+
     if (pr.merged && pr.mergeCommitSha) {
+      if (mission && matchesMission) {
+        await supabase
+          .from('missions')
+          .update({ status: 'integrated', updated_at: new Date().toISOString() })
+          .eq('id', mission.id)
+          .in('status', ['in_review', 'approved']);
+      }
+
       await enqueueReconcile(
         {
           projectId,
@@ -143,7 +147,7 @@ export class ChangeProposalController extends BaseController {
       );
     }
 
-    if (mission) {
+    if (mission && matchesMission) {
       await enqueueReconcile(
         {
           projectId,

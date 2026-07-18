@@ -1,10 +1,8 @@
 # Founder Control Room Claude Instructions
 
-Read [`Juss Founder OS`](.ai/skills/juss-founder-os/SKILL.md) first, then read
-[`GLOBAL_AI.md`](./GLOBAL_AI.md) before any nontrivial work.
+Read [`Juss Founder OS`](.ai/skills/juss-founder-os/SKILL.md) first, then read [`GLOBAL_AI.md`](./GLOBAL_AI.md) and [`skills/portfolio-control-plane/SKILL.md`](./skills/portfolio-control-plane/SKILL.md) before any nontrivial work.
 
-For Se’kret Bip splash, founding-preview, waiting-list, sponsor, or social launch
-work, also read [`docs/private/JUSS_PRIVATE_OPERATING_PLAN.md`](docs/private/JUSS_PRIVATE_OPERATING_PLAN.md).
+For Se’kret Bip splash, founding-preview, waiting-list, sponsor, or social launch work, also read [`docs/private/JUSS_PRIVATE_OPERATING_PLAN.md`](docs/private/JUSS_PRIVATE_OPERATING_PLAN.md).
 
 Use the exact founder stack:
 
@@ -19,8 +17,9 @@ The first redteam attacks the premise. The second attacks the selected plan.
 1. Confirm repository, branch, environment, and requested outcome.
 2. Inspect the current provider interfaces, HTTP routes, auth middleware, schemas, migrations, tests, and recent changes.
 3. Read `docs/ARCHITECTURE.md` and preserve the provider-independent authority model.
-4. Separate verified facts, inference, and unknowns.
-5. Identify the next approval gate before mutation.
+4. Apply the portfolio skill and then the managed repository's local skill when crossing project boundaries.
+5. Separate verified facts, inference, and unknowns.
+6. Identify the next approval gate before mutation.
 
 ## Project rules
 
@@ -34,6 +33,6 @@ The first redteam attacks the premise. The second attacks the selected plan.
 
 ## Required completion report
 
-Reality, premise risk, L99 view, decision, plan risk, action, proof, rollback, and next gate.
+Reality, premise risk, L99 view, decision, plan risk, action, proof, brand/IP impact, rollback, and next gate.
 
 Claude should strengthen founder control, not build an autonomous bureaucracy with an API key and delusions of governance.

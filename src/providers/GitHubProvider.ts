@@ -24,6 +24,7 @@ export class GitHubProvider implements RepositoryProvider {
   readonly name = "github";
   private octokit: Octokit;
   private projectMap: Record<string, string>;
+  private readonly resolvedRefs = new Map<string, string>();
 
   constructor(config: GitHubProviderConfig) {
     this.octokit = new Octokit({ auth: config.token });
@@ -44,6 +45,10 @@ export class GitHubProvider implements RepositoryProvider {
       );
     }
     return { owner, repo };
+  }
+
+  private resolvedRefKey(projectId: string, ref: string): string {
+    return `${projectId}:${ref}`;
   }
 
   async getProject(projectId: string): Promise<ProjectRepo> {
@@ -91,6 +96,18 @@ export class GitHubProvider implements RepositoryProvider {
       throw new Error(`GitHubProvider: "${path}"@${ref} is not a readable file`);
     }
     return Buffer.from(data.content, "base64").toString("utf-8");
+  }
+
+  async resolveRef(projectId: string, ref: string): Promise<string> {
+    const { owner, repo } = this.locate(projectId);
+    const { data } = await this.octokit.repos.getBranch({
+      owner,
+      repo,
+      branch: ref,
+    });
+    const sha = data.commit.sha.toLowerCase();
+    this.resolvedRefs.set(this.resolvedRefKey(projectId, ref), sha);
+    return sha;
   }
 
   async createBranch(
@@ -211,15 +228,30 @@ export class GitHubProvider implements RepositoryProvider {
 
   async integrate(projectId: string, base: string, head: string): Promise<string> {
     const { owner, repo } = this.locate(projectId);
+    const key = this.resolvedRefKey(projectId, head);
+    const exactHeadSha = /^[0-9a-f]{40}$/i.test(head)
+      ? head.toLowerCase()
+      : this.resolvedRefs.get(key);
+
+    if (!exactHeadSha) {
+      throw new Error(
+        `GitHubProvider: integrate(${base}, ${head}) requires resolveRef(${head}) immediately beforehand`
+      );
+    }
+
+    // Consume the attestation once. A retry must resolve the branch again and
+    // therefore cannot accidentally reuse an old approval after the ref moves.
+    this.resolvedRefs.delete(key);
+
     const { data } = await this.octokit.repos.merge({
       owner,
       repo,
       base,
-      head,
+      head: exactHeadSha,
     });
     if (!data) {
       throw new Error(
-        `GitHubProvider: integrate(${base}, ${head}) produced no merge commit — likely already up to date or conflicting`
+        `GitHubProvider: integrate(${base}, ${exactHeadSha}) produced no merge commit — likely already up to date or conflicting`
       );
     }
     return data.sha;

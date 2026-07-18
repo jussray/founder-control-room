@@ -9,6 +9,7 @@ export type ReconcileReason =
   | 'manifest_changed'
   | 'manual_refresh'
   | 'dependency_changed'
+  | 'founder_triggered'
   | 'recovery'
   | 'startup';
 
@@ -31,6 +32,7 @@ export type EvidenceKind =
   | 'lint'
   | 'unit_test'
   | 'integration_test'
+  | 'browser_test'
   | 'security_scan'
   | 'preview_health'
   | 'deployment_result'
@@ -47,6 +49,8 @@ export interface ReconcileRequest {
   resourceId?: string;
   reason: ReconcileReason;
   sourceEventId?: string;
+  /** Controller-specific, non-authoritative request context. */
+  meta?: Record<string, unknown>;
   /** ISO timestamp – do not process before this time (for debounce / delay) */
   availableAt?: string;
 }

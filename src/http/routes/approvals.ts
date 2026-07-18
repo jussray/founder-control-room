@@ -1,75 +1,136 @@
 /**
  * Approvals route — founder-gated action execution.
  *
- * POST /approvals/:missionId/run-proof-gate
- *   Body: { gateId, evidence: ProofEvidence }
- *   Runs a proof gate check against the mission and persists the result.
- *   approvedBy is set automatically from the authenticated founder JWT.
- *   Persistence failure returns 500 — never silently passes.
+ * Proof-gated actions require BOTH:
+ *   1. a fresh founder-approved proof_gate_results record; and
+ *   2. complete machine evidence bound to the exact current head SHA.
  *
- * POST /approvals/:missionId/execute
- *   Body: { actionType, idempotencyKey, payload? }
- *   For merge and create_branch: requires a passing, non-expired
- *   proof_gate_results record before execution proceeds.
- *
- * Supported actionTypes in Milestone B:
- *   - create_branch  (proof gate required)
- *   - merge          (proof gate required)
- *
- * Explicitly NOT supported:
- *   - deploy  (returns 501 — no provider adapter yet)
+ * Every external mutation is reserved in approval_executions BEFORE the
+ * provider call. A pending reservation blocks replay if the provider succeeds
+ * but the final audit update is interrupted.
  */
 
-import { Router } from 'express';
-import { requireFounder } from '../middleware/requireFounder.js';
-import type { FounderRequest } from '../middleware/requireFounder.js';
+import { Router, type Response } from 'express';
+import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { GitHubProvider } from '../../providers/GitHubProvider.js';
 import { enqueueReconcile } from '../../events/outbox.js';
 import { ProofGateController } from '../../controllers/ProofGateController.js';
 import type { ProofEvidence } from '../../proof-gate/index.js';
-import type { Response } from 'express';
+import type { EvidenceKind } from '../../reconciliation/types.js';
 
-/** Actions that must have a passing proof_gate_results record before execution. */
 const PROOF_GATED_ACTIONS = new Set(['merge', 'create_branch']);
-
-/** Gate results expire after 15 minutes. */
 const PROOF_GATE_TTL_MS = 15 * 60 * 1_000;
 
+interface ExecutionRecord {
+  id: string;
+  status: 'pending' | 'succeeded' | 'failed';
+  result: Record<string, unknown> | null;
+  success: boolean | null;
+}
+
 export const approvalsRouter = Router();
-
 approvalsRouter.use(requireFounder);
-
-// ---------------------------------------------------------------------------
-// Runtime evidence validation
-// ---------------------------------------------------------------------------
 
 function validateEvidence(body: unknown): { ok: true; evidence: ProofEvidence } | { ok: false; error: string } {
   if (!body || typeof body !== 'object') {
     return { ok: false, error: 'evidence must be an object' };
   }
-  const e = body as Record<string, unknown>;
+  const evidence = body as Record<string, unknown>;
 
-  const strArrayFields = ['filesChanged', 'checksRun', 'failures', 'unresolvedRisks'] as const;
-  for (const field of strArrayFields) {
-    if (!Array.isArray(e[field]) || !( e[field] as unknown[]).every((v) => typeof v === 'string')) {
+  const stringArrayFields = ['filesChanged', 'checksRun', 'failures', 'unresolvedRisks'] as const;
+  for (const field of stringArrayFields) {
+    if (!Array.isArray(evidence[field]) || !(evidence[field] as unknown[]).every((value) => typeof value === 'string')) {
       return { ok: false, error: `evidence.${field} must be a string array` };
     }
   }
 
-  const strFields = ['behaviorChanged', 'securityImpact', 'deploymentImpact', 'rollbackPath'] as const;
-  for (const field of strFields) {
-    if (typeof e[field] !== 'string' || (e[field] as string).trim() === '') {
+  const stringFields = ['behaviorChanged', 'securityImpact', 'deploymentImpact', 'rollbackPath'] as const;
+  for (const field of stringFields) {
+    if (typeof evidence[field] !== 'string' || (evidence[field] as string).trim() === '') {
       return { ok: false, error: `evidence.${field} must be a non-empty string` };
     }
   }
 
-  return { ok: true, evidence: e as unknown as ProofEvidence };
+  return { ok: true, evidence: evidence as unknown as ProofEvidence };
 }
 
-// ---------------------------------------------------------------------------
-// POST /approvals/:missionId/run-proof-gate
-// ---------------------------------------------------------------------------
+async function verifyExactHeadEvidence(
+  missionId: string,
+  requiredChecks: EvidenceKind[],
+  expectedHeadSha: string,
+): Promise<{ ok: true; summary: Record<string, string> } | { ok: false; error: string; details?: unknown }> {
+  if (!requiredChecks.length) {
+    return { ok: false, error: 'Mission has no required machine checks.' };
+  }
+
+  const { data: rows, error } = await supabase
+    .from('evidence')
+    .select('kind, status, commit_sha, created_at')
+    .eq('mission_id', missionId)
+    .in('kind', requiredChecks)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return { ok: false, error: 'Unable to read machine evidence.', details: error.message };
+  }
+
+  const latest = new Map<string, { status: string; commitSha: string | null }>();
+  for (const row of rows ?? []) {
+    if (latest.has(row.kind)) continue;
+    latest.set(row.kind, {
+      status: row.status,
+      commitSha: row.commit_sha ? String(row.commit_sha).toLowerCase() : null,
+    });
+  }
+
+  const missing = requiredChecks.filter((kind) => !latest.has(kind));
+  const failing = requiredChecks.filter((kind) => latest.get(kind)?.status !== 'pass');
+  const wrongHead = requiredChecks.filter(
+    (kind) => latest.get(kind)?.commitSha !== expectedHeadSha.toLowerCase(),
+  );
+
+  if (missing.length || failing.length || wrongHead.length) {
+    return {
+      ok: false,
+      error: 'Exact-head machine evidence is incomplete.',
+      details: { missing, failing, wrongHead, expectedHeadSha },
+    };
+  }
+
+  return {
+    ok: true,
+    summary: Object.fromEntries(
+      requiredChecks.map((kind) => [kind, `${latest.get(kind)!.status}@${latest.get(kind)!.commitSha}`]),
+    ),
+  };
+}
+
+async function requireFreshProof(missionId: string, actionType: string) {
+  const proofCutoff = new Date(Date.now() - PROOF_GATE_TTL_MS).toISOString();
+  return supabase
+    .from('proof_gate_results')
+    .select('id, status, created_at, gate_id')
+    .eq('mission_id', missionId)
+    .eq('gate_id', actionType)
+    .eq('status', 'pass')
+    .gte('created_at', proofCutoff)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+}
+
+async function findExecution(idempotencyKey: string): Promise<{
+  data: ExecutionRecord | null;
+  error: { message: string } | null;
+}> {
+  const { data, error } = await supabase
+    .from('approval_executions')
+    .select('id, status, result, success')
+    .eq('idempotency_key', idempotencyKey)
+    .maybeSingle();
+  return { data: data as ExecutionRecord | null, error };
+}
 
 approvalsRouter.post(
   '/:missionId/run-proof-gate',
@@ -87,13 +148,13 @@ approvalsRouter.post(
       return res.status(400).json({ error: evidenceValidation.error });
     }
 
-    const { data: mission, error: missionErr } = await supabase
+    const { data: mission, error: missionError } = await supabase
       .from('missions')
-      .select('id, project_id')
+      .select('id, project_id, status')
       .eq('id', missionId)
       .single();
 
-    if (missionErr || !mission) {
+    if (missionError || !mission) {
       return res.status(404).json({ error: 'Mission not found' });
     }
 
@@ -106,7 +167,6 @@ approvalsRouter.post(
       meta: {
         gateId,
         evidence: evidenceValidation.evidence,
-        // approvedBy sourced from verified JWT — not caller-supplied.
         approvedBy: req.founder!.email,
       },
     });
@@ -119,6 +179,22 @@ approvalsRouter.post(
       });
     }
 
+    if (result.status === 'converged' && gateId === 'merge' && mission.status === 'in_review') {
+      const { error: updateError } = await supabase
+        .from('missions')
+        .update({ status: 'approved', updated_at: new Date().toISOString() })
+        .eq('id', missionId)
+        .eq('status', 'in_review');
+
+      if (updateError) {
+        return res.status(500).json({
+          ok: false,
+          error: 'Proof passed but mission approval state could not be persisted.',
+          detail: updateError.message,
+        });
+      }
+    }
+
     const status = result.status === 'converged' ? 200 : 422;
     return res.status(status).json({
       ok: result.status === 'converged',
@@ -129,10 +205,6 @@ approvalsRouter.post(
     });
   },
 );
-
-// ---------------------------------------------------------------------------
-// POST /approvals/:missionId/execute
-// ---------------------------------------------------------------------------
 
 approvalsRouter.post(
   '/:missionId/execute',
@@ -155,134 +227,241 @@ approvalsRouter.post(
       });
     }
 
-    const { data: mission, error: missionErr } = await supabase
+    if (!PROOF_GATED_ACTIONS.has(actionType)) {
+      return res.status(400).json({ error: `Unknown actionType: ${actionType}` });
+    }
+
+    const { data: mission, error: missionError } = await supabase
       .from('missions')
-      .select('id, project_id, status, branch_name, policy_snapshot')
+      .select('id, project_id, status, branch_ref, required_checks, policy_snapshot')
       .eq('id', missionId)
       .single();
 
-    if (missionErr || !mission) {
+    if (missionError || !mission) {
       return res.status(404).json({ error: 'Mission not found' });
     }
 
     const projectId = mission.project_id as string;
 
-    // -------------------------------------------------------------------------
-    // Proof gate enforcement — required for merge and create_branch.
-    // Must have a passing, non-expired proof_gate_results record.
-    // A gate beside the door is decorative architecture.
-    // -------------------------------------------------------------------------
-    if (PROOF_GATED_ACTIONS.has(actionType)) {
-      const proofCutoff = new Date(Date.now() - PROOF_GATE_TTL_MS).toISOString();
-      const { data: proofRecord, error: proofErr } = await supabase
-        .from('proof_gate_results')
-        .select('id, status, created_at, gate_id')
-        .eq('mission_id', missionId)
-        .eq('gate_id', actionType)
-        .eq('status', 'pass')
-        .gte('created_at', proofCutoff)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (proofErr) {
-        return res.status(500).json({
-          error: 'Failed to verify proof gate — cannot proceed',
-          detail: proofErr.message,
-        });
-      }
-
-      if (!proofRecord) {
-        return res.status(403).json({
-          error: `Action '${actionType}' requires a passing proof gate result (gate_id: '${actionType}') within the last 15 minutes.`,
-          code: 'PROOF_GATE_REQUIRED',
-          hint: `Call POST /approvals/${missionId}/run-proof-gate with gateId: "${actionType}" first.`,
-        });
-      }
+    const { data: proofRecord, error: proofError } = await requireFreshProof(missionId, actionType);
+    if (proofError) {
+      return res.status(500).json({
+        error: 'Failed to verify proof gate — cannot proceed',
+        detail: proofError.message,
+      });
+    }
+    if (!proofRecord) {
+      return res.status(403).json({
+        error: `Action '${actionType}' requires a passing proof gate result within the last 15 minutes.`,
+        code: 'PROOF_GATE_REQUIRED',
+        hint: `Call POST /approvals/${missionId}/run-proof-gate with gateId: "${actionType}" first.`,
+      });
     }
 
-    // -------------------------------------------------------------------------
-    // Idempotency check
-    // -------------------------------------------------------------------------
-    const { data: existing } = await supabase
-      .from('approval_executions')
-      .select('id, result')
-      .eq('idempotency_key', idempotencyKey)
-      .maybeSingle();
-
-    if (existing) {
-      return res.json({ ok: true, idempotent: true, result: existing.result });
+    const existingLookup = await findExecution(idempotencyKey);
+    if (existingLookup.error) {
+      return res.status(500).json({
+        error: 'Unable to inspect the action idempotency ledger.',
+        detail: existingLookup.error.message,
+      });
+    }
+    if (existingLookup.data) {
+      if (existingLookup.data.status === 'succeeded') {
+        return res.json({ ok: true, idempotent: true, result: existingLookup.data.result });
+      }
+      if (existingLookup.data.status === 'pending') {
+        return res.status(409).json({
+          ok: false,
+          code: 'ACTION_ALREADY_PENDING',
+          error: 'This approved action is already reserved or may have executed. Reconcile it before retrying.',
+          executionId: existingLookup.data.id,
+        });
+      }
+      return res.status(409).json({
+        ok: false,
+        code: 'ACTION_PREVIOUSLY_FAILED',
+        error: 'This idempotency key is bound to a prior failed action. Use a new approval and key after review.',
+        result: existingLookup.data.result,
+      });
     }
 
-    const { data: connection } = await supabase
-      .from('project_connections')
-      .select('connection_config')
-      .eq('project_id', projectId)
-      .eq('provider', 'github')
-      .eq('status', 'active')
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('id, slug, repo_provider, repo_identifier')
+      .eq('id', projectId)
       .single();
 
-    const config = connection?.connection_config as Record<string, unknown> | undefined;
-    const repoFullName = config?.['repository'] as string | undefined;
-    const token = process.env['GITHUB_TOKEN'];
-
-    const provider = token && repoFullName
-      ? new GitHubProvider({ token, projectMap: { [projectId]: repoFullName } })
-      : null;
-
-    let result: Record<string, unknown> = {};
-    let executionError: string | null = null;
-
-    try {
-      switch (actionType) {
-        case 'create_branch': {
-          if (!provider) throw new Error('GitHub provider not configured');
-          const branchName = (payload['branchName'] as string) ?? `mission/${missionId.slice(0, 8)}`;
-          const baseRef = (payload['baseRef'] as string) ?? 'main';
-          await provider.createBranch(projectId, baseRef, branchName);
-          await supabase
-            .from('missions')
-            .update({ branch_name: branchName, updated_at: new Date().toISOString() })
-            .eq('id', missionId);
-          result = { branchName, baseRef };
-          break;
-        }
-
-        case 'merge': {
-          if (!provider) throw new Error('GitHub provider not configured');
-          const head = (payload['head'] as string) ?? mission.branch_name;
-          const base = (payload['base'] as string) ?? 'main';
-          if (!head) throw new Error('No head branch to merge');
-          const mergeCommitSha = await provider.integrate(projectId, base, head);
-          result = { mergeCommitSha, head, base };
-          await supabase
-            .from('missions')
-            .update({ status: 'verifying', updated_at: new Date().toISOString() })
-            .eq('id', missionId)
-            .eq('status', 'awaiting_approval');
-          break;
-        }
-
-        default:
-          return res.status(400).json({ error: `Unknown actionType: ${actionType}` });
-      }
-    } catch (err) {
-      executionError = err instanceof Error ? err.message : String(err);
+    if (projectError || !project) {
+      return res.status(500).json({ error: 'Project repository configuration not found.' });
     }
 
-    await supabase.from('approval_executions').insert({
-      mission_id: missionId,
-      project_id: projectId,
-      action_type: actionType,
-      idempotency_key: idempotencyKey,
-      executed_by: req.founder!.email,
-      result: executionError ? { error: executionError } : result,
-      success: !executionError,
-      executed_at: new Date().toISOString(),
-    });
+    const token = process.env['GITHUB_TOKEN'];
+    const provider = token && project.repo_provider === 'github' && project.repo_identifier
+      ? new GitHubProvider({
+          token,
+          projectMap: { [project.slug]: project.repo_identifier },
+        })
+      : null;
+
+    if (!provider) {
+      return res.status(503).json({
+        error: 'Repository provider is not configured.',
+        code: 'REPOSITORY_PROVIDER_UNAVAILABLE',
+      });
+    }
+
+    // Reserve before external mutation. The unique idempotency key is the final
+    // race barrier if two requests pass the preceding lookup concurrently.
+    const { data: reservation, error: reservationError } = await supabase
+      .from('approval_executions')
+      .insert({
+        mission_id: missionId,
+        project_id: projectId,
+        action_type: actionType,
+        idempotency_key: idempotencyKey,
+        executed_by: req.founder!.email,
+        status: 'pending',
+        request: payload,
+        result: {},
+        success: null,
+        started_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (reservationError || !reservation) {
+      const racedLookup = await findExecution(idempotencyKey);
+      if (racedLookup.data?.status === 'succeeded') {
+        return res.json({ ok: true, idempotent: true, result: racedLookup.data.result });
+      }
+      if (racedLookup.data) {
+        return res.status(409).json({
+          ok: false,
+          code: 'ACTION_ALREADY_RESERVED',
+          error: 'Another request reserved this action. Reconcile that execution before retrying.',
+          executionId: racedLookup.data.id,
+        });
+      }
+      return res.status(500).json({
+        error: 'Unable to reserve the approved action; no provider mutation was attempted.',
+        code: 'ACTION_RESERVATION_FAILED',
+        detail: reservationError?.message ?? 'Reservation insert returned no record.',
+      });
+    }
+
+    let executionResult: Record<string, unknown> = {};
+    let executionError: string | null = null;
+    const warnings: string[] = [];
+
+    try {
+      if (actionType === 'create_branch') {
+        if (mission.status !== 'proposed') {
+          throw new Error(`Mission must be proposed before branch creation; current status is ${mission.status}.`);
+        }
+        const branchName = (payload['branchName'] as string) ?? `mission/${missionId.slice(0, 8)}`;
+        const baseRef = (payload['baseRef'] as string) ?? 'main';
+        await provider.createBranch(project.slug, baseRef, branchName);
+        executionResult = { branchName, baseRef };
+
+        const { error: missionUpdateError } = await supabase
+          .from('missions')
+          .update({
+            branch_ref: branchName,
+            status: 'sandboxed',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', missionId)
+          .eq('status', 'proposed');
+        if (missionUpdateError) {
+          warnings.push(`Branch was created, but mission state update failed: ${missionUpdateError.message}`);
+        }
+      } else {
+        if (mission.status !== 'approved') {
+          throw new Error(`Mission must be approved before merge; current status is ${mission.status}.`);
+        }
+
+        const head = (payload['head'] as string) ?? mission.branch_ref;
+        const base = (payload['base'] as string) ?? 'main';
+        const expectedHeadSha = typeof payload['expectedHeadSha'] === 'string'
+          ? payload['expectedHeadSha'].toLowerCase()
+          : '';
+        if (!head) throw new Error('No head branch to merge');
+        if (!/^[0-9a-f]{40}$/.test(expectedHeadSha)) {
+          throw new Error('Merge requires expectedHeadSha as a full 40-character commit SHA.');
+        }
+
+        const missionExpectedHead = typeof mission.policy_snapshot?.expectedHeadSha === 'string'
+          ? mission.policy_snapshot.expectedHeadSha.toLowerCase()
+          : '';
+        if (!missionExpectedHead || missionExpectedHead !== expectedHeadSha) {
+          throw new Error('Merge SHA does not match the mission policy snapshot.');
+        }
+
+        const evidenceResult = await verifyExactHeadEvidence(
+          missionId,
+          (mission.required_checks ?? []) as EvidenceKind[],
+          expectedHeadSha,
+        );
+        if (!evidenceResult.ok) {
+          throw new Error(`${evidenceResult.error} ${JSON.stringify(evidenceResult.details ?? {})}`);
+        }
+
+        const currentHeadSha = await provider.resolveRef(project.slug, head);
+        if (currentHeadSha !== expectedHeadSha) {
+          throw new Error(
+            `Branch moved after verification: current ${currentHeadSha}, approved ${expectedHeadSha}.`,
+          );
+        }
+
+        const mergeCommitSha = await provider.integrate(project.slug, base, head);
+        executionResult = {
+          mergeCommitSha,
+          head,
+          base,
+          expectedHeadSha,
+          evidence: evidenceResult.summary,
+        };
+
+        const { error: missionUpdateError } = await supabase
+          .from('missions')
+          .update({ status: 'integrated', updated_at: new Date().toISOString() })
+          .eq('id', missionId)
+          .eq('status', 'approved');
+        if (missionUpdateError) {
+          warnings.push(`Merge succeeded, but mission state update failed: ${missionUpdateError.message}`);
+        }
+      }
+    } catch (error) {
+      executionError = error instanceof Error ? error.message : String(error);
+    }
+
+    if (warnings.length) executionResult.warnings = warnings;
+
+    const finalResult = executionError ? { error: executionError } : executionResult;
+    const { error: auditUpdateError } = await supabase
+      .from('approval_executions')
+      .update({
+        status: executionError ? 'failed' : 'succeeded',
+        result: finalResult,
+        success: !executionError,
+        executed_at: new Date().toISOString(),
+      })
+      .eq('id', reservation.id)
+      .eq('status', 'pending');
+
+    if (auditUpdateError) {
+      return res.status(500).json({
+        ok: false,
+        code: 'ACTION_AUDIT_INCOMPLETE',
+        error: 'The provider action finished, but the execution ledger could not be finalized. Do not retry automatically.',
+        executionId: reservation.id,
+        providerOutcome: finalResult,
+        detail: auditUpdateError.message,
+      });
+    }
 
     if (executionError) {
-      return res.status(500).json({ ok: false, error: executionError });
+      return res.status(409).json({ ok: false, error: executionError, executionId: reservation.id });
     }
 
     await enqueueReconcile({
@@ -292,6 +471,6 @@ approvalsRouter.post(
       reason: 'dependency_changed',
     });
 
-    return res.json({ ok: true, result });
+    return res.json({ ok: true, result: executionResult, executionId: reservation.id });
   },
 );

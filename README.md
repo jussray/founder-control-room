@@ -40,33 +40,46 @@ callers.
 
 ## Structure
 
-```
+```text
 src/
   providers/
     RepositoryProvider.ts   # provider-agnostic interface
     GitHubProvider.ts        # first implementation (Octokit-based)
+  terminal/
+    registry.ts              # project-specific executable + argument allowlist
+    runner.ts                # shell-free, exact-head process runner
   types/
     changeProposal.ts        # Change Proposal (PR-equivalent) types
-    mission.ts                # Mission / verification-run types
+    mission.ts               # Mission / verification-run types
   lib/
     supabaseClient.ts         # Control Room's own Supabase project (NOT Bip's), service-role key
     supabaseAuthClient.ts     # same project, publishable/anon key — auth-only calls
   http/
-    server.ts                 # Express app: mounts /auth and /projects
+    server.ts                 # Express app
     middleware/
-      requireFounder.ts        # verifies session JWT + founder_users allowlist
+      requireFounder.ts       # verifies session JWT + founder_users allowlist
     routes/
-      auth.ts                  # POST /auth/magic-link, GET /auth/callback
-      projects.ts               # GET /projects/:slug (founder-only)
-  index.ts                     # bootstraps the HTTP server
+      auth.ts                 # POST /auth/magic-link, GET /auth/callback
+      projects.ts             # GET /projects/:slug (founder-only)
+      approvals.ts            # reservation-first, exact-head approved actions
+      terminal.ts             # guarded mission verification terminal
+  index.ts                    # bootstraps the HTTP server
 supabase/
   migrations/
-    0001_init.sql              # founder Control Room schema
-    0002_enable_rls_and_founder_policy.sql  # RLS on all tables + founder_users + is_founder()
-    0003_harden_functions.sql   # search_path pin + tighter execute grants on is_founder()
-docs/
-  ARCHITECTURE.md              # full design doc + L99 authority model
+    0001_init.sql
+    0002_enable_rls_and_founder_policy.sql
+    0003_harden_functions.sql
+    20260717195000_guarded_terminal_and_schema_reconciliation.sql
+scripts/
+  verify-guarded-terminal-contract.mjs
+artifacts/
+  billgates/CONTROL_ROOM_TERMINAL_FIX.md
 ```
+
+The timestamped reconciliation migration upgrades the live legacy
+`change_proposals` and `releases` tables in place, creates the action-idempotency
+ledger and terminal audit table, and registers the private hair control repository.
+It must not be applied until the exact Control Room PR head passes all required gates.
 
 ## Data boundary
 
@@ -79,7 +92,7 @@ queries Bip's database directly with broad credentials.
 
 ```bash
 npm install
-cp .env.example .env   # fill in GITHUB_TOKEN and SUPABASE_SERVICE_ROLE_KEY (secrets — not committed)
+cp .env.example .env   # fill in GITHUB_TOKEN and SUPABASE_SERVICE_ROLE_KEY
 npm run dev            # starts the API on :8787 (or $PORT)
 ```
 
@@ -109,25 +122,69 @@ curl http://localhost:8787/projects/sekret-bip \
 ```
 
 `GET /projects/:slug`:
-- requires a valid founder session (checked against `founder_users`, not just any
-  logged-in Supabase user)
-- reads the project's own registry row from the `projects` table
-- fetches live repo state through whatever `RepositoryProvider` that project's
-  `repo_provider` maps to (GitHub today, via `GITHUB_TOKEN`)
-- logs the read to `project_events` as an audited `project_read` event
+- requires a valid founder session checked against `founder_users`;
+- reads the project's registry row;
+- fetches live repository state through its `RepositoryProvider`;
+- logs the read as an audited event.
 
-There's no Control Room frontend yet, so `/auth/callback` returns the session as
-JSON instead of redirecting into a UI — swap that once one exists.
+There's no Control Room web frontend yet, so `/auth/callback` returns the session
+as JSON. The guarded terminal is an authenticated API surface, not an interactive
+browser shell.
+
+## Guarded founder terminal
+
+The terminal is disabled unless all of these are true:
+
+- `CONTROL_ROOM_TERMINAL_ENABLED=true`;
+- the request carries a valid founder session;
+- the request comes from loopback, unless remote access was separately enabled;
+- `CONTROL_ROOM_WORKSPACE_ROOT` contains the reviewed project checkout;
+- the command ID is present in the project-specific registry;
+- the requested commit matches the mission policy snapshot;
+- the checkout's current HEAD still equals that exact commit;
+- the command risk is allowed in the mission's current state.
+
+It never accepts shell strings, caller-provided executables, caller-provided
+arguments, pipes, redirects, or caller-provided environment variables.
+
+```bash
+# List approved commands
+curl http://localhost:8787/terminal/untold-stories/commands \
+  -H 'authorization: Bearer <access_token>'
+
+# Run one exact-head mission check
+curl -X POST http://localhost:8787/terminal/untold-stories/run \
+  -H 'authorization: Bearer <access_token>' \
+  -H 'content-type: application/json' \
+  -d '{
+    "missionId":"<mission-uuid>",
+    "commandId":"verify.playwright",
+    "expectedCommitSha":"<40-character-head-sha>"
+  }'
+```
+
+Each run records the founder, project, mission, approved command, exact commit,
+start/end time, exit status, bounded redacted output, and evidence kind. One run
+per project may be active at a time. Truncated output is retained as warning
+evidence but cannot satisfy a proof gate.
+
+Approved branch or merge actions are reserved in `approval_executions` before the
+provider call. A pending reservation blocks automatic replay when the provider may
+have succeeded but ledger finalization was interrupted. Merge separately requires
+a fresh proof gate, complete exact-head machine evidence, and a final immutable-ref
+check immediately before integration.
 
 ## L99 authority model (summary)
 
 | Action | Approval |
 |---|---|
-| Read project | Allowed during discussion |
-| Create sandbox workspace | Founder approval required |
-| Create internal branch | Founder approval required |
-| Integrate into main | Separate founder approval required |
-| Deploy | Separate founder approval required |
-| Rollback | Separate founder approval required |
+| Read project or approved command list | Founder-authenticated read |
+| Run a mission verification command | Explicit founder request |
+| Install dependencies or browsers | Explicit write-risk confirmation |
+| Create sandbox workspace | Separate founder approval |
+| Create internal branch | Separate founder approval + reservation |
+| Integrate into main | Separate founder approval + exact-head machine proof + reservation |
+| Deploy | Separate founder approval |
+| Rollback | Separate founder approval |
 
 No approval carries forward to the next step.

@@ -1,92 +1,93 @@
 /**
  * CORS middleware unit tests.
  *
- * Tests the origin resolution and normalization logic in isolation,
- * without spinning up a full Express server.
+ * Exercises the exported middleware through Express instead of depending on
+ * private implementation fields from the cors package.
  *
  * Run: npx vitest run src/http/middleware/__tests__/security.cors.test.ts
- *
- * Prerequisites: add vitest to devDependencies
- *   npm install -D vitest
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import express from 'express';
+import request from 'supertest';
+import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Re-imports security.ts with controlled env vars by manipulating
- * process.env before each test block. Uses dynamic import + cache-bust
- * because the module resolves ALLOWED_ORIGINS at load time.
- */
+type SecurityModule = typeof import('../security.js');
+
+const ENV_KEYS = [
+  'NODE_ENV',
+  'FOUNDER_ALLOWED_ORIGINS',
+  'FOUNDER_API_URL',
+] as const;
+
 async function loadSecurityWithEnv(
   env: Record<string, string | undefined>,
-): Promise<{ allowOrigin: (origin: string | undefined) => Promise<boolean> }> {
-  const saved: Record<string, string | undefined> = {};
+): Promise<SecurityModule> {
+  const saved = new Map<string, string | undefined>();
 
-  // Apply test env
-  for (const [k, v] of Object.entries(env)) {
-    saved[k] = process.env[k];
-    if (v === undefined) {
-      delete process.env[k];
-    } else {
-      process.env[k] = v;
+  for (const key of ENV_KEYS) {
+    saved.set(key, process.env[key]);
+  }
+
+  for (const key of ENV_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(env, key)) {
+      const value = env[key];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
     }
   }
 
-  // Reset NODE_ENV so startup validation doesn't throw
-  const savedNodeEnv = process.env['NODE_ENV'];
-  process.env['NODE_ENV'] = 'test';
-
-  // Dynamic import with cache-bust query so each call gets a fresh module
-  const mod = await import(`../security.js?t=${Date.now()}`);
-
-  // Restore env
-  for (const [k, v] of Object.entries(saved)) {
-    if (v === undefined) delete process.env[k];
-    else process.env[k] = v;
+  if (!Object.prototype.hasOwnProperty.call(env, 'NODE_ENV')) {
+    process.env.NODE_ENV = 'test';
   }
-  process.env['NODE_ENV'] = savedNodeEnv;
 
-  // Wrap cors middleware into a testable promise
-  const allowOrigin = (origin: string | undefined): Promise<boolean> =>
-    new Promise((resolve, reject) => {
-      // Access the internal cors option by calling with a fake req
-      // We test the origin resolver logic directly
-      const corsOptions = (mod.corsMiddleware as unknown as { _options: { origin: Function } })._options;
-      if (corsOptions?.origin) {
-        corsOptions.origin(origin, (err: Error | null, allowed: boolean) => {
-          if (err) reject(err);
-          else resolve(allowed);
-        });
-      } else {
-        // Fallback: middleware is configured with a static list
-        resolve(false);
-      }
-    });
+  vi.resetModules();
 
-  return { allowOrigin };
+  try {
+    return await import('../security.js');
+  } finally {
+    for (const [key, value] of saved) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
 }
 
-// ---------------------------------------------------------------------------
-// parseOrigins behaviour (tested indirectly via the module)
-// ---------------------------------------------------------------------------
+async function probe(
+  env: Record<string, string | undefined>,
+  origin?: string,
+) {
+  const security = await loadSecurityWithEnv(env);
+  const app = express();
+
+  app.use(security.corsMiddleware);
+  app.get('/probe', (_req, res) => {
+    res.status(200).json({ ok: true });
+  });
+  app.use(security.errorHandler);
+
+  const pending = request(app).get('/probe');
+  if (origin !== undefined) pending.set('Origin', origin);
+  return pending;
+}
 
 describe('CORS origin resolution', () => {
-  describe('development defaults (no env vars set)', () => {
+  describe('development defaults', () => {
     it('allows http://localhost:3000', async () => {
-      delete process.env['FOUNDER_ALLOWED_ORIGINS'];
-      delete process.env['NODE_ENV'];
-      const { allowOrigin } = await loadSecurityWithEnv({});
-      await expect(allowOrigin('http://localhost:3000')).resolves.toBe(true);
+      const response = await probe({}, 'http://localhost:3000');
+      expect(response.status).toBe(200);
+      expect(response.headers['access-control-allow-origin']).toBe('http://localhost:3000');
     });
 
     it('allows http://localhost:8787', async () => {
-      const { allowOrigin } = await loadSecurityWithEnv({});
-      await expect(allowOrigin('http://localhost:8787')).resolves.toBe(true);
+      const response = await probe({}, 'http://localhost:8787');
+      expect(response.status).toBe(200);
+      expect(response.headers['access-control-allow-origin']).toBe('http://localhost:8787');
     });
 
     it('denies a random external origin', async () => {
-      const { allowOrigin } = await loadSecurityWithEnv({});
-      await expect(allowOrigin('https://evil.example.com')).rejects.toThrow('CORS: origin not allowed');
+      const response = await probe({}, 'https://evil.example.com');
+      expect(response.status).toBe(403);
+      expect(response.body.error).toContain('CORS: origin not allowed');
     });
   });
 
@@ -94,27 +95,28 @@ describe('CORS origin resolution', () => {
     const env = { FOUNDER_ALLOWED_ORIGINS: 'https://control.example.com' };
 
     it('allows the exact configured origin', async () => {
-      const { allowOrigin } = await loadSecurityWithEnv(env);
-      await expect(allowOrigin('https://control.example.com')).resolves.toBe(true);
+      const response = await probe(env, 'https://control.example.com');
+      expect(response.status).toBe(200);
+      expect(response.headers['access-control-allow-origin']).toBe('https://control.example.com');
     });
 
-    it('allows origin with trailing slash (normalized to same origin)', async () => {
-      // Browser never sends trailing slash in Origin header, but the env var
-      // might have one. URL().origin strips it, so both resolve to the same string.
-      const { allowOrigin } = await loadSecurityWithEnv({
-        FOUNDER_ALLOWED_ORIGINS: 'https://control.example.com/',
-      });
-      await expect(allowOrigin('https://control.example.com')).resolves.toBe(true);
+    it('normalizes a trailing slash in configuration', async () => {
+      const response = await probe(
+        { FOUNDER_ALLOWED_ORIGINS: 'https://control.example.com/' },
+        'https://control.example.com',
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers['access-control-allow-origin']).toBe('https://control.example.com');
     });
 
     it('denies an origin not in the list', async () => {
-      const { allowOrigin } = await loadSecurityWithEnv(env);
-      await expect(allowOrigin('https://other.example.com')).rejects.toThrow('CORS: origin not allowed');
+      const response = await probe(env, 'https://other.example.com');
+      expect(response.status).toBe(403);
     });
 
     it('denies a subdomain of the allowed origin', async () => {
-      const { allowOrigin } = await loadSecurityWithEnv(env);
-      await expect(allowOrigin('https://sub.control.example.com')).rejects.toThrow('CORS: origin not allowed');
+      const response = await probe(env, 'https://sub.control.example.com');
+      expect(response.status).toBe(403);
     });
   });
 
@@ -124,31 +126,31 @@ describe('CORS origin resolution', () => {
     };
 
     it('allows the first origin', async () => {
-      const { allowOrigin } = await loadSecurityWithEnv(env);
-      await expect(allowOrigin('https://control.example.com')).resolves.toBe(true);
+      const response = await probe(env, 'https://control.example.com');
+      expect(response.status).toBe(200);
     });
 
     it('allows the second origin', async () => {
-      const { allowOrigin } = await loadSecurityWithEnv(env);
-      await expect(allowOrigin('https://staging.control.example.com')).resolves.toBe(true);
+      const response = await probe(env, 'https://staging.control.example.com');
+      expect(response.status).toBe(200);
     });
 
     it('denies an origin not in the list', async () => {
-      const { allowOrigin } = await loadSecurityWithEnv(env);
-      await expect(allowOrigin('https://evil.example.com')).rejects.toThrow('CORS: origin not allowed');
+      const response = await probe(env, 'https://evil.example.com');
+      expect(response.status).toBe(403);
     });
   });
 
-  describe('missing Origin header (server-to-server)', () => {
-    it('allows requests with no Origin', async () => {
-      const { allowOrigin } = await loadSecurityWithEnv({});
-      // undefined origin = no Origin header = server-to-server
-      await expect(allowOrigin(undefined)).resolves.toBe(true);
+  describe('missing Origin header', () => {
+    it('allows server-to-server requests', async () => {
+      const response = await probe({});
+      expect(response.status).toBe(200);
+      expect(response.headers['access-control-allow-origin']).toBeUndefined();
     });
   });
 
   describe('production startup validation', () => {
-    it('throws if FOUNDER_ALLOWED_ORIGINS is missing in production', async () => {
+    it('throws if FOUNDER_ALLOWED_ORIGINS is missing', async () => {
       await expect(
         loadSecurityWithEnv({
           NODE_ENV: 'production',
@@ -158,7 +160,7 @@ describe('CORS origin resolution', () => {
       ).rejects.toThrow('FOUNDER_ALLOWED_ORIGINS is required in production');
     });
 
-    it('throws if FOUNDER_API_URL is missing in production', async () => {
+    it('throws if FOUNDER_API_URL is missing', async () => {
       await expect(
         loadSecurityWithEnv({
           NODE_ENV: 'production',
@@ -170,9 +172,7 @@ describe('CORS origin resolution', () => {
 
     it('throws if FOUNDER_ALLOWED_ORIGINS contains an invalid URL', async () => {
       await expect(
-        loadSecurityWithEnv({
-          FOUNDER_ALLOWED_ORIGINS: 'not-a-url',
-        }),
+        loadSecurityWithEnv({ FOUNDER_ALLOWED_ORIGINS: 'not-a-url' }),
       ).rejects.toThrow('FOUNDER_ALLOWED_ORIGINS contains an invalid URL');
     });
   });

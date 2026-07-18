@@ -87,21 +87,21 @@ describe('runProofGate — failure cases', () => {
     const evidence: ProofEvidence = { ...validEvidence, filesChanged: [] };
     const result = runProofGate('schema-change', evidence);
     expect(result.status).toBe('fail');
-    expect(result.evidence.failures.some((f) => f.includes('No files reported'))).toBe(true);
+    expect(result.allFailures.some((failure) => failure.includes('No files reported'))).toBe(true);
   });
 
   it('fails when checksRun is empty (happy-path-only)', () => {
     const evidence: ProofEvidence = { ...validEvidence, checksRun: [] };
     const result = runProofGate('schema-change', evidence);
     expect(result.status).toBe('fail');
-    expect(result.evidence.failures.some((f) => f.includes('No checks reported'))).toBe(true);
+    expect(result.allFailures.some((failure) => failure.includes('No checks reported'))).toBe(true);
   });
 
   it('fails when rollbackPath is empty', () => {
     const evidence: ProofEvidence = { ...validEvidence, rollbackPath: '' };
     const result = runProofGate('schema-change', evidence);
     expect(result.status).toBe('fail');
-    expect(result.evidence.failures.some((f) => f.includes('Rollback path'))).toBe(true);
+    expect(result.allFailures.some((failure) => failure.includes('Rollback path'))).toBe(true);
   });
 
   it('fails when rollbackPath is whitespace only', () => {
@@ -114,7 +114,7 @@ describe('runProofGate — failure cases', () => {
     const result = runProofGate('deploy', validEvidence);
     expect(result.status).toBe('fail');
     expect(
-      result.evidence.failures.some((f) => f.includes("Gate 'deploy' is an approval gate")),
+      result.allFailures.some((failure) => failure.includes("Gate 'deploy' is an approval gate")),
     ).toBe(true);
   });
 
@@ -125,7 +125,7 @@ describe('runProofGate — failure cases', () => {
     };
     const result = runProofGate('schema-change', evidence);
     expect(result.status).toBe('fail');
-    expect(result.evidence.failures.some((f) => f.includes('check failure'))).toBe(true);
+    expect(result.allFailures.some((failure) => failure.includes('check failure'))).toBe(true);
   });
 
   it('fails when unresolvedRisks are present without founder acknowledgement', () => {
@@ -136,7 +136,7 @@ describe('runProofGate — failure cases', () => {
     const result = runProofGate('schema-change', evidence);
     expect(result.status).toBe('fail');
     expect(
-      result.evidence.failures.some((f) => f.includes('unresolved risk')),
+      result.allFailures.some((failure) => failure.includes('unresolved risk')),
     ).toBe(true);
   });
 
@@ -149,7 +149,7 @@ describe('runProofGate — failure cases', () => {
     };
     const result = runProofGate('schema-change', evidence);
     expect(result.status).toBe('fail');
-    expect(result.evidence.failures.length).toBeGreaterThanOrEqual(3);
+    expect(result.allFailures.length).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -175,12 +175,12 @@ describe('assertProofPassed', () => {
     try {
       assertProofPassed(result);
       expect.fail('Expected ProofGateError to be thrown');
-    } catch (err) {
-      expect(err).toBeInstanceOf(ProofGateError);
-      const gateErr = err as ProofGateError;
-      expect(gateErr.gateId).toBe('deploy');
-      expect(gateErr.failures.length).toBeGreaterThan(0);
-      expect(gateErr.message).toContain('PROOF GATE FAILED');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ProofGateError);
+      const gateError = error as ProofGateError;
+      expect(gateError.gateId).toBe('deploy');
+      expect(gateError.failures.length).toBeGreaterThan(0);
+      expect(gateError.message).toContain('PROOF GATE FAILED');
     }
   });
 });

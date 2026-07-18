@@ -13,6 +13,9 @@ app.listen(port, () => {
   console.log(`  GET  /projects/:slug`);
   console.log(`  POST /webhooks/github`);
   console.log(`  POST /approvals/:missionId/execute`);
+  console.log(`  GET  /terminal/:projectSlug/commands`);
+  console.log(`  POST /terminal/:projectSlug/run`);
+  console.log(`  POST /terminal/runs/:runId/cancel`);
 
   // Start the outbox worker and all periodic safety resyncs
   startScheduler();
