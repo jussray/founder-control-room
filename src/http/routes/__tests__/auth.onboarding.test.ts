@@ -90,6 +90,8 @@ function browserCookie() {
 describe('founder browser onboarding', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.NODE_ENV = 'test';
+    process.env.FOUNDER_API_URL = 'https://control.example.com';
     setAllowlist(true);
     mockSignInWithOtp.mockResolvedValue({ data: {}, error: null });
     mockGetUser.mockResolvedValue({
@@ -133,7 +135,7 @@ describe('founder browser onboarding', () => {
     expect(mockSignInWithOtp).not.toHaveBeenCalled();
   });
 
-  it('verifies fragment credentials and establishes one HttpOnly session cookie', async () => {
+  it('verifies fragment credentials and establishes one strict secure HttpOnly session cookie', async () => {
     mockSetSession.mockResolvedValue({
       data: { session: validSession(), user: { id: 'founder-user', email: EMAIL } },
       error: null,
@@ -148,8 +150,10 @@ describe('founder browser onboarding', () => {
     const cookie = response.headers['set-cookie']?.[0] ?? '';
     expect(cookie).toContain('fcr_session=');
     expect(cookie).toContain('HttpOnly');
-    expect(cookie).toContain('SameSite=Lax');
+    expect(cookie).toContain('SameSite=Strict');
+    expect(cookie).toContain('Secure');
     expect(cookie).not.toContain(ACCESS_TOKEN);
+    expect(response.headers['cache-control']).toBe('private, no-store');
   });
 
   it('rejects a valid Supabase session when the email is not allowlisted', async () => {
@@ -165,6 +169,7 @@ describe('founder browser onboarding', () => {
 
     expect(response.status).toBe(403);
     expect(response.headers['set-cookie']?.[0]).toContain('Max-Age=0');
+    expect(response.headers['cache-control']).toBe('private, no-store');
   });
 
   it('authenticates browser requests from the HttpOnly session cookie', async () => {
@@ -181,6 +186,7 @@ describe('founder browser onboarding', () => {
     const response = await request(app()).post('/auth/logout');
     expect(response.status).toBe(204);
     expect(response.headers['set-cookie']?.[0]).toContain('Max-Age=0');
+    expect(response.headers['cache-control']).toBe('private, no-store');
   });
 
   it('serves the fragment callback page when no custom token hash is present', async () => {
