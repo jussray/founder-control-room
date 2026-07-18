@@ -1,5 +1,16 @@
 # Founder Control Room Global AI Contract
 
+## Parent operating contract
+
+Before nontrivial work, read [`Juss Founder OS`](.ai/skills/juss-founder-os/SKILL.md).
+For Se’kret Bip acquisition, splash, preview, waiting-list, sponsorship, or social
+launch work, also read [`Juss Private Operating Plan`](docs/private/JUSS_PRIVATE_OPERATING_PLAN.md).
+
+The Founder OS is the private parent skill. This file specializes it for Founder
+Control Room. Repository-specific rules may become stricter, but they may not
+weaken founder authority, brand/IP protection, privacy, evidence, rollback,
+non-deletion, or truthfulness.
+
 This repository follows the shared Jussray founder operating stack:
 
 ```text
