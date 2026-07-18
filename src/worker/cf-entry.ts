@@ -22,6 +22,9 @@ interface WorkerEnv {
   FOUNDER_API_URL: string;
 }
 
+type WorkerFetch = NonNullable<ExportedHandler<WorkerEnv>['fetch']>;
+type WorkerResponse = Awaited<ReturnType<WorkerFetch>>;
+
 let appReady = false;
 
 function injectEnv(env: WorkerEnv): void {
@@ -48,7 +51,7 @@ const handler: ExportedHandler<WorkerEnv> = {
     const { createServer } = await import('../http/server.js');
     const app = createServer();
 
-    return new Promise((resolve, reject) => {
+    return new Promise<WorkerResponse>((resolve, reject) => {
       // Convert Workers Request → Node IncomingMessage-compatible object
       const url = new URL(request.url);
       const nodeReq = Object.assign(request, {
@@ -73,7 +76,15 @@ const handler: ExportedHandler<WorkerEnv> = {
             combined.set(chunk, offset);
             offset += chunk.length;
           }
-          resolve(new Response(combined, { status: nodeRes.statusCode, headers }));
+
+          // nodejs_compat exposes the Workers Response constructor at runtime.
+          // TypeScript also loads DOM Response, so the bridge needs one explicit
+          // cast to the handler's contextual response type.
+          const response = new Response(combined, {
+            status: nodeRes.statusCode,
+            headers,
+          }) as unknown as WorkerResponse;
+          resolve(response);
         },
         write: (chunk: Uint8Array) => {
           chunks.push(chunk);
