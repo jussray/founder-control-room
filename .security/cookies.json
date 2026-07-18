@@ -6,11 +6,29 @@
   "allowedCookieWriters": ["src/auth/founderSession.ts"],
   "cookies": [
     {
-      "name": "fcr_session",
+      "name": "__Host-fcr_session",
       "classification": "strictly_necessary",
-      "purpose": "Maintain the allowlisted founder's Supabase Auth browser session.",
+      "purpose": "Maintain the allowlisted founder's Supabase Auth browser session on HTTPS production and preview hosts.",
       "owner": "backend",
       "providers": ["supabase", "cloudflare"],
+      "environments": ["preview", "production"],
+      "sensitive": true,
+      "httpOnly": true,
+      "secure": "always",
+      "sameSite": "strict",
+      "path": "/",
+      "maxAgeSeconds": 2592000,
+      "cacheControl": "private, no-store",
+      "csrf": "Exact FOUNDER_API_URL origin and same-origin Fetch Metadata are required for browser mutations; explicit Bearer clients are not cookie-authenticated.",
+      "deletion": "Cleared by POST /auth/logout and by failed or disallowed session verification."
+    },
+    {
+      "name": "fcr_session",
+      "classification": "strictly_necessary",
+      "purpose": "Provide the localhost-only development equivalent where a Secure cookie cannot be set over plain HTTP.",
+      "owner": "backend",
+      "providers": ["supabase"],
+      "environments": ["development"],
       "sensitive": true,
       "httpOnly": true,
       "secure": "production",
@@ -18,16 +36,17 @@
       "path": "/",
       "maxAgeSeconds": 2592000,
       "cacheControl": "private, no-store",
-      "csrf": "Exact FOUNDER_API_URL origin is required for browser mutations; explicit Bearer clients are not cookie-authenticated.",
-      "deletion": "Cleared by POST /auth/logout and by failed or disallowed session verification."
+      "csrf": "Exact localhost FOUNDER_API_URL origin and same-origin Fetch Metadata are required for browser mutations.",
+      "deletion": "Cleared together with the production cookie name so environment transitions cannot leave an old session behind."
     }
   ],
   "nonCookieState": [],
   "externalCookieProviders": [],
   "prohibited": [
-    "analytics or advertising cookies",
+    "analytics, advertising, fingerprinting, replay, or cross-site tracking cookies",
     "client-readable founder auth tokens",
     "cross-project Se'kret Bip session reuse",
-    "caching any response that writes or refreshes the founder session"
+    "caching any response that writes or refreshes the founder session",
+    "cookies that authorize merge, deployment, migration, spending, or external communication"
   ]
 }
