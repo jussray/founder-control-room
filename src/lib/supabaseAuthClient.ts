@@ -1,16 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * Auth-only Supabase clients use the publishable key, never the service role.
- * A factory is exposed for request-scoped session establishment and refresh so
- * concurrent browser logins cannot share mutable in-memory auth state.
+ * Auth-only Supabase clients use a public publishable key, never the service
+ * role. SUPABASE_ANON_KEY remains a deployment-compatibility fallback while
+ * Worker secrets are migrated to the modern publishable-key name.
  */
 const url = process.env.SUPABASE_URL;
-const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+const publishableKey =
+  process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY;
 
 if (!url || !publishableKey) {
   throw new Error(
-    'Missing SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY — see .env.example',
+    'Missing SUPABASE_URL and a publishable auth key — see .env.example',
   );
 }
 
