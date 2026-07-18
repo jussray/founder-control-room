@@ -135,4 +135,18 @@ export class ProofGateController extends BaseController {
       message: assertError?.message ?? `Proof gate failed: ${gateResult.allFailures.join('; ')}`,
     };
   }
+
+  private noOp(
+    message: string,
+    status: ReconcileResult['status'] = 'converged',
+  ): ReconcileResult {
+    return {
+      status,
+      observedChanges: [],
+      proposedActions: [],
+      evidenceIds: [],
+      requiresApproval: false,
+      message,
+    };
+  }
 }
