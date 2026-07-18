@@ -1,10 +1,48 @@
 import type { ExportedHandler } from '@cloudflare/workers-types';
 import { describe, expect, it, vi } from 'vitest';
-import { composeWorkerHandler } from '../handler.js';
+import {
+  composeWorkerHandler,
+  validateWorkerEnv,
+  type ControlRoomWorkerEnv,
+} from '../handler.js';
 
 interface TestEnv {
   label: string;
 }
+
+const VALID_ENV: ControlRoomWorkerEnv = {
+  SUPABASE_URL: 'https://control-room.supabase.co',
+  SUPABASE_SERVICE_ROLE_KEY: 'service-role-test-key',
+  SUPABASE_ANON_KEY: 'anon-test-key',
+  GITHUB_WEBHOOK_SECRET: 'webhook-test-secret',
+  GITHUB_APP_ID: '12345',
+  GITHUB_PRIVATE_KEY: 'private-test-key',
+  FOUNDER_ALLOWED_ORIGINS: 'https://control.example.com,https://staging.control.example.com',
+  FOUNDER_API_URL: 'https://api.control.example.com',
+};
+
+describe('Cloudflare Worker binding validation', () => {
+  it('accepts complete absolute production bindings', () => {
+    expect(() => validateWorkerEnv(VALID_ENV)).not.toThrow();
+  });
+
+  it('reports every missing required binding in one failure', () => {
+    expect(() => validateWorkerEnv({ SUPABASE_URL: 'https://control-room.supabase.co' }))
+      .toThrow('Missing required Worker bindings: SUPABASE_SERVICE_ROLE_KEY');
+  });
+
+  it('rejects malformed service and callback URLs', () => {
+    expect(() => validateWorkerEnv({ ...VALID_ENV, FOUNDER_API_URL: 'not-a-url' }))
+      .toThrow('SUPABASE_URL and FOUNDER_API_URL must be absolute URLs');
+  });
+
+  it('rejects origins containing paths or invalid URLs', () => {
+    expect(() => validateWorkerEnv({
+      ...VALID_ENV,
+      FOUNDER_ALLOWED_ORIGINS: 'https://control.example.com/app,invalid-origin',
+    })).toThrow('FOUNDER_ALLOWED_ORIGINS must contain comma-separated absolute origins');
+  });
+});
 
 describe('Cloudflare Worker handler composition', () => {
   it('delegates fetch requests to Cloudflare\'s HTTP adapter', async () => {
