@@ -11,8 +11,11 @@ app.listen(port, () => {
   console.log(`  POST /auth/magic-link`);
   console.log(`  GET  /auth/callback`);
   console.log(`  GET  /projects/:slug`);
+  console.log(`  GET  /projects/:slug/files`);
+  console.log(`  GET  /projects/:slug/file`);
   console.log(`  POST /webhooks/github`);
   console.log(`  POST /approvals/:missionId/execute`);
+  console.log(`  POST /approvals/:missionId/patch`);
   console.log(`  GET  /terminal/:projectSlug/commands`);
   console.log(`  POST /terminal/:projectSlug/run`);
   console.log(`  POST /terminal/runs/:runId/cancel`);

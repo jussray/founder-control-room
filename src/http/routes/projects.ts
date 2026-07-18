@@ -84,3 +84,106 @@ projectsRouter.get("/:slug", requireFounder, async (req: FounderRequest, res) =>
     liveError,
   });
 });
+
+/**
+ * GET /projects/:slug/files?ref=&path=
+ *
+ * Founder-only read of repository directory contents at a ref. Defaults to
+ * the repo's live default branch when `ref` is omitted. Every read is
+ * audited to `project_events`, same as `GET /projects/:slug`.
+ */
+projectsRouter.get("/:slug/files", requireFounder, async (req: FounderRequest, res) => {
+  const { slug } = req.params;
+  const path = typeof req.query.path === "string" ? req.query.path : "";
+  const requestedRef = typeof req.query.ref === "string" ? req.query.ref : undefined;
+
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (projectError) return res.status(500).json({ error: projectError.message });
+  if (!project) return res.status(404).json({ error: `No project registered with slug "${slug}"` });
+  if (!project.repo_identifier) {
+    return res.status(503).json({ error: "Project has no repository configured.", code: "REPOSITORY_PROVIDER_UNAVAILABLE" });
+  }
+
+  let provider: RepositoryProvider;
+  try {
+    provider = providerForProject(project.repo_provider, project.slug, project.repo_identifier);
+  } catch (err) {
+    return res.status(503).json({ error: err instanceof Error ? err.message : "Repository provider unavailable" });
+  }
+
+  try {
+    const ref = requestedRef ?? (await provider.getProject(project.slug)).defaultBranch;
+    const entries = await provider.listFiles(project.slug, ref, path);
+
+    await supabase.from("project_events").insert({
+      project_id: project.id,
+      source_event_id: randomUUID(),
+      event_type: "project_files_read",
+      severity: "info",
+      screen: "control-room-api",
+      metadata: { route: `GET /projects/${slug}/files`, read_by: req.founder?.email, ref, path },
+    });
+
+    return res.json({ ref, path, entries });
+  } catch (err) {
+    return res.status(502).json({ error: err instanceof Error ? err.message : "Failed to list files" });
+  }
+});
+
+/**
+ * GET /projects/:slug/file?ref=&path=
+ *
+ * Founder-only read of a single file's content at a ref. `path` is required.
+ * Defaults to the repo's live default branch when `ref` is omitted.
+ */
+projectsRouter.get("/:slug/file", requireFounder, async (req: FounderRequest, res) => {
+  const { slug } = req.params;
+  const path = typeof req.query.path === "string" ? req.query.path : "";
+  const requestedRef = typeof req.query.ref === "string" ? req.query.ref : undefined;
+
+  if (!path.trim()) {
+    return res.status(400).json({ error: "path query parameter is required" });
+  }
+
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (projectError) return res.status(500).json({ error: projectError.message });
+  if (!project) return res.status(404).json({ error: `No project registered with slug "${slug}"` });
+  if (!project.repo_identifier) {
+    return res.status(503).json({ error: "Project has no repository configured.", code: "REPOSITORY_PROVIDER_UNAVAILABLE" });
+  }
+
+  let provider: RepositoryProvider;
+  try {
+    provider = providerForProject(project.repo_provider, project.slug, project.repo_identifier);
+  } catch (err) {
+    return res.status(503).json({ error: err instanceof Error ? err.message : "Repository provider unavailable" });
+  }
+
+  try {
+    const ref = requestedRef ?? (await provider.getProject(project.slug)).defaultBranch;
+    const content = await provider.readFile(project.slug, ref, path);
+
+    await supabase.from("project_events").insert({
+      project_id: project.id,
+      source_event_id: randomUUID(),
+      event_type: "project_file_read",
+      severity: "info",
+      screen: "control-room-api",
+      metadata: { route: `GET /projects/${slug}/file`, read_by: req.founder?.email, ref, path },
+    });
+
+    return res.json({ ref, path, content });
+  } catch (err) {
+    return res.status(502).json({ error: err instanceof Error ? err.message : "Failed to read file" });
+  }
+});

@@ -6,6 +6,7 @@ const {
   mockCreateBranch,
   mockResolveRef,
   mockIntegrate,
+  mockCommitPatch,
   mockEnqueue,
   mockControllerRun,
 } = vi.hoisted(() => ({
@@ -14,6 +15,7 @@ const {
   mockCreateBranch: vi.fn(),
   mockResolveRef: vi.fn(),
   mockIntegrate: vi.fn(),
+  mockCommitPatch: vi.fn(),
   mockEnqueue: vi.fn(),
   mockControllerRun: vi.fn(),
 }));
@@ -29,6 +31,7 @@ vi.mock('../../../providers/GitHubProvider.js', () => ({
     createBranch = mockCreateBranch;
     resolveRef = mockResolveRef;
     integrate = mockIntegrate;
+    commitPatch = mockCommitPatch;
   },
 }));
 
@@ -507,5 +510,152 @@ describe('reservation-first exact-head execution', () => {
     expect(reservationInsert).toHaveBeenCalled();
     expect(mockCreateBranch).toHaveBeenCalledWith('test-project', 'main', 'mission/test');
     expect(auditUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'succeeded' }));
+  });
+});
+
+describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.GITHUB_TOKEN = 'test-token';
+    authSuccess();
+  });
+
+  function missionRow(overrides: Record<string, unknown> = {}) {
+    return {
+      select: () => ({
+        eq: () => ({
+          single: () => Promise.resolve({
+            data: {
+              id: MISSION_ID,
+              project_id: PROJECT_ID,
+              status: 'sandboxed',
+              branch_ref: 'mission/test',
+              ...overrides,
+            },
+            error: null,
+          }),
+        }),
+      }),
+    };
+  }
+
+  function projectRow() {
+    return {
+      select: () => ({
+        eq: () => ({
+          single: () => Promise.resolve({
+            data: { id: PROJECT_ID, slug: 'test-project', repo_provider: 'github', repo_identifier: 'jussray/test-project' },
+            error: null,
+          }),
+        }),
+      }),
+    };
+  }
+
+  function wireStandardTables(missionOverrides: Record<string, unknown> = {}, projectEventInsert = vi.fn(() => Promise.resolve({ error: null }))) {
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'missions') return missionRow(missionOverrides);
+      if (table === 'projects') return projectRow();
+      if (table === 'project_events') return { insert: projectEventInsert };
+      return {};
+    });
+    return { projectEventInsert };
+  }
+
+  it('rejects a missing message', async () => {
+    wireStandardTables();
+    const res = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/patch`)
+      .set('Authorization', BEARER)
+      .send({ changes: [{ path: 'a.txt', content: 'hi' }] });
+    expect(res.status).toBe(400);
+    expect(mockCommitPatch).not.toHaveBeenCalled();
+  });
+
+  it('rejects an empty changes array', async () => {
+    wireStandardTables();
+    const res = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/patch`)
+      .set('Authorization', BEARER)
+      .send({ message: 'edit', changes: [] });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a path-traversal attempt', async () => {
+    wireStandardTables();
+    const res = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/patch`)
+      .set('Authorization', BEARER)
+      .send({ message: 'edit', changes: [{ path: '../../etc/passwd', content: 'x' }] });
+    expect(res.status).toBe(400);
+    expect(mockCommitPatch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-delete change with no content', async () => {
+    wireStandardTables();
+    const res = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/patch`)
+      .set('Authorization', BEARER)
+      .send({ message: 'edit', changes: [{ path: 'a.txt' }] });
+    expect(res.status).toBe(400);
+    expect(mockCommitPatch).not.toHaveBeenCalled();
+  });
+
+  it('refuses to patch a mission that has not been sandboxed yet', async () => {
+    wireStandardTables({ status: 'proposed', branch_ref: null });
+    const res = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/patch`)
+      .set('Authorization', BEARER)
+      .send({ message: 'edit', changes: [{ path: 'a.txt', content: 'hi' }] });
+    expect(res.status).toBe(409);
+    expect(mockCommitPatch).not.toHaveBeenCalled();
+  });
+
+  it('refuses to patch a mission that has already integrated (no editing after merge)', async () => {
+    wireStandardTables({ status: 'integrated' });
+    const res = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/patch`)
+      .set('Authorization', BEARER)
+      .send({ message: 'edit', changes: [{ path: 'a.txt', content: 'hi' }] });
+    expect(res.status).toBe(409);
+    expect(mockCommitPatch).not.toHaveBeenCalled();
+  });
+
+  it('commits the patch to the mission branch and audits it — never touches base_ref', async () => {
+    const { projectEventInsert } = wireStandardTables();
+    mockCommitPatch.mockResolvedValue('deadbeef'.repeat(5));
+
+    const res = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/patch`)
+      .set('Authorization', BEARER)
+      .send({
+        message: 'Fix the thing',
+        changes: [{ path: 'src/example.ts', content: 'export const x = 1;' }],
+      });
+
+    expect(res.status).toBe(201);
+    expect(mockCommitPatch).toHaveBeenCalledWith(
+      'test-project',
+      'mission/test',
+      expect.objectContaining({ message: 'Fix the thing' }),
+    );
+    // The branch argument must be the mission's sandbox branch, never "main".
+    expect(mockCommitPatch.mock.calls[0][1]).not.toBe('main');
+    expect(projectEventInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ event_type: 'mission_patch_committed' }),
+    );
+  });
+
+  it('surfaces a provider failure as 502 without treating it as success', async () => {
+    wireStandardTables();
+    mockCommitPatch.mockRejectedValue(new Error('branch moved'));
+
+    const res = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/patch`)
+      .set('Authorization', BEARER)
+      .send({ message: 'edit', changes: [{ path: 'a.txt', content: 'hi' }] });
+
+    expect(res.status).toBe(502);
   });
 });
