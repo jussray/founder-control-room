@@ -43,16 +43,34 @@ Classification: `workflow_step_failure`
 
 This changed the actionable next step from waiting for runner recovery to repairing the smallest demonstrated source and test-contract defects.
 
-## Demonstrated unit root causes
+## Demonstrated root causes
 
-The retained test artifact reported 21 failed tests across four suites.
+The first retained unit artifact reported 21 failed tests across four suites.
 
 1. Proof-gate tests read generated failures from `result.evidence.failures`, although the canonical immutable ledger is `result.allFailures`.
 2. CORS tests used a variable dynamic import query unsupported by the Vitest transform and depended on a private field from the `cors` middleware package.
 3. Approval-route tests referenced top-level variables inside hoisted `vi.mock` factories.
 4. Terminal-route tests had the same hoisted-factory defect.
 
-The guarded terminal contract itself passed. The evidence therefore does not support rewriting terminal runtime behavior.
+A conflict-independent proof driver then verified immutable recovery payload head `a91c001bed76fb97700b568f0daa5eea4e382dba` in run `29626029420`.
+
+- Exact Target Metadata `88030504936` passed.
+- Guarded Terminal and AI Contracts `88030504944` passed.
+- Typecheck `88030504927` executed and failed.
+- Lint `88030504953` executed and failed.
+- Unit Tests `88030504942` executed and failed.
+- Production Build `88030504946` executed and failed.
+- Migration Lint Evidence `88030504926` executed and failed.
+
+The retained diagnostics established:
+
+- Typecheck and build had the same contract drift: missing `ReconcileRequest.meta`, missing `ProofGateController.noOp`, invalid chained Supabase RPC usage, an unsupported `founder_triggered` reason, Cloudflare handler parameter conflicts, and outbox attempt-name drift.
+- `helmet`, `cors`, and `express-rate-limit` were imported but absent from the package manifest and lockfile.
+- Lint had three real unused-symbol errors plus 29 warnings. The script converted warnings into failures with `--max-warnings 0` despite the ESLint policy intentionally classifying those rules as warnings.
+- Migration lint did not inspect SQL. It failed while connecting to a local Postgres instance that the workflow never started. That result is infrastructure/configuration evidence, not migration-regression evidence.
+- The second unit artifact reported 14 CORS failures caused by the undeclared security packages and nine approval-route five-second timeouts caused by non-constructable class doubles. Other suites passed.
+
+The guarded terminal contract itself passed throughout. The evidence does not support rewriting terminal runtime behavior.
 
 ## Recovery slice
 
@@ -60,14 +78,23 @@ Branch: `agent/pr35-ci-recovery`
 
 Draft pull request: `#43 Fix PR #35 exact-head CI contract failures`
 
-The first published recovery head was `d599c1d7310a3c725989423c559e2030cf788c0b`. Every later commit creates a new exact head and invalidates older verification for merge purposes.
+Verification-only driver: draft PR `#44 Verify PR #35 recovery at immutable target SHA`. The driver must not be merged.
 
-The slice:
+The slice now:
 
 - updates proof-gate assertions to use `allFailures` without mutating caller evidence;
-- tests CORS through the exported Express middleware and literal module reloads;
-- moves approval and terminal route doubles into `vi.hoisted` factories;
+- tests CORS through exported Express middleware and literal module reloads;
+- replaces undeclared security middleware dependencies with local typed CORS, security-header, and rate-limit middleware;
+- makes approval and terminal route doubles Vitest-hoist-safe, with constructable class doubles where production code uses `new`;
+- adds founder-triggered request metadata to the reconciliation contract;
+- restores the ProofGateController no-op result contract;
+- separates provider-event state updates from RPC attempt increments;
+- aligns the reconciler with the persisted `attempt_count` shape without passing an unused request field;
+- uses contextual Cloudflare Worker handler types;
+- keeps ESLint warnings visible but non-blocking while preserving all error-level enforcement;
 - preserves authentication, exact-head, idempotency, fail-closed, and no-carry-forward approval behavior.
+
+Every new commit creates a new exact head and invalidates older verification for merge purposes.
 
 ## Authority and non-actions
 
@@ -83,17 +110,23 @@ This recovery slice does not:
 
 ## Acceptance gates
 
-The recovery head must execute and pass:
+The final recovery head must execute and pass:
 
 1. Typecheck
 2. Lint
 3. Unit Tests
 4. Guarded Terminal and AI Skill Contracts
-5. Migration lint
-6. Production Build
+5. Production Build
 
-Any job with no executed steps remains infrastructure evidence. Any executed failing step remains a code or configuration defect until corrected and rerun at the exact head.
+Migration lint must either:
+
+- start a local Supabase/Postgres stack before `supabase db lint --local`; or
+- use another supported database target and clearly label the evidence.
+
+Until then, its connection failure is not a SQL verdict and cannot block on the claim of a migration regression.
+
+Any job with no executed steps remains infrastructure evidence. Any executed failing source step remains a code or configuration defect until corrected and rerun at the exact head.
 
 ## Rollback
 
-Delete the child branch or close its draft pull request. The parent PR #35 remains untouched, the production database remains unchanged, and no deployment state changes.
+Delete the child branch or close draft PR #43. Close verification-only PR #44 after evidence capture. The parent PR #35 remains untouched, the production database remains unchanged, and no deployment state changes.
