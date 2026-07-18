@@ -1,8 +1,9 @@
 /**
  * GitHub webhook endpoint.
  *
- * Validates HMAC-SHA256 signature → persists to inbox → enqueues targeted
- * reconciliation. Responds 200 immediately; all processing is async.
+ * Validates HMAC-SHA256 signature → parses the verified raw body → persists to
+ * inbox → enqueues targeted reconciliation. Responds 200 immediately; all
+ * reconciliation processing is async.
  *
  * Supported events:
  *   check_run, pull_request, push, workflow_run, deployment, deployment_status
@@ -33,17 +34,33 @@ function verifySignature(secret: string, body: Buffer, sig: string): boolean {
   }
 }
 
-/** Resolve project_id from the repository full_name stored in connections */
-async function resolveProject(
-  repoFullName: string,
-): Promise<string | null> {
-  const { data } = await supabase
+function parseVerifiedPayload(body: Buffer): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(body.toString('utf8')) as unknown;
+    return parsed && typeof parsed === 'object'
+      ? parsed as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Resolve project_id from the live project_connections schema. */
+async function resolveProject(repoFullName: string): Promise<string | null> {
+  const { data, error } = await supabase
     .from('project_connections')
     .select('project_id')
-    .eq('provider', 'github')
-    .filter('connection_config->>repository', 'eq', repoFullName)
+    .eq('connection_type', 'git')
+    .eq('status', 'active')
+    .filter('config->>repository', 'eq', repoFullName)
     .limit(1)
     .maybeSingle();
+
+  if (error) {
+    console.error('Project connection lookup failed', error);
+    return null;
+  }
+
   return data?.project_id ?? null;
 }
 
@@ -80,21 +97,37 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
     return;
   }
 
+  const rawBody = req.body;
+  if (!Buffer.isBuffer(rawBody)) {
+    res.status(400).json({ error: 'Webhook body must be raw JSON bytes' });
+    return;
+  }
+
   const sig = req.headers['x-hub-signature-256'] as string | undefined;
-  if (!sig || !verifySignature(secret, req.body as Buffer, sig)) {
+  if (!sig || !verifySignature(secret, rawBody, sig)) {
     res.status(401).json({ error: 'Invalid signature' });
     return;
   }
 
-  const eventType = req.headers['x-github-event'] as string;
-  const deliveryId = req.headers['x-github-delivery'] as string;
+  const payload = parseVerifiedPayload(rawBody);
+  if (!payload) {
+    res.status(400).json({ error: 'Invalid JSON payload' });
+    return;
+  }
+
+  const eventType = req.headers['x-github-event'] as string | undefined;
+  const deliveryId = req.headers['x-github-delivery'] as string | undefined;
+
+  if (!eventType || !deliveryId) {
+    res.status(400).json({ error: 'Missing GitHub event or delivery identifier' });
+    return;
+  }
 
   if (!SUPPORTED_EVENTS.has(eventType)) {
     res.status(200).json({ accepted: false, reason: 'unsupported event type' });
     return;
   }
 
-  const payload = req.body as Record<string, unknown>;
   const repo = payload['repository'] as Record<string, unknown> | undefined;
   const repoFullName = repo?.['full_name'] as string | undefined;
 
@@ -105,7 +138,7 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
 
   const projectId = await resolveProject(repoFullName);
   if (!projectId) {
-    // Not a registered project – silently accept to avoid GitHub retries
+    // Not a registered project – silently accept to avoid GitHub retries.
     res.status(200).json({ accepted: false, reason: 'unregistered repository' });
     return;
   }
@@ -116,7 +149,7 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
     return;
   }
 
-  // 1. Persist to inbox (dedup on provider + deliveryId)
+  // 1. Persist to inbox (dedup on provider + deliveryId).
   let inboxResult;
   try {
     inboxResult = await persistProviderEvent({
@@ -139,7 +172,7 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
     return;
   }
 
-  // 2. Enqueue targeted reconciliation (with 500ms debounce for burst events)
+  // 2. Enqueue targeted reconciliation (with 500ms debounce for burst events).
   try {
     await enqueueReconcile(
       {
@@ -153,7 +186,7 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
     );
   } catch (err) {
     console.error('Outbox enqueue failed', err);
-    // Still 200 – event is safely in inbox and can be replayed
+    // Still 200 – event is safely in inbox and can be replayed.
   }
 
   res.status(200).json({ accepted: true, eventId: inboxResult.id });
