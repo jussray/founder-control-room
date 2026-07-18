@@ -58,6 +58,10 @@ The guarded terminal contract itself passed. The evidence therefore does not sup
 
 Branch: `agent/pr35-ci-recovery`
 
+Draft pull request: `#43 Fix PR #35 exact-head CI contract failures`
+
+The first published recovery head was `d599c1d7310a3c725989423c559e2030cf788c0b`. Every later commit creates a new exact head and invalidates older verification for merge purposes.
+
 The slice:
 
 - updates proof-gate assertions to use `allFailures` without mutating caller evidence;
