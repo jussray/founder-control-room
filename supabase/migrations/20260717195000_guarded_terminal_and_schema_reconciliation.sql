@@ -199,7 +199,28 @@ comment on table terminal_runs is
   'Founder-authenticated, project-scoped command evidence. No arbitrary shell commands or unbounded output.';
 
 -- -----------------------------------------------------------------------------
--- 5. Register the private hair control repository as its own trust boundary.
+-- 5. Ensure repository verification columns exist on a fresh database.
+--    The live project already has these columns from federated verification.
+-- -----------------------------------------------------------------------------
+alter table projects
+  add column if not exists verification_enabled boolean not null default true,
+  add column if not exists verification_cadence_minutes integer not null default 15;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'projects'::regclass
+      and conname = 'projects_verification_cadence_minutes_check'
+  ) then
+    alter table projects
+      add constraint projects_verification_cadence_minutes_check
+      check (verification_cadence_minutes between 5 and 1440);
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- 6. Register the private hair control repository as its own trust boundary.
 -- -----------------------------------------------------------------------------
 insert into projects (
   slug,

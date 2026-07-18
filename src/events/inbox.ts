@@ -86,11 +86,23 @@ export async function markEventFailed(
   eventId: string,
   error: string,
 ): Promise<void> {
-  await supabase
+  const { error: updateError } = await supabase
     .from('provider_events')
     .update({
       processing_status: 'failed',
       last_error: error,
     })
-    .rpc('increment_attempt_count', { row_id: eventId });
+    .eq('id', eventId);
+
+  if (updateError) {
+    throw new Error(`Failed to mark provider event failed: ${updateError.message}`);
+  }
+
+  const { error: incrementError } = await supabase.rpc('increment_attempt_count', {
+    row_id: eventId,
+  });
+
+  if (incrementError) {
+    throw new Error(`Failed to increment provider event attempts: ${incrementError.message}`);
+  }
 }

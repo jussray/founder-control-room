@@ -1,26 +1,23 @@
 /**
- * Transactional controller outbox.
+ * Durable controller work queue.
  *
- * Reconcile work is enqueued in the same logical operation as state updates,
- * preventing the "saved to DB but crashed before queuing" split-brain problem.
+ * Provider delivery deduplication belongs in provider_events. Each legitimate
+ * reconciliation request receives its own outbox row so completed history,
+ * retries, and events arriving during active work cannot overwrite one another.
  *
- * Workers claim entries atomically via FOR UPDATE SKIP LOCKED.
+ * Workers claim entries atomically via FOR UPDATE SKIP LOCKED. Completion and
+ * terminal abandonment also update linked provider-event state atomically.
  */
 
 import { supabase } from '../lib/supabaseClient.js';
 import type { OutboxEntry } from '../reconciliation/types.js';
 
 export interface EnqueueOptions {
-  /** Delay processing until this ISO timestamp (for debounce coalescing) */
+  /** Delay processing until this ISO timestamp. */
   availableAt?: string;
 }
 
-/**
- * Enqueue a reconcile request.
- * Coalesces: if an identical (project_id, controller, resource_id) entry
- * already exists and is unclaimed, it updates available_at instead of
- * inserting a duplicate.
- */
+/** Enqueue one durable reconciliation request. */
 export async function enqueueReconcile(
   entry: OutboxEntry,
   opts: EnqueueOptions = {},
@@ -29,26 +26,21 @@ export async function enqueueReconcile(
 
   const { data, error } = await supabase
     .from('controller_outbox')
-    .upsert(
-      {
-        project_id: entry.projectId,
-        controller: entry.controller,
-        resource_id: entry.resourceId ?? null,
-        reason: entry.reason,
-        source_event_id: entry.sourceEventId ?? null,
-        available_at: availableAt,
-        attempt_count: 0,
-      },
-      {
-        onConflict: 'project_id,controller,resource_id',
-        ignoreDuplicates: false, // update available_at on conflict
-      },
-    )
+    .insert({
+      project_id: entry.projectId,
+      controller: entry.controller,
+      resource_id: entry.resourceId ?? null,
+      reason: entry.reason,
+      source_event_id: entry.sourceEventId ?? null,
+      available_at: availableAt,
+      attempt_count: 0,
+    })
     .select('id')
     .single();
 
   if (error) throw new Error(`Failed to enqueue reconcile: ${error.message}`);
-  return data!.id;
+  if (!data?.id) throw new Error('Failed to enqueue reconcile: insert returned no id');
+  return String(data.id);
 }
 
 export interface ClaimedWork {
@@ -80,13 +72,40 @@ export async function claimWork(limit = 10): Promise<ClaimedWork[]> {
   }));
 }
 
-export async function completeWork(id: string): Promise<void> {
-  await supabase
-    .from('controller_outbox')
-    .update({ completed_at: new Date().toISOString(), claimed_at: null })
-    .eq('id', id);
+/** Atomically complete work and mark its source provider event processed. */
+export async function completeWork(
+  id: string,
+  sourceEventId?: string | null,
+): Promise<void> {
+  const { error } = await supabase.rpc('complete_outbox_work', {
+    p_id: id,
+    p_source_event_id: sourceEventId ?? null,
+  });
+
+  if (error) throw new Error(`Failed to complete outbox work: ${error.message}`);
 }
 
-export async function failWork(id: string, error: string): Promise<void> {
-  await supabase.rpc('fail_outbox_work', { p_id: id, p_error: error });
+/** Reschedule retryable work using database-side attempt increment and backoff. */
+export async function failWork(id: string, errorMessage: string): Promise<void> {
+  const { error } = await supabase.rpc('fail_outbox_work', {
+    p_id: id,
+    p_error: errorMessage,
+  });
+
+  if (error) throw new Error(`Failed to reschedule outbox work: ${error.message}`);
+}
+
+/** Atomically stop poison work and mark its source provider event failed. */
+export async function abandonWork(
+  id: string,
+  sourceEventId: string | null,
+  errorMessage: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('abandon_outbox_work', {
+    p_id: id,
+    p_source_event_id: sourceEventId,
+    p_error: errorMessage,
+  });
+
+  if (error) throw new Error(`Failed to abandon outbox work: ${error.message}`);
 }

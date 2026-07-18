@@ -9,6 +9,7 @@ export type ReconcileReason =
   | 'manifest_changed'
   | 'manual_refresh'
   | 'dependency_changed'
+  | 'founder_triggered'
   | 'recovery'
   | 'startup';
 
@@ -48,6 +49,8 @@ export interface ReconcileRequest {
   resourceId?: string;
   reason: ReconcileReason;
   sourceEventId?: string;
+  /** Controller-specific, non-authoritative request context. */
+  meta?: Record<string, unknown>;
   /** ISO timestamp – do not process before this time (for debounce / delay) */
   availableAt?: string;
 }

@@ -1,14 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockGetUser = vi.fn();
+const { mockGetUser, supabaseMock, mockEnqueue } = vi.hoisted(() => ({
+  mockGetUser: vi.fn(),
+  supabaseMock: { from: vi.fn() },
+  mockEnqueue: vi.fn(),
+}));
+
 vi.mock('../../../lib/supabaseAuthClient.js', () => ({
   supabaseAuth: { auth: { getUser: mockGetUser } },
 }));
 
-const supabaseMock = { from: vi.fn() };
 vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
 
-const mockEnqueue = vi.fn();
 vi.mock('../../../events/outbox.js', () => ({ enqueueReconcile: mockEnqueue }));
 
 import express from 'express';
