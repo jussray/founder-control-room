@@ -16,6 +16,9 @@ app.listen(port, () => {
   console.log(`  GET  /terminal/:projectSlug/commands`);
   console.log(`  POST /terminal/:projectSlug/run`);
   console.log(`  POST /terminal/runs/:runId/cancel`);
+  console.log(`  GET  /dashboard/tasks`);
+  console.log(`  GET  /dashboard/activity`);
+  console.log(`  POST /dashboard/manual-analysis`);
 
   // Start the outbox worker and all periodic safety resyncs
   startScheduler();
