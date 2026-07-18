@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  TARGET_SHA: a91c001bed76fb97700b568f0daa5eea4e382dba
+  TARGET_SHA: 9cc76561a87ec227e1904c521a40e870a191df2e
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -159,7 +159,6 @@ jobs:
   migration-lint:
     name: Target Migration Lint Evidence
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -169,11 +168,15 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
-      - name: Run migration lint with retained diagnostics
+      - name: Start local database and lint migrations
         shell: bash
         run: |
           set -o pipefail
-          supabase db lint --local 2>&1 | tee migration-lint.log
+          {
+            test -f supabase/config.toml || supabase init
+            supabase db start
+            supabase db lint --local --fail-on error
+          } 2>&1 | tee migration-lint.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -181,3 +184,6 @@ jobs:
           path: migration-lint.log
           if-no-files-found: error
           retention-days: 7
+      - name: Stop local database
+        if: always()
+        run: supabase stop --no-backup
