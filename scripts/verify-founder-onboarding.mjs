@@ -24,7 +24,7 @@ requireText('auth', 'generic enumeration-safe response', 'GENERIC_MAGIC_LINK_MES
 requireText('session', 'production host cookie', "'__Host-fcr_session'");
 requireText('session', 'HttpOnly cookie', 'HttpOnly');
 requireText('session', 'same-site cookie', 'SameSite=Lax');
-requireText('session', 'production Secure cookie', "production ? '; Secure' : ''");
+requireText('session', 'production Secure cookie', "secure ? '; Secure' : ''");
 requireText('session', 'private no-store response', "'Cache-Control', 'private, no-store'");
 requireText('middleware', 'Bearer compatibility', 'bearerToken(req)');
 requireText('middleware', 'browser cookie auth', 'readFounderSession(req)');
