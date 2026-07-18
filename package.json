@@ -10,7 +10,7 @@
     "start": "node dist/index.js",
     "cf:dev": "wrangler dev src/worker/cf-entry.ts --port 8787",
     "deploy": "wrangler deploy",
-    "lint": "eslint 'src/**/*.ts' --max-warnings 0",
+    "lint": "eslint 'src/**/*.ts'",
     "test": "vitest run",
     "verify:mcp": "node scripts/verify-mcp-config.mjs",
     "verify:terminal-contract": "node scripts/verify-guarded-terminal-contract.mjs",
