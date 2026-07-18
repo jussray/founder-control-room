@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "repository": "jussray/founder-control-room",
+  "runtimeClass": "server_web_app",
+  "firstPartyCookies": [
+    {
+      "name": "__Host-fcr_session",
+      "purpose": "Hold the founder's Supabase access and refresh tokens for the same-origin server-rendered Control Room session.",
+      "classification": "strictly_necessary",
+      "owner": "backend",
+      "httpOnly": true,
+      "secureInProduction": true,
+      "sameSite": "Lax",
+      "path": "/",
+      "maxAgeSeconds": 2592000,
+      "source": "src/auth/founderSession.ts",
+      "environments": ["production"]
+    },
+    {
+      "name": "fcr_session",
+      "purpose": "Localhost-only development equivalent of the founder session cookie where Secure cookies cannot be used over plain HTTP.",
+      "classification": "strictly_necessary",
+      "owner": "backend",
+      "httpOnly": true,
+      "secureInProduction": true,
+      "sameSite": "Lax",
+      "path": "/",
+      "maxAgeSeconds": 2592000,
+      "source": "src/auth/founderSession.ts",
+      "environments": ["development"]
+    }
+  ],
+  "platformManagedCookies": [],
+  "browserStorage": [],
+  "forbidden": [
+    "analytics, advertising, fingerprinting, or cross-site tracking cookies",
+    "client-readable founder access or refresh tokens",
+    "cookie-authenticated mutations without same-origin validation",
+    "cached responses containing Set-Cookie or founder-specific content",
+    "cookies that authorize merge, deployment, migration, spending, or external communication"
+  ],
+  "notes": [
+    "Every request still validates the Supabase user and the private founder_users allowlist.",
+    "Bearer-token API access remains supported and does not depend on browser cookies.",
+    "Login authorizes access only; every consequential action keeps its separate founder approval gate."
+  ]
+}
