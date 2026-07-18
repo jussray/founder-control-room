@@ -1,6 +1,8 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-07-18",
+  "reviewedAgainstPublicGuidanceAt": "2026-07-17",
+  "mission": "Generate lawful, attributable revenue from permission-based conversations while preserving founder authority, brand, privacy, consent, and project separation.",
   "defaultAutomationMode": "draft_only",
   "supportedAutomationModes": [
     "observe_only",
@@ -9,6 +11,31 @@
     "approved_sequence",
     "trusted_rules"
   ],
+  "revenueAccounting": {
+    "recognizedRevenueState": "payment_collected",
+    "separateStates": [
+      "attention",
+      "permission",
+      "conversation",
+      "qualified",
+      "booked",
+      "invoiced",
+      "pledged",
+      "payment_collected",
+      "refunded",
+      "charged_back",
+      "retained",
+      "referred"
+    ],
+    "forbidReportingAsCollected": [
+      "waitlist_joined",
+      "lead_created",
+      "projected_value",
+      "booked_value",
+      "invoice_sent",
+      "sponsorship_pledged"
+    ]
+  },
   "globalRules": {
     "coldOutreachEnabled": false,
     "humanApprovalRequiredForNewCampaign": true,
@@ -18,10 +45,14 @@
     "sensitiveDataSalesUseEnabled": false,
     "purchasedScrapedOrInferredListsAllowed": false,
     "projectSpecificConsentRequired": true,
+    "purposeSpecificConsentRequired": true,
+    "proofOfConsentRequired": true,
     "globalSuppressionOverridesCampaigns": true,
     "automationDisclosureRequired": true,
     "legalPolicyGateRequired": true,
     "providerPolicyEvidenceRequired": true,
+    "claimEvidenceRequired": true,
+    "auditAndIdempotencyRequiredBeforeDispatch": true,
     "recordingDefaultEnabled": false,
     "transcriptionDefaultEnabled": false,
     "syntheticVoiceDefaultEnabled": false,
@@ -31,18 +62,44 @@
     "requiredChecks": [
       "sender_identity_verified",
       "project_and_purpose_known",
+      "recipient_identity_sufficiently_resolved",
       "consent_or_valid_inbound_context_verified",
-      "channel_window_verified",
-      "global_and_channel_suppression_clear",
+      "consent_evidence_retained",
+      "channel_window_or_approved_template_verified",
+      "global_project_channel_and_campaign_suppression_clear",
       "age_and_sensitive_data_boundary_clear",
       "jurisdiction_rules_resolved",
-      "content_and_offer_approved",
+      "quiet_hours_resolved",
+      "sender_campaign_or_telemarketer_registration_resolved",
+      "content_offer_and_claims_approved",
       "required_disclosures_present",
       "opt_out_path_verified",
+      "frequency_budget_and_kill_switch_present",
       "retention_and_audit_policy_present",
-      "provider_terms_and_permissions_current"
+      "provider_terms_and_permissions_current",
+      "idempotency_and_dispatch_audit_ready"
     ],
     "failClosedOnUnknown": true,
+    "denyStates": [
+      "unknown",
+      "conflict",
+      "expired",
+      "missing_evidence"
+    ],
+    "pennsylvaniaTelemarketing": {
+      "outboundSalesCallsEnabled": false,
+      "requiredBeforeEnablement": [
+        "qualified_counsel_registration_or_exemption_decision",
+        "pennsylvania_telemarketer_registration_status",
+        "bonding_or_deposit_status_if_required",
+        "pennsylvania_do_not_call_subscription_and_screening_status",
+        "national_do_not_call_screening_status",
+        "internal_do_not_call_process",
+        "calling_hours_and_disclosure_policy",
+        "artificial_prerecorded_or_synthetic_voice_consent_policy",
+        "recording_and_transcription_consent_policy"
+      ]
+    },
     "requiresQualifiedLegalReviewBefore": [
       "broad_automated_marketing",
       "outbound_prerecorded_or_ai_voice_sales_calls",
@@ -51,6 +108,29 @@
       "sensitive_data_processing",
       "multi_jurisdiction_campaigns",
       "paid_reservations_or_custom_financial_terms"
+    ]
+  },
+  "projectBoundary": {
+    "crossProjectConsentReuse": false,
+    "probabilisticIdentityAutoMerge": false,
+    "sekretBipAllowedData": [
+      "waitlist_status",
+      "founding_preview_participation",
+      "sponsor_interest",
+      "referral_source",
+      "account_communication_preference",
+      "launch_update_permission",
+      "product_feedback_permission"
+    ],
+    "sekretBipProhibitedData": [
+      "journal",
+      "voice_note",
+      "companion_chat",
+      "safety_event",
+      "emotional_state",
+      "health_data",
+      "parent_visible_content",
+      "private_activity_history"
     ]
   },
   "channels": {
@@ -156,6 +236,7 @@
         "stop_help_and_equivalent_keyword_handling",
         "quiet_hours_and_frequency_caps",
         "accurate_sender_identity",
+        "reassigned_number_check_where_applicable",
         "delivery_and_failure_evidence"
       ]
     },
@@ -169,9 +250,10 @@
       "syntheticVoiceDefaultEnabled": false,
       "requirements": [
         "caller_identity_and_purpose_disclosure",
-        "do_not_call_and_entity_suppression_checks",
+        "pennsylvania_registration_or_exemption_decision",
+        "federal_state_and_internal_do_not_call_checks",
         "permissible_calling_hours",
-        "consent_for_prerecorded_or_automated_telemarketing",
+        "consent_for_prerecorded_automated_or_synthetic_voice_telemarketing",
         "jurisdiction_specific_recording_consent",
         "recording_and_transcription_disclosure",
         "human_escalation",
@@ -203,5 +285,16 @@
         "supported_social_and_messaging_channels"
       ]
     }
-  }
+  },
+  "forbidden": [
+    "unrestricted_autonomous_outreach",
+    "purchased_scraped_or_inferred_lists",
+    "cross_project_targeting_without_permission",
+    "sensitive_vulnerability_targeting",
+    "deceptive_claims_testimonials_or_scarcity",
+    "carrier_or_platform_evasion",
+    "hidden_automation_impersonation",
+    "dispatch_without_audit",
+    "reporting_uncollected_value_as_revenue"
+  ]
 }
