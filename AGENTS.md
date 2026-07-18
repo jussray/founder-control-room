@@ -115,6 +115,12 @@ Before triggering a deploy, verify the full checklist in that file. Key secrets 
 - Merge when appropriate under `docs/FOUNDER_MERGE_AUTHORITY.md`. Do not deploy, roll back, alter auth/RLS, contact external parties, publish externally, change commercial terms, spend funds, or perform destructive writes without explicit founder approval for that exact action.
 - Apply repository-specific skills when acting on managed projects; portfolio rules never replace local product, privacy, verification, sales, brand/IP, Supabase, Product Design, or rollback contracts.
 
+## Figma build and implementation
+
+For every Figma, dashboard design, design-system, design-to-code, Code Connect, prototype, or visual QA task, also read `.agents/skills/figma-build-implement/SKILL.md` and `.figma/repository-profile.json`.
+
+Figma is a founder specification and review surface. It cannot create mission truth, evidence provenance, provider truth, approval authority, migration state, integration proof, deployment proof, or rollback authority. Use only synthetic or sanitized operational data.
+
 ## Evidence report
 
 List files changed, behavior changed, tests run, Playwright result or inapplicability, failures or skips, security impact, provider impact, Supabase impact, Product Design evidence status, commercial assumptions, disqualifiers, brand/IP impact, Cloudflare/Control Room proof when applicable, rollback, unresolved risk, and next gate.
