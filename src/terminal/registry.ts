@@ -100,9 +100,9 @@ export const TERMINAL_COMMANDS: readonly TerminalCommandSpec[] = [
   ...gitReadCommands('sekret-bip', 'Sekret-Bip'),
   cookieVerification('sekret-bip', 'Sekret-Bip'),
 
-  ...gitReadCommands('l99-story-engine', 'l99-StoryEngine'),
+  ...gitReadCommands('l99', 'l99-StoryEngine'),
   cookieVerification(
-    'l99-story-engine',
+    'l99',
     'l99-StoryEngine',
     'python',
     ['runtime/promotion_gates_all.py'],
