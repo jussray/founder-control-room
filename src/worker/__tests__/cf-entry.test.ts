@@ -56,7 +56,7 @@ describe('Cloudflare Worker handler composition', () => {
     const ctx = {} as never;
 
     if (!handler.fetch) throw new Error('fetch handler is missing');
-    const result = await handler.fetch(request, env, ctx);
+    const result = await handler.fetch(request as never, env, ctx);
 
     expect(result).toBe(response);
     expect(mockFetch).toHaveBeenCalledWith(request, env, ctx);
