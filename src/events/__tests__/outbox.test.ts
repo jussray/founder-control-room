@@ -5,16 +5,12 @@ const {
   mockInsert,
   mockSelect,
   mockSingle,
-  mockUpdate,
-  mockEq,
   mockRpc,
 } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockInsert: vi.fn(),
   mockSelect: vi.fn(),
   mockSingle: vi.fn(),
-  mockUpdate: vi.fn(),
-  mockEq: vi.fn(),
   mockRpc: vi.fn(),
 }));
 
@@ -26,6 +22,7 @@ vi.mock('../../lib/supabaseClient.js', () => ({
 }));
 
 import {
+  abandonWork,
   claimWork,
   completeWork,
   enqueueReconcile,
@@ -39,15 +36,11 @@ beforeEach(() => {
     insert: mockInsert,
     select: mockSelect,
     single: mockSingle,
-    update: mockUpdate,
-    eq: mockEq,
   };
 
   mockFrom.mockReturnValue(chain);
   mockInsert.mockReturnValue(chain);
   mockSelect.mockReturnValue(chain);
-  mockUpdate.mockReturnValue(chain);
-  mockEq.mockResolvedValue({ error: null });
   mockSingle.mockResolvedValue({ data: { id: 'work-1' }, error: null });
   mockRpc.mockResolvedValue({ data: [], error: null });
 });
@@ -127,11 +120,33 @@ describe('controller outbox', () => {
     expect(mockRpc).toHaveBeenCalledWith('claim_outbox_work', { p_limit: 5 });
   });
 
-  it('surfaces completion and retry persistence failures', async () => {
-    mockEq.mockResolvedValueOnce({ error: { message: 'completion failed' } });
+  it('atomically completes work with its source provider event', async () => {
+    await completeWork('work-1', 'event-1');
+
+    expect(mockRpc).toHaveBeenCalledWith('complete_outbox_work', {
+      p_id: 'work-1',
+      p_source_event_id: 'event-1',
+    });
+  });
+
+  it('atomically abandons poison work with its source provider event', async () => {
+    await abandonWork('work-1', 'event-1', 'retry limit reached');
+
+    expect(mockRpc).toHaveBeenCalledWith('abandon_outbox_work', {
+      p_id: 'work-1',
+      p_source_event_id: 'event-1',
+      p_error: 'retry limit reached',
+    });
+  });
+
+  it('surfaces completion, retry, and abandonment persistence failures', async () => {
+    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'completion failed' } });
     await expect(completeWork('work-1')).rejects.toThrow('completion failed');
 
     mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'retry failed' } });
     await expect(failWork('work-1', 'controller failed')).rejects.toThrow('retry failed');
+
+    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'abandon failed' } });
+    await expect(abandonWork('work-1', null, 'terminal')).rejects.toThrow('abandon failed');
   });
 });
