@@ -29,16 +29,24 @@ vi.mock('../../lib/supabaseClient.js', () => ({
   supabase: { from: mockFrom },
 }));
 
-const controllerModule = (exportName: string) => ({
-  [exportName]: vi.fn().mockImplementation(() => ({ run: mockControllerRun })),
-});
-
-vi.mock('../../controllers/CheckRunController.js', () => controllerModule('CheckRunController'));
-vi.mock('../../controllers/ChangeProposalController.js', () => controllerModule('ChangeProposalController'));
-vi.mock('../../controllers/MissionController.js', () => controllerModule('MissionController'));
-vi.mock('../../controllers/ProjectController.js', () => controllerModule('ProjectController'));
-vi.mock('../../controllers/ReleaseController.js', () => controllerModule('ReleaseController'));
-vi.mock('../../controllers/ProofGateController.js', () => controllerModule('ProofGateController'));
+vi.mock('../../controllers/CheckRunController.js', () => ({
+  CheckRunController: vi.fn().mockImplementation(() => ({ run: mockControllerRun })),
+}));
+vi.mock('../../controllers/ChangeProposalController.js', () => ({
+  ChangeProposalController: vi.fn().mockImplementation(() => ({ run: mockControllerRun })),
+}));
+vi.mock('../../controllers/MissionController.js', () => ({
+  MissionController: vi.fn().mockImplementation(() => ({ run: mockControllerRun })),
+}));
+vi.mock('../../controllers/ProjectController.js', () => ({
+  ProjectController: vi.fn().mockImplementation(() => ({ run: mockControllerRun })),
+}));
+vi.mock('../../controllers/ReleaseController.js', () => ({
+  ReleaseController: vi.fn().mockImplementation(() => ({ run: mockControllerRun })),
+}));
+vi.mock('../../controllers/ProofGateController.js', () => ({
+  ProofGateController: vi.fn().mockImplementation(() => ({ run: mockControllerRun })),
+}));
 
 import { runReconcilerCycle } from '../reconciler.js';
 
