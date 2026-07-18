@@ -1,4 +1,6 @@
 import express from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { authRouter } from './routes/auth.js';
 import { projectsRouter } from './routes/projects.js';
 import { approvalsRouter } from './routes/approvals.js';
@@ -16,12 +18,28 @@ import {
   BODY_LIMIT,
 } from './middleware/security.js';
 
-export function createServer() {
+export interface CreateServerOptions {
+  /**
+   * Serve the static Control Room frontend (public/control-room) from this
+   * process. Node-only — reads from the local filesystem, so it's off by
+   * default in the Cloudflare Worker entry point (cf-entry.ts), where the
+   * documented deployment path is Cloudflare Pages serving the frontend
+   * separately, not this Worker's filesystem.
+   */
+  serveStatic?: boolean;
+}
+
+export function createServer(options: CreateServerOptions = {}) {
   const app = express();
 
   app.use(helmetMiddleware);
   app.use(corsMiddleware);
   app.use(requestAudit);
+
+  if (options.serveStatic) {
+    const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../public');
+    app.use('/control-room', express.static(path.join(publicDir, 'control-room')));
+  }
 
   // Webhooks need the raw body for HMAC verification — mount before express.json()
   app.post(

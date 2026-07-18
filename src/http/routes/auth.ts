@@ -50,17 +50,18 @@ authRouter.post('/magic-link', async (req, res) => {
  * GET /auth/callback?token_hash=...&type=magiclink
  *
  * The founder's mail client hits this after clicking the emailed link.
- * Returns a session JSON (access_token / refresh_token) used as Bearer
- * token on every requireFounder-protected route.
  *
- * This returns JSON rather than a redirect because there is no Control Room
- * frontend yet. Once one exists, replace the JSON response with a redirect
- * that hands the session to the frontend via a secure, httpOnly cookie or
- * a short-lived code exchange.
+ * Default response is a redirect to the Control Room frontend
+ * (`/control-room/`) with the session in the URL fragment — a fragment is
+ * never sent to the server (no log/referrer leakage) and the static SPA
+ * reads it client-side, stores it, and strips it from the address bar.
+ * Pass `?format=json` or `Accept: application/json` to get the session as
+ * JSON instead, for non-browser callers.
  */
 authRouter.get('/callback', async (req, res) => {
   const tokenHash = typeof req.query.token_hash === 'string' ? req.query.token_hash : null;
   const type = typeof req.query.type === 'string' ? req.query.type : 'magiclink';
+  const wantsJson = req.query.format === 'json' || (req.get('accept')?.includes('application/json') ?? false);
 
   if (!tokenHash) {
     return res.status(400).json({ error: 'token_hash is required' });
@@ -88,10 +89,23 @@ authRouter.get('/callback', async (req, res) => {
     return res.status(403).json({ error: 'Not on the founder allowlist' });
   }
 
-  return res.json({
+  const session = {
     access_token: data.session.access_token,
     refresh_token: data.session.refresh_token,
     expires_at: data.session.expires_at,
     founder: { email: data.user.email },
-  });
+  };
+
+  if (wantsJson) {
+    return res.json(session);
+  }
+
+  const fragment = new URLSearchParams({
+    access_token: session.access_token,
+    refresh_token: session.refresh_token,
+    expires_at: String(session.expires_at ?? ''),
+    email: session.founder.email,
+  }).toString();
+
+  return res.redirect(302, `/control-room/#${fragment}`);
 });
