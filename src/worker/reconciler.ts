@@ -2,14 +2,20 @@
  * Reconciler
  *
  * Polls the controller_outbox, claims work atomically, dispatches to the
- * correct controller, marks complete or failed.
+ * correct controller, and atomically finalizes work with its source event.
  * Writes a reconciliation_runs audit row for every execution.
  *
  * Both event-triggered and periodic-resync paths call the same controllers.
  * No separate code path exists for webhooks vs schedules.
  */
 
-import { claimWork, completeWork, failWork } from '../events/outbox.js';
+import {
+  abandonWork,
+  claimWork,
+  completeWork,
+  failWork,
+  type ClaimedWork,
+} from '../events/outbox.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { BaseController } from '../controllers/base.js';
 import { CheckRunController } from '../controllers/CheckRunController.js';
@@ -30,6 +36,7 @@ const CONTROLLERS = new Map<string, BaseController>([
   // ManifestController added in Milestone C
 ]);
 
+const MAX_ATTEMPTS = 5;
 let running = false;
 
 async function writeReconciliationRun(
@@ -53,8 +60,33 @@ async function writeReconciliationRun(
       completed_at: new Date().toISOString(),
     });
   } catch {
-    // Audit log failure must not crash the worker
+    // Audit log failure must not crash or duplicate controller execution.
   }
+}
+
+function terminalResult(message: string): ReconcileResult {
+  return {
+    status: 'blocked',
+    observedChanges: [],
+    proposedActions: [],
+    evidenceIds: [],
+    requiresApproval: false,
+    message,
+  };
+}
+
+function retryLimitReached(item: ClaimedWork): boolean {
+  return item.attemptCount + 1 >= MAX_ATTEMPTS;
+}
+
+async function abandonTerminally(
+  item: ClaimedWork,
+  message: string,
+  startedAt: Date,
+): Promise<void> {
+  const finalMessage = `Terminal reconciliation failure after ${item.attemptCount + 1} attempt(s): ${message}`;
+  await writeReconciliationRun(item, terminalResult(finalMessage), startedAt);
+  await abandonWork(item.id, item.sourceEventId, finalMessage);
 }
 
 export async function runReconcilerCycle(): Promise<void> {
@@ -67,14 +99,13 @@ export async function runReconcilerCycle(): Promise<void> {
 
     await Promise.all(
       items.map(async (item) => {
+        const startedAt = new Date();
         const controller = CONTROLLERS.get(item.controller);
 
         if (!controller) {
-          await failWork(item.id, `Unknown controller: ${item.controller}`);
+          await abandonTerminally(item, `Unknown controller: ${item.controller}`, startedAt);
           return;
         }
-
-        const startedAt = new Date();
 
         try {
           const result = await controller.run({
@@ -85,37 +116,39 @@ export async function runReconcilerCycle(): Promise<void> {
             sourceEventId: item.sourceEventId ?? undefined,
           });
 
-          await writeReconciliationRun(item, result, startedAt);
-          if (result.status === 'retry' && result.retryAfter) {
-            const { enqueueReconcile } = await import('../events/outbox.js');
-            await enqueueReconcile(
-              {
-                projectId: item.projectId,
-                controller: item.controller,
-                resourceId: item.resourceId ?? undefined,
-                reason: item.reason as ReconcileReason,
-                sourceEventId: item.sourceEventId ?? undefined,
-              },
-              { availableAt: result.retryAfter },
-            );
+          if (result.status === 'retry') {
+            const retryMessage = result.message ?? 'Controller requested retry';
+            if (retryLimitReached(item)) {
+              await abandonTerminally(item, retryMessage, startedAt);
+            } else {
+              await writeReconciliationRun(item, result, startedAt);
+              await failWork(item.id, retryMessage);
+            }
+            return;
           }
 
-          await completeWork(item.id);
+          await writeReconciliationRun(item, result, startedAt);
+          await completeWork(item.id, item.sourceEventId);
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          await writeReconciliationRun(
-            item,
-            {
-              status: 'retry',
-              observedChanges: [],
-              proposedActions: [],
-              evidenceIds: [],
-              requiresApproval: false,
-              message: msg,
-            },
-            startedAt,
-          );
-          await failWork(item.id, msg);
+          const message = err instanceof Error ? err.message : String(err);
+
+          if (retryLimitReached(item)) {
+            await abandonTerminally(item, message, startedAt);
+          } else {
+            await writeReconciliationRun(
+              item,
+              {
+                status: 'retry',
+                observedChanges: [],
+                proposedActions: [],
+                evidenceIds: [],
+                requiresApproval: false,
+                message,
+              },
+              startedAt,
+            );
+            await failWork(item.id, message);
+          }
         }
       }),
     );
