@@ -6,7 +6,7 @@ Founder Control Room is not fully operating as an autonomous control loop.
 
 The control-plane Supabase project is healthy and continues to accept founder mission and project events, but the controller execution path is stale: the only observed controller lease expired on July 15, 2026, while controller outbox, reconciliation-run, and issue-summary tables remain empty. GitHub failure routing for Se’kret Bip PR #480 has not produced a persisted Control Room failure record.
 
-The correct response is not to merge, deploy, enable the guarded terminal, or apply the pending reconciliation migration. The reversible move is to restore truthful exact-head verification first.
+The correct response is not to merge, deploy, enable the guarded terminal, or mutate the live database. The reversible move is to restore truthful exact-head verification first.
 
 ## Exact GitHub evidence
 
@@ -52,7 +52,7 @@ The first retained unit artifact reported 21 failed tests across four suites.
 3. Approval-route tests referenced top-level variables inside hoisted `vi.mock` factories.
 4. Terminal-route tests had the same hoisted-factory defect.
 
-A conflict-independent proof driver then verified immutable recovery payload head `a91c001bed76fb97700b568f0daa5eea4e382dba` in run `29626029420`.
+A conflict-independent proof driver verified immutable payload head `a91c001bed76fb97700b568f0daa5eea4e382dba` in run `29626029420`.
 
 - Exact Target Metadata `88030504936` passed.
 - Guarded Terminal and AI Contracts `88030504944` passed.
@@ -64,13 +64,30 @@ A conflict-independent proof driver then verified immutable recovery payload hea
 
 The retained diagnostics established:
 
-- Typecheck and build had the same contract drift: missing `ReconcileRequest.meta`, missing `ProofGateController.noOp`, invalid chained Supabase RPC usage, an unsupported `founder_triggered` reason, Cloudflare handler parameter conflicts, and outbox attempt-name drift.
+- Typecheck and build had contract drift: missing `ReconcileRequest.meta`, missing `ProofGateController.noOp`, invalid chained Supabase RPC usage, an unsupported `founder_triggered` reason, Cloudflare handler parameter conflicts, and outbox attempt-name drift.
 - `helmet`, `cors`, and `express-rate-limit` were imported but absent from the package manifest and lockfile.
-- Lint had three real unused-symbol errors plus 29 warnings. The script converted warnings into failures with `--max-warnings 0` despite the ESLint policy intentionally classifying those rules as warnings.
-- Migration lint did not inspect SQL. It failed while connecting to a local Postgres instance that the workflow never started. That result is infrastructure/configuration evidence, not migration-regression evidence.
-- The second unit artifact reported 14 CORS failures caused by the undeclared security packages and nine approval-route five-second timeouts caused by non-constructable class doubles. Other suites passed.
+- Lint had three real unused-symbol errors plus warnings. The script converted warnings into failures with `--max-warnings 0` despite the ESLint policy intentionally classifying those rules as warnings.
+- The first migration job never reached SQL because no local Postgres service was started.
+- The second unit artifact reported CORS failures caused by undeclared security packages and approval-route timeouts caused by non-constructable class doubles.
 
-The guarded terminal contract itself passed throughout. The evidence does not support rewriting terminal runtime behavior.
+A second immutable verification run, `29626366042`, checked payload head `9cc76561a87ec227e1904c521a40e870a191df2e` and materially narrowed the failure surface:
+
+- Exact Target Metadata `88031480640` passed.
+- Guarded Terminal and AI Contracts `88031480637` passed.
+- Unit Tests `88031480645` passed.
+- Lint `88031480648` passed with warnings visible and zero errors.
+- Typecheck `88031480679` and Production Build `88031480629` each failed on the same single DOM-versus-Workers `Response` type boundary. That boundary was then made explicit in `src/worker/cf-entry.ts`.
+- Migration Lint Evidence `88031480656` started an ephemeral local database, applied the schema, and reached migration execution. It then failed because both `20260711_reconciliation.sql` and `20260711_proof_gate_results.sql` registered the same migration version `20260711`.
+
+The live Supabase migration ledger was inspected read-only. It records the authoritative deployed lineage as:
+
+- `20260711211416_reconciliation`
+- `20260711211452_reconciliation_fix_execute_grants`
+- `20260711214937_proof_gate_results`
+
+The recovery branch now uses those full versions, restores the missing execute-grant hardening migration, and removes the two truncated duplicate files. No live migration was applied or modified.
+
+The guarded terminal contract passed throughout. The evidence does not support rewriting terminal runtime behavior.
 
 ## Recovery slice
 
@@ -90,8 +107,10 @@ The slice now:
 - restores the ProofGateController no-op result contract;
 - separates provider-event state updates from RPC attempt increments;
 - aligns the reconciler with the persisted `attempt_count` shape without passing an unused request field;
-- uses contextual Cloudflare Worker handler types;
+- makes the Cloudflare Workers response bridge explicit at the DOM type boundary;
 - keeps ESLint warnings visible but non-blocking while preserving all error-level enforcement;
+- aligns duplicate migration filenames to the deployed full-timestamp lineage;
+- restores service-role-only execute grants for reconciliation RPCs;
 - preserves authentication, exact-head, idempotency, fail-closed, and no-carry-forward approval behavior.
 
 Every new commit creates a new exact head and invalidates older verification for merge purposes.
@@ -102,7 +121,7 @@ This recovery slice does not:
 
 - merge any pull request;
 - deploy Founder Control Room or Se’kret Bip;
-- apply a Supabase migration;
+- apply or repair a live Supabase migration;
 - enable local or remote terminal execution;
 - create production credentials;
 - alter RLS, authentication, billing, DNS, or customer data;
@@ -112,20 +131,15 @@ This recovery slice does not:
 
 The final recovery head must execute and pass:
 
-1. Typecheck
-2. Lint
-3. Unit Tests
-4. Guarded Terminal and AI Skill Contracts
-5. Production Build
+1. Exact target SHA assertion
+2. Typecheck
+3. Lint
+4. Unit Tests
+5. Guarded Terminal and AI Skill Contracts
+6. Production Build
+7. Migration lint against an ephemeral local database
 
-Migration lint must either:
-
-- start a local Supabase/Postgres stack before `supabase db lint --local`; or
-- use another supported database target and clearly label the evidence.
-
-Until then, its connection failure is not a SQL verdict and cannot block on the claim of a migration regression.
-
-Any job with no executed steps remains infrastructure evidence. Any executed failing source step remains a code or configuration defect until corrected and rerun at the exact head.
+Any job with no executed steps remains infrastructure evidence. Any executed failing source or configuration step remains actionable until corrected and rerun at the exact head.
 
 ## Rollback
 
