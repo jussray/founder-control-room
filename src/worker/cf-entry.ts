@@ -9,7 +9,6 @@
  */
 
 import type { ExportedHandler } from '@cloudflare/workers-types';
-import { runReconcilerCycle } from './reconciler.js';
 
 interface WorkerEnv {
   SUPABASE_URL: string;
@@ -29,7 +28,9 @@ let appReady = false;
 
 function injectEnv(env: WorkerEnv): void {
   if (appReady) return;
-  // Bridge Workers env bindings → process.env for existing Node middleware
+  // Bridge Workers env bindings → process.env for existing Node middleware.
+  // Runtime modules that create environment-backed singletons must be imported
+  // only after this function has completed.
   Object.assign(process.env, {
     SUPABASE_URL: env.SUPABASE_URL,
     SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY,
@@ -47,7 +48,8 @@ const handler: ExportedHandler<WorkerEnv> = {
   async fetch(request, env, _ctx) {
     injectEnv(env);
 
-    // Lazy import so the Express app initialises after env is injected
+    // Lazy import so the Express app and its environment-backed clients
+    // initialise only after Worker bindings are available.
     const { createServer } = await import('../http/server.js');
     const app = createServer();
 
@@ -103,6 +105,11 @@ const handler: ExportedHandler<WorkerEnv> = {
 
   async scheduled(_controller, env, ctx) {
     injectEnv(env);
+
+    // The reconciler imports the Supabase singleton. Importing it before
+    // injectEnv() would evaluate that singleton without Worker bindings and can
+    // kill the cron path during module initialization.
+    const { runReconcilerCycle } = await import('./reconciler.js');
     ctx.waitUntil(runReconcilerCycle());
   },
 };
