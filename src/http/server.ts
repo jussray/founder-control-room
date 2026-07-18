@@ -15,6 +15,7 @@ import {
   requestAudit,
 } from './middleware/security.js';
 import { onboardingContentSecurityPolicy } from './middleware/onboardingSecurity.js';
+import { requireSameOriginForCookieMutation } from './middleware/cookieSecurity.js';
 
 export function createServer() {
   const app = express();
@@ -34,6 +35,7 @@ export function createServer() {
 
   app.use(express.json({ limit: BODY_LIMIT }));
   app.use(rateLimitGeneral);
+  app.use(requireSameOriginForCookieMutation);
 
   app.get('/health', (_req, res) => res.json({ ok: true }));
   app.use('/', onboardingRouter);
