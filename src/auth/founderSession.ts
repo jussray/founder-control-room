@@ -53,9 +53,8 @@ function parseCookieHeader(header: string | undefined): Map<string, string> {
   return cookies;
 }
 
-function cookieAttributes(maxAgeSeconds: number): string {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-  return `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}; Priority=High${secure}`;
+function cookieAttributes(maxAgeSeconds: number, secure: boolean): string {
+  return `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}; Priority=High${secure ? '; Secure' : ''}`;
 }
 
 function preventSessionCaching(res: Response): void {
@@ -81,20 +80,20 @@ export function writeFounderSession(res: Response, session: Session): void {
     refreshToken: session.refresh_token,
     ...(typeof session.expires_at === 'number' ? { expiresAt: session.expires_at } : {}),
   });
+  const production = process.env.NODE_ENV === 'production';
   preventSessionCaching(res);
   res.setHeader(
     'Set-Cookie',
-    `${activeCookieName()}=${encodeURIComponent(value)}; ${cookieAttributes(COOKIE_MAX_AGE_SECONDS)}`,
+    `${activeCookieName()}=${encodeURIComponent(value)}; ${cookieAttributes(COOKIE_MAX_AGE_SECONDS, production)}`,
   );
 }
 
 export function clearFounderSession(res: Response): void {
   preventSessionCaching(res);
-  const expired = [
-    `${PRODUCTION_COOKIE_NAME}=; ${cookieAttributes(0)}; Secure`,
-    `${DEVELOPMENT_COOKIE_NAME}=; ${cookieAttributes(0)}`,
-  ];
-  res.setHeader('Set-Cookie', expired);
+  res.setHeader('Set-Cookie', [
+    `${PRODUCTION_COOKIE_NAME}=; ${cookieAttributes(0, true)}`,
+    `${DEVELOPMENT_COOKIE_NAME}=; ${cookieAttributes(0, false)}`,
+  ]);
 }
 
 export function bearerToken(req: Request): string | null {
