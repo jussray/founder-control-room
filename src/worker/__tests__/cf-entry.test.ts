@@ -1,63 +1,57 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ExportedHandler } from '@cloudflare/workers-types';
+import { describe, expect, it, vi } from 'vitest';
+import { composeWorkerHandler } from '../handler.js';
 
-const { moduleLoadEnv, mockRunReconcilerCycle } = vi.hoisted(() => ({
-  moduleLoadEnv: [] as Array<{ url?: string; serviceRoleKey?: string }>,
-  mockRunReconcilerCycle: vi.fn().mockResolvedValue(undefined),
-}));
+interface TestEnv {
+  label: string;
+}
 
-vi.mock('../reconciler.js', () => {
-  moduleLoadEnv.push({
-    url: process.env['SUPABASE_URL'],
-    serviceRoleKey: process.env['SUPABASE_SERVICE_ROLE_KEY'],
+describe('Cloudflare Worker handler composition', () => {
+  it('delegates fetch requests to Cloudflare\'s HTTP adapter', async () => {
+    const response = new Response('ok', { status: 202 });
+    const mockFetch = vi.fn().mockResolvedValue(response);
+    const httpHandler: ExportedHandler<TestEnv> = { fetch: mockFetch };
+    const loadReconciler = vi.fn();
+    const handler = composeWorkerHandler(httpHandler, loadReconciler);
+    const request = new Request('https://control.example.com/health');
+    const env = { label: 'test' };
+    const ctx = {} as never;
+
+    if (!handler.fetch) throw new Error('fetch handler is missing');
+    const result = await handler.fetch(request, env, ctx);
+
+    expect(result).toBe(response);
+    expect(mockFetch).toHaveBeenCalledWith(request, env, ctx);
+    expect(loadReconciler).not.toHaveBeenCalled();
   });
 
-  return { runReconcilerCycle: mockRunReconcilerCycle };
-});
-
-const ORIGINAL_ENV = { ...process.env };
-
-afterEach(() => {
-  process.env = { ...ORIGINAL_ENV };
-  moduleLoadEnv.length = 0;
-  mockRunReconcilerCycle.mockClear();
-  vi.resetModules();
-});
-
-describe('Cloudflare Worker scheduled handler', () => {
-  it('injects Worker bindings before importing the reconciler', async () => {
-    delete process.env['SUPABASE_URL'];
-    delete process.env['SUPABASE_SERVICE_ROLE_KEY'];
-
-    const { default: handler } = await import('../cf-entry.js');
-
-    // Importing the Worker entry point must not evaluate the reconciler or the
-    // environment-backed Supabase singleton.
-    expect(moduleLoadEnv).toEqual([]);
-
-    const env = {
-      SUPABASE_URL: 'https://control-room.supabase.co',
-      SUPABASE_SERVICE_ROLE_KEY: 'service-role-test-key',
-      SUPABASE_ANON_KEY: 'anon-test-key',
-      GITHUB_WEBHOOK_SECRET: 'webhook-test-secret',
-      GITHUB_APP_ID: '12345',
-      GITHUB_PRIVATE_KEY: 'private-test-key',
-      FOUNDER_ALLOWED_ORIGINS: 'https://control.example.com',
-      FOUNDER_API_URL: 'https://api.control.example.com',
+  it('loads the reconciler only for scheduled events and registers its promise', async () => {
+    const mockRunReconcilerCycle = vi.fn().mockResolvedValue(undefined);
+    const loadReconciler = vi.fn().mockResolvedValue({
+      runReconcilerCycle: mockRunReconcilerCycle,
+    });
+    const httpHandler: ExportedHandler<TestEnv> = {
+      fetch: vi.fn().mockResolvedValue(new Response('ok')),
     };
+    const handler = composeWorkerHandler(httpHandler, loadReconciler);
     const waitUntil = vi.fn();
 
     if (!handler.scheduled) throw new Error('scheduled handler is missing');
-    await handler.scheduled({} as never, env, { waitUntil } as never);
+    await handler.scheduled(
+      {} as never,
+      { label: 'test' },
+      { waitUntil } as never,
+    );
 
-    expect(moduleLoadEnv).toEqual([
-      {
-        url: env.SUPABASE_URL,
-        serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
-      },
-    ]);
+    expect(loadReconciler).toHaveBeenCalledTimes(1);
     expect(mockRunReconcilerCycle).toHaveBeenCalledTimes(1);
     expect(waitUntil).toHaveBeenCalledTimes(1);
-
     await waitUntil.mock.calls[0]?.[0];
+  });
+
+  it('fails during composition when the HTTP adapter has no fetch handler', () => {
+    expect(() => composeWorkerHandler({}, vi.fn())).toThrow(
+      'Cloudflare HTTP handler is missing fetch',
+    );
   });
 });
