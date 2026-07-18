@@ -43,7 +43,18 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
+      - name: Run typecheck with retained diagnostics
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee typecheck.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr35-recovery-typecheck-log
+          path: typecheck.log
+          if-no-files-found: error
+          retention-days: 7
 
   lint:
     name: Target Lint
@@ -59,7 +70,18 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - run: npm run lint
+      - name: Run lint with retained diagnostics
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee lint.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr35-recovery-lint-log
+          path: lint.log
+          if-no-files-found: error
+          retention-days: 7
 
   unit-tests:
     name: Target Unit Tests
@@ -75,13 +97,19 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - run: npm test -- --coverage --reporter=json --outputFile=driver-test-results.json
+      - name: Run unit tests with retained diagnostics
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test -- --coverage --reporter=json --outputFile=driver-test-results.json 2>&1 | tee unit-tests.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: pr35-recovery-driver-test-results
-          path: driver-test-results.json
-          if-no-files-found: error
+          name: pr35-recovery-unit-test-diagnostics
+          path: |
+            unit-tests.log
+            driver-test-results.json
+          if-no-files-found: warn
           retention-days: 7
 
   terminal-contract:
@@ -115,7 +143,18 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - run: npm run build
+      - name: Run production build with retained diagnostics
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee build.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr35-recovery-build-log
+          path: build.log
+          if-no-files-found: error
+          retention-days: 7
 
   migration-lint:
     name: Target Migration Lint Evidence
@@ -130,4 +169,15 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
-      - run: supabase db lint --local
+      - name: Run migration lint with retained diagnostics
+        shell: bash
+        run: |
+          set -o pipefail
+          supabase db lint --local 2>&1 | tee migration-lint.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr35-recovery-migration-lint-log
+          path: migration-lint.log
+          if-no-files-found: error
+          retention-days: 7
