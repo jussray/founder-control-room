@@ -309,3 +309,49 @@ describe('POST /dashboard/manual-analysis', () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe('GET /dashboard/costs', () => {
+  it('rejects unauthenticated requests', async () => {
+    const res = await request(buildApp()).get('/dashboard/costs');
+    expect(res.status).toBe(401);
+  });
+
+  it('rolls costs up by agent and computes a grand total', async () => {
+    authSuccess();
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'agent_costs') {
+        return {
+          select: () => ({
+            order: () => ({
+              limit: () => Promise.resolve({
+                data: [
+                  { id: 'c1', project_id: 'p1', agent_name: 'claude-code', provider: 'anthropic', input_tokens: 100, output_tokens: 50, cost_usd: 1.2 },
+                  { id: 'c2', project_id: 'p1', agent_name: 'claude-code', provider: 'anthropic', input_tokens: 10, output_tokens: 5, cost_usd: 0.3 },
+                  { id: 'c3', project_id: 'p1', agent_name: 'codex', provider: 'openai', input_tokens: 40, output_tokens: 20, cost_usd: 0.5 },
+                ],
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === 'projects') {
+        return {
+          select: () => ({
+            in: () => Promise.resolve({ data: [{ id: 'p1', slug: 'sekret-bip', name: "Se'kret Bip" }], error: null }),
+          }),
+        };
+      }
+      return {};
+    });
+
+    const res = await request(buildApp()).get('/dashboard/costs').set('Authorization', BEARER);
+    expect(res.status).toBe(200);
+    expect(res.body.totalUsd).toBeCloseTo(2.0);
+    expect(res.body.byAgent).toEqual([
+      expect.objectContaining({ agentName: 'claude-code', costUsd: expect.closeTo(1.5, 5) }),
+      expect.objectContaining({ agentName: 'codex', costUsd: 0.5 }),
+    ]);
+  });
+});

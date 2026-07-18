@@ -89,6 +89,131 @@ projectsRouter.post("/", requireFounder, async (req: FounderRequest, res) => {
 });
 
 /**
+ * GET /projects/:slug/releases
+ *
+ * Release Center — read-only. `docs/BLUEPRINT.md` explicitly lists
+ * deployment and rollback execution as NOT allowed yet; this only surfaces
+ * the release ledger ReleaseController already populates from
+ * deployment_status webhooks, so the founder can see release history
+ * without this route becoming a second, ungated deploy trigger.
+ */
+projectsRouter.get("/:slug/releases", requireFounder, async (req: FounderRequest, res) => {
+  const { slug } = req.params;
+
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (projectError) return res.status(500).json({ error: projectError.message });
+  if (!project) return res.status(404).json({ error: `No project registered with slug "${slug}"` });
+
+  const { data: releases, error } = await supabase
+    .from("releases")
+    .select("id, change_proposal_id, version, commit_sha, status, deployed_at, rolled_back_at, notes")
+    .eq("project_id", project.id)
+    .order("deployed_at", { ascending: false, nullsFirst: false });
+
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ releases: releases ?? [] });
+});
+
+/**
+ * GET /projects/:slug/connections
+ *
+ * Plugin/MCP Hub — lists this project's connection slots (git, cloudflare,
+ * supabase, AI providers, commerce, etc). Config is non-secret by design;
+ * `secret_ref` is a pointer, never the credential itself (see
+ * project_connections' own table comment in 0001_init.sql).
+ */
+projectsRouter.get("/:slug/connections", requireFounder, async (req: FounderRequest, res) => {
+  const { slug } = req.params;
+
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (projectError) return res.status(500).json({ error: projectError.message });
+  if (!project) return res.status(404).json({ error: `No project registered with slug "${slug}"` });
+
+  const { data: connections, error } = await supabase
+    .from("project_connections")
+    .select("id, connection_type, label, config, secret_ref, status, created_at, updated_at")
+    .eq("project_id", project.id)
+    .order("created_at", { ascending: false });
+
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ connections: connections ?? [] });
+});
+
+const CONNECTION_TYPES = new Set([
+  "git", "cloudflare", "supabase", "openai", "anthropic", "shopify", "expo", "apple", "google_play", "stripe", "other",
+]);
+
+/**
+ * POST /projects/:slug/connections
+ * Body: { connectionType, label?, config?, secretRef? }
+ *
+ * Registers a connection SLOT — non-secret config and a pointer to where
+ * the real credential lives. This route cannot accept or store an actual
+ * credential value; `secretRef` is a reference string (e.g. an env var
+ * name or secret-manager path), never a token itself.
+ */
+projectsRouter.post("/:slug/connections", requireFounder, async (req: FounderRequest, res) => {
+  const { slug } = req.params;
+  const body = req.body as Record<string, unknown>;
+  const connectionType = typeof body["connectionType"] === "string" ? body["connectionType"] : "";
+
+  if (!CONNECTION_TYPES.has(connectionType)) {
+    return res.status(400).json({ error: `connectionType must be one of: ${[...CONNECTION_TYPES].join(", ")}` });
+  }
+
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (projectError) return res.status(500).json({ error: projectError.message });
+  if (!project) return res.status(404).json({ error: `No project registered with slug "${slug}"` });
+
+  const label = typeof body["label"] === "string" ? body["label"] : null;
+  const config = typeof body["config"] === "object" && body["config"] !== null ? body["config"] : {};
+  const secretRef = typeof body["secretRef"] === "string" ? body["secretRef"] : null;
+
+  const { data: connection, error } = await supabase
+    .from("project_connections")
+    .insert({
+      project_id: project.id,
+      connection_type: connectionType,
+      label,
+      config,
+      secret_ref: secretRef,
+      status: "active",
+    })
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === "23505") {
+      return res.status(409).json({ error: `A "${connectionType}" connection with that label already exists for this project.` });
+    }
+    return res.status(500).json({ error: error.message });
+  }
+
+  await supabase.from("project_events").insert({
+    project_id: project.id,
+    source_event_id: randomUUID(),
+    event_type: "project_connection_registered",
+    severity: "info",
+    screen: "control-room-api",
+    metadata: { route: `POST /projects/${slug}/connections`, registered_by: req.founder?.email, connectionType },
+  });
+
+  return res.status(201).json({ connection });
+});
+
+/**
  * POST /projects/:slug/missions
  * Body: { title, description?, riskLevel? }
  *

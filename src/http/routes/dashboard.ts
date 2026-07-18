@@ -86,6 +86,45 @@ dashboardRouter.get('/activity', async (req: FounderRequest, res) => {
   return res.json({ activity });
 });
 
+const COSTS_LIMIT = 1000;
+
+// ─── GET /dashboard/costs ─────────────────────────────────────────────────────
+/**
+ * Analytics — reads `agent_costs`, rolling it up by project and by agent.
+ * This is a read/aggregation surface only; nothing in the Control Room
+ * writes agent_costs through the founder-facing API — those rows come from
+ * the provider adapters that actually spend tokens, same as agent_runs.
+ */
+dashboardRouter.get('/costs', async (req: FounderRequest, res) => {
+  const { data: rows, error } = await supabase
+    .from('agent_costs')
+    .select('id, project_id, mission_id, agent_name, provider, model, input_tokens, output_tokens, cost_usd, created_at')
+    .order('created_at', { ascending: false })
+    .limit(COSTS_LIMIT);
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  const costs = await withProjectLabels(rows ?? []);
+
+  const totalUsd = costs.reduce((sum, row) => sum + Number(row.cost_usd ?? 0), 0);
+
+  const byAgent = new Map<string, { agentName: string; provider: string | null; costUsd: number; inputTokens: number; outputTokens: number }>();
+  for (const row of costs) {
+    const key = row.agent_name;
+    const bucket = byAgent.get(key) ?? { agentName: row.agent_name, provider: row.provider, costUsd: 0, inputTokens: 0, outputTokens: 0 };
+    bucket.costUsd += Number(row.cost_usd ?? 0);
+    bucket.inputTokens += Number(row.input_tokens ?? 0);
+    bucket.outputTokens += Number(row.output_tokens ?? 0);
+    byAgent.set(key, bucket);
+  }
+
+  return res.json({
+    totalUsd,
+    byAgent: [...byAgent.values()].sort((a, b) => b.costUsd - a.costUsd),
+    costs,
+  });
+});
+
 // ─── POST /dashboard/manual-analysis ─────────────────────────────────────────
 /**
  * Founder-triggered on-demand resync of one project's observed state.

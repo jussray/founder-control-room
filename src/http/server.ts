@@ -7,6 +7,8 @@ import { approvalsRouter } from './routes/approvals.js';
 import { l99Router } from './routes/l99.js';
 import { terminalRouter } from './routes/terminal.js';
 import { dashboardRouter } from './routes/dashboard.js';
+import { missionsRouter } from './routes/missions.js';
+import { promptosRouter } from './routes/promptos.js';
 import { handleGitHubWebhook } from './webhooks/github.js';
 import {
   corsMiddleware,
@@ -61,6 +63,8 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/l99', l99Router);
   app.use('/terminal', terminalRouter);
   app.use('/dashboard', dashboardRouter);
+  app.use('/missions', missionsRouter);
+  app.use('/promptos', promptosRouter);
 
   app.use(errorHandler);
 

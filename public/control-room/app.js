@@ -17,12 +17,21 @@ const state = {
   selectedProjectSlug: null,
   selectedProject: null,
   projectFiles: { ref: null, path: '', entries: [] },
+  projectReleases: [],
+  projectConnections: [],
   missions: [],
   activity: [],
   selectedMissionId: null,
   missionFiles: { path: '', content: '', dirty: false },
+  missionCouncil: [],
+  missionRuns: [],
+  missionCosts: null,
   l99: null,
   terminal: { projectSlug: null, commands: [], lastRun: null },
+  promptTemplates: [],
+  selectedTemplateId: null,
+  selectedTemplate: null,
+  costs: null,
   banner: null, // { kind: 'error'|'notice', text }
 };
 
@@ -162,6 +171,8 @@ const TABS = [
   ['missions', 'Missions'],
   ['activity', 'Activity'],
   ['l99', 'L99'],
+  ['promptos', 'PromptOS'],
+  ['analytics', 'Analytics'],
   ['terminal', 'Terminal'],
 ];
 
@@ -204,6 +215,8 @@ function renderTabContent() {
   if (state.tab === 'missions') return renderMissionsTab(mount);
   if (state.tab === 'activity') return renderActivityTab(mount);
   if (state.tab === 'l99') return renderL99Tab(mount);
+  if (state.tab === 'promptos') return renderPromptOsTab(mount);
+  if (state.tab === 'analytics') return renderAnalyticsTab(mount);
   if (state.tab === 'terminal') return renderTerminalTab(mount);
 }
 
@@ -269,7 +282,19 @@ async function selectProject(slug) {
     state.selectedProject = data;
     state.projectFiles = { ref: data.live?.defaultBranch ?? null, path: '', entries: [] };
     await browseProjectFiles(slug, state.projectFiles.ref, '');
+    await loadProjectReleases(slug);
+    await loadProjectConnections(slug);
   });
+}
+
+async function loadProjectReleases(slug) {
+  const data = await api(`/projects/${encodeURIComponent(slug)}/releases`);
+  state.projectReleases = data.releases ?? [];
+}
+
+async function loadProjectConnections(slug) {
+  const data = await api(`/projects/${encodeURIComponent(slug)}/connections`);
+  state.projectConnections = data.connections ?? [];
 }
 
 async function browseProjectFiles(slug, ref, path) {
@@ -306,6 +331,40 @@ function renderProjectDetail(mount) {
       <textarea name="description" rows="2"></textarea>
       <div style="margin-top:0.5rem"><button class="primary" type="submit">Create mission</button></div>
     </form>
+
+    <h3>Release Center <span class="muted">(read-only — deploy/rollback execution isn't wired up yet)</span></h3>
+    ${state.projectReleases.length === 0 ? '<p class="muted">No releases recorded.</p>' : state.projectReleases.map((r) => `
+      <div class="card" style="cursor:default">
+        <div class="meta">${escapeHtml(r.version ?? 'unversioned')} · <span class="mono">${escapeHtml((r.commit_sha ?? '').slice(0, 12))}</span></div>
+        <div class="title">
+          <span class="badge ${r.status === 'deployed' ? 'ok' : r.status === 'failed' ? 'danger' : ''}">${escapeHtml(r.status)}</span>
+          ${r.deployed_at ? ` · deployed ${escapeHtml(new Date(r.deployed_at).toLocaleString())}` : ''}
+        </div>
+      </div>
+    `).join('')}
+
+    <h3>Plugin / MCP Hub — connections</h3>
+    ${state.projectConnections.length === 0 ? '<p class="muted">No connections registered.</p>' : state.projectConnections.map((c) => `
+      <div class="card" style="cursor:default">
+        <div class="meta">${escapeHtml(c.status)}${c.secret_ref ? ` · secret ref: <span class="mono">${escapeHtml(c.secret_ref)}</span>` : ''}</div>
+        <div class="title">${escapeHtml(c.connection_type)}${c.label ? ` — ${escapeHtml(c.label)}` : ''}</div>
+      </div>
+    `).join('')}
+    <form id="new-connection-form">
+      <div class="row">
+        <div><label>Type</label>
+          <select name="connectionType">
+            <option>git</option><option>cloudflare</option><option>supabase</option>
+            <option>openai</option><option>anthropic</option><option>shopify</option>
+            <option>expo</option><option>apple</option><option>google_play</option>
+            <option>stripe</option><option>other</option>
+          </select>
+        </div>
+        <div><label>Label</label><input name="label" placeholder="production" /></div>
+        <div><label>Secret ref (pointer only — never a real secret)</label><input name="secretRef" placeholder="CLOUDFLARE_API_TOKEN" /></div>
+      </div>
+      <div style="margin-top:0.5rem"><button type="submit">Register connection</button></div>
+    </form>
   `;
 
   panel.querySelector('#file-up')?.addEventListener('click', () => {
@@ -339,6 +398,19 @@ function renderProjectDetail(mount) {
         body: JSON.stringify(values),
       });
       setBanner('notice', 'Mission created. See the Missions tab.');
+      e.target.reset();
+    });
+  });
+
+  panel.querySelector('#new-connection-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const values = formValues(e.target);
+    guarded(async () => {
+      await api(`/projects/${encodeURIComponent(p.project.slug)}/connections`, {
+        method: 'POST',
+        body: JSON.stringify(values),
+      });
+      await loadProjectConnections(p.project.slug);
       e.target.reset();
     });
   });
@@ -390,6 +462,14 @@ function renderMissionsTab(mount) {
 async function selectMission(id) {
   state.selectedMissionId = id;
   state.missionFiles = { path: '', content: '', dirty: false };
+  const [council, runs, costs] = await Promise.all([
+    api(`/missions/${encodeURIComponent(id)}/council`),
+    api(`/missions/${encodeURIComponent(id)}/runs`),
+    api(`/missions/${encodeURIComponent(id)}/costs`),
+  ]);
+  state.missionCouncil = council.conversations ?? [];
+  state.missionRuns = runs.runs ?? [];
+  state.missionCosts = costs;
 }
 
 function renderMissionDetail(mount) {
@@ -452,6 +532,27 @@ function renderMissionDetail(mount) {
         <div style="margin-top:0.5rem"><button class="primary" type="submit">Execute merge</button></div>
       </form>
     ` : ''}
+
+    <h3>Agent Council</h3>
+    ${state.missionCouncil.length === 0 ? '<p class="muted">No council rounds recorded for this mission.</p>' : state.missionCouncil.map((c) => `
+      <div class="card" style="cursor:default">
+        <div class="meta">Round ${escapeHtml(c.round)} · ${(c.participants ?? []).map(escapeHtml).join(', ')}</div>
+        <div class="title">${escapeHtml(c.outcome ?? 'in progress')}</div>
+      </div>
+    `).join('')}
+
+    <h3>Bench — runner/CI checks</h3>
+    ${state.missionRuns.length === 0 ? '<p class="muted">No runner checks recorded for this mission.</p>' : state.missionRuns.map((r) => `
+      <div class="card" style="cursor:default">
+        <div class="meta">${escapeHtml(r.runner_profile ?? 'default')} · ${r.started_at ? escapeHtml(new Date(r.started_at).toLocaleString()) : ''}</div>
+        <div class="title"><span class="badge ${r.status === 'passed' ? 'ok' : r.status === 'failed' ? 'danger' : ''}">${escapeHtml(r.status)}</span></div>
+      </div>
+    `).join('')}
+
+    <h3>Mission cost ledger</h3>
+    ${state.missionCosts && state.missionCosts.costs.length > 0
+      ? `<p class="muted">Total: $${state.missionCosts.totalUsd.toFixed(4)}</p>`
+      : '<p class="muted">No agent cost records for this mission.</p>'}
   `;
 
   panel.querySelector('#create-branch-form')?.addEventListener('submit', (e) => {
@@ -608,6 +709,131 @@ function renderL99Tab(mount) {
   `;
 }
 
+// ─── PromptOS tab ────────────────────────────────────────────────────────────
+
+async function loadPromptTemplates() {
+  const data = await api('/promptos');
+  state.promptTemplates = data.templates ?? [];
+}
+
+async function selectTemplate(id) {
+  state.selectedTemplateId = id;
+  state.selectedTemplate = await api(`/promptos/${encodeURIComponent(id)}`);
+}
+
+function renderPromptOsTab(mount) {
+  mount.appendChild(el(`
+    <div class="panel">
+      <h2>New template</h2>
+      <form id="new-template-form">
+        <div class="row">
+          <div><label>Name</label><input name="name" required /></div>
+          <div><label>Slash command</label><input name="slashCommand" placeholder="/redteam" /></div>
+          <div><label>Category</label><input name="category" placeholder="modes" /></div>
+        </div>
+        <label>Tagline</label><input name="tagline" />
+        <label>Body template — use [PLACEHOLDER] for variables</label>
+        <textarea class="code" name="bodyTemplate" required rows="6"></textarea>
+        <div style="margin-top:0.5rem"><button class="primary" type="submit">Create template</button></div>
+      </form>
+    </div>
+    <div class="panel">
+      <h2>Templates</h2>
+      <div id="template-list"></div>
+    </div>
+    <div class="panel" id="template-detail" style="display:none"></div>
+  `));
+
+  mount.querySelector('#new-template-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const values = formValues(e.target);
+    guarded(async () => {
+      await api('/promptos', { method: 'POST', body: JSON.stringify(values) });
+      await loadPromptTemplates();
+      e.target.reset();
+    });
+  });
+
+  const list = mount.querySelector('#template-list');
+  list.innerHTML = state.promptTemplates.length === 0
+    ? '<p class="muted">No templates yet.</p>'
+    : state.promptTemplates.map((t) => `
+      <div class="card" data-id="${escapeHtml(t.id)}">
+        <div class="meta">${t.slash_command ? escapeHtml(t.slash_command) + ' · ' : ''}${escapeHtml(t.category ?? 'uncategorized')}${t.is_starred ? ' · ★' : ''}</div>
+        <div class="title">${escapeHtml(t.name)} <span class="muted">v${escapeHtml(t.current_version)}</span></div>
+      </div>
+    `).join('');
+
+  list.querySelectorAll('.card').forEach((card) => {
+    card.addEventListener('click', () => guarded(() => selectTemplate(card.dataset.id)));
+  });
+
+  if (state.selectedTemplateId) renderTemplateDetail(mount);
+}
+
+function renderTemplateDetail(mount) {
+  const panel = mount.querySelector('#template-detail');
+  const t = state.selectedTemplate;
+  if (!t) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+
+  panel.innerHTML = `
+    <h2>${escapeHtml(t.template.name)}</h2>
+    <p class="muted">${escapeHtml(t.template.tagline ?? '')}</p>
+    <pre>${escapeHtml(t.template.body_template)}</pre>
+    <form id="edit-template-form">
+      <label>New body (creates version ${t.template.current_version + 1})</label>
+      <textarea class="code" name="bodyTemplate" rows="6">${escapeHtml(t.template.body_template)}</textarea>
+      <label>Change note</label><input name="changeNote" />
+      <div style="margin-top:0.5rem"><button class="primary" type="submit">Save new version</button></div>
+    </form>
+    <h3>Version history</h3>
+    ${t.versions.map((v) => `<div class="card" style="cursor:default"><div class="meta">v${escapeHtml(v.version)} · ${escapeHtml(new Date(v.created_at).toLocaleString())}</div><div class="title">${escapeHtml(v.change_note ?? '—')}</div></div>`).join('')}
+  `;
+
+  panel.querySelector('#edit-template-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const values = formValues(e.target);
+    guarded(async () => {
+      await api(`/promptos/${encodeURIComponent(t.template.id)}`, { method: 'PATCH', body: JSON.stringify(values) });
+      await selectTemplate(t.template.id);
+      await loadPromptTemplates();
+    });
+  });
+}
+
+// ─── Analytics tab ───────────────────────────────────────────────────────────
+
+async function loadCosts() {
+  const data = await api('/dashboard/costs');
+  state.costs = data;
+}
+
+function renderAnalyticsTab(mount) {
+  mount.appendChild(el(`
+    <div class="panel">
+      <div class="toolbar"><button id="refresh-costs">Refresh</button></div>
+      <div id="analytics-body"></div>
+    </div>
+  `));
+
+  mount.querySelector('#refresh-costs').addEventListener('click', () => guarded(loadCosts));
+
+  const body = mount.querySelector('#analytics-body');
+  if (!state.costs) { body.innerHTML = '<p class="muted">Loading…</p>'; return; }
+
+  body.innerHTML = `
+    <h2>Total spend: $${state.costs.totalUsd.toFixed(4)}</h2>
+    <h3>By agent</h3>
+    ${state.costs.byAgent.length === 0 ? '<p class="muted">No cost records yet.</p>' : state.costs.byAgent.map((a) => `
+      <div class="card" style="cursor:default">
+        <div class="meta">${escapeHtml(a.provider ?? 'unknown provider')} · ${escapeHtml(a.inputTokens)} in / ${escapeHtml(a.outputTokens)} out tokens</div>
+        <div class="title">${escapeHtml(a.agentName)} — $${a.costUsd.toFixed(4)}</div>
+      </div>
+    `).join('')}
+  `;
+}
+
 // ─── Terminal tab ────────────────────────────────────────────────────────────
 
 function renderTerminalTab(mount) {
@@ -694,7 +920,7 @@ async function boot() {
   if (!state.session) return;
 
   await guarded(async () => {
-    await Promise.all([loadProjects(), loadMissions(), loadActivity(), loadL99()]);
+    await Promise.all([loadProjects(), loadMissions(), loadActivity(), loadL99(), loadPromptTemplates(), loadCosts()]);
   });
 }
 
