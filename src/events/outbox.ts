@@ -5,7 +5,8 @@
  * reconciliation request receives its own outbox row so completed history,
  * retries, and events arriving during active work cannot overwrite one another.
  *
- * Workers claim entries atomically via FOR UPDATE SKIP LOCKED.
+ * Workers claim entries atomically via FOR UPDATE SKIP LOCKED. Completion and
+ * terminal abandonment also update linked provider-event state atomically.
  */
 
 import { supabase } from '../lib/supabaseClient.js';
@@ -71,15 +72,20 @@ export async function claimWork(limit = 10): Promise<ClaimedWork[]> {
   }));
 }
 
-export async function completeWork(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('controller_outbox')
-    .update({ completed_at: new Date().toISOString(), claimed_at: null })
-    .eq('id', id);
+/** Atomically complete work and mark its source provider event processed. */
+export async function completeWork(
+  id: string,
+  sourceEventId?: string | null,
+): Promise<void> {
+  const { error } = await supabase.rpc('complete_outbox_work', {
+    p_id: id,
+    p_source_event_id: sourceEventId ?? null,
+  });
 
   if (error) throw new Error(`Failed to complete outbox work: ${error.message}`);
 }
 
+/** Reschedule retryable work using database-side attempt increment and backoff. */
 export async function failWork(id: string, errorMessage: string): Promise<void> {
   const { error } = await supabase.rpc('fail_outbox_work', {
     p_id: id,
@@ -87,4 +93,19 @@ export async function failWork(id: string, errorMessage: string): Promise<void> 
   });
 
   if (error) throw new Error(`Failed to reschedule outbox work: ${error.message}`);
+}
+
+/** Atomically stop poison work and mark its source provider event failed. */
+export async function abandonWork(
+  id: string,
+  sourceEventId: string | null,
+  errorMessage: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('abandon_outbox_work', {
+    p_id: id,
+    p_source_event_id: sourceEventId,
+    p_error: errorMessage,
+  });
+
+  if (error) throw new Error(`Failed to abandon outbox work: ${error.message}`);
 }
