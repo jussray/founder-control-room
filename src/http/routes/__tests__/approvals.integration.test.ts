@@ -1,16 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockGetUser = vi.fn();
+const {
+  mockGetUser,
+  supabaseMock,
+  mockCreateBranch,
+  mockResolveRef,
+  mockIntegrate,
+  mockEnqueue,
+  mockControllerRun,
+} = vi.hoisted(() => ({
+  mockGetUser: vi.fn(),
+  supabaseMock: { from: vi.fn() },
+  mockCreateBranch: vi.fn(),
+  mockResolveRef: vi.fn(),
+  mockIntegrate: vi.fn(),
+  mockEnqueue: vi.fn(),
+  mockControllerRun: vi.fn(),
+}));
+
 vi.mock('../../../lib/supabaseAuthClient.js', () => ({
   supabaseAuth: { auth: { getUser: mockGetUser } },
 }));
 
-const supabaseMock = { from: vi.fn() };
 vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
 
-const mockCreateBranch = vi.fn();
-const mockResolveRef = vi.fn();
-const mockIntegrate = vi.fn();
 vi.mock('../../../providers/GitHubProvider.js', () => ({
   GitHubProvider: vi.fn().mockImplementation(() => ({
     createBranch: mockCreateBranch,
@@ -19,10 +32,8 @@ vi.mock('../../../providers/GitHubProvider.js', () => ({
   })),
 }));
 
-const mockEnqueue = vi.fn();
 vi.mock('../../../events/outbox.js', () => ({ enqueueReconcile: mockEnqueue }));
 
-const mockControllerRun = vi.fn();
 vi.mock('../../../controllers/ProofGateController.js', () => ({
   ProofGateController: vi.fn().mockImplementation(() => ({ run: mockControllerRun })),
 }));
