@@ -1,13 +1,20 @@
 import type { Request, Response } from 'express';
 import type { Session } from '@supabase/supabase-js';
 
-const COOKIE_NAME = 'fcr_session';
+const DEVELOPMENT_COOKIE_NAME = 'fcr_session';
+const PRODUCTION_COOKIE_NAME = '__Host-fcr_session';
 const COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
 export interface FounderCookieSession {
   accessToken: string;
   refreshToken: string;
   expiresAt?: number;
+}
+
+function activeCookieName(): string {
+  return process.env.NODE_ENV === 'production'
+    ? PRODUCTION_COOKIE_NAME
+    : DEVELOPMENT_COOKIE_NAME;
 }
 
 function encodeSession(session: FounderCookieSession): string {
@@ -48,11 +55,23 @@ function parseCookieHeader(header: string | undefined): Map<string, string> {
 
 function cookieAttributes(maxAgeSeconds: number): string {
   const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-  return `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure}`;
+  return `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}; Priority=High${secure}`;
+}
+
+function preventSessionCaching(res: Response): void {
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+}
+
+export function hasFounderSessionCookie(req: Request): boolean {
+  const cookies = parseCookieHeader(req.headers.cookie);
+  return cookies.has(PRODUCTION_COOKIE_NAME) || cookies.has(DEVELOPMENT_COOKIE_NAME);
 }
 
 export function readFounderSession(req: Request): FounderCookieSession | null {
-  const encoded = parseCookieHeader(req.headers.cookie).get(COOKIE_NAME);
+  const cookies = parseCookieHeader(req.headers.cookie);
+  const encoded = cookies.get(PRODUCTION_COOKIE_NAME) ?? cookies.get(DEVELOPMENT_COOKIE_NAME);
   return encoded ? decodeSession(encoded) : null;
 }
 
@@ -62,11 +81,20 @@ export function writeFounderSession(res: Response, session: Session): void {
     refreshToken: session.refresh_token,
     ...(typeof session.expires_at === 'number' ? { expiresAt: session.expires_at } : {}),
   });
-  res.setHeader('Set-Cookie', `${COOKIE_NAME}=${encodeURIComponent(value)}; ${cookieAttributes(COOKIE_MAX_AGE_SECONDS)}`);
+  preventSessionCaching(res);
+  res.setHeader(
+    'Set-Cookie',
+    `${activeCookieName()}=${encodeURIComponent(value)}; ${cookieAttributes(COOKIE_MAX_AGE_SECONDS)}`,
+  );
 }
 
 export function clearFounderSession(res: Response): void {
-  res.setHeader('Set-Cookie', `${COOKIE_NAME}=; ${cookieAttributes(0)}`);
+  preventSessionCaching(res);
+  const expired = [
+    `${PRODUCTION_COOKIE_NAME}=; ${cookieAttributes(0)}; Secure`,
+    `${DEVELOPMENT_COOKIE_NAME}=; ${cookieAttributes(0)}`,
+  ];
+  res.setHeader('Set-Cookie', expired);
 }
 
 export function bearerToken(req: Request): string | null {
