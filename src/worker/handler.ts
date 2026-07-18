@@ -1,10 +1,64 @@
 import type { ExportedHandler } from '@cloudflare/workers-types';
 
+export interface ControlRoomWorkerEnv {
+  SUPABASE_URL: string;
+  SUPABASE_SERVICE_ROLE_KEY: string;
+  SUPABASE_ANON_KEY: string;
+  GITHUB_WEBHOOK_SECRET: string;
+  GITHUB_APP_ID: string;
+  GITHUB_PRIVATE_KEY: string;
+  FOUNDER_ALLOWED_ORIGINS: string;
+  FOUNDER_API_URL: string;
+}
+
 interface ReconcilerModule {
   runReconcilerCycle(): Promise<void>;
 }
 
 type ReconcilerLoader = () => Promise<ReconcilerModule>;
+
+const REQUIRED_BINDINGS = [
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE_ANON_KEY',
+  'GITHUB_WEBHOOK_SECRET',
+  'GITHUB_APP_ID',
+  'GITHUB_PRIVATE_KEY',
+  'FOUNDER_ALLOWED_ORIGINS',
+  'FOUNDER_API_URL',
+] as const satisfies readonly (keyof ControlRoomWorkerEnv)[];
+
+/** Fail closed before importing environment-backed application modules. */
+export function validateWorkerEnv(
+  env: Partial<Record<keyof ControlRoomWorkerEnv, unknown>>,
+): asserts env is ControlRoomWorkerEnv {
+  const missing = REQUIRED_BINDINGS.filter((name) => {
+    const value = env[name];
+    return typeof value !== 'string' || value.trim() === '';
+  });
+
+  if (missing.length) {
+    throw new Error(`Missing required Worker bindings: ${missing.join(', ')}`);
+  }
+
+  try {
+    new URL(env.SUPABASE_URL);
+    new URL(env.FOUNDER_API_URL);
+  } catch {
+    throw new Error('SUPABASE_URL and FOUNDER_API_URL must be absolute URLs');
+  }
+
+  const origins = env.FOUNDER_ALLOWED_ORIGINS.split(',').map((value) => value.trim());
+  if (!origins.length || origins.some((origin) => {
+    try {
+      return new URL(origin).origin !== origin.replace(/\/$/, '');
+    } catch {
+      return true;
+    }
+  })) {
+    throw new Error('FOUNDER_ALLOWED_ORIGINS must contain comma-separated absolute origins');
+  }
+}
 
 /**
  * Combine Cloudflare's supported Node HTTP adapter with the scheduled
