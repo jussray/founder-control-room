@@ -1,159 +1,199 @@
-# Founder Control Room CI Recovery
+# Founder Control Room Runtime Recovery
 
 ## Executive decision
 
-Founder Control Room is not fully operating as an autonomous control loop.
+Founder Control Room’s live datastore is reachable, but the deployed control loop is not currently operating as an autonomous system.
 
-The control-plane Supabase project is healthy and continues to accept founder mission and project events, but the controller execution path is stale: the only observed controller lease expired on July 15, 2026, while controller outbox, reconciliation-run, and issue-summary tables remain empty. GitHub failure routing for Se’kret Bip PR #480 has not produced a persisted Control Room failure record.
+Read-only inspection found an empty controller outbox, no reconciliation runs or issue summaries, one expired controller lease, and repository verification activity that had not advanced since July 15, 2026. Se’kret Bip PR #480 had no persisted Control Room failure record.
 
-The correct response is not to merge, deploy, enable the guarded terminal, or mutate the live database. The reversible move is to restore truthful exact-head verification first.
+The repository recovery is now bench-verified. That is not permission to merge, deploy, apply migrations, configure secrets, enable the guarded terminal, or represent the live loop as running.
 
-## Exact GitHub evidence
+## Delivery topology
 
 Repository: `jussray/founder-control-room`
 
-Parent PR: `#35 Add guarded terminal, proof-gated merges, and AI sales controls`
+Parent feature PR: `#35 Add guarded terminal, proof-gated merges, and AI sales controls`
 
-Parent head: `d84f4e642ea406ac4c05ca8705f9812d804a367b`
+Correctly stacked recovery PR: `#45 Stacked: recover PR #35 exact-head CI contracts`
 
-### Initial classification
+Verification-only driver: draft PR `#44 Verify PR #35 recovery at immutable target SHA`
 
-CI run `29622908334` contained four failed jobs with no executed steps or logs:
+PR #43 targeted `main` even though the recovery branch was a child of PR #35. It mixed the parent feature into the recovery diff and produced a structural conflict. PR #45 targets `codex/guarded-terminal-proof-fix`, isolates the recovery delta, and is the correct delivery path.
 
-- Test `88021361481`
-- Migration lint `88021361491`
-- Type check `88021361493`
-- Lint `88021361500`
+## Classification history
 
-Classification: `runner_startup_failure`
+### Runner-startup evidence
 
-This evidence does not prove a code regression.
+CI run `29622908334` had failed jobs with no executed steps or logs. Classification: `runner_startup_failure`. That result did not prove a source regression.
 
-### Changed classification
+### Executed source failures
 
-Quality Gate run `29622908299` later received runners and executed real steps.
+Quality Gate run `29622908299` later received runners. Lint, unit tests, and typecheck executed and failed, while the guarded terminal and AI contracts passed. Classification changed to `workflow_step_failure`.
 
-- Lint `88026500401` failed at `npm run lint`.
-- Unit Tests `88026500416` failed at the Vitest command and retained artifact `8423411134`.
-- Typecheck `88026500421` failed at `npm run typecheck`.
-- Guarded Terminal and AI Skill Contracts `88026500432` passed.
-- Production Build `88026539033` was skipped because required predecessors failed.
+Retained artifacts then exposed focused contract defects rather than a terminal-runtime failure:
 
-Classification: `workflow_step_failure`
+- proof-gate tests read generated failures from the wrong field;
+- CORS tests relied on unsupported dynamic import behavior and private middleware fields;
+- approval and terminal route mocks violated Vitest hoisting and constructor semantics;
+- reconciliation request/result types had drifted from runtime use;
+- middleware imports were absent from the package manifest and lockfile;
+- warning-level ESLint policy was contradicted by `--max-warnings 0`;
+- migration lint was initially wired without a local database;
+- truncated migration filenames collided on the same Supabase migration version;
+- the guarded-terminal migration depended on repository-verification columns it did not create in a fresh database.
 
-This changed the actionable next step from waiting for runner recovery to repairing the smallest demonstrated source and test-contract defects.
+Those defects were repaired and repeatedly narrowed through immutable driver runs. The guarded terminal contract passed throughout; no evidence supported weakening or rewriting its command restrictions.
 
-## Demonstrated root causes
+## Runtime dead-loop findings
 
-The first retained unit artifact reported 21 failed tests across four suites.
+Green source checks alone were not enough. Read-only live-schema comparison and edge-path inspection found additional blockers that explained why the deployed loop could remain silent.
 
-1. Proof-gate tests read generated failures from `result.evidence.failures`, although the canonical immutable ledger is `result.allFailures`.
-2. CORS tests used a variable dynamic import query unsupported by the Vitest transform and depended on a private field from the `cors` middleware package.
-3. Approval-route tests referenced top-level variables inside hoisted `vi.mock` factories.
-4. Terminal-route tests had the same hoisted-factory defect.
+### 1. Unsupported Cloudflare-to-Express bridge
 
-A conflict-independent proof driver verified immutable payload head `a91c001bed76fb97700b568f0daa5eea4e382dba` in run `29626029420`.
+The Worker passed a Fetch `Request` directly into Express with a hand-built partial response object. This was not a real Node HTTP request/response contract.
 
-- Exact Target Metadata `88030504936` passed.
-- Guarded Terminal and AI Contracts `88030504944` passed.
-- Typecheck `88030504927` executed and failed.
-- Lint `88030504953` executed and failed.
-- Unit Tests `88030504942` executed and failed.
-- Production Build `88030504946` executed and failed.
-- Migration Lint Evidence `88030504926` executed and failed.
+Recovery:
 
-The retained diagnostics established:
+- use a real `node:http` server;
+- wrap it with Cloudflare’s supported `httpServerHandler` adapter;
+- enable `enable_nodejs_http_modules` and `enable_nodejs_http_server_modules` while retaining the existing compatibility date;
+- combine the HTTP fetch adapter with the scheduled reconciliation handler;
+- validate all required Worker bindings before importing environment-backed application modules;
+- keep reconciliation loading lazy for scheduled events.
 
-- Typecheck and build had contract drift: missing `ReconcileRequest.meta`, missing `ProofGateController.noOp`, invalid chained Supabase RPC usage, an unsupported `founder_triggered` reason, Cloudflare handler parameter conflicts, and outbox attempt-name drift.
-- `helmet`, `cors`, and `express-rate-limit` were imported but absent from the package manifest and lockfile.
-- Lint had three real unused-symbol errors plus warnings. The script converted warnings into failures with `--max-warnings 0` despite the ESLint policy intentionally classifying those rules as warnings.
-- The first migration job never reached SQL because no local Postgres service was started.
-- The second unit artifact reported CORS failures caused by undeclared security packages and approval-route timeouts caused by non-constructable class doubles.
+### 2. GitHub webhook body was never parsed
 
-A second immutable verification run, `29626366042`, checked payload head `9cc76561a87ec227e1904c521a40e870a191df2e` and materially narrowed the failure surface:
+`express.raw()` correctly preserved signed bytes, but the webhook handler cast the `Buffer` directly to an object. Even a valid signature could not produce `repository.full_name`.
 
-- Exact Target Metadata `88031480640` passed.
-- Guarded Terminal and AI Contracts `88031480637` passed.
-- Unit Tests `88031480645` passed.
-- Lint `88031480648` passed with warnings visible and zero errors.
-- Typecheck `88031480679` and Production Build `88031480629` each failed on the same single DOM-versus-Workers `Response` type boundary. That boundary was then made explicit in `src/worker/cf-entry.ts`.
-- Migration Lint Evidence `88031480656` started an ephemeral local database, applied the schema, and reached migration execution. It then failed because both `20260711_reconciliation.sql` and `20260711_proof_gate_results.sql` registered the same migration version `20260711`.
+Recovery:
 
-The live Supabase migration ledger was inspected read-only. It records the authoritative deployed lineage as:
+- require a raw `Buffer`;
+- verify HMAC-SHA256 over the exact bytes;
+- parse JSON only after signature success;
+- validate GitHub event and delivery headers before persistence.
+
+### 3. Webhook project lookup used nonexistent columns
+
+The route queried `project_connections.provider` and `connection_config`. Live schema uses `connection_type`, `config`, and `status`; active GitHub mappings are stored as `connection_type='git'` with `config.repository`.
+
+Recovery:
+
+- resolve projects through the deployed `connection_type/status/config->>repository` contract;
+- add route-level regression coverage for signed webhook ingestion and controller routing.
+
+### 4. Lease acquisition was not exclusive
+
+Controller code used `upsert(... ignoreDuplicates: true)` and treated the absence of an error as ownership. A conflict could therefore let multiple workers believe they held the same lease.
+
+The live database already contained the authoritative `try_acquire_controller_lease` function, but its migration was missing from source control and runtime code did not call it.
+
+Recovery:
+
+- restore deployed migration `20260715104852_harden_reconciliation_queue_and_leases.sql` from read-only migration history;
+- acquire through the atomic database RPC;
+- read `claimed_at` as an ownership token;
+- release only when both `lease_key` and the exact ownership token match, preventing a slow worker from deleting a newer replacement lease.
+
+### 5. Completed outbox rows absorbed later work
+
+The outbox used a permanent unique constraint plus upsert. A later event for the same resource updated an already-completed row without clearing `completed_at`; `claim_outbox_work` would never claim it again. Retry requests could disappear through the same path.
+
+Recovery:
+
+- make `controller_outbox` append-only;
+- keep provider-delivery deduplication in `provider_events`;
+- insert one durable row for every legitimate reconciliation request;
+- remove the permanent coalescing constraint and retain resource-history indexing.
+
+### 6. Work and source-event lifecycle could split
+
+The reconciler completed outbox rows without marking linked provider events processed. Failures could leave provider events permanently pending, and poison work had no terminal retry boundary.
+
+Recovery:
+
+- add service-role-only `complete_outbox_work` and `abandon_outbox_work` RPCs;
+- atomically finalize the outbox row and linked provider event in one transaction;
+- reschedule retryable work on the same durable row with database-side backoff;
+- terminally abandon deterministic unknown-controller work;
+- stop retrying poison work after five attempts and persist a blocked reconciliation audit record.
+
+## Migration lineage recovery
+
+The live Supabase migration ledger was inspected read-only. It records these authoritative versions:
 
 - `20260711211416_reconciliation`
 - `20260711211452_reconciliation_fix_execute_grants`
 - `20260711214937_proof_gate_results`
+- `20260715104852_harden_reconciliation_queue_and_leases`
 
-The recovery branch now uses those full versions, restores the missing execute-grant hardening migration, and removes the two truncated duplicate files. No live migration was applied or modified.
+The repository now uses those full versions, restores missing execute-grant and lease hardening migrations, removes truncated duplicate-version files, and adds append-only queue plus atomic lifecycle migrations.
 
-A third immutable verification run, `29626592585`, checked payload head `688eb7484664d80f9d2471caf3f6769e9b00a30b`:
+The guarded-terminal migration now creates repository-verification columns, defaults, and cadence constraints before inserting repository settings. No live migration was changed or applied during recovery.
 
-- Exact Target Metadata `88032138663` passed.
-- Typecheck `88032138639` passed.
-- Lint `88032138638` passed.
-- Unit Tests `88032138652` passed.
-- Guarded Terminal and AI Contracts `88032138657` passed.
-- Production Build `88032138665` passed.
-- Migration Lint Evidence `88032138650` executed and failed after successfully applying the aligned reconciliation and proof-gate migrations. The guarded-terminal migration inserted repository verification settings before defining `projects.verification_enabled` and `projects.verification_cadence_minutes` in a fresh database.
+## Verified recovery behavior
 
-The guarded-terminal migration is now self-contained: it creates those columns with the deployed defaults and cadence constraint before registering the repository. The live project was inspected read-only to preserve the exact boolean, integer, default, and constraint contract.
+The recovery slice now:
 
-The guarded terminal contract passed throughout. The evidence does not support rewriting terminal runtime behavior.
+- preserves proof-gate immutability through canonical `allFailures`;
+- provides typed fail-closed CORS, security headers, rate limiting, and startup binding validation;
+- keeps authentication, RLS separation, exact-head verification, immutable-SHA integration, idempotency reservations, no-carry-forward approval, and guarded-terminal restrictions intact;
+- uses Cloudflare’s supported Node HTTP server adapter;
+- verifies signed raw GitHub webhook bytes before parsing;
+- resolves repositories against the deployed connection schema;
+- persists every legitimate work request in an append-only outbox;
+- uses atomic owner-bound leases;
+- atomically finalizes work and provider-event state;
+- enforces bounded retry and terminal poison-event handling;
+- aligns fresh-database migrations with deployed lineage and security grants;
+- includes focused route, Worker, lease, queue, and reconciler lifecycle tests.
 
-## Recovery slice
+## Exact-head proof
 
-Branch: `agent/pr35-ci-recovery`
+Runtime payload head `820adc105a10c8fece5fcf581cfa0261641068eb` was verified by conflict-independent driver run `29628118034`.
 
-Draft pull request: `#43 Fix PR #35 exact-head CI contract failures`
+All executed jobs passed:
 
-Verification-only driver: draft PR `#44 Verify PR #35 recovery at immutable target SHA`. The driver must not be merged.
+- Exact Target Metadata `88036422450`
+- Target Typecheck `88036422438`
+- Target Lint `88036422435`
+- Target Unit Tests `88036422447`
+- Target Terminal and AI Contracts `88036422497`
+- Target Production Build `88036422439`
+- Target Migration Lint Evidence `88036422443`
 
-The slice now:
+The migration job initialized an ephemeral Supabase project, started a fresh local database, applied the complete migration chain, ran `supabase db lint --local --fail-on error`, uploaded diagnostics, and stopped the local stack successfully.
 
-- updates proof-gate assertions to use `allFailures` without mutating caller evidence;
-- tests CORS through exported Express middleware and literal module reloads;
-- replaces undeclared security middleware dependencies with local typed CORS, security-header, and rate-limit middleware;
-- makes approval and terminal route doubles Vitest-hoist-safe, with constructable class doubles where production code uses `new`;
-- adds founder-triggered request metadata to the reconciliation contract;
-- restores the ProofGateController no-op result contract;
-- separates provider-event state updates from RPC attempt increments;
-- aligns the reconciler with the persisted `attempt_count` shape without passing an unused request field;
-- makes the Cloudflare Workers response bridge explicit at the DOM type boundary;
-- keeps ESLint warnings visible but non-blocking while preserving all error-level enforcement;
-- aligns duplicate migration filenames to the deployed full-timestamp lineage;
-- restores service-role-only execute grants for reconciliation RPCs;
-- makes the guarded-terminal migration fresh-database-safe for repository verification fields;
-- preserves authentication, exact-head, idempotency, fail-closed, and no-carry-forward approval behavior.
-
-Every new commit creates a new exact head and invalidates older verification for merge purposes.
+This ledger is a documentation-only commit after that runtime proof. Its final exact-head verification must be recorded on PR #45 without editing this file again.
 
 ## Authority and non-actions
 
-This recovery slice does not:
+This recovery did not:
 
-- merge any pull request;
+- merge PR #35, PR #45, or any downstream product PR;
 - deploy Founder Control Room or Se’kret Bip;
-- apply or repair a live Supabase migration;
-- enable local or remote terminal execution;
-- create production credentials;
-- alter RLS, authentication, billing, DNS, or customer data;
-- treat local or partial evidence as exact-head proof.
+- apply, repair, or reorder migrations in the live Supabase project;
+- configure or rotate production credentials;
+- enable local or remote guarded-terminal execution;
+- change live authentication, RLS, billing, DNS, customer data, or user data;
+- treat stale, wrong-SHA, skipped, runner-less, or partial results as proof.
 
-## Acceptance gates
+## Activation gates
 
-The final recovery head must execute and pass:
+Repository verification is necessary but not sufficient for activation. The next separately approved sequence is:
 
-1. Exact target SHA assertion
-2. Typecheck
-3. Lint
-4. Unit Tests
-5. Guarded Terminal and AI Skill Contracts
-6. Production Build
-7. Migration lint against an ephemeral local database
-
-Any job with no executed steps remains infrastructure evidence. Any executed failing source or configuration step remains actionable until corrected and rerun at the exact head.
+1. Review and integrate the stacked recovery into PR #35.
+2. Reverify the resulting PR #35 exact head.
+3. Explicitly approve and apply the pending migrations to Founder Control Room Supabase.
+4. Verify migration history, function grants, queue constraints, and RLS after apply.
+5. Configure and validate all Worker secrets and origins.
+6. Deploy the Worker with the supported Node HTTP compatibility flags and cron trigger.
+7. Send one signed synthetic GitHub event for a registered sandbox resource.
+8. Prove provider event → outbox claim → lease → controller → reconciliation audit → atomic completion.
+9. Confirm idle cron health and bounded failure behavior.
+10. Keep the guarded terminal disabled until its own separate founder approval.
 
 ## Rollback
 
-Delete the child branch or close draft PR #43. Close verification-only PR #44 after evidence capture. The parent PR #35 remains untouched, the production database remains unchanged, and no deployment state changes.
+Before integration, close PR #45 or delete `agent/pr35-ci-recovery`; PR #35 and live production remain unchanged.
+
+After any future integration, rollback is a separate approved action: revert the integration commit, disable the Worker route/cron if deployed, and use migration-specific rollback or forward-repair plans rather than deleting audit history.
