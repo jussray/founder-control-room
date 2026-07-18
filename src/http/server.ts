@@ -5,6 +5,7 @@ import { authRouter } from './routes/auth.js';
 import { onboardingRouter } from './routes/onboarding.js';
 import { projectsRouter } from './routes/projects.js';
 import { approvalsRouter } from './routes/approvals.js';
+import { designOsRouter } from './routes/designOs.js';
 import { l99Router } from './routes/l99.js';
 import { terminalRouter } from './routes/terminal.js';
 import { dashboardRouter } from './routes/dashboard.js';
@@ -92,6 +93,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/auth', authRouter);
   app.use('/projects', projectsRouter);
   app.use('/approvals', approvalsRouter);
+  app.use('/design-os', designOsRouter);
   app.use('/l99', l99Router);
   app.use('/terminal', terminalRouter);
   app.use('/dashboard', dashboardRouter);
