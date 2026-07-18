@@ -30,22 +30,34 @@ vi.mock('../../lib/supabaseClient.js', () => ({
 }));
 
 vi.mock('../../controllers/CheckRunController.js', () => ({
-  CheckRunController: vi.fn().mockImplementation(() => ({ run: mockControllerRun })),
+  CheckRunController: class MockCheckRunController {
+    run = mockControllerRun;
+  },
 }));
 vi.mock('../../controllers/ChangeProposalController.js', () => ({
-  ChangeProposalController: vi.fn().mockImplementation(() => ({ run: mockControllerRun })),
+  ChangeProposalController: class MockChangeProposalController {
+    run = mockControllerRun;
+  },
 }));
 vi.mock('../../controllers/MissionController.js', () => ({
-  MissionController: vi.fn().mockImplementation(() => ({ run: mockControllerRun })),
+  MissionController: class MockMissionController {
+    run = mockControllerRun;
+  },
 }));
 vi.mock('../../controllers/ProjectController.js', () => ({
-  ProjectController: vi.fn().mockImplementation(() => ({ run: mockControllerRun })),
+  ProjectController: class MockProjectController {
+    run = mockControllerRun;
+  },
 }));
 vi.mock('../../controllers/ReleaseController.js', () => ({
-  ReleaseController: vi.fn().mockImplementation(() => ({ run: mockControllerRun })),
+  ReleaseController: class MockReleaseController {
+    run = mockControllerRun;
+  },
 }));
 vi.mock('../../controllers/ProofGateController.js', () => ({
-  ProofGateController: vi.fn().mockImplementation(() => ({ run: mockControllerRun })),
+  ProofGateController: class MockProofGateController {
+    run = mockControllerRun;
+  },
 }));
 
 import { runReconcilerCycle } from '../reconciler.js';
