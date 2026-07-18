@@ -30,7 +30,6 @@ const CONTROLLERS = new Map<string, BaseController>([
   // ManifestController added in Milestone C
 ]);
 
-const MAX_ATTEMPTS = 5;
 let running = false;
 
 async function writeReconciliationRun(
@@ -80,14 +79,13 @@ export async function runReconcilerCycle(): Promise<void> {
         try {
           const result = await controller.run({
             projectId: item.projectId,
+            controller: item.controller,
             resourceId: item.resourceId ?? undefined,
             reason: item.reason as ReconcileReason,
-            attempt: item.attempt,
             sourceEventId: item.sourceEventId ?? undefined,
           });
 
           await writeReconciliationRun(item, result, startedAt);
-
           if (result.status === 'retry' && result.retryAfter) {
             const { enqueueReconcile } = await import('../events/outbox.js');
             await enqueueReconcile(
