@@ -25,17 +25,19 @@ vi.mock('../../../lib/supabaseAuthClient.js', () => ({
 vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
 
 vi.mock('../../../providers/GitHubProvider.js', () => ({
-  GitHubProvider: vi.fn().mockImplementation(() => ({
-    createBranch: mockCreateBranch,
-    resolveRef: mockResolveRef,
-    integrate: mockIntegrate,
-  })),
+  GitHubProvider: class MockGitHubProvider {
+    createBranch = mockCreateBranch;
+    resolveRef = mockResolveRef;
+    integrate = mockIntegrate;
+  },
 }));
 
 vi.mock('../../../events/outbox.js', () => ({ enqueueReconcile: mockEnqueue }));
 
 vi.mock('../../../controllers/ProofGateController.js', () => ({
-  ProofGateController: vi.fn().mockImplementation(() => ({ run: mockControllerRun })),
+  ProofGateController: class MockProofGateController {
+    run = mockControllerRun;
+  },
 }));
 
 import express from 'express';
