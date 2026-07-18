@@ -8,8 +8,7 @@
  * scheduled handler — wired to runReconcilerCycle() for Cron Triggers
  */
 
-import type { ExportedHandler, ScheduledEvent, ExecutionContext } from '@cloudflare/workers-types';
-import { makeSupabaseClient } from '../lib/supabaseClient.js';
+import type { ExportedHandler } from '@cloudflare/workers-types';
 import { runReconcilerCycle } from './reconciler.js';
 
 interface WorkerEnv {
@@ -41,15 +40,15 @@ function injectEnv(env: WorkerEnv): void {
   appReady = true;
 }
 
-export default {
-  async fetch(request: Request, env: WorkerEnv, ctx: ExecutionContext): Promise<Response> {
+const handler: ExportedHandler<WorkerEnv> = {
+  async fetch(request, env, _ctx) {
     injectEnv(env);
 
     // Lazy import so the Express app initialises after env is injected
     const { createServer } = await import('../http/server.js');
     const app = createServer();
 
-    return new Promise<Response>((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       // Convert Workers Request → Node IncomingMessage-compatible object
       const url = new URL(request.url);
       const nodeReq = Object.assign(request, {
@@ -60,21 +59,26 @@ export default {
       // Capture Express response via a mock ServerResponse
       const chunks: Uint8Array[] = [];
       const headers: Record<string, string> = {};
-      let statusCode = 200;
 
       const nodeRes = {
-        statusCode,
-        setHeader: (k: string, v: string) => { headers[k] = v; },
-        getHeader: (k: string) => headers[k],
-        end: (body: string | Uint8Array) => {
+        statusCode: 200,
+        setHeader: (key: string, value: string) => { headers[key] = value; },
+        getHeader: (key: string) => headers[key],
+        end: (body?: string | Uint8Array) => {
           const bodyBytes = typeof body === 'string' ? new TextEncoder().encode(body) : body;
           if (bodyBytes) chunks.push(bodyBytes);
-          const combined = new Uint8Array(chunks.reduce((a, c) => a + c.length, 0));
+          const combined = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0));
           let offset = 0;
-          for (const chunk of chunks) { combined.set(chunk, offset); offset += chunk.length; }
+          for (const chunk of chunks) {
+            combined.set(chunk, offset);
+            offset += chunk.length;
+          }
           resolve(new Response(combined, { status: nodeRes.statusCode, headers }));
         },
-        write: (chunk: Uint8Array) => { chunks.push(chunk); },
+        write: (chunk: Uint8Array) => {
+          chunks.push(chunk);
+          return true;
+        },
       };
 
       try {
@@ -86,8 +90,10 @@ export default {
     });
   },
 
-  async scheduled(_event: ScheduledEvent, env: WorkerEnv, ctx: ExecutionContext): Promise<void> {
+  async scheduled(_controller, env, ctx) {
     injectEnv(env);
     ctx.waitUntil(runReconcilerCycle());
   },
-} satisfies ExportedHandler<WorkerEnv>;
+};
+
+export default handler;
