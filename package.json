@@ -12,7 +12,8 @@
     "deploy": "wrangler deploy",
     "lint": "eslint 'src/**/*.ts' --max-warnings 0",
     "test": "vitest run",
-    "verify:mcp": "node scripts/verify-mcp-config.mjs"
+    "verify:mcp": "node scripts/verify-mcp-config.mjs",
+    "verify:ai-skills": "node scripts/verify-ai-skills.mjs"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
