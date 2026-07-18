@@ -22,6 +22,15 @@ function requireText(label, source, expected) {
   }
 }
 
+function requireCount(label, source, expected, minimum) {
+  const count = source.split(expected).length - 1;
+  if (count < minimum) {
+    failures.push(
+      `${label}: expected at least ${minimum} occurrences of ${JSON.stringify(expected)}, found ${count}`,
+    );
+  }
+}
+
 function forbidText(label, source, forbidden) {
   if (source.includes(forbidden)) {
     failures.push(`${label}: forbidden stale or unsafe text ${JSON.stringify(forbidden)}`);
@@ -64,6 +73,11 @@ forbidText('Terminal runner', files.runner, "spawn('sh'");
 
 requireText('Terminal registry', files.registry, 'playwright@${PLAYWRIGHT_VERSION}');
 requireText('Terminal registry', files.registry, "'deps.playwright-browser'");
+requireText('Terminal registry', files.registry, "'verify.terminal-contract'");
+requireCount('Terminal registry', files.registry, "'verify.ai-skills'", 4);
+requireCount('Terminal registry', files.registry, "evidenceKind: 'artifact_provenance'", 4);
+requireText('Terminal registry', files.registry, "['run', 'verify:ai-skills']");
+requireText('Terminal registry', files.registry, "['run', 'verify:ai-skill-contract']");
 forbidText('Terminal registry', files.registry, "'bash'");
 forbidText('Terminal registry', files.registry, "'sh'");
 forbidText('Terminal registry', files.registry, "'powershell'");
@@ -74,6 +88,7 @@ requireText('GitHub provider', files.githubProvider, 'this.resolvedRefs.delete(k
 requireText('GitHub provider', files.githubProvider, 'requires resolveRef');
 
 requireText('Evidence types', files.evidenceTypes, "'browser_test'");
+requireText('Evidence types', files.evidenceTypes, "'artifact_provenance'");
 
 requireText('Migration', files.migration, 'create table if not exists approval_executions');
 requireText('Migration', files.migration, "status in ('pending', 'succeeded', 'failed')");
