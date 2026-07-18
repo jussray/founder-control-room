@@ -1,0 +1,97 @@
+name: Founder Control Room Recovery Proof
+
+on:
+  push:
+    branches:
+      - agent/pr35-ci-recovery
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm test -- --coverage --reporter=json --outputFile=test-results.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: recovery-test-results
+          path: test-results.json
+          if-no-files-found: error
+          retention-days: 7
+
+  terminal-contract:
+    name: Guarded Terminal and AI Skill Contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run verify:terminal-contract
+      - run: npm run verify:ai-skills
+
+  migration-lint:
+    name: Migration Lint Evidence
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase db lint --local
+
+  build:
+    name: Production Build
+    runs-on: ubuntu-latest
+    needs:
+      - typecheck
+      - lint
+      - unit-tests
+      - terminal-contract
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
