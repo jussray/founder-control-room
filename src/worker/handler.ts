@@ -41,15 +41,22 @@ export function validateWorkerEnv(
     throw new Error(`Missing required Worker bindings: ${missing.join(', ')}`);
   }
 
+  // The complete-key check above is runtime proof that every required value is
+  // a non-empty string. TypeScript cannot derive that fact through the dynamic
+  // key iteration, so narrow once at this boundary.
+  const validated = env as ControlRoomWorkerEnv;
+
   try {
-    new URL(env.SUPABASE_URL);
-    new URL(env.FOUNDER_API_URL);
+    new URL(validated.SUPABASE_URL);
+    new URL(validated.FOUNDER_API_URL);
   } catch {
     throw new Error('SUPABASE_URL and FOUNDER_API_URL must be absolute URLs');
   }
 
-  const origins = env.FOUNDER_ALLOWED_ORIGINS.split(',').map((value) => value.trim());
-  if (!origins.length || origins.some((origin) => {
+  const origins = validated.FOUNDER_ALLOWED_ORIGINS
+    .split(',')
+    .map((value: string) => value.trim());
+  if (!origins.length || origins.some((origin: string) => {
     try {
       return new URL(origin).origin !== origin.replace(/\/$/, '');
     } catch {
