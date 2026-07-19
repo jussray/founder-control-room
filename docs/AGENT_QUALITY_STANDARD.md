@@ -6,8 +6,9 @@ Founder Control Room agents should operate like production engineers, not demo b
 
 For every nontrivial code change, the acting agent must either:
 
-1. run the local verification gates, or
-2. explicitly report which gates were not run and why.
+1. run the local verification gates,
+2. request those gates through Founder Command Bridge, or
+3. explicitly report which gates were not run and why.
 
 Silence is not proof.
 
@@ -32,13 +33,19 @@ npm run test:e2e
 
 Use the smallest set that proves the changed surface, but never skip `typecheck` for TypeScript code or `test` for route/controller/schema behavior without saying so.
 
+## Command Bridge path
+
+If an agent cannot run a gate in its own tool session, it should request a command card through Founder Command Bridge instead of claiming readiness. The founder approves or denies the exact command, mission, commit SHA, reason, rollback plan, and expiry.
+
+Command Bridge is a request path, not agent-owned execution.
+
 ## Reporting standard
 
 Every agent handoff should include:
 
 - commit or branch inspected;
 - files changed;
-- commands run;
+- commands run or Command Bridge cards requested;
 - pass/fail result;
 - any unrun command and the exact blocker;
 - remaining risk;
@@ -56,4 +63,4 @@ Do not weaken auth, founder allowlisting, RLS, audit logging, evidence gates, te
 
 ## Other-agent rule
 
-Codex, Claude Code, GitHub Copilot, Cursor, and any future agent connected through Plugin Center must follow this same standard. If an agent cannot run the gate in its tool session, it must leave a clear receipt saying exactly what was not verified.
+Codex, Claude Code, GitHub Copilot, Cursor, and any future agent connected through Plugin Center must follow this same standard. If an agent cannot run the gate in its tool session, it must leave a clear receipt saying exactly what was not verified and, where appropriate, request the proof through Founder Command Bridge.
