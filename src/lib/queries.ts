@@ -13,7 +13,7 @@ export async function getLanes(): Promise<Lane[]> {
 export async function getMissions(laneId?: string): Promise<Mission[]> {
   let q = supabaseAdmin()
     .from('missions')
-    .select('*, ooda_steps(*), evidence(*)')
+    .select('*, ooda_steps(*), prototype_evidence(*)')
     .order('created_at', { ascending: false });
   if (laneId) q = q.eq('lane_id', laneId);
   const { data, error } = await q;
@@ -37,7 +37,7 @@ export async function appendEvidence(
   evidence: Omit<Evidence, 'id' | 'created_at'>
 ) {
   const { data, error } = await supabaseAdmin()
-    .from('evidence')
+    .from('prototype_evidence')
     .insert(evidence)
     .select()
     .single();

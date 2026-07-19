@@ -12,6 +12,13 @@ export interface GitHubProviderConfig {
   token: string;
   /** Maps Control Room projectId -> "owner/repo". */
   projectMap: Record<string, string>;
+  /**
+   * Overrides Octokit's API base URL. Only ever set via GITHUB_API_BASE_URL
+   * for pointing at a fake GitHub REST server in e2e/ — never set in
+   * production, where this must remain unset so Octokit talks to the real
+   * api.github.com.
+   */
+  baseUrl?: string;
 }
 
 /**
@@ -27,7 +34,7 @@ export class GitHubProvider implements RepositoryProvider {
   private readonly resolvedRefs = new Map<string, string>();
 
   constructor(config: GitHubProviderConfig) {
-    this.octokit = new Octokit({ auth: config.token });
+    this.octokit = new Octokit({ auth: config.token, ...(config.baseUrl ? { baseUrl: config.baseUrl } : {}) });
     this.projectMap = config.projectMap;
   }
 

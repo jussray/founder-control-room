@@ -324,6 +324,120 @@ describe('approval proof gates', () => {
       .send({ gateId: 'merge', evidence: validEvidence });
     expect(response.status).toBe(500);
   });
+
+  it('pins policy_snapshot.expectedHeadSha to the branch\'s current resolved head when the merge gate converges — nothing else in this codebase ever wrote it, and the merge-execution route unconditionally requires it', async () => {
+    authSuccess();
+    process.env.GITHUB_TOKEN = 'test-token';
+    mockResolveRef.mockResolvedValue(EXPECTED_SHA);
+    mockControllerRun.mockResolvedValue({
+      status: 'converged',
+      proposedActions: [],
+      observedChanges: [],
+      evidenceIds: [],
+      requiresApproval: false,
+    });
+
+    let updatedFields: Record<string, unknown> | null = null;
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'missions') {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({
+                data: {
+                  id: MISSION_ID,
+                  project_id: PROJECT_ID,
+                  status: 'in_review',
+                  branch_ref: 'mission/test',
+                  policy_snapshot: { someExistingKey: 'preserved' },
+                },
+                error: null,
+              }),
+            }),
+          }),
+          update: (fields: Record<string, unknown>) => {
+            updatedFields = fields;
+            return twoEqUpdate();
+          },
+        };
+      }
+      if (table === 'projects') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({
+                data: { slug: 'test-project', repo_provider: 'github', repo_identifier: 'jussray/test-project' },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      return {};
+    });
+
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/run-proof-gate`)
+      .set('Authorization', BEARER)
+      .send({ gateId: 'merge', evidence: validEvidence });
+
+    expect(response.status).toBe(200);
+    expect(mockResolveRef).toHaveBeenCalledWith('test-project', 'mission/test');
+    expect(updatedFields).toMatchObject({
+      status: 'approved',
+      policy_snapshot: { someExistingKey: 'preserved', expectedHeadSha: EXPECTED_SHA },
+    });
+  });
+
+  it('rejects with 502 rather than silently approving when the branch head cannot be resolved', async () => {
+    authSuccess();
+    process.env.GITHUB_TOKEN = 'test-token';
+    mockResolveRef.mockRejectedValue(new Error('branch not found'));
+    mockControllerRun.mockResolvedValue({
+      status: 'converged',
+      proposedActions: [],
+      observedChanges: [],
+      evidenceIds: [],
+      requiresApproval: false,
+    });
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'missions') {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({
+                data: { id: MISSION_ID, project_id: PROJECT_ID, status: 'in_review', branch_ref: 'mission/test', policy_snapshot: {} },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === 'projects') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({
+                data: { slug: 'test-project', repo_provider: 'github', repo_identifier: 'jussray/test-project' },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      return {};
+    });
+
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/run-proof-gate`)
+      .set('Authorization', BEARER)
+      .send({ gateId: 'merge', evidence: validEvidence });
+
+    expect(response.status).toBe(502);
+  });
 });
 
 describe('reservation-first exact-head execution', () => {
@@ -511,6 +625,78 @@ describe('reservation-first exact-head execution', () => {
     expect(mockCreateBranch).toHaveBeenCalledWith('test-project', 'main', 'mission/test');
     expect(auditUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'succeeded' }));
   });
+
+  it('pins policy_snapshot.expectedHeadSha to the new branch head when create_branch executes — without this, the mission can never leave a permanently-null expectedHeadSha while sandboxed/in_review', async () => {
+    executeStack({ missionStatus: 'proposed' });
+    mockResolveRef.mockResolvedValue(EXPECTED_SHA);
+
+    let updatedFields: Record<string, unknown> | null = null;
+    const originalFrom = supabaseMock.from.getMockImplementation();
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'missions') {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({
+                data: {
+                  id: MISSION_ID,
+                  project_id: PROJECT_ID,
+                  status: 'proposed',
+                  branch_ref: null,
+                  policy_snapshot: { someExistingKey: 'preserved' },
+                },
+                error: null,
+              }),
+            }),
+          }),
+          update: (fields: Record<string, unknown>) => {
+            updatedFields = fields;
+            return twoEqUpdate();
+          },
+        };
+      }
+      return originalFrom!(table);
+    });
+
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'create_branch',
+        idempotencyKey: 'branch-pins-head',
+        payload: { branchName: 'mission/test', baseRef: 'main' },
+      });
+
+    expect(response.status).toBe(200);
+    expect(mockResolveRef).toHaveBeenCalledWith('test-project', 'mission/test');
+    expect(updatedFields).toMatchObject({
+      branch_ref: 'mission/test',
+      status: 'sandboxed',
+      policy_snapshot: { someExistingKey: 'preserved', expectedHeadSha: EXPECTED_SHA },
+    });
+    expect(response.body.result).toMatchObject({ expectedHeadSha: EXPECTED_SHA });
+  });
+
+  it('still creates the branch and warns, rather than failing the whole action, when the new head cannot be resolved', async () => {
+    const { auditUpdate } = executeStack({ missionStatus: 'proposed' });
+    mockResolveRef.mockRejectedValue(new Error('branch not found'));
+
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'create_branch',
+        idempotencyKey: 'branch-resolve-fails',
+        payload: { branchName: 'mission/test', baseRef: 'main' },
+      });
+
+    expect(response.status).toBe(200);
+    expect(mockCreateBranch).toHaveBeenCalled();
+    expect(response.body.result.warnings).toEqual(
+      expect.arrayContaining([expect.stringContaining('head commit could not be resolved')]),
+    );
+    expect(auditUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'succeeded' }));
+  });
 });
 
 describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch', () => {
@@ -520,7 +706,12 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
     authSuccess();
   });
 
-  function missionRow(overrides: Record<string, unknown> = {}) {
+  interface MissionRowOptions {
+    missionUpdateError?: { message: string } | null;
+    onMissionUpdate?: (fields: Record<string, unknown>) => void;
+  }
+
+  function missionRow(overrides: Record<string, unknown> = {}, options: MissionRowOptions = {}) {
     return {
       select: () => ({
         eq: () => ({
@@ -530,12 +721,17 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
               project_id: PROJECT_ID,
               status: 'sandboxed',
               branch_ref: 'mission/test',
+              policy_snapshot: { someExistingKey: 'preserved' },
               ...overrides,
             },
             error: null,
           }),
         }),
       }),
+      update: (fields: Record<string, unknown>) => {
+        options.onMissionUpdate?.(fields);
+        return { eq: () => Promise.resolve({ error: options.missionUpdateError ?? null }) };
+      },
     };
   }
 
@@ -552,10 +748,14 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
     };
   }
 
-  function wireStandardTables(missionOverrides: Record<string, unknown> = {}, projectEventInsert = vi.fn(() => Promise.resolve({ error: null }))) {
+  function wireStandardTables(
+    missionOverrides: Record<string, unknown> = {},
+    projectEventInsert = vi.fn(() => Promise.resolve({ error: null })),
+    missionRowOptions: MissionRowOptions = {},
+  ) {
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'founder_users') return founderUsersRow();
-      if (table === 'missions') return missionRow(missionOverrides);
+      if (table === 'missions') return missionRow(missionOverrides, missionRowOptions);
       if (table === 'projects') return projectRow();
       if (table === 'project_events') return { insert: projectEventInsert };
       return {};
@@ -657,5 +857,37 @@ describe('POST /:missionId/patch — founder read/write/edit on a sandbox branch
       .send({ message: 'edit', changes: [{ path: 'a.txt', content: 'hi' }] });
 
     expect(res.status).toBe(502);
+  });
+
+  it('re-pins policy_snapshot.expectedHeadSha to the new commit — without this, CheckRunController silently orphans CI evidence for every commit after the first', async () => {
+    let updatedFields: Record<string, unknown> | null = null;
+    wireStandardTables({}, undefined, { onMissionUpdate: (fields) => { updatedFields = fields; } });
+    const newHeadSha = 'deadbeef'.repeat(5);
+    mockCommitPatch.mockResolvedValue(newHeadSha);
+
+    const res = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/patch`)
+      .set('Authorization', BEARER)
+      .send({ message: 'Fix the thing', changes: [{ path: 'src/example.ts', content: 'export const x = 1;' }] });
+
+    expect(res.status).toBe(201);
+    expect(res.body.warning).toBeUndefined();
+    expect(updatedFields).toMatchObject({
+      policy_snapshot: { someExistingKey: 'preserved', expectedHeadSha: newHeadSha },
+    });
+  });
+
+  it('still returns success with a warning when the re-pin update fails, since the commit itself already succeeded', async () => {
+    wireStandardTables({}, undefined, { missionUpdateError: { message: 'write conflict' } });
+    mockCommitPatch.mockResolvedValue('deadbeef'.repeat(5));
+
+    const res = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/patch`)
+      .set('Authorization', BEARER)
+      .send({ message: 'edit', changes: [{ path: 'a.txt', content: 'hi' }] });
+
+    expect(res.status).toBe(201);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.warning).toMatch(/could not be re-pinned/);
   });
 });

@@ -12,6 +12,7 @@
     "deploy": "wrangler deploy",
     "lint": "eslint 'src/**/*.ts'",
     "test": "vitest run",
+    "test:e2e": "npm run build && node e2e/run.mjs",
     "verify:mcp": "node scripts/verify-mcp-config.mjs",
     "verify:terminal-contract": "node scripts/verify-guarded-terminal-contract.mjs",
     "verify:ai-skills": "node scripts/verify-ai-skill-contract.mjs"
@@ -31,6 +32,7 @@
     "@typescript-eslint/parser": "^8.0.0",
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^9.0.0",
+    "playwright": "^1.61.1",
     "supertest": "^7.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.5.4",

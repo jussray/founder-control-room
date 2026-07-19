@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabaseClient.js";
 import { GitHubProvider } from "../../providers/GitHubProvider.js";
 import type { RepositoryProvider } from "../../providers/RepositoryProvider.js";
 import { requireFounder, type FounderRequest } from "../middleware/requireFounder.js";
+import { AUTHORITY_LEVEL_IDS } from "../../lib/authorityLevels.js";
 
 export const projectsRouter = Router();
 
@@ -121,10 +122,14 @@ projectsRouter.get("/:slug/releases", requireFounder, async (req: FounderRequest
 /**
  * GET /projects/:slug/connections
  *
- * Plugin/MCP Hub — lists this project's connection slots (git, cloudflare,
- * supabase, AI providers, commerce, etc). Config is non-secret by design;
- * `secret_ref` is a pointer, never the credential itself (see
- * project_connections' own table comment in 0001_init.sql).
+ * MCP / Connector Hub — lists this project's connection slots (GitHub,
+ * Cloudflare, Supabase, Figma, Canva, Shopify, Gmail, AI providers, etc),
+ * each with its declared authority level, capabilities, and data boundary.
+ * Config is non-secret by design; `secret_ref` is a pointer, never the
+ * credential itself (see project_connections' own table comment in
+ * 0001_init.sql). This is inventory and visibility — the actual gates
+ * (requireFounder, proof-gate, approval_executions) are unaffected by
+ * anything recorded here.
  */
 projectsRouter.get("/:slug/connections", requireFounder, async (req: FounderRequest, res) => {
   const { slug } = req.params;
@@ -139,7 +144,7 @@ projectsRouter.get("/:slug/connections", requireFounder, async (req: FounderRequ
 
   const { data: connections, error } = await supabase
     .from("project_connections")
-    .select("id, connection_type, label, config, secret_ref, status, created_at, updated_at")
+    .select("id, connection_type, label, config, secret_ref, status, authority_level, capabilities, data_boundary, required_approval, last_checked_at, created_at, updated_at")
     .eq("project_id", project.id)
     .order("created_at", { ascending: false });
 
@@ -148,12 +153,14 @@ projectsRouter.get("/:slug/connections", requireFounder, async (req: FounderRequ
 });
 
 const CONNECTION_TYPES = new Set([
-  "git", "cloudflare", "supabase", "openai", "anthropic", "shopify", "expo", "apple", "google_play", "stripe", "other",
+  "git", "github", "cloudflare", "supabase", "openai", "anthropic", "perplexity",
+  "shopify", "expo", "apple", "google_play", "stripe",
+  "figma", "canva", "playwright", "gmail", "calendar", "context7", "other",
 ]);
 
 /**
  * POST /projects/:slug/connections
- * Body: { connectionType, label?, config?, secretRef? }
+ * Body: { connectionType, label?, config?, secretRef?, authorityLevel?, capabilities?, dataBoundary?, requiredApproval? }
  *
  * Registers a connection SLOT — non-secret config and a pointer to where
  * the real credential lives. This route cannot accept or store an actual
@@ -169,6 +176,11 @@ projectsRouter.post("/:slug/connections", requireFounder, async (req: FounderReq
     return res.status(400).json({ error: `connectionType must be one of: ${[...CONNECTION_TYPES].join(", ")}` });
   }
 
+  const authorityLevel = typeof body["authorityLevel"] === "string" ? body["authorityLevel"] : null;
+  if (authorityLevel !== null && !AUTHORITY_LEVEL_IDS.has(authorityLevel)) {
+    return res.status(400).json({ error: `authorityLevel must be one of: ${[...AUTHORITY_LEVEL_IDS].join(", ")}` });
+  }
+
   const { data: project, error: projectError } = await supabase
     .from("projects")
     .select("id")
@@ -180,6 +192,11 @@ projectsRouter.post("/:slug/connections", requireFounder, async (req: FounderReq
   const label = typeof body["label"] === "string" ? body["label"] : null;
   const config = typeof body["config"] === "object" && body["config"] !== null ? body["config"] : {};
   const secretRef = typeof body["secretRef"] === "string" ? body["secretRef"] : null;
+  const capabilities = Array.isArray(body["capabilities"]) && body["capabilities"].every((c) => typeof c === "string")
+    ? body["capabilities"]
+    : [];
+  const dataBoundary = typeof body["dataBoundary"] === "string" ? body["dataBoundary"] : null;
+  const requiredApproval = typeof body["requiredApproval"] === "string" ? body["requiredApproval"] : null;
 
   const { data: connection, error } = await supabase
     .from("project_connections")
@@ -190,6 +207,10 @@ projectsRouter.post("/:slug/connections", requireFounder, async (req: FounderReq
       config,
       secret_ref: secretRef,
       status: "active",
+      authority_level: authorityLevel,
+      capabilities,
+      data_boundary: dataBoundary,
+      required_approval: requiredApproval,
     })
     .select()
     .single();
@@ -207,21 +228,101 @@ projectsRouter.post("/:slug/connections", requireFounder, async (req: FounderReq
     event_type: "project_connection_registered",
     severity: "info",
     screen: "control-room-api",
-    metadata: { route: `POST /projects/${slug}/connections`, registered_by: req.founder?.email, connectionType },
+    metadata: { route: `POST /projects/${slug}/connections`, registered_by: req.founder?.email, connectionType, authorityLevel },
   });
 
   return res.status(201).json({ connection });
 });
 
 /**
+ * POST /projects/:slug/connections/:connectionId/check
+ * Body: { status? }
+ *
+ * Records a founder-triggered connector health check — sets
+ * last_checked_at to now, and optionally updates status. This does not
+ * call the provider itself (no credential lives in this process for most
+ * of these connectors); it records that a human or an external tool
+ * confirmed the connection works, the same way GET /agents and Bench keep
+ * machine evidence separate from founder attestation.
+ */
+projectsRouter.post("/:slug/connections/:connectionId/check", requireFounder, async (req: FounderRequest, res) => {
+  const { slug, connectionId } = req.params;
+  const body = req.body as Record<string, unknown>;
+  const status = typeof body["status"] === "string" ? body["status"] : undefined;
+
+  if (status && !["active", "disconnected", "error"].includes(status)) {
+    return res.status(400).json({ error: "status must be one of: active, disconnected, error" });
+  }
+
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (projectError) return res.status(500).json({ error: projectError.message });
+  if (!project) return res.status(404).json({ error: `No project registered with slug "${slug}"` });
+
+  const { data: existing, error: existingError } = await supabase
+    .from("project_connections")
+    .select("id")
+    .eq("id", connectionId)
+    .eq("project_id", project.id)
+    .maybeSingle();
+  if (existingError) return res.status(500).json({ error: existingError.message });
+  if (!existing) return res.status(404).json({ error: "Connection not found for this project" });
+
+  const update: Record<string, unknown> = {
+    last_checked_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  if (status) update["status"] = status;
+
+  const { data: connection, error } = await supabase
+    .from("project_connections")
+    .update(update)
+    .eq("id", connectionId)
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  await supabase.from("project_events").insert({
+    project_id: project.id,
+    source_event_id: randomUUID(),
+    event_type: "project_connection_checked",
+    severity: "info",
+    screen: "control-room-api",
+    metadata: { route: `POST /projects/${slug}/connections/${connectionId}/check`, checked_by: req.founder?.email, status: status ?? connection.status },
+  });
+
+  return res.json({ connection });
+});
+
+// Mirrors reconciliation/types.ts's EvidenceKind union — that's a
+// compile-time-only type, so this runtime list has to be kept in sync by
+// hand. A mission with an empty required_checks list can NEVER leave
+// 'sandboxed' (MissionController.reconcile() refuses to evaluate evidence
+// with nothing required — see that file), so this is not an optional nicety.
+const EVIDENCE_KINDS = new Set([
+  "typecheck", "lint", "unit_test", "integration_test", "browser_test",
+  "security_scan", "preview_health", "deployment_result",
+  "migration_verification", "storefront_check", "artifact_provenance", "rls_audit",
+]);
+
+/**
  * POST /projects/:slug/missions
- * Body: { title, description?, riskLevel?, builderAgent?, reviewerAgent? }
+ * Body: { title, description?, riskLevel?, builderAgent?, reviewerAgent?, requiredChecks? }
  *
  * Creates a new mission (the Issues/task-equivalent) under a project,
  * status 'proposed'. This is the founder-initiated entry point into the
  * mission lifecycle — everything else (sandbox branch, patch, proof gate,
  * merge) acts on a mission that already exists. builderAgent/reviewerAgent
  * can also be set later via PATCH /missions/:missionId.
+ *
+ * requiredChecks matters more than it looks: leave it empty and this
+ * mission can never automatically advance past 'sandboxed', because
+ * MissionController requires at least one required check kind before it
+ * will evaluate evidence at all.
  */
 projectsRouter.post("/:slug/missions", requireFounder, async (req: FounderRequest, res) => {
   const { slug } = req.params;
@@ -229,6 +330,14 @@ projectsRouter.post("/:slug/missions", requireFounder, async (req: FounderReques
   const title = typeof body["title"] === "string" ? body["title"].trim() : "";
 
   if (!title) return res.status(400).json({ error: "title is required" });
+
+  const requiredChecksInput = body["requiredChecks"];
+  if (requiredChecksInput !== undefined) {
+    if (!Array.isArray(requiredChecksInput) || !requiredChecksInput.every((k) => typeof k === "string" && EVIDENCE_KINDS.has(k))) {
+      return res.status(400).json({ error: `requiredChecks must be an array drawn from: ${[...EVIDENCE_KINDS].join(", ")}` });
+    }
+  }
+  const requiredChecks = Array.isArray(requiredChecksInput) ? requiredChecksInput : [];
 
   const { data: project, error: projectError } = await supabase
     .from("projects")
@@ -253,6 +362,7 @@ projectsRouter.post("/:slug/missions", requireFounder, async (req: FounderReques
       risk_level: riskLevel,
       builder_agent: builderAgent,
       reviewer_agent: reviewerAgent,
+      required_checks: requiredChecks,
       status: "proposed",
     })
     .select()
@@ -285,6 +395,7 @@ function providerForProject(repoProvider: string, slug: string, repoIdentifier: 
     return new GitHubProvider({
       token,
       projectMap: { [slug]: repoIdentifier },
+      baseUrl: process.env.GITHUB_API_BASE_URL,
     });
   }
   throw new Error(`No RepositoryProvider implementation for "${repoProvider}" yet`);

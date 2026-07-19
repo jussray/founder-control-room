@@ -27,12 +27,13 @@ const state = {
   missionRuns: [],
   missionCosts: null,
   l99: null,
-  terminal: { projectSlug: null, commands: [], lastRun: null },
+  terminal: { projectSlug: null, commands: [], selectedCommandId: null, lastRun: null },
   promptTemplates: [],
   selectedTemplateId: null,
   selectedTemplate: null,
   costs: null,
   agents: [],
+  authorityLevels: [],
   banner: null, // { kind: 'error'|'notice', text }
 };
 
@@ -127,10 +128,18 @@ function escapeHtml(value) {
   ));
 }
 
+/**
+ * Parses an HTML string into a DocumentFragment so every top-level sibling
+ * survives appendChild — not just the first one. Templates in this file
+ * routinely have multiple top-level panels (e.g. a form panel + a list
+ * panel + a hidden detail panel); returning only firstElementChild here
+ * silently dropped the rest, which no vitest/supertest test could ever
+ * catch since none of them render into a real DOM. Caught by e2e/run.mjs.
+ */
 function el(html) {
   const template = document.createElement('template');
   template.innerHTML = html.trim();
-  return template.content.firstElementChild;
+  return template.content;
 }
 
 function on(selector, event, handler) {
@@ -234,6 +243,11 @@ function renderTabContent() {
 async function loadAgents() {
   const data = await api('/agents');
   state.agents = data.agents ?? [];
+}
+
+async function loadAuthorityLevels() {
+  const data = await api('/authority-levels');
+  state.authorityLevels = data.levels ?? [];
 }
 
 // ─── Projects tab ────────────────────────────────────────────────────────────
@@ -350,6 +364,8 @@ function renderProjectDetail(mount) {
         <div><label>Reviewer agent</label><input name="reviewerAgent" list="agent-options-new-mission" placeholder="codex" /></div>
       </div>
       ${agentDatalist('agent-options-new-mission')}
+      <label>Required checks (comma-separated) — leave blank and this mission can never leave "sandboxed" automatically</label>
+      <input name="requiredChecks" placeholder="unit_test, typecheck" />
       <div style="margin-top:0.5rem"><button class="primary" type="submit">Create mission</button></div>
     </form>
 
@@ -364,29 +380,63 @@ function renderProjectDetail(mount) {
       </div>
     `).join('')}
 
-    <h3>Plugin / MCP Hub — connections</h3>
+    <h3>MCP / Connector Hub</h3>
     ${state.projectConnections.length === 0 ? '<p class="muted">No connections registered.</p>' : state.projectConnections.map((c) => `
-      <div class="card" style="cursor:default">
-        <div class="meta">${escapeHtml(c.status)}${c.secret_ref ? ` · secret ref: <span class="mono">${escapeHtml(c.secret_ref)}</span>` : ''}</div>
+      <div class="card" style="cursor:default" data-connection-id="${escapeHtml(c.id)}">
+        <div class="meta">
+          <span class="badge ${c.status === 'active' ? 'ok' : c.status === 'error' ? 'danger' : 'warn'}">${escapeHtml(c.status)}</span>
+          ${c.authority_level ? ` · <span class="badge">${escapeHtml(c.authority_level)}</span>` : ' · <span class="muted">no authority level set</span>'}
+          ${c.last_checked_at ? ` · last checked ${escapeHtml(new Date(c.last_checked_at).toLocaleString())}` : ' · never checked'}
+        </div>
         <div class="title">${escapeHtml(c.connection_type)}${c.label ? ` — ${escapeHtml(c.label)}` : ''}</div>
+        ${(c.capabilities ?? []).length > 0 ? `<p class="muted">${(c.capabilities ?? []).map(escapeHtml).join(', ')}</p>` : ''}
+        ${c.data_boundary ? `<p class="muted">Boundary: ${escapeHtml(c.data_boundary)}</p>` : ''}
+        ${c.secret_ref ? `<p class="muted">Secret ref: <span class="mono">${escapeHtml(c.secret_ref)}</span></p>` : ''}
+        <button class="connection-check-btn" data-connection-id="${escapeHtml(c.id)}" type="button">Check now</button>
       </div>
     `).join('')}
     <form id="new-connection-form">
       <div class="row">
         <div><label>Type</label>
           <select name="connectionType">
-            <option>git</option><option>cloudflare</option><option>supabase</option>
-            <option>openai</option><option>anthropic</option><option>shopify</option>
-            <option>expo</option><option>apple</option><option>google_play</option>
+            <option>github</option><option>git</option><option>cloudflare</option><option>supabase</option>
+            <option>openai</option><option>anthropic</option><option>perplexity</option>
+            <option>figma</option><option>canva</option><option>playwright</option>
+            <option>gmail</option><option>calendar</option><option>context7</option>
+            <option>shopify</option><option>expo</option><option>apple</option><option>google_play</option>
             <option>stripe</option><option>other</option>
           </select>
         </div>
         <div><label>Label</label><input name="label" placeholder="production" /></div>
-        <div><label>Secret ref (pointer only — never a real secret)</label><input name="secretRef" placeholder="CLOUDFLARE_API_TOKEN" /></div>
+        <div><label>Authority level</label>
+          <select name="authorityLevel">
+            <option value="">unset</option>
+            ${state.authorityLevels.map((a) => `<option value="${a.level}">${a.level} — ${escapeHtml(a.label)}</option>`).join('')}
+          </select>
+        </div>
       </div>
+      <div class="row">
+        <div><label>Secret ref (pointer only — never a real secret)</label><input name="secretRef" placeholder="CLOUDFLARE_API_TOKEN" /></div>
+        <div><label>Capabilities (comma-separated)</label><input name="capabilities" placeholder="inspect_repos, create_branch" /></div>
+      </div>
+      <label>Data boundary</label>
+      <input name="dataBoundary" placeholder="Sanitized operational events only, no teen journal content." />
       <div style="margin-top:0.5rem"><button type="submit">Register connection</button></div>
     </form>
   `;
+
+  panel.querySelectorAll('.connection-check-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      guarded(async () => {
+        await api(`/projects/${encodeURIComponent(p.project.slug)}/connections/${btn.dataset.connectionId}/check`, {
+          method: 'POST',
+          body: JSON.stringify({ status: 'active' }),
+        });
+        await loadProjectConnections(p.project.slug);
+        setBanner('notice', 'Connection check recorded.');
+      });
+    });
+  });
 
   panel.querySelector('#file-up')?.addEventListener('click', () => {
     const parent = files.path.split('/').slice(0, -1).join('/');
@@ -413,6 +463,7 @@ function renderProjectDetail(mount) {
   panel.querySelector('#new-mission-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const values = withoutBlanks(formValues(e.target));
+    if (values.requiredChecks) values.requiredChecks = values.requiredChecks.split(',').map((c) => c.trim()).filter(Boolean);
     guarded(async () => {
       await api(`/projects/${encodeURIComponent(p.project.slug)}/missions`, {
         method: 'POST',
@@ -426,6 +477,7 @@ function renderProjectDetail(mount) {
   panel.querySelector('#new-connection-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const values = withoutBlanks(formValues(e.target));
+    if (values.capabilities) values.capabilities = values.capabilities.split(',').map((c) => c.trim()).filter(Boolean);
     guarded(async () => {
       await api(`/projects/${encodeURIComponent(p.project.slug)}/connections`, {
         method: 'POST',
@@ -500,6 +552,11 @@ function renderMissionDetail(mount) {
   panel.style.display = 'block';
 
   const editable = mission.status === 'sandboxed' || mission.status === 'in_review';
+  // create_branch is proof-gated too (PROOF_GATED_ACTIONS in approvals.ts)
+  // and that gate must run BEFORE the branch exists, i.e. while still
+  // 'proposed' — so this form can't be nested inside `editable` only, or
+  // there would be no way to ever pass the create_branch gate at all.
+  const canRunProofGate = mission.status === 'proposed' || editable;
 
   panel.innerHTML = `
     <h2>${escapeHtml(mission.title)}</h2>
@@ -528,6 +585,26 @@ function renderMissionDetail(mount) {
       </form>
     ` : ''}
 
+    ${canRunProofGate ? `
+      <h3>Run proof gate</h3>
+      <form id="proof-gate-form">
+        <label>Gate ID</label>
+        <select name="gateId">
+          <option value="create_branch">create_branch</option>
+          <option value="merge">merge</option>
+        </select>
+        <label>Files changed (comma-separated) — required, the gate rejects an empty list</label>
+        <input name="filesChanged" placeholder="src/index.ts" required />
+        <label>Checks run (comma-separated) — required, the gate rejects an empty list</label>
+        <input name="checksRun" placeholder="typecheck, unit_test" required />
+        <label>Behavior changed</label><input name="behaviorChanged" required />
+        <label>Security impact</label><input name="securityImpact" value="none" required />
+        <label>Deployment impact</label><input name="deploymentImpact" value="none" required />
+        <label>Rollback path</label><input name="rollbackPath" required />
+        <div style="margin-top:0.5rem"><button class="primary" type="submit">Run proof gate</button></div>
+      </form>
+    ` : ''}
+
     ${editable ? `
       <h3>Edit files on ${escapeHtml(mission.branch_ref)}</h3>
       <div class="row">
@@ -540,21 +617,9 @@ function renderMissionDetail(mount) {
       <label>Commit message</label>
       <input id="mission-commit-message" placeholder="Describe the change" />
       <div style="margin-top:0.5rem"><button class="primary" id="mission-commit-btn">Commit to ${escapeHtml(mission.branch_ref ?? '')}</button></div>
+    ` : ''}
 
-      <h3>Run proof gate</h3>
-      <form id="proof-gate-form">
-        <label>Gate ID</label>
-        <select name="gateId">
-          <option value="merge">merge</option>
-          <option value="create_branch">create_branch</option>
-        </select>
-        <label>Behavior changed</label><input name="behaviorChanged" required />
-        <label>Security impact</label><input name="securityImpact" value="none" required />
-        <label>Deployment impact</label><input name="deploymentImpact" value="none" required />
-        <label>Rollback path</label><input name="rollbackPath" required />
-        <div style="margin-top:0.5rem"><button class="primary" type="submit">Run proof gate</button></div>
-      </form>
-
+    ${mission.status === 'approved' ? `
       <h3>Execute merge</h3>
       <form id="execute-merge-form">
         <div class="row">
@@ -605,7 +670,11 @@ function renderMissionDetail(mount) {
 
   panel.querySelector('#create-branch-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
-    const values = formValues(e.target);
+    // Blank fields must be OMITTED, not sent as ''. The backend falls back
+    // to 'main' / `mission/${id}` with `?? default`, which only triggers on
+    // undefined — an empty string would silently create a branch/ref with
+    // an empty name instead of the intended default.
+    const values = withoutBlanks(formValues(e.target));
     guarded(async () => {
       await api(`/approvals/${mission.id}/execute`, {
         method: 'POST',
@@ -681,14 +750,15 @@ function renderMissionDetail(mount) {
   panel.querySelector('#proof-gate-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const values = formValues(e.target);
+    const splitList = (s) => s.split(',').map((x) => x.trim()).filter(Boolean);
     guarded(async () => {
       await api(`/approvals/${mission.id}/run-proof-gate`, {
         method: 'POST',
         body: JSON.stringify({
           gateId: values.gateId,
           evidence: {
-            filesChanged: [],
-            checksRun: [],
+            filesChanged: splitList(values.filesChanged),
+            checksRun: splitList(values.checksRun),
             failures: [],
             unresolvedRisks: [],
             behaviorChanged: values.behaviorChanged,
@@ -953,13 +1023,27 @@ function renderTerminalTab(mount) {
     `).join('');
 
   list.querySelectorAll('.card').forEach((card) => {
-    card.addEventListener('click', () => showTerminalRunForm(mount, card.dataset.id));
+    card.addEventListener('click', () => {
+      state.terminal.selectedCommandId = card.dataset.id;
+      state.terminal.lastRun = null;
+      showTerminalRunForm(mount, card.dataset.id);
+    });
   });
+
+  // guarded() unconditionally re-renders the whole shell after every action,
+  // including a terminal run — so the selection (and its result, below) must
+  // live in state and be rebuilt here, not just written into the DOM inside
+  // the submit handler. A DOM-only write is erased by that same re-render
+  // before anyone could ever see it.
+  if (state.terminal.selectedCommandId) {
+    showTerminalRunForm(mount, state.terminal.selectedCommandId);
+  }
 }
 
 function showTerminalRunForm(mount, commandId) {
   const panel = mount.querySelector('#terminal-run-panel');
   panel.style.display = 'block';
+  const lastRun = state.terminal.lastRun?.commandId === commandId ? state.terminal.lastRun.result : null;
   panel.innerHTML = `
     <h3>Run ${escapeHtml(commandId)}</h3>
     <form id="terminal-run-form">
@@ -968,7 +1052,7 @@ function showTerminalRunForm(mount, commandId) {
       <label><input type="checkbox" name="confirmWrite" style="width:auto; display:inline-block; margin-right:0.4rem;" />Confirm write-risk command</label>
       <div style="margin-top:0.5rem"><button class="primary" type="submit">Run</button></div>
     </form>
-    <div id="terminal-run-result"></div>
+    <div id="terminal-run-result">${lastRun ? `<pre>${escapeHtml(JSON.stringify(lastRun, null, 2))}</pre>` : ''}</div>
   `;
   panel.querySelector('#terminal-run-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -983,7 +1067,7 @@ function showTerminalRunForm(mount, commandId) {
           confirmWrite: values.confirmWrite === 'on',
         }),
       });
-      panel.querySelector('#terminal-run-result').innerHTML = `<pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
+      state.terminal.lastRun = { commandId, result };
     });
   });
 }
@@ -1003,7 +1087,7 @@ async function boot() {
   if (!state.session) return;
 
   await guarded(async () => {
-    await Promise.all([loadProjects(), loadMissions(), loadActivity(), loadL99(), loadPromptTemplates(), loadCosts(), loadAgents()]);
+    await Promise.all([loadProjects(), loadMissions(), loadActivity(), loadL99(), loadPromptTemplates(), loadCosts(), loadAgents(), loadAuthorityLevels()]);
   });
 }
 

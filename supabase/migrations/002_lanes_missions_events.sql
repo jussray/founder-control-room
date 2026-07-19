@@ -61,7 +61,14 @@ create index if not exists idx_events_unprocessed on events(processed, observed_
   where processed = false;
 
 -- ─── Evidence ────────────────────────────────────────────────────────────────
-create table if not exists evidence (
+-- Named prototype_evidence, not evidence: 20260711211416_reconciliation.sql
+-- already owns the real `evidence` table this app's proof-gate/reconciliation
+-- system actually reads and writes (project_id, status, provider, commit_sha,
+-- etc.) — reusing that name here would let `create table if not exists`
+-- silently make whichever migration runs first win, and since this file
+-- sorts before the 2026-timestamped one, the load-bearing schema would never
+-- get created.
+create table if not exists prototype_evidence (
   id          uuid primary key default gen_random_uuid(),
   mission_id  uuid references missions(id) on delete cascade,
   label       text not null,

@@ -15,6 +15,7 @@ import { persistProviderEvent } from '../../events/inbox.js';
 import { enqueueReconcile } from '../../events/outbox.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import type { ProviderKind } from '../../reconciliation/types.js';
+import { sanitizeWebhookPayload } from './sanitize.js';
 
 const SUPPORTED_EVENTS = new Set([
   'check_run',
@@ -149,7 +150,8 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
     return;
   }
 
-  // 1. Persist to inbox (dedup on provider + deliveryId).
+  // 1. Persist to inbox (dedup on provider + deliveryId). Only the
+  // allowlisted envelope is stored — never the raw provider payload.
   let inboxResult;
   try {
     inboxResult = await persistProviderEvent({
@@ -159,7 +161,7 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
       eventType,
       resourceType: eventType,
       resourceId: resourceInfo.resourceId,
-      payload,
+      payload: sanitizeWebhookPayload(eventType, payload),
     });
   } catch (err) {
     console.error('Inbox persist failed', err);

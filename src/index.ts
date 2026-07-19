@@ -18,8 +18,9 @@ app.listen(port, () => {
   console.log(`  GET  /projects/:slug/file`);
   console.log(`  POST /projects/:slug/missions`);
   console.log(`  GET  /projects/:slug/releases`);
-  console.log(`  GET  /projects/:slug/connections`);
+  console.log(`  GET  /projects/:slug/connections    (MCP/Connector Hub)`);
   console.log(`  POST /projects/:slug/connections`);
+  console.log(`  POST /projects/:slug/connections/:connectionId/check`);
   console.log(`  POST /webhooks/github`);
   console.log(`  POST /approvals/:missionId/execute`);
   console.log(`  POST /approvals/:missionId/patch`);
@@ -30,6 +31,7 @@ app.listen(port, () => {
   console.log(`  GET  /missions/:missionId/costs`);
   console.log(`  POST /missions/:missionId/costs`);
   console.log(`  GET  /agents`);
+  console.log(`  GET  /authority-levels`);
   console.log(`  GET  /promptos`);
   console.log(`  POST /promptos`);
   console.log(`  GET  /promptos/:id`);
