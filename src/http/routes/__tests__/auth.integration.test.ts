@@ -39,6 +39,10 @@ const SESSION = {
   expires_at: 123,
 };
 
+type ResponseWithHeaders = {
+  headers: Record<string, string | string[] | undefined>;
+};
+
 function buildApp() {
   const app = express();
   app.use(express.json());
@@ -56,20 +60,24 @@ function founderUsersRow(match: boolean) {
   };
 }
 
-function expectSessionCookie(res: request.Response) {
+function setCookieHeader(res: ResponseWithHeaders): string {
   const cookie = res.headers['set-cookie'];
   expect(cookie).toBeDefined();
-  expect(cookie.join('; ')).toContain('fcr_session=');
-  expect(cookie.join('; ')).toContain('HttpOnly');
-  expect(cookie.join('; ')).toContain('SameSite=Strict');
+  return Array.isArray(cookie) ? cookie.join('; ') : String(cookie);
 }
 
-function expectClearedSessionCookie(res: request.Response) {
-  const cookie = res.headers['set-cookie'];
-  expect(cookie).toBeDefined();
-  expect(cookie.join('; ')).toContain('fcr_session=;');
-  expect(cookie.join('; ')).toContain('Max-Age=0');
-  expect(cookie.join('; ')).toContain('HttpOnly');
+function expectSessionCookie(res: ResponseWithHeaders) {
+  const cookie = setCookieHeader(res);
+  expect(cookie).toContain('fcr_session=');
+  expect(cookie).toContain('HttpOnly');
+  expect(cookie).toContain('SameSite=Strict');
+}
+
+function expectClearedSessionCookie(res: ResponseWithHeaders) {
+  const cookie = setCookieHeader(res);
+  expect(cookie).toContain('fcr_session=;');
+  expect(cookie).toContain('Max-Age=0');
+  expect(cookie).toContain('HttpOnly');
 }
 
 beforeEach(() => {
