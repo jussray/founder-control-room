@@ -4,6 +4,7 @@ Read these before changing code, configuration, schemas, providers, verification
 
 - [`Juss Founder OS`](.ai/skills/juss-founder-os/SKILL.md) first
 - [`GLOBAL_AI.md`](./GLOBAL_AI.md)
+- [`Founder Merge Authority`](./docs/FOUNDER_MERGE_AUTHORITY.md)
 - [`skills/portfolio-control-plane/SKILL.md`](./skills/portfolio-control-plane/SKILL.md)
 - [`skills/sales/SKILL.md`](./skills/sales/SKILL.md) for qualification, offers, proof, conversion quality, retention, and revenue operations
 - [`skills/devil/SKILL.md`](./skills/devil/SKILL.md) for the premise attack and selected-plan attack
@@ -22,7 +23,7 @@ For commercial work add:
 /sales /devil
 ```
 
-`/sales` constructs the strongest truthful exchange. `/devil` attacks both the premise and selected plan. Neither authorizes outreach, pricing, discounts, spending, publication, checkout, external communication, merge, deployment, migration, or database mutation.
+`/sales` constructs the strongest truthful exchange. `/devil` attacks both the premise and selected plan. Neither authorizes outreach, pricing, discounts, spending, publication, checkout, deployment, migration, or database mutation. Repository merges may proceed under the standing conditions in `docs/FOUNDER_MERGE_AUTHORITY.md`.
 
 ## Required loop
 
@@ -43,7 +44,7 @@ For commercial work add:
 - Do not expose provider tokens or service-role keys.
 - Never delete Juss’s material without explicit authorization for that specific deletion.
 - Do not invent demand, scarcity, customer statements, eligibility, savings, performance, inventory, delivery, or authority.
-- Do not merge, deploy, roll back, alter auth/RLS, contact external parties, publish externally, change commercial terms, spend funds, or perform destructive writes without explicit founder approval for that exact action.
+- Merge when appropriate under `docs/FOUNDER_MERGE_AUTHORITY.md`. Do not deploy, roll back, alter auth/RLS, contact external parties, publish externally, change commercial terms, spend funds, or perform destructive writes without explicit founder approval for that exact action.
 - Apply repository-specific skills when acting on managed projects; portfolio rules never replace local product, privacy, verification, sales, brand/IP, or rollback contracts.
 
 ## Evidence report
