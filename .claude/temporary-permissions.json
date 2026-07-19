@@ -1,0 +1,13 @@
+{
+  "temporaryPermissions": [
+    {
+      "id": "temp-bash-git-push-main-2026-07-19",
+      "toolRule": "Bash(git push origin main)",
+      "scope": "jussray/founder-control-room",
+      "requestedBy": "founder",
+      "requestedAt": "2026-07-19T18:47:34Z",
+      "expiresAt": "2026-07-20T18:47:34Z",
+      "removalInstruction": "Remove the matching toolRule from .claude/settings.json at or before expiresAt. This ledger documents intent only; Claude Code enforces the allow rule from .claude/settings.json."
+    }
+  ]
+}
