@@ -5,6 +5,7 @@
 Before nontrivial work, read [`Juss Founder OS`](.ai/skills/juss-founder-os/SKILL.md).
 For Se’kret Bip acquisition, splash, preview, waiting-list, sponsorship, or social
 launch work, also read [`Juss Private Operating Plan`](docs/private/JUSS_PRIVATE_OPERATING_PLAN.md).
+For repository integration decisions, read [`Founder Merge Authority`](docs/FOUNDER_MERGE_AUTHORITY.md).
 
 The Founder OS is the private parent skill. This file specializes it for Founder
 Control Room. Repository-specific rules may become stricter, but they may not
@@ -45,7 +46,7 @@ Never claim a file, feature, test, branch, merge, deployment, approval, or provi
 - Bip may send curated, minimized operational events. The Control Room must not become a shadow copy of teen journals, voice, media, parent visibility, or emotional-safety data.
 - Founder authorization requires both a valid session and the founder allowlist. Authentication alone is not authorization.
 - Every material read, proposal, approval, integration, deployment, rollback, and provider action should leave an auditable event.
-- No approval carries forward automatically. Sandbox, branch, merge, deploy, and rollback are separate gates.
+- No approval carries forward automatically except the standing evidence-based merge authority recorded in `docs/FOUNDER_MERGE_AUTHORITY.md`. Deployment, migration, rollback, auth, secrets, billing, deletion, publication, and external action remain separate gates.
 
 ## Provider roles
 
@@ -67,18 +68,21 @@ Never claim a file, feature, test, branch, merge, deployment, approval, or provi
 - Do not weaken auth, founder allowlisting, RLS, audit logging, tests, types, or release gates to make a check green.
 - Do not silently change provider ownership, project registry semantics, event schemas, approval states, or deployment targets.
 - Do not treat model output as approval, authorization, or repository truth.
+- Merge only under the conditions in `docs/FOUNDER_MERGE_AUTHORITY.md`; a merge must never silently authorize a separately gated action.
 
 ## Approval gates
 
 Require explicit founder approval before:
 
 - creating operational branches or sandboxes when the current authority policy requires it;
-- integrating into `main`, force-pushing, production deploying, or rolling back;
+- force-pushing, production deploying, or rolling back;
 - changing founder identity, auth, authorization, allowlists, sessions, or RLS;
 - adding, rotating, deleting, or exposing credentials;
 - changing repository providers, domains, DNS, production environments, or billing;
 - destructive database or event-history changes;
 - sending external communications or executing provider actions in the founder’s name.
+
+Repository merges are governed by the standing founder decision in `docs/FOUNDER_MERGE_AUTHORITY.md` and may proceed without another merge-only prompt when its conditions are satisfied.
 
 An audit authorizes inspection, not mutation.
 
