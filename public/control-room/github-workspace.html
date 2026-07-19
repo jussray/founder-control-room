@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Founder Control Room · GitHub Workspace</title>
+  <style>
+    :root { color-scheme: dark; --bg:#070d18; --panel:#111b2d; --line:#253755; --text:#edf4ff; --muted:#9eb1ce; --ok:#74f0a7; --warn:#ffd166; --danger:#ff6b7a; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:radial-gradient(circle at top left, #223d6b, var(--bg) 52rem); color:var(--text); }
+    main { max-width:1220px; margin:0 auto; padding:2rem; }
+    header { display:flex; justify-content:space-between; gap:1rem; align-items:center; margin-bottom:1.5rem; }
+    h1 { margin:0; font-size:clamp(2rem, 6vw, 4.25rem); letter-spacing:-0.05em; }
+    h2, h3 { margin-top:0; }
+    a { color:#9cc9ff; }
+    button { border:1px solid var(--line); background:#152743; color:var(--text); border-radius:999px; padding:0.6rem 0.9rem; cursor:pointer; }
+    button.primary { background:#1d4ed8; }
+    input, textarea { width:100%; border:1px solid var(--line); border-radius:12px; background:#0b1527; color:var(--text); padding:0.7rem; }
+    textarea.code { min-height:520px; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:0.9rem; line-height:1.45; }
+    label { display:block; color:var(--muted); font-size:0.85rem; margin:0.65rem 0 0.25rem; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1rem; }
+    .panel, .card { border:1px solid var(--line); background:color-mix(in srgb, var(--panel), transparent 4%); border-radius:18px; padding:1rem; box-shadow:0 24px 80px rgba(0,0,0,0.22); }
+    .muted { color:var(--muted); }
+    .mono { font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .toolbar { display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center; }
+    .stack { display:flex; flex-direction:column; gap:0.75rem; }
+    .badge { display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:999px; padding:0.2rem 0.5rem; font-size:0.75rem; margin-right:0.35rem; color:var(--muted); }
+    .ok { color:var(--ok); }
+    .warn { color:var(--warn); }
+    .danger { color:var(--danger); }
+    .error { color:var(--danger); white-space:pre-wrap; }
+    .file-row { text-align:left; width:100%; border-radius:12px; justify-content:flex-start; }
+    pre { white-space:pre-wrap; background:#07111f; border:1px solid var(--line); border-radius:14px; padding:1rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <p class="muted">Founder Control Room</p>
+        <h1>GitHub Workspace</h1>
+        <p class="muted">Read files, edit mission branches, and write patches through founder-gated repository routes.</p>
+      </div>
+      <div class="toolbar">
+        <a href="/control-room/"><button type="button">Back to Control Room</button></a>
+        <button id="refresh-projects" type="button">Refresh projects</button>
+      </div>
+    </header>
+
+    <section class="panel">
+      <h2>Workspace controls</h2>
+      <p class="muted">Reads can target any ref. Writes go only through <span class="mono">POST /approvals/:missionId/patch</span>, which commits to that mission's sandbox branch.</p>
+      <div class="grid">
+        <div>
+          <label>Project slug</label>
+          <input id="project-slug" value="founder-control-room" />
+        </div>
+        <div>
+          <label>Read ref</label>
+          <input id="read-ref" placeholder="main or mission branch" />
+        </div>
+        <div>
+          <label>Folder path</label>
+          <input id="folder-path" placeholder="src/http/routes" />
+        </div>
+      </div>
+      <div class="toolbar" style="margin-top:0.75rem">
+        <button id="load-project" class="primary" type="button">Load project</button>
+        <button id="browse-files" type="button">Browse files</button>
+      </div>
+    </section>
+
+    <div class="grid" style="margin-top:1rem">
+      <section class="panel">
+        <h2>Files</h2>
+        <div id="file-list" class="stack"><p class="muted">Load a project, then browse a folder.</p></div>
+      </section>
+
+      <section class="panel">
+        <h2>Editor</h2>
+        <label>File path</label>
+        <input id="file-path" placeholder="src/http/routes/projects.ts" />
+        <div class="toolbar" style="margin-top:0.75rem">
+          <button id="read-file" type="button">Read file</button>
+          <button id="mark-new-file" type="button">New file</button>
+        </div>
+        <label>Content</label>
+        <textarea id="file-content" class="code" spellcheck="false"></textarea>
+      </section>
+    </div>
+
+    <section class="panel" style="margin-top:1rem">
+      <h2>Write patch to GitHub</h2>
+      <p class="muted">This does not push to main. It commits to the selected mission branch and re-pins the mission expected head SHA for proof gates.</p>
+      <div class="grid">
+        <div>
+          <label>Mission ID</label>
+          <input id="mission-id" placeholder="mission uuid" />
+        </div>
+        <div>
+          <label>Commit message</label>
+          <input id="commit-message" value="Edit file from Founder GitHub Workspace" />
+        </div>
+      </div>
+      <div class="toolbar" style="margin-top:0.75rem">
+        <button id="commit-patch" class="primary" type="button">Commit patch to mission branch</button>
+      </div>
+      <pre id="result">No write yet.</pre>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY = 'fcr_session';
+    const nodes = {
+      projectSlug: document.getElementById('project-slug'),
+      readRef: document.getElementById('read-ref'),
+      folderPath: document.getElementById('folder-path'),
+      fileList: document.getElementById('file-list'),
+      filePath: document.getElementById('file-path'),
+      fileContent: document.getElementById('file-content'),
+      missionId: document.getElementById('mission-id'),
+      commitMessage: document.getElementById('commit-message'),
+      result: document.getElementById('result'),
+    };
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    }
+
+    function session() {
+      try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || 'null'); } catch { return null; }
+    }
+
+    async function api(path, opts = {}) {
+      const current = session();
+      if (!current?.access_token) throw new Error('No founder session found. Sign in through the main Control Room first.');
+      const headers = { 'Content-Type':'application/json', Authorization:`Bearer ${current.access_token}`, ...(opts.headers || {}) };
+      const res = await fetch(path, { ...opts, headers });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(body?.error || `Request failed (${res.status})`);
+      return body;
+    }
+
+    async function guarded(action) {
+      try { await action(); }
+      catch (error) { nodes.result.textContent = error instanceof Error ? error.message : String(error); }
+    }
+
+    function queryForFiles() {
+      const q = new URLSearchParams();
+      if (nodes.readRef.value.trim()) q.set('ref', nodes.readRef.value.trim());
+      if (nodes.folderPath.value.trim()) q.set('path', nodes.folderPath.value.trim());
+      return q.toString();
+    }
+
+    async function loadProject() {
+      const slug = encodeURIComponent(nodes.projectSlug.value.trim());
+      const data = await api(`/projects/${slug}`);
+      nodes.result.textContent = JSON.stringify({ project: data.project, live: data.live, liveError: data.liveError }, null, 2);
+      if (!nodes.readRef.value.trim() && data.live?.defaultBranch) nodes.readRef.value = data.live.defaultBranch;
+    }
+
+    async function browseFiles() {
+      const slug = encodeURIComponent(nodes.projectSlug.value.trim());
+      const data = await api(`/projects/${slug}/files?${queryForFiles()}`);
+      nodes.readRef.value = data.ref || nodes.readRef.value;
+      nodes.folderPath.value = data.path || nodes.folderPath.value;
+      const entries = data.entries || [];
+      nodes.fileList.innerHTML = entries.length === 0 ? '<p class="muted">No files here.</p>' : entries.map((entry) => `
+        <button type="button" class="file-row" data-path="${escapeHtml(entry.path)}" data-type="${escapeHtml(entry.type)}">
+          <span class="badge ${entry.type === 'dir' ? 'warn' : 'ok'}">${escapeHtml(entry.type)}</span>${escapeHtml(entry.path)}
+        </button>
+      `).join('');
+      nodes.fileList.querySelectorAll('.file-row').forEach((button) => {
+        button.addEventListener('click', () => {
+          if (button.dataset.type === 'dir') {
+            nodes.folderPath.value = button.dataset.path;
+            guarded(browseFiles);
+          } else {
+            nodes.filePath.value = button.dataset.path;
+            guarded(readFile);
+          }
+        });
+      });
+    }
+
+    async function readFile() {
+      const slug = encodeURIComponent(nodes.projectSlug.value.trim());
+      const q = new URLSearchParams({ path: nodes.filePath.value.trim() });
+      if (nodes.readRef.value.trim()) q.set('ref', nodes.readRef.value.trim());
+      const data = await api(`/projects/${slug}/file?${q.toString()}`);
+      nodes.readRef.value = data.ref || nodes.readRef.value;
+      nodes.filePath.value = data.path || nodes.filePath.value;
+      nodes.fileContent.value = data.content || '';
+      nodes.result.textContent = `Loaded ${data.path}@${data.ref}`;
+    }
+
+    async function commitPatch() {
+      const missionId = nodes.missionId.value.trim();
+      const path = nodes.filePath.value.trim();
+      const message = nodes.commitMessage.value.trim();
+      if (!missionId || !path || !message) throw new Error('missionId, file path, and commit message are required.');
+      const data = await api(`/approvals/${encodeURIComponent(missionId)}/patch`, {
+        method: 'POST',
+        body: JSON.stringify({ message, changes: [{ path, content: nodes.fileContent.value }] }),
+      });
+      nodes.result.textContent = JSON.stringify(data, null, 2);
+      if (data.commitSha) nodes.readRef.value = data.branch || nodes.readRef.value;
+    }
+
+    document.getElementById('load-project').addEventListener('click', () => guarded(loadProject));
+    document.getElementById('browse-files').addEventListener('click', () => guarded(browseFiles));
+    document.getElementById('read-file').addEventListener('click', () => guarded(readFile));
+    document.getElementById('mark-new-file').addEventListener('click', () => {
+      nodes.fileContent.value = '';
+      nodes.result.textContent = 'New file mode: enter a repo-relative path and content, then commit to a mission branch.';
+    });
+    document.getElementById('commit-patch').addEventListener('click', () => guarded(commitPatch));
+    document.getElementById('refresh-projects').addEventListener('click', () => guarded(loadProject));
+  </script>
+</body>
+</html>
