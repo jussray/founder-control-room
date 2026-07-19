@@ -414,7 +414,25 @@ approvalsRouter.post(
         const branchName = (payload['branchName'] as string) ?? `mission/${missionId.slice(0, 8)}`;
         const baseRef = (payload['baseRef'] as string) ?? 'main';
         await provider.createBranch(project.slug, baseRef, branchName);
-        executionResult = { branchName, baseRef };
+
+        // Pin the exact commit this mission's sandbox now stands on. Without
+        // this, policy_snapshot.expectedHeadSha never exists while the
+        // mission is sandboxed/in_review — MissionController's wrongHead
+        // check against it is permanently vacuous, and the guarded terminal
+        // (which hard-requires this pin at those exact statuses) can never
+        // run for any mission. A failure here doesn't roll back the branch,
+        // which already exists — it's reported as a warning, same as a
+        // failed mission-state update below.
+        let expectedHeadSha: string | null = null;
+        try {
+          expectedHeadSha = await provider.resolveRef(project.slug, branchName);
+        } catch (resolveError) {
+          warnings.push(
+            `Branch was created, but its head commit could not be resolved and pinned: ${resolveError instanceof Error ? resolveError.message : String(resolveError)}`,
+          );
+        }
+
+        executionResult = { branchName, baseRef, ...(expectedHeadSha ? { expectedHeadSha } : {}) };
 
         const { error: missionUpdateError } = await supabase
           .from('missions')
@@ -422,6 +440,9 @@ approvalsRouter.post(
             branch_ref: branchName,
             status: 'sandboxed',
             updated_at: new Date().toISOString(),
+            ...(expectedHeadSha
+              ? { policy_snapshot: { ...(mission.policy_snapshot as Record<string, unknown> ?? {}), expectedHeadSha } }
+              : {}),
           })
           .eq('id', missionId)
           .eq('status', 'proposed');
@@ -566,7 +587,7 @@ approvalsRouter.post(
 
     const { data: mission, error: missionError } = await supabase
       .from('missions')
-      .select('id, project_id, status, branch_ref')
+      .select('id, project_id, status, branch_ref, policy_snapshot')
       .eq('id', missionId)
       .single();
 
@@ -642,6 +663,25 @@ approvalsRouter.post(
       },
     });
 
-    return res.status(201).json({ ok: true, commitSha, branch: mission.branch_ref });
+    // Re-pin expectedHeadSha to this new commit. Without this, the pin set
+    // at create_branch goes stale the moment a founder edits the sandbox
+    // again — CheckRunController only attributes an incoming CI webhook's
+    // evidence to this mission when its head_sha matches the current pin, so
+    // a stale pin silently orphans every check run reported against the new
+    // commit (evidence gets persisted with mission_id: null and never
+    // reaches MissionController at all).
+    let warning: string | undefined;
+    const { error: pinUpdateError } = await supabase
+      .from('missions')
+      .update({
+        policy_snapshot: { ...(mission.policy_snapshot as Record<string, unknown> ?? {}), expectedHeadSha: commitSha },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', missionId);
+    if (pinUpdateError) {
+      warning = `Commit succeeded, but expectedHeadSha could not be re-pinned: ${pinUpdateError.message}`;
+    }
+
+    return res.status(201).json({ ok: true, commitSha, branch: mission.branch_ref, ...(warning ? { warning } : {}) });
   },
 );

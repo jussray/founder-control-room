@@ -27,7 +27,7 @@ const state = {
   missionRuns: [],
   missionCosts: null,
   l99: null,
-  terminal: { projectSlug: null, commands: [], lastRun: null },
+  terminal: { projectSlug: null, commands: [], selectedCommandId: null, lastRun: null },
   promptTemplates: [],
   selectedTemplateId: null,
   selectedTemplate: null,
@@ -1023,13 +1023,27 @@ function renderTerminalTab(mount) {
     `).join('');
 
   list.querySelectorAll('.card').forEach((card) => {
-    card.addEventListener('click', () => showTerminalRunForm(mount, card.dataset.id));
+    card.addEventListener('click', () => {
+      state.terminal.selectedCommandId = card.dataset.id;
+      state.terminal.lastRun = null;
+      showTerminalRunForm(mount, card.dataset.id);
+    });
   });
+
+  // guarded() unconditionally re-renders the whole shell after every action,
+  // including a terminal run — so the selection (and its result, below) must
+  // live in state and be rebuilt here, not just written into the DOM inside
+  // the submit handler. A DOM-only write is erased by that same re-render
+  // before anyone could ever see it.
+  if (state.terminal.selectedCommandId) {
+    showTerminalRunForm(mount, state.terminal.selectedCommandId);
+  }
 }
 
 function showTerminalRunForm(mount, commandId) {
   const panel = mount.querySelector('#terminal-run-panel');
   panel.style.display = 'block';
+  const lastRun = state.terminal.lastRun?.commandId === commandId ? state.terminal.lastRun.result : null;
   panel.innerHTML = `
     <h3>Run ${escapeHtml(commandId)}</h3>
     <form id="terminal-run-form">
@@ -1038,7 +1052,7 @@ function showTerminalRunForm(mount, commandId) {
       <label><input type="checkbox" name="confirmWrite" style="width:auto; display:inline-block; margin-right:0.4rem;" />Confirm write-risk command</label>
       <div style="margin-top:0.5rem"><button class="primary" type="submit">Run</button></div>
     </form>
-    <div id="terminal-run-result"></div>
+    <div id="terminal-run-result">${lastRun ? `<pre>${escapeHtml(JSON.stringify(lastRun, null, 2))}</pre>` : ''}</div>
   `;
   panel.querySelector('#terminal-run-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1053,7 +1067,7 @@ function showTerminalRunForm(mount, commandId) {
           confirmWrite: values.confirmWrite === 'on',
         }),
       });
-      panel.querySelector('#terminal-run-result').innerHTML = `<pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
+      state.terminal.lastRun = { commandId, result };
     });
   });
 }

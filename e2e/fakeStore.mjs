@@ -46,12 +46,22 @@ export function sortRows(rows, col, ascending) {
   });
 }
 
-export function withDefaults(row) {
+// Mirrors column defaults the real Postgres schema applies on insert (see
+// supabase/migrations) that this generic in-memory store wouldn't otherwise
+// know about — e.g. projects.verification_enabled defaults to true in
+// 20260717195000_guarded_terminal_and_schema_reconciliation.sql, and the
+// guarded terminal route 409s on any project row missing it.
+const TABLE_DEFAULTS = {
+  projects: { verification_enabled: true },
+};
+
+export function withDefaults(row, tableName) {
   const now = new Date().toISOString();
   return {
     id: randomUUID(),
     created_at: now,
     updated_at: now,
+    ...(TABLE_DEFAULTS[tableName] ?? {}),
     ...row,
   };
 }

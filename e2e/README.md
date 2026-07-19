@@ -32,11 +32,27 @@ blob/tree/commit/updateRef calls); a real signed CI webhook
 (`X-Hub-Signature-256`) advances the mission to `in_review` through the
 real background reconciler (webhook → `CheckRunController` → evidence →
 `MissionController` → status transition, no shortcuts); runs the merge
-proof gate, which pins `policy_snapshot.expectedHeadSha`; executes a real
-merge (real `POST .../merges` call); and the fake repository's actual
+proof gate, which re-verifies `policy_snapshot.expectedHeadSha`; executes a
+real merge (real `POST .../merges` call); and the fake repository's actual
 default branch contains the merged content afterward. Plus: an Agent
 Council round, a cost entry, and an MCP connector with an authority level
 and a health check — all through real route handlers.
+
+It also proves the **guarded terminal** (`src/terminal/`) for real: a
+second project (`founder-control-room`) is registered, its mission's
+sandbox branch is created for real against a *second* fake repo whose
+initial commit is seeded to this actual checkout's real
+`git rev-parse HEAD` — not a fake sha — so that when the mission's
+`expectedHeadSha` gets pinned through the ordinary create_branch flow, it's
+pinned to a real, independently-verifiable value. The harness then drives
+the real terminal UI to run `git.head` (`git rev-parse HEAD`, read-risk)
+against `CONTROL_ROOM_WORKSPACE_ROOT`, which is this real repo's own real
+parent directory — a real `git` child process spawns for real
+(`src/terminal/runner.ts`), and its real stdout (the real HEAD sha) comes
+back through the real UI. No shell command is faked anywhere in this path;
+only the branch's provenance (how `expectedHeadSha` got pinned) goes
+through the same fake-GitHub mechanism used everywhere else in this
+harness.
 
 ## Real bugs this harness caught (in the order it caught them)
 
@@ -78,6 +94,46 @@ and a health check — all through real route handlers.
    all — a mission created through the shipped UI could never leave
    `sandboxed`. Fixed by exposing `requiredChecks` on
    `POST /projects/:slug/missions`.
+7. **`policy_snapshot.expectedHeadSha` was only ever written at merge-gate
+   convergence — never at `create_branch`, when a mission's sandbox and its
+   commit are actually established.** Two real consequences, not one:
+   - `MissionController`'s own drift check (`wrongHead`) compares incoming
+     evidence against this pin, but during the entire `sandboxed`/`in_review`
+     phase the pin was always `null` — the check was permanently vacuous,
+     never actually verifying anything until after the mission was already
+     approved.
+   - The guarded terminal (`POST /terminal/:slug/run`) hard-requires this
+     pin to exist while the mission is still `sandboxed`/`in_review` — a
+     status range `expectedHeadSha` could never reach under the old code.
+     No mission, ever, could satisfy the terminal's precondition for a
+     read or verify-risk command.
+
+   Fixed by pinning `expectedHeadSha` to the branch's real resolved head the
+   moment `create_branch` executes (`src/http/routes/approvals.ts`). Fixing
+   only that, though, surfaced an eighth bug in the same area:
+8. **Re-pinning only at branch creation broke evidence attribution for any
+   commit after the first.** `CheckRunController` only attaches an incoming
+   CI webhook's evidence to a mission when the webhook's `head_sha` matches
+   the *current* pin (a deliberate, correct anti-spoofing check — it's what
+   stops evidence for an unrelated commit from being credited to this
+   mission). Since nothing updated the pin when the founder committed a
+   further edit via `POST /:missionId/patch`, that edit's own CI evidence
+   silently got `mission_id: null` and never reached `MissionController` at
+   all — this harness's own step [6d] regressed the instant bug #7 was
+   fixed, which is exactly how this was caught. Fixed by re-pinning
+   `expectedHeadSha` to the new commit inside `/:missionId/patch` too.
+9. **The guarded terminal's run result was erased before it could ever be
+   seen.** `guarded()` (`public/control-room/app.js`) unconditionally
+   re-renders the entire app shell after every action, including a
+   terminal run — but the run's result was written straight into the DOM
+   inside the submit handler, not into `state`. The very next line
+   (`guarded`'s own post-action `render()`) rebuilt the terminal tab from
+   scratch and threw it away. A human clicking "Run" would never see their
+   own command's output; Playwright's polling caught it as an empty
+   `#terminal-run-result` no matter how long it waited. Fixed by tracking
+   `state.terminal.selectedCommandId` and `state.terminal.lastRun` and
+   rendering the result from state, the same way every other panel in this
+   app already has to.
 
 Also surfaced, and worth knowing even though it isn't a bug: **the frontend
 has no live refresh.** A mission that transitions status asynchronously
@@ -88,12 +144,15 @@ this the way a founder would have to: click Refresh, reopen the mission.
 
 ## What this does NOT prove
 
-The guarded terminal (executes real shell commands against a real
-checked-out workspace — different infrastructure than an HTTP API fake),
-and anything requiring a real Supabase or Cloudflare account (production
-auth, deployment, migrations). Those need the founder's own
-credentials/infrastructure and cannot be faked without pretending to have
-authority nobody granted.
+Anything requiring a real Supabase or Cloudflare account (production auth,
+deployment, migrations), and the guarded terminal's *write*-risk and
+*verify*-risk command paths (only a read-risk command — `git.head` — is
+exercised here; write-risk additionally requires `confirmWrite: true` and a
+stricter `sandboxed`-only status window, and verify-risk commands like
+`npm test` would need real dependencies installed, which this harness
+doesn't attempt). Real founder credentials and a real production
+environment need the founder's own account access — those cannot be faked
+without pretending to have authority nobody granted.
 
 ## Running it
 

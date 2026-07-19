@@ -50,7 +50,7 @@ class QueryBuilder {
 
     if (this.mode === 'insert') {
       const inserted = this.insertRows.map((r) => {
-        const row = withDefaults(r);
+        const row = withDefaults(r, this.tableName);
         rows.push(row);
         return row;
       });
@@ -65,7 +65,7 @@ class QueryBuilder {
           rows[existingIdx] = { ...rows[existingIdx], ...r, updated_at: new Date().toISOString() };
           return rows[existingIdx];
         }
-        const row = withDefaults(r);
+        const row = withDefaults(r, this.tableName);
         rows.push(row);
         return row;
       });

@@ -14,37 +14,23 @@
 // create its sandbox branch; have a real signed CI webhook advance it to
 // in_review; edit a file and commit it; run the proof gate; execute a real
 // merge; and see the merged content in the (fake) repository's default
-// branch — plus log an Agent Council round, a cost entry, and register an
-// MCP connector with an authority level. All through real route handlers.
-//
-// This harness has caught four real, previously-hidden bugs while being
-// built, in order:
-//   1. el() (public/control-room/app.js) returned only firstElementChild,
-//      silently dropping every other top-level sibling in multi-panel
-//      templates — broke the Projects/Missions/PromptOS/Terminal tabs.
-//   2. The create-branch form sent blank fields as '' instead of omitting
-//      them, defeating the backend's `?? 'main'` / `?? mission/<id>`
-//      fallback (an empty string isn't nullish) — would have created a
-//      branch/ref with an empty name.
-//   3. The proof-gate form hardcoded filesChanged/checksRun to [], which
-//      the gate unconditionally rejects — merge could never pass through
-//      the shipped UI at all.
-//   4. Nothing in the entire codebase ever wrote
-//      missions.policy_snapshot.expectedHeadSha, which the merge-execution
-//      route unconditionally requires to match — meaning no mission could
-//      ever actually complete a merge, regardless of proof-gate result.
-//      Fixed by pinning it when the merge proof gate converges.
+// branch — plus log an Agent Council round, a cost entry, register an MCP
+// connector with an authority level, and run a real command through the
+// guarded terminal against this actual checked-out repo. All through real
+// route handlers. See e2e/README.md for the full, numbered list of real
+// bugs this harness has caught while being built.
 //
 // What this still does NOT prove: production auth, deployment, or
 // migrations against a real Supabase/Cloudflare account, or the guarded
-// terminal (which executes real shell commands against a real checked-out
-// workspace — a different kind of infrastructure than an HTTP API fake).
-// Those need the founder's own credentials/infrastructure and cannot be
-// faked without pretending to have authority nobody granted.
+// terminal's write/verify-risk command paths. Those need the founder's own
+// credentials/infrastructure and cannot be faked without pretending to
+// have authority nobody granted.
 
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { createHmac, randomUUID } from 'node:crypto';
 import { readFileSync, existsSync, unlinkSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { createFakeGitHubServer } from './fakeGitHubServer.mjs';
@@ -57,6 +43,16 @@ const CHROME_PATH = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const GITHUB_OWNER = 'jussray';
 const GITHUB_REPO = 'demo-project';
 const GITHUB_WEBHOOK_SECRET = 'e2e-webhook-secret';
+
+// The guarded terminal's command registry (src/terminal/registry.ts) hard-codes
+// project slug "founder-control-room" with relativeCwd "founder-control-room"
+// under CONTROL_ROOM_WORKSPACE_ROOT — it's meant to run real, read-only git
+// commands against this very repo's own real checkout, not a fake. So this repo
+// root is real; only its GitHub-facing branch/commit history is faked, same as
+// the "demo-project" repo above.
+const REPO_ROOT = dirname(fileURLToPath(new URL('.', import.meta.url)));
+const REPO_WORKSPACE_ROOT = dirname(REPO_ROOT);
+const REAL_REPO_HEAD_SHA = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT, encoding: 'utf8' }).trim().toLowerCase();
 
 if (existsSync(BRIDGE_FILE)) unlinkSync(BRIDGE_FILE);
 
@@ -178,11 +174,28 @@ async function waitForServer(url) {
 }
 
 // --- fake GitHub server (in-process, no subprocess needed) ------------------
-const { app: fakeGitHubApp, branches: fakeGitHubBranches, trees: fakeGitHubTrees } = createFakeGitHubServer({
+// One process serves both repos below, since GitHubProvider is configured
+// from a single process-wide GITHUB_API_BASE_URL — see fakeGitHubServer.mjs's
+// module comment on why it's multi-repo.
+const { app: fakeGitHubApp, addRepo, getRepo } = createFakeGitHubServer();
+const demoRepo = addRepo({
   owner: GITHUB_OWNER,
   repo: GITHUB_REPO,
   defaultBranch: 'main',
   seedFiles: { 'README.md': '# Demo Project\n', 'src/index.ts': 'console.log("hello");\n' },
+});
+const { branches: fakeGitHubBranches, trees: fakeGitHubTrees } = demoRepo;
+// This repo's "main" tip is pinned to the real, current HEAD of this actual
+// checkout — see REAL_REPO_HEAD_SHA above — so that when the guarded
+// terminal proof (below) creates a branch off it, GitHubProvider.resolveRef
+// returns exactly the sha the real local `git rev-parse HEAD` will also
+// return, letting the terminal's exact-head check pass for real.
+const TERMINAL_PROOF_REPO = 'founder-control-room';
+addRepo({
+  owner: GITHUB_OWNER,
+  repo: TERMINAL_PROOF_REPO,
+  defaultBranch: 'main',
+  rootCommitSha: REAL_REPO_HEAD_SHA,
 });
 const fakeGitHubServer = fakeGitHubApp.listen(0);
 const fakeGitHubPort = await new Promise((resolve) => fakeGitHubServer.once('listening', () => resolve(fakeGitHubServer.address().port)));
@@ -203,7 +216,8 @@ const server = spawn(
       E2E_AUTH_BRIDGE_FILE: BRIDGE_FILE,
       PORT: String(PORT),
       NODE_ENV: 'development',
-      CONTROL_ROOM_TERMINAL_ENABLED: 'false',
+      CONTROL_ROOM_TERMINAL_ENABLED: 'true',
+      CONTROL_ROOM_WORKSPACE_ROOT: REPO_WORKSPACE_ROOT,
       FOUNDER_API_URL: BASE_URL,
       FOUNDER_ALLOWED_ORIGINS: BASE_URL,
       GITHUB_TOKEN: 'fake-github-token',
@@ -446,7 +460,92 @@ async function main() {
   const connectionText = await waitForText(page, '[data-connection-id]:has-text("figma")', 'last checked');
   assert(connectionText.toLowerCase().includes('last checked'), 'connector health check recorded a real last_checked_at');
 
-  console.log('\n[9] No uncaught JS exceptions during the whole run');
+  console.log('\n[9] Guarded terminal: run a real read-only command against this actual checked-out repo, through the real UI');
+  // Unlike every step above, this one doesn't touch the fake GitHub repo at
+  // all for its actual execution — CONTROL_ROOM_WORKSPACE_ROOT points at this
+  // real repo's real parent directory, and the terminal spawns a real `git`
+  // process against it (src/terminal/runner.ts). The fake repo above is only
+  // used to legitimately pin policy_snapshot.expectedHeadSha to the real
+  // local HEAD sha, through the same real create_branch proof-gate + execute
+  // flow already proven in [6b] — not a shortcut around it.
+  {
+    const founderToken = await page.evaluate(() => JSON.parse(sessionStorage.getItem('fcr_session')).access_token);
+    const projectRes = await fetch(`${BASE_URL}/projects`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${founderToken}` },
+      body: JSON.stringify({
+        slug: TERMINAL_PROOF_REPO,
+        name: 'Founder Control Room (self)',
+        repoIdentifier: `${GITHUB_OWNER}/${TERMINAL_PROOF_REPO}`,
+      }),
+    });
+    assert(projectRes.ok, `registered the ${TERMINAL_PROOF_REPO} project so the terminal's command registry (keyed on this exact slug) has somewhere real to run (status ${projectRes.status})`);
+
+    const missionRes = await fetch(`${BASE_URL}/projects/${TERMINAL_PROOF_REPO}/missions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${founderToken}` },
+      body: JSON.stringify({ title: 'Prove the guarded terminal end to end' }),
+    });
+    const missionBody = await missionRes.json();
+    assert(missionRes.ok, `created a mission on ${TERMINAL_PROOF_REPO} (status ${missionRes.status})`);
+    const terminalMissionId = missionBody.mission.id;
+
+    const gateRes = await fetch(`${BASE_URL}/approvals/${terminalMissionId}/run-proof-gate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${founderToken}` },
+      body: JSON.stringify({
+        gateId: 'create_branch',
+        evidence: {
+          filesChanged: ['mission-plan'],
+          behaviorChanged: 'No behavior change yet — opening the sandbox.',
+          checksRun: ['plan_reviewed'],
+          failures: [],
+          securityImpact: 'none',
+          deploymentImpact: 'none',
+          rollbackPath: 'Delete the sandbox branch.',
+          unresolvedRisks: [],
+        },
+      }),
+    });
+    assert(gateRes.ok, `create_branch proof gate passed for the terminal mission (status ${gateRes.status})`);
+
+    const executeRes = await fetch(`${BASE_URL}/approvals/${terminalMissionId}/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${founderToken}` },
+      body: JSON.stringify({
+        actionType: 'create_branch',
+        idempotencyKey: `terminal-proof-branch-${terminalMissionId}`,
+        payload: { branchName: 'terminal-proof', baseRef: 'main' },
+      }),
+    });
+    const executeBody = await executeRes.json();
+    assert(
+      executeRes.ok && executeBody.result?.expectedHeadSha === REAL_REPO_HEAD_SHA,
+      `branch creation pinned policy_snapshot.expectedHeadSha to this real repo's actual HEAD (${REAL_REPO_HEAD_SHA}), not just a fake sha — this is the fix for bug #7 below (expectedHeadSha was previously only ever written at merge time, which the guarded terminal's own sandboxed/in_review precondition can never reach)`,
+    );
+    assert(
+      getRepo(GITHUB_OWNER, TERMINAL_PROOF_REPO)?.branches.get('terminal-proof')?.sha === REAL_REPO_HEAD_SHA,
+      "the fake repo's new branch head really does equal this checkout's real git HEAD",
+    );
+
+    await page.click('.tabs button[data-tab=terminal]');
+    await page.waitForSelector('#terminal-project-slug');
+    await page.fill('#terminal-project-slug', TERMINAL_PROOF_REPO);
+    await page.click('#terminal-load-commands');
+    await waitForCount(page, '#terminal-commands .card', 1);
+    await page.click('#terminal-commands .card[data-id="git.head"]');
+    await page.waitForSelector('#terminal-run-form');
+    await page.fill('#terminal-run-form input[name=missionId]', terminalMissionId);
+    await page.fill('#terminal-run-form input[name=expectedCommitSha]', REAL_REPO_HEAD_SHA);
+    await page.click('#terminal-run-form button[type=submit]');
+    const terminalResultText = await waitForText(page, '#terminal-run-result', REAL_REPO_HEAD_SHA);
+    assert(
+      terminalResultText.toLowerCase().includes(REAL_REPO_HEAD_SHA) && terminalResultText.toLowerCase().includes('"status": "passed"'),
+      'the guarded terminal spawned a real `git rev-parse HEAD` against this real checkout and returned its real, correct output through the real UI',
+    );
+  }
+
+  console.log('\n[10] No uncaught JS exceptions during the whole run');
   assert(jsExceptions.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(jsExceptions)})`);
   if (networkDiagnostics.length) console.log(`  (${networkDiagnostics.length} expected network diagnostic message(s), not counted as failures: ${JSON.stringify(networkDiagnostics)})`);
 
