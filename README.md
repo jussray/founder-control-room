@@ -55,9 +55,10 @@ callers.
 ## Tracked external app setup
 
 - `Story Engine` is the Meta developer app container for Se'kret Bip Facebook/Instagram social integration setup.
-- Control Room tracks Story Engine as an external dependency and evidence item only. It must not store Meta App Secret, long-lived access tokens, webhook verify tokens, Page tokens, Instagram credentials, or any teen/private content.
-- Current status: placeholder/configuration planning only. No production social API route, publishing workflow, webhook ingestion, or account connection flow is verified.
-- Required gate before implementation: explicit founder approval, privacy boundary, least-privilege permission list, server-only secret storage, token rotation plan, webhook verification if used, and production evidence that does not expose private teen data.
+- `Playground` is the Meta Model API / Muse Spark developer surface for direct model-response experiments.
+- Control Room tracks both as external dependencies and evidence items only. It must not store Meta App Secret, Model API keys, long-lived access tokens, webhook verify tokens, Page tokens, Instagram credentials, raw prompts, raw model outputs, or any teen/private content.
+- Current status: placeholder/configuration planning only. No production social API route, publishing workflow, webhook ingestion, account connection flow, provider routing, or model-response runtime is verified.
+- Required gate before implementation: explicit founder approval, privacy boundary, least-privilege permission list or provider capability boundary, server-only secret storage, token/key rotation plan, webhook verification if used, reduced-data prompt policy if model APIs are used, and production evidence that does not expose private teen data.
 
 ## Structure
 
