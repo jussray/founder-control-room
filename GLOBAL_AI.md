@@ -7,6 +7,7 @@ For Se’kret Bip acquisition, splash, preview, waiting-list, sponsorship, or so
 launch work, also read [`Juss Private Operating Plan`](docs/private/JUSS_PRIVATE_OPERATING_PLAN.md).
 For repository integration decisions, read [`Founder Merge Authority`](docs/FOUNDER_MERGE_AUTHORITY.md).
 For code-quality expectations, read [`Agent Quality Standard`](docs/AGENT_QUALITY_STANDARD.md).
+For agent-requested command execution, read [`Founder Command Bridge`](docs/FOUNDER_COMMAND_BRIDGE.md).
 
 The Founder OS is the private parent skill. This file specializes it for Founder
 Control Room. Repository-specific rules may become stricter, but they may not
@@ -71,6 +72,7 @@ Never claim a file, feature, test, branch, merge, deployment, approval, or provi
 - Do not treat model output as approval, authorization, or repository truth.
 - Merge only under the conditions in `docs/FOUNDER_MERGE_AUTHORITY.md`; a merge must never silently authorize a separately gated action.
 - For nontrivial code changes, run `npm run typecheck` and `npm test` before claiming readiness, or explicitly report why they could not be run.
+- Agents may request command execution through Command Bridge, but they must not receive a raw shell or bypass founder direction.
 
 ## Approval gates
 
