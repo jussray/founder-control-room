@@ -7,6 +7,7 @@ const files = {
   middleware: await readFile(new URL('../src/http/middleware/requireFounder.ts', import.meta.url), 'utf8'),
   server: await readFile(new URL('../src/http/server.ts', import.meta.url), 'utf8'),
   worker: await readFile(new URL('../src/worker/cf-entry.ts', import.meta.url), 'utf8'),
+  workerHandler: await readFile(new URL('../src/worker/handler.ts', import.meta.url), 'utf8'),
   wrangler: await readFile(new URL('../wrangler.toml', import.meta.url), 'utf8'),
 };
 
@@ -29,10 +30,15 @@ requireText('middleware', 'browser cookie auth', 'readFounderSession(req)');
 requireText('middleware', 'server refresh', 'refreshSession');
 requireText('server', 'security headers', 'helmetMiddleware');
 requireText('server', 'CSP', 'onboardingContentSecurityPolicy');
-requireText('server', 'special magic-link route', "app.use('/auth', authRouter)");
-requireText('worker', 'official Node request bridge', 'handleAsNodeRequest');
-requireText('worker', 'real Node server', 'createHttpServer');
-requireText('wrangler', 'Node HTTP compatibility date', 'compatibility_date = "2026-07-17"');
+requireText('server', 'same-origin browser mutation gate', 'requireSameOriginBrowserMutation');
+requireText('server', 'onboarding route', "app.use('/', onboardingRouter)");
+requireText('server', 'auth route', "app.use('/auth', authRouter)");
+requireText('worker', 'current Cloudflare Node HTTP adapter', 'httpServerHandler');
+requireText('worker', 'current Worker composition', 'composeWorkerHandler');
+requireText('worker', 'current runtime validation', 'validateWorkerEnv(env)');
+requireText('workerHandler', 'runtime validation helper', 'validateWorkerEnv');
+requireText('workerHandler', 'scheduled reconciler composition', 'composeWorkerHandler');
+requireText('wrangler', 'Node HTTP compatibility flag', 'enable_nodejs_http_server_modules');
 
 if (files.ui.includes('sekretbip@gmail.com')) {
   errors.push('privacy: founder email must not be embedded in browser assets');
@@ -46,6 +52,9 @@ if (files.auth.includes('SUPABASE_SERVICE_ROLE_KEY')) {
 if (files.worker.includes('Object.assign(request')) {
   errors.push('Worker bridge: hand-built Request duck typing must not return');
 }
+if (files.worker.includes('handleAsNodeRequest')) {
+  errors.push('Worker bridge: stale handleAsNodeRequest path must not replace current httpServerHandler composition');
+}
 
 if (errors.length) {
   console.error('Founder onboarding contract failed:');
@@ -58,4 +67,4 @@ console.log('Founder email embedded in UI: no');
 console.log('Raw token callback JSON: no');
 console.log('Auth service-role reference: no');
 console.log('Founder cookie: HttpOnly, SameSite=Strict, HTTPS-aware Secure, private/no-store');
-console.log('Worker bridge: Cloudflare Node HTTP');
+console.log('Worker bridge: current Cloudflare httpServerHandler composition preserved');
