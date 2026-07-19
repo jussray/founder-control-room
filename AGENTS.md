@@ -14,7 +14,7 @@ For Se’kret Bip splash, founding-preview, waiting-list, sponsor, or social lau
 Use the exact founder stack:
 
 ```text
-/garyvee lindymode redteam l99 redteam ooda
+/elonmusk /garyvee lindymode redteam l99 redteam ooda /truthmode
 ```
 
 For commercial work add:
@@ -27,13 +27,35 @@ For commercial work add:
 
 ## Required loop
 
-1. Inspect repository, branch, provider state, auth boundaries, migrations, tests, commercial evidence, launch evidence, and runtime truth.
+1. Inspect repository, branch, provider state, auth boundaries, migrations, tests, commercial evidence, launch evidence, Cloudflare evidence, and runtime truth.
 2. Complete 5W1H and identify the next authority gate.
 3. Attack the premise before designing the solution or offer.
-4. Apply the Lindy screen and map authority, provenance, project boundaries, state, evidence, economics, event history, failure modes, and rollback through L99.
+4. Apply the Lindy screen and map authority, provenance, project boundaries, state, evidence, economics, event history, failure modes, release truth, and rollback through L99.
 5. Attack the selected plan before implementation or execution.
-6. Make the smallest coherent, reversible change and verify it.
+6. Make the smallest coherent, reversible change and verify it, including Playwright when a user-facing web/runtime path changes.
 7. Re-observe through OODA and report proof plus the next founder approval gate.
+
+## Release-truth outage classification
+
+Founder Control Room is the first and authoritative place to record and interpret cross-repo release truth.
+
+When GitHub Actions fails, classify the evidence before assigning blame:
+
+- `runner_startup_failure`: runner/job startup failed before meaningful steps executed, especially no steps, no logs, or null log URLs.
+- `workflow_no_jobs`: the workflow schedules no jobs or is skipped before jobs exist.
+- `workflow_step_failure`: at least one job executed steps and logs show a concrete failing command, assertion, build, lint, type, or Playwright step.
+
+Never claim a code regression when GitHub jobs have no executed steps or logs. Treat zero-step/no-log failures as infrastructure evidence. This infrastructure outage still gates release truth when repository rules require executed checks, Playwright proof, or exact-head evidence.
+
+For every incident record, capture repository, PR, branch, head SHA, workflow, run, job evidence, classification, Cloudflare build/deploy status, runtime evidence, impact, and next gate.
+
+Cloudflare build/deploy evidence is release truth, but it is separate from GitHub Actions. A successful Cloudflare build does not prove GitHub checks, Playwright, auth, data, privacy, or app behavior passed. A GitHub runner outage does not prove application failure. Record both without blending them.
+
+## Canonical project routing
+
+Only `jussray/Sekret-Bip` is the active Se’kret Bip working repository. Other Bip-named repositories are historical or investigate-only unless Founder Control Room explicitly names one for provenance capture.
+
+Active work may proceed in Founder Control Room, `jussray/Sekret-Bip`, `jussray/l99-StoryEngine`, Chief/PromptOS, Juss Beautiful Hair repos, and clothing/storefront repos when each repo’s local gates are satisfied.
 
 ## Non-negotiable boundaries
 
@@ -49,4 +71,4 @@ For commercial work add:
 
 ## Evidence report
 
-List files changed, behavior changed, tests run, failures or skips, security impact, provider impact, commercial assumptions, disqualifiers, brand/IP impact, proof, rollback, unresolved risk, and next gate.
+List files changed, behavior changed, tests run, Playwright result or inapplicability, failures or skips, security impact, provider impact, commercial assumptions, disqualifiers, brand/IP impact, Cloudflare/Control Room proof when applicable, rollback, unresolved risk, and next gate.
