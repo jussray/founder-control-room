@@ -1,8 +1,65 @@
 import { LaneCard } from '@/components/LaneCard';
 import { MissionCard } from '@/components/MissionCard';
+import { getLanes, getMissions } from '@/lib/queries';
 import { laneSummaries, missionCards } from '@/lib/data';
+import type { LaneSummary, MissionCard as MissionCardType } from '@/lib/types';
 
-export default function ControlRoomPage() {
+export const dynamic = 'force-dynamic';
+
+async function fetchLanes(): Promise<LaneSummary[]> {
+  try {
+    const rows = await getLanes();
+    return rows.map((r) => ({
+      id: r.id as LaneSummary['id'],
+      label: r.label,
+      description: '',
+      status: r.status,
+      risk: r.risk,
+      metrics: []
+    }));
+  } catch {
+    return laneSummaries; // fall back to static seed if DB not reachable
+  }
+}
+
+async function fetchMissions(): Promise<MissionCardType[]> {
+  try {
+    const rows = await getMissions();
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      lane: r.lane_id as MissionCardType['lane'],
+      objective: r.objective,
+      risk: r.risk,
+      observe: r.ooda_steps?.filter((s) => s.phase === 'observe').map((s) => s.body) ?? [],
+      orient:  r.ooda_steps?.filter((s) => s.phase === 'orient').map((s) => s.body) ?? [],
+      decide:  r.ooda_steps?.filter((s) => s.phase === 'decide').map((s) => s.body) ?? [],
+      act:     r.ooda_steps?.filter((s) => s.phase === 'act').map((s) => s.body) ?? [],
+      evidence: r.evidence?.map((e) => ({
+        id: e.id,
+        label: e.label,
+        kind: e.kind,
+        verified: e.verified
+      })) ?? [],
+      nextAction: r.next_action ?? ''
+    }));
+  } catch {
+    return missionCards; // fall back to static seed
+  }
+}
+
+export default async function ControlRoomPage() {
+  const [lanes, missions] = await Promise.all([fetchLanes(), fetchMissions()]);
+
+  // Merge live DB lanes with static descriptions/metrics (static data has richer content)
+  const enrichedLanes = lanes.map((live) => {
+    const seed = laneSummaries.find((s) => s.id === live.id);
+    return seed ? { ...seed, risk: live.risk, status: live.status } : live;
+  });
+
+  // Use static missions when DB has none yet (no missions seeded = fall back)
+  const displayMissions = missions.length > 0 ? missions : missionCards;
+
   return (
     <main className="shell">
       <section className="hero">
@@ -32,7 +89,7 @@ export default function ControlRoomPage() {
       </section>
 
       <section className="laneGrid">
-        {laneSummaries.map((lane) => (
+        {enrichedLanes.map((lane) => (
           <LaneCard key={lane.id} lane={lane} />
         ))}
       </section>
@@ -46,7 +103,7 @@ export default function ControlRoomPage() {
       </section>
 
       <section className="missionGrid">
-        {missionCards.map((mission) => (
+        {displayMissions.map((mission) => (
           <MissionCard key={mission.id} mission={mission} />
         ))}
       </section>
