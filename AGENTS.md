@@ -9,6 +9,7 @@ Read these before changing code, configuration, schemas, providers, verification
 - [`skills/typescript-audit/SKILL.md`](./skills/typescript-audit/SKILL.md) before TypeScript, TSX, JavaScript, Node, Worker, build, PR, draft PR, or mergeability edits
 - [`skills/typescript-root-cause-debugger/SKILL.md`](./skills/typescript-root-cause-debugger/SKILL.md) for ranked root-cause debugging before patch proposals
 - [`skills/typescript-minimal-patch/SKILL.md`](./skills/typescript-minimal-patch/SKILL.md) when writing the smallest safe TypeScript repair
+- [`skills/typescript-behavior-tests/SKILL.md`](./skills/typescript-behavior-tests/SKILL.md) when writing, replacing, or retiring Jest/Vitest behavior tests
 - [`skills/typescript-strict-review/SKILL.md`](./skills/typescript-strict-review/SKILL.md) before merge-ready or ready-for-review claims on TypeScript changes
 - [`skills/sales/SKILL.md`](./skills/sales/SKILL.md) for qualification, offers, proof, conversion quality, retention, and revenue operations
 - [`skills/devil/SKILL.md`](./skills/devil/SKILL.md) for the premise attack and selected-plan attack
@@ -36,7 +37,7 @@ For commercial work add:
 3. Attack the premise before designing the solution or offer.
 4. Apply the Lindy screen and map authority, provenance, project boundaries, state, evidence, economics, event history, failure modes, release truth, and rollback through L99.
 5. Attack the selected plan before implementation or execution.
-6. Make the smallest coherent, reversible change and verify it, including Playwright when a user-facing web/runtime path changes.
+6. Make the smallest coherent, reversible change and verify it, including behavior tests and Playwright when a user-facing web/runtime path changes.
 7. Re-observe through OODA and report proof plus the next founder approval gate.
 
 ## Release-truth outage classification
