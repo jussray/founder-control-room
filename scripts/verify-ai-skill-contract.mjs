@@ -7,6 +7,7 @@ const files = {
   typescriptAudit: await readFile(new URL('../skills/typescript-audit/SKILL.md', import.meta.url), 'utf8'),
   typescriptDebugger: await readFile(new URL('../skills/typescript-root-cause-debugger/SKILL.md', import.meta.url), 'utf8'),
   typescriptPatch: await readFile(new URL('../skills/typescript-minimal-patch/SKILL.md', import.meta.url), 'utf8'),
+  typescriptTests: await readFile(new URL('../skills/typescript-behavior-tests/SKILL.md', import.meta.url), 'utf8'),
   typescriptReview: await readFile(new URL('../skills/typescript-strict-review/SKILL.md', import.meta.url), 'utf8'),
   agents: await readFile(new URL('../AGENTS.md', import.meta.url), 'utf8'),
   global: await readFile(new URL('../GLOBAL_AI.md', import.meta.url), 'utf8'),
@@ -53,6 +54,7 @@ for (const [label, source, metadata] of [
   ['typescript-audit', files.typescriptAudit, ['name: typescript-audit', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
   ['typescript-root-cause-debugger', files.typescriptDebugger, ['name: typescript-root-cause-debugger', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
   ['typescript-minimal-patch', files.typescriptPatch, ['name: typescript-minimal-patch', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
+  ['typescript-behavior-tests', files.typescriptTests, ['name: typescript-behavior-tests', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
   ['typescript-strict-review', files.typescriptReview, ['name: typescript-strict-review', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
 ]) for (const field of metadata) requireText(`${label} metadata`, source, field);
 
@@ -84,6 +86,13 @@ for (const phrase of [
   'Manual test steps',
 ]) requireText('typescript-patch invariant', files.typescriptPatch, phrase);
 for (const phrase of [
+  'Test real behavior, not implementation details',
+  'No tests that would pass if the function were deleted',
+  'Use Jest or Vitest',
+  'Test retirement contract',
+  'Never delete tests merely to make GitHub Actions green',
+]) requireText('typescript-tests invariant', files.typescriptTests, phrase);
+for (const phrase of [
   'Correctness',
   'Regression risk',
   'Type safety',
@@ -97,6 +106,7 @@ requireText('AGENTS devil entry', files.agents, 'skills/devil/SKILL.md');
 requireText('AGENTS TypeScript audit entry', files.agents, 'skills/typescript-audit/SKILL.md');
 requireText('AGENTS TypeScript debugger entry', files.agents, 'skills/typescript-root-cause-debugger/SKILL.md');
 requireText('AGENTS TypeScript patch entry', files.agents, 'skills/typescript-minimal-patch/SKILL.md');
+requireText('AGENTS TypeScript tests entry', files.agents, 'skills/typescript-behavior-tests/SKILL.md');
 requireText('AGENTS TypeScript review entry', files.agents, 'skills/typescript-strict-review/SKILL.md');
 requireText('AGENTS commercial extension', files.agents, '/sales /devil');
 requireText('AGENTS separation', files.agents, 'separate approval gates');
