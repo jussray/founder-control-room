@@ -8,6 +8,16 @@
       "requestedAt": "2026-07-19T18:47:34Z",
       "expiresAt": "2026-07-20T18:47:34Z",
       "removalInstruction": "Remove the matching toolRule from .claude/settings.json at or before expiresAt. This ledger documents intent only; Claude Code enforces the allow rule from .claude/settings.json."
+    },
+    {
+      "id": "temp-bash-gh-issue-close-2026-07-19",
+      "toolRule": "Bash(gh issue close:*)",
+      "scope": "jussray/founder-control-room",
+      "requestedBy": "founder",
+      "requestedAt": "2026-07-19T18:50:00Z",
+      "expiresAt": "2026-07-20T18:50:00Z",
+      "usageLimit": "Close only necessary open issues after preserving evidence in the issue or linked Control Room artifact. Do not close unresolved founder-decision, deployment, credential, billing, deletion, or external-platform gates.",
+      "removalInstruction": "Remove the matching toolRule from .claude/settings.json at or before expiresAt. This ledger documents intent only; Claude Code enforces the allow rule from .claude/settings.json."
     }
   ]
 }
