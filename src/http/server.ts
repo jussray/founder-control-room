@@ -12,6 +12,7 @@ import { promptosRouter } from './routes/promptos.js';
 import { agentsRouter } from './routes/agents.js';
 import { authorityLevelsRouter } from './routes/authorityLevels.js';
 import { handleGitHubWebhook } from './webhooks/github.js';
+import { publicGuardrailSnapshot, renderGuardrailStatusPage } from '../guardrails.js';
 import {
   corsMiddleware,
   helmetMiddleware,
@@ -55,6 +56,28 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use(express.json({ limit: BODY_LIMIT }));
 
   app.get('/health', (_req, res) => res.json({ ok: true }));
+
+  app.get('/guardrails', (_req, res) => {
+    res.set({
+      'Cache-Control': 'no-store',
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Security-Policy':
+        "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+      'Referrer-Policy': 'no-referrer',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    res.status(200).send(renderGuardrailStatusPage());
+  });
+
+  app.get('/guardrails.json', (_req, res) => {
+    res.set({
+      'Cache-Control': 'no-store',
+      'Content-Type': 'application/json; charset=utf-8',
+      'Referrer-Policy': 'no-referrer',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    res.status(200).json(publicGuardrailSnapshot());
+  });
 
   app.use('/auth/magic-link', rateLimitMagicLink);
   app.use(rateLimitGeneral);
