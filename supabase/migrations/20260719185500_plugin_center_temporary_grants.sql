@@ -25,6 +25,12 @@ create table if not exists plugin_permission_grants (
   check (expires_at <= created_at + interval '24 hours')
 );
 
+alter table plugin_permission_grants enable row level security;
+
+drop policy if exists founder_full_access on plugin_permission_grants;
+create policy founder_full_access on plugin_permission_grants
+  for all using (is_founder()) with check (is_founder());
+
 create index if not exists plugin_permission_grants_project_active_idx
   on plugin_permission_grants (project_id, expires_at)
   where revoked_at is null;
