@@ -1,6 +1,6 @@
 # Founder Control Room Claude Instructions
 
-Read [`Juss Founder OS`](.ai/skills/juss-founder-os/SKILL.md) first, then read [`GLOBAL_AI.md`](./GLOBAL_AI.md) and [`skills/portfolio-control-plane/SKILL.md`](./skills/portfolio-control-plane/SKILL.md) before any nontrivial work.
+Read [`Juss Founder OS`](.ai/skills/juss-founder-os/SKILL.md) first, then read [`GLOBAL_AI.md`](./GLOBAL_AI.md), [`docs/FOUNDER_MERGE_AUTHORITY.md`](./docs/FOUNDER_MERGE_AUTHORITY.md), and [`skills/portfolio-control-plane/SKILL.md`](./skills/portfolio-control-plane/SKILL.md) before any nontrivial work.
 
 For Se’kret Bip splash, founding-preview, waiting-list, sponsor, or social launch work, also read [`docs/private/JUSS_PRIVATE_OPERATING_PLAN.md`](docs/private/JUSS_PRIVATE_OPERATING_PLAN.md).
 
@@ -29,7 +29,7 @@ The first redteam attacks the premise. The second attacks the selected plan.
 - Curated operational events may cross project boundaries. Raw private user content must not.
 - Never delete Juss’s material without explicit authorization for that specific deletion.
 - Do not invent dashboard state, provider configuration, deployment success, or approval history.
-- Do not merge, deploy, rotate credentials, alter auth/RLS, publish externally, or perform destructive changes without explicit founder approval.
+- Merge when appropriate under `docs/FOUNDER_MERGE_AUTHORITY.md`. Do not deploy, rotate credentials, alter auth/RLS, publish externally, spend funds, or perform destructive changes without explicit founder approval.
 
 ## Required completion report
 
