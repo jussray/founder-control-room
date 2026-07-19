@@ -4,6 +4,7 @@ const files = {
   portfolio: await readFile(new URL('../skills/portfolio-control-plane/SKILL.md', import.meta.url), 'utf8'),
   sales: await readFile(new URL('../skills/sales/SKILL.md', import.meta.url), 'utf8'),
   devil: await readFile(new URL('../skills/devil/SKILL.md', import.meta.url), 'utf8'),
+  typescriptAudit: await readFile(new URL('../skills/typescript-audit/SKILL.md', import.meta.url), 'utf8'),
   agents: await readFile(new URL('../AGENTS.md', import.meta.url), 'utf8'),
   global: await readFile(new URL('../GLOBAL_AI.md', import.meta.url), 'utf8'),
   redteam: await readFile(new URL('../artifacts/redteam/SALES_DEVIL_ATTACK.md', import.meta.url), 'utf8'),
@@ -46,6 +47,7 @@ for (const invariant of [
 for (const [label, source, metadata] of [
   ['sales', files.sales, ['name: sales', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
   ['devil', files.devil, ['name: devil', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
+  ['typescript-audit', files.typescriptAudit, ['name: typescript-audit', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
 ]) for (const field of metadata) requireText(`${label} metadata`, source, field);
 
 for (const phrase of ['5W1H', 'Qualify', 'disqualifiers', 'evidence', 'No approval carries forward', 'A sales plan is not authorization']) {
@@ -54,10 +56,18 @@ for (const phrase of ['5W1H', 'Qualify', 'disqualifiers', 'evidence', 'No approv
 for (const phrase of ['Pass I — premise attack', 'Pass II — selected-plan attack', 'kill criteria', 'does not authorize execution']) {
   requireText('devil invariant', files.devil, phrase);
 }
+for (const phrase of [
+  'Audit first, then suggest',
+  'Open draft PRs are part of the work',
+  'Recommended next step only',
+  'Never treat `mergeable: true` alone as merge approval',
+  'Zero-step/no-log GitHub Actions runs are infrastructure evidence',
+]) requireText('typescript-audit invariant', files.typescriptAudit, phrase);
 
 requireText('AGENTS portfolio entry', files.agents, 'skills/portfolio-control-plane/SKILL.md');
 requireText('AGENTS sales entry', files.agents, 'skills/sales/SKILL.md');
 requireText('AGENTS devil entry', files.agents, 'skills/devil/SKILL.md');
+requireText('AGENTS TypeScript audit entry', files.agents, 'skills/typescript-audit/SKILL.md');
 requireText('AGENTS commercial extension', files.agents, '/sales /devil');
 requireText('AGENTS separation', files.agents, 'separate approval gates');
 requireText('global alignment', files.global, '/garyvee lindymode redteam l99 redteam ooda');
