@@ -25,17 +25,17 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
   }),
   Object.freeze({
     id: 'FCR-BOUNDARY-001',
-    status: 'active',
+    status: 'partial',
     summary:
-      'Control Room uses its own Supabase trust boundary and does not borrow Se’kret Bip credentials.',
+      'Control Room is configured for its own Supabase trust boundary, but runtime project-identity validation is not yet enforced.',
     evidence: ['src/lib/supabaseClient.ts', 'docs/ARCHITECTURE.md'],
   }),
   Object.freeze({
     id: 'FCR-DATA-001',
-    status: 'active',
+    status: 'partial',
     summary:
-      'Only curated operational evidence may cross project boundaries; raw private product content is forbidden.',
-    evidence: ['GLOBAL_AI.md', 'docs/ARCHITECTURE.md'],
+      'Raw private product content is forbidden by policy, but provider-event ingress still needs field allowlisting or redaction before persistence.',
+    evidence: ['GLOBAL_AI.md', 'docs/ARCHITECTURE.md', 'src/http/webhooks/github.ts'],
   }),
   Object.freeze({
     id: 'FCR-APPROVAL-001',
@@ -59,15 +59,16 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
   }),
   Object.freeze({
     id: 'FCR-AUDIT-001',
-    status: 'active',
-    summary: 'Project reads and material provider actions require audit evidence.',
-    evidence: ['src/http/routes/projects.ts'],
+    status: 'partial',
+    summary:
+      'Some project reads and provider actions create audit evidence, but coverage and fail-closed persistence are not yet complete.',
+    evidence: ['src/http/routes/projects.ts', 'src/events/inbox.ts'],
   }),
 ]);
 
 export function publicGuardrailSnapshot() {
   return Object.freeze({
-    version: '1.1.0',
+    version: '1.1.1',
     vision: CONTROL_ROOM_VISION,
     guardrails: CONTROL_ROOM_GUARDRAILS.map(({ id, status, summary }) => ({
       id,
@@ -119,7 +120,7 @@ export function renderGuardrailStatusPage() {
       <p>${escapeHtml(snapshot.vision.northStar)}</p>
     </article>
     <section>
-      <h2>Active contract</h2>
+      <h2>Guardrail contract</h2>
       <ul>${items}</ul>
     </section>
     <p data-testid="sensitive-status"><code>sensitiveFieldsIncluded=false</code></p>
