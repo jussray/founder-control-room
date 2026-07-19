@@ -8,6 +8,7 @@ launch work, also read [`Juss Private Operating Plan`](docs/private/JUSS_PRIVATE
 For repository integration decisions, read [`Founder Merge Authority`](docs/FOUNDER_MERGE_AUTHORITY.md).
 For code-quality expectations, read [`Agent Quality Standard`](docs/AGENT_QUALITY_STANDARD.md).
 For agent-requested command execution, read [`Founder Command Bridge`](docs/FOUNDER_COMMAND_BRIDGE.md).
+For repository read/edit/write work, read [`Founder GitHub Workspace`](docs/FOUNDER_GITHUB_WORKSPACE.md).
 
 The Founder OS is the private parent skill. This file specializes it for Founder
 Control Room. Repository-specific rules may become stricter, but they may not
@@ -55,7 +56,7 @@ Never claim a file, feature, test, branch, merge, deployment, approval, or provi
 - **Claude / Claude Code** — long-context repository analysis, structured implementation, careful refactors, and documentation.
 - **Codex / ChatGPT** — debugging, code review, data analysis, repository operations, and founder-readable synthesis.
 - **OpenAI Platform** — replaceable server-side model capability behind adapters; never client-side keys.
-- **Anthropic Platform** — replaceable server-side model capability behind adapters; model context is not durable memory.
+- **Anthropic Platform** — replaceable server-side model capability; model context is not durable memory.
 - **Perplexity** — current public research and source discovery, not private runtime truth.
 - **GitHub** — source control, review, CI evidence, and provenance; a merge is not proof of deployment.
 - **Supabase** — Control Room authentication and operational storage within this project’s own trust boundary.
@@ -73,6 +74,7 @@ Never claim a file, feature, test, branch, merge, deployment, approval, or provi
 - Merge only under the conditions in `docs/FOUNDER_MERGE_AUTHORITY.md`; a merge must never silently authorize a separately gated action.
 - For nontrivial code changes, run `npm run typecheck` and `npm test` before claiming readiness, or explicitly report why they could not be run.
 - Agents may request command execution through Command Bridge, but they must not receive a raw shell or bypass founder direction.
+- Repository edits from Control Room must go through GitHub Workspace or the Approval Engine patch route, and writes must land on mission branches unless a separate founder merge gate is satisfied.
 
 ## Approval gates
 
