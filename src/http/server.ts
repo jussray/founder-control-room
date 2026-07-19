@@ -11,6 +11,7 @@ import { missionsRouter } from './routes/missions.js';
 import { promptosRouter } from './routes/promptos.js';
 import { agentsRouter } from './routes/agents.js';
 import { authorityLevelsRouter } from './routes/authorityLevels.js';
+import { pluginCenterRouter } from './routes/pluginCenter.js';
 import { handleGitHubWebhook } from './webhooks/github.js';
 import { publicGuardrailSnapshot, renderGuardrailStatusPage } from '../guardrails.js';
 import {
@@ -92,6 +93,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/promptos', promptosRouter);
   app.use('/agents', agentsRouter);
   app.use('/authority-levels', authorityLevelsRouter);
+  app.use('/plugin-center', pluginCenterRouter);
 
   app.use(errorHandler);
 
