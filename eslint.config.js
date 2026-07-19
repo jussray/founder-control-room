@@ -2,9 +2,21 @@
 import tseslint from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 
+const preservedNextPrototype = [
+  'src/app/**',
+  'src/components/**',
+  'src/lib/contracts.ts',
+  'src/lib/data.ts',
+  'src/lib/db-types.ts',
+  'src/lib/queries.ts',
+  'src/lib/supabase.ts',
+  'src/lib/types.ts',
+  'src/worker/index.ts',
+];
+
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**'],
+    ignores: ['dist/**', 'node_modules/**', ...preservedNextPrototype],
   },
   {
     files: ['src/**/*.ts'],
