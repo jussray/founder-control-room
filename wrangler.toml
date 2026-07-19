@@ -10,15 +10,29 @@ compatibility_flags = [
 [observability]
 enabled = true
 
-# Secrets (set via `wrangler secret put <NAME>`):
-#   SUPABASE_URL
-#   SUPABASE_SERVICE_ROLE_KEY
-#   SUPABASE_ANON_KEY
-#   GITHUB_WEBHOOK_SECRET
-#   GITHUB_APP_ID
-#   GITHUB_PRIVATE_KEY
-#   FOUNDER_ALLOWED_ORIGINS
-#   FOUNDER_API_URL
+# ---------------------------------------------------------------------------
+# Non-secret vars — committed here, safe to expose
+# ---------------------------------------------------------------------------
+# NOTE: Founder Control Room deploys to Vercel.
+#       Se'kret Bip does NOT use Vercel (it has its own separate infra).
+#       ORIGIN_URL must point at the Vercel deployment for this repo only.
+# ---------------------------------------------------------------------------
+[vars]
+ENVIRONMENT = "production"
+# Replace with your actual Vercel deployment URL after first deploy:
+ORIGIN_URL = "https://founder-control-room.vercel.app"
+
+# ---------------------------------------------------------------------------
+# Secrets — set via `wrangler secret put <NAME>` (never committed)
+# ---------------------------------------------------------------------------
+# wrangler secret put GITHUB_WEBHOOK_SECRET
+# wrangler secret put SUPABASE_URL
+# wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+# wrangler secret put SUPABASE_ANON_KEY
+# wrangler secret put GITHUB_APP_ID
+# wrangler secret put GITHUB_PRIVATE_KEY
+# wrangler secret put FOUNDER_ALLOWED_ORIGINS
+# wrangler secret put FOUNDER_API_URL
 
 [triggers]
 crons = ["* * * * *"]
