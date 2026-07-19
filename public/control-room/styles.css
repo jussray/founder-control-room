@@ -1,0 +1,112 @@
+:root {
+  color-scheme: dark;
+  --bg: #0f1115;
+  --panel: #171a21;
+  --panel-border: #2a2e38;
+  --text: #e6e8ec;
+  --muted: #8b93a1;
+  --accent: #4fd1c5;
+  --danger: #f56565;
+  --warn: #ecc94b;
+  --ok: #68d391;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.boot-fallback { padding: 2rem; color: var(--muted); }
+
+a { color: var(--accent); }
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.5rem 0.9rem;
+}
+button:hover { border-color: var(--accent); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.primary { background: var(--accent); color: #0a0e10; border-color: var(--accent); font-weight: 600; }
+button.danger { border-color: var(--danger); color: var(--danger); }
+
+input, textarea, select {
+  font: inherit;
+  background: #0b0d11;
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 0.45rem 0.6rem;
+  width: 100%;
+}
+
+label { display: block; font-size: 0.8rem; color: var(--muted); margin: 0.6rem 0 0.2rem; }
+
+.shell { display: flex; flex-direction: column; min-height: 100vh; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--panel-border);
+  gap: 1rem;
+}
+
+.topbar .brand { font-weight: 700; letter-spacing: 0.02em; }
+.topbar .founder-email { color: var(--muted); font-size: 0.85rem; }
+
+.tabs { display: flex; gap: 0.25rem; padding: 0 1.25rem; border-bottom: 1px solid var(--panel-border); overflow-x: auto; }
+.tabs button { border: none; border-radius: 0; background: transparent; border-bottom: 2px solid transparent; padding: 0.7rem 0.9rem; color: var(--muted); white-space: nowrap; }
+.tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+
+.content { flex: 1; padding: 1.25rem; max-width: 1100px; width: 100%; margin: 0 auto; }
+
+.panel { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
+.panel h2 { margin-top: 0; font-size: 1rem; }
+.panel h3 { font-size: 0.9rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+.row { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end; }
+.row > * { flex: 1; min-width: 160px; }
+
+.grid-lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; }
+.lane { background: #12151b; border: 1px solid var(--panel-border); border-radius: 10px; padding: 0.6rem; min-height: 80px; }
+.lane h4 { margin: 0 0 0.5rem; font-size: 0.75rem; text-transform: uppercase; color: var(--muted); }
+
+.card { background: #0f1218; border: 1px solid var(--panel-border); border-radius: 8px; padding: 0.6rem; margin-bottom: 0.5rem; cursor: pointer; }
+.card:hover { border-color: var(--accent); }
+.card .meta { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; }
+.card .title { font-size: 0.85rem; margin-top: 0.15rem; }
+
+.badge { display: inline-block; border-radius: 999px; padding: 0.1rem 0.55rem; font-size: 0.7rem; border: 1px solid var(--panel-border); }
+.badge.ok { color: var(--ok); border-color: var(--ok); }
+.badge.warn { color: var(--warn); border-color: var(--warn); }
+.badge.danger { color: var(--danger); border-color: var(--danger); }
+
+pre { background: #0b0d11; border: 1px solid var(--panel-border); border-radius: 8px; padding: 0.75rem; overflow: auto; max-height: 420px; font-size: 0.8rem; }
+textarea.code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; min-height: 260px; }
+
+.error { color: var(--danger); font-size: 0.85rem; margin-top: 0.4rem; }
+.notice { color: var(--muted); font-size: 0.85rem; margin-top: 0.4rem; }
+
+.sign-in-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.sign-in-card { width: 100%; max-width: 360px; }
+
+.file-tree { list-style: none; margin: 0; padding: 0; font-size: 0.85rem; }
+.file-tree li { padding: 0.25rem 0.4rem; border-radius: 6px; cursor: pointer; }
+.file-tree li:hover { background: #12151b; }
+.file-tree li.dir::before { content: "📁 "; }
+.file-tree li.file::before { content: "📄 "; }
+
+.toolbar { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.muted { color: var(--muted); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

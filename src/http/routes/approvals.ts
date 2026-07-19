@@ -11,6 +11,7 @@
  */
 
 import { Router, type Response } from 'express';
+import { randomUUID } from 'node:crypto';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { GitHubProvider } from '../../providers/GitHubProvider.js';
@@ -18,6 +19,16 @@ import { enqueueReconcile } from '../../events/outbox.js';
 import { ProofGateController } from '../../controllers/ProofGateController.js';
 import type { ProofEvidence } from '../../proof-gate/index.js';
 import type { EvidenceKind } from '../../reconciliation/types.js';
+import type { PatchFileChange } from '../../providers/RepositoryProvider.js';
+
+/** Mission states in which the branch is still under active work — safe to patch. */
+const PATCHABLE_MISSION_STATUSES = new Set(['sandboxed', 'in_review']);
+
+/** Rejects absolute paths and `..` segments before they reach the provider. */
+function isSafeRepoPath(path: string): boolean {
+  if (!path || path.startsWith('/') || path.includes('\0')) return false;
+  return !path.split('/').some((segment) => segment === '..' || segment === '');
+}
 
 const PROOF_GATED_ACTIONS = new Set(['merge', 'create_branch']);
 const PROOF_GATE_TTL_MS = 15 * 60 * 1_000;
@@ -472,5 +483,122 @@ approvalsRouter.post(
     });
 
     return res.json({ ok: true, result: executionResult, executionId: reservation.id });
+  },
+);
+
+/**
+ * POST /:missionId/patch
+ *
+ * Founder-gated read/write/edit action: commits file changes onto a
+ * mission's OWN sandbox branch — never onto the project's base ref.
+ *
+ * This is deliberately unguarded by the proof-gate — it edits a branch
+ * nobody has approved yet, which is what sandboxes are for. The proof-gate
+ * and exact-head verification in `/:missionId/execute` remain the only path
+ * that can move code onto `base_ref`, so this route cannot be used to
+ * bypass approval; it only changes what a pending approval will see.
+ */
+approvalsRouter.post(
+  '/:missionId/patch',
+  async (req: FounderRequest, res: Response) => {
+    const { missionId } = req.params as { missionId: string };
+    const { message, changes } = req.body as { message?: unknown; changes?: unknown };
+
+    if (typeof message !== 'string' || message.trim() === '') {
+      return res.status(400).json({ error: 'message is required' });
+    }
+    if (!Array.isArray(changes) || changes.length === 0) {
+      return res.status(400).json({ error: 'changes must be a non-empty array' });
+    }
+
+    for (const change of changes as Array<Record<string, unknown>>) {
+      if (typeof change?.['path'] !== 'string' || !isSafeRepoPath(change['path'] as string)) {
+        return res.status(400).json({ error: `Invalid or unsafe path: ${JSON.stringify(change?.['path'])}` });
+      }
+      if (change['delete'] !== true && typeof change['content'] !== 'string') {
+        return res.status(400).json({
+          error: `changes for "${change['path'] as string}" must include string content unless delete is true`,
+        });
+      }
+    }
+
+    const { data: mission, error: missionError } = await supabase
+      .from('missions')
+      .select('id, project_id, status, branch_ref')
+      .eq('id', missionId)
+      .single();
+
+    if (missionError || !mission) {
+      return res.status(404).json({ error: 'Mission not found' });
+    }
+
+    if (!PATCHABLE_MISSION_STATUSES.has(mission.status)) {
+      return res.status(409).json({
+        error: `Mission must be sandboxed or in_review to accept edits; current status is ${mission.status}.`,
+        code: 'MISSION_NOT_EDITABLE',
+      });
+    }
+    if (!mission.branch_ref) {
+      return res.status(409).json({
+        error: 'Mission has no branch yet. Call POST /:missionId/execute with actionType "create_branch" first.',
+        code: 'MISSION_HAS_NO_BRANCH',
+      });
+    }
+
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('id, slug, repo_provider, repo_identifier')
+      .eq('id', mission.project_id as string)
+      .single();
+
+    if (projectError || !project) {
+      return res.status(500).json({ error: 'Project repository configuration not found.' });
+    }
+
+    const token = process.env['GITHUB_TOKEN'];
+    const provider = token && project.repo_provider === 'github' && project.repo_identifier
+      ? new GitHubProvider({
+          token,
+          projectMap: { [project.slug]: project.repo_identifier },
+        })
+      : null;
+
+    if (!provider) {
+      return res.status(503).json({
+        error: 'Repository provider is not configured.',
+        code: 'REPOSITORY_PROVIDER_UNAVAILABLE',
+      });
+    }
+
+    let commitSha: string;
+    try {
+      commitSha = await provider.commitPatch(project.slug, mission.branch_ref, {
+        message,
+        changes: changes as PatchFileChange[],
+        authorName: 'founder-control-room',
+      });
+    } catch (error) {
+      return res.status(502).json({
+        error: error instanceof Error ? error.message : 'Patch commit failed',
+        code: 'PATCH_COMMIT_FAILED',
+      });
+    }
+
+    await supabase.from('project_events').insert({
+      project_id: project.id,
+      source_event_id: randomUUID(),
+      event_type: 'mission_patch_committed',
+      severity: 'info',
+      screen: 'control-room-api',
+      metadata: {
+        route: `POST /approvals/${missionId}/patch`,
+        committed_by: req.founder!.email,
+        branch: mission.branch_ref,
+        commitSha,
+        filesChanged: (changes as Array<Record<string, unknown>>).map((c) => c['path']),
+      },
+    });
+
+    return res.status(201).json({ ok: true, commitSha, branch: mission.branch_ref });
   },
 );
