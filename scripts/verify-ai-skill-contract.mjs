@@ -5,6 +5,9 @@ const files = {
   sales: await readFile(new URL('../skills/sales/SKILL.md', import.meta.url), 'utf8'),
   devil: await readFile(new URL('../skills/devil/SKILL.md', import.meta.url), 'utf8'),
   typescriptAudit: await readFile(new URL('../skills/typescript-audit/SKILL.md', import.meta.url), 'utf8'),
+  typescriptDebugger: await readFile(new URL('../skills/typescript-root-cause-debugger/SKILL.md', import.meta.url), 'utf8'),
+  typescriptPatch: await readFile(new URL('../skills/typescript-minimal-patch/SKILL.md', import.meta.url), 'utf8'),
+  typescriptReview: await readFile(new URL('../skills/typescript-strict-review/SKILL.md', import.meta.url), 'utf8'),
   agents: await readFile(new URL('../AGENTS.md', import.meta.url), 'utf8'),
   global: await readFile(new URL('../GLOBAL_AI.md', import.meta.url), 'utf8'),
   redteam: await readFile(new URL('../artifacts/redteam/SALES_DEVIL_ATTACK.md', import.meta.url), 'utf8'),
@@ -48,6 +51,9 @@ for (const [label, source, metadata] of [
   ['sales', files.sales, ['name: sales', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
   ['devil', files.devil, ['name: devil', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
   ['typescript-audit', files.typescriptAudit, ['name: typescript-audit', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
+  ['typescript-root-cause-debugger', files.typescriptDebugger, ['name: typescript-root-cause-debugger', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
+  ['typescript-minimal-patch', files.typescriptPatch, ['name: typescript-minimal-patch', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
+  ['typescript-strict-review', files.typescriptReview, ['name: typescript-strict-review', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
 ]) for (const field of metadata) requireText(`${label} metadata`, source, field);
 
 for (const phrase of ['5W1H', 'Qualify', 'disqualifiers', 'evidence', 'No approval carries forward', 'A sales plan is not authorization']) {
@@ -63,11 +69,35 @@ for (const phrase of [
   'Never treat `mergeable: true` alone as merge approval',
   'Zero-step/no-log GitHub Actions runs are infrastructure evidence',
 ]) requireText('typescript-audit invariant', files.typescriptAudit, phrase);
+for (const phrase of [
+  'root-cause analysis',
+  'Rank no more than three likely causes by probability',
+  'Ordered debug checklist',
+  'Smallest viable patch',
+  'Regression risks after patch',
+]) requireText('typescript-debugger invariant', files.typescriptDebugger, phrase);
+for (const phrase of [
+  'minimal patch',
+  'Touch the fewest files possible',
+  'No placeholder logic',
+  'Unified diff or exact replacement blocks',
+  'Manual test steps',
+]) requireText('typescript-patch invariant', files.typescriptPatch, phrase);
+for (const phrase of [
+  'Correctness',
+  'Regression risk',
+  'Type safety',
+  'Supabase or Worker integration safety',
+  'Merge recommendation: YES, NO, or YES WITH CHANGES',
+]) requireText('typescript-review invariant', files.typescriptReview, phrase);
 
 requireText('AGENTS portfolio entry', files.agents, 'skills/portfolio-control-plane/SKILL.md');
 requireText('AGENTS sales entry', files.agents, 'skills/sales/SKILL.md');
 requireText('AGENTS devil entry', files.agents, 'skills/devil/SKILL.md');
 requireText('AGENTS TypeScript audit entry', files.agents, 'skills/typescript-audit/SKILL.md');
+requireText('AGENTS TypeScript debugger entry', files.agents, 'skills/typescript-root-cause-debugger/SKILL.md');
+requireText('AGENTS TypeScript patch entry', files.agents, 'skills/typescript-minimal-patch/SKILL.md');
+requireText('AGENTS TypeScript review entry', files.agents, 'skills/typescript-strict-review/SKILL.md');
 requireText('AGENTS commercial extension', files.agents, '/sales /devil');
 requireText('AGENTS separation', files.agents, 'separate approval gates');
 requireText('global alignment', files.global, '/garyvee lindymode redteam l99 redteam ooda');
