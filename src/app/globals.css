@@ -1,0 +1,113 @@
+:root {
+  --bg: #0c0f14;
+  --surface: #141923;
+  --surface-2: #1b2230;
+  --border: #2b3547;
+  --text: #eef2ff;
+  --muted: #a6b0c3;
+  --accent: #8cf4d8;
+  --green: #33d17a;
+  --yellow: #f6c65b;
+  --red: #ff6b6b;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: radial-gradient(circle at top, #182032 0%, var(--bg) 50%); color: var(--text); font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+body { min-height: 100vh; }
+a { color: inherit; }
+
+.shell {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 32px;
+  display: grid;
+  gap: 24px;
+}
+
+.hero, .laneCard, .missionCard, .heroPanel {
+  border: 1px solid var(--border);
+  background: rgba(20, 25, 35, 0.88);
+  backdrop-filter: blur(14px);
+  border-radius: 24px;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 20px;
+  padding: 28px;
+}
+
+h1, h2, h3, p { margin: 0; }
+h1 { font-size: clamp(2rem, 5vw, 4.5rem); line-height: 1.02; max-width: 12ch; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.2rem; }
+.heroCopy, .laneDescription, .objective, .nextAction { color: var(--muted); }
+.heroCopy { margin-top: 14px; max-width: 65ch; }
+.eyebrow { color: var(--accent); text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.72rem; margin-bottom: 10px; }
+
+.heroPanel {
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+.panelLabel { display: block; color: var(--muted); font-size: 0.75rem; margin-bottom: 6px; }
+
+.laneGrid, .missionGrid { display: grid; gap: 20px; }
+.laneGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.missionGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.laneCard, .missionCard { padding: 20px; }
+.laneHeader, .missionTop, .boardHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.riskBadge {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+}
+
+.metricGrid, .oodaGrid { display: grid; gap: 12px; margin-top: 18px; }
+.metricGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.metricBox {
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.metricBox span { display: block; color: var(--muted); font-size: 0.8rem; margin-bottom: 8px; }
+
+.oodaGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.oodaColumn {
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.oodaColumn ul, .evidenceBox ul { margin: 0; padding-left: 18px; color: var(--muted); display: grid; gap: 8px; }
+.evidenceBox {
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(140, 244, 216, 0.06);
+  border: 1px solid rgba(140, 244, 216, 0.16);
+}
+.evidenceBox li { list-style: none; display: flex; gap: 10px; margin-left: -18px; }
+.riskDot { width: 12px; height: 12px; border-radius: 50%; margin-top: 8px; }
+.risk-green { background: var(--green); }
+.risk-yellow { background: var(--yellow); }
+.risk-red { background: var(--red); }
+.boardHeader { padding: 0 4px; }
+
+@media (max-width: 1100px) {
+  .hero, .laneGrid, .missionGrid, .metricGrid, .oodaGrid { grid-template-columns: 1fr; }
+  .shell { padding: 20px; }
+  h1 { max-width: 100%; }
+}
