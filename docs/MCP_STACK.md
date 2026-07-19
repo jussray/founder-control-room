@@ -1,6 +1,16 @@
 # Founder Control Room MCP stack
 
-Last reviewed: 2026-07-14
+Last reviewed: 2026-07-19
+
+This file governs which MCP servers an AI agent (e.g. Claude Code) may use
+while **developing this repository**. It is a different thing from the
+Control Room's own **MCP / Connector Hub** (`project_connections` +
+`GET /agents` + `GET /authority-levels`), which is a data registry of
+connectors for the PROJECTS the Control Room manages (Se'kret Bip and
+future projects) — inventory and authority-level bookkeeping, not a live
+tool connection. Don't conflate the two: this file is about what tools help
+build the Control Room; the Connector Hub is about what the Control Room
+records regarding each managed project's own tool surface.
 
 The Control Room is a private, repository-agnostic governance service. Its default MCP stack supports repository inspection, current implementation documentation, its own database schema, and its own Cloudflare deployment evidence.
 
@@ -17,8 +27,8 @@ The Control Room is a private, repository-agnostic governance service. Its defau
 
 ## Deliberately excluded
 
-- Playwright while the repository has no frontend. Add it when a real browser UI and synthetic test route exist.
-- Figma while there is no active source-design implementation workflow.
+- Playwright — the exclusion condition ("no frontend") is now false: `public/control-room/` is a real, tested, served frontend as of 2026-07-19. Reconsider adding it for browser-verified proof of UI changes. Not added automatically here — enabling a new MCP server for this repo's Claude Code sessions is the founder's call, not something to change unprompted.
+- Figma — still excluded. There is no active source-design implementation workflow in this repo (no Figma files, no Code Connect mapping). Reconsider once one exists.
 - DBHub and generic database MCP servers. The project-scoped read-only Supabase server covers the current schema-inspection need.
 - Netdata while the service runs on managed infrastructure without claimed persistent hosts.
 - GitHub Insiders and local Docker GitHub MCP as committed defaults.

@@ -172,4 +172,119 @@ describe('POST /projects/:slug/connections', () => {
       .send({ connectionType: 'git' });
     expect(res.status).toBe(409);
   });
+
+  it('rejects an unknown authorityLevel', async () => {
+    authSuccess();
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      return {};
+    });
+    const res = await request(buildApp())
+      .post(`/projects/${PROJECT_SLUG}/connections`)
+      .set('Authorization', BEARER)
+      .send({ connectionType: 'figma', authorityLevel: 'L99' });
+    expect(res.status).toBe(400);
+  });
+
+  it('accepts a valid authorityLevel, capabilities, and dataBoundary for a newly-widened connector type', async () => {
+    authSuccess();
+    let insertedRow: Record<string, unknown> | null = null;
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'projects') return projectFoundRow(true);
+      if (table === 'project_connections') {
+        return {
+          insert: (row: Record<string, unknown>) => {
+            insertedRow = row;
+            return { select: () => ({ single: () => Promise.resolve({ data: { id: 'conn-2', ...row }, error: null }) }) };
+          },
+        };
+      }
+      if (table === 'project_events') return { insert: () => Promise.resolve({ error: null }) };
+      return {};
+    });
+
+    const res = await request(buildApp())
+      .post(`/projects/${PROJECT_SLUG}/connections`)
+      .set('Authorization', BEARER)
+      .send({
+        connectionType: 'figma',
+        authorityLevel: 'L2',
+        capabilities: ['inspect_designs', 'compare_design_vs_implementation'],
+        dataBoundary: 'Approved screens only, no unpublished brand assets.',
+      });
+
+    expect(res.status).toBe(201);
+    expect(insertedRow).toMatchObject({
+      connection_type: 'figma',
+      authority_level: 'L2',
+      capabilities: ['inspect_designs', 'compare_design_vs_implementation'],
+      data_boundary: 'Approved screens only, no unpublished brand assets.',
+    });
+  });
+});
+
+describe('POST /projects/:slug/connections/:connectionId/check', () => {
+  it('returns 404 when the connection does not belong to this project', async () => {
+    authSuccess();
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'projects') return projectFoundRow(true);
+      if (table === 'project_connections') {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
+            }),
+          }),
+        };
+      }
+      return {};
+    });
+
+    const res = await request(buildApp())
+      .post(`/projects/${PROJECT_SLUG}/connections/conn-x/check`)
+      .set('Authorization', BEARER)
+      .send({});
+    expect(res.status).toBe(404);
+  });
+
+  it('records last_checked_at and an audited status change', async () => {
+    authSuccess();
+    let updatePayload: Record<string, unknown> | null = null;
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'projects') return projectFoundRow(true);
+      if (table === 'project_connections') {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({ maybeSingle: () => Promise.resolve({ data: { id: 'conn-1' }, error: null }) }),
+            }),
+          }),
+          update: (payload: Record<string, unknown>) => {
+            updatePayload = payload;
+            return {
+              eq: () => ({
+                select: () => ({
+                  single: () => Promise.resolve({ data: { id: 'conn-1', status: 'active', ...payload }, error: null }),
+                }),
+              }),
+            };
+          },
+        };
+      }
+      if (table === 'project_events') return { insert: () => Promise.resolve({ error: null }) };
+      return {};
+    });
+
+    const res = await request(buildApp())
+      .post(`/projects/${PROJECT_SLUG}/connections/conn-1/check`)
+      .set('Authorization', BEARER)
+      .send({ status: 'active' });
+
+    expect(res.status).toBe(200);
+    expect(updatePayload).toMatchObject({ status: 'active' });
+    expect(updatePayload!['last_checked_at']).toEqual(expect.any(String));
+  });
 });

@@ -122,7 +122,10 @@ describe('GitHub webhook ingestion', () => {
       eventType: 'pull_request',
       resourceType: 'pull_request',
       resourceId: '480',
-      payload,
+      payload: {
+        repository: { full_name: 'jussray/Sekret-Bip' },
+        pull_request: { number: 480, head: undefined, base: undefined, user: undefined },
+      },
     });
     expect(mockEnqueueReconcile).toHaveBeenCalledWith(
       {
@@ -136,6 +139,58 @@ describe('GitHub webhook ingestion', () => {
     );
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({ accepted: true, eventId: 'event-123' });
+  });
+
+  it('strips fields the controllers never read — sender, organization, installation, review bodies', async () => {
+    const payload = {
+      repository: { full_name: 'jussray/Sekret-Bip', private: true, owner: { login: 'jussray' } },
+      action: 'opened',
+      pull_request: {
+        number: 480,
+        title: 'Add feature',
+        state: 'open',
+        merged: false,
+        merge_commit_sha: null,
+        html_url: 'https://github.com/jussray/Sekret-Bip/pull/480',
+        updated_at: '2026-07-18T00:00:00Z',
+        body: 'This PR contains sensitive internal planning notes.',
+        head: { sha: 'a'.repeat(40), ref: 'feature/x', repo: { full_name: 'jussray/Sekret-Bip' } },
+        base: { ref: 'main' },
+        user: { login: 'jussray', id: 999, avatar_url: 'https://example.com/avatar.png' },
+        requested_reviewers: [{ login: 'someone-private' }],
+      },
+      sender: { login: 'jussray', id: 999 },
+      organization: { login: 'jussray-org' },
+      installation: { id: 12345 },
+    };
+    const req = signedRequest(payload);
+    const res = makeResponse();
+
+    await handleGitHubWebhook(req, res as unknown as Response);
+
+    const storedPayload = mockPersistProviderEvent.mock.calls[0][0].payload;
+    expect(storedPayload).toEqual({
+      repository: { full_name: 'jussray/Sekret-Bip' },
+      action: 'opened',
+      pull_request: {
+        number: 480,
+        title: 'Add feature',
+        state: 'open',
+        merged: false,
+        merge_commit_sha: null,
+        html_url: 'https://github.com/jussray/Sekret-Bip/pull/480',
+        updated_at: '2026-07-18T00:00:00Z',
+        head: { sha: 'a'.repeat(40), ref: 'feature/x' },
+        base: { ref: 'main' },
+        user: { login: 'jussray' },
+      },
+    });
+    expect(storedPayload.sender).toBeUndefined();
+    expect(storedPayload.organization).toBeUndefined();
+    expect(storedPayload.installation).toBeUndefined();
+    expect(storedPayload.pull_request.body).toBeUndefined();
+    expect(storedPayload.pull_request.user.avatar_url).toBeUndefined();
+    expect(storedPayload.pull_request.requested_reviewers).toBeUndefined();
   });
 
   it('rejects invalid JSON only after the raw-body signature passes', async () => {

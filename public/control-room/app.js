@@ -33,6 +33,7 @@ const state = {
   selectedTemplate: null,
   costs: null,
   agents: [],
+  authorityLevels: [],
   banner: null, // { kind: 'error'|'notice', text }
 };
 
@@ -236,6 +237,11 @@ async function loadAgents() {
   state.agents = data.agents ?? [];
 }
 
+async function loadAuthorityLevels() {
+  const data = await api('/authority-levels');
+  state.authorityLevels = data.levels ?? [];
+}
+
 // ─── Projects tab ────────────────────────────────────────────────────────────
 
 async function loadProjects() {
@@ -364,29 +370,63 @@ function renderProjectDetail(mount) {
       </div>
     `).join('')}
 
-    <h3>Plugin / MCP Hub — connections</h3>
+    <h3>MCP / Connector Hub</h3>
     ${state.projectConnections.length === 0 ? '<p class="muted">No connections registered.</p>' : state.projectConnections.map((c) => `
-      <div class="card" style="cursor:default">
-        <div class="meta">${escapeHtml(c.status)}${c.secret_ref ? ` · secret ref: <span class="mono">${escapeHtml(c.secret_ref)}</span>` : ''}</div>
+      <div class="card" style="cursor:default" data-connection-id="${escapeHtml(c.id)}">
+        <div class="meta">
+          <span class="badge ${c.status === 'active' ? 'ok' : c.status === 'error' ? 'danger' : 'warn'}">${escapeHtml(c.status)}</span>
+          ${c.authority_level ? ` · <span class="badge">${escapeHtml(c.authority_level)}</span>` : ' · <span class="muted">no authority level set</span>'}
+          ${c.last_checked_at ? ` · last checked ${escapeHtml(new Date(c.last_checked_at).toLocaleString())}` : ' · never checked'}
+        </div>
         <div class="title">${escapeHtml(c.connection_type)}${c.label ? ` — ${escapeHtml(c.label)}` : ''}</div>
+        ${(c.capabilities ?? []).length > 0 ? `<p class="muted">${(c.capabilities ?? []).map(escapeHtml).join(', ')}</p>` : ''}
+        ${c.data_boundary ? `<p class="muted">Boundary: ${escapeHtml(c.data_boundary)}</p>` : ''}
+        ${c.secret_ref ? `<p class="muted">Secret ref: <span class="mono">${escapeHtml(c.secret_ref)}</span></p>` : ''}
+        <button class="connection-check-btn" data-connection-id="${escapeHtml(c.id)}" type="button">Check now</button>
       </div>
     `).join('')}
     <form id="new-connection-form">
       <div class="row">
         <div><label>Type</label>
           <select name="connectionType">
-            <option>git</option><option>cloudflare</option><option>supabase</option>
-            <option>openai</option><option>anthropic</option><option>shopify</option>
-            <option>expo</option><option>apple</option><option>google_play</option>
+            <option>github</option><option>git</option><option>cloudflare</option><option>supabase</option>
+            <option>openai</option><option>anthropic</option><option>perplexity</option>
+            <option>figma</option><option>canva</option><option>playwright</option>
+            <option>gmail</option><option>calendar</option><option>context7</option>
+            <option>shopify</option><option>expo</option><option>apple</option><option>google_play</option>
             <option>stripe</option><option>other</option>
           </select>
         </div>
         <div><label>Label</label><input name="label" placeholder="production" /></div>
-        <div><label>Secret ref (pointer only — never a real secret)</label><input name="secretRef" placeholder="CLOUDFLARE_API_TOKEN" /></div>
+        <div><label>Authority level</label>
+          <select name="authorityLevel">
+            <option value="">unset</option>
+            ${state.authorityLevels.map((a) => `<option value="${a.level}">${a.level} — ${escapeHtml(a.label)}</option>`).join('')}
+          </select>
+        </div>
       </div>
+      <div class="row">
+        <div><label>Secret ref (pointer only — never a real secret)</label><input name="secretRef" placeholder="CLOUDFLARE_API_TOKEN" /></div>
+        <div><label>Capabilities (comma-separated)</label><input name="capabilities" placeholder="inspect_repos, create_branch" /></div>
+      </div>
+      <label>Data boundary</label>
+      <input name="dataBoundary" placeholder="Sanitized operational events only, no teen journal content." />
       <div style="margin-top:0.5rem"><button type="submit">Register connection</button></div>
     </form>
   `;
+
+  panel.querySelectorAll('.connection-check-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      guarded(async () => {
+        await api(`/projects/${encodeURIComponent(p.project.slug)}/connections/${btn.dataset.connectionId}/check`, {
+          method: 'POST',
+          body: JSON.stringify({ status: 'active' }),
+        });
+        await loadProjectConnections(p.project.slug);
+        setBanner('notice', 'Connection check recorded.');
+      });
+    });
+  });
 
   panel.querySelector('#file-up')?.addEventListener('click', () => {
     const parent = files.path.split('/').slice(0, -1).join('/');
@@ -426,6 +466,7 @@ function renderProjectDetail(mount) {
   panel.querySelector('#new-connection-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const values = withoutBlanks(formValues(e.target));
+    if (values.capabilities) values.capabilities = values.capabilities.split(',').map((c) => c.trim()).filter(Boolean);
     guarded(async () => {
       await api(`/projects/${encodeURIComponent(p.project.slug)}/connections`, {
         method: 'POST',
@@ -1003,7 +1044,7 @@ async function boot() {
   if (!state.session) return;
 
   await guarded(async () => {
-    await Promise.all([loadProjects(), loadMissions(), loadActivity(), loadL99(), loadPromptTemplates(), loadCosts(), loadAgents()]);
+    await Promise.all([loadProjects(), loadMissions(), loadActivity(), loadL99(), loadPromptTemplates(), loadCosts(), loadAgents(), loadAuthorityLevels()]);
   });
 }
 
