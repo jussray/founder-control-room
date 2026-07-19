@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Founder Control Room · Command Bridge</title>
+  <style>
+    :root { color-scheme: dark; --bg:#070d18; --panel:#111b2d; --line:#253755; --text:#edf4ff; --muted:#9eb1ce; --ok:#74f0a7; --warn:#ffd166; --danger:#ff6b7a; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:radial-gradient(circle at top right, #223d6b, var(--bg) 52rem); color:var(--text); }
+    main { max-width:1180px; margin:0 auto; padding:2rem; }
+    header { display:flex; justify-content:space-between; gap:1rem; align-items:center; margin-bottom:1.5rem; }
+    h1 { margin:0; font-size:clamp(2rem, 6vw, 4.25rem); letter-spacing:-0.05em; }
+    h2, h3 { margin-top:0; }
+    a { color:#9cc9ff; }
+    button { border:1px solid var(--line); background:#152743; color:var(--text); border-radius:999px; padding:0.6rem 0.9rem; cursor:pointer; }
+    button.primary { background:#1d4ed8; }
+    input, textarea { width:100%; border:1px solid var(--line); border-radius:12px; background:#0b1527; color:var(--text); padding:0.7rem; }
+    label { display:block; color:var(--muted); font-size:0.85rem; margin:0.65rem 0 0.25rem; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:1rem; }
+    .panel, .card { border:1px solid var(--line); background:color-mix(in srgb, var(--panel), transparent 4%); border-radius:18px; padding:1rem; box-shadow:0 24px 80px rgba(0,0,0,0.22); }
+    .summary { grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); }
+    .metric { font-size:2rem; font-weight:800; }
+    .muted { color:var(--muted); }
+    .badge { display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:999px; padding:0.2rem 0.5rem; font-size:0.75rem; margin-right:0.35rem; color:var(--muted); }
+    .ok { color:var(--ok); }
+    .warn { color:var(--warn); }
+    .danger { color:var(--danger); }
+    .mono { font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .stack { display:flex; flex-direction:column; gap:1rem; }
+    .toolbar { display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center; }
+    .error { color:var(--danger); white-space:pre-wrap; }
+    pre { white-space:pre-wrap; background:#07111f; border:1px solid var(--line); border-radius:14px; padding:1rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <p class="muted">Founder Control Room</p>
+        <h1>Command Bridge</h1>
+        <p class="muted">Agents request. Founder directs. Guarded terminal leaves receipts.</p>
+      </div>
+      <div class="toolbar">
+        <a href="/control-room/"><button type="button">Back to Control Room</button></a>
+        <button id="refresh" type="button">Refresh</button>
+      </div>
+    </header>
+
+    <section class="grid summary" id="summary"></section>
+    <section class="panel" style="margin-top:1rem" id="contract"></section>
+
+    <div class="grid" style="margin-top:1rem">
+      <section class="panel">
+        <h2>New command card</h2>
+        <p class="muted">Creates a request only. Approval returns a guarded terminal payload; it does not open a raw shell.</p>
+        <form id="request-form">
+          <label>Project slug</label><input name="projectSlug" value="founder-control-room" required />
+          <label>Mission ID</label><input name="missionId" required />
+          <label>Command ID</label><input name="commandId" value="verify.typecheck" required />
+          <label>Expected commit SHA</label><input class="mono" name="expectedCommitSha" minlength="40" maxlength="40" required />
+          <label>Requesting agent</label><input name="requestingAgent" value="codex" />
+          <label>Reason</label><textarea name="reason" rows="3" required>Need proof-gate evidence before claiming readiness.</textarea>
+          <label>Rollback plan</label><textarea name="rollbackPlan" rows="2">Let the card expire or deny it; no terminal run starts until founder approval.</textarea>
+          <label>Duration minutes</label><input name="durationMinutes" type="number" min="1" max="60" value="15" />
+          <div style="margin-top:0.75rem"><button class="primary" type="submit">Create request</button></div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Command cards</h2>
+        <div class="stack" id="requests"></div>
+      </section>
+    </div>
+
+    <section class="panel" style="margin-top:1rem">
+      <h2>Approved terminal payload</h2>
+      <p class="muted">After approving a card, send this payload through the guarded terminal flow.</p>
+      <pre id="payload">No approved payload yet.</pre>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY = 'fcr_session';
+    const nodes = {
+      summary: document.getElementById('summary'),
+      contract: document.getElementById('contract'),
+      requests: document.getElementById('requests'),
+      payload: document.getElementById('payload'),
+      refresh: document.getElementById('refresh'),
+      form: document.getElementById('request-form'),
+    };
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    }
+
+    function session() {
+      try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || 'null'); } catch { return null; }
+    }
+
+    async function api(path, opts = {}) {
+      const current = session();
+      if (!current?.access_token) throw new Error('No founder session found. Sign in through the main Control Room first.');
+      const headers = { 'Content-Type':'application/json', Authorization:`Bearer ${current.access_token}`, ...(opts.headers || {}) };
+      const res = await fetch(path, { ...opts, headers });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(body?.error || `Request failed (${res.status})`);
+      return body;
+    }
+
+    function riskClass(risk) {
+      if (risk === 'write') return 'danger';
+      if (risk === 'verify') return 'warn';
+      return 'ok';
+    }
+
+    function renderSummary(summary) {
+      const items = [
+        ['Total', summary.total],
+        ['Requested', summary.requested],
+        ['Approved', summary.approved],
+        ['Executed', summary.executed],
+        ['Write risk', summary.writeRisk],
+      ];
+      nodes.summary.innerHTML = items.map(([label, value]) => `<div class="panel"><div class="metric">${escapeHtml(value ?? 0)}</div><div class="muted">${escapeHtml(label)}</div></div>`).join('');
+    }
+
+    function renderContract(contract) {
+      nodes.contract.innerHTML = `
+        <h2>${escapeHtml(contract.label)}</h2>
+        <p>${escapeHtml(contract.purpose)}</p>
+        <ul>${(contract.principles || []).map((principle) => `<li>${escapeHtml(principle)}</li>`).join('')}</ul>
+      `;
+    }
+
+    function renderRequests(requests) {
+      nodes.requests.innerHTML = requests.length === 0 ? '<p class="muted">No command cards yet.</p>' : requests.map((card) => `
+        <div class="card" data-id="${escapeHtml(card.id)}">
+          <div><span class="badge ${riskClass(card.risk)}">${escapeHtml(card.risk)}</span><span class="badge">${escapeHtml(card.status)}</span></div>
+          <h3>${escapeHtml(card.commandId)}</h3>
+          <p class="muted">${escapeHtml(card.projectName || card.projectSlug)} · ${escapeHtml(card.missionTitle || card.missionId)}</p>
+          <p>${escapeHtml(card.reason)}</p>
+          <p class="muted mono">${escapeHtml(card.expectedCommitSha)}</p>
+          <p class="muted">Requested by ${escapeHtml(card.requestingAgent)} · expires ${escapeHtml(card.expiresAt ? new Date(card.expiresAt).toLocaleString() : '')}</p>
+          ${card.status === 'requested' ? `<div class="toolbar"><button class="approve" data-id="${escapeHtml(card.id)}">Approve</button><button class="deny" data-id="${escapeHtml(card.id)}">Deny</button></div>` : ''}
+        </div>
+      `).join('');
+
+      nodes.requests.querySelectorAll('.approve').forEach((button) => {
+        button.addEventListener('click', async () => {
+          await guarded(async () => {
+            const data = await api(`/command-bridge/requests/${encodeURIComponent(button.dataset.id)}/approve`, { method:'POST', body: JSON.stringify({ approvalNote:'Founder approved from Command Bridge UI.' }) });
+            nodes.payload.textContent = JSON.stringify(data.execution, null, 2);
+            await load();
+          });
+        });
+      });
+      nodes.requests.querySelectorAll('.deny').forEach((button) => {
+        button.addEventListener('click', async () => {
+          await guarded(async () => {
+            await api(`/command-bridge/requests/${encodeURIComponent(button.dataset.id)}/deny`, { method:'POST', body: JSON.stringify({ approvalNote:'Founder denied from Command Bridge UI.' }) });
+            await load();
+          });
+        });
+      });
+    }
+
+    async function guarded(action) {
+      try { await action(); }
+      catch (error) { nodes.contract.innerHTML = `<p class="error">${escapeHtml(error instanceof Error ? error.message : String(error))}</p>`; }
+    }
+
+    async function load() {
+      const data = await api('/command-bridge');
+      renderSummary(data.summary || {});
+      renderContract(data.contract || {});
+      renderRequests(data.requests || []);
+    }
+
+    nodes.refresh.addEventListener('click', () => guarded(load));
+    nodes.form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const values = Object.fromEntries(new FormData(event.target).entries());
+      values.durationMinutes = Number(values.durationMinutes || 15);
+      guarded(async () => {
+        await api('/command-bridge/requests', { method:'POST', body: JSON.stringify(values) });
+        event.target.reset();
+        await load();
+      });
+    });
+
+    guarded(load);
+  </script>
+</body>
+</html>
