@@ -119,6 +119,63 @@ async function fakeRpc(name, args) {
     }
     return { data: true, error: null };
   }
+
+  if (name === 'claim_outbox_work') {
+    const now = new Date().toISOString();
+    const outbox = table('controller_outbox');
+    const claimable = outbox
+      .filter((row) => !row.completed_at && !row.claimed_at && row.available_at <= now)
+      .slice(0, args.p_limit ?? 10);
+    for (const row of claimable) row.claimed_at = now;
+    return {
+      data: claimable.map((row) => ({
+        id: row.id,
+        project_id: row.project_id,
+        controller: row.controller,
+        resource_id: row.resource_id,
+        reason: row.reason,
+        source_event_id: row.source_event_id,
+        attempt_count: row.attempt_count,
+      })),
+      error: null,
+    };
+  }
+
+  if (name === 'complete_outbox_work') {
+    const outbox = table('controller_outbox');
+    const row = outbox.find((r) => r.id === args.p_id);
+    if (row) row.completed_at = new Date().toISOString();
+    if (args.p_source_event_id) {
+      const event = table('provider_events').find((r) => r.id === args.p_source_event_id);
+      if (event) { event.processing_status = 'processed'; event.processed_at = new Date().toISOString(); }
+    }
+    return { data: null, error: null };
+  }
+
+  if (name === 'fail_outbox_work') {
+    const outbox = table('controller_outbox');
+    const row = outbox.find((r) => r.id === args.p_id);
+    if (row) {
+      row.claimed_at = null;
+      row.attempt_count = (row.attempt_count ?? 0) + 1;
+      row.last_error = args.p_error;
+      const backoffSeconds = 2 ** Math.min(row.attempt_count, 6);
+      row.available_at = new Date(Date.now() + backoffSeconds * 1000).toISOString();
+    }
+    return { data: null, error: null };
+  }
+
+  if (name === 'abandon_outbox_work') {
+    const outbox = table('controller_outbox');
+    const row = outbox.find((r) => r.id === args.p_id);
+    if (row) { row.completed_at = new Date().toISOString(); row.last_error = args.p_error; }
+    if (args.p_source_event_id) {
+      const event = table('provider_events').find((r) => r.id === args.p_source_event_id);
+      if (event) { event.processing_status = 'failed'; event.last_error = args.p_error; }
+    }
+    return { data: null, error: null };
+  }
+
   console.warn(`[fake supabase] unhandled rpc "${name}" — returning null`);
   return { data: null, error: null };
 }

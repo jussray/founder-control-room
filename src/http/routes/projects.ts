@@ -298,15 +298,31 @@ projectsRouter.post("/:slug/connections/:connectionId/check", requireFounder, as
   return res.json({ connection });
 });
 
+// Mirrors reconciliation/types.ts's EvidenceKind union — that's a
+// compile-time-only type, so this runtime list has to be kept in sync by
+// hand. A mission with an empty required_checks list can NEVER leave
+// 'sandboxed' (MissionController.reconcile() refuses to evaluate evidence
+// with nothing required — see that file), so this is not an optional nicety.
+const EVIDENCE_KINDS = new Set([
+  "typecheck", "lint", "unit_test", "integration_test", "browser_test",
+  "security_scan", "preview_health", "deployment_result",
+  "migration_verification", "storefront_check", "artifact_provenance", "rls_audit",
+]);
+
 /**
  * POST /projects/:slug/missions
- * Body: { title, description?, riskLevel?, builderAgent?, reviewerAgent? }
+ * Body: { title, description?, riskLevel?, builderAgent?, reviewerAgent?, requiredChecks? }
  *
  * Creates a new mission (the Issues/task-equivalent) under a project,
  * status 'proposed'. This is the founder-initiated entry point into the
  * mission lifecycle — everything else (sandbox branch, patch, proof gate,
  * merge) acts on a mission that already exists. builderAgent/reviewerAgent
  * can also be set later via PATCH /missions/:missionId.
+ *
+ * requiredChecks matters more than it looks: leave it empty and this
+ * mission can never automatically advance past 'sandboxed', because
+ * MissionController requires at least one required check kind before it
+ * will evaluate evidence at all.
  */
 projectsRouter.post("/:slug/missions", requireFounder, async (req: FounderRequest, res) => {
   const { slug } = req.params;
@@ -314,6 +330,14 @@ projectsRouter.post("/:slug/missions", requireFounder, async (req: FounderReques
   const title = typeof body["title"] === "string" ? body["title"].trim() : "";
 
   if (!title) return res.status(400).json({ error: "title is required" });
+
+  const requiredChecksInput = body["requiredChecks"];
+  if (requiredChecksInput !== undefined) {
+    if (!Array.isArray(requiredChecksInput) || !requiredChecksInput.every((k) => typeof k === "string" && EVIDENCE_KINDS.has(k))) {
+      return res.status(400).json({ error: `requiredChecks must be an array drawn from: ${[...EVIDENCE_KINDS].join(", ")}` });
+    }
+  }
+  const requiredChecks = Array.isArray(requiredChecksInput) ? requiredChecksInput : [];
 
   const { data: project, error: projectError } = await supabase
     .from("projects")
@@ -338,6 +362,7 @@ projectsRouter.post("/:slug/missions", requireFounder, async (req: FounderReques
       risk_level: riskLevel,
       builder_agent: builderAgent,
       reviewer_agent: reviewerAgent,
+      required_checks: requiredChecks,
       status: "proposed",
     })
     .select()
@@ -370,6 +395,7 @@ function providerForProject(repoProvider: string, slug: string, repoIdentifier: 
     return new GitHubProvider({
       token,
       projectMap: { [slug]: repoIdentifier },
+      baseUrl: process.env.GITHUB_API_BASE_URL,
     });
   }
   throw new Error(`No RepositoryProvider implementation for "${repoProvider}" yet`);

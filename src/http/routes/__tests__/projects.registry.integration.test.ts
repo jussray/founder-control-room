@@ -235,4 +235,92 @@ describe('POST /projects/:slug/missions', () => {
     expect(res.body.mission.status).toBe('proposed');
     expect(insertCalls[0]).toMatchObject({ event_type: 'mission_created' });
   });
+
+  it('rejects an unknown requiredChecks kind', async () => {
+    authSuccess();
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      return {};
+    });
+
+    const res = await request(buildApp())
+      .post('/projects/sekret-bip/missions')
+      .set('Authorization', BEARER)
+      .send({ title: 'Do the thing', requiredChecks: ['not_a_real_kind'] });
+    expect(res.status).toBe(400);
+  });
+
+  it('stores a valid requiredChecks list — without it, MissionController can never advance the mission past sandboxed', async () => {
+    authSuccess();
+    let insertedMission: Record<string, unknown> | null = null;
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'projects') {
+        return {
+          select: () => ({
+            eq: () => ({ maybeSingle: () => Promise.resolve({ data: { id: 'project-1' }, error: null }) }),
+          }),
+        };
+      }
+      if (table === 'missions') {
+        return {
+          insert: (row: Record<string, unknown>) => {
+            insertedMission = row;
+            return {
+              select: () => ({
+                single: () => Promise.resolve({ data: { id: 'mission-1', ...row }, error: null }),
+              }),
+            };
+          },
+        };
+      }
+      if (table === 'project_events') return { insert: () => Promise.resolve({ error: null }) };
+      return {};
+    });
+
+    const res = await request(buildApp())
+      .post('/projects/sekret-bip/missions')
+      .set('Authorization', BEARER)
+      .send({ title: 'Do the thing', requiredChecks: ['unit_test', 'typecheck'] });
+
+    expect(res.status).toBe(201);
+    expect(insertedMission).toMatchObject({ required_checks: ['unit_test', 'typecheck'] });
+  });
+
+  it('defaults requiredChecks to an empty array when omitted', async () => {
+    authSuccess();
+    let insertedMission: Record<string, unknown> | null = null;
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'projects') {
+        return {
+          select: () => ({
+            eq: () => ({ maybeSingle: () => Promise.resolve({ data: { id: 'project-1' }, error: null }) }),
+          }),
+        };
+      }
+      if (table === 'missions') {
+        return {
+          insert: (row: Record<string, unknown>) => {
+            insertedMission = row;
+            return {
+              select: () => ({
+                single: () => Promise.resolve({ data: { id: 'mission-1', ...row }, error: null }),
+              }),
+            };
+          },
+        };
+      }
+      if (table === 'project_events') return { insert: () => Promise.resolve({ error: null }) };
+      return {};
+    });
+
+    const res = await request(buildApp())
+      .post('/projects/sekret-bip/missions')
+      .set('Authorization', BEARER)
+      .send({ title: 'Do the thing' });
+
+    expect(res.status).toBe(201);
+    expect(insertedMission).toMatchObject({ required_checks: [] });
+  });
 });

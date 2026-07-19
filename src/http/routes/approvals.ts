@@ -161,7 +161,7 @@ approvalsRouter.post(
 
     const { data: mission, error: missionError } = await supabase
       .from('missions')
-      .select('id, project_id, status')
+      .select('id, project_id, status, branch_ref, policy_snapshot')
       .eq('id', missionId)
       .single();
 
@@ -191,9 +191,50 @@ approvalsRouter.post(
     }
 
     if (result.status === 'converged' && gateId === 'merge' && mission.status === 'in_review') {
+      // Nothing in this codebase ever wrote policy_snapshot.expectedHeadSha,
+      // which the merge-execution route (below) unconditionally requires to
+      // match before it will merge anything — meaning no mission could ever
+      // actually reach a completable merge, regardless of proof-gate result.
+      // This is the natural point to pin it: the founder is approving merge
+      // of the branch's CURRENT exact commit, resolved fresh right now, not
+      // whatever it drifts to later (the execute route separately re-checks
+      // this hasn't moved since).
+      let expectedHeadSha: string | null = null;
+      if (mission.branch_ref) {
+        const { data: project } = await supabase
+          .from('projects')
+          .select('slug, repo_provider, repo_identifier')
+          .eq('id', mission.project_id as string)
+          .maybeSingle();
+
+        const token = process.env['GITHUB_TOKEN'];
+        if (project?.repo_identifier && token && project.repo_provider === 'github') {
+          const provider = new GitHubProvider({
+            token,
+            projectMap: { [project.slug]: project.repo_identifier },
+            baseUrl: process.env['GITHUB_API_BASE_URL'],
+          });
+          try {
+            expectedHeadSha = await provider.resolveRef(project.slug, mission.branch_ref);
+          } catch (err) {
+            return res.status(502).json({
+              ok: false,
+              error: 'Proof passed but the branch head could not be resolved — approval not persisted.',
+              detail: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+      }
+
       const { error: updateError } = await supabase
         .from('missions')
-        .update({ status: 'approved', updated_at: new Date().toISOString() })
+        .update({
+          status: 'approved',
+          updated_at: new Date().toISOString(),
+          ...(expectedHeadSha
+            ? { policy_snapshot: { ...(mission.policy_snapshot as Record<string, unknown> ?? {}), expectedHeadSha } }
+            : {}),
+        })
         .eq('id', missionId)
         .eq('status', 'in_review');
 
@@ -311,6 +352,7 @@ approvalsRouter.post(
       ? new GitHubProvider({
           token,
           projectMap: { [project.slug]: project.repo_identifier },
+          baseUrl: process.env['GITHUB_API_BASE_URL'],
         })
       : null;
 
@@ -560,6 +602,7 @@ approvalsRouter.post(
       ? new GitHubProvider({
           token,
           projectMap: { [project.slug]: project.repo_identifier },
+          baseUrl: process.env['GITHUB_API_BASE_URL'],
         })
       : null;
 

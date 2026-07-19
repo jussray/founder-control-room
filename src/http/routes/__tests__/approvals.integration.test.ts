@@ -324,6 +324,120 @@ describe('approval proof gates', () => {
       .send({ gateId: 'merge', evidence: validEvidence });
     expect(response.status).toBe(500);
   });
+
+  it('pins policy_snapshot.expectedHeadSha to the branch\'s current resolved head when the merge gate converges — nothing else in this codebase ever wrote it, and the merge-execution route unconditionally requires it', async () => {
+    authSuccess();
+    process.env.GITHUB_TOKEN = 'test-token';
+    mockResolveRef.mockResolvedValue(EXPECTED_SHA);
+    mockControllerRun.mockResolvedValue({
+      status: 'converged',
+      proposedActions: [],
+      observedChanges: [],
+      evidenceIds: [],
+      requiresApproval: false,
+    });
+
+    let updatedFields: Record<string, unknown> | null = null;
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'missions') {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({
+                data: {
+                  id: MISSION_ID,
+                  project_id: PROJECT_ID,
+                  status: 'in_review',
+                  branch_ref: 'mission/test',
+                  policy_snapshot: { someExistingKey: 'preserved' },
+                },
+                error: null,
+              }),
+            }),
+          }),
+          update: (fields: Record<string, unknown>) => {
+            updatedFields = fields;
+            return twoEqUpdate();
+          },
+        };
+      }
+      if (table === 'projects') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({
+                data: { slug: 'test-project', repo_provider: 'github', repo_identifier: 'jussray/test-project' },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      return {};
+    });
+
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/run-proof-gate`)
+      .set('Authorization', BEARER)
+      .send({ gateId: 'merge', evidence: validEvidence });
+
+    expect(response.status).toBe(200);
+    expect(mockResolveRef).toHaveBeenCalledWith('test-project', 'mission/test');
+    expect(updatedFields).toMatchObject({
+      status: 'approved',
+      policy_snapshot: { someExistingKey: 'preserved', expectedHeadSha: EXPECTED_SHA },
+    });
+  });
+
+  it('rejects with 502 rather than silently approving when the branch head cannot be resolved', async () => {
+    authSuccess();
+    process.env.GITHUB_TOKEN = 'test-token';
+    mockResolveRef.mockRejectedValue(new Error('branch not found'));
+    mockControllerRun.mockResolvedValue({
+      status: 'converged',
+      proposedActions: [],
+      observedChanges: [],
+      evidenceIds: [],
+      requiresApproval: false,
+    });
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderUsersRow();
+      if (table === 'missions') {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({
+                data: { id: MISSION_ID, project_id: PROJECT_ID, status: 'in_review', branch_ref: 'mission/test', policy_snapshot: {} },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === 'projects') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({
+                data: { slug: 'test-project', repo_provider: 'github', repo_identifier: 'jussray/test-project' },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      return {};
+    });
+
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/run-proof-gate`)
+      .set('Authorization', BEARER)
+      .send({ gateId: 'merge', evidence: validEvidence });
+
+    expect(response.status).toBe(502);
+  });
 });
 
 describe('reservation-first exact-head execution', () => {

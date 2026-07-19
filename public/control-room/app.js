@@ -364,6 +364,8 @@ function renderProjectDetail(mount) {
         <div><label>Reviewer agent</label><input name="reviewerAgent" list="agent-options-new-mission" placeholder="codex" /></div>
       </div>
       ${agentDatalist('agent-options-new-mission')}
+      <label>Required checks (comma-separated) — leave blank and this mission can never leave "sandboxed" automatically</label>
+      <input name="requiredChecks" placeholder="unit_test, typecheck" />
       <div style="margin-top:0.5rem"><button class="primary" type="submit">Create mission</button></div>
     </form>
 
@@ -461,6 +463,7 @@ function renderProjectDetail(mount) {
   panel.querySelector('#new-mission-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const values = withoutBlanks(formValues(e.target));
+    if (values.requiredChecks) values.requiredChecks = values.requiredChecks.split(',').map((c) => c.trim()).filter(Boolean);
     guarded(async () => {
       await api(`/projects/${encodeURIComponent(p.project.slug)}/missions`, {
         method: 'POST',
@@ -549,6 +552,11 @@ function renderMissionDetail(mount) {
   panel.style.display = 'block';
 
   const editable = mission.status === 'sandboxed' || mission.status === 'in_review';
+  // create_branch is proof-gated too (PROOF_GATED_ACTIONS in approvals.ts)
+  // and that gate must run BEFORE the branch exists, i.e. while still
+  // 'proposed' — so this form can't be nested inside `editable` only, or
+  // there would be no way to ever pass the create_branch gate at all.
+  const canRunProofGate = mission.status === 'proposed' || editable;
 
   panel.innerHTML = `
     <h2>${escapeHtml(mission.title)}</h2>
@@ -577,6 +585,26 @@ function renderMissionDetail(mount) {
       </form>
     ` : ''}
 
+    ${canRunProofGate ? `
+      <h3>Run proof gate</h3>
+      <form id="proof-gate-form">
+        <label>Gate ID</label>
+        <select name="gateId">
+          <option value="create_branch">create_branch</option>
+          <option value="merge">merge</option>
+        </select>
+        <label>Files changed (comma-separated) — required, the gate rejects an empty list</label>
+        <input name="filesChanged" placeholder="src/index.ts" required />
+        <label>Checks run (comma-separated) — required, the gate rejects an empty list</label>
+        <input name="checksRun" placeholder="typecheck, unit_test" required />
+        <label>Behavior changed</label><input name="behaviorChanged" required />
+        <label>Security impact</label><input name="securityImpact" value="none" required />
+        <label>Deployment impact</label><input name="deploymentImpact" value="none" required />
+        <label>Rollback path</label><input name="rollbackPath" required />
+        <div style="margin-top:0.5rem"><button class="primary" type="submit">Run proof gate</button></div>
+      </form>
+    ` : ''}
+
     ${editable ? `
       <h3>Edit files on ${escapeHtml(mission.branch_ref)}</h3>
       <div class="row">
@@ -589,21 +617,9 @@ function renderMissionDetail(mount) {
       <label>Commit message</label>
       <input id="mission-commit-message" placeholder="Describe the change" />
       <div style="margin-top:0.5rem"><button class="primary" id="mission-commit-btn">Commit to ${escapeHtml(mission.branch_ref ?? '')}</button></div>
+    ` : ''}
 
-      <h3>Run proof gate</h3>
-      <form id="proof-gate-form">
-        <label>Gate ID</label>
-        <select name="gateId">
-          <option value="merge">merge</option>
-          <option value="create_branch">create_branch</option>
-        </select>
-        <label>Behavior changed</label><input name="behaviorChanged" required />
-        <label>Security impact</label><input name="securityImpact" value="none" required />
-        <label>Deployment impact</label><input name="deploymentImpact" value="none" required />
-        <label>Rollback path</label><input name="rollbackPath" required />
-        <div style="margin-top:0.5rem"><button class="primary" type="submit">Run proof gate</button></div>
-      </form>
-
+    ${mission.status === 'approved' ? `
       <h3>Execute merge</h3>
       <form id="execute-merge-form">
         <div class="row">
@@ -654,7 +670,11 @@ function renderMissionDetail(mount) {
 
   panel.querySelector('#create-branch-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
-    const values = formValues(e.target);
+    // Blank fields must be OMITTED, not sent as ''. The backend falls back
+    // to 'main' / `mission/${id}` with `?? default`, which only triggers on
+    // undefined — an empty string would silently create a branch/ref with
+    // an empty name instead of the intended default.
+    const values = withoutBlanks(formValues(e.target));
     guarded(async () => {
       await api(`/approvals/${mission.id}/execute`, {
         method: 'POST',
@@ -730,14 +750,15 @@ function renderMissionDetail(mount) {
   panel.querySelector('#proof-gate-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const values = formValues(e.target);
+    const splitList = (s) => s.split(',').map((x) => x.trim()).filter(Boolean);
     guarded(async () => {
       await api(`/approvals/${mission.id}/run-proof-gate`, {
         method: 'POST',
         body: JSON.stringify({
           gateId: values.gateId,
           evidence: {
-            filesChanged: [],
-            checksRun: [],
+            filesChanged: splitList(values.filesChanged),
+            checksRun: splitList(values.checksRun),
             failures: [],
             unresolvedRisks: [],
             behaviorChanged: values.behaviorChanged,
