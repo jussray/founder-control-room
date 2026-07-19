@@ -1,18 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockSignInWithOtp, mockVerifyOtp, mockSignOut, supabaseMock } = vi.hoisted(() => ({
+const {
+  mockSignInWithOtp,
+  mockSetSession,
+  mockVerifyOtp,
+  supabaseMock,
+} = vi.hoisted(() => ({
   mockSignInWithOtp: vi.fn(),
+  mockSetSession: vi.fn(),
   mockVerifyOtp: vi.fn(),
-  mockSignOut: vi.fn(),
   supabaseMock: { from: vi.fn() },
 }));
 
 vi.mock('../../../lib/supabaseAuthClient.js', () => ({
+  createSupabaseAuthClient: () => ({
+    auth: {
+      setSession: mockSetSession,
+      verifyOtp: mockVerifyOtp,
+    },
+  }),
   supabaseAuth: {
     auth: {
       signInWithOtp: mockSignInWithOtp,
-      verifyOtp: mockVerifyOtp,
-      signOut: mockSignOut,
     },
   },
 }));
@@ -24,6 +33,11 @@ import request from 'supertest';
 import { authRouter } from '../auth.js';
 
 const FOUNDER_EMAIL = 'founder@example.com';
+const SESSION = {
+  access_token: 'at',
+  refresh_token: 'rt',
+  expires_at: 123,
+};
 
 function buildApp() {
   const app = express();
@@ -35,15 +49,34 @@ function buildApp() {
 function founderUsersRow(match: boolean) {
   return {
     select: () => ({
-      eq: () => ({ maybeSingle: () => Promise.resolve({ data: match ? { email: FOUNDER_EMAIL } : null, error: null }) }),
+      eq: () => ({
+        maybeSingle: () => Promise.resolve({ data: match ? { email: FOUNDER_EMAIL } : null, error: null }),
+      }),
     }),
   };
+}
+
+function expectSessionCookie(res: request.Response) {
+  const cookie = res.headers['set-cookie'];
+  expect(cookie).toBeDefined();
+  expect(cookie.join('; ')).toContain('fcr_session=');
+  expect(cookie.join('; ')).toContain('HttpOnly');
+  expect(cookie.join('; ')).toContain('SameSite=Strict');
+}
+
+function expectClearedSessionCookie(res: request.Response) {
+  const cookie = res.headers['set-cookie'];
+  expect(cookie).toBeDefined();
+  expect(cookie.join('; ')).toContain('fcr_session=;');
+  expect(cookie.join('; ')).toContain('Max-Age=0');
+  expect(cookie.join('; ')).toContain('HttpOnly');
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockSignInWithOtp.mockResolvedValue({ error: null });
-  mockSignOut.mockResolvedValue({ error: null });
+  mockSetSession.mockResolvedValue({ data: {}, error: null });
+  mockVerifyOtp.mockResolvedValue({ data: {}, error: null });
 });
 
 describe('POST /auth/magic-link', () => {
@@ -63,54 +96,48 @@ describe('POST /auth/magic-link', () => {
     supabaseMock.from.mockImplementation(() => founderUsersRow(true));
     const res = await request(buildApp()).post('/auth/magic-link').send({ email: FOUNDER_EMAIL });
     expect(res.status).toBe(202);
-    expect(mockSignInWithOtp).toHaveBeenCalledWith(expect.objectContaining({ email: FOUNDER_EMAIL }));
+    expect(mockSignInWithOtp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: FOUNDER_EMAIL,
+        options: expect.objectContaining({ shouldCreateUser: true }),
+      }),
+    );
   });
 });
 
 describe('GET /auth/callback', () => {
-  it('requires token_hash', async () => {
+  it('serves the same-origin callback page when token_hash is absent', async () => {
     const res = await request(buildApp()).get('/auth/callback');
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('text/html');
+    expect(res.headers['cache-control']).toContain('no-store');
+    expect(res.text).toContain('Completing founder login');
+    expect(mockVerifyOtp).not.toHaveBeenCalled();
   });
 
-  it('returns 401 when verifyOtp fails', async () => {
+  it('clears any session and returns the callback page when verifyOtp fails', async () => {
     mockVerifyOtp.mockResolvedValue({ data: {}, error: { message: 'expired' } });
     const res = await request(buildApp()).get('/auth/callback').query({ token_hash: 'bad' });
     expect(res.status).toBe(401);
+    expect(res.text).toContain('Completing founder login');
+    expectClearedSessionCookie(res);
   });
 
-  it('signs out and rejects a verified user who is not on the allowlist', async () => {
+  it('clears any session and rejects a verified user who is not on the allowlist', async () => {
     mockVerifyOtp.mockResolvedValue({
-      data: { session: { access_token: 'at', refresh_token: 'rt', expires_at: 123 }, user: { email: 'stranger@example.com' } },
+      data: { session: SESSION, user: { email: 'stranger@example.com' } },
       error: null,
     });
     supabaseMock.from.mockImplementation(() => founderUsersRow(false));
 
     const res = await request(buildApp()).get('/auth/callback').query({ token_hash: 'good' });
-    expect(res.status).toBe(403);
-    expect(mockSignOut).toHaveBeenCalled();
+    expect(res.status).toBe(401);
+    expectClearedSessionCookie(res);
   });
 
-  it('returns JSON when explicitly requested via ?format=json', async () => {
+  it('sets an HttpOnly session cookie and redirects to the Control Room by default', async () => {
     mockVerifyOtp.mockResolvedValue({
-      data: { session: { access_token: 'at', refresh_token: 'rt', expires_at: 123 }, user: { email: FOUNDER_EMAIL } },
-      error: null,
-    });
-    supabaseMock.from.mockImplementation(() => founderUsersRow(true));
-
-    const res = await request(buildApp()).get('/auth/callback').query({ token_hash: 'good', format: 'json' });
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({
-      access_token: 'at',
-      refresh_token: 'rt',
-      expires_at: 123,
-      founder: { email: FOUNDER_EMAIL },
-    });
-  });
-
-  it('redirects to the frontend with the session in the URL fragment by default', async () => {
-    mockVerifyOtp.mockResolvedValue({
-      data: { session: { access_token: 'at', refresh_token: 'rt', expires_at: 123 }, user: { email: FOUNDER_EMAIL } },
+      data: { session: SESSION, user: { email: FOUNDER_EMAIL } },
       error: null,
     });
     supabaseMock.from.mockImplementation(() => founderUsersRow(true));
@@ -120,12 +147,44 @@ describe('GET /auth/callback', () => {
       .query({ token_hash: 'good' })
       .redirects(0);
 
-    expect(res.status).toBe(302);
-    const location = res.headers.location;
-    expect(location).toMatch(/^\/control-room\/#/);
-    expect(location).toContain('access_token=at');
-    // The Location header must never carry the token as a query string —
-    // only in the fragment, which browsers never send back to any server.
-    expect(location.split('#')[0]).toBe('/control-room/');
+    expect(res.status).toBe(303);
+    expect(res.headers.location).toBe('/');
+    expectSessionCookie(res);
+    expect(res.headers.location).not.toContain('access_token');
+  });
+});
+
+describe('POST /auth/session', () => {
+  it('rejects missing implicit-flow credentials and clears the browser session', async () => {
+    const res = await request(buildApp()).post('/auth/session').send({});
+    expect(res.status).toBe(400);
+    expectClearedSessionCookie(res);
+    expect(mockSetSession).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid implicit-flow credentials and clears the browser session', async () => {
+    mockSetSession.mockResolvedValue({ data: {}, error: { message: 'expired' } });
+    const res = await request(buildApp())
+      .post('/auth/session')
+      .send({ access_token: 'bad-at', refresh_token: 'bad-rt' });
+
+    expect(res.status).toBe(401);
+    expectClearedSessionCookie(res);
+  });
+
+  it('converts valid implicit-flow credentials into an HttpOnly founder session', async () => {
+    mockSetSession.mockResolvedValue({
+      data: { session: SESSION, user: { email: FOUNDER_EMAIL } },
+      error: null,
+    });
+    supabaseMock.from.mockImplementation(() => founderUsersRow(true));
+
+    const res = await request(buildApp())
+      .post('/auth/session')
+      .send({ access_token: 'at', refresh_token: 'rt' });
+
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ ok: true, founder: { email: FOUNDER_EMAIL } });
+    expectSessionCookie(res);
   });
 });
