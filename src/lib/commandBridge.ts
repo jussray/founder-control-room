@@ -46,7 +46,7 @@ export interface CommandBridgeRequestSnapshot {
   updatedAt: string;
 }
 
-export const COMMAND_BRIDGE_MAX_REQUEST_WINDOW_MINUTES = 60;
+export const COMMAND_BRIDGE_MAX_REQUEST_WINDOW_MINUTES = 24 * 60;
 
 export const COMMAND_BRIDGE_CONTRACT: CommandBridgeContract = Object.freeze({
   id: 'founder-control-room-command-bridge',
