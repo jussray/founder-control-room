@@ -6,6 +6,7 @@ Before nontrivial work, read [`Juss Founder OS`](.ai/skills/juss-founder-os/SKIL
 For Se’kret Bip acquisition, splash, preview, waiting-list, sponsorship, or social
 launch work, also read [`Juss Private Operating Plan`](docs/private/JUSS_PRIVATE_OPERATING_PLAN.md).
 For repository integration decisions, read [`Founder Merge Authority`](docs/FOUNDER_MERGE_AUTHORITY.md).
+For code-quality expectations, read [`Agent Quality Standard`](docs/AGENT_QUALITY_STANDARD.md).
 
 The Founder OS is the private parent skill. This file specializes it for Founder
 Control Room. Repository-specific rules may become stricter, but they may not
@@ -69,6 +70,7 @@ Never claim a file, feature, test, branch, merge, deployment, approval, or provi
 - Do not silently change provider ownership, project registry semantics, event schemas, approval states, or deployment targets.
 - Do not treat model output as approval, authorization, or repository truth.
 - Merge only under the conditions in `docs/FOUNDER_MERGE_AUTHORITY.md`; a merge must never silently authorize a separately gated action.
+- For nontrivial code changes, run `npm run typecheck` and `npm test` before claiming readiness, or explicitly report why they could not be run.
 
 ## Approval gates
 
