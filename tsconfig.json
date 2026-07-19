@@ -14,5 +14,16 @@
     "declaration": true,
     "sourceMap": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": [
+    "src/app/**/*",
+    "src/components/**/*",
+    "src/lib/contracts.ts",
+    "src/lib/data.ts",
+    "src/lib/db-types.ts",
+    "src/lib/queries.ts",
+    "src/lib/supabase.ts",
+    "src/lib/types.ts",
+    "src/worker/index.ts"
+  ]
 }
