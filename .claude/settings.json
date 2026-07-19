@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git push origin main)"
+      "Bash(git push origin main)",
+      "Bash(gh issue close:*)"
     ],
     "deny": []
   }
