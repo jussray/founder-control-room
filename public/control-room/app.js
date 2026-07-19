@@ -128,10 +128,18 @@ function escapeHtml(value) {
   ));
 }
 
+/**
+ * Parses an HTML string into a DocumentFragment so every top-level sibling
+ * survives appendChild — not just the first one. Templates in this file
+ * routinely have multiple top-level panels (e.g. a form panel + a list
+ * panel + a hidden detail panel); returning only firstElementChild here
+ * silently dropped the rest, which no vitest/supertest test could ever
+ * catch since none of them render into a real DOM. Caught by e2e/run.mjs.
+ */
 function el(html) {
   const template = document.createElement('template');
   template.innerHTML = html.trim();
-  return template.content.firstElementChild;
+  return template.content;
 }
 
 function on(selector, event, handler) {
