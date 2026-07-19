@@ -3,10 +3,9 @@ import type { ExportedHandler } from '@cloudflare/workers-types';
 export interface ControlRoomWorkerEnv {
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
-  SUPABASE_ANON_KEY: string;
+  SUPABASE_PUBLISHABLE_KEY: string;
   GITHUB_WEBHOOK_SECRET: string;
-  GITHUB_APP_ID: string;
-  GITHUB_PRIVATE_KEY: string;
+  GITHUB_TOKEN: string;
   FOUNDER_ALLOWED_ORIGINS: string;
   FOUNDER_API_URL: string;
 }
@@ -20,10 +19,9 @@ type ReconcilerLoader = () => Promise<ReconcilerModule>;
 const REQUIRED_BINDINGS = [
   'SUPABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
-  'SUPABASE_ANON_KEY',
+  'SUPABASE_PUBLISHABLE_KEY',
   'GITHUB_WEBHOOK_SECRET',
-  'GITHUB_APP_ID',
-  'GITHUB_PRIVATE_KEY',
+  'GITHUB_TOKEN',
   'FOUNDER_ALLOWED_ORIGINS',
   'FOUNDER_API_URL',
 ] as const satisfies readonly (keyof ControlRoomWorkerEnv)[];

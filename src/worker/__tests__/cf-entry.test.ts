@@ -13,10 +13,9 @@ interface TestEnv {
 const VALID_ENV: ControlRoomWorkerEnv = {
   SUPABASE_URL: 'https://control-room.supabase.co',
   SUPABASE_SERVICE_ROLE_KEY: 'service-role-test-key',
-  SUPABASE_ANON_KEY: 'anon-test-key',
+  SUPABASE_PUBLISHABLE_KEY: 'publishable-test-key',
   GITHUB_WEBHOOK_SECRET: 'webhook-test-secret',
-  GITHUB_APP_ID: '12345',
-  GITHUB_PRIVATE_KEY: 'private-test-key',
+  GITHUB_TOKEN: 'github-token-test-value',
   FOUNDER_ALLOWED_ORIGINS: 'https://control.example.com,https://staging.control.example.com',
   FOUNDER_API_URL: 'https://api.control.example.com',
 };

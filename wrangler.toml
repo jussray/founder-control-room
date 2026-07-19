@@ -28,9 +28,8 @@ ORIGIN_URL = "https://founder-control-room.vercel.app"
 # wrangler secret put GITHUB_WEBHOOK_SECRET
 # wrangler secret put SUPABASE_URL
 # wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-# wrangler secret put SUPABASE_ANON_KEY
-# wrangler secret put GITHUB_APP_ID
-# wrangler secret put GITHUB_PRIVATE_KEY
+# wrangler secret put SUPABASE_PUBLISHABLE_KEY
+# wrangler secret put GITHUB_TOKEN
 # wrangler secret put FOUNDER_ALLOWED_ORIGINS
 # wrangler secret put FOUNDER_API_URL
 
