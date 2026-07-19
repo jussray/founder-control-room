@@ -6,6 +6,7 @@ Read these before changing code, configuration, schemas, providers, verification
 - [`GLOBAL_AI.md`](./GLOBAL_AI.md)
 - [`Founder Merge Authority`](./docs/FOUNDER_MERGE_AUTHORITY.md)
 - [`skills/portfolio-control-plane/SKILL.md`](./skills/portfolio-control-plane/SKILL.md)
+- [`skills/typescript-audit/SKILL.md`](./skills/typescript-audit/SKILL.md) before TypeScript, TSX, JavaScript, Node, Worker, build, PR, draft PR, or mergeability edits
 - [`skills/sales/SKILL.md`](./skills/sales/SKILL.md) for qualification, offers, proof, conversion quality, retention, and revenue operations
 - [`skills/devil/SKILL.md`](./skills/devil/SKILL.md) for the premise attack and selected-plan attack
 
@@ -27,7 +28,7 @@ For commercial work add:
 
 ## Required loop
 
-1. Inspect repository, branch, provider state, auth boundaries, migrations, tests, commercial evidence, launch evidence, Cloudflare evidence, and runtime truth.
+1. Inspect repository, branch, provider state, auth boundaries, migrations, tests, commercial evidence, launch evidence, Cloudflare evidence, runtime truth, open PRs, and draft PRs.
 2. Complete 5W1H and identify the next authority gate.
 3. Attack the premise before designing the solution or offer.
 4. Apply the Lindy screen and map authority, provenance, project boundaries, state, evidence, economics, event history, failure modes, release truth, and rollback through L99.
