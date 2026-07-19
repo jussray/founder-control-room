@@ -52,6 +52,13 @@ where a repository actually lives. Later providers (`InternalGitProvider`,
 `ForgejoProvider`, `LocalGitProvider`) can be swapped in without touching
 callers.
 
+## Tracked external app setup
+
+- `Story Engine` is the Meta developer app container for Se'kret Bip Facebook/Instagram social integration setup.
+- Control Room tracks Story Engine as an external dependency and evidence item only. It must not store Meta App Secret, long-lived access tokens, webhook verify tokens, Page tokens, Instagram credentials, or any teen/private content.
+- Current status: placeholder/configuration planning only. No production social API route, publishing workflow, webhook ingestion, or account connection flow is verified.
+- Required gate before implementation: explicit founder approval, privacy boundary, least-privilege permission list, server-only secret storage, token rotation plan, webhook verification if used, and production evidence that does not expose private teen data.
+
 ## Structure
 
 ```text
@@ -198,7 +205,3 @@ check immediately before integration.
 | Create sandbox workspace | Separate founder approval |
 | Create internal branch | Separate founder approval + reservation |
 | Integrate into main | Separate founder approval + exact-head machine proof + reservation |
-| Deploy | Separate founder approval |
-| Rollback | Separate founder approval |
-
-No approval carries forward to the next step.
