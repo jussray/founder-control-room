@@ -16,9 +16,12 @@ id = "YOUR_SESSIONS_KV_NAMESPACE_ID"
 binding = "FEATURE_FLAGS_KV"
 id = "YOUR_FEATURE_FLAGS_KV_NAMESPACE_ID"
 
-[[r2_buckets]]
-binding = "FCR_BACKUPS"
-bucket_name = "fcr-backups"
+# R2 backups are intentionally not bound in the default deploy config.
+# Cloudflare rejects R2 bucket bindings when R2 is not enabled for the account.
+# The current deletion queue worker does not consume FCR_BACKUPS, so an unused
+# R2 binding must not block deploys. Re-add an R2 binding only through an
+# approved Founder Control Room production gate after R2 is enabled and the
+# backup worker code actually requires it.
 
 [headers]
   [headers."/*"]
