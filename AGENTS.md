@@ -41,6 +41,27 @@ For commercial work add:
 6. Make the smallest coherent, reversible change and verify it, including behavior tests and Playwright when a user-facing web/runtime path changes.
 7. Re-observe through OODA and report proof plus the next founder approval gate.
 
+## Codex provider baseline
+
+When a repo-running Codex agent needs model-provider configuration, keep it machine-local and use OpenAI/Codex as the default coding engine:
+
+```toml
+model = "gpt-5.3-codex"
+model_provider = "openai"
+model_reasoning_effort = "high"
+model_reasoning_summary = "auto"
+model_supports_reasoning_summaries = true
+model_auto_compact_token_limit = 900000
+```
+
+Store the API key outside the repository, for example in `~/.codex/.env`:
+
+```dotenv
+OPENAI_API_KEY=replace_with_local_secret
+```
+
+Never commit `.codex/.env`, `OPENAI_API_KEY`, `MODEL_API_KEY`, service-role keys, provider tokens, or any other secret. Model choice does not override this file, `GLOBAL_AI.md`, repository skills, verification gates, Founder Merge Authority, or explicit founder approval gates.
+
 ## Product Design and Supabase truth
 
 Product Design screenshot or prototype evidence can identify visual, UX, and accessibility issues, but it does not prove Supabase Auth, RLS, Storage, Realtime, Edge Functions, schema behavior, or deployment safety.
