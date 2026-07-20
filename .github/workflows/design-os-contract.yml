@@ -1,0 +1,119 @@
+name: Portfolio Design OS Contract
+
+on:
+  push:
+    branches:
+      - agent/design-os-registry-refresh
+    paths:
+      - '.github/workflows/design-os-contract.yml'
+      - 'src/design-os/**'
+      - 'src/http/routes/designOs.ts'
+      - 'src/http/routes/designOs.test.ts'
+      - 'src/http/server.ts'
+      - 'scripts/verify-design-os-contract.mjs'
+      - 'docs/PORTFOLIO_DESIGN_OS.md'
+      - 'artifacts/truthmode/PORTFOLIO_DESIGN_OS_PROOF.md'
+      - 'vitest.design-os.config.ts'
+      - 'tsconfig.design-os.json'
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    paths:
+      - '.github/workflows/design-os-contract.yml'
+      - 'src/design-os/**'
+      - 'src/http/routes/designOs.ts'
+      - 'src/http/routes/designOs.test.ts'
+      - 'src/http/server.ts'
+      - 'scripts/verify-design-os-contract.mjs'
+      - 'docs/PORTFOLIO_DESIGN_OS.md'
+      - 'artifacts/truthmode/PORTFOLIO_DESIGN_OS_PROOF.md'
+      - 'vitest.design-os.config.ts'
+      - 'tsconfig.design-os.json'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: design-os-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-head-design-os:
+    name: Exact-head Design OS proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout exact event head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Record exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p logs
+          git rev-parse HEAD | tee logs/exact-head.txt
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify Portfolio Design OS contract
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run verify:design-os 2>&1 | tee logs/verify-design-os.log
+
+      - name: Typecheck Portfolio Design OS
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run typecheck:design-os 2>&1 | tee logs/typecheck-design-os.log
+
+      - name: Lint Portfolio Design OS
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run lint:design-os 2>&1 | tee logs/lint-design-os.log
+
+      - name: Repository typecheck diagnostic
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee logs/repository-typecheck-diagnostic.log
+
+      - name: Repository lint diagnostic
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee logs/repository-lint-diagnostic.log
+
+      - name: Repository build diagnostic
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee logs/repository-build-diagnostic.log
+
+      - name: Upload Design OS proof logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: design-os-proof-${{ github.event.pull_request.head.sha || github.sha }}
+          path: logs/
+          if-no-files-found: error
+          retention-days: 14
