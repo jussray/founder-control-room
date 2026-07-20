@@ -5,6 +5,10 @@
  */
 import { createClient } from '@supabase/supabase-js';
 
+interface Env {
+  [key: string]: string | undefined;
+}
+
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -46,7 +50,7 @@ export async function runDeletionWorker(): Promise<void> {
 }
 
 export default {
-  async scheduled(_e: ScheduledEvent, _env: Env, _ctx: ExecutionContext) {
+  async scheduled(_event: unknown, _env: Env, _ctx: unknown) {
     await runDeletionWorker();
   },
 };

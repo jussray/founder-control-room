@@ -6,11 +6,11 @@
  * in CI) and publishes the result to the event bus inbox.
  *
  * Usage:
- *   import { dispatchReconciliation } from './dispatcher';
+ *   import { dispatchReconciliation } from './dispatcher.js';
  *   await dispatchReconciliation(inbox, ['sekret-bip', 'l99-story-engine']);
  */
-import type { ServiceName } from './types';
-import type { Inbox } from '../events/inbox';
+import type { ServiceName } from './types.js';
+import type { Inbox } from '../events/inbox.js';
 
 /**
  * Service endpoint registry.
