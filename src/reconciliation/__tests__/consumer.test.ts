@@ -14,13 +14,13 @@ describe('ReconciliationConsumer', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('subscribes to reconciliation.report on start', async () => {
-    const { startReconciliationConsumer } = await import('../consumer');
+    const { startReconciliationConsumer } = await import('../consumer.js');
     startReconciliationConsumer(mockInbox, mockOutbox, mockDb);
     expect(mockSubscribe).toHaveBeenCalledWith('reconciliation.report', expect.any(Function));
   });
 
   it('rejects payloads missing the service field', async () => {
-    const { startReconciliationConsumer } = await import('../consumer');
+    const { startReconciliationConsumer } = await import('../consumer.js');
     startReconciliationConsumer(mockInbox, mockOutbox, mockDb);
 
     // Extract the registered callback
@@ -32,7 +32,7 @@ describe('ReconciliationConsumer', () => {
   });
 
   it('persists a valid clean report without publishing to outbox', async () => {
-    const { startReconciliationConsumer } = await import('../consumer');
+    const { startReconciliationConsumer } = await import('../consumer.js');
     startReconciliationConsumer(mockInbox, mockOutbox, mockDb);
 
     const callback = mockSubscribe.mock.calls[0][1];
@@ -50,7 +50,7 @@ describe('ReconciliationConsumer', () => {
   });
 
   it('publishes reconciliation.drift to outbox when drift is detected', async () => {
-    const { startReconciliationConsumer } = await import('../consumer');
+    const { startReconciliationConsumer } = await import('../consumer.js');
     startReconciliationConsumer(mockInbox, mockOutbox, mockDb);
 
     const callback = mockSubscribe.mock.calls[0][1];
