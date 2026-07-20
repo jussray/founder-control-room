@@ -1,0 +1,31 @@
+name: Founder Cookie Contract Mirror
+
+on:
+  pull_request:
+    paths:
+      - '.security/cookies.json'
+      - 'scripts/verify-cookie-contract.mjs'
+      - 'scripts/verify-founder-onboarding.mjs'
+      - 'scripts/verify-guarded-terminal-contract.mjs'
+      - 'src/auth/**'
+      - 'src/http/middleware/**'
+      - 'src/http/routes/auth.ts'
+      - 'src/terminal/registry.ts'
+      - '.github/workflows/cookie-contract-mirror.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cookie-contract:
+    name: Founder and portfolio cookie contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node scripts/verify-cookie-contract.mjs
+      - run: node scripts/verify-founder-onboarding.mjs
+      - run: node scripts/verify-guarded-terminal-contract.mjs

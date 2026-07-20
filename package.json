@@ -15,7 +15,8 @@
     "test:e2e": "npm run build && node e2e/run.mjs",
     "verify:mcp": "node scripts/verify-mcp-config.mjs",
     "verify:terminal-contract": "node scripts/verify-guarded-terminal-contract.mjs",
-    "verify:ai-skills": "node scripts/verify-ai-skill-contract.mjs"
+    "verify:ai-skills": "node scripts/verify-ai-skill-contract.mjs",
+    "verify:cookies": "node scripts/verify-cookie-contract.mjs"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
