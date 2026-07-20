@@ -9,6 +9,37 @@
 import { supabase } from '../lib/supabaseClient.js';
 import type { ProviderKind } from '../reconciliation/types.js';
 
+export type InboxHandler = (payload: unknown) => void | Promise<void>;
+
+export interface Inbox {
+  publish(topic: string, payload: unknown): Promise<void>;
+  subscribe(topic: string, handler: InboxHandler): void;
+}
+
+class InMemoryInbox implements Inbox {
+  private readonly handlers = new Map<string, Set<InboxHandler>>();
+
+  subscribe(topic: string, handler: InboxHandler): void {
+    const topicHandlers = this.handlers.get(topic) ?? new Set<InboxHandler>();
+    topicHandlers.add(handler);
+    this.handlers.set(topic, topicHandlers);
+  }
+
+  async publish(topic: string, payload: unknown): Promise<void> {
+    const topicHandlers = this.handlers.get(topic);
+    if (!topicHandlers?.size) return;
+
+    await Promise.all([...topicHandlers].map((handler) => handler(payload)));
+  }
+}
+
+let singletonInbox: Inbox | null = null;
+
+export function getInbox(): Inbox {
+  singletonInbox ??= new InMemoryInbox();
+  return singletonInbox;
+}
+
 export interface RawProviderEvent {
   provider: ProviderKind;
   projectId: string;
