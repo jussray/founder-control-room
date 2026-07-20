@@ -10,17 +10,22 @@ compatibility_flags = [
 [observability]
 enabled = true
 
+# This Worker (src/worker/cf-entry.ts) is the whole application — Express
+# running behind Cloudflare's Node HTTP adapter — not a thin relay in front
+# of a separate Next.js/Vercel deploy. That relay design (src/worker/index.ts,
+# ORIGIN_URL) belongs to an earlier, unbuilt prototype path and is excluded
+# from this build (see tsconfig.json's exclude list); it is not read by
+# cf-entry.ts and must not be confused with it.
+
+[[routes]]
+pattern = "foundercontrolroom.org"
+custom_domain = true
+
 # ---------------------------------------------------------------------------
 # Non-secret vars — committed here, safe to expose
 # ---------------------------------------------------------------------------
-# NOTE: Founder Control Room deploys to Vercel.
-#       Se'kret Bip does NOT use Vercel (it has its own separate infra).
-#       ORIGIN_URL must point at the Vercel deployment for this repo only.
-# ---------------------------------------------------------------------------
 [vars]
 ENVIRONMENT = "production"
-# Replace with your actual Vercel deployment URL after first deploy:
-ORIGIN_URL = "https://founder-control-room.vercel.app"
 
 # ---------------------------------------------------------------------------
 # Secrets — set via `wrangler secret put <NAME>` (never committed)
@@ -30,8 +35,8 @@ ORIGIN_URL = "https://founder-control-room.vercel.app"
 # wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 # wrangler secret put SUPABASE_PUBLISHABLE_KEY
 # wrangler secret put GITHUB_TOKEN
-# wrangler secret put FOUNDER_ALLOWED_ORIGINS
-# wrangler secret put FOUNDER_API_URL
+# wrangler secret put FOUNDER_ALLOWED_ORIGINS   # https://foundercontrolroom.org
+# wrangler secret put FOUNDER_API_URL           # https://foundercontrolroom.org
 
 [triggers]
 crons = ["* * * * *"]
