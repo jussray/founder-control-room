@@ -1,4 +1,4 @@
-name = "founder-control-room"
+name = "founder-control-room2"
 main = "src/workers/deletion-queue-worker.ts"
 compatibility_date = "2024-09-23"
 
@@ -8,13 +8,10 @@ ENVIRONMENT = "production"
 [[triggers.crons]]
 cron = "0 */6 * * *"
 
-[[kv_namespaces]]
-binding = "SESSIONS_KV"
-id = "YOUR_SESSIONS_KV_NAMESPACE_ID"
-
-[[kv_namespaces]]
-binding = "FEATURE_FLAGS_KV"
-id = "YOUR_FEATURE_FLAGS_KV_NAMESPACE_ID"
+# KV cleanup uses Cloudflare API namespace IDs supplied as secrets/env vars.
+# Do not bind placeholder KV namespaces here: Cloudflare connected builds reject
+# fake namespace IDs before deployment. Re-add direct KV bindings only after the
+# real namespace IDs are known and the Worker code consumes env.<BINDING_NAME>.
 
 # R2 backups are intentionally not bound in the default deploy config.
 # Cloudflare rejects R2 bucket bindings when R2 is not enabled for the account.
@@ -23,14 +20,10 @@ id = "YOUR_FEATURE_FLAGS_KV_NAMESPACE_ID"
 # approved Founder Control Room production gate after R2 is enabled and the
 # backup worker code actually requires it.
 
-[headers]
-  [headers."/*"]
-    Content-Security-Policy = "default-src 'self'; script-src 'self'"
-    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+# Security headers are intentionally not configured in wrangler.toml.
+# This deployment target is a scheduled Worker, and Wrangler rejects top-level
+# [headers] blocks for Workers. Add HTTP headers in response code only when an
+# HTTP Worker entrypoint needs them.
 
 # Secrets (wrangler secret put <NAME>):
 # SUPABASE_SERVICE_ROLE_KEY
@@ -38,3 +31,4 @@ id = "YOUR_FEATURE_FLAGS_KV_NAMESPACE_ID"
 # CF_ACCOUNT_ID
 # CF_SESSIONS_KV_NAMESPACE_ID
 # CF_FEATURE_FLAGS_KV_NAMESPACE_ID
+# NEXT_PUBLIC_SUPABASE_URL
