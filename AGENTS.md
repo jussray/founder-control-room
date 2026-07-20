@@ -11,6 +11,7 @@ Read these before changing code, configuration, schemas, providers, verification
 - [`skills/typescript-minimal-patch/SKILL.md`](./skills/typescript-minimal-patch/SKILL.md) when writing the smallest safe TypeScript repair
 - [`skills/typescript-behavior-tests/SKILL.md`](./skills/typescript-behavior-tests/SKILL.md) when writing, replacing, or retiring Jest/Vitest behavior tests
 - [`skills/typescript-strict-review/SKILL.md`](./skills/typescript-strict-review/SKILL.md) before merge-ready or ready-for-review claims on TypeScript changes
+- [`skills/product-design-gate/SKILL.md`](./skills/product-design-gate/SKILL.md) before Product Design audits, prototypes, visual QA, or design evidence claims
 - [`skills/sales/SKILL.md`](./skills/sales/SKILL.md) for qualification, offers, proof, conversion quality, retention, and revenue operations
 - [`skills/devil/SKILL.md`](./skills/devil/SKILL.md) for the premise attack and selected-plan attack
 
@@ -40,6 +41,12 @@ For commercial work add:
 6. Make the smallest coherent, reversible change and verify it, including behavior tests and Playwright when a user-facing web/runtime path changes.
 7. Re-observe through OODA and report proof plus the next founder approval gate.
 
+## Product Design and Supabase truth
+
+Product Design screenshot or prototype evidence can identify visual, UX, and accessibility issues, but it does not prove Supabase Auth, RLS, Storage, Realtime, Edge Functions, schema behavior, or deployment safety.
+
+When a product surface depends on Supabase, keep design evidence and Supabase evidence separate: design QA can pass while Supabase verification remains blocked.
+
 ## Release-truth outage classification
 
 Founder Control Room is the first and authoritative place to record and interpret cross-repo release truth.
@@ -65,15 +72,15 @@ Active work may proceed in Founder Control Room, `jussray/Sekret-Bip`, `jussray/
 ## Non-negotiable boundaries
 
 - Preserve the `RepositoryProvider` abstraction.
-- Keep Control Room Supabase, credentials, and data separate from Se’kret Bip.
-- Never copy raw teen, journal, voice, media, health, parent-visibility, customer-secret, or other sensitive user data into operational storage, prompts, sales analysis, or outreach.
+- Keep Control Room Supabase, credentials, and data separate from every managed project.
+- Never copy private user, family, customer, vendor, media, credential, or commercially sensitive data into operational storage, prompts, sales analysis, Product Design captures, QA reports, Figma boards, prototypes, or outreach.
 - Preserve founder allowlist authorization, audit events, project isolation, and separate approval gates.
 - Do not expose provider tokens or service-role keys.
 - Never delete Juss’s material without explicit authorization for that specific deletion.
 - Do not invent demand, scarcity, customer statements, eligibility, savings, performance, inventory, delivery, or authority.
 - Merge when appropriate under `docs/FOUNDER_MERGE_AUTHORITY.md`. Do not deploy, roll back, alter auth/RLS, contact external parties, publish externally, change commercial terms, spend funds, or perform destructive writes without explicit founder approval for that exact action.
-- Apply repository-specific skills when acting on managed projects; portfolio rules never replace local product, privacy, verification, sales, brand/IP, or rollback contracts.
+- Apply repository-specific skills when acting on managed projects; portfolio rules never replace local product, privacy, verification, sales, brand/IP, Supabase, Product Design, or rollback contracts.
 
 ## Evidence report
 
-List files changed, behavior changed, tests run, Playwright result or inapplicability, failures or skips, security impact, provider impact, commercial assumptions, disqualifiers, brand/IP impact, Cloudflare/Control Room proof when applicable, rollback, unresolved risk, and next gate.
+List files changed, behavior changed, tests run, Playwright result or inapplicability, failures or skips, security impact, provider impact, Supabase impact, Product Design evidence status, commercial assumptions, disqualifiers, brand/IP impact, Cloudflare/Control Room proof when applicable, rollback, unresolved risk, and next gate.
