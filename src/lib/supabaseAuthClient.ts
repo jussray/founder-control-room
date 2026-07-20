@@ -5,18 +5,21 @@ import { createClient } from '@supabase/supabase-js';
  * role. SUPABASE_ANON_KEY remains a deployment-compatibility fallback while
  * Worker secrets are migrated to the modern publishable-key name.
  */
-const url = process.env.SUPABASE_URL;
-const publishableKey =
+const supabaseUrl = process.env.SUPABASE_URL;
+const publishableAuthKey =
   process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY;
 
-if (!url || !publishableKey) {
+if (!supabaseUrl || !publishableAuthKey) {
   throw new Error(
     'Missing SUPABASE_URL and a publishable auth key — see .env.example',
   );
 }
 
+const resolvedSupabaseUrl: string = supabaseUrl;
+const resolvedPublishableAuthKey: string = publishableAuthKey;
+
 export function createSupabaseAuthClient() {
-  return createClient(url, publishableKey, {
+  return createClient(resolvedSupabaseUrl, resolvedPublishableAuthKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
