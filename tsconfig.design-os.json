@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": [
+    "src/design-os/**/*.ts",
+    "src/http/routes/designOs.ts",
+    "src/http/routes/designOs.test.ts"
+  ]
+}

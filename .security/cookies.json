@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "repository": "jussray/founder-control-room",
+  "defaultPolicy": "deny-undeclared",
+  "scanRoots": ["src"],
+  "allowedCookieWriters": ["src/auth/founderSession.ts"],
+  "cookies": [
+    {
+      "name": "fcr_session",
+      "classification": "strictly_necessary",
+      "purpose": "Maintain the allowlisted founder's Supabase Auth browser session.",
+      "owner": "backend",
+      "providers": ["supabase", "cloudflare"],
+      "sensitive": true,
+      "httpOnly": true,
+      "secure": "production",
+      "sameSite": "strict",
+      "path": "/",
+      "maxAgeSeconds": 2592000,
+      "cacheControl": "private, no-store",
+      "csrf": "Exact FOUNDER_API_URL origin is required for browser mutations; explicit Bearer clients are not cookie-authenticated.",
+      "deletion": "Cleared by POST /auth/logout and by failed or disallowed session verification."
+    }
+  ],
+  "nonCookieState": [],
+  "externalCookieProviders": [],
+  "prohibited": [
+    "analytics or advertising cookies",
+    "client-readable founder auth tokens",
+    "cross-project Se'kret Bip session reuse",
+    "caching any response that writes or refreshes the founder session"
+  ]
+}

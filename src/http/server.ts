@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authRouter } from './routes/auth.js';
+import { onboardingRouter } from './routes/onboarding.js';
 import { projectsRouter } from './routes/projects.js';
 import { approvalsRouter } from './routes/approvals.js';
 import { l99Router } from './routes/l99.js';
@@ -13,17 +14,19 @@ import { agentsRouter } from './routes/agents.js';
 import { authorityLevelsRouter } from './routes/authorityLevels.js';
 import { pluginCenterRouter } from './routes/pluginCenter.js';
 import { commandBridgeRouter } from './routes/commandBridge.js';
+import { designOsRouter } from './routes/designOs.js';
 import { handleGitHubWebhook } from './webhooks/github.js';
 import { publicGuardrailSnapshot, renderGuardrailStatusPage } from '../guardrails.js';
 import {
   corsMiddleware,
   helmetMiddleware,
   rateLimitGeneral,
-  rateLimitMagicLink,
   requestAudit,
   errorHandler,
   BODY_LIMIT,
 } from './middleware/security.js';
+import { onboardingContentSecurityPolicy } from './middleware/onboardingSecurity.js';
+import { requireSameOriginBrowserMutation } from './middleware/csrf.js';
 
 export interface CreateServerOptions {
   /**
@@ -38,8 +41,10 @@ export interface CreateServerOptions {
 
 export function createServer(options: CreateServerOptions = {}) {
   const app = express();
+  app.disable('x-powered-by');
 
   app.use(helmetMiddleware);
+  app.use(onboardingContentSecurityPolicy);
   app.use(corsMiddleware);
   app.use(requestAudit);
 
@@ -48,13 +53,15 @@ export function createServer(options: CreateServerOptions = {}) {
     app.use('/control-room', express.static(path.join(publicDir, 'control-room')));
   }
 
-  // Webhooks need the raw body for HMAC verification — mount before express.json()
+  // Webhooks need the raw body for HMAC verification and do not use browser
+  // cookies, so mount them before the browser mutation gate and JSON parser.
   app.post(
     '/webhooks/github',
-    express.raw({ type: 'application/json' }),
+    express.raw({ type: 'application/json', limit: BODY_LIMIT }),
     handleGitHubWebhook,
   );
 
+  app.use(requireSameOriginBrowserMutation);
   app.use(express.json({ limit: BODY_LIMIT }));
 
   app.get('/health', (_req, res) => res.json({ ok: true }));
@@ -81,9 +88,9 @@ export function createServer(options: CreateServerOptions = {}) {
     res.status(200).json(publicGuardrailSnapshot());
   });
 
-  app.use('/auth/magic-link', rateLimitMagicLink);
   app.use(rateLimitGeneral);
 
+  app.use('/', onboardingRouter);
   app.use('/auth', authRouter);
   app.use('/projects', projectsRouter);
   app.use('/approvals', approvalsRouter);
@@ -96,6 +103,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/authority-levels', authorityLevelsRouter);
   app.use('/plugin-center', pluginCenterRouter);
   app.use('/command-bridge', commandBridgeRouter);
+  app.use('/design-os', designOsRouter);
 
   app.use(errorHandler);
 

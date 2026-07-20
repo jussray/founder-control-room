@@ -16,6 +16,13 @@ enabled = true
 # ORIGIN_URL) belongs to an earlier, unbuilt prototype path and is excluded
 # from this build (see tsconfig.json's exclude list); it is not read by
 # cf-entry.ts and must not be confused with it.
+#
+# The deletion-queue worker (src/workers/deletion-queue-worker.ts) is a
+# separate Cloudflare Worker — its own config lives in
+# wrangler.deletion-queue.toml (`wrangler deploy --config
+# wrangler.deletion-queue.toml`), not here. It must never share this file:
+# a single wrangler.toml can only declare one `main`/`name` pair, and this
+# one is the founder-control-room application itself.
 
 [[routes]]
 pattern = "foundercontrolroom.org"

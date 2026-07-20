@@ -12,6 +12,45 @@
 import { supabase } from '../lib/supabaseClient.js';
 import type { OutboxEntry } from '../reconciliation/types.js';
 
+export type OutboxHandler = (payload: unknown) => void | Promise<void>;
+
+export interface Outbox {
+  publish(topic: string, payload: unknown): Promise<void>;
+  subscribe(topic: string, handler: OutboxHandler): void;
+}
+
+class InMemoryOutbox implements Outbox {
+  private readonly handlers = new Map<string, Set<OutboxHandler>>();
+
+  subscribe(topic: string, handler: OutboxHandler): void {
+    const topicHandlers = this.handlers.get(topic) ?? new Set<OutboxHandler>();
+    topicHandlers.add(handler);
+    this.handlers.set(topic, topicHandlers);
+  }
+
+  async publish(topic: string, payload: unknown): Promise<void> {
+    const topicHandlers = this.handlers.get(topic);
+    if (!topicHandlers?.size) {
+      console.log(JSON.stringify({
+        ts: new Date().toISOString(),
+        bus: 'reconciliation_outbox',
+        topic,
+        payload,
+      }));
+      return;
+    }
+
+    await Promise.all([...topicHandlers].map((handler) => handler(payload)));
+  }
+}
+
+let singletonOutbox: Outbox | null = null;
+
+export function getOutbox(): Outbox {
+  singletonOutbox ??= new InMemoryOutbox();
+  return singletonOutbox;
+}
+
 export interface EnqueueOptions {
   /** Delay processing until this ISO timestamp. */
   availableAt?: string;

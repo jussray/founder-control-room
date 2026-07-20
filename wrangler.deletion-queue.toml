@@ -1,0 +1,34 @@
+name = "founder-control-room2"
+main = "src/workers/deletion-queue-worker.ts"
+compatibility_date = "2024-09-23"
+
+[vars]
+ENVIRONMENT = "production"
+
+[[triggers.crons]]
+cron = "0 */6 * * *"
+
+# KV cleanup uses Cloudflare API namespace IDs supplied as secrets/env vars.
+# Do not bind placeholder KV namespaces here: Cloudflare connected builds reject
+# fake namespace IDs before deployment. Re-add direct KV bindings only after the
+# real namespace IDs are known and the Worker code consumes env.<BINDING_NAME>.
+
+# R2 backups are intentionally not bound in the default deploy config.
+# Cloudflare rejects R2 bucket bindings when R2 is not enabled for the account.
+# The current deletion queue worker does not consume FCR_BACKUPS, so an unused
+# R2 binding must not block deploys. Re-add an R2 binding only through an
+# approved Founder Control Room production gate after R2 is enabled and the
+# backup worker code actually requires it.
+
+# Security headers are intentionally not configured in wrangler.toml.
+# This deployment target is a scheduled Worker, and Wrangler rejects top-level
+# [headers] blocks for Workers. Add HTTP headers in response code only when an
+# HTTP Worker entrypoint needs them.
+
+# Secrets (wrangler secret put <NAME> --config wrangler.deletion-queue.toml):
+# SUPABASE_SERVICE_ROLE_KEY
+# CF_API_TOKEN
+# CF_ACCOUNT_ID
+# CF_SESSIONS_KV_NAMESPACE_ID
+# CF_FEATURE_FLAGS_KV_NAMESPACE_ID
+# NEXT_PUBLIC_SUPABASE_URL

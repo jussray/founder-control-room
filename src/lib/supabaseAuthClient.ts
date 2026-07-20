@@ -1,24 +1,35 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from '@supabase/supabase-js';
 
 /**
- * Auth-only Supabase client, created with the PUBLISHABLE (anon) key —
- * never the service role key. This is the client that's allowed to call
- * `auth.signInWithOtp` / `auth.verifyOtp` / `auth.getUser`, because those
- * are the operations a public, unauthenticated caller is meant to be able
- * to reach (rate-limited by Supabase itself).
- *
- * All privileged DB reads/writes still go through `lib/supabaseClient.ts`
- * (service role), never through this client.
+ * Auth-only Supabase clients use a public publishable key, never the service
+ * role. SUPABASE_ANON_KEY remains a deployment-compatibility fallback while
+ * Worker secrets are migrated to the modern publishable-key name.
  */
-const url = process.env.SUPABASE_URL;
-const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+const supabaseUrl = process.env.SUPABASE_URL;
+const publishableAuthKey =
+  process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY;
 
-if (!url || !publishableKey) {
+if (!supabaseUrl || !publishableAuthKey) {
   throw new Error(
-    "Missing SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY — see .env.example"
+    'Missing SUPABASE_URL and a publishable auth key — see .env.example',
   );
 }
 
-export const supabaseAuth = createClient(url, publishableKey, {
-  auth: { persistSession: false },
-});
+const resolvedSupabaseUrl: string = supabaseUrl;
+const resolvedPublishableAuthKey: string = publishableAuthKey;
+
+export function createSupabaseAuthClient() {
+  return createClient(resolvedSupabaseUrl, resolvedPublishableAuthKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
+
+/**
+ * Stateless token validation and magic-link delivery may reuse this client.
+ * Request paths that call setSession or refreshSession must use the factory.
+ */
+export const supabaseAuth = createSupabaseAuthClient();
