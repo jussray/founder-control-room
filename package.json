@@ -6,17 +6,20 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:design-os": "tsc -p tsconfig.design-os.json",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "cf:dev": "wrangler dev src/worker/cf-entry.ts --port 8787",
     "deploy": "wrangler deploy",
     "lint": "eslint 'src/**/*.ts'",
+    "lint:design-os": "eslint 'src/design-os/**/*.ts' 'src/http/routes/designOs.ts' 'src/http/routes/designOs.test.ts' --max-warnings 0",
     "test": "vitest run",
     "test:e2e": "npm run build && node e2e/run.mjs",
     "verify:mcp": "node scripts/verify-mcp-config.mjs",
     "verify:terminal-contract": "node scripts/verify-guarded-terminal-contract.mjs",
     "verify:ai-skills": "node scripts/verify-ai-skill-contract.mjs",
-    "verify:cookies": "node scripts/verify-cookie-contract.mjs"
+    "verify:cookies": "node scripts/verify-cookie-contract.mjs",
+    "verify:design-os": "node scripts/verify-design-os-contract.mjs && vitest run --config vitest.design-os.config.ts"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
