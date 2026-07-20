@@ -11,9 +11,9 @@
  * Wire-up: call `startReconciliationConsumer(inbox, outbox)` in src/index.ts
  */
 import { createId } from '@paralleldrive/cuid2';
-import type { DriftReport, ReconciliationEvent, ReconciliationOutcome } from './types';
-import type { Inbox } from '../events/inbox';
-import type { Outbox } from '../events/outbox';
+import type { DriftReport, ReconciliationEvent, ReconciliationOutcome } from './types.js';
+import type { Inbox } from '../events/inbox.js';
+import type { Outbox } from '../events/outbox.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 const RECONCILIATION_EVENTS_TABLE = 'reconciliation_events';
