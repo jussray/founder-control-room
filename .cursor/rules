@@ -1,0 +1,29 @@
+# Cursor Rules — founder-control-room
+
+## 5W1H Operating Contract
+
+Before every nontrivial edit, establish and state:
+
+- **Who** — requester, decision owner, affected data subjects, execution authority
+- **What** — exact outcome, deliverable, non-goals, preserved dashboard work
+- **Where** — `jussray/founder-control-room`, exact branch, environment, dashboard data sources
+- **When** — lifecycle state, ordering constraint, rollback window
+- **Why** — verified founder decision or oversight need
+- **How** — smallest safe implementation, verification plan, rollback
+
+## Repository Identity
+
+Read-only founder operational dashboard aggregating health, metrics, and status across the Chief AI ecosystem. This is a status surface, not an execution layer.
+
+## Rules
+
+- Dashboard is read-only — no execution, mutations, or secrets storage.
+- Never expose credentials, private business data, vendor details, or customer records in UI.
+- All changes via branch + PR, never direct to `main`.
+- Credentials and integration tokens must stay in vault.
+- Run `lint` and `build` before PR.
+- Adding execution capabilities requires explicit founder approval.
+
+## Approval Gates
+
+Require explicit founder approval before: merging, deploying, adding data sources, extending integration scope, rotating secrets, or adding execution capabilities.

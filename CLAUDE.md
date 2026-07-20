@@ -1,38 +1,43 @@
-# Founder Control Room Claude Instructions
+# Claude Operating Contract — founder-control-room
 
-Read [`Juss Founder OS`](.ai/skills/juss-founder-os/SKILL.md) first, then read [`GLOBAL_AI.md`](./GLOBAL_AI.md), [`docs/FOUNDER_MERGE_AUTHORITY.md`](./docs/FOUNDER_MERGE_AUTHORITY.md), and [`skills/portfolio-control-plane/SKILL.md`](./skills/portfolio-control-plane/SKILL.md) before any nontrivial work.
+This file governs Claude (claude.ai, Claude Code, MCP-connected sessions) when working in `jussray/founder-control-room`.
 
-For Se’kret Bip splash, founding-preview, waiting-list, sponsor, or social launch work, also read [`docs/private/JUSS_PRIVATE_OPERATING_PLAN.md`](docs/private/JUSS_PRIVATE_OPERATING_PLAN.md).
+## 5W1H — Required Before Every Nontrivial Action
 
-Use the exact founder stack:
+- **Who** — requester, decision owner, affected users, data subjects, execution authority.
+- **What** — requested outcome, deliverable, non-goals, existing work to preserve.
+- **Where** — `jussray/founder-control-room`, exact branch, environment, runtime, dashboard data sources, and provider boundary.
+- **When** — current lifecycle/release state, ordering, timing, rollback window.
+- **Why** — verified founder decision or oversight need and evidence.
+- **How** — smallest safe implementation, permissions, verification, rollout, rollback.
 
-```text
-/garyvee lindymode redteam l99 redteam ooda
-```
+## Repository Identity
 
-The first redteam attacks the premise. The second attacks the selected plan.
+**Repository:** `jussray/founder-control-room`
+**Role:** Founder-facing operational dashboard aggregating health, metrics, and status signals across all Chief AI ecosystem projects — Chief AI, Se’kret Bip, Think Tank, JBH, Untold Stories, and L99.
+**Trust boundary:** This surface shows aggregated status. It must never become an execution layer — no mutations, no secrets storage, no direct project writes.
 
-## Required start
+## Non-Negotiable Boundaries
 
-1. Confirm repository, branch, environment, and requested outcome.
-2. Inspect the current provider interfaces, HTTP routes, auth middleware, schemas, migrations, tests, and recent changes.
-3. Read `docs/ARCHITECTURE.md` and preserve the provider-independent authority model.
-4. Apply the portfolio skill and then the managed repository's local skill when crossing project boundaries.
-5. Separate verified facts, inference, and unknowns.
-6. Identify the next approval gate before mutation.
+- This dashboard is read-only and status-only — no execution, mutation, or secrets storage.
+- Never expose raw credentials, private business data, vendor details, or customer/order records in the dashboard UI or any model output.
+- Do not blend project-specific private data across project views.
+- Credentials and integration tokens must stay in vault — never in client code.
+- All production-touching changes require explicit founder approval.
 
-## Project rules
+## Required Loop
 
-- Keep the Control Room separate from Se’kret Bip’s database and service credentials.
-- Preserve `RepositoryProvider` abstraction unless an approved architecture decision replaces it.
-- Founder authentication is not enough; founder allowlist authorization must remain enforced.
-- Curated operational events may cross project boundaries. Raw private user content must not.
-- Never delete Juss’s material without explicit authorization for that specific deletion.
-- Do not invent dashboard state, provider configuration, deployment success, or approval history.
-- Merge when appropriate under `docs/FOUNDER_MERGE_AUTHORITY.md`. Do not deploy, rotate credentials, alter auth/RLS, publish externally, spend funds, or perform destructive changes without explicit founder approval.
+1. Observe exact branch, data source configurations, and display boundaries.
+2. Complete 5W1H and identify authority or safety gaps.
+3. Red-team data exposure, cross-project blending, mutation creep, and rollback.
+4. Choose smallest reversible action preserving existing work.
+5. Run build and display-boundary checks.
+6. Report proven, inferred, blocked, and next owner.
 
-## Required completion report
+## Approval Gates
 
-Reality, premise risk, L99 view, decision, plan risk, action, proof, brand/IP impact, rollback, and next gate.
+Require explicit founder approval before: merging, deploying, adding new data sources, changing integration scope, rotating secrets, or adding execution capabilities.
 
-Claude should strengthen founder control, not build an autonomous bureaucracy with an API key and delusions of governance.
+## Output Format
+
+Return: completed 5W1H · repo/branch/SHA · files touched · checks run · preserved work · rollback path · blocker and next owner.
