@@ -1,37 +1,37 @@
 name = "founder-control-room"
-main = "src/worker/cf-entry.ts"
-compatibility_date = "2025-06-01"
-compatibility_flags = [
-  "nodejs_compat",
-  "enable_nodejs_http_modules",
-  "enable_nodejs_http_server_modules",
-]
+main = "src/workers/deletion-queue-worker.ts"
+compatibility_date = "2024-09-23"
 
-[observability]
-enabled = true
-
-# ---------------------------------------------------------------------------
-# Non-secret vars — committed here, safe to expose
-# ---------------------------------------------------------------------------
-# NOTE: Founder Control Room deploys to Vercel.
-#       Se'kret Bip does NOT use Vercel (it has its own separate infra).
-#       ORIGIN_URL must point at the Vercel deployment for this repo only.
-# ---------------------------------------------------------------------------
 [vars]
 ENVIRONMENT = "production"
-# Replace with your actual Vercel deployment URL after first deploy:
-ORIGIN_URL = "https://founder-control-room.vercel.app"
 
-# ---------------------------------------------------------------------------
-# Secrets — set via `wrangler secret put <NAME>` (never committed)
-# ---------------------------------------------------------------------------
-# wrangler secret put GITHUB_WEBHOOK_SECRET
-# wrangler secret put SUPABASE_URL
-# wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-# wrangler secret put SUPABASE_PUBLISHABLE_KEY
-# wrangler secret put GITHUB_TOKEN
-# wrangler secret put FOUNDER_ALLOWED_ORIGINS
-# wrangler secret put FOUNDER_API_URL
+[[triggers.crons]]
+cron = "0 */6 * * *"
 
-[triggers]
-crons = ["* * * * *"]
+[[kv_namespaces]]
+binding = "SESSIONS_KV"
+id = "YOUR_SESSIONS_KV_NAMESPACE_ID"
+
+[[kv_namespaces]]
+binding = "FEATURE_FLAGS_KV"
+id = "YOUR_FEATURE_FLAGS_KV_NAMESPACE_ID"
+
+[[r2_buckets]]
+binding = "FCR_BACKUPS"
+bucket_name = "fcr-backups"
+
+[headers]
+  [headers."/*"]
+    Content-Security-Policy = "default-src 'self'; script-src 'self'"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+# Secrets (wrangler secret put <NAME>):
+# SUPABASE_SERVICE_ROLE_KEY
+# CF_API_TOKEN
+# CF_ACCOUNT_ID
+# CF_SESSIONS_KV_NAMESPACE_ID
+# CF_FEATURE_FLAGS_KV_NAMESPACE_ID
