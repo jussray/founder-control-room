@@ -1,105 +1,43 @@
 /**
- * Core reconciliation domain types.
- * No provider-specific concepts belong here.
+ * Shared types for the Control Room reconciliation event bus.
+ *
+ * All three services (founder-control-room, Sekret-Bip, l99-StoryEngine)
+ * emit DriftReport objects. The Control Room ingests them via the event bus,
+ * stores them, and surfaces them in the dashboard.
  */
 
-export type ReconcileReason =
-  | 'provider_event'
-  | 'periodic_resync'
-  | 'manifest_changed'
-  | 'manual_refresh'
-  | 'dependency_changed'
-  | 'founder_triggered'
-  | 'recovery'
-  | 'startup';
+export type ServiceName = 'founder-control-room' | 'sekret-bip' | 'l99-story-engine';
 
-export type ReconcileStatus =
-  | 'converged'
-  | 'drifted'
-  | 'blocked'
-  | 'retry';
+export type DriftKind =
+  | 'missing_table'
+  | 'row_count_zero'
+  | 'policy_missing'
+  | 'schema_invalid'
+  | 'missing_schema'
+  | 'manifest_mismatch'
+  | 'unknown';
 
-export type ProviderKind =
-  | 'github'
-  | 'cloudflare'
-  | 'supabase'
-  | 'expo'
-  | 'shopify'
-  | 'custom';
-
-export type EvidenceKind =
-  | 'typecheck'
-  | 'lint'
-  | 'unit_test'
-  | 'integration_test'
-  | 'browser_test'
-  | 'security_scan'
-  | 'preview_health'
-  | 'deployment_result'
-  | 'migration_verification'
-  | 'storefront_check'
-  | 'artifact_provenance'
-  | 'rls_audit';
-
-export type EvidenceStatus = 'pass' | 'fail' | 'warn' | 'pending';
-
-export interface ReconcileRequest {
-  projectId: string;
-  controller: string;
-  resourceId?: string;
-  reason: ReconcileReason;
-  sourceEventId?: string;
-  /** Controller-specific, non-authoritative request context. */
-  meta?: Record<string, unknown>;
-  /** ISO timestamp – do not process before this time (for debounce / delay) */
-  availableAt?: string;
+export interface DriftItem {
+  type: DriftKind;
+  detail: string;
 }
 
-export interface ObservedChange {
-  resourceType: string;
-  resourceId: string;
-  field: string;
-  previousValue: unknown;
-  newValue: unknown;
+export interface DriftReport {
+  service: ServiceName;
+  timestamp: string;
+  durationMs: number;
+  status: 'clean' | 'drift_detected';
+  drift: DriftItem[];
+  /** Optional: number of schemas/tables checked */
+  schemasChecked?: number;
 }
 
-export interface ProposedAction {
-  actionType: string;
-  resourceType: string;
-  resourceId: string;
-  requiresApproval: boolean;
-  idempotencyKey: string;
-  payload: Record<string, unknown>;
+export interface ReconciliationEvent {
+  id: string;            // uuid
+  receivedAt: string;    // ISO timestamp when the Control Room ingested the report
+  report: DriftReport;
 }
 
-export interface EvidenceRecord {
-  missionId?: string;
-  projectId: string;
-  subject: string;
-  kind: EvidenceKind;
-  status: EvidenceStatus;
-  provider: ProviderKind;
-  commitSha?: string;
-  environment?: string;
-  detailsRef?: string;
-  reusableUntil?: string;
-}
-
-export interface ReconcileResult {
-  status: ReconcileStatus;
-  observedChanges: ObservedChange[];
-  proposedActions: ProposedAction[];
-  evidenceIds: string[];
-  retryAfter?: string;
-  requiresApproval: boolean;
-  message?: string;
-}
-
-/** The shape persisted in controller_outbox.reason */
-export interface OutboxEntry {
-  projectId: string;
-  controller: string;
-  resourceId?: string;
-  reason: ReconcileReason;
-  sourceEventId?: string;
-}
+export type ReconciliationOutcome =
+  | { ok: true; eventId: string }
+  | { ok: false; reason: string };
