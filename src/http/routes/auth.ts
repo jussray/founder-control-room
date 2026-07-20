@@ -6,6 +6,7 @@ import {
 import { supabase } from '../../lib/supabaseClient.js';
 import {
   clearFounderSession,
+  readFounderSession,
   writeFounderSession,
 } from '../../auth/founderSession.js';
 import { FOUNDER_API_URL, rateLimitMagicLink } from '../middleware/security.js';
@@ -17,8 +18,14 @@ export const authRouter = Router();
 const GENERIC_MAGIC_LINK_MESSAGE =
   'If this email is on the founder allowlist, a secure login link has been sent.';
 
+const MIN_FOUNDER_PASSWORD_LENGTH = 12;
+
 function normalizeEmail(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function normalizePassword(value: unknown): string {
+  return typeof value === 'string' ? value : '';
 }
 
 async function isAllowlisted(email: string): Promise<boolean> {
@@ -134,6 +141,57 @@ authRouter.post('/session', async (req, res) => {
 authRouter.get('/me', requireFounder, (req: FounderRequest, res) => {
   res.setHeader('Cache-Control', 'no-store');
   return res.json({ founder: req.founder });
+});
+
+/**
+ * Lets an authenticated founder claim password ownership after magic-link
+ * onboarding. The password is never logged, returned, persisted outside
+ * Supabase Auth, or accepted without an existing founder session cookie.
+ */
+authRouter.post('/password', requireFounder, async (req: FounderRequest, res) => {
+  const password = normalizePassword(req.body?.password);
+  const confirmPassword = normalizePassword(req.body?.confirmPassword);
+
+  if (password.length < MIN_FOUNDER_PASSWORD_LENGTH) {
+    return res.status(400).json({
+      error: `Password must be at least ${MIN_FOUNDER_PASSWORD_LENGTH} characters.`,
+    });
+  }
+  if (confirmPassword && confirmPassword !== password) {
+    return res.status(400).json({ error: 'Passwords do not match.' });
+  }
+
+  const cookieSession = readFounderSession(req);
+  if (!cookieSession) {
+    clearFounderSession(res);
+    return res.status(401).json({ error: 'Browser founder session required' });
+  }
+
+  const requestAuth = createSupabaseAuthClient();
+  const { data: sessionData, error: sessionError } = await requestAuth.auth.setSession({
+    access_token: cookieSession.accessToken,
+    refresh_token: cookieSession.refreshToken,
+  });
+
+  const email = normalizeEmail(sessionData.user?.email);
+  if (sessionError || !sessionData.session || !email || email !== req.founder?.email) {
+    clearFounderSession(res);
+    return res.status(401).json({ error: 'Founder session could not be verified' });
+  }
+  if (!(await isAllowlisted(email))) {
+    clearFounderSession(res);
+    return res.status(403).json({ error: 'Not on the founder allowlist' });
+  }
+
+  const { error: updateError } = await requestAuth.auth.updateUser({ password });
+  if (updateError) {
+    return res.status(400).json({ error: updateError.message });
+  }
+
+  const { data: refreshed } = await requestAuth.auth.getSession();
+  if (refreshed.session) writeFounderSession(res, refreshed.session);
+
+  return res.status(200).json({ ok: true, message: 'Founder password updated.' });
 });
 
 authRouter.post('/logout', (_req, res) => {
