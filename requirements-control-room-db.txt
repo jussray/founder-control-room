@@ -1,0 +1,4 @@
+# Founder Control Room local/admin database smoke-test dependencies.
+# Keep this file separate from the Node/TypeScript runtime package manifest.
+python-dotenv==1.2.2
+psycopg2-binary==2.9.12
