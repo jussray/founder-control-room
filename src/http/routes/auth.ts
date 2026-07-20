@@ -100,7 +100,21 @@ authRouter.get('/callback', async (req, res) => {
   }
 
   writeFounderSession(res, data.session);
-  res.status(303).setHeader('Location', '/');
+
+  // The founder dashboard SPA (public/control-room/app.js) keeps its own
+  // Bearer-token session in sessionStorage, read from this redirect's URL
+  // *fragment* (consumeHashSession()) — fragments never reach the server,
+  // so this is the standard implicit-flow handoff, not a leak. The
+  // HttpOnly cookie written above is a separate, same-origin session used
+  // by the lightweight onboarding shell at '/'; both are kept in sync from
+  // this one verified Supabase session.
+  const fragment = new URLSearchParams({
+    access_token: data.session.access_token,
+    refresh_token: data.session.refresh_token ?? '',
+    expires_at: String(data.session.expires_at ?? ''),
+    email,
+  });
+  res.status(303).setHeader('Location', `/control-room/#${fragment.toString()}`);
   return res.end();
 });
 

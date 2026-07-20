@@ -25,7 +25,6 @@ import {
   errorHandler,
   BODY_LIMIT,
 } from './middleware/security.js';
-import { onboardingContentSecurityPolicy } from './middleware/onboardingSecurity.js';
 import { requireSameOriginBrowserMutation } from './middleware/csrf.js';
 
 export interface CreateServerOptions {
@@ -44,7 +43,6 @@ export function createServer(options: CreateServerOptions = {}) {
   app.disable('x-powered-by');
 
   app.use(helmetMiddleware);
-  app.use(onboardingContentSecurityPolicy);
   app.use(corsMiddleware);
   app.use(requestAudit);
 

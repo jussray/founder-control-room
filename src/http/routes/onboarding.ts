@@ -1,6 +1,12 @@
 import { Router, type Response } from 'express';
+import { onboardingContentSecurityPolicy } from '../middleware/onboardingSecurity.js';
 
 export const onboardingRouter = Router();
+
+// Scoped to this router's own routes only — the founder dashboard SPA
+// (public/control-room/app.js) relies on inline `style="..."` attributes
+// throughout its templates, which this strict policy would otherwise block.
+onboardingRouter.use(onboardingContentSecurityPolicy);
 
 const CONTROL_ROOM_HTML = `<!doctype html>
 <html lang="en">

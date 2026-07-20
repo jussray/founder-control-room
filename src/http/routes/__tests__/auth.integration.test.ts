@@ -143,7 +143,7 @@ describe('GET /auth/callback', () => {
     expectClearedSessionCookie(res);
   });
 
-  it('sets an HttpOnly session cookie and redirects to the Control Room by default', async () => {
+  it('sets an HttpOnly session cookie and redirects to the Control Room dashboard with a session handoff', async () => {
     mockVerifyOtp.mockResolvedValue({
       data: { session: SESSION, user: { email: FOUNDER_EMAIL } },
       error: null,
@@ -156,9 +156,21 @@ describe('GET /auth/callback', () => {
       .redirects(0);
 
     expect(res.status).toBe(303);
-    expect(res.headers.location).toBe('/');
     expectSessionCookie(res);
-    expect(res.headers.location).not.toContain('access_token');
+
+    // The HttpOnly cookie above authenticates same-origin requests (e.g. the
+    // onboarding shell's /auth/me check). The dashboard SPA at /control-room/
+    // (public/control-room/app.js) additionally keeps its own Bearer-token
+    // session in sessionStorage, read once from this redirect's URL
+    // *fragment* — fragments never reach the server or appear in Referer
+    // headers, so this is the standard implicit-flow handoff, not a leak.
+    const location = String(res.headers.location);
+    expect(location.startsWith('/control-room/#')).toBe(true);
+    const fragment = new URLSearchParams(location.split('#')[1]);
+    expect(fragment.get('access_token')).toBe(SESSION.access_token);
+    expect(fragment.get('refresh_token')).toBe(SESSION.refresh_token);
+    expect(fragment.get('expires_at')).toBe(String(SESSION.expires_at));
+    expect(fragment.get('email')).toBe(FOUNDER_EMAIL);
   });
 });
 
