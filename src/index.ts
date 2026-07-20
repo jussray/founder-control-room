@@ -1,6 +1,10 @@
 import 'dotenv/config';
 import { createServer } from './http/server.js';
 import { startScheduler } from './worker/scheduler.js';
+import { startReconciliationConsumer } from './reconciliation/consumer.js';
+import { getInbox } from './events/inbox.js';
+import { getOutbox } from './events/outbox.js';
+import { getDb } from './lib/db.js';
 
 const port = Number(process.env.PORT ?? 8787);
 const app = createServer({ serveStatic: true });
@@ -43,7 +47,12 @@ app.listen(port, () => {
   console.log(`  GET  /dashboard/activity`);
   console.log(`  GET  /dashboard/costs`);
   console.log(`  POST /dashboard/manual-analysis`);
+  console.log(`  POST /api/reconcile             (inbound drift reports)`);
 
   // Start the outbox worker and all periodic safety resyncs
   startScheduler();
+
+  // Start reconciliation event bus consumer
+  // Listens on inbox 'reconciliation.report' → persists → forwards drift to outbox
+  startReconciliationConsumer(getInbox(), getOutbox(), getDb());
 });
