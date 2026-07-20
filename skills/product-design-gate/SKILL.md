@@ -99,7 +99,7 @@ A QA result must be `passed` only when no actionable P0, P1, or P2 issues remain
 For Supabase-backed product surfaces:
 
 - use synthetic users, synthetic workspace/project data, and synthetic media for design captures;
-- never expose service-role keys, JWTs, refresh tokens, anon or publishable keys copied from private environments, connection strings, bucket secrets, or signed URLs;
+- never expose service-role keys, JWTs, refresh tokens, private environment keys, connection strings, bucket secrets, or signed URLs;
 - never infer RLS correctness from UI visibility alone;
 - require database/Auth/RLS/Edge Function evidence when the visible behavior depends on Supabase access control or server logic;
 - do not change migrations, policies, storage rules, or Edge Functions from a Product Design workflow unless a separate Supabase gate authorizes it.
