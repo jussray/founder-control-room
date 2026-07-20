@@ -35,7 +35,7 @@ Do not use this skill as a substitute for TypeScript audit, Supabase review, rel
 Invoke this skill when work touches:
 
 - product flows, onboarding paths, dashboards, checkouts, settings, prototypes, visual QA, Figma, screenshots, mockups, source visuals, URL-to-code, image-to-code, or design critique;
-- Supabase-backed UI behavior where Auth, RLS, Realtime, Storage, Edge Functions, or client data fetching could affect what the user sees;
+- Supabase-backed UI behavior where Supabase Auth, RLS, Storage, Realtime, Edge Functions, or client data fetching could affect what the user sees;
 - PR claims based on visual correctness or prototype fidelity.
 
 ## Required with
@@ -54,6 +54,8 @@ For Supabase-backed product work, also apply the relevant Supabase local contrac
 Product Design evidence is design evidence. It is not merge proof, deployment proof, privacy proof, auth proof, Supabase proof, Playwright proof, or production readiness.
 
 A Product Design pass can inform the next GitHub patch, but it does not waive exact-head checks, release gates, privacy review, Supabase schema/RLS/Auth verification, or Founder Control Room evidence.
+
+A design QA can pass while Supabase verification remains blocked; visual fidelity does not prove database access control, server logic, storage rules, realtime subscriptions, or Edge Function behavior.
 
 ## Chat mode boundary
 
