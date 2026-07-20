@@ -15,7 +15,7 @@ Read these before changing code, configuration, schemas, providers, verification
 - [`skills/sales/SKILL.md`](./skills/sales/SKILL.md) for qualification, offers, proof, conversion quality, retention, and revenue operations
 - [`skills/devil/SKILL.md`](./skills/devil/SKILL.md) for the premise attack and selected-plan attack
 
-For Se’kret Bip splash, founding-preview, waiting-list, sponsor, or social launch work, also read [`docs/private/JUSS_PRIVATE_OPERATING_PLAN.md`](docs/private/JUSS_PRIVATE_OPERATING_PLAN.md).
+For Se'kret Bip splash, founding-preview, waiting-list, sponsor, or social launch work, also read [`docs/private/JUSS_PRIVATE_OPERATING_PLAN.md`](docs/private/JUSS_PRIVATE_OPERATING_PLAN.md).
 
 Use the exact founder stack:
 
@@ -65,9 +65,21 @@ Cloudflare build/deploy evidence is release truth, but it is separate from GitHu
 
 ## Canonical project routing
 
-Only `jussray/Sekret-Bip` is the active Se’kret Bip working repository. Other Bip-named repositories are historical or investigate-only unless Founder Control Room explicitly names one for provenance capture.
+Only `jussray/Sekret-Bip` is the active Se'kret Bip working repository. Other Bip-named repositories are historical or investigate-only unless Founder Control Room explicitly names one for provenance capture.
 
-Active work may proceed in Founder Control Room, `jussray/Sekret-Bip`, `jussray/l99-StoryEngine`, Chief/PromptOS, Juss Beautiful Hair repos, and clothing/storefront repos when each repo’s local gates are satisfied.
+Active work may proceed in Founder Control Room, `jussray/Sekret-Bip`, `jussray/l99-StoryEngine`, Chief/PromptOS, Juss Beautiful Hair repos, and clothing/storefront repos when each repo's local gates are satisfied.
+
+## GitHub Actions Secrets
+
+All secrets required by `.github/workflows/` are documented in [`docs/SECRETS.md`](./docs/SECRETS.md).
+
+Before triggering a deploy, verify the full checklist in that file. Key secrets added this session:
+
+| Secret | Used by | Purpose |
+|---|---|---|
+| `RECONCILE_SHARED_SECRET` | `deploy.yml / reconcile`, `POST /api/reconcile` | Authenticates inbound DriftReports. Minimum 32 random hex chars. Must be set in GitHub Secrets AND in Sekret-Bip and l99-StoryEngine for cross-service reconciliation. Generate with `openssl rand -hex 32`. |
+
+> Never commit, log, or expose `RECONCILE_SHARED_SECRET`. Never put it in a `NEXT_PUBLIC_*` var.
 
 ## Non-negotiable boundaries
 
@@ -76,7 +88,7 @@ Active work may proceed in Founder Control Room, `jussray/Sekret-Bip`, `jussray/
 - Never copy private user, family, customer, vendor, media, credential, or commercially sensitive data into operational storage, prompts, sales analysis, Product Design captures, QA reports, Figma boards, prototypes, or outreach.
 - Preserve founder allowlist authorization, audit events, project isolation, and separate approval gates.
 - Do not expose provider tokens or service-role keys.
-- Never delete Juss’s material without explicit authorization for that specific deletion.
+- Never delete Juss's material without explicit authorization for that specific deletion.
 - Do not invent demand, scarcity, customer statements, eligibility, savings, performance, inventory, delivery, or authority.
 - Merge when appropriate under `docs/FOUNDER_MERGE_AUTHORITY.md`. Do not deploy, roll back, alter auth/RLS, contact external parties, publish externally, change commercial terms, spend funds, or perform destructive writes without explicit founder approval for that exact action.
 - Apply repository-specific skills when acting on managed projects; portfolio rules never replace local product, privacy, verification, sales, brand/IP, Supabase, Product Design, or rollback contracts.
