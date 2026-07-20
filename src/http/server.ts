@@ -104,7 +104,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/command-bridge', commandBridgeRouter);
   app.use('/design-os', designOsRouter);
 
-  // Debug routes — CI and founder inspection only (no secrets exposed)
+  // Debug routes — CI and founder inspection only (no secrets exposed).
   app.use('/_debug', debugRouter);
 
   app.use(errorHandler);
