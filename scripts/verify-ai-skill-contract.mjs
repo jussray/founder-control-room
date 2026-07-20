@@ -9,6 +9,7 @@ const files = {
   typescriptPatch: await readFile(new URL('../skills/typescript-minimal-patch/SKILL.md', import.meta.url), 'utf8'),
   typescriptTests: await readFile(new URL('../skills/typescript-behavior-tests/SKILL.md', import.meta.url), 'utf8'),
   typescriptReview: await readFile(new URL('../skills/typescript-strict-review/SKILL.md', import.meta.url), 'utf8'),
+  productDesign: await readFile(new URL('../skills/product-design-gate/SKILL.md', import.meta.url), 'utf8'),
   agents: await readFile(new URL('../AGENTS.md', import.meta.url), 'utf8'),
   global: await readFile(new URL('../GLOBAL_AI.md', import.meta.url), 'utf8'),
   redteam: await readFile(new URL('../artifacts/redteam/SALES_DEVIL_ATTACK.md', import.meta.url), 'utf8'),
@@ -56,6 +57,7 @@ for (const [label, source, metadata] of [
   ['typescript-minimal-patch', files.typescriptPatch, ['name: typescript-minimal-patch', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
   ['typescript-behavior-tests', files.typescriptTests, ['name: typescript-behavior-tests', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
   ['typescript-strict-review', files.typescriptReview, ['name: typescript-strict-review', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
+  ['product-design-gate', files.productDesign, ['name: product-design-gate', 'version: 1.0.0', 'status: active', 'scope: founder-control-room']],
 ]) for (const field of metadata) requireText(`${label} metadata`, source, field);
 
 for (const phrase of ['5W1H', 'Qualify', 'disqualifiers', 'evidence', 'No approval carries forward', 'A sales plan is not authorization']) {
@@ -99,6 +101,13 @@ for (const phrase of [
   'Supabase or Worker integration safety',
   'Merge recommendation: YES, NO, or YES WITH CHANGES',
 ]) requireText('typescript-review invariant', files.typescriptReview, phrase);
+for (const phrase of [
+  'Product Design evidence is design evidence',
+  'source visual plus rendered implementation',
+  'No screenshot evidence means no completed audit',
+  'Supabase Auth, RLS, Storage, Realtime, Edge Functions',
+  'design QA can pass while Supabase verification remains blocked',
+]) requireText('product-design invariant', files.productDesign, phrase);
 
 requireText('AGENTS portfolio entry', files.agents, 'skills/portfolio-control-plane/SKILL.md');
 requireText('AGENTS sales entry', files.agents, 'skills/sales/SKILL.md');
@@ -108,6 +117,8 @@ requireText('AGENTS TypeScript debugger entry', files.agents, 'skills/typescript
 requireText('AGENTS TypeScript patch entry', files.agents, 'skills/typescript-minimal-patch/SKILL.md');
 requireText('AGENTS TypeScript tests entry', files.agents, 'skills/typescript-behavior-tests/SKILL.md');
 requireText('AGENTS TypeScript review entry', files.agents, 'skills/typescript-strict-review/SKILL.md');
+requireText('AGENTS Product Design entry', files.agents, 'skills/product-design-gate/SKILL.md');
+requireText('AGENTS Product Design/Supabase split', files.agents, 'design evidence and Supabase evidence separate');
 requireText('AGENTS commercial extension', files.agents, '/sales /devil');
 requireText('AGENTS separation', files.agents, 'separate approval gates');
 requireText('global alignment', files.global, '/garyvee lindymode redteam l99 redteam ooda');
