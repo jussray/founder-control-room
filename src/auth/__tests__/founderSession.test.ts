@@ -2,7 +2,7 @@ import express from 'express';
 import request from 'supertest';
 import type { Session } from '@supabase/supabase-js';
 import { afterEach, describe, expect, it } from 'vitest';
-import { clearFounderSession, writeFounderSession } from './founderSession.js';
+import { clearFounderSession, writeFounderSession } from '../founderSession.js';
 
 const originalNodeEnv = process.env.NODE_ENV;
 
@@ -66,7 +66,7 @@ describe('founder session cookie', () => {
     });
 
     const response = await request(app).post('/clear');
-    const cookies = response.headers['set-cookie'] ?? [];
+    const cookies = ([] as string[]).concat(response.headers['set-cookie'] ?? []);
 
     expect(cookies).toHaveLength(2);
     expect(cookies.some((cookie: string) => cookie.startsWith('__Host-fcr_session='))).toBe(true);
