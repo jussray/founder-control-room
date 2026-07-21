@@ -19,6 +19,7 @@
     "verify:terminal-contract": "node scripts/verify-guarded-terminal-contract.mjs",
     "verify:ai-skills": "node scripts/verify-ai-skill-contract.mjs",
     "verify:cookies": "node scripts/verify-cookie-contract.mjs",
+    "verify:growth-inbox": "node scripts/verify-unified-growth-inbox.mjs",
     "verify:design-os": "node scripts/verify-design-os-contract.mjs && vitest run --config vitest.design-os.config.ts"
   },
   "dependencies": {

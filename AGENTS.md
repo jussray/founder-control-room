@@ -17,6 +17,20 @@ Read these before changing code, configuration, schemas, providers, verification
 
 For Se'kret Bip splash, founding-preview, waiting-list, sponsor, or social launch work, also read [`docs/private/JUSS_PRIVATE_OPERATING_PLAN.md`](docs/private/JUSS_PRIVATE_OPERATING_PLAN.md).
 
+For messaging, lead generation, sales automation, unified inbox, consent, outreach,
+email, SMS, calls, webchat, Instagram, Facebook, WhatsApp, Telegram, Viber, or
+channel-adapter work, also read:
+
+- [`.ai/skills/unified-growth-inbox/SKILL.md`](.ai/skills/unified-growth-inbox/SKILL.md)
+- [`docs/private/UNIFIED_GROWTH_INBOX_PLAN.md`](docs/private/UNIFIED_GROWTH_INBOX_PLAN.md)
+- [`docs/private/UNIFIED_GROWTH_INBOX_COMPLIANCE_GATE.md`](docs/private/UNIFIED_GROWTH_INBOX_COMPLIANCE_GATE.md)
+- [`config/unified-growth-inbox.channels.json`](config/unified-growth-inbox.channels.json)
+- [`src/types/growthInbox.ts`](src/types/growthInbox.ts)
+
+The default growth-inbox mode is `draft_only`. No live outreach, calling, campaign,
+credential creation, paid provider enablement, deployment, or pricing/discount action
+is authorized merely because the skill or contract exists.
+
 Use the exact founder stack:
 
 ```text

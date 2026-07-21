@@ -11,6 +11,20 @@ This file governs Claude (claude.ai, Claude Code, MCP-connected sessions) when w
 - **Why** — verified founder decision or oversight need and evidence.
 - **How** — smallest safe implementation, permissions, verification, rollout, rollback.
 
+For messaging, lead generation, sales automation, unified inbox, consent, outreach,
+email, SMS, calls, webchat, Instagram, Facebook, WhatsApp, Telegram, Viber, or
+channel-adapter work, also read:
+
+- [`.ai/skills/unified-growth-inbox/SKILL.md`](.ai/skills/unified-growth-inbox/SKILL.md)
+- [`docs/private/UNIFIED_GROWTH_INBOX_PLAN.md`](docs/private/UNIFIED_GROWTH_INBOX_PLAN.md)
+- [`docs/private/UNIFIED_GROWTH_INBOX_COMPLIANCE_GATE.md`](docs/private/UNIFIED_GROWTH_INBOX_COMPLIANCE_GATE.md)
+- [`config/unified-growth-inbox.channels.json`](config/unified-growth-inbox.channels.json)
+- [`src/types/growthInbox.ts`](src/types/growthInbox.ts)
+
+The default growth-inbox mode is `draft_only`. The existence of these contracts does
+not authorize live outreach, calling, campaign launch, provider credentials, paid
+services, deployment, pricing, discounts, or external publishing.
+
 ## Repository Identity
 
 **Repository:** `jussray/founder-control-room`
@@ -24,6 +38,13 @@ This file governs Claude (claude.ai, Claude Code, MCP-connected sessions) when w
 - Do not blend project-specific private data across project views.
 - Credentials and integration tokens must stay in vault — never in client code.
 - All production-touching changes require explicit founder approval.
+- Keep the Control Room separate from Se’kret Bip’s database and service credentials.
+- Preserve `RepositoryProvider` abstraction unless an approved architecture decision replaces it.
+- Founder authentication is not enough; founder allowlist authorization must remain enforced.
+- Curated operational events may cross project boundaries. Raw private user content must not.
+- Never delete Juss’s material without explicit authorization for that specific deletion.
+- Do not invent dashboard state, provider configuration, deployment success, approval history, demand, or revenue.
+- Do not merge, deploy, rotate credentials, alter auth/RLS, publish externally, contact anyone, or perform destructive changes without explicit founder approval.
 
 ## Required Loop
 

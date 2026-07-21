@@ -1,0 +1,300 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-07-18",
+  "reviewedAgainstPublicGuidanceAt": "2026-07-17",
+  "mission": "Generate lawful, attributable revenue from permission-based conversations while preserving founder authority, brand, privacy, consent, and project separation.",
+  "defaultAutomationMode": "draft_only",
+  "supportedAutomationModes": [
+    "observe_only",
+    "draft_only",
+    "inbound_assist",
+    "approved_sequence",
+    "trusted_rules"
+  ],
+  "revenueAccounting": {
+    "recognizedRevenueState": "payment_collected",
+    "separateStates": [
+      "attention",
+      "permission",
+      "conversation",
+      "qualified",
+      "booked",
+      "invoiced",
+      "pledged",
+      "payment_collected",
+      "refunded",
+      "charged_back",
+      "retained",
+      "referred"
+    ],
+    "forbidReportingAsCollected": [
+      "waitlist_joined",
+      "lead_created",
+      "projected_value",
+      "booked_value",
+      "invoice_sent",
+      "sponsorship_pledged"
+    ]
+  },
+  "globalRules": {
+    "coldOutreachEnabled": false,
+    "humanApprovalRequiredForNewCampaign": true,
+    "humanApprovalRequiredForOutboundCalls": true,
+    "humanApprovalRequiredForPricingOrDiscounts": true,
+    "crossProjectTargetingEnabled": false,
+    "sensitiveDataSalesUseEnabled": false,
+    "purchasedScrapedOrInferredListsAllowed": false,
+    "projectSpecificConsentRequired": true,
+    "purposeSpecificConsentRequired": true,
+    "proofOfConsentRequired": true,
+    "globalSuppressionOverridesCampaigns": true,
+    "automationDisclosureRequired": true,
+    "legalPolicyGateRequired": true,
+    "providerPolicyEvidenceRequired": true,
+    "claimEvidenceRequired": true,
+    "auditAndIdempotencyRequiredBeforeDispatch": true,
+    "recordingDefaultEnabled": false,
+    "transcriptionDefaultEnabled": false,
+    "syntheticVoiceDefaultEnabled": false,
+    "minorDirectedMarketingDefaultEnabled": false
+  },
+  "legalPolicyGate": {
+    "requiredChecks": [
+      "sender_identity_verified",
+      "project_and_purpose_known",
+      "recipient_identity_sufficiently_resolved",
+      "consent_or_valid_inbound_context_verified",
+      "consent_evidence_retained",
+      "channel_window_or_approved_template_verified",
+      "global_project_channel_and_campaign_suppression_clear",
+      "age_and_sensitive_data_boundary_clear",
+      "jurisdiction_rules_resolved",
+      "quiet_hours_resolved",
+      "sender_campaign_or_telemarketer_registration_resolved",
+      "content_offer_and_claims_approved",
+      "required_disclosures_present",
+      "opt_out_path_verified",
+      "frequency_budget_and_kill_switch_present",
+      "retention_and_audit_policy_present",
+      "provider_terms_and_permissions_current",
+      "idempotency_and_dispatch_audit_ready"
+    ],
+    "failClosedOnUnknown": true,
+    "denyStates": [
+      "unknown",
+      "conflict",
+      "expired",
+      "missing_evidence"
+    ],
+    "pennsylvaniaTelemarketing": {
+      "outboundSalesCallsEnabled": false,
+      "requiredBeforeEnablement": [
+        "qualified_counsel_registration_or_exemption_decision",
+        "pennsylvania_telemarketer_registration_status",
+        "bonding_or_deposit_status_if_required",
+        "pennsylvania_do_not_call_subscription_and_screening_status",
+        "national_do_not_call_screening_status",
+        "internal_do_not_call_process",
+        "calling_hours_and_disclosure_policy",
+        "artificial_prerecorded_or_synthetic_voice_consent_policy",
+        "recording_and_transcription_consent_policy"
+      ]
+    },
+    "requiresQualifiedLegalReviewBefore": [
+      "broad_automated_marketing",
+      "outbound_prerecorded_or_ai_voice_sales_calls",
+      "call_recording_or_transcription",
+      "minor_directed_marketing",
+      "sensitive_data_processing",
+      "multi_jurisdiction_campaigns",
+      "paid_reservations_or_custom_financial_terms"
+    ]
+  },
+  "projectBoundary": {
+    "crossProjectConsentReuse": false,
+    "probabilisticIdentityAutoMerge": false,
+    "sekretBipAllowedData": [
+      "waitlist_status",
+      "founding_preview_participation",
+      "sponsor_interest",
+      "referral_source",
+      "account_communication_preference",
+      "launch_update_permission",
+      "product_feedback_permission"
+    ],
+    "sekretBipProhibitedData": [
+      "journal",
+      "voice_note",
+      "companion_chat",
+      "safety_event",
+      "emotional_state",
+      "health_data",
+      "parent_visible_content",
+      "private_activity_history"
+    ]
+  },
+  "channels": {
+    "webchat": {
+      "status": "recommended_first",
+      "initialMode": "draft_only",
+      "inboundSupported": true,
+      "outboundSupported": false,
+      "recordingSupported": false,
+      "requirements": [
+        "first_party_notice",
+        "automation_disclosure",
+        "purpose_specific_consent",
+        "retention_policy",
+        "human_handoff",
+        "security_review"
+      ]
+    },
+    "email": {
+      "status": "viable",
+      "initialMode": "draft_only",
+      "inboundSupported": true,
+      "outboundSupported": true,
+      "requirements": [
+        "accurate_from_reply_to_and_routing",
+        "non_deceptive_subject",
+        "commercial_message_disclosure_when_required",
+        "valid_postal_address_for_commercial_email",
+        "working_unsubscribe",
+        "opt_out_honored_within_required_time",
+        "suppression_list",
+        "transactional_and_commercial_separation"
+      ]
+    },
+    "instagram_direct": {
+      "status": "viable_after_meta_readiness",
+      "initialMode": "draft_only",
+      "inboundSupported": true,
+      "outboundSupported": "provider_limited",
+      "requirements": [
+        "professional_account",
+        "meta_app_review_and_permissions",
+        "webhook_signature_verification",
+        "provider_messaging_window",
+        "approved_use_case",
+        "automation_disclosure",
+        "opt_out_and_block_handling"
+      ]
+    },
+    "facebook_messenger": {
+      "status": "viable_after_meta_readiness",
+      "initialMode": "draft_only",
+      "inboundSupported": true,
+      "outboundSupported": "provider_limited",
+      "requirements": [
+        "facebook_page",
+        "page_token_server_side",
+        "meta_app_review_and_permissions",
+        "webhook_signature_verification",
+        "provider_messaging_window",
+        "approved_use_case",
+        "opt_out_and_block_handling"
+      ]
+    },
+    "whatsapp": {
+      "status": "viable_after_business_readiness",
+      "initialMode": "draft_only",
+      "inboundSupported": true,
+      "outboundSupported": "template_and_window_limited",
+      "requirements": [
+        "whatsapp_business_platform",
+        "business_and_phone_readiness",
+        "explicit_channel_opt_in",
+        "webhook_signature_verification",
+        "approved_templates_outside_user_window",
+        "quality_and_rate_monitoring",
+        "opt_out_handling"
+      ]
+    },
+    "telegram": {
+      "status": "viable_for_user_initiated_flows",
+      "initialMode": "draft_only",
+      "inboundSupported": true,
+      "outboundSupported": "user_relationship_required",
+      "requirements": [
+        "bot_created_and_secured",
+        "user_initiated_or_authorized_relationship",
+        "webhook_secret_verification",
+        "clear_bot_identity",
+        "block_and_delete_handling"
+      ]
+    },
+    "sms_mms": {
+      "status": "viable_after_registration_and_legal_review",
+      "initialMode": "observe_only",
+      "inboundSupported": true,
+      "outboundSupported": "consent_and_sender_limited",
+      "requirements": [
+        "registered_sender_or_campaign_where_required",
+        "affirmative_purpose_specific_consent",
+        "consent_evidence",
+        "do_not_call_and_suppression_checks_where_applicable",
+        "stop_help_and_equivalent_keyword_handling",
+        "quiet_hours_and_frequency_caps",
+        "accurate_sender_identity",
+        "reassigned_number_check_where_applicable",
+        "delivery_and_failure_evidence"
+      ]
+    },
+    "voice_calls": {
+      "status": "inbound_first_high_control",
+      "initialMode": "observe_only",
+      "inboundSupported": true,
+      "outboundSupported": false,
+      "recordingDefaultEnabled": false,
+      "transcriptionDefaultEnabled": false,
+      "syntheticVoiceDefaultEnabled": false,
+      "requirements": [
+        "caller_identity_and_purpose_disclosure",
+        "pennsylvania_registration_or_exemption_decision",
+        "federal_state_and_internal_do_not_call_checks",
+        "permissible_calling_hours",
+        "consent_for_prerecorded_automated_or_synthetic_voice_telemarketing",
+        "jurisdiction_specific_recording_consent",
+        "recording_and_transcription_disclosure",
+        "human_escalation",
+        "call_and_opt_out_records"
+      ]
+    },
+    "viber": {
+      "status": "deferred_commercial_gate",
+      "initialMode": "observe_only",
+      "inboundSupported": "after_onboarding",
+      "outboundSupported": "subscriber_and_commercial_terms_limited",
+      "requirements": [
+        "commercial_onboarding",
+        "approved_bot_or_business_messages_account",
+        "user_subscription_or_valid_permission",
+        "provider_terms_and_rate_limits",
+        "opt_out_handling"
+      ]
+    },
+    "google_business_messages": {
+      "status": "retired_do_not_build",
+      "initialMode": "observe_only",
+      "inboundSupported": false,
+      "outboundSupported": false,
+      "replacement": [
+        "google_business_profile_website_link",
+        "phone",
+        "webchat",
+        "supported_social_and_messaging_channels"
+      ]
+    }
+  },
+  "forbidden": [
+    "unrestricted_autonomous_outreach",
+    "purchased_scraped_or_inferred_lists",
+    "cross_project_targeting_without_permission",
+    "sensitive_vulnerability_targeting",
+    "deceptive_claims_testimonials_or_scarcity",
+    "carrier_or_platform_evasion",
+    "hidden_automation_impersonation",
+    "dispatch_without_audit",
+    "reporting_uncollected_value_as_revenue"
+  ]
+}
