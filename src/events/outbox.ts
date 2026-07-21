@@ -84,6 +84,7 @@ export async function enqueueReconcile(
 
 export interface ClaimedWork {
   id: string;
+  claimToken: string;
   projectId: string;
   controller: string;
   resourceId: string | null;
@@ -95,29 +96,42 @@ export interface ClaimedWork {
 /**
  * Claim up to `limit` outbox entries for processing.
  * Uses row-level locking (FOR UPDATE SKIP LOCKED via Postgres function).
+ *
+ * The returned `claimed_at` value is an ownership token. Every lifecycle write
+ * must pass it back so stale workers cannot complete, fail, or abandon work
+ * they no longer own after crash recovery reclaimed the row.
  */
 export async function claimWork(limit = 10): Promise<ClaimedWork[]> {
   const { data, error } = await supabase.rpc('claim_outbox_work', { p_limit: limit });
 
   if (error) throw new Error(`Failed to claim outbox work: ${error.message}`);
-  return (data ?? []).map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    projectId: row.project_id as string,
-    controller: row.controller as string,
-    resourceId: row.resource_id as string | null,
-    reason: row.reason as string,
-    sourceEventId: row.source_event_id as string | null,
-    attemptCount: row.attempt_count as number,
-  }));
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    if (!row.claimed_at) {
+      throw new Error(`Failed to claim outbox work: row ${String(row.id)} missing claim token`);
+    }
+
+    return {
+      id: row.id as string,
+      claimToken: String(row.claimed_at),
+      projectId: row.project_id as string,
+      controller: row.controller as string,
+      resourceId: row.resource_id as string | null,
+      reason: row.reason as string,
+      sourceEventId: row.source_event_id as string | null,
+      attemptCount: row.attempt_count as number,
+    };
+  });
 }
 
 /** Atomically complete work and mark its source provider event processed. */
 export async function completeWork(
   id: string,
+  claimToken: string,
   sourceEventId?: string | null,
 ): Promise<void> {
   const { error } = await supabase.rpc('complete_outbox_work', {
     p_id: id,
+    p_claimed_at: claimToken,
     p_source_event_id: sourceEventId ?? null,
   });
 
@@ -125,9 +139,10 @@ export async function completeWork(
 }
 
 /** Reschedule retryable work using database-side attempt increment and backoff. */
-export async function failWork(id: string, errorMessage: string): Promise<void> {
+export async function failWork(id: string, claimToken: string, errorMessage: string): Promise<void> {
   const { error } = await supabase.rpc('fail_outbox_work', {
     p_id: id,
+    p_claimed_at: claimToken,
     p_error: errorMessage,
   });
 
@@ -137,11 +152,13 @@ export async function failWork(id: string, errorMessage: string): Promise<void> 
 /** Atomically stop poison work and mark its source provider event failed. */
 export async function abandonWork(
   id: string,
+  claimToken: string,
   sourceEventId: string | null,
   errorMessage: string,
 ): Promise<void> {
   const { error } = await supabase.rpc('abandon_outbox_work', {
     p_id: id,
+    p_claimed_at: claimToken,
     p_source_event_id: sourceEventId,
     p_error: errorMessage,
   });
