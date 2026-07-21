@@ -8,6 +8,9 @@ const files = {
   registry: await readFile(new URL('../src/terminal/registry.ts', import.meta.url), 'utf8'),
   githubProvider: await readFile(new URL('../src/providers/GitHubProvider.ts', import.meta.url), 'utf8'),
   evidenceTypes: await readFile(new URL('../src/reconciliation/types.ts', import.meta.url), 'utf8'),
+  packageJson: await readFile(new URL('../package.json', import.meta.url), 'utf8'),
+  localWorkspace: await readFile(new URL('../scripts/verify-local-workspace.mjs', import.meta.url), 'utf8'),
+  localWorkspaceDocs: await readFile(new URL('../docs/LOCAL_WORKSPACE.md', import.meta.url), 'utf8'),
   migration: await readFile(
     new URL('../supabase/migrations/20260717195000_guarded_terminal_and_schema_reconciliation.sql', import.meta.url),
     'utf8',
@@ -89,6 +92,26 @@ requireText('GitHub provider', files.githubProvider, 'requires resolveRef');
 
 requireText('Evidence types', files.evidenceTypes, "'browser_test'");
 requireText('Evidence types', files.evidenceTypes, "'artifact_provenance'");
+
+requireText('Package scripts', files.packageJson, 'verify:local-workspace');
+requireText('Local workspace preflight', files.localWorkspace, 'CONTROL_ROOM_WORKSPACE_ROOT');
+requireText('Local workspace preflight', files.localWorkspace, 'jbh-private');
+requireText('Local workspace preflight', files.localWorkspace, 'jussbeautifulhair-site');
+requireText('Local workspace preflight', files.localWorkspace, 'untold-stories-storefront');
+requireText('Local workspace preflight', files.localWorkspace, 'a77bdcd4314eb9753da6354ffd35d17df5ba6927');
+requireText('Local workspace preflight', files.localWorkspace, '9444483d63d1d10823b80323f3b4c796b444be0c');
+requireText('Local workspace preflight', files.localWorkspace, 'eb23d6e364a483b28e0ea8d6577d050b293b9930');
+requireText('Local workspace preflight', files.localWorkspace, 'private checkout');
+requireText('Local workspace preflight', files.localWorkspace, 'must not be nested inside the public Control Room repository');
+requireText('Local workspace preflight', files.localWorkspace, "spawn('git'");
+requireText('Local workspace preflight', files.localWorkspace, 'shell: false');
+forbidText('Local workspace preflight', files.localWorkspace, "spawn('bash'");
+forbidText('Local workspace preflight', files.localWorkspace, "spawn('sh'");
+
+requireText('Local workspace docs', files.localWorkspaceDocs, 'Private repositories must never be copied or nested');
+requireText('Local workspace docs', files.localWorkspaceDocs, 'A passing preflight is not mission evidence by itself');
+requireText('Local workspace docs', files.localWorkspaceDocs, 'CONTROL_ROOM_TERMINAL_ALLOW_REMOTE=false');
+requireText('Local workspace docs', files.localWorkspaceDocs, 'No approval carries forward');
 
 requireText('Migration', files.migration, 'create table if not exists approval_executions');
 requireText('Migration', files.migration, "status in ('pending', 'succeeded', 'failed')");
