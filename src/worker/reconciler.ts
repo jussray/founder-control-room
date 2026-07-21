@@ -86,7 +86,7 @@ async function abandonTerminally(
 ): Promise<void> {
   const finalMessage = `Terminal reconciliation failure after ${item.attemptCount + 1} attempt(s): ${message}`;
   await writeReconciliationRun(item, terminalResult(finalMessage), startedAt);
-  await abandonWork(item.id, item.sourceEventId, finalMessage);
+  await abandonWork(item.id, item.claimToken, item.sourceEventId, finalMessage);
 }
 
 export async function runReconcilerCycle(): Promise<void> {
@@ -122,13 +122,13 @@ export async function runReconcilerCycle(): Promise<void> {
               await abandonTerminally(item, retryMessage, startedAt);
             } else {
               await writeReconciliationRun(item, result, startedAt);
-              await failWork(item.id, retryMessage);
+              await failWork(item.id, item.claimToken, retryMessage);
             }
             return;
           }
 
           await writeReconciliationRun(item, result, startedAt);
-          await completeWork(item.id, item.sourceEventId);
+          await completeWork(item.id, item.claimToken, item.sourceEventId);
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
 
@@ -147,7 +147,7 @@ export async function runReconcilerCycle(): Promise<void> {
               },
               startedAt,
             );
-            await failWork(item.id, message);
+            await failWork(item.id, item.claimToken, message);
           }
         }
       }),
