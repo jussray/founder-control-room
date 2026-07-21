@@ -1,6 +1,6 @@
 import {access, readdir, realpath} from 'node:fs/promises';
 import {constants} from 'node:fs';
-import {join, relative, resolve, sep} from 'node:path';
+import {isAbsolute, join, relative, sep} from 'node:path';
 import {spawn} from 'node:child_process';
 
 const expected = [
@@ -68,7 +68,7 @@ function runGit(cwd, args) {
 
 function isInside(parent, child) {
   const rel = relative(parent, child);
-  return rel === '' || (!rel.startsWith('..') && rel !== '..' && !rel.startsWith(`..${sep}`) && !resolve(rel).startsWith(sep));
+  return rel === '' || (!rel.startsWith('..') && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 }
 
 function containsOwnerRepo(remoteOutput, ownerRepo) {
@@ -82,7 +82,7 @@ const rootInput = process.env.CONTROL_ROOM_WORKSPACE_ROOT;
 if (!rootInput) {
   failures.push('CONTROL_ROOM_WORKSPACE_ROOT is not set.');
   printUsage();
-} else if (!resolve(rootInput).startsWith(sep)) {
+} else if (!isAbsolute(rootInput)) {
   failures.push('CONTROL_ROOM_WORKSPACE_ROOT must be an absolute path.');
 }
 
