@@ -1,5 +1,7 @@
 # Guarded Local Workspace Runbook
 
+Version: `1.0.0`
+
 Founder Control Room can continue storefront verification without private GitHub-hosted runners only when a reviewed local workspace exists. This workspace is not stored in the public Control Room repository. It is a local sibling directory tree containing exact private checkouts.
 
 ## Authority boundary
