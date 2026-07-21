@@ -7,6 +7,11 @@ function readText(path) {
   return readFileSync(resolve(root, path), 'utf8');
 }
 
+/** Collapses markdown soft line-wraps so phrase checks survive prose reflow. */
+function normalizeProse(text) {
+  return text.replace(/\s+/g, ' ');
+}
+
 function readJson(path) {
   return JSON.parse(readText(path));
 }
@@ -24,9 +29,9 @@ const compliancePath = 'docs/private/UNIFIED_GROWTH_INBOX_COMPLIANCE_GATE.md';
 const typePath = 'src/types/growthInbox.ts';
 
 const registry = readJson(registryPath);
-const skill = readText(skillPath);
-const plan = readText(planPath);
-const compliance = readText(compliancePath);
+const skill = normalizeProse(readText(skillPath));
+const plan = normalizeProse(readText(planPath));
+const compliance = normalizeProse(readText(compliancePath));
 const types = readText(typePath);
 
 assert(registry.defaultAutomationMode === 'draft_only', 'default automation mode must remain draft_only');
@@ -59,7 +64,7 @@ for (const phrase of [
   'default operating mode is `draft_only`',
   'No level authorizes unrestricted autonomous outreach',
   'Never ingest into growth or sales analysis',
-  'Revenue only when actually collected',
+  'revenue only when actually collected',
 ]) {
   assert(skill.includes(phrase), `skill contract missing phrase: ${phrase}`);
 }
