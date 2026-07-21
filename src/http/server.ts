@@ -22,6 +22,7 @@ import {
   handleRepositoryVerificationIngest,
   repositoryVerificationRouter,
 } from './routes/repositoryVerification.js';
+import { economicIntelligenceRouter } from './routes/economicIntelligence.js';
 import { handleGitHubWebhook } from './webhooks/github.js';
 import { debugRouter } from './routes/debug.js';
 import { publicGuardrailSnapshot, renderGuardrailStatusPage } from '../guardrails.js';
@@ -121,6 +122,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/design-os', designOsRouter);
   app.use('/cloudflare', cloudflareReasoningRouter);
   app.use('/mcp', mcpRouter);
+  app.use('/economic-intelligence', economicIntelligenceRouter);
 
   // Debug routes — CI and founder inspection only (no secrets exposed).
   app.use('/_debug', debugRouter);
