@@ -28,6 +28,8 @@ requireText('auth', 'password handoff Supabase update', 'requestAuth.auth.update
 requireText('auth', 'password minimum', 'MIN_FOUNDER_PASSWORD_LENGTH = 12');
 requireText('auth', 'fragment handoff construction', 'new URLSearchParams');
 requireText('auth', 'fragment handoff redirect', "setHeader('Location', `/control-room/#${fragment.toString()}`)");
+requireText('ui', 'scoped CSP import', 'onboardingContentSecurityPolicy');
+requireText('ui', 'scoped CSP middleware', 'onboardingRouter.use(onboardingContentSecurityPolicy)');
 requireText('ui', 'password form', 'id="password-form"');
 requireText('ui', 'password confirmation', 'name="confirmPassword"');
 requireText('ui', 'password endpoint fetch', "fetch('/auth/password'");
@@ -39,7 +41,6 @@ requireText('middleware', 'Bearer compatibility', 'bearerToken(req)');
 requireText('middleware', 'browser cookie auth', 'readFounderSession(req)');
 requireText('middleware', 'server refresh', 'refreshSession');
 requireText('server', 'security headers', 'helmetMiddleware');
-requireText('server', 'CSP', 'onboardingContentSecurityPolicy');
 requireText('server', 'same-origin browser mutation gate', 'requireSameOriginBrowserMutation');
 requireText('server', 'onboarding route', "app.use('/', onboardingRouter)");
 requireText('server', 'auth route', "app.use('/auth', authRouter)");
