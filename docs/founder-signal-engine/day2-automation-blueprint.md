@@ -1,4 +1,4 @@
-# Founder Signal Engine — Day 2 Automation Blueprint
+# Founder Signal Engine - Day 2 Automation Blueprint
 
 ## REALITY
 Ray has connected:
@@ -33,7 +33,24 @@ GitHub update
 - Social queue: Buffer
 - AI drafting layer: OpenAI Platform key connected inside Zapier
 
-## ZAP 1 — GitHub Commit to LinkedIn Draft
+## 5W1H SEND GATE
+
+Every post, DM, email, investor note, partner note, or civic outreach must pass a 5W1H check before it is queued, sent, or logged as ready.
+
+The engine must answer:
+
+| Gate | Required answer | Failure behavior |
+|---|---|---|
+| Who | Who is this for? Name the audience, person type, or HubSpot contact segment. | Do not send. Create a research task. |
+| What | What changed or what proof exists? Include repo, commit, PR, issue, screenshot, or demo link. | Do not send. Ask for proof or use a softer build-in-public post. |
+| Where | Where should this go? LinkedIn, Facebook, Instagram, Gmail, HubSpot note, or internal-only. | Do not send. Route to internal review. |
+| When | Why now? New commit, milestone, demo, risk fixed, civic timing, trend timing, or follow-up window. | Do not send. Schedule later or keep as draft. |
+| Why | Why does this recipient/audience care? State the white space, value, risk solved, or opportunity. | Do not send. Create positioning task. |
+| How | How should they act? Comment, connect, review repo, book call, fund, partner, test, or simply follow along. | Do not send. Add a clearer call to action. |
+
+Send rule: if the 5W1H check is incomplete, the automation should create a HubSpot task instead of sending or publishing.
+
+## ZAP 1 - GitHub Commit to LinkedIn Draft
 
 ### Trigger
 
@@ -50,6 +67,24 @@ Prompt:
 
 ```text
 You are writing for Ray, founder of Se’kret Bip and related GitHub projects.
+
+Use /human and /confess: tell the truth without sounding corporate, fake, desperate, or inflated.
+
+Before writing anything, run the 5W1H send gate.
+
+Return this structure:
+
+5W1H:
+- Who:
+- What:
+- Where:
+- When:
+- Why:
+- How:
+- Send decision: publish-draft, review-only, internal-only, or research-task
+- Missing proof or missing context:
+
+Then write the LinkedIn draft only if the send decision is publish-draft or review-only.
 
 Write in Ray’s voice:
 - direct
@@ -90,6 +125,13 @@ Channel: LinkedIn first.
 
 Safety rule: do not enable blind auto-posting until the first test draft is reviewed.
 
+Zapier filter before Buffer:
+
+```text
+Only continue if OpenAI Send decision equals publish-draft or review-only.
+Do not continue if Send decision equals internal-only or research-task.
+```
+
 ### Action 3: HubSpot Task
 
 App: HubSpot  
@@ -109,6 +151,16 @@ Trigger: GitHub commit
 Generated channel: LinkedIn
 Status: Review before publishing
 
+5W1H:
+Who: {{OpenAI Who}}
+What: {{OpenAI What}}
+Where: {{OpenAI Where}}
+When: {{OpenAI When}}
+Why: {{OpenAI Why}}
+How: {{OpenAI How}}
+Send decision: {{OpenAI Send decision}}
+Missing proof/context: {{OpenAI Missing proof or missing context}}
+
 Draft content:
 {{OpenAI generated LinkedIn post}}
 
@@ -118,7 +170,7 @@ Proof link:
 
 Associate manually with HubSpot Deal: `Founder Signal Engine` if Zapier exposes association fields. If not, leave the deal name in the task body.
 
-## ZAP 2 — Multi-Channel Draft Split
+## ZAP 2 - Multi-Channel Draft Split
 
 Only enable after Zap 1 works.
 
@@ -130,6 +182,17 @@ Same GitHub trigger.
 
 ```text
 Create three platform-specific drafts from this GitHub update.
+
+Use the 5W1H send gate first:
+- Who is the audience or contact segment?
+- What proof changed?
+- Where should this go?
+- When should this be sent or queued?
+- Why does this audience care?
+- How should they act?
+
+If any 5W1H field is weak or missing, label the draft review-only or internal-only.
+Never auto-send incomplete outreach.
 
 1. LinkedIn
 Audience: builders, investors, technical partners, operators.
@@ -175,6 +238,12 @@ Use for:
 - partnership signal
 - founder execution updates
 
+Required 5W1H emphasis:
+
+- Who: builders, investors, operators, AI/product people, civic or family-tech partners
+- Why: white space, proof of execution, strategic opportunity
+- How: comment, connect, review the repo, book a call, or follow the build
+
 ### Facebook
 Use for:
 
@@ -182,6 +251,12 @@ Use for:
 - family/parent angle
 - local/civic relevance
 - founder struggle and progress
+
+Required 5W1H emphasis:
+
+- Who: local community, family, parents, friends, everyday supporters
+- Why: human stakes, teen/family relevance, local economic possibility
+- How: share, comment, support, follow progress, introduce a helpful person
 
 ### Instagram
 Use for:
@@ -191,6 +266,26 @@ Use for:
 - brand visuals
 - before/after product progress
 - short captions with proof links or link-in-bio CTA
+
+Required 5W1H emphasis:
+
+- Who: visual-first followers, creators, teen/family audience, brand watchers
+- What: screenshot, character, screen, demo, before/after proof
+- How: follow, tap link, comment, share, watch the build
+
+### Gmail or Direct Outreach
+Use only after social draft quality is proven.
+
+Required 5W1H emphasis:
+
+- Who: named person or clear segment
+- What: specific repo/update/proof
+- Where: email or DM
+- When: milestone, follow-up timing, or urgent market/civic window
+- Why: recipient-specific value, not generic attention-seeking
+- How: one clear ask
+
+If the message cannot name the recipient-specific Why, do not send. Create a HubSpot research task.
 
 ## REPO-TO-AUDIENCE MAP V0
 
@@ -212,6 +307,8 @@ Use for:
 - No auto-emailing investors until message quality is proven.
 - Every post or outreach should point to proof.
 - If the project is unfinished, say it is being built, not launched.
+- Every outbound message must pass the 5W1H send gate.
+- If Who, Why, or How is weak, create a HubSpot research task instead of sending.
 
 ## FIRST TEST SUCCESS CONDITION
 
@@ -219,9 +316,10 @@ Day 2 is done only when:
 
 1. GitHub update triggers Zapier.
 2. OpenAI generates a LinkedIn draft in Ray’s voice.
-3. Buffer receives the draft or queue item.
-4. HubSpot receives a review task or note.
-5. Founder Control Room records the evidence.
+3. The draft includes a 5W1H block and a send decision.
+4. Buffer receives the draft or queue item only if the send decision allows it.
+5. HubSpot receives a review task or note with the 5W1H block.
+6. Founder Control Room records the evidence.
 
 ## ROLLBACK
 
@@ -232,4 +330,4 @@ Day 2 is done only when:
 
 ## NEXT GATE
 
-Run one controlled GitHub update against `jussray/Sekret-Bip` and confirm Zapier produces the LinkedIn draft without auto-publishing.
+Run one controlled GitHub update against `jussray/Sekret-Bip` and confirm Zapier produces the LinkedIn draft with the 5W1H block and without auto-publishing.
