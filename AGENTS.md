@@ -62,6 +62,55 @@ OPENAI_API_KEY=replace_with_local_secret
 
 Never commit `.codex/.env`, `OPENAI_API_KEY`, `MODEL_API_KEY`, service-role keys, provider tokens, or any other secret. Model choice does not override this file, `GLOBAL_AI.md`, repository skills, verification gates, Founder Merge Authority, or explicit founder approval gates.
 
+## OpenAI Platform and Zapier key handoff
+
+For Founder Signal Engine automation, Codex and ChatGPT agents must treat Zapier as the workflow cockpit and OpenAI Platform as the key/model layer.
+
+Canonical Zapier key intent:
+
+```text
+OpenAI Platform key name: zapier-founder-signal-engine
+Purpose: allow Zapier to call OpenAI for Founder Signal Engine 5W1H analysis, draft generation, routing decisions, and review-task content.
+Target: Ray's OpenAI Platform organization/project selected through the OpenAI Platform connector.
+```
+
+Agent rules:
+
+- Use the OpenAI Platform connector only to identify the correct organization/project, start secure key setup, or rotate a Zapier-specific key.
+- Never ask Ray to paste the raw key into GitHub, HubSpot, Founder Control Room, issue comments, PR bodies, repo files, screenshots, logs, or chat-visible documentation.
+- Never commit the Zapier OpenAI key or any placeholder that looks like a live secret.
+- Do not reuse the local Codex `OPENAI_API_KEY` for Zapier unless Ray explicitly chooses to wire that same key outside the repository. Prefer a dedicated Zapier key.
+- ChatGPT/Codex can guide Ray to paste the generated key into Zapier's OpenAI connection, but cannot assume it can edit Zapier steps unless a Zapier tool is explicitly available in that environment.
+- If Zapier fails at the OpenAI step, first verify that the Zapier OpenAI connection uses the dedicated key and that the key is active in OpenAI Platform.
+- If Zapier reaches HubSpot, the HubSpot task/note must be associated with the `Founder Signal Engine` deal rather than created as a floating task.
+
+Correct workflow boundary:
+
+```text
+GitHub evidence
+-> Zapier trigger
+-> OpenAI Platform key used inside Zapier
+-> OpenAI 5W1H send gate
+-> Buffer draft or queue item only when allowed
+-> HubSpot task/note associated with Founder Signal Engine deal
+-> Founder Control Room evidence record
+```
+
+Required 5W1H behavior for Zapier OpenAI calls:
+
+```text
+Who:
+What:
+Where:
+When:
+Why:
+How:
+Send decision: publish-draft, review-only, internal-only, or research-task
+Missing proof or missing context:
+```
+
+If the 5W1H block is incomplete, Zapier must not publish or send. It should create a HubSpot research/review task associated with the Founder Signal Engine deal.
+
 ## Product Design and Supabase truth
 
 Product Design screenshot or prototype evidence can identify visual, UX, and accessibility issues, but it does not prove Supabase Auth, RLS, Storage, Realtime, Edge Functions, schema behavior, or deployment safety.
