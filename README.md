@@ -86,8 +86,11 @@ supabase/
     20260717195000_guarded_terminal_and_schema_reconciliation.sql
 scripts/
   verify-guarded-terminal-contract.mjs
+  verify-local-workspace.mjs
 artifacts/
   billgates/CONTROL_ROOM_TERMINAL_FIX.md
+docs/
+  LOCAL_WORKSPACE.md
 ```
 
 The timestamped reconciliation migration upgrades the live legacy
@@ -160,6 +163,17 @@ The terminal is disabled unless all of these are true:
 
 It never accepts shell strings, caller-provided executables, caller-provided
 arguments, pipes, redirects, or caller-provided environment variables.
+
+A local workspace is required when private GitHub-hosted runners cannot execute.
+Use [`docs/LOCAL_WORKSPACE.md`](docs/LOCAL_WORKSPACE.md) and run:
+
+```bash
+CONTROL_ROOM_WORKSPACE_ROOT=/absolute/path/to/workspace npm run verify:local-workspace
+```
+
+A passing local-workspace preflight is not mission evidence. It only proves the
+private sibling checkouts are clean, exact-head, and safe enough for guarded
+loopback terminal execution.
 
 ```bash
 # List approved commands
