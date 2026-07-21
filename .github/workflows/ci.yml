@@ -62,6 +62,32 @@ jobs:
         env:
           NODE_ENV: test
 
+  e2e:
+    name: Playwright e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Chromium for Playwright harness
+        shell: bash
+        run: |
+          sudo mkdir -p /opt/pw-browsers
+          sudo chown -R "$USER:$USER" /opt/pw-browsers
+          PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers npx playwright install --with-deps chromium
+
+      - name: Run Playwright browser proof
+        run: npm run test:e2e
+        env:
+          NODE_ENV: test
+          PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
+
   migration-lint:
     name: Migration lint
     runs-on: ubuntu-latest
