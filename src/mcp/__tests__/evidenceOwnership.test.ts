@@ -7,7 +7,7 @@ const database = vi.hoisted(() => ({
   change_proposals: [] as Array<Record<string, unknown>>,
 }));
 
-vi.mock("../lib/supabaseClient.js", () => ({
+vi.mock("../../lib/supabaseClient.js", () => ({
   supabase: {
     from(table: keyof typeof database) {
       return {
@@ -37,7 +37,7 @@ vi.mock("../lib/supabaseClient.js", () => ({
   },
 }));
 
-import { validateEvidenceReferences } from "./hub.js";
+import { validateEvidenceReferences } from "../hub.js";
 
 const PROJECT_A = "11111111-1111-4111-8111-111111111111";
 const PROJECT_B = "22222222-2222-4222-8222-222222222222";

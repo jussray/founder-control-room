@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_MCP_SERVERS } from "./defaultRegistry.js";
+import { DEFAULT_MCP_SERVERS } from "../defaultRegistry.js";
 import {
   evaluateMcpPolicy,
   inferToolRisk,
   matchesToolPattern,
-} from "./policy.js";
+} from "../policy.js";
 
 const github = DEFAULT_MCP_SERVERS.find((server) => server.id === "github");
 if (!github) throw new Error("GitHub MCP definition missing");
