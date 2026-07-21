@@ -6,7 +6,7 @@ async function buildApp() {
   vi.resetModules();
   process.env.NODE_ENV = 'test';
   process.env.FOUNDER_API_URL = 'https://control.example.com';
-  const { requireSameOriginBrowserMutation } = await import('./csrf.js');
+  const { requireSameOriginBrowserMutation } = await import('../csrf.js');
   const app = express();
   app.use(requireSameOriginBrowserMutation);
   app.all('/mutation', (_req, res) => res.json({ ok: true }));
