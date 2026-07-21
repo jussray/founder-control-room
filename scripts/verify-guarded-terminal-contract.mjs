@@ -11,6 +11,7 @@ const files = {
   packageJson: await readFile(new URL('../package.json', import.meta.url), 'utf8'),
   localWorkspace: await readFile(new URL('../scripts/verify-local-workspace.mjs', import.meta.url), 'utf8'),
   localWorkspaceDocs: await readFile(new URL('../docs/LOCAL_WORKSPACE.md', import.meta.url), 'utf8'),
+  localWorkspaceUx: await readFile(new URL('../docs/product-design/LOCAL_WORKSPACE_MISSION_UX.md', import.meta.url), 'utf8'),
   migration: await readFile(
     new URL('../supabase/migrations/20260717195000_guarded_terminal_and_schema_reconciliation.sql', import.meta.url),
     'utf8',
@@ -112,6 +113,12 @@ requireText('Local workspace docs', files.localWorkspaceDocs, 'Private repositor
 requireText('Local workspace docs', files.localWorkspaceDocs, 'A passing preflight is not mission evidence by itself');
 requireText('Local workspace docs', files.localWorkspaceDocs, 'CONTROL_ROOM_TERMINAL_ALLOW_REMOTE=false');
 requireText('Local workspace docs', files.localWorkspaceDocs, 'No approval carries forward');
+
+requireText('Local workspace UX', files.localWorkspaceUx, 'Use a cockpit, not a wizard');
+requireText('Local workspace UX', files.localWorkspaceUx, 'Workspace is ready. This is not mission proof');
+requireText('Local workspace UX', files.localWorkspaceUx, 'Never label `steps: null` as a code failure');
+requireText('Local workspace UX', files.localWorkspaceUx, 'Separate approval required');
+requireText('Local workspace UX', files.localWorkspaceUx, 'This flow does not authorize merge, deployment, pricing, outreach, spending, checkout changes, refunds, customer communication, vendor access, customer data access, credential access, or making private repositories public.');
 
 requireText('Migration', files.migration, 'create table if not exists approval_executions');
 requireText('Migration', files.migration, "status in ('pending', 'succeeded', 'failed')");
