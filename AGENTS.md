@@ -62,6 +62,51 @@ OPENAI_API_KEY=replace_with_local_secret
 
 Never commit `.codex/.env`, `OPENAI_API_KEY`, `MODEL_API_KEY`, service-role keys, provider tokens, or any other secret. Model choice does not override this file, `GLOBAL_AI.md`, repository skills, verification gates, Founder Merge Authority, or explicit founder approval gates.
 
+## Founder Signal Engine agent boundary
+
+Founder Signal Engine work must keep the three control planes separate:
+
+| Plane | What agents can do | What agents must not imply |
+|---|---|---|
+| GitHub / Founder Control Room | Create branches, docs, issues, PRs, reviews, evidence comments, and source-of-truth records. | Do not claim a Zapier or Buffer action completed from GitHub evidence alone. |
+| OpenAI Platform / OpenAI Developers | Confirm organization/project targets, create or route API-key setup for Zapier, and define model/prompt behavior. | Do not claim this controls Zapier UI, Zap history, Buffer queues, social publishing, or HubSpot action mapping. |
+| HubSpot | Read and write approved CRM tasks, notes, deals, contacts, and associations when permissions and approvals allow. | Do not assume Zapier wrote to HubSpot unless an actual Zapier-created CRM record is found. |
+| Zapier / Buffer / social platforms | Treat as external cockpit work unless a dedicated connector is available in the current environment. | Do not say a Zap was edited, tested, enabled, or published unless direct tool evidence or user-provided screenshot proves it. |
+
+For the current Founder Signal Engine build, assume Ray has connected Zapier, GitHub, HubSpot, OpenAI Platform, Buffer, LinkedIn, Facebook, and likely Instagram. That means the integration path exists, not that this agent can operate every external dashboard.
+
+Use this routing truth:
+
+```text
+GitHub proof
+-> OpenAI 5W1H analysis and draft
+-> Zapier routing
+-> Buffer draft or queue
+-> HubSpot task/note/deal tracking
+-> Founder Control Room evidence
+```
+
+Before any post, DM, email, investor note, partner note, civic outreach, or social draft is marked ready, run 5W1H:
+
+- Who is it for?
+- What changed or what proof exists?
+- Where should it go?
+- When should it send or queue?
+- Why should that audience or recipient care?
+- How should they respond or act?
+
+If Who, Why, or How is weak, do not send. Create a HubSpot research/review task instead. If Zapier fails to produce HubSpot evidence, check whether the Zap trigger is limited to `main`, whether the trigger should use PR events, and whether HubSpot task creation is missing an association to the `Founder Signal Engine` deal.
+
+Current known CRM anchor:
+
+```text
+HubSpot Deal: Founder Signal Engine
+Deal ID: 337185466050
+Owner ID: 95470536
+```
+
+Use `docs/founder-signal-engine/day2-automation-blueprint.md` as the active Day 2 blueprint until superseded by a later Control Room issue or PR.
+
 ## Product Design and Supabase truth
 
 Product Design screenshot or prototype evidence can identify visual, UX, and accessibility issues, but it does not prove Supabase Auth, RLS, Storage, Realtime, Edge Functions, schema behavior, or deployment safety.
