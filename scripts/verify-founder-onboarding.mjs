@@ -26,6 +26,8 @@ requireText('auth', 'password handoff auth gate', "authRouter.post('/password', 
 requireText('auth', 'password handoff cookie gate', 'readFounderSession(req)');
 requireText('auth', 'password handoff Supabase update', 'auth.updateUser({ password })');
 requireText('auth', 'password minimum', 'MIN_FOUNDER_PASSWORD_LENGTH = 12');
+requireText('auth', 'fragment handoff construction', 'new URLSearchParams');
+requireText('auth', 'fragment handoff redirect', "setHeader('Location', `/control-room/#${fragment.toString()}`)");
 requireText('ui', 'password form', 'id="password-form"');
 requireText('ui', 'password confirmation', 'name="confirmPassword"');
 requireText('ui', 'password endpoint fetch', "fetch('/auth/password'");
@@ -51,7 +53,7 @@ requireText('wrangler', 'Node HTTP compatibility flag', 'enable_nodejs_http_serv
 if (files.ui.includes('sekretbip@gmail.com')) {
   errors.push('privacy: founder email must not be embedded in browser assets');
 }
-if (/access_token:\s*data\.session\.access_token/.test(files.auth)) {
+if (/json\([^)]*access_token\s*:\s*data\.session\.access_token/s.test(files.auth)) {
   errors.push('token handling: raw access tokens must not be returned as callback JSON');
 }
 if (files.auth.includes('SUPABASE_SERVICE_ROLE_KEY')) {
