@@ -24,7 +24,7 @@ requireText('auth', 'generic enumeration-safe response', 'GENERIC_MAGIC_LINK_MES
 requireText('auth', 'password handoff endpoint', "authRouter.post('/password'");
 requireText('auth', 'password handoff auth gate', "authRouter.post('/password', requireFounder");
 requireText('auth', 'password handoff cookie gate', 'readFounderSession(req)');
-requireText('auth', 'password handoff Supabase update', 'auth.updateUser({ password })');
+requireText('auth', 'password handoff Supabase update', 'requestAuth.auth.updateUser({ password })');
 requireText('auth', 'password minimum', 'MIN_FOUNDER_PASSWORD_LENGTH = 12');
 requireText('auth', 'fragment handoff construction', 'new URLSearchParams');
 requireText('auth', 'fragment handoff redirect', "setHeader('Location', `/control-room/#${fragment.toString()}`)");
