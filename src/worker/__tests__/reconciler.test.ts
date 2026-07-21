@@ -62,8 +62,11 @@ vi.mock('../../controllers/ProofGateController.js', () => ({
 
 import { runReconcilerCycle } from '../reconciler.js';
 
+const CLAIM_TOKEN = '2026-07-21T10:50:00.000Z';
+
 const WORK_ITEM = {
   id: 'work-1',
+  claimToken: CLAIM_TOKEN,
   projectId: 'project-1',
   controller: 'CheckRunController',
   resourceId: 'check-1',
@@ -92,7 +95,7 @@ beforeEach(() => {
 });
 
 describe('reconciler lifecycle', () => {
-  it('atomically completes successful work with its source event', async () => {
+  it('atomically completes successful work with its claim token and source event', async () => {
     mockClaimWork.mockResolvedValue([WORK_ITEM]);
 
     await runReconcilerCycle();
@@ -104,7 +107,7 @@ describe('reconciler lifecycle', () => {
       reason: 'provider_event',
       sourceEventId: 'event-1',
     });
-    expect(mockCompleteWork).toHaveBeenCalledWith('work-1', 'event-1');
+    expect(mockCompleteWork).toHaveBeenCalledWith('work-1', CLAIM_TOKEN, 'event-1');
     expect(mockFailWork).not.toHaveBeenCalled();
     expect(mockAbandonWork).not.toHaveBeenCalled();
   });
@@ -120,7 +123,7 @@ describe('reconciler lifecycle', () => {
 
     await runReconcilerCycle();
 
-    expect(mockFailWork).toHaveBeenCalledWith('work-1', 'lease held');
+    expect(mockFailWork).toHaveBeenCalledWith('work-1', CLAIM_TOKEN, 'lease held');
     expect(mockCompleteWork).not.toHaveBeenCalled();
     expect(mockAbandonWork).not.toHaveBeenCalled();
   });
@@ -137,6 +140,7 @@ describe('reconciler lifecycle', () => {
 
     expect(mockAbandonWork).toHaveBeenCalledWith(
       'work-1',
+      CLAIM_TOKEN,
       'event-1',
       expect.stringContaining('Terminal reconciliation failure after 5 attempt(s)'),
     );
@@ -160,6 +164,7 @@ describe('reconciler lifecycle', () => {
     expect(mockControllerRun).not.toHaveBeenCalled();
     expect(mockAbandonWork).toHaveBeenCalledWith(
       'work-1',
+      CLAIM_TOKEN,
       'event-1',
       expect.stringContaining('Unknown controller: MissingController'),
     );
@@ -172,7 +177,7 @@ describe('reconciler lifecycle', () => {
 
     await runReconcilerCycle();
 
-    expect(mockFailWork).toHaveBeenCalledWith('work-1', 'provider timeout');
+    expect(mockFailWork).toHaveBeenCalledWith('work-1', CLAIM_TOKEN, 'provider timeout');
     expect(mockAbandonWork).not.toHaveBeenCalled();
   });
 });
