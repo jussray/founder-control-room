@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeGitHubEvent } from "./githubEventSanitizer.js";
+import { sanitizeGitHubEvent } from "../githubEventSanitizer.js";
 
 const repository = {
   id: 123,

@@ -1,6 +1,6 @@
 import { createVerify, generateKeyPairSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { createGitHubAppJwt } from "./githubAppAuth.js";
+import { createGitHubAppJwt } from "../githubAppAuth.js";
 
 function decodeJson(segment: string): Record<string, unknown> {
   return JSON.parse(Buffer.from(segment, "base64url").toString("utf8")) as Record<string, unknown>;

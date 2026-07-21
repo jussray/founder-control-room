@@ -37,6 +37,8 @@ const CONTROLLERS = new Map<string, BaseController>([
   ["ProofGateController", new ProofGateController()],
 ]);
 
+const MAX_ATTEMPTS = 5;
+
 let running = false;
 
 async function writeReconciliationRun(

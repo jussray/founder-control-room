@@ -7,13 +7,13 @@ import type {
   RepositoryProvider,
   RepositoryRef,
   VerificationSignal,
-} from "../providers/RepositoryProvider.js";
-import { REPOSITORY_MANIFEST_PATH } from "../types/repositoryVerification.js";
+} from "../../providers/RepositoryProvider.js";
+import { REPOSITORY_MANIFEST_PATH } from "../../types/repositoryVerification.js";
 import {
   inspectRepositoryManifest,
   parseRepositoryManifest,
   type RegistryProjectIdentity,
-} from "./repositoryVerification.js";
+} from "../repositoryVerification.js";
 
 const project: RegistryProjectIdentity = {
   slug: "example-project",
@@ -87,6 +87,10 @@ class FakeProvider implements RepositoryProvider {
     const content = this.files[path];
     if (content === undefined) throw new Error(`missing:${path}`);
     return content;
+  }
+
+  async resolveRef(): Promise<string> {
+    return "a".repeat(40);
   }
 
   async getRef(): Promise<RepositoryRef> {

@@ -43,6 +43,10 @@ class LazyRepositoryProvider implements RepositoryProvider {
     return (await this.delegate()).readFile(projectId, ref, path);
   }
 
+  async resolveRef(projectId: string, ref: string): Promise<string> {
+    return (await this.delegate()).resolveRef(projectId, ref);
+  }
+
   async getRef(projectId: string, ref: string): Promise<RepositoryRef> {
     return (await this.delegate()).getRef(projectId, ref);
   }

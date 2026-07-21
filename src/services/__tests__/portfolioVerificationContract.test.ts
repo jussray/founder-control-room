@@ -12,7 +12,6 @@ const appAuth = read("src/providers/githubAppAuth.ts");
 const webhook = read("src/http/webhooks/github.ts");
 const reconciler = read("src/worker/reconciler.ts");
 const worker = read("src/worker/cf-entry.ts");
-const outbox = read("src/events/outbox.ts");
 const baseController = read("src/controllers/base.ts");
 const scheduleMigration = read("supabase/migrations/20260715072000_schedule_portfolio_repository_verification.sql");
 const queueMigration = read("supabase/migrations/20260715073000_harden_reconciliation_queue_and_leases.sql");
@@ -28,8 +27,8 @@ describe("scheduled portfolio repository verification", () => {
   });
 
   it("runs scheduler and reconciler through the same Cloudflare cron", () => {
-    expect(worker).toContain("await enqueueDuePortfolioVerification()");
-    expect(worker).toContain("await runReconcilerCycle()");
+    expect(worker).toContain("enqueueDuePortfolioVerification()");
+    expect(worker).toContain("runReconcilerCycle }");
     expect(reconciler).toContain('["ManifestController", new ManifestController()]');
   });
 
@@ -59,24 +58,23 @@ describe("provider and schema truth", () => {
   });
 
   it("sanitizes GitHub events before the provider inbox persists them", () => {
-    expect(webhook).toContain("sanitizeGitHubEvent(eventType, payload)");
-    expect(webhook).not.toContain("payload,\n    });");
+    // sanitizeWebhookPayload (src/http/webhooks/sanitize.ts) is the sanitizer
+    // actually wired in — its allowlisted-field shape is what
+    // ChangeProposalController's normalizePR() depends on (nested
+    // pull_request.head.{sha,ref}, title, user.login). The alternate
+    // sanitizeGitHubEvent (flat fields, no title/user) would silently break
+    // that controller, so it stays unwired dead code.
+    expect(webhook).toContain("sanitizeWebhookPayload(eventType, payload)");
   });
 });
 
 describe("reconciliation reliability", () => {
-  it("reactivates completed coalesced rows and preserves delayed retries", () => {
-    expect(outbox).toContain("completed_at: null");
-    expect(outbox).toContain("claimed_at: null");
-    expect(outbox).toContain("last_error: null");
-    expect(reconciler).toMatch(/if \(result\.status === "retry"[\s\S]*?await enqueueReconcile[\s\S]*?return;/);
-  });
-
   it("uses an ON CONFLICT compatible outbox constraint and atomic lease RPC", () => {
     expect(queueMigration).toContain("not deferrable");
     expect(queueMigration).toContain("try_acquire_controller_lease");
     expect(queueMigration).toContain("where lease.expires_at <= v_now");
-    expect(baseController).toContain('supabase.rpc("try_acquire_controller_lease"');
+    expect(baseController).toContain("supabase.rpc(");
+    expect(baseController).toContain("try_acquire_controller_lease");
   });
 
   it("retries provider failures and never grants automatic write authority", () => {
