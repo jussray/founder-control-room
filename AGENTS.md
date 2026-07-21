@@ -64,7 +64,7 @@ Never commit `.codex/.env`, `OPENAI_API_KEY`, `MODEL_API_KEY`, service-role keys
 
 ## OpenAI Platform and Zapier key handoff
 
-For Founder Signal Engine automation, Codex and ChatGPT agents must treat Zapier as the workflow cockpit and OpenAI Platform as the key/model layer.
+For Founder Signal Engine automation, Codex and ChatGPT agents must treat Zapier as an operable workflow cockpit when the current environment exposes a Zapier, automation, browser-control, MCP, or equivalent connector. OpenAI Platform remains the key/model layer.
 
 Canonical Zapier key intent:
 
@@ -74,13 +74,25 @@ Purpose: allow Zapier to call OpenAI for Founder Signal Engine 5W1H analysis, dr
 Target: Ray's OpenAI Platform organization/project selected through the OpenAI Platform connector.
 ```
 
+Agent steering rule for Day 2:
+
+```text
+Goal: make the Day 2 workflow actually run.
+Path: GitHub evidence -> Zapier -> OpenAI 5W1H -> Buffer draft/queue -> HubSpot deal-associated task/note -> Founder Control Room evidence.
+Default behavior: try to steer or repair Zapier through available tools before asking Ray to do it manually.
+Fallback behavior: only give Ray exact Zapier UI steps after confirming no Zapier/control connector is available in the current environment.
+```
+
 Agent rules:
 
-- Use the OpenAI Platform connector only to identify the correct organization/project, start secure key setup, or rotate a Zapier-specific key.
+- First discover whether the current environment has a Zapier, automation, browser-control, MCP, OpenAI Developers, or equivalent connector that can inspect Zap history, edit Zap steps, test actions, or update app connections.
+- If such a connector exists, use it to inspect the Day 2 Zap, verify the GitHub trigger, repair branch/PR trigger scope, test the OpenAI step, map Buffer draft/queue output, and associate HubSpot tasks/notes with the `Founder Signal Engine` deal.
+- Do not stop at “I cannot access Zapier” until tool discovery confirms there is no usable Zapier/control path in the current environment.
+- Use the OpenAI Platform connector to identify the correct organization/project, start secure key setup, or rotate a Zapier-specific key.
 - Never ask Ray to paste the raw key into GitHub, HubSpot, Founder Control Room, issue comments, PR bodies, repo files, screenshots, logs, or chat-visible documentation.
 - Never commit the Zapier OpenAI key or any placeholder that looks like a live secret.
 - Do not reuse the local Codex `OPENAI_API_KEY` for Zapier unless Ray explicitly chooses to wire that same key outside the repository. Prefer a dedicated Zapier key.
-- ChatGPT/Codex can guide Ray to paste the generated key into Zapier's OpenAI connection, but cannot assume it can edit Zapier steps unless a Zapier tool is explicitly available in that environment.
+- ChatGPT/Codex should guide Ray to paste the generated key into Zapier's OpenAI connection only when the environment cannot securely complete that Zapier connection itself.
 - If Zapier fails at the OpenAI step, first verify that the Zapier OpenAI connection uses the dedicated key and that the key is active in OpenAI Platform.
 - If Zapier reaches HubSpot, the HubSpot task/note must be associated with the `Founder Signal Engine` deal rather than created as a floating task.
 
