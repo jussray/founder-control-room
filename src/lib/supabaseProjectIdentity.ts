@@ -5,7 +5,8 @@ export interface SupabaseProjectIdentityOptions {
   allowLocal?: boolean;
 }
 
-const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1']);
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+const LOCAL_RUNTIME_ENVIRONMENTS = new Set(['development', 'test']);
 
 function normalizedNodeEnv(value: string | undefined): string {
   return value?.trim().toLowerCase() || 'production';
@@ -54,12 +55,15 @@ export function validateControlRoomSupabaseUrl(
   const isLocal = LOCAL_HOSTNAMES.has(hostname);
 
   if (isLocal) {
-    if (options.allowLocal === true && nodeEnv !== 'production') {
+    if (
+      options.allowLocal === true &&
+      LOCAL_RUNTIME_ENVIRONMENTS.has(nodeEnv)
+    ) {
       return url;
     }
 
     throw new Error(
-      'Local SUPABASE_URL requires SUPABASE_ALLOW_LOCAL=true outside production',
+      'Local SUPABASE_URL requires SUPABASE_ALLOW_LOCAL=true with NODE_ENV=development or test',
     );
   }
 
