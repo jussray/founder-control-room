@@ -3,6 +3,7 @@
 Read these before changing code, configuration, schemas, providers, verification contracts, commercial plans, launch surfaces, or documentation:
 
 - [`Juss Founder OS`](.ai/skills/juss-founder-os/SKILL.md) first
+- [`founder-control-room-operator`](.agents/skills/founder-control-room-operator/SKILL.md) for the repository-scoped 5W1H operating contract
 - [`GLOBAL_AI.md`](./GLOBAL_AI.md)
 - [`Founder Merge Authority`](./docs/FOUNDER_MERGE_AUTHORITY.md)
 - [`skills/portfolio-control-plane/SKILL.md`](./skills/portfolio-control-plane/SKILL.md)
@@ -204,6 +205,12 @@ The Elon Musk pass may delete duplicate workflows, redundant adapters, stale req
 - Do not invent demand, scarcity, customer statements, eligibility, savings, performance, inventory, delivery, or authority.
 - Merge when appropriate under `docs/FOUNDER_MERGE_AUTHORITY.md`. Do not deploy, roll back, alter auth/RLS, contact external parties, publish externally, change commercial terms, spend funds, or perform destructive writes without explicit founder approval for that exact action.
 - Apply repository-specific skills when acting on managed projects; portfolio rules never replace local product, privacy, verification, sales, brand/IP, Supabase, Product Design, or rollback contracts.
+
+## Figma build and implementation
+
+For every Figma, dashboard design, design-system, design-to-code, Code Connect, prototype, or visual QA task, also read `.agents/skills/figma-build-implement/SKILL.md` and `.figma/repository-profile.json`.
+
+Figma is a founder specification and review surface. It cannot create mission truth, evidence provenance, provider truth, approval authority, migration state, integration proof, deployment proof, or rollback authority. Use only synthetic or sanitized operational data.
 
 ## Evidence report
 
