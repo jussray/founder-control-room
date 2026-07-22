@@ -1,4 +1,5 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { validateControlRoomSupabaseUrl } from './supabaseProjectIdentity.js';
 
 /**
  * This client points at the Control Room's OWN Supabase project
@@ -8,16 +9,22 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * Room backend, never in a browser/client context.
  *
  * Usage (Node / existing code — no change needed):
- *   import { supabase } from "../lib/supabaseClient.js";
+ *   import { supabase } from '../lib/supabaseClient.js';
  *
  * Usage (Workers — pass env bindings):
- *   import { makeSupabaseClient } from "../lib/supabaseClient.js";
+ *   import { makeSupabaseClient } from '../lib/supabaseClient.js';
  *   const supabase = makeSupabaseClient(env);
  */
 
 export interface SupabaseEnv {
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
+  SUPABASE_ALLOW_LOCAL?: string;
+  NODE_ENV?: string;
+}
+
+function isExplicitlyEnabled(value: string | undefined): boolean {
+  return value?.trim().toLowerCase() === 'true';
 }
 
 /**
@@ -32,9 +39,16 @@ export function makeSupabaseClient(env?: SupabaseEnv): SupabaseClient {
 
   if (!url || !serviceRoleKey) {
     throw new Error(
-      "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY — see .env.example"
+      'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY — see .env.example',
     );
   }
+
+  validateControlRoomSupabaseUrl(url, {
+    nodeEnv: env?.NODE_ENV ?? process.env.NODE_ENV,
+    allowLocal: isExplicitlyEnabled(
+      env?.SUPABASE_ALLOW_LOCAL ?? process.env.SUPABASE_ALLOW_LOCAL,
+    ),
+  });
 
   return createClient(url, serviceRoleKey, {
     auth: { persistSession: false },
@@ -43,6 +57,7 @@ export function makeSupabaseClient(env?: SupabaseEnv): SupabaseClient {
 
 /**
  * Default singleton for Node / existing callers.
- * Throws at import time if env vars are missing — same behaviour as before.
+ * Throws at import time if env vars are missing or the project identity is
+ * unexpected — privileged startup fails closed rather than crossing projects.
  */
 export const supabase = makeSupabaseClient();
