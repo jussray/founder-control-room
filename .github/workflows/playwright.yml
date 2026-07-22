@@ -29,6 +29,20 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
+      - name: Compatibility link for E2E Chromium path
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_chrome="$(find "${PLAYWRIGHT_BROWSERS_PATH}" -path '*/chrome-linux/chrome' -type f | head -n 1)"
+          if [[ -z "${actual_chrome}" ]]; then
+            echo "Could not locate installed Playwright Chromium binary under ${PLAYWRIGHT_BROWSERS_PATH}" >&2
+            find "${PLAYWRIGHT_BROWSERS_PATH}" -maxdepth 4 -type f | sort >&2 || true
+            exit 1
+          fi
+          sudo mkdir -p /opt/pw-browsers/chromium-1194/chrome-linux
+          sudo ln -sf "${actual_chrome}" /opt/pw-browsers/chromium-1194/chrome-linux/chrome
+          /opt/pw-browsers/chromium-1194/chrome-linux/chrome --version
+
       - name: Run E2E harness
         shell: bash
         run: |
