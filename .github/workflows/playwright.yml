@@ -30,7 +30,14 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: Run E2E harness
-        run: npm run test:e2e
+        shell: bash
+        run: |
+          mkdir -p logs
+          set +e
+          npm run test:e2e 2>&1 | tee logs/e2e.log
+          status=${PIPESTATUS[0]}
+          echo "E2E harness exit status: ${status}" | tee -a logs/e2e.log
+          exit "${status}"
         env:
           NODE_ENV: test
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
