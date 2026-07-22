@@ -11,6 +11,10 @@
       "type": "http",
       "url": "https://mcp.context7.com/mcp"
     },
+    "figma": {
+      "type": "http",
+      "url": "https://mcp.figma.com/mcp"
+    },
     "supabase": {
       "type": "http",
       "url": "https://mcp.supabase.com/mcp?project_ref=YOUR_CONTROL_ROOM_PROJECT_REF&read_only=true&features=database,docs"

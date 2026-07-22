@@ -1,6 +1,6 @@
 # Cross-repository MCP stack policy
 
-Last reviewed: 2026-07-14
+Last reviewed: 2026-07-17
 
 ## Decision rule
 
@@ -12,21 +12,21 @@ A repository receives only the MCP capabilities required by a current, evidence-
 4. a credential-handling rule;
 5. an explicit condition for removal or deferral.
 
-The default posture is read-only inspection. Writes, migrations, deployments, merges, destructive actions, production-data access, and temporary escalations require separate founder approval.
+The default posture is read-only inspection. Writes, designs, migrations, deployments, merges, destructive actions, production-data access, and temporary escalations require the relevant repository contract and separate founder approval.
 
 ## OODA workflow
 
 ### Observe
 
 - Identify whether the repository is a live product, operational control plane, framework, prototype, backup, duplicate, or archived migration copy.
-- Read its current runtime, data store, deployment target, CI, privacy boundary, and active work.
-- Check for an existing `.mcp.json`, `.vscode/mcp.json`, validator, and stack documentation.
+- Read its current runtime, data store, deployment target, CI, privacy boundary, active work, and design source of truth.
+- Check for an existing `.mcp.json`, `.vscode/mcp.json`, validator, skill routing, source-of-truth ledger, and stack documentation.
 
 ### Orient
 
 - Map each real workflow to one capability.
 - Prefer official remote servers with OAuth or project-scoped read-only access.
-- Treat public repositories, private user data, payment data, vendor intelligence, production logs, and database access as separate trust boundaries.
+- Treat public repositories, private user data, payment data, vendor intelligence, production logs, design files, and database access as separate trust boundaries.
 
 ### Decide
 
@@ -37,7 +37,7 @@ Add a server only when its evidence value exceeds its authority and data-exposur
 - Create a branch and draft pull request.
 - Add project, example, and VS Code configuration where the host formats differ.
 - Pin local packages.
-- Add a validator that rejects drift, credentials, `@latest`, and unjustified servers.
+- Add a validator that rejects drift, credentials, `@latest`, unjustified servers, missing skill routes, and missing source-of-truth ledgers.
 - Document synthetic-data and production-data rules.
 - Require exact-head CI and founder review before merge.
 
@@ -48,7 +48,7 @@ Add a server only when its evidence value exceeds its authority and data-exposur
 | GitHub MCP | The repo uses GitHub source, PRs, Actions, or security scanning | Never grant unbounded toolsets or commit a PAT |
 | Context7 | Work depends on fast-moving libraries, SDKs, frameworks, or CLIs | Do not send private product/user data; documentation questions only |
 | Playwright | There is a browser surface or web-rendered mobile flow worth testing | No frontend, no synthetic test path, or package cannot be pinned and isolated |
-| Figma | A live implementation must be compared with source design nodes | No active Figma source-of-truth workflow |
+| Figma | A canonical editable design source is active, its file/node ledger is recorded, and repo-specific builder plus implementation skills are routed | No active Figma source of truth, no implementation owner, or Figma would be treated as backend/release authority |
 | Supabase MCP | The repo has its own Supabase project and schema/doc inspection is currently useful | Never point one repo at another product's database; default read-only and project-scoped |
 | Cloudflare Docs | The repo uses Cloudflare products | Documentation-only questions |
 | Cloudflare Builds | The repo owns a Cloudflare deployment needing build evidence | The deployment belongs to another repository |
@@ -63,12 +63,12 @@ Add a server only when its evidence value exceeds its authority and data-exposur
 ### Live products, frameworks, and control planes
 
 - `jussray/Sekret-Bip`: full guarded product stack; app, Supabase, Cloudflare, Figma, Playwright, Context7.
-- `jussray/jussbeautifulhair-site`: public storefront stack; GitHub, Context7, narrow Cloudflare evidence, isolated Playwright.
-- `jussray/jbh-private`: private admin stack; GitHub, Context7, isolated Playwright; no standing deployment or database MCP.
-- `jussray/founder-control-room`: governance/control-plane stack; GitHub, Context7, its own read-only Supabase project, narrow Cloudflare evidence.
-- `jussray/chief-ai-machine`: public prototype-SPA stack; GitHub, Context7, isolated Playwright; add deployment/data tools only after a private backend is selected and implemented.
-- `jussray/l99-StoryEngine`: public runtime/framework stack; GitHub, Context7, isolated Playwright for synthetic dashboard verification; add Netdata only after persistent monitored hosts exist.
-- `jussray/untold-stories-storefront`: private Shopify Hydrogen storefront stack; GitHub, Context7, isolated Playwright; add hosting-specific operational tools only after Oxygen or Cloudflare is selected and deployed.
+- `jussray/jussbeautifulhair-site`: public storefront stack; GitHub, Context7, narrow Cloudflare evidence, isolated Playwright. Figma governance must be reconciled before standing design-write authority is claimed.
+- `jussray/jbh-private`: private admin stack; GitHub, Context7, isolated Playwright; no standing deployment, database, or Figma MCP.
+- `jussray/founder-control-room`: governance/control-plane stack; GitHub, Context7, its own read-only Supabase project, official Figma bound to `docs/FIGMA_SOURCE_OF_TRUTH.md` and repo-specific builder/implementation skills, narrow Cloudflare evidence.
+- `jussray/chief-ai-machine`: public prototype-SPA stack; GitHub, Context7, isolated Playwright. Its Figma operating guide exists, but standing design-write authority requires executable builder/implementation skill routing.
+- `jussray/l99-StoryEngine`: public runtime/framework stack; GitHub, Context7, isolated Playwright for synthetic dashboard verification; Figma remains deferred until a verified design authority exists; add Netdata only after persistent monitored hosts exist.
+- `jussray/untold-stories-storefront`: private Shopify Hydrogen storefront stack; GitHub, Context7, isolated Playwright; add Figma or hosting-specific operational tools only after a canonical design source or Oxygen/Cloudflare deployment is selected and governed.
 
 ### Do not automatically modify
 
@@ -89,12 +89,14 @@ Reject a proposed stack when it:
 - adds a broad database server because schema work might happen someday;
 - uses `@latest`, unreviewed bridges, or committed bearer headers;
 - gives a public frontend direct production database authority;
-- sends customer, teen, parent, vendor, payment, journal, voice, safety, or credential data into documentation or model-evaluation tools;
-- treats MCP connectivity as release evidence;
+- connects Figma without a canonical file/node ledger and repo-specific builder/implementation skills;
+- lets a mockup redefine backend behavior, permissions, privacy, or production status;
+- sends customer, teen, parent, vendor, payment, journal, voice, safety, applicant, or credential data into design, documentation, or model-evaluation tools;
+- treats MCP connectivity, Code Connect, or visual polish as release evidence;
 - connects multiple tools that provide the same authority without a clear fallback purpose;
 - adds monitoring for infrastructure the project does not own;
 - changes an obsolete clone rather than the canonical repository.
 
 ## Opportunity trigger
 
-When a material PR introduces a new runtime, database, deployment provider, browser surface, design source of truth, or recurring operational investigation, review this policy and add or remove the relevant capability in that same PR or a linked governance PR.
+When a material PR introduces a new runtime, database, deployment provider, browser surface, canonical design source, or recurring operational investigation, review this policy and add or remove the relevant capability in that same PR or a linked governance PR.
