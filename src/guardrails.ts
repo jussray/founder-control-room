@@ -25,10 +25,14 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
   }),
   Object.freeze({
     id: 'FCR-BOUNDARY-001',
-    status: 'partial',
+    status: 'active',
     summary:
-      'Control Room is configured for its own Supabase trust boundary, but runtime project-identity validation is not yet enforced.',
-    evidence: ['src/lib/supabaseClient.ts', 'docs/ARCHITECTURE.md'],
+      'Privileged startup validates the code-owned Founder Control Room Supabase project identity and fails closed on mismatch.',
+    evidence: [
+      'src/lib/supabaseClient.ts',
+      'src/lib/supabaseProjectIdentity.ts',
+      'src/lib/__tests__/supabaseProjectIdentity.test.ts',
+    ],
   }),
   Object.freeze({
     id: 'FCR-DATA-001',
@@ -68,7 +72,7 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
 
 export function publicGuardrailSnapshot() {
   return Object.freeze({
-    version: '1.1.1',
+    version: '1.2.0',
     vision: CONTROL_ROOM_VISION,
     guardrails: CONTROL_ROOM_GUARDRAILS.map(({ id, status, summary }) => ({
       id,
