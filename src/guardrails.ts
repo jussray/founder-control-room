@@ -36,10 +36,15 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
   }),
   Object.freeze({
     id: 'FCR-DATA-001',
-    status: 'partial',
+    status: 'active',
     summary:
-      'Raw private product content is forbidden by policy, but provider-event ingress still needs field allowlisting or redaction before persistence.',
-    evidence: ['GLOBAL_AI.md', 'docs/ARCHITECTURE.md', 'src/http/webhooks/github.ts'],
+      'Signed provider events are reduced to typed, bounded, controller-required operational metadata before persistence.',
+    evidence: [
+      'src/http/webhooks/github.ts',
+      'src/http/webhooks/sanitize.ts',
+      'src/http/webhooks/__tests__/github.test.ts',
+      'src/http/webhooks/__tests__/sanitize.test.ts',
+    ],
   }),
   Object.freeze({
     id: 'FCR-APPROVAL-001',
@@ -72,7 +77,7 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
 
 export function publicGuardrailSnapshot() {
   return Object.freeze({
-    version: '1.2.0',
+    version: '1.3.0',
     vision: CONTROL_ROOM_VISION,
     guardrails: CONTROL_ROOM_GUARDRAILS.map(({ id, status, summary }) => ({
       id,
