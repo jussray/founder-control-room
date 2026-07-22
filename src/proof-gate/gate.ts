@@ -1,55 +1,33 @@
 /**
- * Proof Gate
+ * Proof Gate — core engine.
  *
- * Enforces the evidence-completeness rule from the operating contract:
- * "Never report 'all good' when only one happy-path click was tested."
+ * runProofGate()             — validates evidence and returns a ProofGateResult.
+ * formatProofGateFailure()   — renders one canonical human-readable failure message.
+ * assertProofPassed()        — throws ProofGateError if the gate did not pass.
+ * ProofGateError             — structured error with gateId + failures for instanceof checks.
+ * requiresFounderApproval()  — convenience alias over isApprovalGate().
  *
- * Two tiers:
- *   1. Evidence gates  (gateId not in APPROVAL_GATES) — verify evidence
- *      quality only. No founder sign-off required.
- *   2. Approval gates  (gateId in APPROVAL_GATES) — require explicit
- *      founder sign-off via `approvedBy` before proceeding.
- *
- * Evidence is founder-attested, not CI-verified. Callers must label
- * responses accordingly and never use attestation as the sole signal
- * for executing a merge.
+ * Evidence is founder-attested, not CI-verified. A passing manual attestation
+ * must not be the sole authorization signal for a merge or deployment action.
  */
 
 import type { ProofEvidence, ProofGateResult, ProofStatus } from './types.js';
+import { APPROVAL_GATES, isApprovalGate } from './types.js';
 
-export const APPROVAL_GATES = [
-  'merge',
-  'deploy',
-  'rollback',
-  'billing-change',
-  'auth-change',
-  'secrets-change',
-  'db-destructive',
-  'dns-change',
-] as const;
+export { APPROVAL_GATES, isApprovalGate };
 
-type ApprovalGateId = typeof APPROVAL_GATES[number];
+/** Convenience alias used in tests and controllers. */
+export const requiresFounderApproval = isApprovalGate;
 
-export function requiresFounderApproval(gateId: string): gateId is ApprovalGateId {
-  return (APPROVAL_GATES as readonly string[]).includes(gateId);
-}
-
-/**
- * Typed error thrown by assertProofPassed().
- * Carries gateId and the flat allFailures list.
- */
 export class ProofGateError extends Error {
   constructor(
     public readonly gateId: string,
     public readonly failures: string[],
+    message: string,
   ) {
-    const lines = [
-      `\n\u274c PROOF GATE FAILED [${gateId}]`,
-      ...failures.map((f) => `  \u2022 ${f}`),
-      `\nResolve the above before proceeding.`,
-    ];
-    super(lines.join('\n'));
+    super(message);
     this.name = 'ProofGateError';
+    Object.setPrototypeOf(this, ProofGateError.prototype);
   }
 }
 
@@ -58,57 +36,68 @@ export function runProofGate(
   evidence: ProofEvidence,
   approvedBy?: string,
 ): ProofGateResult {
-  const gateFailures: string[] = [];
+  const detectedFailures: string[] = [];
 
-  // 1. Caller-reported check failures block immediately
+  if (!evidence.filesChanged.length) {
+    detectedFailures.push('No files reported as changed — gate cannot verify scope.');
+  }
+
+  if (!evidence.checksRun.length) {
+    detectedFailures.push('No checks reported — happy-path-only claim rejected.');
+  }
+
+  if (!evidence.rollbackPath?.trim()) {
+    detectedFailures.push('Rollback path is missing — required before any material change.');
+  }
+
+  if (isApprovalGate(gateId) && !approvedBy) {
+    detectedFailures.push(
+      `Gate '${gateId}' is an approval gate and requires explicit founder approval before proceeding.`,
+    );
+  }
+
+  if (evidence.unresolvedRisks.length > 0 && !approvedBy) {
+    detectedFailures.push(
+      `${evidence.unresolvedRisks.length} unresolved risk(s) present without founder acknowledgement.`,
+    );
+  }
+
   if (evidence.failures.length > 0) {
-    gateFailures.push(
+    detectedFailures.push(
       `${evidence.failures.length} caller-reported check failure(s): ${evidence.failures.join('; ')}`,
     );
   }
 
-  // 2. Reject empty evidence
-  if (!evidence.filesChanged.length) {
-    gateFailures.push('No files reported as changed — gate cannot verify scope.');
-  }
-
-  if (!evidence.checksRun.length) {
-    gateFailures.push('No checks reported — happy-path-only claim rejected.');
-  }
-
-  if (!evidence.rollbackPath || evidence.rollbackPath.trim() === '') {
-    gateFailures.push('Rollback path is missing — required before any material change.');
-  }
-
-  // 3. Approval gates require founder sign-off
-  if (requiresFounderApproval(gateId) && !approvedBy) {
-    gateFailures.push(
-      `Gate '${gateId}' is an approval gate and requires explicit founder sign-off (approvedBy).`,
-    );
-  }
-
-  // 4. Unresolved risks require founder acknowledgement
-  if (evidence.unresolvedRisks.length > 0 && !approvedBy) {
-    gateFailures.push(
-      `${evidence.unresolvedRisks.length} unresolved risk(s) present without founder acknowledgement: ${evidence.unresolvedRisks.join('; ')}`,
-    );
-  }
-
-  const allFailures = gateFailures;
+  const allFailures = [...detectedFailures];
   const status: ProofStatus = allFailures.length === 0 ? 'pass' : 'fail';
 
   return {
     status,
-    evidence,
     allFailures,
+    evidence,
     timestamp: new Date().toISOString(),
     gateId,
     approvedBy,
   };
 }
 
+/** Render the canonical failure message for throwing and non-throwing callers. */
+export function formatProofGateFailure(result: ProofGateResult): string {
+  const lines = [
+    `\n❌  PROOF GATE FAILED [${result.gateId}] at ${result.timestamp}`,
+    ...result.allFailures.map((failure) => `  • ${failure}`),
+    `\nResolve every item above before proceeding.`,
+  ];
+
+  return lines.join('\n');
+}
+
 export function assertProofPassed(result: ProofGateResult): void {
   if (result.status !== 'pass') {
-    throw new ProofGateError(result.gateId, result.allFailures);
+    throw new ProofGateError(
+      result.gateId,
+      result.allFailures,
+      formatProofGateFailure(result),
+    );
   }
 }

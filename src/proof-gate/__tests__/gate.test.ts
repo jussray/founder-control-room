@@ -8,15 +8,12 @@ import { describe, it, expect } from 'vitest';
 import {
   runProofGate,
   assertProofPassed,
+  formatProofGateFailure,
   requiresFounderApproval,
   ProofGateError,
   APPROVAL_GATES,
 } from '../gate.js';
 import type { ProofEvidence } from '../types.js';
-
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
 
 const validEvidence: ProofEvidence = {
   filesChanged: ['src/api/auth.ts'],
@@ -29,32 +26,24 @@ const validEvidence: ProofEvidence = {
   unresolvedRisks: [],
 };
 
-// ---------------------------------------------------------------------------
-// requiresFounderApproval
-// ---------------------------------------------------------------------------
-
 describe('requiresFounderApproval', () => {
-  it('returns true for every APPROVAL_GATE id', () => {
+  it('returns true for every approval gate id', () => {
     for (const id of APPROVAL_GATES) {
       expect(requiresFounderApproval(id)).toBe(true);
     }
   });
 
-  it('returns false for an arbitrary gate id', () => {
+  it('returns false for arbitrary evidence gate ids', () => {
     expect(requiresFounderApproval('schema-change')).toBe(false);
     expect(requiresFounderApproval('lint')).toBe(false);
   });
 });
 
-// ---------------------------------------------------------------------------
-// runProofGate — passing cases
-// ---------------------------------------------------------------------------
-
 describe('runProofGate — passing cases', () => {
   it('passes a non-approval gate with valid evidence', () => {
     const result = runProofGate('schema-change', validEvidence);
     expect(result.status).toBe('pass');
-    expect(result.evidence.failures).toHaveLength(0);
+    expect(result.allFailures).toHaveLength(0);
   });
 
   it('passes an approval gate when approvedBy is set', () => {
@@ -78,10 +67,6 @@ describe('runProofGate — passing cases', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// runProofGate — failure cases
-// ---------------------------------------------------------------------------
-
 describe('runProofGate — failure cases', () => {
   it('fails when filesChanged is empty', () => {
     const evidence: ProofEvidence = { ...validEvidence, filesChanged: [] };
@@ -90,7 +75,7 @@ describe('runProofGate — failure cases', () => {
     expect(result.allFailures.some((failure) => failure.includes('No files reported'))).toBe(true);
   });
 
-  it('fails when checksRun is empty (happy-path-only)', () => {
+  it('fails when checksRun is empty', () => {
     const evidence: ProofEvidence = { ...validEvidence, checksRun: [] };
     const result = runProofGate('schema-change', evidence);
     expect(result.status).toBe('fail');
@@ -104,10 +89,9 @@ describe('runProofGate — failure cases', () => {
     expect(result.allFailures.some((failure) => failure.includes('Rollback path'))).toBe(true);
   });
 
-  it('fails when rollbackPath is whitespace only', () => {
+  it('fails when rollbackPath contains only whitespace', () => {
     const evidence: ProofEvidence = { ...validEvidence, rollbackPath: '   ' };
-    const result = runProofGate('schema-change', evidence);
-    expect(result.status).toBe('fail');
+    expect(runProofGate('schema-change', evidence).status).toBe('fail');
   });
 
   it('fails an approval gate without approvedBy', () => {
@@ -128,19 +112,17 @@ describe('runProofGate — failure cases', () => {
     expect(result.allFailures.some((failure) => failure.includes('check failure'))).toBe(true);
   });
 
-  it('fails when unresolvedRisks are present without founder acknowledgement', () => {
+  it('fails when unresolved risks lack founder acknowledgement', () => {
     const evidence: ProofEvidence = {
       ...validEvidence,
       unresolvedRisks: ['Race condition in token refresh.'],
     };
     const result = runProofGate('schema-change', evidence);
     expect(result.status).toBe('fail');
-    expect(
-      result.allFailures.some((failure) => failure.includes('unresolved risk')),
-    ).toBe(true);
+    expect(result.allFailures.some((failure) => failure.includes('unresolved risk'))).toBe(true);
   });
 
-  it('accumulates multiple failures in a single run', () => {
+  it('accumulates multiple failures in one run', () => {
     const evidence: ProofEvidence = {
       ...validEvidence,
       filesChanged: [],
@@ -153,11 +135,7 @@ describe('runProofGate — failure cases', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// assertProofPassed
-// ---------------------------------------------------------------------------
-
-describe('assertProofPassed', () => {
+describe('assertProofPassed and failure formatting', () => {
   it('does not throw when status is pass', () => {
     const result = runProofGate('lint', validEvidence);
     expect(() => assertProofPassed(result)).not.toThrow();
@@ -169,17 +147,20 @@ describe('assertProofPassed', () => {
     expect(() => assertProofPassed(result)).toThrow(ProofGateError);
   });
 
-  it('ProofGateError includes the gateId and failure list', () => {
+  it('uses the canonical formatted message', () => {
     const evidence: ProofEvidence = { ...validEvidence, filesChanged: [], checksRun: [] };
     const result = runProofGate('deploy', evidence);
+    const expectedMessage = formatProofGateFailure(result);
+
     try {
       assertProofPassed(result);
       expect.fail('Expected ProofGateError to be thrown');
-    } catch (error) {
-      expect(error).toBeInstanceOf(ProofGateError);
-      const gateError = error as ProofGateError;
+    } catch (err) {
+      expect(err).toBeInstanceOf(ProofGateError);
+      const gateError = err as ProofGateError;
       expect(gateError.gateId).toBe('deploy');
       expect(gateError.failures.length).toBeGreaterThan(0);
+      expect(gateError.message).toBe(expectedMessage);
       expect(gateError.message).toContain('PROOF GATE FAILED');
     }
   });
