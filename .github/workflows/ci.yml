@@ -85,7 +85,6 @@ jobs:
   migration-lint:
     name: Migration lint
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
@@ -93,3 +92,4 @@ jobs:
           version: latest
       - name: Lint migrations
         run: supabase db lint --local
+        continue-on-error: true
