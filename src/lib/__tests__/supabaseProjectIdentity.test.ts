@@ -83,7 +83,7 @@ describe('validateControlRoomSupabaseUrl', () => {
     ).toThrow('must be a valid absolute URL');
   });
 
-  it('allows local Supabase only with an explicit non-production opt-in', () => {
+  it('allows IPv4 local Supabase only with an explicit test opt-in', () => {
     const result = validateControlRoomSupabaseUrl('http://127.0.0.1:54321', {
       nodeEnv: 'test',
       allowLocal: true,
@@ -92,12 +92,23 @@ describe('validateControlRoomSupabaseUrl', () => {
     expect(result.origin).toBe('http://127.0.0.1:54321');
   });
 
+  it('allows IPv6 local Supabase only with an explicit development opt-in', () => {
+    const result = validateControlRoomSupabaseUrl('http://[::1]:54321', {
+      nodeEnv: 'development',
+      allowLocal: true,
+    });
+
+    expect(result.origin).toBe('http://[::1]:54321');
+  });
+
   it('rejects local Supabase without the explicit opt-in', () => {
     expect(() =>
       validateControlRoomSupabaseUrl('http://localhost:54321', {
         nodeEnv: 'development',
       }),
-    ).toThrow('requires SUPABASE_ALLOW_LOCAL=true');
+    ).toThrow(
+      'requires SUPABASE_ALLOW_LOCAL=true with NODE_ENV=development or test',
+    );
   });
 
   it('rejects local Supabase in production even with the opt-in flag', () => {
@@ -106,7 +117,20 @@ describe('validateControlRoomSupabaseUrl', () => {
         nodeEnv: 'production',
         allowLocal: true,
       }),
-    ).toThrow('requires SUPABASE_ALLOW_LOCAL=true outside production');
+    ).toThrow(
+      'requires SUPABASE_ALLOW_LOCAL=true with NODE_ENV=development or test',
+    );
+  });
+
+  it('rejects local Supabase in staging even with the opt-in flag', () => {
+    expect(() =>
+      validateControlRoomSupabaseUrl('http://localhost:54321', {
+        nodeEnv: 'staging',
+        allowLocal: true,
+      }),
+    ).toThrow(
+      'requires SUPABASE_ALLOW_LOCAL=true with NODE_ENV=development or test',
+    );
   });
 
   it('treats an unknown environment as production', () => {
@@ -114,6 +138,8 @@ describe('validateControlRoomSupabaseUrl', () => {
       validateControlRoomSupabaseUrl('http://localhost:54321', {
         allowLocal: true,
       }),
-    ).toThrow('requires SUPABASE_ALLOW_LOCAL=true outside production');
+    ).toThrow(
+      'requires SUPABASE_ALLOW_LOCAL=true with NODE_ENV=development or test',
+    );
   });
 });
