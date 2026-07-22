@@ -17,6 +17,11 @@ import { commandBridgeRouter } from './routes/commandBridge.js';
 import { designOsRouter } from './routes/designOs.js';
 import { cloudflareReasoningRouter } from './routes/cloudflareReasoning.js';
 import { mcpRouter } from './routes/mcp.js';
+import { portfolioVerificationRouter } from './routes/portfolioVerification.js';
+import {
+  handleRepositoryVerificationIngest,
+  repositoryVerificationRouter,
+} from './routes/repositoryVerification.js';
 import { handleGitHubWebhook } from './webhooks/github.js';
 import { debugRouter } from './routes/debug.js';
 import { publicGuardrailSnapshot, renderGuardrailStatusPage } from '../guardrails.js';
@@ -44,6 +49,7 @@ export interface CreateServerOptions {
 export function createServer(options: CreateServerOptions = {}) {
   const app = express();
   app.disable('x-powered-by');
+  app.set('trust proxy', 1);
 
   app.use(helmetMiddleware);
   app.use(corsMiddleware);
@@ -54,12 +60,18 @@ export function createServer(options: CreateServerOptions = {}) {
     app.use('/control-room', express.static(path.join(publicDir, 'control-room')));
   }
 
-  // Webhooks need the raw body for HMAC verification and do not use browser
-  // cookies, so mount them before the browser mutation gate and JSON parser.
+  // Webhooks and repo-runner pings need the raw body for HMAC verification
+  // and do not use browser cookies, so mount them before the browser
+  // mutation gate and JSON parser.
   app.post(
     '/webhooks/github',
     express.raw({ type: 'application/json', limit: BODY_LIMIT }),
     handleGitHubWebhook,
+  );
+  app.post(
+    '/ingest/repository-verification',
+    express.raw({ type: 'application/json', limit: '512kb' }),
+    handleRepositoryVerificationIngest,
   );
 
   app.use(requireSameOriginBrowserMutation);
@@ -93,6 +105,8 @@ export function createServer(options: CreateServerOptions = {}) {
 
   app.use('/', onboardingRouter);
   app.use('/auth', authRouter);
+  app.use('/portfolio', portfolioVerificationRouter);
+  app.use('/projects', repositoryVerificationRouter);
   app.use('/projects', projectsRouter);
   app.use('/approvals', approvalsRouter);
   app.use('/l99', l99Router);

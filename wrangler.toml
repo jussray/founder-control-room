@@ -41,9 +41,15 @@ ENVIRONMENT = "production"
 # wrangler secret put SUPABASE_URL
 # wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 # wrangler secret put SUPABASE_PUBLISHABLE_KEY
-# wrangler secret put GITHUB_TOKEN
+# wrangler secret put GITHUB_APP_ID
+# wrangler secret put GITHUB_PRIVATE_KEY
+# wrangler secret put REPOSITORY_INGEST_SECRET
+# wrangler secret put REPOSITORY_INGEST_SECRET_<NORMALIZED_PROJECT_SLUG>  # preferred per repo
 # wrangler secret put FOUNDER_ALLOWED_ORIGINS   # https://foundercontrolroom.org
 # wrangler secret put FOUNDER_API_URL           # https://foundercontrolroom.org
+#
+# Local/development fallback only:
+# wrangler secret put GITHUB_TOKEN
 
 [triggers]
 crons = ["* * * * *"]

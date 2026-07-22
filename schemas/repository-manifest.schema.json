@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://founder-control-room.local/schemas/repository-manifest.schema.json",
+  "title": "Founder Control Room Repository Manifest",
+  "description": "A repo-owned, provider-neutral declaration of identity, verifiable capabilities, required checks, code-use assertions, build-assist policy, and portfolio privacy boundaries.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "repository",
+    "verification",
+    "capabilities",
+    "privacy"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "projectId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "identifier", "defaultBranch"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "identifier": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "defaultBranch": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requiredSignals"],
+      "properties": {
+        "requiredSignals": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "required": {
+                "type": "boolean",
+                "default": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description", "status", "evidencePaths"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "status": {
+            "enum": ["active", "planned", "retired"]
+          },
+          "evidencePaths": {
+            "type": "array",
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500,
+              "pattern": "^(?!/)(?!.*(?:^|/)\.\.(?:/|$))(?!.*\\\\).+$"
+            }
+          },
+          "requiredSignals": {
+            "type": "array",
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "default": []
+          },
+          "usageAssertions": {
+            "type": "array",
+            "maxItems": 100,
+            "uniqueItems": true,
+            "default": [],
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "path", "marker"],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100,
+                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                },
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500,
+                  "pattern": "^(?!/)(?!.*(?:^|/)\.\.(?:/|$))(?!.*\\\\).+$"
+                },
+                "marker": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[^\\r\\n]+$",
+                  "description": "A short symbol, import path, route name, command, or workflow marker. Never source contents or secrets."
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "buildAssist": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "preferredBuilder": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "riskLevel": {
+          "enum": ["low", "medium", "high"]
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowlistedPacketFields", "forbiddenData"],
+      "properties": {
+        "allowlistedPacketFields": {
+          "type": "array",
+          "maxItems": 200,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "forbiddenData": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 200,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      }
+    }
+  }
+}

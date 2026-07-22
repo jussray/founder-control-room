@@ -8,6 +8,8 @@ export interface ControlRoomWorkerEnv {
   GITHUB_TOKEN: string;
   FOUNDER_ALLOWED_ORIGINS: string;
   FOUNDER_API_URL: string;
+  /** HMAC secret for POST /ingest/repository-verification. Optional — that route 401s without it. */
+  REPOSITORY_INGEST_SECRET?: string;
 }
 
 interface ReconcilerModule {

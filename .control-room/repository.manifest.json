@@ -1,0 +1,312 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "founder-control-room",
+  "repository": {
+    "provider": "github",
+    "identifier": "jussray/founder-control-room",
+    "defaultBranch": "main"
+  },
+  "verification": {
+    "requiredSignals": [
+      {
+        "id": "typecheck",
+        "name": "Type check",
+        "required": true
+      },
+      {
+        "id": "lint",
+        "name": "Lint",
+        "required": true
+      },
+      {
+        "id": "tests",
+        "name": "Test",
+        "required": true
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "id": "provider-agnostic-repository-control",
+      "description": "Reads and changes repositories through a provider-neutral interface and uses repository-scoped GitHub App installation credentials instead of making a personal token authoritative.",
+      "status": "active",
+      "evidencePaths": [
+        "src/providers/RepositoryProvider.ts",
+        "src/providers/GitHubProvider.ts",
+        "src/providers/providerFactory.ts",
+        "src/providers/githubAppAuth.ts",
+        "src/providers/githubAppAuth.test.ts"
+      ],
+      "requiredSignals": [
+        "typecheck",
+        "tests"
+      ],
+      "usageAssertions": [
+        {
+          "id": "manifest-controller-uses-provider-factory",
+          "path": "src/controllers/ManifestController.ts",
+          "marker": "providerForProject",
+          "description": "Scheduled manifest verification resolves repositories through the provider abstraction."
+        },
+        {
+          "id": "provider-factory-uses-installation-auth",
+          "path": "src/providers/providerFactory.ts",
+          "marker": "getGitHubInstallationToken",
+          "description": "Production GitHub reads use installation-scoped credentials."
+        }
+      ]
+    },
+    {
+      "id": "federated-repository-verification",
+      "description": "Identifies exact repo commits, checks manifest claims against code paths, code-use assertions, and CI signals, and stores sanitized drift evidence.",
+      "status": "active",
+      "evidencePaths": [
+        "src/types/repositoryVerification.ts",
+        "src/services/repositoryVerification.ts",
+        "src/services/repositoryEvidenceStore.ts",
+        "src/http/routes/repositoryVerification.ts",
+        "src/http/routes/portfolioVerification.ts",
+        "schemas/repository-manifest.schema.json",
+        "docs/REPOSITORY_FEDERATION.md",
+        "supabase/migrations/20260715070000_federated_repository_verification.sql",
+        "supabase/migrations/20260715071000_fix_repository_verification_packet_dedupe.sql",
+        "supabase/migrations/20260715074000_repository_usage_assertions.sql"
+      ],
+      "requiredSignals": [
+        "typecheck",
+        "lint",
+        "tests"
+      ],
+      "usageAssertions": [
+        {
+          "id": "manifest-controller-invokes-inspector",
+          "path": "src/controllers/ManifestController.ts",
+          "marker": "inspectRepositoryManifest",
+          "description": "The scheduled controller invokes exact-commit manifest inspection."
+        },
+        {
+          "id": "server-mounts-verification-routes",
+          "path": "src/http/server.ts",
+          "marker": "repositoryVerificationRouter",
+          "description": "Founder verification routes are mounted in the HTTP server."
+        },
+        {
+          "id": "evidence-store-persists-usage-failures",
+          "path": "src/services/repositoryEvidenceStore.ts",
+          "marker": "failed_usage_assertion_ids",
+          "description": "Code-use assertion failures reach the durable evidence ledger."
+        }
+      ]
+    },
+    {
+      "id": "sanitized-provider-event-ingestion",
+      "description": "Routes GitHub events using the raw body in memory but persists only allowlisted operational fields without messages, PR text, people, emails, secrets, or unknown payload fields.",
+      "status": "active",
+      "evidencePaths": [
+        "src/http/webhooks/github.ts",
+        "src/providers/githubEventSanitizer.ts",
+        "src/providers/githubEventSanitizer.test.ts"
+      ],
+      "requiredSignals": [
+        "typecheck",
+        "lint",
+        "tests"
+      ],
+      "usageAssertions": [
+        {
+          "id": "webhook-sanitizes-before-persistence",
+          "path": "src/http/webhooks/github.ts",
+          "marker": "sanitizeGitHubEvent(eventType, payload)",
+          "description": "Raw GitHub payloads are reduced before the provider inbox is called."
+        },
+        {
+          "id": "server-mounts-raw-github-webhook",
+          "path": "src/http/server.ts",
+          "marker": "handleGitHubWebhook",
+          "description": "The signed raw-body GitHub webhook is mounted before JSON parsing."
+        }
+      ]
+    },
+    {
+      "id": "scheduled-portfolio-reconciliation",
+      "description": "Enqueues only due main-portfolio repositories, preserves provider retry backoff, verifies them through ManifestController, and excludes the demo project.",
+      "status": "active",
+      "evidencePaths": [
+        "src/controllers/ManifestController.ts",
+        "src/controllers/ProjectController.ts",
+        "src/services/portfolioVerificationScheduler.ts",
+        "src/services/portfolioVerificationContract.test.ts",
+        "src/worker/reconciler.ts",
+        "src/worker/cf-entry.ts",
+        "src/events/outbox.ts",
+        "src/controllers/base.ts",
+        "supabase/migrations/20260715072000_schedule_portfolio_repository_verification.sql",
+        "supabase/migrations/20260715073000_harden_reconciliation_queue_and_leases.sql"
+      ],
+      "requiredSignals": [
+        "typecheck",
+        "lint",
+        "tests"
+      ],
+      "usageAssertions": [
+        {
+          "id": "worker-enqueues-due-verification",
+          "path": "src/worker/cf-entry.ts",
+          "marker": "enqueueDuePortfolioVerification",
+          "description": "The Cloudflare cron schedules due repository scans."
+        },
+        {
+          "id": "reconciler-registers-manifest-controller",
+          "path": "src/worker/reconciler.ts",
+          "marker": "new ManifestController()",
+          "description": "The common reconciler can execute manifest work."
+        },
+        {
+          "id": "controllers-use-atomic-lease-rpc",
+          "path": "src/controllers/base.ts",
+          "marker": "try_acquire_controller_lease",
+          "description": "Concurrent controller work is guarded by the database lease RPC."
+        }
+      ]
+    },
+    {
+      "id": "secure-founder-portfolio-ui",
+      "description": "Provides a same-origin founder dashboard backed by HttpOnly rotating sessions, CSRF protection, security headers, and founder-only repository evidence APIs.",
+      "status": "active",
+      "evidencePaths": [
+        "src/http/routes/controlRoomUi.ts",
+        "src/http/routes/controlRoomUi.contract.test.ts",
+        "src/http/routes/auth.ts",
+        "src/http/middleware/requireFounder.ts",
+        "src/http/middleware/sessionCookies.ts",
+        "src/http/middleware/sessionCookies.test.ts",
+        "src/http/middleware/csrf.ts",
+        "src/http/middleware/csrf.test.ts",
+        "src/http/middleware/security.ts",
+        "src/http/middleware/security.contract.test.ts",
+        "src/http/server.ts"
+      ],
+      "requiredSignals": [
+        "typecheck",
+        "lint",
+        "tests"
+      ],
+      "usageAssertions": [
+        {
+          "id": "server-mounts-control-room-ui",
+          "path": "src/http/server.ts",
+          "marker": "controlRoomUiRouter",
+          "description": "The dashboard is mounted in the production HTTP server."
+        },
+        {
+          "id": "auth-callback-redirects-to-dashboard",
+          "path": "src/http/routes/auth.ts",
+          "marker": "res.redirect(303, \"/control-room\")",
+          "description": "Magic links establish the browser session and enter the dashboard."
+        },
+        {
+          "id": "protected-writes-use-csrf",
+          "path": "src/http/server.ts",
+          "marker": "requireCsrf",
+          "description": "Cookie-backed write routes require a double-submit CSRF token."
+        }
+      ]
+    },
+    {
+      "id": "approval-gated-build-assist",
+      "description": "Converts verified drift into proposed missions without carrying approval into branch, integration, deploy, or rollback actions.",
+      "status": "active",
+      "evidencePaths": [
+        "src/controllers/ManifestController.ts",
+        "src/http/routes/repositoryVerification.ts",
+        "src/http/routes/controlRoomUi.ts",
+        "src/http/routes/approvals.ts",
+        "src/types/mission.ts"
+      ],
+      "requiredSignals": [
+        "typecheck",
+        "tests"
+      ],
+      "usageAssertions": [
+        {
+          "id": "repair-missions-start-proposed",
+          "path": "src/http/routes/repositoryVerification.ts",
+          "marker": "status: \"proposed\"",
+          "description": "Drift creates a proposal rather than an executing mission."
+        },
+        {
+          "id": "dashboard-exposes-prepare-only-action",
+          "path": "src/http/routes/controlRoomUi.ts",
+          "marker": "Prepare repair mission",
+          "description": "The founder UI prepares a mission but exposes no merge or deploy action."
+        }
+      ]
+    },
+    {
+      "id": "separate-founder-data-boundary",
+      "description": "Uses a dedicated founder-operations Supabase project and accepts only sanitized operational evidence from product repos.",
+      "status": "active",
+      "evidencePaths": [
+        "src/lib/supabaseClient.ts",
+        "docs/ARCHITECTURE.md",
+        "docs/REPOSITORY_FEDERATION.md",
+        "supabase/migrations/0001_init.sql"
+      ],
+      "requiredSignals": [
+        "typecheck"
+      ],
+      "usageAssertions": [
+        {
+          "id": "evidence-store-uses-control-room-client",
+          "path": "src/services/repositoryEvidenceStore.ts",
+          "marker": "../lib/supabaseClient.js",
+          "description": "Repository evidence is written through the standalone Control Room database client."
+        }
+      ]
+    }
+  ],
+  "buildAssist": {
+    "enabled": true,
+    "preferredBuilder": "codex",
+    "riskLevel": "high"
+  },
+  "privacy": {
+    "allowlistedPacketFields": [
+      "projectId",
+      "repository.provider",
+      "repository.identifier",
+      "commitSha",
+      "branch",
+      "manifestHash",
+      "generatedAt",
+      "runner.provider",
+      "runner.runId",
+      "runner.detailsUrl",
+      "checks.id",
+      "checks.name",
+      "checks.required",
+      "checks.status",
+      "checks.detailsUrl",
+      "capabilities.id",
+      "capabilities.claimedStatus",
+      "capabilities.observedStatus",
+      "capabilities.evidencePaths",
+      "capabilities.usageAssertionIds",
+      "capabilities.failedUsageAssertionIds",
+      "capabilities.reason"
+    ],
+    "forbiddenData": [
+      "source code contents",
+      "usage assertion marker text in runner packets",
+      "commit messages",
+      "pull request title or body",
+      "provider sender, user, author, reviewer, or committer identities",
+      "email addresses",
+      "secrets or credentials",
+      "raw logs containing secrets",
+      "customer or user content",
+      "voice transcripts",
+      "private product database rows"
+    ]
+  }
+}

@@ -2,17 +2,8 @@
  * Provider-agnostic repository interface.
  *
  * Every other Control Room subsystem (Mission Engine, Change Proposals,
- * Council review, runners) talks to a repository ONLY through this
- * interface. It must never import an SDK for a specific host (Octokit,
- * a Forgejo client, raw `git`, etc.) directly.
- *
- * This is what makes the Control Room GitHub-compatible without being
- * GitHub-dependent: swap the implementation, nothing else changes.
- *
- *   GitHubProvider     — Phase 1 (this repo, today)
- *   InternalGitProvider — Phase 2/3 (bare repos on Control Room storage)
- *   ForgejoProvider     — Option 2 (self-hosted forge behind the API)
- *   LocalGitProvider    — Option 3 (hybrid local-first)
+ * Council review, runners, Repo Brain) talks to a repository ONLY through
+ * this interface. It must never import an SDK for a specific host directly.
  */
 
 export interface ProjectRepo {
@@ -34,6 +25,37 @@ export interface FileEntry {
   path: string;
   type: "file" | "dir";
   size?: number;
+}
+
+export interface RepositoryRef {
+  name: string;
+  commitSha: string;
+  committedAt?: string;
+}
+
+export type VerificationSignalStatus =
+  | "queued"
+  | "running"
+  | "passed"
+  | "failed"
+  | "cancelled"
+  | "skipped"
+  | "unknown";
+
+/**
+ * A provider-neutral CI or verification signal attached to an exact commit.
+ * GitHub check runs are one source; internal runners and Forgejo checks can
+ * expose the same shape later.
+ */
+export interface VerificationSignal {
+  id: string;
+  name: string;
+  status: VerificationSignalStatus;
+  commitSha: string;
+  provider: string;
+  startedAt?: string;
+  completedAt?: string;
+  detailsUrl?: string;
 }
 
 export interface DiffFile {
@@ -68,13 +90,9 @@ export interface Patch {
 }
 
 /**
- * Provider-agnostic repository interface. All methods are read-heavy except
- * `createBranch`, `commitPatch`, and `integrate` — those correspond to the
- * L99 authority-gated actions (create sandbox workspace / create internal
- * branch / integrate into main) and callers are responsible for having
- * already obtained founder approval before invoking them. This interface
- * does not enforce approval itself — that's the Approval Engine's job,
- * one layer up.
+ * Provider-agnostic repository interface. All write methods correspond to
+ * separately approval-gated L99 actions. Read methods may be used by Repo
+ * Brain during discussion and reconciliation, but every read is still logged.
  */
 export interface RepositoryProvider {
   readonly name: string;
@@ -87,6 +105,12 @@ export interface RepositoryProvider {
 
   /** Resolves a mutable ref to the exact immutable commit SHA it currently names. */
   resolveRef(projectId: string, ref: string): Promise<string>;
+
+  /** Resolves a branch/tag/ref to the exact commit being verified. */
+  getRef(projectId: string, ref: string): Promise<RepositoryRef>;
+
+  /** Returns provider CI/check evidence for the exact ref/commit. */
+  listVerificationSignals(projectId: string, ref: string): Promise<VerificationSignal[]>;
 
   /** Creates a new branch from `baseRef`. Returns the created branch name. */
   createBranch(projectId: string, baseRef: string, name: string): Promise<string>;

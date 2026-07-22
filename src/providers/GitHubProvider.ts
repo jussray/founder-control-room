@@ -3,6 +3,9 @@ import type {
   RepositoryProvider,
   ProjectRepo,
   FileEntry,
+  RepositoryRef,
+  VerificationSignal,
+  VerificationSignalStatus,
   Diff,
   DiffFile,
   Patch,
@@ -23,8 +26,7 @@ export interface GitHubProviderConfig {
 
 /**
  * First RepositoryProvider implementation. Talks to GitHub via Octokit so
- * that every other Control Room subsystem can stay repository-agnostic.
- *
+ * every other Control Room subsystem can stay repository-agnostic.
  * Nothing outside this file should import `@octokit/rest`.
  */
 export class GitHubProvider implements RepositoryProvider {
@@ -42,13 +44,13 @@ export class GitHubProvider implements RepositoryProvider {
     const locator = this.projectMap[projectId];
     if (!locator) {
       throw new Error(
-        `GitHubProvider: no repo mapped for projectId "${projectId}"`
+        `GitHubProvider: no repo mapped for projectId "${projectId}"`,
       );
     }
     const [owner, repo] = locator.split("/");
     if (!owner || !repo) {
       throw new Error(
-        `GitHubProvider: malformed locator "${locator}" for "${projectId}" (expected "owner/repo")`
+        `GitHubProvider: malformed locator "${locator}" for "${projectId}" (expected "owner/repo")`,
       );
     }
     return { owner, repo };
@@ -74,7 +76,7 @@ export class GitHubProvider implements RepositoryProvider {
   async listFiles(
     projectId: string,
     ref: string,
-    path = ""
+    path = "",
   ): Promise<FileEntry[]> {
     const { owner, repo } = this.locate(projectId);
     const { data } = await this.octokit.repos.getContent({
@@ -84,10 +86,10 @@ export class GitHubProvider implements RepositoryProvider {
       path,
     });
     const entries = Array.isArray(data) ? data : [data];
-    return entries.map((e) => ({
-      path: e.path,
-      type: e.type === "dir" ? "dir" : "file",
-      size: "size" in e ? e.size : undefined,
+    return entries.map((entry) => ({
+      path: entry.path,
+      type: entry.type === "dir" ? "dir" : "file",
+      size: "size" in entry ? entry.size : undefined,
     }));
   }
 
@@ -117,10 +119,46 @@ export class GitHubProvider implements RepositoryProvider {
     return sha;
   }
 
+  async getRef(projectId: string, ref: string): Promise<RepositoryRef> {
+    const { owner, repo } = this.locate(projectId);
+    const { data } = await this.octokit.repos.getCommit({ owner, repo, ref });
+    return {
+      name: ref,
+      commitSha: data.sha,
+      committedAt: data.commit.committer?.date ?? data.commit.author?.date ?? undefined,
+    };
+  }
+
+  async listVerificationSignals(
+    projectId: string,
+    ref: string,
+  ): Promise<VerificationSignal[]> {
+    const { owner, repo } = this.locate(projectId);
+    const resolved = await this.getRef(projectId, ref);
+    const { data } = await this.octokit.checks.listForRef({
+      owner,
+      repo,
+      ref: resolved.commitSha,
+      per_page: 100,
+      filter: "latest",
+    });
+
+    return data.check_runs.map((run) => ({
+      id: String(run.id),
+      name: run.name,
+      status: mapCheckStatus(run.status, run.conclusion),
+      commitSha: run.head_sha,
+      provider: this.name,
+      startedAt: run.started_at ?? undefined,
+      completedAt: run.completed_at ?? undefined,
+      detailsUrl: run.details_url ?? undefined,
+    }));
+  }
+
   async createBranch(
     projectId: string,
     baseRef: string,
-    name: string
+    name: string,
   ): Promise<string> {
     const { owner, repo } = this.locate(projectId);
     const base = await this.octokit.repos.getBranch({
@@ -140,11 +178,10 @@ export class GitHubProvider implements RepositoryProvider {
   async commitPatch(
     projectId: string,
     branch: string,
-    patch: Patch
+    patch: Patch,
   ): Promise<string> {
     const { owner, repo } = this.locate(projectId);
 
-    // Resolve current tree for the branch.
     const branchData = await this.octokit.repos.getBranch({
       owner,
       repo,
@@ -153,7 +190,6 @@ export class GitHubProvider implements RepositoryProvider {
     const baseTreeSha = branchData.data.commit.commit.tree.sha;
     const parentSha = branchData.data.commit.sha;
 
-    // Build blobs for every changed (non-deleted) file.
     const treeEntries = await Promise.all(
       patch.changes.map(async (change) => {
         if (change.delete) {
@@ -176,7 +212,7 @@ export class GitHubProvider implements RepositoryProvider {
           type: "blob" as const,
           sha: blob.data.sha,
         };
-      })
+      }),
     );
 
     const newTree = await this.octokit.git.createTree({
@@ -216,12 +252,12 @@ export class GitHubProvider implements RepositoryProvider {
       head,
     });
 
-    const files: DiffFile[] = (data.files ?? []).map((f) => ({
-      path: f.filename,
-      status: mapFileStatus(f.status),
-      additions: f.additions,
-      deletions: f.deletions,
-      patch: f.patch,
+    const files: DiffFile[] = (data.files ?? []).map((file) => ({
+      path: file.filename,
+      status: mapFileStatus(file.status),
+      additions: file.additions,
+      deletions: file.deletions,
+      patch: file.patch,
     }));
 
     return {
@@ -258,7 +294,7 @@ export class GitHubProvider implements RepositoryProvider {
     });
     if (!data) {
       throw new Error(
-        `GitHubProvider: integrate(${base}, ${exactHeadSha}) produced no merge commit — likely already up to date or conflicting`
+        `GitHubProvider: integrate(${base}, ${exactHeadSha}) produced no merge commit — likely already up to date or conflicting`,
       );
     }
     return data.sha;
@@ -271,6 +307,35 @@ export class GitHubProvider implements RepositoryProvider {
       repo,
       ref: `heads/${branch}`,
     });
+  }
+}
+
+function mapCheckStatus(
+  status: string,
+  conclusion: string | null,
+): VerificationSignalStatus {
+  if (status === "queued" || status === "requested" || status === "waiting") {
+    return "queued";
+  }
+  if (status === "in_progress" || status === "pending") return "running";
+  if (status !== "completed") return "unknown";
+
+  switch (conclusion) {
+    case "success":
+    case "neutral":
+      return "passed";
+    case "skipped":
+      return "skipped";
+    case "cancelled":
+    case "stale":
+      return "cancelled";
+    case "failure":
+    case "timed_out":
+    case "action_required":
+    case "startup_failure":
+      return "failed";
+    default:
+      return "unknown";
   }
 }
 

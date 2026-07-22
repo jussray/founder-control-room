@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "example-project",
+  "repository": {
+    "provider": "github",
+    "identifier": "founder/example-project"
+  },
+  "branch": "feat/example-verification",
+  "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "manifest": {
+    "kind": "github_blob_sha",
+    "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "path": ".control-room/repository.manifest.json"
+  },
+  "generatedAt": "2026-07-15T12:00:00.000Z",
+  "overallStatus": "failed",
+  "evidence": "Founder-reviewed GitHub Actions run and connector inspection",
+  "buildAssist": {
+    "enabled": true,
+    "preferredBuilder": "codex",
+    "riskLevel": "high"
+  },
+  "checks": [
+    {
+      "id": "typecheck",
+      "name": "Typecheck",
+      "required": true,
+      "status": "passed"
+    },
+    {
+      "id": "unit-tests",
+      "name": "Unit Tests",
+      "required": true,
+      "status": "failed",
+      "reason": "one exact-commit contract failed"
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "example-capability",
+      "claimedStatus": "active",
+      "observedStatus": "drifted",
+      "evidencePaths": [
+        "src/example.ts"
+      ],
+      "missingEvidencePaths": [],
+      "requiredSignalIds": [
+        "typecheck",
+        "unit-tests"
+      ],
+      "failedSignalIds": [
+        "unit-tests"
+      ],
+      "usageAssertionIds": [
+        "entrypoint-uses-example"
+      ],
+      "failedUsageAssertionIds": [],
+      "reason": "required unit-test proof failed"
+    }
+  ],
+  "findings": [
+    {
+      "fingerprint": "check:unit-tests",
+      "category": "check",
+      "severity": "high",
+      "title": "Unit Tests are not proven",
+      "detail": "The exact preview commit has a failing required unit-test signal.",
+      "suggestedAction": "Inspect the failing contract and prepare a bounded repair mission."
+    }
+  ],
+  "resolvedFindingFingerprints": []
+}
