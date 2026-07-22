@@ -29,6 +29,8 @@ import {
   failWork,
 } from '../outbox.js';
 
+const CLAIM_TOKEN = '2026-07-21T10:50:00.000Z';
+
 beforeEach(() => {
   vi.clearAllMocks();
 
@@ -90,7 +92,39 @@ describe('controller outbox', () => {
     });
   });
 
-  it('maps atomically claimed database rows into controller work', async () => {
+  it('maps atomically claimed database rows into controller work with ownership tokens', async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: [
+        {
+          id: 'work-1',
+          claimed_at: CLAIM_TOKEN,
+          project_id: 'project-123',
+          controller: 'ProjectController',
+          resource_id: null,
+          reason: 'periodic_resync',
+          source_event_id: null,
+          attempt_count: 2,
+        },
+      ],
+      error: null,
+    });
+
+    await expect(claimWork(5)).resolves.toEqual([
+      {
+        id: 'work-1',
+        claimToken: CLAIM_TOKEN,
+        projectId: 'project-123',
+        controller: 'ProjectController',
+        resourceId: null,
+        reason: 'periodic_resync',
+        sourceEventId: null,
+        attemptCount: 2,
+      },
+    ]);
+    expect(mockRpc).toHaveBeenCalledWith('claim_outbox_work', { p_limit: 5 });
+  });
+
+  it('rejects claimed rows that do not include an ownership token', async () => {
     mockRpc.mockResolvedValueOnce({
       data: [
         {
@@ -106,34 +140,35 @@ describe('controller outbox', () => {
       error: null,
     });
 
-    await expect(claimWork(5)).resolves.toEqual([
-      {
-        id: 'work-1',
-        projectId: 'project-123',
-        controller: 'ProjectController',
-        resourceId: null,
-        reason: 'periodic_resync',
-        sourceEventId: null,
-        attemptCount: 2,
-      },
-    ]);
-    expect(mockRpc).toHaveBeenCalledWith('claim_outbox_work', { p_limit: 5 });
+    await expect(claimWork()).rejects.toThrow('missing claim token');
   });
 
-  it('atomically completes work with its source provider event', async () => {
-    await completeWork('work-1', 'event-1');
+  it('atomically completes work with its claim token and source provider event', async () => {
+    await completeWork('work-1', CLAIM_TOKEN, 'event-1');
 
     expect(mockRpc).toHaveBeenCalledWith('complete_outbox_work', {
       p_id: 'work-1',
+      p_claimed_at: CLAIM_TOKEN,
       p_source_event_id: 'event-1',
     });
   });
 
-  it('atomically abandons poison work with its source provider event', async () => {
-    await abandonWork('work-1', 'event-1', 'retry limit reached');
+  it('atomically reschedules work with its claim token', async () => {
+    await failWork('work-1', CLAIM_TOKEN, 'controller failed');
+
+    expect(mockRpc).toHaveBeenCalledWith('fail_outbox_work', {
+      p_id: 'work-1',
+      p_claimed_at: CLAIM_TOKEN,
+      p_error: 'controller failed',
+    });
+  });
+
+  it('atomically abandons poison work with its claim token and source provider event', async () => {
+    await abandonWork('work-1', CLAIM_TOKEN, 'event-1', 'retry limit reached');
 
     expect(mockRpc).toHaveBeenCalledWith('abandon_outbox_work', {
       p_id: 'work-1',
+      p_claimed_at: CLAIM_TOKEN,
       p_source_event_id: 'event-1',
       p_error: 'retry limit reached',
     });
@@ -141,12 +176,12 @@ describe('controller outbox', () => {
 
   it('surfaces completion, retry, and abandonment persistence failures', async () => {
     mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'completion failed' } });
-    await expect(completeWork('work-1')).rejects.toThrow('completion failed');
+    await expect(completeWork('work-1', CLAIM_TOKEN)).rejects.toThrow('completion failed');
 
     mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'retry failed' } });
-    await expect(failWork('work-1', 'controller failed')).rejects.toThrow('retry failed');
+    await expect(failWork('work-1', CLAIM_TOKEN, 'controller failed')).rejects.toThrow('retry failed');
 
     mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'abandon failed' } });
-    await expect(abandonWork('work-1', null, 'terminal')).rejects.toThrow('abandon failed');
+    await expect(abandonWork('work-1', CLAIM_TOKEN, null, 'terminal')).rejects.toThrow('abandon failed');
   });
 });

@@ -137,7 +137,14 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
     return;
   }
 
-  const projectId = await resolveProject(repoFullName);
+  let projectId: string | null;
+  try {
+    projectId = await resolveProject(repoFullName);
+  } catch (err) {
+    console.error('resolveProject failed', err);
+    res.status(500).json({ error: 'Failed to resolve project' });
+    return;
+  }
   if (!projectId) {
     // Not a registered project – silently accept to avoid GitHub retries.
     res.status(200).json({ accepted: false, reason: 'unregistered repository' });

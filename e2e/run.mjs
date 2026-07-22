@@ -39,7 +39,6 @@ const PORT = 8802;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 const FOUNDER_EMAIL = 'founder@example.com';
 const BRIDGE_FILE = new URL('./.auth-bridge.json', import.meta.url).pathname;
-const CHROME_PATH = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const GITHUB_OWNER = 'jussray';
 const GITHUB_REPO = 'demo-project';
 const GITHUB_WEBHOOK_SECRET = 'e2e-webhook-secret';
@@ -259,7 +258,10 @@ async function main() {
   await waitForServer(`${BASE_URL}/health`);
   console.log(`Server up on ${BASE_URL}, fake GitHub up on ${fakeGitHubUrl}`);
 
-  const browser = await chromium.launch({ executablePath: CHROME_PATH, headless: true, args: ['--no-sandbox'] });
+  // No executablePath override: Playwright resolves its own installed browser
+  // (via PLAYWRIGHT_BROWSERS_PATH when set), so this doesn't drift out of sync
+  // with whatever chromium revision `playwright install` actually fetched.
+  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage();
   // Uncaught JS exceptions are real bugs (this is how el() single-element
   // truncation got caught). Chrome's own "Failed to load resource" console
