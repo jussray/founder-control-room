@@ -1,13 +1,24 @@
 import type { Request, Response } from 'express';
 import type { Session } from '@supabase/supabase-js';
 
-const COOKIE_NAME = 'fcr_session';
+const DEVELOPMENT_COOKIE_NAME = 'fcr_session';
+const PRODUCTION_COOKIE_NAME = '__Host-fcr_session';
 const COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
 export interface FounderCookieSession {
   accessToken: string;
   refreshToken: string;
   expiresAt?: number;
+}
+
+function isHttpsDeployment(): boolean {
+  return process.env.NODE_ENV === 'production' || process.env.FOUNDER_API_URL?.startsWith('https://') === true;
+}
+
+// __Host- is only valid on Secure, Path=/, no-Domain cookies, so it must track
+// the same HTTPS-deployment detection used for the Secure attribute itself.
+function activeCookieName(): string {
+  return isHttpsDeployment() ? PRODUCTION_COOKIE_NAME : DEVELOPMENT_COOKIE_NAME;
 }
 
 function encodeSession(session: FounderCookieSession): string {
@@ -46,10 +57,8 @@ function parseCookieHeader(header: string | undefined): Map<string, string> {
   return cookies;
 }
 
-function cookieAttributes(maxAgeSeconds: number): string {
-  const httpsDeployment = process.env.FOUNDER_API_URL?.startsWith('https://') === true;
-  const secure = process.env.NODE_ENV === 'production' || httpsDeployment ? '; Secure' : '';
-  return `Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAgeSeconds}${secure}`;
+function cookieAttributes(maxAgeSeconds: number, secure: boolean): string {
+  return `Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAgeSeconds}; Priority=High${secure ? '; Secure' : ''}`;
 }
 
 function preventSessionCaching(res: Response): void {
@@ -59,7 +68,8 @@ function preventSessionCaching(res: Response): void {
 }
 
 export function readFounderSession(req: Request): FounderCookieSession | null {
-  const encoded = parseCookieHeader(req.headers.cookie).get(COOKIE_NAME);
+  const cookies = parseCookieHeader(req.headers.cookie);
+  const encoded = cookies.get(PRODUCTION_COOKIE_NAME) ?? cookies.get(DEVELOPMENT_COOKIE_NAME);
   return encoded ? decodeSession(encoded) : null;
 }
 
@@ -69,13 +79,20 @@ export function writeFounderSession(res: Response, session: Session): void {
     refreshToken: session.refresh_token,
     ...(typeof session.expires_at === 'number' ? { expiresAt: session.expires_at } : {}),
   });
+  const secure = isHttpsDeployment();
   preventSessionCaching(res);
-  res.setHeader('Set-Cookie', `${COOKIE_NAME}=${encodeURIComponent(value)}; ${cookieAttributes(COOKIE_MAX_AGE_SECONDS)}`);
+  res.setHeader(
+    'Set-Cookie',
+    `${activeCookieName()}=${encodeURIComponent(value)}; ${cookieAttributes(COOKIE_MAX_AGE_SECONDS, secure)}`,
+  );
 }
 
 export function clearFounderSession(res: Response): void {
   preventSessionCaching(res);
-  res.setHeader('Set-Cookie', `${COOKIE_NAME}=; ${cookieAttributes(0)}`);
+  res.setHeader('Set-Cookie', [
+    `${PRODUCTION_COOKIE_NAME}=; ${cookieAttributes(0, true)}`,
+    `${DEVELOPMENT_COOKIE_NAME}=; ${cookieAttributes(0, false)}`,
+  ]);
 }
 
 export function bearerToken(req: Request): string | null {

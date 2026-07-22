@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "authority": "founder-control-room",
+  "rules": {
+    "nonessentialCookiesEnabled": false,
+    "trackingCookiesAllowed": false,
+    "consentCookieRequired": false,
+    "cookieAuthRequiresServerValidation": true,
+    "cookieAuthenticatedWritesRequireOriginGate": true,
+    "authenticatedResponsesRequireNoStore": true
+  },
+  "repositories": [
+    {
+      "repository": "jussray/founder-control-room",
+      "policyPath": ".security/cookies.json",
+      "posture": "one_custom_server_session",
+      "authority": "backend",
+      "notes": "Supabase Auth tokens are held in one logical HttpOnly same-origin session with production and localhost cookie names."
+    },
+    {
+      "repository": "jussray/Sekret-Bip",
+      "policyPath": ".control-room/cookie-policy.json",
+      "posture": "no_first_party_cookies",
+      "authority": "native_secure_storage",
+      "notes": "Native sessions remain in Expo SecureStore; Expo web remains an explicit rich client."
+    },
+    {
+      "repository": "jussray/l99-StoryEngine",
+      "policyPath": ".control-room/cookie-policy.json",
+      "posture": "no_cookies",
+      "authority": "runtime_event_and_provenance_system",
+      "notes": "No verified browser identity boundary exists."
+    },
+    {
+      "repository": "jussray/chief-ai-machine",
+      "policyPath": ".control-room/cookie-policy.json",
+      "posture": "no_cookies",
+      "authority": "static_spa",
+      "notes": "The current vanilla SPA has no secure authenticated backend."
+    },
+    {
+      "repository": "jussray/jussbeautifulhair-site",
+      "policyPath": ".control-room/cookie-policy.json",
+      "posture": "zero_first_party_cookies",
+      "authority": "stateless_cloudflare_checkout_boundary",
+      "notes": "Checkout uses Origin, canonical catalog validation, and explicit idempotency rather than ambient cookies."
+    },
+    {
+      "repository": "jussray/untold-stories-storefront",
+      "policyPath": ".control-room/cookie-policy.json",
+      "posture": "platform_managed_only",
+      "authority": "shopify_hydrogen_and_oxygen",
+      "notes": "Shopify owns any necessary cart or customer-account session cookies."
+    },
+    {
+      "repository": "jussray/jbh-private",
+      "policyPath": ".control-room/cookie-policy.json",
+      "posture": "zero_cookies_until_authenticated_loopback_backend",
+      "authority": "local_only_admin",
+      "notes": "A Vite-only local UI cannot obtain security by setting an admin cookie."
+    }
+  ]
+}
