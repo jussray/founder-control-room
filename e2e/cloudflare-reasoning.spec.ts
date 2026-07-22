@@ -58,5 +58,8 @@ test('health stays public while reasoning mutation remains unavailable', async (
   const unknownMutation = await request.post('/cloudflare/sekret-bip/deploy', {
     data: { action: 'deploy' },
   });
-  expect(unknownMutation.status()).toBe(404);
+  // The same-origin browser mutation gate runs before routing, so an
+  // unrecognized route never reaches Express's 404 handler -- it fails
+  // closed with 403 instead of leaking whether the route exists.
+  expect(unknownMutation.status()).toBe(403);
 });

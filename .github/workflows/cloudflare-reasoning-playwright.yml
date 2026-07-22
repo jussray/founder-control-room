@@ -8,7 +8,7 @@ on:
       - 'src/http/server.ts'
       - 'src/test-server.ts'
       - 'e2e/cloudflare-reasoning.spec.ts'
-      - 'playwright.config.ts'
+      - 'playwright.cloudflare-reasoning.config.ts'
       - 'docs/CLOUDFLARE_REASONING.md'
       - '.github/workflows/cloudflare-reasoning-playwright.yml'
   workflow_dispatch:
@@ -55,7 +55,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run Cloudflare API Playwright checks
-        run: npx playwright test e2e/cloudflare-reasoning.spec.ts
+        run: npx playwright test -c playwright.cloudflare-reasoning.config.ts e2e/cloudflare-reasoning.spec.ts
         env:
           NODE_ENV: test
           SUPABASE_URL: https://example.supabase.co
