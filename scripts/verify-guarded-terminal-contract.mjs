@@ -82,6 +82,20 @@ requireCount('Terminal registry', files.registry, "'verify.ai-skills'", 4);
 requireCount('Terminal registry', files.registry, "evidenceKind: 'artifact_provenance'", 4);
 requireText('Terminal registry', files.registry, "['run', 'verify:ai-skills']");
 requireText('Terminal registry', files.registry, "['run', 'verify:ai-skill-contract']");
+requireText('Terminal registry', files.registry, "'verify.cookies'");
+requireText('Terminal registry', files.registry, "['run', 'verify:cookies']");
+requireText('Terminal registry', files.registry, "['runtime/promotion_gates_all.py']");
+for (const project of [
+  'founder-control-room',
+  'sekret-bip',
+  'l99',
+  'chief-ai-machine',
+  'juss-beautiful-hair-private',
+  'juss-beautiful-hair',
+  'untold-stories',
+]) {
+  requireText('Terminal registry portfolio coverage', files.registry, `'${project}'`);
+}
 forbidText('Terminal registry', files.registry, "'bash'");
 forbidText('Terminal registry', files.registry, "'sh'");
 forbidText('Terminal registry', files.registry, "'powershell'");
@@ -93,6 +107,7 @@ requireText('GitHub provider', files.githubProvider, 'requires resolveRef');
 
 requireText('Evidence types', files.evidenceTypes, "'browser_test'");
 requireText('Evidence types', files.evidenceTypes, "'artifact_provenance'");
+requireText('Evidence types', files.evidenceTypes, "'security_scan'");
 
 requireText('Package scripts', files.packageJson, 'verify:local-workspace');
 requireText('Local workspace preflight', files.localWorkspace, 'CONTROL_ROOM_WORKSPACE_ROOT');

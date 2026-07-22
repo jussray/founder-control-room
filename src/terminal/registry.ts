@@ -69,6 +69,23 @@ const playwrightSetupCommands = (
   ),
 ];
 
+const cookieVerification = (
+  projectSlug: string,
+  relativeCwd: string,
+  executable = 'npm',
+  args: readonly string[] = ['run', 'verify:cookies'],
+): TerminalCommandSpec =>
+  spec(
+    projectSlug,
+    relativeCwd,
+    'verify.cookies',
+    'Verify repository cookie and browser-state contract',
+    executable,
+    args,
+    'verify',
+    { evidenceKind: 'security_scan' },
+  );
+
 export const TERMINAL_COMMANDS: readonly TerminalCommandSpec[] = [
   ...gitReadCommands('founder-control-room', 'founder-control-room'),
   spec('founder-control-room', 'founder-control-room', 'deps.install', 'Install locked dependencies', 'npm', ['ci', '--no-audit', '--no-fund'], 'write', {timeoutMs: INSTALL_TIMEOUT}),
@@ -78,6 +95,21 @@ export const TERMINAL_COMMANDS: readonly TerminalCommandSpec[] = [
   spec('founder-control-room', 'founder-control-room', 'verify.lint', 'Lint Control Room', 'npm', ['run', 'lint'], 'verify', {evidenceKind: 'lint'}),
   spec('founder-control-room', 'founder-control-room', 'verify.unit', 'Run Control Room tests', 'npm', ['test'], 'verify', {evidenceKind: 'unit_test'}),
   spec('founder-control-room', 'founder-control-room', 'verify.build', 'Build Control Room', 'npm', ['run', 'build'], 'verify', {evidenceKind: 'integration_test'}),
+  cookieVerification('founder-control-room', 'founder-control-room'),
+
+  ...gitReadCommands('sekret-bip', 'Sekret-Bip'),
+  cookieVerification('sekret-bip', 'Sekret-Bip'),
+
+  ...gitReadCommands('l99', 'l99-StoryEngine'),
+  cookieVerification(
+    'l99',
+    'l99-StoryEngine',
+    'python',
+    ['runtime/promotion_gates_all.py'],
+  ),
+
+  ...gitReadCommands('chief-ai-machine', 'chief-ai-machine'),
+  cookieVerification('chief-ai-machine', 'chief-ai-machine'),
 
   ...gitReadCommands('juss-beautiful-hair-private', 'jbh-private'),
   spec('juss-beautiful-hair-private', 'jbh-private/admin', 'deps.install', 'Install private hair dependencies', 'npm', ['ci', '--no-audit', '--no-fund'], 'write', {timeoutMs: INSTALL_TIMEOUT}),
@@ -87,6 +119,7 @@ export const TERMINAL_COMMANDS: readonly TerminalCommandSpec[] = [
   spec('juss-beautiful-hair-private', 'jbh-private/admin', 'verify.typecheck', 'Typecheck private hair control layer', 'npm', ['run', 'check'], 'verify', {evidenceKind: 'typecheck'}),
   spec('juss-beautiful-hair-private', 'jbh-private/admin', 'verify.build', 'Build private hair control layer', 'npm', ['run', 'build'], 'verify', {evidenceKind: 'integration_test'}),
   spec('juss-beautiful-hair-private', 'jbh-private/admin', 'verify.playwright', 'Run private hair Playwright moat checks', 'npm', ['run', 'verify:playwright'], 'verify', {evidenceKind: 'browser_test'}),
+  cookieVerification('juss-beautiful-hair-private', 'jbh-private/admin'),
 
   ...gitReadCommands('juss-beautiful-hair', 'jussbeautifulhair-site'),
   spec('juss-beautiful-hair', 'jussbeautifulhair-site', 'deps.install', 'Install public hair dependencies', 'npm', ['ci', '--no-audit', '--no-fund'], 'write', {timeoutMs: INSTALL_TIMEOUT}),
@@ -98,6 +131,7 @@ export const TERMINAL_COMMANDS: readonly TerminalCommandSpec[] = [
   spec('juss-beautiful-hair', 'jussbeautifulhair-site', 'verify.build', 'Build public hair storefront', 'npm', ['run', 'build'], 'verify', {evidenceKind: 'integration_test'}),
   spec('juss-beautiful-hair', 'jussbeautifulhair-site', 'verify.deploy-boundary', 'Verify public hair deployment boundary', 'npm', ['run', 'security:deploy-boundary'], 'verify', {evidenceKind: 'security_scan'}),
   spec('juss-beautiful-hair', 'jussbeautifulhair-site', 'verify.playwright', 'Run public hair Playwright moat checks', 'npm', ['run', 'verify:playwright'], 'verify', {evidenceKind: 'browser_test'}),
+  cookieVerification('juss-beautiful-hair', 'jussbeautifulhair-site'),
 
   ...gitReadCommands('untold-stories', 'untold-stories-storefront'),
   spec('untold-stories', 'untold-stories-storefront', 'deps.install', 'Install Untold Stories dependencies', 'npm', ['ci', '--no-audit', '--no-fund'], 'write', {timeoutMs: INSTALL_TIMEOUT}),
@@ -107,6 +141,7 @@ export const TERMINAL_COMMANDS: readonly TerminalCommandSpec[] = [
   spec('untold-stories', 'untold-stories-storefront', 'verify.typecheck', 'Typecheck Untold Stories', 'npm', ['run', 'typecheck'], 'verify', {evidenceKind: 'typecheck'}),
   spec('untold-stories', 'untold-stories-storefront', 'verify.build', 'Build Untold Stories', 'npm', ['run', 'build'], 'verify', {evidenceKind: 'integration_test'}),
   spec('untold-stories', 'untold-stories-storefront', 'verify.playwright', 'Run Untold Stories Playwright moat checks', 'npm', ['run', 'verify:playwright'], 'verify', {evidenceKind: 'browser_test'}),
+  cookieVerification('untold-stories', 'untold-stories-storefront'),
 ] as const;
 
 export function listTerminalCommands(projectSlug: string): TerminalCommandSpec[] {
