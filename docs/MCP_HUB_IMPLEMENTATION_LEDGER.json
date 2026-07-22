@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "feature": "mcp-hub-phase-1",
+  "authority": {
+    "readDuringDiscussion": true,
+    "createBranchRequiresApproval": true,
+    "integrateRequiresSeparateApproval": true,
+    "deployRequiresSeparateApproval": true,
+    "rollbackRequiresSeparateApproval": true
+  },
+  "budget": {
+    "defaultMonthlyUsd": 0,
+    "paidCapabilityRequiresApproval": true
+  },
+  "servers": [
+    "github",
+    "playwright",
+    "figma",
+    "supabase-dev"
+  ],
+  "activeProjects": [
+    "sekret-bip",
+    "jussbeautifulhair-site",
+    "jbh-private",
+    "l99-story-engine",
+    "chief-ai-machine",
+    "untold-stories-storefront",
+    "founder-control-room",
+    "promptos"
+  ],
+  "excludedData": [
+    "secrets",
+    "raw_mcp_arguments",
+    "raw_mcp_results",
+    "teen_journals",
+    "teen_messages",
+    "voice_transcripts",
+    "parent_summaries",
+    "customer_data",
+    "private_vendor_data",
+    "story_drafts"
+  ],
+  "nextCustomCapabilities": [
+    "story-artifact-factory",
+    "companion-reply-studio",
+    "promptos-mcp",
+    "portfolio-repo-brain"
+  ],
+  "verification": {
+    "typecheck": "pending_ci",
+    "tests": "pending_ci",
+    "lint": "pending_ci",
+    "migrationReview": "pending",
+    "remoteMcpSmoke": "pending"
+  }
+}
