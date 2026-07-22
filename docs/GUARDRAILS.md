@@ -12,7 +12,7 @@ A status of `active` means the stated control is enforced on the relevant path. 
 | `FCR-APPROVAL-001` | `active` | Evidence-backed merges may use standing founder authority while deployment, migration, rollback, auth, secrets, billing, deletion, and publication remain separate gates. | `docs/FOUNDER_MERGE_AUTHORITY.md`, active AI instruction files, and explicit public contract fields. |
 | `FCR-PROVIDER-001` | `active` | Repository and AI providers remain replaceable adapters. | `RepositoryProvider` boundary and provider-neutral guardrail snapshot. |
 | `FCR-SECRET-001` | `active` | Provider tokens, service-role keys, founder sessions, and private project data never appear in public responses. | Public status exposes IDs, states, and summaries only; tests scan responses for secret markers. |
-| `FCR-AUDIT-001` | `partial` | Material provider actions and project reads must be auditable. | Some paths persist audit evidence, but read coverage is incomplete and failed audit writes do not yet fail closed everywhere. |
+| `FCR-AUDIT-001` | `partial` | Material provider actions and project reads must be auditable. | Every successful founder read served by `projectsRouter` now waits for a sanitized access event and fails closed if persistence or project resolution fails. Mutation audit atomicity and broader provider-action coverage remain incomplete. |
 
 ## Supabase identity contract
 
@@ -45,6 +45,20 @@ GitHub webhook data crosses into Control Room storage only through the signed in
 
 A controller that needs a new provider field must extend the typed allowlist and its tests first. Until then, the field resolves as absent, which is the intended fail-closed behavior.
 
+## Founder project-read audit contract
+
+The Project Registry access gate wraps `projectsRouter` after unrelated repository-verification routes. For successful founder GET responses it:
+
+1. identifies the read surface and registered project or projects represented by the response;
+2. creates a sanitized event for registry, project, release, connection, directory, or file access;
+3. stores the founder user UUID rather than the founder email;
+4. releases the original response only after the audit insert succeeds;
+5. replaces the response with `AUDIT_PERSISTENCE_FAILED` when project resolution or event persistence fails.
+
+Existing 4xx and 5xx responses are not rewritten, and non-GET methods are outside this response gate. An empty registry has no project row to use as the required `project_events.project_id`; because it discloses no project records, it is the documented zero-row exception.
+
+This closes false-success behavior for founder project reads. The guardrail remains `partial` because mutations are not yet transactionally coupled to their audit events and other material provider-action surfaces still require a complete coverage review.
+
 ## Public status surfaces
 
 `GET /guardrails` is intentionally public and contains only non-sensitive vision and enforcement metadata.
@@ -68,4 +82,4 @@ npm run lint
 npm test
 ```
 
-The integration tests verify the HTML and JSON status surfaces, secret minimization, public health, unauthenticated denial of project access, Supabase project-identity enforcement, and typed bounded provider-event minimization. They do not substitute for complete fail-closed audit persistence, full RLS verification, deployment evidence, or authenticated production end-to-end evidence.
+The integration tests verify the HTML and JSON status surfaces, secret minimization, public health, unauthenticated denial of project access, Supabase project-identity enforcement, typed bounded provider-event minimization, and fail-closed founder project-read auditing. They do not substitute for mutation-audit atomicity, full RLS verification, deployment evidence, or authenticated production end-to-end evidence.

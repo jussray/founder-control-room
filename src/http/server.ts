@@ -35,6 +35,7 @@ import {
   BODY_LIMIT,
 } from './middleware/security.js';
 import { requireSameOriginBrowserMutation } from './middleware/csrf.js';
+import { requireProjectReadAudit } from './middleware/projectReadAudit.js';
 
 export interface CreateServerOptions {
   /**
@@ -108,7 +109,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/auth', authRouter);
   app.use('/portfolio', portfolioVerificationRouter);
   app.use('/projects', repositoryVerificationRouter);
-  app.use('/projects', projectsRouter);
+  app.use('/projects', requireProjectReadAudit, projectsRouter);
   app.use('/approvals', approvalsRouter);
   app.use('/l99', l99Router);
   app.use('/terminal', terminalRouter);

@@ -23,9 +23,12 @@ export default defineConfig({
       ...process.env,
       PORT: '8787',
       NODE_ENV: 'test',
-      SUPABASE_URL: process.env.SUPABASE_URL || 'https://example.supabase.co',
-      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || 'test-service-role-key',
-      SUPABASE_PUBLISHABLE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY || 'test-publishable-key',
+      SUPABASE_URL:
+        process.env.SUPABASE_URL || 'https://oojzfmmywbvficgybaxd.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY:
+        process.env.SUPABASE_SERVICE_ROLE_KEY || 'test-service-role-key',
+      SUPABASE_PUBLISHABLE_KEY:
+        process.env.SUPABASE_PUBLISHABLE_KEY || 'test-publishable-key',
       GITHUB_TOKEN: process.env.GITHUB_TOKEN || 'test-github-token',
     },
   },
