@@ -53,7 +53,21 @@ For commercial work add:
 4. Apply the Lindy screen and map authority, provenance, project boundaries, state, evidence, economics, event history, failure modes, release truth, and rollback through L99.
 5. Attack the selected plan before implementation or execution.
 6. Make the smallest coherent, reversible change and verify it, including behavior tests and Playwright when a user-facing web/runtime path changes.
-7. Re-observe through OODA and report proof plus the next founder approval gate.
+7. Run the Bill Gates pass: identify the bottleneck, highest-leverage correction, reusable standard, and what must not be scaled yet.
+8. Run the Elon Musk pass: question requirements, delete unnecessary complexity, simplify the remaining system, shorten the proof loop, and automate last.
+9. Re-observe through OODA and report proof plus the next founder approval gate.
+
+## Implementation rule
+
+The reasoning loop continues while code is being written. It is not a decorative preamble pasted above a diff after the interesting mistakes have already happened.
+
+For material implementation, maintain this sequence:
+
+```text
+Goal → Reality → Redteam I → Lindy → L99 → Redteam II → OODA → Bill Gates → Elon Musk → Proof → Rollback → Next gate
+```
+
+Re-observe after meaningful edits, schema changes, workflow changes, and test results. Compilation, unit tests, CI, and runtime proof are separate evidence layers. Do not convert one into a claim about the others.
 
 ## Codex provider baseline
 
@@ -177,6 +191,8 @@ Before triggering a deploy, verify the full checklist in that file. Key secrets 
 
 > Never commit, log, or expose `RECONCILE_SHARED_SECRET`. Never put it in a `NEXT_PUBLIC_*` var.
 
+The Elon Musk pass may delete duplicate workflows, redundant adapters, stale requirements, and unnecessary state transitions. It may not delete founder approvals, privacy boundaries, auditability, rollback, or evidence requirements merely to move faster.
+
 ## Non-negotiable boundaries
 
 - Preserve the `RepositoryProvider` abstraction.
@@ -191,4 +207,4 @@ Before triggering a deploy, verify the full checklist in that file. Key secrets 
 
 ## Evidence report
 
-List files changed, behavior changed, tests run, Playwright result or inapplicability, failures or skips, security impact, provider impact, Supabase impact, Product Design evidence status, commercial assumptions, disqualifiers, brand/IP impact, Cloudflare/Control Room proof when applicable, rollback, unresolved risk, and next gate.
+List goal, reality, premise risk, Lindy choice, L99 boundaries, selected decision, plan risk, OODA action, Bill Gates bottleneck/leverage findings, Elon Musk requirement/deletion/simplification/feedback/automation findings, files changed, behavior changed, tests run, Playwright result or inapplicability, failures or skips, security impact, provider impact, Supabase impact, Product Design evidence status, commercial assumptions, disqualifiers, brand/IP impact, Cloudflare/Control Room proof when applicable, rollback, unresolved risk, and next gate.

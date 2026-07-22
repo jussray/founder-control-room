@@ -32,6 +32,56 @@ Repeated `redteam` tokens are intentional.
 
 Do not collapse the two redteam passes. The first attacks the task. The second attacks the proposed solution.
 
+## Implementation discipline
+
+The operating stack governs implementation, not merely planning or final summaries. Use it while writing code, schemas, migrations, provider adapters, workflows, tests, documentation, and deployment configuration.
+
+For every material implementation, keep this sequence visible in the working decision record:
+
+```text
+Goal
+→ Reality
+→ Redteam I
+→ Lindy
+→ L99
+→ Redteam II
+→ OODA
+→ Bill Gates
+→ Elon Musk
+→ Proof
+→ Rollback
+→ Next gate
+```
+
+The **Bill Gates implementation pass** is appended after OODA. It must identify:
+
+- the current bottleneck;
+- the highest-leverage correction;
+- what should be standardized for reuse;
+- what must not be scaled or automated yet.
+
+The **Elon Musk implementation pass** follows Bill Gates and must apply first-principles pressure to the selected implementation:
+
+1. Question every requirement and identify who or what evidence created it.
+2. Delete unnecessary components, paths, approvals, or duplicated authority before optimizing them.
+3. Simplify the remaining system and reduce interfaces, state transitions, and failure surfaces.
+4. Shorten the observe → implement → verify feedback loop without weakening proof.
+5. Automate only after the simplified manual path has succeeded repeatedly with rollback evidence.
+
+This pass may recommend deleting code or workflow complexity. It may never delete an approval boundary, safety control, audit trail, privacy boundary, rollback path, or evidence requirement merely to move faster.
+
+These extensions do not replace or weaken the exact founder stack. They force the selected code path to survive operating-system, scale, and first-principles reviews before completion is claimed.
+
+Implementation rules:
+
+- Do not stop reasoning when code generation begins.
+- Re-observe after each meaningful change rather than carrying stale assumptions into the next file.
+- Map code paths to explicit guardrails, evidence sources, and approval boundaries.
+- Treat compilation as syntax evidence, tests as behavioral evidence, CI as repository evidence, and runtime observation as deployment evidence. None substitutes for all the others.
+- Never code around an unknown provider state, schema state, credential state, or failed workflow merely to make the patch appear complete.
+- Delete duplicate authority and dead workflow paths before adding another abstraction, credential, retry, or dashboard.
+- Report the exact behavior changed, tests actually run, failures or skips, security and provider impact, rollback path, unresolved risk, and next approval gate.
+
 ## Truth order
 
 1. Repository, branch, deployed configuration, and runtime actually inspected.
@@ -96,14 +146,18 @@ An audit authorizes inspection, not mutation.
 
 For material work, report:
 
-1. Reality
-2. Risk I: premise
-3. L99 system view
-4. Decision
-5. Risk II: chosen plan
-6. Action
-7. Proof
-8. Rollback
-9. Next approval gate
+1. Goal
+2. Reality
+3. Risk I: premise
+4. Lindy screen
+5. L99 system view
+6. Decision
+7. Risk II: chosen plan
+8. OODA action
+9. Bill Gates bottleneck and leverage pass
+10. Elon Musk requirement, deletion, simplification, feedback, and automation pass
+11. Proof
+12. Rollback
+13. Next approval gate
 
 The Control Room exists to preserve founder authority, not automate it out of existence because a workflow diagram became excited.
