@@ -38,7 +38,7 @@ jobs:
         run: npm test
         env:
           NODE_ENV: test
-          SUPABASE_URL: https://example.supabase.co
+          SUPABASE_URL: https://oojzfmmywbvficgybaxd.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
           SUPABASE_PUBLISHABLE_KEY: test-publishable-key
 
@@ -58,7 +58,7 @@ jobs:
         run: npx playwright test -c playwright.cloudflare-reasoning.config.ts e2e/cloudflare-reasoning.spec.ts
         env:
           NODE_ENV: test
-          SUPABASE_URL: https://example.supabase.co
+          SUPABASE_URL: https://oojzfmmywbvficgybaxd.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
           SUPABASE_PUBLISHABLE_KEY: test-publishable-key
           GITHUB_TOKEN: test-github-token
