@@ -136,6 +136,7 @@ async function fakeRpc(name, args) {
         reason: row.reason,
         source_event_id: row.source_event_id,
         attempt_count: row.attempt_count,
+        claimed_at: row.claimed_at,
       })),
       error: null,
     };
@@ -144,10 +145,16 @@ async function fakeRpc(name, args) {
   if (name === 'complete_outbox_work') {
     const outbox = table('controller_outbox');
     const row = outbox.find((r) => r.id === args.p_id);
-    if (row) row.completed_at = new Date().toISOString();
+    if (!row || row.claimed_at !== args.p_claimed_at || row.completed_at) {
+      return { data: null, error: { message: 'outbox_work_claim_not_owned_or_completed' } };
+    }
+    row.completed_at = new Date().toISOString();
+    row.claimed_at = null;
+    row.last_error = null;
     if (args.p_source_event_id) {
       const event = table('provider_events').find((r) => r.id === args.p_source_event_id);
-      if (event) { event.processing_status = 'processed'; event.processed_at = new Date().toISOString(); }
+      if (!event) return { data: null, error: { message: 'provider_event_not_found' } };
+      event.processing_status = 'processed'; event.processed_at = new Date().toISOString();
     }
     return { data: null, error: null };
   }
@@ -155,23 +162,31 @@ async function fakeRpc(name, args) {
   if (name === 'fail_outbox_work') {
     const outbox = table('controller_outbox');
     const row = outbox.find((r) => r.id === args.p_id);
-    if (row) {
-      row.claimed_at = null;
-      row.attempt_count = (row.attempt_count ?? 0) + 1;
-      row.last_error = args.p_error;
-      const backoffSeconds = 2 ** Math.min(row.attempt_count, 6);
-      row.available_at = new Date(Date.now() + backoffSeconds * 1000).toISOString();
+    if (!row || row.claimed_at !== args.p_claimed_at || row.completed_at) {
+      return { data: null, error: { message: 'outbox_work_claim_not_owned' } };
     }
+    row.claimed_at = null;
+    row.attempt_count = (row.attempt_count ?? 0) + 1;
+    row.last_error = args.p_error;
+    const backoffSeconds = 2 ** Math.min(row.attempt_count, 6);
+    row.available_at = new Date(Date.now() + backoffSeconds * 1000).toISOString();
     return { data: null, error: null };
   }
 
   if (name === 'abandon_outbox_work') {
     const outbox = table('controller_outbox');
     const row = outbox.find((r) => r.id === args.p_id);
-    if (row) { row.completed_at = new Date().toISOString(); row.last_error = args.p_error; }
+    if (!row || row.claimed_at !== args.p_claimed_at || row.completed_at) {
+      return { data: null, error: { message: 'outbox_work_claim_not_owned_or_completed' } };
+    }
+    row.completed_at = new Date().toISOString();
+    row.claimed_at = null;
+    row.attempt_count = (row.attempt_count ?? 0) + 1;
+    row.last_error = args.p_error;
     if (args.p_source_event_id) {
       const event = table('provider_events').find((r) => r.id === args.p_source_event_id);
-      if (event) { event.processing_status = 'failed'; event.last_error = args.p_error; }
+      if (!event) return { data: null, error: { message: 'provider_event_not_found' } };
+      event.processing_status = 'failed'; event.last_error = args.p_error;
     }
     return { data: null, error: null };
   }
