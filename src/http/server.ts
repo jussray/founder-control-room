@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authRouter } from './routes/auth.js';
 import { onboardingRouter } from './routes/onboarding.js';
+import { founderOnboardingRouter } from './routes/founderOnboarding.js';
 import { projectsRouter } from './routes/projects.js';
 import { approvalsRouter } from './routes/approvals.js';
 import { l99Router } from './routes/l99.js';
@@ -107,6 +108,7 @@ export function createServer(options: CreateServerOptions = {}) {
 
   app.use('/', onboardingRouter);
   app.use('/auth', authRouter);
+  app.use('/onboarding', founderOnboardingRouter);
   app.use('/portfolio', portfolioVerificationRouter);
   app.use('/projects', repositoryVerificationRouter);
   app.use('/projects', requireProjectReadAudit, projectsRouter);
