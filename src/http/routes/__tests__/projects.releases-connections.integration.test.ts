@@ -265,11 +265,24 @@ describe('POST /projects/:slug/connections/:connectionId/check', () => {
           update: (payload: Record<string, unknown>) => {
             updatePayload = payload;
             return {
-              eq: () => ({
-                select: () => ({
-                  single: () => Promise.resolve({ data: { id: 'conn-1', status: 'active', ...payload }, error: null }),
-                }),
-              }),
+              eq: (field: string, value: unknown) => {
+                expect(field).toBe('id');
+                expect(value).toBe('conn-1');
+                return {
+                  eq: (projectField: string, projectValue: unknown) => {
+                    expect(projectField).toBe('project_id');
+                    expect(projectValue).toBe('project-1');
+                    return {
+                      select: () => ({
+                        single: () => Promise.resolve({
+                          data: { id: 'conn-1', project_id: 'project-1', status: 'active', ...payload },
+                          error: null,
+                        }),
+                      }),
+                    };
+                  },
+                };
+              },
             };
           },
         };
