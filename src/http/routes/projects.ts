@@ -467,6 +467,7 @@ projectsRouter.post("/:slug/connections/:connectionId/check", requireFounder, as
     .from("project_connections")
     .update(update)
     .eq("id", connectionId)
+    .eq("project_id", project.id)
     .select()
     .single();
 
