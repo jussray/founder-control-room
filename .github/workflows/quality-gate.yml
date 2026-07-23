@@ -69,6 +69,28 @@ jobs:
       - run: npm run verify:terminal-contract
       - run: npm run verify:ai-skills
 
+  rls-contract:
+    name: "RLS Migration Contract"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify migration-wide RLS state
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run verify:rls-contract 2>&1 | tee rls-contract-report.txt
+      - name: Upload RLS contract report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rls-contract-report
+          path: rls-contract-report.txt
+          if-no-files-found: error
+          retention-days: 14
+
   build:
     name: "Production Build"
     runs-on: ubuntu-latest
@@ -77,6 +99,7 @@ jobs:
       - lint
       - unit-tests
       - terminal-contract
+      - rls-contract
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

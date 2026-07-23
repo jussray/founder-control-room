@@ -1,0 +1,27 @@
+[
+  {
+    "table": "escalations",
+    "sourceMigration": "002_lanes_missions_events.sql",
+    "reason": "Legacy prototype escalation text has no final RLS enablement. Treat it as service-role-only and prohibit authenticated client access until an approved corrective migration defines its policy."
+  },
+  {
+    "table": "events",
+    "sourceMigration": "002_lanes_missions_events.sql",
+    "reason": "Legacy prototype event payload storage has no final RLS enablement. It is not the hardened provider_events inbox and must remain outside direct authenticated client access until corrected."
+  },
+  {
+    "table": "lanes",
+    "sourceMigration": "002_lanes_missions_events.sql",
+    "reason": "Legacy prototype lane metadata was added after the original founder RLS migration and has no final RLS enablement. A corrective policy migration is required before client access."
+  },
+  {
+    "table": "ooda_steps",
+    "sourceMigration": "002_lanes_missions_events.sql",
+    "reason": "Legacy prototype OODA step content has no final RLS enablement. It must be treated as backend-only until an approved migration establishes founder access policy."
+  },
+  {
+    "table": "prototype_evidence",
+    "sourceMigration": "002_lanes_missions_events.sql",
+    "reason": "Legacy prototype evidence labels and artifact references have no final RLS enablement. Direct authenticated access remains prohibited pending a corrective migration."
+  }
+]

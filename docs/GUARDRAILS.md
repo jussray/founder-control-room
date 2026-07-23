@@ -12,6 +12,7 @@ A status of `active` means the stated control is enforced on the relevant path. 
 | `FCR-APPROVAL-001` | `active` | Evidence-backed merges may use standing founder authority while deployment, migration, rollback, auth, secrets, billing, deletion, and publication remain separate gates. | `docs/FOUNDER_MERGE_AUTHORITY.md`, active AI instruction files, and explicit public contract fields. |
 | `FCR-PROVIDER-001` | `active` | Repository and AI providers remain replaceable adapters. | `RepositoryProvider` boundary and provider-neutral guardrail snapshot. |
 | `FCR-SECRET-001` | `active` | Provider tokens, service-role keys, founder sessions, and private project data never appear in public responses. | Public status exposes IDs, states, and summaries only; tests scan responses for secret markers. |
+| `FCR-RLS-001` | `partial` | Every final public migration table must have reviewed row-level-security state. | CI inventories create/drop/enable/disable operations across every authoritative migration and blocks new or stale gaps. Five legacy prototype tables remain without final RLS enablement pending an approved corrective migration. |
 | `FCR-AUDIT-001` | `partial` | Material provider actions and project reads must be auditable. | Founder project reads fail closed on missing audit evidence. Provider-event persistence, duplicate resolution, and processed/failed transitions now reject database errors and missing-row success. Mutation audit atomicity, the two-write failed-status transition, and full provider-action coverage remain incomplete. |
 
 ## Supabase identity contract
@@ -31,6 +32,35 @@ Local Supabase may be used only when all of the following are true:
 - the hostname is `localhost`, `127.0.0.1`, or `::1`.
 
 Unknown runtime environments are treated as production. Embedded credentials, query parameters, fragments, nested paths, insecure cloud URLs, and custom cloud ports are rejected before the service-role client is created.
+
+## Migration-wide RLS contract
+
+`scripts/verify-rls-contract.mjs` reads every SQL file in `supabase/migrations` in filename order and models public-table lifecycle operations:
+
+- `CREATE TABLE` and `CREATE TABLE IF NOT EXISTS`;
+- `DROP TABLE`;
+- `ENABLE ROW LEVEL SECURITY`;
+- `DISABLE ROW LEVEL SECURITY`.
+
+`CREATE TABLE IF NOT EXISTS` is treated as a no-op when the table already exists, so a later compatibility migration cannot falsely erase an earlier RLS state in the inventory.
+
+The contract fails when:
+
+1. a final public table lacks RLS and is absent from the reviewed baseline;
+2. a baseline entry remains after the table becomes protected or disappears;
+3. a gap's source migration changes;
+4. a baseline entry lacks a precise reason or source migration;
+5. duplicate gap entries exist.
+
+The retained CI artifact `rls-contract-report` records the result for review. The current reviewed gaps are:
+
+- `lanes`: legacy prototype lane metadata;
+- `events`: legacy prototype payload inbox, distinct from hardened `provider_events`;
+- `ooda_steps`: legacy prototype mission-step content;
+- `prototype_evidence`: legacy prototype artifact references;
+- `escalations`: legacy prototype blocker and escalation text.
+
+All five originate in `002_lanes_missions_events.sql`. They must be treated as backend/service-role-only, with direct authenticated client access prohibited, until a separately approved corrective migration enables RLS and defines the intended policy. The inventory gate prevents the gap set from growing silently, but it does not repair these tables, so `FCR-RLS-001` remains `partial`.
 
 ## Provider-event minimization contract
 
@@ -94,6 +124,7 @@ npm install
 npm run typecheck
 npm run lint
 npm test
+npm run verify:rls-contract
 ```
 
-The integration tests verify the HTML and JSON status surfaces, secret minimization, public health, unauthenticated denial of project access, Supabase project-identity enforcement, typed bounded provider-event minimization, fail-closed founder project-read auditing, and provider-event persistence/status failure behavior. They do not substitute for transactional mutation auditing, full RLS verification, deployment evidence, or authenticated production end-to-end evidence.
+The integration tests and repository contracts verify the HTML and JSON status surfaces, secret minimization, public health, unauthenticated denial of project access, Supabase project-identity enforcement, migration-wide RLS inventory, typed bounded provider-event minimization, fail-closed founder project-read auditing, and provider-event persistence/status failure behavior. They do not substitute for a corrective RLS policy migration, transactional mutation auditing, deployment evidence, or authenticated production end-to-end evidence.
