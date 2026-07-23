@@ -7,6 +7,8 @@ import type {
   ProjectRepo,
   RepositoryProvider,
   RepositoryRef,
+  RulesetConfig,
+  RulesetResult,
   VerificationSignal,
 } from "./RepositoryProvider.js";
 
@@ -73,6 +75,14 @@ class LazyRepositoryProvider implements RepositoryProvider {
 
   async deleteBranch(projectId: string, branch: string): Promise<void> {
     return (await this.delegate()).deleteBranch(projectId, branch);
+  }
+
+  async applyBranchRuleset(projectId: string, config: RulesetConfig): Promise<RulesetResult> {
+    const delegate = await this.delegate();
+    if (!delegate.applyBranchRuleset) {
+      throw new Error(`${delegate.name}: does not support applyBranchRuleset`);
+    }
+    return delegate.applyBranchRuleset(projectId, config);
   }
 }
 
