@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Founder Control Room · Repository Settings</title>
+  <style>
+    :root { color-scheme: dark; --bg:#070d18; --panel:#111b2d; --line:#253755; --text:#edf4ff; --muted:#9eb1ce; --ok:#74f0a7; --warn:#ffd166; --danger:#ff6b7a; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:radial-gradient(circle at top left, #223d6b, var(--bg) 52rem); color:var(--text); }
+    main { max-width:900px; margin:0 auto; padding:2rem; }
+    header { display:flex; justify-content:space-between; gap:1rem; align-items:center; margin-bottom:1.5rem; }
+    h1 { margin:0; font-size:clamp(2rem, 6vw, 4.25rem); letter-spacing:-0.05em; }
+    h2, h3 { margin-top:0; }
+    a { color:#9cc9ff; }
+    button { border:1px solid var(--line); background:#152743; color:var(--text); border-radius:999px; padding:0.6rem 0.9rem; cursor:pointer; }
+    button.primary { background:#1d4ed8; }
+    input, select { width:100%; border:1px solid var(--line); border-radius:12px; background:#0b1527; color:var(--text); padding:0.7rem; }
+    label { display:block; color:var(--muted); font-size:0.85rem; margin:0.65rem 0 0.25rem; }
+    label.checkbox { display:flex; align-items:center; gap:0.5rem; color:var(--text); }
+    label.checkbox input { width:auto; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:1rem; }
+    .panel { border:1px solid var(--line); background:color-mix(in srgb, var(--panel), transparent 4%); border-radius:18px; padding:1rem; box-shadow:0 24px 80px rgba(0,0,0,0.22); margin-top:1rem; }
+    .muted { color:var(--muted); }
+    .mono { font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .toolbar { display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center; }
+    .warn { color:var(--warn); }
+    pre { white-space:pre-wrap; background:#07111f; border:1px solid var(--line); border-radius:14px; padding:1rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <p class="muted">Founder Control Room</p>
+        <h1>Repository Settings</h1>
+        <p class="muted">Apply a GitHub branch ruleset through the founder-gated <span class="mono">POST /projects/:slug/ruleset</span> route. Repository administration, not a code change — no proof gate, no mission.</p>
+      </div>
+      <a href="/control-room/"><button type="button">Back to Control Room</button></a>
+    </header>
+
+    <section class="panel">
+      <p class="warn">⚠ This changes real branch protection on the live repository. Requiring pull requests here will also block this app's own <span class="mono">integrate()</span> merges (a direct-write Merges API call, not a PR merge) unless this app's own GitHub App identity is listed as a bypass actor below.</p>
+    </section>
+
+    <form id="ruleset-form" class="panel">
+      <h2>Ruleset</h2>
+      <div class="grid">
+        <div>
+          <label>Project slug</label>
+          <input name="projectSlug" value="founder-control-room" required />
+        </div>
+        <div>
+          <label>Ruleset name</label>
+          <input name="name" value="protect-main" required />
+        </div>
+        <div>
+          <label>Enforcement</label>
+          <select name="enforcement">
+            <option value="active">active</option>
+            <option value="evaluate">evaluate (dry run, does not block anything)</option>
+            <option value="disabled">disabled</option>
+          </select>
+        </div>
+        <div>
+          <label>Target branches (comma-separated)</label>
+          <input name="targetRefs" value="main" required />
+        </div>
+      </div>
+
+      <h3>Rules</h3>
+      <div class="grid">
+        <div>
+          <label class="checkbox"><input type="checkbox" name="requirePullRequest" /> Require a pull request before merging</label>
+          <label class="checkbox"><input type="checkbox" name="blockForcePushes" checked /> Block force pushes</label>
+          <label class="checkbox"><input type="checkbox" name="blockDeletion" checked /> Block branch deletion</label>
+        </div>
+        <div>
+          <label>Required approving review count (only used if PR is required)</label>
+          <input name="requiredApprovingReviewCount" type="number" min="0" value="0" />
+          <label>Required status check names (comma-separated, optional)</label>
+          <input name="requiredStatusCheckNames" placeholder="Typecheck, Lint" />
+        </div>
+      </div>
+
+      <h3>Bypass actor</h3>
+      <p class="muted">This app's own GitHub App numeric ID (from the GitHub App's settings page), so its automated merges aren't blocked by the rules above. Leave blank only if this ruleset has no PR requirement and this app never needs to bypass it.</p>
+      <div class="grid">
+        <div>
+          <label>GitHub App ID</label>
+          <input name="bypassAppId" placeholder="123456" />
+        </div>
+      </div>
+
+      <h3>Idempotency</h3>
+      <label>Idempotency key</label>
+      <input id="idempotency-key" name="idempotencyKey" required />
+
+      <div class="toolbar" style="margin-top:1rem">
+        <button class="primary" type="submit">Apply ruleset</button>
+      </div>
+    </form>
+
+    <section class="panel">
+      <h2>Result</h2>
+      <pre id="result">No request sent yet.</pre>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY = 'fcr_session';
+    const nodes = {
+      form: document.getElementById('ruleset-form'),
+      idempotencyKey: document.getElementById('idempotency-key'),
+      result: document.getElementById('result'),
+    };
+
+    function session() {
+      try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || 'null'); } catch { return null; }
+    }
+
+    async function api(path, opts = {}) {
+      const current = session();
+      if (!current?.access_token) throw new Error('No founder session found. Sign in through the main Control Room first.');
+      const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${current.access_token}`, ...(opts.headers || {}) };
+      const res = await fetch(path, { ...opts, headers });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(body?.error || `Request failed (${res.status})`);
+      return body;
+    }
+
+    function splitList(value) {
+      return value.split(',').map((v) => v.trim()).filter(Boolean);
+    }
+
+    function resetIdempotencyKey() {
+      const slug = nodes.form.projectSlug.value.trim() || 'project';
+      nodes.idempotencyKey.value = `ruleset-${slug}-${Date.now()}`;
+    }
+    resetIdempotencyKey();
+
+    nodes.form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const values = new FormData(nodes.form);
+      const slug = String(values.get('projectSlug') || '').trim();
+      const bypassAppId = String(values.get('bypassAppId') || '').trim();
+
+      const body = {
+        idempotencyKey: String(values.get('idempotencyKey') || '').trim(),
+        name: String(values.get('name') || '').trim(),
+        enforcement: String(values.get('enforcement') || 'active'),
+        targetRefs: splitList(String(values.get('targetRefs') || '')),
+        requirePullRequest: values.get('requirePullRequest') === 'on',
+        requiredApprovingReviewCount: Number(values.get('requiredApprovingReviewCount') || 0),
+        requiredStatusCheckNames: splitList(String(values.get('requiredStatusCheckNames') || '')),
+        blockForcePushes: values.get('blockForcePushes') === 'on',
+        blockDeletion: values.get('blockDeletion') === 'on',
+        bypassActors: bypassAppId ? [{ kind: 'app', id: bypassAppId }] : [],
+      };
+
+      nodes.result.textContent = 'Applying…';
+      (async () => {
+        try {
+          const data = await api(`/projects/${encodeURIComponent(slug)}/ruleset`, {
+            method: 'POST',
+            body: JSON.stringify(body),
+          });
+          nodes.result.textContent = JSON.stringify(data, null, 2);
+          resetIdempotencyKey();
+        } catch (error) {
+          nodes.result.textContent = error instanceof Error ? error.message : String(error);
+        }
+      })();
+    });
+  </script>
+</body>
+</html>
