@@ -70,19 +70,20 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
     id: 'FCR-AUDIT-001',
     status: 'partial',
     summary:
-      'Successful founder project reads now fail closed unless access evidence persists; mutation audit atomicity and broader provider-action coverage remain incomplete.',
+      'Founder project reads fail closed on missing audit evidence, and provider-event persistence and status transitions reject silent or missing-row success; mutation atomicity and full provider-action coverage remain incomplete.',
     evidence: [
       'src/http/middleware/projectReadAudit.ts',
       'src/http/middleware/__tests__/projectReadAudit.test.ts',
-      'src/http/routes/projects.ts',
       'src/events/inbox.ts',
+      'src/events/__tests__/inbox.test.ts',
+      'src/http/routes/projects.ts',
     ],
   }),
 ]);
 
 export function publicGuardrailSnapshot() {
   return Object.freeze({
-    version: '1.3.1',
+    version: '1.3.2',
     vision: CONTROL_ROOM_VISION,
     guardrails: CONTROL_ROOM_GUARDRAILS.map(({ id, status, summary }) => ({
       id,
