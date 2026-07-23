@@ -71,24 +71,27 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
   }),
   Object.freeze({
     id: 'FCR-PROJECT-ISOLATION-001',
-    status: 'partial',
+    status: 'active',
     summary:
-      'Project connection lists and route-level health-check authorization are project-scoped and deny foreign connection IDs; the final update predicate still needs project_id scoping to eliminate a direct-database reassignment race.',
+      'Project connection reads, ownership checks, and final health-check writes are project-scoped; foreign IDs and mid-request reassignment cannot mutate or audit another project.',
     evidence: [
       'src/http/routes/projects.ts',
       'src/http/routes/__tests__/projectConnectionIsolation.test.ts',
+      'src/http/routes/__tests__/projectConnectionReassignmentRace.test.ts',
+      'src/http/routes/__tests__/projects.releases-connections.integration.test.ts',
     ],
   }),
   Object.freeze({
     id: 'FCR-RLS-001',
     status: 'partial',
     summary:
-      'Migration-wide RLS inventory is CI-enforced, but five legacy prototype tables remain reviewed gaps pending an approved corrective policy migration.',
+      'Repository CI defines and verifies service-role-only policy intent, but the live Supabase project still reports eight RLS-enabled public tables without policies and a mutable onboarding-function search path; approved migration application and runtime proof remain incomplete.',
     evidence: [
       'scripts/verify-rls-contract.mjs',
       'config/rls-known-gaps.json',
-      'supabase/migrations/0002_enable_rls_and_founder_policy.sql',
-      'supabase/migrations/002_lanes_missions_events.sql',
+      'supabase/migrations/20260723000000_lockdown_legacy_prototype_tables.sql',
+      'src/lib/__tests__/lockdownLegacyPrototypeTables.contract.test.ts',
+      'artifacts/supabase/LIVE_SECURITY_TRUTH_2026-07-23.md',
     ],
   }),
   Object.freeze({
@@ -108,7 +111,7 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
 
 export function publicGuardrailSnapshot() {
   return Object.freeze({
-    version: '1.5.0',
+    version: '1.6.0',
     vision: CONTROL_ROOM_VISION,
     guardrails: CONTROL_ROOM_GUARDRAILS.map(({ id, status, summary }) => ({
       id,
