@@ -67,6 +67,18 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
     evidence: ['src/http/server.ts'],
   }),
   Object.freeze({
+    id: 'FCR-RLS-001',
+    status: 'partial',
+    summary:
+      'Migration-wide RLS inventory is CI-enforced, but five legacy prototype tables remain reviewed gaps pending an approved corrective policy migration.',
+    evidence: [
+      'scripts/verify-rls-contract.mjs',
+      'config/rls-known-gaps.json',
+      'supabase/migrations/0002_enable_rls_and_founder_policy.sql',
+      'supabase/migrations/002_lanes_missions_events.sql',
+    ],
+  }),
+  Object.freeze({
     id: 'FCR-AUDIT-001',
     status: 'partial',
     summary:
@@ -83,7 +95,7 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
 
 export function publicGuardrailSnapshot() {
   return Object.freeze({
-    version: '1.3.2',
+    version: '1.4.0',
     vision: CONTROL_ROOM_VISION,
     guardrails: CONTROL_ROOM_GUARDRAILS.map(({ id, status, summary }) => ({
       id,
