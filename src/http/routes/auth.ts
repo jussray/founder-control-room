@@ -40,6 +40,38 @@ async function isAllowlisted(email: string): Promise<boolean> {
 }
 
 /**
+ * Starts a Supabase-hosted Google OAuth flow. The callback still performs the
+ * private founder allowlist check before issuing the Control Room cookie, so a
+ * valid Google identity alone never grants founder authority.
+ */
+authRouter.get('/google', async (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+
+  try {
+    const { data, error } = await supabaseAuth.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${FOUNDER_API_URL}/auth/callback`,
+        skipBrowserRedirect: true,
+      },
+    });
+
+    if (error || !data.url) {
+      console.error('Google OAuth start failed:', error?.message ?? 'No redirect URL returned');
+      return res.status(503).json({ error: 'Google sign-in is temporarily unavailable' });
+    }
+
+    return res.redirect(303, data.url);
+  } catch (error) {
+    console.error(
+      'Google OAuth start failed:',
+      error instanceof Error ? error.message : String(error),
+    );
+    return res.status(503).json({ error: 'Google sign-in is temporarily unavailable' });
+  }
+});
+
+/**
  * Sends a one-time Supabase link only to an allowlisted founder email. The
  * response remains generic so the endpoint cannot enumerate founder accounts.
  */
@@ -71,10 +103,11 @@ authRouter.post('/magic-link', rateLimitMagicLink, async (req, res) => {
 });
 
 /**
- * Supabase's standard implicit magic-link flow returns credentials in the URL
- * fragment, which never reaches the server. This page loads a same-origin
- * module that posts those one-time credentials to POST /auth/session, where
- * they are verified and converted into an HttpOnly Control Room cookie.
+ * Supabase's standard implicit magic-link and OAuth flows return credentials in
+ * the URL fragment, which never reaches the server. This page loads a
+ * same-origin module that posts those one-time credentials to POST
+ * /auth/session, where they are verified and converted into an HttpOnly Control
+ * Room cookie.
  *
  * A token_hash query is also supported for custom Supabase email templates.
  */

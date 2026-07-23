@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  mockSignInWithOAuth,
   mockSignInWithOtp,
   mockSetSession,
   mockVerifyOtp,
@@ -8,6 +9,7 @@ const {
   mockRefreshSession,
   supabaseMock,
 } = vi.hoisted(() => ({
+  mockSignInWithOAuth: vi.fn(),
   mockSignInWithOtp: vi.fn(),
   mockSetSession: vi.fn(),
   mockVerifyOtp: vi.fn(),
@@ -19,6 +21,7 @@ const {
 vi.mock('../../../lib/supabaseAuthClient.js', () => ({
   supabaseAuth: {
     auth: {
+      signInWithOAuth: mockSignInWithOAuth,
       signInWithOtp: mockSignInWithOtp,
       getUser: mockGetUser,
     },
@@ -93,6 +96,10 @@ describe('founder browser onboarding', () => {
     process.env.NODE_ENV = 'test';
     process.env.FOUNDER_API_URL = 'https://control.example.com';
     setAllowlist(true);
+    mockSignInWithOAuth.mockResolvedValue({
+      data: { provider: 'google', url: 'https://supabase.example/authorize/google' },
+      error: null,
+    });
     mockSignInWithOtp.mockResolvedValue({ data: {}, error: null });
     mockGetUser.mockResolvedValue({
       data: { user: { id: 'founder-user', email: EMAIL } },
@@ -100,13 +107,46 @@ describe('founder browser onboarding', () => {
     });
   });
 
-  it('serves a login surface without embedding the founder email', async () => {
+  it('serves Google login and the full founder workspace onboarding surface without embedding the founder email', async () => {
     const response = await request(app()).get('/');
     expect(response.status).toBe(200);
     expect(response.type).toBe('text/html');
     expect(response.text).toContain('Founder Control Room');
+    expect(response.text).toContain('Continue with Google');
+    expect(response.text).toContain('/auth/google');
+    expect(response.text).toContain('GitHub Workspace');
+    expect(response.text).toContain('Command Bridge');
+    expect(response.text).toContain('HubSpot');
+    expect(response.text).toContain('Playwright');
     expect(response.text).not.toContain(EMAIL);
     expect(response.text).toContain('type="module"');
+  });
+
+  it('starts Google OAuth through Supabase and returns a no-store redirect', async () => {
+    const response = await request(app()).get('/auth/google');
+
+    expect(response.status).toBe(303);
+    expect(response.headers.location).toBe('https://supabase.example/authorize/google');
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(mockSignInWithOAuth).toHaveBeenCalledWith({
+      provider: 'google',
+      options: {
+        redirectTo: expect.stringMatching(/\/auth\/callback$/),
+        skipBrowserRedirect: true,
+      },
+    });
+  });
+
+  it('returns a controlled error when Google OAuth cannot start', async () => {
+    mockSignInWithOAuth.mockResolvedValue({
+      data: { provider: 'google', url: null },
+      error: { message: 'provider disabled' },
+    });
+
+    const response = await request(app()).get('/auth/google');
+
+    expect(response.status).toBe(503);
+    expect(response.body.error).toMatch(/temporarily unavailable/);
   });
 
   it('sends a first-login magic link only for the allowlisted email', async () => {

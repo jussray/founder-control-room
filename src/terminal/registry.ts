@@ -90,6 +90,7 @@ export const TERMINAL_COMMANDS: readonly TerminalCommandSpec[] = [
   ...gitReadCommands('founder-control-room', 'founder-control-room'),
   spec('founder-control-room', 'founder-control-room', 'deps.install', 'Install locked dependencies', 'npm', ['ci', '--no-audit', '--no-fund'], 'write', {timeoutMs: INSTALL_TIMEOUT}),
   spec('founder-control-room', 'founder-control-room', 'verify.terminal-contract', 'Verify guarded terminal contract', 'npm', ['run', 'verify:terminal-contract'], 'verify', {evidenceKind: 'security_scan'}),
+  spec('founder-control-room', 'founder-control-room', 'verify.founder-onboarding', 'Verify founder OAuth and workspace onboarding contract', 'npm', ['run', 'verify:founder-onboarding'], 'verify', {evidenceKind: 'security_scan'}),
   spec('founder-control-room', 'founder-control-room', 'verify.ai-skills', 'Verify Control Room AI skill contracts', 'npm', ['run', 'verify:ai-skills'], 'verify', {evidenceKind: 'artifact_provenance'}),
   spec('founder-control-room', 'founder-control-room', 'verify.typecheck', 'Typecheck Control Room', 'npm', ['run', 'typecheck'], 'verify', {evidenceKind: 'typecheck'}),
   spec('founder-control-room', 'founder-control-room', 'verify.lint', 'Lint Control Room', 'npm', ['run', 'lint'], 'verify', {evidenceKind: 'lint'}),
