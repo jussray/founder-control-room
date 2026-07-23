@@ -82,6 +82,17 @@ jobs:
           NODE_ENV: test
           PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
 
+  rls-contract:
+    name: RLS migration contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify every public migration table has reviewed RLS state
+        run: npm run verify:rls-contract
+
   migration-lint:
     name: Migration lint
     runs-on: ubuntu-latest
