@@ -90,6 +90,54 @@ export interface Patch {
 }
 
 /**
+ * An actor exempted from a ruleset's restrictions. Needed because this
+ * app's own `integrate()` writes to the protected branch directly (see
+ * RulesetConfig doc comment) — without an explicit bypass entry for this
+ * app's own machine identity, applying a ruleset that blocks direct writes
+ * would also block the app's own founder-approved merge action.
+ */
+export interface RulesetBypassActor {
+  /** "app" = this Control Room's own GitHub App installation. */
+  kind: "app";
+  /** Provider-specific identity, e.g. the GitHub App's numeric ID. */
+  id: string;
+}
+
+/**
+ * Provider-agnostic branch protection policy. Deliberately narrow — the
+ * handful of protections this app's own build/merge discipline actually
+ * depends on, not a full passthrough of every rule a host might support.
+ */
+export interface RulesetConfig {
+  /** Stable name so re-applying updates the same ruleset instead of duplicating it. */
+  name: string;
+  /** "evaluate" reports violations without blocking anything — a safe dry run. */
+  enforcement: "active" | "evaluate" | "disabled";
+  /** Refs this ruleset targets, e.g. ["main"]. Host-specific pattern syntax. */
+  targetRefs: string[];
+  /** Require a pull request before writes to a targeted ref, blocking direct pushes. */
+  requirePullRequest: boolean;
+  requiredApprovingReviewCount: number;
+  /** Check names that must pass at the exact head before merge. */
+  requiredStatusCheckNames: string[];
+  blockForcePushes: boolean;
+  blockDeletion: boolean;
+  /**
+   * Actors exempt from the rules above. Must explicitly include this app's
+   * own GitHub App identity if `requirePullRequest` is true, or the app's
+   * own integrate() (a direct merge-commit write, not a PR merge) breaks.
+   */
+  bypassActors?: RulesetBypassActor[];
+}
+
+export interface RulesetResult {
+  /** Provider-specific ruleset identifier, for later reference or rollback. */
+  id: string;
+  name: string;
+  enforcement: string;
+}
+
+/**
  * Provider-agnostic repository interface. All write methods correspond to
  * separately approval-gated L99 actions. Read methods may be used by Repo
  * Brain during discussion and reconciliation, but every read is still logged.
@@ -130,4 +178,12 @@ export interface RepositoryProvider {
 
   /** Deletes a branch — used for "reject and delete branch". */
   deleteBranch(projectId: string, branch: string): Promise<void>;
+
+  /**
+   * Applies (creates or updates, by name) a branch protection ruleset.
+   * Optional: administration-tier repository configuration is a GitHub-shaped
+   * concept that not every future provider (bare git, Forgejo) needs to
+   * support the same way. Callers must feature-detect before calling.
+   */
+  applyBranchRuleset?(projectId: string, config: RulesetConfig): Promise<RulesetResult>;
 }

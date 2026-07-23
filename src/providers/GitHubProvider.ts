@@ -1,4 +1,5 @@
 import { Octokit } from "@octokit/rest";
+import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type {
   RepositoryProvider,
   ProjectRepo,
@@ -9,6 +10,8 @@ import type {
   Diff,
   DiffFile,
   Patch,
+  RulesetConfig,
+  RulesetResult,
 } from "./RepositoryProvider.js";
 
 export interface GitHubProviderConfig {
@@ -307,6 +310,78 @@ export class GitHubProvider implements RepositoryProvider {
       repo,
       ref: `heads/${branch}`,
     });
+  }
+
+  async applyBranchRuleset(
+    projectId: string,
+    config: RulesetConfig,
+  ): Promise<RulesetResult> {
+    const { owner, repo } = this.locate(projectId);
+
+    type RepoRule = NonNullable<
+      RestEndpointMethodTypes["repos"]["createRepoRuleset"]["parameters"]
+    >["rules"] extends (infer R)[] | undefined
+      ? R
+      : never;
+    const rules: RepoRule[] = [];
+    if (config.requirePullRequest) {
+      rules.push({
+        type: "pull_request",
+        parameters: {
+          dismiss_stale_reviews_on_push: false,
+          require_code_owner_review: false,
+          require_last_push_approval: false,
+          required_approving_review_count: config.requiredApprovingReviewCount,
+          required_review_thread_resolution: true,
+        },
+      });
+    }
+    if (config.requiredStatusCheckNames.length > 0) {
+      rules.push({
+        type: "required_status_checks",
+        parameters: {
+          do_not_enforce_on_create: false,
+          required_status_checks: config.requiredStatusCheckNames.map((context) => ({ context })),
+          strict_required_status_checks_policy: true,
+        },
+      });
+    }
+    if (config.blockForcePushes) rules.push({ type: "non_fast_forward" });
+    if (config.blockDeletion) rules.push({ type: "deletion" });
+
+    const bypassActors = (config.bypassActors ?? []).map((actor) => {
+      if (actor.kind === "app") {
+        return { actor_type: "Integration" as const, actor_id: Number(actor.id), bypass_mode: "always" as const };
+      }
+      throw new Error(`GitHubProvider: unsupported bypass actor kind "${actor.kind}"`);
+    });
+
+    const payload = {
+      owner,
+      repo,
+      name: config.name,
+      target: "branch" as const,
+      enforcement: config.enforcement,
+      bypass_actors: bypassActors,
+      conditions: {
+        ref_name: {
+          include: config.targetRefs.map((ref) => `refs/heads/${ref}`),
+          exclude: [],
+        },
+      },
+      rules,
+    };
+
+    // Idempotent by name: re-applying the same config updates the existing
+    // ruleset rather than creating a duplicate with the same intent.
+    const { data: existing } = await this.octokit.repos.getRepoRulesets({ owner, repo, per_page: 100 });
+    const match = existing.find((ruleset) => ruleset.name === config.name);
+
+    const { data } = match
+      ? await this.octokit.repos.updateRepoRuleset({ ...payload, ruleset_id: match.id })
+      : await this.octokit.repos.createRepoRuleset(payload);
+
+    return { id: String(data.id), name: data.name, enforcement: data.enforcement };
   }
 }
 
