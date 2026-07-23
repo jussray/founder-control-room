@@ -55,6 +55,20 @@ export interface InboxResult {
   isDuplicate: boolean;
 }
 
+function requiredRowId(
+  row: { id?: unknown } | null | undefined,
+  context: string,
+): string {
+  if (typeof row?.id !== 'string' || row.id.length === 0) {
+    throw new Error(`${context}: database returned no row id`);
+  }
+  return row.id;
+}
+
+function operationalError(value: string): string {
+  return value.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 1_000);
+}
+
 /**
  * Persist a provider event.
  * If a duplicate arrives (same provider + providerEventId), returns the
@@ -87,47 +101,75 @@ export async function persistProviderEvent(
     .single();
 
   if (error) {
-    // If ignoreDuplicates returned nothing, fetch the existing row
+    // PostgREST returns PGRST116 when ignoreDuplicates produces no row.
+    // Resolve the existing row, but never treat a failed or empty lookup as a
+    // successful duplicate receipt.
     if (error.code === 'PGRST116') {
-      const { data: existing } = await supabase
+      const { data: existing, error: existingError } = await supabase
         .from('provider_events')
         .select('id')
         .eq('provider', event.provider)
         .eq('provider_event_id', event.providerEventId)
-        .single();
-      return { id: existing!.id, isDuplicate: true };
+        .maybeSingle();
+
+      if (existingError) {
+        throw new Error(
+          `Failed to resolve duplicate provider event: ${existingError.message}`,
+        );
+      }
+
+      return {
+        id: requiredRowId(existing, 'Failed to resolve duplicate provider event'),
+        isDuplicate: true,
+      };
     }
     throw new Error(`Failed to persist provider event: ${error.message}`);
   }
 
-  return { id: data!.id, isDuplicate: false };
+  return {
+    id: requiredRowId(data, 'Failed to persist provider event'),
+    isDuplicate: false,
+  };
 }
 
 export async function markEventProcessed(eventId: string): Promise<void> {
-  await supabase
+  const { data, error } = await supabase
     .from('provider_events')
     .update({
       processing_status: 'processed',
       processed_at: new Date().toISOString(),
+      last_error: null,
     })
-    .eq('id', eventId);
+    .eq('id', eventId)
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to mark provider event processed: ${error.message}`);
+  }
+
+  requiredRowId(data, 'Failed to mark provider event processed');
 }
 
 export async function markEventFailed(
   eventId: string,
   error: string,
 ): Promise<void> {
-  const { error: updateError } = await supabase
+  const { data, error: updateError } = await supabase
     .from('provider_events')
     .update({
       processing_status: 'failed',
-      last_error: error,
+      last_error: operationalError(error),
     })
-    .eq('id', eventId);
+    .eq('id', eventId)
+    .select('id')
+    .maybeSingle();
 
   if (updateError) {
     throw new Error(`Failed to mark provider event failed: ${updateError.message}`);
   }
+
+  requiredRowId(data, 'Failed to mark provider event failed');
 
   const { error: incrementError } = await supabase.rpc('increment_attempt_count', {
     row_id: eventId,
