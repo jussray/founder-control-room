@@ -31,7 +31,7 @@ function collectOperations(sql, file) {
     {
       kind: 'create',
       regex: new RegExp(
-        String.raw`\bcreate\s+(?:unlogged\s+)?table\s+(?:if\s+not\s+exists\s+)?${qualified}`,
+        String.raw`\bcreate\s+(?:unlogged\s+)?table\s+(?<ifNotExists>if\s+not\s+exists\s+)?${qualified}`,
         'gi',
       ),
     },
@@ -68,6 +68,7 @@ function collectOperations(sql, file) {
         table,
         file,
         index: match.index ?? 0,
+        ifNotExists: kind === 'create' && Boolean(match.groups?.ifNotExists),
       });
     }
   }
@@ -126,10 +127,15 @@ async function inventoryMigrations() {
         lastOperation: null,
       };
 
+      let effective = true;
       if (operation.kind === 'create') {
-        existing.exists = true;
-        existing.rlsEnabled = false;
-        existing.sourceMigration ??= file;
+        if (existing.exists && operation.ifNotExists) {
+          effective = false;
+        } else {
+          existing.exists = true;
+          existing.rlsEnabled = false;
+          existing.sourceMigration = file;
+        }
       } else if (operation.kind === 'drop') {
         existing.exists = false;
         existing.rlsEnabled = false;
@@ -137,12 +143,15 @@ async function inventoryMigrations() {
         existing.rlsEnabled = true;
       } else if (operation.kind === 'disable' && existing.exists) {
         existing.rlsEnabled = false;
+      } else {
+        effective = false;
       }
 
       existing.lastOperation = {
         kind: operation.kind,
         file,
         sequence,
+        effective,
       };
       tables.set(operation.table, existing);
     }
