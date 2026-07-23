@@ -70,6 +70,16 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
     evidence: ['src/http/server.ts'],
   }),
   Object.freeze({
+    id: 'FCR-PROJECT-ISOLATION-001',
+    status: 'partial',
+    summary:
+      'Project connection lists and route-level health-check authorization are project-scoped and deny foreign connection IDs; the final update predicate still needs project_id scoping to eliminate a direct-database reassignment race.',
+    evidence: [
+      'src/http/routes/projects.ts',
+      'src/http/routes/__tests__/projectConnectionIsolation.test.ts',
+    ],
+  }),
+  Object.freeze({
     id: 'FCR-RLS-001',
     status: 'partial',
     summary:
@@ -98,7 +108,7 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
 
 export function publicGuardrailSnapshot() {
   return Object.freeze({
-    version: '1.4.1',
+    version: '1.5.0',
     vision: CONTROL_ROOM_VISION,
     guardrails: CONTROL_ROOM_GUARDRAILS.map(({ id, status, summary }) => ({
       id,
