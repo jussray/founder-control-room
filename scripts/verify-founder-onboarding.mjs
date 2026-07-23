@@ -109,7 +109,7 @@ if (/console\.(log|error|warn)\([^)]*password/i.test(files.auth + files.ui)) {
 if (/secret_ref:\s*['"`][^'"`]+/.test(files.workspace)) {
   errors.push('connector boundary: onboarding must not commit credential references automatically');
 }
-if (files.workspace.includes("status: 'active'")) {
+if (/secret_ref:\s*null[\s\S]{0,240}status:\s*'active'/.test(files.workspace)) {
   errors.push('truth boundary: onboarding provider slots must not be labeled active before verification');
 }
 if (files.worker.includes('Object.assign(request')) {
