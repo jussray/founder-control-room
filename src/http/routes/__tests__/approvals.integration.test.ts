@@ -134,7 +134,8 @@ interface ExecuteOptions {
   reservationError?: { message: string } | null;
   auditUpdateError?: { message: string } | null;
   missionUpdateError?: { message: string } | null;
-  evidenceRows?: Array<{ kind: string; status: string; commit_sha: string; created_at: string }>;
+  evidenceRows?: Array<{ kind: string; status: string; commit_sha: string; provider?: string; created_at: string }>;
+  requiredChecks?: string[];
   currentHead?: string;
   integrateError?: Error | null;
 }
@@ -152,7 +153,7 @@ function executeStack(options: ExecuteOptions = {}) {
     project_id: PROJECT_ID,
     status: missionStatus,
     branch_ref: 'codex/test',
-    required_checks: ['typecheck', 'browser_test'],
+    required_checks: options.requiredChecks ?? ['typecheck', 'browser_test'],
     policy_snapshot: {
       expectedHeadSha: EXPECTED_SHA,
       rollbackPath: 'Revert merge commit.',
@@ -541,6 +542,53 @@ describe('reservation-first exact-head execution', () => {
     expect(response.body.error).toMatch(/Exact-head machine evidence/);
     expect(mockIntegrate).not.toHaveBeenCalled();
     expect(auditUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
+  });
+
+  it('rejects deployment_result evidence that did not come from the verified GitHub webhook', async () => {
+    const { auditUpdate } = executeStack({
+      requiredChecks: ['typecheck', 'deployment_result'],
+      evidenceRows: [
+        { kind: 'typecheck', status: 'pass', commit_sha: EXPECTED_SHA, provider: 'github', created_at: new Date().toISOString() },
+        // A self-reported/custom row can never satisfy deployment_result — only
+        // GitHub's own signed deployment_status webhook can attest to a real
+        // deployment happening on GitHub's infrastructure.
+        { kind: 'deployment_result', status: 'pass', commit_sha: EXPECTED_SHA, provider: 'custom', created_at: new Date().toISOString() },
+      ],
+    });
+
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'merge',
+        idempotencyKey: 'merge-wrong-provider',
+        payload: { head: 'codex/test', base: 'main', expectedHeadSha: EXPECTED_SHA },
+      });
+    expect(response.status).toBe(409);
+    expect(response.body.error).toMatch(/Exact-head machine evidence/);
+    expect(mockIntegrate).not.toHaveBeenCalled();
+    expect(auditUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
+  });
+
+  it('accepts deployment_result evidence sourced from the verified GitHub webhook', async () => {
+    executeStack({
+      requiredChecks: ['typecheck', 'deployment_result'],
+      evidenceRows: [
+        { kind: 'typecheck', status: 'pass', commit_sha: EXPECTED_SHA, provider: 'github', created_at: new Date().toISOString() },
+        { kind: 'deployment_result', status: 'pass', commit_sha: EXPECTED_SHA, provider: 'github', created_at: new Date().toISOString() },
+      ],
+    });
+
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'merge',
+        idempotencyKey: 'merge-correct-provider',
+        payload: { head: 'codex/test', base: 'main', expectedHeadSha: EXPECTED_SHA },
+      });
+    expect(response.status).toBe(200);
+    expect(mockIntegrate).toHaveBeenCalled();
   });
 
   it('rejects a branch that moved after verification and finalizes the reservation as failed', async () => {

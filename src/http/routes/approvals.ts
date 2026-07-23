@@ -19,6 +19,7 @@ import { enqueueReconcile } from '../../events/outbox.js';
 import { ProofGateController } from '../../controllers/ProofGateController.js';
 import type { ProofEvidence } from '../../proof-gate/index.js';
 import type { EvidenceKind } from '../../reconciliation/types.js';
+import { WEBHOOK_ONLY_EVIDENCE_KINDS } from '../../reconciliation/types.js';
 import type { PatchFileChange } from '../../providers/RepositoryProvider.js';
 
 /** Mission states in which the branch is still under active work — safe to patch. */
@@ -77,7 +78,7 @@ async function verifyExactHeadEvidence(
 
   const { data: rows, error } = await supabase
     .from('evidence')
-    .select('kind, status, commit_sha, created_at')
+    .select('kind, status, commit_sha, provider, created_at')
     .eq('mission_id', missionId)
     .in('kind', requiredChecks)
     .order('created_at', { ascending: false });
@@ -86,12 +87,13 @@ async function verifyExactHeadEvidence(
     return { ok: false, error: 'Unable to read machine evidence.', details: error.message };
   }
 
-  const latest = new Map<string, { status: string; commitSha: string | null }>();
+  const latest = new Map<string, { status: string; commitSha: string | null; provider: string | null }>();
   for (const row of rows ?? []) {
     if (latest.has(row.kind)) continue;
     latest.set(row.kind, {
       status: row.status,
       commitSha: row.commit_sha ? String(row.commit_sha).toLowerCase() : null,
+      provider: row.provider ?? null,
     });
   }
 
@@ -100,19 +102,27 @@ async function verifyExactHeadEvidence(
   const wrongHead = requiredChecks.filter(
     (kind) => latest.get(kind)?.commitSha !== expectedHeadSha.toLowerCase(),
   );
+  const wrongProvider = requiredChecks.filter((kind) => {
+    if (!WEBHOOK_ONLY_EVIDENCE_KINDS.has(kind)) return false;
+    const evidence = latest.get(kind);
+    return evidence !== undefined && evidence.provider !== 'github';
+  });
 
-  if (missing.length || failing.length || wrongHead.length) {
+  if (missing.length || failing.length || wrongHead.length || wrongProvider.length) {
     return {
       ok: false,
       error: 'Exact-head machine evidence is incomplete.',
-      details: { missing, failing, wrongHead, expectedHeadSha },
+      details: { missing, failing, wrongHead, wrongProvider, expectedHeadSha },
     };
   }
 
   return {
     ok: true,
     summary: Object.fromEntries(
-      requiredChecks.map((kind) => [kind, `${latest.get(kind)!.status}@${latest.get(kind)!.commitSha}`]),
+      requiredChecks.map((kind) => [
+        kind,
+        `${latest.get(kind)!.status}@${latest.get(kind)!.commitSha}${latest.get(kind)!.provider ? `:${latest.get(kind)!.provider}` : ''}`,
+      ]),
     ),
   };
 }
