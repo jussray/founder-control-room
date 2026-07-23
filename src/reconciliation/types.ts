@@ -62,6 +62,17 @@ export type EvidenceKind =
   | 'deployment_result'
   | 'manual_attestation';
 
+/**
+ * Evidence kinds only GitHub's own systems can attest to — a founder running
+ * a guarded-terminal command cannot make a deployment happen on GitHub's
+ * infrastructure, so unlike typecheck/lint/unit_test/browser_test/etc.
+ * (which the guarded terminal legitimately proves exact-head, as an
+ * independently-audited alternative to CI), this kind must come from the
+ * signature-verified GitHub webhook path (evidence.provider === 'github'),
+ * never a self-reported 'custom' row.
+ */
+export const WEBHOOK_ONLY_EVIDENCE_KINDS: ReadonlySet<EvidenceKind> = new Set(['deployment_result']);
+
 export type EvidenceStatus = 'pass' | 'fail' | 'warn' | 'pending';
 
 export type ReconcileReason =

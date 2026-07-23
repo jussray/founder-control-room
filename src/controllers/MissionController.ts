@@ -18,6 +18,7 @@ import type {
   ProposedAction,
   EvidenceKind,
 } from '../reconciliation/types.js';
+import { WEBHOOK_ONLY_EVIDENCE_KINDS } from '../reconciliation/types.js';
 import type { ProofEvidence } from '../proof-gate/types.js';
 
 type MissionStatus =
@@ -33,6 +34,7 @@ type MissionStatus =
 interface LatestEvidence {
   status: string;
   commitSha: string | null;
+  provider: string | null;
 }
 
 export class MissionController extends BaseController {
@@ -91,7 +93,7 @@ export class MissionController extends BaseController {
 
     const { data: evidenceRows } = await supabase
       .from('evidence')
-      .select('kind, status, commit_sha, created_at')
+      .select('kind, status, commit_sha, provider, created_at')
       .eq('mission_id', missionId)
       .order('created_at', { ascending: false });
 
@@ -101,6 +103,7 @@ export class MissionController extends BaseController {
       latestByKind.set(row.kind, {
         status: row.status,
         commitSha: row.commit_sha ? String(row.commit_sha).toLowerCase() : null,
+        provider: row.provider ?? null,
       });
     }
 
@@ -111,10 +114,19 @@ export class MissionController extends BaseController {
           return evidence && evidence.commitSha !== expectedHeadSha;
         })
       : [];
+    const wrongProvider = requiredChecks.filter((kind) => {
+      if (!WEBHOOK_ONLY_EVIDENCE_KINDS.has(kind)) return false;
+      const evidence = latestByKind.get(kind);
+      return evidence !== undefined && evidence.provider !== 'github';
+    });
     const failing = requiredChecks.filter((kind) => latestByKind.get(kind)?.status === 'fail');
     const passing = requiredChecks.filter((kind) => {
       const evidence = latestByKind.get(kind);
-      return evidence?.status === 'pass' && (!expectedHeadSha || evidence.commitSha === expectedHeadSha);
+      if (!evidence) return false;
+      if (evidence.status !== 'pass') return false;
+      if (expectedHeadSha && evidence.commitSha !== expectedHeadSha) return false;
+      if (WEBHOOK_ONLY_EVIDENCE_KINDS.has(kind) && evidence.provider !== 'github') return false;
+      return true;
     });
     const allPass = passing.length === requiredChecks.length;
 
@@ -126,6 +138,7 @@ export class MissionController extends BaseController {
       failing: failing.length,
       missing: missing.length,
       wrongHead: wrongHead.length,
+      wrongProvider: wrongProvider.length,
     });
 
     let nextStatus: MissionStatus | null = null;
@@ -167,7 +180,10 @@ export class MissionController extends BaseController {
             payload: {
               expectedHeadSha,
               evidenceSummary: Object.fromEntries(
-                [...latestByKind.entries()].map(([kind, value]) => [kind, value.status]),
+                [...latestByKind.entries()].map(([kind, value]) => [
+                  kind,
+                  { status: value.status, provider: value.provider },
+                ]),
               ),
               proofGate: {
                 status: gateResult.status,
@@ -193,7 +209,7 @@ export class MissionController extends BaseController {
             },
           });
         }
-      } else if (failing.length > 0 || wrongHead.length > 0) {
+      } else if (failing.length > 0 || wrongHead.length > 0 || wrongProvider.length > 0) {
         proposedActions.push({
           actionType: 'flag_failing_checks',
           resourceType: 'mission',
@@ -203,9 +219,9 @@ export class MissionController extends BaseController {
             projectId,
             missionId,
             'flag_failing',
-            [...failing, ...wrongHead].join(','),
+            [...failing, ...wrongHead, ...wrongProvider].join(','),
           ),
-          payload: { failing, missing, wrongHead, expectedHeadSha },
+          payload: { failing, missing, wrongHead, wrongProvider, expectedHeadSha },
         });
       }
     }
