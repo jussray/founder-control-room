@@ -4,11 +4,11 @@
 
 Day 2 is not complete until the real Zapier path runs and produces proof.
 
-Ray has clarified the operating model: the OpenAI step inside Zapier is the only reliable handle this chat can shape directly. So agents should treat OpenAI as the signal layer Zapier listens to, not as the posting destination.
+Agents must not stop at "I cannot reach Zapier" until they first check whether the current environment exposes a Zapier, automation, browser-control, MCP, OpenAI Developers, or equivalent connector that can inspect, test, or edit the workflow.
 
 ## Goal
 
-Make this chain run and prove it:
+Make the Day 2 workflow actually run:
 
 ```text
 GitHub evidence
@@ -25,11 +25,11 @@ Before giving Ray manual Zapier UI steps, the acting agent must:
 
 1. Check available tools/connectors for Zapier, automation, browser-control, MCP, OpenAI Developers, or equivalent workflow-control access.
 2. If a usable connector exists, inspect or repair the Zap directly.
-3. If no usable connector exists, use OpenAI Platform as the reachable signal check and give exact Zapier UI steps only for the missing dashboard action.
+3. If no usable connector exists, give Ray exact Zapier UI instructions and record that tool discovery blocked direct control.
 
-Manual handoff is fallback, not default.
+Manual handoff is the fallback, not the default.
 
-## OpenAI Platform boundary
+## OpenAI Platform key boundary
 
 OpenAI Platform is the key/model layer for Zapier.
 
@@ -40,7 +40,15 @@ OpenAI Platform key name: zapier-founder-signal-engine
 Purpose: let Zapier call OpenAI for Founder Signal Engine 5W1H analysis, draft generation, routing decisions, and HubSpot review-task content.
 ```
 
-Known target:
+Rules:
+
+- Use the OpenAI Platform connector to identify the correct org/project or start secure key setup.
+- Never paste or store the raw OpenAI key in GitHub, HubSpot, Founder Control Room, PRs, issues, logs, screenshots, or chat-visible docs.
+- Prefer a dedicated Zapier key over reusing the local Codex `OPENAI_API_KEY`.
+- Guide Ray to paste the key into Zapier only when the current environment cannot securely complete the Zapier connection itself.
+- If Zapier fails at the OpenAI step, first verify the Zapier OpenAI connection is using the dedicated key and that the key is active.
+
+Known OpenAI Platform target from Day 2:
 
 ```text
 Organization: Personal
@@ -49,16 +57,15 @@ Project: Default project
 Project ID: proj_OojryPqVk2W5IIifEGLy9M7B
 ```
 
-Rules:
+Do not publish the raw key.
 
-- Use the existing key unless Ray explicitly approves key rotation.
-- Never paste, commit, log, screenshot, or store the raw key in unsafe surfaces.
-- If Zapier fails at OpenAI, verify the Zapier OpenAI connection is using the dedicated key.
-- Do not claim OpenAI posted anything. OpenAI only produces/rates/routes the content Zapier consumes.
+## Zapier fix plan
 
-## Step 1 - GitHub trigger
+### Step 1 - GitHub trigger
 
-Preferred trigger:
+Use a PR-aware trigger, not only a main-branch commit trigger.
+
+Preferred:
 
 ```text
 App: GitHub
@@ -68,15 +75,7 @@ Scope: any branch, if available
 Allowed events: opened, ready_for_review, synchronize, reopened
 ```
 
-If only commit triggers are available:
-
-```text
-Repo: jussray/Sekret-Bip
-Branch scope: any branch or selected test branch
-Do not force-merge a smoke-test PR just to satisfy a main-only trigger.
-```
-
-Reference smoke-test proof:
+Smoke-test evidence:
 
 ```text
 PR: jussray/Sekret-Bip#580
@@ -85,22 +84,18 @@ Branch: founder-signal-engine-smoke-test
 Changed file: docs/founder-signal-engine/smoke-test-2026-07-21.md
 ```
 
-## Step 2 - OpenAI 5W1H action
+If Zapier only offers a commit trigger, configure it for any branch or the test branch. Do not merge PR #580 just to make a main-only trigger fire.
 
-Zapier OpenAI action:
+### Step 2 - OpenAI 5W1H action
 
-```text
-App: OpenAI / ChatGPT
-Connection: zapier-founder-signal-engine
-Action: Generate text / conversation response
-```
+Use OpenAI / ChatGPT inside Zapier with the dedicated Zapier OpenAI connection.
 
 Prompt:
 
 ```text
 You are writing for Ray, founder of Se’kret Bip.
 
-Use /human and /confess: tell the truth without sounding corporate, fake, desperate, inflated, or generic.
+Use /human and /confess: tell the truth without sounding corporate, fake, desperate, inflated, or like generic marketing.
 
 Before writing anything, run the 5W1H send gate.
 
@@ -129,41 +124,43 @@ Rules:
 - Keep the social draft under 1,300 characters.
 
 GitHub evidence:
-PR title: {{GitHub PR title}}
-PR body: {{GitHub PR body}}
-PR URL: {{GitHub PR URL}}
-Commit SHA: {{GitHub commit SHA}}
-Changed files: {{GitHub changed files}}
+{{GitHub PR title}}
+{{GitHub PR body}}
+{{GitHub PR URL}}
+{{GitHub commit SHA}}
+{{GitHub changed files}}
 
 Write the LinkedIn draft only if Send decision is publish-draft or review-only.
 ```
 
-## Step 3 - Filter before Buffer
+### Step 3 - Filter before Buffer
 
 ```text
 Continue only if OpenAI Send decision contains publish-draft or review-only.
 Do not continue to Buffer if Send decision is internal-only or research-task.
 ```
 
-Fallback path model:
+If Zapier OR logic is awkward, use paths:
 
 ```text
 Path A: publish-draft -> Buffer + HubSpot review task
 Path B: review-only -> Buffer draft + HubSpot review task
-Path C: internal-only/research-task -> HubSpot task only, no Buffer
+Path C: internal-only or research-task -> HubSpot task only, no Buffer
 ```
 
-## Step 4 - Buffer action
+### Step 4 - Buffer action
 
 ```text
 App: Buffer
 Action: Create Draft or Add to Queue
 Channel: LinkedIn first
 Content: OpenAI generated LinkedIn draft
-Safety: first test must stay review-first, not blind auto-publish
+Safety: first test must remain review-first, not blind auto-publish
 ```
 
-## Step 5 - HubSpot association
+### Step 5 - HubSpot association
+
+HubSpot tasks must attach to the Founder Signal Engine deal.
 
 Known deal:
 
@@ -176,10 +173,16 @@ Owner ID: 95470536
 Use:
 
 ```text
-Find Deal: Founder Signal Engine
-Create Task or Note
+Step: Find Deal
+Search: Founder Signal Engine
+```
+
+Then:
+
+```text
+Step: Create Task or Note
 Associated object: Deal
-Associated deal: 337185466050
+Associated deal: Founder Signal Engine / 337185466050
 Owner: 95470536
 Status: NOT_STARTED
 ```
@@ -187,7 +190,7 @@ Status: NOT_STARTED
 Task title:
 
 ```text
-Review Founder Signal Engine draft from GitHub proof
+Review Founder Signal Engine draft from GitHub PR
 ```
 
 Task body:
@@ -216,21 +219,11 @@ Proof:
 {{GitHub PR URL}}
 ```
 
-## First post test
-
-The first post test should be:
-
-```text
-review-only or publish-draft
-```
-
-It must not be a blind public post. The test passes if Buffer receives a draft/queue item and HubSpot records the review proof attached to the deal.
-
 ## Pass/fail check
 
 Day 2 passes only if:
 
-1. GitHub proof is detected by Zapier.
+1. GitHub PR #580 or equivalent controlled GitHub evidence is detected.
 2. OpenAI returns the 5W1H block.
 3. Buffer receives a LinkedIn draft or queue item only when the send decision allows it.
 4. HubSpot creates a task or note attached to Founder Signal Engine deal `337185466050`.
@@ -242,12 +235,14 @@ Day 2 passes only if:
 | Failure | Likely cause | Fix |
 |---|---|---|
 | Zapier does not fire | Trigger watches only `main` or only commits | Use PR trigger, Updated PR trigger, or any-branch commit trigger. |
-| OpenAI step fails | Zapier OpenAI connection missing or wrong key | Reconnect OpenAI in Zapier using the dedicated key. |
+| OpenAI step fails | Zapier OpenAI connection missing or wrong key | Reconnect OpenAI in Zapier using the dedicated `zapier-founder-signal-engine` key. |
 | Buffer step does not run | Send decision is internal-only/research-task or filter mapping wrong | Check OpenAI output field mapping and filter logic. |
-| HubSpot task floats | HubSpot association missing | Find Deal first, then create task/note associated to deal `337185466050`. |
-| Agent says it cannot access Zapier | Tool discovery not completed | Search for Zapier/control connectors before manual handoff. |
+| HubSpot task fails | Task is floating without association | Find Deal first, then create task associated to deal `337185466050`. |
+| Agent says it cannot access Zapier | Tool discovery not completed | Search for Zapier/control connectors before falling back to UI handoff. |
 
-## Evidence capture template
+## Next gate
+
+Run or repair the Zap, then capture:
 
 ```text
 Zapier run status:
@@ -256,7 +251,3 @@ Buffer draft/queue result:
 HubSpot task/note URL:
 Founder Control Room evidence link:
 ```
-
-## Next gate
-
-Use the OpenAI action as the reachable Zapier signal, then verify whether Zapier moved that signal into Buffer and HubSpot.

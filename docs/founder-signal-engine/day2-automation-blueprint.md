@@ -1,115 +1,78 @@
 # Founder Signal Engine - Day 2 Automation Blueprint
 
-## Reality
+## REALITY
+Ray has connected:
 
-Ray reports the core Day 2 accounts and connections are already wired through Zapier:
-
+- HubSpot
 - GitHub
 - Zapier
-- OpenAI Platform key for Zapier
 - Buffer
-- HubSpot
+- OpenAI Platform API key for Zapier
 - LinkedIn
 - Facebook
-- Instagram, likely connected or ready
+- Instagram, likely connected or ready to connect
 
-This file does not claim direct Zapier UI control. It documents the controlled automation path and the evidence required to prove it.
+The build now moves from account setup to a controlled first live workflow.
 
-## Goal
-
-Create and verify the first review-first automation path:
-
-```text
-GitHub evidence
--> Zapier trigger
--> OpenAI 5W1H analysis and draft
--> Buffer draft or queue item
--> HubSpot task/note associated with Founder Signal Engine deal
--> Founder Control Room evidence
-```
-
-## Current control truth
-
-| Layer | Purpose | Boundary |
-|---|---|---|
-| GitHub | Creates proof events and stores source-of-truth docs. | GitHub evidence alone does not prove Zapier ran. |
-| OpenAI Platform | Supplies the model/key layer Zapier calls. | OpenAI is not the posting tool. |
-| Zapier | Routes GitHub events through OpenAI, Buffer, and HubSpot. | Direct Zapier control depends on connector/browser access. |
-| Buffer | Holds the social draft or queue item. | First run must be review-first, not blind auto-publish. |
-| HubSpot | Stores CRM proof and review tasks. | Task/note must attach to the Founder Signal Engine deal. |
-| Founder Control Room | Records the evidence chain. | Do not mark Day 2 complete without downstream proof. |
-
-## OpenAI key intent
+## GOAL
+Create the first working automation path:
 
 ```text
-OpenAI Platform key name: zapier-founder-signal-engine
-Purpose: let Zapier call OpenAI for 5W1H analysis, draft generation, routing decisions, and HubSpot review-task content.
+GitHub update
+→ OpenAI drafts Ray-style content
+→ Buffer receives the approved social draft
+→ HubSpot tracks the review/outreach task
+→ Founder Control Room stores evidence
 ```
 
-Rules:
+## SOURCE OF TRUTH
 
-- Use the existing Zapier OpenAI key unless Ray explicitly asks to rotate or create a new one.
-- Never publish, commit, log, paste, screenshot, or store the raw key in GitHub, HubSpot, Founder Control Room, chat-visible docs, PR bodies, issues, screenshots, or logs.
-- Treat OpenAI as the reachable signal layer for Zapier. If we cannot inspect Zapier directly, shape and verify the OpenAI output Zapier consumes.
+- GitHub proof source: `jussray/Sekret-Bip`
+- Project control source: `jussray/founder-control-room`
+- CRM source: HubSpot Deal `Founder Signal Engine`
+- Social queue: Buffer
+- AI drafting layer: OpenAI Platform key connected inside Zapier
 
-## 5W1H send gate
+## 5W1H SEND GATE
 
-Every post, DM, email, investor note, partner note, civic outreach, or social draft must pass this gate before it is sent, queued, or logged as ready.
+Every post, DM, email, investor note, partner note, or civic outreach must pass a 5W1H check before it is queued, sent, or logged as ready.
+
+The engine must answer:
 
 | Gate | Required answer | Failure behavior |
 |---|---|---|
-| Who | Audience, person type, named recipient, or HubSpot segment. | Do not send. Create a research/review task. |
-| What | Exact GitHub proof, commit, PR, issue, screenshot, or demo. | Do not send. Ask for proof or use internal-only. |
-| Where | LinkedIn, Facebook, Instagram, Gmail, HubSpot, or internal-only. | Do not send. Route to internal review. |
-| When | Why now: milestone, fix, test, market timing, or follow-up window. | Do not send. Keep as draft or schedule later. |
-| Why | Recipient/audience-specific value, white space, risk solved, or opportunity. | Do not send. Create positioning task. |
-| How | Clear next action: review, comment, connect, book call, test, partner, fund, or follow. | Do not send. Add a clearer call to action. |
+| Who | Who is this for? Name the audience, person type, or HubSpot contact segment. | Do not send. Create a research task. |
+| What | What changed or what proof exists? Include repo, commit, PR, issue, screenshot, or demo link. | Do not send. Ask for proof or use a softer build-in-public post. |
+| Where | Where should this go? LinkedIn, Facebook, Instagram, Gmail, HubSpot note, or internal-only. | Do not send. Route to internal review. |
+| When | Why now? New commit, milestone, demo, risk fixed, civic timing, trend timing, or follow-up window. | Do not send. Schedule later or keep as draft. |
+| Why | Why does this recipient/audience care? State the white space, value, risk solved, or opportunity. | Do not send. Create positioning task. |
+| How | How should they act? Comment, connect, review repo, book call, fund, partner, test, or simply follow along. | Do not send. Add a clearer call to action. |
 
-Send decision values:
+Send rule: if the 5W1H check is incomplete, the automation should create a HubSpot task instead of sending or publishing.
 
-```text
-publish-draft
-review-only
-internal-only
-research-task
-```
+## ZAP 1 - GitHub Commit to LinkedIn Draft
 
-If any 5W1H field is incomplete, Zapier must not publish. It should create a HubSpot research/review task instead.
+### Trigger
 
-## Zapier path
+App: GitHub  
+Event: New Commit  
+Repository: `jussray/Sekret-Bip`
 
-### Step 1 - GitHub trigger
+### Action 1: OpenAI Draft
 
-Preferred trigger:
-
-```text
-App: GitHub
-Event: New Pull Request or Updated Pull Request
-Repo: jussray/Sekret-Bip
-Scope: any branch, if available
-Allowed events: opened, ready_for_review, synchronize, reopened
-```
-
-If Zapier only exposes a commit trigger, use any branch or the selected test branch. Do not merge a test PR just to satisfy a main-only trigger.
-
-### Step 2 - OpenAI action
-
-```text
-App: OpenAI / ChatGPT inside Zapier
-Connection: zapier-founder-signal-engine
+App: OpenAI / ChatGPT in Zapier  
 Action: Generate text / conversation response
-```
 
-Prompt core:
+Prompt:
 
 ```text
-You are writing for Ray, founder of Se’kret Bip.
+You are writing for Ray, founder of Se’kret Bip and related GitHub projects.
 
-Use /human and /confess: tell the truth without sounding corporate, fake, desperate, inflated, or generic.
+Use /human and /confess: tell the truth without sounding corporate, fake, desperate, or inflated.
 
 Before writing anything, run the 5W1H send gate.
 
-Return this exact structure:
+Return this structure:
 
 5W1H:
 - Who:
@@ -121,139 +84,250 @@ Return this exact structure:
 - Send decision: publish-draft, review-only, internal-only, or research-task
 - Missing proof or missing context:
 
+Then write the LinkedIn draft only if the send decision is publish-draft or review-only.
+
+Write in Ray’s voice:
+- direct
+- human
+- founder-led
+- emotionally honest
+- technical but understandable
+- broke-founder energy without sounding desperate
+- urgent in a good way: early, real, worth paying attention to
+
+Turn this GitHub update into a LinkedIn post.
+
 Rules:
-- If Who, What, Where, When, Why, or How is incomplete, set Send decision to research-task.
-- If the update is real but still needs Ray to review it, set Send decision to review-only.
-- If the update is strong enough to queue as a draft but not blindly publish, set Send decision to publish-draft.
-- Never claim the product is finished unless GitHub evidence proves it.
-- Never fake traction, customers, funding, demand, partnerships, or launch status.
+- Do not sound corporate.
+- Do not sound like generic marketing.
+- Do not fake traction.
+- Do not promise the product is finished if the repo is still being built.
 - Mention the repo/project name.
 - Explain what changed.
 - Explain why it matters.
 - Point back to proof.
-- Keep the social draft under 1,300 characters.
+- End with a soft call to action for builders, funders, partners, or people who understand the opportunity.
+- Keep it under 1,300 characters.
 
-GitHub evidence:
-{{GitHub PR title}}
-{{GitHub PR body}}
-{{GitHub PR URL}}
-{{GitHub commit SHA}}
-{{GitHub changed files}}
+GitHub update:
+{{GitHub commit message / PR / issue / release data}}
 
-Write the LinkedIn draft only if Send decision is publish-draft or review-only.
+Repo link:
+{{GitHub repo URL}}
 ```
 
-### Step 3 - Filter before Buffer
+### Action 2: Buffer
+
+App: Buffer  
+Action: Add to Queue or Create Draft, depending on what the connected Buffer plan exposes.
+
+Channel: LinkedIn first.
+
+Safety rule: do not enable blind auto-posting until the first test draft is reviewed.
+
+Zapier filter before Buffer:
 
 ```text
-Continue only if OpenAI Send decision contains publish-draft or review-only.
-Do not continue to Buffer if Send decision is internal-only or research-task.
+Only continue if OpenAI Send decision equals publish-draft or review-only.
+Do not continue if Send decision equals internal-only or research-task.
 ```
 
-If Zapier filter OR logic is awkward, use paths:
+### Action 3: HubSpot Task
+
+App: HubSpot  
+Action: Create Task
+
+Task title:
 
 ```text
-Path A: publish-draft -> Buffer + HubSpot review task
-Path B: review-only -> Buffer draft + HubSpot review task
-Path C: internal-only/research-task -> HubSpot task only, no Buffer
+Review GitHub-generated LinkedIn post for Se’kret Bip
 ```
 
-### Step 4 - Buffer
+Task body:
 
 ```text
-App: Buffer
-Action: Create Draft or Add to Queue
-Channel: LinkedIn first
-Content: OpenAI generated LinkedIn draft
-Safety: first live test remains review-first
-```
-
-### Step 5 - HubSpot
-
-Known CRM anchor:
-
-```text
-Deal name: Founder Signal Engine
-Deal ID: 337185466050
-Owner ID: 95470536
-```
-
-Preferred path:
-
-```text
-Find Deal -> Founder Signal Engine
-Create Task or Note
-Associated object: Deal
-Associated deal: 337185466050
-Status: NOT_STARTED
-```
-
-Task body should include:
-
-```text
-Source repo:
-Source PR:
-Commit:
-Changed files:
+Source repo: jussray/Sekret-Bip
+Trigger: GitHub commit
+Generated channel: LinkedIn
+Status: Review before publishing
 
 5W1H:
-Who:
-What:
-Where:
-When:
-Why:
-How:
+Who: {{OpenAI Who}}
+What: {{OpenAI What}}
+Where: {{OpenAI Where}}
+When: {{OpenAI When}}
+Why: {{OpenAI Why}}
+How: {{OpenAI How}}
+Send decision: {{OpenAI Send decision}}
+Missing proof/context: {{OpenAI Missing proof or missing context}}
 
-Send decision:
-Missing proof/context:
+Draft content:
+{{OpenAI generated LinkedIn post}}
 
-Draft:
-
-Proof:
+Proof link:
+{{GitHub commit / repo link}}
 ```
 
-## First post test
+Associate manually with HubSpot Deal: `Founder Signal Engine` if Zapier exposes association fields. If not, leave the deal name in the task body.
 
-The first post test is not an auto-publication test. It is a review-first draft test:
+## ZAP 2 - Multi-Channel Draft Split
 
-1. GitHub creates a real proof event.
-2. Zapier catches the event.
-3. Zapier calls OpenAI through `zapier-founder-signal-engine`.
-4. OpenAI returns 5W1H + draft.
-5. Zapier sends the draft to Buffer as review-first.
-6. Zapier creates a HubSpot task/note attached to deal `337185466050`.
-7. Founder Control Room records the evidence.
+Only enable after Zap 1 works.
 
-## Repo-to-audience map v0
+### Trigger
 
-| Repo | Primary angle | Best audience | First channel |
+Same GitHub trigger.
+
+### Action: OpenAI creates three drafts
+
+```text
+Create three platform-specific drafts from this GitHub update.
+
+Use the 5W1H send gate first:
+- Who is the audience or contact segment?
+- What proof changed?
+- Where should this go?
+- When should this be sent or queued?
+- Why does this audience care?
+- How should they act?
+
+If any 5W1H field is weak or missing, label the draft review-only or internal-only.
+Never auto-send incomplete outreach.
+
+1. LinkedIn
+Audience: builders, investors, technical partners, operators.
+Tone: strategic, technical, proof-led.
+Length: under 1,300 characters.
+
+2. Facebook
+Audience: community, family, local supporters, people following Ray’s founder story.
+Tone: personal, clear, founder journey.
+Length: under 900 characters.
+
+3. Instagram
+Audience: visual-first followers.
+Tone: short, punchy, caption-style.
+Length: under 700 characters.
+Include 3–6 hashtags.
+
+Shared voice:
+- Ray-style
+- human
+- direct
+- emotionally honest
+- not corporate
+- not desperate
+- no fake traction
+- no finished-product claims unless verified
+
+GitHub update:
+{{GitHub data}}
+
+Repo link:
+{{GitHub repo URL}}
+```
+
+## CHANNEL ROUTING RULES
+
+### LinkedIn
+Use for:
+
+- investor narrative
+- technical progress
+- GitHub proof
+- partnership signal
+- founder execution updates
+
+Required 5W1H emphasis:
+
+- Who: builders, investors, operators, AI/product people, civic or family-tech partners
+- Why: white space, proof of execution, strategic opportunity
+- How: comment, connect, review the repo, book a call, or follow the build
+
+### Facebook
+Use for:
+
+- community story
+- family/parent angle
+- local/civic relevance
+- founder struggle and progress
+
+Required 5W1H emphasis:
+
+- Who: local community, family, parents, friends, everyday supporters
+- Why: human stakes, teen/family relevance, local economic possibility
+- How: share, comment, support, follow progress, introduce a helpful person
+
+### Instagram
+Use for:
+
+- UI screenshots
+- characters
+- brand visuals
+- before/after product progress
+- short captions with proof links or link-in-bio CTA
+
+Required 5W1H emphasis:
+
+- Who: visual-first followers, creators, teen/family audience, brand watchers
+- What: screenshot, character, screen, demo, before/after proof
+- How: follow, tap link, comment, share, watch the build
+
+### Gmail or Direct Outreach
+Use only after social draft quality is proven.
+
+Required 5W1H emphasis:
+
+- Who: named person or clear segment
+- What: specific repo/update/proof
+- Where: email or DM
+- When: milestone, follow-up timing, or urgent market/civic window
+- Why: recipient-specific value, not generic attention-seeking
+- How: one clear ask
+
+If the message cannot name the recipient-specific Why, do not send. Create a HubSpot research task.
+
+## REPO-TO-AUDIENCE MAP V0
+
+| Repo | Primary Angle | Best Audience | First Channel |
 |---|---|---|---|
-| `jussray/Sekret-Bip` | Teen/family AI companion, safety, emotional support, identity-safe architecture | investors, family-tech builders, AI safety people, creators, civic partners | LinkedIn |
+| `jussray/Sekret-Bip` | Teen/family AI companion, safety, emotional support, identity-safe product architecture | investors, family-tech builders, AI safety people, creators, civic partners | LinkedIn |
 | `jussray/founder-control-room` | Founder operating system, proof tracking, repo intelligence, build discipline | operators, technical founders, investor scouts, AI workflow people | LinkedIn |
-| `jussray/l99-StoryEngine` | Story systems, AI narrative engine, creator content infrastructure | creators, media, entertainment tech, creator economy investors | LinkedIn + Instagram |
+| `jussray/l99-StoryEngine` | Story systems, AI narrative engine, content infrastructure | creators, media people, entertainment tech, creator economy investors | LinkedIn + Instagram |
 | `jussray/chief-ai-machine` | AI agent command layer / founder execution machine | builders, automation people, AI tooling partners | LinkedIn |
 | `jussray/untold-stories-storefront` | Commerce/storytelling/storefront wedge | creators, brand partners, commerce investors | Instagram + Facebook |
 | `jussray/jussbeautifulhair-site` | Beauty commerce and local brand web presence | beauty buyers, local customers, creator commerce partners | Instagram + Facebook |
 
-## Pass condition
+## OUTREACH RULES
 
-Day 2 is complete only when:
+- Draft first. Human review before send.
+- Never spam.
+- Match each person to a repo thesis before contact.
+- Every contact needs a reason: funding, partnership, distribution, engineering, media, civic value, or creator reach.
+- No auto-emailing investors until message quality is proven.
+- Every post or outreach should point to proof.
+- If the project is unfinished, say it is being built, not launched.
+- Every outbound message must pass the 5W1H send gate.
+- If Who, Why, or How is weak, create a HubSpot research task instead of sending.
 
-1. GitHub evidence is detected by Zapier.
-2. OpenAI returns a 5W1H block and send decision.
-3. Buffer receives a review-first draft or allowed queue item.
-4. HubSpot creates a task/note attached to Founder Signal Engine deal `337185466050`.
-5. Founder Control Room records the evidence.
-6. No raw OpenAI key appears anywhere unsafe.
+## FIRST TEST SUCCESS CONDITION
 
-## Rollback
+Day 2 is done only when:
 
-- Turn off the Zap.
-- Remove or pause the Buffer draft/queue item.
-- Close or update the HubSpot test task/note.
-- Revoke the dedicated OpenAI key only if it is exposed.
-- Close the PR if the docs are superseded.
+1. GitHub update triggers Zapier.
+2. OpenAI generates a LinkedIn draft in Ray’s voice.
+3. The draft includes a 5W1H block and a send decision.
+4. Buffer receives the draft or queue item only if the send decision allows it.
+5. HubSpot receives a review task or note with the 5W1H block.
+6. Founder Control Room records the evidence.
 
-## Next gate
+## ROLLBACK
 
-Use the OpenAI step as the reachable signal into Zapier, then verify whether Zapier carried that signal into Buffer and HubSpot.
+- Turn off Zap 1 in Zapier.
+- Remove queued Buffer post if needed.
+- Close or update HubSpot task if it was only a test.
+- Revoke the dedicated OpenAI API key if credentials appear exposed.
+
+## NEXT GATE
+
+Run one controlled GitHub update against `jussray/Sekret-Bip` and confirm Zapier produces the LinkedIn draft with the 5W1H block and without auto-publishing.
