@@ -62,7 +62,7 @@ export interface PluginCenterSummary {
 
 export const PLUGIN_CENTER_CONTRACT = Object.freeze({
   id: 'founder-control-room-plugin-center',
-  version: '1.0.0',
+  version: '1.1.0',
   label: 'Founder Control Room Plugin Center',
   purpose: 'Connect tools, gate power, preserve proof.',
   enforcementNote:
@@ -71,7 +71,8 @@ export const PLUGIN_CENTER_CONTRACT = Object.freeze({
     'No credential values in database rows, dashboards, docs, logs, or committed config.',
     'Read authority is separate from write authority; no approval carries forward.',
     'Temporary grants must have an expiry, usage limit, and rollback/removal instruction.',
-    'External communication, billing, deployment, credentials, deletion, and provider changes remain separate founder gates.',
+    'External communication, CRM mutation, billing, deployment, credentials, deletion, and provider changes remain separate founder gates.',
+    'OpenAI Developers is a build surface within the OpenAI provider boundary, not a second source of authority.',
     'Plugin health is observed evidence, not a promise that the provider action succeeded.',
   ]),
 });
@@ -116,6 +117,14 @@ const CAPABILITIES = Object.freeze({
     risk: 'low',
     requiresEvidence: false,
     separateFounderGate: false,
+  },
+  manageCrmRecords: {
+    id: 'manage_crm_records',
+    label: 'Create or update CRM records and associations',
+    authorityLevel: 'L6',
+    risk: 'critical',
+    requiresEvidence: true,
+    separateFounderGate: true,
   },
   writeDesign: {
     id: 'write_design_artifact',
@@ -168,13 +177,19 @@ export const PLUGIN_CATALOG = [
   },
   {
     type: 'openai',
-    label: 'OpenAI',
-    description: 'Replaceable model capability behind server-side adapters.',
+    label: 'OpenAI Platform / Developers',
+    description:
+      'Replaceable server-side model capability plus the OpenAI Developers build surface for Agents SDK and ChatGPT App work; neither model output nor build tooling is approval authority.',
     defaultAuthorityLevel: 'L3',
-    defaultDataBoundary: 'Server-side model calls with minimized prompts and no durable private memory.',
-    secretsPolicy: 'API keys stay server-side and never ship to browser or client repositories.',
+    defaultDataBoundary: 'Server-side model calls and developer artifacts with minimized prompts, no durable private memory, and no raw private content mirror.',
+    secretsPolicy: 'API keys stay server-side and never ship to browser, client repositories, CRM records, logs, or chat-visible documentation.',
     capabilities: [CAPABILITIES.inspectData],
-    blockedByDefault: ['client_side_key', 'raw_private_content_ingest'],
+    blockedByDefault: [
+      'client_side_key',
+      'raw_private_content_ingest',
+      'create_or_rotate_key_without_gate',
+      'autonomous_provider_action',
+    ],
   },
   {
     type: 'anthropic',
@@ -215,6 +230,23 @@ export const PLUGIN_CATALOG = [
     secretsPolicy: 'OAuth connection is provider-held; never persist tokens in Control Room tables.',
     capabilities: [CAPABILITIES.inspectData, CAPABILITIES.sendExternalMessage],
     blockedByDefault: ['send_without_founder_instruction', 'delete_email', 'bulk_forward_private_threads'],
+  },
+  {
+    type: 'hubspot',
+    label: 'HubSpot',
+    description: 'CRM records, deal-associated review tasks, notes, tickets, and controlled customer-operation surfaces.',
+    defaultAuthorityLevel: 'L6',
+    defaultDataBoundary:
+      'Minimized CRM metadata and founder-approved records only. Do not copy customer, vendor, mailbox, order, payment, or private product data into Control Room storage.',
+    secretsPolicy: 'HubSpot OAuth remains provider-held; never persist access tokens or credential values in repository files, CRM bodies, or Control Room rows.',
+    capabilities: [CAPABILITIES.inspectData, CAPABILITIES.manageCrmRecords],
+    blockedByDefault: [
+      'create_or_update_without_confirmation',
+      'floating_task_without_association',
+      'send_external_message_without_founder_instruction',
+      'bulk_customer_export',
+      'payment_or_quote_publication',
+    ],
   },
   {
     type: 'shopify',

@@ -125,7 +125,23 @@ describe('GET /plugin-center', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.contract.id).toBe('founder-control-room-plugin-center');
+    expect(res.body.contract.version).toBe('1.1.0');
     expect(res.body.catalog.some((plugin: { type: string }) => plugin.type === 'github')).toBe(true);
+
+    const hubspot = res.body.catalog.find((plugin: { type: string }) => plugin.type === 'hubspot');
+    expect(hubspot).toMatchObject({
+      label: 'HubSpot',
+      defaultAuthorityLevel: 'L6',
+    });
+    expect(hubspot.capabilities.some((capability: { id: string }) => capability.id === 'manage_crm_records')).toBe(true);
+    expect(hubspot.blockedByDefault).toContain('create_or_update_without_confirmation');
+    expect(hubspot.blockedByDefault).toContain('floating_task_without_association');
+
+    const openai = res.body.catalog.find((plugin: { type: string }) => plugin.type === 'openai');
+    expect(openai.label).toBe('OpenAI Platform / Developers');
+    expect(openai.description).toContain('OpenAI Developers');
+    expect(openai.blockedByDefault).toContain('create_or_rotate_key_without_gate');
+
     expect(res.body.summary).toMatchObject({
       installedConnections: 1,
       activeConnections: 1,

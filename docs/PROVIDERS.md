@@ -10,9 +10,11 @@ Best for long-context repository analysis, provider-interface work, structured i
 
 Best for debugging, code review, tests, repository operations, data analysis, and founder-readable decisions. Must read `AGENTS.md` and `GLOBAL_AI.md`. Tool proof is required for claimed writes.
 
-## OpenAI Platform
+## OpenAI Platform / Developers
 
-Server-side model capability behind replaceable adapters. Keep keys off clients. Version model, prompt, tool schemas, safety behavior, and provenance. Model output is never approval or authorization.
+OpenAI Platform is the server-side key and model layer behind replaceable adapters. OpenAI Developers, Agents SDK, and ChatGPT Apps are build surfaces that may create or adapt developer artifacts, but they do not become a second provider authority and model output is never approval or authorization.
+
+Keep keys off clients, repositories, CRM records, logs, screenshots, and chat-visible documentation. Version model, prompt, tool schemas, safety behavior, and provenance. Creating or rotating a key remains a separate founder gate and must use a secure setup flow.
 
 ## Anthropic Platform
 
@@ -29,6 +31,12 @@ Current repository provider and evidence layer. Branches, commits, PRs, checks, 
 ## Supabase
 
 Owns Control Room authentication and operational storage inside this project’s separate trust boundary. Service-role credentials stay server-side. Founder access requires session validation plus allowlist authorization.
+
+## HubSpot
+
+CRM proof, deal-associated review tasks, notes, tickets, contacts, companies, and controlled revenue-operation records. Read authority does not imply write authority. Every CRM mutation requires the provider confirmation gate, and outreach, quote publication, payment actions, customer exports, or external communication remain separately authorized actions.
+
+Founder Signal Engine tasks and notes must be associated with the `Founder Signal Engine` deal rather than created as floating records. HubSpot OAuth remains provider-held; never copy access tokens, customer data, vendor intelligence, mailbox contents, payment details, or order data into Control Room storage.
 
 ## Required handoff between providers
 
