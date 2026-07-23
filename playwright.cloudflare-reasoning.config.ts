@@ -5,7 +5,10 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 5_000 },
   forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 1 : 0,
+  // A retried pass is a flake, not proof: this suite's result becomes a
+  // GitHub check run, which becomes evidence a mission's merge gate reads.
+  // Retrying in CI would let a flaky pass silently satisfy that gate.
+  retries: 0,
   workers: 1,
   reporter: process.env.CI
     ? [['list'], ['html', { open: 'never' }]]
