@@ -20,8 +20,11 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
     id: 'FCR-AUTH-001',
     status: 'active',
     summary:
-      'Founder project access requires session validation plus founder allowlist authorization.',
-    evidence: ['src/http/middleware/requireFounder.ts'],
+      'Founder access requires a valid stable provider identity plus service-role allowlist authorization; refreshed founder cookies are issued only after both gates pass.',
+    evidence: [
+      'src/http/middleware/requireFounder.ts',
+      'src/http/middleware/__tests__/requireFounder.test.ts',
+    ],
   }),
   Object.freeze({
     id: 'FCR-BOUNDARY-001',
@@ -95,7 +98,7 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
 
 export function publicGuardrailSnapshot() {
   return Object.freeze({
-    version: '1.4.0',
+    version: '1.4.1',
     vision: CONTROL_ROOM_VISION,
     guardrails: CONTROL_ROOM_GUARDRAILS.map(({ id, status, summary }) => ({
       id,
