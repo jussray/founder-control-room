@@ -69,6 +69,16 @@ jobs:
       - run: npm run verify:terminal-contract
       - run: npm run verify:ai-skills
 
+  rls-contract:
+    name: "RLS Migration Contract"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm run verify:rls-contract
+
   build:
     name: "Production Build"
     runs-on: ubuntu-latest
@@ -77,6 +87,7 @@ jobs:
       - lint
       - unit-tests
       - terminal-contract
+      - rls-contract
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
