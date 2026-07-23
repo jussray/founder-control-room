@@ -12,7 +12,7 @@ A status of `active` means the stated control is enforced on the relevant path. 
 | `FCR-APPROVAL-001` | `active` | Evidence-backed merges may use standing founder authority while deployment, migration, rollback, auth, secrets, billing, deletion, and publication remain separate gates. | `docs/FOUNDER_MERGE_AUTHORITY.md`, active AI instruction files, and explicit public contract fields. |
 | `FCR-PROVIDER-001` | `active` | Repository and AI providers remain replaceable adapters. | `RepositoryProvider` boundary and provider-neutral guardrail snapshot. |
 | `FCR-SECRET-001` | `active` | Provider tokens, service-role keys, founder sessions, and private project data never appear in public responses. | Public status exposes IDs, states, and summaries only; tests scan responses for secret markers. |
-| `FCR-AUDIT-001` | `partial` | Material provider actions and project reads must be auditable. | Every successful founder read served by `projectsRouter` now waits for a sanitized access event and fails closed if persistence or project resolution fails. Mutation audit atomicity and broader provider-action coverage remain incomplete. |
+| `FCR-AUDIT-001` | `partial` | Material provider actions and project reads must be auditable. | Founder project reads fail closed on missing audit evidence. Provider-event persistence, duplicate resolution, and processed/failed transitions now reject database errors and missing-row success. Mutation audit atomicity, the two-write failed-status transition, and full provider-action coverage remain incomplete. |
 
 ## Supabase identity contract
 
@@ -59,6 +59,20 @@ Existing 4xx and 5xx responses are not rewritten, and non-GET methods are outsid
 
 This closes false-success behavior for founder project reads. The guardrail remains `partial` because mutations are not yet transactionally coupled to their audit events and other material provider-action surfaces still require a complete coverage review.
 
+## Provider-event status integrity contract
+
+The durable provider inbox rejects silent or phantom success at every currently available application-level transition:
+
+1. a fresh provider-event insert must return a concrete row ID;
+2. a duplicate receipt is accepted only after a separate lookup confirms the existing row ID;
+3. duplicate lookup errors and zero-row lookups fail closed;
+4. processed and failed status updates must return the updated event row ID;
+5. zero-row updates are treated as failures rather than successful no-ops;
+6. stored provider error text has control characters removed and is capped at 1,000 characters;
+7. attempt-counter RPC failures are surfaced to the caller.
+
+The failed transition still performs the status update and attempt increment as two database operations. A failure between those operations can leave `processing_status = failed` without the incremented attempt count. Closing that gap requires an approved transactional database RPC or equivalent migration, so `FCR-AUDIT-001` remains `partial`.
+
 ## Public status surfaces
 
 `GET /guardrails` is intentionally public and contains only non-sensitive vision and enforcement metadata.
@@ -82,4 +96,4 @@ npm run lint
 npm test
 ```
 
-The integration tests verify the HTML and JSON status surfaces, secret minimization, public health, unauthenticated denial of project access, Supabase project-identity enforcement, typed bounded provider-event minimization, and fail-closed founder project-read auditing. They do not substitute for mutation-audit atomicity, full RLS verification, deployment evidence, or authenticated production end-to-end evidence.
+The integration tests verify the HTML and JSON status surfaces, secret minimization, public health, unauthenticated denial of project access, Supabase project-identity enforcement, typed bounded provider-event minimization, fail-closed founder project-read auditing, and provider-event persistence/status failure behavior. They do not substitute for transactional mutation auditing, full RLS verification, deployment evidence, or authenticated production end-to-end evidence.
