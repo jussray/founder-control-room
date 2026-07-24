@@ -98,7 +98,7 @@ Allowed actions:
 - `queue_review_draft`
 - `publish_or_send`
 
-`publish_or_send` and any request with `allowHubSpotWrite: true` require a non-empty exact `founderApprovalId`.
+`publish_or_send` and any request with `allowHubSpotWrite: true` require a non-empty `founderApprovalId` approval-receipt reference. The bridge checks that the reference is present; it does not independently verify that reference against an approval registry.
 
 ## Secret boundary
 
