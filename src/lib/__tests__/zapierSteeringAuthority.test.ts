@@ -4,6 +4,8 @@ import { evaluateZapierSteering, ZAPIER_STEERING_AUTHORITY } from '../zapierStee
 const BASE_REQUEST = {
   zapId: 'founder-signal-engine-day2',
   zapierControlConnected: true,
+  openAIDevelopersBridgeConnected: false,
+  bridgeTargetConfigured: false,
   openAIKeyReferenceAvailable: true,
   steeringGrantId: 'founder-grant-day2-zapier',
   auditEnabled: true,
@@ -11,11 +13,11 @@ const BASE_REQUEST = {
 } as const;
 
 describe('Zapier steering authority', () => {
-  it('keeps the API key and Zapier control path as separate capabilities', () => {
+  it('keeps the raw API key and workflow-control path as separate capabilities', () => {
     expect(ZAPIER_STEERING_AUTHORITY.principles).toEqual(
       expect.arrayContaining([
-        expect.stringContaining('not a Zapier control token'),
-        expect.stringContaining('connector is required'),
+        expect.stringContaining('never a Zapier control token'),
+        expect.stringContaining('OpenAI Developers bridge'),
       ]),
     );
   });
@@ -42,7 +44,7 @@ describe('Zapier steering authority', () => {
     expect(result.auditRequired).toBe(true);
   });
 
-  it('does not treat an OpenAI API key as Zapier control authority', () => {
+  it('does not treat an OpenAI API key by itself as Zapier control authority', () => {
     const result = evaluateZapierSteering({
       ...BASE_REQUEST,
       action: 'run_openai_step',
@@ -50,10 +52,11 @@ describe('Zapier steering authority', () => {
     });
 
     expect(result.status).toBe('blocked');
-    expect(result.reason).toContain('key alone cannot');
+    expect(result.reason).toContain('key reference by itself');
+    expect(result.controlPath).toBeNull();
   });
 
-  it('allows read-only inspection through a scoped connector without key use', () => {
+  it('allows read-only inspection through a scoped direct connector without key use', () => {
     const result = evaluateZapierSteering({
       ...BASE_REQUEST,
       action: 'inspect_workflow',
@@ -63,9 +66,55 @@ describe('Zapier steering authority', () => {
 
     expect(result).toMatchObject({
       status: 'allowed',
+      controlPath: 'direct_zapier_connector',
       openAIKeyRequired: false,
       separateFounderGate: false,
     });
+  });
+
+  it('allows ChatGPT to inspect through a configured OpenAI Developers bridge', () => {
+    const result = evaluateZapierSteering({
+      ...BASE_REQUEST,
+      action: 'inspect_workflow',
+      zapierControlConnected: false,
+      openAIDevelopersBridgeConnected: true,
+      bridgeTargetConfigured: true,
+      steeringGrantId: null,
+    });
+
+    expect(result).toMatchObject({
+      status: 'allowed',
+      controlPath: 'openai_developers_bridge',
+      openAIKeyRequired: true,
+    });
+  });
+
+  it('blocks the OpenAI Developers path when the named bridge target is missing', () => {
+    const result = evaluateZapierSteering({
+      ...BASE_REQUEST,
+      action: 'inspect_workflow',
+      zapierControlConnected: false,
+      openAIDevelopersBridgeConnected: true,
+      bridgeTargetConfigured: false,
+    });
+
+    expect(result.status).toBe('blocked');
+    expect(result.reason).toContain('no named Founder Signal Engine Zapier bridge target');
+  });
+
+  it('blocks the OpenAI Developers bridge when its provider-held key reference is unavailable', () => {
+    const result = evaluateZapierSteering({
+      ...BASE_REQUEST,
+      action: 'inspect_workflow',
+      zapierControlConnected: false,
+      openAIDevelopersBridgeConnected: true,
+      bridgeTargetConfigured: true,
+      openAIKeyReferenceAvailable: false,
+      steeringGrantId: null,
+    });
+
+    expect(result.status).toBe('blocked');
+    expect(result.reason).toContain('zapier-founder-signal-engine key reference');
   });
 
   it('requires an explicit steering grant for workflow edits', () => {
@@ -88,8 +137,25 @@ describe('Zapier steering authority', () => {
     expect(result).toMatchObject({
       status: 'allowed',
       zapId: 'founder-signal-engine-day2',
+      controlPath: 'direct_zapier_connector',
       openAIKeyRequired: true,
       separateFounderGate: false,
+    });
+  });
+
+  it('allows a scoped OpenAI step through the ChatGPT bridge path', () => {
+    const result = evaluateZapierSteering({
+      ...BASE_REQUEST,
+      action: 'run_openai_step',
+      zapierControlConnected: false,
+      openAIDevelopersBridgeConnected: true,
+      bridgeTargetConfigured: true,
+    });
+
+    expect(result).toMatchObject({
+      status: 'allowed',
+      controlPath: 'openai_developers_bridge',
+      openAIKeyRequired: true,
     });
   });
 
