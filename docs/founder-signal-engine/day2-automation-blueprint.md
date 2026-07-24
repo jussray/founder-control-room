@@ -18,8 +18,9 @@ The build now moves from account setup to a controlled first live workflow.
 Create the first working automation path:
 
 ```text
-GitHub update
-→ OpenAI drafts Ray-style content
+GitHub PR evidence
+→ Zapier receives a PR opened or updated event
+→ OpenAI drafts Ray-style platform content
 → Buffer receives the approved social draft
 → HubSpot tracks the review/outreach task
 → Founder Control Room stores evidence
@@ -50,13 +51,17 @@ The engine must answer:
 
 Send rule: if the 5W1H check is incomplete, the automation should create a HubSpot task instead of sending or publishing.
 
-## ZAP 1 - GitHub Commit to LinkedIn Draft
+## ZAP 1 - GitHub Pull Request Event to LinkedIn Draft
 
 ### Trigger
 
 App: GitHub  
-Event: New Commit  
-Repository: `jussray/Sekret-Bip`
+Event: New Pull Request or Updated Pull Request  
+Repository: `jussray/Sekret-Bip`  
+Branch scope: any branch, if available  
+Allowed actions: `opened`, `ready_for_review`, `synchronize`, `reopened`
+
+If Zapier exposes only a commit trigger, scope it to any branch or the controlled proof branch. Do not leave the Zap main-only.
 
 ### Action 1: OpenAI Draft
 
@@ -109,11 +114,12 @@ Rules:
 - End with a soft call to action for builders, funders, partners, or people who understand the opportunity.
 - Keep it under 1,300 characters.
 
-GitHub update:
-{{GitHub commit message / PR / issue / release data}}
-
-Repo link:
-{{GitHub repo URL}}
+GitHub evidence:
+{{GitHub PR title}}
+{{GitHub PR body}}
+{{GitHub PR URL}}
+{{GitHub head commit SHA}}
+{{GitHub changed files}}
 ```
 
 ### Action 2: Buffer
@@ -147,7 +153,8 @@ Task body:
 
 ```text
 Source repo: jussray/Sekret-Bip
-Trigger: GitHub commit
+Source PR: {{GitHub PR URL}}
+Trigger: GitHub pull request opened or updated
 Generated channel: LinkedIn
 Status: Review before publishing
 
@@ -164,11 +171,13 @@ Missing proof/context: {{OpenAI Missing proof or missing context}}
 Draft content:
 {{OpenAI generated LinkedIn post}}
 
-Proof link:
-{{GitHub commit / repo link}}
+Proof:
+PR: {{GitHub PR URL}}
+Commit: {{GitHub head commit SHA}}
+Changed files: {{GitHub changed files}}
 ```
 
-Associate manually with HubSpot Deal: `Founder Signal Engine` if Zapier exposes association fields. If not, leave the deal name in the task body.
+Before creating the task, use a Find Deal step for `Founder Signal Engine`, then associate the task with deal `337185466050`. Do not create a floating task.
 
 ## ZAP 2 - Multi-Channel Draft Split
 
@@ -176,7 +185,7 @@ Only enable after Zap 1 works.
 
 ### Trigger
 
-Same GitHub trigger.
+Same GitHub PR-aware trigger.
 
 ### Action: OpenAI creates three drafts
 
@@ -314,11 +323,11 @@ If the message cannot name the recipient-specific Why, do not send. Create a Hub
 
 Day 2 is done only when:
 
-1. GitHub update triggers Zapier.
+1. A GitHub pull request opened or updated event triggers Zapier.
 2. OpenAI generates a LinkedIn draft in Ray’s voice.
 3. The draft includes a 5W1H block and a send decision.
 4. Buffer receives the draft or queue item only if the send decision allows it.
-5. HubSpot receives a review task or note with the 5W1H block.
+5. HubSpot receives a deal-associated review task or note with the 5W1H block.
 6. Founder Control Room records the evidence.
 
 ## ROLLBACK
@@ -330,4 +339,4 @@ Day 2 is done only when:
 
 ## NEXT GATE
 
-Run one controlled GitHub update against `jussray/Sekret-Bip` and confirm Zapier produces the LinkedIn draft with the 5W1H block and without auto-publishing.
+Inspect the live Zap name/ID, enabled state, GitHub trigger event, selected repository, and branch/event scope. Use Zapier’s built-in test trigger first. Do not emit another GitHub proof PR until the trigger contract matches this blueprint. After the built-in trigger passes, run one controlled PR event against `jussray/Sekret-Bip` and confirm Zapier produces the LinkedIn draft with the 5W1H block and without blind auto-publishing.
