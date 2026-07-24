@@ -18,6 +18,7 @@ import { commandBridgeRouter } from './routes/commandBridge.js';
 import { designOsRouter } from './routes/designOs.js';
 import { cloudflareReasoningRouter } from './routes/cloudflareReasoning.js';
 import { mcpRouter } from './routes/mcp.js';
+import { handleFounderSignalEngineMcp } from './routes/founderSignalEngineMcp.js';
 import { portfolioVerificationRouter } from './routes/portfolioVerification.js';
 import {
   handleRepositoryVerificationIngest,
@@ -63,9 +64,9 @@ export function createServer(options: CreateServerOptions = {}) {
     app.use('/control-room', express.static(path.join(publicDir, 'control-room')));
   }
 
-  // Webhooks and repo-runner pings need the raw body for HMAC verification
-  // and do not use browser cookies, so mount them before the browser
-  // mutation gate and JSON parser.
+  // Webhooks, remote MCP calls, and repo-runner pings do not use browser
+  // cookies. Mount them before the browser same-origin mutation gate and give
+  // each endpoint its own strict parser/authentication contract.
   app.post(
     '/webhooks/github',
     express.raw({ type: 'application/json', limit: BODY_LIMIT }),
@@ -75,6 +76,12 @@ export function createServer(options: CreateServerOptions = {}) {
     '/ingest/repository-verification',
     express.raw({ type: 'application/json', limit: '512kb' }),
     handleRepositoryVerificationIngest,
+  );
+  app.post(
+    '/mcp/founder-signal-engine',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '64kb' }),
+    handleFounderSignalEngineMcp,
   );
 
   app.use(requireSameOriginBrowserMutation);
