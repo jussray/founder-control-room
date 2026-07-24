@@ -13,7 +13,7 @@ Zapier steering has two separate planes:
 1. **Credential plane:** the dedicated OpenAI Platform key lets the OpenAI step inside Zapier call an approved model.
 2. **Control plane:** a Zapier, automation, browser-control, MCP, Catch Hook, webhook bridge, or equivalent connector lets an acting agent inspect, invoke, or operate the Zapier workflow.
 
-A configured Zapier OpenAI connection may use the dedicated key without exposing the raw key to the acting agent. **Key possession alone is not a Zapier administration surface.** A connector alone does not prove that the OpenAI action is authenticated.
+A configured Zapier OpenAI connection may use the dedicated key without exposing the raw key to the acting agent. **Key possession alone is not a Zapier control surface.** A connector alone does not prove that the OpenAI action is authenticated.
 
 ## ChatGPT fallback rule
 
