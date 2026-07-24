@@ -157,6 +157,6 @@ on conflict (project_id, server_id) do update set
   enabled = excluded.enabled,
   mode = excluded.mode,
   allowed_tool_patterns = excluded.allowed_tool_patterns,
-  denied_tool_patterns = excluded.denied_patterns,
+  denied_tool_patterns = excluded.denied_tool_patterns,
   cost_limit_usd = excluded.cost_limit_usd,
   updated_at = now();
