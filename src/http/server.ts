@@ -38,11 +38,12 @@ import {
 } from './middleware/security.js';
 import { requireSameOriginBrowserMutation } from './middleware/csrf.js';
 import { requireProjectReadAudit } from './middleware/projectReadAudit.js';
+import { requireFounderSignalEngineReviewOnly } from './middleware/founderSignalEngineWriteGate.js';
 
 export interface CreateServerOptions {
   /**
    * Serve the static Control Room frontend (public/control-room) from this
-   * process. Node-only — reads from the local filesystem, so it's off by
+   * process. Node-only - reads from the local filesystem, so it's off by
    * default in the Cloudflare Worker entry point (cf-entry.ts), where the
    * documented deployment path is Cloudflare Pages serving the frontend
    * separately, not this Worker's filesystem.
@@ -81,6 +82,7 @@ export function createServer(options: CreateServerOptions = {}) {
     '/mcp/founder-signal-engine',
     rateLimitGeneral,
     express.json({ type: 'application/json', limit: '64kb' }),
+    requireFounderSignalEngineReviewOnly,
     handleFounderSignalEngineMcp,
   );
 
@@ -134,7 +136,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/mcp', mcpRouter);
   app.use('/economic-intelligence', economicIntelligenceRouter);
 
-  // Debug routes — CI and founder inspection only (no secrets exposed).
+  // Debug routes - CI and founder inspection only (no secrets exposed).
   app.use('/_debug', debugRouter);
 
   app.use(errorHandler);
