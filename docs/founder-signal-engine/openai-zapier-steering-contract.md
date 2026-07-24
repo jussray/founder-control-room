@@ -2,49 +2,103 @@
 
 ## Goal
 
-Allow connected ChatGPT, Codex, and OpenAI-backed agents to inspect, repair, test, and run the Founder Signal Engine Zapier workflow through explicit, least-privilege control paths.
+Allow ChatGPT, Codex, Claude, and other approved agents to operate the Founder Signal Engine through the strongest control path available without exposing credentials or pretending that one tool grants authority it does not have.
 
-## Core distinction
+## Canonical rule
 
-Zapier steering has two separate planes:
+Use this order:
 
-1. **Credential plane:** the dedicated OpenAI Platform key lets the OpenAI step inside Zapier call an approved model.
-2. **Control plane:** a Zapier, OpenAI Developers, automation, browser-control, MCP, or equivalent connector lets an acting agent inspect or operate the Zapier workflow.
+1. **Native Zapier connector available:** use it directly for inspection, repair, testing, and scoped execution.
+2. **No native Zapier connector:** use the existing `@OpenAI Developers` key-backed execution bridge for the named Founder Signal Engine Zap.
+3. **Neither path available:** stop, record the blocker, and provide exact manual Zapier steps.
 
-A configured Zapier OpenAI connection may use the dedicated key without exposing the raw key to the acting agent. **Key possession alone is not a Zapier control surface.** A connector alone does not prove that the OpenAI action is authenticated.
+Claude currently has a direct Zapier connector in the founder stack. ChatGPT does not currently have that native connector here, so ChatGPT must use the `@OpenAI Developers` bridge backed by the existing `zapier-founder-signal-engine` key reference.
 
-## Steering authority matrix
+The raw key is never requested, displayed, copied, logged, committed, or placed in a payload. The provider-held key reference is the connection.
 
-| Available path | Allowed steering | Proof limit |
+## What the key-backed bridge means
+
+The key-backed bridge allows an approved agent without native Zapier control to call a preconfigured Founder Signal Engine Zap through `@OpenAI Developers`.
+
+It may:
+
+- invoke the named Zap;
+- test the preconfigured execution path;
+- run the OpenAI 5W1H step;
+- create review-first Buffer output;
+- create an approved HubSpot task or note;
+- return run evidence to Founder Control Room.
+
+It may not, by itself:
+
+- inspect arbitrary Zapier run history;
+- edit Zap structure, filters, paths, mappings, app connections, or account settings;
+- change credentials or billing;
+- widen the Zap scope;
+- publish or send without the exact founder approval required for that action.
+
+Those administrative actions still require a native Zapier, browser-control, MCP, or equivalent control connector.
+
+## Required bridge invocation envelope
+
+Agents without a native Zapier connector must use this non-secret envelope:
+
+```json
+{
+  "bridge": "openai-developers",
+  "key_reference": "zapier-founder-signal-engine",
+  "zap_id": "founder-signal-engine-day2",
+  "action": "test_workflow",
+  "source": {
+    "repository": "jussray/Sekret-Bip",
+    "pull_request": 599,
+    "commit_sha": "f4573d360a8fea99b301f33a2a21192525725f7b"
+  },
+  "steering_grant_id": "founder-grant-day2-zapier",
+  "audit_path": "founder-control-room",
+  "founder_approval_id": null
+}
+```
+
+Rules:
+
+- `key_reference` names the provider-held connection only. Never substitute the raw secret.
+- `zap_id` must name the approved workflow. Unscoped Zapier calls are forbidden.
+- `action` must be one of the actions allowed by `src/lib/zapierSteeringAuthority.ts`.
+- `steering_grant_id` is required for execution or repair actions.
+- `founder_approval_id` is required for publishing, sending, CRM writes outside an already approved scope, credential changes, or billing changes.
+- `audit_path` must be active before execution.
+
+## Control-path matrix
+
+| Available path | Allowed behavior | Not allowed |
 |---|---|---|
-| Scoped Zapier/control connector plus an active dedicated OpenAI connection | Inspect, edit, test, and run the controlled Day 2 Zap; repair trigger scope and mappings; verify OpenAI output; create review-first Buffer and deal-associated HubSpot evidence. | Retain exact run evidence and obey the 5W1H send gate. |
-| Scoped Zapier/control connector without an active OpenAI connection | Inspect and repair non-OpenAI workflow structure and mappings. | Cannot claim the OpenAI step or full workflow passed. |
-| Authorized dedicated OpenAI key access plus secure Zapier UI/control access | Configure or repair the Zapier OpenAI connection, then test through Zapier. | Raw key remains outside logs, chat, screenshots, GitHub, HubSpot, and Control Room records. |
-| Dedicated OpenAI key without Zapier connector or secure Zapier UI/control access | Validate OpenAI Platform target and key status only. | Cannot inspect, edit, test, or run Zapier directly. |
-| Neither connector nor authorized key path | Provide exact manual UI steps and create a blocked-evidence record. | No direct-control or end-to-end claim. |
+| Native Zapier connector | Inspect, edit, test, run, and repair the named Zap within the steering grant. | Publishing, CRM mutation, credentials, billing, or scope expansion without exact approval. |
+| `@OpenAI Developers` bridge plus existing key reference | Invoke and test the preconfigured Zap, run OpenAI, create review-first Buffer output, and perform approved downstream actions. | Zapier administration, arbitrary history inspection, connection edits, or account changes. |
+| Existing key reference without a configured bridge target | Verify that the named key reference exists only. | Claiming Zapier was invoked or passed. |
+| No connector and no bridge | Record blocked state and provide manual steps. | Any direct-control or end-to-end claim. |
 
-## Canonical Day 2 path
+## Canonical Founder Signal Engine path
 
 ```text
 GitHub evidence
--> Zapier trigger
--> dedicated OpenAI connection
+-> native Zapier connector OR @OpenAI Developers key-backed bridge
+-> preconfigured Founder Signal Engine Zap
 -> OpenAI 5W1H send gate
--> Buffer draft or queue item only when allowed
--> HubSpot task or note associated with Founder Signal Engine
+-> Buffer draft, queue, schedule, or approved publish action
+-> HubSpot task or note associated with deal 337185466050
 -> Founder Control Room evidence record
 ```
 
 ## Agent behavior
 
-- Discover Zapier, OpenAI Developers, automation, browser-control, MCP, and equivalent connectors before falling back to manual instructions.
-- Use a connector to steer Zapier only within its declared capabilities and project boundary.
-- An agent does not need to see the raw key when Zapier already holds a working dedicated OpenAI connection.
-- An agent authorized to configure the key must place it only into the secure Zapier/OpenAI connection surface.
-- Prefer the dedicated `zapier-founder-signal-engine` key over a local Codex key.
-- Do not reuse, reveal, copy, log, commit, screenshot, or place the raw key in CRM or evidence content.
-- Do not treat successful OpenAI authentication as proof that the GitHub trigger, Buffer mapping, HubSpot association, or full Zap passed.
-- Do not treat connector availability as permission to publish, send outreach, spend funds, alter commercial terms, or widen scopes.
+- Discover a native Zapier connector first.
+- When native Zapier control is absent, call the approved workflow through `@OpenAI Developers` using the existing provider-held `zapier-founder-signal-engine` key reference.
+- Do not create or rotate another key unless Ray explicitly requests it.
+- Do not ask Ray to paste the key into chat, GitHub, HubSpot, screenshots, or evidence.
+- Do not claim the bridge ran when no invocation target or run receipt is visible.
+- Do not confuse successful OpenAI authentication with proof that GitHub, Buffer, HubSpot, or the whole Zap passed.
+- Preserve review-first publishing until the workflow has documented trust and Ray approves graduation to scheduled automation.
 
 ## 5W1H send gate
 
@@ -68,17 +122,18 @@ If any field is incomplete, the workflow must not publish or send. It should cre
 A full pass requires:
 
 1. exact GitHub source evidence;
-2. Zapier run ID and status;
-3. OpenAI 5W1H output without credentials;
-4. Buffer draft or queue evidence when the send decision permits it;
-5. HubSpot task or note associated with deal `337185466050`;
-6. Founder Control Room evidence linking the run to the source SHA;
-7. no raw key in any retained artifact.
+2. native connector or OpenAI Developers bridge invocation receipt;
+3. Zapier run ID and status;
+4. OpenAI 5W1H output without credentials;
+5. Buffer artifact and channel status when permitted;
+6. HubSpot task or note associated with deal `337185466050`;
+7. Founder Control Room evidence tied to the source SHA;
+8. no raw key in any retained artifact.
 
 ## Non-authority
 
-This contract does not authorize blind publication, external outreach, key disclosure, credential reuse, billing changes, deployment, database migration, auth changes, deletion, or destructive provider actions.
+This contract does not authorize blind publication, spam, external outreach, key disclosure, billing changes, deployment, database migration, auth changes, deletion, or destructive provider actions.
 
 ## Rollback
 
-Disable the Zap, disconnect or rotate the dedicated OpenAI connection, restore the prior Zap version, and mark downstream Buffer or HubSpot artifacts as invalidated. Never delete founder evidence merely to make the run look clean.
+Stop bridge invocation, disable the named Zap through an authorized control path, invalidate queued Buffer items, restore the prior Zap version when native control is available, and mark downstream HubSpot artifacts as invalidated. Never delete founder evidence merely to make the run look clean.
