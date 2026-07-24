@@ -6,16 +6,25 @@ const MCP_PROTOCOL_VERSION = '2025-06-18';
 const TOOL_NAME = 'invoke_founder_signal_engine';
 const ACTIVE_REPOSITORY = 'jussray/Sekret-Bip';
 const ACTIVE_PROJECT_SLUG = 'sekret-bip';
+const OPENAI_KEY_REFERENCE = 'zapier-founder-signal-engine';
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 const DEFAULT_TIMEOUT_MS = 10_000;
-const INVOCATION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const INVOCATION_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
-const SECRETISH_PATTERN = /(sk-[A-Za-z0-9_-]{12,}|Bearer\s+\S+|hooks\.zapier\.com|API[_-]?KEY|SERVICE[_-]?ROLE|PASSWORD|SECRET|TOKEN)/i;
+const SECRETISH_PATTERN =
+  /(sk-[A-Za-z0-9_-]{12,}|Bearer\s+\S+|hooks\.zapier\.com|API[_-]?KEY|SERVICE[_-]?ROLE|PASSWORD|SECRET|TOKEN)/i;
+
+type JsonRpcId = string | number | null;
+type DbRecord = Record<string, unknown>;
+type RequestedAction = 'run_openai_step' | 'queue_review_draft' | 'publish_or_send';
+
 const ALLOWED_ACTIONS = new Set<RequestedAction>([
   'run_openai_step',
   'queue_review_draft',
   'publish_or_send',
 ]);
+
 const ALLOWED_ARGUMENT_KEYS = new Set([
   'invocationId',
   'sourceRepository',
@@ -29,10 +38,6 @@ const ALLOWED_ARGUMENT_KEYS = new Set([
   'allowHubSpotWrite',
   'founderApprovalId',
 ]);
-
-type JsonRpcId = string | number | null;
-type DbRecord = Record<string, unknown>;
-type RequestedAction = 'run_openai_step' | 'queue_review_draft' | 'publish_or_send';
 
 interface InvocationArguments {
   invocationId: string;
@@ -101,7 +106,8 @@ function nonEmptyString(value: unknown, maxLength = 500): string | null {
 }
 
 function rpcId(value: unknown): JsonRpcId {
-  return typeof value === 'string' || typeof value === 'number' || value === null ? value : null;
+  if (typeof value === 'string' || typeof value === 'number') return value;
+  return null;
 }
 
 function rpcResult(id: JsonRpcId, result: unknown): DbRecord {
@@ -130,8 +136,7 @@ function secureEqual(actual: string, expected: string): boolean {
 function bearerToken(req: Request): string | null {
   const authorization = req.header('authorization');
   if (!authorization?.startsWith('Bearer ')) return null;
-  const token = authorization.slice('Bearer '.length).trim();
-  return token.length > 0 ? token : null;
+  return nonEmptyString(authorization.slice('Bearer '.length), 4096);
 }
 
 function containsSecretLikeMaterial(value: unknown): boolean {
@@ -143,8 +148,12 @@ function containsSecretLikeMaterial(value: unknown): boolean {
   );
 }
 
-function parseInvocationArguments(value: unknown): { value: InvocationArguments | null; errors: string[] } {
-  if (!isRecord(value)) return { value: null, errors: ['arguments must be an object'] };
+function parseInvocationArguments(
+  value: unknown,
+): { value: InvocationArguments | null; errors: string[] } {
+  if (!isRecord(value)) {
+    return { value: null, errors: ['arguments must be an object'] };
+  }
 
   const errors: string[] = [];
   for (const key of Object.keys(value)) {
@@ -180,15 +189,13 @@ function parseInvocationArguments(value: unknown): { value: InvocationArguments 
   }
 
   const steeringGrantId = nonEmptyString(value.steeringGrantId, 200);
-  if (!steeringGrantId) errors.push('steeringGrantId is required');
-
   const auditPath = nonEmptyString(value.auditPath, 500);
-  if (!auditPath) errors.push('auditPath is required');
-
   const rollbackStep = nonEmptyString(value.rollbackStep, 500);
-  if (!rollbackStep) errors.push('rollbackStep is required');
-
   const requestingAgent = nonEmptyString(value.requestingAgent, 100);
+
+  if (!steeringGrantId) errors.push('steeringGrantId is required');
+  if (!auditPath) errors.push('auditPath is required');
+  if (!rollbackStep) errors.push('rollbackStep is required');
   if (!requestingAgent) errors.push('requestingAgent is required');
 
   if (typeof value.allowHubSpotWrite !== 'boolean') {
@@ -196,10 +203,16 @@ function parseInvocationArguments(value: unknown): { value: InvocationArguments 
   }
   const allowHubSpotWrite = value.allowHubSpotWrite === true;
 
-  const founderApprovalId = value.founderApprovalId === undefined || value.founderApprovalId === null
-    ? null
-    : nonEmptyString(value.founderApprovalId, 200);
-  if (value.founderApprovalId !== undefined && value.founderApprovalId !== null && !founderApprovalId) {
+  const founderApprovalId =
+    value.founderApprovalId === undefined || value.founderApprovalId === null
+      ? null
+      : nonEmptyString(value.founderApprovalId, 200);
+
+  if (
+    value.founderApprovalId !== undefined &&
+    value.founderApprovalId !== null &&
+    !founderApprovalId
+  ) {
     errors.push('founderApprovalId must be a non-empty string when provided');
   }
 
@@ -247,7 +260,7 @@ function toolDefinition(): DbRecord {
     name: TOOL_NAME,
     title: 'Invoke Founder Signal Engine',
     description:
-      'Invoke the scoped Founder Signal Engine Zapier bridge for verified GitHub evidence. This tool never accepts raw credentials and does not prove the downstream chain without an explicit Zapier run ID.',
+      'Invoke the scoped Founder Signal Engine Zapier bridge for verified GitHub evidence. The tool never accepts raw credentials. A Zapier run receipt is not complete Day 3 proof.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -296,6 +309,7 @@ async function defaultResolveProjectId(): Promise<string> {
     .select('id')
     .eq('slug', ACTIVE_PROJECT_SLUG)
     .maybeSingle();
+
   if (error) throw new Error(`PROJECT_LOOKUP_FAILED:${error.message}`);
   const id = isRecord(data) ? nonEmptyString(data.id, 100) : null;
   if (!id) throw new Error(`PROJECT_NOT_REGISTERED:${ACTIVE_PROJECT_SLUG}`);
@@ -313,6 +327,7 @@ async function defaultWriteAuditEvent(projectId: string, event: AuditEvent): Pro
     decision: event.decision,
     metadata: event.metadata,
   });
+
   if (!error) return;
   if ((error as { code?: string }).code === '23505') throw new DuplicateInvocationError();
   throw new Error(`AUDIT_WRITE_FAILED:${error.message}`);
@@ -321,11 +336,15 @@ async function defaultWriteAuditEvent(projectId: string, event: AuditEvent): Pro
 function hookUrl(env: NodeJS.ProcessEnv): URL {
   const raw = env.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL?.trim();
   if (!raw) throw new Error('ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL is not configured');
+
   const url = new URL(raw);
   if (!['http:', 'https:'].includes(url.protocol)) {
     throw new Error('Zapier hook URL must use http or https');
   }
-  if (env.NODE_ENV === 'production' && (url.protocol !== 'https:' || url.hostname !== 'hooks.zapier.com')) {
+  if (
+    env.NODE_ENV === 'production' &&
+    (url.protocol !== 'https:' || url.hostname !== 'hooks.zapier.com')
+  ) {
     throw new Error('Production Zapier hook URL must use https://hooks.zapier.com');
   }
   return url;
@@ -333,10 +352,9 @@ function hookUrl(env: NodeJS.ProcessEnv): URL {
 
 function timeoutMs(env: NodeJS.ProcessEnv): number {
   const configured = Number(env.FOUNDER_SIGNAL_ENGINE_HOOK_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
-  if (!Number.isFinite(configured) || configured < 500 || configured > 60_000) {
-    return DEFAULT_TIMEOUT_MS;
-  }
-  return configured;
+  return Number.isFinite(configured) && configured >= 500 && configured <= 60_000
+    ? configured
+    : DEFAULT_TIMEOUT_MS;
 }
 
 async function readProviderResponse(response: globalThis.Response): Promise<ParsedProviderBody> {
@@ -436,7 +454,7 @@ async function callZapier(
         requesting_agent: args.requestingAgent,
         allow_hubspot_write: args.allowHubSpotWrite,
         founder_approval_id: args.founderApprovalId,
-        key_reference: 'zapier-founder-signal-engine',
+        key_reference: OPENAI_KEY_REFERENCE,
       }),
       signal: controller.signal,
     });
@@ -464,11 +482,9 @@ function toolResponse(receipt: DbRecord, isError: boolean): DbRecord {
   const runId = nonEmptyString(receipt.zapierRunId, 200);
   const text = isError
     ? `Founder Signal Engine invocation failed or remains blocked. Invocation ${invocationId}.`
-    : `Founder Signal Engine bridge accepted invocation ${invocationId}. ${
-        runId
-          ? `Zapier run ${runId} was returned.`
-          : 'Zapier did not return a run ID, so end-to-end proof is still incomplete.'
-      }`;
+    : runId
+      ? `Founder Signal Engine bridge accepted invocation ${invocationId}. Zapier run ${runId} was returned, but downstream Day 3 proof is still incomplete.`
+      : `Founder Signal Engine bridge accepted invocation ${invocationId}. Zapier did not return a run ID, so end-to-end proof is still incomplete.`;
 
   return {
     content: [{ type: 'text', text }],
@@ -513,6 +529,7 @@ async function invokeTool(
           accepted: false,
           auditComplete: true,
           duplicateBlocked: true,
+          zapierRunIdentified: false,
           endToEndProofComplete: false,
           nextGate: 'Use a new invocationId only after inspecting the prior invocation evidence.',
         },
@@ -537,8 +554,11 @@ async function invokeTool(
         sourceCommitSha: args.sourceCommitSha,
         requestedAction: args.requestedAction,
         failure: message,
+        zapierRunIdentified: false,
+        endToEndProofComplete: false,
       },
     });
+
     return toolResponse(
       {
         invocationId: args.invocationId,
@@ -546,14 +566,17 @@ async function invokeTool(
         auditComplete: true,
         providerError: message,
         zapierRunId: null,
+        zapierRunIdentified: false,
         endToEndProofComplete: false,
-        nextGate: 'Repair the configured Zapier Catch Hook or network path, then invoke with a new invocationId.',
+        nextGate:
+          'Repair the configured Zapier Catch Hook or network path, then invoke with a new invocationId.',
       },
       true,
     );
   }
 
-  const proofComplete = providerReceipt.accepted && Boolean(providerReceipt.runId);
+  const zapierRunIdentified = providerReceipt.accepted && Boolean(providerReceipt.runId);
+
   try {
     await dependencies.writeAuditEvent(projectId, {
       sourceEventId: resultEventId,
@@ -569,7 +592,8 @@ async function invokeTool(
         providerHttpStatus: providerReceipt.httpStatus,
         providerResponseKind: providerReceipt.responseKind,
         zapierRunId: providerReceipt.runId,
-        endToEndProofComplete: proofComplete,
+        zapierRunIdentified,
+        endToEndProofComplete: false,
       },
     });
   } catch (error) {
@@ -579,6 +603,7 @@ async function invokeTool(
         accepted: providerReceipt.accepted,
         providerHttpStatus: providerReceipt.httpStatus,
         zapierRunId: providerReceipt.runId,
+        zapierRunIdentified,
         auditComplete: false,
         endToEndProofComplete: false,
         auditError: error instanceof Error ? error.message : 'Unknown post-call audit failure',
@@ -597,14 +622,15 @@ async function invokeTool(
       providerResponseKind: providerReceipt.responseKind,
       providerDetail: providerReceipt.detail,
       zapierRunId: providerReceipt.runId,
+      zapierRunIdentified,
       auditComplete: true,
-      endToEndProofComplete: proofComplete,
+      endToEndProofComplete: false,
       sourceRepository: args.sourceRepository,
       sourcePr: args.sourcePr,
       sourceCommitSha: args.sourceCommitSha,
       requestedAction: args.requestedAction,
-      nextGate: proofComplete
-        ? 'Capture the OpenAI 5W1H result, Buffer artifact, HubSpot association, and Founder Control Room evidence.'
+      nextGate: zapierRunIdentified
+        ? 'Capture and verify the OpenAI 5W1H result, Buffer artifact, HubSpot deal association, and final Founder Control Room evidence before marking Day 3 complete.'
         : 'Locate the invocation in Zapier history using invocationId, record its run ID, and continue downstream evidence capture.',
     },
     !providerReceipt.accepted,
@@ -630,7 +656,9 @@ export function createFounderSignalEngineMcpHandler(
   return async (req: Request, res: ExpressResponse): Promise<void> => {
     const configuredToken = dependencies.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN?.trim();
     if (!configuredToken) {
-      res.status(503).json(rpcError(null, -32001, 'Founder Signal Engine MCP token is not configured'));
+      res.status(503).json(
+        rpcError(null, -32001, 'Founder Signal Engine MCP token is not configured'),
+      );
       return;
     }
 
@@ -656,7 +684,7 @@ export function createFounderSignalEngineMcpHandler(
         rpcResult(id, {
           protocolVersion: MCP_PROTOCOL_VERSION,
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: 'founder-signal-engine-bridge', version: '1.0.0' },
+          serverInfo: { name: 'founder-signal-engine-bridge', version: '1.1.0' },
         }),
       );
       return;
@@ -690,7 +718,8 @@ export function createFounderSignalEngineMcpHandler(
       const result = await invokeTool(parsed.value, dependencies);
       res.json(rpcResult(id, result));
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Founder Signal Engine MCP failure';
+      const message =
+        error instanceof Error ? error.message : 'Founder Signal Engine MCP failure';
       res.status(500).json(rpcError(id, -32603, message));
     }
   };
