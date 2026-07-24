@@ -72,8 +72,8 @@
       "entrypoint": "AGENTS_FOUNDER_INTELLIGENCE.md",
       "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
       "primaryAgentContract": "AGENTS.md",
-      "status": "missing",
-      "nextAction": "Add a commerce-specific Founder Intelligence constitution, entrypoint, and AGENTS.md reference through a focused documentation PR."
+      "status": "enforced",
+      "nextAction": "Preserve the commerce-specific constitution merged in jussbeautifulhair-site PR #25 and ensure future AGENTS.md changes retain its entrypoint."
     },
     {
       "slug": "jbh-private",
