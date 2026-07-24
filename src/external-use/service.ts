@@ -19,6 +19,9 @@ import type {
 
 export const EXTERNAL_USE_DIGEST_RECIPIENT = "sekretbip@gmail.com";
 const MAX_DIGEST_ITEMS = 200;
+const DIGEST_FAILED_RETRY_MS = 10 * 60_000;
+const DIGEST_STALE_RUNNING_MS = 20 * 60_000;
+const RESEND_TIMEOUT_MS = 15_000;
 
 interface PersistResult {
   inserted: number;
@@ -42,6 +45,7 @@ interface ExistingDiscoveryRow {
 }
 
 interface DigestDiscoveryRow {
+  id: unknown;
   project_id: unknown;
   title: unknown;
   evidence_url: unknown;
@@ -62,6 +66,15 @@ interface DigestProjectRow {
   id: unknown;
   name: unknown;
   repo_identifier: unknown;
+}
+
+interface ExistingDigestRow {
+  id: unknown;
+  digest_hour: unknown;
+  status: unknown;
+  started_at: unknown;
+  updated_at: unknown;
+  attempt_count: unknown;
 }
 
 function errorCode(error: unknown): string {
@@ -101,7 +114,12 @@ function searchArguments(tool: McpToolDefinition, query: string): Record<string,
   );
   if (!queryAssigned) args.query = query;
 
-  setFirstSupported(args, properties, ["num_results", "numResults", "limit", "per_page", "perPage"], 10);
+  setFirstSupported(
+    args,
+    properties,
+    ["num_results", "numResults", "limit", "per_page", "perPage"],
+    10,
+  );
   setFirstSupported(args, properties, ["include_text", "includeText"], true);
   return args;
 }
@@ -123,7 +141,9 @@ function findTool(
   for (const preferred of preferredNames) {
     const exact = tools.find((tool) => tool.name === preferred);
     if (exact) return exact;
-    const namespaced = tools.find((tool) => tool.name.endsWith(`_${preferred}`) || tool.name.endsWith(`.${preferred}`));
+    const namespaced = tools.find(
+      (tool) => tool.name.endsWith(`_${preferred}`) || tool.name.endsWith(`.${preferred}`),
+    );
     if (namespaced) return namespaced;
   }
   return undefined;
@@ -210,7 +230,9 @@ async function scanGitHubMcp(
       sourceCounts[repoTool.name] = found.length;
     }
 
-    if (!forksTool && !codeTool && !repoTool) warnings.push("github_mcp_no_supported_search_tool");
+    if (!forksTool && !codeTool && !repoTool) {
+      warnings.push("github_mcp_no_supported_search_tool");
+    }
   } catch (error) {
     warnings.push(`github_mcp_unavailable:${errorCode(error)}`);
   }
@@ -232,7 +254,11 @@ async function scanExaMcp(
       "web_search_exa",
     ]);
     if (!tool) {
-      return { candidates: [], sourceCounts, warnings: ["exa_mcp_no_supported_search_tool"] };
+      return {
+        candidates: [],
+        sourceCounts,
+        warnings: ["exa_mcp_no_supported_search_tool"],
+      };
     }
 
     const query = [
@@ -293,10 +319,15 @@ async function persistCandidates(
     .select("id,evidence_hash")
     .eq("project_id", projectId)
     .in("evidence_hash", hashes);
-  if (existingError) throw new Error(`external_use_existing_read_failed:${existingError.message}`);
+  if (existingError) {
+    throw new Error(`external_use_existing_read_failed:${existingError.message}`);
+  }
 
   const existingByHash = new Map(
-    ((existingRows ?? []) as ExistingDiscoveryRow[]).map((row) => [String(row.evidence_hash), String(row.id)]),
+    ((existingRows ?? []) as ExistingDiscoveryRow[]).map((row) => [
+      String(row.evidence_hash),
+      String(row.id),
+    ]),
   );
   const newRows = normalized
     .filter((candidate) => !existingByHash.has(candidate.evidenceHash))
@@ -394,7 +425,10 @@ export async function runExternalUseDiscoveryCycle(
     summary.inserted += persisted.inserted;
     summary.refreshed += persisted.refreshed;
     summary.warnings.push(...github.warnings, ...exa.warnings);
-    for (const [source, count] of Object.entries({ ...github.sourceCounts, ...exa.sourceCounts })) {
+    for (const [source, count] of Object.entries({
+      ...github.sourceCounts,
+      ...exa.sourceCounts,
+    })) {
       summary.sourceCounts[source] = (summary.sourceCounts[source] ?? 0) + count;
     }
   }
@@ -407,25 +441,81 @@ function hourStart(date: Date): string {
   return new Date(Math.floor(date.getTime() / 3_600_000) * 3_600_000).toISOString();
 }
 
+function retryDelay(status: string): number | undefined {
+  if (status === "failed") return DIGEST_FAILED_RETRY_MS;
+  if (status === "running") return DIGEST_STALE_RUNNING_MS;
+  return undefined;
+}
+
 async function reserveDigest(date: Date): Promise<DigestReservation | undefined> {
   const id = randomUUID();
   const digestHour = hourStart(date);
+  const startedAt = date.toISOString();
   const { error } = await supabase.from("external_code_use_digest_runs").insert({
     id,
     digest_hour: digestHour,
     recipient: EXTERNAL_USE_DIGEST_RECIPIENT,
     status: "running",
-    started_at: date.toISOString(),
+    started_at: startedAt,
+    attempt_count: 1,
   });
   if (!error) return { id, digestHour };
-  if (error.code === "23505") return undefined;
-  throw new Error(`external_use_digest_reservation_failed:${error.message}`);
+  if (error.code !== "23505") {
+    throw new Error(`external_use_digest_reservation_failed:${error.message}`);
+  }
+
+  const { data: existingData, error: existingError } = await supabase
+    .from("external_code_use_digest_runs")
+    .select("id,digest_hour,status,started_at,updated_at,attempt_count")
+    .eq("digest_hour", digestHour)
+    .maybeSingle();
+  if (existingError) {
+    throw new Error(`external_use_digest_reservation_read_failed:${existingError.message}`);
+  }
+  if (!existingData) return undefined;
+
+  const existing = existingData as ExistingDigestRow;
+  const status = String(existing.status);
+  const delay = retryDelay(status);
+  if (delay === undefined) return undefined;
+  const previousStart = Date.parse(String(existing.started_at));
+  if (!Number.isFinite(previousStart) || date.getTime() - previousStart < delay) {
+    return undefined;
+  }
+
+  const nextAttempt = Math.max(1, Number(existing.attempt_count) || 1) + 1;
+  const { data: reclaimed, error: reclaimError } = await supabase
+    .from("external_code_use_digest_runs")
+    .update({
+      status: "running",
+      recipient: EXTERNAL_USE_DIGEST_RECIPIENT,
+      started_at: startedAt,
+      completed_at: null,
+      attempt_count: nextAttempt,
+      item_count: 0,
+      new_item_count: 0,
+      source_counts: {},
+      warnings: [],
+      resend_email_id: null,
+    })
+    .eq("id", String(existing.id))
+    .eq("updated_at", String(existing.updated_at))
+    .select("id,digest_hour")
+    .maybeSingle();
+  if (reclaimError) {
+    throw new Error(`external_use_digest_reclaim_failed:${reclaimError.message}`);
+  }
+  if (!reclaimed) return undefined;
+  return {
+    id: String(reclaimed.id),
+    digestHour: String(reclaimed.digest_hour),
+  };
 }
 
 async function digestItems(): Promise<ExternalUseDigestItem[]> {
   const { data: rows, error } = await supabase
     .from("external_code_use_discoveries")
-    .select("project_id,title,evidence_url,evidence_summary,classification,confidence,who_text,what_text,where_text,when_text,why_text,how_text,first_seen_at,last_seen_at")
+    .select("id,project_id,title,evidence_url,evidence_summary,classification,confidence,who_text,what_text,where_text,when_text,why_text,how_text,first_seen_at,last_seen_at")
     .neq("classification", "dismissed")
     .order("last_seen_at", { ascending: false })
     .limit(MAX_DIGEST_ITEMS);
@@ -439,7 +529,9 @@ async function digestItems(): Promise<ExternalUseDigestItem[]> {
       .from("projects")
       .select("id,name,repo_identifier")
       .in("id", projectIds);
-    if (projectsError) throw new Error(`external_use_digest_project_read_failed:${projectsError.message}`);
+    if (projectsError) {
+      throw new Error(`external_use_digest_project_read_failed:${projectsError.message}`);
+    }
     for (const project of (projects ?? []) as DigestProjectRow[]) {
       projectById.set(String(project.id), {
         name: String(project.name),
@@ -454,6 +546,7 @@ async function digestItems(): Promise<ExternalUseDigestItem[]> {
       repository: "unknown",
     };
     return {
+      id: String(row.id),
       projectName: project.name,
       projectRepository: project.repository,
       title: String(row.title),
@@ -485,32 +578,46 @@ async function sendWithResend(options: {
   const from = process.env.EXTERNAL_USE_EMAIL_FROM?.trim();
   if (!apiKey || !from) throw new Error("external_use_resend_not_configured");
 
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json",
-      "idempotency-key": `external-code-use-${options.digestHour}`,
-    },
-    body: JSON.stringify({
-      from,
-      to: [EXTERNAL_USE_DIGEST_RECIPIENT],
-      subject: options.subject,
-      html: options.html,
-      text: options.text,
-      tags: [
-        { name: "system", value: "founder-control-room" },
-        { name: "report", value: "external-code-use" },
-      ],
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), RESEND_TIMEOUT_MS);
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
+        "idempotency-key": `external-code-use-${options.digestHour}`,
+      },
+      body: JSON.stringify({
+        from,
+        to: [EXTERNAL_USE_DIGEST_RECIPIENT],
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+        tags: [
+          { name: "system", value: "founder-control-room" },
+          { name: "report", value: "external-code-use" },
+        ],
+      }),
+      signal: controller.signal,
+    });
 
-  const payload = await response.json().catch(() => ({})) as { id?: unknown };
-  if (!response.ok) throw new Error(`external_use_resend_send_failed:${response.status}`);
-  if (typeof payload.id !== "string" || !payload.id) {
-    throw new Error("external_use_resend_missing_email_id");
+    const payload = await response.json().catch(() => ({})) as { id?: unknown };
+    if (!response.ok) {
+      throw new Error(`external_use_resend_send_failed:${response.status}`);
+    }
+    if (typeof payload.id !== "string" || !payload.id) {
+      throw new Error("external_use_resend_missing_email_id");
+    }
+    return payload.id;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("external_use_resend_timeout");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-  return payload.id;
 }
 
 export async function runExternalUseHourlyCycle(
@@ -522,39 +629,50 @@ export async function runExternalUseHourlyCycle(
   try {
     const discovery = await runExternalUseDiscoveryCycle();
     const items = await digestItems();
-    const newItemCount = items.filter((item) => item.firstSeenAt >= reservation.digestHour).length;
+    const newItemCount = items.filter(
+      (item) => item.firstSeenAt >= reservation.digestHour,
+    ).length;
+    const warnings = [...discovery.warnings];
+    if (items.length === MAX_DIGEST_ITEMS) {
+      warnings.push(`digest_capped_at_${MAX_DIGEST_ITEMS}`);
+    }
     const rendered = renderExternalUseDigest({
       generatedAt: now.toISOString(),
       items,
       newItemCount,
-      warnings: discovery.warnings,
+      warnings,
     });
     const resendEmailId = await sendWithResend({
       digestHour: reservation.digestHour,
       ...rendered,
     });
 
-    const { error: digestMarkError } = await supabase
-      .from("external_code_use_discoveries")
-      .update({ last_digest_at: now.toISOString() })
-      .neq("classification", "dismissed");
-    if (digestMarkError) {
-      throw new Error(`external_use_digest_mark_failed:${digestMarkError.message}`);
+    if (items.length) {
+      const { error: digestMarkError } = await supabase
+        .from("external_code_use_discoveries")
+        .update({ last_digest_at: now.toISOString() })
+        .in("id", items.map((item) => item.id));
+      if (digestMarkError) {
+        throw new Error(`external_use_digest_mark_failed:${digestMarkError.message}`);
+      }
     }
 
-    const { error } = await supabase
+    const { data: finalized, error } = await supabase
       .from("external_code_use_digest_runs")
       .update({
         status: "sent",
         item_count: items.length,
         new_item_count: newItemCount,
         source_counts: discovery.sourceCounts,
-        warnings: discovery.warnings,
+        warnings,
         resend_email_id: resendEmailId,
         completed_at: new Date().toISOString(),
       })
-      .eq("id", reservation.id);
+      .eq("id", reservation.id)
+      .select("id")
+      .maybeSingle();
     if (error) throw new Error(`external_use_digest_finalize_failed:${error.message}`);
+    if (!finalized) throw new Error("external_use_digest_finalize_missing_reservation");
 
     return { status: "sent", itemCount: items.length, newItemCount };
   } catch (error) {
