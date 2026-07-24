@@ -1,6 +1,11 @@
 import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../../lib/supabaseClient.js', () => ({
+  supabase: {},
+}));
+
 import {
   createFounderSignalEngineMcpHandler,
   type FounderSignalEngineMcpDependencies,
