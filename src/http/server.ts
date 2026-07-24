@@ -43,7 +43,7 @@ import { requireFounderSignalEngineReviewOnly } from './middleware/founderSignal
 export interface CreateServerOptions {
   /**
    * Serve the static Control Room frontend (public/control-room) from this
-   * process. Node-only - reads from the local filesystem, so it's off by
+   * process. Node-only — reads from the local filesystem, so it's off by
    * default in the Cloudflare Worker entry point (cf-entry.ts), where the
    * documented deployment path is Cloudflare Pages serving the frontend
    * separately, not this Worker's filesystem.
@@ -136,7 +136,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/mcp', mcpRouter);
   app.use('/economic-intelligence', economicIntelligenceRouter);
 
-  // Debug routes - CI and founder inspection only (no secrets exposed).
+  // Debug routes — CI and founder inspection only (no secrets exposed).
   app.use('/_debug', debugRouter);
 
   app.use(errorHandler);
