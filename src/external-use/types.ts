@@ -50,6 +50,7 @@ export interface ExternalUseDiscoverySummary {
 }
 
 export interface ExternalUseDigestItem {
+  id: string;
   projectName: string;
   projectRepository: string;
   title: string;
