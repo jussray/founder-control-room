@@ -11,6 +11,7 @@ const files = {
   typescriptReview: await readFile(new URL('../skills/typescript-strict-review/SKILL.md', import.meta.url), 'utf8'),
   productDesign: await readFile(new URL('../skills/product-design-gate/SKILL.md', import.meta.url), 'utf8'),
   zapierSteering: await readFile(new URL('../docs/founder-signal-engine/openai-zapier-steering-contract.md', import.meta.url), 'utf8'),
+  chatgptZapierBridge: await readFile(new URL('../.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md', import.meta.url), 'utf8'),
   agents: await readFile(new URL('../AGENTS.md', import.meta.url), 'utf8'),
   global: await readFile(new URL('../GLOBAL_AI.md', import.meta.url), 'utf8'),
   redteam: await readFile(new URL('../artifacts/redteam/SALES_DEVIL_ATTACK.md', import.meta.url), 'utf8'),
@@ -118,6 +119,16 @@ for (const phrase of [
   'HubSpot task or note associated with deal `337185466050`',
   'does not authorize blind publication',
 ]) requireText('OpenAI Zapier steering invariant', files.zapierSteering, phrase);
+for (const phrase of [
+  'ChatGPT',
+  '@OpenAI Developers / OpenAI Platform secure key reference',
+  'zapier-founder-signal-engine',
+  'approved Founder Signal Engine Catch Hook, webhook, or named bridge target',
+  'A bridge response without a Zapier run ID is not proof that Zapier executed',
+  'do not create, rotate, or duplicate it',
+  'Bridge invocation does not silently grant Zapier administration',
+  '## Separate founder approval required',
+]) requireText('ChatGPT Zapier bridge invariant', files.chatgptZapierBridge, phrase);
 
 requireText('AGENTS portfolio entry', files.agents, 'skills/portfolio-control-plane/SKILL.md');
 requireText('AGENTS sales entry', files.agents, 'skills/sales/SKILL.md');
@@ -128,9 +139,12 @@ requireText('AGENTS TypeScript patch entry', files.agents, 'skills/typescript-mi
 requireText('AGENTS TypeScript tests entry', files.agents, 'skills/typescript-behavior-tests/SKILL.md');
 requireText('AGENTS TypeScript review entry', files.agents, 'skills/typescript-strict-review/SKILL.md');
 requireText('AGENTS Product Design entry', files.agents, 'skills/product-design-gate/SKILL.md');
+requireText('AGENTS ChatGPT Zapier bridge skill', files.agents, '.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md');
 requireText('AGENTS Zapier cockpit rule', files.agents, 'treat Zapier as an operable workflow cockpit');
 requireText('AGENTS Zapier connector discovery', files.agents, 'OpenAI Developers');
 requireText('AGENTS dedicated Zapier key', files.agents, 'zapier-founder-signal-engine');
+requireText('AGENTS existing key boundary', files.agents, 'do not recreate, rotate, or duplicate without explicit founder approval');
+requireText('AGENTS run proof', files.agents, 'Require a real Zapier run ID');
 requireText('AGENTS Product Design/Supabase split', files.agents, 'design evidence and Supabase evidence separate');
 requireText('AGENTS commercial extension', files.agents, '/sales /devil');
 requireText('AGENTS separation', files.agents, 'separate approval gates');
