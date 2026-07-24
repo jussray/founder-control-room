@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
 const root = new URL('../', import.meta.url);
 const read = (path) => readFile(new URL(path, root), 'utf8');
@@ -14,6 +15,16 @@ const pkg = JSON.parse(pkgText);
 const failures = [];
 const requireValue = (condition, message) => {
   if (!condition) failures.push(message);
+};
+
+const normalize = (value) => {
+  if (Array.isArray(value)) return value.map(normalize);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.keys(value).sort().map((key) => [key, normalize(value[key])]),
+    );
+  }
+  return value;
 };
 
 requireValue(contract.schemaVersion === 1, 'pair contract schemaVersion must be 1');
@@ -40,6 +51,25 @@ for (const field of ['Goal', 'Known', 'Unknown', 'Recommendation', 'Confidence',
   requireValue(fields.includes(field), `pair contract missing executive field ${field}`);
 }
 
+const counterpartPath = process.env.PAIR_CONTRACT_PATH;
+requireValue(Boolean(counterpartPath), 'PAIR_CONTRACT_PATH is required for cross-repository verification');
+
+if (counterpartPath) {
+  try {
+    const counterpart = JSON.parse(await readFile(resolve(process.cwd(), counterpartPath), 'utf8'));
+    requireValue(
+      counterpart.contractVersion === contract.contractVersion,
+      `pair drift: counterpart version ${counterpart.contractVersion ?? 'missing'} does not match ${contract.contractVersion}`,
+    );
+    requireValue(
+      JSON.stringify(normalize(counterpart)) === JSON.stringify(normalize(contract)),
+      'pair drift: counterpart contract content does not match',
+    );
+  } catch (error) {
+    failures.push(`counterpart contract could not be read: ${error.message}`);
+  }
+}
+
 if (failures.length > 0) {
   console.error('Founder Control Room / Chief AI pair contract failed:');
   for (const failure of failures) console.error(` - ${failure}`);
@@ -47,4 +77,4 @@ if (failures.length > 0) {
 }
 
 console.log(`Pair contract ${contract.contractVersion} passed for Founder Control Room.`);
-console.log('Static repository-policy alignment verified. Runtime behavior remains unverified.');
+console.log('Cross-repository static policy alignment verified. Runtime behavior remains unverified.');
