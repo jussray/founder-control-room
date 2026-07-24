@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
-import type { Request, RequestHandler, Response } from 'express';
+import type { Request, RequestHandler, Response as ExpressResponse } from 'express';
 import { supabase } from '../../lib/supabaseClient.js';
 
 const MCP_PROTOCOL_VERSION = '2025-06-18';
@@ -11,7 +11,11 @@ const DEFAULT_TIMEOUT_MS = 10_000;
 const INVOCATION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
 const SECRETISH_PATTERN = /(sk-[A-Za-z0-9_-]{12,}|Bearer\s+\S+|hooks\.zapier\.com|API[_-]?KEY|SERVICE[_-]?ROLE|PASSWORD|SECRET|TOKEN)/i;
-const ALLOWED_ACTIONS = new Set(['run_openai_step', 'queue_review_draft', 'publish_or_send']);
+const ALLOWED_ACTIONS = new Set<RequestedAction>([
+  'run_openai_step',
+  'queue_review_draft',
+  'publish_or_send',
+]);
 const ALLOWED_ARGUMENT_KEYS = new Set([
   'invocationId',
   'sourceRepository',
@@ -28,7 +32,6 @@ const ALLOWED_ARGUMENT_KEYS = new Set([
 
 type JsonRpcId = string | number | null;
 type DbRecord = Record<string, unknown>;
-
 type RequestedAction = 'run_openai_step' | 'queue_review_draft' | 'publish_or_send';
 
 interface InvocationArguments {
@@ -72,6 +75,12 @@ interface ProviderReceipt {
   httpStatus: number;
   runId: string | null;
   responseKind: 'json' | 'text' | 'empty';
+  detail: string | null;
+}
+
+interface ParsedProviderBody {
+  kind: ProviderReceipt['responseKind'];
+  payload: unknown;
   detail: string | null;
 }
 
@@ -129,7 +138,9 @@ function containsSecretLikeMaterial(value: unknown): boolean {
   if (typeof value === 'string') return SECRETISH_PATTERN.test(value);
   if (Array.isArray(value)) return value.some(containsSecretLikeMaterial);
   if (!isRecord(value)) return false;
-  return Object.entries(value).some(([key, nested]) => SECRETISH_PATTERN.test(key) || containsSecretLikeMaterial(nested));
+  return Object.entries(value).some(
+    ([key, nested]) => SECRETISH_PATTERN.test(key) || containsSecretLikeMaterial(nested),
+  );
 }
 
 function parseInvocationArguments(value: unknown): { value: InvocationArguments | null; errors: string[] } {
@@ -139,22 +150,34 @@ function parseInvocationArguments(value: unknown): { value: InvocationArguments 
   for (const key of Object.keys(value)) {
     if (!ALLOWED_ARGUMENT_KEYS.has(key)) errors.push(`unexpected argument: ${key}`);
   }
-  if (containsSecretLikeMaterial(value)) errors.push('arguments must not contain credentials, hook URLs, or secret-like material');
+  if (containsSecretLikeMaterial(value)) {
+    errors.push('arguments must not contain credentials, hook URLs, or secret-like material');
+  }
 
   const invocationId = nonEmptyString(value.invocationId, 64);
-  if (!invocationId || !INVOCATION_ID_PATTERN.test(invocationId)) errors.push('invocationId must be a UUID');
+  if (!invocationId || !INVOCATION_ID_PATTERN.test(invocationId)) {
+    errors.push('invocationId must be a UUID');
+  }
 
   const sourceRepository = nonEmptyString(value.sourceRepository, 100);
-  if (sourceRepository !== ACTIVE_REPOSITORY) errors.push(`sourceRepository must be ${ACTIVE_REPOSITORY}`);
+  if (sourceRepository !== ACTIVE_REPOSITORY) {
+    errors.push(`sourceRepository must be ${ACTIVE_REPOSITORY}`);
+  }
 
   const sourcePr = Number(value.sourcePr);
-  if (!Number.isInteger(sourcePr) || sourcePr <= 0) errors.push('sourcePr must be a positive integer');
+  if (!Number.isInteger(sourcePr) || sourcePr <= 0) {
+    errors.push('sourcePr must be a positive integer');
+  }
 
   const sourceCommitSha = nonEmptyString(value.sourceCommitSha, 40);
-  if (!sourceCommitSha || !COMMIT_SHA_PATTERN.test(sourceCommitSha)) errors.push('sourceCommitSha must be an exact 40-character commit SHA');
+  if (!sourceCommitSha || !COMMIT_SHA_PATTERN.test(sourceCommitSha)) {
+    errors.push('sourceCommitSha must be an exact 40-character commit SHA');
+  }
 
   const requestedAction = nonEmptyString(value.requestedAction, 50);
-  if (!requestedAction || !ALLOWED_ACTIONS.has(requestedAction)) errors.push('requestedAction is not allowed');
+  if (!requestedAction || !ALLOWED_ACTIONS.has(requestedAction as RequestedAction)) {
+    errors.push('requestedAction is not allowed');
+  }
 
   const steeringGrantId = nonEmptyString(value.steeringGrantId, 200);
   if (!steeringGrantId) errors.push('steeringGrantId is required');
@@ -168,7 +191,9 @@ function parseInvocationArguments(value: unknown): { value: InvocationArguments 
   const requestingAgent = nonEmptyString(value.requestingAgent, 100);
   if (!requestingAgent) errors.push('requestingAgent is required');
 
-  if (typeof value.allowHubSpotWrite !== 'boolean') errors.push('allowHubSpotWrite must be a boolean');
+  if (typeof value.allowHubSpotWrite !== 'boolean') {
+    errors.push('allowHubSpotWrite must be a boolean');
+  }
   const allowHubSpotWrite = value.allowHubSpotWrite === true;
 
   const founderApprovalId = value.founderApprovalId === undefined || value.founderApprovalId === null
@@ -182,7 +207,20 @@ function parseInvocationArguments(value: unknown): { value: InvocationArguments 
     errors.push('founderApprovalId is required for publication, sending, or HubSpot mutation');
   }
 
-  if (errors.length > 0 || !invocationId || sourceRepository !== ACTIVE_REPOSITORY || !sourceCommitSha || !requestedAction || !steeringGrantId || !auditPath || !rollbackStep || !requestingAgent) {
+  if (
+    errors.length > 0 ||
+    !invocationId ||
+    sourceRepository !== ACTIVE_REPOSITORY ||
+    !Number.isInteger(sourcePr) ||
+    sourcePr <= 0 ||
+    !sourceCommitSha ||
+    !requestedAction ||
+    !ALLOWED_ACTIONS.has(requestedAction as RequestedAction) ||
+    !steeringGrantId ||
+    !auditPath ||
+    !rollbackStep ||
+    !requestingAgent
+  ) {
     return { value: null, errors };
   }
 
@@ -208,7 +246,8 @@ function toolDefinition(): DbRecord {
   return {
     name: TOOL_NAME,
     title: 'Invoke Founder Signal Engine',
-    description: 'Use this when ChatGPT or another approved agent needs to invoke the scoped Founder Signal Engine Zapier bridge for verified GitHub evidence. This tool does not expose credentials and does not prove the downstream chain without a Zapier run ID.',
+    description:
+      'Invoke the scoped Founder Signal Engine Zapier bridge for verified GitHub evidence. This tool never accepts raw credentials and does not prove the downstream chain without an explicit Zapier run ID.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -225,11 +264,15 @@ function toolDefinition(): DbRecord {
         'allowHubSpotWrite',
       ],
       properties: {
-        invocationId: { type: 'string', format: 'uuid', description: 'Caller-generated idempotency identifier.' },
+        invocationId: {
+          type: 'string',
+          format: 'uuid',
+          description: 'Caller-generated idempotency identifier.',
+        },
         sourceRepository: { type: 'string', enum: [ACTIVE_REPOSITORY] },
         sourcePr: { type: 'integer', minimum: 1 },
         sourceCommitSha: { type: 'string', pattern: '^[0-9a-fA-F]{40}$' },
-        requestedAction: { type: 'string', enum: [...ALLOWED_ACTIONS] },
+        requestedAction: { type: 'string', enum: Array.from(ALLOWED_ACTIONS) },
         steeringGrantId: { type: 'string', minLength: 1, maxLength: 200 },
         auditPath: { type: 'string', minLength: 1, maxLength: 500 },
         rollbackStep: { type: 'string', minLength: 1, maxLength: 500 },
@@ -279,23 +322,26 @@ function hookUrl(env: NodeJS.ProcessEnv): URL {
   const raw = env.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL?.trim();
   if (!raw) throw new Error('ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL is not configured');
   const url = new URL(raw);
-  if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Zapier hook URL must use http or https');
-  if (env.NODE_ENV === 'production') {
-    if (url.protocol !== 'https:' || url.hostname !== 'hooks.zapier.com') {
-      throw new Error('Production Zapier hook URL must use https://hooks.zapier.com');
-    }
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    throw new Error('Zapier hook URL must use http or https');
+  }
+  if (env.NODE_ENV === 'production' && (url.protocol !== 'https:' || url.hostname !== 'hooks.zapier.com')) {
+    throw new Error('Production Zapier hook URL must use https://hooks.zapier.com');
   }
   return url;
 }
 
 function timeoutMs(env: NodeJS.ProcessEnv): number {
   const configured = Number(env.FOUNDER_SIGNAL_ENGINE_HOOK_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
-  if (!Number.isFinite(configured) || configured < 500 || configured > 60_000) return DEFAULT_TIMEOUT_MS;
+  if (!Number.isFinite(configured) || configured < 500 || configured > 60_000) {
+    return DEFAULT_TIMEOUT_MS;
+  }
   return configured;
 }
 
-async function readProviderResponse(response: Response): Promise<{ kind: ProviderReceipt['responseKind']; payload: unknown; detail: string | null }> {
+async function readProviderResponse(response: globalThis.Response): Promise<ParsedProviderBody> {
   if (!response.body) return { kind: 'empty', payload: null, detail: null };
+
   const declaredLength = Number(response.headers.get('content-length'));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_PROVIDER_RESPONSE_BYTES) {
     await response.body.cancel();
@@ -306,6 +352,7 @@ async function readProviderResponse(response: Response): Promise<{ kind: Provide
   const decoder = new TextDecoder();
   let total = 0;
   let text = '';
+
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -325,6 +372,7 @@ async function readProviderResponse(response: Response): Promise<{ kind: Provide
 
   const trimmed = text.trim();
   if (!trimmed) return { kind: 'empty', payload: null, detail: null };
+
   const contentType = response.headers.get('content-type') ?? '';
   if (contentType.includes('application/json')) {
     try {
@@ -333,16 +381,26 @@ async function readProviderResponse(response: Response): Promise<{ kind: Provide
       return { kind: 'text', payload: null, detail: 'Zapier returned invalid JSON' };
     }
   }
+
   return { kind: 'text', payload: null, detail: trimmed.slice(0, 500) };
 }
 
-function explicitRunId(payload: unknown, response: Response): string | null {
+function explicitRunId(payload: unknown, response: globalThis.Response): string | null {
   const headerRunId = nonEmptyString(response.headers.get('x-zapier-run-id'), 200);
   if (headerRunId) return headerRunId;
   if (!isRecord(payload)) return null;
-  const candidates = [payload.zapier_run_id, payload.zapierRunId, payload.run_id, payload.runId];
+
+  const candidates: unknown[] = [
+    payload.zapier_run_id,
+    payload.zapierRunId,
+    payload.run_id,
+    payload.runId,
+  ];
   const data = isRecord(payload.data) ? payload.data : null;
-  if (data) candidates.push(data.zapier_run_id, data.zapierRunId, data.run_id, data.runId);
+  if (data) {
+    candidates.push(data.zapier_run_id, data.zapierRunId, data.run_id, data.runId);
+  }
+
   for (const candidate of candidates) {
     const runId = nonEmptyString(candidate, 200);
     if (runId) return runId;
@@ -357,8 +415,9 @@ async function callZapier(
 ): Promise<ProviderReceipt> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs(env));
+
   try {
-    const response = await fetchFn(hookUrl(env), {
+    const response = await fetchFn(hookUrl(env).toString(), {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -381,6 +440,7 @@ async function callZapier(
       }),
       signal: controller.signal,
     });
+
     const parsed = await readProviderResponse(response);
     return {
       accepted: response.ok,
@@ -390,7 +450,9 @@ async function callZapier(
       detail: parsed.detail,
     };
   } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') throw new Error('Zapier hook request timed out');
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Zapier hook request timed out');
+    }
     throw error;
   } finally {
     clearTimeout(timer);
@@ -398,9 +460,16 @@ async function callZapier(
 }
 
 function toolResponse(receipt: DbRecord, isError: boolean): DbRecord {
+  const invocationId = String(receipt.invocationId ?? 'unknown');
+  const runId = nonEmptyString(receipt.zapierRunId, 200);
   const text = isError
-    ? `Founder Signal Engine invocation failed or remains blocked. Invocation ${String(receipt.invocationId ?? 'unknown')}.`
-    : `Founder Signal Engine bridge accepted invocation ${String(receipt.invocationId)}. ${receipt.zapierRunId ? `Zapier run ${String(receipt.zapierRunId)} was returned.` : 'Zapier did not return a run ID, so end-to-end proof is still incomplete.'}`;
+    ? `Founder Signal Engine invocation failed or remains blocked. Invocation ${invocationId}.`
+    : `Founder Signal Engine bridge accepted invocation ${invocationId}. ${
+        runId
+          ? `Zapier run ${runId} was returned.`
+          : 'Zapier did not return a run ID, so end-to-end proof is still incomplete.'
+      }`;
+
   return {
     content: [{ type: 'text', text }],
     structuredContent: receipt,
@@ -438,14 +507,17 @@ async function invokeTool(
     });
   } catch (error) {
     if (error instanceof DuplicateInvocationError) {
-      return toolResponse({
-        invocationId: args.invocationId,
-        accepted: false,
-        auditComplete: true,
-        duplicateBlocked: true,
-        endToEndProofComplete: false,
-        nextGate: 'Use a new invocationId only after inspecting the prior invocation evidence.',
-      }, true);
+      return toolResponse(
+        {
+          invocationId: args.invocationId,
+          accepted: false,
+          auditComplete: true,
+          duplicateBlocked: true,
+          endToEndProofComplete: false,
+          nextGate: 'Use a new invocationId only after inspecting the prior invocation evidence.',
+        },
+        true,
+      );
     }
     throw error;
   }
@@ -467,15 +539,18 @@ async function invokeTool(
         failure: message,
       },
     });
-    return toolResponse({
-      invocationId: args.invocationId,
-      accepted: false,
-      auditComplete: true,
-      providerError: message,
-      zapierRunId: null,
-      endToEndProofComplete: false,
-      nextGate: 'Repair the configured Zapier Catch Hook or network path, then invoke with a new invocationId.',
-    }, true);
+    return toolResponse(
+      {
+        invocationId: args.invocationId,
+        accepted: false,
+        auditComplete: true,
+        providerError: message,
+        zapierRunId: null,
+        endToEndProofComplete: false,
+        nextGate: 'Repair the configured Zapier Catch Hook or network path, then invoke with a new invocationId.',
+      },
+      true,
+    );
   }
 
   const proofComplete = providerReceipt.accepted && Boolean(providerReceipt.runId);
@@ -498,38 +573,47 @@ async function invokeTool(
       },
     });
   } catch (error) {
-    return toolResponse({
+    return toolResponse(
+      {
+        invocationId: args.invocationId,
+        accepted: providerReceipt.accepted,
+        providerHttpStatus: providerReceipt.httpStatus,
+        zapierRunId: providerReceipt.runId,
+        auditComplete: false,
+        endToEndProofComplete: false,
+        auditError: error instanceof Error ? error.message : 'Unknown post-call audit failure',
+        nextGate:
+          'The provider call occurred, but Founder Control Room could not retain the result audit. Repair audit storage before retrying.',
+      },
+      true,
+    );
+  }
+
+  return toolResponse(
+    {
       invocationId: args.invocationId,
       accepted: providerReceipt.accepted,
       providerHttpStatus: providerReceipt.httpStatus,
+      providerResponseKind: providerReceipt.responseKind,
+      providerDetail: providerReceipt.detail,
       zapierRunId: providerReceipt.runId,
-      auditComplete: false,
-      endToEndProofComplete: false,
-      auditError: error instanceof Error ? error.message : 'Unknown post-call audit failure',
-      nextGate: 'The provider call occurred, but Founder Control Room could not retain the result audit. Repair audit storage before retrying.',
-    }, true);
-  }
-
-  return toolResponse({
-    invocationId: args.invocationId,
-    accepted: providerReceipt.accepted,
-    providerHttpStatus: providerReceipt.httpStatus,
-    providerResponseKind: providerReceipt.responseKind,
-    providerDetail: providerReceipt.detail,
-    zapierRunId: providerReceipt.runId,
-    auditComplete: true,
-    endToEndProofComplete: proofComplete,
-    sourceRepository: args.sourceRepository,
-    sourcePr: args.sourcePr,
-    sourceCommitSha: args.sourceCommitSha,
-    requestedAction: args.requestedAction,
-    nextGate: proofComplete
-      ? 'Capture the OpenAI 5W1H result, Buffer artifact, HubSpot association, and Founder Control Room evidence.'
-      : 'Locate the invocation in Zapier history using invocationId, record its run ID, and continue downstream evidence capture.',
-  }, !providerReceipt.accepted);
+      auditComplete: true,
+      endToEndProofComplete: proofComplete,
+      sourceRepository: args.sourceRepository,
+      sourcePr: args.sourcePr,
+      sourceCommitSha: args.sourceCommitSha,
+      requestedAction: args.requestedAction,
+      nextGate: proofComplete
+        ? 'Capture the OpenAI 5W1H result, Buffer artifact, HubSpot association, and Founder Control Room evidence.'
+        : 'Locate the invocation in Zapier history using invocationId, record its run ID, and continue downstream evidence capture.',
+    },
+    !providerReceipt.accepted,
+  );
 }
 
-function requiredDependencies(overrides: FounderSignalEngineMcpDependencies): Required<FounderSignalEngineMcpDependencies> {
+function requiredDependencies(
+  overrides: FounderSignalEngineMcpDependencies,
+): Required<FounderSignalEngineMcpDependencies> {
   return {
     env: overrides.env ?? process.env,
     fetchFn: overrides.fetchFn ?? fetch,
@@ -543,44 +627,71 @@ export function createFounderSignalEngineMcpHandler(
 ): RequestHandler {
   const dependencies = requiredDependencies(overrides);
 
-  return async (req: Request, res: Response) => {
+  return async (req: Request, res: ExpressResponse): Promise<void> => {
     const configuredToken = dependencies.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN?.trim();
-    if (!configuredToken) return res.status(503).json(rpcError(null, -32001, 'Founder Signal Engine MCP token is not configured'));
+    if (!configuredToken) {
+      res.status(503).json(rpcError(null, -32001, 'Founder Signal Engine MCP token is not configured'));
+      return;
+    }
+
     const token = bearerToken(req);
-    if (!token || !secureEqual(token, configuredToken)) return res.status(401).json(rpcError(null, -32000, 'Unauthorized'));
+    if (!token || !secureEqual(token, configuredToken)) {
+      res.status(401).json(rpcError(null, -32000, 'Unauthorized'));
+      return;
+    }
 
     const body = req.body as JsonRpcRequestBody;
     const id = rpcId(body?.id);
     if (!isRecord(body) || body.jsonrpc !== '2.0' || typeof body.method !== 'string') {
-      return res.status(400).json(rpcError(id, -32600, 'Invalid JSON-RPC request'));
+      res.status(400).json(rpcError(id, -32600, 'Invalid JSON-RPC request'));
+      return;
     }
 
-    if (body.method === 'notifications/initialized') return res.status(204).send();
-    if (body.method === 'initialize') {
-      return res.json(rpcResult(id, {
-        protocolVersion: MCP_PROTOCOL_VERSION,
-        capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: 'founder-signal-engine-bridge', version: '1.0.0' },
-      }));
+    if (body.method === 'notifications/initialized') {
+      res.status(204).send();
+      return;
     }
-    if (body.method === 'ping') return res.json(rpcResult(id, {}));
-    if (body.method === 'tools/list') return res.json(rpcResult(id, { tools: [toolDefinition()] }));
-    if (body.method !== 'tools/call') return res.status(404).json(rpcError(id, -32601, `Method not found: ${body.method}`));
+    if (body.method === 'initialize') {
+      res.json(
+        rpcResult(id, {
+          protocolVersion: MCP_PROTOCOL_VERSION,
+          capabilities: { tools: { listChanged: false } },
+          serverInfo: { name: 'founder-signal-engine-bridge', version: '1.0.0' },
+        }),
+      );
+      return;
+    }
+    if (body.method === 'ping') {
+      res.json(rpcResult(id, {}));
+      return;
+    }
+    if (body.method === 'tools/list') {
+      res.json(rpcResult(id, { tools: [toolDefinition()] }));
+      return;
+    }
+    if (body.method !== 'tools/call') {
+      res.status(404).json(rpcError(id, -32601, `Method not found: ${body.method}`));
+      return;
+    }
 
     const params = isRecord(body.params) ? body.params : null;
     if (!params || params.name !== TOOL_NAME) {
-      return res.status(400).json(rpcError(id, -32602, `Only ${TOOL_NAME} is available`));
+      res.status(400).json(rpcError(id, -32602, `Only ${TOOL_NAME} is available`));
+      return;
     }
 
     const parsed = parseInvocationArguments(params.arguments);
-    if (!parsed.value) return res.status(400).json(rpcError(id, -32602, 'Invalid tool arguments', parsed.errors));
+    if (!parsed.value) {
+      res.status(400).json(rpcError(id, -32602, 'Invalid tool arguments', parsed.errors));
+      return;
+    }
 
     try {
       const result = await invokeTool(parsed.value, dependencies);
-      return res.json(rpcResult(id, result));
+      res.json(rpcResult(id, result));
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Founder Signal Engine MCP failure';
-      return res.status(500).json(rpcError(id, -32603, message));
+      res.status(500).json(rpcError(id, -32603, message));
     }
   };
 }
