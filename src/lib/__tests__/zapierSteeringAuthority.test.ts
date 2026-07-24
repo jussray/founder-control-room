@@ -189,6 +189,21 @@ describe('Zapier steering authority', () => {
     expect(result.separateFounderGate).toBe(true);
   });
 
+  it('blocks bridge CRM writes when the steering grant is missing', () => {
+    const result = evaluateZapierSteering({
+      ...BASE_REQUEST,
+      action: 'write_crm',
+      zapierControlConnected: false,
+      openAIDevelopersBridgeAvailable: true,
+      bridgeTargetBound: true,
+      steeringGrantId: null,
+      founderApprovalId: 'approval-founder-signal-engine-crm-2026-07-24',
+    });
+
+    expect(result.status).toBe('blocked');
+    expect(result.reason).toContain('steering grant');
+  });
+
   it('allows approved CRM writing through the bound bridge', () => {
     const result = evaluateZapierSteering({
       ...BASE_REQUEST,
