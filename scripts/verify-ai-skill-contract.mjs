@@ -11,6 +11,7 @@ const files = {
   typescriptReview: await readFile(new URL('../skills/typescript-strict-review/SKILL.md', import.meta.url), 'utf8'),
   productDesign: await readFile(new URL('../skills/product-design-gate/SKILL.md', import.meta.url), 'utf8'),
   zapierSteering: await readFile(new URL('../docs/founder-signal-engine/openai-zapier-steering-contract.md', import.meta.url), 'utf8'),
+  chatgptZapierBridge: await readFile(new URL('../.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md', import.meta.url), 'utf8'),
   agents: await readFile(new URL('../AGENTS.md', import.meta.url), 'utf8'),
   global: await readFile(new URL('../GLOBAL_AI.md', import.meta.url), 'utf8'),
   redteam: await readFile(new URL('../artifacts/redteam/SALES_DEVIL_ATTACK.md', import.meta.url), 'utf8'),
@@ -112,12 +113,21 @@ for (const phrase of [
 for (const phrase of [
   'Credential plane',
   'Control plane',
-  'Key possession alone is not a Zapier control surface',
+  'Key possession alone is not a Zapier administration surface',
   'does not need to see the raw key',
   'No direct-control or end-to-end claim',
   'HubSpot task or note associated with deal `337185466050`',
   'does not authorize blind publication',
 ]) requireText('OpenAI Zapier steering invariant', files.zapierSteering, phrase);
+for (const phrase of [
+  'ChatGPT',
+  '@OpenAI Developers / OpenAI Platform secure key reference',
+  'zapier-founder-signal-engine',
+  'approved Founder Signal Engine Catch Hook, webhook, or named bridge target',
+  'A bridge response without a Zapier run ID is not proof that Zapier executed',
+  '## Separate founder approval required',
+  'do not create, rotate, or duplicate it',
+]) requireText('ChatGPT Zapier bridge invariant', files.chatgptZapierBridge, phrase);
 
 requireText('AGENTS portfolio entry', files.agents, 'skills/portfolio-control-plane/SKILL.md');
 requireText('AGENTS sales entry', files.agents, 'skills/sales/SKILL.md');
