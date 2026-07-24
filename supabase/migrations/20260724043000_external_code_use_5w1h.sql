@@ -48,6 +48,7 @@ create table if not exists external_code_use_digest_runs (
   digest_hour timestamptz not null unique,
   recipient text not null check (recipient = 'sekretbip@gmail.com'),
   status text not null check (status in ('running', 'sent', 'failed')),
+  attempt_count integer not null default 1 check (attempt_count >= 1),
   item_count integer not null default 0 check (item_count >= 0),
   new_item_count integer not null default 0 check (new_item_count >= 0),
   source_counts jsonb not null default '{}'::jsonb,
@@ -61,7 +62,7 @@ create table if not exists external_code_use_digest_runs (
 );
 
 comment on table external_code_use_digest_runs is
-  'Hourly, idempotent Resend delivery ledger for the external code-use list. The recipient is purpose-bound to the Se''kret Bip inbox.';
+  'Hourly, idempotent Resend delivery ledger for the external code-use list. Failed or stale claims may be safely retried while preserving one row per hour and the attempt count.';
 
 alter table external_code_use_discoveries enable row level security;
 alter table external_code_use_digest_runs enable row level security;
