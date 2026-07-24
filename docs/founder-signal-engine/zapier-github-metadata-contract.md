@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Use Zapier's GitHub integration as a deterministic repository metadata layer, not as the GitHub Actions workflow runtime.
+Use Zapier's GitHub integration as a deterministic read/write metadata layer, not as the GitHub Actions workflow runtime.
 
 This contract separates three capabilities that must never be blended:
 
