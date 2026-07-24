@@ -11,6 +11,7 @@ const files = {
   typescriptReview: await readFile(new URL('../skills/typescript-strict-review/SKILL.md', import.meta.url), 'utf8'),
   productDesign: await readFile(new URL('../skills/product-design-gate/SKILL.md', import.meta.url), 'utf8'),
   zapierSteering: await readFile(new URL('../docs/founder-signal-engine/openai-zapier-steering-contract.md', import.meta.url), 'utf8'),
+  zapierGitHubMetadata: await readFile(new URL('../docs/founder-signal-engine/zapier-github-metadata-contract.md', import.meta.url), 'utf8'),
   chatgptZapierBridge: await readFile(new URL('../.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md', import.meta.url), 'utf8'),
   agents: await readFile(new URL('../AGENTS.md', import.meta.url), 'utf8'),
   global: await readFile(new URL('../GLOBAL_AI.md', import.meta.url), 'utf8'),
@@ -113,12 +114,22 @@ for (const phrase of [
 for (const phrase of [
   'Credential plane',
   'Control plane',
+  'GitHub metadata plane',
   'Key possession alone is not a Zapier control surface or administration surface',
   'does not need to see the raw key',
   'No direct-control or end-to-end claim',
   'HubSpot task or note associated with deal `337185466050`',
   'does not authorize blind publication',
 ]) requireText('OpenAI Zapier steering invariant', files.zapierSteering, phrase);
+for (const phrase of [
+  'read/write metadata layer, not as the GitHub Actions workflow runtime',
+  'Find Repository',
+  'Get File Contents',
+  'Create Issue',
+  'GitHub Actions or deploy failure email',
+  'Polling triggers deduplicate items by unique identifier',
+  'must not auto-merge',
+]) requireText('Zapier GitHub metadata invariant', files.zapierGitHubMetadata, phrase);
 for (const phrase of [
   'ChatGPT',
   '@OpenAI Developers / OpenAI Platform secure key reference',
@@ -127,6 +138,9 @@ for (const phrase of [
   'A bridge response without a Zapier run ID is not proof that Zapier executed',
   'do not create, rotate, or duplicate it',
   'Bridge invocation does not silently grant Zapier administration',
+  'read/write metadata layer, not the GitHub Actions workflow-runtime layer',
+  'Find Repository',
+  'Create Issue',
   '## Separate founder approval required',
 ]) requireText('ChatGPT Zapier bridge invariant', files.chatgptZapierBridge, phrase);
 
