@@ -9,6 +9,13 @@ do $$
 declare
   updated_count integer;
 begin
+  -- A newly initialized Control Room has no mission rows yet. Preserve strict
+  -- production drift detection, but allow clean schema replay to continue.
+  if not exists (select 1 from public.missions) then
+    raise notice 'no missions exist; skipping storefront expected-head refresh';
+    return;
+  end if;
+
   update public.missions
   set
     policy_snapshot = jsonb_set(
