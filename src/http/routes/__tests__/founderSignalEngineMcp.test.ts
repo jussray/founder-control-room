@@ -133,7 +133,7 @@ describe('Founder Signal Engine remote MCP', () => {
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
-  it('requires exact founder approval before publication or HubSpot mutation', async () => {
+  it('requires a founder approval receipt before publication or HubSpot mutation', async () => {
     const fetchFn = mockFetch(async () => new globalThis.Response(null, { status: 200 }));
     const app = buildApp({ fetchFn });
     const response = await request(app)
@@ -152,12 +152,17 @@ describe('Founder Signal Engine remote MCP', () => {
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
-  it('writes audit evidence before and after invoking Zapier and returns the explicit run ID', async () => {
-    const auditEvents: Array<{ sourceEventId: string; eventType: string }> = [];
+  it('identifies the Zapier run without falsely marking Day 3 proof complete', async () => {
+    const auditEvents: Array<{
+      sourceEventId: string;
+      eventType: string;
+      metadata: Record<string, unknown>;
+    }> = [];
     const writeAuditEvent: AuditWriter = vi.fn(async (_projectId, event) => {
       auditEvents.push({
         sourceEventId: event.sourceEventId,
         eventType: event.eventType,
+        metadata: event.metadata,
       });
     });
     const fetchFn = vi.fn(
@@ -190,16 +195,25 @@ describe('Founder Signal Engine remote MCP', () => {
       invocationId: INVOCATION_ID,
       accepted: true,
       zapierRunId: 'zap-run-599',
+      zapierRunIdentified: true,
       auditComplete: true,
-      endToEndProofComplete: true,
+      endToEndProofComplete: false,
     });
+    expect(response.body.result.content[0].text).toContain(
+      'downstream Day 3 proof is still incomplete',
+    );
     expect(auditEvents.map((event) => event.eventType)).toEqual([
       'founder_signal_engine_bridge_requested',
       'founder_signal_engine_bridge_accepted',
     ]);
+    expect(auditEvents[1]?.metadata).toMatchObject({
+      zapierRunId: 'zap-run-599',
+      zapierRunIdentified: true,
+      endToEndProofComplete: false,
+    });
   });
 
-  it('does not confuse a successful hook acceptance with complete Day 3 proof when no run ID is returned', async () => {
+  it('does not confuse a successful hook acceptance with a Zapier run or Day 3 proof', async () => {
     const fetchFn = mockFetch(async () =>
       new globalThis.Response(JSON.stringify({ status: 'accepted' }), {
         status: 200,
@@ -218,6 +232,7 @@ describe('Founder Signal Engine remote MCP', () => {
     expect(response.body.result.structuredContent).toMatchObject({
       accepted: true,
       zapierRunId: null,
+      zapierRunIdentified: false,
       endToEndProofComplete: false,
     });
     expect(response.body.result.content[0].text).toContain(
@@ -243,6 +258,7 @@ describe('Founder Signal Engine remote MCP', () => {
     expect(response.body.result.structuredContent).toMatchObject({
       accepted: true,
       auditComplete: false,
+      zapierRunIdentified: true,
       endToEndProofComplete: false,
       zapierRunId: 'zap-run-123',
     });
