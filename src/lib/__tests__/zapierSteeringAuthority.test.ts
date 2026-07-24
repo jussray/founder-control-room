@@ -4,6 +4,8 @@ import { evaluateZapierSteering, ZAPIER_STEERING_AUTHORITY } from '../zapierStee
 const BASE_REQUEST = {
   zapId: 'founder-signal-engine-day2',
   zapierControlConnected: true,
+  openAIDevelopersBridgeAvailable: false,
+  bridgeTargetBound: false,
   openAIKeyReferenceAvailable: true,
   steeringGrantId: 'founder-grant-day2-zapier',
   auditEnabled: true,
@@ -11,11 +13,12 @@ const BASE_REQUEST = {
 } as const;
 
 describe('Zapier steering authority', () => {
-  it('keeps the API key and Zapier control path as separate capabilities', () => {
+  it('documents both the native connector and OpenAI Developers bridge paths', () => {
     expect(ZAPIER_STEERING_AUTHORITY.principles).toEqual(
       expect.arrayContaining([
-        expect.stringContaining('not a Zapier control token'),
-        expect.stringContaining('connector is required'),
+        expect.stringContaining('native Zapier connector'),
+        expect.stringContaining('OpenAI Developers bridge'),
+        expect.stringContaining('not a Zapier administrator token'),
       ]),
     );
   });
@@ -42,7 +45,7 @@ describe('Zapier steering authority', () => {
     expect(result.auditRequired).toBe(true);
   });
 
-  it('does not treat an OpenAI API key as Zapier control authority', () => {
+  it('does not treat an OpenAI key alone as a usable Zapier path', () => {
     const result = evaluateZapierSteering({
       ...BASE_REQUEST,
       action: 'run_openai_step',
@@ -50,10 +53,11 @@ describe('Zapier steering authority', () => {
     });
 
     expect(result.status).toBe('blocked');
-    expect(result.reason).toContain('key alone cannot');
+    expect(result.controlPath).toBe('none');
+    expect(result.reason).toContain('No native Zapier connector or ready OpenAI Developers bridge');
   });
 
-  it('allows read-only inspection through a scoped connector without key use', () => {
+  it('allows read-only inspection through a scoped native connector without key use', () => {
     const result = evaluateZapierSteering({
       ...BASE_REQUEST,
       action: 'inspect_workflow',
@@ -63,6 +67,7 @@ describe('Zapier steering authority', () => {
 
     expect(result).toMatchObject({
       status: 'allowed',
+      controlPath: 'direct_connector',
       openAIKeyRequired: false,
       separateFounderGate: false,
     });
@@ -79,7 +84,7 @@ describe('Zapier steering authority', () => {
     expect(result.reason).toContain('steering grant');
   });
 
-  it('allows a scoped OpenAI step when connector, key reference, grant, and audit exist', () => {
+  it('allows a scoped OpenAI step through a native connector', () => {
     const result = evaluateZapierSteering({
       ...BASE_REQUEST,
       action: 'run_openai_step',
@@ -88,9 +93,68 @@ describe('Zapier steering authority', () => {
     expect(result).toMatchObject({
       status: 'allowed',
       zapId: 'founder-signal-engine-day2',
+      controlPath: 'direct_connector',
       openAIKeyRequired: true,
       separateFounderGate: false,
     });
+  });
+
+  it('allows ChatGPT to invoke the named workflow through the approved bridge', () => {
+    const result = evaluateZapierSteering({
+      ...BASE_REQUEST,
+      action: 'run_openai_step',
+      zapierControlConnected: false,
+      openAIDevelopersBridgeAvailable: true,
+      bridgeTargetBound: true,
+    });
+
+    expect(result).toMatchObject({
+      status: 'allowed',
+      controlPath: 'openai_developers_bridge',
+      openAIKeyRequired: true,
+    });
+    expect(result.reason).toContain('existing key reference');
+  });
+
+  it('blocks the fallback bridge until it is bound to the named Zapier target', () => {
+    const result = evaluateZapierSteering({
+      ...BASE_REQUEST,
+      action: 'test_workflow',
+      zapierControlConnected: false,
+      openAIDevelopersBridgeAvailable: true,
+      bridgeTargetBound: false,
+    });
+
+    expect(result.status).toBe('blocked');
+    expect(result.reason).toContain('not bound to the named Zapier workflow target');
+  });
+
+  it('blocks the fallback bridge when the existing dedicated key reference is unavailable', () => {
+    const result = evaluateZapierSteering({
+      ...BASE_REQUEST,
+      action: 'run_openai_step',
+      zapierControlConnected: false,
+      openAIDevelopersBridgeAvailable: true,
+      bridgeTargetBound: true,
+      openAIKeyReferenceAvailable: false,
+    });
+
+    expect(result.status).toBe('blocked');
+    expect(result.reason).toContain('existing dedicated OpenAI key reference');
+  });
+
+  it('does not let the fallback bridge inspect or administer Zapier', () => {
+    const result = evaluateZapierSteering({
+      ...BASE_REQUEST,
+      action: 'inspect_workflow',
+      zapierControlConnected: false,
+      openAIDevelopersBridgeAvailable: true,
+      bridgeTargetBound: true,
+    });
+
+    expect(result.status).toBe('blocked');
+    expect(result.controlPath).toBe('openai_developers_bridge');
+    expect(result.reason).toContain('requires direct Zapier control');
   });
 
   it('blocks the OpenAI step when the dedicated key reference is missing', () => {
@@ -123,5 +187,37 @@ describe('Zapier steering authority', () => {
 
     expect(result.status).toBe('allowed');
     expect(result.separateFounderGate).toBe(true);
+  });
+
+  it('blocks bridge CRM writes when the steering grant is missing', () => {
+    const result = evaluateZapierSteering({
+      ...BASE_REQUEST,
+      action: 'write_crm',
+      zapierControlConnected: false,
+      openAIDevelopersBridgeAvailable: true,
+      bridgeTargetBound: true,
+      steeringGrantId: null,
+      founderApprovalId: 'approval-founder-signal-engine-crm-2026-07-24',
+    });
+
+    expect(result.status).toBe('blocked');
+    expect(result.reason).toContain('steering grant');
+  });
+
+  it('allows approved CRM writing through the bound bridge', () => {
+    const result = evaluateZapierSteering({
+      ...BASE_REQUEST,
+      action: 'write_crm',
+      zapierControlConnected: false,
+      openAIDevelopersBridgeAvailable: true,
+      bridgeTargetBound: true,
+      founderApprovalId: 'approval-founder-signal-engine-crm-2026-07-24',
+    });
+
+    expect(result).toMatchObject({
+      status: 'allowed',
+      controlPath: 'openai_developers_bridge',
+      separateFounderGate: true,
+    });
   });
 });
