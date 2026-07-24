@@ -184,7 +184,6 @@ function hashEvidence(project: ExternalUseProject, candidate: ExternalUseCandida
   return createHash("sha256")
     .update([
       project.slug,
-      candidate.source,
       candidate.evidenceUrl.toLowerCase(),
       candidate.externalRepository?.toLowerCase() ?? "",
     ].join("|"))
