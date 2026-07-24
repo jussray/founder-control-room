@@ -32,6 +32,8 @@ custom_domain = true
 # ---------------------------------------------------------------------------
 [vars]
 ENVIRONMENT = "production"
+MCP_EXA_URL = "https://mcp.exa.ai/mcp"
+MCP_RESEND_URL = "https://mcp.resend.com/mcp"
 
 # ---------------------------------------------------------------------------
 # Secrets — set in the founder-control-room Worker secret store, never commit
@@ -47,6 +49,12 @@ ENVIRONMENT = "production"
 # Required GitHub authentication, choose one path:
 #   GITHUB_APP_ID + GITHUB_PRIVATE_KEY  # preferred production path
 #   GITHUB_TOKEN                        # local/development fallback
+#
+# External code-use discovery and hourly digest:
+#   MCP_GITHUB_URL                     # GitHub MCP endpoint
+#   MCP_GITHUB_TOKEN                   # read-only repository discovery token
+#   RESEND_API_KEY                     # sender and Resend MCP bearer credential
+#   EXTERNAL_USE_EMAIL_FROM            # sender on a Resend-verified domain
 #
 # Optional repository ingestion:
 #   REPOSITORY_INGEST_SECRET
