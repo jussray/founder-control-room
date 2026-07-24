@@ -5,7 +5,11 @@ export interface ControlRoomWorkerEnv {
   SUPABASE_SERVICE_ROLE_KEY: string;
   SUPABASE_PUBLISHABLE_KEY: string;
   GITHUB_WEBHOOK_SECRET: string;
-  GITHUB_TOKEN: string;
+  /** Preferred production GitHub authentication. Must be configured as a pair. */
+  GITHUB_APP_ID?: string;
+  GITHUB_PRIVATE_KEY?: string;
+  /** Local/development fallback when GitHub App credentials are unavailable. */
+  GITHUB_TOKEN?: string;
   FOUNDER_ALLOWED_ORIGINS: string;
   FOUNDER_API_URL: string;
   /** HMAC secret for POST /ingest/repository-verification. Optional — that route 401s without it. */
@@ -23,22 +27,36 @@ const REQUIRED_BINDINGS = [
   'SUPABASE_SERVICE_ROLE_KEY',
   'SUPABASE_PUBLISHABLE_KEY',
   'GITHUB_WEBHOOK_SECRET',
-  'GITHUB_TOKEN',
   'FOUNDER_ALLOWED_ORIGINS',
   'FOUNDER_API_URL',
 ] as const satisfies readonly (keyof ControlRoomWorkerEnv)[];
+
+function hasNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim() !== '';
+}
 
 /** Fail closed before importing environment-backed application modules. */
 export function validateWorkerEnv(
   env: Partial<Record<keyof ControlRoomWorkerEnv, unknown>>,
 ): asserts env is ControlRoomWorkerEnv {
-  const missing = REQUIRED_BINDINGS.filter((name) => {
-    const value = env[name];
-    return typeof value !== 'string' || value.trim() === '';
-  });
+  const missing = REQUIRED_BINDINGS.filter((name) => !hasNonEmptyString(env[name]));
 
   if (missing.length) {
     throw new Error(`Missing required Worker bindings: ${missing.join(', ')}`);
+  }
+
+  const hasGitHubToken = hasNonEmptyString(env.GITHUB_TOKEN);
+  const hasGitHubAppId = hasNonEmptyString(env.GITHUB_APP_ID);
+  const hasGitHubPrivateKey = hasNonEmptyString(env.GITHUB_PRIVATE_KEY);
+
+  if (!hasGitHubToken && !hasGitHubAppId && !hasGitHubPrivateKey) {
+    throw new Error(
+      'GitHub authentication is not configured; set GITHUB_APP_ID and GITHUB_PRIVATE_KEY or GITHUB_TOKEN',
+    );
+  }
+
+  if (hasGitHubAppId !== hasGitHubPrivateKey) {
+    throw new Error('GITHUB_APP_ID and GITHUB_PRIVATE_KEY must be configured together');
   }
 
   // The complete-key check above is runtime proof that every required value is
