@@ -11,6 +11,18 @@ const project = {
   repository: "jussray/Sekret-Bip",
 };
 
+const outsideEvidence = {
+  source: "github_mcp" as const,
+  sourceTool: "list_forks",
+  evidenceUrl: "https://github.com/outside-owner/sekret-bip-copy",
+  externalOwner: "outside-owner",
+  externalRepository: "outside-owner/sekret-bip-copy",
+  title: "sekret-bip-copy",
+  evidenceSummary: "Forked from jussray/Sekret-Bip.",
+  discoveryQuery: "forks of jussray/Sekret-Bip",
+  observedAt: "2026-07-24T04:00:00.000Z",
+};
+
 describe("external code-use normalization", () => {
   it("extracts external repositories and excludes founder-owned results", () => {
     const candidates = extractExternalUseCandidates({
@@ -39,22 +51,23 @@ describe("external code-use normalization", () => {
   });
 
   it("produces a complete 5W1H record with confirmed fork confidence", () => {
-    const normalized = normalizeExternalUse(project, {
-      source: "github_mcp",
-      sourceTool: "list_forks",
-      evidenceUrl: "https://github.com/outside-owner/sekret-bip-copy",
-      externalOwner: "outside-owner",
-      externalRepository: "outside-owner/sekret-bip-copy",
-      title: "sekret-bip-copy",
-      evidenceSummary: "Forked from jussray/Sekret-Bip.",
-      discoveryQuery: "forks of jussray/Sekret-Bip",
-      observedAt: "2026-07-24T04:00:00.000Z",
-    });
+    const normalized = normalizeExternalUse(project, outsideEvidence);
 
     expect(normalized.classification).toBe("confirmed");
     expect(normalized.confidence).toBeGreaterThan(0.9);
     expect(Object.values(normalized.fiveWOneH).every(Boolean)).toBe(true);
     expect(normalized.fiveWOneH.how).toContain("private source code was not sent");
+  });
+
+  it("deduplicates the same evidence across discovery providers", () => {
+    const github = normalizeExternalUse(project, outsideEvidence);
+    const exa = normalizeExternalUse(project, {
+      ...outsideEvidence,
+      source: "exa_mcp",
+      sourceTool: "deep_search_exa",
+    });
+
+    expect(github.evidenceHash).toBe(exa.evidenceHash);
   });
 
   it("renders an hourly digest even when no evidence exists", () => {
