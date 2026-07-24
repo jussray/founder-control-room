@@ -11,6 +11,14 @@ const ENDPOINT = '/mcp/founder-signal-engine';
 const INVOCATION_ID = '123e4567-e89b-42d3-a456-426614174000';
 const SOURCE_SHA = 'f4573d360a8fea99b301f33a2a21192525725f7b';
 
+type AuditWriter = NonNullable<FounderSignalEngineMcpDependencies['writeAuditEvent']>;
+
+function mockFetch(
+  implementation: () => Promise<globalThis.Response>,
+): typeof fetch {
+  return vi.fn(implementation) as unknown as typeof fetch;
+}
+
 function validArguments(overrides: Record<string, unknown> = {}) {
   return {
     invocationId: INVOCATION_ID,
@@ -30,20 +38,25 @@ function validArguments(overrides: Record<string, unknown> = {}) {
 function buildApp(overrides: FounderSignalEngineMcpDependencies = {}) {
   const app = express();
   app.use(express.json());
-  app.post(ENDPOINT, createFounderSignalEngineMcpHandler({
-    env: {
-      NODE_ENV: 'test',
-      FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: TOKEN,
-      ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL: 'https://example.test/zapier-hook',
-    },
-    fetchFn: vi.fn(async () => new globalThis.Response(JSON.stringify({ runId: 'zap-run-123' }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    })) as typeof fetch,
-    resolveProjectId: vi.fn(async () => 'project-uuid-001'),
-    writeAuditEvent: vi.fn(async () => undefined),
-    ...overrides,
-  }));
+  app.post(
+    ENDPOINT,
+    createFounderSignalEngineMcpHandler({
+      env: {
+        NODE_ENV: 'test',
+        FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: TOKEN,
+        ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL: 'https://example.test/zapier-hook',
+      },
+      fetchFn: mockFetch(async () =>
+        new globalThis.Response(JSON.stringify({ runId: 'zap-run-123' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+      resolveProjectId: vi.fn(async () => 'project-uuid-001'),
+      writeAuditEvent: vi.fn(async () => undefined),
+      ...overrides,
+    }),
+  );
   return app;
 }
 
@@ -98,7 +111,7 @@ describe('Founder Signal Engine remote MCP', () => {
   });
 
   it('blocks secret-like material and unexpected arguments before any provider call', async () => {
-    const fetchFn = vi.fn(async () => new globalThis.Response(null, { status: 200 })) as typeof fetch;
+    const fetchFn = mockFetch(async () => new globalThis.Response(null, { status: 200 }));
     const app = buildApp({ fetchFn });
     const response = await request(app)
       .post(ENDPOINT)
@@ -106,46 +119,59 @@ describe('Founder Signal Engine remote MCP', () => {
       .send(toolCall(validArguments({ apiKey: 'sk-this-should-never-enter-the-tool' })));
 
     expect(response.status).toBe(400);
-    expect(response.body.error.data).toEqual(expect.arrayContaining([
-      'unexpected argument: apiKey',
-      'arguments must not contain credentials, hook URLs, or secret-like material',
-    ]));
+    expect(response.body.error.data).toEqual(
+      expect.arrayContaining([
+        'unexpected argument: apiKey',
+        'arguments must not contain credentials, hook URLs, or secret-like material',
+      ]),
+    );
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
   it('requires exact founder approval before publication or HubSpot mutation', async () => {
-    const fetchFn = vi.fn(async () => new globalThis.Response(null, { status: 200 })) as typeof fetch;
+    const fetchFn = mockFetch(async () => new globalThis.Response(null, { status: 200 }));
     const app = buildApp({ fetchFn });
     const response = await request(app)
       .post(ENDPOINT)
       .set('Authorization', `Bearer ${TOKEN}`)
-      .send(toolCall(validArguments({ requestedAction: 'publish_or_send', allowHubSpotWrite: true })));
+      .send(
+        toolCall(
+          validArguments({ requestedAction: 'publish_or_send', allowHubSpotWrite: true }),
+        ),
+      );
 
     expect(response.status).toBe(400);
-    expect(response.body.error.data).toContain('founderApprovalId is required for publication, sending, or HubSpot mutation');
+    expect(response.body.error.data).toContain(
+      'founderApprovalId is required for publication, sending, or HubSpot mutation',
+    );
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
   it('writes audit evidence before and after invoking Zapier and returns the explicit run ID', async () => {
     const auditEvents: Array<{ sourceEventId: string; eventType: string }> = [];
-    const writeAuditEvent = vi.fn(async (_projectId: string, event: { sourceEventId: string; eventType: string }) => {
-      auditEvents.push(event);
+    const writeAuditEvent: AuditWriter = vi.fn(async (_projectId, event) => {
+      auditEvents.push({
+        sourceEventId: event.sourceEventId,
+        eventType: event.eventType,
+      });
     });
-    const fetchFn = vi.fn(async (_input: URL | RequestInfo, init?: RequestInit) => {
-      expect(init?.method).toBe('POST');
-      const body = JSON.parse(String(init?.body));
-      expect(body).toMatchObject({
-        invocation_id: INVOCATION_ID,
-        source_commit_sha: SOURCE_SHA,
-        key_reference: 'zapier-founder-signal-engine',
-        allow_hubspot_write: false,
-      });
-      expect(JSON.stringify(body)).not.toContain('sk-');
-      return new globalThis.Response(JSON.stringify({ zapier_run_id: 'zap-run-599' }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
-    }) as typeof fetch;
+    const fetchFn = vi.fn(
+      async (_input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+        expect(init?.method).toBe('POST');
+        const body = JSON.parse(String(init?.body));
+        expect(body).toMatchObject({
+          invocation_id: INVOCATION_ID,
+          source_commit_sha: SOURCE_SHA,
+          key_reference: 'zapier-founder-signal-engine',
+          allow_hubspot_write: false,
+        });
+        expect(JSON.stringify(body)).not.toContain('sk-');
+        return new globalThis.Response(JSON.stringify({ zapier_run_id: 'zap-run-599' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      },
+    ) as unknown as typeof fetch;
     const app = buildApp({ fetchFn, writeAuditEvent });
 
     const response = await request(app)
@@ -169,10 +195,12 @@ describe('Founder Signal Engine remote MCP', () => {
   });
 
   it('does not confuse a successful hook acceptance with complete Day 3 proof when no run ID is returned', async () => {
-    const fetchFn = vi.fn(async () => new globalThis.Response(JSON.stringify({ status: 'accepted' }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    })) as typeof fetch;
+    const fetchFn = mockFetch(async () =>
+      new globalThis.Response(JSON.stringify({ status: 'accepted' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
     const app = buildApp({ fetchFn });
 
     const response = await request(app)
@@ -187,12 +215,14 @@ describe('Founder Signal Engine remote MCP', () => {
       zapierRunId: null,
       endToEndProofComplete: false,
     });
-    expect(response.body.result.content[0].text).toContain('end-to-end proof is still incomplete');
+    expect(response.body.result.content[0].text).toContain(
+      'end-to-end proof is still incomplete',
+    );
   });
 
   it('reports provider success as audit-incomplete when the post-call audit write fails', async () => {
     let auditWrites = 0;
-    const writeAuditEvent = vi.fn(async () => {
+    const writeAuditEvent: AuditWriter = vi.fn(async () => {
       auditWrites += 1;
       if (auditWrites === 2) throw new Error('audit storage unavailable');
     });
