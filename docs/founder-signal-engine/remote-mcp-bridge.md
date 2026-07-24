@@ -22,10 +22,12 @@ Founder Control Room audit-first bridge
 Private Zapier Catch Hook
         |
         v
-Zapier -> OpenAI 5W1H -> Buffer -> HubSpot -> Founder Control Room proof
+Zapier -> OpenAI 5W1H -> Buffer review queue -> Founder Control Room proof
 ```
 
 The OpenAI API key authenticates the caller's OpenAI request. It is not sent to this MCP endpoint and is never accepted as a tool argument. The remote MCP endpoint uses a separate bearer token, and the private Zapier hook URL stays in the deployed backend secret store.
+
+The key is an invocation credential path. It is not Zapier administrator access, a Zapier history viewer, a social publishing approval, or permission to mutate HubSpot.
 
 ## Endpoint
 
@@ -92,13 +94,14 @@ This example contains no live credentials. Do not replace placeholders in reposi
 }
 ```
 
-Allowed actions:
+Active review-only actions:
 
 - `run_openai_step`
 - `queue_review_draft`
-- `publish_or_send`
 
-`publish_or_send` and any request with `allowHubSpotWrite: true` require a non-empty `founderApprovalId` approval-receipt reference. The bridge checks that the reference is present; it does not independently verify that reference against an approval registry.
+The protocol also recognizes `publish_or_send`, but the deployed HTTP route blocks it. The deployed route also blocks every request with `allowHubSpotWrite: true`.
+
+This is intentional. The current Founder Control Room approval registry does not represent social publishing or HubSpot mutation. A caller-supplied string such as `founderApprovalId: "yes"` is never authority. Publication, sending, and HubSpot mutation remain unavailable until a dedicated registry-backed approval receipt is implemented and verified.
 
 ## Secret boundary
 
@@ -139,9 +142,13 @@ These states are intentionally different:
 1. **MCP accepted:** the remote tool received and validated the request.
 2. **Zapier hook accepted:** Zapier returned a successful HTTP response.
 3. **Zapier run identified:** an explicit Zapier run ID was returned.
-4. **Day 3 proof complete:** the Zapier run ID, OpenAI 5W1H output, Buffer artifact, HubSpot deal-associated evidence, and Founder Control Room evidence all exist.
+4. **OpenAI result verified:** the expected 5W1H and platform-specific copy exist.
+5. **Buffer review artifact verified:** a review draft or queue artifact exists.
+6. **Day 3 proof complete:** the Zapier run ID, OpenAI output, Buffer artifact, any separately approved HubSpot evidence, and Founder Control Room evidence all exist.
 
 A successful HTTP response without an explicit run ID does not complete Day 3. The invocation ID must be located in Zapier history and associated with the real run receipt.
+
+A Zapier run ID alone also does not prove OpenAI output, Buffer receipt, HubSpot mutation, or publication.
 
 ## Current Day 3 source
 
@@ -155,14 +162,24 @@ Founder Control Room issue: #73
 
 ## Deployment and activation gate
 
-Merging this endpoint does not deploy or activate it. Live activation requires separate approval to:
+Merging this endpoint does not deploy or activate it. Live review-only activation requires separate approval to:
 
 1. deploy the updated Founder Control Room backend;
 2. add the separate MCP bearer token to the backend secret store;
 3. add the private Zapier Catch Hook URL to the backend secret store;
 4. configure the Zap to return or log an explicit run receipt;
 5. register the deployed MCP endpoint with the authorized OpenAI caller;
-6. invoke the Day 3 source and capture the downstream evidence.
+6. invoke the Day 3 source with `run_openai_step` or `queue_review_draft`;
+7. capture the Zapier, OpenAI, Buffer, and Founder Control Room evidence.
+
+Enabling publication, sending, or HubSpot mutation requires a later focused change that adds:
+
+1. a dedicated approval action vocabulary;
+2. founder-authenticated approval creation;
+3. exact invocation, source SHA, channel, and action scope;
+4. expiration, revocation, replay protection, and one-time use where appropriate;
+5. audit evidence before and after the external mutation;
+6. focused tests proving approval-looking text cannot bypass authority.
 
 No raw credentials belong in GitHub, HubSpot, Buffer, screenshots, chat, or Founder Control Room evidence.
 

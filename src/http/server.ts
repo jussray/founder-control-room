@@ -38,6 +38,7 @@ import {
 } from './middleware/security.js';
 import { requireSameOriginBrowserMutation } from './middleware/csrf.js';
 import { requireProjectReadAudit } from './middleware/projectReadAudit.js';
+import { requireFounderSignalEngineReviewOnly } from './middleware/founderSignalEngineWriteGate.js';
 
 export interface CreateServerOptions {
   /**
@@ -81,6 +82,7 @@ export function createServer(options: CreateServerOptions = {}) {
     '/mcp/founder-signal-engine',
     rateLimitGeneral,
     express.json({ type: 'application/json', limit: '64kb' }),
+    requireFounderSignalEngineReviewOnly,
     handleFounderSignalEngineMcp,
   );
 
