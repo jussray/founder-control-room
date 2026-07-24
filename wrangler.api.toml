@@ -1,0 +1,45 @@
+name = "founder-control-room2"
+main = "src/worker/cf-entry.ts"
+compatibility_date = "2025-06-01"
+compatibility_flags = [
+  "nodejs_compat",
+  "enable_nodejs_http_modules",
+  "enable_nodejs_http_server_modules",
+]
+
+# Keep this second Worker isolated from the root-domain Worker. It serves the
+# API custom domain and intentionally has no cron trigger, preventing duplicate
+# reconciliation cycles when both Workers are deployed.
+workers_dev = true
+preview_urls = true
+
+[observability]
+enabled = true
+
+[[routes]]
+pattern = "api.foundercontrolroom.org"
+custom_domain = true
+
+# Non-secret vars only. Provider credentials and application secrets must be
+# configured in the founder-control-room2 Worker secret store, never here.
+[vars]
+ENVIRONMENT = "production"
+
+# Required service bindings:
+#   SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+#   SUPABASE_PUBLISHABLE_KEY
+#   GITHUB_WEBHOOK_SECRET
+#   FOUNDER_ALLOWED_ORIGINS
+#   FOUNDER_API_URL
+#
+# Required GitHub authentication, choose one path:
+#   GITHUB_APP_ID + GITHUB_PRIVATE_KEY  (preferred production path)
+#   GITHUB_TOKEN                        (local/development fallback)
+#
+# Founder Signal Engine review-only bridge bindings:
+#   FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
+#   ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
+# Optional:
+#   FOUNDER_SIGNAL_ENGINE_HOOK_TIMEOUT_MS
+#   REPOSITORY_INGEST_SECRET
