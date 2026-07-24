@@ -25,6 +25,42 @@ The default growth-inbox mode is `draft_only`. The existence of these contracts 
 not authorize live outreach, calling, campaign launch, provider credentials, paid
 services, deployment, pricing, discounts, or external publishing.
 
+## Founder Signal Engine provider routing
+
+For Founder Signal Engine, also read:
+
+- [`.ai/skills/claude-zapier-founder-operator/SKILL.md`](.ai/skills/claude-zapier-founder-operator/SKILL.md)
+- [`docs/founder-signal-engine/claude-zapier-operator.md`](docs/founder-signal-engine/claude-zapier-operator.md)
+- [`docs/founder-signal-engine/zapier-steering-authority.md`](docs/founder-signal-engine/zapier-steering-authority.md)
+- [`.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md`](.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md)
+
+Current provider truth:
+
+```text
+Claude with connected Zapier MCP
+-> direct Zapier and connected-app operator path within exposed scope
+
+ChatGPT without direct Zapier MCP
+-> existing OpenAI Developers bridge
+-> approved Catch Hook, webhook, or named Founder Signal Engine target
+-> Zapier invocation within exposed bridge scope
+```
+
+The OpenAI Developers bridge remains valid and operational. The current limitation is that ChatGPT does not have a direct Zapier MCP connection in its active connector set. Never report the missing ChatGPT MCP connection as an OpenAI bridge failure.
+
+Claude's direct Zapier MCP path complements the OpenAI bridge. It does not replace it. The bridge also does not grant ChatGPT direct Zapier administration.
+
+Use the strongest valid path that is actually available:
+
+1. Claude should use connected Zapier MCP tools directly when they expose the required action.
+2. ChatGPT should use the existing OpenAI Developers bridge when direct Zapier MCP is absent and the bridge exposes the required invocation.
+3. Manual Zapier UI instructions are the final fallback only when neither path can perform the action.
+4. Never create, rotate, duplicate, reveal, or paste an API key merely because direct MCP access is absent.
+
+A Claude MCP tool run proves only the tool action actually returned. An OpenAI bridge invocation proves only the bridge action and artifacts actually returned. Neither path proves the complete Founder Signal Engine chain without the required Zapier, analysis, HubSpot, Buffer when applicable, and Founder Control Room evidence.
+
+Using connected external tools under the scoped Founder Signal Engine contracts does not turn the Founder Control Room dashboard runtime into a general mutation layer. Keep repository runtime boundaries separate from agent tool authority.
+
 ## Repository Identity
 
 **Repository:** `jussray/founder-control-room`
