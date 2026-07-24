@@ -70,6 +70,18 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
     evidence: ['src/http/server.ts'],
   }),
   Object.freeze({
+    id: 'FCR-AUTOMATION-001',
+    status: 'partial',
+    summary:
+      'Zapier steering authority separates workflow-control connectors from OpenAI key execution, requires named scope and audit, and preserves separate founder gates; live connector and end-to-end run evidence remain incomplete.',
+    evidence: [
+      'src/lib/zapierSteeringAuthority.ts',
+      'src/lib/__tests__/zapierSteeringAuthority.test.ts',
+      'docs/founder-signal-engine/zapier-steering-authority.md',
+      'docs/founder-signal-engine/day2-zapier-cockpit-runbook.md',
+    ],
+  }),
+  Object.freeze({
     id: 'FCR-PROJECT-ISOLATION-001',
     status: 'active',
     summary:
@@ -111,7 +123,7 @@ export const CONTROL_ROOM_GUARDRAILS: readonly Guardrail[] = Object.freeze([
 
 export function publicGuardrailSnapshot() {
   return Object.freeze({
-    version: '1.6.0',
+    version: '1.7.0',
     vision: CONTROL_ROOM_VISION,
     guardrails: CONTROL_ROOM_GUARDRAILS.map(({ id, status, summary }) => ({
       id,
