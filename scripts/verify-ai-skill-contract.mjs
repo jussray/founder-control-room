@@ -113,7 +113,7 @@ for (const phrase of [
 for (const phrase of [
   'Credential plane',
   'Control plane',
-  'Key possession alone is not a Zapier control surface',
+  'Key possession alone is not a Zapier control surface or administration surface',
   'does not need to see the raw key',
   'No direct-control or end-to-end claim',
   'HubSpot task or note associated with deal `337185466050`',
