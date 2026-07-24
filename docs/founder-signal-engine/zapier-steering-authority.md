@@ -2,25 +2,27 @@
 
 ## Founder intent
 
-OpenAI Developers, ChatGPT, Codex, and other approved agents may steer the Founder Signal Engine Zap when the environment exposes a usable Zapier, automation, browser-control, MCP, or equivalent workflow-control connector.
+OpenAI Developers, ChatGPT, Codex, Claude, and other approved agents may steer the Founder Signal Engine Zap when the environment exposes a usable Zapier, automation, browser-control, MCP, Catch Hook, webhook bridge, or equivalent workflow-control path.
 
 Agents with access to the dedicated OpenAI Platform key reference may use that credential through the connected Zap to execute the OpenAI step. The raw key must never be exposed.
+
+ChatGPT-specific fallback behavior is defined in [`chatgpt-openai-developers-zapier-fallback.md`](./chatgpt-openai-developers-zapier-fallback.md).
 
 ## The two-capability rule
 
 Zapier steering is not a single skeleton key.
 
-### 1. Workflow-control capability
+### 1. Workflow-control or invocation capability
 
-A Zapier or equivalent control connector provides the path to:
+A Zapier connector, Catch Hook, webhook bridge, secure Zapier UI path, MCP action, browser-control path, or equivalent connector provides the path to:
 
-- inspect Zap structure and run history;
-- test a scoped workflow;
-- repair mappings, filters, paths, and associations;
-- edit a named Zap under an explicit steering grant;
+- inspect Zap structure and run history when supported;
+- invoke or test a scoped workflow;
+- repair mappings, filters, paths, and associations when supported;
+- edit a named Zap under an explicit steering grant when supported;
 - retain before/after evidence.
 
-Without this control path, possession of an OpenAI API key does not allow an agent to inspect or edit Zapier.
+Without an invocation or control path, possession of an OpenAI API key does not prove that Zapier received or ran a request.
 
 ### 2. OpenAI execution capability
 
@@ -33,14 +35,31 @@ A dedicated active OpenAI key reference allows the connected Zap to:
 
 The key authenticates OpenAI API calls. It is not Zapier administrator authority, publication authority, CRM authority, billing authority, or approval authority.
 
+## ChatGPT fallback authority
+
+When ChatGPT has no native Zapier connector, the approved fallback is:
+
+```text
+ChatGPT request
+-> @OpenAI Developers secure key/model path
+-> existing zapier-founder-signal-engine key reference
+-> approved Catch Hook or webhook bridge
+-> named Founder Signal Engine Zap
+```
+
+This fallback allows ChatGPT to invoke the preconfigured workflow only through the approved bridge. It does not grant arbitrary Zap inspection or editing unless the bridge explicitly provides those capabilities.
+
+If no approved bridge or Catch Hook is available, ChatGPT must record a blocked invocation path rather than create another key or claim the Zap ran.
+
 ## Required steering envelope
 
-Every write or execution request must name:
+Every write, invocation, or execution request must name:
 
 ```text
 Zap ID:
 Requested action:
 Steering grant ID:
+Invocation path or bridge identifier:
 OpenAI key reference available: yes/no
 Audit path available: yes/no
 Separate founder approval ID, when required:
@@ -51,23 +70,23 @@ Unscoped steering is forbidden.
 
 ## Standing scoped authority
 
-For the Founder Signal Engine Day 2 workflow, an approved agent may use an available control connector to:
+For the Founder Signal Engine workflow, an approved agent may use an available control or invocation path to:
 
-- inspect the named Zap;
-- inspect run history;
-- repair the GitHub trigger scope;
-- test workflow structure;
+- inspect the named Zap when supported;
+- inspect run history when supported;
+- repair the GitHub trigger scope when supported;
+- invoke or test workflow structure;
 - test the OpenAI step when the dedicated key reference is active;
-- repair 5W1H field mappings;
-- repair Buffer review-draft routing;
-- repair HubSpot deal association;
+- repair 5W1H field mappings when supported;
+- repair Buffer review-draft routing when supported;
+- repair HubSpot deal association when supported;
 - collect evidence and record the result in Founder Control Room.
 
 This standing steering authority does not carry forward to unrelated Zaps, accounts, projects, or providers.
 
 ## Separate founder gates
 
-Even with a connector, key reference, steering grant, and audit path, the following require approval for the exact action:
+Even with a connector, bridge, key reference, steering grant, and audit path, the following require approval for the exact action:
 
 - publishing or sending external content;
 - creating or updating HubSpot records when no approved CRM write is already in scope;
@@ -99,8 +118,8 @@ src/lib/zapierSteeringAuthority.ts
 
 Its tests prove:
 
-- a key alone cannot steer Zapier;
-- a connector alone can inspect a scoped workflow;
+- a key alone cannot prove Zapier invocation;
+- a connector or approved bridge is required for invocation or control;
 - edits and execution require a steering grant;
 - OpenAI execution requires the dedicated key reference;
 - all steering requires audit;
@@ -108,6 +127,8 @@ Its tests prove:
 
 ## Current environment truth
 
-At the time this contract was added, no directly invokable Zapier plugin was exposed in the active ChatGPT connector set. Agents must continue tool discovery in each environment because connector availability can change.
+At the time this contract was updated, no directly invokable Zapier plugin was exposed in the active ChatGPT connector set. ChatGPT therefore uses `@OpenAI Developers` for the secure OpenAI key/model path and requires an approved Zapier Catch Hook, webhook bridge, secure UI path, MCP action, browser-control path, or equivalent invocation mechanism.
 
-When no usable control connector exists, give exact Zapier UI steps and record the blocked direct-control path. Manual handoff remains the fallback, not the default.
+Agents must continue tool discovery in each environment because connector availability can change. Claude or another environment may expose a direct Zapier connector and should use it when available.
+
+When no usable invocation or control path exists, record the exact missing bridge identifier or setup action. Manual handoff is the fallback, not proof of completion.
