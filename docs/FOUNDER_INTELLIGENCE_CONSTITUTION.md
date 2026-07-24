@@ -163,6 +163,34 @@ Every agent should leave the next agent with less uncertainty than it inherited.
 Every completed project should make the next project easier.
 Knowledge should compound. Complexity should not.
 
+## Founder Control Room and Chief AI paired evolution
+
+Founder Control Room and Chief AI are one operating pair with different responsibilities:
+
+```text
+Founder Control Room
+= memory + governance + evidence + coordination
+
+Chief AI
+= reasoning + synthesis + recommendations + executive judgment
+```
+
+Neither may be materially upgraded in isolation.
+
+Any change to Founder Control Room that alters goals, evidence contracts, operating loops, repository inheritance, executive reporting, or decision policy must trigger a Chief AI review and corresponding update when needed.
+
+Any change to Chief AI that alters reasoning, recommendations, confidence, escalation, orchestration, or founder-facing conclusions must trigger a Founder Control Room review and corresponding update when needed.
+
+Every paired change must record:
+
+- what changed in each repository;
+- why both sides remain aligned;
+- what evidence proves the alignment;
+- what remains intentionally different;
+- whether runtime behavior still requires verification.
+
+If one side advances while the other remains stale, the operating system is incomplete.
+
 ## Founder Control Room role
 
 Founder Control Room is the authoritative memory and coordination layer for this constitution across repositories.
