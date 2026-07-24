@@ -7,7 +7,24 @@
 - The task crosses Gmail, GitHub, HubSpot, Buffer, Zapier, or saved Zapier MCP skills.
 - Claude must distinguish a conversational MCP run from an always-on event Zap.
 
-Read [`docs/founder-signal-engine/claude-zapier-operator.md`](../../../docs/founder-signal-engine/claude-zapier-operator.md) and [`docs/founder-signal-engine/zapier-steering-authority.md`](../../../docs/founder-signal-engine/zapier-steering-authority.md) before acting.
+Read [`CLAUDE.md`](../../../CLAUDE.md), [`docs/founder-signal-engine/claude-zapier-operator.md`](../../../docs/founder-signal-engine/claude-zapier-operator.md), and [`docs/founder-signal-engine/zapier-steering-authority.md`](../../../docs/founder-signal-engine/zapier-steering-authority.md) before acting.
+
+## Provider routing truth
+
+Claude's connected Zapier MCP is a direct operator path for the actions the MCP exposes.
+
+The OpenAI Developers bridge remains valid and operational. ChatGPT's present limitation is the absence of a direct Zapier MCP connection, not a failure of the OpenAI bridge.
+
+```text
+Claude + Zapier MCP
+-> direct scoped operator path
+
+ChatGPT without Zapier MCP
+-> OpenAI Developers bridge
+-> approved Founder Signal Engine invocation path
+```
+
+The paths complement each other. Do not describe Claude as replacing the OpenAI bridge. Do not describe the OpenAI bridge as granting direct Zapier administration.
 
 ## Authority
 
