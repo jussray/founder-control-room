@@ -62,6 +62,10 @@ const STEERING_GRANT_ACTIONS: ReadonlySet<ZapierSteeringAction> = new Set([
   'edit_workflow',
   'run_openai_step',
   'queue_review_draft',
+  'publish_or_send',
+  'write_crm',
+  'change_credentials',
+  'change_billing',
 ]);
 
 const DIRECT_CONNECTOR_ONLY_ACTIONS: ReadonlySet<ZapierSteeringAction> = new Set([
@@ -214,7 +218,7 @@ export function evaluateZapierSteering(request: ZapierSteeringRequest): ZapierSt
     return decision(
       request,
       'allowed',
-      'The scoped control path, audit trail, and exact founder approval are present.',
+      'The scoped control path, audit trail, steering grant, and exact founder approval are present.',
       controlPath,
     );
   }
