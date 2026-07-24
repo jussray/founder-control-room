@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "owner": "Juss",
+  "authorityRepository": "jussray/founder-control-room",
+  "canonicalConstitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
+  "canonicalEntrypoint": "AGENTS_FOUNDER_INTELLIGENCE.md",
+  "inheritanceRule": "Repository-local constitutions and agent rules may specialize or strengthen this contract, but may not weaken human agency, truthfulness, evidence, privacy, safety, reversibility, founder authority, provenance, or non-deletion.",
+  "requiredLoop": [
+    "/human",
+    "/futureyou",
+    "/truthmode",
+    "/confess",
+    "/billgates",
+    "/elonmusk",
+    "Build",
+    "Verify",
+    "Explain",
+    "Leave evidence",
+    "Teach the next builder",
+    "Repeat"
+  ],
+  "statusDefinitions": {
+    "enforced": "The repository has a local entrypoint and constitution, and its primary AGENTS.md explicitly loads the entrypoint.",
+    "partial": "The repository has a local entrypoint and constitution, but its primary AGENTS.md does not yet explicitly load the entrypoint.",
+    "missing": "The repository is missing the local entrypoint, the local constitution, or both. Local repository rules remain authoritative until a focused inheritance PR is reviewed."
+  },
+  "projects": [
+    {
+      "slug": "founder-control-room",
+      "repository": "jussray/founder-control-room",
+      "role": "authoritative memory, coordination, evidence, approvals, and portfolio governance",
+      "entrypoint": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
+      "primaryAgentContract": "AGENTS.md",
+      "status": "enforced",
+      "nextAction": "Keep the registry, AGENTS.md entry, and verifier aligned whenever active portfolio membership changes."
+    },
+    {
+      "slug": "sekret-bip",
+      "repository": "jussray/Sekret-Bip",
+      "role": "teen companion product and family-facing runtime",
+      "entrypoint": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
+      "primaryAgentContract": "AGENTS.md",
+      "status": "partial",
+      "nextAction": "Add one explicit AGENTS.md reference to the existing Founder Intelligence entrypoint in a focused documentation PR."
+    },
+    {
+      "slug": "chief-ai-machine",
+      "repository": "jussray/chief-ai-machine",
+      "role": "provider-independent founder intelligence and executive coordination",
+      "entrypoint": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
+      "primaryAgentContract": "AGENTS.md",
+      "status": "enforced",
+      "nextAction": "Preserve the merged Future You loop and keep execution authority in Founder Control Room."
+    },
+    {
+      "slug": "l99",
+      "repository": "jussray/l99-StoryEngine",
+      "role": "story provenance, isolation, artifact lifecycle, and promotion",
+      "entrypoint": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
+      "primaryAgentContract": "AGENTS.md",
+      "status": "partial",
+      "nextAction": "Add one explicit AGENTS.md reference to the existing Founder Intelligence entrypoint in a focused documentation PR."
+    },
+    {
+      "slug": "juss-beautiful-hair",
+      "repository": "jussray/jussbeautifulhair-site",
+      "role": "public hair storefront and minimal payment-session Worker",
+      "entrypoint": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
+      "primaryAgentContract": "AGENTS.md",
+      "status": "missing",
+      "nextAction": "Add a commerce-specific Founder Intelligence constitution, entrypoint, and AGENTS.md reference through a focused documentation PR."
+    },
+    {
+      "slug": "jbh-private",
+      "repository": "jussray/jbh-private",
+      "role": "private hair operations, supplier intelligence, and commercial controls",
+      "entrypoint": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
+      "primaryAgentContract": "AGENTS.md",
+      "status": "partial",
+      "nextAction": "Add one explicit AGENTS.md reference to the existing Founder Intelligence entrypoint in a focused documentation PR."
+    },
+    {
+      "slug": "untold-stories",
+      "repository": "jussray/untold-stories-storefront",
+      "role": "story commerce and storefront operations",
+      "entrypoint": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
+      "primaryAgentContract": "AGENTS.md",
+      "status": "partial",
+      "nextAction": "Add one explicit AGENTS.md reference to the existing Founder Intelligence entrypoint in a focused documentation PR."
+    },
+    {
+      "slug": "promptos",
+      "repository": "jussray/promptos",
+      "role": "prompt, skill, agent, and instruction governance",
+      "entrypoint": "AGENTS_FOUNDER_INTELLIGENCE.md",
+      "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
+      "primaryAgentContract": "AGENTS.md",
+      "status": "partial",
+      "nextAction": "Add one explicit AGENTS.md reference to the existing Founder Intelligence entrypoint in a focused documentation PR."
+    }
+  ],
+  "lastInspected": "2026-07-24",
+  "truthBoundary": "This registry records repository instruction inheritance only. It does not prove runtime behavior, deployment, provider execution, user outcomes, compliance, or that an external agent actually loaded the files."
+}
