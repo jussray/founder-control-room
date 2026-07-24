@@ -18,6 +18,7 @@ import { commandBridgeRouter } from './routes/commandBridge.js';
 import { designOsRouter } from './routes/designOs.js';
 import { cloudflareReasoningRouter } from './routes/cloudflareReasoning.js';
 import { mcpRouter } from './routes/mcp.js';
+import { externalUseRouter } from './routes/externalUse.js';
 import { handleFounderSignalEngineMcp } from './routes/founderSignalEngineMcp.js';
 import { portfolioVerificationRouter } from './routes/portfolioVerification.js';
 import {
@@ -134,6 +135,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/design-os', designOsRouter);
   app.use('/cloudflare', cloudflareReasoningRouter);
   app.use('/mcp', mcpRouter);
+  app.use('/external-use', externalUseRouter);
   app.use('/economic-intelligence', economicIntelligenceRouter);
 
   // Debug routes — CI and founder inspection only (no secrets exposed).
