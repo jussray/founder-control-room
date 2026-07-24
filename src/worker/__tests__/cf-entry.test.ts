@@ -15,19 +15,48 @@ const VALID_ENV: ControlRoomWorkerEnv = {
   SUPABASE_SERVICE_ROLE_KEY: 'service-role-test-key',
   SUPABASE_PUBLISHABLE_KEY: 'publishable-test-key',
   GITHUB_WEBHOOK_SECRET: 'webhook-test-secret',
-  GITHUB_TOKEN: 'github-token-test-value',
+  GITHUB_APP_ID: '123456',
+  GITHUB_PRIVATE_KEY: 'private-key-test-value',
   FOUNDER_ALLOWED_ORIGINS: 'https://control.example.com,https://staging.control.example.com',
   FOUNDER_API_URL: 'https://api.control.example.com',
 };
 
 describe('Cloudflare Worker binding validation', () => {
-  it('accepts complete absolute production bindings', () => {
+  it('accepts complete absolute production bindings with GitHub App credentials', () => {
     expect(() => validateWorkerEnv(VALID_ENV)).not.toThrow();
   });
 
-  it('reports every missing required binding in one failure', () => {
+  it('accepts the documented GitHub token fallback without GitHub App credentials', () => {
+    expect(() => validateWorkerEnv({
+      ...VALID_ENV,
+      GITHUB_APP_ID: undefined,
+      GITHUB_PRIVATE_KEY: undefined,
+      GITHUB_TOKEN: 'github-token-test-value',
+    })).not.toThrow();
+  });
+
+  it('reports every missing required service binding in one failure', () => {
     expect(() => validateWorkerEnv({ SUPABASE_URL: 'https://control-room.supabase.co' }))
       .toThrow('Missing required Worker bindings: SUPABASE_SERVICE_ROLE_KEY');
+  });
+
+  it('rejects a Worker with no GitHub authentication path', () => {
+    expect(() => validateWorkerEnv({
+      ...VALID_ENV,
+      GITHUB_APP_ID: undefined,
+      GITHUB_PRIVATE_KEY: undefined,
+      GITHUB_TOKEN: undefined,
+    })).toThrow(
+      'GitHub authentication is not configured; set GITHUB_APP_ID and GITHUB_PRIVATE_KEY or GITHUB_TOKEN',
+    );
+  });
+
+  it('rejects partial GitHub App credentials instead of silently falling back', () => {
+    expect(() => validateWorkerEnv({
+      ...VALID_ENV,
+      GITHUB_PRIVATE_KEY: undefined,
+      GITHUB_TOKEN: 'github-token-test-value',
+    })).toThrow('GITHUB_APP_ID and GITHUB_PRIVATE_KEY must be configured together');
   });
 
   it('rejects malformed service and callback URLs', () => {

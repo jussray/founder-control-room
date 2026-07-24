@@ -6,6 +6,8 @@ compatibility_flags = [
   "enable_nodejs_http_modules",
   "enable_nodejs_http_server_modules",
 ]
+workers_dev = false
+preview_urls = false
 
 [observability]
 enabled = true
@@ -17,12 +19,9 @@ enabled = true
 # from this build (see tsconfig.json's exclude list); it is not read by
 # cf-entry.ts and must not be confused with it.
 #
-# The deletion-queue worker (src/workers/deletion-queue-worker.ts) is a
-# separate Cloudflare Worker — its own config lives in
-# wrangler.deletion-queue.toml (`wrangler deploy --config
-# wrangler.deletion-queue.toml`), not here. It must never share this file:
-# a single wrangler.toml can only declare one `main`/`name` pair, and this
-# one is the founder-control-room application itself.
+# The API-subdomain Worker has its own config in wrangler.api.toml. The
+# deletion-queue worker has its own config in wrangler.deletion-queue.toml.
+# These Workers must not share a name, route, or cron configuration.
 
 [[routes]]
 pattern = "foundercontrolroom.org"
@@ -35,21 +34,29 @@ custom_domain = true
 ENVIRONMENT = "production"
 
 # ---------------------------------------------------------------------------
-# Secrets — set via `wrangler secret put <NAME>` (never committed)
+# Secrets — set in the founder-control-room Worker secret store, never commit
 # ---------------------------------------------------------------------------
-# wrangler secret put GITHUB_WEBHOOK_SECRET
-# wrangler secret put SUPABASE_URL
-# wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-# wrangler secret put SUPABASE_PUBLISHABLE_KEY
-# wrangler secret put GITHUB_APP_ID
-# wrangler secret put GITHUB_PRIVATE_KEY
-# wrangler secret put REPOSITORY_INGEST_SECRET
-# wrangler secret put REPOSITORY_INGEST_SECRET_<NORMALIZED_PROJECT_SLUG>  # preferred per repo
-# wrangler secret put FOUNDER_ALLOWED_ORIGINS   # https://foundercontrolroom.org
-# wrangler secret put FOUNDER_API_URL           # https://foundercontrolroom.org
+# Required service bindings:
+#   SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+#   SUPABASE_PUBLISHABLE_KEY
+#   GITHUB_WEBHOOK_SECRET
+#   FOUNDER_ALLOWED_ORIGINS            # https://foundercontrolroom.org
+#   FOUNDER_API_URL                    # https://foundercontrolroom.org
 #
-# Local/development fallback only:
-# wrangler secret put GITHUB_TOKEN
+# Required GitHub authentication, choose one path:
+#   GITHUB_APP_ID + GITHUB_PRIVATE_KEY  # preferred production path
+#   GITHUB_TOKEN                        # local/development fallback
+#
+# Optional repository ingestion:
+#   REPOSITORY_INGEST_SECRET
+#   REPOSITORY_INGEST_SECRET_<NORMALIZED_PROJECT_SLUG>
+#
+# Founder Signal Engine review-only bridge:
+#   FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
+#   ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
+# Optional:
+#   FOUNDER_SIGNAL_ENGINE_HOOK_TIMEOUT_MS
 
 [triggers]
 crons = ["* * * * *"]
