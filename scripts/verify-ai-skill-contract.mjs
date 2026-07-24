@@ -10,6 +10,7 @@ const files = {
   typescriptTests: await readFile(new URL('../skills/typescript-behavior-tests/SKILL.md', import.meta.url), 'utf8'),
   typescriptReview: await readFile(new URL('../skills/typescript-strict-review/SKILL.md', import.meta.url), 'utf8'),
   productDesign: await readFile(new URL('../skills/product-design-gate/SKILL.md', import.meta.url), 'utf8'),
+  zapierSteering: await readFile(new URL('../docs/founder-signal-engine/openai-zapier-steering-contract.md', import.meta.url), 'utf8'),
   agents: await readFile(new URL('../AGENTS.md', import.meta.url), 'utf8'),
   global: await readFile(new URL('../GLOBAL_AI.md', import.meta.url), 'utf8'),
   redteam: await readFile(new URL('../artifacts/redteam/SALES_DEVIL_ATTACK.md', import.meta.url), 'utf8'),
@@ -108,6 +109,15 @@ for (const phrase of [
   'Supabase Auth, RLS, Storage, Realtime, Edge Functions',
   'design QA can pass while Supabase verification remains blocked',
 ]) requireText('product-design invariant', files.productDesign, phrase);
+for (const phrase of [
+  'Credential plane',
+  'Control plane',
+  'Key possession alone is not a Zapier control surface',
+  'does not need to see the raw key',
+  'No direct-control or end-to-end claim',
+  'HubSpot task or note associated with deal `337185466050`',
+  'does not authorize blind publication',
+]) requireText('OpenAI Zapier steering invariant', files.zapierSteering, phrase);
 
 requireText('AGENTS portfolio entry', files.agents, 'skills/portfolio-control-plane/SKILL.md');
 requireText('AGENTS sales entry', files.agents, 'skills/sales/SKILL.md');
@@ -118,6 +128,9 @@ requireText('AGENTS TypeScript patch entry', files.agents, 'skills/typescript-mi
 requireText('AGENTS TypeScript tests entry', files.agents, 'skills/typescript-behavior-tests/SKILL.md');
 requireText('AGENTS TypeScript review entry', files.agents, 'skills/typescript-strict-review/SKILL.md');
 requireText('AGENTS Product Design entry', files.agents, 'skills/product-design-gate/SKILL.md');
+requireText('AGENTS Zapier cockpit rule', files.agents, 'treat Zapier as an operable workflow cockpit');
+requireText('AGENTS Zapier connector discovery', files.agents, 'OpenAI Developers');
+requireText('AGENTS dedicated Zapier key', files.agents, 'zapier-founder-signal-engine');
 requireText('AGENTS Product Design/Supabase split', files.agents, 'design evidence and Supabase evidence separate');
 requireText('AGENTS commercial extension', files.agents, '/sales /devil');
 requireText('AGENTS separation', files.agents, 'separate approval gates');
