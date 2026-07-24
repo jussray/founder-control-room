@@ -32,8 +32,8 @@
       "entrypoint": "AGENTS_FOUNDER_INTELLIGENCE.md",
       "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
       "primaryAgentContract": "AGENTS.md",
-      "status": "enforced",
-      "nextAction": "Keep the registry, AGENTS.md entry, and verifier aligned whenever active portfolio membership changes."
+      "status": "partial",
+      "nextAction": "Add one explicit AGENTS.md reference to the Founder Intelligence entrypoint in a focused documentation PR, then change this status to enforced."
     },
     {
       "slug": "sekret-bip",
