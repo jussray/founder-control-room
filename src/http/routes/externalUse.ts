@@ -93,7 +93,7 @@ externalUseRouter.get("/digests", requireFounder, async (req: Request, res: Resp
   try {
     const { data, error } = await supabase
       .from("external_code_use_digest_runs")
-      .select("id,digest_hour,recipient,status,item_count,new_item_count,source_counts,warnings,resend_email_id,error_code,started_at,completed_at")
+      .select("id,digest_hour,recipient,status,attempt_count,item_count,new_item_count,source_counts,warnings,resend_email_id,error_code,started_at,completed_at")
       .order("digest_hour", { ascending: false })
       .limit(boundedLimit(req.query.limit, 48));
     if (error) throw new Error(`external_use_digest_list_failed:${error.message}`);
