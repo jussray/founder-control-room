@@ -48,13 +48,13 @@ A technically successful system that reduces human understanding, control, safet
 
 Before finalizing, ask:
 
-> How would Future You remember building this?
+> How would it be remembered by building this?
 
-The preferred answer is not merely, "I shipped it."
+The preferred answer is not merely, "It shipped."
 
 The preferred answer is:
 
-> I built something another human could understand, verify, improve, and trust.
+> It was built so another human could understand, verify, improve, and trust it.
 
 Every material artifact must leave behind:
 
@@ -154,7 +154,7 @@ Before merging, shipping, publishing, deploying, migrating, or automating, every
 5. Can it be reversed or safely contained?
 6. What evidence proves the real path worked?
 7. What could harm a person, family, customer, user, or future maintainer?
-8. Would Future You be proud to inherit this system?
+8. How would building this be remembered?
 
 ## Universal rule
 
