@@ -13,6 +13,7 @@ Read these before changing code, configuration, schemas, providers, verification
 - [`skills/typescript-behavior-tests/SKILL.md`](./skills/typescript-behavior-tests/SKILL.md) when writing, replacing, or retiring Jest/Vitest behavior tests
 - [`skills/typescript-strict-review/SKILL.md`](./skills/typescript-strict-review/SKILL.md) before merge-ready or ready-for-review claims on TypeScript changes
 - [`skills/product-design-gate/SKILL.md`](./skills/product-design-gate/SKILL.md) before Product Design audits, prototypes, visual QA, or design evidence claims
+- [`.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md`](./.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md) before ChatGPT or another agent without a native Zapier connector invokes the Founder Signal Engine bridge
 - [`skills/sales/SKILL.md`](./skills/sales/SKILL.md) for qualification, offers, proof, conversion quality, retention, and revenue operations
 - [`skills/devil/SKILL.md`](./skills/devil/SKILL.md) for the premise attack and selected-plan attack
 
@@ -93,48 +94,53 @@ Never commit `.codex/.env`, `OPENAI_API_KEY`, `MODEL_API_KEY`, service-role keys
 
 ## OpenAI Platform and Zapier key handoff
 
-For Founder Signal Engine automation, Codex and ChatGPT agents must treat Zapier as an operable workflow cockpit when the current environment exposes a Zapier, automation, browser-control, MCP, or equivalent connector. OpenAI Platform remains the key/model layer.
+For Founder Signal Engine automation, Codex and ChatGPT agents must treat Zapier as an operable workflow cockpit when the current environment exposes either a direct Zapier/control connector or the approved OpenAI Developers invocation bridge. OpenAI Platform remains the key/model layer.
 
 Canonical Zapier key intent:
 
 ```text
 OpenAI Platform key name: zapier-founder-signal-engine
+Status: existing provider-held key reference; do not recreate, rotate, or duplicate without explicit founder approval.
 Purpose: allow Zapier to call OpenAI for Founder Signal Engine 5W1H analysis, draft generation, routing decisions, and review-task content.
 Target: Ray's OpenAI Platform organization/project selected through the OpenAI Platform connector.
 ```
 
-Agent steering rule for Day 2:
+Agent steering rule for Founder Signal Engine Day 3:
 
 ```text
-Goal: make the Day 2 workflow actually run.
-Path: GitHub evidence -> Zapier -> OpenAI 5W1H -> Buffer draft/queue -> HubSpot deal-associated task/note -> Founder Control Room evidence.
-Default behavior: try to steer or repair Zapier through available tools before asking Ray to do it manually.
-Fallback behavior: only give Ray exact Zapier UI steps after confirming no Zapier/control connector is available in the current environment.
+Goal: make the workflow actually run and capture proof.
+Path: GitHub evidence -> Zapier -> OpenAI 5W1H -> Buffer draft/queue/publish path -> HubSpot deal-associated task/note -> Founder Control Room evidence.
+Direct path: use a native Zapier or equivalent control connector when available.
+ChatGPT fallback: use @OpenAI Developers with the existing zapier-founder-signal-engine key reference through the approved Catch Hook, webhook, or named bridge target.
+Manual fallback: only give Ray exact Zapier UI steps after confirming neither a direct connector nor an approved bridge invocation path is available.
 ```
 
 Agent rules:
 
-- First discover whether the current environment has a Zapier, automation, browser-control, MCP, OpenAI Developers, or equivalent connector that can inspect Zap history, edit Zap steps, test actions, or update app connections.
-- If such a connector exists, use it to inspect the Day 2 Zap, verify the GitHub trigger, repair branch/PR trigger scope, test the OpenAI step, map Buffer draft/queue output, and associate HubSpot tasks/notes with the `Founder Signal Engine` deal.
-- Do not stop at “I cannot access Zapier” until tool discovery confirms there is no usable Zapier/control path in the current environment.
-- Use the OpenAI Platform connector to identify the correct organization/project, start secure key setup, or rotate a Zapier-specific key.
-- Never ask Ray to paste the raw key into GitHub, HubSpot, Founder Control Room, issue comments, PR bodies, repo files, screenshots, logs, or chat-visible documentation.
+- First discover whether the current environment has a native Zapier, automation, browser-control, MCP, or equivalent connector that can inspect Zap history, edit Zap steps, test actions, or update app connections.
+- When a native connector exists, use it within its declared scope to inspect the Zap, verify the GitHub trigger, repair mappings, test the OpenAI step, map Buffer output, and verify HubSpot association.
+- When ChatGPT or another approved agent has no native Zapier connector, read [`.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md`](./.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md) and invoke the approved OpenAI Developers bridge using the existing `zapier-founder-signal-engine` key reference.
+- “Call the key” means invoke the secure provider-held key reference through the approved bridge. It never means reading, copying, displaying, logging, or pasting the raw secret.
+- Do not start secure key setup, rotate the Zapier-specific key, or create a duplicate merely because direct Zapier tooling is absent. Credential changes require explicit founder approval for that exact action.
+- A bridge may perform only the capabilities it explicitly exposes. Invocation access does not silently grant Zapier inspection, editing, credential, billing, or administration authority.
+- Require a real Zapier run ID or retain the exact provider error. Do not claim that Zapier, OpenAI, Buffer, HubSpot, or the full chain ran without the corresponding evidence.
+- Do not stop at “I cannot access Zapier” until tool discovery confirms there is no usable direct connector or approved OpenAI Developers bridge path in the current environment.
+- Never ask Ray to paste the raw key into GitHub, HubSpot, Founder Control Room, issue comments, PR bodies, repository files, screenshots, logs, or chat-visible documentation.
 - Never commit the Zapier OpenAI key or any placeholder that looks like a live secret.
-- Do not reuse the local Codex `OPENAI_API_KEY` for Zapier unless Ray explicitly chooses to wire that same key outside the repository. Prefer a dedicated Zapier key.
-- ChatGPT/Codex should guide Ray to paste the generated key into Zapier's OpenAI connection only when the environment cannot securely complete that Zapier connection itself.
-- If Zapier fails at the OpenAI step, first verify that the Zapier OpenAI connection uses the dedicated key and that the key is active in OpenAI Platform.
-- If Zapier reaches HubSpot, the HubSpot task/note must be associated with the `Founder Signal Engine` deal rather than created as a floating task.
+- Do not reuse the local Codex `OPENAI_API_KEY` for Zapier unless Ray explicitly authorizes that separate provider configuration. Prefer the established dedicated Zapier key reference.
+- If the bridge or Zapier fails at the OpenAI step, first verify that the invocation uses the existing dedicated key reference and that the named target is bound and active.
+- If Zapier reaches HubSpot, the HubSpot task or note must be associated with the `Founder Signal Engine` deal rather than created as a floating task.
 
 Correct workflow boundary:
 
 ```text
 GitHub evidence
--> Zapier trigger
--> OpenAI Platform key used inside Zapier
+-> direct Zapier trigger or approved OpenAI Developers bridge invocation
+-> existing OpenAI Platform key reference used inside the configured workflow
 -> OpenAI 5W1H send gate
--> Buffer draft or queue item only when allowed
+-> Buffer draft, queue, schedule, or approved publish action only when allowed
 -> HubSpot task/note associated with Founder Signal Engine deal
--> Founder Control Room evidence record
+-> Founder Control Room evidence record tied to the exact GitHub SHA
 ```
 
 Required 5W1H behavior for Zapier OpenAI calls:
@@ -151,6 +157,16 @@ Missing proof or missing context:
 ```
 
 If the 5W1H block is incomplete, Zapier must not publish or send. It should create a HubSpot research/review task associated with the Founder Signal Engine deal.
+
+Current Day 3 source:
+
+```text
+Repository: jussray/Sekret-Bip
+PR: #599
+Merge commit: f4573d360a8fea99b301f33a2a21192525725f7b
+```
+
+The GitHub trigger is complete. Day 3 does not pass until the Zapier run ID, OpenAI 5W1H result, Buffer artifact, HubSpot deal-associated evidence, and Founder Control Room proof exist.
 
 ## Product Design and Supabase truth
 
