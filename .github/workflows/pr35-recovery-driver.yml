@@ -1,4 +1,4 @@
-name: PR35 Recovery Exact-Head Driver
+name: PR Recovery Exact-Head Driver
 
 on:
   pull_request:
@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  TARGET_SHA: 15c4a181d8a5dcea854c181c963c64390a2a17fa
+  TARGET_SHA: ${{ github.event.pull_request.head.sha }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
