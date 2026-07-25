@@ -1,5 +1,6 @@
 ---
 name: control-room-incident-triage
+description: Use when builds, tests, deployments, providers, integrations, routes, or runtimes fail to classify the incident, preserve evidence, rank causes, and select the smallest safe recovery.
 version: 1.0.0
 status: active
 scope: founder-control-room
