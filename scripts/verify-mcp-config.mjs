@@ -3,6 +3,8 @@ import path from 'node:path';
 
 const root = process.cwd();
 const expectedServerNames = [
+  'cloudflare',
+  'cloudflare-bindings',
   'cloudflare-builds',
   'cloudflare-docs',
   'cloudflare-observability',
@@ -11,12 +13,21 @@ const expectedServerNames = [
   'github',
   'supabase',
 ];
+const expectedCloudflareServerNames = [
+  'cloudflare',
+  'cloudflare-bindings',
+  'cloudflare-builds',
+  'cloudflare-docs',
+  'cloudflare-observability',
+];
 
 const expectedRemoteUrls = {
   github: 'https://api.githubcopilot.com/mcp/',
   context7: 'https://mcp.context7.com/mcp',
   figma: 'https://mcp.figma.com/mcp',
+  cloudflare: 'https://mcp.cloudflare.com/mcp',
   'cloudflare-docs': 'https://docs.mcp.cloudflare.com/mcp',
+  'cloudflare-bindings': 'https://bindings.mcp.cloudflare.com/mcp',
   'cloudflare-builds': 'https://builds.mcp.cloudflare.com/mcp',
   'cloudflare-observability': 'https://observability.mcp.cloudflare.com/mcp',
 };
@@ -47,6 +58,13 @@ function validateServerSet(relativePath, servers) {
   );
 }
 
+function validateCloudflareServerSet(relativePath, servers) {
+  assert(
+    JSON.stringify(Object.keys(servers ?? {}).sort()) === JSON.stringify(expectedCloudflareServerNames),
+    `${relativePath} must contain exactly the Cloudflare fleet: ${expectedCloudflareServerNames.join(', ')}`,
+  );
+}
+
 function validateRemoteServers(relativePath, servers) {
   for (const [name, url] of Object.entries(expectedRemoteUrls)) {
     assert(servers[name]?.type === 'http', `${relativePath}:${name} must use HTTP`);
@@ -66,6 +84,15 @@ function validateRemoteServers(relativePath, servers) {
 
   assert(!servers.figma?.headers, `${relativePath}:figma must authenticate through the supported client`);
   assert(!servers.figma?.env, `${relativePath}:figma must not commit environment credentials`);
+}
+
+function validateCursorCloudflareServers(relativePath, servers) {
+  validateCloudflareServerSet(relativePath, servers);
+  for (const name of expectedCloudflareServerNames) {
+    assert(servers[name]?.url === expectedRemoteUrls[name], `${relativePath}:${name} URL drifted`);
+    assert(!servers[name]?.headers, `${relativePath}:${name} must authenticate through the supported client`);
+    assert(!servers[name]?.env, `${relativePath}:${name} must not commit environment credentials`);
+  }
 }
 
 function validateSupabase(relativePath, server, expectedProjectRef) {
@@ -121,6 +148,13 @@ function validateSkillRouting(routing) {
     for (const skill of route.skills) allSkills.add(skill);
   }
 
+  for (const serverName of expectedCloudflareServerNames) {
+    assert(
+      routedServers[serverName]?.skills?.includes('control-room-cloudflare-agent-fleet'),
+      `${serverName} routing must include control-room-cloudflare-agent-fleet`,
+    );
+  }
+
   const figmaSkills = routedServers.figma?.skills ?? [];
   for (const required of [
     'control-room-repo-contract',
@@ -142,19 +176,23 @@ function validateSkillRouting(routing) {
 const projectConfig = readJson('.mcp.json');
 const exampleConfig = readJson('.mcp.example.json');
 const vscodeConfig = readJson('.vscode/mcp.json');
+const cursorConfig = readJson('.cursor/mcp.json');
 const skillRouting = readJson('config/mcp-skill-routing.json');
 
 const projectServers = projectConfig.mcpServers;
 const exampleServers = exampleConfig.mcpServers;
 const vscodeServers = vscodeConfig.servers;
+const cursorServers = cursorConfig.mcpServers;
 
 validateServerSet('.mcp.json', projectServers);
 validateServerSet('.mcp.example.json', exampleServers);
 validateServerSet('.vscode/mcp.json', vscodeServers);
+validateCloudflareServerSet('.cursor/mcp.json', cursorServers);
 
 validateRemoteServers('.mcp.json', projectServers);
 validateRemoteServers('.mcp.example.json', exampleServers);
 validateRemoteServers('.vscode/mcp.json', vscodeServers);
+validateCursorCloudflareServers('.cursor/mcp.json', cursorServers);
 
 validateSupabase('.mcp.json', projectServers.supabase, 'oojzfmmywbvficgybaxd');
 validateSupabase('.mcp.example.json', exampleServers.supabase, 'YOUR_CONTROL_ROOM_PROJECT_REF');
@@ -165,16 +203,19 @@ for (const [relativePath, parsed] of [
   ['.mcp.json', projectConfig],
   ['.mcp.example.json', exampleConfig],
   ['.vscode/mcp.json', vscodeConfig],
+  ['.cursor/mcp.json', cursorConfig],
 ]) {
   assertNoCommittedSecrets(relativePath, parsed);
   const servers = parsed.mcpServers ?? parsed.servers;
   for (const forbidden of ['playwright', 'dbhub', 'netdata-cloud']) {
     assert(!servers[forbidden], `${relativePath}:${forbidden} is not justified in the current Control Room phase`);
   }
-  assert(
-    !String(servers.supabase?.url ?? '').includes('tbsevonvegdnlyjgplmm'),
-    `${relativePath}:Control Room must never point its standing MCP config at Bip's Supabase project`,
-  );
+  if (servers.supabase) {
+    assert(
+      !String(servers.supabase.url ?? '').includes('tbsevonvegdnlyjgplmm'),
+      `${relativePath}:Control Room must never point its standing MCP config at Bip's Supabase project`,
+    );
+  }
 }
 
-console.log('[verify:mcp] Control Room MCP configuration and skill routing are scoped, credential-free, and repository-bound.');
+console.log('[verify:mcp] Control Room MCP configuration and Cloudflare agent-fleet routing are scoped, credential-free, and repository-bound.');
