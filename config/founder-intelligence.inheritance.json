@@ -32,8 +32,8 @@
       "entrypoint": "AGENTS_FOUNDER_INTELLIGENCE.md",
       "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
       "primaryAgentContract": "AGENTS.md",
-      "status": "partial",
-      "nextAction": "Add one explicit AGENTS.md reference to the Founder Intelligence entrypoint in a focused documentation PR, then change this status to enforced."
+      "status": "enforced",
+      "nextAction": "Preserve the explicit AGENTS.md entrypoint and keep the registry, constitution, and verifier aligned when portfolio membership or governance changes."
     },
     {
       "slug": "sekret-bip",
@@ -106,6 +106,6 @@
       "nextAction": "Add one explicit AGENTS.md reference to the existing Founder Intelligence entrypoint in a focused documentation PR."
     }
   ],
-  "lastInspected": "2026-07-24",
+  "lastInspected": "2026-07-25",
   "truthBoundary": "This registry records repository instruction inheritance only. It does not prove runtime behavior, deployment, provider execution, user outcomes, compliance, or that an external agent actually loaded the files."
 }
