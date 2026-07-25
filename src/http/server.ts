@@ -19,6 +19,7 @@ import { designOsRouter } from './routes/designOs.js';
 import { cloudflareReasoningRouter } from './routes/cloudflareReasoning.js';
 import { mcpRouter } from './routes/mcp.js';
 import { externalUseRouter } from './routes/externalUse.js';
+import { futureYouRouter } from './routes/futureYou.js';
 import { handleFounderSignalEngineMcp } from './routes/founderSignalEngineMcp.js';
 import { portfolioVerificationRouter } from './routes/portfolioVerification.js';
 import {
@@ -126,6 +127,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/l99', l99Router);
   app.use('/terminal', terminalRouter);
   app.use('/dashboard', dashboardRouter);
+  app.use('/futureyou', futureYouRouter);
   app.use('/missions', missionsRouter);
   app.use('/promptos', promptosRouter);
   app.use('/agents', agentsRouter);
