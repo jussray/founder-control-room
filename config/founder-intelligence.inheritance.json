@@ -102,8 +102,8 @@
       "entrypoint": "AGENTS_FOUNDER_INTELLIGENCE.md",
       "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
       "primaryAgentContract": "AGENTS.md",
-      "status": "partial",
-      "nextAction": "Add one explicit AGENTS.md reference to the existing Founder Intelligence entrypoint in a focused documentation PR."
+      "status": "enforced",
+      "nextAction": "Preserve the existing primary AGENTS.md entrypoint and the human agency, prompt provenance, privacy, evidence, disablement, rollback, and non-deletion boundaries it loads."
     }
   ],
   "lastInspected": "2026-07-25",
