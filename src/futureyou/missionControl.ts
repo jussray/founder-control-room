@@ -296,7 +296,7 @@ export function buildMissionControlBrief(input: {
       redTeam: 'Expose blind spots and never present a draft, estimate, or stale record as completed reality.',
       ooda: 'Observe signals, orient by risk and state, decide one next move, act through existing gates, then verify.',
       lindyMode: 'Organize around durable founder decisions rather than whichever provider happens to be connected today.',
-      l99: 'Every recommendation declares its authority level and keeps approval boundaries explicit.',
+      l99: 'L99 requires every recommendation to declare its authority level and keep approval boundaries explicit.',
     },
     summary: {
       openMissions: openMissions.length,
