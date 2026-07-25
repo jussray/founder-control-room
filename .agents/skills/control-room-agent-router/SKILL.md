@@ -60,6 +60,10 @@ Stop condition:
 Fallback route:
 ```
 
+## Anti-stale routing
+
+A previous agent's route is evidence of an earlier decision, not permanent authority. Reconfirm the repository, branch, available connectors, provider state, and execution owner whenever the task, head SHA, permissions, or runtime evidence changes.
+
 ## Anti-patterns
 
 - Do not ask every agent to solve the same problem independently unless deliberate variance reduction is required.
