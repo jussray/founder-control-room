@@ -103,7 +103,7 @@ Every material post must have:
 - no invented metrics, testimonials, partnerships, users, revenue, deployment, or approval;
 - no implication of founder approval when only an agent drafted the content;
 - a reviewable draft or an approved automated publishing class;
-- a captured URL, platform artifact, message ID, or equivalent evidence after publication;
+- a captured URL, observable platform artifact, message ID, or equivalent evidence after publication;
 - a correction path when the post becomes inaccurate.
 
 ## Status language
