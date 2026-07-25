@@ -42,6 +42,19 @@ function invocationIdOf(event) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+function sourceOf(event) {
+  const metadata = metadataOf(event);
+  return {
+    repository: metadata.sourceRepository ?? metadata.source_repository ?? null,
+    commit: metadata.sourceCommitSha ?? metadata.source_commit_sha ?? null,
+  };
+}
+
+function sourceMatches(event, source) {
+  const observed = sourceOf(event);
+  return observed.repository === source.repository && observed.commit === source.commit;
+}
+
 function latestDate(events) {
   return events
     .map((event) => event?.created_at)
@@ -50,13 +63,17 @@ function latestDate(events) {
     .at(-1) ?? null;
 }
 
-function latestInvocation(events) {
+function latestInvocation(events, source) {
   const ordered = [...events].sort((a, b) =>
     String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')),
   );
-  const invocationId = ordered.map(invocationIdOf).find(Boolean) ?? null;
+  const requested = ordered.find((event) =>
+    eventType(event) === EVENT.bridgeRequested && sourceMatches(event, source),
+  ) ?? null;
+  const invocationId = invocationIdOf(requested);
   return {
     invocationId,
+    requested,
     events: invocationId
       ? ordered.filter((event) => invocationIdOf(event) === invocationId)
       : [],
@@ -78,10 +95,10 @@ export function buildFounderSignalModel(activity, source = DEFAULT_SOURCE) {
   const signalEvents = Array.isArray(activity)
     ? activity.filter((event) => eventType(event).startsWith('founder_signal_engine_'))
     : [];
-  const latest = latestInvocation(signalEvents);
+  const latest = latestInvocation(signalEvents, source);
   const events = latest.events;
 
-  const requested = events.find((event) => eventType(event) === EVENT.bridgeRequested) ?? null;
+  const requested = latest.requested;
   const accepted = events.find((event) => eventType(event) === EVENT.bridgeAccepted) ?? null;
   const failed = events.find((event) =>
     [EVENT.bridgeFailed, EVENT.bridgeRejected].includes(eventType(event)),
@@ -114,14 +131,14 @@ export function buildFounderSignalModel(activity, source = DEFAULT_SOURCE) {
       id: 'bridge',
       label: 'Secure bridge',
       ...stage(
-        requested || accepted || failed ? 'complete' : 'pending',
-        requested || accepted || failed
+        requested ? 'complete' : 'pending',
+        requested
           ? `Audited invocation: ${latest.invocationId}`
-          : 'No audited bridge invocation found.',
-        latestDate(events),
-        requested || accepted || failed
+          : 'No audited bridge invocation found for the exact source commit.',
+        requested?.created_at ?? null,
+        requested
           ? 'Keep the raw key sealed and inspect the provider receipt.'
-          : 'Invoke through the approved @OpenAI Developers bridge path.',
+          : 'Invoke through the approved @OpenAI Developers bridge path for this exact source.',
       ),
     },
     {
@@ -147,11 +164,11 @@ export function buildFounderSignalModel(activity, source = DEFAULT_SOURCE) {
               'pending',
               requested
                 ? `Invocation requested: ${latest.invocationId}`
-                : 'No Zapier provider receipt recorded.',
+                : 'No Zapier provider receipt recorded for this source.',
               requested?.created_at ?? null,
               requested
                 ? 'Wait for or inspect the provider result.'
-                : 'Run the approved bridge invocation.',
+                : 'Run the approved bridge invocation for this source commit.',
             )),
     },
     {
@@ -217,10 +234,10 @@ export function buildFounderSignalModel(activity, source = DEFAULT_SOURCE) {
           )
         : stage(
             'pending',
-            signalEvents.length
-              ? `${signalEvents.length} audit event(s) retained; final proof is still open.`
-              : 'No Founder Signal Engine audit events found.',
-            latestDate(signalEvents),
+            events.length
+              ? `${events.length} event(s) retained for this invocation; final proof is still open.`
+              : 'No matching invocation events found.',
+            latestDate(events),
             'Keep Day 3 open until every downstream artifact is verified.',
           )),
     },
