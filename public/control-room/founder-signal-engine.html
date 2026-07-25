@@ -5,77 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Founder Signal Engine | Founder Control Room</title>
 <style>
-:root{color-scheme:dark;--bg:#07111f;--panel:#0d1b2d;--panel-2:#12233a;--border:#29405f;--text:#edf5ff;--muted:#9eb0c6;--good:#42d392;--warn:#f6c453;--bad:#ff6b7a;--accent:#8ea8ff}
-*{box-sizing:border-box}
-body{margin:0;background:radial-gradient(circle at 12% 0%,#162b49 0,transparent 34rem),var(--bg);color:var(--text);font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-a{color:#b8c8ff}
-button{font:inherit}
-.shell{max-width:1180px;margin:0 auto;padding:24px}
-.topline{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:18px}
-.back{display:inline-flex;gap:8px;align-items:center;text-decoration:none;color:var(--muted)}
-.actions{display:flex;gap:10px;flex-wrap:wrap}
-.button{border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:10px;padding:9px 13px;cursor:pointer}
-.button:hover{border-color:var(--accent)}
-.hero{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:16px;margin-bottom:16px}
-.panel{border:1px solid var(--border);background:linear-gradient(180deg,rgba(18,35,58,.92),rgba(10,24,42,.96));border-radius:16px;padding:18px;box-shadow:0 20px 65px rgba(0,0,0,.24)}
-.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-weight:700}
-h1{font-size:clamp(30px,5vw,52px);line-height:1.03;margin:8px 0 12px;max-width:780px}
-h2{font-size:18px;margin:0 0 12px}
-p{margin:0 0 10px}
-.status-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px}
-.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-weight:700;font-size:13px}
-.pill::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--muted)}
-.pill.complete::before{background:var(--good)}
-.pill.pending::before{background:var(--warn)}
-.pill.blocked::before{background:var(--bad)}
-.meta-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}
-.meta{border:1px solid rgba(41,64,95,.7);background:rgba(7,17,31,.45);border-radius:10px;padding:10px}
-.meta strong{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em;overflow-wrap:anywhere}
-.route{display:grid;gap:8px;margin-top:12px}
-.route-step{display:grid;grid-template-columns:26px 1fr;gap:9px;align-items:start}
-.route-step span:first-child{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#1c3150;color:#dfe8ff;font-weight:800;font-size:12px}
-.guard{margin-top:14px;border-left:3px solid var(--accent);padding:10px 12px;background:rgba(142,168,255,.09);border-radius:0 10px 10px 0;color:#dfe8ff}
-.progress{display:grid;grid-template-columns:repeat(6,minmax(130px,1fr));gap:10px;margin:16px 0}
-.stage{position:relative;min-height:142px;border:1px solid var(--border);background:var(--panel);border-radius:14px;padding:14px}
-.stage.complete{border-color:rgba(66,211,146,.55)}
-.stage.pending{border-color:rgba(246,196,83,.55)}
-.stage.blocked{border-color:rgba(255,107,122,.62)}
-.stage-number{font-size:12px;color:var(--muted);font-weight:800;letter-spacing:.08em}
-.stage h3{font-size:15px;margin:8px 0 6px}
-.stage p{color:var(--muted);font-size:13px;margin:0}
-.stage .stage-status{position:absolute;left:14px;bottom:12px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
-.complete .stage-status{color:var(--good)}
-.pending .stage-status{color:var(--warn)}
-.blocked .stage-status{color:var(--bad)}
-.blocker{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;border:1px solid rgba(246,196,83,.5);background:rgba(246,196,83,.08);border-radius:14px;padding:16px;margin-bottom:16px}
-.blocker.blocked{border-color:rgba(255,107,122,.55);background:rgba(255,107,122,.08)}
-.blocker.complete{border-color:rgba(66,211,146,.55);background:rgba(66,211,146,.08)}
-.blocker-icon{font-size:24px;line-height:1}
-.blocker strong{display:block;margin-bottom:4px;font-size:17px}
-.evidence-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;min-width:800px}
-th,td{text-align:left;padding:12px;border-bottom:1px solid rgba(41,64,95,.72);vertical-align:top}
-th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
-td.status{font-weight:800;text-transform:uppercase;font-size:12px}
-td.status.complete{color:var(--good)}
-td.status.pending{color:var(--warn)}
-td.status.blocked{color:var(--bad)}
-.empty{color:var(--muted)}
-.footer-note{color:var(--muted);font-size:13px;margin-top:12px}
-.notice{border:1px solid var(--border);border-radius:12px;padding:12px;background:rgba(7,17,31,.56)}
-.error{border-color:rgba(255,107,122,.55);color:#ffd5da}
-@media(max-width:900px){.hero{grid-template-columns:1fr}.progress{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:560px){.shell{padding:14px}.topline{align-items:flex-start}.progress{grid-template-columns:1fr}.meta-grid{grid-template-columns:1fr}}
+:root{color-scheme:dark;--bg:#07111f;--panel:#0d1b2d;--panel2:#12233a;--line:#29405f;--text:#edf5ff;--muted:#9eb0c6;--good:#42d392;--warn:#f6c453;--bad:#ff6b7a;--accent:#9b8cff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 12% 0%,#1b3153 0,transparent 34rem),var(--bg);color:var(--text);font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:#c6c9ff}button{font:inherit}.shell{max-width:1240px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:18px}.back{text-decoration:none;color:var(--muted)}.actions{display:flex;gap:10px;flex-wrap:wrap}.button{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:10px;padding:9px 13px;cursor:pointer}.button:hover{border-color:var(--accent)}.panel{border:1px solid var(--line);background:linear-gradient(180deg,rgba(18,35,58,.94),rgba(9,22,38,.97));border-radius:16px;padding:18px;box-shadow:0 20px 65px rgba(0,0,0,.24)}.hero{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(290px,1fr);gap:16px}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-weight:800}h1{font-size:clamp(30px,5vw,52px);line-height:1.03;margin:8px 0 12px}h2{font-size:18px;margin:0 0 12px}p{margin:0 0 10px}.status-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px}.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-weight:800;font-size:13px}.pill::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--muted)}.complete::before,.complete .dot{background:var(--good)}.pending::before,.pending .dot{background:var(--warn)}.blocked::before,.blocked .dot{background:var(--bad)}.meta-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}.meta{border:1px solid rgba(41,64,95,.7);background:rgba(7,17,31,.45);border-radius:10px;padding:10px}.meta strong{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em;overflow-wrap:anywhere}.route{display:grid;gap:8px}.route-step{display:grid;grid-template-columns:24px 1fr;gap:9px;align-items:start}.route-step b{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#1c3150}.guard{margin-top:14px;border-left:3px solid var(--accent);padding:10px 12px;background:rgba(155,140,255,.1);border-radius:0 10px 10px 0}.progress{display:grid;grid-template-columns:repeat(7,minmax(126px,1fr));gap:10px;margin:16px 0}.stage{position:relative;min-height:155px;border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:14px}.stage.complete{border-color:rgba(66,211,146,.55)}.stage.pending{border-color:rgba(246,196,83,.55)}.stage.blocked{border-color:rgba(255,107,122,.62)}.stage-number{font-size:12px;color:var(--muted);font-weight:800;letter-spacing:.08em}.stage h3{font-size:15px;margin:8px 0 6px}.stage p{color:var(--muted);font-size:13px;margin:0}.stage-status{position:absolute;left:14px;bottom:12px;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}.stage.complete .stage-status{color:var(--good)}.stage.pending .stage-status{color:var(--warn)}.stage.blocked .stage-status{color:var(--bad)}.blocker{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;border:1px solid rgba(246,196,83,.5);background:rgba(246,196,83,.08);border-radius:14px;padding:16px;margin-bottom:16px}.blocker.blocked{border-color:rgba(255,107,122,.55);background:rgba(255,107,122,.08)}.blocker.complete{border-color:rgba(66,211,146,.55);background:rgba(66,211,146,.08)}.blocker-icon{font-size:24px;line-height:1}.blocker strong{display:block;margin-bottom:4px;font-size:17px}.evidence{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:820px}th,td{text-align:left;padding:12px;border-bottom:1px solid rgba(41,64,95,.72);vertical-align:top}th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}td.status{font-weight:900;text-transform:uppercase;font-size:12px}td.status.complete{color:var(--good)}td.status.pending{color:var(--warn)}td.status.blocked{color:var(--bad)}.footer{color:var(--muted);font-size:13px;margin-top:12px}.notice{border:1px solid var(--line);border-radius:12px;padding:12px;background:rgba(7,17,31,.56);margin-top:16px}.error{border-color:rgba(255,107,122,.55);color:#ffd5da}
+@media(max-width:1050px){.progress{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:900px){.hero{grid-template-columns:1fr}}@media(max-width:600px){.shell{padding:14px}.top{align-items:flex-start}.progress{grid-template-columns:1fr}.meta-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <main class="shell">
-  <div class="topline">
+  <div class="top">
     <a class="back" href="/control-room/">← Founder Control Room</a>
     <div class="actions">
       <button class="button" id="refresh" type="button">Refresh evidence</button>
-      <button class="button" id="copy-proof" type="button">Copy proof packet</button>
+      <button class="button" id="copy" type="button">Copy proof packet</button>
     </div>
   </div>
 
@@ -83,73 +24,71 @@ td.status.blocked{color:var(--bad)}
     <article class="panel">
       <div class="eyebrow">Day 3 operator console</div>
       <h1>Founder Signal Engine</h1>
-      <p>One run, six proof gates. The console shows the first missing artifact instead of flattening every system into a vague “automation succeeded.”</p>
+      <p>One run, seven independent proof gates. A request label, permission flag, or accepted bridge response cannot impersonate a downstream artifact.</p>
       <div class="status-row">
-        <span class="pill pending" id="overall-pill">Loading evidence</span>
+        <span class="pill pending" id="overall">Loading evidence</span>
         <span class="pill complete">Raw key sealed</span>
+        <span class="pill pending">Review-first publishing</span>
       </div>
       <div class="meta-grid">
         <div class="meta"><strong>Source</strong><code>jussray/Sekret-Bip#599</code></div>
         <div class="meta"><strong>Merge commit</strong><code>f4573d360a8fea99b301f33a2a21192525725f7b</code></div>
         <div class="meta"><strong>Audit issue</strong><a href="https://github.com/jussray/founder-control-room/issues/73">founder-control-room#73</a></div>
-        <div class="meta"><strong>Publishing mode</strong>Review-first</div>
+        <div class="meta"><strong>HubSpot deal</strong><code>337185466050</code></div>
       </div>
     </article>
 
     <aside class="panel">
-      <div class="eyebrow">Agent routing rule</div>
-      <h2>No direct Zapier connector</h2>
-      <div class="route" aria-label="ChatGPT Zapier bridge route">
-        <div class="route-step"><span>1</span><div>ChatGPT or approved agent</div></div>
-        <div class="route-step"><span>2</span><div><strong>@OpenAI Developers</strong> secure provider path</div></div>
-        <div class="route-step"><span>3</span><div>Existing key reference <code>zapier-founder-signal-engine</code></div></div>
-        <div class="route-step"><span>4</span><div>Configured Founder Signal Engine Zapier bridge</div></div>
+      <div class="eyebrow">Approved agent route</div>
+      <h2>When no native Zapier connector exists</h2>
+      <div class="route">
+        <div class="route-step"><b>1</b><div>ChatGPT or approved agent</div></div>
+        <div class="route-step"><b>2</b><div><strong>@OpenAI Developers</strong> secure provider path</div></div>
+        <div class="route-step"><b>3</b><div>Existing reference <code>zapier-founder-signal-engine</code></div></div>
+        <div class="route-step"><b>4</b><div>Configured Founder Signal Engine Zapier bridge</div></div>
       </div>
-      <div class="guard">The reference may be named. The raw key may never be displayed, copied into evidence, recreated, or committed.</div>
+      <div class="guard">The reference may be named. The raw key may never be displayed, copied, committed, rotated, or recreated by this workflow.</div>
     </aside>
   </section>
 
-  <section class="progress" id="progress" aria-label="Founder Signal Engine proof stages"></section>
+  <section class="progress" id="progress" aria-label="Founder Signal Engine proof gates"></section>
 
   <section class="blocker" id="blocker" aria-live="polite">
     <div class="blocker-icon">⏳</div>
-    <div><strong>Loading the latest audited run</strong><span class="empty">Reading founder-gated Control Room evidence.</span></div>
+    <div><strong>Loading the latest audited invocation</strong><span>Reading founder-gated Control Room evidence.</span></div>
   </section>
 
   <section class="panel">
     <div class="eyebrow">Evidence ledger</div>
     <h2>What exists, what is missing, what happens next</h2>
-    <div class="evidence-wrap">
+    <div class="evidence">
       <table>
         <thead><tr><th>Gate</th><th>Status</th><th>Evidence</th><th>Last observed</th><th>Operator action</th></tr></thead>
         <tbody id="evidence-body"></tbody>
       </table>
     </div>
-    <p class="footer-note">A Zapier acceptance receipt proves only the bridge response. OpenAI output, Buffer state, HubSpot association, and final Control Room proof remain separate gates.</p>
+    <p class="footer">Zapier acceptance proves only the bridge response. OpenAI output, Buffer state, HubSpot association, and final Control Room proof remain separate gates.</p>
   </section>
 
   <p class="notice" id="message" hidden></p>
 </main>
-<script>
+<script type="module">
+import { buildFounderSignalModel, DEFAULT_SOURCE } from './founder-signal-engine-model.js';
+
 const SESSION_KEY = 'fcr_session';
-const ACTIVE_SOURCE = {
-  repository: 'jussray/Sekret-Bip',
-  pr: 599,
-  commit: 'f4573d360a8fea99b301f33a2a21192525725f7b',
-  auditIssue: 'jussray/founder-control-room#73',
-  keyReference: 'zapier-founder-signal-engine',
-};
-
-const stageDefinitions = [
-  { id: 'github', label: 'GitHub', proof: 'Merged source PR and exact commit', complete: () => true },
-  { id: 'zapier', label: 'Zapier', proof: 'Run ID and provider status' },
-  { id: 'openai', label: 'OpenAI 5W1H', proof: 'Generated output and send decision' },
-  { id: 'buffer', label: 'Buffer', proof: 'Draft, queue, schedule, or publish artifact' },
-  { id: 'hubspot', label: 'HubSpot', proof: 'Deal-associated task or note' },
-  { id: 'control-room', label: 'Control Room', proof: 'Audited invocation and final evidence record' },
-];
-
 let latestModel = null;
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[character]));
+}
+
+function displayDate(value) {
+  if (!value) return 'Not observed';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+}
 
 function readSession() {
   try {
@@ -160,108 +99,9 @@ function readSession() {
   }
 }
 
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (character) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  }[character]));
-}
-
-function metadataOf(event) {
-  return event && typeof event.metadata === 'object' && event.metadata ? event.metadata : {};
-}
-
-function eventType(event) {
-  return String(event?.event_type ?? '').toLowerCase();
-}
-
-function eventHas(event, terms) {
-  const type = eventType(event);
-  const metadata = JSON.stringify(metadataOf(event)).toLowerCase();
-  return terms.every((term) => type.includes(term) || metadata.includes(term));
-}
-
-function latestDate(events) {
-  const dates = events.map((event) => event?.created_at).filter(Boolean).sort();
-  return dates.at(-1) ?? null;
-}
-
-function displayDate(value) {
-  if (!value) return 'Not observed';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
-}
-
-function latestInvocation(events) {
-  const sorted = [...events].sort((a, b) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')));
-  const invocation = sorted.map((event) => metadataOf(event).invocationId).find(Boolean);
-  if (!invocation) return { invocationId: null, events: sorted };
-  return {
-    invocationId: String(invocation),
-    events: sorted.filter((event) => String(metadataOf(event).invocationId ?? '') === String(invocation)),
-  };
-}
-
-function proofEvent(events, terms) {
-  return events.find((event) => eventHas(event, terms)) ?? null;
-}
-
-function buildModel(activity) {
-  const signalEvents = activity.filter((event) => eventType(event).startsWith('founder_signal_engine_'));
-  const latest = latestInvocation(signalEvents);
-  const events = latest.events;
-  const accepted = events.find((event) => eventType(event) === 'founder_signal_engine_bridge_accepted') ?? null;
-  const failed = events.find((event) => ['founder_signal_engine_bridge_failed','founder_signal_engine_bridge_rejected'].includes(eventType(event))) ?? null;
-  const requested = events.find((event) => eventType(event) === 'founder_signal_engine_bridge_requested') ?? null;
-  const runId = String(metadataOf(accepted).zapierRunId ?? '').trim() || null;
-  const openai = proofEvent(events, ['openai']) || proofEvent(events, ['5w1h']);
-  const buffer = proofEvent(events, ['buffer']);
-  const hubspot = proofEvent(events, ['hubspot']);
-  const finalEvidence = events.find((event) => metadataOf(event).endToEndProofComplete === true) ?? null;
-
-  const stages = {
-    github: { status: 'complete', evidence: `PR #${ACTIVE_SOURCE.pr} merged at ${ACTIVE_SOURCE.commit}`, observedAt: null, action: 'None. Preserve the exact source reference.' },
-    zapier: failed
-      ? { status: 'blocked', evidence: metadataOf(failed).failure || eventType(failed), observedAt: failed.created_at, action: 'Repair the configured Zapier hook or bridge path, then invoke with a new invocation ID.' }
-      : accepted
-        ? { status: runId ? 'complete' : 'pending', evidence: runId ? `Run ID: ${runId}` : 'Bridge accepted, but no Zapier run ID was returned.', observedAt: accepted.created_at, action: runId ? 'Inspect the run and capture the OpenAI output.' : 'Locate the invocation in Zapier history and record its run ID.' }
-        : requested
-          ? { status: 'pending', evidence: `Invocation requested: ${latest.invocationId ?? 'unknown'}`, observedAt: requested.created_at, action: 'Wait for or inspect the provider result.' }
-          : { status: 'pending', evidence: 'No audited bridge invocation found.', observedAt: null, action: 'Invoke the configured Founder Signal Engine bridge through the approved agent path.' },
-    openai: openai
-      ? { status: 'complete', evidence: '5W1H output evidence recorded.', observedAt: openai.created_at, action: 'Verify the platform-specific content and send decision.' }
-      : { status: 'pending', evidence: 'No OpenAI 5W1H artifact recorded.', observedAt: null, action: 'Capture the OpenAI output from the matching Zapier run.' },
-    buffer: buffer
-      ? { status: 'complete', evidence: 'Buffer artifact recorded.', observedAt: buffer.created_at, action: 'Confirm review, queue, schedule, or publish state.' }
-      : { status: 'pending', evidence: 'No Buffer draft, queue, schedule, or publish artifact recorded.', observedAt: null, action: 'Capture the Buffer result for the matching run.' },
-    hubspot: hubspot
-      ? { status: 'complete', evidence: 'HubSpot association recorded.', observedAt: hubspot.created_at, action: 'Verify association with deal 337185466050.' }
-      : { status: 'pending', evidence: 'No matching HubSpot task or note recorded.', observedAt: null, action: 'Confirm or create the deal-associated evidence record after approval.' },
-    'control-room': finalEvidence
-      ? { status: 'complete', evidence: 'End-to-end evidence marked complete.', observedAt: finalEvidence.created_at, action: 'Close the Day 3 gate only after artifact inspection.' }
-      : signalEvents.length
-        ? { status: 'complete', evidence: `${signalEvents.length} Founder Signal Engine audit event(s) retained.`, observedAt: latestDate(signalEvents), action: 'Keep the final gate open until all downstream artifacts exist.' }
-        : { status: 'pending', evidence: 'No Founder Signal Engine audit events found.', observedAt: null, action: 'Verify project registration and audit storage before retrying.' },
-  };
-
-  const ordered = stageDefinitions.map((definition) => ({ ...definition, ...stages[definition.id] }));
-  let firstBlocker = ordered.find((stage) => stage.status === 'blocked');
-  if (!firstBlocker) firstBlocker = ordered.find((stage) => stage.status !== 'complete');
-  const complete = ordered.every((stage) => stage.status === 'complete') && Boolean(finalEvidence);
-
-  return {
-    invocationId: latest.invocationId,
-    runId,
-    stages: ordered,
-    complete,
-    firstBlocker,
-    signalEventCount: signalEvents.length,
-  };
-}
-
-function renderModel(model) {
+function render(model) {
   latestModel = model;
-  const progress = document.getElementById('progress');
-  progress.innerHTML = model.stages.map((stage, index) => `
+  document.getElementById('progress').innerHTML = model.stages.map((stage, index) => `
     <article class="stage ${escapeHtml(stage.status)}">
       <div class="stage-number">GATE ${index + 1}</div>
       <h3>${escapeHtml(stage.label)}</h3>
@@ -270,23 +110,22 @@ function renderModel(model) {
     </article>
   `).join('');
 
-  const pill = document.getElementById('overall-pill');
+  const overall = document.getElementById('overall');
   const blocker = document.getElementById('blocker');
   if (model.complete) {
-    pill.className = 'pill complete';
-    pill.textContent = 'Day 3 proof complete';
+    overall.className = 'pill complete';
+    overall.textContent = 'Day 3 proof complete';
     blocker.className = 'blocker complete';
-    blocker.innerHTML = '<div class="blocker-icon">✓</div><div><strong>All proof gates are complete</strong><span>Inspect the artifacts before closing the launch gate.</span></div>';
+    blocker.innerHTML = '<div class="blocker-icon">✓</div><div><strong>All proof gates are complete</strong><span>Inspect every artifact before closing the launch gate.</span></div>';
   } else {
-    const status = model.firstBlocker?.status === 'blocked' ? 'blocked' : 'pending';
-    pill.className = `pill ${status}`;
-    pill.textContent = model.firstBlocker ? `Waiting at ${model.firstBlocker.label}` : 'Evidence incomplete';
-    blocker.className = `blocker ${status}`;
-    blocker.innerHTML = `<div class="blocker-icon">${status === 'blocked' ? '!' : '→'}</div><div><strong>${escapeHtml(model.firstBlocker ? `Next gate: ${model.firstBlocker.label}` : 'Evidence incomplete')}</strong><span>${escapeHtml(model.firstBlocker?.action ?? 'Refresh the evidence ledger.')}</span></div>`;
+    const state = model.firstBlocker?.status === 'blocked' ? 'blocked' : 'pending';
+    overall.className = `pill ${state}`;
+    overall.textContent = model.firstBlocker ? `Waiting at ${model.firstBlocker.label}` : 'Evidence incomplete';
+    blocker.className = `blocker ${state}`;
+    blocker.innerHTML = `<div class="blocker-icon">${state === 'blocked' ? '!' : '→'}</div><div><strong>${escapeHtml(model.firstBlocker ? `Next gate: ${model.firstBlocker.label}` : 'Evidence incomplete')}</strong><span>${escapeHtml(model.firstBlocker?.action ?? 'Refresh the ledger.')}</span></div>`;
   }
 
-  const body = document.getElementById('evidence-body');
-  body.innerHTML = model.stages.map((stage) => `
+  document.getElementById('evidence-body').innerHTML = model.stages.map((stage) => `
     <tr>
       <td><strong>${escapeHtml(stage.label)}</strong></td>
       <td class="status ${escapeHtml(stage.status)}">${escapeHtml(stage.status)}</td>
@@ -305,7 +144,7 @@ async function loadEvidence() {
     message.hidden = false;
     message.className = 'notice error';
     message.innerHTML = 'Founder session required. <a href="/control-room/">Return to Founder Control Room to sign in.</a>';
-    renderModel(buildModel([]));
+    render(buildFounderSignalModel([], DEFAULT_SOURCE));
     return;
   }
 
@@ -320,41 +159,43 @@ async function loadEvidence() {
     }
     if (!response.ok) throw new Error(`Evidence request failed (${response.status})`);
     const payload = await response.json();
-    renderModel(buildModel(Array.isArray(payload.activity) ? payload.activity : []));
+    render(buildFounderSignalModel(Array.isArray(payload.activity) ? payload.activity : [], DEFAULT_SOURCE));
   } catch (error) {
     message.hidden = false;
     message.className = 'notice error';
     message.textContent = error instanceof Error ? error.message : String(error);
-    renderModel(buildModel([]));
+    render(buildFounderSignalModel([], DEFAULT_SOURCE));
   }
 }
 
 async function copyProofPacket() {
   if (!latestModel) return;
-  const lines = [
+  const packet = [
     'FOUNDER SIGNAL ENGINE DAY 3 PROOF',
-    `Source: ${ACTIVE_SOURCE.repository}#${ACTIVE_SOURCE.pr}`,
-    `Commit: ${ACTIVE_SOURCE.commit}`,
+    `Source: ${DEFAULT_SOURCE.repository}#${DEFAULT_SOURCE.pr}`,
+    `Commit: ${DEFAULT_SOURCE.commit}`,
     `Invocation: ${latestModel.invocationId ?? 'not observed'}`,
     `Zapier run: ${latestModel.runId ?? 'not observed'}`,
     ...latestModel.stages.map((stage) => `${stage.label}: ${stage.status.toUpperCase()} | ${stage.evidence}`),
     `Next gate: ${latestModel.firstBlocker?.label ?? 'artifact inspection'}`,
+    'Publishing mode: REVIEW_FIRST',
+    'PUBLISH_ALLOWED: false',
     'Secret check: raw API key not included',
-  ];
-  const text = lines.join('\n');
+  ].join('\n');
+
   try {
-    await navigator.clipboard.writeText(text);
+    await navigator.clipboard.writeText(packet);
     const message = document.getElementById('message');
     message.hidden = false;
     message.className = 'notice';
     message.textContent = 'Proof packet copied without credentials.';
   } catch {
-    window.prompt('Copy the proof packet:', text);
+    window.prompt('Copy the proof packet:', packet);
   }
 }
 
 document.getElementById('refresh').addEventListener('click', loadEvidence);
-document.getElementById('copy-proof').addEventListener('click', copyProofPacket);
+document.getElementById('copy').addEventListener('click', copyProofPacket);
 loadEvidence();
 </script>
 </body>
