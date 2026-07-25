@@ -6,7 +6,7 @@ Repository: `jussray/l99-StoryEngine`
 
 ## Operating rule
 
-Founder Control Room is the first evidence ledger while fixes are discovered, implemented, verified, merged, or held. Repository-local results remain inputs. Founder Control Room records the exact PR, branch, head SHA, workflow/job evidence, failure classification, release impact, rollback, and next gate.
+Founder Control Room is the first evidence ledger while fixes are discovered, implemented, verified, merged, held, superseded, or rolled back. Repository-local results remain inputs. Founder Control Room records the exact PR, branch, head SHA, workflow/job evidence, failure classification, release impact, rollback, and next gate.
 
 ## REALITY
 
@@ -19,14 +19,30 @@ Story Engine `main` previously allowed the same API key through two ambient cook
 
 Removing only the browser writer would not have closed the boundary because old or manually planted cookies would still authenticate.
 
-### Control Room status bridge
+### Control Room integration architecture
 
-After the cookie fix, the L99 to Founder Control Room bridge remains incomplete on current `main`:
+Two historical integration paths exist:
 
-- `control-room.manifest.json` still identifies the deleted repository `jussray/l99-`.
-- `runtime/portfolio_status.py` on the pre-repair main is reduced to a copyright line.
-- the existing workflow is manual-only and grants OIDC permission at workflow scope.
-- stale PR #18 predates the current `cookie_contract` promotion gate.
+- closed Founder Control Room PR #11 implemented a direct L99-only GitHub OIDC observer at `ingest-l99-status`;
+- merged Founder Control Room PR #21 intentionally superseded that observer with provider-neutral repository federation and signed runner-packet ingestion.
+
+PR #11 was closed specifically because retaining the direct observer would create a second observation path and duplicate evidence semantics. Its receiver contract is useful historical proof of accepted claims, but it is not the canonical integration path.
+
+Current canonical routing is:
+
+```text
+jussray/l99-StoryEngine
+→ .control-room/repository.manifest.json
+→ provider-neutral repository verification / signed runner packet
+→ Founder Control Room evidence and findings
+```
+
+The Founder Control Room project mapping is already explicit on current `main`:
+
+```text
+project slug: l99
+repository: jussray/l99-StoryEngine
+```
 
 ## FIX MERGED
 
@@ -75,32 +91,30 @@ A controlled retry of the focused promotion job also failed before runner provis
 
 Playwright was inapplicable to the transport-only authentication boundary because no page layout, route navigation, or visual behavior changed.
 
-## CURRENT HOLD
+## SUPERSEDED DIRECT-BRIDGE PRS
+
+### Story Engine PR #18
+
+PR #18 is an old direct L99-only OIDC bridge. Its architecture is superseded by merged Founder Control Room PR #21.
+
+### Story Engine PR #39
 
 Pull request: `jussray/l99-StoryEngine#39`
-Title: Restore the current-main L99 OIDC status bridge
 Branch: `fix/current-main-oidc-status-bridge`
 Base: `3a6b8ca6be3148876f4e62fac7440b92682b5eec`
 Exact head: `3a494c71fdad648e1f5fff3bffd9e247bf1d7b55`
 Changed files: 4
 
-The proposed repair:
+PR #39 repairs the old direct bridge correctly in isolation, including exact-main OIDC restrictions and the current cookie gate. However, merging it would revive the retired L99-specific observation channel and duplicate the provider-neutral evidence path.
 
-- restores the bounded portfolio status exporter;
-- binds status to the current full promotion registry, including `cookie_contract`;
-- canonicalizes repository identity as `jussray/l99-StoryEngine`;
-- adds executable tests for identity, secret rejection, proof-reference safety, exact SHA, timezone, private-content denial, blocked status, and current gate registration;
-- verifies immutable PR heads;
-- grants `id-token: write` only to the publishing job;
-- skips publishing on pull requests;
-- restricts publishing to exact `refs/heads/main` push or manual dispatch;
-- retains sanitized status artifacts for 14 days.
+Local contract evidence for PR #39 remains valid but does not make the architecture canonical:
 
-### Local contract evidence
+- isolated exporter and test reproduction: 9 tests passed;
+- Python compilation: passed;
+- pull-request publish job: correctly skipped;
+- no external POST occurred.
 
-An isolated reproduction of the exact exporter and test logic with a full eight-gate stub registry passed 9 tests and Python compilation. This proves the exporter contract logic, not the real repository promotion results or external receiver.
-
-### Hosted evidence
+Hosted evidence:
 
 | Workflow | Run | Job evidence | Classification |
 |---|---:|---|---|
@@ -110,36 +124,46 @@ An isolated reproduction of the exact exporter and test logic with a full eight-
 
 Controlled retry job `89617529071` also returned `steps: null` with no logs.
 
-The skipped publish job confirms that pull requests do not request an OIDC token or POST status. It does not prove the exact-main write path.
-
 ## FOUNDER CONTROL ROOM DECISION
 
-Status: `HOLD`
+Status: `SUPERSEDE_AND_REBUILD`
 
-Do not merge PR #39 yet.
+Do not merge Story Engine PR #18 or PR #39.
 
-The write-side receiver contract for `ingest-l99-status` is not discoverable in the current Founder Control Room repository snapshot. The exact accepted GitHub OIDC repository/ref/audience claims therefore remain unverified. Merging PR #39 would trigger a real external status POST from `main`, so construction proof alone is insufficient.
+This is not a rejection of their bounded contract logic. It is an architecture decision: Founder Control Room already owns one provider-neutral verification and evidence spine. A second L99-only observer would split provenance, duplicate status events, and create competing release truth.
 
-This HOLD is not code blame. The exporter contract currently has positive local evidence, while hosted execution is blocked by runner startup failure and the receiver claim boundary lacks source proof.
+The correct current-main repair is to:
+
+- update `.control-room/repository.manifest.json` to reflect the current `promotion_gates_all.py` entrypoint and `cookie_contract` evidence;
+- verify the canonical project mapping `l99` → `jussray/l99-StoryEngine`;
+- retire the legacy direct-publish workflow without deleting its history;
+- add a repository-local contract preventing the retired direct observer from regaining OIDC or POST authority;
+- run the provider-neutral Founder Control Room verification path.
 
 ## RISK
 
 - Browser-readable session key storage remains a production blocker even though ambient cookie authentication is closed.
-- PR #39 may construct a valid envelope but fail at the receiver because claim expectations are unverified.
-- A successful POST would still prove only sanitized status ingestion, not Story Engine release readiness, deployment, tenant-safe identity, creator/operator separation, or production behavior.
+- Story Engine's current federation manifest still points its workflow usage assertion at `python runtime/promotion_gates.py`, while the current exact entrypoint is `python runtime/promotion_gates_all.py`.
+- The current federation manifest does not yet declare cookie-auth contract evidence.
+- Leaving the legacy manual OIDC workflow available risks accidental resurrection of a duplicate observation path.
+- A green provider-neutral verification would prove bounded repository evidence only, not Story Engine deployment, tenant-safe identity, creator/operator separation, or production release readiness.
 - Cloudflare evidence was not involved and must remain separate.
 
 ## ROLLBACK
 
 - PR #38 can be reverted through merge commit `3a6b8ca6be3148876f4e62fac7440b92682b5eec` if explicit rollback is approved.
-- PR #39 is unmerged; rollback is closing or revising the PR. No receiver cleanup is currently required.
-- No credential rotation, migration, deployment, publication, DNS change, or destructive write occurred in this evidence workflow.
+- PR #18 and PR #39 are unmerged; rollback is closure while preserving their branches and history.
+- The canonical federation path is already merged through Founder Control Room PR #21.
+- No credential rotation, migration, deployment, publication, DNS change, or destructive write occurred in this reconciliation.
 
 ## NEXT GATE
 
-1. Locate or restore the Founder Control Room receiver source for `ingest-l99-status`.
-2. Verify exact OIDC audience, repository, owner, ref, workflow, and environment claim checks.
-3. Confirm the canonical project identity mapping between repository `jussray/l99-StoryEngine` and Founder Control Room project slug `l99`.
-4. Obtain an executed exact-head PR build-status run or retain the runner outage and reproduce the full real promotion registry locally.
-5. Merge PR #39 only when the receiver contract and rollback are proven.
-6. After merge, capture the exact-main workflow run, artifact, OIDC POST result, and matching Founder Control Room receipt before closing stale PR #18.
+1. Rebuild Story Engine's federation manifest on current `main`.
+2. Add `runtime/promotion_gates_all.py`, `runtime/cookie_contract.py`, `.security/cookies.json`, browser auth, server auth, and regression tests as declared evidence.
+3. Change the workflow usage assertion to `python runtime/promotion_gates_all.py`.
+4. Retire the legacy direct OIDC workflow without deleting history and prove it has no token or POST authority.
+5. Add the federation contract to the full promotion registry.
+6. Verify locally and through hosted exact-head checks when runners provision.
+7. Merge the focused federation repair.
+8. Close Story Engine PR #18 and #39 as superseded, preserving both branches.
+9. Capture the resulting provider-neutral Founder Control Room verification record before claiming the reconciliation complete.
