@@ -50,9 +50,9 @@ Codex reads `AGENTS.md`; the Cloudflare plugin provides Skills and MCP servers.
 
 ### Cursor
 
-Run `/add-plugin cloudflare` or use `.cursor/mcp.json`. The repository also ships
-`.cursor/rules/cloudflare-agent-fleet.mdc` so Cloudflare authority and proof
-boundaries remain active in project context.
+Run `/add-plugin cloudflare` or use `.cursor/mcp.json`. The repository's actual
+Cursor project guardrail is the `.cursor/rules` file, which includes the
+Cloudflare authority and proof boundaries used in project context.
 
 ### GitHub Copilot
 
