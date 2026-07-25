@@ -42,8 +42,8 @@
       "entrypoint": "AGENTS_FOUNDER_INTELLIGENCE.md",
       "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
       "primaryAgentContract": "AGENTS.md",
-      "status": "partial",
-      "nextAction": "Add one explicit AGENTS.md reference to the existing Founder Intelligence entrypoint in a focused documentation PR."
+      "status": "enforced",
+      "nextAction": "Preserve the explicit AGENTS.md entrypoint merged in Se'kret Bip PR #644 and keep heightened teen privacy, consent, safety, dignity, and anti-surveillance duties intact."
     },
     {
       "slug": "chief-ai-machine",
