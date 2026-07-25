@@ -1,0 +1,46 @@
+name: FutureYou V8 Proof
+
+on:
+  pull_request:
+    paths:
+      - 'src/futureyou/**'
+      - 'src/http/routes/futureYou.ts'
+      - 'src/http/routes/__tests__/futureYou.integration.test.ts'
+      - 'src/http/server.ts'
+      - 'public/control-room/futureyou-v8.*'
+      - 'public/control-room/index.html'
+      - 'e2e/futureyou-v8.mjs'
+      - 'scripts/verify-futureyou-v8.mjs'
+      - 'docs/FUTUREYOU_V8_MISSION_CONTROL.md'
+      - 'package.json'
+      - '.github/workflows/futureyou-v8.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-futureyou-v8:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Verify static, unit, and route contracts
+        run: npm run verify:futureyou-v8
+      - name: Render cockpit proof
+        run: node e2e/futureyou-v8.mjs
+      - name: Upload rendered evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: futureyou-v8-cockpit-${{ github.sha }}
+          path: artifacts/futureyou-v8-cockpit.png
+          if-no-files-found: warn
+          retention-days: 14
