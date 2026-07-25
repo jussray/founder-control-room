@@ -1,0 +1,82 @@
+contract_version: "1.0"
+name: Founder Control Room
+version: "0.1.0"
+mission: Govern portfolio execution through explicit approvals, exact-head verification, evidence capture, and safe operational controls.
+owner: jussray
+repository: jussray/founder-control-room
+capabilities:
+  - id: BUILD
+    status: verified
+    description: TypeScript build pipeline.
+    evidence: ["package.json#scripts.build"]
+  - id: TEST
+    status: verified
+    description: Unit and end-to-end test commands.
+    evidence: ["package.json#scripts.test", "package.json#scripts.test:e2e"]
+  - id: VERIFY
+    status: verified
+    description: Contract-specific verification commands and exact-head governance.
+    evidence: ["package.json#scripts.verify:mcp", "package.json#scripts.verify:founder-chief-pair"]
+  - id: DEPLOY
+    status: partial
+    description: Cloudflare deployment commands exist; current production proof must be refreshed per commit.
+    evidence: ["package.json#scripts.deploy"]
+  - id: ROLLBACK
+    status: partial
+    description: Governed rollback intent exists; automated rollback proof is not claimed.
+    evidence: []
+  - id: MCP
+    status: verified
+    description: MCP policy and configuration verification.
+    evidence: ["scripts/verify-mcp-config.mjs"]
+  - id: SECURITY
+    status: partial
+    description: Guarded terminal, RLS, cookies, and policy contracts are present.
+    evidence: ["package.json#scripts.verify:terminal-contract", "package.json#scripts.verify:rls-contract"]
+  - id: EVIDENCE
+    status: verified
+    description: Preview and verification evidence ingestion.
+    evidence: ["package.json#scripts.preview:evidence"]
+verification:
+  - name: build
+    command: npm run build
+    required: true
+  - name: test
+    command: npm test
+    required: true
+  - name: capability-contract
+    command: npm run verify:capability-contract
+    required: true
+health:
+  overall: yellow
+  build: unknown
+  tests: unknown
+  deploy: unknown
+  runtime: unknown
+  proof: yellow
+proof:
+  - claim: Capability Contract v1 schema is repository-controlled.
+    status: verified
+    artifact: contracts/capability-contract.schema.json
+    verified_at: null
+deployment:
+  provider: cloudflare
+  command: npm run deploy
+  automatic: false
+rollback:
+  automatic: false
+  method: Revert approved change and redeploy exact verified commit.
+dependencies:
+  - GitHub
+  - Cloudflare
+  - Supabase
+security:
+  approval_required: true
+  exact_head_required: true
+telemetry:
+  status_endpoint: null
+  evidence_import: scripts/import-preview-evidence.mjs
+last_verified: null
+blockers:
+  - Portfolio contracts have not yet been collected and scored from all active repositories.
+next_gate: Validate every registered repository contract, collect commit-bound proof, and compute portfolio health without treating unknown values as green.
