@@ -67,7 +67,7 @@ Rollback path:
 
 - Rank no more than three likely causes.
 - Identify the evidence that would disprove each cause.
-- Fix the earliest causal break, not the loudest downstream symptom.
+- The selected repair must fix the earliest causal break, not the loudest downstream symptom.
 - Preserve the original failure artifact before reruns or edits.
 - Do not treat a rerun that happens to pass as proof the cause is fixed.
 
