@@ -82,8 +82,8 @@
       "entrypoint": "AGENTS_FOUNDER_INTELLIGENCE.md",
       "constitution": "docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md",
       "primaryAgentContract": "AGENTS.md",
-      "status": "partial",
-      "nextAction": "Add one explicit AGENTS.md reference to the existing Founder Intelligence entrypoint in a focused documentation PR."
+      "status": "enforced",
+      "nextAction": "Preserve the explicit AGENTS.md entrypoint merged in jbh-private PR #16 and require overlapping PR #9 to retain it before integration."
     },
     {
       "slug": "untold-stories",
