@@ -22,23 +22,40 @@
       ],
       "boundary": "Control Room project-scoped read-only inspection by default. DDL remains migration-first and separately approved."
     },
+    "cloudflare": {
+      "skills": [
+        "control-room-repo-contract",
+        "control-room-cloudflare-agent-fleet"
+      ],
+      "boundary": "Account-scoped Cloudflare API Code Mode. Read by default; writes, deployments, DNS, billing, credentials, and destructive actions require separate founder approval and provider evidence."
+    },
     "cloudflare-docs": {
       "skills": [
-        "control-room-repo-contract"
+        "control-room-repo-contract",
+        "control-room-cloudflare-agent-fleet"
       ],
-      "boundary": "Public Cloudflare documentation only."
+      "boundary": "Current public Cloudflare documentation only; documentation is not runtime or deployment proof."
+    },
+    "cloudflare-bindings": {
+      "skills": [
+        "control-room-repo-contract",
+        "control-room-cloudflare-agent-fleet"
+      ],
+      "boundary": "Inspect Workers bindings and project wiring. Binding mutations and production environment changes remain separately approved."
     },
     "cloudflare-builds": {
       "skills": [
-        "control-room-repo-contract"
+        "control-room-repo-contract",
+        "control-room-cloudflare-agent-fleet"
       ],
-      "boundary": "Read build evidence only. Deployment is a separate approval gate."
+      "boundary": "Read build evidence only. Deployment, rollback, and production promotion remain separate approval gates."
     },
     "cloudflare-observability": {
       "skills": [
-        "control-room-repo-contract"
+        "control-room-repo-contract",
+        "control-room-cloudflare-agent-fleet"
       ],
-      "boundary": "Read minimized operational telemetry only; do not copy raw sensitive payloads."
+      "boundary": "Read minimized operational telemetry only; do not copy raw sensitive payloads or treat logs as authorization."
     },
     "figma": {
       "skills": [

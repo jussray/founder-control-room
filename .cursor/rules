@@ -24,6 +24,24 @@ Read-only founder operational dashboard aggregating health, metrics, and status 
 - Run `lint` and `build` before PR.
 - Adding execution capabilities requires explicit founder approval.
 
+## Cloudflare agent fleet
+
+Before Cloudflare work, also read:
+
+- `.agents/skills/control-room-cloudflare-agent-fleet/SKILL.md`
+- `docs/CLOUDFLARE_AGENT_FLEET.md`
+
+Use Cloudflare Skills for platform conventions, `cloudflare-docs` for current
+product behavior, the API Code Mode MCP for scoped account operations, focused
+MCP servers for bindings/builds/observability, and Wrangler for local and
+deployment commands.
+
+A valid MCP config is not runtime proof. Keep changes focused and reversible.
+Never expose secrets or perform production deployment, rollback, DNS, domain,
+billing, auth, or destructive account changes without the required founder
+approval. Browser-visible work requires targeted Playwright evidence against the
+exact preview artifact.
+
 ## Approval Gates
 
 Require explicit founder approval before: merging, deploying, adding data sources, extending integration scope, rotating secrets, or adding execution capabilities.
