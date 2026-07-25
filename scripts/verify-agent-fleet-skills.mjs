@@ -15,7 +15,7 @@ const requireText = (label, source, expected) => {
 };
 
 for (const [label, source] of Object.entries(skills)) {
-  for (const field of ['version: 1.0.0', 'status: active', 'scope: founder-control-room', 'owner: Juss']) {
+  for (const field of ['description:', 'version: 1.0.0', 'status: active', 'scope: founder-control-room', 'owner: Juss']) {
     requireText(`${label} metadata`, source, field);
   }
   requireText(`${label} done contract`, source, 'Definition of done');
