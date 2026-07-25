@@ -1,5 +1,6 @@
 ---
 name: control-room-agent-handoff
+description: Use when work moves between agents, tools, humans, repositories, or providers to transfer exact state, evidence, boundaries, rollback, and one next action without transferring broader authority.
 version: 1.0.0
 status: active
 scope: founder-control-room
