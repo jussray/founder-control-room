@@ -1,5 +1,6 @@
 ---
 name: control-room-token-efficient-execution
+description: Use for repository, debugging, implementation, review, research, and cross-agent work to minimize repeated context and tool calls without skipping evidence, safety, verification, or authority checks.
 version: 1.0.0
 status: active
 scope: founder-control-room
