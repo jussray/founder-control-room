@@ -1,5 +1,6 @@
 ---
 name: control-room-agent-router
+description: Route multi-agent, connector, provider, and repository tasks to one smallest capable execution owner with explicit authority, evidence, fallback, and anti-stale checks.
 version: 1.0.0
 status: active
 scope: founder-control-room
