@@ -29,7 +29,7 @@
     "verify:design-os": "node scripts/verify-design-os-contract.mjs && vitest run --config vitest.design-os.config.ts",
     "verify:local-workspace": "node scripts/verify-local-workspace.mjs",
     "verify:rls-contract": "node scripts/verify-rls-contract.mjs",
-    "verify:futureyou-v8": "node scripts/verify-futureyou-v8.mjs && vitest run src/futureyou/missionControl.test.ts"
+    "verify:futureyou-v8": "node scripts/verify-futureyou-v8.mjs && vitest run src/futureyou/missionControl.test.ts src/http/routes/__tests__/futureYou.integration.test.ts"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
