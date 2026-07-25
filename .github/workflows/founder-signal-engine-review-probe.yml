@@ -6,6 +6,11 @@ on:
       - test/fse-review-only-probe
     paths:
       - .github/workflows/founder-signal-engine-review-probe.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/founder-signal-engine-review-probe.yml
   workflow_dispatch:
 
 permissions:
