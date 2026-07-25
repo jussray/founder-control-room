@@ -1,0 +1,38 @@
+name: Capability Contract
+
+on:
+  pull_request:
+    paths:
+      - '.control/**'
+      - 'schemas/capability-contract.v1.schema.json'
+      - 'scripts/verify-capability-contract.mjs'
+      - 'src/capabilities/**'
+      - 'package.json'
+      - '.github/workflows/capability-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.control/**'
+      - 'schemas/capability-contract.v1.schema.json'
+      - 'scripts/verify-capability-contract.mjs'
+      - 'src/capabilities/**'
+      - 'package.json'
+      - '.github/workflows/capability-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run verify:capability-contract
+      - run: npx vitest run src/capabilities/score.test.ts
+      - run: npm run typecheck
