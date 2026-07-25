@@ -1,5 +1,6 @@
 ---
 name: control-room-proof-ladder
+description: Apply before completion, readiness, deployment, publication, synchronization, or operational claims to separate configuration, CI, provider, runtime, and outcome proof.
 version: 1.0.0
 status: active
 scope: founder-control-room
