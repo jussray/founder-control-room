@@ -7,7 +7,16 @@ import {
 const invocationId = '11111111-1111-4111-8111-111111111111';
 
 function event(event_type, metadata = {}, created_at = '2026-07-25T05:00:00.000Z') {
-  return { event_type, metadata: { invocationId, ...metadata }, created_at };
+  return {
+    event_type,
+    metadata: {
+      invocationId,
+      sourceRepository: DEFAULT_SOURCE.repository,
+      sourceCommitSha: DEFAULT_SOURCE.commit,
+      ...metadata,
+    },
+    created_at,
+  };
 }
 
 describe('Founder Signal Engine operator evidence model', () => {
@@ -55,18 +64,34 @@ describe('Founder Signal Engine operator evidence model', () => {
     expect(model.source).toEqual(DEFAULT_SOURCE);
   });
 
-  it('does not mix evidence across invocation IDs', () => {
+  it('anchors the dashboard to the newest matching bridge request, not a later old artifact', () => {
     const oldInvocation = '22222222-2222-4222-8222-222222222222';
     const model = buildFounderSignalModel([
+      event('founder_signal_engine_bridge_requested', {}, '2026-07-25T05:00:00.000Z'),
       {
         event_type: 'founder_signal_engine_openai_output_recorded',
-        metadata: { invocationId: oldInvocation, openAiArtifactVerified: true },
-        created_at: '2026-07-25T04:00:00.000Z',
+        metadata: {
+          invocationId: oldInvocation,
+          sourceRepository: DEFAULT_SOURCE.repository,
+          sourceCommitSha: DEFAULT_SOURCE.commit,
+          openAiArtifactVerified: true,
+        },
+        created_at: '2026-07-25T06:00:00.000Z',
       },
-      event('founder_signal_engine_bridge_requested', {}, '2026-07-25T05:00:00.000Z'),
     ]);
 
     expect(model.invocationId).toBe(invocationId);
     expect(model.stages.find((stage) => stage.id === 'openai')?.status).toBe('pending');
+  });
+
+  it('ignores bridge requests for a different source commit', () => {
+    const model = buildFounderSignalModel([
+      event('founder_signal_engine_bridge_requested', {
+        sourceCommitSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      }),
+    ]);
+
+    expect(model.invocationId).toBeNull();
+    expect(model.stages.find((stage) => stage.id === 'bridge')?.status).toBe('pending');
   });
 });
