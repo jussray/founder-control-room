@@ -1,5 +1,6 @@
 ---
 name: control-room-futureyou-leverage
+description: Use when choosing the next task, repair, automation, integration, standard, or investment to rank the highest-leverage verified move for Future Juss with explicit authority, evidence, and rollback.
 version: 1.0.0
 status: active
 scope: founder-control-room
