@@ -95,6 +95,26 @@ function validateCursorCloudflareServers(relativePath, servers) {
   }
 }
 
+function validateOpenCodeCloudflareServers(relativePath, servers) {
+  validateCloudflareServerSet(relativePath, servers);
+  for (const name of expectedCloudflareServerNames) {
+    assert(servers[name]?.type === 'remote', `${relativePath}:${name} must use remote type`);
+    assert(servers[name]?.url === expectedRemoteUrls[name], `${relativePath}:${name} URL drifted`);
+    assert(servers[name]?.enabled === true, `${relativePath}:${name} must remain enabled`);
+    assert(!servers[name]?.headers, `${relativePath}:${name} must authenticate through the supported client`);
+    assert(!servers[name]?.env, `${relativePath}:${name} must not commit environment credentials`);
+  }
+}
+
+function validateWindsurfCloudflareServers(relativePath, servers) {
+  validateCloudflareServerSet(relativePath, servers);
+  for (const name of expectedCloudflareServerNames) {
+    assert(servers[name]?.serverUrl === expectedRemoteUrls[name], `${relativePath}:${name} URL drifted`);
+    assert(!servers[name]?.headers, `${relativePath}:${name} must authenticate through the supported client`);
+    assert(!servers[name]?.env, `${relativePath}:${name} must not commit environment credentials`);
+  }
+}
+
 function validateSupabase(relativePath, server, expectedProjectRef) {
   const url = new URL(server?.url ?? '');
   assert(server?.type === 'http', `${relativePath}:supabase must use HTTP`);
@@ -177,22 +197,30 @@ const projectConfig = readJson('.mcp.json');
 const exampleConfig = readJson('.mcp.example.json');
 const vscodeConfig = readJson('.vscode/mcp.json');
 const cursorConfig = readJson('.cursor/mcp.json');
+const openCodeConfig = readJson('config/agent-fleet/opencode.jsonc');
+const windsurfConfig = readJson('config/agent-fleet/windsurf-mcp_config.json');
 const skillRouting = readJson('config/mcp-skill-routing.json');
 
 const projectServers = projectConfig.mcpServers;
 const exampleServers = exampleConfig.mcpServers;
 const vscodeServers = vscodeConfig.servers;
 const cursorServers = cursorConfig.mcpServers;
+const openCodeServers = openCodeConfig.mcp;
+const windsurfServers = windsurfConfig.mcpServers;
 
 validateServerSet('.mcp.json', projectServers);
 validateServerSet('.mcp.example.json', exampleServers);
 validateServerSet('.vscode/mcp.json', vscodeServers);
 validateCloudflareServerSet('.cursor/mcp.json', cursorServers);
+validateCloudflareServerSet('config/agent-fleet/opencode.jsonc', openCodeServers);
+validateCloudflareServerSet('config/agent-fleet/windsurf-mcp_config.json', windsurfServers);
 
 validateRemoteServers('.mcp.json', projectServers);
 validateRemoteServers('.mcp.example.json', exampleServers);
 validateRemoteServers('.vscode/mcp.json', vscodeServers);
 validateCursorCloudflareServers('.cursor/mcp.json', cursorServers);
+validateOpenCodeCloudflareServers('config/agent-fleet/opencode.jsonc', openCodeServers);
+validateWindsurfCloudflareServers('config/agent-fleet/windsurf-mcp_config.json', windsurfServers);
 
 validateSupabase('.mcp.json', projectServers.supabase, 'oojzfmmywbvficgybaxd');
 validateSupabase('.mcp.example.json', exampleServers.supabase, 'YOUR_CONTROL_ROOM_PROJECT_REF');
@@ -204,9 +232,11 @@ for (const [relativePath, parsed] of [
   ['.mcp.example.json', exampleConfig],
   ['.vscode/mcp.json', vscodeConfig],
   ['.cursor/mcp.json', cursorConfig],
+  ['config/agent-fleet/opencode.jsonc', openCodeConfig],
+  ['config/agent-fleet/windsurf-mcp_config.json', windsurfConfig],
 ]) {
   assertNoCommittedSecrets(relativePath, parsed);
-  const servers = parsed.mcpServers ?? parsed.servers;
+  const servers = parsed.mcpServers ?? parsed.servers ?? parsed.mcp;
   for (const forbidden of ['playwright', 'dbhub', 'netdata-cloud']) {
     assert(!servers[forbidden], `${relativePath}:${forbidden} is not justified in the current Control Room phase`);
   }
