@@ -15,9 +15,9 @@ interface ProjectRow {
   name: string;
 }
 
-async function projectLabels(projectIds: string[]) {
+async function projectLabels(projectIds: string[]): Promise<Map<string, { slug: string; name: string }>> {
   const uniqueIds = [...new Set(projectIds.filter(Boolean))];
-  if (uniqueIds.length === 0) return new Map<string, { slug: string; name: string }>();
+  if (uniqueIds.length === 0) return new Map();
 
   const { data, error } = await supabase
     .from('projects')
@@ -25,7 +25,8 @@ async function projectLabels(projectIds: string[]) {
     .in('id', uniqueIds);
 
   if (error) throw new Error(error.message);
-  return new Map((data as ProjectRow[] | null ?? []).map((project) => [project.id, { slug: project.slug, name: project.name }]));
+  const rows = (data ?? []) as ProjectRow[];
+  return new Map(rows.map((project) => [project.id, { slug: project.slug, name: project.name }]));
 }
 
 futureYouRouter.get('/v8/brief', async (_req: FounderRequest, res) => {
