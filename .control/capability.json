@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0",
+  "name": "Founder Control Room",
+  "version": "0.1.0",
+  "mission": "Govern portfolio operations through approval gates, exact-head verification, evidence collection, and safe escalation without autonomous merging or deployment.",
+  "owner": "jussray",
+  "repository": "jussray/founder-control-room",
+  "capabilities": [
+    { "id": "BUILD", "status": "partial", "evidence_ids": [], "notes": "Build command exists; current branch execution evidence is not attached yet." },
+    { "id": "TEST", "status": "partial", "evidence_ids": [], "notes": "Unit and end-to-end commands exist; current branch execution evidence is not attached yet." },
+    { "id": "VERIFY", "status": "verified", "evidence_ids": ["contract-verifiers"], "notes": "Repository includes focused contract verification commands." },
+    { "id": "DEPLOY", "status": "unverified", "evidence_ids": [], "notes": "Deployment commands exist, but this contract does not claim a live deployment." },
+    { "id": "ROLLBACK", "status": "unverified", "evidence_ids": [] },
+    { "id": "HEALTH", "status": "partial", "evidence_ids": [], "notes": "Capability health model exists; runtime health ingestion remains to be implemented." },
+    { "id": "API", "status": "partial", "evidence_ids": [], "notes": "Express and Cloudflare API surfaces are present." },
+    { "id": "MCP", "status": "verified", "evidence_ids": ["mcp-verifier"] },
+    { "id": "AUTOMATION", "status": "partial", "evidence_ids": [], "notes": "Orchestration contracts exist with guarded authority boundaries." },
+    { "id": "OBSERVABILITY", "status": "partial", "evidence_ids": [], "notes": "Evidence import and operational records exist; unified portfolio telemetry remains open." },
+    { "id": "SECURITY", "status": "partial", "evidence_ids": ["security-contracts"] },
+    { "id": "EVIDENCE", "status": "verified", "evidence_ids": ["evidence-import"] }
+  ],
+  "verification": [
+    { "id": "build", "command": "npm run build", "purpose": "Compile the TypeScript application." },
+    { "id": "test", "command": "npm test", "purpose": "Run the Vitest suite." },
+    { "id": "e2e", "command": "npm run test:e2e", "purpose": "Build and run the end-to-end verification flow." },
+    { "id": "mcp", "command": "npm run verify:mcp", "purpose": "Verify MCP configuration contracts." },
+    { "id": "terminal", "command": "npm run verify:terminal-contract", "purpose": "Verify guarded terminal authority boundaries." },
+    { "id": "ai-skills", "command": "npm run verify:ai-skills", "purpose": "Verify AI skill and founder intelligence inheritance contracts." }
+  ],
+  "health": {
+    "overall": "yellow",
+    "build": "unknown",
+    "tests": "unknown",
+    "deploy": "unknown",
+    "runtime": "unknown",
+    "proof": "yellow"
+  },
+  "proof": [
+    { "id": "contract-verifiers", "kind": "commit", "status": "verified", "source": "package.json verification scripts", "verified_at": "2026-07-25T01:00:00Z" },
+    { "id": "mcp-verifier", "kind": "commit", "status": "verified", "source": "scripts/verify-mcp-config.mjs", "verified_at": "2026-07-25T01:00:00Z" },
+    { "id": "security-contracts", "kind": "manual_review", "status": "verified", "source": "Guarded terminal, cookie, RLS, and authority verification commands", "verified_at": "2026-07-25T01:00:00Z" },
+    { "id": "evidence-import", "kind": "commit", "status": "verified", "source": "scripts/import-preview-evidence.mjs", "verified_at": "2026-07-25T01:00:00Z" }
+  ],
+  "deployment": {
+    "provider": "Cloudflare Workers",
+    "environment": "unknown",
+    "url": ""
+  },
+  "rollback": {
+    "method": "Revert the exact approved commit and redeploy through the normal guarded workflow.",
+    "verified": false,
+    "evidence_id": null
+  },
+  "dependencies": ["GitHub", "Cloudflare Workers", "Supabase"],
+  "security": ["Approval-gated writes", "Exact-head verification", "Guarded terminal contracts", "No autonomous merge or deploy"],
+  "telemetry": ["Preview evidence import", "Contract verification results"],
+  "last_verified": "2026-07-25T01:00:00Z",
+  "blockers": ["Run branch verification commands and attach immutable artifacts.", "Implement portfolio contract ingestion and health scoring.", "Verify rollback execution on a non-production environment."],
+  "next_gate": "Validate this contract against the canonical schema, then ingest contracts from active repositories into a proof-first portfolio view."
+}
