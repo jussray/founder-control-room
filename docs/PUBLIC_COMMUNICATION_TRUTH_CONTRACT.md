@@ -90,7 +90,7 @@ This standing authorization removes the need for per-post founder approval for c
 - crisis communications, admissions of liability, political statements, or other high-consequence communications not explicitly approved as a separate class;
 - bypassing a hold condition because a scheduler or model is technically able to publish.
 
-Any post outside these boundaries requires fresh founder approval.
+Fresh approval is still required for any post outside these boundaries.
 
 ## Posting requirements
 
