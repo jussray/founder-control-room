@@ -18,7 +18,7 @@ export interface CapabilityContract {
 const STATUS_WEIGHT: Record<CapabilityStatus, number | null> = {
   verified: 1,
   partial: 0.5,
-  unverified: 0.2,
+  unverified: 0,
   blocked: 0,
   not_applicable: null,
 };
