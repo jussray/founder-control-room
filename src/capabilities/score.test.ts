@@ -6,7 +6,7 @@ describe('scoreCapabilityContract', () => {
     const result = scoreCapabilityContract({
       capabilities: [
         { id: 'BUILD', status: 'verified', evidence_ids: ['build-1'] },
-        { id: 'TEST', status: 'partial' },
+        { id: 'TEST', status: 'partial', evidence_ids: ['test-1'] },
         { id: 'DEPLOY', status: 'unverified' },
         { id: 'ROLLBACK', status: 'blocked' },
         { id: 'CRM', status: 'not_applicable' },
@@ -14,7 +14,7 @@ describe('scoreCapabilityContract', () => {
     });
 
     expect(result).toEqual({
-      score: 43,
+      score: 38,
       applicable: 4,
       verified: 1,
       partial: 1,
@@ -22,6 +22,12 @@ describe('scoreCapabilityContract', () => {
       blocked: 1,
       notApplicable: 1,
     });
+  });
+
+  it('awards no readiness credit to unverified claims', () => {
+    expect(
+      scoreCapabilityContract({ capabilities: [{ id: 'DEPLOY', status: 'unverified' }] }),
+    ).toMatchObject({ score: 0, applicable: 1, unverified: 1 });
   });
 
   it('returns zero when every capability is not applicable', () => {
