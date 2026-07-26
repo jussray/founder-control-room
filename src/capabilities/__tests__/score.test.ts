@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scoreCapabilityContract } from './score.js';
+import { scoreCapabilityContract } from '../score.js';
 
 describe('scoreCapabilityContract', () => {
   it('scores proof states deterministically and excludes not applicable claims', () => {
