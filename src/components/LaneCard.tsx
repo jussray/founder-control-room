@@ -1,12 +1,15 @@
-import type { LaneSummary } from '@/lib/types';
+import { deriveLaneHealth } from '@/lib/laneHealth';
+import type { LaneHealthState, LaneSummary } from '@/lib/types';
 
-const riskTone: Record<LaneSummary['risk'], string> = {
-  green: 'var(--green)',
-  yellow: 'var(--yellow)',
-  red: 'var(--red)'
+const healthTone: Record<LaneHealthState, string> = {
+  healthy: 'var(--green)',
+  waiting: 'var(--yellow)',
+  blocked: 'var(--red)',
+  unknown: 'var(--unknown)'
 };
 
 export function LaneCard({ lane }: { lane: LaneSummary }) {
+  const health = deriveLaneHealth(lane);
   return (
     <section className="laneCard">
       <div className="laneHeader">
@@ -14,8 +17,9 @@ export function LaneCard({ lane }: { lane: LaneSummary }) {
           <p className="eyebrow">{lane.status}</p>
           <h2>{lane.label}</h2>
         </div>
-        <span className="riskBadge" style={{ borderColor: riskTone[lane.risk] }}>
-          {lane.risk}
+        <span className="riskBadge" style={{ borderColor: healthTone[health] }}>
+          <span className={`healthDot health-${health}`} />
+          {health}
         </span>
       </div>
       <p className="laneDescription">{lane.description}</p>
