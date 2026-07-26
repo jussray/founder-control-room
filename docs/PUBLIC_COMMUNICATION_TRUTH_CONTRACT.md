@@ -45,6 +45,8 @@ Produced an outcome
 
 One layer does not prove another. Do not describe committed code as deployed, a triggered workflow as successful, a draft as published, a scheduled post as delivered, a model response as an external action, or attention as customer impact.
 
+A publication claim requires an observable platform artifact. A draft, scheduler acceptance, workflow trigger, or model response is not that artifact.
+
 ## /confess
 
 Before release, state internally and, when material to the audience, publicly:
@@ -91,6 +93,7 @@ This standing authorization removes the need for per-post founder approval for c
 - bypassing a hold condition because a scheduler or model is technically able to publish.
 
 Fresh approval is still required for any post outside these boundaries.
+Any post outside these boundaries requires fresh founder approval. Fresh approval is still required whenever the post is outside the approved automated publishing class or crosses a high-consequence boundary.
 
 ## Posting requirements
 

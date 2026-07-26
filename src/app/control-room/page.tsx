@@ -15,7 +15,8 @@ async function fetchLanes(): Promise<LaneSummary[]> {
       description: '',
       status: r.status,
       risk: r.risk,
-      metrics: []
+      metrics: [],
+      updatedAt: r.updated_at
     }));
   } catch {
     return laneSummaries; // fall back to static seed if DB not reachable
@@ -54,7 +55,7 @@ export default async function ControlRoomPage() {
   // Merge live DB lanes with static descriptions/metrics (static data has richer content)
   const enrichedLanes = lanes.map((live) => {
     const seed = laneSummaries.find((s) => s.id === live.id);
-    return seed ? { ...seed, risk: live.risk, status: live.status } : live;
+    return seed ? { ...seed, risk: live.risk, status: live.status, updatedAt: live.updatedAt } : live;
   });
 
   // Use static missions when DB has none yet (no missions seeded = fall back)

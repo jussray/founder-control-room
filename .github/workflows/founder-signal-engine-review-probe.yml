@@ -1,0 +1,239 @@
+name: Founder Signal Engine Review-Only Probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: founder-signal-engine-review-only-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: Probe sealed MCP bridge
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: founder-signal-engine-review
+    steps:
+      - name: Prepare immutable probe context
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          invocation_id="$(python - <<'PY'
+          import uuid
+          print(uuid.uuid4())
+          PY
+          )"
+
+          {
+            echo "INVOCATION_ID=$invocation_id"
+            echo "SOURCE_REPOSITORY=jussray/Sekret-Bip"
+            echo "SOURCE_PR=599"
+            echo "SOURCE_COMMIT_SHA=f4573d360a8fea99b301f33a2a21192525725f7b"
+            echo "REQUESTED_ACTION=run_openai_step"
+            echo "WORKFLOW_HEAD_SHA=$GITHUB_SHA"
+            echo "WORKFLOW_RUN_ID=$GITHUB_RUN_ID"
+          } >> "$GITHUB_ENV"
+
+      - name: Call review-only Founder Signal Engine bridge
+        id: invoke
+        shell: bash
+        env:
+          FOUNDER_API_URL: ${{ secrets.FOUNDER_API_URL }}
+          MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          write_local_failure() {
+            local code="$1"
+            local message="$2"
+            jq -n \
+              --arg code "$code" \
+              --arg message "$message" \
+              --arg invocation_id "$INVOCATION_ID" \
+              --arg workflow_head_sha "$WORKFLOW_HEAD_SHA" \
+              --arg workflow_run_id "$WORKFLOW_RUN_ID" \
+              '{
+                receiptVersion: 1,
+                state: "configuration_failure",
+                workflowHeadSha: $workflow_head_sha,
+                workflowRunId: $workflow_run_id,
+                invocationId: $invocation_id,
+                httpStatus: null,
+                error: {code: $code, message: $message},
+                result: null
+              }' > founder-signal-engine-receipt.json
+          }
+
+          if [[ -z "${MCP_TOKEN:-}" ]]; then
+            write_local_failure "MISSING_MCP_TOKEN" "The sealed Founder Signal Engine MCP token is not configured."
+            echo "::error title=Missing sealed MCP token::FOUNDER_SIGNAL_ENGINE_MCP_TOKEN is not configured."
+            exit 2
+          fi
+          echo "::add-mask::$MCP_TOKEN"
+
+          resolved_api_url="${FOUNDER_API_URL:-https://api.foundercontrolroom.org}"
+          if [[ "$resolved_api_url" != "https://api.foundercontrolroom.org" ]]; then
+            write_local_failure "UNAPPROVED_API_URL" "The configured Founder API URL is not the approved HTTPS origin."
+            echo "::error title=Unapproved API endpoint::Only https://api.foundercontrolroom.org is permitted for this probe."
+            exit 2
+          fi
+
+          request_body="$(jq -n \
+            --arg invocation_id "$INVOCATION_ID" \
+            --arg source_repository "$SOURCE_REPOSITORY" \
+            --argjson source_pr "$SOURCE_PR" \
+            --arg source_commit_sha "$SOURCE_COMMIT_SHA" \
+            --arg requested_action "$REQUESTED_ACTION" \
+            --arg steering_grant_id "founder-signal-engine-day3-review-only" \
+            --arg audit_path "Founder Control Room issue #73; operator console merge 93a57d0308a9461b3995a4997a35d417fdc7a3bb" \
+            --arg rollback_step "Disable the Zapier Catch Hook and preserve the evidence trail." \
+            --arg requesting_agent "github-actions-review-probe" \
+            '{
+              jsonrpc: "2.0",
+              id: $invocation_id,
+              method: "tools/call",
+              params: {
+                name: "invoke_founder_signal_engine",
+                arguments: {
+                  invocationId: $invocation_id,
+                  sourceRepository: $source_repository,
+                  sourcePr: $source_pr,
+                  sourceCommitSha: $source_commit_sha,
+                  requestedAction: $requested_action,
+                  steeringGrantId: $steering_grant_id,
+                  auditPath: $audit_path,
+                  rollbackStep: $rollback_step,
+                  requestingAgent: $requesting_agent,
+                  allowHubSpotWrite: false,
+                  founderApprovalId: null
+                }
+              }
+            }')"
+
+          http_status="$(curl --silent --show-error \
+            --proto '=https' \
+            --proto-redir '=https' \
+            --max-redirs 0 \
+            --connect-timeout 10 \
+            --max-time 45 \
+            --output response.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            --url "https://api.foundercontrolroom.org/mcp/founder-signal-engine" \
+            --header 'content-type: application/json' \
+            --header "authorization: Bearer $MCP_TOKEN" \
+            --data "$request_body")"
+
+          if jq -e . response.json >/dev/null 2>&1; then
+            jq \
+              --arg http_status "$http_status" \
+              --arg workflow_head_sha "$WORKFLOW_HEAD_SHA" \
+              --arg workflow_run_id "$WORKFLOW_RUN_ID" \
+              '{
+                receiptVersion: 1,
+                state: (if (.result.structuredContent.accepted // false) then "bridge_response" else "bridge_rejection" end),
+                workflowHeadSha: $workflow_head_sha,
+                workflowRunId: $workflow_run_id,
+                httpStatus: ($http_status | tonumber),
+                jsonrpc: (.jsonrpc // null),
+                id: (.id // null),
+                error: (if .error then {
+                  code: (.error.code // "REMOTE_ERROR"),
+                  message: ((.error.message // "Remote bridge error") | tostring | .[0:240])
+                } else null end),
+                result: (if .result then {
+                  isError: (.result.isError // false),
+                  structuredContent: {
+                    invocationId: (.result.structuredContent.invocationId // null),
+                    accepted: (.result.structuredContent.accepted // false),
+                    providerHttpStatus: (.result.structuredContent.providerHttpStatus // null),
+                    providerResponseKind: ((.result.structuredContent.providerResponseKind // null) | if type == "string" then .[0:80] else . end),
+                    zapierRunId: ((.result.structuredContent.zapierRunId // null) | if type == "string" then .[0:160] else . end),
+                    zapierRunIdentified: (.result.structuredContent.zapierRunIdentified // false),
+                    auditComplete: (.result.structuredContent.auditComplete // false),
+                    duplicateBlocked: (.result.structuredContent.duplicateBlocked // false),
+                    endToEndProofComplete: (.result.structuredContent.endToEndProofComplete // false),
+                    sourceRepository: (.result.structuredContent.sourceRepository // null),
+                    sourcePr: (.result.structuredContent.sourcePr // null),
+                    sourceCommitSha: (.result.structuredContent.sourceCommitSha // null),
+                    requestedAction: (.result.structuredContent.requestedAction // null),
+                    nextGate: ((.result.structuredContent.nextGate // null) | if type == "string" then .[0:240] else . end)
+                  }
+                } else null end)
+              }' response.json > founder-signal-engine-receipt.json
+          else
+            jq -n \
+              --arg http_status "$http_status" \
+              --arg invocation_id "$INVOCATION_ID" \
+              --arg workflow_head_sha "$WORKFLOW_HEAD_SHA" \
+              --arg workflow_run_id "$WORKFLOW_RUN_ID" \
+              '{
+                receiptVersion: 1,
+                state: "non_json_response",
+                workflowHeadSha: $workflow_head_sha,
+                workflowRunId: $workflow_run_id,
+                invocationId: $invocation_id,
+                httpStatus: ($http_status | tonumber),
+                error: {code: "NON_JSON_RESPONSE", message: "Founder API returned a non-JSON response; raw body omitted."},
+                result: null
+              }' > founder-signal-engine-receipt.json
+          fi
+
+          {
+            echo '## Founder Signal Engine review-only probe'
+            echo
+            echo "Workflow head: \`$WORKFLOW_HEAD_SHA\`"
+            echo "Workflow run: \`$WORKFLOW_RUN_ID\`"
+            echo "Invocation: \`$INVOCATION_ID\`"
+            echo
+            echo '```json'
+            cat founder-signal-engine-receipt.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$http_status" -lt 200 || "$http_status" -ge 300 ]]; then
+            echo "::error title=Bridge HTTP failure::Founder Signal Engine returned HTTP $http_status."
+            exit 1
+          fi
+
+          jq -e \
+            --arg invocation_id "$INVOCATION_ID" \
+            --arg source_repository "$SOURCE_REPOSITORY" \
+            --argjson source_pr "$SOURCE_PR" \
+            --arg source_commit_sha "$SOURCE_COMMIT_SHA" \
+            --arg requested_action "$REQUESTED_ACTION" \
+            '
+              .jsonrpc == "2.0" and
+              .id == $invocation_id and
+              .result.isError == false and
+              .result.structuredContent.invocationId == $invocation_id and
+              .result.structuredContent.accepted == true and
+              .result.structuredContent.sourceRepository == $source_repository and
+              .result.structuredContent.sourcePr == $source_pr and
+              .result.structuredContent.sourceCommitSha == $source_commit_sha and
+              .result.structuredContent.requestedAction == $requested_action
+            ' founder-signal-engine-receipt.json >/dev/null || {
+              echo "::error title=Receipt correlation failure::The bridge response did not match the exact invocation and source evidence."
+              exit 1
+            }
+
+          jq -e '
+            (.result.structuredContent.zapierRunIdentified == true) and
+            ((.result.structuredContent.zapierRunId // "") | type == "string" and length > 0)
+          ' founder-signal-engine-receipt.json >/dev/null || {
+            echo "::error title=Zapier execution proof missing::The bridge did not return an explicit matching Zapier run ID."
+            exit 1
+          }
+
+      - name: Upload sanitized receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: founder-signal-engine-review-only-receipt
+          path: founder-signal-engine-receipt.json
+          if-no-files-found: ignore
+          retention-days: 7
