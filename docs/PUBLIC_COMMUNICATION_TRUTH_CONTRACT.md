@@ -92,6 +92,7 @@ This standing authorization removes the need for per-post founder approval for c
 - crisis communications, admissions of liability, political statements, or other high-consequence communications not explicitly approved as a separate class;
 - bypassing a hold condition because a scheduler or model is technically able to publish.
 
+Fresh approval is still required for any post outside these boundaries.
 Any post outside these boundaries requires fresh founder approval. Fresh approval is still required whenever the post is outside the approved automated publishing class or crosses a high-consequence boundary.
 
 ## Posting requirements
@@ -105,7 +106,7 @@ Every material post must have:
 - no invented metrics, testimonials, partnerships, users, revenue, deployment, or approval;
 - no implication of founder approval when only an agent drafted the content;
 - a reviewable draft or an approved automated publishing class;
-- a captured URL, platform artifact, message ID, or equivalent evidence after publication;
+- a captured URL, observable platform artifact, message ID, or equivalent evidence after publication;
 - a correction path when the post becomes inaccurate.
 
 ## Status language
