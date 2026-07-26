@@ -30,4 +30,8 @@ export interface LaneSummary {
   status: string;
   risk: RiskState;
   metrics: Array<{ label: string; value: string }>;
+  /** ISO timestamp of the lane's last update, when known (e.g. `lanes.updated_at`). */
+  updatedAt?: string;
 }
+
+export type LaneHealthState = 'healthy' | 'waiting' | 'blocked' | 'unknown';
