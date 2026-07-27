@@ -16,13 +16,31 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: economic-intelligence-playwright-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   city-agnostic-proof:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - name: Checkout exact head
+      - name: Check out exact head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          printf 'Verified exact head: %s\n' "$actual"
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -32,9 +50,6 @@ jobs:
 
       - name: Install locked repository dependencies
         run: npm ci
-
-      - name: Install pinned Playwright proof dependency
-        run: npm install --no-save --package-lock=false @playwright/test@1.61.1
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
@@ -49,7 +64,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: economic-intelligence-playwright-${{ github.sha }}
+          name: economic-intelligence-playwright-${{ env.EXPECTED_HEAD_SHA }}
           path: |
             playwright-report/economic-intelligence/
             test-results/
