@@ -140,7 +140,7 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
     reality: [
       `The authoritative repository ref is ${input.target.name} at ${input.target.commitSha}.`,
       `${exactHeadSignals.length} exact-head verification signal(s) were inspected.`,
-      'This inspection performed no repository, provider, deployment, database, CRM, or publication mutation.',
+      'This inspection performed no repository, provider, deployment, product-data, CRM, or publication mutation. The route may retain one sanitized internal access-audit event.',
     ],
     fix: ['No fix was applied. Goalfix v1 stops at inspection and founder decision authority.'],
     proof,
@@ -148,7 +148,7 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
       'Passing repository checks prove only the checks that actually ran, not production behavior or the founder outcome.',
       'Missing, skipped, running, unknown, or mismatched-head evidence must not be presented as green.',
     ],
-    rollback: ['No rollback is required because this vertical slice is read-only.'],
+    rollback: ['No target-system rollback is required. Revert the Goalfix code change to remove the surface; retain any sanitized audit event as historical evidence.'],
     nextGate,
   };
 }
