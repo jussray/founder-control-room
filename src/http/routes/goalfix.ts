@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { buildGoalfixReport, type FounderGoal } from '../../goalfix/engine.js';
 import { supabase } from '../../lib/supabaseClient.js';
@@ -54,7 +55,8 @@ function safeRef(value: unknown): string | null {
  * Executes the first Goalfix vertical slice: founder goal intake, one bounded
  * repository read, exact-head evidence classification, and a founder-ready
  * report. It never creates a branch, changes a file, merges, deploys, writes to
- * CRM, or mutates provider state.
+ * CRM, or mutates provider state. One sanitized internal access-audit event is
+ * required before a successful report is returned.
  */
 goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
   const body = req.body as Record<string, unknown>;
@@ -119,6 +121,34 @@ goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
       goal,
       verificationSignals,
     });
+
+    const exactHeadSignalCount = verificationSignals.filter(
+      (signal) => signal.commitSha.toLowerCase() === target.commitSha.toLowerCase(),
+    ).length;
+    const { error: auditError } = await supabase.from('project_events').insert({
+      project_id: project.id,
+      source_event_id: randomUUID(),
+      event_type: 'goalfix_inspection_completed',
+      severity: report.readiness === 'blocked' ? 'error' : 'info',
+      screen: 'control-room-goalfix',
+      metadata: {
+        route: 'POST /goalfix/inspect',
+        actor: 'founder',
+        founder_user_id: req.founder?.userId ?? null,
+        target_ref: target.name,
+        target_sha: target.commitSha,
+        readiness: report.readiness,
+        exact_head_signal_count: exactHeadSignalCount,
+        skill: report.routing.skill,
+      },
+    });
+
+    if (auditError) {
+      return res.status(500).json({
+        error: 'Goalfix access audit persistence failed',
+        code: 'AUDIT_PERSISTENCE_FAILED',
+      });
+    }
 
     res.set('Cache-Control', 'no-store');
     return res.json(report);
