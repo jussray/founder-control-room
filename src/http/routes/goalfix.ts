@@ -3,6 +3,11 @@ import { Router } from 'express';
 import { buildGoalfixReport, type FounderGoal } from '../../goalfix/engine.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { providerForProject } from '../../providers/providerFactory.js';
+import type {
+  RepositoryProvider,
+  RepositoryRef,
+  VerificationSignal,
+} from '../../providers/RepositoryProvider.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 export const goalfixRouter = Router();
@@ -17,6 +22,20 @@ interface ProjectRow {
   name: string;
   repo_provider: string;
   repo_identifier: string | null;
+}
+
+interface GoalfixAuditInput {
+  projectId: string;
+  founderUserId: string | null;
+  eventType: 'goalfix_inspection_completed' | 'goalfix_inspection_failed';
+  severity: 'info' | 'error';
+  stage: 'provider_factory' | 'resolve_ref' | 'list_verification_signals' | 'completed';
+  requestedRef: string;
+  target?: RepositoryRef;
+  readiness?: string;
+  exactHeadSignalCount?: number;
+  expectedSignalCount: number;
+  errorClass?: string;
 }
 
 function optionalString(value: unknown, maxLength: number): string | undefined {
@@ -49,14 +68,44 @@ function safeRef(value: unknown): string | null {
   return trimmed;
 }
 
+function errorClass(error: unknown): string {
+  if (error instanceof Error) return error.name || 'Error';
+  return typeof error;
+}
+
+async function persistGoalfixAudit(input: GoalfixAuditInput): Promise<boolean> {
+  const { error } = await supabase.from('project_events').insert({
+    project_id: input.projectId,
+    source_event_id: randomUUID(),
+    event_type: input.eventType,
+    severity: input.severity,
+    screen: 'control-room-goalfix',
+    metadata: {
+      route: 'POST /goalfix/inspect',
+      actor: 'founder',
+      founder_user_id: input.founderUserId,
+      stage: input.stage,
+      requested_ref: input.requestedRef,
+      target_ref: input.target?.name ?? null,
+      target_sha: input.target?.commitSha ?? null,
+      readiness: input.readiness ?? null,
+      exact_head_signal_count: input.exactHeadSignalCount ?? null,
+      expected_signal_count: input.expectedSignalCount,
+      error_class: input.errorClass ?? null,
+      skill: 'goalfix',
+    },
+  });
+  return !error;
+}
+
 /**
  * POST /goalfix/inspect
  *
  * Executes the first Goalfix vertical slice: founder goal intake, one bounded
  * repository read, exact-head evidence classification, and a founder-ready
  * report. It never creates a branch, changes a file, merges, deploys, writes to
- * CRM, or mutates provider state. One sanitized internal access-audit event is
- * required before a successful report is returned.
+ * CRM, or mutates provider state. A sanitized internal access-audit event is
+ * required for both completed and failed provider-read attempts.
  */
 goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
   const body = req.body as Record<string, unknown>;
@@ -65,6 +114,7 @@ goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
   const targetRef = safeRef(body['targetRef']);
   const constraints = stringList(body['constraints'], 20, 300);
   const firstFilesOrLogs = stringList(body['firstFilesOrLogs'], 20, 300);
+  const expectedVerificationNames = stringList(body['expectedVerificationNames'], 20, 200);
 
   if (!projectSlug || !SLUG_PATTERN.test(projectSlug)) {
     return res.status(400).json({ error: 'projectSlug must be lowercase alphanumeric segments separated by hyphens' });
@@ -75,8 +125,13 @@ goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
   if (!targetRef) {
     return res.status(400).json({ error: 'targetRef contains an unsupported ref format' });
   }
-  if (!constraints || !firstFilesOrLogs) {
-    return res.status(400).json({ error: 'constraints and firstFilesOrLogs must be bounded arrays of non-empty strings' });
+  if (!constraints || !firstFilesOrLogs || !expectedVerificationNames) {
+    return res.status(400).json({
+      error: 'constraints, firstFilesOrLogs, and expectedVerificationNames must be bounded arrays of non-empty strings',
+    });
+  }
+  if (expectedVerificationNames.length === 0) {
+    return res.status(400).json({ error: 'expectedVerificationNames must contain at least one required check name' });
   }
 
   const goal: FounderGoal = {
@@ -85,6 +140,7 @@ goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
     constraints,
     suspectedFailureArea: optionalString(body['suspectedFailureArea'], 500),
     firstFilesOrLogs,
+    expectedVerificationNames,
     stopCondition: optionalString(body['stopCondition'], 500),
   };
 
@@ -101,61 +157,96 @@ goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
     return res.status(503).json({ error: 'Project has no repository configured.', code: 'REPOSITORY_PROVIDER_UNAVAILABLE' });
   }
 
-  try {
-    const provider = providerForProject({
-      repo_provider: project.repo_provider,
-      slug: project.slug,
-      repo_identifier: project.repo_identifier,
-    });
-    const target = await provider.getRef(project.slug, targetRef);
-    const verificationSignals = await provider.listVerificationSignals(project.slug, target.commitSha);
-    const report = buildGoalfixReport({
-      project: {
-        id: project.id,
-        slug: project.slug,
-        name: project.name,
-        repository: project.repo_identifier,
-        provider: project.repo_provider,
-      },
+  const founderUserId = req.founder?.userId ?? null;
+  const providerFailure = async (
+    stage: GoalfixAuditInput['stage'],
+    providerError: unknown,
+    target?: RepositoryRef,
+  ) => {
+    const audited = await persistGoalfixAudit({
+      projectId: project.id,
+      founderUserId,
+      eventType: 'goalfix_inspection_failed',
+      severity: 'error',
+      stage,
+      requestedRef: targetRef,
       target,
-      goal,
-      verificationSignals,
+      expectedSignalCount: expectedVerificationNames.length,
+      errorClass: errorClass(providerError),
     });
-
-    const exactHeadSignalCount = verificationSignals.filter(
-      (signal) => signal.commitSha.toLowerCase() === target.commitSha.toLowerCase(),
-    ).length;
-    const { error: auditError } = await supabase.from('project_events').insert({
-      project_id: project.id,
-      source_event_id: randomUUID(),
-      event_type: 'goalfix_inspection_completed',
-      severity: report.readiness === 'blocked' ? 'error' : 'info',
-      screen: 'control-room-goalfix',
-      metadata: {
-        route: 'POST /goalfix/inspect',
-        actor: 'founder',
-        founder_user_id: req.founder?.userId ?? null,
-        target_ref: target.name,
-        target_sha: target.commitSha,
-        readiness: report.readiness,
-        exact_head_signal_count: exactHeadSignalCount,
-        skill: report.routing.skill,
-      },
-    });
-
-    if (auditError) {
+    if (!audited) {
       return res.status(500).json({
         error: 'Goalfix access audit persistence failed',
         code: 'AUDIT_PERSISTENCE_FAILED',
       });
     }
-
-    res.set('Cache-Control', 'no-store');
-    return res.json(report);
-  } catch (providerError) {
     return res.status(502).json({
       error: providerError instanceof Error ? providerError.message : 'Unable to inspect repository evidence',
       code: 'GOALFIX_INSPECTION_FAILED',
     });
+  };
+
+  let provider: RepositoryProvider;
+  try {
+    provider = providerForProject({
+      repo_provider: project.repo_provider,
+      slug: project.slug,
+      repo_identifier: project.repo_identifier,
+    });
+  } catch (providerError) {
+    return providerFailure('provider_factory', providerError);
   }
+
+  let target: RepositoryRef;
+  try {
+    target = await provider.getRef(project.slug, targetRef);
+  } catch (providerError) {
+    return providerFailure('resolve_ref', providerError);
+  }
+
+  let verificationSignals: VerificationSignal[];
+  try {
+    verificationSignals = await provider.listVerificationSignals(project.slug, target.commitSha);
+  } catch (providerError) {
+    return providerFailure('list_verification_signals', providerError, target);
+  }
+
+  const report = buildGoalfixReport({
+    project: {
+      id: project.id,
+      slug: project.slug,
+      name: project.name,
+      repository: project.repo_identifier,
+      provider: project.repo_provider,
+    },
+    target,
+    goal,
+    verificationSignals,
+  });
+
+  const exactHeadSignalCount = verificationSignals.filter(
+    (signal) => signal.commitSha.toLowerCase() === target.commitSha.toLowerCase(),
+  ).length;
+  const audited = await persistGoalfixAudit({
+    projectId: project.id,
+    founderUserId,
+    eventType: 'goalfix_inspection_completed',
+    severity: report.readiness === 'blocked' ? 'error' : 'info',
+    stage: 'completed',
+    requestedRef: targetRef,
+    target,
+    readiness: report.readiness,
+    exactHeadSignalCount,
+    expectedSignalCount: expectedVerificationNames.length,
+  });
+
+  if (!audited) {
+    return res.status(500).json({
+      error: 'Goalfix access audit persistence failed',
+      code: 'AUDIT_PERSISTENCE_FAILED',
+    });
+  }
+
+  res.set('Cache-Control', 'no-store');
+  return res.json(report);
 });

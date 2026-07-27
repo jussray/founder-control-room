@@ -7,18 +7,18 @@
   "repository": "jussray/founder-control-room",
   "capabilities": [
     { "id": "BUILD", "status": "partial", "evidence_ids": [], "notes": "Build command and exact-head CI exist; deployment build evidence remains separate." },
-    { "id": "TEST", "status": "partial", "evidence_ids": ["goalfix-v1-proof"], "notes": "Goalfix contracts and desktop/mobile Chromium proof passed on the recorded exact implementation head; portfolio-wide runtime verification remains broader." },
-    { "id": "VERIFY", "status": "verified", "evidence_ids": ["contract-verifiers", "goalfix-v1-proof"], "notes": "Repository includes focused contract verification commands and retained exact-head Goalfix proof." },
+    { "id": "TEST", "status": "partial", "evidence_ids": [], "notes": "Goalfix contracts and Chromium proof exist historically, but this mutable contract does not self-attest the current head." },
+    { "id": "VERIFY", "status": "verified", "evidence_ids": ["contract-verifiers"], "notes": "Repository includes focused contract verification commands; current-head Goalfix proof must be read from immutable workflow evidence." },
     { "id": "DEPLOY", "status": "unverified", "evidence_ids": [], "notes": "Deployment commands exist, but this contract does not claim a live deployment." },
     { "id": "ROLLBACK", "status": "unverified", "evidence_ids": [] },
     { "id": "HEALTH", "status": "partial", "evidence_ids": [], "notes": "Capability health model exists; runtime health ingestion remains to be implemented." },
-    { "id": "API", "status": "partial", "evidence_ids": ["goalfix-v1-proof"], "notes": "Founder-gated Goalfix API contracts passed; deployed API reachability remains unverified." },
-    { "id": "AI", "status": "partial", "evidence_ids": ["goalfix-v1-proof"], "notes": "Goalfix v1 provides founder goal intake, deterministic target-system read-only repository routing, exact-head evidence classification, sanitized fail-closed access auditing, and a founder decision report. The broader Chief AI roadmap remains partial." },
+    { "id": "API", "status": "partial", "evidence_ids": [], "notes": "Founder-gated Goalfix API contracts exist; current-head and deployed API reachability remain separate evidence gates." },
+    { "id": "AI", "status": "partial", "evidence_ids": [], "notes": "Goalfix v1 implements founder goal intake, deterministic target-system read-only repository routing, named exact-head proof requirements, sanitized fail-closed access auditing, and a founder decision report. The broader Chief AI roadmap remains partial." },
     { "id": "MCP", "status": "verified", "evidence_ids": ["mcp-verifier"] },
     { "id": "AUTOMATION", "status": "partial", "evidence_ids": [], "notes": "Orchestration contracts exist with guarded authority boundaries." },
-    { "id": "OBSERVABILITY", "status": "partial", "evidence_ids": ["goalfix-v1-proof"], "notes": "Goalfix emits sanitized internal access-audit events and exact-head evidence receipts; unified portfolio telemetry remains open." },
-    { "id": "SECURITY", "status": "partial", "evidence_ids": ["security-contracts", "goalfix-v1-proof"] },
-    { "id": "EVIDENCE", "status": "verified", "evidence_ids": ["evidence-import", "goalfix-v1-proof"] }
+    { "id": "OBSERVABILITY", "status": "partial", "evidence_ids": [], "notes": "Goalfix emits sanitized internal access-audit events and exact-head evidence receipts; unified portfolio telemetry remains open." },
+    { "id": "SECURITY", "status": "partial", "evidence_ids": ["security-contracts"] },
+    { "id": "EVIDENCE", "status": "verified", "evidence_ids": ["evidence-import"] }
   ],
   "verification": [
     { "id": "build", "command": "npm run build", "purpose": "Compile the TypeScript application." },
@@ -27,22 +27,22 @@
     { "id": "mcp", "command": "npm run verify:mcp", "purpose": "Verify MCP configuration contracts." },
     { "id": "terminal", "command": "npm run verify:terminal-contract", "purpose": "Verify guarded terminal authority boundaries." },
     { "id": "ai-skills", "command": "npm run verify:ai-skills", "purpose": "Verify AI skill and founder intelligence inheritance contracts." },
-    { "id": "goalfix", "command": "npm run verify:goalfix && npm run proof:goalfix", "purpose": "Verify the Goalfix inspection engine, founder-gated route, exact-head evidence boundary, sanitized audit contract, and rendered desktop/mobile report." }
+    { "id": "goalfix", "command": "npm run verify:goalfix && npm run proof:goalfix", "purpose": "Verify the Goalfix engine, named required proof set, founder-gated route, completed and failed-read audit contracts, and rendered desktop/mobile report." }
   ],
   "health": {
     "overall": "yellow",
     "build": "unknown",
-    "tests": "green",
+    "tests": "yellow",
     "deploy": "unknown",
     "runtime": "unknown",
-    "proof": "green"
+    "proof": "yellow"
   },
   "proof": [
     { "id": "contract-verifiers", "kind": "commit", "status": "verified", "source": "package.json verification scripts", "verified_at": "2026-07-25T01:00:00Z" },
     { "id": "mcp-verifier", "kind": "commit", "status": "verified", "source": "scripts/verify-mcp-config.mjs", "verified_at": "2026-07-25T01:00:00Z" },
     { "id": "security-contracts", "kind": "manual_review", "status": "verified", "source": "Guarded terminal, cookie, RLS, and authority verification commands", "verified_at": "2026-07-25T01:00:00Z" },
     { "id": "evidence-import", "kind": "commit", "status": "verified", "source": "scripts/import-preview-evidence.mjs", "verified_at": "2026-07-25T01:00:00Z" },
-    { "id": "goalfix-v1-proof", "kind": "artifact", "status": "verified", "source": "GitHub Actions run 30308470704; artifact goalfix-playwright-87f518161862f9574f5278df27f2bcdf39289724; sha256:1867f239bf1a6d7fd9ce14f8647f3c57717f44b25658b50b5cf3784133ac8e0a", "sha256": "1867f239bf1a6d7fd9ce14f8647f3c57717f44b25658b50b5cf3784133ac8e0a", "verified_at": "2026-07-27T21:51:31Z" }
+    { "id": "goalfix-v1-proof", "kind": "artifact", "status": "stale", "source": "Historical GitHub Actions artifact from an earlier Goalfix head. Consult the current pull request's immutable workflow artifact instead of treating this entry as current-head proof.", "sha256": "1867f239bf1a6d7fd9ce14f8647f3c57717f44b25658b50b5cf3784133ac8e0a", "verified_at": "2026-07-27T21:51:31Z" }
   ],
   "deployment": {
     "provider": "Cloudflare Workers",
@@ -55,9 +55,9 @@
     "evidence_id": null
   },
   "dependencies": ["GitHub", "Cloudflare Workers", "Supabase"],
-  "security": ["Approval-gated target-system writes", "Exact-head verification", "Sanitized fail-closed Goalfix access auditing", "Guarded terminal contracts", "No autonomous merge or deploy"],
+  "security": ["Approval-gated target-system writes", "Exact-head verification", "Named required proof sets", "Sanitized failed-read auditing", "Guarded terminal contracts", "No autonomous merge or deploy"],
   "telemetry": ["Preview evidence import", "Contract verification results", "Goalfix exact-head inspection reports", "Goalfix sanitized project access-audit events"],
   "last_verified": "2026-07-27T21:51:31Z",
-  "blockers": ["Verify deployment and runtime reachability after a separately approved merge.", "Implement portfolio contract ingestion and health scoring.", "Verify rollback execution on a non-production environment."],
-  "next_gate": "Rerun the exact-head contracts after this evidence-ledger update, inspect the retained artifact and review threads, then merge only the focused PR before opening the separate Cloudflare deployment/runtime gate."
+  "blockers": ["Obtain and inspect an immutable artifact for the current Goalfix implementation head.", "Verify deployment and runtime reachability after a separately approved merge.", "Implement portfolio contract ingestion and health scoring.", "Verify rollback execution on a non-production environment."],
+  "next_gate": "Use the current pull request's exact-head workflow and retained artifact as the proof authority, keep this mutable ledger cautious, then merge only after review threads are resolved."
 }

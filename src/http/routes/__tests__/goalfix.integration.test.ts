@@ -63,12 +63,24 @@ function projectsRow() {
   };
 }
 
+function validPayload() {
+  return {
+    projectSlug: 'sekret-bip',
+    targetRef: 'main',
+    desiredOutcome: 'Keep the public welcome available before login.',
+    constraints: ['Do not weaken protected route guards.'],
+    firstFilesOrLogs: ['app/_layout.tsx', 'Playwright artifact'],
+    expectedVerificationNames: ['Typecheck', 'Playwright'],
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   providerForProjectMock.mockReturnValue(providerMock);
   providerMock.getRef.mockResolvedValue({ name: 'main', commitSha: SHA });
   providerMock.listVerificationSignals.mockResolvedValue([
     { id: 'check-1', name: 'Typecheck', status: 'passed', commitSha: SHA, provider: 'github' },
+    { id: 'check-2', name: 'Playwright', status: 'passed', commitSha: SHA, provider: 'github' },
   ]);
   auditInsertMock.mockResolvedValue({ error: null });
   supabaseMock.from.mockImplementation((table: string) => {
@@ -83,7 +95,7 @@ describe('POST /goalfix/inspect', () => {
   it('rejects requests without a founder session before repository access', async () => {
     const response = await request(buildApp())
       .post('/goalfix/inspect')
-      .send({ projectSlug: 'sekret-bip', desiredOutcome: 'Inspect the current blocker.' });
+      .send(validPayload());
 
     expect(response.status).toBe(401);
     expect(providerForProjectMock).not.toHaveBeenCalled();
@@ -99,9 +111,26 @@ describe('POST /goalfix/inspect', () => {
     const response = await request(buildApp())
       .post('/goalfix/inspect')
       .set('Authorization', BEARER)
-      .send({ projectSlug: '../unsafe', desiredOutcome: '' });
+      .send({ ...validPayload(), projectSlug: '../unsafe', desiredOutcome: '' });
 
     expect(response.status).toBe(400);
+    expect(providerForProjectMock).not.toHaveBeenCalled();
+    expect(auditInsertMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an empty required proof set before repository access', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
+      error: null,
+    });
+
+    const response = await request(buildApp())
+      .post('/goalfix/inspect')
+      .set('Authorization', BEARER)
+      .send({ ...validPayload(), expectedVerificationNames: [] });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain('at least one required check name');
     expect(providerForProjectMock).not.toHaveBeenCalled();
     expect(auditInsertMock).not.toHaveBeenCalled();
   });
@@ -115,13 +144,7 @@ describe('POST /goalfix/inspect', () => {
     const response = await request(buildApp())
       .post('/goalfix/inspect')
       .set('Authorization', BEARER)
-      .send({
-        projectSlug: 'sekret-bip',
-        targetRef: 'main',
-        desiredOutcome: 'Keep the public welcome available before login.',
-        constraints: ['Do not weaken protected route guards.'],
-        firstFilesOrLogs: ['app/_layout.tsx', 'Playwright artifact'],
-      });
+      .send(validPayload());
 
     expect(response.status).toBe(200);
     expect(response.headers['cache-control']).toBe('no-store');
@@ -138,14 +161,19 @@ describe('POST /goalfix/inspect', () => {
         route: 'POST /goalfix/inspect',
         actor: 'founder',
         founder_user_id: 'founder-user-1',
+        stage: 'completed',
+        requested_ref: 'main',
         target_ref: 'main',
         target_sha: SHA,
         readiness: 'ready_for_founder_decision',
-        exact_head_signal_count: 1,
+        exact_head_signal_count: 2,
+        expected_signal_count: 2,
+        error_class: null,
         skill: 'goalfix',
       },
     });
     expect(JSON.stringify(audit)).not.toContain('Keep the public welcome available before login.');
+    expect(JSON.stringify(audit)).not.toContain('Typecheck');
     expect(response.body).toMatchObject({
       version: 'goalfix-v1',
       readiness: 'ready_for_founder_decision',
@@ -158,10 +186,11 @@ describe('POST /goalfix/inspect', () => {
       },
       project: { repository: 'jussray/Sekret-Bip' },
       target: { name: 'main', commitSha: SHA },
+      goal: { expectedVerificationNames: ['Typecheck', 'Playwright'] },
     });
   });
 
-  it('fails closed when the sanitized access audit cannot persist', async () => {
+  it('fails closed when the sanitized completion audit cannot persist', async () => {
     mockGetUser.mockResolvedValue({
       data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
       error: null,
@@ -171,7 +200,7 @@ describe('POST /goalfix/inspect', () => {
     const response = await request(buildApp())
       .post('/goalfix/inspect')
       .set('Authorization', BEARER)
-      .send({ projectSlug: 'sekret-bip', desiredOutcome: 'Inspect the current blocker.' });
+      .send(validPayload());
 
     expect(response.status).toBe(500);
     expect(response.body).toEqual({
@@ -180,7 +209,7 @@ describe('POST /goalfix/inspect', () => {
     });
   });
 
-  it('fails closed when provider inspection cannot complete', async () => {
+  it('audits a ref-resolution failure before returning the provider error', async () => {
     mockGetUser.mockResolvedValue({
       data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
       error: null,
@@ -190,13 +219,77 @@ describe('POST /goalfix/inspect', () => {
     const response = await request(buildApp())
       .post('/goalfix/inspect')
       .set('Authorization', BEARER)
-      .send({ projectSlug: 'sekret-bip', desiredOutcome: 'Inspect the current blocker.' });
+      .send(validPayload());
 
     expect(response.status).toBe(502);
     expect(response.body).toEqual({
       error: 'provider unavailable',
       code: 'GOALFIX_INSPECTION_FAILED',
     });
-    expect(auditInsertMock).not.toHaveBeenCalled();
+    expect(auditInsertMock).toHaveBeenCalledTimes(1);
+    const audit = auditInsertMock.mock.calls[0]?.[0];
+    expect(audit).toMatchObject({
+      event_type: 'goalfix_inspection_failed',
+      severity: 'error',
+      metadata: {
+        stage: 'resolve_ref',
+        requested_ref: 'main',
+        target_ref: null,
+        target_sha: null,
+        expected_signal_count: 2,
+        error_class: 'Error',
+      },
+    });
+    expect(JSON.stringify(audit)).not.toContain('provider unavailable');
+  });
+
+  it('audits a verification-signal failure with the already resolved exact head', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
+      error: null,
+    });
+    providerMock.listVerificationSignals.mockRejectedValue(new Error('checks unavailable'));
+
+    const response = await request(buildApp())
+      .post('/goalfix/inspect')
+      .set('Authorization', BEARER)
+      .send(validPayload());
+
+    expect(response.status).toBe(502);
+    expect(auditInsertMock).toHaveBeenCalledTimes(1);
+    const audit = auditInsertMock.mock.calls[0]?.[0];
+    expect(audit).toMatchObject({
+      event_type: 'goalfix_inspection_failed',
+      severity: 'error',
+      metadata: {
+        stage: 'list_verification_signals',
+        requested_ref: 'main',
+        target_ref: 'main',
+        target_sha: SHA,
+        expected_signal_count: 2,
+        error_class: 'Error',
+      },
+    });
+    expect(JSON.stringify(audit)).not.toContain('checks unavailable');
+  });
+
+  it('fails closed when a provider-failure audit cannot persist', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
+      error: null,
+    });
+    providerMock.listVerificationSignals.mockRejectedValue(new Error('checks unavailable'));
+    auditInsertMock.mockResolvedValue({ error: { message: 'audit unavailable' } });
+
+    const response = await request(buildApp())
+      .post('/goalfix/inspect')
+      .set('Authorization', BEARER)
+      .send(validPayload());
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({
+      error: 'Goalfix access audit persistence failed',
+      code: 'AUDIT_PERSISTENCE_FAILED',
+    });
   });
 });

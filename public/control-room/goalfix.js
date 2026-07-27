@@ -98,6 +98,12 @@ form.addEventListener('submit', async (event) => {
   }
 
   const values = Object.fromEntries(new FormData(form).entries());
+  const expectedVerificationNames = lines(values.expectedVerificationNames);
+  if (expectedVerificationNames.length === 0) {
+    renderError('Name at least one required exact-head check before inspecting.');
+    return;
+  }
+
   const payload = {
     projectSlug: String(values.projectSlug ?? '').trim(),
     targetRef: String(values.targetRef ?? '').trim(),
@@ -106,6 +112,7 @@ form.addEventListener('submit', async (event) => {
     suspectedFailureArea: String(values.suspectedFailureArea ?? '').trim() || undefined,
     constraints: lines(values.constraints),
     firstFilesOrLogs: lines(values.firstFilesOrLogs),
+    expectedVerificationNames,
     stopCondition: String(values.stopCondition ?? '').trim() || undefined,
   };
 

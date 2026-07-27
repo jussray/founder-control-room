@@ -28,6 +28,7 @@ body{margin:0;background:#070b14;color:#e8eef8;font:16px/1.5 system-ui,-apple-sy
 .goalfix-section{margin-top:1rem;padding-top:1rem;border-top:1px solid #26334a}
 .goalfix-section ul{margin:.4rem 0 0;padding-left:1.25rem}
 .goalfix-muted{color:#a7b7cd}
+.goalfix-hint{font-size:.82rem;color:#91a4be;font-weight:500}
 .goalfix-error{border:1px solid #7f2d43;background:#351722;color:#ffc1d1;border-radius:10px;padding:.75rem}
 .goalfix-empty{display:grid;place-items:center;min-height:360px;text-align:center;color:#a7b7cd}
 .goalfix-authority{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;margin-top:.75rem}
@@ -49,7 +50,7 @@ body{margin:0;background:#070b14;color:#e8eef8;font:16px/1.5 system-ui,-apple-sy
     <section class="goalfix-panel" aria-labelledby="goalfix-heading">
       <div class="goalfix-kicker">Read-only inspection</div>
       <h1 id="goalfix-heading">Seek the real blocker.</h1>
-      <p class="goalfix-muted">Resolve one repository ref, inspect exact-head proof, and stop before mutation.</p>
+      <p class="goalfix-muted">Resolve one repository ref, inspect the complete named exact-head proof set, and stop before mutation.</p>
       <form id="goalfix-form" class="goalfix-form">
         <label>Project slug
           <input name="projectSlug" required value="sekret-bip" autocomplete="off" />
@@ -72,8 +73,12 @@ body{margin:0;background:#070b14;color:#e8eef8;font:16px/1.5 system-ui,-apple-sy
         <label>First files or logs, one per line
           <textarea name="firstFilesOrLogs" placeholder="src/http/server.ts&#10;exact-head workflow log"></textarea>
         </label>
+        <label>Required exact-head check names, one per line
+          <textarea name="expectedVerificationNames" required placeholder="Typecheck&#10;Playwright"></textarea>
+          <span class="goalfix-hint">Goalfix cannot declare decision readiness unless every named check appears and passes on the exact commit.</span>
+        </label>
         <label>Stop condition
-          <input name="stopCondition" autocomplete="off" placeholder="Exact-head proof exists or approval is required" />
+          <input name="stopCondition" autocomplete="off" placeholder="Complete named proof exists or approval is required" />
         </label>
         <button id="goalfix-submit" type="submit">Inspect exact head</button>
       </form>
