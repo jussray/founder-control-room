@@ -8,6 +8,7 @@ import { buildGoalfixReport } from '../dist/goalfix/engine.js';
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const ARTIFACT_DIR = join(ROOT, 'artifacts', 'goalfix');
 const SHA = 'abc123abc123abc123abc123abc123abc123abcd';
+const REQUIRED_CHECKS = ['Typecheck', 'Product Design Playwright Proof'];
 const report = buildGoalfixReport({
   project: {
     id: 'project-proof',
@@ -22,15 +23,25 @@ const report = buildGoalfixReport({
     reason: 'Preserve a usable front door without weakening protected routes.',
     constraints: ['Read-only inspection', 'No deployment'],
     firstFilesOrLogs: ['app/_layout.tsx', 'Product Design Playwright Proof'],
+    expectedVerificationNames: REQUIRED_CHECKS,
     stopCondition: 'Stop before mutation.',
   },
-  verificationSignals: [{
-    id: 'proof-1',
-    name: 'Product Design Playwright Proof',
-    status: 'failed',
-    commitSha: SHA,
-    provider: 'github',
-  }],
+  verificationSignals: [
+    {
+      id: 'proof-typecheck',
+      name: 'Typecheck',
+      status: 'passed',
+      commitSha: SHA,
+      provider: 'github',
+    },
+    {
+      id: 'proof-playwright',
+      name: 'Product Design Playwright Proof',
+      status: 'failed',
+      commitSha: SHA,
+      provider: 'github',
+    },
+  ],
   observedAt: new Date('2026-07-27T20:00:00.000Z'),
 });
 
@@ -64,8 +75,12 @@ const server = createServer((req, res) => {
       }
       try {
         const payload = JSON.parse(raw);
-        if (payload.projectSlug !== 'sekret-bip' || !payload.desiredOutcome) {
-          throw new Error('Proof request did not preserve founder input.');
+        if (
+          payload.projectSlug !== 'sekret-bip'
+          || !payload.desiredOutcome
+          || JSON.stringify(payload.expectedVerificationNames) !== JSON.stringify(REQUIRED_CHECKS)
+        ) {
+          throw new Error('Proof request did not preserve the founder goal and required check set.');
         }
         res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
         res.end(JSON.stringify(report));
@@ -118,6 +133,7 @@ async function proveViewport(name, viewport) {
   await page.fill('[name="reason"]', 'Preserve the front door without weakening protected routes.');
   await page.fill('[name="constraints"]', 'Read-only inspection\nNo deployment');
   await page.fill('[name="firstFilesOrLogs"]', 'app/_layout.tsx\nProduct Design Playwright Proof');
+  await page.fill('[name="expectedVerificationNames"]', REQUIRED_CHECKS.join('\n'));
   await page.click('#goalfix-submit');
   await page.locator('[data-state="blocked"]').waitFor({ state: 'visible' });
 
@@ -125,7 +141,9 @@ async function proveViewport(name, viewport) {
   assert(text.includes("Se'kret Bip"), `${name}: project identity renders`);
   assert(text.includes(SHA), `${name}: immutable exact head renders`);
   assert(text.includes('L1 · read-only'), `${name}: authority boundary renders`);
-  assert(text.includes('Product Design Playwright Proof: failed'), `${name}: failed proof remains visible`);
+  assert(text.includes('Required exact-head checks: Typecheck, Product Design Playwright Proof.'), `${name}: complete named proof set renders`);
+  assert(text.includes('Typecheck: passed'), `${name}: passing required proof remains visible`);
+  assert(text.includes('Product Design Playwright Proof: failed'), `${name}: failed required proof remains visible`);
   assert(text.includes('NEXT GATE'), `${name}: founder next gate renders`);
   assert(pageErrors.length === 0, `${name}: no uncaught browser errors`);
   assert(failedRequests.length === 0, `${name}: no failed network requests`);
