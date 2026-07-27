@@ -8,6 +8,7 @@ export interface FounderGoal {
   constraints: string[];
   suspectedFailureArea?: string;
   firstFilesOrLogs: string[];
+  expectedVerificationNames: string[];
   stopCondition?: string;
 }
 
@@ -69,21 +70,60 @@ function describeSignal(signal: VerificationSignal): string {
   return `${signal.name || 'Unnamed verification signal'}: ${signal.status} at ${signal.commitSha}`;
 }
 
+function normalizeSignalName(name: string): string {
+  return name.trim().toLocaleLowerCase('en-US');
+}
+
+function uniqueExpectedNames(names: string[]): string[] {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const raw of names) {
+    const name = raw.trim();
+    const normalized = normalizeSignalName(name);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    unique.push(name);
+  }
+  return unique;
+}
+
 export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixReport {
   const expectedSha = input.target.commitSha.toLowerCase();
+  const expectedVerificationNames = uniqueExpectedNames(input.goal.expectedVerificationNames);
+  const expectedNameKeys = new Set(expectedVerificationNames.map(normalizeSignalName));
   const exactHeadSignals = input.verificationSignals.filter(
     (signal) => signal.commitSha.toLowerCase() === expectedSha,
   );
   const mismatchedSignals = input.verificationSignals.filter(
     (signal) => signal.commitSha.toLowerCase() !== expectedSha,
   );
+  const exactHeadSignalsByName = new Map<string, VerificationSignal[]>();
+  for (const signal of exactHeadSignals) {
+    const key = normalizeSignalName(signal.name);
+    const group = exactHeadSignalsByName.get(key) ?? [];
+    group.push(signal);
+    exactHeadSignalsByName.set(key, group);
+  }
+
+  const missingExpectedNames = expectedVerificationNames.filter(
+    (name) => !exactHeadSignalsByName.has(normalizeSignalName(name)),
+  );
+  const expectedSignals = exactHeadSignals.filter(
+    (signal) => expectedNameKeys.has(normalizeSignalName(signal.name)),
+  );
   const failures = exactHeadSignals.filter((signal) => TERMINAL_FAILURES.has(signal.status));
   const incomplete = exactHeadSignals.filter((signal) => INCOMPLETE_SIGNALS.has(signal.status));
   const passed = exactHeadSignals.filter((signal) => signal.status === 'passed');
+  const everyExpectedNamePassed = expectedVerificationNames.length > 0
+    && missingExpectedNames.length === 0
+    && expectedVerificationNames.every((name) => {
+      const matching = exactHeadSignalsByName.get(normalizeSignalName(name)) ?? [];
+      return matching.some((signal) => signal.status === 'passed');
+    });
 
   let readiness: GoalfixReadiness = 'waiting_for_evidence';
   if (failures.length > 0) readiness = 'blocked';
-  else if (exactHeadSignals.length > 0 && incomplete.length === 0 && passed.length === exactHeadSignals.length) {
+  else if (everyExpectedNamePassed && incomplete.length === 0) {
     readiness = 'ready_for_founder_decision';
   }
 
@@ -97,6 +137,12 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
   const unknown: string[] = [];
   const blocked: string[] = failures.map(describeSignal);
 
+  if (expectedVerificationNames.length === 0) {
+    unknown.push('No required verification signal names were supplied; decision readiness cannot be established.');
+  }
+  for (const name of missingExpectedNames) {
+    unknown.push(`Missing required exact-head verification signal: ${name}.`);
+  }
   if (exactHeadSignals.length === 0) {
     unknown.push(`No exact-head verification signals were returned for ${input.target.commitSha}.`);
   }
@@ -109,15 +155,18 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
     );
   }
 
-  const proof = exactHeadSignals.length > 0
-    ? exactHeadSignals.map(describeSignal)
-    : [`No exact-head provider proof exists yet for ${input.target.commitSha}.`];
+  const proof = [
+    `Required exact-head checks: ${expectedVerificationNames.length > 0 ? expectedVerificationNames.join(', ') : 'none supplied'}.`,
+    ...(exactHeadSignals.length > 0
+      ? exactHeadSignals.map(describeSignal)
+      : [`No exact-head provider proof exists yet for ${input.target.commitSha}.`]),
+  ];
 
   const nextGate = readiness === 'blocked'
     ? 'Inspect the first exact-head failed or cancelled signal, repair only its verified root cause, then rerun the focused check.'
     : readiness === 'waiting_for_evidence'
-      ? 'Run or finish the narrowest required exact-head verification, retain its logs or artifact, and inspect the result before any mutation.'
-      : 'Founder reviews the evidence and explicitly approves one bounded mutation, or closes the goal with no change.';
+      ? 'Run or finish every named required exact-head verification, retain its logs or artifact, and inspect the result before any mutation.'
+      : 'Founder reviews the complete named proof set and explicitly approves one bounded mutation, or closes the goal with no change.';
 
   return {
     version: 'goalfix-v1',
@@ -135,18 +184,22 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
     },
     project: input.project,
     target: input.target,
-    goal: input.goal,
+    goal: {
+      ...input.goal,
+      expectedVerificationNames,
+    },
     evidence: { verified, inferred, unknown, blocked },
     reality: [
       `The authoritative repository ref is ${input.target.name} at ${input.target.commitSha}.`,
-      `${exactHeadSignals.length} exact-head verification signal(s) were inspected.`,
+      `${exactHeadSignals.length} exact-head verification signal(s) were inspected against ${expectedVerificationNames.length} required name(s).`,
+      `${expectedSignals.length} exact-head signal(s) matched the required proof set.`,
       'This inspection performed no repository, provider, deployment, product-data, CRM, or publication mutation. The route may retain one sanitized internal access-audit event.',
     ],
     fix: ['No fix was applied. Goalfix v1 stops at inspection and founder decision authority.'],
     proof,
     risk: [
       'Passing repository checks prove only the checks that actually ran, not production behavior or the founder outcome.',
-      'Missing, skipped, running, unknown, or mismatched-head evidence must not be presented as green.',
+      'Missing named checks, skipped, running, unknown, or mismatched-head evidence must not be presented as green.',
     ],
     rollback: ['No target-system rollback is required. Revert the Goalfix code change to remove the surface; retain any sanitized audit event as historical evidence.'],
     nextGate,
