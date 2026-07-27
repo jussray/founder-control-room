@@ -100,7 +100,11 @@ goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
   }
 
   try {
-    const provider = providerForProject(project);
+    const provider = providerForProject({
+      repo_provider: project.repo_provider,
+      slug: project.slug,
+      repo_identifier: project.repo_identifier,
+    });
     const target = await provider.getRef(project.slug, targetRef);
     const verificationSignals = await provider.listVerificationSignals(project.slug, target.commitSha);
     const report = buildGoalfixReport({
