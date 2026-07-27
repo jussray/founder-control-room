@@ -13,6 +13,7 @@
     { "id": "ROLLBACK", "status": "unverified", "evidence_ids": [] },
     { "id": "HEALTH", "status": "partial", "evidence_ids": [], "notes": "Capability health model exists; runtime health ingestion remains to be implemented." },
     { "id": "API", "status": "partial", "evidence_ids": [], "notes": "Express and Cloudflare API surfaces are present." },
+    { "id": "AI", "status": "partial", "evidence_ids": ["goalfix-v1-source"], "notes": "Goalfix v1 provides founder goal intake, deterministic read-only repository routing, exact-head evidence classification, and a founder decision report. Exact-head workflow proof remains pending." },
     { "id": "MCP", "status": "verified", "evidence_ids": ["mcp-verifier"] },
     { "id": "AUTOMATION", "status": "partial", "evidence_ids": [], "notes": "Orchestration contracts exist with guarded authority boundaries." },
     { "id": "OBSERVABILITY", "status": "partial", "evidence_ids": [], "notes": "Evidence import and operational records exist; unified portfolio telemetry remains open." },
@@ -25,7 +26,8 @@
     { "id": "e2e", "command": "npm run test:e2e", "purpose": "Build and run the end-to-end verification flow." },
     { "id": "mcp", "command": "npm run verify:mcp", "purpose": "Verify MCP configuration contracts." },
     { "id": "terminal", "command": "npm run verify:terminal-contract", "purpose": "Verify guarded terminal authority boundaries." },
-    { "id": "ai-skills", "command": "npm run verify:ai-skills", "purpose": "Verify AI skill and founder intelligence inheritance contracts." }
+    { "id": "ai-skills", "command": "npm run verify:ai-skills", "purpose": "Verify AI skill and founder intelligence inheritance contracts." },
+    { "id": "goalfix", "command": "npm run verify:goalfix && npm run proof:goalfix", "purpose": "Verify the Goalfix inspection engine, founder-gated route, exact-head evidence boundary, and rendered desktop/mobile report." }
   ],
   "health": {
     "overall": "yellow",
@@ -39,7 +41,8 @@
     { "id": "contract-verifiers", "kind": "commit", "status": "verified", "source": "package.json verification scripts", "verified_at": "2026-07-25T01:00:00Z" },
     { "id": "mcp-verifier", "kind": "commit", "status": "verified", "source": "scripts/verify-mcp-config.mjs", "verified_at": "2026-07-25T01:00:00Z" },
     { "id": "security-contracts", "kind": "manual_review", "status": "verified", "source": "Guarded terminal, cookie, RLS, and authority verification commands", "verified_at": "2026-07-25T01:00:00Z" },
-    { "id": "evidence-import", "kind": "commit", "status": "verified", "source": "scripts/import-preview-evidence.mjs", "verified_at": "2026-07-25T01:00:00Z" }
+    { "id": "evidence-import", "kind": "commit", "status": "verified", "source": "scripts/import-preview-evidence.mjs", "verified_at": "2026-07-25T01:00:00Z" },
+    { "id": "goalfix-v1-source", "kind": "commit", "status": "missing", "source": "Goalfix vertical-slice branch requires an exact-head Goalfix Vertical Slice Proof workflow run and retained Playwright artifact.", "verified_at": null }
   ],
   "deployment": {
     "provider": "Cloudflare Workers",
@@ -53,8 +56,8 @@
   },
   "dependencies": ["GitHub", "Cloudflare Workers", "Supabase"],
   "security": ["Approval-gated writes", "Exact-head verification", "Guarded terminal contracts", "No autonomous merge or deploy"],
-  "telemetry": ["Preview evidence import", "Contract verification results"],
+  "telemetry": ["Preview evidence import", "Contract verification results", "Goalfix exact-head inspection reports"],
   "last_verified": "2026-07-25T01:00:00Z",
-  "blockers": ["Run branch verification commands and attach immutable artifacts.", "Implement portfolio contract ingestion and health scoring.", "Verify rollback execution on a non-production environment."],
-  "next_gate": "Validate this contract against the canonical schema, then ingest contracts from active repositories into a proof-first portfolio view."
+  "blockers": ["Run the Goalfix exact-head workflow and retain its Playwright artifact.", "Implement portfolio contract ingestion and health scoring.", "Verify rollback execution on a non-production environment."],
+  "next_gate": "Run the Goalfix Vertical Slice Proof workflow on the exact branch head, inspect its artifact and review threads, then record the immutable evidence before any merge or deployment."
 }
