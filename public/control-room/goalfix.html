@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Goalfix · Founder Control Room</title>
+<link rel="stylesheet" href="/control-room/styles.css" />
+<style>
+:root{color-scheme:dark}
+body{margin:0;background:#070b14;color:#e8eef8;font:16px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.goalfix-shell{max-width:1120px;margin:0 auto;padding:1.25rem}
+.goalfix-top{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem}
+.goalfix-top a{color:#9eeed8;text-decoration:none}
+.goalfix-grid{display:grid;grid-template-columns:minmax(280px,.85fr) minmax(320px,1.15fr);gap:1rem}
+.goalfix-panel{background:#101827;border:1px solid #26334a;border-radius:18px;padding:1rem;box-shadow:0 18px 50px rgba(0,0,0,.25)}
+.goalfix-panel h1,.goalfix-panel h2,.goalfix-panel h3{margin-top:0}
+.goalfix-form{display:grid;gap:.8rem}
+.goalfix-form label{display:grid;gap:.35rem;font-weight:700;color:#dce7f6}
+.goalfix-form input,.goalfix-form textarea{width:100%;box-sizing:border-box;border:1px solid #34445f;border-radius:10px;background:#080e19;color:#f5f8ff;padding:.7rem;font:inherit}
+.goalfix-form textarea{min-height:92px;resize:vertical}
+.goalfix-form button{border:0;border-radius:10px;background:#8a5cff;color:white;padding:.8rem 1rem;font-weight:800;cursor:pointer}
+.goalfix-form button:disabled{opacity:.55;cursor:wait}
+.goalfix-kicker{color:#a7b7cd;text-transform:uppercase;letter-spacing:.16em;font-size:.76rem;font-weight:800}
+.goalfix-status{display:inline-flex;align-items:center;gap:.4rem;border-radius:999px;padding:.35rem .65rem;background:#18243a;font-weight:800}
+.goalfix-status[data-state="blocked"]{background:#421f2b;color:#ffb7ca}
+.goalfix-status[data-state="waiting_for_evidence"]{background:#453815;color:#ffe497}
+.goalfix-status[data-state="ready_for_founder_decision"]{background:#143d32;color:#a9f5dc}
+.goalfix-section{margin-top:1rem;padding-top:1rem;border-top:1px solid #26334a}
+.goalfix-section ul{margin:.4rem 0 0;padding-left:1.25rem}
+.goalfix-muted{color:#a7b7cd}
+.goalfix-error{border:1px solid #7f2d43;background:#351722;color:#ffc1d1;border-radius:10px;padding:.75rem}
+.goalfix-empty{display:grid;place-items:center;min-height:360px;text-align:center;color:#a7b7cd}
+.goalfix-authority{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;margin-top:.75rem}
+.goalfix-authority div{border:1px solid #26334a;border-radius:10px;padding:.65rem;background:#0b1220}
+@media (max-width:780px){.goalfix-grid{grid-template-columns:1fr}.goalfix-authority{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main class="goalfix-shell">
+  <div class="goalfix-top">
+    <div>
+      <div class="goalfix-kicker">Founder Control Room</div>
+      <strong>Goalfix v1</strong>
+    </div>
+    <a href="/control-room/">← Back to Control Room</a>
+  </div>
+
+  <div class="goalfix-grid">
+    <section class="goalfix-panel" aria-labelledby="goalfix-heading">
+      <div class="goalfix-kicker">Read-only inspection</div>
+      <h1 id="goalfix-heading">Seek the real blocker.</h1>
+      <p class="goalfix-muted">Resolve one repository ref, inspect exact-head proof, and stop before mutation.</p>
+      <form id="goalfix-form" class="goalfix-form">
+        <label>Project slug
+          <input name="projectSlug" required value="sekret-bip" autocomplete="off" />
+        </label>
+        <label>Target ref
+          <input name="targetRef" required value="main" autocomplete="off" />
+        </label>
+        <label>Desired outcome
+          <textarea name="desiredOutcome" required placeholder="What must be true when this goal is complete?"></textarea>
+        </label>
+        <label>Why it matters
+          <textarea name="reason" placeholder="Founder, user, product, safety, or business value"></textarea>
+        </label>
+        <label>Suspected failure area
+          <input name="suspectedFailureArea" autocomplete="off" />
+        </label>
+        <label>Constraints, one per line
+          <textarea name="constraints" placeholder="Preserve unrelated work&#10;Do not deploy"></textarea>
+        </label>
+        <label>First files or logs, one per line
+          <textarea name="firstFilesOrLogs" placeholder="src/http/server.ts&#10;exact-head workflow log"></textarea>
+        </label>
+        <label>Stop condition
+          <input name="stopCondition" autocomplete="off" placeholder="Exact-head proof exists or approval is required" />
+        </label>
+        <button id="goalfix-submit" type="submit">Inspect exact head</button>
+      </form>
+      <p id="goalfix-message" role="status" aria-live="polite"></p>
+    </section>
+
+    <section id="goalfix-result" class="goalfix-panel" aria-live="polite">
+      <div class="goalfix-empty">
+        <div>
+          <div class="goalfix-kicker">No report yet</div>
+          <h2>Evidence lands here.</h2>
+          <p>Goalfix will classify what is verified, inferred, unknown, and blocked.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+<script type="module" src="/control-room/goalfix.js"></script>
+</body>
+</html>
