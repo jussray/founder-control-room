@@ -69,8 +69,9 @@ describe('buildGoalfixReport', () => {
     expect(report.proof).toHaveLength(2);
     expect(report.nextGate).toContain('explicitly approves one bounded mutation');
     expect(report.reality).toContain(
-      'This inspection performed no repository, provider, deployment, database, CRM, or publication mutation.',
+      'This inspection performed no repository, provider, deployment, product-data, CRM, or publication mutation. The route may retain one sanitized internal access-audit event.',
     );
+    expect(report.rollback[0]).toContain('retain any sanitized audit event as historical evidence');
   });
 
   it('ignores proof from a different commit instead of creating a false green', () => {
