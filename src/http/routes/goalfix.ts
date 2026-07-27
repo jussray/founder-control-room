@@ -3,7 +3,11 @@ import { Router } from 'express';
 import { buildGoalfixReport, type FounderGoal } from '../../goalfix/engine.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { providerForProject } from '../../providers/providerFactory.js';
-import type { RepositoryProvider, RepositoryRef } from '../../providers/RepositoryProvider.js';
+import type {
+  RepositoryProvider,
+  RepositoryRef,
+  VerificationSignal,
+} from '../../providers/RepositoryProvider.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 export const goalfixRouter = Router();
@@ -200,7 +204,7 @@ goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
     return providerFailure('resolve_ref', providerError);
   }
 
-  let verificationSignals;
+  let verificationSignals: VerificationSignal[];
   try {
     verificationSignals = await provider.listVerificationSignals(project.slug, target.commitSha);
   } catch (providerError) {
