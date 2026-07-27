@@ -1,11 +1,11 @@
 import { createServer } from 'node:http';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { buildGoalfixReport } from '../dist/goalfix/engine.js';
 
-const ROOT = dirname(fileURLToPath(new URL('../', import.meta.url)));
+const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const ARTIFACT_DIR = join(ROOT, 'artifacts', 'goalfix');
 const SHA = 'abc123abc123abc123abc123abc123abc123abcd';
 const report = buildGoalfixReport({
