@@ -2,7 +2,7 @@
 
 ## Founder outcome
 
-Turn a messy founder goal into one bounded, proof-first repository inspection without granting the Control Room standing mutation authority.
+Turn a messy founder goal into one bounded, proof-first repository inspection without granting the Control Room standing target-system mutation authority.
 
 ## Runtime path
 
@@ -13,6 +13,7 @@ Founder session
 → RepositoryProvider.getRef
 → RepositoryProvider.listVerificationSignals
 → exact-head evidence classifier
+→ sanitized project_events access audit
 → REALITY / FIX / PROOF / RISK / ROLLBACK / NEXT GATE report
 → founder decision
 ```
@@ -36,13 +37,14 @@ The founder-facing surface is available at `/control-room/goalfix.html` after si
 
 ## Authority boundary
 
-Goalfix v1 is `L1` and read-only.
+Goalfix v1 is `L1` and target-system read-only.
 
 It may:
 
 - resolve one registered repository ref to an immutable commit;
 - read verification signals for that exact commit;
 - classify evidence as verified, inferred, unknown, or blocked;
+- persist one sanitized internal access-audit event containing project ID, founder user ID, target ref/SHA, readiness, signal count, and route metadata;
 - recommend one next gate.
 
 It may not:
@@ -51,11 +53,12 @@ It may not:
 - edit files;
 - merge or close pull requests;
 - deploy or roll back a provider;
-- mutate Supabase, HubSpot, Linear, or another external system;
+- mutate project/business data in Supabase, HubSpot, Linear, or another external system;
+- store the founder's desired outcome, reason, constraints, or supplied file names in the access-audit event;
 - use credentials beyond the existing repository read provider;
 - present missing, stale, skipped, running, unknown, or wrong-head evidence as green.
 
-Any future mutation requires a separate founder-approved action through the existing approval and idempotency system.
+The route fails closed when its sanitized access audit cannot persist. Any future target-system mutation requires a separate founder-approved action through the existing approval and idempotency system.
 
 ## Readiness states
 
@@ -80,7 +83,8 @@ The dedicated `Goalfix Vertical Slice Proof` workflow checks out the immutable p
 - Cloudflare owns deployment/runtime evidence after a separately approved merge and deployment.
 - Linear may track the implementation and unresolved gates, but does not become code authority.
 - HubSpot may receive a proof note only after the required CRM confirmation. It does not become repository truth.
+- Supabase stores the sanitized internal access-audit event; it does not receive the founder's free-text goal payload from this route.
 
 ## Rollback
 
-Revert the focused merge. No data migration, provider configuration, secret, CRM record, deployment, or external account cleanup is required by this slice.
+Revert the focused merge to remove Goalfix code and UI. No data migration, provider configuration, secret, CRM record, deployment, or external account cleanup is required. Sanitized audit events already written remain historical evidence rather than being deleted.
