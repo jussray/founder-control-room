@@ -20,6 +20,7 @@ import { cloudflareReasoningRouter } from './routes/cloudflareReasoning.js';
 import { mcpRouter } from './routes/mcp.js';
 import { externalUseRouter } from './routes/externalUse.js';
 import { futureYouRouter } from './routes/futureYou.js';
+import { goalfixRouter } from './routes/goalfix.js';
 import { handleFounderSignalEngineMcp } from './routes/founderSignalEngineMcp.js';
 import { portfolioVerificationRouter } from './routes/portfolioVerification.js';
 import {
@@ -128,6 +129,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/terminal', terminalRouter);
   app.use('/dashboard', dashboardRouter);
   app.use('/futureyou', futureYouRouter);
+  app.use('/goalfix', goalfixRouter);
   app.use('/missions', missionsRouter);
   app.use('/promptos', promptosRouter);
   app.use('/agents', agentsRouter);
