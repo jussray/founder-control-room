@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetUser, supabaseMock, providerMock, providerForProjectMock } = vi.hoisted(() => ({
+const { mockGetUser, supabaseMock, providerMock, providerForProjectMock, auditInsertMock } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   supabaseMock: { from: vi.fn() },
   providerMock: {
@@ -8,6 +8,7 @@ const { mockGetUser, supabaseMock, providerMock, providerForProjectMock } = vi.h
     listVerificationSignals: vi.fn(),
   },
   providerForProjectMock: vi.fn(),
+  auditInsertMock: vi.fn(),
 }));
 
 vi.mock('../../../lib/supabaseAuthClient.js', () => ({
@@ -69,9 +70,11 @@ beforeEach(() => {
   providerMock.listVerificationSignals.mockResolvedValue([
     { id: 'check-1', name: 'Typecheck', status: 'passed', commitSha: SHA, provider: 'github' },
   ]);
+  auditInsertMock.mockResolvedValue({ error: null });
   supabaseMock.from.mockImplementation((table: string) => {
     if (table === 'founder_users') return founderUsersRow();
     if (table === 'projects') return projectsRow();
+    if (table === 'project_events') return { insert: auditInsertMock };
     return {};
   });
 });
@@ -84,6 +87,7 @@ describe('POST /goalfix/inspect', () => {
 
     expect(response.status).toBe(401);
     expect(providerForProjectMock).not.toHaveBeenCalled();
+    expect(auditInsertMock).not.toHaveBeenCalled();
   });
 
   it('rejects malformed goal input without touching the provider', async () => {
@@ -99,9 +103,10 @@ describe('POST /goalfix/inspect', () => {
 
     expect(response.status).toBe(400);
     expect(providerForProjectMock).not.toHaveBeenCalled();
+    expect(auditInsertMock).not.toHaveBeenCalled();
   });
 
-  it('returns an exact-head, read-only founder report', async () => {
+  it('returns an exact-head, read-only founder report after a sanitized audit persists', async () => {
     mockGetUser.mockResolvedValue({
       data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
       error: null,
@@ -122,6 +127,25 @@ describe('POST /goalfix/inspect', () => {
     expect(response.headers['cache-control']).toBe('no-store');
     expect(providerMock.getRef).toHaveBeenCalledWith('sekret-bip', 'main');
     expect(providerMock.listVerificationSignals).toHaveBeenCalledWith('sekret-bip', SHA);
+    expect(auditInsertMock).toHaveBeenCalledTimes(1);
+    const audit = auditInsertMock.mock.calls[0]?.[0];
+    expect(audit).toMatchObject({
+      project_id: 'project-1',
+      event_type: 'goalfix_inspection_completed',
+      severity: 'info',
+      screen: 'control-room-goalfix',
+      metadata: {
+        route: 'POST /goalfix/inspect',
+        actor: 'founder',
+        founder_user_id: 'founder-user-1',
+        target_ref: 'main',
+        target_sha: SHA,
+        readiness: 'ready_for_founder_decision',
+        exact_head_signal_count: 1,
+        skill: 'goalfix',
+      },
+    });
+    expect(JSON.stringify(audit)).not.toContain('Keep the public welcome available before login.');
     expect(response.body).toMatchObject({
       version: 'goalfix-v1',
       readiness: 'ready_for_founder_decision',
@@ -134,6 +158,25 @@ describe('POST /goalfix/inspect', () => {
       },
       project: { repository: 'jussray/Sekret-Bip' },
       target: { name: 'main', commitSha: SHA },
+    });
+  });
+
+  it('fails closed when the sanitized access audit cannot persist', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
+      error: null,
+    });
+    auditInsertMock.mockResolvedValue({ error: { message: 'audit unavailable' } });
+
+    const response = await request(buildApp())
+      .post('/goalfix/inspect')
+      .set('Authorization', BEARER)
+      .send({ projectSlug: 'sekret-bip', desiredOutcome: 'Inspect the current blocker.' });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({
+      error: 'Goalfix access audit persistence failed',
+      code: 'AUDIT_PERSISTENCE_FAILED',
     });
   });
 
@@ -154,5 +197,6 @@ describe('POST /goalfix/inspect', () => {
       error: 'provider unavailable',
       code: 'GOALFIX_INSPECTION_FAILED',
     });
+    expect(auditInsertMock).not.toHaveBeenCalled();
   });
 });
