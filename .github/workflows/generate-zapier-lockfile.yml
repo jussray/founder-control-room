@@ -1,0 +1,29 @@
+name: Generate Zapier lockfile
+
+on:
+  pull_request:
+    paths:
+      - "tools/zapier/package.json"
+      - ".github/workflows/generate-zapier-lockfile.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lockfile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Generate package lock
+        run: npm install --prefix tools/zapier --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Upload package lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: zapier-package-lock
+          path: tools/zapier/package-lock.json
+          if-no-files-found: error
