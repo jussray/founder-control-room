@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test src/verify-readonly.test.ts",
     "start": "tsx src/index.ts",
-    "login": "zapier-sdk login",
-    "connections": "zapier-sdk list-connections --owner me --json",
-    "apps": "zapier-sdk list-apps --json"
+    "verify:readonly": "tsx src/verify-readonly.ts",
+    "login": "zapier-sdk login --skip-prompts",
+    "connections:raw": "zapier-sdk list-connections --owner me --json",
+    "apps:raw": "zapier-sdk list-apps --json"
   },
   "dependencies": {
     "@zapier/zapier-sdk": "0.89.0"

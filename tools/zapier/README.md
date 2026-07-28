@@ -8,25 +8,46 @@ Requirements: Node.js 20+ and a Zapier account with at least one connected app.
 
 ```bash
 cd tools/zapier
-npm install
+npm ci
 npx skills add zapier/sdk -y
 npm run login
-npm run connections
-npm run start
+npm run verify:readonly
 ```
 
-`npm run start` performs a read-only authentication check with `getProfile()`. It does not run an app action.
+`npm run login` opens Zapier's browser authentication flow with interactive CLI prompts disabled.
 
-## Explore connected apps
+`npm run verify:readonly` performs the approved account-scoped validation:
+
+- proves the local Zapier session can authenticate;
+- observes at most 100 apps and 100 owned connections;
+- reports only counts, expiration count, and app keys;
+- discards profile fields;
+- never prints connection IDs, titles, account labels, or email addresses;
+- never runs an app action or performs a write.
+
+When either observed count is exactly 100, the output marks that additional records may exist beyond the inspected page.
+
+## Development checks
 
 ```bash
-npm run apps
-npm run connections
+npm run typecheck
+npm test
+```
+
+The focused test verifies that connection IDs, titles, labels, emails, and raw provider errors cannot enter the approved summary output.
+
+## Raw exploration
+
+Raw CLI inventory may contain account labels, titles, connection IDs, or other sensitive metadata. Run these only in a private local terminal and never paste, commit, upload, or attach their output:
+
+```bash
+npm run apps:raw
+npm run connections:raw
 npx zapier-sdk list-actions github
 npx zapier-sdk list-actions hubspot
 ```
 
-Generate TypeScript types only for integrations that are actually selected for implementation:
+Generate TypeScript types only for integrations selected for implementation:
 
 ```bash
 npx zapier-sdk add github hubspot --types-output ./src/generated
