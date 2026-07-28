@@ -154,15 +154,28 @@ requireText('AGENTS TypeScript tests entry', files.agents, 'skills/typescript-be
 requireText('AGENTS TypeScript review entry', files.agents, 'skills/typescript-strict-review/SKILL.md');
 requireText('AGENTS Product Design entry', files.agents, 'skills/product-design-gate/SKILL.md');
 requireText('AGENTS ChatGPT Zapier bridge skill', files.agents, '.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md');
-requireText('AGENTS Zapier cockpit rule', files.agents, 'treat Zapier as an operable workflow cockpit');
+requireText('AGENTS Zapier cockpit rule', files.agents, 'treat Zapier as an operable workflow cockpit only');
 requireText('AGENTS Zapier connector discovery', files.agents, 'OpenAI Developers');
 requireText('AGENTS dedicated Zapier key', files.agents, 'zapier-founder-signal-engine');
 requireText('AGENTS existing key boundary', files.agents, 'do not recreate, rotate, or duplicate without explicit founder approval');
 requireText('AGENTS run proof', files.agents, 'Require a real Zapier run ID');
+requireText('AGENTS metadata boundary', files.agents, "Zapier's GitHub app is a deterministic read/write metadata layer");
+requireText('AGENTS deterministic lookup', files.agents, '`Find Repository` -> `Get File Contents`');
+requireText('AGENTS Actions boundary', files.agents, 'Never treat Zapier\'s GitHub app as authority to inspect GitHub Actions jobs or logs');
+requireText('AGENTS Gmail triage path', files.agents, 'Gmail failure evidence -> ChatGPT structured summary');
+requireText('AGENTS no auto-merge', files.agents, 'must not auto-merge or auto-deploy through Zapier');
+requireText('AGENTS sensitive repo boundary', files.agents, 'Sensitive teen, family, journal, voice, media, or wellness repositories');
 requireText('AGENTS Product Design/Supabase split', files.agents, 'design evidence and Supabase evidence separate');
 requireText('AGENTS commercial extension', files.agents, '/sales /devil');
 requireText('AGENTS separation', files.agents, 'separate approval gates');
 requireText('global alignment', files.global, '/garyvee lindymode redteam l99 redteam ooda');
+
+for (const forbidden of [
+  'verify the GitHub trigger, repair mappings',
+  'The GitHub trigger is complete',
+]) {
+  if (files.agents.includes(forbidden)) failures.push(`stale AGENTS Zapier authority text: ${forbidden}`);
+}
 
 for (const [label, source, phrase] of [
   ['redteam artifact', files.redteam, 'Premise attack'],
