@@ -35,7 +35,7 @@ Every ChatGPT fallback call must include:
 
 ```text
 Zap ID: founder-signal-engine-day2
-Requested action: inspect_workflow | test_workflow | edit_workflow | run_openai_step | queue_review_draft
+Requested action: test_workflow | run_openai_step | queue_review_draft | publish_or_send | write_crm
 Steering grant ID: founder-grant-day2-zapier
 OpenAI key reference: zapier-founder-signal-engine
 Bridge target: named endpoint or provider-held action reference
@@ -44,17 +44,20 @@ Founder approval ID: required for publish, send, CRM mutation, credentials, bill
 Rollback: disable or revert the named Zap action
 ```
 
+`inspect_workflow`, `edit_workflow`, credential changes, billing changes, and Zapier administration require a native Zapier or equivalent direct-control connector. The fallback bridge must not claim those capabilities.
+
 ## Allowed behavior
 
 With a configured bridge, steering grant, audit path, and active key reference, ChatGPT may:
 
 - trigger a scoped test run;
 - invoke the OpenAI 5W1H step;
-- repair or update supported workflow inputs when the bridge exposes that action;
+- supply or update supported workflow inputs when the bridge explicitly exposes that action;
 - queue review-first social content;
+- perform an already approved HubSpot write when the bridge exposes it;
 - collect Zapier, Buffer, HubSpot, and Founder Control Room evidence.
 
-The bridge capability determines what can actually be inspected or changed. Agents must not claim access beyond the bridge's declared operations.
+The bridge capability determines what can actually be invoked. Agents must not claim inspection, editing, administration, or run-history access unless a direct connector exposes those operations.
 
 ## Separate founder gates
 
