@@ -8,8 +8,8 @@
     "start": "tsx src/index.ts",
     "verify:readonly": "tsx src/verify-readonly.ts",
     "login": "zapier-sdk login --skip-prompts",
-    "connections": "zapier-sdk list-connections --owner me --json",
-    "apps": "zapier-sdk list-apps --json"
+    "connections:raw": "zapier-sdk list-connections --owner me --json",
+    "apps:raw": "zapier-sdk list-apps --json"
   },
   "dependencies": {
     "@zapier/zapier-sdk": "0.89.0"
