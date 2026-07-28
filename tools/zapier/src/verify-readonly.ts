@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { createZapierSdk } from "@zapier/zapier-sdk";
 
 type AppRow = {
@@ -8,6 +9,22 @@ type AppRow = {
 type ConnectionRow = {
   app_key?: unknown;
   is_expired?: unknown;
+};
+
+export type ReadonlyVerificationSummary = {
+  authenticated: true;
+  mode: "read_only";
+  limits: {
+    apps: 100;
+    connections: 100;
+  };
+  availableAppsObserved: number;
+  connectionsObserved: number;
+  expiredConnectionsObserved: number;
+  appKeys: string[];
+  possibleAdditionalApps: boolean;
+  possibleAdditionalConnections: boolean;
+  redactedFields: string[];
 };
 
 function createClient() {
@@ -47,7 +64,7 @@ function isExpired(value: unknown): boolean {
   return value === true || value === "true";
 }
 
-function classifyFailure(error: unknown): string {
+export function classifyFailure(error: unknown): string {
   const message = error instanceof Error ? error.message : "";
 
   if (message === "incomplete_client_credentials") {
@@ -65,21 +82,10 @@ function classifyFailure(error: unknown): string {
   return "verification_failed";
 }
 
-async function main(): Promise<void> {
-  const zapier = createClient();
-
-  // Authentication proof only. Profile fields are deliberately discarded.
-  await zapier.getProfile();
-
-  const [{ data: apps }, { data: connections }] = await Promise.all([
-    zapier.listApps({ maxItems: 100 }),
-    zapier.listConnections({
-      owner: "me",
-      pageSize: 100,
-      maxItems: 100,
-    }),
-  ]);
-
+export function buildReadonlySummary(
+  apps: unknown,
+  connections: unknown,
+): ReadonlyVerificationSummary {
   const appRows = asRows(apps) as AppRow[];
   const connectionRows = asRows(connections) as ConnectionRow[];
   const appKeys = new Set<string>();
@@ -94,7 +100,7 @@ async function main(): Promise<void> {
     if (appKey) appKeys.add(appKey);
   }
 
-  const summary = {
+  return {
     authenticated: true,
     mode: "read_only",
     limits: {
@@ -117,21 +123,44 @@ async function main(): Promise<void> {
       "email",
     ],
   };
-
-  console.log(JSON.stringify(summary, null, 2));
 }
 
-main().catch((error: unknown) => {
-  console.error(
-    JSON.stringify(
-      {
-        authenticated: false,
-        mode: "read_only",
-        error: classifyFailure(error),
-      },
-      null,
-      2,
-    ),
-  );
-  process.exitCode = 1;
-});
+async function main(): Promise<void> {
+  const zapier = createClient();
+
+  // Authentication proof only. Profile fields are deliberately discarded.
+  await zapier.getProfile();
+
+  const [{ data: apps }, { data: connections }] = await Promise.all([
+    zapier.listApps({ maxItems: 100 }),
+    zapier.listConnections({
+      owner: "me",
+      pageSize: 100,
+      maxItems: 100,
+    }),
+  ]);
+
+  console.log(JSON.stringify(buildReadonlySummary(apps, connections), null, 2));
+}
+
+function isDirectExecution(): boolean {
+  const entrypoint = process.argv[1];
+  return Boolean(entrypoint && import.meta.url === pathToFileURL(entrypoint).href);
+}
+
+if (isDirectExecution()) {
+  main().catch((error: unknown) => {
+    console.error(
+      JSON.stringify(
+        {
+          authenticated: false,
+          mode: "read_only",
+          error: classifyFailure(error),
+        },
+        null,
+        2,
+      ),
+    );
+    process.exitCode = 1;
+  });
+}
