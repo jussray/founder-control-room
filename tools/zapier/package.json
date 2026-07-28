@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "tsx --test src/verify-readonly.test.ts",
     "start": "tsx src/index.ts",
     "verify:readonly": "tsx src/verify-readonly.ts",
     "login": "zapier-sdk login --skip-prompts",
