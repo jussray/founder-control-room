@@ -22,9 +22,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: tools/zapier/package-lock.json
 
       - name: Install isolated tooling dependencies
-        run: npm install --prefix tools/zapier --ignore-scripts --no-audit --no-fund
+        run: npm ci --prefix tools/zapier --ignore-scripts --no-audit --no-fund
 
       - name: Typecheck Zapier SDK bootstrap
         run: npm --prefix tools/zapier run typecheck
