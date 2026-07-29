@@ -59,16 +59,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Deploy Worker
+        id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: 'latest'
+          wranglerVersion: '4.110.0'
+          command: deploy --config wrangler.toml --var GIT_SHA:${{ github.sha }}
+          secrets: |
+            FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -76,8 +81,10 @@ jobs:
           CF_SESSIONS_KV_NAMESPACE_ID: ${{ secrets.CF_SESSIONS_KV_NAMESPACE_ID }}
           CF_FEATURE_FLAGS_KV_NAMESPACE_ID: ${{ secrets.CF_FEATURE_FLAGS_KV_NAMESPACE_ID }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON: >-
+            {"id":"founder-approved-auto-distribution-v1","enabled":true,"routes":[{"channel":"linkedin","audienceSegment":"build-in-public"},{"channel":"facebook","audienceSegment":"build-in-public"}],"repositories":["jussray/Sekret-Bip"],"approvedRecipientIds":[],"expiresAt":null}
 
-  # ── 3. Post-deploy smoke test ───────────────────────────────────────────────
+  # ── 3. Post-deploy exact-SHA proof ──────────────────────────────────────────
   smoke-test:
     name: Smoke Test
     runs-on: ubuntu-latest
@@ -85,37 +92,69 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Health check
+      - name: Verify Worker health
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X GET "$DEPLOY_URL/api/health")
-          echo "Health check status: $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "Health check failed with status $STATUS"
+          set -euo pipefail
+          DEPLOY_URL="${DEPLOY_URL%/}"
+          BODY=$(curl --fail --silent --show-error "$DEPLOY_URL/health")
+          BODY="$BODY" python3 - <<'PY'
+          import json
+          import os
+
+          body = json.loads(os.environ['BODY'])
+          if body != {'ok': True}:
+              raise SystemExit(f'unexpected health payload: {body!r}')
+          PY
+        env:
+          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+
+      - name: Verify exact deployed commit
+        run: |
+          set -euo pipefail
+          DEPLOY_URL="${DEPLOY_URL%/}"
+          BODY=$(curl --fail --silent --show-error "$DEPLOY_URL/version")
+          DEPLOYED_SHA=$(BODY="$BODY" python3 - <<'PY'
+          import json
+          import os
+
+          body = json.loads(os.environ['BODY'])
+          print(body.get('gitSha') or '')
+          PY
+          )
+          echo "Expected SHA: $GITHUB_SHA"
+          echo "Deployed SHA: $DEPLOYED_SHA"
+          if [ "$DEPLOYED_SHA" != "$GITHUB_SHA" ]; then
+            echo "Exact deployment proof failed"
             exit 1
           fi
         env:
           DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
 
-      - name: Status check (readiness)
+      - name: Verify public guardrail surface
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X GET "$DEPLOY_URL/api/status")
-          echo "Status check: $STATUS"
-          # 200 = fully ready, 207 = degraded but alive — both acceptable post-deploy
-          if [ "$STATUS" != "200" ] && [ "$STATUS" != "207" ] && [ "$STATUS" != "503" ]; then
-            echo "Unexpected status response: $STATUS"
-            exit 1
-          fi
+          set -euo pipefail
+          DEPLOY_URL="${DEPLOY_URL%/}"
+          BODY=$(curl --fail --silent --show-error "$DEPLOY_URL/guardrails.json")
+          BODY="$BODY" python3 - <<'PY'
+          import json
+          import os
+
+          body = json.loads(os.environ['BODY'])
+          if body.get('sensitiveFieldsIncluded') is not False:
+              raise SystemExit('guardrail surface is not public-safe')
+          if body.get('standingMergeAuthority') is not True:
+              raise SystemExit('standing merge authority is not active')
+          PY
         env:
           DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
 
-  # ── 4. Post-deploy reconciliation trigger ─────────────────────────────────
+  # ── 4. Post-deploy database reconciliation inspection ───────────────────────
   reconcile:
     name: Post-Deploy Reconciliation
     runs-on: ubuntu-latest
     needs: smoke-test
-    # Never block a deploy on reconciliation failures — always continue
+    # Reconciliation drift is retained as evidence but does not roll back a
+    # deployment that already passed exact-SHA and public-surface proof.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -128,35 +167,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Control Room self-reconciliation
+      - name: Run Control Room database inspection
         run: npx tsx src/reconciliation/scripts/self-reconcile.ts
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          RECONCILE_SHARED_SECRET: ${{ secrets.RECONCILE_SHARED_SECRET }}
-          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
 
-      - name: Trigger Sekret-Bip reconciliation
-        # Fire-and-forget — POST the drift report to Control Room inbox
+      - name: Record reconciliation ingestion gate
         run: |
-          curl -s -X POST "$DEPLOY_URL/api/reconcile" \
-            -H "Content-Type: application/json" \
-            -H "X-Reconcile-Secret: $RECONCILE_SHARED_SECRET" \
-            -H "X-Source: deploy-workflow" \
-            -d '{"service":"sekret-bip","timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","status":"clean","drift":[],"durationMs":0,"_note":"deploy-triggered probe"}' \
-            || echo "Sekret-Bip reconcile ping skipped (service may not be running)"
-        env:
-          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
-          RECONCILE_SHARED_SECRET: ${{ secrets.RECONCILE_SHARED_SECRET }}
-
-      - name: Trigger L99 StoryEngine reconciliation
-        run: |
-          curl -s -X POST "$DEPLOY_URL/api/reconcile" \
-            -H "Content-Type: application/json" \
-            -H "X-Reconcile-Secret: $RECONCILE_SHARED_SECRET" \
-            -H "X-Source: deploy-workflow" \
-            -d '{"service":"l99-story-engine","timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","status":"clean","drift":[],"durationMs":0,"_note":"deploy-triggered probe"}' \
-            || echo "L99 reconcile ping skipped (service may not be running)"
-        env:
-          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
-          RECONCILE_SHARED_SECRET: ${{ secrets.RECONCILE_SHARED_SECRET }}
+          echo "Database inspection completed."
+          echo "Cross-service reconciliation POSTs remain disabled until the deployed Worker has a durable ingestion consumer."
