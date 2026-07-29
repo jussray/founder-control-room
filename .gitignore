@@ -7,3 +7,8 @@ dist/
 e2e/.auth-bridge.json
 playwright-report/
 test-results/
+
+# HubSpot CLI local authentication and account context
+hubspot.config.yml
+.hsaccount
+.hs/
