@@ -12,9 +12,11 @@ The production deploy workflow:
 2. deploys the Cloudflare Worker with `GIT_SHA` set to `github.sha`;
 3. stores a social-only Founder Signal automation grant in the Worker secret store;
 4. verifies `/health` returns the expected Worker payload;
-5. verifies `/version` reports the exact triggering SHA;
+5. verifies `/version` reports the exact triggering SHA and a minimized `{ configured, enabled }` grant status;
 6. verifies `/guardrails.json` remains public-safe;
 7. runs the existing database reconciliation inspection with the Supabase HTTP project URL.
+
+The public version response never exposes the grant ID, routes, recipient IDs, or raw secret value.
 
 ## Social-only standing grant
 
@@ -39,6 +41,15 @@ Exact deployment proof does not by itself prove a completed social post. Day 3 r
 
 The deployment workflow performs database inspection only. Cross-service POST reconciliation remains disabled until the deployed Worker has a durable ingestion consumer; the previous undeployed Next-style `/api/reconcile` route is not treated as runtime evidence.
 
-## Rollback
+## Rollback and revocation
 
-Remove or disable `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON`, or revert the deployment-proof change. Either action blocks automatic social distribution before the downstream provider call.
+Revocation is a two-key operation because a Worker deployment does not delete an already stored secret, while deleting the secret without changing the workflow allows a later deployment to restore the enabled grant.
+
+To revoke automatic social distribution safely:
+
+1. remove the enabled grant uploader from the deployment workflow, or change its literal to an `enabled: false` grant;
+2. explicitly delete `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` from the Worker secret store, or deploy the disabled grant immediately;
+3. deploy the rollback commit;
+4. verify `/version` reports the rollback commit SHA and either `{ "configured": false, "enabled": null }` or `{ "configured": true, "enabled": false }` for `founderSignalAutomationGrant`.
+
+Do not treat code reversion alone or secret deletion alone as complete revocation.
