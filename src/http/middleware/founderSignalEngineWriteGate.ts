@@ -56,6 +56,12 @@ export interface FounderSignalEngineWriteGateDependencies {
   writePolicyAudit?: (input: PolicyAuditInput) => Promise<void>;
 }
 
+class DuplicatePolicyInvocationError extends Error {
+  constructor() {
+    super('Duplicate Founder Signal policy invocation blocked');
+  }
+}
+
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -102,14 +108,21 @@ function parseCandidate(value: unknown): { value: CandidatePayload | null; error
 
   const errors: string[] = [];
   for (const key of Object.keys(value)) {
-    if (!ALLOWED_CANDIDATE_KEYS.has(key)) errors.push(`unexpected automationCandidate field: ${key}`);
+    if (!ALLOWED_CANDIDATE_KEYS.has(key)) {
+      errors.push(`unexpected automationCandidate field: ${key}`);
+    }
   }
   if (containsSecretLikeMaterial(value)) {
     errors.push('automationCandidate must not contain credentials or secret-like material');
   }
 
   const channel = boundedText(value.channel, 30);
-  if (!channel || !FOUNDER_SIGNAL_CHANNELS.includes(channel as (typeof FOUNDER_SIGNAL_CHANNELS)[number])) {
+  if (
+    !channel ||
+    !FOUNDER_SIGNAL_CHANNELS.includes(
+      channel as (typeof FOUNDER_SIGNAL_CHANNELS)[number],
+    )
+  ) {
     errors.push('automationCandidate.channel is not supported');
   }
 
@@ -161,7 +174,9 @@ function parseStringArray(value: unknown, field: string): string[] {
     throw new Error(`${field} must be a non-empty array`);
   }
   const values = value.map((entry) => boundedText(entry, 200));
-  if (values.some((entry) => !entry)) throw new Error(`${field} must contain non-empty strings`);
+  if (values.some((entry) => !entry)) {
+    throw new Error(`${field} must contain non-empty strings`);
+  }
   return values as string[];
 }
 
@@ -176,7 +191,9 @@ function parseGrant(raw: string): FounderSignalAutomationGrant {
   } catch {
     throw new Error('FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON is not valid JSON');
   }
-  if (!isRecord(parsed)) throw new Error('Founder Signal automation grant must be an object');
+  if (!isRecord(parsed)) {
+    throw new Error('Founder Signal automation grant must be an object');
+  }
 
   const id = boundedText(parsed.id, 100);
   if (!id) throw new Error('Founder Signal automation grant id is required');
@@ -188,12 +205,16 @@ function parseGrant(raw: string): FounderSignalAutomationGrant {
   }
 
   const routes = parsed.routes.map((route, index) => {
-    if (!isRecord(route)) throw new Error(`Founder Signal automation route ${index} is invalid`);
+    if (!isRecord(route)) {
+      throw new Error(`Founder Signal automation route ${index} is invalid`);
+    }
     const channel = boundedText(route.channel, 30);
     const audienceSegment = boundedText(route.audienceSegment, 100);
     if (
       !channel ||
-      !FOUNDER_SIGNAL_CHANNELS.includes(channel as (typeof FOUNDER_SIGNAL_CHANNELS)[number]) ||
+      !FOUNDER_SIGNAL_CHANNELS.includes(
+        channel as (typeof FOUNDER_SIGNAL_CHANNELS)[number],
+      ) ||
       !audienceSegment
     ) {
       throw new Error(`Founder Signal automation route ${index} is invalid`);
@@ -215,7 +236,9 @@ function parseGrant(raw: string): FounderSignalAutomationGrant {
     routes,
     repositories: parseStringArray(parsed.repositories, 'repositories'),
     approvedRecipientIds: Array.isArray(parsed.approvedRecipientIds)
-      ? parsed.approvedRecipientIds.map((entry) => boundedText(entry, 200)).filter(Boolean) as string[]
+      ? (parsed.approvedRecipientIds
+          .map((entry) => boundedText(entry, 200))
+          .filter(Boolean) as string[])
       : [],
     expiresAt,
   };
@@ -264,7 +287,8 @@ async function defaultResolveTrustedEvidence(
     const row = rawRow as JsonRecord;
     if (!exactProofUrls(row).includes(lookup.proofUrl)) continue;
     const runner = isRecord(row.runner) ? row.runner : null;
-    const rawProvider = boundedText(runner?.provider, 50) ?? boundedText(row.repository_provider, 50);
+    const rawProvider =
+      boundedText(runner?.provider, 50) ?? boundedText(row.repository_provider, 50);
     const provider = rawProvider?.toLowerCase();
     if (provider !== 'github' && provider !== 'cloudflare') continue;
 
@@ -286,8 +310,12 @@ async function defaultWritePolicyAudit(input: PolicyAuditInput): Promise<void> {
     .select('id')
     .eq('repo_identifier', input.sourceRepository)
     .maybeSingle();
-  if (projectError) throw new Error(`POLICY_PROJECT_LOOKUP_FAILED:${projectError.message}`);
-  if (!project?.id) throw new Error(`POLICY_PROJECT_NOT_REGISTERED:${input.sourceRepository}`);
+  if (projectError) {
+    throw new Error(`POLICY_PROJECT_LOOKUP_FAILED:${projectError.message}`);
+  }
+  if (!project?.id) {
+    throw new Error(`POLICY_PROJECT_NOT_REGISTERED:${input.sourceRepository}`);
+  }
 
   const { error } = await supabase.from('project_events').insert({
     project_id: project.id,
@@ -315,7 +343,11 @@ async function defaultWritePolicyAudit(input: PolicyAuditInput): Promise<void> {
       recipientId: input.candidate.recipientId ?? null,
     },
   });
-  if (error) throw new Error(`POLICY_AUDIT_WRITE_FAILED:${error.message}`);
+  if (!error) return;
+  if ((error as { code?: string }).code === '23505') {
+    throw new DuplicatePolicyInvocationError();
+  }
+  throw new Error(`POLICY_AUDIT_WRITE_FAILED:${error.message}`);
 }
 
 function jsonRpcError(
@@ -344,7 +376,8 @@ export function createFounderSignalEngineWriteGate(
 ): RequestHandler {
   const env = overrides.env ?? process.env;
   const loadGrant = overrides.loadGrant ?? defaultLoadGrant;
-  const resolveTrustedEvidence = overrides.resolveTrustedEvidence ?? defaultResolveTrustedEvidence;
+  const resolveTrustedEvidence =
+    overrides.resolveTrustedEvidence ?? defaultResolveTrustedEvidence;
   const writePolicyAudit = overrides.writePolicyAudit ?? defaultWritePolicyAudit;
 
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -455,6 +488,13 @@ export function createFounderSignalEngineWriteGate(
         result: policyResult,
       });
     } catch (error) {
+      if (error instanceof DuplicatePolicyInvocationError) {
+        jsonRpcError(res, 409, id, -32007, 'Duplicate Founder Signal invocation blocked', {
+          invocationId,
+          nextGate: 'Inspect the retained policy decision and use a new invocationId.',
+        });
+        return;
+      }
       jsonRpcError(res, 503, id, -32006, 'Founder Signal policy audit could not be retained', {
         detail: error instanceof Error ? error.message : 'Unknown policy audit failure',
       });
@@ -474,8 +514,12 @@ export function createFounderSignalEngineWriteGate(
       return;
     }
 
+    res.locals.founderSignalAutomationAuthorization = {
+      grantId: grant.id,
+      invocationId,
+    };
     args.founderApprovalId = `standing-policy:${grant.id}:${invocationId}`;
-    delete args.automationCandidate;
+    args.automationCandidate = parsedCandidate.value;
     next();
   };
 }
