@@ -477,6 +477,10 @@ export function createFounderSignalEngineWriteGate(
       policyResult.decision = 'blocked';
       policyResult.reasons.push('steering grant ID does not match the configured grant');
     }
+    if (allowHubSpotWrite && candidate.channel !== 'gmail') {
+      policyResult.decision = 'blocked';
+      policyResult.reasons.push('HubSpot mutation requires the Gmail investor route');
+    }
 
     try {
       await writePolicyAudit({
