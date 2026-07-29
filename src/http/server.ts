@@ -44,6 +44,38 @@ import { requireProjectReadAudit } from './middleware/projectReadAudit.js';
 import { requireFounderSignalEngineMcpToken } from './middleware/founderSignalEngineMcpAuth.js';
 import { requireFounderSignalEngineReviewOnly } from './middleware/founderSignalEngineWriteGate.js';
 
+const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
+
+type JsonRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is JsonRecord {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function founderSignalAutomationGrantStatus() {
+  const raw = process.env.FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON?.trim();
+  if (!raw) return { configured: false, enabled: null };
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return {
+      configured: true,
+      enabled: isRecord(parsed) && typeof parsed.enabled === 'boolean' ? parsed.enabled : null,
+    };
+  } catch {
+    return { configured: true, enabled: null };
+  }
+}
+
+function deploymentVersion() {
+  const configuredSha = process.env.GIT_SHA?.trim() ?? '';
+  return {
+    service: 'founder-control-room',
+    gitSha: EXACT_COMMIT_SHA.test(configuredSha) ? configuredSha.toLowerCase() : null,
+    founderSignalAutomationGrant: founderSignalAutomationGrantStatus(),
+  };
+}
+
 export interface CreateServerOptions {
   /**
    * Serve the static Control Room frontend (public/control-room) from this
@@ -95,6 +127,16 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use(express.json({ limit: BODY_LIMIT }));
 
   app.get('/health', (_req, res) => res.json({ ok: true }));
+
+  app.get('/version', (_req, res) => {
+    res.set({
+      'Cache-Control': 'no-store',
+      'Content-Type': 'application/json; charset=utf-8',
+      'Referrer-Policy': 'no-referrer',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    res.status(200).json(deploymentVersion());
+  });
 
   app.get('/guardrails', (_req, res) => {
     res.set({
