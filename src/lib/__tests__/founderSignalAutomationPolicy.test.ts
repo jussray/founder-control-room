@@ -6,13 +6,19 @@ import {
 } from '../founderSignalAutomationPolicy.js';
 
 const SHA = 'f4573d360a8fea99b301f33a2a21192525725f7b';
+const PROOF_URL = 'https://github.com/jussray/Sekret-Bip/pull/599';
 
 const grant: FounderSignalAutomationGrant = {
   id: 'founder-approved-auto-distribution-v1',
   enabled: true,
-  channels: ['linkedin', 'facebook', 'instagram', 'gmail'],
+  routes: [
+    { channel: 'linkedin', audienceSegment: 'build-in-public' },
+    { channel: 'facebook', audienceSegment: 'build-in-public' },
+    { channel: 'instagram', audienceSegment: 'build-in-public' },
+    { channel: 'gmail', audienceSegment: 'preapproved-potential-investors' },
+  ],
   repositories: ['jussray/Sekret-Bip', 'jussray/founder-control-room'],
-  audienceSegments: ['build-in-public', 'preapproved-potential-investors'],
+  approvedRecipientIds: ['hubspot-contact-123'],
   expiresAt: null,
 };
 
@@ -21,8 +27,15 @@ function candidate(overrides: Partial<FounderSignalCandidate> = {}): FounderSign
     repository: 'jussray/Sekret-Bip',
     channel: 'linkedin',
     audienceSegment: 'build-in-public',
-    proofUrl: 'https://github.com/jussray/Sekret-Bip/pull/599',
+    proofUrl: PROOF_URL,
     sourceCommitSha: SHA,
+    evidenceReceipt: {
+      verified: true,
+      provider: 'github',
+      repository: 'jussray/Sekret-Bip',
+      sourceCommitSha: SHA,
+      proofUrl: PROOF_URL,
+    },
     who: 'Builders, operators, and aligned investors',
     what: 'A verified product milestone shipped',
     where: 'LinkedIn',
@@ -34,7 +47,7 @@ function candidate(overrides: Partial<FounderSignalCandidate> = {}): FounderSign
 }
 
 describe('evaluateFounderSignalAutomation', () => {
-  it('allows automatic social distribution inside a founder-approved scope', () => {
+  it('allows automatic social distribution only with trusted evidence inside an approved route', () => {
     expect(evaluateFounderSignalAutomation(grant, candidate())).toEqual({
       decision: 'auto-distribute',
       reasons: [],
@@ -42,7 +55,7 @@ describe('evaluateFounderSignalAutomation', () => {
     });
   });
 
-  it('allows automatic investor email only for a named CRM recipient with a specific why', () => {
+  it('allows automatic investor email only for an approved CRM recipient with a specific why', () => {
     const result = evaluateFounderSignalAutomation(
       grant,
       candidate({
@@ -77,19 +90,70 @@ describe('evaluateFounderSignalAutomation', () => {
     );
   });
 
-  it('blocks channels, repositories, or segments outside the grant', () => {
+  it('blocks an investor recipient that is not explicitly approved by the grant', () => {
     const result = evaluateFounderSignalAutomation(
       grant,
-      candidate({ repository: 'someone/unknown', audienceSegment: 'unapproved-list' }),
+      candidate({
+        channel: 'gmail',
+        audienceSegment: 'preapproved-potential-investors',
+        where: 'Gmail',
+        recipientId: 'hubspot-contact-unapproved',
+        recipientSpecificWhy: 'A specific thesis match.',
+      }),
     );
 
     expect(result.decision).toBe('blocked');
-    expect(result.reasons).toEqual(
-      expect.arrayContaining([
-        'repository is outside the grant scope',
-        'audience segment is outside the grant scope',
-      ]),
+    expect(result.reasons).toContain('investor recipient is outside the approved grant scope');
+  });
+
+  it('blocks cross-channel audience combinations that were never approved', () => {
+    const result = evaluateFounderSignalAutomation(
+      grant,
+      candidate({ channel: 'gmail', audienceSegment: 'build-in-public', where: 'Gmail' }),
     );
+
+    expect(result.decision).toBe('blocked');
+    expect(result.reasons).toContain('channel and audience route is outside the grant scope');
+  });
+
+  it('does not trust caller-supplied proof that is missing or mismatched', () => {
+    const result = evaluateFounderSignalAutomation(
+      grant,
+      candidate({
+        proofUrl: 'https://example.com/not-proof',
+        evidenceReceipt: {
+          verified: true,
+          provider: 'github',
+          repository: 'jussray/Sekret-Bip',
+          sourceCommitSha: SHA,
+          proofUrl: PROOF_URL,
+        },
+      }),
+    );
+
+    expect(result.decision).toBe('review-only');
+    expect(result.reasons).toContain(
+      'trusted evidence receipt must match repository, commit, and proof URL',
+    );
+  });
+
+  it('blocks repositories outside the grant', () => {
+    const result = evaluateFounderSignalAutomation(
+      grant,
+      candidate({
+        repository: 'someone/unknown',
+        evidenceReceipt: {
+          verified: true,
+          provider: 'github',
+          repository: 'someone/unknown',
+          sourceCommitSha: SHA,
+          proofUrl: PROOF_URL,
+        },
+      }),
+    );
+
+    expect(result.decision).toBe('blocked');
+    expect(result.reasons).toContain('repository is outside the grant scope');
   });
 
   it('blocks a revoked grant immediately', () => {
