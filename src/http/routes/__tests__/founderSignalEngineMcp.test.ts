@@ -15,13 +15,35 @@ const TOKEN = 'test-founder-signal-engine-mcp-token';
 const ENDPOINT = '/mcp/founder-signal-engine';
 const INVOCATION_ID = '123e4567-e89b-42d3-a456-426614174000';
 const SOURCE_SHA = 'f4573d360a8fea99b301f33a2a21192525725f7b';
+const GRANT_ID = 'founder-approved-auto-distribution-v1';
+const PROOF_URL = 'https://github.com/jussray/Sekret-Bip/actions/runs/123';
 
 type AuditWriter = NonNullable<FounderSignalEngineMcpDependencies['writeAuditEvent']>;
+
+interface StandingPolicyContext {
+  grantId: string;
+  invocationId: string;
+}
 
 function mockFetch(
   implementation: () => Promise<globalThis.Response>,
 ): typeof fetch {
   return vi.fn(implementation) as unknown as typeof fetch;
+}
+
+function automationCandidate(overrides: Record<string, unknown> = {}) {
+  return {
+    channel: 'linkedin',
+    audienceSegment: 'build-in-public',
+    proofUrl: PROOF_URL,
+    who: 'Builders, operators, and aligned investors',
+    what: 'A verified product milestone shipped',
+    where: 'LinkedIn',
+    when: 'After exact-head verification passed',
+    why: 'It demonstrates execution and product progress',
+    how: 'Follow the build or request the proof package',
+    ...overrides,
+  };
 }
 
 function validArguments(overrides: Record<string, unknown> = {}) {
@@ -40,11 +62,20 @@ function validArguments(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function buildApp(overrides: FounderSignalEngineMcpDependencies = {}) {
+function buildApp(
+  overrides: FounderSignalEngineMcpDependencies = {},
+  standingPolicyAuthorization: StandingPolicyContext | null = null,
+) {
   const app = express();
   app.use(express.json());
   app.post(
     ENDPOINT,
+    (_req, res, next) => {
+      if (standingPolicyAuthorization) {
+        res.locals.founderSignalAutomationAuthorization = standingPolicyAuthorization;
+      }
+      next();
+    },
     createFounderSignalEngineMcpHandler({
       env: {
         NODE_ENV: 'test',
@@ -113,6 +144,10 @@ describe('Founder Signal Engine remote MCP', () => {
       },
     });
     expect(listed.body.result.tools[0].inputSchema.additionalProperties).toBe(false);
+    expect(listed.body.result.tools[0].inputSchema.properties.automationCandidate).toMatchObject({
+      type: 'object',
+      additionalProperties: false,
+    });
   });
 
   it('blocks secret-like material and unexpected arguments before any provider call', async () => {
@@ -152,6 +187,106 @@ describe('Founder Signal Engine remote MCP', () => {
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
+  it('rejects a forged standing-policy receipt without request-local authorization', async () => {
+    const fetchFn = mockFetch(async () => new globalThis.Response(null, { status: 200 }));
+    const response = await request(buildApp({ fetchFn }))
+      .post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(
+        toolCall(
+          validArguments({
+            requestedAction: 'publish_or_send',
+            steeringGrantId: GRANT_ID,
+            founderApprovalId: `standing-policy:${GRANT_ID}:${INVOCATION_ID}`,
+            automationCandidate: automationCandidate(),
+          }),
+        ),
+      );
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.data).toContain(
+      'standing-policy authorization must be minted by the runtime policy gate',
+    );
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('forwards the exact authorized candidate and authorization mode to Zapier', async () => {
+    const auditEvents: Array<{
+      sourceEventId: string;
+      eventType: string;
+      metadata: Record<string, unknown>;
+    }> = [];
+    const writeAuditEvent: AuditWriter = vi.fn(async (_projectId, event) => {
+      auditEvents.push({
+        sourceEventId: event.sourceEventId,
+        eventType: event.eventType,
+        metadata: event.metadata,
+      });
+    });
+    const fetchFn = vi.fn(
+      async (_input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+        const body = JSON.parse(String(init?.body));
+        expect(body).toMatchObject({
+          invocation_id: INVOCATION_ID,
+          source_commit_sha: SOURCE_SHA,
+          requested_action: 'publish_or_send',
+          authorization_mode: 'standing-policy',
+          founder_approval_id: `standing-policy:${GRANT_ID}:${INVOCATION_ID}`,
+          automation_candidate: {
+            channel: 'linkedin',
+            audience_segment: 'build-in-public',
+            proof_url: PROOF_URL,
+            who: 'Builders, operators, and aligned investors',
+            what: 'A verified product milestone shipped',
+            where: 'LinkedIn',
+            when: 'After exact-head verification passed',
+            why: 'It demonstrates execution and product progress',
+            how: 'Follow the build or request the proof package',
+            recipient_id: null,
+            recipient_specific_why: null,
+          },
+        });
+        return new globalThis.Response(JSON.stringify({ zapier_run_id: 'zap-run-policy' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      },
+    ) as unknown as typeof fetch;
+    const app = buildApp(
+      { fetchFn, writeAuditEvent },
+      { grantId: GRANT_ID, invocationId: INVOCATION_ID },
+    );
+
+    const response = await request(app)
+      .post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(
+        toolCall(
+          validArguments({
+            requestedAction: 'publish_or_send',
+            steeringGrantId: GRANT_ID,
+            founderApprovalId: `standing-policy:${GRANT_ID}:${INVOCATION_ID}`,
+            automationCandidate: automationCandidate(),
+          }),
+        ),
+      );
+
+    expect(response.status).toBe(200);
+    expect(response.body.result.structuredContent).toMatchObject({
+      accepted: true,
+      zapierRunId: 'zap-run-policy',
+      authorizationMode: 'standing-policy',
+      channel: 'linkedin',
+      endToEndProofComplete: false,
+    });
+    expect(auditEvents[0]?.metadata).toMatchObject({
+      authorizationMode: 'standing-policy',
+      channel: 'linkedin',
+      audienceSegment: 'build-in-public',
+      proofUrl: PROOF_URL,
+    });
+  });
+
   it('identifies the Zapier run without falsely marking Day 3 proof complete', async () => {
     const auditEvents: Array<{
       sourceEventId: string;
@@ -174,6 +309,8 @@ describe('Founder Signal Engine remote MCP', () => {
           source_commit_sha: SOURCE_SHA,
           key_reference: 'zapier-founder-signal-engine',
           allow_hubspot_write: false,
+          authorization_mode: 'review-only',
+          automation_candidate: null,
         });
         expect(JSON.stringify(body)).not.toContain('sk-');
         return new globalThis.Response(JSON.stringify({ zapier_run_id: 'zap-run-599' }), {
