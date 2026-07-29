@@ -7,14 +7,28 @@ export const FOUNDER_SIGNAL_CHANNELS = [
 
 export type FounderSignalChannel = (typeof FOUNDER_SIGNAL_CHANNELS)[number];
 export type FounderSignalDecision = 'auto-distribute' | 'review-only' | 'blocked';
+export type FounderSignalEvidenceProvider = 'github' | 'cloudflare';
+
+export interface FounderSignalRouteGrant {
+  channel: FounderSignalChannel;
+  audienceSegment: string;
+}
 
 export interface FounderSignalAutomationGrant {
   id: string;
   enabled: boolean;
-  channels: FounderSignalChannel[];
+  routes: FounderSignalRouteGrant[];
   repositories: string[];
-  audienceSegments: string[];
+  approvedRecipientIds: string[];
   expiresAt: string | null;
+}
+
+export interface FounderSignalEvidenceReceipt {
+  verified: boolean;
+  provider: FounderSignalEvidenceProvider;
+  repository: string;
+  sourceCommitSha: string;
+  proofUrl: string;
 }
 
 export interface FounderSignalCandidate {
@@ -23,6 +37,7 @@ export interface FounderSignalCandidate {
   audienceSegment: string;
   proofUrl: string | null;
   sourceCommitSha: string | null;
+  evidenceReceipt: FounderSignalEvidenceReceipt | null;
   who: string | null;
   what: string | null;
   where: string | null;
@@ -51,6 +66,31 @@ function isExpired(expiresAt: string | null, now: Date): boolean {
   return !Number.isFinite(timestamp) || timestamp <= now.getTime();
 }
 
+function routeIsApproved(
+  grant: FounderSignalAutomationGrant,
+  candidate: FounderSignalCandidate,
+): boolean {
+  return grant.routes.some(
+    (route) =>
+      route.channel === candidate.channel &&
+      route.audienceSegment === candidate.audienceSegment,
+  );
+}
+
+function evidenceIsBound(candidate: FounderSignalCandidate): boolean {
+  const receipt = candidate.evidenceReceipt;
+  if (!receipt?.verified) return false;
+  if (!hasText(candidate.proofUrl) || !hasText(receipt.proofUrl)) return false;
+  if (!candidate.sourceCommitSha || !COMMIT_SHA_PATTERN.test(candidate.sourceCommitSha)) {
+    return false;
+  }
+  return (
+    receipt.repository === candidate.repository &&
+    receipt.sourceCommitSha.toLowerCase() === candidate.sourceCommitSha.toLowerCase() &&
+    receipt.proofUrl === candidate.proofUrl
+  );
+}
+
 export function evaluateFounderSignalAutomation(
   grant: FounderSignalAutomationGrant,
   candidate: FounderSignalCandidate,
@@ -60,17 +100,19 @@ export function evaluateFounderSignalAutomation(
 
   if (!grant.enabled) reasons.push('automation grant is disabled');
   if (isExpired(grant.expiresAt, now)) reasons.push('automation grant is expired or invalid');
-  if (!grant.channels.includes(candidate.channel)) reasons.push('channel is outside the grant scope');
   if (!grant.repositories.includes(candidate.repository)) {
     reasons.push('repository is outside the grant scope');
   }
-  if (!grant.audienceSegments.includes(candidate.audienceSegment)) {
-    reasons.push('audience segment is outside the grant scope');
+  if (!routeIsApproved(grant, candidate)) {
+    reasons.push('channel and audience route is outside the grant scope');
   }
 
   if (!hasText(candidate.proofUrl)) reasons.push('proof URL is required');
   if (!candidate.sourceCommitSha || !COMMIT_SHA_PATTERN.test(candidate.sourceCommitSha)) {
     reasons.push('an exact 40-character source commit SHA is required');
+  }
+  if (!evidenceIsBound(candidate)) {
+    reasons.push('trusted evidence receipt must match repository, commit, and proof URL');
   }
 
   const fiveW1h = [
@@ -86,7 +128,11 @@ export function evaluateFounderSignalAutomation(
   }
 
   if (candidate.channel === 'gmail') {
-    if (!hasText(candidate.recipientId)) reasons.push('investor recipient ID is required');
+    if (!hasText(candidate.recipientId)) {
+      reasons.push('investor recipient ID is required');
+    } else if (!grant.approvedRecipientIds.includes(candidate.recipientId.trim())) {
+      reasons.push('investor recipient is outside the approved grant scope');
+    }
     if (!hasText(candidate.recipientSpecificWhy)) {
       reasons.push('recipient-specific why is required for investor email');
     }
