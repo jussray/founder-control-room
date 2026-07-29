@@ -50,6 +50,8 @@ function automationCandidate(overrides: Record<string, unknown> = {}) {
     when: 'After exact-head verification passed',
     why: 'It demonstrates execution and product progress',
     how: 'Follow the build or request the proof package',
+    recipientId: null,
+    recipientSpecificWhy: null,
     ...overrides,
   };
 }
