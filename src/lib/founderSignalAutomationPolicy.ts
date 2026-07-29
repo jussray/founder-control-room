@@ -128,9 +128,10 @@ export function evaluateFounderSignalAutomation(
   }
 
   if (candidate.channel === 'gmail') {
-    if (!hasText(candidate.recipientId)) {
+    const recipientId = candidate.recipientId?.trim() ?? '';
+    if (!recipientId) {
       reasons.push('investor recipient ID is required');
-    } else if (!grant.approvedRecipientIds.includes(candidate.recipientId.trim())) {
+    } else if (!grant.approvedRecipientIds.includes(recipientId)) {
       reasons.push('investor recipient is outside the approved grant scope');
     }
     if (!hasText(candidate.recipientSpecificWhy)) {
