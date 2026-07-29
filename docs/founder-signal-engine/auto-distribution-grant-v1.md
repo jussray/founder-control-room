@@ -2,9 +2,9 @@
 
 ## REALITY
 
-The remote MCP bridge supports publication and sending only when each invocation carries a `founderApprovalId`. That is safe for review-mode operation, but it cannot represent Juss's standing approval for automatic build-in-public posts and qualified investor outreach.
+The remote MCP bridge originally accepted publication and sending only when an invocation carried a `founderApprovalId`, while the deployed write-gate middleware blocked every publish, send, and HubSpot mutation before the bridge could run. Caller-supplied approval-looking text was never a trustworthy standing authorization mechanism.
 
-This slice adds the reusable policy contract that the Zapier bridge must call before any automatic distribution.
+The runtime gate now has a bounded standing-policy path. It still fails closed unless a server-held grant, exact-commit trusted evidence, complete 5W1H context, route scope, and recipient scope all pass.
 
 ## APPROVED OUTCOME
 
@@ -33,7 +33,46 @@ The policy returns one of three decisions:
 |---|---|
 | `auto-distribute` | The event is inside the founder-approved scope and all proof/context gates pass. |
 | `review-only` | The route is valid, but evidence or message context is incomplete. Do not send. |
-| `blocked` | The grant is disabled, expired, outside scope, or targets an unapproved investor recipient. |
+| `blocked` | The grant is disabled, expired, outside scope, mismatched, or targets an unapproved investor recipient. |
+
+## RUNTIME AUTHORIZATION
+
+The deployed MCP endpoint evaluates write actions in `founderSignalEngineWriteGate.ts` before the existing bridge handler runs.
+
+For every `publish_or_send` action or HubSpot mutation, the gate:
+
+1. rejects caller-supplied `founderApprovalId` text;
+2. loads `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` from the Worker secret store;
+3. accepts an `automationCandidate` containing the channel, audience, proof URL, 5W1H fields, and optional CRM recipient fields;
+4. resolves evidence from signed, passing `repository_verification_runs` records at the exact repository and commit;
+5. requires the proof URL to match a retained runner or check details URL;
+6. calls `evaluateFounderSignalAutomation`;
+7. writes the policy decision to `project_events` before any downstream provider call;
+8. mints a one-invocation internal authorization receipt only for `auto-distribute` decisions.
+
+The caller cannot supply an `evidenceReceipt`. That field is rejected rather than trusted.
+
+## WORKER GRANT SECRET
+
+`FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` uses this shape:
+
+```json
+{
+  "id": "founder-approved-auto-distribution-v1",
+  "enabled": true,
+  "routes": [
+    { "channel": "linkedin", "audienceSegment": "build-in-public" },
+    { "channel": "facebook", "audienceSegment": "build-in-public" },
+    { "channel": "instagram", "audienceSegment": "build-in-public" },
+    { "channel": "gmail", "audienceSegment": "preapproved-potential-investors" }
+  ],
+  "repositories": ["jussray/Sekret-Bip"],
+  "approvedRecipientIds": [],
+  "expiresAt": null
+}
+```
+
+Keep `approvedRecipientIds` empty until each HubSpot contact has been deliberately qualified and approved. Social distribution can be activated independently of investor email.
 
 ## INVESTOR EMAIL RULE
 
@@ -49,18 +88,18 @@ A self-labeled segment, generic scraped list, arbitrary contact ID, or missing r
 
 Build-in-public posts may auto-distribute only through an explicitly approved social-channel plus build-in-public route. The evidence receipt must be verified by a trusted provider and match the candidate repository, commit, and proof URL. The Zapier layer remains responsible for channel formatting, duplicate prevention, scheduling, and retaining the final Buffer or platform receipt.
 
-## INTEGRATION GATE
+## REMAINING PROOF GATE
 
-The next focused patch must call `evaluateFounderSignalAutomation` from the remote MCP/Zapier invocation path and persist:
+Merging the runtime integration does not prove that production distribution is active. Activation still requires:
 
-- grant ID;
-- policy decision and reasons;
-- trusted evidence provider and receipt;
-- approved CRM recipient ID when applicable;
-- downstream Zapier, Buffer, Gmail, and HubSpot receipts.
+- the Worker grant secret to be configured;
+- the current deployment to contain this exact commit;
+- a passing signed repository verification record with an exact proof URL;
+- one controlled social invocation with a retained Zapier and platform receipt;
+- separate recipient-level qualification before any investor email test.
 
-Until that integration patch is merged and real-path evidence is captured, this contract does **not** claim that live posts or emails are already running automatically.
+Until those receipts exist, report the system as **wired but not live-proven**.
 
 ## ROLLBACK
 
-Disable or remove the configured grant. The policy then returns `blocked` before downstream distribution.
+Set the configured grant's `enabled` field to `false` or remove the Worker secret. The gate then blocks downstream distribution before any provider call.
