@@ -68,6 +68,25 @@ describe('public guardrail contract', () => {
     );
   });
 
+  it('publishes an exact, public-safe deployment SHA when configured', async () => {
+    const gitSha = '4ab94c6804ab09fddae9eecf9b8a54058347d577';
+    vi.stubEnv('GIT_SHA', gitSha.toUpperCase());
+
+    try {
+      const res = await request(createServer()).get('/version');
+
+      expect(res.status).toBe(200);
+      expect(res.headers['cache-control']).toBe('no-store');
+      expect(res.body).toEqual({
+        service: 'founder-control-room',
+        gitSha,
+      });
+      expect(JSON.stringify(res.body)).not.toMatch(/TOKEN|SECRET|PASSWORD|SERVICE_ROLE/i);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('keeps health public and project state founder-protected', async () => {
     const app = createServer();
     const health = await request(app).get('/health');
