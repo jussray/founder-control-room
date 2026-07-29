@@ -55,6 +55,13 @@ export interface FounderSignalPolicyResult {
 }
 
 const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
+const HARD_BLOCK_REASONS = new Set([
+  'automation grant is disabled',
+  'automation grant is expired or invalid',
+  'repository is outside the grant scope',
+  'channel and audience route is outside the grant scope',
+  'investor recipient is outside the approved grant scope',
+]);
 
 function hasText(value: string | null | undefined): boolean {
   return typeof value === 'string' && value.trim().length > 0;
@@ -143,12 +150,7 @@ export function evaluateFounderSignalAutomation(
     return { decision: 'auto-distribute', reasons: [], grantId: grant.id };
   }
 
-  const hardBlock = reasons.some(
-    (reason) =>
-      reason.includes('disabled') ||
-      reason.includes('expired') ||
-      reason.includes('outside the grant scope'),
-  );
+  const hardBlock = reasons.some((reason) => HARD_BLOCK_REASONS.has(reason));
 
   return {
     decision: hardBlock ? 'blocked' : 'review-only',
