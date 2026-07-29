@@ -84,7 +84,7 @@ jobs:
           FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON: >-
             {"id":"founder-approved-auto-distribution-v1","enabled":true,"routes":[{"channel":"linkedin","audienceSegment":"build-in-public"},{"channel":"facebook","audienceSegment":"build-in-public"}],"repositories":["jussray/Sekret-Bip"],"approvedRecipientIds":[],"expiresAt":null}
 
-  # ── 3. Post-deploy exact-SHA proof ──────────────────────────────────────────
+  # ── 3. Post-deploy exact-SHA and grant proof ────────────────────────────────
   smoke-test:
     name: Smoke Test
     runs-on: ubuntu-latest
@@ -108,25 +108,30 @@ jobs:
         env:
           DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
 
-      - name: Verify exact deployed commit
+      - name: Verify exact deployed commit and social grant
         run: |
           set -euo pipefail
           DEPLOY_URL="${DEPLOY_URL%/}"
           BODY=$(curl --fail --silent --show-error "$DEPLOY_URL/version")
-          DEPLOYED_SHA=$(BODY="$BODY" python3 - <<'PY'
+          BODY="$BODY" EXPECTED_SHA="$GITHUB_SHA" python3 - <<'PY'
           import json
           import os
 
           body = json.loads(os.environ['BODY'])
-          print(body.get('gitSha') or '')
+          expected_sha = os.environ['EXPECTED_SHA']
+          deployed_sha = body.get('gitSha')
+          grant = body.get('founderSignalAutomationGrant') or {}
+
+          print(f'Expected SHA: {expected_sha}')
+          print(f'Deployed SHA: {deployed_sha}')
+          print(f'Grant configured: {grant.get("configured")}')
+          print(f'Grant enabled: {grant.get("enabled")}')
+
+          if deployed_sha != expected_sha:
+              raise SystemExit('exact deployment proof failed')
+          if grant != {'configured': True, 'enabled': True}:
+              raise SystemExit('social grant activation read-back failed')
           PY
-          )
-          echo "Expected SHA: $GITHUB_SHA"
-          echo "Deployed SHA: $DEPLOYED_SHA"
-          if [ "$DEPLOYED_SHA" != "$GITHUB_SHA" ]; then
-            echo "Exact deployment proof failed"
-            exit 1
-          fi
         env:
           DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
 
