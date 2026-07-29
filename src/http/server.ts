@@ -46,11 +46,33 @@ import { requireFounderSignalEngineReviewOnly } from './middleware/founderSignal
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 
+type JsonRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is JsonRecord {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function founderSignalAutomationGrantStatus() {
+  const raw = process.env.FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON?.trim();
+  if (!raw) return { configured: false, enabled: null };
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return {
+      configured: true,
+      enabled: isRecord(parsed) && typeof parsed.enabled === 'boolean' ? parsed.enabled : null,
+    };
+  } catch {
+    return { configured: true, enabled: null };
+  }
+}
+
 function deploymentVersion() {
   const configuredSha = process.env.GIT_SHA?.trim() ?? '';
   return {
     service: 'founder-control-room',
     gitSha: EXACT_COMMIT_SHA.test(configuredSha) ? configuredSha.toLowerCase() : null,
+    founderSignalAutomationGrant: founderSignalAutomationGrantStatus(),
   };
 }
 
