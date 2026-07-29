@@ -217,6 +217,42 @@ describe('Founder Signal Engine standing-policy write gate', () => {
     );
   });
 
+  it('blocks HubSpot mutation when only a social route is authorized', async () => {
+    const response = await request(buildApp()).post('/mcp').send(
+      toolCall(validArguments({ allowHubSpotWrite: true })),
+    );
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.data).toMatchObject({ decision: 'blocked' });
+    expect(response.body.error.data.reasons).toContain(
+      'HubSpot mutation requires the Gmail investor route',
+    );
+  });
+
+  it('allows HubSpot mutation only through an approved Gmail recipient route', async () => {
+    const response = await request(buildApp()).post('/mcp').send(
+      toolCall(
+        validArguments({
+          allowHubSpotWrite: true,
+          automationCandidate: automationCandidate({
+            channel: 'gmail',
+            audienceSegment: 'preapproved-potential-investors',
+            where: 'Gmail and HubSpot',
+            recipientId: 'hubspot-contact-123',
+            recipientSpecificWhy: 'The recipient thesis matches this verified milestone.',
+          }),
+        }),
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.arguments.allowHubSpotWrite).toBe(true);
+    expect(response.body.arguments.automationCandidate).toMatchObject({
+      channel: 'gmail',
+      recipientId: 'hubspot-contact-123',
+    });
+  });
+
   it('binds the sanitized candidate and one-invocation receipt to request-local context', async () => {
     const writePolicyAudit = vi.fn(async () => undefined);
     const response = await request(buildApp({ writePolicyAudit }))
