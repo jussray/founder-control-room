@@ -84,7 +84,10 @@ function buildApp(overrides: FounderSignalEngineWriteGateDependencies = {}) {
       ...overrides,
     }),
     (req, res) => {
-      res.status(200).json({ arguments: req.body.params.arguments });
+      res.status(200).json({
+        arguments: req.body.params.arguments,
+        authorization: res.locals.founderSignalAutomationAuthorization ?? null,
+      });
     },
   );
   return app;
@@ -212,7 +215,7 @@ describe('Founder Signal Engine standing-policy write gate', () => {
     );
   });
 
-  it('mints a one-invocation authorization receipt only after policy and audit pass', async () => {
+  it('binds the sanitized candidate and one-invocation receipt to request-local context', async () => {
     const writePolicyAudit = vi.fn(async () => undefined);
     const response = await request(buildApp({ writePolicyAudit }))
       .post('/mcp')
@@ -222,7 +225,11 @@ describe('Founder Signal Engine standing-policy write gate', () => {
     expect(response.body.arguments.founderApprovalId).toBe(
       `standing-policy:${grant.id}:${INVOCATION_ID}`,
     );
-    expect(response.body.arguments.automationCandidate).toBeUndefined();
+    expect(response.body.arguments.automationCandidate).toEqual(automationCandidate());
+    expect(response.body.authorization).toEqual({
+      grantId: grant.id,
+      invocationId: INVOCATION_ID,
+    });
     expect(writePolicyAudit).toHaveBeenCalledWith(
       expect.objectContaining({
         invocationId: INVOCATION_ID,
