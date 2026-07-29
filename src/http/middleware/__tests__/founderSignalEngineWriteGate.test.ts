@@ -5,6 +5,11 @@ import type {
   FounderSignalAutomationGrant,
   FounderSignalEvidenceReceipt,
 } from '../../../lib/founderSignalAutomationPolicy.js';
+
+vi.mock('../../../lib/supabaseClient.js', () => ({
+  supabase: {},
+}));
+
 import {
   createFounderSignalEngineWriteGate,
   type FounderSignalEngineWriteGateDependencies,
