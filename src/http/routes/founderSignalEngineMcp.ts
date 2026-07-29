@@ -15,9 +15,12 @@ const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
 const SECRETISH_PATTERN =
   /(sk-[A-Za-z0-9_-]{12,}|Bearer\s+\S+|hooks\.zapier\.com|API[_-]?KEY|SERVICE[_-]?ROLE|PASSWORD|SECRET|TOKEN)/i;
 
+const AUTOMATION_CHANNELS = ['linkedin', 'facebook', 'instagram', 'gmail'] as const;
+type AutomationChannel = (typeof AUTOMATION_CHANNELS)[number];
 type JsonRpcId = string | number | null;
 type DbRecord = Record<string, unknown>;
 type RequestedAction = 'run_openai_step' | 'queue_review_draft' | 'publish_or_send';
+type AuthorizationMode = 'review-only' | 'manual-reference' | 'standing-policy';
 
 const ALLOWED_ACTIONS = new Set<RequestedAction>([
   'run_openai_step',
@@ -37,7 +40,41 @@ const ALLOWED_ARGUMENT_KEYS = new Set([
   'requestingAgent',
   'allowHubSpotWrite',
   'founderApprovalId',
+  'automationCandidate',
 ]);
+
+const ALLOWED_AUTOMATION_CANDIDATE_KEYS = new Set([
+  'channel',
+  'audienceSegment',
+  'proofUrl',
+  'who',
+  'what',
+  'where',
+  'when',
+  'why',
+  'how',
+  'recipientId',
+  'recipientSpecificWhy',
+]);
+
+interface AutomationCandidate {
+  channel: AutomationChannel;
+  audienceSegment: string;
+  proofUrl: string;
+  who: string;
+  what: string;
+  where: string;
+  when: string;
+  why: string;
+  how: string;
+  recipientId: string | null;
+  recipientSpecificWhy: string | null;
+}
+
+interface StandingPolicyAuthorizationContext {
+  grantId: string;
+  invocationId: string;
+}
 
 interface InvocationArguments {
   invocationId: string;
@@ -51,6 +88,8 @@ interface InvocationArguments {
   requestingAgent: string;
   allowHubSpotWrite: boolean;
   founderApprovalId: string | null;
+  automationCandidate: AutomationCandidate | null;
+  authorizationMode: AuthorizationMode;
 }
 
 interface JsonRpcRequestBody {
@@ -148,8 +187,118 @@ function containsSecretLikeMaterial(value: unknown): boolean {
   );
 }
 
+function httpsUrl(value: unknown): string | null {
+  const text = nonEmptyString(value, 1000);
+  if (!text) return null;
+  try {
+    const parsed = new URL(text);
+    return parsed.protocol === 'https:' ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function optionalString(value: unknown, maxLength: number): string | null {
+  if (value === undefined || value === null) return null;
+  return nonEmptyString(value, maxLength);
+}
+
+function parseAutomationCandidate(
+  value: unknown,
+): { value: AutomationCandidate | null; errors: string[] } {
+  if (value === undefined || value === null) return { value: null, errors: [] };
+  if (!isRecord(value)) {
+    return { value: null, errors: ['automationCandidate must be an object'] };
+  }
+
+  const errors: string[] = [];
+  for (const key of Object.keys(value)) {
+    if (!ALLOWED_AUTOMATION_CANDIDATE_KEYS.has(key)) {
+      errors.push(`unexpected automationCandidate field: ${key}`);
+    }
+  }
+
+  const channel = nonEmptyString(value.channel, 30);
+  if (!channel || !AUTOMATION_CHANNELS.includes(channel as AutomationChannel)) {
+    errors.push('automationCandidate.channel is not supported');
+  }
+  const audienceSegment = nonEmptyString(value.audienceSegment, 100);
+  if (!audienceSegment) errors.push('automationCandidate.audienceSegment is required');
+  const proofUrl = httpsUrl(value.proofUrl);
+  if (!proofUrl) errors.push('automationCandidate.proofUrl must be a valid HTTPS URL');
+
+  const requiredContext = ['who', 'what', 'where', 'when', 'why', 'how'] as const;
+  const context: Record<(typeof requiredContext)[number], string | null> = {
+    who: null,
+    what: null,
+    where: null,
+    when: null,
+    why: null,
+    how: null,
+  };
+  for (const field of requiredContext) {
+    context[field] = nonEmptyString(value[field], 2000);
+    if (!context[field]) errors.push(`automationCandidate.${field} is required`);
+  }
+
+  const recipientId = optionalString(value.recipientId, 200);
+  if (value.recipientId !== undefined && value.recipientId !== null && !recipientId) {
+    errors.push('automationCandidate.recipientId must be a non-empty string when provided');
+  }
+  const recipientSpecificWhy = optionalString(value.recipientSpecificWhy, 2000);
+  if (
+    value.recipientSpecificWhy !== undefined &&
+    value.recipientSpecificWhy !== null &&
+    !recipientSpecificWhy
+  ) {
+    errors.push(
+      'automationCandidate.recipientSpecificWhy must be a non-empty string when provided',
+    );
+  }
+
+  if (
+    errors.length > 0 ||
+    !channel ||
+    !audienceSegment ||
+    !proofUrl ||
+    !context.who ||
+    !context.what ||
+    !context.where ||
+    !context.when ||
+    !context.why ||
+    !context.how
+  ) {
+    return { value: null, errors };
+  }
+
+  return {
+    value: {
+      channel: channel as AutomationChannel,
+      audienceSegment,
+      proofUrl,
+      who: context.who,
+      what: context.what,
+      where: context.where,
+      when: context.when,
+      why: context.why,
+      how: context.how,
+      recipientId,
+      recipientSpecificWhy,
+    },
+    errors: [],
+  };
+}
+
+function standingPolicyContext(value: unknown): StandingPolicyAuthorizationContext | null {
+  if (!isRecord(value)) return null;
+  const grantId = nonEmptyString(value.grantId, 100);
+  const invocationId = nonEmptyString(value.invocationId, 64);
+  return grantId && invocationId ? { grantId, invocationId } : null;
+}
+
 function parseInvocationArguments(
   value: unknown,
+  internalAuthorization: StandingPolicyAuthorizationContext | null,
 ): { value: InvocationArguments | null; errors: string[] } {
   if (!isRecord(value)) {
     return { value: null, errors: ['arguments must be an object'] };
@@ -220,6 +369,25 @@ function parseInvocationArguments(
     errors.push('founderApprovalId is required for publication, sending, or HubSpot mutation');
   }
 
+  const parsedCandidate = parseAutomationCandidate(value.automationCandidate);
+  errors.push(...parsedCandidate.errors);
+
+  let authorizationMode: AuthorizationMode = founderApprovalId
+    ? 'manual-reference'
+    : 'review-only';
+  if (founderApprovalId?.startsWith('standing-policy:')) {
+    authorizationMode = 'standing-policy';
+    const expectedReceipt = internalAuthorization
+      ? `standing-policy:${internalAuthorization.grantId}:${internalAuthorization.invocationId}`
+      : null;
+    if (!expectedReceipt || founderApprovalId !== expectedReceipt) {
+      errors.push('standing-policy authorization must be minted by the runtime policy gate');
+    }
+    if (!parsedCandidate.value) {
+      errors.push('automationCandidate is required for standing-policy authorization');
+    }
+  }
+
   if (
     errors.length > 0 ||
     !invocationId ||
@@ -250,8 +418,45 @@ function parseInvocationArguments(
       requestingAgent,
       allowHubSpotWrite,
       founderApprovalId,
+      automationCandidate: parsedCandidate.value,
+      authorizationMode,
     },
     errors: [],
+  };
+}
+
+function automationCandidateSchema(): DbRecord {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: [
+      'channel',
+      'audienceSegment',
+      'proofUrl',
+      'who',
+      'what',
+      'where',
+      'when',
+      'why',
+      'how',
+    ],
+    properties: {
+      channel: { type: 'string', enum: [...AUTOMATION_CHANNELS] },
+      audienceSegment: { type: 'string', minLength: 1, maxLength: 100 },
+      proofUrl: { type: 'string', format: 'uri', maxLength: 1000 },
+      who: { type: 'string', minLength: 1, maxLength: 2000 },
+      what: { type: 'string', minLength: 1, maxLength: 2000 },
+      where: { type: 'string', minLength: 1, maxLength: 2000 },
+      when: { type: 'string', minLength: 1, maxLength: 2000 },
+      why: { type: 'string', minLength: 1, maxLength: 2000 },
+      how: { type: 'string', minLength: 1, maxLength: 2000 },
+      recipientId: { type: ['string', 'null'], minLength: 1, maxLength: 200 },
+      recipientSpecificWhy: {
+        type: ['string', 'null'],
+        minLength: 1,
+        maxLength: 2000,
+      },
+    },
   };
 }
 
@@ -260,7 +465,7 @@ function toolDefinition(): DbRecord {
     name: TOOL_NAME,
     title: 'Invoke Founder Signal Engine',
     description:
-      'Invoke the scoped Founder Signal Engine Zapier bridge for verified GitHub evidence. The tool never accepts raw credentials. A Zapier run receipt is not complete Day 3 proof.',
+      'Invoke the scoped Founder Signal Engine Zapier bridge for verified GitHub evidence. The tool never accepts raw credentials. Publication and sending require the server-side standing-policy gate. A Zapier run receipt is not complete Day 3 proof.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -291,7 +496,13 @@ function toolDefinition(): DbRecord {
         rollbackStep: { type: 'string', minLength: 1, maxLength: 500 },
         requestingAgent: { type: 'string', minLength: 1, maxLength: 100 },
         allowHubSpotWrite: { type: 'boolean' },
-        founderApprovalId: { type: ['string', 'null'], minLength: 1, maxLength: 200 },
+        founderApprovalId: {
+          type: ['string', 'null'],
+          minLength: 1,
+          maxLength: 200,
+          description: 'Runtime-populated authorization receipt. Caller values are rejected upstream.',
+        },
+        automationCandidate: automationCandidateSchema(),
       },
     },
     annotations: {
@@ -426,6 +637,23 @@ function explicitRunId(payload: unknown, response: globalThis.Response): string 
   return null;
 }
 
+function zapierAutomationCandidate(candidate: AutomationCandidate | null): DbRecord | null {
+  if (!candidate) return null;
+  return {
+    channel: candidate.channel,
+    audience_segment: candidate.audienceSegment,
+    proof_url: candidate.proofUrl,
+    who: candidate.who,
+    what: candidate.what,
+    where: candidate.where,
+    when: candidate.when,
+    why: candidate.why,
+    how: candidate.how,
+    recipient_id: candidate.recipientId,
+    recipient_specific_why: candidate.recipientSpecificWhy,
+  };
+}
+
 async function callZapier(
   args: InvocationArguments,
   env: NodeJS.ProcessEnv,
@@ -454,6 +682,8 @@ async function callZapier(
         requesting_agent: args.requestingAgent,
         allow_hubspot_write: args.allowHubSpotWrite,
         founder_approval_id: args.founderApprovalId,
+        authorization_mode: args.authorizationMode,
+        automation_candidate: zapierAutomationCandidate(args.automationCandidate),
         key_reference: OPENAI_KEY_REFERENCE,
       }),
       signal: controller.signal,
@@ -519,6 +749,11 @@ async function invokeTool(
         requestingAgent: args.requestingAgent,
         allowHubSpotWrite: args.allowHubSpotWrite,
         founderApprovalPresent: Boolean(args.founderApprovalId),
+        authorizationMode: args.authorizationMode,
+        channel: args.automationCandidate?.channel ?? null,
+        audienceSegment: args.automationCandidate?.audienceSegment ?? null,
+        proofUrl: args.automationCandidate?.proofUrl ?? null,
+        recipientId: args.automationCandidate?.recipientId ?? null,
       },
     });
   } catch (error) {
@@ -553,6 +788,8 @@ async function invokeTool(
         invocationId: args.invocationId,
         sourceCommitSha: args.sourceCommitSha,
         requestedAction: args.requestedAction,
+        authorizationMode: args.authorizationMode,
+        channel: args.automationCandidate?.channel ?? null,
         failure: message,
         zapierRunIdentified: false,
         endToEndProofComplete: false,
@@ -589,6 +826,8 @@ async function invokeTool(
         invocationId: args.invocationId,
         sourceCommitSha: args.sourceCommitSha,
         requestedAction: args.requestedAction,
+        authorizationMode: args.authorizationMode,
+        channel: args.automationCandidate?.channel ?? null,
         providerHttpStatus: providerReceipt.httpStatus,
         providerResponseKind: providerReceipt.responseKind,
         zapierRunId: providerReceipt.runId,
@@ -629,6 +868,8 @@ async function invokeTool(
       sourcePr: args.sourcePr,
       sourceCommitSha: args.sourceCommitSha,
       requestedAction: args.requestedAction,
+      authorizationMode: args.authorizationMode,
+      channel: args.automationCandidate?.channel ?? null,
       nextGate: zapierRunIdentified
         ? 'Capture and verify the OpenAI 5W1H result, Buffer artifact, HubSpot deal association, and final Founder Control Room evidence before marking Day 3 complete.'
         : 'Locate the invocation in Zapier history using invocationId, record its run ID, and continue downstream evidence capture.',
@@ -684,7 +925,7 @@ export function createFounderSignalEngineMcpHandler(
         rpcResult(id, {
           protocolVersion: MCP_PROTOCOL_VERSION,
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: 'founder-signal-engine-bridge', version: '1.1.0' },
+          serverInfo: { name: 'founder-signal-engine-bridge', version: '1.2.0' },
         }),
       );
       return;
@@ -708,7 +949,10 @@ export function createFounderSignalEngineMcpHandler(
       return;
     }
 
-    const parsed = parseInvocationArguments(params.arguments);
+    const internalAuthorization = standingPolicyContext(
+      res.locals.founderSignalAutomationAuthorization,
+    );
+    const parsed = parseInvocationArguments(params.arguments, internalAuthorization);
     if (!parsed.value) {
       res.status(400).json(rpcError(id, -32602, 'Invalid tool arguments', parsed.errors));
       return;

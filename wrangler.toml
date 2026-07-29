@@ -68,9 +68,10 @@ MCP_RESEND_URL = "https://mcp.resend.com/mcp"
 #   REPOSITORY_INGEST_SECRET
 #   REPOSITORY_INGEST_SECRET_<NORMALIZED_PROJECT_SLUG>
 #
-# Founder Signal Engine review-only bridge:
+# Founder Signal Engine remote bridge:
 #   FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
 #   ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
+#   FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON # scoped, revocable standing grant
 # Optional:
 #   FOUNDER_SIGNAL_ENGINE_HOOK_TIMEOUT_MS
 

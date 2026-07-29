@@ -167,7 +167,7 @@ jobs:
       - run: test "$(git rev-parse HEAD)" = "$TARGET_SHA"
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.101.0
       - name: Start local database and lint migrations
         shell: bash
         run: |
