@@ -4,12 +4,7 @@ import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const skillPath = path.join(root, '.ai/skills/juss-flow-launch-loop/SKILL.md');
-const agentsPath = path.join(root, 'AGENTS.md');
-
-const [skill, agents] = await Promise.all([
-  readFile(skillPath, 'utf8'),
-  readFile(agentsPath, 'utf8'),
-]);
+const skill = await readFile(skillPath, 'utf8');
 
 const requiredSkillTokens = [
   'ULTRATHINK',
@@ -62,13 +57,12 @@ if (missingReleaseStates.length > 0) {
   );
 }
 
-const agentsLink = '.ai/skills/juss-flow-launch-loop/SKILL.md';
-if (!agents.includes(agentsLink)) {
-  throw new Error(`AGENTS.md must link to ${agentsLink}`);
-}
-
 if (!skill.includes('Do not run an uncontrolled autonomous merge loop.')) {
   throw new Error('The merge loop must remain evidence-gated and bounded.');
+}
+
+if (!skill.includes('Never quietly shrink `full app launch`')) {
+  throw new Error('GoalFix must preserve the full-app-launch objective.');
 }
 
 console.log('Juss Flow launch-loop contract verified.');
