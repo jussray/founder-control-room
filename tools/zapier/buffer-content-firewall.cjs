@@ -1,3 +1,4 @@
+/* globals inputData, output: true */
 'use strict';
 
 const MIN_POST_LENGTH = 80;
@@ -121,9 +122,11 @@ if (typeof inputData !== 'undefined') {
   output = validateBufferPublishInput(inputData);
 }
 
-module.exports = {
-  validateBufferPublishInput,
-  ALLOWED_CONTENT_FIELDS,
-  FORBIDDEN_CONTENT_FIELDS,
-  PROMPT_LEAK_PATTERNS,
-};
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    validateBufferPublishInput,
+    ALLOWED_CONTENT_FIELDS,
+    FORBIDDEN_CONTENT_FIELDS,
+    PROMPT_LEAK_PATTERNS,
+  };
+}
