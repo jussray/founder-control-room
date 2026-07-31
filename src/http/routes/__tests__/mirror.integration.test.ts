@@ -18,6 +18,9 @@ import { createMirrorRouter, type MirrorRouteDependencies } from '../mirror.js';
 
 const FOUNDER_EMAIL = 'founder@example.com';
 const BEARER = 'Bearer test-token';
+type MirrorAuditEventInput = Parameters<
+  NonNullable<MirrorRouteDependencies['writeAuditEvent']>
+>[0];
 
 function founderUsersRow() {
   return {
@@ -117,7 +120,7 @@ describe('POST /mirror/run', () => {
       data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
       error: null,
     });
-    const writeAuditEvent = vi.fn(async () => undefined);
+    const writeAuditEvent = vi.fn(async (_event: MirrorAuditEventInput) => undefined);
     const runMirror = vi.fn(async () => modelResult());
 
     const response = await request(buildApp({ runMirror, writeAuditEvent }))
