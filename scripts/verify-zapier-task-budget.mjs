@@ -10,7 +10,7 @@ const fail = (message) => {
   process.exitCode = 1;
 };
 
-const { plan, scope, allocations, guardrails } = budget;
+const { plan, scope, allocations, analysis_output_contract: outputContract, guardrails } = budget;
 
 if (!Number.isInteger(plan?.monthly_task_limit) || plan.monthly_task_limit <= 0) {
   fail('plan.monthly_task_limit must be a positive integer');
@@ -62,9 +62,63 @@ if (calculatedHeadroom !== scope?.headroom_below_operating_ceiling) {
   fail(`declared headroom ${scope?.headroom_below_operating_ceiling} does not match calculated headroom ${calculatedHeadroom}`);
 }
 
+if (outputContract?.single_ai_action !== true) {
+  fail('analysis output contract must use one shared AI action');
+}
+
+const requiredOutputFields = [
+  'signal_id',
+  'decision',
+  'verified_evidence',
+  'inferred_conclusions',
+  'unknown_information',
+  'recommended_next_action',
+  'me_reality_now',
+  'me_smallest_next_action',
+  'me_founder_voice',
+  'future_you_guidance',
+  'future_you_what_mattered',
+  'future_you_what_did_not',
+  'future_you_valid_fear',
+  'chief_ai_decision',
+  'linkedin_draft',
+  'facebook_draft',
+  'instagram_draft',
+  'investor_outreach_draft',
+  'publish_allowed'
+];
+
+const outputFields = new Set(outputContract?.fields ?? []);
+for (const field of requiredOutputFields) {
+  if (!outputFields.has(field)) {
+    fail(`analysis output contract is missing ${field}`);
+  }
+}
+
+if (outputContract?.future_you?.time_horizon_years !== 5) {
+  fail('FutureYou must reason from a five-year horizon');
+}
+
+if (outputContract?.future_you?.voice !== 'first_person_future_self') {
+  fail('FutureYou must use first-person future-self voice');
+}
+
+if (!outputContract?.future_you?.required_opener) {
+  fail('FutureYou must retain its required opener');
+}
+
+if (outputContract?.future_you?.generic_advice_allowed !== false) {
+  fail('FutureYou must not allow generic advice');
+}
+
+if (outputContract?.me?.must_choose_one_smallest_next_action !== true) {
+  fail('Me must choose one smallest next action');
+}
+
 const requiredGuardrails = [
   'one_ai_call_per_signal',
   'social_channels_generated_in_one_ai_response',
+  'future_you_and_me_share_core_ai_action',
   'hubspot_result_note_is_canonical_writeback',
   'founder_control_room_reads_proof_without_a_second_zapier_write',
   'external_send_or_publish_requires_founder_approval',
@@ -84,5 +138,6 @@ if (process.exitCode) {
 
 console.log(
   `Zapier budget verified: ${calculatedTotal}/${plan.monthly_task_limit} planned tasks, ` +
-    `${calculatedHeadroom} operating headroom, ${plan.emergency_reserve} emergency reserve.`
+    `${calculatedHeadroom} operating headroom, ${plan.emergency_reserve} emergency reserve, ` +
+    'FutureYou and Me included in the shared AI action.'
 );
