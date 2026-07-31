@@ -235,3 +235,8 @@ Figma is a founder specification and review surface. It cannot create mission tr
 ## Evidence report
 
 List goal, reality, premise risk, Lindy choice, L99 boundaries, selected decision, plan risk, OODA action, Bill Gates bottleneck/leverage findings, Elon Musk requirement/deletion/simplification/feedback/automation findings, files changed, behavior changed, tests run, Playwright result or inapplicability, failures or skips, security impact, provider impact, Supabase impact, Product Design evidence status, commercial assumptions, disqualifiers, brand/IP impact, Cloudflare/Control Room proof when applicable, rollback, unresolved risk, and next gate.
+
+## Fact-check and portable founder approvals
+
+- Read [`skills/fact-check-every-claim/SKILL.md`](./skills/fact-check-every-claim/SKILL.md) before externally using factual claims, numbers, quotations, dates, or action guidance.
+- Read [`docs/PORTABLE_FOUNDER_APPROVALS.md`](./docs/PORTABLE_FOUNDER_APPROVALS.md) before treating approval from another approved founder console as mutation authority.
