@@ -1,0 +1,125 @@
+name: Founder Repo Cycle
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - package.json
+      - package-lock.json
+      - scripts/**
+      - src/**
+      - e2e/**
+      - .github/workflows/repo-cycle.yml
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Repository cycle operation
+        required: true
+        default: preflight
+        type: choice
+        options:
+          - preflight
+          - inspect
+          - test
+          - build
+          - verify
+          - merge_gate
+      expected_head_sha:
+        description: Exact commit SHA approved for this run
+        required: true
+        type: string
+      target_branch:
+        description: Branch expected to be checked out
+        required: true
+        default: codex/founder-control-room-master-build-spec-20260730
+        type: string
+      founder_approval_id:
+        description: External Founder Control Room approval or decision ID
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: founder-repo-cycle-${{ github.repository }}-${{ github.event.pull_request.number || inputs.target_branch || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  repo-cycle:
+    name: ${{ inputs.operation || 'verify' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      REPO_CYCLE_OPERATION: ${{ inputs.operation || 'verify' }}
+      TARGET_BRANCH: ${{ inputs.target_branch || github.head_ref }}
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha || github.event.pull_request.head.sha }}
+      FOUNDER_APPROVAL_ID: ${{ inputs.founder_approval_id || '' }}
+
+    steps:
+      - name: Checkout exact approved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify approved head before installing dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTUAL_HEAD_SHA="$(git rev-parse HEAD)"
+          echo "Expected: ${EXPECTED_HEAD_SHA}"
+          echo "Actual:   ${ACTUAL_HEAD_SHA}"
+          test "${ACTUAL_HEAD_SHA}" = "${EXPECTED_HEAD_SHA}"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run guarded repository cycle
+        id: cycle
+        run: >-
+          node scripts/repo-cycle.mjs
+          "${REPO_CYCLE_OPERATION}"
+          "--target-branch=${TARGET_BRANCH}"
+          "--expected-sha=${EXPECTED_HEAD_SHA}"
+
+      - name: Publish job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Founder Repo Cycle"
+            echo
+            echo "- Operation: \`${REPO_CYCLE_OPERATION}\`"
+            echo "- Target branch: \`${TARGET_BRANCH}\`"
+            echo "- Approved head: \`${EXPECTED_HEAD_SHA}\`"
+            echo "- Founder approval ID: \`${FOUNDER_APPROVAL_ID:-not supplied}\`"
+            echo "- Merge authorized: \`false\`"
+            echo
+            echo "> This workflow is evidence-only. Its token has read-only repository permissions and cannot push or merge."
+            if [ -f repo-cycle-result.json ]; then
+              echo
+              echo "### Result"
+              echo '```json'
+              cat repo-cycle-result.json
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload evidence receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repo-cycle-${{ env.REPO_CYCLE_OPERATION }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: repo-cycle-result.json
+          if-no-files-found: warn
+          retention-days: 30
