@@ -21,6 +21,15 @@ const waveTwo = [
   { id: "playwright-e2e", command: process.execPath, args: ["e2e/run.mjs"] },
 ];
 
+function redactFailureExcerpt(value) {
+  return String(value ?? "")
+    .slice(-4000)
+    .replace(/Bearer\s+\S+/gi, "Bearer [REDACTED]")
+    .replace(/(token|secret|password|private[_ -]?key|api[_ -]?key)(\s*[:=]\s*)\S+/gi, "$1$2[REDACTED]")
+    .replace(/\b(?:sk|ghp|github_pat|xox[baprs])-[-A-Za-z0-9_]{12,}\b/g, "[REDACTED_TOKEN]")
+    .replace(/\b[A-Fa-f0-9]{64,}\b/g, "[REDACTED_HEX]");
+}
+
 async function runTask(task) {
   const taskStartedAt = new Date().toISOString();
   const started = Date.now();
@@ -44,8 +53,6 @@ async function runTask(task) {
       exitCode: 0,
       startedAt: taskStartedAt,
       durationMs: Date.now() - started,
-      stdout: stdout.trim(),
-      stderr: stderr.trim(),
     };
   } catch (error) {
     const stdout = String(error.stdout ?? "").trim();
@@ -60,8 +67,7 @@ async function runTask(task) {
       exitCode: typeof error.code === "number" ? error.code : 1,
       startedAt: taskStartedAt,
       durationMs: Date.now() - started,
-      stdout,
-      stderr,
+      failureExcerpt: redactFailureExcerpt([stdout, stderr].filter(Boolean).join("\n")),
     };
   }
 }
