@@ -6,11 +6,11 @@ Authoritative budget: [`config/zapier-task-budget.json`](../../config/zapier-tas
 
 ## Goal
 
-Give Ray maximum decision coverage without multiplying Zapier actions.
+Give Ray maximum decision and distribution coverage without multiplying Zapier thinking actions.
 
-FutureYou, ME, Chief AI, 5W1H, evidence classification, social drafts, investor drafting, and the recommended next action must be produced by the same structured AI action used by the Founder Signal Engine.
+FutureYou, ME, Chief AI, 5W1H, evidence classification, the recommended next action, investor drafting, media direction, and every supported social-platform draft must be produced by the same structured AI action used by the Founder Signal Engine.
 
-This contract adds fields, not billable steps.
+This contract adds fields, not separate AI tasks.
 
 ## One signal, one thinking action
 
@@ -22,12 +22,14 @@ normalized source signal
    -> ME decision lens
    -> FutureYou decision lens
    -> Chief AI routing decision
-   -> social and investor review drafts
+   -> platform-native social campaign package
+   -> investor review draft when requested
 -> free validation + Paths
 -> ONE canonical HubSpot result note
+-> optional founder-approved Buffer fan-out
 ```
 
-Do not create separate Zaps or separate AI calls for FutureYou, ME, LinkedIn, Facebook, Instagram, investor outreach, or proof formatting.
+Do not create separate Zaps or separate AI calls for FutureYou, ME, LinkedIn, Facebook, Instagram, Threads, X, TikTok, YouTube Shorts, Pinterest, Bluesky, Mastodon, Google Business, investor outreach, or proof formatting.
 
 ## ME lens
 
@@ -47,7 +49,7 @@ Rules:
 - State what is verified now without inflating progress.
 - Choose one smallest reversible next action.
 - Preserve Ray's founder voice rather than generating generic corporate copy.
-- Populate `me_profile_angle` only when the signal affects Ray's LinkedIn/profile positioning, founder brand, Se'kret Bip narrative, or investor-facing proof.
+- Populate `me_profile_angle` only when the signal affects Ray's profile positioning, founder brand, Se'kret Bip narrative, or investor-facing proof.
 - Do not turn ME into a second AI action.
 
 ## FutureYou lens
@@ -86,6 +88,37 @@ FutureYou must identify:
 
 Do not fabricate future facts, revenue, users, funding, partnerships, launch status, or outcomes. FutureYou is a decision-compression lens, not evidence.
 
+## Shared social campaign lens
+
+The same AI action must create one coherent campaign package, then tailor the copy to each platform instead of copying one generic caption everywhere.
+
+Required campaign fields:
+
+```text
+social_campaign_angle
+social_campaign_media_brief
+linkedin_draft
+facebook_draft
+instagram_draft
+threads_draft
+x_draft
+tiktok_caption
+youtube_shorts_draft
+pinterest_draft
+bluesky_draft
+mastodon_draft
+google_business_draft
+```
+
+Rules:
+
+- Keep one verified campaign claim set across every platform.
+- Adapt hook, length, formatting, call to action, and media framing to the platform.
+- Do not invent platform traction, views, followers, customers, partnerships, or launch proof.
+- Keep every draft review-only until an exact founder approval event exists.
+- The Buffer lane may distribute to three approved active channels in parallel, costing one Buffer action per channel.
+- Non-selected platform drafts remain available in HubSpot and Founder Control Room without another AI task.
+
 ## Shared truth boundary
 
 The AI result must keep these categories separate:
@@ -96,9 +129,10 @@ INFERRED
 UNKNOWN
 FUTUREYOU GUIDANCE
 ME DECISION
+SOCIAL REVIEW COPY
 ```
 
-FutureYou guidance and ME decisions may reason from verified evidence, but they must never be written back as verified facts.
+FutureYou guidance, ME decisions, and social copy may reason from verified evidence, but they must never be written back as verified facts.
 
 ## Shared output minimum
 
@@ -128,9 +162,19 @@ future_you_what_mattered
 future_you_what_did_not
 future_you_valid_fear
 chief_ai_decision
+social_campaign_angle
+social_campaign_media_brief
 linkedin_draft
 facebook_draft
 instagram_draft
+threads_draft
+x_draft
+tiktok_caption
+youtube_shorts_draft
+pinterest_draft
+bluesky_draft
+mastodon_draft
+google_business_draft
 investor_outreach_draft
 publish_allowed
 ```
@@ -139,19 +183,27 @@ publish_allowed
 
 ## Zapier task effect
 
-Adding FutureYou and ME changes the structured response schema only.
+Adding FutureYou, ME, and the wider social matrix changes the structured response schema only.
 
 ```text
 Before: 1 AI action per signal
 After:  1 AI action per signal
-Added Zapier tasks: 0
+Added AI tasks: 0
 ```
 
-The locked monthly plan remains:
+Approved Buffer distribution remains separately and honestly budgeted:
 
 ```text
-82 planned tasks
-8 routine headroom
+3 selected channels
+x 1 Buffer action per channel
+= 3 Zapier tasks per approved campaign
+```
+
+The locked monthly plan is:
+
+```text
+88 planned tasks
+2 routine headroom
 10 emergency reserve
 100-task free-plan limit
 ```
@@ -168,10 +220,13 @@ The verifier must fail when:
 
 - FutureYou fields are removed;
 - ME fields are removed;
-- FutureYou and ME are split into separate AI actions;
+- a required social-platform draft is removed;
+- FutureYou, ME, or social drafting are split into separate AI actions;
+- the Buffer allocation does not equal the number of configured parallel channel slots;
+- platform-native copy is no longer required;
 - the planned task total exceeds the 90-task operating ceiling;
 - the 10-task emergency reserve is consumed by routine planning.
 
 ## Rollback
 
-Revert this contract, the matching JSON fields, and verifier assertions together. Do not delete Zapier workflows, HubSpot evidence, Buffer drafts, Zap History, or queue records.
+Revert this contract, the matching JSON fields, and verifier assertions together. Do not delete Zapier workflows, HubSpot evidence, Buffer drafts/posts, Zap History, or queue records.
