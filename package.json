@@ -22,7 +22,7 @@
     "verify:capability-contract": "node scripts/verify-capability-contract.mjs",
     "verify:mcp": "node scripts/verify-mcp-config.mjs",
     "verify:terminal-contract": "node scripts/verify-guarded-terminal-contract.mjs",
-    "verify:ai-skills": "node scripts/verify-ai-skill-contract.mjs && node scripts/verify-founder-intelligence-inheritance.mjs && node scripts/verify-agent-fleet-skills.mjs",
+    "verify:ai-skills": "node scripts/verify-ai-skill-contract.mjs && node scripts/verify-mirror-and-fact-check-contract.mjs && node scripts/verify-founder-intelligence-inheritance.mjs && node scripts/verify-agent-fleet-skills.mjs",
     "verify:founder-chief-pair": "node scripts/verify-founder-chief-pair.mjs",
     "verify:cookies": "node scripts/verify-cookie-contract.mjs",
     "verify:founder-onboarding": "node scripts/verify-founder-onboarding.mjs",
@@ -33,6 +33,7 @@
     "verify:futureyou-v8": "node scripts/verify-futureyou-v8.mjs && vitest run src/futureyou/missionControl.test.ts src/http/routes/__tests__/futureYou.integration.test.ts",
     "verify:goalfix": "vitest run src/goalfix/__tests__/engine.test.ts src/http/routes/__tests__/goalfix.integration.test.ts",
     "verify:mirror": "vitest run src/http/routes/__tests__/mirror.integration.test.ts",
+    "verify:mirror-contract": "node scripts/verify-mirror-and-fact-check-contract.mjs",
     "proof:goalfix": "npm run build && node e2e/goalfix-proof.mjs"
   },
   "dependencies": {
