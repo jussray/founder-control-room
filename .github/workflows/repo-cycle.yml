@@ -1,6 +1,16 @@
 name: Founder Repo Cycle
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - package.json
+      - package-lock.json
+      - scripts/**
+      - src/**
+      - e2e/**
+      - .github/workflows/repo-cycle.yml
   workflow_dispatch:
     inputs:
       operation:
@@ -34,27 +44,30 @@ permissions:
   actions: read
 
 concurrency:
-  group: founder-repo-cycle-${{ github.repository }}-${{ inputs.target_branch }}-${{ inputs.operation }}
+  group: founder-repo-cycle-${{ github.repository }}-${{ github.event.pull_request.number || inputs.target_branch || github.ref }}
   cancel-in-progress: false
 
 jobs:
   repo-cycle:
-    name: ${{ inputs.operation }}
+    name: ${{ inputs.operation || 'verify' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      REPO_CYCLE_OPERATION: ${{ inputs.operation || 'verify' }}
+      TARGET_BRANCH: ${{ inputs.target_branch || github.head_ref }}
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha || github.event.pull_request.head.sha }}
+      FOUNDER_APPROVAL_ID: ${{ inputs.founder_approval_id || '' }}
 
     steps:
-      - name: Checkout exact branch
+      - name: Checkout exact approved commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.target_branch }}
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
           fetch-depth: 0
           persist-credentials: false
 
       - name: Verify approved head before installing dependencies
         shell: bash
-        env:
-          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
         run: |
           set -euo pipefail
           ACTUAL_HEAD_SHA="$(git rev-parse HEAD)"
@@ -73,27 +86,20 @@ jobs:
 
       - name: Run guarded repository cycle
         id: cycle
-        env:
-          FOUNDER_APPROVAL_ID: ${{ inputs.founder_approval_id }}
         run: >-
           node scripts/repo-cycle.mjs
-          "${{ inputs.operation }}"
-          "--target-branch=${{ inputs.target_branch }}"
-          "--expected-sha=${{ inputs.expected_head_sha }}"
+          "${REPO_CYCLE_OPERATION}"
+          "--target-branch=${TARGET_BRANCH}"
+          "--expected-sha=${EXPECTED_HEAD_SHA}"
 
       - name: Publish job summary
         if: always()
         shell: bash
-        env:
-          OPERATION: ${{ inputs.operation }}
-          TARGET_BRANCH: ${{ inputs.target_branch }}
-          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
-          FOUNDER_APPROVAL_ID: ${{ inputs.founder_approval_id }}
         run: |
           {
             echo "## Founder Repo Cycle"
             echo
-            echo "- Operation: \`${OPERATION}\`"
+            echo "- Operation: \`${REPO_CYCLE_OPERATION}\`"
             echo "- Target branch: \`${TARGET_BRANCH}\`"
             echo "- Approved head: \`${EXPECTED_HEAD_SHA}\`"
             echo "- Founder approval ID: \`${FOUNDER_APPROVAL_ID:-not supplied}\`"
@@ -113,7 +119,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: repo-cycle-${{ inputs.operation }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: repo-cycle-${{ env.REPO_CYCLE_OPERATION }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: repo-cycle-result.json
           if-no-files-found: warn
           retention-days: 30
