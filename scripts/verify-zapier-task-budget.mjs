@@ -92,6 +92,8 @@ const requiredOutputFields = [
   'social_campaign_media_brief',
   'linkedin_draft',
   'facebook_draft',
+  'facebook_founder_draft',
+  'facebook_brand_draft',
   'instagram_draft',
   'threads_draft',
   'x_draft',
@@ -185,6 +187,70 @@ for (const platform of requiredDraftPlatforms) {
   }
 }
 
+const contentContract = bufferDistribution?.publish_content_contract;
+if (contentContract?.source !== 'structured_ai_output_only') {
+  fail('Buffer publish copy must come from structured AI output only');
+}
+
+if (contentContract?.validated_output_field !== 'validated_post_text') {
+  fail('Buffer must map only validated_post_text into the publish action');
+}
+
+if (!Number.isInteger(contentContract?.minimum_characters) || contentContract.minimum_characters < 80) {
+  fail('Buffer publish copy must require at least 80 characters');
+}
+
+if (contentContract?.require_https_proof_url !== true) {
+  fail('Buffer publish copy must require an HTTPS proof URL');
+}
+
+if (contentContract?.require_exact_source_commit_sha !== true) {
+  fail('Buffer publish copy must require an exact source commit SHA');
+}
+
+if (contentContract?.reject_prompt_like_copy !== true) {
+  fail('Buffer publish copy must reject prompt-like copy');
+}
+
+if (contentContract?.reject_unresolved_template_tokens !== true) {
+  fail('Buffer publish copy must reject unresolved template tokens');
+}
+
+if (contentContract?.queue_or_publish_requires_founder_approval !== true) {
+  fail('Buffer queue or publish mode must require founder approval');
+}
+
+const requiredAllowedSourceFields = [
+  'linkedin_draft',
+  'facebook_founder_draft',
+  'facebook_brand_draft',
+  'instagram_draft'
+];
+const allowedSourceFields = new Set(contentContract?.allowed_source_fields ?? []);
+for (const field of requiredAllowedSourceFields) {
+  if (!allowedSourceFields.has(field)) {
+    fail(`Buffer allowed source fields are missing ${field}`);
+  }
+}
+
+const forbiddenSourceFields = new Set(contentContract?.forbidden_source_fields ?? []);
+for (const field of ['prompt', 'system_prompt', 'user_message', 'instructions', 'raw_response']) {
+  if (!forbiddenSourceFields.has(field)) {
+    fail(`Buffer forbidden source fields are missing ${field}`);
+  }
+}
+
+const requiredChannelRoutes = {
+  juss_rayy_linkedin: 'linkedin_draft',
+  juss_and_co_facebook: 'facebook_founder_draft',
+  juss_beautiful_hair_facebook: 'facebook_brand_draft'
+};
+for (const [channel, field] of Object.entries(requiredChannelRoutes)) {
+  if (contentContract?.channel_routes?.[channel] !== field) {
+    fail(`Buffer route ${channel} must map to ${field}`);
+  }
+}
+
 const requiredGuardrails = [
   'one_ai_call_per_signal',
   'social_channels_generated_in_one_ai_response',
@@ -196,7 +262,9 @@ const requiredGuardrails = [
   'founder_control_room_reads_proof_without_a_second_zapier_write',
   'external_send_or_publish_requires_founder_approval',
   'budget_gate_runs_before_billable_actions',
-  'stop_new_billable_work_at_operating_ceiling'
+  'stop_new_billable_work_at_operating_ceiling',
+  'buffer_never_receives_prompt_or_instructions',
+  'buffer_content_must_pass_firewall'
 ];
 
 for (const key of requiredGuardrails) {
@@ -213,5 +281,5 @@ console.log(
   `Zapier budget verified: ${calculatedTotal}/${plan.monthly_task_limit} planned tasks, ` +
     `${calculatedHeadroom} operating headroom, ${plan.emergency_reserve} emergency reserve, ` +
     `${bufferDistribution.parallel_channel_slots} Buffer channels per approved campaign, ` +
-    'all platform drafts plus FutureYou and Me included in the shared AI action.'
+    'platform-ready copy is firewall-validated before Buffer.'
 );
