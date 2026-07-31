@@ -32,6 +32,7 @@
     "verify:rls-contract": "node scripts/verify-rls-contract.mjs",
     "verify:futureyou-v8": "node scripts/verify-futureyou-v8.mjs && vitest run src/futureyou/missionControl.test.ts src/http/routes/__tests__/futureYou.integration.test.ts",
     "verify:goalfix": "vitest run src/goalfix/__tests__/engine.test.ts src/http/routes/__tests__/goalfix.integration.test.ts",
+    "verify:mirror": "vitest run src/http/routes/__tests__/mirror.integration.test.ts",
     "proof:goalfix": "npm run build && node e2e/goalfix-proof.mjs"
   },
   "dependencies": {
@@ -52,8 +53,6 @@
     "@types/supertest": "^6.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
-    "@vitest/coverage-v8": "^4.1.10",
-    "eslint": "^9.0.0",
     "playwright": "^1.61.1",
     "supertest": "^7.0.0",
     "tsx": "^4.19.0",
