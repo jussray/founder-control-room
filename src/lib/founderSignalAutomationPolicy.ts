@@ -2,6 +2,14 @@ export const FOUNDER_SIGNAL_CHANNELS = [
   'linkedin',
   'facebook',
   'instagram',
+  'threads',
+  'x',
+  'tiktok',
+  'youtube',
+  'pinterest',
+  'bluesky',
+  'mastodon',
+  'google_business',
   'gmail',
 ] as const;
 
