@@ -1,0 +1,68 @@
+name: Cloudflare + Local Parallel Preflight
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .node-version
+      - package.json
+      - package-lock.json
+      - wrangler.toml
+      - public/**
+      - src/**
+      - e2e/**
+      - scripts/verify-parallel.mjs
+      - .github/workflows/cloudflare-local-preflight.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-local-preflight-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Parallel local parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Setup supported Node runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Run local-parity verification
+        run: npm run verify:parallel
+
+      - name: Upload verification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parallel-verify-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/parallel-verify-result.json
+          if-no-files-found: warn
+          retention-days: 30
