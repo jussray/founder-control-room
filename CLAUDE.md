@@ -109,6 +109,26 @@ Using connected external tools under the scoped Founder Signal Engine contracts 
 - Repository merges follow `docs/FOUNDER_MERGE_AUTHORITY.md`: standing authority or a valid portable founder approval may authorize the exact merge only when required evidence is green and current.
 - Do not deploy, rotate credentials, alter auth/RLS, publish externally, contact anyone, spend funds, change DNS, or perform destructive changes without the separate exact founder authority required for that action.
 
+## Never signal success on failure
+
+Do not show a success message or set a success flag inside a `catch` block.
+
+If an operation throws or returns an error, the UI must reflect failure. Success may only be shown after the operation has completed successfully and its result has been verified.
+
+This rule prevents false-positive UX where a user believes an action completed even though the underlying operation failed. A known example was a reminder interface reporting that a reminder was set after scheduling had thrown.
+
+## Branch hygiene
+
+Maintain one active implementation branch and one pull request per logical change.
+
+- Branch once from current `main`.
+- Use descriptive names such as `fix/*`, `chore/*`, or `feat/*`.
+- Continue corrections, review changes, and conflict resolution on the canonical branch.
+- Do not create duplicate or versioned branches such as `*-v2`, `*-v3`, or `*-current-main`.
+- Do not open a replacement PR merely to avoid repairing the existing canonical change path.
+
+See [`REPO_HEALTH_DUPLICATES.md`](REPO_HEALTH_DUPLICATES.md) for the full duplicate-work and branch policy.
+
 ## Implementation Discipline
 
 Continue the same reasoning style while implementing code. Do not perform analysis once, then abandon it when editing begins.
