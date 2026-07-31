@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "plan": {
     "name": "Zapier Free",
     "monthly_task_limit": 100,
@@ -81,6 +81,8 @@
       "social_campaign_media_brief",
       "linkedin_draft",
       "facebook_draft",
+      "facebook_founder_draft",
+      "facebook_brand_draft",
       "instagram_draft",
       "threads_draft",
       "x_draft",
@@ -138,7 +140,47 @@
     "one_billable_buffer_action_per_selected_channel": true,
     "platform_native_copy_required": true,
     "unselected_platforms": "retain_as_review_drafts_in_hubspot_and_founder_control_room",
-    "fallback_at_budget_ceiling": "keep_campaign_in_free_backlog_without_buffer_actions"
+    "fallback_at_budget_ceiling": "keep_campaign_in_free_backlog_without_buffer_actions",
+    "publish_content_contract": {
+      "source": "structured_ai_output_only",
+      "validated_output_field": "validated_post_text",
+      "minimum_characters": 80,
+      "require_https_proof_url": true,
+      "require_exact_source_commit_sha": true,
+      "reject_prompt_like_copy": true,
+      "reject_unresolved_template_tokens": true,
+      "draft_mode_requires_founder_approval": false,
+      "queue_or_publish_requires_founder_approval": true,
+      "allowed_source_fields": [
+        "linkedin_draft",
+        "facebook_founder_draft",
+        "facebook_brand_draft",
+        "instagram_draft",
+        "threads_draft",
+        "x_draft",
+        "tiktok_caption",
+        "youtube_shorts_draft",
+        "pinterest_draft",
+        "bluesky_draft",
+        "mastodon_draft",
+        "google_business_draft"
+      ],
+      "forbidden_source_fields": [
+        "prompt",
+        "system_prompt",
+        "user_prompt",
+        "user_message",
+        "instructions",
+        "raw_response",
+        "input",
+        "github_evidence"
+      ],
+      "channel_routes": {
+        "juss_rayy_linkedin": "linkedin_draft",
+        "juss_and_co_facebook": "facebook_founder_draft",
+        "juss_beautiful_hair_facebook": "facebook_brand_draft"
+      }
+    }
   },
   "free_steps": [
     "triggers",
@@ -166,6 +208,8 @@
     "external_send_or_publish_requires_founder_approval": true,
     "budget_gate_runs_before_billable_actions": true,
     "stop_new_billable_work_at_operating_ceiling": true,
+    "buffer_never_receives_prompt_or_instructions": true,
+    "buffer_content_must_pass_firewall": true,
     "delete_or_disable_existing_zaps_automatically": false
   }
 }
