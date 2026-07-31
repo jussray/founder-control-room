@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { readFileSync } = require('node:fs');
+const vm = require('node:vm');
 const { validateBufferPublishInput } = require('./buffer-content-firewall.cjs');
 
 const sha = '205a239486b6b542648ce2f125178814e358b816';
@@ -27,7 +29,7 @@ This redesign is currently in preview and is not live on the production storefro
 Current storefront: https://jussbeautifulhair.com
 `.trim();
 
-const validDraft = validateBufferPublishInput({
+const validInput = {
   post_text: founderLinkedInPost,
   content_field: 'linkedin_draft',
   channel: 'juss_rayy_linkedin',
@@ -36,7 +38,9 @@ const validDraft = validateBufferPublishInput({
   founder_approval_id: '',
   proof_url: 'https://github.com/jussray/jussbeautifulhair-site/pull/27',
   source_commit_sha: sha,
-});
+};
+
+const validDraft = validateBufferPublishInput(validInput);
 
 assert.equal(validDraft.content_validated, true);
 assert.equal(validDraft.validated_post_text, founderLinkedInPost);
@@ -107,4 +111,18 @@ assert.equal(
   'queue',
 );
 
-console.log('Buffer content firewall verified: finished post copy passes; prompts and unauthorized queue/publish payloads fail.');
+const zapierLikeContext = {
+  inputData: validInput,
+  output: undefined,
+};
+vm.createContext(zapierLikeContext);
+vm.runInContext(
+  readFileSync(require.resolve('./buffer-content-firewall.cjs'), 'utf8'),
+  zapierLikeContext,
+  { filename: 'buffer-content-firewall.cjs' },
+);
+
+assert.equal(zapierLikeContext.output.content_validated, true);
+assert.equal(zapierLikeContext.output.validated_post_text, founderLinkedInPost);
+
+console.log('Buffer content firewall verified: finished post copy passes in Node and Zapier-like runtimes; prompts and unauthorized queue/publish payloads fail.');
