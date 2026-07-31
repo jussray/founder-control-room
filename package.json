@@ -12,12 +12,15 @@
     "start": "node dist/index.js",
     "cf:dev": "wrangler dev --config wrangler.toml --port 8787",
     "cf:dev:api": "wrangler dev --config wrangler.api.toml --port 8788",
+    "cf:dry-run": "wrangler deploy --dry-run --config wrangler.toml --outdir .wrangler/dry-run",
     "deploy": "wrangler deploy --config wrangler.toml",
     "deploy:api": "wrangler deploy --config wrangler.api.toml",
     "lint": "eslint 'src/**/*.ts'",
     "lint:design-os": "eslint 'src/design-os/**/*.ts' 'src/http/routes/designOs.ts' 'src/http/routes/designOs.test.ts' --max-warnings 0",
     "test": "vitest run",
     "test:e2e": "npm run build && node e2e/run.mjs",
+    "setup:test-browser": "playwright install chromium",
+    "verify:parallel": "node scripts/verify-parallel.mjs",
     "preview:evidence": "node scripts/import-preview-evidence.mjs",
     "verify:capability-contract": "node scripts/verify-capability-contract.mjs",
     "verify:mcp": "node scripts/verify-mcp-config.mjs",
@@ -65,6 +68,6 @@
     "wrangler": "^4.110.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   }
 }
