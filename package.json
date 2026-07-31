@@ -10,6 +10,8 @@
     "typecheck:design-os": "tsc -p tsconfig.design-os.json",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
+    "whoami": "python3 scripts/whoami.py",
+    "verify:whoami": "python3 -m unittest scripts/test_whoami.py",
     "cf:dev": "wrangler dev --config wrangler.toml --port 8787",
     "cf:dev:api": "wrangler dev --config wrangler.api.toml --port 8788",
     "cf:dry-run": "wrangler deploy --dry-run --config wrangler.toml --outdir .wrangler/dry-run",
