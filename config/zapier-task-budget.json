@@ -1,0 +1,171 @@
+{
+  "version": 2,
+  "plan": {
+    "name": "Zapier Free",
+    "monthly_task_limit": 100,
+    "operating_ceiling": 90,
+    "emergency_reserve": 10
+  },
+  "scope": {
+    "reported_current_monthly_tasks": 126,
+    "planned_monthly_tasks": 88,
+    "headroom_below_operating_ceiling": 2,
+    "overflow_behavior": "hold_in_zapier_table_for_manual_review_or_next_month"
+  },
+  "allocations": [
+    {
+      "id": "founder-signal-analysis",
+      "monthly_runs": 30,
+      "tasks_per_run": 2,
+      "planned_tasks": 60,
+      "billable_actions": [
+        "one structured AI analysis",
+        "one same-deal HubSpot result note"
+      ]
+    },
+    {
+      "id": "approved-buffer-parallel-campaigns",
+      "monthly_runs": 6,
+      "tasks_per_run": 3,
+      "planned_tasks": 18,
+      "billable_actions": [
+        "one Buffer draft or queue action for each of three founder-approved active channels"
+      ]
+    },
+    {
+      "id": "approved-investor-outreach",
+      "monthly_runs": 6,
+      "tasks_per_run": 1,
+      "planned_tasks": 6,
+      "billable_actions": [
+        "one personalized email send after founder approval"
+      ]
+    },
+    {
+      "id": "failure-writeback",
+      "monthly_runs": 4,
+      "tasks_per_run": 1,
+      "planned_tasks": 4,
+      "billable_actions": [
+        "one same-deal HubSpot failure task"
+      ]
+    }
+  ],
+  "analysis_output_contract": {
+    "single_ai_action": true,
+    "fields": [
+      "signal_id",
+      "decision",
+      "who",
+      "what",
+      "where",
+      "when",
+      "why",
+      "how",
+      "verified_evidence",
+      "inferred_conclusions",
+      "unknown_information",
+      "missing_evidence",
+      "first_failure_stage",
+      "recommended_next_action",
+      "me_reality_now",
+      "me_smallest_next_action",
+      "me_founder_voice",
+      "me_profile_angle",
+      "future_you_guidance",
+      "future_you_what_mattered",
+      "future_you_what_did_not",
+      "future_you_valid_fear",
+      "chief_ai_decision",
+      "social_campaign_angle",
+      "social_campaign_media_brief",
+      "linkedin_draft",
+      "facebook_draft",
+      "instagram_draft",
+      "threads_draft",
+      "x_draft",
+      "tiktok_caption",
+      "youtube_shorts_draft",
+      "pinterest_draft",
+      "bluesky_draft",
+      "mastodon_draft",
+      "google_business_draft",
+      "investor_outreach_draft",
+      "publish_allowed"
+    ],
+    "future_you": {
+      "time_horizon_years": 5,
+      "voice": "first_person_future_self",
+      "required_opener": "The thing you’re worried about most right now — I remember that. Here’s what actually happened…",
+      "must_be_specific": true,
+      "generic_advice_allowed": false
+    },
+    "me": {
+      "meaning": "present-self founder decision layer",
+      "must_name_reality_now": true,
+      "must_choose_one_smallest_next_action": true,
+      "must_preserve_founder_voice": true,
+      "profile_angle_only_when_relevant": true
+    }
+  },
+  "buffer_distribution": {
+    "mode": "parallel_review_first",
+    "parallel_channel_slots": 3,
+    "conservative_connected_channel_baseline": 3,
+    "active_channels_source": "live_buffer_connections",
+    "selection_policy": [
+      "founder_approval",
+      "audience_fit",
+      "platform_readiness",
+      "media_compatibility",
+      "queue_capacity",
+      "recent_coverage"
+    ],
+    "supported_draft_platforms": [
+      "linkedin",
+      "facebook",
+      "instagram",
+      "threads",
+      "x",
+      "tiktok",
+      "youtube_shorts",
+      "pinterest",
+      "bluesky",
+      "mastodon",
+      "google_business"
+    ],
+    "selected_channels_must_be_unique": true,
+    "one_billable_buffer_action_per_selected_channel": true,
+    "platform_native_copy_required": true,
+    "unselected_platforms": "retain_as_review_drafts_in_hubspot_and_founder_control_room",
+    "fallback_at_budget_ceiling": "keep_campaign_in_free_backlog_without_buffer_actions"
+  },
+  "free_steps": [
+    "triggers",
+    "filters",
+    "formatter",
+    "paths",
+    "delay",
+    "looping",
+    "sub-zaps",
+    "digests",
+    "zapier-manager",
+    "storage",
+    "tables",
+    "forms"
+  ],
+  "guardrails": {
+    "one_ai_call_per_signal": true,
+    "social_channels_generated_in_one_ai_response": true,
+    "future_you_and_me_share_core_ai_action": true,
+    "buffer_parallel_distribution": true,
+    "one_buffer_action_per_active_channel": true,
+    "nonselected_social_channels_remain_review_drafts": true,
+    "hubspot_result_note_is_canonical_writeback": true,
+    "founder_control_room_reads_proof_without_a_second_zapier_write": true,
+    "external_send_or_publish_requires_founder_approval": true,
+    "budget_gate_runs_before_billable_actions": true,
+    "stop_new_billable_work_at_operating_ceiling": true,
+    "delete_or_disable_existing_zaps_automatically": false
+  }
+}
