@@ -84,6 +84,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
       - name: Run guarded repository cycle
         id: cycle
         run: >-
