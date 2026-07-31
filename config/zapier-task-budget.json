@@ -51,6 +51,53 @@
       ]
     }
   ],
+  "analysis_output_contract": {
+    "single_ai_action": true,
+    "fields": [
+      "signal_id",
+      "decision",
+      "who",
+      "what",
+      "where",
+      "when",
+      "why",
+      "how",
+      "verified_evidence",
+      "inferred_conclusions",
+      "unknown_information",
+      "missing_evidence",
+      "first_failure_stage",
+      "recommended_next_action",
+      "me_reality_now",
+      "me_smallest_next_action",
+      "me_founder_voice",
+      "me_profile_angle",
+      "future_you_guidance",
+      "future_you_what_mattered",
+      "future_you_what_did_not",
+      "future_you_valid_fear",
+      "chief_ai_decision",
+      "linkedin_draft",
+      "facebook_draft",
+      "instagram_draft",
+      "investor_outreach_draft",
+      "publish_allowed"
+    ],
+    "future_you": {
+      "time_horizon_years": 5,
+      "voice": "first_person_future_self",
+      "required_opener": "The thing you’re worried about most right now — I remember that. Here’s what actually happened…",
+      "must_be_specific": true,
+      "generic_advice_allowed": false
+    },
+    "me": {
+      "meaning": "present-self founder decision layer",
+      "must_name_reality_now": true,
+      "must_choose_one_smallest_next_action": true,
+      "must_preserve_founder_voice": true,
+      "profile_angle_only_when_relevant": true
+    }
+  },
   "free_steps": [
     "triggers",
     "filters",
@@ -68,6 +115,7 @@
   "guardrails": {
     "one_ai_call_per_signal": true,
     "social_channels_generated_in_one_ai_response": true,
+    "future_you_and_me_share_core_ai_action": true,
     "buffer_linkedin_first": true,
     "other_social_channels_remain_review_drafts": true,
     "hubspot_result_note_is_canonical_writeback": true,
