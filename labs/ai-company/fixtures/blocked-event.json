@@ -1,0 +1,19 @@
+{
+  "dataClassification": "synthetic",
+  "projectSlug": "synthetic-founder-project",
+  "eventId": "synthetic-event-blocked",
+  "summary": "A synthetic event is missing traction and governance proof.",
+  "requestedMode": "publish",
+  "audiences": ["investors"],
+  "platforms": ["linkedin"],
+  "proof": {
+    "projectSlug": "synthetic-founder-project",
+    "status": "ready",
+    "urls": [
+      "https://proof.example.test/synthetic-event-blocked"
+    ]
+  },
+  "traction": [],
+  "governanceAdvantages": [],
+  "founderApprovalId": "synthetic-approval-blocked"
+}
