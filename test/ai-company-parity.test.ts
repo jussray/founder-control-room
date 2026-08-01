@@ -235,6 +235,43 @@ describe('Founder OS and AI Company cross-lab parity', () => {
     expect(failures).toEqual([]);
   });
 
+  it('ignores stale approval references on review-only drafts in both labs', () => {
+    const founderPlan = planFounderOsLab({
+      goal: 'Prepare a review-only founder draft.',
+      action: 'draft-social',
+      approval: {
+        id: 'founder-approved:unrelated-queue-action',
+        actions: ['queue-social'],
+      },
+      evidence: {
+        repository: 'jussray/founder-control-room',
+        commitSha: SHA,
+        proofUrls: [PROOF_URL],
+      },
+      socialPost: socialPost('draft'),
+    });
+    const company = runCompanySimulation(companyInput({
+      requestedMode: 'draft',
+      founderApprovalId: 'founder-approved:stale-draft-token',
+    }));
+
+    expect(founderPlan.authority).toMatchObject({
+      executionAllowed: false,
+      approvalRequired: false,
+      approvalObserved: false,
+    });
+    expect(company.authority).toEqual({
+      level: 'L0',
+      mode: 'simulation',
+      executionAllowed: false,
+      approvalRequired: false,
+      approvalObserved: false,
+    });
+    expect(company.decision.status).toBe('draft_ready');
+    expect(company.decision.publishAllowed).toBe(false);
+    expect(company.receipts.every((receipt: { status: string }) => receipt.status === 'simulated_draft')).toBe(true);
+  });
+
   it('produces deterministic plans and receipts for identical synthetic input', () => {
     const founderRequest = {
       goal: 'Prepare a deterministic founder draft.',
