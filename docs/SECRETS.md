@@ -31,7 +31,8 @@ Secrets marked **required** will cause the named workflow job to fail if absent.
 | Secret | Required by | Description |
 |---|---|---|
 | `CLOUDFLARE_API_TOKEN` | `deploy.yml / worker-deploy` | Wrangler deploy token. Scope: `Workers Scripts:Edit` on the target account. |
-| `CLOUDFLARE_ACCOUNT_ID` | `deploy.yml / worker-deploy` | Cloudflare account ID. |
+| `CLOUDFLARE_BUILDS_API_TOKEN` | manual `cloudflare-build-diagnostic.yml` | User-scoped token with the Cloudflare Workers Builds read permissions required by the Builds API. Keep this separate from account-scoped deploy tokens because the Builds API rejects account-scoped tokens. |
+| `CLOUDFLARE_ACCOUNT_ID` | `deploy.yml / worker-deploy`, manual Cloudflare diagnostic | Cloudflare account ID. |
 | `CF_SESSIONS_KV_NAMESPACE_ID` | `deploy.yml / worker-deploy` | KV namespace ID for session storage. |
 | `CF_FEATURE_FLAGS_KV_NAMESPACE_ID` | `deploy.yml / worker-deploy` | KV namespace ID for feature flags. |
 
@@ -115,6 +116,7 @@ Never commit this value. Never log it. Never put it in a `NEXT_PUBLIC_*` variabl
 [ ] SUPABASE_SERVICE_ROLE_KEY
 [ ] NEXT_PUBLIC_SUPABASE_URL
 [ ] CLOUDFLARE_API_TOKEN
+[ ] CLOUDFLARE_BUILDS_API_TOKEN (optional; manual redacted build diagnostics only)
 [ ] CLOUDFLARE_ACCOUNT_ID
 [ ] CF_SESSIONS_KV_NAMESPACE_ID
 [ ] CF_FEATURE_FLAGS_KV_NAMESPACE_ID

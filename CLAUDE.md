@@ -11,6 +11,34 @@ This file governs Claude (claude.ai, Claude Code, MCP-connected sessions) when w
 - **Why** — verified founder decision or oversight need and evidence.
 - **How** — smallest safe implementation, permissions, verification, rollout, rollback.
 
+## Mirror Engine, fact-checking, and portable approvals
+
+For Mirror Engine, founder-voice compression, Tiny Move, Tone Guard, fact-checking,
+or conversational approval work, also read:
+
+- [`docs/MIRROR_ENGINE_V1.md`](docs/MIRROR_ENGINE_V1.md)
+- [`skills/fact-check-every-claim/SKILL.md`](skills/fact-check-every-claim/SKILL.md)
+- [`docs/PORTABLE_FOUNDER_APPROVALS.md`](docs/PORTABLE_FOUNDER_APPROVALS.md)
+- [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md)
+- [`docs/FOUNDER_COMMAND_BRIDGE.md`](docs/FOUNDER_COMMAND_BRIDGE.md)
+
+Claude may carry Juss’s exact approve or deny decision through a registered,
+authenticated portable-approval adapter. Claude does not become the source of
+truth and may not self-approve. Founder Control Room must validate and record the
+founder identity, source conversation or receipt reference, exact action, target,
+content hash, branch, commit SHA, expiry, one-time consumption, evidence, and
+immutable decision receipt.
+
+Plain copied chat text, prior broad approval, model memory, or Claude’s own
+recommendation is not a mutation receipt. Evidence is the lock; Claude is an
+approved command console when the adapter and receipt contract are valid.
+
+Before external content use, fact-check every factual claim line by line. Use
+Perplexity MCP for parallel source discovery when available, while inspecting and
+recording the underlying primary and reputable secondary sources. Tone Guard may
+improve phrasing but may not erase uncertainty or turn an unsupported claim into
+verified evidence.
+
 For messaging, lead generation, sales automation, unified inbox, consent, outreach,
 email, SMS, calls, webchat, Instagram, Facebook, WhatsApp, Telegram, Viber, or
 channel-adapter work, also read:
@@ -65,22 +93,41 @@ Using connected external tools under the scoped Founder Signal Engine contracts 
 
 **Repository:** `jussray/founder-control-room`
 **Role:** Founder-facing operational dashboard aggregating health, metrics, and status signals across all Chief AI ecosystem projects — Chief AI, Se’kret Bip, Think Tank, JBH, Untold Stories, and L99.
-**Trust boundary:** This surface shows aggregated status. It must never become an execution layer — no mutations, no secrets storage, no direct project writes.
+**Trust boundary:** This surface aggregates status and exposes narrowly guarded execution routes. It must never become an unrestricted mutation layer, secrets store, or raw shell.
 
 ## Non-Negotiable Boundaries
 
-- This dashboard is read-only and status-only — no execution, mutation, or secrets storage.
-- Never expose raw credentials, private business data, vendor details, or customer/order records in the dashboard UI or any model output.
+- Never expose raw credentials, private business data, vendor details, or customer/order records in the dashboard UI or model output.
 - Do not blend project-specific private data across project views.
-- Credentials and integration tokens must stay in vault — never in client code.
-- All production-touching changes require explicit founder approval.
+- Credentials and integration tokens must stay in vault or backend secret storage, never client code.
 - Keep the Control Room separate from Se’kret Bip’s database and service credentials.
 - Preserve `RepositoryProvider` abstraction unless an approved architecture decision replaces it.
 - Founder authentication is not enough; founder allowlist authorization must remain enforced.
 - Curated operational events may cross project boundaries. Raw private user content must not.
 - Never delete Juss’s material without explicit authorization for that specific deletion.
 - Do not invent dashboard state, provider configuration, deployment success, approval history, demand, or revenue.
-- Do not merge, deploy, rotate credentials, alter auth/RLS, publish externally, contact anyone, or perform destructive changes without explicit founder approval.
+- Repository merges follow `docs/FOUNDER_MERGE_AUTHORITY.md`: standing authority or a valid portable founder approval may authorize the exact merge only when required evidence is green and current.
+- Do not deploy, rotate credentials, alter auth/RLS, publish externally, contact anyone, spend funds, change DNS, or perform destructive changes without the separate exact founder authority required for that action.
+
+## Never signal success on failure
+
+Do not show a success message or set a success flag inside a `catch` block.
+
+If an operation throws or returns an error, the UI must reflect failure. Success may only be shown after the operation has completed successfully and its result has been verified.
+
+This rule prevents false-positive UX where a user believes an action completed even though the underlying operation failed. A known example was a reminder interface reporting that a reminder was set after scheduling had thrown.
+
+## Branch hygiene
+
+Maintain one active implementation branch and one pull request per logical change.
+
+- Branch once from current `main`.
+- Use descriptive names such as `fix/*`, `chore/*`, or `feat/*`.
+- Continue corrections, review changes, and conflict resolution on the canonical branch.
+- Do not create duplicate or versioned branches such as `*-v2`, `*-v3`, or `*-current-main`.
+- Do not open a replacement PR merely to avoid repairing the existing canonical change path.
+
+See [`REPO_HEALTH_DUPLICATES.md`](REPO_HEALTH_DUPLICATES.md) for the full duplicate-work and branch policy.
 
 ## Implementation Discipline
 
@@ -105,13 +152,15 @@ Compilation proves compilation. Unit tests prove tested behavior. CI proves repo
 1. Observe exact branch, data source configurations, and display boundaries.
 2. Complete 5W1H and identify authority or safety gaps.
 3. Red-team data exposure, cross-project blending, mutation creep, and rollback.
-4. Choose smallest reversible action preserving existing work.
-5. Run build and display-boundary checks.
+4. Choose the smallest reversible action preserving existing work.
+5. Run the narrowest valid type, lint, unit, build, contract, and Playwright checks for the touched path.
 6. Report proven, inferred, blocked, and next owner.
 
 ## Approval Gates
 
-Require explicit founder approval before: merging, deploying, adding new data sources, changing integration scope, rotating secrets, or adding execution capabilities.
+Repository merge authority is governed by `docs/FOUNDER_MERGE_AUTHORITY.md` and may be carried through a valid packet from an approved conversational console under `docs/PORTABLE_FOUNDER_APPROVALS.md`.
+
+Separate exact founder authority remains required before deployment, new provider or data-source scope, credential changes, auth/RLS changes, DNS, billing, destructive writes, publication, sending, or external communication unless a narrower standing policy explicitly covers that exact category.
 
 ## Output Format
 

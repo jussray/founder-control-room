@@ -6,15 +6,19 @@
 <title>Founder Control Room</title>
 <link rel="stylesheet" href="/control-room/styles.css" />
 <style>
-.control-room-entry{position:fixed;right:1rem;z-index:1000;border:1px solid rgba(148,163,184,.35);background:#111827;color:#e5f0ff;text-decoration:none;border-radius:999px;padding:.65rem .9rem;font:600 14px system-ui,sans-serif;box-shadow:0 16px 48px rgba(0,0,0,.28)}
-.control-room-entry:hover{background:#1f2937}
-.plugin-center-entry{bottom:1rem}
-.command-bridge-entry{bottom:4.25rem}
-.github-workspace-entry{bottom:7.5rem}
-.repository-settings-entry{bottom:10.75rem}
-.founder-signal-entry{bottom:14rem}
-.futureyou-entry{bottom:17.25rem;border-color:rgba(128,241,211,.45);color:#bffbed}
-.goalfix-entry{bottom:20.5rem;border-color:rgba(171,131,255,.55);color:#dccbff}
+.launch-dock{position:fixed;right:max(1rem,env(safe-area-inset-right));bottom:max(1rem,env(safe-area-inset-bottom));z-index:1000;width:min(23rem,calc(100vw - 2rem));padding:.75rem;border:1px solid rgba(148,163,184,.28);border-radius:1.25rem;background:rgba(8,13,25,.94);box-shadow:0 24px 72px rgba(0,0,0,.4);backdrop-filter:blur(18px)}
+.launch-dock summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.2rem .25rem;color:#eef5ff;font:700 14px system-ui,sans-serif}
+.launch-dock summary::-webkit-details-marker{display:none}
+.launch-dock summary::after{content:'+';display:grid;place-items:center;width:1.7rem;height:1.7rem;border-radius:999px;background:rgba(148,163,184,.14);font-size:1.15rem}
+.launch-dock[open] summary::after{content:'−'}
+.launch-dock-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem;margin-top:.7rem}
+.launch-link{display:flex;min-height:3rem;align-items:center;padding:.7rem .75rem;border:1px solid rgba(148,163,184,.22);border-radius:.85rem;background:#111827;color:#e5f0ff;text-decoration:none;font:650 13px/1.25 system-ui,sans-serif}
+.launch-link:hover{background:#1f2937;border-color:rgba(171,131,255,.55)}
+.launch-link:focus-visible,.launch-dock summary:focus-visible{outline:3px solid #a78bfa;outline-offset:3px}
+.launch-link[data-family='chief']{border-color:rgba(128,241,211,.34);color:#c9fff1}
+.launch-link[data-family='proof']{border-color:rgba(171,131,255,.38);color:#e3d6ff}
+@media(max-width:640px){.launch-dock{left:max(.75rem,env(safe-area-inset-left));right:max(.75rem,env(safe-area-inset-right));bottom:max(.75rem,env(safe-area-inset-bottom));width:auto}.launch-dock-grid{grid-template-columns:1fr 1fr}.launch-link{min-height:3.25rem}}
+@media(prefers-reduced-motion:no-preference){.launch-dock{transition:transform .16s ease}.launch-link{transition:background-color .16s ease,border-color .16s ease,transform .16s ease}.launch-link:hover{transform:translateY(-1px)}}
 </style>
 </head>
 <body>
@@ -24,13 +28,18 @@
        to show the sign-in screen or the app shell. -->
   <p class="boot-fallback">Loading Founder Control Room…</p>
 </div>
-<a class="control-room-entry goalfix-entry" href="/control-room/goalfix.html">Goalfix</a>
-<a class="control-room-entry futureyou-entry" href="/control-room/futureyou-v8.html">FutureYou V8</a>
-<a class="control-room-entry founder-signal-entry" href="/control-room/founder-signal-engine.html">Founder Signal Engine</a>
-<a class="control-room-entry github-workspace-entry" href="/control-room/github-workspace.html">GitHub Workspace</a>
-<a class="control-room-entry command-bridge-entry" href="/control-room/command-bridge.html">Command Bridge</a>
-<a class="control-room-entry plugin-center-entry" href="/control-room/plugin-center.html">Plugin Center</a>
-<a class="control-room-entry repository-settings-entry" href="/control-room/repository-settings.html">Repository Settings</a>
+<details class="launch-dock">
+  <summary>Open the founder stack</summary>
+  <nav class="launch-dock-grid" aria-label="Founder Control Room product surfaces">
+    <a class="launch-link" data-family="proof" href="/control-room/goalfix.html">Goalfix</a>
+    <a class="launch-link" data-family="chief" href="/control-room/futureyou-v8.html">FutureYou V8</a>
+    <a class="launch-link" data-family="chief" href="/control-room/founder-signal-engine.html">Founder Signal Engine</a>
+    <a class="launch-link" data-family="proof" href="/control-room/github-workspace.html">GitHub Workspace</a>
+    <a class="launch-link" href="/control-room/command-bridge.html">Command Bridge</a>
+    <a class="launch-link" href="/control-room/plugin-center.html">Plugin Center</a>
+    <a class="launch-link" href="/control-room/repository-settings.html">Repository Settings</a>
+  </nav>
+</details>
 <script type="module" src="/control-room/app.js"></script>
 </body>
 </html>
