@@ -11,6 +11,7 @@ on:
       - 'tools/zapier/test-buffer-provider-contract.cjs'
       - 'config/buffer-provider-contract.json'
       - 'test/ai-company-parity.test.ts'
+      - 'vitest.ai-company-parity.config.ts'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/ai-company-parity.yml'
