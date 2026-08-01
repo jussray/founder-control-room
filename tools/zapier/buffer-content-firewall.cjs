@@ -4,7 +4,10 @@
 const MIN_POST_LENGTH = 80;
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const HTTPS_URL = /^https:\/\//i;
-const ALLOWED_DESTINATION_MODES = new Set(['draft', 'queue', 'publish']);
+const BUFFER_PROVIDER_ACTION = 'buffer_add_to_queue';
+const BUFFER_PROVIDER_METHOD = 'draft';
+const BUFFER_API_SAVE_TO_DRAFT = true;
+const ALLOWED_DESTINATION_MODES = new Set(['draft']);
 const ALLOWED_CONTENT_FIELDS = new Set([
   'linkedin_draft',
   'facebook_founder_draft',
@@ -57,7 +60,6 @@ function validateBufferPublishInput(input = {}) {
   const destinationMode = asTrimmedString(input.destination_mode).toLowerCase();
   const proofUrl = asTrimmedString(input.proof_url);
   const sourceCommitSha = asTrimmedString(input.source_commit_sha);
-  const founderApprovalId = asTrimmedString(input.founder_approval_id);
   const publishAllowed = asBoolean(input.publish_allowed);
   const channel = asTrimmedString(input.channel);
 
@@ -74,7 +76,11 @@ function validateBufferPublishInput(input = {}) {
   if (!channel) errors.push('channel is required');
 
   if (!ALLOWED_DESTINATION_MODES.has(destinationMode)) {
-    errors.push('destination_mode must be draft, queue, or publish');
+    errors.push('destination_mode must remain draft while the Buffer provider contract is draft-only');
+  }
+
+  if (publishAllowed) {
+    errors.push('publish_allowed must remain false while the Buffer provider contract is draft-only');
   }
 
   if (postText.length < MIN_POST_LENGTH) {
@@ -94,11 +100,6 @@ function validateBufferPublishInput(input = {}) {
     errors.push('source_commit_sha must be an exact 40-character commit SHA');
   }
 
-  if ((destinationMode === 'queue' || destinationMode === 'publish') &&
-      (!publishAllowed || !founderApprovalId)) {
-    errors.push('queue or publish mode requires publish_allowed=true and founder_approval_id');
-  }
-
   if (errors.length > 0) {
     const error = new Error(`FOUNDER_SIGNAL_CONTENT_REJECTED: ${errors.join('; ')}`);
     error.code = 'FOUNDER_SIGNAL_CONTENT_REJECTED';
@@ -111,10 +112,14 @@ function validateBufferPublishInput(input = {}) {
     content_validated: true,
     content_field: contentField,
     channel,
-    destination_mode: destinationMode,
+    destination_mode: 'draft',
+    publish_allowed: false,
     proof_url: proofUrl,
     source_commit_sha: sourceCommitSha,
-    founder_approval_id: founderApprovalId || null,
+    founder_approval_id: null,
+    buffer_action: BUFFER_PROVIDER_ACTION,
+    buffer_method: BUFFER_PROVIDER_METHOD,
+    buffer_save_to_draft: BUFFER_API_SAVE_TO_DRAFT,
   };
 }
 
@@ -125,6 +130,9 @@ if (typeof inputData !== 'undefined') {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     validateBufferPublishInput,
+    BUFFER_PROVIDER_ACTION,
+    BUFFER_PROVIDER_METHOD,
+    BUFFER_API_SAVE_TO_DRAFT,
     ALLOWED_CONTENT_FIELDS,
     FORBIDDEN_CONTENT_FIELDS,
     PROMPT_LEAK_PATTERNS,
