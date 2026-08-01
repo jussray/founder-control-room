@@ -129,3 +129,16 @@ test('blocks cross-project proof even when every other field is complete', async
   );
   assert.equal(transport.calls.length, 0);
 });
+
+test('blocks a complete synthetic event when clickable proof is missing', async () => {
+  const input = await fixture('parity-missing-proof.json');
+  const transport = createFakeTransport();
+  const result = runCompanySimulation(input, { transport });
+
+  assert.equal(result.decision.status, 'blocked');
+  assert.ok(result.decision.blockers.includes('missing clickable proof'));
+  assert.equal(result.authority.executionAllowed, false);
+  assert.equal(result.campaign, null);
+  assert.equal(result.receipts.length, 0);
+  assert.equal(transport.calls.length, 0);
+});
