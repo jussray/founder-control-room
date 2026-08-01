@@ -3,7 +3,12 @@
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const vm = require('node:vm');
-const { validateBufferPublishInput } = require('./buffer-content-firewall.cjs');
+const {
+  validateBufferPublishInput,
+  BUFFER_PROVIDER_ACTION,
+  BUFFER_PROVIDER_METHOD,
+  BUFFER_API_SAVE_TO_DRAFT,
+} = require('./buffer-content-firewall.cjs');
 
 const sha = '205a239486b6b542648ce2f125178814e358b816';
 
@@ -44,19 +49,27 @@ const validDraft = validateBufferPublishInput(validInput);
 
 assert.equal(validDraft.content_validated, true);
 assert.equal(validDraft.validated_post_text, founderLinkedInPost);
+assert.equal(validDraft.destination_mode, 'draft');
+assert.equal(validDraft.publish_allowed, false);
+assert.equal(validDraft.founder_approval_id, null);
+assert.equal(validDraft.buffer_action, BUFFER_PROVIDER_ACTION);
+assert.equal(validDraft.buffer_action, 'buffer_add_to_queue');
+assert.equal(validDraft.buffer_method, BUFFER_PROVIDER_METHOD);
+assert.equal(validDraft.buffer_method, 'draft');
+assert.equal(validDraft.buffer_save_to_draft, BUFFER_API_SAVE_TO_DRAFT);
+assert.equal(validDraft.buffer_save_to_draft, true);
 
-assert.equal(
-  validateBufferPublishInput({
-    post_text: brandFacebookPost,
-    content_field: 'facebook_brand_draft',
-    channel: 'juss_beautiful_hair_facebook',
-    destination_mode: 'draft',
-    publish_allowed: false,
-    proof_url: 'https://github.com/jussray/jussbeautifulhair-site/pull/27',
-    source_commit_sha: sha,
-  }).content_validated,
-  true,
-);
+const brandDraft = validateBufferPublishInput({
+  post_text: brandFacebookPost,
+  content_field: 'facebook_brand_draft',
+  channel: 'juss_beautiful_hair_facebook',
+  destination_mode: 'draft',
+  publish_allowed: false,
+  proof_url: 'https://github.com/jussray/jussbeautifulhair-site/pull/27',
+  source_commit_sha: sha,
+});
+assert.equal(brandDraft.content_validated, true);
+assert.equal(brandDraft.buffer_method, 'draft');
 
 assert.throws(
   () => validateBufferPublishInput({
@@ -84,32 +97,37 @@ assert.throws(
   /instruction input, not publishable copy/,
 );
 
+for (const destinationMode of ['queue', 'publish', 'schedule', 'share_now', 'share_next', 'schedule_draft']) {
+  assert.throws(
+    () => validateBufferPublishInput({
+      ...validInput,
+      destination_mode: destinationMode,
+      publish_allowed: true,
+      founder_approval_id: 'founder-approved:must-not-bypass-draft-lock',
+    }),
+    /destination_mode must remain draft/,
+    `${destinationMode} must fail even when approval-looking input is supplied`,
+  );
+}
+
 assert.throws(
   () => validateBufferPublishInput({
-    post_text: founderLinkedInPost,
-    content_field: 'linkedin_draft',
-    channel: 'juss_rayy_linkedin',
-    destination_mode: 'queue',
-    publish_allowed: false,
-    proof_url: 'https://github.com/jussray/jussbeautifulhair-site/pull/27',
-    source_commit_sha: sha,
+    ...validInput,
+    publish_allowed: true,
+    founder_approval_id: 'founder-approved:must-not-bypass-draft-lock',
   }),
-  /requires publish_allowed=true and founder_approval_id/,
+  /publish_allowed must remain false/,
 );
 
-assert.equal(
-  validateBufferPublishInput({
-    post_text: founderLinkedInPost,
-    content_field: 'linkedin_draft',
-    channel: 'juss_rayy_linkedin',
-    destination_mode: 'queue',
-    publish_allowed: true,
-    founder_approval_id: 'founder-approved:day3-buffer-copy',
-    proof_url: 'https://github.com/jussray/jussbeautifulhair-site/pull/27',
-    source_commit_sha: sha,
-  }).destination_mode,
-  'queue',
-);
+const overrideAttempt = validateBufferPublishInput({
+  ...validInput,
+  method: 'share_now',
+  buffer_method: 'share_now',
+  saveToDraft: false,
+  buffer_save_to_draft: false,
+});
+assert.equal(overrideAttempt.buffer_method, 'draft');
+assert.equal(overrideAttempt.buffer_save_to_draft, true);
 
 const zapierLikeContext = {
   inputData: validInput,
@@ -124,5 +142,8 @@ vm.runInContext(
 
 assert.equal(zapierLikeContext.output.content_validated, true);
 assert.equal(zapierLikeContext.output.validated_post_text, founderLinkedInPost);
+assert.equal(zapierLikeContext.output.buffer_action, 'buffer_add_to_queue');
+assert.equal(zapierLikeContext.output.buffer_method, 'draft');
+assert.equal(zapierLikeContext.output.buffer_save_to_draft, true);
 
-console.log('Buffer content firewall verified: finished post copy passes in Node and Zapier-like runtimes; prompts and unauthorized queue/publish payloads fail.');
+console.log('Buffer content firewall verified: finished copy is forced to draft-only provider fields in Node and Zapier-like runtimes; prompts, queue, schedule, and publish attempts fail closed.');
