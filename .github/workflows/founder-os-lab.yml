@@ -19,9 +19,24 @@ jobs:
   isolated-lab:
     runs-on: ubuntu-22.04
     timeout-minutes: 10
+    env:
+      TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - name: Check out exact candidate
+      - name: Check out exact candidate head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact candidate head
+        run: |
+          actual_sha="$(git rev-parse HEAD)"
+          test "$actual_sha" = "$TARGET_SHA" || {
+            echo "Expected $TARGET_SHA but checked out $actual_sha" >&2
+            exit 1
+          }
+          echo "Verified exact candidate head: $actual_sha"
 
       - name: Set up Node
         uses: actions/setup-node@v4
