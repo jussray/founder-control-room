@@ -199,7 +199,7 @@ describe('Founder OS and AI Company cross-lab parity', () => {
         founder_approval_id: 'founder-approved:unsafe-override',
         proof_url: PROOF_URL,
         source_commit_sha: SHA,
-      })).toThrow(/destination_mode must be draft/);
+      })).toThrow(/destination_mode must remain draft[\s\S]*publish_allowed must remain false/);
     }
   });
 
