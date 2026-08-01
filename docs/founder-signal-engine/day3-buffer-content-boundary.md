@@ -1,178 +1,114 @@
 # Day 3 Buffer Content Boundary
 
-Status: `IMPLEMENTED_IN_REPO_AWAITING_LIVE_ZAP_MAPPING`
+Status: `EXECUTABLE_DRAFT_GUARD_IMPLEMENTED_AWAITING_LIVE_ZAP_MAPPING`
 
-Authoritative configuration: [`config/zapier-task-budget.json`](../../config/zapier-task-budget.json)
+Authoritative budget: [`config/zapier-task-budget.json`](../../config/zapier-task-budget.json)
+
+Machine-readable provider contract: [`config/buffer-provider-contract.json`](../../config/buffer-provider-contract.json)
 
 Executable firewall: [`tools/zapier/buffer-content-firewall.cjs`](../../tools/zapier/buffer-content-firewall.cjs)
 
-Verification: `npm run verify:zapier-budget`
+Verification:
+
+```bash
+npm run verify:buffer-content
+```
 
 ## Reality
 
-The Day 3 lane has transported prompt instructions into Buffer instead of the finished social post generated from those instructions.
+The original failure was a field-mapping failure: prompt instructions could reach Buffer instead of finished platform copy. A second provider-level gap also existed: review-only policy did not itself set Buffer's `Method` field.
 
-That is a field-mapping failure, not a writing failure.
+The executable firewall now handles both boundaries. It accepts only finished, proof-linked platform copy and emits only draft-safe Buffer fields.
 
-The prompt is private orchestration input. Buffer must receive only complete, platform-ready copy after the structured AI response has been parsed and validated.
+## Executable output contract
 
-## Founder-approved content shape
+A valid firewall result includes:
 
-The desired output is the finished post package demonstrated by the PR #27 status copy:
-
-- name the real change;
-- distinguish verified evidence from unfinished work;
-- avoid launch or product claims that the evidence does not support;
-- include the relevant proof links;
-- preserve Ray's direct founder voice;
-- adapt the same proof package for each owned channel rather than copying one generic caption everywhere.
-
-The three canonical first routes are:
-
-| Owned channel | Structured AI output field | Audience job |
-|---|---|---|
-| Juss Rayy LinkedIn | `linkedin_draft` | Technical founder narrative, evidence, business lesson, partner or investor signal |
-| Juss&Co Facebook | `facebook_founder_draft` | Founder confession, community context, what changed, what remains unfinished |
-| Juss Beautiful Hair Facebook | `facebook_brand_draft` | Customer-facing brand update, clear promises, preview status, customer question |
-
-`facebook_draft` remains available for backward compatibility and general Facebook review copy, but it is not the canonical source for either named Facebook page.
-
-## Required structured AI response
-
-The shared AI action must return one valid JSON object with the existing evidence, ME, FutureYou, and campaign fields plus these distinct finished-copy fields:
-
-```json
-{
-  "verified_evidence": [],
-  "inferred_conclusions": [],
-  "unknown_information": [],
-  "missing_evidence": [],
-  "linkedin_draft": "complete LinkedIn post",
-  "facebook_founder_draft": "complete Juss&Co Facebook post",
-  "facebook_brand_draft": "complete Juss Beautiful Hair Facebook post",
-  "instagram_draft": "complete Instagram caption",
-  "publish_allowed": false
-}
+```text
+validated_post_text
+content_validated: true
+content_field
+channel
+destination_mode: draft
+publish_allowed: false
+proof_url
+source_commit_sha
+founder_approval_id: null
+buffer_action: buffer_add_to_queue
+buffer_method: draft
+buffer_save_to_draft: true
 ```
 
-The response must not wrap JSON in Markdown or place commentary outside the object.
+Caller-supplied values such as `share_now`, `queue`, `publish`, or `saveToDraft: false` cannot widen this output. The firewall owns the provider fields.
 
-## Zap step order
+## Required Zap order
 
 ```text
 verified source signal
 -> one structured AI action
--> parse JSON fields
--> select the exact channel-specific draft field
--> Buffer content firewall
--> Buffer draft, queue, or publish action
--> retain Buffer and platform receipts
+-> parse channel-specific finished copy
+-> Code by Zapier using buffer-content-firewall.cjs
+-> map Buffer Post Text from validated_post_text
+-> map Buffer Method from buffer_method
+-> create Buffer draft
+-> retain the real Buffer draft identifier
 ```
 
-Do not send the raw AI response directly to Buffer. Do not map the prompt, system instruction, user message, source note, raw response, or GitHub evidence field into Buffer's post text.
+Do not map the raw AI response, prompt, system instruction, user message, source note, or GitHub evidence field into Buffer's post text.
 
-## Firewall input mapping
-
-Add **Code by Zapier** immediately before each Buffer action and paste the contents of:
-
-```text
-tools/zapier/buffer-content-firewall.cjs
-```
-
-Map these inputs:
+## Code by Zapier inputs
 
 | Code input | Source |
 |---|---|
-| `post_text` | The selected platform output, such as `linkedin_draft` |
-| `content_field` | Literal name of that selected output field |
+| `post_text` | Selected platform output such as `linkedin_draft` |
+| `content_field` | Literal approved output-field name |
 | `channel` | Stable owned-channel identifier |
-| `destination_mode` | `draft`, `queue`, or `publish` |
-| `publish_allowed` | Parsed AI/approval-lane value |
-| `founder_approval_id` | Exact founder approval receipt when queueing or publishing |
-| `proof_url` | Exact PR, commit, issue, deployment, screenshot, or demo proof URL |
+| `destination_mode` | Literal `draft` |
+| `publish_allowed` | Literal `false` |
+| `proof_url` | Exact public proof URL |
 | `source_commit_sha` | Exact 40-character source commit SHA |
 
-The Code step returns:
+The current draft-only milestone rejects `queue`, `publish`, `schedule`, `share_now`, `share_next`, and `schedule_draft`, even when approval-looking input is supplied.
+
+## Buffer field mapping
+
+| Buffer field | Firewall output |
+|---|---|
+| Post Text | `validated_post_text` |
+| Method | `buffer_method` |
+
+The expected provider output is always:
 
 ```text
-validated_post_text
-content_validated
-content_field
-channel
-destination_mode
-proof_url
-source_commit_sha
-founder_approval_id
+buffer_action: buffer_add_to_queue
+buffer_method: draft
+buffer_save_to_draft: true
 ```
 
-## Buffer mapping
-
-Buffer's **Post Text** field must map only to:
-
-```text
-validated_post_text
-```
-
-The following sources are forbidden:
-
-```text
-prompt
-system_prompt
-user_prompt
-user_message
-instructions
-raw_response
-input
-github_evidence
-```
-
-The firewall also rejects prompt-like phrases, unresolved `{{template}}` tokens, missing proof, missing exact commit SHA, undersized copy, and unauthorized queue/publish requests.
-
-## Draft versus publication authority
-
-- `draft` may be used while `publish_allowed` is false so the founder can review the finished copy.
-- `queue` and `publish` require both `publish_allowed: true` and a non-empty exact `founder_approval_id`.
-- A successful Zapier or Buffer transport event does not prove publication.
-- Publication proof requires the real platform post/activity ID or permalink receipt.
-
-## Focused acceptance test
-
-Use a controlled signal with the same evidence shape as the Juss Beautiful Hair PR #27 example.
+## Acceptance test
 
 The test passes only when:
 
-1. the structured output contains complete LinkedIn, founder-Facebook, and brand-Facebook posts;
-2. each post accurately distinguishes verified work from unfinished work;
-3. the prompt text and template variables are absent from all three posts;
-4. each channel selects its dedicated output field;
-5. the firewall returns `content_validated: true`;
-6. Buffer receives `validated_post_text`, not the prompt or raw response;
-7. draft mode produces real Buffer draft identifiers;
-8. queue or publish mode remains blocked without an exact founder approval receipt;
-9. any published run retains a real LinkedIn or Facebook receipt;
-10. Founder Control Room correlates the source SHA, Zapier run ID, Buffer artifact, platform receipt, policy decision, and timestamp.
+1. finished copy passes content validation;
+2. prompt-like text and forbidden source fields fail;
+3. exact proof URL and commit SHA are present;
+4. the Node and Zapier-like runtimes both emit `buffer_method: draft`;
+5. the API-safe equivalent is `buffer_save_to_draft: true`;
+6. every queue, scheduling, immediate-share, or publish attempt fails closed;
+7. caller overrides cannot replace the safe provider output;
+8. the live controlled run later returns a genuine Buffer draft ID;
+9. no Queue, Sent, scheduled, or public permalink evidence exists.
 
-## Proof currently available
+## Proof boundary
 
-Repository verification proves the content firewall behavior through:
+Repository tests prove the executable mapping and rejection behavior. They do not prove that the live Zap has been remapped or that Buffer created a draft.
 
-```bash
-npm run verify:zapier-budget
-```
-
-The test suite accepts finished posts modeled on the PR #27 copy and rejects:
-
-- prompt instructions;
-- unresolved template tokens;
-- forbidden input fields;
-- unauthorized queue or publish attempts.
-
-This repository proof does not claim that the live Zap has already been remapped or that Buffer has created a new draft. Those remain external Day 3 gates.
+Requires Approval can be additional account-side protection only when the relevant paid collaboration plan and a separate restricted user are actually configured. It is not relied on by this code contract.
 
 ## Rollback
 
-Revert the configuration, verifier, firewall, test, package script, and this document together. Do not delete existing Buffer drafts, sent posts, Zap History, HubSpot evidence, or platform receipts.
+Revert the firewall, focused tests, provider configuration, package commands, workflow, and this documentation update together. Do not delete historical Buffer drafts, sent posts, Zap History, HubSpot evidence, or platform receipts.
 
 ## Stop condition
 
-Day 3 remains open until the live Zap maps a channel-specific finished draft through the firewall into Buffer and returns genuine Buffer plus platform receipts. A run that posts instructions or a prompt is a failed run even when every transport step reports success.
+Day 3 remains open until a controlled synthetic run maps the firewall-owned `buffer_method` into Buffer and returns a genuine draft identifier without Queue, Sent, schedule, or public-post evidence.
