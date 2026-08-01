@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,6 +17,11 @@ MODULE_PATH = Path(__file__).with_name("whoami.py")
 SPEC = importlib.util.spec_from_file_location("founder_whoami", MODULE_PATH)
 assert SPEC and SPEC.loader
 whoami = importlib.util.module_from_spec(SPEC)
+# Must be registered before exec_module: whoami.py uses `from __future__ import
+# annotations` with `@dataclass(frozen=True)`, and dataclass's own type
+# resolution looks the module up via sys.modules[cls.__module__] — which is
+# empty until this line, otherwise raising AttributeError on class definition.
+sys.modules[SPEC.name] = whoami
 SPEC.loader.exec_module(whoami)
 
 
