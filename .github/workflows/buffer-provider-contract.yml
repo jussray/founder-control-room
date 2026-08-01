@@ -30,4 +30,4 @@ jobs:
           node-version: '22'
 
       - name: Verify Buffer draft-only provider contract
-        run: node tools/zapier/test-buffer-provider-contract.cjs
+        run: npm run verify:buffer-provider
