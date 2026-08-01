@@ -160,5 +160,9 @@ test('ignores stale approval references on draft-only simulations', async () => 
   assert.equal(result.decision.status, 'draft_ready');
   assert.equal(result.decision.publishAllowed, false);
   assert.ok(result.receipts.every((receipt) => receipt.status === 'simulated_draft'));
+  assert.ok(result.receipts.every((receipt) => receipt.simulation === true));
+  assert.ok(result.receipts.every((receipt) => receipt.executionAllowed === false));
+  assert.ok(result.receipts.every((receipt) => receipt.liveSideEffects === false));
+  assert.ok(result.receipts.every((receipt) => receipt.publicUrl === null));
   assert.equal(result.liveSideEffects, false);
 });
