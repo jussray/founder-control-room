@@ -31,6 +31,7 @@
     "verify:zapier-budget": "node scripts/verify-zapier-task-budget.mjs && node tools/zapier/test-buffer-content-firewall.cjs && node tools/zapier/test-buffer-provider-contract.cjs",
     "verify:buffer-content": "node tools/zapier/test-buffer-content-firewall.cjs && node tools/zapier/test-buffer-provider-contract.cjs",
     "verify:buffer-provider": "node tools/zapier/test-buffer-provider-contract.cjs",
+    "verify:ai-company-parity": "node scripts/verify-founder-os-lab-isolation.mjs && npm --prefix labs/ai-company run verify && vitest run test/ai-company-parity.test.ts",
     "verify:founder-chief-pair": "node scripts/verify-founder-chief-pair.mjs",
     "verify:cookies": "node scripts/verify-cookie-contract.mjs",
     "verify:founder-onboarding": "node scripts/verify-founder-onboarding.mjs",
