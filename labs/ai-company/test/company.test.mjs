@@ -15,6 +15,9 @@ test('blocks an event with no verified traction or governance advantage', async 
   const result = runCompanySimulation(input, { transport });
 
   assert.equal(result.liveSideEffects, false);
+  assert.equal(result.authority.level, 'L0');
+  assert.equal(result.authority.mode, 'simulation');
+  assert.equal(result.authority.executionAllowed, false);
   assert.equal(result.decision.status, 'blocked');
   assert.equal(result.decision.recommendedMode, 'internal_only');
   assert.equal(result.campaign, null);
@@ -38,11 +41,18 @@ test('downgrades publish to draft when founder approval is absent', async () => 
   const transport = createFakeTransport();
   const result = runCompanySimulation(input, { transport });
 
+  assert.equal(result.authority.level, 'L0');
+  assert.equal(result.authority.mode, 'simulation');
+  assert.equal(result.authority.executionAllowed, false);
+  assert.equal(result.authority.approvalRequired, true);
+  assert.equal(result.authority.approvalObserved, false);
   assert.equal(result.decision.status, 'approval_required');
   assert.equal(result.decision.recommendedMode, 'draft');
   assert.equal(result.decision.publishAllowed, false);
   assert.equal(result.receipts.length, 2);
   assert.ok(result.receipts.every((receipt) => receipt.status === 'simulated_draft'));
+  assert.ok(result.receipts.every((receipt) => receipt.executionAllowed === false));
+  assert.ok(result.receipts.every((receipt) => receipt.liveSideEffects === false));
   assert.ok(result.receipts.every((receipt) => receipt.publicUrl === null));
 });
 
@@ -51,11 +61,20 @@ test('simulates an authorized publish without any live side effect', async () =>
   const transport = createFakeTransport();
   const result = runCompanySimulation(input, { transport });
 
+  assert.deepEqual(result.authority, {
+    level: 'L0',
+    mode: 'simulation',
+    executionAllowed: false,
+    approvalRequired: true,
+    approvalObserved: true,
+  });
   assert.equal(result.decision.status, 'authorized');
   assert.equal(result.decision.publishAllowed, true);
   assert.equal(result.decision.recommendedMode, 'publish');
   assert.equal(result.receipts.length, 2);
   assert.ok(result.receipts.every((receipt) => receipt.simulation === true));
+  assert.ok(result.receipts.every((receipt) => receipt.executionAllowed === false));
+  assert.ok(result.receipts.every((receipt) => receipt.liveSideEffects === false));
   assert.ok(result.receipts.every((receipt) => receipt.status === 'simulated_publish'));
   assert.ok(result.receipts.every((receipt) => receipt.publicUrl === null));
   assert.equal(result.liveSideEffects, false);
