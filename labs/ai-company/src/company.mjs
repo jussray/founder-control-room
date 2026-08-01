@@ -29,12 +29,13 @@ function requireSynthetic(input) {
 }
 
 function buildSimulationAuthority(input) {
+  const approvalRequired = MUTATING_MODES.has(input.requestedMode);
   return {
     level: 'L0',
     mode: 'simulation',
     executionAllowed: false,
-    approvalRequired: MUTATING_MODES.has(input.requestedMode),
-    approvalObserved: Boolean(input.founderApprovalId?.trim()),
+    approvalRequired,
+    approvalObserved: approvalRequired && Boolean(input.founderApprovalId?.trim()),
   };
 }
 
