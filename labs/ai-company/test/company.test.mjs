@@ -142,3 +142,23 @@ test('blocks a complete synthetic event when clickable proof is missing', async 
   assert.equal(result.receipts.length, 0);
   assert.equal(transport.calls.length, 0);
 });
+
+test('ignores stale approval references on draft-only simulations', async () => {
+  const input = await fixture('authorized-event.json');
+  input.requestedMode = 'draft';
+  input.founderApprovalId = 'founder-approved:stale-draft-token';
+  const transport = createFakeTransport();
+  const result = runCompanySimulation(input, { transport });
+
+  assert.deepEqual(result.authority, {
+    level: 'L0',
+    mode: 'simulation',
+    executionAllowed: false,
+    approvalRequired: false,
+    approvalObserved: false,
+  });
+  assert.equal(result.decision.status, 'draft_ready');
+  assert.equal(result.decision.publishAllowed, false);
+  assert.ok(result.receipts.every((receipt) => receipt.status === 'simulated_draft'));
+  assert.equal(result.liveSideEffects, false);
+});
