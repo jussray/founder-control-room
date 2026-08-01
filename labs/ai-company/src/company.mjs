@@ -12,6 +12,7 @@ const CONTENT_FIELD_BY_PLATFORM = Object.freeze({
 });
 
 const VALID_MODES = new Set(['draft', 'queue', 'publish']);
+const MUTATING_MODES = new Set(['queue', 'publish']);
 
 function unique(values) {
   return [...new Set(values)];
@@ -25,6 +26,17 @@ function requireSynthetic(input) {
   if (input.dataClassification !== 'synthetic') {
     throw new Error('AI Company Lab accepts synthetic data only.');
   }
+}
+
+function buildSimulationAuthority(input) {
+  const approvalRequired = MUTATING_MODES.has(input.requestedMode);
+  return {
+    level: 'L0',
+    mode: 'simulation',
+    executionAllowed: false,
+    approvalRequired,
+    approvalObserved: approvalRequired && Boolean(input.founderApprovalId?.trim()),
+  };
 }
 
 function observeReality(input) {
@@ -72,12 +84,8 @@ function decideGovernance(input, reality) {
 
   if (input.proof?.status === 'blocked') blockers.push('proof engine is blocked');
   if (proofUrls.length === 0) blockers.push('missing clickable proof');
-  if (traction.length === 0) {
-    blockers.push('missing verified traction; activity is not traction');
-  }
-  if (governanceAdvantages.length === 0) {
-    blockers.push('missing governance advantage with proof');
-  }
+  if (traction.length === 0) blockers.push('missing verified traction; activity is not traction');
+  if (governanceAdvantages.length === 0) blockers.push('missing governance advantage with proof');
   if (input.proof?.status === 'conditional') {
     warnings.push('proof is conditional; external queue or publish is disabled');
   }
@@ -218,6 +226,7 @@ const SIMULATION_CREATED_AT = '2026-08-01T16:00:00.000Z';
 export function runCompanySimulation(input) {
   requireSynthetic(input);
 
+  const authority = buildSimulationAuthority(input);
   const transport = createFakeTransport();
   const trace = [];
   const reality = observeReality(input);
@@ -255,6 +264,7 @@ export function runCompanySimulation(input) {
     lab: true,
     dataClassification: 'synthetic',
     liveSideEffects: false,
+    authority,
     decision,
     campaign,
     receipts,
