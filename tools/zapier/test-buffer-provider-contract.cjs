@@ -7,11 +7,11 @@ const { join, resolve, relative, basename, extname } = require('node:path');
 const ROOT = resolve(__dirname, '../..');
 const CONTRACT_PATH = join(ROOT, 'config', 'buffer-provider-contract.json');
 const MATRIX_PATH = join(ROOT, 'docs', 'founder-signal-engine', 'buffer-provider-action-matrix.md');
-const DAY3_PATH = join(ROOT, 'docs', 'founder-signal-engine', 'day3-buffer-content-boundary.md');
+const CHECKLIST_PATH = join(ROOT, 'docs', 'founder-signal-engine', 'v10-buffer-provider-checklist.md');
 
 const contract = JSON.parse(readFileSync(CONTRACT_PATH, 'utf8'));
 const matrix = readFileSync(MATRIX_PATH, 'utf8');
-const day3 = readFileSync(DAY3_PATH, 'utf8');
+const checklist = readFileSync(CHECKLIST_PATH, 'utf8');
 
 function validateProviderAction(input = {}) {
   const errors = [];
@@ -115,8 +115,10 @@ assert.match(matrix, /action: buffer_add_to_queue/);
 assert.match(matrix, /method: draft # required; never rely on Buffer default/);
 assert.match(matrix, /saveToDraft: true # required/);
 assert.match(matrix, /not a free-plan control/);
-assert.match(day3, /buffer-provider-action-matrix\.md/);
-assert.match(day3, /method: draft # required; never rely on Buffer default/);
+assert.match(checklist, /buffer-provider-action-matrix\.md/);
+assert.match(checklist, /method: draft # required; never rely on Buffer default/);
+assert.match(checklist, /saveToDraft: true/);
+assert.match(checklist, /optional Team-plan defense-in-depth/);
 
 const ALLOWED_EXTENSIONS = new Set(['.md', '.json', '.cjs', '.mjs', '.js', '.ts']);
 const SKIPPED_DIRECTORIES = new Set(['.git', 'node_modules', 'dist', 'coverage', 'test-results']);
@@ -156,7 +158,7 @@ for (const root of ['config', 'docs', 'tools']) {
   scan(join(ROOT, root));
 }
 
-assert.ok(references.length >= 2, 'expected canonical Buffer action references were not found');
+assert.ok(references.length >= 3, 'expected canonical Buffer action references were not found');
 
 console.log(
   `Buffer provider contract verified: ${references.length} pinned action reference(s); only method=draft and saveToDraft=true are authorized.`,
