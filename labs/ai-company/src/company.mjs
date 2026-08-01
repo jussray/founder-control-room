@@ -12,6 +12,7 @@ const CONTENT_FIELD_BY_PLATFORM = Object.freeze({
 });
 
 const VALID_MODES = new Set(['draft', 'queue', 'publish']);
+const MUTATING_MODES = new Set(['queue', 'publish']);
 
 function unique(values) {
   return [...new Set(values)];
@@ -25,6 +26,16 @@ function requireSynthetic(input) {
   if (input.dataClassification !== 'synthetic') {
     throw new Error('AI Company Lab accepts synthetic data only.');
   }
+}
+
+function buildSimulationAuthority(input) {
+  return {
+    level: 'L0',
+    mode: 'simulation',
+    executionAllowed: false,
+    approvalRequired: MUTATING_MODES.has(input.requestedMode),
+    approvalObserved: Boolean(input.founderApprovalId?.trim()),
+  };
 }
 
 function observeReality(input) {
@@ -222,6 +233,7 @@ export function runCompanySimulation(
 ) {
   requireSynthetic(input);
 
+  const authority = buildSimulationAuthority(input);
   const trace = [];
   const reality = observeReality(input);
   trace.push({ actor: reality.actor, status: reality.observed ? 'observed' : 'blocked' });
@@ -258,6 +270,7 @@ export function runCompanySimulation(
     lab: true,
     dataClassification: 'synthetic',
     liveSideEffects: false,
+    authority,
     decision,
     campaign,
     receipts,
