@@ -15,12 +15,18 @@ import { randomUUID } from 'node:crypto';
 import { supabase } from '../../lib/supabaseClient.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import { ProjectController } from '../../controllers/ProjectController.js';
+import {
+  buildProofEngineSnapshot,
+  type ProofSignal,
+  type ProofStatus,
+} from '../../proof-engine/readiness.js';
 
 export const dashboardRouter = Router();
 dashboardRouter.use(requireFounder);
 
 const TASKS_LIMIT = 200;
 const ACTIVITY_LIMIT = 100;
+const PROOF_EVENT_LIMIT = 200;
 
 async function auditEvent(
   projectId: string,
@@ -54,6 +60,35 @@ async function withProjectLabels<T extends { project_id: string }>(
   return rows.map((row) => ({ ...row, project: bySlug.get(row.project_id) ?? null }));
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function readProofSignal(metadata: unknown): ProofSignal | null {
+  if (!isRecord(metadata)) return null;
+  const provider = metadata.provider;
+  const status = metadata.status;
+  const label = metadata.label;
+  const evidence = metadata.evidence;
+
+  if (!['github', 'supabase', 'cloudflare', 'playwright', 'legal'].includes(String(provider))) return null;
+  if (!['verified', 'warning', 'blocked', 'unknown'].includes(String(status))) return null;
+  if (typeof label !== 'string' || !label.trim()) return null;
+
+  return {
+    id: typeof metadata.id === 'string' && metadata.id.trim()
+      ? metadata.id
+      : `${String(provider)}:${label}`,
+    provider: provider as ProofSignal['provider'],
+    label: label.trim(),
+    status: status as ProofStatus,
+    evidence: Array.isArray(evidence)
+      ? evidence.filter((item): item is string => typeof item === 'string')
+      : [],
+    checkedAt: typeof metadata.checkedAt === 'string' ? metadata.checkedAt : null,
+  };
+}
+
 // ─── GET /dashboard/tasks ────────────────────────────────────────────────────
 /** Founder task board — reads `missions`, the existing issues/PR-equivalent table. */
 dashboardRouter.get('/tasks', async (req: FounderRequest, res) => {
@@ -84,6 +119,53 @@ dashboardRouter.get('/activity', async (req: FounderRequest, res) => {
   const activity = await withProjectLabels(events ?? []);
 
   return res.json({ activity });
+});
+
+// ─── GET /dashboard/proof-engine ─────────────────────────────────────────────
+/**
+ * Founder-only launch readiness read model.
+ *
+ * Provider adapters publish sanitized `proof_signal` events into the existing
+ * project event stream. This route selects the newest signal per provider and
+ * label, then computes readiness without inventing a second evidence store.
+ */
+dashboardRouter.get('/proof-engine', async (req: FounderRequest, res) => {
+  const projectSlug = typeof req.query.projectSlug === 'string' ? req.query.projectSlug.trim() : '';
+  if (!projectSlug) return res.status(400).json({ error: 'projectSlug is required' });
+
+  const { data: project, error: projectError } = await supabase
+    .from('projects')
+    .select('id, slug, name')
+    .eq('slug', projectSlug)
+    .maybeSingle();
+
+  if (projectError) return res.status(500).json({ error: projectError.message });
+  if (!project) return res.status(404).json({ error: `No project registered with slug "${projectSlug}"` });
+
+  const { data: events, error } = await supabase
+    .from('project_events')
+    .select('metadata, created_at')
+    .eq('project_id', project.id)
+    .eq('event_type', 'proof_signal')
+    .order('created_at', { ascending: false })
+    .limit(PROOF_EVENT_LIMIT);
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  const newest = new Map<string, ProofSignal>();
+  for (const event of events ?? []) {
+    const signal = readProofSignal(event.metadata);
+    if (!signal) continue;
+    const key = `${signal.provider}:${signal.label}`;
+    if (!newest.has(key)) {
+      newest.set(key, { ...signal, checkedAt: signal.checkedAt ?? event.created_at ?? null });
+    }
+  }
+
+  return res.json({
+    project: { slug: project.slug, name: project.name },
+    snapshot: buildProofEngineSnapshot(project.slug, [...newest.values()]),
+  });
 });
 
 const COSTS_LIMIT = 1000;
