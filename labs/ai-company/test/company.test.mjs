@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { runCompanySimulation } from '../src/company.mjs';
-import { createFakeTransport } from '../src/fake-transport.mjs';
 
 const fixture = async (name) =>
   JSON.parse(
@@ -11,15 +10,13 @@ const fixture = async (name) =>
 
 test('blocks an event with no verified traction or governance advantage', async () => {
   const input = await fixture('blocked-event.json');
-  const transport = createFakeTransport();
-  const result = runCompanySimulation(input, { transport });
+  const result = runCompanySimulation(input);
 
   assert.equal(result.liveSideEffects, false);
   assert.equal(result.decision.status, 'blocked');
   assert.equal(result.decision.recommendedMode, 'internal_only');
   assert.equal(result.campaign, null);
   assert.equal(result.receipts.length, 0);
-  assert.equal(transport.calls.length, 0);
   assert.ok(
     result.decision.blockers.includes(
       'missing verified traction; activity is not traction',
@@ -35,8 +32,7 @@ test('blocks an event with no verified traction or governance advantage', async 
 test('downgrades publish to draft when founder approval is absent', async () => {
   const input = await fixture('authorized-event.json');
   input.founderApprovalId = null;
-  const transport = createFakeTransport();
-  const result = runCompanySimulation(input, { transport });
+  const result = runCompanySimulation(input);
 
   assert.equal(result.decision.status, 'approval_required');
   assert.equal(result.decision.recommendedMode, 'draft');
@@ -48,8 +44,7 @@ test('downgrades publish to draft when founder approval is absent', async () => 
 
 test('simulates an authorized publish without any live side effect', async () => {
   const input = await fixture('authorized-event.json');
-  const transport = createFakeTransport();
-  const result = runCompanySimulation(input, { transport });
+  const result = runCompanySimulation(input);
 
   assert.equal(result.decision.status, 'authorized');
   assert.equal(result.decision.publishAllowed, true);
@@ -61,11 +56,25 @@ test('simulates an authorized publish without any live side effect', async () =>
   assert.equal(result.liveSideEffects, false);
 });
 
+test('ignores caller-supplied transports and records only private fake receipts', async () => {
+  const input = await fixture('authorized-event.json');
+  const injectedTransport = {
+    dispatch() {
+      throw new Error('live transport must never run inside the AI Company Lab');
+    },
+  };
+
+  const result = runCompanySimulation(input, { transport: injectedTransport });
+
+  assert.equal(result.liveSideEffects, false);
+  assert.ok(result.receipts.every((receipt) => receipt.provider === 'fake-buffer'));
+  assert.ok(result.receipts.every((receipt) => receipt.simulation === true));
+});
+
 test('routes dedicated content fields and never transports raw instructions', async () => {
   const input = await fixture('authorized-event.json');
   input.privatePrompt = 'DO NOT TRANSPORT THIS PRIVATE ORCHESTRATION TEXT';
-  const transport = createFakeTransport();
-  const result = runCompanySimulation(input, { transport });
+  const result = runCompanySimulation(input);
 
   assert.deepEqual(
     result.campaign.drafts.map(({ platform, contentField }) => ({ platform, contentField })),
@@ -87,20 +96,17 @@ test('routes dedicated content fields and never transports raw instructions', as
 test('rejects any non-synthetic input before an agent or adapter runs', async () => {
   const input = await fixture('authorized-event.json');
   input.dataClassification = 'production';
-  const transport = createFakeTransport();
 
   assert.throws(
-    () => runCompanySimulation(input, { transport }),
+    () => runCompanySimulation(input),
     /synthetic data only/i,
   );
-  assert.equal(transport.calls.length, 0);
 });
 
 test('blocks cross-project proof even when every other field is complete', async () => {
   const input = await fixture('authorized-event.json');
   input.proof.projectSlug = 'different-synthetic-project';
-  const transport = createFakeTransport();
-  const result = runCompanySimulation(input, { transport });
+  const result = runCompanySimulation(input);
 
   assert.equal(result.decision.status, 'blocked');
   assert.ok(
@@ -108,5 +114,4 @@ test('blocks cross-project proof even when every other field is complete', async
       'proof and event belong to different projects',
     ),
   );
-  assert.equal(transport.calls.length, 0);
 });

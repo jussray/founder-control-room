@@ -213,15 +213,12 @@ function learnFromSimulation(input, decision, receipts) {
   };
 }
 
-export function runCompanySimulation(
-  input,
-  {
-    transport = createFakeTransport(),
-    now = () => '2026-08-01T16:00:00.000Z',
-  } = {},
-) {
+const SIMULATION_CREATED_AT = '2026-08-01T16:00:00.000Z';
+
+export function runCompanySimulation(input) {
   requireSynthetic(input);
 
+  const transport = createFakeTransport();
   const trace = [];
   const reality = observeReality(input);
   trace.push({ actor: reality.actor, status: reality.observed ? 'observed' : 'blocked' });
@@ -244,7 +241,7 @@ export function runCompanySimulation(
           mode: decision.recommendedMode,
           content: draft.content,
           eventId: input.eventId,
-          now: now(),
+          now: SIMULATION_CREATED_AT,
         }),
       );
     }
