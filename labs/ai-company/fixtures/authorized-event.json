@@ -1,0 +1,30 @@
+{
+  "dataClassification": "synthetic",
+  "projectSlug": "synthetic-founder-project",
+  "eventId": "synthetic-event-001",
+  "summary": "A synthetic proof-gated publishing workflow reached its authorized simulation state.",
+  "requestedMode": "publish",
+  "audiences": ["investors", "founders"],
+  "platforms": ["linkedin", "facebook_founder"],
+  "proof": {
+    "projectSlug": "synthetic-founder-project",
+    "status": "ready",
+    "urls": [
+      "https://proof.example.test/synthetic-event-001"
+    ]
+  },
+  "traction": [
+    {
+      "label": "Qualified synthetic interest",
+      "value": "3 simulated requests",
+      "sourceUrl": "https://traction.example.test/synthetic-event-001"
+    }
+  ],
+  "governanceAdvantages": [
+    {
+      "label": "Publication requires evidence and an exact approval receipt",
+      "proofUrl": "https://governance.example.test/synthetic-event-001"
+    }
+  ],
+  "founderApprovalId": "synthetic-approval-001"
+}
