@@ -1,0 +1,12 @@
+{
+  "name": "@juss/ai-company-lab",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic, synthetic-data-only simulation of the Juss AI company architecture.",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "verify:isolation": "node scripts/verify-isolation.mjs",
+    "verify": "npm run verify:isolation && npm test"
+  }
+}
