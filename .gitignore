@@ -6,6 +6,8 @@ dist/
 .DS_Store
 .wrangler/
 e2e/.auth-bridge.json
+__pycache__/
+*.pyc
 playwright-report/
 test-results/
 

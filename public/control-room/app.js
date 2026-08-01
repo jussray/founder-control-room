@@ -129,6 +129,17 @@ function escapeHtml(value) {
 }
 
 /**
+ * Renders risk_level (low/medium/high — see supabase/migrations/0001_init.sql)
+ * with the same .badge ok/warn/danger treatment already used for release and
+ * connection status in this file, instead of the bare risk word.
+ */
+const RISK_BADGE_TONE = { low: 'ok', medium: 'warn', high: 'danger' };
+function riskBadge(riskLevel) {
+  const tone = RISK_BADGE_TONE[riskLevel] ?? '';
+  return `<span class="badge ${tone}">${escapeHtml(riskLevel)} risk</span>`;
+}
+
+/**
  * Parses an HTML string into a DocumentFragment so every top-level sibling
  * survives appendChild — not just the first one. Templates in this file
  * routinely have multiple top-level panels (e.g. a form panel + a list
@@ -293,7 +304,7 @@ function renderProjectsTab(mount) {
   } else {
     list.innerHTML = state.projects.map((p) => `
       <div class="card" data-slug="${escapeHtml(p.slug)}">
-        <div class="meta">${escapeHtml(p.repo_provider)} · ${escapeHtml(p.risk_level)} risk · ${escapeHtml(p.status)}</div>
+        <div class="meta">${escapeHtml(p.repo_provider)} · ${riskBadge(p.risk_level)} · ${escapeHtml(p.status)}</div>
         <div class="title">${escapeHtml(p.name)} <span class="muted mono">(${escapeHtml(p.slug)})</span></div>
       </div>
     `).join('');
@@ -517,7 +528,7 @@ function renderMissionsTab(mount) {
         <h4>${lane} (${items.length})</h4>
         ${items.map((m) => `
           <div class="card" data-id="${escapeHtml(m.id)}">
-            <div class="meta">${escapeHtml(m.project?.slug ?? 'unknown')} · ${escapeHtml(m.risk_level)}</div>
+            <div class="meta">${escapeHtml(m.project?.slug ?? 'unknown')} · ${riskBadge(m.risk_level)}</div>
             <div class="title">${escapeHtml(m.title)}</div>
           </div>
         `).join('')}
