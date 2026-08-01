@@ -19,6 +19,8 @@ export function createFakeTransport() {
         eventId,
         content,
         simulation: true,
+        executionAllowed: false,
+        liveSideEffects: false,
         publicUrl: null,
         createdAt: now,
       };
