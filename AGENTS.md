@@ -223,7 +223,7 @@ The Elon Musk pass may delete duplicate workflows, redundant adapters, stale req
 - Do not expose provider tokens or service-role keys.
 - Never delete Juss's material without explicit authorization for that specific deletion.
 - Do not invent demand, scarcity, customer statements, eligibility, savings, performance, inventory, delivery, or authority.
-- Merge when appropriate under `docs/FOUNDER_MERGE_AUTHORITY.md`. Do not deploy, roll back, alter auth/RLS, contact external parties, publish externally, change commercial terms, spend funds, or perform destructive writes without explicit founder approval for that exact action.
+- Merge when appropriate under `docs/FOUNDER_MERGE_AUTHORITY.md`. Do not deploy, roll back, alter auth/RLS, contact external parties, publish externally, change commercial terms, spend funds, or perform destructive writes without explicit founder approval for that exact action. The exception is a compliant post inside an approved automated publishing class explicitly authorized by `docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md`; all other external communication remains separately gated.
 - Apply repository-specific skills when acting on managed projects; portfolio rules never replace local product, privacy, verification, sales, brand/IP, Supabase, Product Design, or rollback contracts.
 
 ## Figma build and implementation
