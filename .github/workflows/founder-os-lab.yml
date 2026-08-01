@@ -1,0 +1,42 @@
+name: Founder OS Lab Isolation
+
+on:
+  pull_request:
+    paths:
+      - 'src/founder-os-lab/**'
+      - 'scripts/verify-founder-os-lab-isolation.mjs'
+      - '.github/workflows/founder-os-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: founder-os-lab-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-lab:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Enforce no-side-effect boundary
+        run: node scripts/verify-founder-os-lab-isolation.mjs
+
+      - name: Run focused lab contracts
+        run: npx vitest run src/founder-os-lab/__tests__/engine.test.ts
+
+      - name: Typecheck repository integration
+        run: npm run typecheck
