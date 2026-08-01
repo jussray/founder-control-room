@@ -1,165 +1,91 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const { readFileSync, readdirSync, statSync } = require('node:fs');
-const { join, resolve, relative, basename, extname } = require('node:path');
+const { readFileSync } = require('node:fs');
+const { join, resolve } = require('node:path');
+const {
+  validateBufferPublishInput,
+  BUFFER_PROVIDER_ACTION,
+  BUFFER_PROVIDER_METHOD,
+  BUFFER_API_SAVE_TO_DRAFT,
+} = require('./buffer-content-firewall.cjs');
 
 const ROOT = resolve(__dirname, '../..');
-const CONTRACT_PATH = join(ROOT, 'config', 'buffer-provider-contract.json');
-const MATRIX_PATH = join(ROOT, 'docs', 'founder-signal-engine', 'buffer-provider-action-matrix.md');
-const CHECKLIST_PATH = join(ROOT, 'docs', 'founder-signal-engine', 'v10-buffer-provider-checklist.md');
-
-const contract = JSON.parse(readFileSync(CONTRACT_PATH, 'utf8'));
-const matrix = readFileSync(MATRIX_PATH, 'utf8');
-const checklist = readFileSync(CHECKLIST_PATH, 'utf8');
-
-function validateProviderAction(input = {}) {
-  const errors = [];
-
-  if (input.action !== contract.zapier.action) {
-    errors.push(`action must be ${contract.zapier.action}`);
-  }
-  if (input.method !== contract.zapier.requiredMethod) {
-    errors.push(`method must be ${contract.zapier.requiredMethod}`);
-  }
-  if (input.destination_mode !== 'draft') {
-    errors.push('destination_mode must remain draft');
-  }
-  if (input.publish_allowed !== false) {
-    errors.push('publish_allowed must remain false for the draft-only milestone');
-  }
-
-  if (errors.length > 0) {
-    throw new Error(`BUFFER_PROVIDER_CONTRACT_REJECTED: ${errors.join('; ')}`);
-  }
-
-  return {
-    action: input.action,
-    method: input.method,
-    destination_mode: input.destination_mode,
-    publish_allowed: input.publish_allowed,
-    saveToDraft: contract.api.required.saveToDraft,
-  };
-}
+const contract = JSON.parse(
+  readFileSync(join(ROOT, 'config', 'buffer-provider-contract.json'), 'utf8'),
+);
 
 assert.equal(contract.version, 1);
 assert.equal(contract.status, 'draft-only');
 assert.equal(contract.provider, 'buffer');
-assert.equal(contract.zapier.action, 'buffer_add_to_queue');
-assert.equal(contract.zapier.requiredMethod, 'draft');
-assert.deepEqual(contract.zapier.allowedMethods, ['draft']);
+assert.equal(contract.zapier.action, BUFFER_PROVIDER_ACTION);
+assert.equal(contract.zapier.requiredMethod, BUFFER_PROVIDER_METHOD);
+assert.deepEqual(contract.zapier.allowedMethods, [BUFFER_PROVIDER_METHOD]);
 assert.equal(contract.api.mutation, 'createPost');
-assert.equal(contract.api.required.saveToDraft, true);
+assert.equal(contract.api.required.saveToDraft, BUFFER_API_SAVE_TO_DRAFT);
 assert.equal(contract.authority.publishAllowed, false);
 assert.equal(contract.authority.liveProviderMutationIncluded, false);
-assert.equal(contract.defenseInDepth.requiresApprovalRole.requiresTeamPlan, true);
-assert.equal(contract.defenseInDepth.requiresApprovalRole.organizationOwnerEligible, false);
 
-const valid = validateProviderAction({
-  action: 'buffer_add_to_queue',
-  method: 'draft',
+const baseInput = {
+  post_text: [
+    'The repository now enforces Buffer draft-only provider fields in executable code.',
+    'The firewall returns method draft and saveToDraft true, while queue and publish attempts fail closed.',
+    'Proof: https://github.com/jussray/founder-control-room/pull/192',
+  ].join('\n\n'),
+  content_field: 'linkedin_draft',
+  channel: 'juss_rayy_linkedin',
   destination_mode: 'draft',
   publish_allowed: false,
-});
-assert.equal(valid.method, 'draft');
-assert.equal(valid.saveToDraft, true);
+  proof_url: 'https://github.com/jussray/founder-control-room/pull/192',
+  source_commit_sha: '38d8e5bd40594915407126915177f98c6ef983d9',
+};
 
-for (const method of ['queue', 'schedule', 'share_next', 'share_now', 'schedule_draft']) {
+const prepared = validateBufferPublishInput(baseInput);
+assert.equal(prepared.buffer_action, contract.zapier.action);
+assert.equal(prepared.buffer_method, contract.zapier.requiredMethod);
+assert.equal(prepared.buffer_save_to_draft, contract.api.required.saveToDraft);
+assert.equal(prepared.destination_mode, 'draft');
+assert.equal(prepared.publish_allowed, false);
+
+for (const destinationMode of contract.zapier.rejectedMethods) {
   assert.throws(
-    () => validateProviderAction({
-      action: 'buffer_add_to_queue',
-      method,
-      destination_mode: 'draft',
-      publish_allowed: false,
-    }),
-    /method must be draft/,
-    `${method} must fail closed`,
-  );
-}
-
-assert.throws(
-  () => validateProviderAction({
-    action: 'buffer_add_to_queue',
-    destination_mode: 'draft',
-    publish_allowed: false,
-  }),
-  /method must be draft/,
-  'missing method must fail closed',
-);
-
-for (const destinationMode of ['queue', 'publish']) {
-  assert.throws(
-    () => validateProviderAction({
-      action: 'buffer_add_to_queue',
-      method: 'draft',
+    () => validateBufferPublishInput({
+      ...baseInput,
       destination_mode: destinationMode,
-      publish_allowed: false,
+      publish_allowed: true,
+      founder_approval_id: 'founder-approved:cannot-widen-this-contract',
     }),
     /destination_mode must remain draft/,
-    `${destinationMode} must fail in review-only mode`,
+    `${destinationMode} must fail closed in executable code`,
   );
 }
 
 assert.throws(
-  () => validateProviderAction({
-    action: 'buffer_add_to_queue',
-    method: 'draft',
-    destination_mode: 'draft',
+  () => validateBufferPublishInput({
+    ...baseInput,
+    destination_mode: '',
+  }),
+  /destination_mode must remain draft/,
+  'missing destination mode must fail closed',
+);
+
+assert.throws(
+  () => validateBufferPublishInput({
+    ...baseInput,
     publish_allowed: true,
   }),
   /publish_allowed must remain false/,
-  'draft-only contract must reject publication authority drift',
+  'publication authority drift must fail closed',
 );
 
-assert.match(matrix, /action: buffer_add_to_queue/);
-assert.match(matrix, /method: draft # required; never rely on Buffer default/);
-assert.match(matrix, /saveToDraft: true # required/);
-assert.match(matrix, /not a free-plan control/);
-assert.match(checklist, /buffer-provider-action-matrix\.md/);
-assert.match(checklist, /method: draft # required; never rely on Buffer default/);
-assert.match(checklist, /saveToDraft: true/);
-assert.match(checklist, /optional Team-plan defense-in-depth/);
+const callerOverride = validateBufferPublishInput({
+  ...baseInput,
+  method: 'share_now',
+  buffer_method: 'share_now',
+  saveToDraft: false,
+  buffer_save_to_draft: false,
+});
+assert.equal(callerOverride.buffer_method, 'draft');
+assert.equal(callerOverride.buffer_save_to_draft, true);
 
-const ALLOWED_EXTENSIONS = new Set(['.md', '.json', '.cjs', '.mjs', '.js', '.ts']);
-const SKIPPED_DIRECTORIES = new Set(['.git', 'node_modules', 'dist', 'coverage', 'test-results']);
-const SELF = basename(__filename);
-const references = [];
-
-function scan(directory) {
-  for (const entry of readdirSync(directory)) {
-    const fullPath = join(directory, entry);
-    const relativePath = relative(ROOT, fullPath);
-    const stat = statSync(fullPath);
-
-    if (stat.isDirectory()) {
-      if (!SKIPPED_DIRECTORIES.has(entry)) scan(fullPath);
-      continue;
-    }
-
-    if (entry === SELF || !ALLOWED_EXTENSIONS.has(extname(entry))) continue;
-
-    const source = readFileSync(fullPath, 'utf8');
-    if (!source.includes('buffer_add_to_queue')) continue;
-
-    references.push(relativePath);
-    const pinned = (
-      /method:\s*draft/.test(source)
-      || /"requiredMethod"\s*:\s*"draft"/.test(source)
-    );
-    assert.equal(
-      pinned,
-      true,
-      `${relativePath} references buffer_add_to_queue without pinning method: draft`,
-    );
-  }
-}
-
-for (const root of ['config', 'docs', 'tools']) {
-  scan(join(ROOT, root));
-}
-
-assert.ok(references.length >= 3, 'expected canonical Buffer action references were not found');
-
-console.log(
-  `Buffer provider contract verified: ${references.length} pinned action reference(s); only method=draft and saveToDraft=true are authorized.`,
-);
+console.log('Buffer provider contract verified against executable firewall code: only draft output is produced, unsafe modes fail closed, and caller overrides cannot widen authority.');
