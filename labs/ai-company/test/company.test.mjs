@@ -18,10 +18,11 @@ test('blocks an event with no verified traction or governance advantage', async 
     mode: 'simulation',
     executionAllowed: false,
     approvalRequired: true,
-    approvalObserved: false,
+    approvalObserved: true,
   });
   assert.equal(result.decision.status, 'blocked');
   assert.equal(result.decision.recommendedMode, 'internal_only');
+  assert.equal(result.decision.publishAllowed, false);
   assert.equal(result.campaign, null);
   assert.equal(result.receipts.length, 0);
   assert.ok(result.decision.blockers.includes('missing verified traction; activity is not traction'));
