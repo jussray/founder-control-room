@@ -1,4 +1,6 @@
 const STORAGE_KEY = 'fcr_session';
+const ATTEMPTS_KEY_PREFIX = 'fcr_goalfix_attempts_v1';
+const MAX_ATTEMPTS = 20;
 const form = document.getElementById('goalfix-form');
 const result = document.getElementById('goalfix-result');
 const message = document.getElementById('goalfix-message');
@@ -18,6 +20,96 @@ function lines(value) {
     .split('\n')
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function attemptStorageKey(projectSlug, targetRef) {
+  const project = String(projectSlug ?? '').trim().toLowerCase();
+  const target = String(targetRef ?? '').trim() || 'main';
+  return `${ATTEMPTS_KEY_PREFIX}:${project}:${target}`;
+}
+
+function sanitizeAttempt(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+
+  const approach = typeof value.approach === 'string' ? value.approach.trim().slice(0, 500) : '';
+  const failureSignature = typeof value.failureSignature === 'string'
+    ? value.failureSignature.trim().slice(0, 500)
+    : undefined;
+  const verificationName = typeof value.verificationName === 'string'
+    ? value.verificationName.trim().slice(0, 200)
+    : undefined;
+  const resultValue = value.result;
+  const result = resultValue === 'passed' || resultValue === 'failed' || resultValue === 'blocked'
+    ? resultValue
+    : null;
+  const filesTouched = Array.isArray(value.filesTouched)
+    ? value.filesTouched
+      .filter((item) => typeof item === 'string')
+      .map((item) => item.trim().slice(0, 300))
+      .filter(Boolean)
+      .slice(0, 20)
+    : [];
+
+  if (!approach || !result) return null;
+  return {
+    approach,
+    failureSignature,
+    filesTouched,
+    verificationName,
+    result,
+  };
+}
+
+function loadAttempts(projectSlug, targetRef) {
+  try {
+    const raw = sessionStorage.getItem(attemptStorageKey(projectSlug, targetRef));
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(sanitizeAttempt).filter(Boolean).slice(-MAX_ATTEMPTS);
+  } catch {
+    return [];
+  }
+}
+
+function saveAttempts(projectSlug, targetRef, attempts) {
+  const bounded = attempts.map(sanitizeAttempt).filter(Boolean).slice(-MAX_ATTEMPTS);
+  sessionStorage.setItem(attemptStorageKey(projectSlug, targetRef), JSON.stringify(bounded));
+}
+
+function attemptFromProofLine(value) {
+  const line = String(value ?? '').trim();
+  const match = line.match(/^(.+): (passed|failed|cancelled|queued|running|skipped|unknown) at ([a-f0-9]{40})$/i);
+  if (!match) return null;
+
+  const verificationName = match[1].trim().slice(0, 200);
+  const status = match[2].toLowerCase();
+  const commitSha = match[3].toLowerCase();
+  const normalizedName = verificationName.toLowerCase().replace(/\s+/g, ' ');
+
+  return sanitizeAttempt({
+    approach: `Inspect ${verificationName} at ${commitSha}`,
+    failureSignature: `verification:${normalizedName}`,
+    filesTouched: [],
+    verificationName,
+    result: status === 'passed'
+      ? 'passed'
+      : status === 'failed' || status === 'cancelled'
+        ? 'failed'
+        : 'blocked',
+  });
+}
+
+function recordVerificationAttempts(report, requestedProjectSlug, requestedTargetRef) {
+  const projectSlug = report?.project?.slug ?? requestedProjectSlug;
+  const targetRef = report?.target?.name ?? requestedTargetRef;
+  const nextAttempts = (report?.proof ?? []).map(attemptFromProofLine).filter(Boolean);
+  if (nextAttempts.length === 0) return;
+
+  saveAttempts(
+    projectSlug,
+    targetRef,
+    [...loadAttempts(projectSlug, targetRef), ...nextAttempts],
+  );
 }
 
 function node(tag, text, className) {
@@ -104,9 +196,11 @@ form.addEventListener('submit', async (event) => {
     return;
   }
 
+  const projectSlug = String(values.projectSlug ?? '').trim();
+  const targetRef = String(values.targetRef ?? '').trim();
   const payload = {
-    projectSlug: String(values.projectSlug ?? '').trim(),
-    targetRef: String(values.targetRef ?? '').trim(),
+    projectSlug,
+    targetRef,
     desiredOutcome: String(values.desiredOutcome ?? '').trim(),
     reason: String(values.reason ?? '').trim() || undefined,
     suspectedFailureArea: String(values.suspectedFailureArea ?? '').trim() || undefined,
@@ -114,6 +208,7 @@ form.addEventListener('submit', async (event) => {
     firstFilesOrLogs: lines(values.firstFilesOrLogs),
     expectedVerificationNames,
     stopCondition: String(values.stopCondition ?? '').trim() || undefined,
+    attempts: loadAttempts(projectSlug, targetRef),
   };
 
   submit.disabled = true;
@@ -128,8 +223,12 @@ form.addEventListener('submit', async (event) => {
       body: JSON.stringify(payload),
     });
     const body = await response.json().catch(() => null);
-    if (response.status === 401) sessionStorage.removeItem(STORAGE_KEY);
+    if (response.status === 401) {
+      sessionStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(attemptStorageKey(projectSlug, targetRef));
+    }
     if (!response.ok) throw new Error(body?.error ?? `Inspection failed (${response.status})`);
+    recordVerificationAttempts(body, projectSlug, targetRef);
     renderReport(body);
   } catch (error) {
     renderError(error instanceof Error ? error.message : String(error));
