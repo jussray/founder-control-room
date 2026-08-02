@@ -7,6 +7,7 @@ const HTTPS_URL = /^https:\/\//i;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const BUFFER_PROVIDER_ACTION = 'buffer_add_to_queue';
 const BUFFER_PROVIDER_METHOD = 'schedule';
+const BUFFER_API_SHARING_MODE = 'customScheduled';
 const BUFFER_API_SAVE_TO_DRAFT = false;
 const BUFFER_REVIEW_WINDOW_MINUTES = 20;
 const BUFFER_REVIEW_WINDOW_MS = BUFFER_REVIEW_WINDOW_MINUTES * 60 * 1000;
@@ -194,6 +195,7 @@ function validateBufferPublishInput(input = {}, options = {}) {
     error.details = ['scheduled_at must remain in the future'];
     throw error;
   }
+  const scheduledAt = new Date(scheduledAtMs).toISOString();
 
   return {
     validated_post_text: postText,
@@ -213,8 +215,8 @@ function validateBufferPublishInput(input = {}, options = {}) {
     batch_size: batchSize,
     batch_index: batchIndex,
     generated_at: new Date(generatedAtMs).toISOString(),
-    scheduled_at: new Date(scheduledAtMs).toISOString(),
-    review_deadline: new Date(scheduledAtMs).toISOString(),
+    scheduled_at: scheduledAt,
+    review_deadline: scheduledAt,
     review_window_minutes: BUFFER_REVIEW_WINDOW_MINUTES,
     review_state: 'pending_notification',
     notification_mode: BUFFER_NOTIFICATION_MODE,
@@ -223,6 +225,8 @@ function validateBufferPublishInput(input = {}, options = {}) {
     buffer_action: BUFFER_PROVIDER_ACTION,
     buffer_method: BUFFER_PROVIDER_METHOD,
     buffer_save_to_draft: BUFFER_API_SAVE_TO_DRAFT,
+    buffer_api_sharing_mode: BUFFER_API_SHARING_MODE,
+    buffer_api_due_at: scheduledAt,
     share_now_allowed: false,
   };
 }
@@ -236,6 +240,7 @@ if (typeof module !== 'undefined' && module.exports) {
     validateBufferPublishInput,
     BUFFER_PROVIDER_ACTION,
     BUFFER_PROVIDER_METHOD,
+    BUFFER_API_SHARING_MODE,
     BUFFER_API_SAVE_TO_DRAFT,
     BUFFER_REVIEW_WINDOW_MINUTES,
     BUFFER_SCHEDULE_POLICY_ID,
