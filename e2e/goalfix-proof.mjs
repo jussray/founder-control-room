@@ -60,6 +60,13 @@ function buildProofReport(commitSha) {
         commitSha,
         provider: 'github',
       },
+      {
+        id: 'proof-playwright-duplicate-suite',
+        name: 'Product Design Playwright Proof',
+        status: 'failed',
+        commitSha,
+        provider: 'github',
+      },
       ...unrelatedSignals,
     ],
     observedAt: new Date('2026-07-27T20:00:00.000Z'),
@@ -253,14 +260,14 @@ async function proveViewport(name, viewport) {
   assert(text.includes('NEXT GATE'), `${name}: founder next gate renders`);
   assert(
     JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([2]),
-    `${name}: only named required checks enter the attempt ledger`,
+    `${name}: duplicate suites collapse to one observation per required check`,
   );
 
   const secondResponse = await submitInspection(page);
   assert(secondResponse.status() === 200, `${name}: second inspection receives accumulated exact-head history`);
   assert(
     JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([4]),
-    `${name}: second verification result extends per-check history`,
+    `${name}: second inspection adds one observation per required check`,
   );
 
   const thirdResponse = await submitInspection(page);
@@ -301,7 +308,7 @@ try {
   await proveViewport('mobile', { width: 390, height: 844 });
   assert(
     JSON.stringify(requestAttemptCounts) === JSON.stringify([0, 2, 4, 4, 0, 0, 2, 4, 4, 0]),
-    'desktop and mobile bind attempts to exact heads while fresh scopes start clean',
+    'desktop and mobile bind deduplicated attempts to exact heads while fresh scopes start clean',
   );
 } finally {
   await browser.close();
@@ -312,5 +319,5 @@ if (failures > 0) {
   console.error(`Goalfix browser proof failed with ${failures} assertion(s).`);
   process.exitCode = 1;
 } else {
-  console.log('Goalfix browser proof passed for desktop and mobile, including exact-head recovery and bounded required-check history.');
+  console.log('Goalfix browser proof passed for desktop and mobile, including duplicate-suite collapse, exact-head recovery, and bounded required-check history.');
 }
