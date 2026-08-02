@@ -8,6 +8,9 @@ const fail = (message) => failures.push(message);
 const requireTrue = (value, message) => {
   if (value !== true) fail(message);
 };
+const requireFalse = (value, message) => {
+  if (value !== false) fail(message);
+};
 
 const {
   version,
@@ -16,10 +19,15 @@ const {
   allocations,
   analysis_output_contract: outputContract,
   buffer_distribution: bufferDistribution,
+  non_billable_primitives_assumed_when_available: assumedPrimitives,
+  capability_truth: capabilityTruth,
   guardrails,
 } = budget;
 
-if (version !== 4) fail('budget version must be 4 for the review-window contract');
+if (version !== 5) fail('budget version must be 5 for capability-truth review-window planning');
+if (plan?.name !== 'Conservative 100-task planning envelope') {
+  fail('plan name must describe a planning envelope rather than claim a live Zapier tier');
+}
 if (!Number.isInteger(plan?.monthly_task_limit) || plan.monthly_task_limit <= 0) {
   fail('plan.monthly_task_limit must be a positive integer');
 }
@@ -32,6 +40,9 @@ if (!Number.isInteger(plan?.emergency_reserve) || plan.emergency_reserve < 0) {
 if (plan.operating_ceiling + plan.emergency_reserve !== plan.monthly_task_limit) {
   fail('operating ceiling plus emergency reserve must equal the monthly task limit');
 }
+requireFalse(plan?.live_plan_verified, 'repository budget must not claim the live Zapier plan is verified');
+requireFalse(plan?.free_two_step_plan_sufficient, 'a free two-step Zap must not be treated as sufficient');
+requireTrue(plan?.multi_step_or_backend_orchestration_required, 'multi-step Zap or backend orchestration must be required');
 if (!Array.isArray(allocations) || allocations.length === 0) {
   fail('allocations must contain at least one budget lane');
 }
@@ -103,6 +114,9 @@ if (!campaignAllocation) {
   if (campaignAllocation.tasks_per_run !== expectedTasksPerRun) {
     fail(`campaign tasks per run must equal ${expectedTasksPerRun}: one per Buffer channel plus one Gmail digest`);
   }
+  if (campaignAllocation.topology_requirement !== 'multi_step_zap_or_backend_orchestration') {
+    fail('campaign allocation must declare its multi-step or backend topology requirement');
+  }
 }
 
 const reviewWindow = bufferDistribution?.review_window;
@@ -122,6 +136,12 @@ if (reviewWindow?.edit_policy !== 'regenerate_and_revalidate_before_buffer_updat
   fail('edit requests must regenerate and revalidate before Buffer update');
 }
 if (reviewWindow?.share_now_allowed !== false) fail('share_now must remain disabled');
+requireTrue(reviewWindow?.instant_private_reply_ingress_required, 'review window must require instant private reply ingress');
+requireFalse(reviewWindow?.gmail_polling_allowed_for_deadline_commands, 'Gmail polling must not control deadline commands');
+if (reviewWindow?.preferred_reply_ingress !== 'cloudflare_email_routing_worker') {
+  fail('preferred reply ingress must be the Cloudflare Email Routing Worker path');
+}
+requireFalse(reviewWindow?.reply_ingress_live_proof_complete, 'repository config must not claim live reply-ingress proof');
 
 const contentContract = bufferDistribution?.publish_content_contract;
 if (contentContract?.source !== 'structured_ai_output_only') fail('Buffer copy must come from structured AI output only');
@@ -138,6 +158,8 @@ if (contentContract?.review_window_minutes !== 20) fail('content contract review
 if (contentContract?.notification_mode !== 'gmail_campaign_digest') fail('content contract must require Gmail campaign digest');
 if (contentContract?.notification_failure_policy !== 'cancel_scheduled_batch') fail('content contract must cancel on notification failure');
 if (contentContract?.share_now_allowed !== false) fail('content contract must reject share_now');
+if (contentContract?.buffer_api_sharing_mode !== 'customScheduled') fail('Buffer API sharing mode must be customScheduled');
+if (contentContract?.buffer_api_due_at_source !== 'scheduled_at') fail('Buffer API dueAt must derive from scheduled_at');
 
 const requiredDraftPlatforms = [
   'linkedin', 'facebook', 'instagram', 'threads', 'x', 'tiktok',
@@ -168,11 +190,28 @@ for (const [channel, field] of Object.entries(requiredChannelRoutes)) {
   if (contentContract?.channel_routes?.[channel] !== field) fail(`Buffer route ${channel} must map to ${field}`);
 }
 
+if (!Array.isArray(assumedPrimitives) || assumedPrimitives.length === 0) {
+  fail('non-billable primitives must be listed only as assumptions when available');
+}
+for (const unsupportedClaim of ['sub-zaps', 'forms', 'zapier-manager']) {
+  if (assumedPrimitives?.includes(unsupportedClaim)) {
+    fail(`${unsupportedClaim} must not be represented as a guaranteed non-billable primitive`);
+  }
+}
+
+requireTrue(capabilityTruth?.webhook_trigger_required, 'webhook trigger capability must be required');
+requireTrue(capabilityTruth?.multi_step_workflow_or_backend_orchestration_required, 'multi-step or backend orchestration must be required');
+requireTrue(capabilityTruth?.instant_private_reply_ingress_required, 'instant private reply ingress must be required');
+requireFalse(capabilityTruth?.gmail_polling_sufficient_for_twenty_minute_window, 'Gmail polling must not be treated as sufficient');
+requireTrue(capabilityTruth?.repository_budget_is_not_live_plan_proof, 'repository budget must not be live-plan proof');
+requireTrue(capabilityTruth?.activation_stops_until_capabilities_are_verified, 'activation must stop until capabilities are verified');
+
 const requiredGuardrails = [
   'one_ai_call_per_signal', 'social_channels_generated_in_one_ai_response',
   'future_you_and_me_share_core_ai_action', 'buffer_parallel_distribution',
   'one_buffer_action_per_active_channel', 'one_gmail_review_digest_per_campaign',
-  'gmail_notification_failure_cancels_batch', 'nonselected_social_channels_remain_review_drafts',
+  'gmail_notification_failure_cancels_batch', 'gmail_polling_never_controls_deadline_commands',
+  'instant_private_reply_ingress_required', 'nonselected_social_channels_remain_review_drafts',
   'hubspot_result_note_is_canonical_writeback',
   'founder_control_room_reads_proof_without_a_second_zapier_write',
   'external_send_or_publish_requires_founder_approval', 'budget_gate_runs_before_billable_actions',
@@ -189,7 +228,8 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `Zapier budget verified: ${calculatedTotal}/${plan.monthly_task_limit} planned tasks, ` +
+  `Founder Signal planning envelope verified: ${calculatedTotal}/${plan.monthly_task_limit} planned tasks, ` +
   `${calculatedHeadroom} operating headroom, ${plan.emergency_reserve} emergency reserve, ` +
-  `${bufferDistribution.parallel_channel_slots} scheduled Buffer channels plus one Gmail review digest per campaign.`,
+  `${bufferDistribution.parallel_channel_slots} Buffer schedules plus one Gmail digest per campaign; ` +
+  'live plan capability and instant reply ingress remain explicit activation gates.',
 );
