@@ -1,6 +1,7 @@
 const STORAGE_KEY = 'fcr_session';
 const ATTEMPTS_KEY_PREFIX = 'fcr_goalfix_attempts_v1';
-const MAX_ATTEMPTS = 20;
+const MAX_ATTEMPTS_PER_SIGNATURE = 3;
+const MAX_ATTEMPTS = 60;
 const form = document.getElementById('goalfix-form');
 const result = document.getElementById('goalfix-result');
 const message = document.getElementById('goalfix-message');
@@ -20,6 +21,10 @@ function lines(value) {
     .split('\n')
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function normalizeSignalName(value) {
+  return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 function fingerprint(value) {
@@ -57,10 +62,16 @@ function sanitizeAttempt(value) {
   const verificationName = typeof value.verificationName === 'string'
     ? value.verificationName.trim().slice(0, 200)
     : undefined;
+  const commitSha = typeof value.commitSha === 'string' && /^[a-f0-9]{40}$/i.test(value.commitSha.trim())
+    ? value.commitSha.trim().toLowerCase()
+    : undefined;
   const resultValue = value.result;
-  const result = resultValue === 'passed' || resultValue === 'failed' || resultValue === 'blocked'
-    ? resultValue
-    : null;
+  const result = (
+    resultValue === 'passed'
+    || resultValue === 'failed'
+    || resultValue === 'blocked'
+    || resultValue === 'incomplete'
+  ) ? resultValue : null;
   const filesTouched = Array.isArray(value.filesTouched)
     ? value.filesTouched
       .filter((item) => typeof item === 'string')
@@ -75,8 +86,32 @@ function sanitizeAttempt(value) {
     failureSignature,
     filesTouched,
     verificationName,
+    commitSha,
     result,
   };
+}
+
+function attemptSignature(attempt) {
+  return attempt.failureSignature
+    || `verification:${normalizeSignalName(attempt.verificationName)}`
+    || attempt.approach;
+}
+
+function boundAttempts(attempts) {
+  const sanitized = attempts.map(sanitizeAttempt).filter(Boolean);
+  const signatureCounts = new Map();
+  const reversed = [];
+
+  for (let index = sanitized.length - 1; index >= 0; index -= 1) {
+    const attempt = sanitized[index];
+    const signature = attemptSignature(attempt);
+    const count = signatureCounts.get(signature) ?? 0;
+    if (count >= MAX_ATTEMPTS_PER_SIGNATURE) continue;
+    signatureCounts.set(signature, count + 1);
+    reversed.push(attempt);
+  }
+
+  return reversed.reverse().slice(-MAX_ATTEMPTS);
 }
 
 function loadAttempts(projectSlug, targetRef, scopeId) {
@@ -84,17 +119,16 @@ function loadAttempts(projectSlug, targetRef, scopeId) {
     const raw = sessionStorage.getItem(attemptStorageKey(projectSlug, targetRef, scopeId));
     const parsed = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(parsed)) return [];
-    return parsed.map(sanitizeAttempt).filter(Boolean).slice(-MAX_ATTEMPTS);
+    return boundAttempts(parsed);
   } catch {
     return [];
   }
 }
 
 function saveAttempts(projectSlug, targetRef, scopeId, attempts) {
-  const bounded = attempts.map(sanitizeAttempt).filter(Boolean).slice(-MAX_ATTEMPTS);
   sessionStorage.setItem(
     attemptStorageKey(projectSlug, targetRef, scopeId),
-    JSON.stringify(bounded),
+    JSON.stringify(boundAttempts(attempts)),
   );
 }
 
@@ -106,23 +140,33 @@ function attemptFromProofLine(value) {
   const verificationName = match[1].trim().slice(0, 200);
   const status = match[2].toLowerCase();
   const commitSha = match[3].toLowerCase();
-  const normalizedName = verificationName.toLowerCase().replace(/\s+/g, ' ');
+  const normalizedName = normalizeSignalName(verificationName);
 
   return sanitizeAttempt({
     approach: `Inspect ${verificationName} at ${commitSha}`,
     failureSignature: `verification:${normalizedName}`,
     filesTouched: [],
     verificationName,
+    commitSha,
     result: status === 'passed'
       ? 'passed'
       : status === 'failed' || status === 'cancelled'
         ? 'failed'
-        : 'blocked',
+        : 'incomplete',
   });
 }
 
-function recordVerificationAttempts(report, projectSlug, targetRef, scopeId) {
-  const nextAttempts = (report?.proof ?? []).map(attemptFromProofLine).filter(Boolean);
+function recordVerificationAttempts(
+  report,
+  projectSlug,
+  targetRef,
+  scopeId,
+  expectedVerificationNames,
+) {
+  const requiredNames = new Set(expectedVerificationNames.map(normalizeSignalName));
+  const nextAttempts = (report?.proof ?? [])
+    .map(attemptFromProofLine)
+    .filter((attempt) => attempt && requiredNames.has(normalizeSignalName(attempt.verificationName)));
   if (nextAttempts.length === 0) return;
 
   saveAttempts(
@@ -263,7 +307,13 @@ form.addEventListener('submit', async (event) => {
       sessionStorage.removeItem(attemptStorageKey(projectSlug, targetRef, scopeId));
     }
     if (!response.ok) throw new Error(body?.error ?? `Inspection failed (${response.status})`);
-    recordVerificationAttempts(body, projectSlug, targetRef, scopeId);
+    recordVerificationAttempts(
+      body,
+      projectSlug,
+      targetRef,
+      scopeId,
+      expectedVerificationNames,
+    );
     renderReport(body);
   } catch (error) {
     renderError(error instanceof Error ? error.message : String(error));
