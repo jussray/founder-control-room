@@ -2,6 +2,7 @@ const STORAGE_KEY = 'fcr_session';
 const ATTEMPTS_KEY_PREFIX = 'fcr_goalfix_attempts_v1';
 const MAX_ATTEMPTS_PER_SIGNATURE = 3;
 const MAX_ATTEMPTS = 60;
+const ATTEMPT_PRIORITY = Object.freeze({ passed: 1, incomplete: 2, blocked: 3, failed: 3 });
 const form = document.getElementById('goalfix-form');
 const result = document.getElementById('goalfix-result');
 const message = document.getElementById('goalfix-message');
@@ -156,6 +157,20 @@ function attemptFromProofLine(value) {
   });
 }
 
+function collapseInspectionAttempts(attempts) {
+  const byCheckAndCommit = new Map();
+
+  for (const attempt of attempts) {
+    const key = `${normalizeSignalName(attempt.verificationName)}:${attempt.commitSha ?? ''}`;
+    const current = byCheckAndCommit.get(key);
+    if (!current || ATTEMPT_PRIORITY[attempt.result] > ATTEMPT_PRIORITY[current.result]) {
+      byCheckAndCommit.set(key, attempt);
+    }
+  }
+
+  return [...byCheckAndCommit.values()];
+}
+
 function recordVerificationAttempts(
   report,
   projectSlug,
@@ -164,9 +179,11 @@ function recordVerificationAttempts(
   expectedVerificationNames,
 ) {
   const requiredNames = new Set(expectedVerificationNames.map(normalizeSignalName));
-  const nextAttempts = (report?.proof ?? [])
-    .map(attemptFromProofLine)
-    .filter((attempt) => attempt && requiredNames.has(normalizeSignalName(attempt.verificationName)));
+  const nextAttempts = collapseInspectionAttempts(
+    (report?.proof ?? [])
+      .map(attemptFromProofLine)
+      .filter((attempt) => attempt && requiredNames.has(normalizeSignalName(attempt.verificationName))),
+  );
   if (nextAttempts.length === 0) return;
 
   saveAttempts(
