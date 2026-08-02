@@ -38,9 +38,11 @@ export interface FounderOsSandboxRun {
 }
 
 function deepFreeze<T>(value: T): Readonly<T> {
-  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) {
+    return value as Readonly<T>;
+  }
   for (const nested of Object.values(value as Record<string, unknown>)) deepFreeze(nested);
-  return Object.freeze(value);
+  return Object.freeze(value) as Readonly<T>;
 }
 
 function assertJsonSafe(value: unknown, path = '$', seen = new WeakSet<object>()): void {
@@ -85,7 +87,7 @@ function stableStringify(value: unknown): string {
       .map((key) => `${JSON.stringify(key)}:${stableStringify((value as Record<string, unknown>)[key])}`)
       .join(',')}}`;
   }
-  return JSON.stringify(value);
+  return JSON.stringify(value) ?? 'null';
 }
 
 function fingerprint(value: unknown): string {
@@ -131,7 +133,7 @@ export function runFounderOsSandbox(
       violations: ['kill_switch_active'],
       sandbox,
       plan: null,
-    });
+    } satisfies FounderOsSandboxRun);
   }
 
   if (
@@ -144,7 +146,7 @@ export function runFounderOsSandbox(
       violations: ['input_fingerprint_mismatch'],
       sandbox,
       plan: null,
-    });
+    } satisfies FounderOsSandboxRun);
   }
 
   const before = stableStringify(input);
@@ -165,5 +167,5 @@ export function runFounderOsSandbox(
       outputFingerprint: fingerprint(plan),
     },
     plan,
-  });
+  } satisfies FounderOsSandboxRun);
 }
