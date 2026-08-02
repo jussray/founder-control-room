@@ -1,0 +1,76 @@
+{
+  "dataClassification": "synthetic",
+  "killSwitch": false,
+  "requestedAuthority": {
+    "level": "L0",
+    "mode": "simulation",
+    "executionAllowed": false
+  },
+  "approvalScope": {
+    "id": "synthetic-approval-adversarial-001",
+    "projectSlug": "synthetic-founder-project",
+    "eventId": "synthetic-adversarial-event-001",
+    "mode": "publish"
+  },
+  "consumedApprovalIds": [],
+  "observedAt": "2026-08-01T16:00:00.000Z",
+  "proofObservedAt": "2026-08-01T15:00:00.000Z",
+  "delegationChain": [
+    "juss-chief-ai",
+    "governance-agent",
+    "campaign-agent"
+  ],
+  "agentVotes": [
+    {
+      "agent": "reality-agent",
+      "decision": "allow"
+    },
+    {
+      "agent": "governance-agent",
+      "decision": "allow"
+    }
+  ],
+  "budget": {
+    "steps": 6,
+    "costUnits": 30,
+    "elapsedMs": 1200
+  },
+  "seenCampaignKeys": [],
+  "prompt": "Prepare one synthetic proof-gated company simulation for review.",
+  "companyInput": {
+    "dataClassification": "synthetic",
+    "projectSlug": "synthetic-founder-project",
+    "eventId": "synthetic-adversarial-event-001",
+    "summary": "A synthetic adversarial company workflow passed every preflight gate.",
+    "requestedMode": "publish",
+    "audiences": [
+      "investors",
+      "founders"
+    ],
+    "platforms": [
+      "linkedin",
+      "facebook_founder"
+    ],
+    "proof": {
+      "projectSlug": "synthetic-founder-project",
+      "status": "ready",
+      "urls": [
+        "https://proof.example.test/synthetic-adversarial-event-001"
+      ]
+    },
+    "traction": [
+      {
+        "label": "Synthetic governed demand",
+        "value": "4 simulated requests",
+        "sourceUrl": "https://traction.example.test/synthetic-adversarial-event-001"
+      }
+    ],
+    "governanceAdvantages": [
+      {
+        "label": "Every simulated action remains L0 and receipt-bound",
+        "proofUrl": "https://governance.example.test/synthetic-adversarial-event-001"
+      }
+    ],
+    "founderApprovalId": "synthetic-approval-adversarial-001"
+  }
+}
