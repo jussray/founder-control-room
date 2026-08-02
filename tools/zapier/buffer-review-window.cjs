@@ -5,6 +5,15 @@ const { createHash, timingSafeEqual } = require('node:crypto');
 const MAX_REPLY_LENGTH = 2000;
 const CHANNEL_COMMAND = /^([^:]+):\s*(.+)$/s;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const QUOTE_OR_SIGNATURE_BOUNDARIES = [
+  /^>/,
+  /^-{2,}\s*original message\s*-{2,}$/i,
+  /^on\s.+wrote:\s*$/i,
+  /^(from|sent|to|subject):\s/i,
+  /^--\s*$/,
+  /^sent from my (iphone|ipad|android)/i,
+  /^get outlook for/i,
+];
 
 function asTrimmedString(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -30,6 +39,40 @@ function constantTimeEqual(left, right) {
   const leftBuffer = Buffer.from(asTrimmedString(left));
   const rightBuffer = Buffer.from(asTrimmedString(right));
   return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function isQuoteOrSignatureBoundary(line) {
+  return QUOTE_OR_SIGNATURE_BOUNDARIES.some((pattern) => pattern.test(line));
+}
+
+function extractReplyCommand(value) {
+  const raw = asTrimmedString(value);
+  if (!raw) throw new Error('FOUNDER_REVIEW_REJECTED: reply_text is required');
+  if (raw.length > MAX_REPLY_LENGTH) throw new Error('FOUNDER_REVIEW_REJECTED: reply_text is too long');
+
+  const lines = raw.replace(/\r\n?/g, '\n').split('\n');
+  let command = null;
+  let quotedOrSignedRegion = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (quotedOrSignedRegion) continue;
+    if (isQuoteOrSignatureBoundary(trimmed)) {
+      quotedOrSignedRegion = true;
+      continue;
+    }
+    if (command === null) {
+      command = trimmed;
+      continue;
+    }
+    throw new Error('FOUNDER_REVIEW_REJECTED: reply contains multiple unquoted command lines');
+  }
+
+  if (!command) {
+    throw new Error('FOUNDER_REVIEW_REJECTED: reply contains no unquoted command');
+  }
+  return command;
 }
 
 function requireScheduledPosts(posts) {
@@ -100,17 +143,18 @@ function buildGmailReviewDigest(input = {}) {
       `Review window closes at ${reviewDeadline}.`,
       '',
       ...sections.flatMap((section) => [section, '', '---', '']),
-      'Reply before the deadline with one command:',
+      'Reply before the deadline with exactly one command on the first non-empty line:',
       '- cancel all',
       '- <channel>: cancel',
       '- <channel>: <requested tweak>',
       '',
+      'Quoted history and standard mail signatures are ignored after that command. Additional unquoted command lines are rejected.',
       'A requested tweak must be regenerated and revalidated before Buffer is updated. No reply means Buffer keeps the existing scheduled fire time.',
       `Review token: ${reviewToken}`,
     ].join('\n'),
     review_deadline: reviewDeadline,
     review_token: reviewToken,
-    reply_contract: 'channel_scoped_or_cancel_all',
+    reply_contract: 'one_unquoted_channel_scoped_command_or_cancel_all',
     no_reply_behavior: 'publish_by_existing_buffer_schedule',
     notification_failure_policy: 'cancel_scheduled_batch',
     scheduled_post_count: posts.length,
@@ -128,9 +172,7 @@ function findPostByChannel(posts, requestedChannel) {
 
 function processFounderReviewReply(input = {}, options = {}) {
   const posts = requireScheduledPosts(input.scheduled_posts);
-  const replyText = asTrimmedString(input.reply_text);
-  if (!replyText) throw new Error('FOUNDER_REVIEW_REJECTED: reply_text is required');
-  if (replyText.length > MAX_REPLY_LENGTH) throw new Error('FOUNDER_REVIEW_REJECTED: reply_text is too long');
+  const replyCommand = extractReplyCommand(input.reply_text);
 
   if (!constantTimeEqual(input.review_token, input.expected_review_token)) {
     throw new Error('FOUNDER_REVIEW_REJECTED: review token mismatch');
@@ -155,11 +197,12 @@ function processFounderReviewReply(input = {}, options = {}) {
     throw new Error('FOUNDER_REVIEW_REJECTED: received_at is too far in the future');
   }
 
-  const normalizedReply = replyText.toLowerCase();
+  const normalizedReply = replyCommand.toLowerCase();
   if (normalizedReply === 'cancel' || normalizedReply === 'cancel all') {
     return {
       review_state: 'cancel_requested',
       review_action: 'cancel_all',
+      parsed_command: replyCommand,
       stop_publish: true,
       operations: posts.map((post) => ({
         buffer_action: 'buffer_cancel_scheduled_post',
@@ -172,16 +215,17 @@ function processFounderReviewReply(input = {}, options = {}) {
     };
   }
 
-  const commandMatch = replyText.match(CHANNEL_COMMAND);
+  const commandMatch = replyCommand.match(CHANNEL_COMMAND);
   if (!commandMatch) {
     if (posts.length === 1) {
       const [post] = posts;
       return {
         review_state: 'edit_requested',
         review_action: 'edit_one',
+        parsed_command: replyCommand,
         target_channel: post.channel,
         buffer_post_id: post.buffer_post_id,
-        edit_instruction: replyText,
+        edit_instruction: replyCommand,
         requires_regeneration: true,
         requires_content_firewall_revalidation: true,
         schedule_preserved: true,
@@ -201,6 +245,7 @@ function processFounderReviewReply(input = {}, options = {}) {
     return {
       review_state: 'cancel_requested',
       review_action: 'cancel_one',
+      parsed_command: replyCommand,
       target_channel: post.channel,
       stop_publish: false,
       operations: [{
@@ -217,6 +262,7 @@ function processFounderReviewReply(input = {}, options = {}) {
   return {
     review_state: 'edit_requested',
     review_action: 'edit_one',
+    parsed_command: replyCommand,
     target_channel: post.channel,
     buffer_post_id: post.buffer_post_id,
     edit_instruction: instruction,
@@ -267,4 +313,5 @@ module.exports = {
   buildNotificationFailureCompensation,
   resolveNoReplyDeadline,
   buildReviewToken,
+  extractReplyCommand,
 };
