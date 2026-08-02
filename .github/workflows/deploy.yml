@@ -1,9 +1,23 @@
 name: Deploy
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      expected_head_sha:
+        description: Exact current main commit approved for production deployment
+        required: true
+        type: string
+      deployment_approval_id:
+        description: Founder Control Room production decision or approval reference
+        required: true
+        type: string
+      deployment_reason:
+        description: Short reason for this production deployment
+        required: false
+        type: string
+
+permissions:
+  contents: read
 
 concurrency:
   group: deploy-production
@@ -13,14 +27,74 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  authority-gate:
+    name: Production Authority and Exact-Head Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    env:
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+      DEPLOYMENT_APPROVAL_ID: ${{ inputs.deployment_approval_id }}
+      DEPLOYMENT_REASON: ${{ inputs.deployment_reason }}
+    steps:
+      - name: Checkout exact approved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify production authority and current main
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=Invalid exact head::expected_head_sha must be a lowercase 40-character commit SHA."
+            exit 1
+          fi
+          if [[ ! "$DEPLOYMENT_APPROVAL_ID" =~ ^[A-Za-z0-9._:-]{8,200}$ ]]; then
+            echo "::error title=Invalid production approval reference::deployment_approval_id must be an auditable 8-200 character reference."
+            exit 1
+          fi
+
+          ACTUAL_HEAD_SHA="$(git rev-parse HEAD)"
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          CURRENT_MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
+
+          echo "Expected approved SHA: $EXPECTED_HEAD_SHA"
+          echo "Checked-out SHA:       $ACTUAL_HEAD_SHA"
+          echo "Current main SHA:       $CURRENT_MAIN_SHA"
+          echo "Approval reference:     $DEPLOYMENT_APPROVAL_ID"
+
+          test "$ACTUAL_HEAD_SHA" = "$EXPECTED_HEAD_SHA"
+          test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"
+
+      - name: Record authority receipt
+        shell: bash
+        run: |
+          {
+            echo "## Production authority receipt"
+            echo
+            echo "- Exact approved head: \`$EXPECTED_HEAD_SHA\`"
+            echo "- Approval reference: \`$DEPLOYMENT_APPROVAL_ID\`"
+            echo "- Reason: ${DEPLOYMENT_REASON:-not supplied}"
+            echo "- Trigger: manual workflow dispatch"
+            echo "- Founder Signal auto-distribution: disabled"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # ── 1. Supabase migrations ──────────────────────────────────────────────────────
   supabase-migrate:
     name: Supabase DB Push
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: production
+    needs: authority-gate
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_head_sha }}
+          persist-credentials: false
 
       - uses: supabase/setup-cli@v2
         with:
@@ -108,6 +182,9 @@ jobs:
     needs: supabase-migrate
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_head_sha }}
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
@@ -117,14 +194,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Deploy Worker
+      - name: Deploy Worker with distribution disabled
         id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: '4.110.0'
-          command: deploy --config wrangler.toml --var GIT_SHA:${{ github.sha }}
+          command: deploy --config wrangler.toml --var GIT_SHA:${{ inputs.expected_head_sha }}
           secrets: |
             FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
         env:
@@ -135,15 +212,18 @@ jobs:
           CF_FEATURE_FLAGS_KV_NAMESPACE_ID: ${{ secrets.CF_FEATURE_FLAGS_KV_NAMESPACE_ID }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON: >-
-            {"id":"founder-approved-auto-distribution-v1","enabled":true,"routes":[{"channel":"linkedin","audienceSegment":"build-in-public"},{"channel":"facebook","audienceSegment":"build-in-public"}],"repositories":["jussray/Sekret-Bip"],"approvedRecipientIds":[],"expiresAt":null}
+            {"id":"founder-signal-draft-only-v1","enabled":false,"routes":[{"channel":"linkedin","audienceSegment":"build-in-public"},{"channel":"facebook","audienceSegment":"build-in-public"}],"repositories":["jussray/Sekret-Bip"],"approvedRecipientIds":[],"expiresAt":null}
 
-  # ── 3. Post-deploy exact-SHA and grant proof ────────────────────────────────
+  # ── 3. Post-deploy exact-SHA and fail-closed grant proof ─────────────────────
   smoke-test:
     name: Smoke Test
     runs-on: ubuntu-latest
     needs: worker-deploy
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_head_sha }}
+          persist-credentials: false
 
       - name: Verify Worker health
         run: |
@@ -161,12 +241,12 @@ jobs:
         env:
           DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
 
-      - name: Verify exact deployed commit and social grant
+      - name: Verify exact deployed commit and disabled social grant
         run: |
           set -euo pipefail
           DEPLOY_URL="${DEPLOY_URL%/}"
           BODY=$(curl --fail --silent --show-error "$DEPLOY_URL/version")
-          BODY="$BODY" EXPECTED_SHA="$GITHUB_SHA" python3 - <<'PY'
+          BODY="$BODY" EXPECTED_SHA="${{ inputs.expected_head_sha }}" python3 - <<'PY'
           import json
           import os
 
@@ -182,8 +262,8 @@ jobs:
 
           if deployed_sha != expected_sha:
               raise SystemExit('exact deployment proof failed')
-          if grant != {'configured': True, 'enabled': True}:
-              raise SystemExit('social grant activation read-back failed')
+          if grant != {'configured': True, 'enabled': False}:
+              raise SystemExit('social distribution fail-closed read-back failed')
           PY
         env:
           DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
@@ -211,11 +291,12 @@ jobs:
     name: Post-Deploy Reconciliation
     runs-on: ubuntu-latest
     needs: smoke-test
-    # Reconciliation drift is retained as evidence but does not roll back a
-    # deployment that already passed exact-SHA and public-surface proof.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_head_sha }}
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
