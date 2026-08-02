@@ -29,6 +29,13 @@ const scheduledPosts = [
   },
 ];
 
+const replyIdentity = {
+  reply_from: 'Juss Ray <juss@example.com>',
+  expected_reply_from: 'juss@example.com',
+  gmail_thread_id: 'thread-123',
+  expected_gmail_thread_id: 'thread-123',
+};
+
 const digest = buildGmailReviewDigest({
   batch_id: '66cf315f-e1a0-4aad-9c76-355f1df30b54',
   scheduled_posts: structuredClone(scheduledPosts),
@@ -48,6 +55,7 @@ const cancelAll = processFounderReviewReply({
   review_deadline: digest.review_deadline,
   review_token: digest.review_token,
   expected_review_token: digest.review_token,
+  ...replyIdentity,
 }, { nowMs: Date.parse('2026-08-02T21:05:01.000Z') });
 assert.equal(cancelAll.review_action, 'cancel_all');
 assert.equal(cancelAll.stop_publish, true);
@@ -61,6 +69,7 @@ const cancelOne = processFounderReviewReply({
   review_deadline: digest.review_deadline,
   review_token: digest.review_token,
   expected_review_token: digest.review_token,
+  ...replyIdentity,
 }, { nowMs: Date.parse('2026-08-02T21:05:01.000Z') });
 assert.equal(cancelOne.review_action, 'cancel_one');
 assert.equal(cancelOne.operations[0].buffer_post_id, 'buffer-1');
@@ -72,6 +81,7 @@ const editOne = processFounderReviewReply({
   review_deadline: digest.review_deadline,
   review_token: digest.review_token,
   expected_review_token: digest.review_token,
+  ...replyIdentity,
 }, { nowMs: Date.parse('2026-08-02T21:05:01.000Z') });
 assert.equal(editOne.review_action, 'edit_one');
 assert.equal(editOne.requires_regeneration, true);
@@ -87,6 +97,7 @@ assert.throws(
     review_deadline: digest.review_deadline,
     review_token: digest.review_token,
     expected_review_token: digest.review_token,
+    ...replyIdentity,
   }, { nowMs: Date.parse('2026-08-02T21:05:01.000Z') }),
   /multi-post replies must name a channel/,
 );
@@ -99,6 +110,7 @@ assert.throws(
     review_deadline: digest.review_deadline,
     review_token: digest.review_token,
     expected_review_token: digest.review_token,
+    ...replyIdentity,
   }, { nowMs: Date.parse('2026-08-02T21:20:02.000Z') }),
   /after the review deadline/,
 );
@@ -111,8 +123,37 @@ assert.throws(
     review_deadline: digest.review_deadline,
     review_token: 'forged',
     expected_review_token: digest.review_token,
+    ...replyIdentity,
   }, { nowMs: Date.parse('2026-08-02T21:05:01.000Z') }),
   /review token mismatch/,
+);
+
+assert.throws(
+  () => processFounderReviewReply({
+    scheduled_posts: structuredClone(scheduledPosts),
+    reply_text: 'cancel all',
+    received_at: '2026-08-02T21:05:00.000Z',
+    review_deadline: digest.review_deadline,
+    review_token: digest.review_token,
+    expected_review_token: digest.review_token,
+    ...replyIdentity,
+    reply_from: 'attacker@example.com',
+  }, { nowMs: Date.parse('2026-08-02T21:05:01.000Z') }),
+  /reply sender does not match/,
+);
+
+assert.throws(
+  () => processFounderReviewReply({
+    scheduled_posts: structuredClone(scheduledPosts),
+    reply_text: 'cancel all',
+    received_at: '2026-08-02T21:05:00.000Z',
+    review_deadline: digest.review_deadline,
+    review_token: digest.review_token,
+    expected_review_token: digest.review_token,
+    ...replyIdentity,
+    gmail_thread_id: 'wrong-thread',
+  }, { nowMs: Date.parse('2026-08-02T21:05:01.000Z') }),
+  /Gmail thread mismatch/,
 );
 
 const compensation = buildNotificationFailureCompensation({
