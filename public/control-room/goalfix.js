@@ -22,10 +22,29 @@ function lines(value) {
     .filter(Boolean);
 }
 
-function attemptStorageKey(projectSlug, targetRef) {
+function fingerprint(value) {
+  let hash = 2166136261;
+  const text = String(value ?? '');
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function attemptScopeId({ desiredOutcome, suspectedFailureArea, firstFilesOrLogs, expectedVerificationNames }) {
+  return fingerprint([
+    String(desiredOutcome ?? '').trim(),
+    String(suspectedFailureArea ?? '').trim(),
+    ...(firstFilesOrLogs ?? []),
+    ...(expectedVerificationNames ?? []),
+  ].join('\u241f'));
+}
+
+function attemptStorageKey(projectSlug, targetRef, scopeId) {
   const project = String(projectSlug ?? '').trim().toLowerCase();
   const target = String(targetRef ?? '').trim() || 'main';
-  return `${ATTEMPTS_KEY_PREFIX}:${project}:${target}`;
+  return `${ATTEMPTS_KEY_PREFIX}:${project}:${target}:${scopeId}`;
 }
 
 function sanitizeAttempt(value) {
@@ -60,9 +79,9 @@ function sanitizeAttempt(value) {
   };
 }
 
-function loadAttempts(projectSlug, targetRef) {
+function loadAttempts(projectSlug, targetRef, scopeId) {
   try {
-    const raw = sessionStorage.getItem(attemptStorageKey(projectSlug, targetRef));
+    const raw = sessionStorage.getItem(attemptStorageKey(projectSlug, targetRef, scopeId));
     const parsed = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(parsed)) return [];
     return parsed.map(sanitizeAttempt).filter(Boolean).slice(-MAX_ATTEMPTS);
@@ -71,9 +90,12 @@ function loadAttempts(projectSlug, targetRef) {
   }
 }
 
-function saveAttempts(projectSlug, targetRef, attempts) {
+function saveAttempts(projectSlug, targetRef, scopeId, attempts) {
   const bounded = attempts.map(sanitizeAttempt).filter(Boolean).slice(-MAX_ATTEMPTS);
-  sessionStorage.setItem(attemptStorageKey(projectSlug, targetRef), JSON.stringify(bounded));
+  sessionStorage.setItem(
+    attemptStorageKey(projectSlug, targetRef, scopeId),
+    JSON.stringify(bounded),
+  );
 }
 
 function attemptFromProofLine(value) {
@@ -99,16 +121,15 @@ function attemptFromProofLine(value) {
   });
 }
 
-function recordVerificationAttempts(report, requestedProjectSlug, requestedTargetRef) {
-  const projectSlug = report?.project?.slug ?? requestedProjectSlug;
-  const targetRef = report?.target?.name ?? requestedTargetRef;
+function recordVerificationAttempts(report, projectSlug, targetRef, scopeId) {
   const nextAttempts = (report?.proof ?? []).map(attemptFromProofLine).filter(Boolean);
   if (nextAttempts.length === 0) return;
 
   saveAttempts(
     projectSlug,
     targetRef,
-    [...loadAttempts(projectSlug, targetRef), ...nextAttempts],
+    scopeId,
+    [...loadAttempts(projectSlug, targetRef, scopeId), ...nextAttempts],
   );
 }
 
@@ -198,17 +219,26 @@ form.addEventListener('submit', async (event) => {
 
   const projectSlug = String(values.projectSlug ?? '').trim();
   const targetRef = String(values.targetRef ?? '').trim();
+  const desiredOutcome = String(values.desiredOutcome ?? '').trim();
+  const suspectedFailureArea = String(values.suspectedFailureArea ?? '').trim();
+  const firstFilesOrLogs = lines(values.firstFilesOrLogs);
+  const scopeId = attemptScopeId({
+    desiredOutcome,
+    suspectedFailureArea,
+    firstFilesOrLogs,
+    expectedVerificationNames,
+  });
   const payload = {
     projectSlug,
     targetRef,
-    desiredOutcome: String(values.desiredOutcome ?? '').trim(),
+    desiredOutcome,
     reason: String(values.reason ?? '').trim() || undefined,
-    suspectedFailureArea: String(values.suspectedFailureArea ?? '').trim() || undefined,
+    suspectedFailureArea: suspectedFailureArea || undefined,
     constraints: lines(values.constraints),
-    firstFilesOrLogs: lines(values.firstFilesOrLogs),
+    firstFilesOrLogs,
     expectedVerificationNames,
     stopCondition: String(values.stopCondition ?? '').trim() || undefined,
-    attempts: loadAttempts(projectSlug, targetRef),
+    attempts: loadAttempts(projectSlug, targetRef, scopeId),
   };
 
   submit.disabled = true;
@@ -225,10 +255,10 @@ form.addEventListener('submit', async (event) => {
     const body = await response.json().catch(() => null);
     if (response.status === 401) {
       sessionStorage.removeItem(STORAGE_KEY);
-      sessionStorage.removeItem(attemptStorageKey(projectSlug, targetRef));
+      sessionStorage.removeItem(attemptStorageKey(projectSlug, targetRef, scopeId));
     }
     if (!response.ok) throw new Error(body?.error ?? `Inspection failed (${response.status})`);
-    recordVerificationAttempts(body, projectSlug, targetRef);
+    recordVerificationAttempts(body, projectSlug, targetRef, scopeId);
     renderReport(body);
   } catch (error) {
     renderError(error instanceof Error ? error.message : String(error));
