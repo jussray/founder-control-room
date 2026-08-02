@@ -9,12 +9,16 @@ const {
   BUFFER_PROVIDER_METHOD,
   BUFFER_API_SAVE_TO_DRAFT,
   BUFFER_REVIEW_WINDOW_MINUTES,
-  BUFFER_SCHEDULE_AUTHORITY,
+  BUFFER_SCHEDULE_POLICY_ID,
+  BUFFER_AUTHORIZATION_MODE,
   BUFFER_NOTIFICATION_MODE,
 } = require('./buffer-content-firewall.cjs');
 
 const sha = '205a239486b6b542648ce2f125178814e358b816';
 const generatedAt = '2026-08-02T21:00:00.000Z';
+const invocationId = '3f10e0f9-b0b4-4e64-b9ff-c5f10f848067';
+const steeringGrantId = 'founder-approved-auto-distribution-v1';
+const founderApprovalId = `standing-policy:${steeringGrantId}:${invocationId}`;
 const nowMs = Date.parse('2026-08-02T21:01:00.000Z');
 
 const founderLinkedInPost = `
@@ -41,7 +45,11 @@ const validInput = {
   batch_id: '66cf315f-e1a0-4aad-9c76-355f1df30b54',
   batch_size: 3,
   batch_index: 1,
-  schedule_authority_id: BUFFER_SCHEDULE_AUTHORITY,
+  invocation_id: invocationId,
+  steering_grant_id: steeringGrantId,
+  founder_approval_id: founderApprovalId,
+  authorization_mode: BUFFER_AUTHORIZATION_MODE,
+  schedule_policy_id: BUFFER_SCHEDULE_POLICY_ID,
   notification_mode: BUFFER_NOTIFICATION_MODE,
 };
 
@@ -50,8 +58,9 @@ assert.equal(prepared.content_validated, true);
 assert.equal(prepared.validated_post_text, founderLinkedInPost);
 assert.equal(prepared.destination_mode, 'schedule');
 assert.equal(prepared.publish_allowed, true);
-assert.equal(prepared.founder_approval_id, null);
-assert.equal(prepared.standing_authority_id, BUFFER_SCHEDULE_AUTHORITY);
+assert.equal(prepared.authorization_mode, BUFFER_AUTHORIZATION_MODE);
+assert.equal(prepared.authorization_receipt_verified, true);
+assert.equal(prepared.schedule_policy_id, BUFFER_SCHEDULE_POLICY_ID);
 assert.equal(prepared.buffer_action, BUFFER_PROVIDER_ACTION);
 assert.equal(prepared.buffer_action, 'buffer_add_to_queue');
 assert.equal(prepared.buffer_method, BUFFER_PROVIDER_METHOD);
@@ -90,8 +99,13 @@ assert.throws(
 );
 
 assert.throws(
-  () => validateBufferPublishInput({ ...validInput, schedule_authority_id: 'founder-approved:caller-text' }, { nowMs }),
-  /does not match the checked-in founder scheduling policy/,
+  () => validateBufferPublishInput({ ...validInput, founder_approval_id: 'founder-approved:caller-text' }, { nowMs }),
+  /runtime-minted receipt/,
+);
+
+assert.throws(
+  () => validateBufferPublishInput({ ...validInput, schedule_policy_id: 'caller-owned-policy' }, { nowMs }),
+  /checked-in scheduling contract/,
 );
 
 assert.throws(
