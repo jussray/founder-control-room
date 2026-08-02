@@ -7,6 +7,7 @@ const {
   validateBufferPublishInput,
   BUFFER_PROVIDER_ACTION,
   BUFFER_PROVIDER_METHOD,
+  BUFFER_API_SHARING_MODE,
   BUFFER_API_SAVE_TO_DRAFT,
   BUFFER_REVIEW_WINDOW_MINUTES,
   BUFFER_SCHEDULE_POLICY_ID,
@@ -25,6 +26,7 @@ const nowMs = Date.parse('2026-08-02T21:01:00.000Z');
 
 assert.equal(MAX_STEERING_GRANT_ID_LENGTH, 100);
 assert.equal(MAX_AUTHORIZATION_RECEIPT_LENGTH, 200);
+assert.equal(BUFFER_API_SHARING_MODE, 'customScheduled');
 
 const founderLinkedInPost = `
 I deleted the marketing before I added the design.
@@ -72,6 +74,9 @@ assert.equal(prepared.buffer_method, BUFFER_PROVIDER_METHOD);
 assert.equal(prepared.buffer_method, 'schedule');
 assert.equal(prepared.buffer_save_to_draft, BUFFER_API_SAVE_TO_DRAFT);
 assert.equal(prepared.buffer_save_to_draft, false);
+assert.equal(prepared.buffer_api_sharing_mode, BUFFER_API_SHARING_MODE);
+assert.equal(prepared.buffer_api_sharing_mode, 'customScheduled');
+assert.equal(prepared.buffer_api_due_at, '2026-08-02T21:20:00.000Z');
 assert.equal(prepared.review_window_minutes, BUFFER_REVIEW_WINDOW_MINUTES);
 assert.equal(prepared.review_window_minutes, 20);
 assert.equal(prepared.scheduled_at, '2026-08-02T21:20:00.000Z');
@@ -142,10 +147,14 @@ const overrideAttempt = validateBufferPublishInput({
   buffer_method: 'share_now',
   saveToDraft: true,
   buffer_save_to_draft: true,
+  buffer_api_sharing_mode: 'shareNow',
+  buffer_api_due_at: '2026-08-02T21:01:01.000Z',
   scheduled_at: '2026-08-02T21:01:01.000Z',
 }, { nowMs });
 assert.equal(overrideAttempt.buffer_method, 'schedule');
 assert.equal(overrideAttempt.buffer_save_to_draft, false);
+assert.equal(overrideAttempt.buffer_api_sharing_mode, 'customScheduled');
+assert.equal(overrideAttempt.buffer_api_due_at, '2026-08-02T21:20:00.000Z');
 assert.equal(overrideAttempt.scheduled_at, '2026-08-02T21:20:00.000Z');
 
 class FixedDate extends Date {
@@ -167,6 +176,8 @@ vm.runInContext(
 );
 assert.equal(zapierLikeContext.output.buffer_method, 'schedule');
 assert.equal(zapierLikeContext.output.buffer_save_to_draft, false);
+assert.equal(zapierLikeContext.output.buffer_api_sharing_mode, 'customScheduled');
+assert.equal(zapierLikeContext.output.buffer_api_due_at, '2026-08-02T21:20:00.000Z');
 assert.equal(zapierLikeContext.output.review_window_minutes, 20);
 
-console.log('Buffer scheduling firewall verified: approved finished copy receives one owned schedule 20 minutes after generation; backend-aligned grant limits, stale timestamps, prompts, draft/queue/share-now modes, and caller overrides fail closed.');
+console.log('Buffer scheduling firewall verified: approved finished copy receives one owned 20-minute schedule with customScheduled/dueAt API mapping; backend-aligned grant limits, stale timestamps, prompts, draft/queue/share-now modes, and caller overrides fail closed.');
