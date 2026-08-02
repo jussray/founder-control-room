@@ -1,39 +1,75 @@
 {
-  "version": 1,
-  "status": "draft-only",
+  "version": 2,
+  "status": "schedule-with-review-window",
   "provider": "buffer",
   "zapier": {
     "action": "buffer_add_to_queue",
-    "requiredMethod": "draft",
+    "requiredMethod": "schedule",
     "allowedMethods": [
-      "draft"
+      "schedule"
     ],
     "rejectedMethods": [
+      "draft",
       "queue",
-      "schedule",
+      "publish",
       "share_next",
       "share_now",
       "schedule_draft"
     ],
-    "mappingComment": "method: draft # required; never rely on Buffer default"
+    "mappingComment": "method: schedule # computed fire time is exactly generated_at + 20 minutes; never rely on Buffer defaults"
   },
   "api": {
     "mutation": "createPost",
     "required": {
-      "saveToDraft": true
+      "saveToDraft": false
     }
+  },
+  "reviewWindow": {
+    "minutes": 20,
+    "startsFrom": "generated_at",
+    "generatedAtMaximumAgeMinutes": 5,
+    "fireTimeOwnedByFirewall": true,
+    "noReplyBehavior": "publish_by_existing_buffer_schedule",
+    "shareNowAllowed": false
+  },
+  "notification": {
+    "provider": "gmail",
+    "required": true,
+    "mode": "one_campaign_digest_for_up_to_three_posts",
+    "requiredFields": [
+      "caption",
+      "channel",
+      "fire_time",
+      "buffer_post_id",
+      "review_token"
+    ],
+    "failurePolicy": "cancel_scheduled_batch",
+    "replyCommands": [
+      "cancel all",
+      "<channel>: cancel",
+      "<channel>: <requested tweak>"
+    ],
+    "editPolicy": "regenerate_and_revalidate_before_buffer_update"
   },
   "authority": {
-    "publishAllowed": false,
-    "requiresFounderApprovalToChange": true,
+    "publishAllowed": true,
+    "standingAuthorityId": "checked-in-founder-policy:buffer-20-minute-review-v1",
+    "requiresExactSourceCommit": true,
+    "requiresHttpsProof": true,
     "liveProviderMutationIncluded": false
   },
-  "defenseInDepth": {
-    "requiresApprovalRole": {
-      "optional": true,
-      "requiresTeamPlan": true,
-      "organizationOwnerEligible": false,
-      "note": "Use only when Buffer Team access and a separate restricted user are actually configured. It is not a free-plan control and does not replace the explicit draft method."
-    }
+  "activationGates": {
+    "requiredSecrets": [
+      "FOUNDER_SIGNAL_ENGINE_MCP_TOKEN",
+      "ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL",
+      "FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON"
+    ],
+    "zapierPlanMustSupport": [
+      "webhook_trigger",
+      "multi_step_workflow",
+      "delay"
+    ],
+    "controlledSyntheticRunRequired": true,
+    "exactReceiptCorrelationRequired": true
   }
 }
