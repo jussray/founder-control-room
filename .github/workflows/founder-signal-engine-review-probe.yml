@@ -114,6 +114,7 @@ jobs:
               }
             }')"
 
+          curl_exit=0
           http_status="$(curl --silent --show-error \
             --proto '=https' \
             --proto-redir '=https' \
@@ -126,9 +127,51 @@ jobs:
             --url "https://api.foundercontrolroom.org/mcp/founder-signal-engine" \
             --header 'content-type: application/json' \
             --header "authorization: Bearer $MCP_TOKEN" \
-            --data "$request_body")"
+            --data "$request_body" \
+            2>curl-error.txt)" || curl_exit=$?
+          http_status="${http_status:-000}"
 
-          if jq -e . response.json >/dev/null 2>&1; then
+          if [[ "$curl_exit" -ne 0 ]]; then
+            transport_code="TRANSPORT_FAILURE"
+            transport_message="Founder API request failed before a usable HTTP response."
+            case "$curl_exit" in
+              6)
+                transport_code="DNS_RESOLUTION_FAILED"
+                transport_message="The Founder API hostname could not be resolved."
+                ;;
+              7)
+                transport_code="CONNECTION_FAILED"
+                transport_message="The Founder API connection could not be established."
+                ;;
+              28)
+                transport_code="REQUEST_TIMEOUT"
+                transport_message="The Founder API request timed out."
+                ;;
+              35|60)
+                transport_code="TLS_FAILURE"
+                transport_message="The Founder API TLS connection could not be verified."
+                ;;
+            esac
+
+            jq -n \
+              --arg code "$transport_code" \
+              --arg message "$transport_message" \
+              --arg invocation_id "$INVOCATION_ID" \
+              --arg workflow_head_sha "$WORKFLOW_HEAD_SHA" \
+              --arg workflow_run_id "$WORKFLOW_RUN_ID" \
+              --argjson curl_exit "$curl_exit" \
+              '{
+                receiptVersion: 1,
+                state: "transport_failure",
+                workflowHeadSha: $workflow_head_sha,
+                workflowRunId: $workflow_run_id,
+                invocationId: $invocation_id,
+                httpStatus: null,
+                transport: {curlExitCode: $curl_exit},
+                error: {code: $code, message: $message},
+                result: null
+              }' > founder-signal-engine-receipt.json
+          elif jq -e . response.json >/dev/null 2>&1; then
             jq \
               --arg http_status "$http_status" \
               --arg workflow_head_sha "$WORKFLOW_HEAD_SHA" \
@@ -194,6 +237,12 @@ jobs:
             cat founder-signal-engine-receipt.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$curl_exit" -ne 0 ]]; then
+            error_code="$(jq -r '.error.code' founder-signal-engine-receipt.json)"
+            echo "::error title=Bridge transport failure::$error_code prevented an HTTP response."
+            exit 1
+          fi
 
           if [[ "$http_status" -lt 200 || "$http_status" -ge 300 ]]; then
             echo "::error title=Bridge HTTP failure::Founder Signal Engine returned HTTP $http_status."

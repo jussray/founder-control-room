@@ -1,0 +1,28 @@
+{
+  "dataClassification": "synthetic",
+  "projectSlug": "synthetic-founder-project",
+  "eventId": "synthetic-parity-missing-proof",
+  "summary": "A synthetic founder company event intentionally omits clickable proof.",
+  "requestedMode": "draft",
+  "audiences": ["founders"],
+  "platforms": ["linkedin"],
+  "proof": {
+    "projectSlug": "synthetic-founder-project",
+    "status": "ready",
+    "urls": []
+  },
+  "traction": [
+    {
+      "label": "Synthetic governed demand",
+      "value": "1 simulated workflow",
+      "sourceUrl": "https://traction.example.test/synthetic-parity-missing-proof"
+    }
+  ],
+  "governanceAdvantages": [
+    {
+      "label": "Execution remains disabled inside both labs",
+      "proofUrl": "https://governance.example.test/synthetic-parity-missing-proof"
+    }
+  ],
+  "founderApprovalId": null
+}

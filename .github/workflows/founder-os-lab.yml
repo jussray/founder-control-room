@@ -1,0 +1,57 @@
+name: Founder OS Lab Isolation
+
+on:
+  pull_request:
+    paths:
+      - 'src/founder-os-lab/**'
+      - 'scripts/verify-founder-os-lab-isolation.mjs'
+      - '.github/workflows/founder-os-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: founder-os-lab-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-lab:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    env:
+      TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact candidate head
+        run: |
+          actual_sha="$(git rev-parse HEAD)"
+          test "$actual_sha" = "$TARGET_SHA" || {
+            echo "Expected $TARGET_SHA but checked out $actual_sha" >&2
+            exit 1
+          }
+          echo "Verified exact candidate head: $actual_sha"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Enforce no-side-effect boundary
+        run: node scripts/verify-founder-os-lab-isolation.mjs
+
+      - name: Run focused lab contracts
+        run: npx vitest run src/founder-os-lab/__tests__/engine.test.ts
+
+      - name: Typecheck repository integration
+        run: npm run typecheck

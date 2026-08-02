@@ -1,0 +1,60 @@
+name: AI Company Cross-Lab Parity
+
+on:
+  pull_request:
+    paths:
+      - 'src/founder-os-lab/**'
+      - 'scripts/verify-founder-os-lab-isolation.mjs'
+      - 'labs/ai-company/**'
+      - 'tools/zapier/buffer-content-firewall.cjs'
+      - 'tools/zapier/test-buffer-content-firewall.cjs'
+      - 'tools/zapier/test-buffer-provider-contract.cjs'
+      - 'config/buffer-provider-contract.json'
+      - 'test/ai-company-parity.test.ts'
+      - 'vitest.ai-company-parity.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/ai-company-parity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-company-parity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-parity:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    env:
+      TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact candidate head
+        run: |
+          actual_sha="$(git rev-parse HEAD)"
+          test "$actual_sha" = "$TARGET_SHA" || {
+            echo "Expected $TARGET_SHA but checked out $actual_sha" >&2
+            exit 1
+          }
+          echo "Verified exact candidate head: $actual_sha"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify cross-lab authority and isolation parity
+        run: npm run verify:ai-company-parity

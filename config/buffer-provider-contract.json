@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "status": "draft-only",
+  "provider": "buffer",
+  "zapier": {
+    "action": "buffer_add_to_queue",
+    "requiredMethod": "draft",
+    "allowedMethods": [
+      "draft"
+    ],
+    "rejectedMethods": [
+      "queue",
+      "schedule",
+      "share_next",
+      "share_now",
+      "schedule_draft"
+    ],
+    "mappingComment": "method: draft # required; never rely on Buffer default"
+  },
+  "api": {
+    "mutation": "createPost",
+    "required": {
+      "saveToDraft": true
+    }
+  },
+  "authority": {
+    "publishAllowed": false,
+    "requiresFounderApprovalToChange": true,
+    "liveProviderMutationIncluded": false
+  },
+  "defenseInDepth": {
+    "requiresApprovalRole": {
+      "optional": true,
+      "requiresTeamPlan": true,
+      "organizationOwnerEligible": false,
+      "note": "Use only when Buffer Team access and a separate restricted user are actually configured. It is not a free-plan control and does not replace the explicit draft method."
+    }
+  }
+}

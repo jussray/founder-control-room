@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "note": "Starting policy for src/lib/socialCampaignPolicy.ts. Deliberately minimal — add a repository entry only once its containsMinorOrSensitiveData and publicProofUrls values have been reviewed, not by copying a template. See docs/founder-signal-engine/social-campaign-policy-v1.md.",
+  "repositories": {
+    "jussray/founder-control-room": {
+      "containsMinorOrSensitiveData": false,
+      "configuredMode": "ecosystem_only",
+      "publicProofUrls": [],
+      "neverClaim": ["publicly launched", "production complete", "SOC 2 certified"],
+      "neverExpose": ["tokens", "credentials", "private audit payloads", "internal infrastructure"]
+    },
+    "jussray/Sekret-Bip": {
+      "containsMinorOrSensitiveData": true,
+      "publicProofUrls": [],
+      "neverClaim": [],
+      "neverExpose": [
+        "teen records",
+        "private reflections",
+        "customer information",
+        "internal Supabase data"
+      ],
+      "_gate": "config/repository-visibility-policy.json currently targets this repository for privatization (priority: critical, action: privatize_then_create_clean_showcase_export). containsMinorOrSensitiveData short-circuits classifyRepositoryForContent() regardless of configuredMode — see socialCampaignPolicy.ts."
+    }
+  }
+}
