@@ -2,36 +2,29 @@
 
 ## Purpose
 
-Provide approved OpenAI-backed callers with a real, scoped invocation path into the Founder Signal Engine when the active environment does not expose a native Zapier connector.
+Provide approved OpenAI-backed callers with a scoped invocation path into the Founder Signal Engine when the active environment lacks a native Zapier connector.
 
 ## Architecture
 
 ```text
 OpenAI-backed caller
-  uses provider-held OpenAI key reference: zapier-founder-signal-engine
-        |
-        v
-Founder Control Room remote MCP endpoint
-  POST /mcp/founder-signal-engine
-  tool: invoke_founder_signal_engine
-        |
-        v
-Authenticated Founder Signal middleware
-  exact evidence + server-held standing-policy gate
-        |
-        v
-Private Zapier Catch Hook
-        |
-        v
-Zapier -> structured generation -> Buffer 20-minute schedules
-       -> one Gmail review digest -> receipts
+-> Founder Control Room remote MCP endpoint
+-> authenticated evidence and standing-policy gate
+-> private Zapier Catch Hook or approved backend orchestration
+-> structured generation
+-> Buffer custom schedules at generated_at + 20 minutes
+-> one Gmail review digest
+-> instant private reply ingress
+-> provider and Founder Control Room receipts
 ```
 
-The OpenAI API key authenticates the caller's OpenAI request. It is never sent as a tool argument and does not authenticate the MCP endpoint.
+The existing provider-held OpenAI key reference remains:
 
-The MCP endpoint uses a separate bearer token. The private Zapier hook URL and automation grant remain in the deployed backend secret store.
+```text
+zapier-founder-signal-engine
+```
 
-Connection to this path is not Zapier administrator access, a Zapier history viewer, arbitrary publication authority, HubSpot mutation authority, or permission to disclose credentials.
+The OpenAI key authenticates the caller's OpenAI request. It is never accepted as a tool argument and does not authenticate the MCP endpoint.
 
 ## Endpoint
 
@@ -41,66 +34,15 @@ Authorization: Bearer {FOUNDER_SIGNAL_ENGINE_MCP_TOKEN}
 Content-Type: application/json
 ```
 
-The endpoint implements stateless MCP JSON-RPC for:
-
-```text
-initialize
-notifications/initialized
-ping
-tools/list
-tools/call
-```
-
-It exposes exactly one tool:
+The endpoint implements stateless MCP JSON-RPC and exposes one tool:
 
 ```text
 invoke_founder_signal_engine
 ```
 
-## OpenAI remote MCP configuration
+Connection to this endpoint is not Zapier administration, arbitrary publication authority, HubSpot mutation authority, or permission to disclose credentials.
 
-The caller keeps `OPENAI_API_KEY` or the existing provider-managed key outside the repository. An OpenAI request may attach the MCP endpoint with configuration equivalent to:
-
-```ts
-const response = await openai.responses.create({
-  model: process.env.OPENAI_MODEL ?? 'gpt-5',
-  input: 'Invoke the Founder Signal Engine for the verified GitHub source.',
-  tools: [
-    {
-      type: 'mcp',
-      server_label: 'founder_signal_engine',
-      server_url: `${process.env.FOUNDER_API_URL}/mcp/founder-signal-engine`,
-      allowed_tools: ['invoke_founder_signal_engine'],
-      require_approval: 'always',
-      headers: {
-        Authorization: `Bearer ${process.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN}`,
-      },
-    },
-  ],
-});
-```
-
-This example contains no live credentials. Do not replace placeholders in repository files.
-
-## Tool input
-
-Base invocation shape:
-
-```json
-{
-  "invocationId": "caller-generated UUID",
-  "sourceRepository": "jussray/Sekret-Bip",
-  "sourcePr": 599,
-  "sourceCommitSha": "f4573d360a8fea99b301f33a2a21192525725f7b",
-  "requestedAction": "run_openai_step",
-  "steeringGrantId": "founder-signal-engine-day3-proof",
-  "auditPath": "Founder Control Room issue #73",
-  "rollbackStep": "Disable the Zapier Catch Hook and retain the evidence trail.",
-  "requestingAgent": "chatgpt",
-  "allowHubSpotWrite": false,
-  "founderApprovalId": null
-}
-```
+## Invocation and authority
 
 Supported action vocabulary:
 
@@ -110,36 +52,19 @@ queue_review_draft
 publish_or_send
 ```
 
-`publish_or_send` is not authorized by caller text. It becomes valid only when the server-held automation grant and exact trusted evidence select `auto-distribute`, middleware injects the matching grant and invocation context, and the runtime mints:
+`publish_or_send` is never authorized by caller text. It becomes valid only when exact trusted evidence satisfies the server-held automation grant, middleware injects the matching grant and invocation context, and the runtime mints:
 
 ```text
 standing-policy:<grantId>:<invocationId>
 ```
 
-The caller cannot supply or forge the internal authorization context. The route rejects mismatched standing-policy receipts.
+The caller cannot supply the internal authorization context. Manual approval-looking strings remain references only.
 
-Manual approval-looking strings remain references only. They do not become executable authority merely because they are present in `founderApprovalId`.
+The receipt is an exact runtime correlation value backed by authenticated middleware and private provider ingress. It is not a standalone cryptographic signature.
 
-## Standing-policy evidence
+## Scheduled distribution
 
-The automation candidate must include the exact supported channel, audience segment, HTTPS proof URL, and complete 5W1H context expected by the gate.
-
-The server-held grant remains authoritative for:
-
-- enabled/disabled state;
-- allowed repositories;
-- allowed channels;
-- allowed audience segments;
-- allowed actions;
-- source-evidence age;
-- trusted proof domains;
-- rollback and audit paths.
-
-The deterministic receipt is an exact runtime correlation value. The authenticated backend middleware and private Zapier hook are the security boundary. The receipt is not a standalone cryptographic signature and must not be accepted outside that trusted path.
-
-## Scheduled distribution contract
-
-After standing-policy authorization, Zapier must map selected finished content through the checked-in Buffer firewall.
+After authorization, each selected finished post passes the checked-in Buffer firewall.
 
 The firewall requires:
 
@@ -149,34 +74,54 @@ HTTPS proof URL
 fresh generated_at
 runtime invocation and grant
 matching standing-policy receipt
-approved content field and channel
+approved channel and output field
 schedule_policy_id: buffer-20-minute-review-v1
 notification_mode: gmail_campaign_digest
 ```
 
-It owns the provider fields and computes:
+It owns:
 
 ```text
 scheduled_at = generated_at + 20 minutes
-buffer_method = schedule
+buffer_api_sharing_mode = customScheduled
+buffer_api_due_at = scheduled_at
+buffer_save_to_draft = false
 share_now_allowed = false
 ```
 
-After Buffer returns real schedule IDs, the Zap sends one Gmail digest covering up to three posts. Edit and cancel replies are accepted only from the founder mailbox, in the original Gmail thread, with the matching review token, before the deadline.
+The Zapier-facing `buffer_method: schedule` is still subject to live action-schema proof. The Buffer API-safe mapping is `customScheduled` plus `dueAt`.
 
-No valid reply means no extra publish action. Buffer keeps the existing schedules.
+## Gmail notification and private reply ingress
+
+After Buffer returns real schedule IDs, send one Gmail digest covering up to three posts. The digest includes each caption, channel, due time, Buffer ID, review token, and a private context-bound Reply-To address.
+
+Gmail polling is not accepted for the deadline command path. A polling trigger can consume most of a 20-minute window and cannot guarantee that a valid command is handled in time.
+
+The preferred durable architecture is:
+
+```text
+Gmail digest
+Reply-To: private address on an owned domain
+-> Cloudflare Email Routing Worker
+-> validate founder sender, recipient/context, token, and deadline
+-> controlled edit or cancel action
+```
+
+The private reply route is a separate implementation and deployment surface. Repository configuration does not prove that DNS, Email Routing, Worker execution, or provider actions are live.
+
+Accepted commands:
+
+```text
+cancel all
+<channel>: cancel
+<channel>: <requested tweak>
+```
+
+Exactly one unquoted command is accepted. Edits return to generation and firewall validation before Buffer update. No valid reply means no extra publish call; Buffer keeps the existing schedules.
 
 ## Secret boundary
 
-The tool rejects:
-
-- raw OpenAI keys;
-- bearer tokens;
-- Zapier hook URLs;
-- API-key, password, secret, token, or service-role fields;
-- unexpected tool arguments.
-
-Provider secrets are configured only as deployed backend environment variables:
+Provider secrets remain only in deployed secret stores:
 
 ```text
 FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
@@ -185,37 +130,32 @@ FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
 FOUNDER_SIGNAL_ENGINE_HOOK_TIMEOUT_MS
 ```
 
-The existing OpenAI key reference remains:
+The tool rejects raw keys, tokens, passwords, hook URLs, service-role fields, and unexpected secret-shaped arguments.
 
-```text
-zapier-founder-signal-engine
-```
-
-Do not create, rotate, or duplicate that key merely because ChatGPT lacks a native Zapier connector.
+Do not duplicate or rotate the existing OpenAI key merely because ChatGPT lacks a native Zapier connector.
 
 ## Audit and idempotency
 
-The caller supplies a UUID `invocationId`. Founder Control Room writes a deterministic request audit before the provider call and a deterministic result audit after it.
+The caller supplies a UUID `invocationId`. Founder Control Room writes deterministic request and result audits.
 
-Duplicate request audit IDs are blocked. Retrying after a real or uncertain provider call requires inspecting prior evidence first. Use a new invocation ID only when the prior state proves a new attempt is appropriate.
+Duplicate invocation IDs are blocked. After a real or uncertain external call, inspect retained evidence before retrying. Create a new invocation only when prior state proves a new attempt is appropriate.
 
 ## Proof semantics
 
-These states are intentionally different:
+These states are different:
 
-1. **MCP accepted:** the remote tool received and validated the request.
-2. **Policy authorized:** trusted evidence satisfied the server-held standing grant.
-3. **Zapier hook accepted:** Zapier returned a successful HTTP response.
-4. **Zapier run identified:** an explicit matching Zapier run ID exists.
-5. **Structured output verified:** expected 5W1H and platform-specific copy exist.
-6. **Buffer schedules verified:** real Buffer schedule IDs and fire times exist.
-7. **Gmail review verified:** one digest, thread ID, sender binding, token, and deadline exist.
-8. **Review outcome verified:** edit, cancel, compensation, or no-reply result is retained.
-9. **Distribution proof complete:** final Buffer/platform and Founder Control Room receipts correlate to the exact invocation.
+1. MCP accepted.
+2. Standing policy authorized.
+3. Zapier hook or backend orchestration accepted.
+4. Exact run identified.
+5. Structured output verified.
+6. Buffer custom schedules and IDs verified.
+7. Gmail digest and private Reply-To verified.
+8. Instant reply-ingress receipt verified.
+9. Edit, cancel, compensation, or no-reply result verified.
+10. Final Buffer/platform and Founder Control Room receipts correlated.
 
-A successful HTTP response without an explicit run ID does not prove Zapier execution.
-
-A Zapier run ID alone does not prove structured output, Buffer schedules, Gmail delivery, publication, HubSpot mutation, or final correlation.
+A successful HTTP response does not prove a Zapier run. A run ID does not prove Buffer, Gmail, reply ingress, publication, HubSpot mutation, or final correlation.
 
 ## Historical Day 3 source
 
@@ -235,24 +175,25 @@ Merging code does not deploy or activate it.
 
 Live activation requires separate approval to:
 
-1. deploy the updated Founder Control Room backend;
-2. install the separate MCP bearer token;
-3. install the private Zapier Catch Hook URL;
-4. install and validate the server-held automation grant;
-5. confirm the live Zapier plan supports the required webhook and multi-step workflow;
-6. remap the existing Zap to the exact checked-in firewall and review controller;
-7. return or log explicit Zapier, Buffer, Gmail, and final provider receipts;
-8. run one controlled synthetic campaign;
-9. verify edit/cancel and no-reply behavior without duplicates;
-10. correlate every artifact in Founder Control Room.
+1. deploy the updated backend;
+2. install the MCP token, private hook URL, and automation grant;
+3. verify the live webhook and orchestration topology;
+4. verify the live Buffer schedule schema and exact returned IDs;
+5. implement and deploy instant private reply ingress;
+6. configure the Gmail digest with the bound private Reply-To;
+7. run one controlled synthetic campaign;
+8. prove one edit or cancel path and one no-reply path;
+9. correlate Zapier/backend, Buffer, Gmail, ingress, platform, and Founder Control Room receipts.
+
+A Free two-step Zap alone is not sufficient for this complete architecture. Gmail polling is not accepted for the 20-minute deadline path.
 
 `share_now`, unrelated outreach, arbitrary HubSpot mutation, and unrelated provider actions remain outside this contract.
 
 ## Rollback
 
 - disable or remove `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON`;
-- disable the affected Zap or Catch Hook;
+- disable the affected Catch Hook, Zap, backend route, and private reply route;
 - cancel only identified scheduled test artifacts when real provider IDs exist;
-- revoke the separate MCP bearer token when required;
-- preserve request/result audits, Zap history, Gmail receipts, Buffer receipts, platform receipts, and HubSpot evidence;
-- do not rotate the existing OpenAI key unless a separate credential incident or founder approval requires it.
+- revoke the separate MCP token when required;
+- preserve request/result audits, Zap history, mail receipts, Buffer/platform receipts, and HubSpot evidence;
+- do not rotate the existing OpenAI key without a separate credential incident or approval.
