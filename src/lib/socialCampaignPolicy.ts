@@ -2,6 +2,7 @@ import {
   FIRST_PARTY_PLATFORM_CAPABILITIES,
   type FirstPartySocialPlatform,
   type FirstPartySocialPostInput,
+  type SocialMediaAsset,
   type SocialProofLink,
 } from './firstPartySocialPublisher.js';
 
@@ -10,9 +11,8 @@ import {
  *
  * This module decides WHETHER and HOW MUCH a repository may feed the
  * first-party social pipeline. It never generates text, never calls an
- * LLM or a platform provider, and never persists anything — those are
- * separately gated (new provider/data-source scope under CLAUDE.md
- * Approval Gates) and are not part of this pass.
+ * LLM or a platform provider, and never persists anything. Those are
+ * separately gated and are not part of this module.
  */
 
 export type CampaignMode =
@@ -25,10 +25,8 @@ export type CampaignMode =
 export interface RepositoryContentPolicy {
   /**
    * Set this true for any repository whose activity could reference minors,
-   * private health/wellness content, or other data classes this
-   * organization treats as never-public. See `README.md` in this file's
-   * companion doc for what's required before this can ever be false for
-   * a repository that starts out true.
+   * private health/wellness content, or other data classes this organization
+   * treats as never-public.
    */
   containsMinorOrSensitiveData: boolean;
   configuredMode?: CampaignMode;
@@ -53,100 +51,141 @@ export interface CampaignClassification {
   reason: string;
   eligibleForDraftGeneration: boolean;
   daysAllocated: number;
+  /** Immutable identity of the evidence this classification authorized. */
+  authorizedRepository: string;
+  authorizedExactHead: string;
 }
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
+const COMMON_CONFUSABLES: Readonly<Record<string, string>> = {
+  а: 'a',
+  α: 'a',
+  е: 'e',
+  ε: 'e',
+  і: 'i',
+  ι: 'i',
+  о: 'o',
+  ο: 'o',
+  р: 'p',
+  ρ: 'p',
+  с: 'c',
+  х: 'x',
+  χ: 'x',
+  у: 'y',
+  к: 'k',
+  κ: 'k',
+  м: 'm',
+  т: 't',
+  τ: 't',
+};
+
+function classification(
+  repo: RepositoryEvidence,
+  result: Omit<CampaignClassification, 'authorizedRepository' | 'authorizedExactHead'>,
+): CampaignClassification {
+  return {
+    ...result,
+    authorizedRepository: repo.fullName,
+    authorizedExactHead: repo.exactHead.toLowerCase(),
+  };
+}
 
 /**
- * Pure, deterministic classification. No network calls, no side effects.
+ * Pure, deterministic classification. No network calls and no side effects.
  *
- * The `containsMinorOrSensitiveData` check runs first and short-circuits
- * everything else — a repository flagged this way cannot reach eligibility
- * through any other branch, including an explicit `configuredMode` override
- * in its own policy file. A config author cannot self-approve past this
- * gate; only removing the flag (a founder decision, made outside this
- * module) can.
+ * Sensitive-data and explicit-block checks run before every eligibility path.
+ * A repository cannot self-approve past either boundary through another
+ * configured mode.
  */
 export function classifyRepositoryForContent(repo: RepositoryEvidence): CampaignClassification {
   if (!EXACT_COMMIT_SHA.test(repo.exactHead)) {
-    return {
+    return classification(repo, {
       mode: 'not_eligible',
       reason: 'exactHead is not a valid 40-character commit SHA — refusing to classify unverified state.',
       eligibleForDraftGeneration: false,
       daysAllocated: 0,
-    };
+    });
   }
 
   if (repo.policy.containsMinorOrSensitiveData) {
-    return {
+    return classification(repo, {
       mode: 'blocked_pending_output_safeguard',
       reason:
-        'Repository is flagged containsMinorOrSensitiveData. Prompt-side instructions ("never expose X") are not a sufficient boundary for this data class — see docs/founder-signal-engine/social-campaign-policy-v1.md for what an output-side safeguard needs to look like before this repository can become eligible.',
+        'Repository is flagged containsMinorOrSensitiveData. Prompt-side instructions are not a sufficient boundary for this data class; an output-side safeguard is required before eligibility.',
       eligibleForDraftGeneration: false,
       daysAllocated: 0,
-    };
+    });
+  }
+
+  if (repo.policy.configuredMode === 'blocked_pending_output_safeguard') {
+    return classification(repo, {
+      mode: 'blocked_pending_output_safeguard',
+      reason: 'Repository policy explicitly blocks draft generation pending an output-side safeguard.',
+      eligibleForDraftGeneration: false,
+      daysAllocated: 0,
+    });
   }
 
   if (repo.archived) {
-    return {
+    return classification(repo, {
       mode: 'not_eligible',
       reason: 'Repository is archived.',
       eligibleForDraftGeneration: false,
       daysAllocated: 0,
-    };
+    });
   }
 
   if (repo.policy.configuredMode === 'not_eligible') {
-    return {
+    return classification(repo, {
       mode: 'not_eligible',
       reason: 'Repository policy explicitly excludes it from content generation.',
       eligibleForDraftGeneration: false,
       daysAllocated: 0,
-    };
+    });
   }
 
   if (repo.visibility === 'private' && repo.policy.publicProofUrls.length === 0) {
-    return {
+    return classification(repo, {
       mode: 'not_eligible',
       reason: 'Private repository has no approved public proof URL to reference.',
       eligibleForDraftGeneration: false,
       daysAllocated: 0,
-    };
+    });
   }
 
   if (repo.recentCommitCount === 0 && repo.recentMergedPullRequests === 0) {
-    return {
+    return classification(repo, {
       mode: 'ecosystem_only',
       reason: 'No meaningful recent repository activity to draft from.',
       eligibleForDraftGeneration: true,
       daysAllocated: 1,
-    };
+    });
   }
 
   if (repo.policy.configuredMode === 'sanitized_product_only') {
-    return {
+    return classification(repo, {
       mode: 'sanitized_product_only',
       reason: 'Policy restricts content to verified customer-facing outcomes only.',
       eligibleForDraftGeneration: true,
       daysAllocated: 14,
-    };
+    });
   }
 
   if (repo.policy.configuredMode === 'full_campaign') {
-    return {
+    return classification(repo, {
       mode: 'full_campaign',
       reason: 'Repository has approved public proof and an explicit full-campaign policy.',
       eligibleForDraftGeneration: true,
       daysAllocated: 14,
-    };
+    });
   }
 
-  return {
+  return classification(repo, {
     mode: 'ecosystem_only',
     reason: 'Recent activity is meaningful but no full-campaign policy is configured for this repository.',
     eligibleForDraftGeneration: true,
     daysAllocated: 2,
-  };
+  });
 }
 
 export interface DraftMaterial {
@@ -158,25 +197,150 @@ export interface DraftMaterial {
   audienceValue: string;
   investorSignal: string;
   proofLinks: SocialProofLink[];
+  media?: SocialMediaAsset[];
+  platformCharacterLimit?: number | null;
+}
+
+function assertClassificationMatchesRepository(
+  classificationResult: CampaignClassification,
+  repo: RepositoryEvidence,
+): void {
+  if (
+    classificationResult.authorizedRepository !== repo.fullName ||
+    classificationResult.authorizedExactHead !== repo.exactHead.toLowerCase()
+  ) {
+    throw new Error(
+      `Campaign classification does not authorize ${repo.fullName}@${repo.exactHead}; ` +
+        `it authorizes ${classificationResult.authorizedRepository}@${classificationResult.authorizedExactHead}.`,
+    );
+  }
+}
+
+function decodePublicValue(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function normalizedPolicyText(value: string): { spaced: string; compact: string } {
+  const confusableNormalized = [...decodePublicValue(value).normalize('NFKD').toLocaleLowerCase('en-US')]
+    .map((character) => COMMON_CONFUSABLES[character] ?? character)
+    .join('');
+  const spaced = confusableNormalized
+    .replace(/\p{Mark}+/gu, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+
+  return {
+    spaced,
+    compact: spaced.replace(/\s+/g, ''),
+  };
+}
+
+function containsPolicyTerm(publicSurface: string, prohibited: string): boolean {
+  const source = normalizedPolicyText(publicSurface);
+  const term = normalizedPolicyText(prohibited.trim());
+
+  if (!term.spaced) return false;
+  if (source.spaced.includes(term.spaced)) return true;
+
+  // Compact matching catches punctuation and whitespace inserted inside a
+  // prohibited phrase while avoiding noisy matches for very short tokens.
+  return term.compact.length >= 6 && source.compact.includes(term.compact);
+}
+
+function isApprovedProofUrl(candidate: string, approvedUrl: string): boolean {
+  try {
+    const candidateUrl = new URL(candidate);
+    const approved = new URL(approvedUrl);
+    if (candidateUrl.protocol !== 'https:' || approved.protocol !== 'https:') return false;
+    if (candidateUrl.origin !== approved.origin) return false;
+
+    const approvedPath = approved.pathname.replace(/\/+$/, '');
+    const candidatePath = candidateUrl.pathname.replace(/\/+$/, '');
+    if (!approvedPath) return true;
+
+    return candidatePath === approvedPath || candidatePath.startsWith(`${approvedPath}/`);
+  } catch {
+    return false;
+  }
+}
+
+function assertApprovedProofLinks(repo: RepositoryEvidence, draft: DraftMaterial): void {
+  if (repo.policy.publicProofUrls.length === 0) {
+    throw new Error(`${repo.fullName} has no approved public proof URLs.`);
+  }
+
+  for (const proof of draft.proofLinks) {
+    const approved = repo.policy.publicProofUrls.some((url) => isApprovedProofUrl(proof.url, url));
+    if (!approved) {
+      throw new Error(`Draft uses an unapproved proof URL: ${proof.url}`);
+    }
+  }
+}
+
+function assertRepositoryPolicyAllowsDraft(repo: RepositoryEvidence, draft: DraftMaterial): void {
+  assertApprovedProofLinks(repo, draft);
+
+  const publicSurface = [
+    draft.text,
+    draft.traction,
+    draft.governanceAdvantage,
+    draft.audienceValue,
+    draft.investorSignal,
+    ...draft.proofLinks.flatMap((proof) => [proof.label, proof.url]),
+    ...(draft.media ?? []).flatMap((asset) => [asset.altText ?? '', asset.url]),
+  ].join('\n');
+
+  for (const prohibited of repo.policy.neverClaim) {
+    const term = prohibited.trim();
+    if (term && containsPolicyTerm(publicSurface, term)) {
+      throw new Error(`Draft violates neverClaim policy: ${term}`);
+    }
+  }
+
+  for (const prohibited of repo.policy.neverExpose) {
+    const term = prohibited.trim();
+    if (term && containsPolicyTerm(publicSurface, term)) {
+      throw new Error(`Draft violates neverExpose policy: ${term}`);
+    }
+  }
+}
+
+function assertPlatformRequirements(draft: DraftMaterial): void {
+  const capability = FIRST_PARTY_PLATFORM_CAPABILITIES[draft.platform];
+
+  if (capability.safeCharacterLimit === null) {
+    if (!Number.isInteger(draft.platformCharacterLimit) || Number(draft.platformCharacterLimit) <= 0) {
+      throw new Error(`${draft.platform} requires a verified platformCharacterLimit.`);
+    }
+  }
+
+  if (capability.requiresMedia && (!draft.media || draft.media.length === 0)) {
+    throw new Error(`${draft.platform} requires at least one media asset.`);
+  }
 }
 
 /**
  * Shapes classified, already-generated draft text into the exact input
- * contract `validateFirstPartySocialPost` (src/lib/firstPartySocialPublisher.ts)
- * expects, always in `draft` mode. This is the integration point a future
- * content-generation adapter (Perplexity or otherwise) would call into —
- * it does not itself generate anything, and `mode: 'draft'` never requires
- * `publishAllowed` or `founderApprovalId`, so nothing this function builds
- * can be queued or published on its own.
+ * contract validateFirstPartySocialPost expects, always in draft mode.
  */
 export function buildFirstPartySocialPostInput(
-  classification: CampaignClassification,
+  classificationResult: CampaignClassification,
   repo: RepositoryEvidence,
   draft: DraftMaterial,
 ): FirstPartySocialPostInput {
-  if (!classification.eligibleForDraftGeneration) {
-    throw new Error(`${repo.fullName} is not eligible for draft generation: ${classification.reason}`);
+  assertClassificationMatchesRepository(classificationResult, repo);
+
+  if (!classificationResult.eligibleForDraftGeneration) {
+    throw new Error(`${repo.fullName} is not eligible for draft generation: ${classificationResult.reason}`);
   }
+
+  assertRepositoryPolicyAllowsDraft(repo, draft);
+  assertPlatformRequirements(draft);
 
   return {
     platform: draft.platform,
@@ -193,5 +357,7 @@ export function buildFirstPartySocialPostInput(
     mode: 'draft',
     publishAllowed: false,
     founderApprovalId: null,
+    media: draft.media,
+    platformCharacterLimit: draft.platformCharacterLimit,
   };
 }
