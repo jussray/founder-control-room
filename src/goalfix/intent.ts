@@ -5,12 +5,14 @@ export interface GoalfixIntent {
   resolved: string;
   confidence: GoalfixIntentConfidence;
   assumptions: string[];
+  confirmed: boolean;
 }
 
 export interface ResolveGoalfixIntentInput {
   raw: string;
   resolved?: string;
   assumptions?: string[];
+  confirmed?: boolean;
 }
 
 function normalizeWhitespace(value: string): string {
@@ -21,12 +23,20 @@ export function resolveGoalfixIntent(input: ResolveGoalfixIntentInput): GoalfixI
   const raw = normalizeWhitespace(input.raw);
   const resolved = normalizeWhitespace(input.resolved ?? input.raw);
   const assumptions = [...new Set((input.assumptions ?? []).map(normalizeWhitespace).filter(Boolean))];
+  const confirmed = input.confirmed === true;
+  const explicitResolution = input.resolved !== undefined;
 
-  let confidence: GoalfixIntentConfidence = 'high';
-  if (!raw || !resolved) confidence = 'low';
-  else if (assumptions.length > 0 || raw.toLocaleLowerCase('en-US') !== resolved.toLocaleLowerCase('en-US')) {
-    confidence = 'medium';
+  let confidence: GoalfixIntentConfidence = 'low';
+  if (raw && resolved) {
+    if (
+      assumptions.length > 0
+      || raw.toLocaleLowerCase('en-US') !== resolved.toLocaleLowerCase('en-US')
+    ) {
+      confidence = 'medium';
+    } else if (confirmed || explicitResolution) {
+      confidence = 'high';
+    }
   }
 
-  return { raw, resolved, confidence, assumptions };
+  return { raw, resolved, confidence, assumptions, confirmed };
 }
