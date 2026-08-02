@@ -17,6 +17,7 @@ jobs:
   supabase-migrate:
     name: Supabase DB Push
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment: production
     steps:
       - uses: actions/checkout@v4
@@ -28,6 +29,59 @@ jobs:
       - name: Report Supabase CLI version
         run: supabase --version
 
+      - name: Validate Supabase deployment configuration
+        shell: bash
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${SUPABASE_DB_URL:-}" ]]; then
+            echo "::error title=Missing Supabase database URL::Set SUPABASE_DB_URL in the GitHub production environment before deploying."
+            exit 1
+          fi
+
+          SUPABASE_DB_URL="$SUPABASE_DB_URL" python3 - <<'PY'
+          import os
+          from urllib.parse import urlparse
+
+          parsed = urlparse(os.environ['SUPABASE_DB_URL'])
+          errors = []
+
+          if parsed.scheme not in {'postgres', 'postgresql'}:
+              errors.append('SUPABASE_DB_URL must use the postgres or postgresql scheme')
+          if not parsed.hostname:
+              errors.append('SUPABASE_DB_URL must include a database hostname')
+          if not parsed.username:
+              errors.append('SUPABASE_DB_URL must include a database username')
+          if parsed.password is None or parsed.password == '':
+              errors.append('SUPABASE_DB_URL must include the database password')
+          if parsed.path.rstrip('/') != '/postgres':
+              errors.append('SUPABASE_DB_URL must target the postgres database')
+
+          try:
+              port = parsed.port
+          except ValueError:
+              errors.append('SUPABASE_DB_URL contains an invalid port')
+              port = None
+
+          if port != 5432:
+              errors.append('SUPABASE_DB_URL must use port 5432 for migration sessions')
+
+          if errors:
+              for error in errors:
+                  print(f'::error title=Invalid Supabase database URL::{error}')
+              raise SystemExit(1)
+
+          if parsed.hostname.startswith('db.') and parsed.hostname.endswith('.supabase.co'):
+              print(
+                  '::warning title=Direct Supabase endpoint detected::'
+                  'GitHub-hosted runners are IPv4-only. Prefer the Supavisor session pooler URL unless the project has the IPv4 add-on.'
+              )
+
+          print('Supabase deployment configuration is present and structurally valid.')
+          PY
+
       - name: Preview migrations
         run: |
           set -euo pipefail
@@ -35,16 +89,15 @@ jobs:
             --dry-run \
             --db-url "$SUPABASE_DB_URL"
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
       - name: Push migrations
         run: |
           set -euo pipefail
           supabase db push \
+            --yes \
             --db-url "$SUPABASE_DB_URL"
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
   # ── 2. Cloudflare Worker deploy ──────────────────────────────────────────────
