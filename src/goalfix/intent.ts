@@ -23,8 +23,8 @@ export function resolveGoalfixIntent(input: ResolveGoalfixIntentInput): GoalfixI
   const raw = normalizeWhitespace(input.raw);
   const resolved = normalizeWhitespace(input.resolved ?? input.raw);
   const assumptions = [...new Set((input.assumptions ?? []).map(normalizeWhitespace).filter(Boolean))];
-  const confirmed = input.confirmed === true;
   const explicitResolution = input.resolved !== undefined;
+  const confirmed = input.confirmed === true || explicitResolution;
 
   let confidence: GoalfixIntentConfidence = 'low';
   if (raw && resolved) {
@@ -33,7 +33,7 @@ export function resolveGoalfixIntent(input: ResolveGoalfixIntentInput): GoalfixI
       || raw.toLocaleLowerCase('en-US') !== resolved.toLocaleLowerCase('en-US')
     ) {
       confidence = 'medium';
-    } else if (confirmed || explicitResolution) {
+    } else if (confirmed) {
       confidence = 'high';
     }
   }
