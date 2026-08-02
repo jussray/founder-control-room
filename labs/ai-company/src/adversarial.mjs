@@ -181,13 +181,19 @@ export function evaluateAdversarialEnvelope(envelope) {
   };
 }
 
-function inspectClaimedReceipts(claimedReceipts, actualReceipts) {
+function inspectClaimedReceipts(claimedReceipts, actualReceipts, expectedEventId) {
   if (!Array.isArray(claimedReceipts)) return [];
-  if (claimedReceipts.length !== actualReceipts.length) return ['receipt_claim_count_mismatch'];
-  if (stableStringify(claimedReceipts) !== stableStringify(actualReceipts)) {
-    return ['receipt_claim_mismatch'];
+
+  const violations = [];
+  for (const receipt of claimedReceipts) {
+    violations.push(...inspectReceipt(receipt, expectedEventId));
   }
-  return [];
+  if (claimedReceipts.length !== actualReceipts.length) {
+    violations.push('receipt_claim_count_mismatch');
+  } else if (stableStringify(claimedReceipts) !== stableStringify(actualReceipts)) {
+    violations.push('receipt_claim_mismatch');
+  }
+  return unique(violations);
 }
 
 export function runAdversarialSimulation(envelope) {
@@ -208,7 +214,11 @@ export function runAdversarialSimulation(envelope) {
   const result = runCompanySimulation(envelope.companyInput);
   const postflightBlockers = [
     ...inspectAuthorityBoundary(result),
-    ...inspectClaimedReceipts(envelope.claimedReceipts, result.receipts),
+    ...inspectClaimedReceipts(
+      envelope.claimedReceipts,
+      result.receipts,
+      result.campaign?.eventId ?? envelope.companyInput?.eventId,
+    ),
   ];
 
   return {
