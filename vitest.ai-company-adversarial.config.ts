@@ -6,6 +6,7 @@ export default defineConfig({
     include: [
       'test/ai-company-adversarial.test.ts',
       'test/ai-company-sandboxes.test.ts',
+      'test/ai-company-sandbox-inputs.test.ts',
     ],
   },
 });
