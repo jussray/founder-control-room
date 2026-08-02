@@ -28,6 +28,7 @@ The founder-facing surface is available at `/control-room/goalfix.html` after si
   "projectSlug": "sekret-bip",
   "targetRef": "main",
   "desiredOutcome": "Keep the public welcome available before login.",
+  "resolvedIntent": "Keep the public welcome available before login.",
   "reason": "Preserve a usable front door without weakening protected routes.",
   "constraints": ["Preserve unrelated work", "Do not deploy"],
   "suspectedFailureArea": "auth route boundary",
@@ -38,6 +39,8 @@ The founder-facing surface is available at `/control-room/goalfix.html` after si
 ```
 
 `expectedVerificationNames` is required and must contain at least one exact provider check name. Goalfix does not infer the required proof set from whichever checks happen to be returned.
+
+`resolvedIntent` is required for a proceedable request and represents the founder-confirmed outcome. Raw-only nonempty requests are intentionally blocked before repository access.
 
 ## Authority boundary
 
