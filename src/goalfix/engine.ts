@@ -74,6 +74,20 @@ function normalizeSignalName(name: string): string {
   return name.trim().toLocaleLowerCase('en-US');
 }
 
+function signalTime(signal: VerificationSignal): number {
+  return Date.parse(signal.completedAt ?? signal.startedAt ?? '') || 0;
+}
+
+function latestSignalsByName(signals: VerificationSignal[]): Map<string, VerificationSignal> {
+  const latest = new Map<string, VerificationSignal>();
+  for (const signal of signals) {
+    const key = normalizeSignalName(signal.name);
+    const current = latest.get(key);
+    if (!current || signalTime(signal) >= signalTime(current)) latest.set(key, signal);
+  }
+  return latest;
+}
+
 function uniqueExpectedNames(names: string[]): string[] {
   const seen = new Set<string>();
   const unique: string[] = [];
@@ -94,31 +108,27 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
   const exactHeadSignals = input.verificationSignals.filter(
     (signal) => signal.commitSha.toLowerCase() === expectedSha,
   );
+  const latestExactHeadSignals = latestSignalsByName(exactHeadSignals);
   const mismatchedSignals = input.verificationSignals.filter(
     (signal) => signal.commitSha.toLowerCase() !== expectedSha,
   );
-  const exactHeadSignalsByName = new Map<string, VerificationSignal[]>();
-  for (const signal of exactHeadSignals) {
-    const key = normalizeSignalName(signal.name);
-    const group = exactHeadSignalsByName.get(key) ?? [];
-    group.push(signal);
-    exactHeadSignalsByName.set(key, group);
-  }
+  const exactHeadSignalsByName = latestExactHeadSignals;
 
   const missingExpectedNames = expectedVerificationNames.filter(
     (name) => !exactHeadSignalsByName.has(normalizeSignalName(name)),
   );
-  const expectedSignals = exactHeadSignals.filter(
+  const latestSignals = [...latestExactHeadSignals.values()];
+  const expectedSignals = latestSignals.filter(
     (signal) => expectedNameKeys.has(normalizeSignalName(signal.name)),
   );
-  const failures = exactHeadSignals.filter((signal) => TERMINAL_FAILURES.has(signal.status));
-  const incomplete = exactHeadSignals.filter((signal) => INCOMPLETE_SIGNALS.has(signal.status));
-  const passed = exactHeadSignals.filter((signal) => signal.status === 'passed');
+  const failures = latestSignals.filter((signal) => TERMINAL_FAILURES.has(signal.status));
+  const incomplete = latestSignals.filter((signal) => INCOMPLETE_SIGNALS.has(signal.status));
+  const passed = latestSignals.filter((signal) => signal.status === 'passed');
   const everyExpectedNamePassed = expectedVerificationNames.length > 0
     && missingExpectedNames.length === 0
     && expectedVerificationNames.every((name) => {
-      const matching = exactHeadSignalsByName.get(normalizeSignalName(name)) ?? [];
-      return matching.some((signal) => signal.status === 'passed');
+      const matching = exactHeadSignalsByName.get(normalizeSignalName(name));
+      return matching?.status === 'passed';
     });
 
   let readiness: GoalfixReadiness = 'waiting_for_evidence';
@@ -157,8 +167,8 @@ export function buildGoalfixReport(input: BuildGoalfixReportInput): GoalfixRepor
 
   const proof = [
     `Required exact-head checks: ${expectedVerificationNames.length > 0 ? expectedVerificationNames.join(', ') : 'none supplied'}.`,
-    ...(exactHeadSignals.length > 0
-      ? exactHeadSignals.map(describeSignal)
+    ...(latestSignals.length > 0
+      ? latestSignals.map(describeSignal)
       : [`No exact-head provider proof exists yet for ${input.target.commitSha}.`]),
   ];
 
