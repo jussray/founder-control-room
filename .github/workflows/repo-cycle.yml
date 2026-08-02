@@ -1,6 +1,16 @@
 name: Founder Repo Cycle
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - package.json
+      - package-lock.json
+      - scripts/**
+      - src/**
+      - e2e/**
+      - .github/workflows/repo-cycle.yml
   pull_request:
     branches:
       - main
@@ -54,8 +64,8 @@ jobs:
     timeout-minutes: 45
     env:
       REPO_CYCLE_OPERATION: ${{ inputs.operation || 'verify' }}
-      TARGET_BRANCH: ${{ inputs.target_branch || github.head_ref }}
-      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha || github.event.pull_request.head.sha }}
+      TARGET_BRANCH: ${{ inputs.target_branch || github.head_ref || github.ref_name }}
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha || github.event.pull_request.head.sha || github.sha }}
       FOUNDER_APPROVAL_ID: ${{ inputs.founder_approval_id || '' }}
 
     steps:
