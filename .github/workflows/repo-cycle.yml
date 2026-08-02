@@ -7,6 +7,11 @@ on:
     paths:
       - package.json
       - package-lock.json
+      - public/**
+      - tsconfig*.json
+      - eslint.config.*
+      - playwright*.config.*
+      - vitest*.config.*
       - scripts/**
       - src/**
       - e2e/**
@@ -17,6 +22,11 @@ on:
     paths:
       - package.json
       - package-lock.json
+      - public/**
+      - tsconfig*.json
+      - eslint.config.*
+      - playwright*.config.*
+      - vitest*.config.*
       - scripts/**
       - src/**
       - e2e/**
