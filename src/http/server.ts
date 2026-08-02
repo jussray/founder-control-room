@@ -23,6 +23,7 @@ import { futureYouRouter } from './routes/futureYou.js';
 import { goalfixRouter } from './routes/goalfix.js';
 import { mirrorRouter } from './routes/mirror.js';
 import { handleFounderSignalEngineMcp } from './routes/founderSignalEngineMcp.js';
+import { handleHairCommerceReceiptIngest } from './routes/hairCommerceReceipts.js';
 import { portfolioVerificationRouter } from './routes/portfolioVerification.js';
 import {
   handleRepositoryVerificationIngest,
@@ -102,9 +103,9 @@ export function createServer(options: CreateServerOptions = {}) {
     app.use('/control-room', express.static(path.join(publicDir, 'control-room')));
   }
 
-  // Webhooks, remote MCP calls, and repo-runner pings do not use browser
-  // cookies. Mount them before the browser same-origin mutation gate and give
-  // each endpoint its own strict parser/authentication contract.
+  // Webhooks, remote MCP calls, repo-runner pings, and sanitized commerce
+  // receipts do not use browser cookies. Mount them before the browser
+  // same-origin mutation gate and give each endpoint strict parser/auth rules.
   app.post(
     '/webhooks/github',
     express.raw({ type: 'application/json', limit: BODY_LIMIT }),
@@ -114,6 +115,12 @@ export function createServer(options: CreateServerOptions = {}) {
     '/ingest/repository-verification',
     express.raw({ type: 'application/json', limit: '512kb' }),
     handleRepositoryVerificationIngest,
+  );
+  app.post(
+    '/ingest/hair-commerce-receipts',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '32kb' }),
+    handleHairCommerceReceiptIngest,
   );
   app.post(
     '/mcp/founder-signal-engine',

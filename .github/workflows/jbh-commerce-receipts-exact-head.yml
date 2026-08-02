@@ -1,0 +1,67 @@
+name: JBH Commerce Receipts Exact-Head Gate
+
+on:
+  pull_request:
+    paths:
+      - "src/hairCommerce/**"
+      - "src/http/routes/hairCommerceReceipts.ts"
+      - "src/http/routes/__tests__/hairCommerceReceipts.integration.test.ts"
+      - "src/http/server.ts"
+      - "supabase/migrations/20260802193000_hair_commerce_receipts.sql"
+      - ".github/workflows/jbh-commerce-receipts-exact-head.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jbh-commerce-receipts-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  verify:
+    name: Verify sanitized receipt and runtime boundary
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact requested head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run focused receipt integration proof
+        run: npx vitest run src/http/routes/__tests__/hairCommerceReceipts.integration.test.ts
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Chromium
+        run: npm run setup:test-browser
+
+      - name: Run desktop and mobile Playwright proof
+        run: npm run test:e2e
