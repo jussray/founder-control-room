@@ -70,6 +70,27 @@ describe('hair commerce receipt ingest', () => {
     expect(store).not.toHaveBeenCalled();
   });
 
+  it('rejects evidence from another repository or another commit', async () => {
+    const store = vi.fn<HairCommerceReceiptStore>();
+    const mismatches = [
+      'https://github.com/other/private/commit/' + validReceipt.exactCommitSha,
+      'https://github.com/jussray/jbh-private/commit/' + 'c'.repeat(40),
+      validReceipt.evidenceUrl + '?untrusted=1',
+      validReceipt.evidenceUrl + '#fragment',
+    ];
+
+    for (const evidenceUrl of mismatches) {
+      const response = await request(createTestApp(store))
+        .post('/ingest/hair-commerce-receipts')
+        .set('x-jbh-receipt-token', 'test-secret-token')
+        .send({ ...validReceipt, evidenceUrl });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'evidence_url_mismatch' });
+    }
+    expect(store).not.toHaveBeenCalled();
+  });
+
   it('stores only the sanitized exact-head receipt', async () => {
     const store = vi.fn<HairCommerceReceiptStore>().mockResolvedValue('stored');
     const response = await request(createTestApp(store))
@@ -88,7 +109,7 @@ describe('hair commerce receipt ingest', () => {
     expect(store).toHaveBeenCalledWith(validReceipt);
   });
 
-  it('returns an idempotent duplicate receipt without storing private data', async () => {
+  it('returns an idempotent duplicate only for an identical receipt replay', async () => {
     const store = vi.fn<HairCommerceReceiptStore>().mockResolvedValue('duplicate');
     const response = await request(createTestApp(store))
       .post('/ingest/hair-commerce-receipts')
@@ -96,7 +117,28 @@ describe('hair commerce receipt ingest', () => {
       .send(validReceipt);
 
     expect(response.status).toBe(200);
-    expect(response.body.duplicate).toBe(true);
+    expect(response.body).toEqual({
+      accepted: true,
+      duplicate: true,
+      receiptId: validReceipt.receiptId,
+      event: validReceipt.event,
+    });
+  });
+
+  it('rejects receipt-ID reuse with a different immutable payload', async () => {
+    const store = vi.fn<HairCommerceReceiptStore>().mockResolvedValue('conflict');
+    const response = await request(createTestApp(store))
+      .post('/ingest/hair-commerce-receipts')
+      .set('x-jbh-receipt-token', 'test-secret-token')
+      .send({ ...validReceipt, event: 'owner_approved' });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      accepted: false,
+      duplicate: false,
+      error: 'receipt_id_payload_conflict',
+      receiptId: validReceipt.receiptId,
+    });
   });
 
   it('fails closed when the ingest token is not configured', async () => {
