@@ -1,4 +1,4 @@
-import { runCompanySimulation } from './company.mjs';
+import { inspectAuthorityBoundary, runCompanySandbox } from './sandbox.mjs';
 
 const MUTATING_MODES = new Set(['queue', 'publish']);
 const INJECTION_PATTERNS = [
@@ -48,7 +48,7 @@ function campaignKey(companyInput) {
   ].join(':');
 }
 
-function inspectReceipt(receipt, expectedEventId) {
+function inspectClaimedReceipt(receipt, expectedEventId) {
   const violations = [];
   if (receipt?.provider !== 'fake-buffer') violations.push('receipt_provider_not_fake');
   if (receipt?.simulation !== true) violations.push('receipt_not_simulation');
@@ -60,27 +60,6 @@ function inspectReceipt(receipt, expectedEventId) {
     violations.push('receipt_status_invalid');
   }
   return violations;
-}
-
-export function inspectAuthorityBoundary(result) {
-  const violations = [];
-  if (result?.authority?.level !== 'L0') violations.push('authority_level_escalated');
-  if (result?.authority?.mode !== 'simulation') violations.push('authority_mode_escalated');
-  if (result?.authority?.executionAllowed !== false) violations.push('execution_authority_enabled');
-  if (result?.liveSideEffects !== undefined && result.liveSideEffects !== false) {
-    violations.push('live_side_effects_enabled');
-  }
-
-  const isolation = result?.isolation;
-  if (isolation && Object.values(isolation).some((value) => value !== false)) {
-    violations.push('isolation_boundary_broken');
-  }
-
-  for (const receipt of result?.receipts ?? []) {
-    violations.push(...inspectReceipt(receipt, result?.campaign?.eventId ?? receipt?.eventId));
-  }
-
-  return unique(violations);
 }
 
 export function evaluateAdversarialEnvelope(envelope) {
@@ -186,7 +165,7 @@ function inspectClaimedReceipts(claimedReceipts, actualReceipts, expectedEventId
 
   const violations = [];
   for (const receipt of claimedReceipts) {
-    violations.push(...inspectReceipt(receipt, expectedEventId));
+    violations.push(...inspectClaimedReceipt(receipt, expectedEventId));
   }
   if (claimedReceipts.length !== actualReceipts.length) {
     violations.push('receipt_claim_count_mismatch');
@@ -206,12 +185,30 @@ export function runAdversarialSimulation(envelope) {
       authority: preflight.authority,
       blockers: preflight.blockers,
       campaignKey: preflight.campaignKey,
+      sandbox: null,
       result: null,
       receipts: [],
     };
   }
 
-  const result = runCompanySimulation(envelope.companyInput);
+  const sandboxRun = runCompanySandbox(envelope.companyInput, {
+    expectedInputFingerprint: envelope.expectedInputFingerprint,
+  });
+  if (sandboxRun.status !== 'simulated' || !sandboxRun.result) {
+    return {
+      status: sandboxRun.status,
+      phase: 'sandbox',
+      simulatorInvoked: sandboxRun.simulatorInvoked,
+      authority: preflight.authority,
+      blockers: sandboxRun.violations,
+      campaignKey: preflight.campaignKey,
+      sandbox: sandboxRun.sandbox,
+      result: sandboxRun.result,
+      receipts: sandboxRun.result?.receipts ?? [],
+    };
+  }
+
+  const result = sandboxRun.result;
   const postflightBlockers = [
     ...inspectAuthorityBoundary(result),
     ...inspectClaimedReceipts(
@@ -228,6 +225,7 @@ export function runAdversarialSimulation(envelope) {
     authority: preflight.authority,
     blockers: unique(postflightBlockers),
     campaignKey: preflight.campaignKey,
+    sandbox: sandboxRun.sandbox,
     result,
     receipts: result.receipts,
   };
