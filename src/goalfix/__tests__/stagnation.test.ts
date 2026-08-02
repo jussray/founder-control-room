@@ -45,4 +45,39 @@ describe('detectGoalfixStagnation', () => {
 
     expect(result.stagnant).toBe(false);
   });
+
+  it('clears two stale failures after the same signature passes', () => {
+    const result = detectGoalfixStagnation([
+      failedAttempt('runner unavailable'),
+      failedAttempt('Runner unavailable'),
+      {
+        approach: 'Restore the runner and rerun the exact check.',
+        failureSignature: 'runner unavailable',
+        filesTouched: ['.github/workflows/ci.yml'],
+        verificationName: 'Playwright',
+        result: 'passed',
+      },
+    ]);
+
+    expect(result.stagnant).toBe(false);
+    expect(result.repeatedFailureSignature).toBeUndefined();
+    expect(result.matchingAttempts).toBe(0);
+  });
+
+  it('starts a fresh count after a resolved signature fails again', () => {
+    const result = detectGoalfixStagnation([
+      failedAttempt('runner unavailable'),
+      failedAttempt('runner unavailable'),
+      {
+        approach: 'Restore the runner.',
+        failureSignature: 'runner unavailable',
+        filesTouched: ['.github/workflows/ci.yml'],
+        verificationName: 'Playwright',
+        result: 'passed',
+      },
+      failedAttempt('runner unavailable'),
+    ]);
+
+    expect(result.stagnant).toBe(false);
+  });
 });
