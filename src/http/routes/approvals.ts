@@ -14,6 +14,7 @@ import { Router, type Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import { supabase } from '../../lib/supabaseClient.js';
+import { executionScopeMatches } from '../../lib/idempotencyScope.js';
 import { GitHubProvider } from '../../providers/GitHubProvider.js';
 import { enqueueReconcile } from '../../events/outbox.js';
 import { ProofGateController } from '../../controllers/ProofGateController.js';
@@ -36,6 +37,9 @@ const PROOF_GATE_TTL_MS = 15 * 60 * 1_000;
 
 interface ExecutionRecord {
   id: string;
+  mission_id: string | null;
+  project_id: string;
+  action_type: string;
   status: 'pending' | 'succeeded' | 'failed';
   result: Record<string, unknown> | null;
   success: boolean | null;
@@ -147,7 +151,7 @@ async function findExecution(idempotencyKey: string): Promise<{
 }> {
   const { data, error } = await supabase
     .from('approval_executions')
-    .select('id, status, result, success')
+    .select('id, mission_id, project_id, action_type, status, result, success')
     .eq('idempotency_key', idempotencyKey)
     .maybeSingle();
   return { data: data as ExecutionRecord | null, error };
@@ -304,6 +308,7 @@ approvalsRouter.post(
     }
 
     const projectId = mission.project_id as string;
+    const expectedScope = { missionId, projectId, actionType };
 
     const { data: proofRecord, error: proofError } = await requireFreshProof(missionId, actionType);
     if (proofError) {
@@ -328,6 +333,13 @@ approvalsRouter.post(
       });
     }
     if (existingLookup.data) {
+      if (!executionScopeMatches(existingLookup.data, expectedScope)) {
+        return res.status(409).json({
+          ok: false,
+          code: 'IDEMPOTENCY_SCOPE_MISMATCH',
+          error: 'This idempotency key belongs to a different mission, project, or action.',
+        });
+      }
       if (existingLookup.data.status === 'succeeded') {
         return res.json({ ok: true, idempotent: true, result: existingLookup.data.result });
       }
@@ -394,6 +406,13 @@ approvalsRouter.post(
 
     if (reservationError || !reservation) {
       const racedLookup = await findExecution(idempotencyKey);
+      if (racedLookup.data && !executionScopeMatches(racedLookup.data, expectedScope)) {
+        return res.status(409).json({
+          ok: false,
+          code: 'IDEMPOTENCY_SCOPE_MISMATCH',
+          error: 'This idempotency key belongs to a different mission, project, or action.',
+        });
+      }
       if (racedLookup.data?.status === 'succeeded') {
         return res.json({ ok: true, idempotent: true, result: racedLookup.data.result });
       }

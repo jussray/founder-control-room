@@ -121,6 +121,9 @@ function proofGateMission() {
 
 interface ExecutionRecord {
   id: string;
+  mission_id?: string | null;
+  project_id?: string;
+  action_type?: string;
   status: 'pending' | 'succeeded' | 'failed';
   result: Record<string, unknown>;
   success: boolean | null;
@@ -211,10 +214,18 @@ function executeStack(options: ExecuteOptions = {}) {
         select: () => ({
           eq: () => ({
             maybeSingle: () => {
-              const data = executionLookupCount === 0
+              const rawData = executionLookupCount === 0
                 ? options.existingExecution ?? null
                 : options.racedExecution ?? options.existingExecution ?? null;
               executionLookupCount += 1;
+              const data = rawData
+                ? {
+                    mission_id: MISSION_ID,
+                    project_id: PROJECT_ID,
+                    action_type: missionStatus === 'proposed' ? 'create_branch' : 'merge',
+                    ...rawData,
+                  }
+                : null;
               return Promise.resolve({ data, error: null });
             },
           }),
@@ -482,6 +493,34 @@ describe('reservation-first exact-head execution', () => {
       });
     expect(response.status).toBe(200);
     expect(response.body.idempotent).toBe(true);
+    expect(mockIntegrate).not.toHaveBeenCalled();
+  });
+
+  it('rejects a succeeded idempotency key from a different mission scope without leaking its result', async () => {
+    executeStack({
+      existingExecution: {
+        id: EXECUTION_ID,
+        mission_id: 'mission-uuid-other',
+        project_id: PROJECT_ID,
+        action_type: 'merge',
+        status: 'succeeded',
+        result: { mergeCommitSha: 'other-mission-merge' },
+        success: true,
+      },
+    });
+
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'merge',
+        idempotencyKey: 'shared-key',
+        payload: { head: 'codex/test', base: 'main', expectedHeadSha: EXPECTED_SHA },
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('IDEMPOTENCY_SCOPE_MISMATCH');
+    expect(response.body.result).toBeUndefined();
     expect(mockIntegrate).not.toHaveBeenCalled();
   });
 
