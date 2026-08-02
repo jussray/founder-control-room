@@ -15,14 +15,14 @@ describe('resolveGoalfixIntent', () => {
     });
   });
 
-  it('treats an explicit same-text resolution as a valid resolution signal', () => {
+  it('treats an explicit same-text resolution as a valid confirmation signal', () => {
     const intent = resolveGoalfixIntent({
       raw: 'Audit current main before judging the patch.',
       resolved: 'Audit current main before judging the patch.',
     });
 
     expect(intent.confidence).toBe('high');
-    expect(intent.confirmed).toBe(false);
+    expect(intent.confirmed).toBe(true);
   });
 
   it('labels an interpreted request as medium confidence and records assumptions', () => {
@@ -35,7 +35,7 @@ describe('resolveGoalfixIntent', () => {
     expect(intent.confidence).toBe('medium');
     expect(intent.raw).toBe('cont the skill thing');
     expect(intent.assumptions).toEqual(['The referenced skill is the uploaded Lean Build Suite.']);
-    expect(intent.confirmed).toBe(false);
+    expect(intent.confirmed).toBe(true);
   });
 
   it('returns low confidence for a nonempty raw-only goal without confirmation', () => {
