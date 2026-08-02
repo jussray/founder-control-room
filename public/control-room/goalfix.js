@@ -216,6 +216,10 @@ form.addEventListener('submit', async (event) => {
     renderError('Name at least one required exact-head check before inspecting.');
     return;
   }
+  if (values.intentConfirmed !== 'on') {
+    renderError('Confirm the exact founder outcome before inspecting.');
+    return;
+  }
 
   const projectSlug = String(values.projectSlug ?? '').trim();
   const targetRef = String(values.targetRef ?? '').trim();
@@ -232,6 +236,7 @@ form.addEventListener('submit', async (event) => {
     projectSlug,
     targetRef,
     desiredOutcome,
+    resolvedIntent: desiredOutcome,
     reason: String(values.reason ?? '').trim() || undefined,
     suspectedFailureArea: suspectedFailureArea || undefined,
     constraints: lines(values.constraints),
