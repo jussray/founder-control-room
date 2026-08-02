@@ -4,6 +4,7 @@ const { createHash, timingSafeEqual } = require('node:crypto');
 
 const MAX_REPLY_LENGTH = 2000;
 const CHANNEL_COMMAND = /^([^:]+):\s*(.+)$/s;
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 function asTrimmedString(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -16,6 +17,13 @@ function parseIsoTimestamp(value, fieldName) {
     throw new Error(`FOUNDER_REVIEW_REJECTED: ${fieldName} must be a valid ISO timestamp`);
   }
   return { text: new Date(timestamp).toISOString(), timestamp };
+}
+
+function normalizeEmail(value) {
+  const text = asTrimmedString(value).toLowerCase();
+  const bracketed = text.match(/<([^>]+)>/);
+  const email = (bracketed ? bracketed[1] : text).trim();
+  return EMAIL.test(email) ? email : null;
 }
 
 function constantTimeEqual(left, right) {
@@ -39,10 +47,11 @@ function requireScheduledPosts(posts) {
     if (!channel || !postId || !text) {
       throw new Error('FOUNDER_REVIEW_REJECTED: each scheduled post requires channel, buffer_post_id, and validated_post_text');
     }
-    if (channels.has(channel.toLowerCase())) {
+    const normalizedChannel = channel.toLowerCase();
+    if (channels.has(normalizedChannel)) {
       throw new Error('FOUNDER_REVIEW_REJECTED: scheduled post channels must be unique');
     }
-    channels.add(channel.toLowerCase());
+    channels.add(normalizedChannel);
     return {
       channel,
       buffer_post_id: postId,
@@ -125,6 +134,15 @@ function processFounderReviewReply(input = {}, options = {}) {
 
   if (!constantTimeEqual(input.review_token, input.expected_review_token)) {
     throw new Error('FOUNDER_REVIEW_REJECTED: review token mismatch');
+  }
+
+  const replyFrom = normalizeEmail(input.reply_from);
+  const expectedReplyFrom = normalizeEmail(input.expected_reply_from);
+  if (!replyFrom || !expectedReplyFrom || replyFrom !== expectedReplyFrom) {
+    throw new Error('FOUNDER_REVIEW_REJECTED: reply sender does not match the founder mailbox');
+  }
+  if (!constantTimeEqual(input.gmail_thread_id, input.expected_gmail_thread_id)) {
+    throw new Error('FOUNDER_REVIEW_REJECTED: Gmail thread mismatch');
   }
 
   const receivedAt = parseIsoTimestamp(input.received_at, 'received_at');
