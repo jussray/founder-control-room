@@ -35,9 +35,14 @@ export interface GoalfixSkillRuntimeDecision {
 }
 
 function normalizeScope(scope: GoalfixScopeBudget): GoalfixScopeBudget {
+  const maxInitialReads = Math.max(1, Math.floor(scope.maxInitialReads));
+  const uniqueFirstFilesOrLogs = [
+    ...new Set(scope.firstFilesOrLogs.map(value => value.trim()).filter(Boolean)),
+  ];
+
   return {
-    firstFilesOrLogs: [...new Set(scope.firstFilesOrLogs.map(value => value.trim()).filter(Boolean))],
-    maxInitialReads: Math.max(1, Math.floor(scope.maxInitialReads)),
+    firstFilesOrLogs: uniqueFirstFilesOrLogs.slice(0, maxInitialReads),
+    maxInitialReads,
     stopCondition: scope.stopCondition.trim(),
   };
 }
