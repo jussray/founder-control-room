@@ -7,8 +7,11 @@ on:
       - 'config/zapier-task-budget.json'
       - 'docs/founder-signal-engine/day3-buffer-content-boundary.md'
       - 'docs/founder-signal-engine/auto-distribution-grant-v1.md'
+      - 'docs/founder-signal-engine/claude-zapier-operator.md'
+      - 'docs/founder-signal-engine/remote-mcp-bridge.md'
       - '.ai/skills/claude-zapier-founder-operator/SKILL.md'
       - 'scripts/verify-zapier-task-budget.mjs'
+      - 'test/ai-company-parity.test.ts'
       - 'tools/zapier/buffer-content-firewall.cjs'
       - 'tools/zapier/buffer-review-window.cjs'
       - 'tools/zapier/test-buffer-content-firewall.cjs'
@@ -40,5 +43,5 @@ jobs:
       - name: Verify executable Buffer review-window contract
         run: npm run verify:buffer-content
 
-      - name: Verify Zapier task budget
+      - name: Verify planning envelope and live-capability gates
         run: node scripts/verify-zapier-task-budget.mjs
