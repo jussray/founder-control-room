@@ -4,10 +4,17 @@
 const MIN_POST_LENGTH = 80;
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const HTTPS_URL = /^https:\/\//i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const BUFFER_PROVIDER_ACTION = 'buffer_add_to_queue';
-const BUFFER_PROVIDER_METHOD = 'draft';
-const BUFFER_API_SAVE_TO_DRAFT = true;
-const ALLOWED_DESTINATION_MODES = new Set(['draft']);
+const BUFFER_PROVIDER_METHOD = 'schedule';
+const BUFFER_API_SAVE_TO_DRAFT = false;
+const BUFFER_REVIEW_WINDOW_MINUTES = 20;
+const BUFFER_REVIEW_WINDOW_MS = BUFFER_REVIEW_WINDOW_MINUTES * 60 * 1000;
+const MAX_GENERATION_AGE_MS = 5 * 60 * 1000;
+const MAX_CLOCK_SKEW_MS = 60 * 1000;
+const BUFFER_SCHEDULE_AUTHORITY = 'checked-in-founder-policy:buffer-20-minute-review-v1';
+const BUFFER_NOTIFICATION_MODE = 'gmail_campaign_digest';
+const ALLOWED_DESTINATION_MODES = new Set(['schedule']);
 const ALLOWED_CONTENT_FIELDS = new Set([
   'linkedin_draft',
   'facebook_founder_draft',
@@ -54,7 +61,18 @@ function asBoolean(value) {
   return value === true || value === 'true';
 }
 
-function validateBufferPublishInput(input = {}) {
+function asInteger(value) {
+  const parsed = typeof value === 'number' ? value : Number.parseInt(String(value ?? ''), 10);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+function parseIsoTimestamp(value) {
+  const text = asTrimmedString(value);
+  const timestamp = Date.parse(text);
+  return text && Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function validateBufferPublishInput(input = {}, options = {}) {
   const postText = asTrimmedString(input.post_text);
   const contentField = asTrimmedString(input.content_field);
   const destinationMode = asTrimmedString(input.destination_mode).toLowerCase();
@@ -62,6 +80,13 @@ function validateBufferPublishInput(input = {}) {
   const sourceCommitSha = asTrimmedString(input.source_commit_sha);
   const publishAllowed = asBoolean(input.publish_allowed);
   const channel = asTrimmedString(input.channel);
+  const batchId = asTrimmedString(input.batch_id);
+  const batchSize = asInteger(input.batch_size);
+  const batchIndex = asInteger(input.batch_index);
+  const scheduleAuthority = asTrimmedString(input.schedule_authority_id);
+  const notificationMode = asTrimmedString(input.notification_mode);
+  const generatedAtMs = parseIsoTimestamp(input.generated_at);
+  const nowMs = Number.isFinite(options.nowMs) ? options.nowMs : Date.now();
 
   const errors = [];
 
@@ -76,11 +101,27 @@ function validateBufferPublishInput(input = {}) {
   if (!channel) errors.push('channel is required');
 
   if (!ALLOWED_DESTINATION_MODES.has(destinationMode)) {
-    errors.push('destination_mode must remain draft while the Buffer provider contract is draft-only');
+    errors.push('destination_mode must be schedule under the 20-minute review-window contract');
   }
 
-  if (publishAllowed) {
-    errors.push('publish_allowed must remain false while the Buffer provider contract is draft-only');
+  if (!publishAllowed) {
+    errors.push('publish_allowed must be true for the approved schedule-with-review-window contract');
+  }
+
+  if (scheduleAuthority !== BUFFER_SCHEDULE_AUTHORITY) {
+    errors.push('schedule_authority_id does not match the checked-in founder scheduling policy');
+  }
+
+  if (notificationMode !== BUFFER_NOTIFICATION_MODE) {
+    errors.push('notification_mode must be gmail_campaign_digest');
+  }
+
+  if (!UUID.test(batchId)) errors.push('batch_id must be a UUID');
+  if (batchSize === null || batchSize < 1 || batchSize > 3) {
+    errors.push('batch_size must be an integer from 1 through 3');
+  }
+  if (batchIndex === null || batchIndex < 1 || batchSize === null || batchIndex > batchSize) {
+    errors.push('batch_index must identify one item inside the declared batch_size');
   }
 
   if (postText.length < MIN_POST_LENGTH) {
@@ -100,10 +141,30 @@ function validateBufferPublishInput(input = {}) {
     errors.push('source_commit_sha must be an exact 40-character commit SHA');
   }
 
+  if (generatedAtMs === null) {
+    errors.push('generated_at must be a valid ISO timestamp');
+  } else {
+    const generationAgeMs = nowMs - generatedAtMs;
+    if (generationAgeMs > MAX_GENERATION_AGE_MS) {
+      errors.push('generated_at is too stale to preserve a meaningful review window');
+    }
+    if (generationAgeMs < -MAX_CLOCK_SKEW_MS) {
+      errors.push('generated_at is too far in the future');
+    }
+  }
+
   if (errors.length > 0) {
     const error = new Error(`FOUNDER_SIGNAL_CONTENT_REJECTED: ${errors.join('; ')}`);
     error.code = 'FOUNDER_SIGNAL_CONTENT_REJECTED';
     error.details = errors;
+    throw error;
+  }
+
+  const scheduledAtMs = generatedAtMs + BUFFER_REVIEW_WINDOW_MS;
+  if (scheduledAtMs <= nowMs) {
+    const error = new Error('FOUNDER_SIGNAL_CONTENT_REJECTED: scheduled_at must remain in the future');
+    error.code = 'FOUNDER_SIGNAL_CONTENT_REJECTED';
+    error.details = ['scheduled_at must remain in the future'];
     throw error;
   }
 
@@ -112,14 +173,27 @@ function validateBufferPublishInput(input = {}) {
     content_validated: true,
     content_field: contentField,
     channel,
-    destination_mode: 'draft',
-    publish_allowed: false,
+    destination_mode: 'schedule',
+    publish_allowed: true,
     proof_url: proofUrl,
     source_commit_sha: sourceCommitSha,
     founder_approval_id: null,
+    standing_authority_id: BUFFER_SCHEDULE_AUTHORITY,
+    batch_id: batchId,
+    batch_size: batchSize,
+    batch_index: batchIndex,
+    generated_at: new Date(generatedAtMs).toISOString(),
+    scheduled_at: new Date(scheduledAtMs).toISOString(),
+    review_deadline: new Date(scheduledAtMs).toISOString(),
+    review_window_minutes: BUFFER_REVIEW_WINDOW_MINUTES,
+    review_state: 'pending_notification',
+    notification_mode: BUFFER_NOTIFICATION_MODE,
+    notification_required: true,
+    notification_failure_policy: 'cancel_scheduled_batch',
     buffer_action: BUFFER_PROVIDER_ACTION,
     buffer_method: BUFFER_PROVIDER_METHOD,
     buffer_save_to_draft: BUFFER_API_SAVE_TO_DRAFT,
+    share_now_allowed: false,
   };
 }
 
@@ -133,6 +207,9 @@ if (typeof module !== 'undefined' && module.exports) {
     BUFFER_PROVIDER_ACTION,
     BUFFER_PROVIDER_METHOD,
     BUFFER_API_SAVE_TO_DRAFT,
+    BUFFER_REVIEW_WINDOW_MINUTES,
+    BUFFER_SCHEDULE_AUTHORITY,
+    BUFFER_NOTIFICATION_MODE,
     ALLOWED_CONTENT_FIELDS,
     FORBIDDEN_CONTENT_FIELDS,
     PROMPT_LEAK_PATTERNS,
