@@ -27,13 +27,13 @@ export function resolveGoalfixIntent(input: ResolveGoalfixIntentInput): GoalfixI
   const confirmed = input.confirmed === true || explicitResolution;
 
   let confidence: GoalfixIntentConfidence = 'low';
-  if (raw && resolved) {
+  if (raw && resolved && confirmed) {
     if (
       assumptions.length > 0
       || raw.toLocaleLowerCase('en-US') !== resolved.toLocaleLowerCase('en-US')
     ) {
       confidence = 'medium';
-    } else if (confirmed) {
+    } else {
       confidence = 'high';
     }
   }
