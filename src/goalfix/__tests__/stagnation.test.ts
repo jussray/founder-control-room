@@ -31,6 +31,28 @@ describe('detectGoalfixStagnation', () => {
     expect(result.nextAction).toContain('Stop retrying the same path');
   });
 
+  it('does not treat incomplete checks as repeated failure evidence', () => {
+    const result = detectGoalfixStagnation([
+      {
+        approach: 'Inspect queued Playwright evidence.',
+        failureSignature: 'verification:playwright',
+        filesTouched: [],
+        verificationName: 'Playwright',
+        result: 'incomplete',
+      },
+      {
+        approach: 'Inspect running Playwright evidence.',
+        failureSignature: 'verification:playwright',
+        filesTouched: [],
+        verificationName: 'Playwright',
+        result: 'incomplete',
+      },
+    ]);
+
+    expect(result.stagnant).toBe(false);
+    expect(result.matchingAttempts).toBe(0);
+  });
+
   it('does not treat a passing attempt as repeated failure evidence', () => {
     const result = detectGoalfixStagnation([
       failedAttempt('typecheck failed'),
