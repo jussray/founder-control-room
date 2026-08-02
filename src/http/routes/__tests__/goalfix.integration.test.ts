@@ -71,6 +71,7 @@ function validPayload() {
     constraints: ['Do not weaken protected route guards.'],
     firstFilesOrLogs: ['app/_layout.tsx', 'Playwright artifact'],
     expectedVerificationNames: ['Typecheck', 'Playwright'],
+    stopCondition: 'Stop after every named exact-head check has completed.',
   };
 }
 
@@ -135,6 +136,79 @@ describe('POST /goalfix/inspect', () => {
     expect(auditInsertMock).not.toHaveBeenCalled();
   });
 
+  it('blocks missing stop conditions before project or provider access', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
+      error: null,
+    });
+
+    const response = await request(buildApp())
+      .post('/goalfix/inspect')
+      .set('Authorization', BEARER)
+      .send({ ...validPayload(), stopCondition: '' });
+
+    expect(response.status).toBe(409);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.body).toMatchObject({
+      code: 'GOALFIX_RUNTIME_BLOCKED',
+      skillRuntime: {
+        version: 'goalfix-skill-runtime-v1',
+        mayProceed: false,
+        scope: { stopCondition: '' },
+      },
+    });
+    expect(response.body.error).toContain('Define a concrete stop condition');
+    expect(supabaseMock.from).not.toHaveBeenCalledWith('projects');
+    expect(providerForProjectMock).not.toHaveBeenCalled();
+    expect(auditInsertMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks a repeated failure signature before project or provider access', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
+      error: null,
+    });
+
+    const response = await request(buildApp())
+      .post('/goalfix/inspect')
+      .set('Authorization', BEARER)
+      .send({
+        ...validPayload(),
+        attempts: [
+          {
+            approach: 'Rerun the browser check.',
+            failureSignature: 'runner unavailable',
+            filesTouched: [],
+            verificationName: 'Playwright',
+            result: 'failed',
+          },
+          {
+            approach: 'Rerun the browser check again.',
+            failureSignature: 'Runner unavailable',
+            filesTouched: [],
+            verificationName: 'Playwright',
+            result: 'blocked',
+          },
+        ],
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toMatchObject({
+      code: 'GOALFIX_RUNTIME_BLOCKED',
+      skillRuntime: {
+        mayProceed: false,
+        stagnation: {
+          stagnant: true,
+          repeatedFailureSignature: 'runner unavailable',
+          matchingAttempts: 2,
+        },
+      },
+    });
+    expect(response.body.error).toContain('Stop retrying the same path');
+    expect(supabaseMock.from).not.toHaveBeenCalledWith('projects');
+    expect(providerForProjectMock).not.toHaveBeenCalled();
+  });
+
   it('returns an exact-head, read-only founder report after a sanitized audit persists', async () => {
     mockGetUser.mockResolvedValue({
       data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
@@ -144,7 +218,13 @@ describe('POST /goalfix/inspect', () => {
     const response = await request(buildApp())
       .post('/goalfix/inspect')
       .set('Authorization', BEARER)
-      .send(validPayload());
+      .send({
+        ...validPayload(),
+        resolvedIntent: 'Preserve the public welcome while keeping protected routes guarded.',
+        intentAssumptions: ['The public welcome is the current founder priority.'],
+        artifactSha256: 'a'.repeat(64),
+        artifactSourceName: 'lean-build-suite.zip',
+      });
 
     expect(response.status).toBe(200);
     expect(response.headers['cache-control']).toBe('no-store');
@@ -170,10 +250,12 @@ describe('POST /goalfix/inspect', () => {
         expected_signal_count: 2,
         error_class: null,
         skill: 'goalfix',
+        skill_runtime: 'goalfix-skill-runtime-v1',
       },
     });
     expect(JSON.stringify(audit)).not.toContain('Keep the public welcome available before login.');
     expect(JSON.stringify(audit)).not.toContain('Typecheck');
+    expect(JSON.stringify(audit)).not.toContain('lean-build-suite.zip');
     expect(response.body).toMatchObject({
       version: 'goalfix-v1',
       readiness: 'ready_for_founder_decision',
@@ -186,7 +268,24 @@ describe('POST /goalfix/inspect', () => {
       },
       project: { repository: 'jussray/Sekret-Bip' },
       target: { name: 'main', commitSha: SHA },
-      goal: { expectedVerificationNames: ['Typecheck', 'Playwright'] },
+      goal: {
+        desiredOutcome: 'Preserve the public welcome while keeping protected routes guarded.',
+        expectedVerificationNames: ['Typecheck', 'Playwright'],
+      },
+      skillRuntime: {
+        version: 'goalfix-skill-runtime-v1',
+        mayProceed: true,
+        intent: {
+          raw: 'Keep the public welcome available before login.',
+          resolved: 'Preserve the public welcome while keeping protected routes guarded.',
+          confidence: 'medium',
+          assumptions: ['The public welcome is the current founder priority.'],
+        },
+        provenance: {
+          artifactSha256: 'a'.repeat(64),
+          sourceName: 'lean-build-suite.zip',
+        },
+      },
     });
   });
 
