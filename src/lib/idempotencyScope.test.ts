@@ -16,6 +16,18 @@ describe('executionScopeMatches', () => {
     })).toBe(true);
   });
 
+  it('supports explicitly unscoped project actions when project and action match', () => {
+    expect(executionScopeMatches({
+      mission_id: null,
+      project_id: 'project-a',
+      action_type: 'apply_ruleset',
+    }, {
+      missionId: null,
+      projectId: 'project-a',
+      actionType: 'apply_ruleset',
+    })).toBe(true);
+  });
+
   it.each([
     ['mission', { missionId: 'mission-b', projectId: 'project-a', actionType: 'merge' }],
     ['project', { missionId: 'mission-a', projectId: 'project-b', actionType: 'merge' }],

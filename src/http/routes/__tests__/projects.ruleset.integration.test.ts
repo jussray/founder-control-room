@@ -22,6 +22,7 @@ import { projectsRouter } from "../projects.js";
 const FOUNDER_EMAIL = "founder@example.com";
 const BEARER = "Bearer test-token";
 const PROJECT_SLUG = "founder-control-room";
+const PROJECT_ID = "project-1";
 const EXECUTION_ID = "execution-uuid-001";
 
 function buildApp() {
@@ -54,8 +55,17 @@ const validBody = {
   bypassActors: [{ kind: "app", id: "123456" }],
 };
 
+interface ExistingExecution {
+  id: string;
+  mission_id?: string | null;
+  project_id?: string;
+  action_type?: string;
+  status: "pending" | "succeeded" | "failed";
+  result: Record<string, unknown>;
+}
+
 interface RouteOptions {
-  existingExecution?: { status: "pending" | "succeeded" | "failed"; result: Record<string, unknown>; id: string } | null;
+  existingExecution?: ExistingExecution | null;
   applyResult?: { id: string; name: string; enforcement: string };
   applyError?: Error;
   providerSupportsRuleset?: boolean;
@@ -77,7 +87,7 @@ function stubRoute(options: RouteOptions = {}) {
         select: () => ({
           eq: () => ({
             maybeSingle: () => Promise.resolve({
-              data: { id: "project-1", slug: PROJECT_SLUG, repo_provider: "github", repo_identifier: "jussray/founder-control-room" },
+              data: { id: PROJECT_ID, slug: PROJECT_SLUG, repo_provider: "github", repo_identifier: "jussray/founder-control-room" },
               error: null,
             }),
           }),
@@ -88,7 +98,17 @@ function stubRoute(options: RouteOptions = {}) {
       return {
         select: () => ({
           eq: () => ({
-            maybeSingle: () => Promise.resolve({ data: options.existingExecution ?? null, error: null }),
+            maybeSingle: () => Promise.resolve({
+              data: options.existingExecution
+                ? {
+                    mission_id: null,
+                    project_id: PROJECT_ID,
+                    action_type: "apply_ruleset",
+                    ...options.existingExecution,
+                  }
+                : null,
+              error: null,
+            }),
           }),
         }),
         insert: insertExecutionMock,

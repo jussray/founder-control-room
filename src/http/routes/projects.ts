@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { supabase } from "../../lib/supabaseClient.js";
+import { executionScopeMatches } from "../../lib/idempotencyScope.js";
 import { providerForProject } from "../../providers/providerFactory.js";
 import type { RepositoryProvider } from "../../providers/RepositoryProvider.js";
 import { requireFounder, type FounderRequest } from "../middleware/requireFounder.js";
@@ -236,6 +237,9 @@ projectsRouter.post("/:slug/connections", requireFounder, async (req: FounderReq
 
 interface RulesetExecutionRecord {
   id: string;
+  mission_id: string | null;
+  project_id: string;
+  action_type: string;
   status: "pending" | "succeeded" | "failed";
   result: Record<string, unknown>;
 }
@@ -245,7 +249,7 @@ async function findRulesetExecution(
 ): Promise<{ data: RulesetExecutionRecord | null; error: { message: string } | null }> {
   const { data, error } = await supabase
     .from("approval_executions")
-    .select("id, status, result")
+    .select("id, mission_id, project_id, action_type, status, result")
     .eq("idempotency_key", idempotencyKey)
     .maybeSingle();
   return { data: data as RulesetExecutionRecord | null, error };
@@ -316,11 +320,19 @@ projectsRouter.post("/:slug/ruleset", requireFounder, async (req: FounderRequest
     return res.status(503).json({ error: "Project has no repository configured.", code: "REPOSITORY_PROVIDER_UNAVAILABLE" });
   }
 
+  const expectedScope = { missionId: null, projectId: project.id as string, actionType: "apply_ruleset" };
   const existingLookup = await findRulesetExecution(idempotencyKey);
   if (existingLookup.error) {
     return res.status(500).json({ error: "Unable to inspect the action idempotency ledger.", detail: existingLookup.error.message });
   }
   if (existingLookup.data) {
+    if (!executionScopeMatches(existingLookup.data, expectedScope)) {
+      return res.status(409).json({
+        ok: false,
+        code: "IDEMPOTENCY_SCOPE_MISMATCH",
+        error: "This idempotency key belongs to a different mission, project, or action.",
+      });
+    }
     if (existingLookup.data.status === "succeeded") {
       return res.json({ ok: true, idempotent: true, result: existingLookup.data.result });
     }
@@ -377,6 +389,13 @@ projectsRouter.post("/:slug/ruleset", requireFounder, async (req: FounderRequest
 
   if (reservationError || !reservation) {
     const racedLookup = await findRulesetExecution(idempotencyKey);
+    if (racedLookup.data && !executionScopeMatches(racedLookup.data, expectedScope)) {
+      return res.status(409).json({
+        ok: false,
+        code: "IDEMPOTENCY_SCOPE_MISMATCH",
+        error: "This idempotency key belongs to a different mission, project, or action.",
+      });
+    }
     if (racedLookup.data?.status === "succeeded") {
       return res.json({ ok: true, idempotent: true, result: racedLookup.data.result });
     }
