@@ -68,6 +68,7 @@ function validPayload() {
     projectSlug: 'sekret-bip',
     targetRef: 'main',
     desiredOutcome: 'Keep the public welcome available before login.',
+    resolvedIntent: 'Keep the public welcome available before login.',
     constraints: ['Do not weaken protected route guards.'],
     firstFilesOrLogs: ['app/_layout.tsx', 'Playwright artifact'],
     expectedVerificationNames: ['Typecheck', 'Playwright'],
@@ -132,6 +133,38 @@ describe('POST /goalfix/inspect', () => {
 
     expect(response.status).toBe(400);
     expect(response.body.error).toContain('at least one required check name');
+    expect(providerForProjectMock).not.toHaveBeenCalled();
+    expect(auditInsertMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks nonempty raw-only intent before project or provider access', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
+      error: null,
+    });
+
+    const { resolvedIntent: _resolvedIntent, ...rawOnlyPayload } = validPayload();
+    const response = await request(buildApp())
+      .post('/goalfix/inspect')
+      .set('Authorization', BEARER)
+      .send({ ...rawOnlyPayload, desiredOutcome: 'cont the skill thing' });
+
+    expect(response.status).toBe(409);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.body).toMatchObject({
+      code: 'GOALFIX_RUNTIME_BLOCKED',
+      skillRuntime: {
+        mayProceed: false,
+        intent: {
+          raw: 'cont the skill thing',
+          resolved: 'cont the skill thing',
+          confidence: 'low',
+          confirmed: false,
+        },
+      },
+    });
+    expect(response.body.error).toContain('Resolve the founder intent');
+    expect(supabaseMock.from).not.toHaveBeenCalledWith('projects');
     expect(providerForProjectMock).not.toHaveBeenCalled();
     expect(auditInsertMock).not.toHaveBeenCalled();
   });
@@ -282,6 +315,7 @@ describe('POST /goalfix/inspect', () => {
           resolved: 'Preserve the public welcome while keeping protected routes guarded.',
           confidence: 'medium',
           assumptions: ['The public welcome is the current founder priority.'],
+          confirmed: true,
         },
         scope: {
           firstFilesOrLogs: ['app/_layout.tsx'],
