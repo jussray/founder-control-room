@@ -72,7 +72,7 @@ function adversarialEnvelope() {
 
 describe('sandbox malformed-input rejection', () => {
   it('returns a sealed company rejection instead of leaking a simulator exception', () => {
-    const malformed = companyInput() as ReturnType<typeof companyInput> & { projectSlug: unknown };
+    const malformed: Record<string, unknown> = companyInput();
     malformed.projectSlug = 42;
 
     const run = runCompanySandbox(malformed);
