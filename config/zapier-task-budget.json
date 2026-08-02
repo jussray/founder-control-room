@@ -1,16 +1,20 @@
 {
-  "version": 4,
+  "version": 5,
   "plan": {
-    "name": "Zapier Free",
+    "name": "Conservative 100-task planning envelope",
     "monthly_task_limit": 100,
     "operating_ceiling": 90,
-    "emergency_reserve": 10
+    "emergency_reserve": 10,
+    "live_plan_verified": false,
+    "free_two_step_plan_sufficient": false,
+    "multi_step_or_backend_orchestration_required": true,
+    "note": "The 100-task envelope is a self-imposed cost ceiling. It is not proof that the connected Zapier plan supports the required workflow topology."
   },
   "scope": {
     "reported_current_monthly_tasks": 126,
     "planned_monthly_tasks": 88,
     "headroom_below_operating_ceiling": 2,
-    "overflow_behavior": "hold_in_zapier_table_for_manual_review_or_next_month"
+    "overflow_behavior": "hold_in_existing_backlog_for_manual_review_or_next_month"
   },
   "allocations": [
     {
@@ -31,7 +35,8 @@
       "billable_actions": [
         "one Buffer scheduled action for each of three founder-approved active channels",
         "one Gmail review digest for the complete campaign batch"
-      ]
+      ],
+      "topology_requirement": "multi_step_zap_or_backend_orchestration"
     },
     {
       "id": "approved-investor-outreach",
@@ -142,7 +147,7 @@
     "one_billable_gmail_digest_per_campaign": true,
     "platform_native_copy_required": true,
     "unselected_platforms": "retain_as_review_drafts_in_hubspot_and_founder_control_room",
-    "fallback_at_budget_ceiling": "keep_campaign_in_free_backlog_without_buffer_actions",
+    "fallback_at_budget_ceiling": "keep_campaign_in_existing_backlog_without_buffer_actions",
     "review_window": {
       "minutes": 20,
       "starts_from": "generated_at",
@@ -151,7 +156,11 @@
       "notification_failure_policy": "cancel_scheduled_batch",
       "no_reply_behavior": "publish_by_existing_buffer_schedule",
       "edit_policy": "regenerate_and_revalidate_before_buffer_update",
-      "share_now_allowed": false
+      "share_now_allowed": false,
+      "instant_private_reply_ingress_required": true,
+      "gmail_polling_allowed_for_deadline_commands": false,
+      "preferred_reply_ingress": "cloudflare_email_routing_worker",
+      "reply_ingress_live_proof_complete": false
     },
     "publish_content_contract": {
       "source": "structured_ai_output_only",
@@ -166,6 +175,8 @@
       "notification_mode": "gmail_campaign_digest",
       "notification_failure_policy": "cancel_scheduled_batch",
       "share_now_allowed": false,
+      "buffer_api_sharing_mode": "customScheduled",
+      "buffer_api_due_at_source": "scheduled_at",
       "allowed_source_fields": [
         "linkedin_draft",
         "facebook_founder_draft",
@@ -197,20 +208,25 @@
       }
     }
   },
-  "free_steps": [
+  "non_billable_primitives_assumed_when_available": [
     "triggers",
     "filters",
     "formatter",
     "paths",
     "delay",
     "looping",
-    "sub-zaps",
     "digests",
-    "zapier-manager",
     "storage",
-    "tables",
-    "forms"
+    "tables"
   ],
+  "capability_truth": {
+    "webhook_trigger_required": true,
+    "multi_step_workflow_or_backend_orchestration_required": true,
+    "instant_private_reply_ingress_required": true,
+    "gmail_polling_sufficient_for_twenty_minute_window": false,
+    "repository_budget_is_not_live_plan_proof": true,
+    "activation_stops_until_capabilities_are_verified": true
+  },
   "guardrails": {
     "one_ai_call_per_signal": true,
     "social_channels_generated_in_one_ai_response": true,
@@ -219,6 +235,8 @@
     "one_buffer_action_per_active_channel": true,
     "one_gmail_review_digest_per_campaign": true,
     "gmail_notification_failure_cancels_batch": true,
+    "gmail_polling_never_controls_deadline_commands": true,
+    "instant_private_reply_ingress_required": true,
     "nonselected_social_channels_remain_review_drafts": true,
     "hubspot_result_note_is_canonical_writeback": true,
     "founder_control_room_reads_proof_without_a_second_zapier_write": true,
