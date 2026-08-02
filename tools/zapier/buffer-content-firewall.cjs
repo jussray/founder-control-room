@@ -12,6 +12,8 @@ const BUFFER_REVIEW_WINDOW_MINUTES = 20;
 const BUFFER_REVIEW_WINDOW_MS = BUFFER_REVIEW_WINDOW_MINUTES * 60 * 1000;
 const MAX_GENERATION_AGE_MS = 5 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 60 * 1000;
+const MAX_STEERING_GRANT_ID_LENGTH = 100;
+const MAX_AUTHORIZATION_RECEIPT_LENGTH = 200;
 const BUFFER_SCHEDULE_POLICY_ID = 'buffer-20-minute-review-v1';
 const BUFFER_AUTHORIZATION_MODE = 'standing-policy';
 const BUFFER_NOTIFICATION_MODE = 'gmail_campaign_digest';
@@ -114,8 +116,11 @@ function validateBufferPublishInput(input = {}, options = {}) {
   }
 
   if (!UUID.test(invocationId)) errors.push('invocation_id must be a UUID');
-  if (!steeringGrantId || steeringGrantId.length > 200) {
-    errors.push('steering_grant_id is required and must not exceed 200 characters');
+  if (!steeringGrantId || steeringGrantId.length > MAX_STEERING_GRANT_ID_LENGTH) {
+    errors.push(`steering_grant_id is required and must not exceed ${MAX_STEERING_GRANT_ID_LENGTH} characters`);
+  }
+  if (founderApprovalId.length > MAX_AUTHORIZATION_RECEIPT_LENGTH) {
+    errors.push(`founder_approval_id must not exceed ${MAX_AUTHORIZATION_RECEIPT_LENGTH} characters`);
   }
   if (authorizationMode !== BUFFER_AUTHORIZATION_MODE) {
     errors.push('authorization_mode must be standing-policy');
@@ -123,7 +128,11 @@ function validateBufferPublishInput(input = {}, options = {}) {
   const expectedApprovalId = steeringGrantId && invocationId
     ? `standing-policy:${steeringGrantId}:${invocationId}`
     : null;
-  if (!expectedApprovalId || founderApprovalId !== expectedApprovalId) {
+  if (
+    !expectedApprovalId ||
+    expectedApprovalId.length > MAX_AUTHORIZATION_RECEIPT_LENGTH ||
+    founderApprovalId !== expectedApprovalId
+  ) {
     errors.push('founder_approval_id must be the runtime-minted receipt for this grant and invocation');
   }
   if (schedulePolicyId !== BUFFER_SCHEDULE_POLICY_ID) {
@@ -232,6 +241,8 @@ if (typeof module !== 'undefined' && module.exports) {
     BUFFER_SCHEDULE_POLICY_ID,
     BUFFER_AUTHORIZATION_MODE,
     BUFFER_NOTIFICATION_MODE,
+    MAX_STEERING_GRANT_ID_LENGTH,
+    MAX_AUTHORIZATION_RECEIPT_LENGTH,
     ALLOWED_CONTENT_FIELDS,
     FORBIDDEN_CONTENT_FIELDS,
     PROMPT_LEAK_PATTERNS,
