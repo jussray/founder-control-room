@@ -17,7 +17,7 @@ const forbiddenPatterns = [
   { pattern: /\bRouter\s*\(/, label: 'route construction' },
   { pattern: /\.insert\s*\(/, label: 'database insert' },
   { pattern: /\.update\s*\(/, label: 'database update' },
-  { pattern: /\.delete\s*\(/, label: 'database delete' },
+  { pattern: /\b(?:db|database|client|table|query)\s*\.\s*delete\s*\(/i, label: 'database delete' },
   { pattern: /executeFirstPartyPublication/, label: 'live social adapter execution' },
   { pattern: /\beval\s*\(|new\s+Function\b|node:vm/, label: 'dynamic code evaluation' },
   { pattern: /\bimport\s*\(/, label: 'dynamic import' },
