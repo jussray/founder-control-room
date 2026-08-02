@@ -99,6 +99,17 @@ function fingerprint(value) {
   return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
+function sandboxMetadata(inputFingerprint, outputFingerprint = null) {
+  return {
+    id: `ai-company-${inputFingerprint}`,
+    version: AI_COMPANY_SANDBOX_VERSION,
+    deterministic: true,
+    inputFingerprint,
+    outputFingerprint,
+    capabilities: AI_COMPANY_SANDBOX_CAPABILITIES,
+  };
+}
+
 function inspectReceipt(receipt, expectedEventId) {
   const violations = [];
   if (receipt?.provider !== 'fake-buffer') violations.push('receipt_provider_not_fake');
@@ -145,14 +156,7 @@ export function runCompanySandbox(companyInput, options = {}) {
       status: 'blocked',
       simulatorInvoked: false,
       violations: ['kill_switch_active'],
-      sandbox: {
-        id: `ai-company-${inputFingerprint}`,
-        version: AI_COMPANY_SANDBOX_VERSION,
-        deterministic: true,
-        inputFingerprint,
-        outputFingerprint: null,
-        capabilities: AI_COMPANY_SANDBOX_CAPABILITIES,
-      },
+      sandbox: sandboxMetadata(inputFingerprint),
       result: null,
     });
   }
@@ -162,20 +166,24 @@ export function runCompanySandbox(companyInput, options = {}) {
       status: 'blocked',
       simulatorInvoked: false,
       violations: ['input_fingerprint_mismatch'],
-      sandbox: {
-        id: `ai-company-${inputFingerprint}`,
-        version: AI_COMPANY_SANDBOX_VERSION,
-        deterministic: true,
-        inputFingerprint,
-        outputFingerprint: null,
-        capabilities: AI_COMPANY_SANDBOX_CAPABILITIES,
-      },
+      sandbox: sandboxMetadata(inputFingerprint),
       result: null,
     });
   }
 
   const before = stableStringify(input);
-  const rawResult = runCompanySimulation(input);
+  let rawResult;
+  try {
+    rawResult = runCompanySimulation(input);
+  } catch {
+    return deepFreeze({
+      status: 'blocked',
+      simulatorInvoked: true,
+      violations: ['simulation_input_rejected'],
+      sandbox: sandboxMetadata(inputFingerprint),
+      result: null,
+    });
+  }
   const after = stableStringify(input);
   const result = sealSandboxValue(rawResult);
   const violations = [
@@ -187,14 +195,7 @@ export function runCompanySandbox(companyInput, options = {}) {
     status: violations.length > 0 ? 'quarantined' : 'simulated',
     simulatorInvoked: true,
     violations: [...new Set(violations)],
-    sandbox: {
-      id: `ai-company-${inputFingerprint}`,
-      version: AI_COMPANY_SANDBOX_VERSION,
-      deterministic: true,
-      inputFingerprint,
-      outputFingerprint: fingerprint(result),
-      capabilities: AI_COMPANY_SANDBOX_CAPABILITIES,
-    },
+    sandbox: sandboxMetadata(inputFingerprint, fingerprint(result)),
     result,
   });
 }
