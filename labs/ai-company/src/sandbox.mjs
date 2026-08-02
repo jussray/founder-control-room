@@ -22,6 +22,15 @@ function deepFreeze(value) {
   return Object.freeze(value);
 }
 
+function assertDataDescriptor(descriptor, path) {
+  if (!descriptor || !('value' in descriptor)) {
+    throw new TypeError(`${path}: accessor properties are not sandbox-safe`);
+  }
+  if (descriptor.enumerable !== true) {
+    throw new TypeError(`${path}: hidden properties are not sandbox-safe`);
+  }
+}
+
 function assertJsonSafe(value, path = '$', ancestors = []) {
   if (value === null) return;
 
@@ -33,20 +42,32 @@ function assertJsonSafe(value, path = '$', ancestors = []) {
   }
   if (type !== 'object') throw new TypeError(`${path}: ${type} is not sandbox-safe`);
   if (ancestors.includes(value)) throw new TypeError(`${path}: circular input is not sandbox-safe`);
+  if (Object.getOwnPropertySymbols(value).length > 0) {
+    throw new TypeError(`${path}: symbol properties are not sandbox-safe`);
+  }
 
+  const descriptors = Object.getOwnPropertyDescriptors(value);
   ancestors.push(value);
   if (Array.isArray(value)) {
     if (Object.getPrototypeOf(value) !== Array.prototype) {
       throw new TypeError(`${path}: custom array prototypes are not sandbox-safe`);
     }
-    value.forEach((item, index) => assertJsonSafe(item, `${path}[${index}]`, ancestors));
+    for (const [key, descriptor] of Object.entries(descriptors)) {
+      if (key === 'length') continue;
+      if (!/^(0|[1-9]\d*)$/.test(key)) {
+        throw new TypeError(`${path}.${key}: custom array properties are not sandbox-safe`);
+      }
+      assertDataDescriptor(descriptor, `${path}[${key}]`);
+      assertJsonSafe(descriptor.value, `${path}[${key}]`, ancestors);
+    }
   } else {
     const prototype = Object.getPrototypeOf(value);
     if (prototype !== Object.prototype && prototype !== null) {
       throw new TypeError(`${path}: custom prototypes are not sandbox-safe`);
     }
-    for (const [key, nested] of Object.entries(value)) {
-      assertJsonSafe(nested, `${path}.${key}`, ancestors);
+    for (const [key, descriptor] of Object.entries(descriptors)) {
+      assertDataDescriptor(descriptor, `${path}.${key}`);
+      assertJsonSafe(descriptor.value, `${path}.${key}`, ancestors);
     }
   }
   ancestors.pop();
