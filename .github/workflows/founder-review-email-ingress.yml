@@ -1,0 +1,64 @@
+name: Founder Review Email Ingress
+
+on:
+  pull_request:
+    paths:
+      - '.env.example'
+      - '.github/workflows/founder-review-email-ingress.yml'
+      - 'package.json'
+      - 'scripts/verify-founder-review-email-ingress.mjs'
+      - 'scripts/verify-rls-contract.mjs'
+      - 'src/founderSignalEmailIngress/**'
+      - 'src/http/routes/founderSignalReviewEmailIngress.ts'
+      - 'src/http/routes/__tests__/founderSignalReviewEmailIngress.integration.test.ts'
+      - 'src/http/server.ts'
+      - 'src/worker/founderSignalReviewEmail.ts'
+      - 'src/worker/founderSignalReviewEmail.test.ts'
+      - 'supabase/migrations/20260802224500_founder_signal_review_email_receipts.sql'
+      - 'wrangler.api.toml'
+      - 'wrangler.email.toml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install canonical dependencies
+        run: npm ci
+
+      - name: Verify TypeScript contracts
+        run: npm run typecheck
+
+      - name: Verify intake isolation, tests, and email Worker bundle
+        run: npm run verify:founder-review-email
+
+      - name: Verify public-table RLS inventory
+        run: npm run verify:rls-contract
+
+      - name: Lint focused runtime files
+        run: >-
+          npx eslint
+          src/founderSignalEmailIngress/receipt.ts
+          src/founderSignalEmailIngress/email.ts
+          src/founderSignalEmailIngress/email.test.ts
+          src/http/routes/founderSignalReviewEmailIngress.ts
+          src/http/routes/__tests__/founderSignalReviewEmailIngress.integration.test.ts
+          src/worker/founderSignalReviewEmail.ts
+          src/worker/founderSignalReviewEmail.test.ts
+          --max-warnings 0
