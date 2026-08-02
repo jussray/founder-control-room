@@ -130,6 +130,52 @@ function normalizeSignalName(value?: string): string {
   return (value ?? '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
 }
 
+function liveAttemptResult(status: VerificationSignal['status']): GoalfixAttempt['result'] {
+  if (status === 'passed') return 'passed';
+  if (status === 'failed' || status === 'cancelled') return 'failed';
+  return 'incomplete';
+}
+
+function currentRequiredCheckResults(
+  signals: VerificationSignal[],
+  targetSha: string,
+  expectedVerificationNames: string[],
+): Map<string, GoalfixAttempt['result']> {
+  const priority: Record<GoalfixAttempt['result'], number> = {
+    passed: 1,
+    incomplete: 2,
+    blocked: 3,
+    failed: 3,
+  };
+  const results = new Map<string, GoalfixAttempt['result']>();
+
+  for (const name of expectedVerificationNames) {
+    results.set(normalizeSignalName(name), 'incomplete');
+  }
+
+  for (const signal of signals) {
+    if (signal.commitSha.toLowerCase() !== targetSha.toLowerCase()) continue;
+    const key = normalizeSignalName(signal.name);
+    const current = results.get(key);
+    if (!current) continue;
+    const candidate = liveAttemptResult(signal.status);
+    if (priority[candidate] > priority[current]) results.set(key, candidate);
+    if (current === 'incomplete' && candidate === 'passed') results.set(key, candidate);
+  }
+
+  return results;
+}
+
+function refreshAttemptHistory(
+  attempts: GoalfixAttempt[],
+  currentResults: Map<string, GoalfixAttempt['result']>,
+): GoalfixAttempt[] {
+  return attempts.filter((attempt) => {
+    const current = currentResults.get(normalizeSignalName(attempt.verificationName));
+    return current === 'failed' || current === 'blocked';
+  });
+}
+
 function errorClass(error: unknown): string {
   if (error instanceof Error) return error.name || 'Error';
   return typeof error;
@@ -310,15 +356,30 @@ goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
     return providerFailure('resolve_ref', providerError);
   }
 
+  let verificationSignals: VerificationSignal[];
+  try {
+    verificationSignals = await provider.listVerificationSignals(project.slug, target.commitSha);
+  } catch (providerError) {
+    return providerFailure('list_verification_signals', providerError, target);
+  }
+
   const expectedNameKeys = new Set(expectedVerificationNames.map(normalizeSignalName));
   const exactHeadAttempts = attempts.filter((attempt) => (
     attempt.commitSha?.toLowerCase() === target.commitSha.toLowerCase()
     && expectedNameKeys.has(normalizeSignalName(attempt.verificationName))
   ));
+  const currentResults = currentRequiredCheckResults(
+    verificationSignals,
+    target.commitSha,
+    expectedVerificationNames,
+  );
   const runtimeDecision = buildGoalfixSkillRuntimeDecision({
     ...runtimeInput,
-    attempts: exactHeadAttempts,
+    attempts: refreshAttemptHistory(exactHeadAttempts, currentResults),
   });
+  const exactHeadSignalCount = verificationSignals.filter(
+    (signal) => signal.commitSha.toLowerCase() === target.commitSha.toLowerCase(),
+  ).length;
 
   if (!runtimeDecision.mayProceed) {
     const audited = await persistGoalfixAudit({
@@ -330,7 +391,7 @@ goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
       requestedRef: targetRef,
       target,
       readiness: 'blocked',
-      exactHeadSignalCount: 0,
+      exactHeadSignalCount,
       expectedSignalCount: expectedVerificationNames.length,
     });
     if (!audited) {
@@ -359,13 +420,6 @@ goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
     stopCondition: runtimeDecision.scope.stopCondition,
   };
 
-  let verificationSignals: VerificationSignal[];
-  try {
-    verificationSignals = await provider.listVerificationSignals(project.slug, target.commitSha);
-  } catch (providerError) {
-    return providerFailure('list_verification_signals', providerError, target);
-  }
-
   const report = buildGoalfixReport({
     project: {
       id: project.id,
@@ -379,9 +433,6 @@ goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
     verificationSignals,
   });
 
-  const exactHeadSignalCount = verificationSignals.filter(
-    (signal) => signal.commitSha.toLowerCase() === target.commitSha.toLowerCase(),
-  ).length;
   const audited = await persistGoalfixAudit({
     projectId: project.id,
     founderUserId,
