@@ -38,6 +38,17 @@ describe('resolveGoalfixIntent', () => {
     expect(intent.confirmed).toBe(true);
   });
 
+  it('does not let assumptions raise an unconfirmed raw-only goal', () => {
+    const intent = resolveGoalfixIntent({
+      raw: 'cont the skill thing',
+      assumptions: ['The referenced skill is the uploaded Lean Build Suite.'],
+    });
+
+    expect(intent.confidence).toBe('low');
+    expect(intent.confirmed).toBe(false);
+    expect(intent.assumptions).toEqual(['The referenced skill is the uploaded Lean Build Suite.']);
+  });
+
   it('returns low confidence for a nonempty raw-only goal without confirmation', () => {
     const intent = resolveGoalfixIntent({ raw: 'cont the skill thing' });
 
