@@ -52,6 +52,9 @@
       "<channel>: <requested tweak>"
     ],
     "replyIdentityPolicy": "exact_founder_sender_and_original_gmail_thread",
+    "replyParsingPolicy": "exactly_one_unquoted_command_on_first_nonempty_line",
+    "quotedHistoryPolicy": "ignore_only_after_valid_command_boundary",
+    "ambiguousReplyPolicy": "reject_multiple_unquoted_command_lines",
     "editPolicy": "regenerate_and_revalidate_before_buffer_update"
   },
   "authority": {
@@ -60,6 +63,10 @@
     "requiredAuthorizationMode": "standing-policy",
     "requiresRuntimeMintedReceipt": true,
     "receiptFormat": "standing-policy:<grantId>:<invocationId>",
+    "receiptPurpose": "exact runtime correlation",
+    "securityBoundary": "authenticated Founder Control Room middleware plus private Zapier hook",
+    "maximumGrantIdLength": 100,
+    "maximumReceiptLength": 200,
     "requiresExactSourceCommit": true,
     "requiresHttpsProof": true,
     "liveProviderMutationIncluded": false
