@@ -36,6 +36,17 @@ assert.equal(contract.reviewWindow.shareNowAllowed, false);
 assert.equal(contract.notification.provider, 'gmail');
 assert.equal(contract.notification.required, true);
 assert.equal(contract.notification.failurePolicy, 'cancel_scheduled_batch');
+assert.ok(contract.notification.requiredFields.includes('reply_context_id'));
+assert.ok(contract.notification.requiredFields.includes('gmail_thread_id'));
+assert.deepEqual(contract.notification.replyAuthorizationFields, [
+  'founder_sender',
+  'reply_to',
+  'reply_context_id',
+  'review_token',
+  'review_deadline',
+]);
+assert.deepEqual(contract.notification.evidenceOnlyFields, ['gmail_thread_id']);
+assert.equal(contract.notification.replyIdentityPolicy, 'exact_founder_sender_private_recipient_and_uuid_review_context');
 assert.equal(contract.notification.replyParsingPolicy, 'exactly_one_unquoted_command_on_first_nonempty_line');
 assert.equal(contract.notification.ambiguousReplyPolicy, 'reject_multiple_unquoted_command_lines');
 assert.equal(contract.notification.replyIngress.requiredLatencyClass, 'instant_private_ingress');
@@ -129,4 +140,4 @@ assert.equal(callerOverride.buffer_api_due_at, '2026-08-02T21:20:00.000Z');
 assert.equal(callerOverride.buffer_save_to_draft, false);
 assert.equal(callerOverride.scheduled_at, '2026-08-02T21:20:00.000Z');
 
-console.log('Buffer provider contract verified against executable scheduling code: exact customScheduled/dueAt mapping, backend-aligned runtime receipt correlation, one-command Gmail review parsing, instant private reply-ingress gate, fail-closed compensation, and no share-now override.');
+console.log('Buffer provider contract verified against executable scheduling code: exact customScheduled/dueAt mapping, runtime receipt correlation, private recipient/context authority, Gmail thread evidence separation, instant reply-ingress gate, fail-closed compensation, and no share-now override.');
