@@ -34,6 +34,8 @@
     "verify:buffer-provider": "node tools/zapier/test-buffer-provider-contract.cjs",
     "verify:ai-company-parity": "node scripts/verify-founder-os-lab-isolation.mjs && npm --prefix labs/ai-company run verify && vitest run --config vitest.ai-company-parity.config.ts",
     "verify:ai-company-adversarial": "node scripts/verify-founder-os-lab-isolation.mjs && npm --prefix labs/ai-company run verify && vitest run --config vitest.ai-company-adversarial.config.ts",
+    "verify:ai-company-container:unit": "node labs/ai-company/process-sandbox/verify.mjs && node --test labs/ai-company/process-sandbox/test/*.test.mjs",
+    "verify:ai-company-container": "npm run verify:ai-company-container:unit && node labs/ai-company/process-sandbox/container-proof.mjs",
     "verify:founder-chief-pair": "node scripts/verify-founder-chief-pair.mjs",
     "verify:cookies": "node scripts/verify-cookie-contract.mjs",
     "verify:founder-onboarding": "node scripts/verify-founder-onboarding.mjs",
