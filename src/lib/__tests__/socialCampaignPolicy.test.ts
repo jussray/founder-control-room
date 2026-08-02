@@ -27,22 +27,23 @@ function repo(overrides: Partial<RepositoryEvidence> = {}): RepositoryEvidence {
 
 describe('classifyRepositoryForContent', () => {
   it('blocks a sensitive-data repository even when configuredMode requests a full campaign', () => {
-    const result = classifyRepositoryForContent(
-      repo({
-        fullName: 'jussray/Sekret-Bip',
-        policy: {
-          containsMinorOrSensitiveData: true,
-          configuredMode: 'full_campaign',
-          publicProofUrls: ['https://sekretbip.net'],
-          neverClaim: [],
-          neverExpose: ['teen records'],
-        },
-      }),
-    );
+    const source = repo({
+      fullName: 'jussray/Sekret-Bip',
+      policy: {
+        containsMinorOrSensitiveData: true,
+        configuredMode: 'full_campaign',
+        publicProofUrls: ['https://sekretbip.net'],
+        neverClaim: [],
+        neverExpose: ['teen records'],
+      },
+    });
+    const result = classifyRepositoryForContent(source);
 
     expect(result.mode).toBe('blocked_pending_output_safeguard');
     expect(result.eligibleForDraftGeneration).toBe(false);
     expect(result.daysAllocated).toBe(0);
+    expect(result.authorizedRepository).toBe(source.fullName);
+    expect(result.authorizedExactHead).toBe(source.exactHead);
   });
 
   it('blocks a sensitive-data repository with no activity at all, same as an active one', () => {
@@ -61,6 +62,24 @@ describe('classifyRepositoryForContent', () => {
 
     expect(result.mode).toBe('blocked_pending_output_safeguard');
     expect(result.eligibleForDraftGeneration).toBe(false);
+  });
+
+  it('honors an explicit blocked mode for a non-sensitive repository', () => {
+    const result = classifyRepositoryForContent(
+      repo({
+        policy: {
+          containsMinorOrSensitiveData: false,
+          configuredMode: 'blocked_pending_output_safeguard',
+          publicProofUrls: ['https://github.com/jussray/example'],
+          neverClaim: [],
+          neverExpose: [],
+        },
+      }),
+    );
+
+    expect(result.mode).toBe('blocked_pending_output_safeguard');
+    expect(result.eligibleForDraftGeneration).toBe(false);
+    expect(result.daysAllocated).toBe(0);
   });
 
   it('refuses to classify an unverified (non-exact) head', () => {
@@ -133,26 +152,66 @@ describe('buildFirstPartySocialPostInput', () => {
   };
 
   it('refuses to build input for an ineligible repository', () => {
-    const blocked = classifyRepositoryForContent(
-      repo({
-        fullName: 'jussray/Sekret-Bip',
-        policy: {
-          containsMinorOrSensitiveData: true,
-          publicProofUrls: [],
-          neverClaim: [],
-          neverExpose: [],
-        },
-      }),
-    );
+    const source = repo({
+      fullName: 'jussray/Sekret-Bip',
+      policy: {
+        containsMinorOrSensitiveData: true,
+        publicProofUrls: [],
+        neverClaim: [],
+        neverExpose: [],
+      },
+    });
+    const blocked = classifyRepositoryForContent(source);
 
-    expect(() => buildFirstPartySocialPostInput(blocked, repo({ fullName: 'jussray/Sekret-Bip' }), draft)).toThrow(
-      /not eligible/,
-    );
+    expect(() => buildFirstPartySocialPostInput(blocked, source, draft)).toThrow(/not eligible/);
+  });
+
+  it('rejects a classification reused for another repository', () => {
+    const first = repo({ fullName: 'jussray/first' });
+    const second = repo({ fullName: 'jussray/second' });
+    const eligible = classifyRepositoryForContent(first);
+
+    expect(() => buildFirstPartySocialPostInput(eligible, second, draft)).toThrow(/does not authorize/);
+  });
+
+  it('rejects a stale classification reused after the repository head changes', () => {
+    const first = repo();
+    const moved = repo({ exactHead: 'b'.repeat(40) });
+    const eligible = classifyRepositoryForContent(first);
+
+    expect(() => buildFirstPartySocialPostInput(eligible, moved, draft)).toThrow(/does not authorize/);
+  });
+
+  it('enforces repository-specific neverClaim and neverExpose terms', () => {
+    const source = repo({
+      policy: {
+        containsMinorOrSensitiveData: false,
+        publicProofUrls: ['https://github.com/jussray/example'],
+        neverClaim: ['SOC 2 certified'],
+        neverExpose: ['vendor margin'],
+      },
+    });
+    const eligible = classifyRepositoryForContent(source);
+
+    expect(() =>
+      buildFirstPartySocialPostInput(eligible, source, {
+        ...draft,
+        text: `${draft.text} We are SOC 2 certified.`,
+      }),
+    ).toThrow(/neverClaim/);
+
+    expect(() =>
+      buildFirstPartySocialPostInput(eligible, source, {
+        ...draft,
+        traction: 'The vendor margin is now visible.',
+      }),
+    ).toThrow(/neverExpose/);
   });
 
   it('always builds draft-mode input, never queue or publish', () => {
-    const eligible = classifyRepositoryForContent(repo());
-    const input = buildFirstPartySocialPostInput(eligible, repo(), draft);
+    const source = repo();
+    const eligible = classifyRepositoryForContent(source);
+    const input = buildFirstPartySocialPostInput(eligible, source, draft);
 
     expect(input.mode).toBe('draft');
     expect(input.publishAllowed).toBe(false);
@@ -162,9 +221,31 @@ describe('buildFirstPartySocialPostInput', () => {
     expect(input.sourceCommitSha).toBe(VALID_HEAD);
   });
 
-  it('uses the real per-platform contentField, not a guessed pattern (tiktok is _caption, not _draft)', () => {
-    const eligible = classifyRepositoryForContent(repo());
-    const input = buildFirstPartySocialPostInput(eligible, repo(), { ...draft, platform: 'tiktok' });
+  it('requires verified limits and media, then carries them into media-platform input', () => {
+    const source = repo();
+    const eligible = classifyRepositoryForContent(source);
+
+    expect(() => buildFirstPartySocialPostInput(eligible, source, { ...draft, platform: 'tiktok' })).toThrow(
+      /platformCharacterLimit/,
+    );
+
+    expect(() =>
+      buildFirstPartySocialPostInput(eligible, source, {
+        ...draft,
+        platform: 'tiktok',
+        platformCharacterLimit: 2200,
+      }),
+    ).toThrow(/media asset/);
+
+    const input = buildFirstPartySocialPostInput(eligible, source, {
+      ...draft,
+      platform: 'tiktok',
+      platformCharacterLimit: 2200,
+      media: [{ type: 'video', url: 'https://example.com/proof-video.mp4', altText: 'Product proof clip' }],
+    });
+
     expect(input.contentField).toBe('tiktok_caption');
+    expect(input.platformCharacterLimit).toBe(2200);
+    expect(input.media).toHaveLength(1);
   });
 });
