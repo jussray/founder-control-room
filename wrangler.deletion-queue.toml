@@ -1,6 +1,7 @@
 name = "founder-control-room2"
 main = "src/workers/deletion-queue-worker.ts"
 compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
 
 [vars]
 ENVIRONMENT = "production"
