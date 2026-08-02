@@ -5,6 +5,7 @@ const { createHash, timingSafeEqual } = require('node:crypto');
 const MAX_REPLY_LENGTH = 2000;
 const CHANNEL_COMMAND = /^([^:]+):\s*(.+)$/s;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const QUOTE_OR_SIGNATURE_BOUNDARIES = [
   /^>/,
   /^-{2,}\s*original message\s*-{2,}$/i,
@@ -104,9 +105,23 @@ function requireScheduledPosts(posts) {
   });
 }
 
-function buildReviewToken({ batchId, scheduledPosts }) {
+function requireReplyContext(input = {}) {
+  const replyContextId = asTrimmedString(input.reply_context_id);
+  if (!UUID.test(replyContextId)) {
+    throw new Error('FOUNDER_REVIEW_REJECTED: reply_context_id must be a UUID');
+  }
+  const replyToAddress = normalizeEmail(input.reply_to_address);
+  if (!replyToAddress) {
+    throw new Error('FOUNDER_REVIEW_REJECTED: reply_to_address must be a valid email address');
+  }
+  return { replyContextId, replyToAddress };
+}
+
+function buildReviewToken({ batchId, replyContextId, replyToAddress, scheduledPosts }) {
   const canonical = [
     asTrimmedString(batchId),
+    asTrimmedString(replyContextId),
+    asTrimmedString(replyToAddress).toLowerCase(),
     ...scheduledPosts
       .map((post) => `${post.channel}|${post.buffer_post_id}|${post.scheduled_at}|${post.validated_post_text}`)
       .sort(),
@@ -117,6 +132,7 @@ function buildReviewToken({ batchId, scheduledPosts }) {
 function buildGmailReviewDigest(input = {}) {
   const batchId = asTrimmedString(input.batch_id);
   if (!batchId) throw new Error('FOUNDER_REVIEW_REJECTED: batch_id is required');
+  const { replyContextId, replyToAddress } = requireReplyContext(input);
   const posts = requireScheduledPosts(input.scheduled_posts);
   const uniqueDeadlines = new Set(posts.map((post) => post.scheduled_at));
   if (uniqueDeadlines.size !== 1) {
@@ -124,7 +140,12 @@ function buildGmailReviewDigest(input = {}) {
   }
 
   const reviewDeadline = posts[0].scheduled_at;
-  const reviewToken = buildReviewToken({ batchId, scheduledPosts: posts });
+  const reviewToken = buildReviewToken({
+    batchId,
+    replyContextId,
+    replyToAddress,
+    scheduledPosts: posts,
+  });
   const sections = posts.map((post, index) => [
     `${index + 1}. ${post.channel}`,
     `Fire time: ${post.scheduled_at}`,
@@ -135,9 +156,12 @@ function buildGmailReviewDigest(input = {}) {
 
   return {
     batch_id: batchId,
+    reply_context_id: replyContextId,
+    reply_to_address: replyToAddress,
     notification_state: 'ready',
     notification_required: true,
     gmail_action: 'gmail_send_email',
+    gmail_reply_to: replyToAddress,
     gmail_subject: `[Founder Signal Review] ${posts.length} scheduled post${posts.length === 1 ? '' : 's'} · ${reviewDeadline}`,
     gmail_body: [
       `Review window closes at ${reviewDeadline}.`,
@@ -149,12 +173,15 @@ function buildGmailReviewDigest(input = {}) {
       '- <channel>: <requested tweak>',
       '',
       'Quoted history and standard mail signatures are ignored after that command. Additional unquoted command lines are rejected.',
-      'A requested tweak must be regenerated and revalidated before Buffer is updated. No reply means Buffer keeps the existing scheduled fire time.',
+      'A requested tweak must be regenerated and revalidated before Buffer is updated. No valid reply means Buffer keeps the existing scheduled fire time.',
+      `Review context: ${replyContextId}`,
       `Review token: ${reviewToken}`,
     ].join('\n'),
     review_deadline: reviewDeadline,
     review_token: reviewToken,
     reply_contract: 'one_unquoted_channel_scoped_command_or_cancel_all',
+    reply_ingress_required: 'instant_private_ingress',
+    gmail_polling_allowed: false,
     no_reply_behavior: 'publish_by_existing_buffer_schedule',
     notification_failure_policy: 'cancel_scheduled_batch',
     scheduled_post_count: posts.length,
@@ -172,7 +199,6 @@ function findPostByChannel(posts, requestedChannel) {
 
 function processFounderReviewReply(input = {}, options = {}) {
   const posts = requireScheduledPosts(input.scheduled_posts);
-  const replyCommand = extractReplyCommand(input.reply_text);
 
   if (!constantTimeEqual(input.review_token, input.expected_review_token)) {
     throw new Error('FOUNDER_REVIEW_REJECTED: review token mismatch');
@@ -180,11 +206,25 @@ function processFounderReviewReply(input = {}, options = {}) {
 
   const replyFrom = normalizeEmail(input.reply_from);
   const expectedReplyFrom = normalizeEmail(input.expected_reply_from);
-  if (!replyFrom || !expectedReplyFrom || replyFrom !== expectedReplyFrom) {
+  if (!replyFrom || !expectedReplyFrom || !constantTimeEqual(replyFrom, expectedReplyFrom)) {
     throw new Error('FOUNDER_REVIEW_REJECTED: reply sender does not match the founder mailbox');
   }
-  if (!constantTimeEqual(input.gmail_thread_id, input.expected_gmail_thread_id)) {
-    throw new Error('FOUNDER_REVIEW_REJECTED: Gmail thread mismatch');
+
+  const replyToAddress = normalizeEmail(input.reply_to_address);
+  const expectedReplyToAddress = normalizeEmail(input.expected_reply_to_address);
+  if (
+    !replyToAddress ||
+    !expectedReplyToAddress ||
+    !constantTimeEqual(replyToAddress, expectedReplyToAddress)
+  ) {
+    throw new Error('FOUNDER_REVIEW_REJECTED: reply recipient does not match the private review address');
+  }
+
+  if (!constantTimeEqual(input.reply_context_id, input.expected_reply_context_id)) {
+    throw new Error('FOUNDER_REVIEW_REJECTED: review context mismatch');
+  }
+  if (!UUID.test(asTrimmedString(input.reply_context_id))) {
+    throw new Error('FOUNDER_REVIEW_REJECTED: reply_context_id must be a UUID');
   }
 
   const receivedAt = parseIsoTimestamp(input.received_at, 'received_at');
@@ -197,12 +237,21 @@ function processFounderReviewReply(input = {}, options = {}) {
     throw new Error('FOUNDER_REVIEW_REJECTED: received_at is too far in the future');
   }
 
+  const replyCommand = extractReplyCommand(input.reply_text);
   const normalizedReply = replyCommand.toLowerCase();
+  const sharedReceipt = {
+    parsed_command: replyCommand,
+    reply_context_id: asTrimmedString(input.reply_context_id),
+    reply_to_address: replyToAddress,
+    received_at: receivedAt.text,
+    review_deadline: deadline.text,
+  };
+
   if (normalizedReply === 'cancel' || normalizedReply === 'cancel all') {
     return {
       review_state: 'cancel_requested',
       review_action: 'cancel_all',
-      parsed_command: replyCommand,
+      ...sharedReceipt,
       stop_publish: true,
       operations: posts.map((post) => ({
         buffer_action: 'buffer_cancel_scheduled_post',
@@ -210,8 +259,6 @@ function processFounderReviewReply(input = {}, options = {}) {
         channel: post.channel,
       })),
       external_writes_required: posts.length,
-      received_at: receivedAt.text,
-      review_deadline: deadline.text,
     };
   }
 
@@ -222,7 +269,7 @@ function processFounderReviewReply(input = {}, options = {}) {
       return {
         review_state: 'edit_requested',
         review_action: 'edit_one',
-        parsed_command: replyCommand,
+        ...sharedReceipt,
         target_channel: post.channel,
         buffer_post_id: post.buffer_post_id,
         edit_instruction: replyCommand,
@@ -245,7 +292,7 @@ function processFounderReviewReply(input = {}, options = {}) {
     return {
       review_state: 'cancel_requested',
       review_action: 'cancel_one',
-      parsed_command: replyCommand,
+      ...sharedReceipt,
       target_channel: post.channel,
       stop_publish: false,
       operations: [{
@@ -254,15 +301,13 @@ function processFounderReviewReply(input = {}, options = {}) {
         channel: post.channel,
       }],
       external_writes_required: 1,
-      received_at: receivedAt.text,
-      review_deadline: deadline.text,
     };
   }
 
   return {
     review_state: 'edit_requested',
     review_action: 'edit_one',
-    parsed_command: replyCommand,
+    ...sharedReceipt,
     target_channel: post.channel,
     buffer_post_id: post.buffer_post_id,
     edit_instruction: instruction,
@@ -281,7 +326,7 @@ function buildNotificationFailureCompensation(input = {}) {
     review_state: 'notification_failed',
     review_action: 'cancel_all',
     stop_publish: true,
-    reason: 'gmail_notification_failed',
+    reason: 'gmail_notification_or_private_reply_setup_failed',
     operations: posts.map((post) => ({
       buffer_action: 'buffer_cancel_scheduled_post',
       buffer_post_id: post.buffer_post_id,
