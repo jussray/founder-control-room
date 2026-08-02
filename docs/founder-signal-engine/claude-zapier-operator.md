@@ -4,32 +4,44 @@
 
 Claude is a first-class Founder Signal Engine operator when Claude has a connected Zapier MCP or another declared Zapier control surface.
 
-This is not a generic permission grant. Claude may use only the tools, accounts, records, Zaps, and actions exposed by the connected Zapier MCP and covered by the current founder-approved scope.
+This is not a generic permission grant. Claude may use only the tools, accounts, records, Zaps, and actions exposed by the connected control surface and covered by the current founder-approved scope.
 
-The existing OpenAI Developers bridge remains a separate ChatGPT/OpenAI fallback. Claude does not need to route through that bridge when its own Zapier MCP provides the required capability.
+The OpenAI Developers bridge remains a separate ChatGPT/OpenAI route. Claude may use its direct Zapier path when that path exposes the required capability. Neither route silently expands the other route's authority.
 
-## Founder outcome
+## Milestone truth
 
-Claude is expected to help turn scattered operational signals into a verified founder conclusion and, when configured as an event Zap, write the conclusion back to the correct HubSpot record.
+The original Day 3 draft-routing milestone is proven and closed.
 
-Canonical closed loop:
+Historical Day 3 source:
 
 ```text
-source event
--> Zapier trigger
--> Claude analysis
--> validation gate
--> HubSpot deal-associated result
--> founder approval
--> optional Buffer action
--> Founder Control Room proof
+Repository: jussray/Sekret-Bip
+Pull request: #599
+Merge commit: f4573d360a8fea99b301f33a2a21192525725f7b
+Founder Control Room issue: #73
 ```
 
-The first live mode is always `REVIEW_ONLY` with `PUBLISH_ALLOWED: false`.
+Do not reopen that milestone or describe its original draft receipt as the current blocker.
+
+The current target is controlled scheduled distribution:
+
+```text
+verified source evidence
+-> server-held standing-policy decision
+-> runtime-minted one-invocation authorization receipt
+-> one structured AI result
+-> Buffer schedules at generated_at + 20 minutes
+-> one Gmail campaign digest
+-> founder edit/cancel window
+-> no reply preserves automatic Buffer publication
+-> retained provider and Founder Control Room receipts
+```
+
+Repository implementation is not proof that the live Zap has been remapped, enabled, or executed.
 
 ## Two execution modes
 
-### 1. Conversational Zapier MCP mode
+### Conversational Zapier MCP mode
 
 Claude may perform a requested cross-app investigation while the founder is actively asking for it.
 
@@ -37,44 +49,70 @@ Examples:
 
 - read a Gmail notification;
 - extract repository, pull request, workflow, branch, SHA, run ID, and timestamp;
-- inspect the matching GitHub evidence;
+- inspect matching GitHub evidence;
 - cross-reference HubSpot records;
-- inspect or update a saved Zapier MCP skill when supported;
+- inspect or update an existing saved Zapier skill when supported;
 - return a joined conclusion.
 
-A conversational MCP run does not become an always-on automation merely because it succeeded once.
+A conversational run does not become an always-on event Zap merely because it succeeded once.
 
-### 2. Event Zap mode
+### Event Zap mode
 
-Work that must run after the conversation closes requires a published Zap with a real trigger.
+Work that must continue after the conversation closes requires a published Zap with a real trigger and a verified live plan that supports the chosen workflow.
 
-Example:
+Current scheduled path:
 
 ```text
-HubSpot new request note
--> filter request events
--> Claude structured analysis
--> validate required fields
--> create result note on the same deal
+Founder Signal Engine invocation
+-> exact evidence and policy gate
+-> runtime authorization receipt
+-> structured generation
+-> executable content firewall
+-> Buffer schedule creation
+-> Gmail digest and reply monitoring
+-> Buffer edit/cancel or no-change result
+-> HubSpot and Founder Control Room evidence
 ```
 
-Claude must not describe a conversational tool run as proof that an event-triggered Zap is active.
+Do not describe a conversational tool call or repository test as proof that this event path is active.
 
 ## Saved skill rule
 
-When an existing saved Zapier MCP skill such as `founder rundown` already covers the requested purpose:
+When an existing saved Zapier skill such as `founder rundown` covers the requested purpose:
 
 1. inspect the existing skill;
 2. update it rather than create a duplicate;
 3. preserve useful existing sources and behavior;
-4. add only the missing verification, classification, and writeback rules;
-5. report what changed.
+4. add only the missing verification, classification, scheduling, and writeback rules;
+5. report exactly what changed.
 
-Do not create `founder rundown v2`, `new founder rundown`, or another near-duplicate unless the founder explicitly requests a separate skill.
+Do not create near-duplicates merely to produce visible activity.
 
-## Investigator contract
+## Authority model
 
-For Gmail-to-GitHub or similar cross-source investigation, Claude must extract and verify the most specific available identifiers:
+Connection is capability, not authority.
+
+Scheduled publication is allowed only when all of these are true:
+
+- exact source evidence satisfies the server-held standing policy;
+- the policy gate selects `auto-distribute` for the exact route;
+- the middleware supplies the matching grant and invocation context;
+- the runtime mints this receipt:
+
+```text
+standing-policy:<grantId>:<invocationId>
+```
+
+- the Buffer firewall verifies that exact receipt correlation;
+- the post uses an approved content field, exact source SHA, HTTPS proof, fresh generation timestamp, and the 20-minute schedule contract.
+
+A checked-in policy name, caller-written approval, copied receipt, founder-sounding sentence, or manual field mapping is not authority.
+
+This receipt is a runtime correlation value backed by the authenticated backend and private hook boundary. It is not a standalone cryptographic signature and must never be accepted outside that trusted path.
+
+## Evidence-first investigation
+
+For Gmail-to-GitHub or similar cross-source work, extract and verify the most specific available identifiers:
 
 ```text
 repository
@@ -83,24 +121,15 @@ workflow name
 branch
 commit SHA
 workflow run ID
-job ID, when available
+job ID when available
 event timestamp
 notification timestamp
+provider artifact IDs
 ```
 
-Claude must follow identifiers, not merely similar titles.
+Follow identifiers, not similar titles.
 
-A closed pull request does not by itself prove that a failure notification is stale.
-
-Before classifying the notification, verify as many of these as the tools expose:
-
-- the commit belongs to the identified PR or branch;
-- the workflow run belongs to that commit;
-- the run timestamp relative to PR closure or merge;
-- whether the run executed meaningful jobs and steps;
-- whether logs exist;
-- whether a newer run changed the state;
-- whether the same workflow is failing on another active ref.
+A closed pull request does not by itself prove a failure notification is stale.
 
 ## Required classification
 
@@ -117,62 +146,31 @@ UNRESOLVED
 
 Rules:
 
-- `ACTIVE_FAILURE`: exact current ref or workflow remains failing and action is still required.
-- `HISTORICAL_FAILURE`: the failure was real at the time but applies to superseded or completed work.
-- `STALE_NOTIFICATION`: the notification no longer represents current state, proven by newer evidence.
+- `ACTIVE_FAILURE`: the exact current ref or workflow remains failing and action is required.
+- `HISTORICAL_FAILURE`: the failure was real but applies to superseded or completed work.
+- `STALE_NOTIFICATION`: newer evidence proves the notice no longer represents current state.
 - `INFRASTRUCTURE_FAILURE`: zero-step, no-log, runner-startup, provider, or platform evidence prevents assigning a code regression.
 - `RESOLVED`: the exact failure has later verified green or superseding proof.
-- `UNRESOLVED`: the available tools cannot establish a defensible classification.
-
-Do not use `likely stale` as the final verdict when the exact SHA and run relationship have not been verified. Keep it under inference.
+- `UNRESOLVED`: connected tools cannot establish a defensible classification.
 
 ## Evidence labels
 
 Every conclusion must separate:
 
-### VERIFIED
-
-Facts directly supported by tool output, record IDs, URLs, SHAs, run IDs, timestamps, logs, or returned action artifacts.
-
-### INFERRED
-
-Reasoned conclusions supported by verified facts but not directly proven.
-
-### UNKNOWN
-
-Information that could change the verdict and was not available through the connected tools.
-
-Claude must never promote an inference into VERIFIED merely because it sounds probable.
-
-## Founder Signal Engine request contract
-
-Preferred HubSpot request note:
-
 ```text
-EVENT_TYPE: FOUNDER_SIGNAL_REQUEST
-SIGNAL_ID: <unique stable value>
-SOURCE: HubSpot
-TARGET: Claude via Zapier
-MODE: REVIEW_ONLY
-PUBLISH_ALLOWED: false
-
-REQUEST:
-<analysis request>
+VERIFIED
+INFERRED
+UNKNOWN
+BLOCKED
 ```
 
-The event Zap must ignore result notes to prevent loops.
+Never promote inference into VERIFIED because it sounds probable.
 
-Recommended filter:
+## Structured generation contract
 
-```text
-continue when EVENT_TYPE contains FOUNDER_SIGNAL_REQUEST
-and PUBLISH_ALLOWED equals false
-and EVENT_TYPE does not contain FOUNDER_SIGNAL_RESULT
-```
+Generate the complete platform set in one structured AI action when the budget contract requires it.
 
-## Claude structured output
-
-Return these fields in a machine-mappable structure:
+Required proof-bearing fields include:
 
 ```text
 signal_id
@@ -189,28 +187,102 @@ unknown_information
 missing_evidence
 first_failure_stage
 recommended_next_action
+traction
+governance_advantage
+clickable_proof
 linkedin_draft
-facebook_draft
+facebook_founder_draft
+facebook_brand_draft
 instagram_draft
 publish_allowed
 ```
 
-Allowed decisions:
+Only approved platform output fields may reach the Buffer firewall. Raw prompts, instructions, user messages, source notes, and unresolved template values are forbidden.
+
+## Buffer scheduling contract
+
+Each selected channel must pass `tools/zapier/buffer-content-firewall.cjs`.
+
+Required inputs include:
 
 ```text
-PASS
-BLOCKED
-IGNORE
-UNRESOLVED
+post_text
+content_field
+channel
+destination_mode: schedule
+publish_allowed: true
+proof_url
+source_commit_sha
+generated_at
+batch_id
+batch_size
+batch_index
+invocation_id
+steering_grant_id
+founder_approval_id
+authorization_mode: standing-policy
+schedule_policy_id: buffer-20-minute-review-v1
+notification_mode: gmail_campaign_digest
 ```
 
-`publish_allowed` must be `false` during review-first operation.
+Map Buffer only from firewall-owned outputs:
 
-If any required field is absent, the Zap must stop before public routing and create or retain failure evidence.
+```text
+Post Text <- validated_post_text
+Method <- buffer_method
+Scheduled time <- scheduled_at
+```
 
-## HubSpot writeback contract
+The firewall owns the fire time:
 
-The result must be associated with the same source deal, not created as a floating note or task.
+```text
+scheduled_at = generated_at + 20 minutes
+```
+
+It rejects draft, queue, publish, share-next, schedule-draft, and share-now modes under this contract. Caller-supplied provider fields cannot widen the output.
+
+## Gmail review contract
+
+After all selected Buffer schedules return real post IDs, build one campaign digest for up to three posts.
+
+The digest must contain:
+
+```text
+caption
+channel
+fire time
+Buffer post ID
+review deadline
+review token
+```
+
+Accepted commands:
+
+```text
+cancel all
+<channel>: cancel
+<channel>: <requested tweak>
+```
+
+The parser accepts exactly one unquoted command on the first non-empty line. Standard quoted history and recognized mail signatures after that command are ignored. Multiple unquoted command lines and quoted-only messages fail closed.
+
+A reply is actionable only when all retained values match:
+
+- founder mailbox sender;
+- original Gmail thread ID;
+- review token;
+- deadline;
+- one exact target channel for multi-post edits.
+
+An edit request returns to generation and firewall validation before any Buffer update. It never maps raw reply text directly into Buffer.
+
+If Gmail notification fails, cancel the scheduled batch and retain partial-failure evidence. Do not silently publish without the promised review notice.
+
+If no valid reply arrives, perform no extra publish call. Buffer retains the existing schedule.
+
+## HubSpot writeback
+
+When CRM write is approved, associate the result with the same source deal rather than creating a floating note or task.
 
 Canonical deal:
 
@@ -219,92 +291,64 @@ Deal: Founder Signal Engine
 Deal ID: 337185466050
 ```
 
-Result note prefix:
+Retain:
 
 ```text
-EVENT_TYPE: FOUNDER_SIGNAL_RESULT
-SOURCE_EVENT_ID: <original engagement ID>
-SIGNAL_ID: <matching signal ID>
-PUBLISH_ALLOWED: false
+source event ID
+signal ID
+decision
+VERIFIED / INFERRED / UNKNOWN / BLOCKED
+source SHA and proof URL
+policy and invocation references
+Zapier run ID
+Buffer schedule IDs and fire times
+Gmail message and thread ID
+edit, cancel, compensation, or no-reply result
+final provider receipts
 ```
 
-The body must include:
+A successful AI response without associated evidence does not prove the closed loop.
+
+## Budget rule
+
+The current checked-in budget funds six campaigns as:
 
 ```text
-DECISION
-WHO
-WHAT
-WHERE
-WHEN
-WHY
-HOW
-VERIFIED
-INFERRED
-UNKNOWN
-MISSING EVIDENCE
-FIRST FAILURE STAGE
-RECOMMENDED NEXT ACTION
-REVIEW DRAFTS, when generated
-ZAPIER RUN ID, when exposed
+3 Buffer schedule actions
++ 1 Gmail campaign digest
+= 4 tasks per campaign
 ```
 
-A successful Claude response with no associated HubSpot writeback does not prove the closed loop.
+Do not send one notice per channel unless the budget contract is deliberately changed and reverified.
 
-## Buffer boundary
+The repository label `Zapier Free` is an assumption about the planned budget, not proof of live plan capability. Verify the account supports the webhook and multi-step workflow before activation.
 
-If the connected Buffer tools expose only triggers or creation actions and do not expose reliable Find/Get reads:
+## `share_now`
 
-- do not report an empty queue as proof that no item exists;
-- do not fabricate a Buffer lookup result;
-- capture the Buffer item ID, status, channel, and timestamp returned by the creation action;
-- write that returned artifact to HubSpot immediately;
-- use HubSpot and Founder Control Room as the proof ledger.
+The current contract rejects `share_now`.
 
-No Buffer action may publish externally unless the exact founder approval is present.
-
-## Allowed standing work
-
-Within an approved Founder Signal Engine scope and the capabilities exposed by Zapier MCP, Claude may:
-
-- inspect a named Zap and its run history;
-- inspect and update the existing `founder rundown` skill;
-- repair trigger scope, filters, field mappings, paths, and same-deal association;
-- test review-only actions;
-- run cross-app investigations;
-- create structured internal analysis;
-- prepare HubSpot result content;
-- write to the approved HubSpot deal when that CRM write is in scope;
-- capture returned Buffer draft or queue artifacts;
-- report exact blockers and recovery actions.
-
-## Separate founder approval required
-
-Claude must not perform these merely because Zapier MCP is connected:
-
-- publish or send external content;
-- enable blind auto-publishing;
-- contact vendors, customers, partners, officials, sponsors, or investors;
-- merge, deploy, or alter repositories;
-- create, rotate, reveal, or replace credentials;
-- change billing or paid plans;
-- delete Zaps, skills, runs, drafts, records, files, branches, or evidence;
-- broaden access to unrelated projects or accounts.
+A founder naming a specific immediate run does not make the present code support it. Immediate publication requires a separate exact-run authority contract with expiry, replay protection, tests, receipts, and rollback.
 
 ## Required proof
 
-A Founder Signal Engine Claude run is complete only when the applicable artifacts exist:
+A scheduled Founder Signal Engine run is complete only when applicable artifacts exist:
 
 ```text
-source event ID or source identifiers
-Zapier run ID and status, when exposed
-Claude structured output
-classification with VERIFIED / INFERRED / UNKNOWN
-HubSpot result note or task associated with the correct deal
-Buffer returned artifact, if Buffer was invoked
-Founder Control Room evidence record or exact next evidence gate
+exact source identifiers and SHA
+trusted proof URL
+policy decision and grant ID
+invocation ID and runtime receipt
+Zapier run ID and status
+structured AI output
+each Buffer schedule ID and fire time
+Gmail message and thread ID
+founder reply result or no-reply result
+HubSpot same-deal evidence when approved
+final Buffer or platform receipt
+Founder Control Room audit correlation
 ```
 
-Do not claim the complete chain ran if any mandatory artifact is missing.
+Do not claim the chain ran when a mandatory artifact is missing.
 
 ## Failure behavior
 
@@ -312,42 +356,50 @@ When a step fails:
 
 1. retain the exact error or skipped-step reason;
 2. identify the first failed stage;
-3. do not retry a public creation action blindly;
-4. search for an existing artifact before replaying a potentially duplicate action;
-5. keep `PUBLISH_ALLOWED: false`;
-6. record the recovery action;
+3. do not blindly retry an external creation action;
+4. search retained evidence for an existing artifact before replay;
+5. execute defined compensation when safe and supported;
+6. preserve partial provider IDs and receipts;
 7. stop at the smallest unresolved gate.
-
-If the trigger does not fire, inspect whether the Zap is enabled and whether the event type, account, object, repository, branch, or filter matches the actual source.
-
-If Claude runs but HubSpot remains unchanged, inspect the validation filter, associated deal mapping, and HubSpot action result.
 
 ## Required report format
 
-Claude should return:
-
 ```text
-REALITY:
-What is verified now.
-
-FIX:
-What was changed or executed.
-
-PROOF:
-Exact IDs, SHAs, runs, records, links, returned artifacts, and timestamps.
-
-RISK:
-What could still be wrong.
-
-ROLLBACK:
-How to disable or reverse the focused change safely.
-
-NEXT GATE:
-One exact founder decision or next action.
+REALITY
+FIX
+PROOF
+RISK
+ROLLBACK
+NEXT GATE
 ```
+
+## Separate approval required
+
+This contract does not itself authorize:
+
+- merge or deployment;
+- secret creation, rotation, or disclosure;
+- enabling or publishing a Zap;
+- unrelated account access;
+- billing changes;
+- deletion of Zaps, records, branches, provider artifacts, or evidence;
+- immediate `share_now` publication;
+- vendor, customer, official, sponsor, or investor outreach outside its own approved route.
 
 ## Stop condition
 
-Stop when the requested scoped action is complete and evidenced, or when one exact external gate prevents further verified progress.
+Stop when the scoped action is evidenced or one exact external gate prevents further verified progress.
 
-Do not wander into unrelated Zaps, repositories, skills, providers, or project records.
+Valid current gates include:
+
+```text
+missing bridge secret
+missing automation grant
+unsupported Zapier plan capability
+missing runtime authorization receipt
+missing Buffer post ID
+missing Gmail thread receipt
+reply identity mismatch
+expired review window
+missing final provider receipt
+```
