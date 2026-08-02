@@ -38,12 +38,20 @@ function fingerprint(value) {
   return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
+function normalizedVerificationNames(values) {
+  return [...new Set(
+    (values ?? [])
+      .map(normalizeSignalName)
+      .filter(Boolean),
+  )].sort();
+}
+
 function attemptScopeId({ desiredOutcome, suspectedFailureArea, firstFilesOrLogs, expectedVerificationNames }) {
   return fingerprint([
     String(desiredOutcome ?? '').trim(),
     String(suspectedFailureArea ?? '').trim(),
     ...(firstFilesOrLogs ?? []),
-    ...(expectedVerificationNames ?? []),
+    ...normalizedVerificationNames(expectedVerificationNames),
   ].join('\u241f'));
 }
 

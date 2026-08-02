@@ -136,18 +136,17 @@ function liveAttemptResult(status: VerificationSignal['status']): GoalfixAttempt
   return 'incomplete';
 }
 
+function signalTime(signal: VerificationSignal): number {
+  return Date.parse(signal.completedAt ?? signal.startedAt ?? '') || 0;
+}
+
 function currentRequiredCheckResults(
   signals: VerificationSignal[],
   targetSha: string,
   expectedVerificationNames: string[],
 ): Map<string, GoalfixAttempt['result']> {
-  const priority: Record<GoalfixAttempt['result'], number> = {
-    passed: 1,
-    incomplete: 2,
-    blocked: 3,
-    failed: 3,
-  };
   const results = new Map<string, GoalfixAttempt['result']>();
+  const latest = new Map<string, VerificationSignal>();
 
   for (const name of expectedVerificationNames) {
     results.set(normalizeSignalName(name), 'incomplete');
@@ -156,11 +155,13 @@ function currentRequiredCheckResults(
   for (const signal of signals) {
     if (signal.commitSha.toLowerCase() !== targetSha.toLowerCase()) continue;
     const key = normalizeSignalName(signal.name);
-    const current = results.get(key);
-    if (!current) continue;
-    const candidate = liveAttemptResult(signal.status);
-    if (priority[candidate] > priority[current]) results.set(key, candidate);
-    if (current === 'incomplete' && candidate === 'passed') results.set(key, candidate);
+    if (!results.has(key)) continue;
+    const current = latest.get(key);
+    if (!current || signalTime(signal) >= signalTime(current)) latest.set(key, signal);
+  }
+
+  for (const [key, signal] of latest) {
+    results.set(key, liveAttemptResult(signal.status));
   }
 
   return results;
