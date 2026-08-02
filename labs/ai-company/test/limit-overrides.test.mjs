@@ -69,21 +69,21 @@ test('lower caller ceilings are accepted as stricter sandbox policy', async () =
 test('invalid or unknown limit fields fail closed', async () => {
   const safe = await loadSafeEnvelope();
   const invalidCases = [
-    null,
-    [],
-    { maxSteps: Number.POSITIVE_INFINITY },
-    { maxSteps: -1 },
-    { maxSteps: 1.5 },
-    { unlimited: true },
+    [null, 'invalid_limit_override'],
+    [[], 'invalid_limit_override'],
+    [{ maxSteps: Number.POSITIVE_INFINITY }, 'invalid_adversarial_envelope'],
+    [{ maxSteps: -1 }, 'invalid_limit_override'],
+    [{ maxSteps: 1.5 }, 'invalid_limit_override'],
+    [{ unlimited: true }, 'invalid_limit_override'],
   ];
 
-  for (const limits of invalidCases) {
+  for (const [limits, blocker] of invalidCases) {
     const envelope = clone(safe);
     envelope.limits = limits;
     const result = runAdversarialSimulation(envelope);
 
     assert.equal(result.status, 'blocked');
     assert.equal(result.simulatorInvoked, false);
-    assert.ok(result.blockers.includes('invalid_limit_override'));
+    assert.ok(result.blockers.includes(blocker));
   }
 });
