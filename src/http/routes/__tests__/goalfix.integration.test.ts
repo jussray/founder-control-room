@@ -183,6 +183,40 @@ describe('POST /goalfix/inspect', () => {
     expect(auditInsertMock).not.toHaveBeenCalled();
   });
 
+  it('blocks assumptions-only intent before project or provider access', async () => {
+    founderSession();
+    const { resolvedIntent: _resolvedIntent, ...rawOnlyPayload } = validPayload();
+
+    const response = await request(buildApp())
+      .post('/goalfix/inspect')
+      .set('Authorization', BEARER)
+      .send({
+        ...rawOnlyPayload,
+        desiredOutcome: 'cont the skill thing',
+        intentAssumptions: ['The referenced skill is the uploaded Lean Build Suite.'],
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.body).toMatchObject({
+      code: 'GOALFIX_RUNTIME_BLOCKED',
+      skillRuntime: {
+        mayProceed: false,
+        intent: {
+          raw: 'cont the skill thing',
+          resolved: 'cont the skill thing',
+          confidence: 'low',
+          confirmed: false,
+          assumptions: ['The referenced skill is the uploaded Lean Build Suite.'],
+        },
+      },
+    });
+    expect(response.body.error).toContain('Resolve the founder intent');
+    expect(supabaseMock.from).not.toHaveBeenCalledWith('projects');
+    expect(providerForProjectMock).not.toHaveBeenCalled();
+    expect(auditInsertMock).not.toHaveBeenCalled();
+  });
+
   it('blocks missing stop conditions before project or provider access', async () => {
     founderSession();
 
