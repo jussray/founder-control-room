@@ -7,6 +7,7 @@ const {
   validateBufferPublishInput,
   BUFFER_PROVIDER_ACTION,
   BUFFER_PROVIDER_METHOD,
+  BUFFER_API_SHARING_MODE,
   BUFFER_API_SAVE_TO_DRAFT,
   BUFFER_REVIEW_WINDOW_MINUTES,
   BUFFER_SCHEDULE_POLICY_ID,
@@ -20,12 +21,15 @@ const ROOT = resolve(__dirname, '../..');
 const contract = JSON.parse(readFileSync(join(ROOT, 'config', 'buffer-provider-contract.json'), 'utf8'));
 
 assert.equal(contract.version, 2);
-assert.equal(contract.status, 'schedule-with-review-window');
+assert.equal(contract.status, 'implemented-awaiting-live-provider-and-ingress-proof');
 assert.equal(contract.provider, 'buffer');
 assert.equal(contract.zapier.action, BUFFER_PROVIDER_ACTION);
 assert.equal(contract.zapier.requiredMethod, BUFFER_PROVIDER_METHOD);
 assert.deepEqual(contract.zapier.allowedMethods, [BUFFER_PROVIDER_METHOD]);
 assert.equal(contract.api.mutation, 'createPost');
+assert.equal(contract.api.required.sharingMode, BUFFER_API_SHARING_MODE);
+assert.equal(contract.api.required.sharingMode, 'customScheduled');
+assert.equal(contract.api.required.dueAtSource, 'scheduled_at');
 assert.equal(contract.api.required.saveToDraft, BUFFER_API_SAVE_TO_DRAFT);
 assert.equal(contract.reviewWindow.minutes, BUFFER_REVIEW_WINDOW_MINUTES);
 assert.equal(contract.reviewWindow.shareNowAllowed, false);
@@ -34,6 +38,9 @@ assert.equal(contract.notification.required, true);
 assert.equal(contract.notification.failurePolicy, 'cancel_scheduled_batch');
 assert.equal(contract.notification.replyParsingPolicy, 'exactly_one_unquoted_command_on_first_nonempty_line');
 assert.equal(contract.notification.ambiguousReplyPolicy, 'reject_multiple_unquoted_command_lines');
+assert.equal(contract.notification.replyIngress.requiredLatencyClass, 'instant_private_ingress');
+assert.equal(contract.notification.replyIngress.gmailPollingAllowed, false);
+assert.equal(contract.notification.replyIngress.preferredImplementation, 'cloudflare_email_routing_worker');
 assert.equal(contract.authority.publishAllowed, true);
 assert.equal(contract.authority.schedulePolicyId, BUFFER_SCHEDULE_POLICY_ID);
 assert.equal(contract.authority.requiredAuthorizationMode, BUFFER_AUTHORIZATION_MODE);
@@ -42,6 +49,9 @@ assert.equal(contract.authority.receiptPurpose, 'exact runtime correlation');
 assert.equal(contract.authority.maximumGrantIdLength, MAX_STEERING_GRANT_ID_LENGTH);
 assert.equal(contract.authority.maximumReceiptLength, MAX_AUTHORIZATION_RECEIPT_LENGTH);
 assert.equal(contract.authority.liveProviderMutationIncluded, false);
+assert.equal(contract.activationGates.freeTwoStepZapAloneSufficient, false);
+assert.equal(contract.activationGates.gmailPollingTriggerAcceptedForDeadlineCommands, false);
+assert.equal(contract.activationGates.controlledSyntheticRunRequired, true);
 
 const baseInput = {
   post_text: [
@@ -71,6 +81,8 @@ const nowMs = Date.parse('2026-08-02T21:00:30.000Z');
 const prepared = validateBufferPublishInput(baseInput, { nowMs });
 assert.equal(prepared.buffer_action, contract.zapier.action);
 assert.equal(prepared.buffer_method, contract.zapier.requiredMethod);
+assert.equal(prepared.buffer_api_sharing_mode, contract.api.required.sharingMode);
+assert.equal(prepared.buffer_api_due_at, prepared.scheduled_at);
 assert.equal(prepared.buffer_save_to_draft, contract.api.required.saveToDraft);
 assert.equal(prepared.destination_mode, 'schedule');
 assert.equal(prepared.publish_allowed, true);
@@ -107,10 +119,14 @@ const callerOverride = validateBufferPublishInput({
   buffer_method: 'share_now',
   saveToDraft: true,
   buffer_save_to_draft: true,
+  buffer_api_sharing_mode: 'shareNow',
+  buffer_api_due_at: '2026-08-02T21:00:31.000Z',
   scheduled_at: '2026-08-02T21:00:31.000Z',
 }, { nowMs });
 assert.equal(callerOverride.buffer_method, 'schedule');
+assert.equal(callerOverride.buffer_api_sharing_mode, 'customScheduled');
+assert.equal(callerOverride.buffer_api_due_at, '2026-08-02T21:20:00.000Z');
 assert.equal(callerOverride.buffer_save_to_draft, false);
 assert.equal(callerOverride.scheduled_at, '2026-08-02T21:20:00.000Z');
 
-console.log('Buffer provider contract verified against executable scheduling code: backend-aligned runtime receipt correlation, one owned 20-minute schedule, one-command Gmail review parsing, fail-closed notification compensation, and no share-now override.');
+console.log('Buffer provider contract verified against executable scheduling code: exact customScheduled/dueAt mapping, backend-aligned runtime receipt correlation, one-command Gmail review parsing, instant private reply-ingress gate, fail-closed compensation, and no share-now override.');
