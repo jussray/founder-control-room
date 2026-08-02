@@ -207,8 +207,12 @@ describe('POST /goalfix/inspect', () => {
     expect(auditInsertMock).not.toHaveBeenCalled();
   });
 
-  it('blocks repeated failures only after resolving the exact current head', async () => {
+  it('blocks repeated failures only after refreshing the exact current head', async () => {
     founderSession();
+    providerMock.listVerificationSignals.mockResolvedValue([
+      { id: 'check-1', name: 'Typecheck', status: 'passed', commitSha: SHA, provider: 'github' },
+      { id: 'check-2', name: 'Playwright', status: 'failed', commitSha: SHA, provider: 'github' },
+    ]);
 
     const response = await request(buildApp())
       .post('/goalfix/inspect')
@@ -237,7 +241,7 @@ describe('POST /goalfix/inspect', () => {
     expect(response.body.error).toContain('Stop retrying the same path');
     expect(providerForProjectMock).toHaveBeenCalledTimes(1);
     expect(providerMock.getRef).toHaveBeenCalledWith('sekret-bip', 'main');
-    expect(providerMock.listVerificationSignals).not.toHaveBeenCalled();
+    expect(providerMock.listVerificationSignals).toHaveBeenCalledWith('sekret-bip', SHA);
     expect(auditInsertMock).toHaveBeenCalledTimes(1);
     expect(auditInsertMock.mock.calls[0]?.[0]).toMatchObject({
       event_type: 'goalfix_inspection_failed',
@@ -246,7 +250,7 @@ describe('POST /goalfix/inspect', () => {
         stage: 'completed',
         target_sha: SHA,
         readiness: 'blocked',
-        exact_head_signal_count: 0,
+        exact_head_signal_count: 2,
       },
     });
   });
