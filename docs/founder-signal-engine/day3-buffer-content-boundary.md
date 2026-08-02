@@ -1,6 +1,6 @@
 # Day 3 Buffer Content Boundary
 
-Status: `EXECUTABLE_DRAFT_GUARD_IMPLEMENTED_AWAITING_LIVE_ZAP_MAPPING`
+Status: `DAY3_PROVEN__20_MINUTE_REVIEW_WINDOW_IMPLEMENTED_AWAITING_LIVE_ACTIVATION`
 
 Authoritative budget: [`config/zapier-task-budget.json`](../../config/zapier-task-budget.json)
 
@@ -8,107 +8,197 @@ Machine-readable provider contract: [`config/buffer-provider-contract.json`](../
 
 Executable firewall: [`tools/zapier/buffer-content-firewall.cjs`](../../tools/zapier/buffer-content-firewall.cjs)
 
+Review controller: [`tools/zapier/buffer-review-window.cjs`](../../tools/zapier/buffer-review-window.cjs)
+
 Verification:
 
 ```bash
 npm run verify:buffer-content
+node scripts/verify-zapier-task-budget.mjs
 ```
 
-## Reality
+## Historical Day 3 truth
 
-The original failure was a field-mapping failure: prompt instructions could reach Buffer instead of finished platform copy. A second provider-level gap also existed: review-only policy did not itself set Buffer's `Method` field.
+The Day 3 draft-routing milestone is proven and closed. Do not reopen it or describe the original draft proof as the current blocker.
 
-The executable firewall now handles both boundaries. It accepts only finished, proof-linked platform copy and emits only draft-safe Buffer fields.
-
-## Executable output contract
-
-A valid firewall result includes:
+Historical source:
 
 ```text
-validated_post_text
-content_validated: true
-content_field
-channel
-destination_mode: draft
-publish_allowed: false
-proof_url
-source_commit_sha
-founder_approval_id: null
-buffer_action: buffer_add_to_queue
-buffer_method: draft
-buffer_save_to_draft: true
+Repository: jussray/Sekret-Bip
+Pull request: #599
+Merge commit: f4573d360a8fea99b301f33a2a21192525725f7b
+Founder Control Room issue: #73
 ```
 
-Caller-supplied values such as `share_now`, `queue`, `publish`, or `saveToDraft: false` cannot widen this output. The firewall owns the provider fields.
+The next phase is controlled scheduled distribution with a founder review window. Repository implementation does not itself prove that the live Zap has been remapped, enabled, or executed.
+
+## Current executable contract
+
+A valid Buffer input must contain:
+
+```text
+finished platform-native post text
+approved content field and channel
+exact HTTPS proof URL
+exact 40-character source commit SHA
+fresh generated_at timestamp
+batch UUID, size, and item index
+invocation UUID
+steering grant ID
+authorization_mode: standing-policy
+runtime-minted founder_approval_id
+schedule_policy_id: buffer-20-minute-review-v1
+notification_mode: gmail_campaign_digest
+publish_allowed: true
+destination_mode: schedule
+```
+
+The runtime-minted authorization receipt must equal:
+
+```text
+standing-policy:<steeringGrantId>:<invocationId>
+```
+
+A checked-in policy name is not authorization. Caller-written approval text, a copied policy identifier, or a mismatched invocation fails closed.
+
+The firewall owns the provider fields and emits:
+
+```text
+buffer_action: buffer_add_to_queue
+buffer_method: schedule
+buffer_save_to_draft: false
+scheduled_at: generated_at + 20 minutes
+review_deadline: scheduled_at
+notification_required: true
+notification_failure_policy: cancel_scheduled_batch
+share_now_allowed: false
+```
+
+Caller-supplied `scheduled_at`, `method`, `buffer_method`, `saveToDraft`, or `share_now` values cannot override those outputs.
 
 ## Required Zap order
 
 ```text
 verified source signal
+-> Founder Signal standing-policy gate
+-> runtime-minted one-invocation authorization receipt
 -> one structured AI action
--> parse channel-specific finished copy
--> Code by Zapier using buffer-content-firewall.cjs
--> map Buffer Post Text from validated_post_text
--> map Buffer Method from buffer_method
--> create Buffer draft
--> retain the real Buffer draft identifier
+-> select up to three channel-specific finished posts
+-> run each post through buffer-content-firewall.cjs
+-> create Buffer schedules for the owned fire time
+-> retain every returned Buffer post ID
+-> build one Gmail campaign digest
+-> send the digest to the founder mailbox
+-> retain Gmail thread ID, review token, sender, deadline, and Buffer IDs
+-> process only matching-thread replies from the founder mailbox
+-> cancel, or regenerate + revalidate + update, before the deadline
+-> no reply leaves the existing Buffer schedules unchanged
+-> retain final Buffer/platform and Founder Control Room receipts
 ```
 
-Do not map the raw AI response, prompt, system instruction, user message, source note, or GitHub evidence field into Buffer's post text.
+## Gmail review contract
 
-## Code by Zapier inputs
+One campaign digest contains every scheduled caption, channel, fire time, Buffer post ID, and the review token.
 
-| Code input | Source |
-|---|---|
-| `post_text` | Selected platform output such as `linkedin_draft` |
-| `content_field` | Literal approved output-field name |
-| `channel` | Stable owned-channel identifier |
-| `destination_mode` | Literal `draft` |
-| `publish_allowed` | Literal `false` |
-| `proof_url` | Exact public proof URL |
-| `source_commit_sha` | Exact 40-character source commit SHA |
-
-The current draft-only milestone rejects `queue`, `publish`, `schedule`, `share_now`, `share_next`, and `schedule_draft`, even when approval-looking input is supplied.
-
-## Buffer field mapping
-
-| Buffer field | Firewall output |
-|---|---|
-| Post Text | `validated_post_text` |
-| Method | `buffer_method` |
-
-The expected provider output is always:
+Accepted commands before the deadline:
 
 ```text
-buffer_action: buffer_add_to_queue
-buffer_method: draft
-buffer_save_to_draft: true
+cancel all
+<channel>: cancel
+<channel>: <requested tweak>
 ```
 
-## Acceptance test
+A reply is rejected unless all of these match retained state:
 
-The test passes only when:
+- review token;
+- founder mailbox sender;
+- original Gmail thread;
+- review deadline;
+- exactly one target channel for multi-post edits.
 
-1. finished copy passes content validation;
-2. prompt-like text and forbidden source fields fail;
-3. exact proof URL and commit SHA are present;
-4. the Node and Zapier-like runtimes both emit `buffer_method: draft`;
-5. the API-safe equivalent is `buffer_save_to_draft: true`;
-6. every queue, scheduling, immediate-share, or publish attempt fails closed;
-7. caller overrides cannot replace the safe provider output;
-8. the live controlled run later returns a genuine Buffer draft ID;
-9. no Queue, Sent, scheduled, or public permalink evidence exists.
+An edit request does not directly mutate Buffer. It returns to generation and the content firewall, preserving the original scheduled fire time only when enough time remains to complete the validated update.
+
+If Gmail notification fails, cancel the complete scheduled batch. Do not allow silent publication without the promised review notice.
+
+## Budget boundary
+
+The budget funds six campaigns per month as:
+
+```text
+3 Buffer schedule actions
++ 1 Gmail campaign digest
+= 4 tasks per campaign
+```
+
+Founder-signal analysis is reduced from 30 to 27 monthly runs so the complete plan remains at 88 planned tasks, two below the 90-task operating ceiling, with ten emergency-reserve tasks.
+
+The repository plan label is not proof of current Zapier account capability. Before activation, verify that the live plan supports the webhook and multi-step workflow actually used.
 
 ## Proof boundary
 
-Repository tests prove the executable mapping and rejection behavior. They do not prove that the live Zap has been remapped or that Buffer created a draft.
+Repository tests prove:
 
-Requires Approval can be additional account-side protection only when the relevant paid collaboration plan and a separate restricted user are actually configured. It is not relied on by this code contract.
+- the exact 20-minute computation;
+- stale-generation rejection;
+- runtime receipt correlation;
+- prompt and forbidden-field rejection;
+- caller override resistance;
+- one digest for up to three posts;
+- sender, thread, token, and deadline checks;
+- channel-scoped edit and cancel commands;
+- cancel-on-notification-failure compensation;
+- no-reply preservation of the existing schedule;
+- the 88-task budget ceiling.
+
+They do not prove:
+
+- live Zapier plan capability;
+- installed secrets;
+- live Zap mapping;
+- Buffer schedule creation;
+- Gmail delivery or reply ingestion;
+- edit or cancellation against Buffer;
+- public platform publication;
+- final receipt correlation.
+
+## Activation gates
+
+Live activation requires:
+
+```text
+FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
+ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
+FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
+```
+
+It also requires one controlled synthetic campaign proving:
+
+```text
+exact source SHA and proof URL
+standing-policy decision and runtime receipt
+Zapier run ID
+three or fewer Buffer schedule IDs
+one Gmail digest and thread ID
+one edit or cancel path
+one no-reply path
+final Buffer/platform receipts
+Founder Control Room audit correlation
+```
+
+No raw secret belongs in GitHub, chat, HubSpot, Buffer captions, screenshots, or evidence artifacts.
+
+## `share_now` boundary
+
+`share_now` remains rejected by this contract. A founder naming a specific immediate run does not automatically create executable authority. Immediate publication requires a separate, exact-run contract with its own receipt, tests, expiry, replay protection, and rollback.
 
 ## Rollback
 
-Revert the firewall, focused tests, provider configuration, package commands, workflow, and this documentation update together. Do not delete historical Buffer drafts, sent posts, Zap History, HubSpot evidence, or platform receipts.
+1. Disable or remove `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` before changing provider state.
+2. Disable the affected Zap or Catch Hook.
+3. Cancel only the identified scheduled test batch when provider IDs are known.
+4. Revert the firewall, review controller, tests, provider contract, task budget, workflow, and operator instructions together.
+5. Preserve Zap history, Gmail receipts, Buffer receipts, platform receipts, HubSpot evidence, and Founder Control Room audits.
 
 ## Stop condition
 
-Day 3 remains open until a controlled synthetic run maps the firewall-owned `buffer_method` into Buffer and returns a genuine draft identifier without Queue, Sent, schedule, or public-post evidence.
+This code phase is complete only when exact-head checks pass on one immutable PR head. Live activation remains separate and stops at the first missing secret, plan capability, provider receipt, or correlation artifact.
