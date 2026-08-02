@@ -1,6 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { Request, RequestHandler, Response } from 'express';
-import { supabaseAdmin } from '../../lib/supabase.js';
 import {
   HairCommerceReceiptError,
   type HairCommerceReceipt,
@@ -24,6 +23,10 @@ function tokenMatches(provided: string | undefined, expected: string): boolean {
 }
 
 export const persistHairCommerceReceipt: HairCommerceReceiptStore = async (receipt) => {
+  // Keep the service-role dependency behind the real persistence path. This
+  // lets injected-store tests execute without production Supabase bindings and
+  // still fails closed when the live route actually needs persistence.
+  const { supabaseAdmin } = await import('../../lib/supabase.js');
   const { data, error } = await supabaseAdmin()
     .from('hair_commerce_receipts')
     .upsert(
