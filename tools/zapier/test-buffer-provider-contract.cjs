@@ -12,6 +12,8 @@ const {
   BUFFER_SCHEDULE_POLICY_ID,
   BUFFER_AUTHORIZATION_MODE,
   BUFFER_NOTIFICATION_MODE,
+  MAX_STEERING_GRANT_ID_LENGTH,
+  MAX_AUTHORIZATION_RECEIPT_LENGTH,
 } = require('./buffer-content-firewall.cjs');
 
 const ROOT = resolve(__dirname, '../..');
@@ -30,23 +32,28 @@ assert.equal(contract.reviewWindow.shareNowAllowed, false);
 assert.equal(contract.notification.provider, 'gmail');
 assert.equal(contract.notification.required, true);
 assert.equal(contract.notification.failurePolicy, 'cancel_scheduled_batch');
+assert.equal(contract.notification.replyParsingPolicy, 'exactly_one_unquoted_command_on_first_nonempty_line');
+assert.equal(contract.notification.ambiguousReplyPolicy, 'reject_multiple_unquoted_command_lines');
 assert.equal(contract.authority.publishAllowed, true);
 assert.equal(contract.authority.schedulePolicyId, BUFFER_SCHEDULE_POLICY_ID);
 assert.equal(contract.authority.requiredAuthorizationMode, BUFFER_AUTHORIZATION_MODE);
 assert.equal(contract.authority.requiresRuntimeMintedReceipt, true);
+assert.equal(contract.authority.receiptPurpose, 'exact runtime correlation');
+assert.equal(contract.authority.maximumGrantIdLength, MAX_STEERING_GRANT_ID_LENGTH);
+assert.equal(contract.authority.maximumReceiptLength, MAX_AUTHORIZATION_RECEIPT_LENGTH);
 assert.equal(contract.authority.liveProviderMutationIncluded, false);
 
 const baseInput = {
   post_text: [
     'The repository now computes a Buffer schedule exactly twenty minutes after verified content generation.',
     'A required Gmail digest exposes each caption, channel, fire time, and cancellation path before the posts can fire.',
-    'Proof: https://github.com/jussray/founder-control-room/pull/221',
+    'Proof: https://github.com/jussray/founder-control-room/pull/222',
   ].join('\n\n'),
   content_field: 'linkedin_draft',
   channel: 'juss_rayy_linkedin',
   destination_mode: 'schedule',
   publish_allowed: true,
-  proof_url: 'https://github.com/jussray/founder-control-room/pull/221',
+  proof_url: 'https://github.com/jussray/founder-control-room/pull/222',
   source_commit_sha: '38d8e5bd40594915407126915177f98c6ef983d9',
   generated_at: '2026-08-02T21:00:00.000Z',
   invocation_id: '3f10e0f9-b0b4-4e64-b9ff-c5f10f848067',
@@ -106,4 +113,4 @@ assert.equal(callerOverride.buffer_method, 'schedule');
 assert.equal(callerOverride.buffer_save_to_draft, false);
 assert.equal(callerOverride.scheduled_at, '2026-08-02T21:20:00.000Z');
 
-console.log('Buffer provider contract verified against executable scheduling code: runtime-minted standing authorization, one owned 20-minute schedule, required Gmail review digest, fail-closed notification compensation, and no share-now override.');
+console.log('Buffer provider contract verified against executable scheduling code: backend-aligned runtime receipt correlation, one owned 20-minute schedule, one-command Gmail review parsing, fail-closed notification compensation, and no share-now override.');
