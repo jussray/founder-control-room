@@ -177,7 +177,18 @@ export function runFounderOsSandbox(
   }
 
   const before = stableStringify(input);
-  const rawPlan = planFounderOsLab(input);
+  let rawPlan: FounderOsLabPlan;
+  try {
+    rawPlan = planFounderOsLab(input);
+  } catch {
+    return deepFreeze({
+      status: 'blocked',
+      plannerInvoked: true,
+      violations: ['planner_input_rejected'],
+      sandbox,
+      plan: null,
+    } satisfies FounderOsSandboxRun);
+  }
   const after = stableStringify(input);
   const plan = cloneAndFreeze(rawPlan) as Readonly<FounderOsLabPlan>;
   const violations = [
