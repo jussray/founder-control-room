@@ -26,6 +26,7 @@ import { goalfixRouter } from '../goalfix.js';
 const FOUNDER_EMAIL = 'founder@example.com';
 const BEARER = 'Bearer test-token';
 const SHA = 'abc123abc123abc123abc123abc123abc123abcd';
+const OLD_SHA = 'def456def456def456def456def456def456def4';
 
 function buildApp() {
   const app = express();
@@ -76,6 +77,28 @@ function validPayload() {
   };
 }
 
+function founderSession() {
+  mockGetUser.mockResolvedValue({
+    data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
+    error: null,
+  });
+}
+
+function verificationAttempt(
+  verificationName: string,
+  commitSha: string,
+  result: 'passed' | 'failed' | 'blocked' | 'incomplete',
+) {
+  return {
+    approach: `Inspect ${verificationName} at ${commitSha}`,
+    failureSignature: `verification:${verificationName.toLowerCase()}`,
+    filesTouched: [],
+    verificationName,
+    commitSha,
+    result,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   providerForProjectMock.mockReturnValue(providerMock);
@@ -105,10 +128,7 @@ describe('POST /goalfix/inspect', () => {
   });
 
   it('rejects malformed goal input without touching the provider', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
-      error: null,
-    });
+    founderSession();
 
     const response = await request(buildApp())
       .post('/goalfix/inspect')
@@ -121,10 +141,7 @@ describe('POST /goalfix/inspect', () => {
   });
 
   it('rejects an empty required proof set before repository access', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
-      error: null,
-    });
+    founderSession();
 
     const response = await request(buildApp())
       .post('/goalfix/inspect')
@@ -138,12 +155,9 @@ describe('POST /goalfix/inspect', () => {
   });
 
   it('blocks nonempty raw-only intent before project or provider access', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
-      error: null,
-    });
-
+    founderSession();
     const { resolvedIntent: _resolvedIntent, ...rawOnlyPayload } = validPayload();
+
     const response = await request(buildApp())
       .post('/goalfix/inspect')
       .set('Authorization', BEARER)
@@ -170,10 +184,7 @@ describe('POST /goalfix/inspect', () => {
   });
 
   it('blocks missing stop conditions before project or provider access', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
-      error: null,
-    });
+    founderSession();
 
     const response = await request(buildApp())
       .post('/goalfix/inspect')
@@ -196,11 +207,8 @@ describe('POST /goalfix/inspect', () => {
     expect(auditInsertMock).not.toHaveBeenCalled();
   });
 
-  it('blocks a repeated failure signature before project or provider access', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
-      error: null,
-    });
+  it('blocks repeated failures only after resolving the exact current head', async () => {
+    founderSession();
 
     const response = await request(buildApp())
       .post('/goalfix/inspect')
@@ -208,45 +216,101 @@ describe('POST /goalfix/inspect', () => {
       .send({
         ...validPayload(),
         attempts: [
-          {
-            approach: 'Rerun the browser check.',
-            failureSignature: 'runner unavailable',
-            filesTouched: [],
-            verificationName: 'Playwright',
-            result: 'failed',
-          },
-          {
-            approach: 'Rerun the browser check again.',
-            failureSignature: 'Runner unavailable',
-            filesTouched: [],
-            verificationName: 'Playwright',
-            result: 'blocked',
-          },
+          verificationAttempt('Playwright', SHA, 'failed'),
+          verificationAttempt('Playwright', SHA, 'failed'),
         ],
       });
 
     expect(response.status).toBe(409);
     expect(response.body).toMatchObject({
       code: 'GOALFIX_RUNTIME_BLOCKED',
+      target: { name: 'main', commitSha: SHA },
       skillRuntime: {
         mayProceed: false,
         stagnation: {
           stagnant: true,
-          repeatedFailureSignature: 'runner unavailable',
+          repeatedFailureSignature: 'verification:playwright',
           matchingAttempts: 2,
         },
       },
     });
     expect(response.body.error).toContain('Stop retrying the same path');
-    expect(supabaseMock.from).not.toHaveBeenCalledWith('projects');
-    expect(providerForProjectMock).not.toHaveBeenCalled();
+    expect(providerForProjectMock).toHaveBeenCalledTimes(1);
+    expect(providerMock.getRef).toHaveBeenCalledWith('sekret-bip', 'main');
+    expect(providerMock.listVerificationSignals).not.toHaveBeenCalled();
+    expect(auditInsertMock).toHaveBeenCalledTimes(1);
+    expect(auditInsertMock.mock.calls[0]?.[0]).toMatchObject({
+      event_type: 'goalfix_inspection_failed',
+      severity: 'error',
+      metadata: {
+        stage: 'completed',
+        target_sha: SHA,
+        readiness: 'blocked',
+        exact_head_signal_count: 0,
+      },
+    });
+  });
+
+  it('ignores failures from an older commit when a moving ref advances', async () => {
+    founderSession();
+
+    const response = await request(buildApp())
+      .post('/goalfix/inspect')
+      .set('Authorization', BEARER)
+      .send({
+        ...validPayload(),
+        attempts: [
+          verificationAttempt('Playwright', OLD_SHA, 'failed'),
+          verificationAttempt('Playwright', OLD_SHA, 'failed'),
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(providerMock.getRef).toHaveBeenCalledWith('sekret-bip', 'main');
+    expect(providerMock.listVerificationSignals).toHaveBeenCalledWith('sekret-bip', SHA);
+    expect(response.body.skillRuntime.stagnation.stagnant).toBe(false);
+  });
+
+  it('does not block while required exact-head checks remain incomplete', async () => {
+    founderSession();
+
+    const response = await request(buildApp())
+      .post('/goalfix/inspect')
+      .set('Authorization', BEARER)
+      .send({
+        ...validPayload(),
+        attempts: [
+          verificationAttempt('Playwright', SHA, 'incomplete'),
+          verificationAttempt('Playwright', SHA, 'incomplete'),
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(providerMock.listVerificationSignals).toHaveBeenCalledWith('sekret-bip', SHA);
+    expect(response.body.skillRuntime.stagnation.stagnant).toBe(false);
+  });
+
+  it('ignores exact-head attempts for checks outside the named required proof set', async () => {
+    founderSession();
+
+    const response = await request(buildApp())
+      .post('/goalfix/inspect')
+      .set('Authorization', BEARER)
+      .send({
+        ...validPayload(),
+        attempts: [
+          verificationAttempt('Unrelated Lint', SHA, 'failed'),
+          verificationAttempt('Unrelated Lint', SHA, 'failed'),
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(providerMock.listVerificationSignals).toHaveBeenCalledWith('sekret-bip', SHA);
+    expect(response.body.skillRuntime.stagnation.stagnant).toBe(false);
   });
 
   it('returns an exact-head, read-only founder report after a sanitized audit persists', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
-      error: null,
-    });
+    founderSession();
 
     const response = await request(buildApp())
       .post('/goalfix/inspect')
@@ -331,10 +395,7 @@ describe('POST /goalfix/inspect', () => {
   });
 
   it('fails closed when the sanitized completion audit cannot persist', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
-      error: null,
-    });
+    founderSession();
     auditInsertMock.mockResolvedValue({ error: { message: 'audit unavailable' } });
 
     const response = await request(buildApp())
@@ -350,10 +411,7 @@ describe('POST /goalfix/inspect', () => {
   });
 
   it('audits a ref-resolution failure before returning the provider error', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
-      error: null,
-    });
+    founderSession();
     providerMock.getRef.mockRejectedValue(new Error('provider unavailable'));
 
     const response = await request(buildApp())
@@ -384,10 +442,7 @@ describe('POST /goalfix/inspect', () => {
   });
 
   it('audits a verification-signal failure with the already resolved exact head', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
-      error: null,
-    });
+    founderSession();
     providerMock.listVerificationSignals.mockRejectedValue(new Error('checks unavailable'));
 
     const response = await request(buildApp())
@@ -414,10 +469,7 @@ describe('POST /goalfix/inspect', () => {
   });
 
   it('fails closed when a provider-failure audit cannot persist', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
-      error: null,
-    });
+    founderSession();
     providerMock.listVerificationSignals.mockRejectedValue(new Error('checks unavailable'));
     auditInsertMock.mockResolvedValue({ error: { message: 'audit unavailable' } });
 
