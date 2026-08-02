@@ -45,7 +45,7 @@ function deepFreeze<T>(value: T): Readonly<T> {
   return Object.freeze(value) as Readonly<T>;
 }
 
-function assertJsonSafe(value: unknown, path = '$', seen = new WeakSet<object>()): void {
+function assertJsonSafe(value: unknown, path = '$', ancestors: object[] = []): void {
   if (value === null) return;
 
   const type = typeof value;
@@ -57,21 +57,21 @@ function assertJsonSafe(value: unknown, path = '$', seen = new WeakSet<object>()
   if (type !== 'object') throw new TypeError(`${path}: ${type} is not sandbox-safe`);
 
   const object = value as object;
-  if (seen.has(object)) throw new TypeError(`${path}: circular input is not sandbox-safe`);
-  seen.add(object);
+  if (ancestors.includes(object)) throw new TypeError(`${path}: circular input is not sandbox-safe`);
+  ancestors.push(object);
 
   if (Array.isArray(value)) {
-    value.forEach((item, index) => assertJsonSafe(item, `${path}[${index}]`, seen));
+    value.forEach((item, index) => assertJsonSafe(item, `${path}[${index}]`, ancestors));
   } else {
     const prototype = Object.getPrototypeOf(value);
     if (prototype !== Object.prototype && prototype !== null) {
       throw new TypeError(`${path}: custom prototypes are not sandbox-safe`);
     }
     for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-      assertJsonSafe(nested, `${path}.${key}`, seen);
+      assertJsonSafe(nested, `${path}.${key}`, ancestors);
     }
   }
-  seen.delete(object);
+  ancestors.pop();
 }
 
 function cloneAndFreeze<T>(value: T): Readonly<T> {
