@@ -1,5 +1,7 @@
 import { inspectAuthorityBoundary, runCompanySandbox } from './sandbox.mjs';
 
+export { inspectAuthorityBoundary };
+
 const MUTATING_MODES = new Set(['queue', 'publish']);
 const INJECTION_PATTERNS = [
   /ignore\s+(all|any|previous)\s+instructions/i,
