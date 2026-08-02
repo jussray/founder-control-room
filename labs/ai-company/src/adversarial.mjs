@@ -57,12 +57,49 @@ function isFiniteNonNegative(value) {
   return Number.isFinite(value) && value >= 0;
 }
 
+function isRecord(value) {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function isStringArray(value) {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function isStringFieldRecord(value, fields) {
+  return isRecord(value) && fields.every((field) => typeof value[field] === 'string');
+}
+
+function companyInputShapeIsValid(input) {
+  if (!isRecord(input)) return false;
+  if (!['projectSlug', 'eventId', 'summary', 'requestedMode'].every((field) => typeof input[field] === 'string')) {
+    return false;
+  }
+  if (!isStringArray(input.audiences) || !isStringArray(input.platforms)) return false;
+  if (!isRecord(input.proof)) return false;
+  if (typeof input.proof.projectSlug !== 'string' || typeof input.proof.status !== 'string') return false;
+  if (!isStringArray(input.proof.urls)) return false;
+  if (!Array.isArray(input.traction) || !input.traction.every((item) => (
+    isStringFieldRecord(item, ['label', 'value', 'sourceUrl'])
+  ))) {
+    return false;
+  }
+  if (!Array.isArray(input.governanceAdvantages) || !input.governanceAdvantages.every((item) => (
+    isStringFieldRecord(item, ['label', 'proofUrl'])
+  ))) {
+    return false;
+  }
+  if (input.founderApprovalId !== null && input.founderApprovalId !== undefined && typeof input.founderApprovalId !== 'string') {
+    return false;
+  }
+  return true;
+}
+
 function resolveLimits(overrides) {
   const limits = { ...DEFAULT_ADVERSARIAL_LIMITS };
   const blockers = [];
 
   if (overrides === undefined) return { limits, blockers };
-  if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides)) {
+  if (!isRecord(overrides)) {
     return { limits, blockers: ['invalid_limit_override'] };
   }
 
@@ -89,9 +126,9 @@ function campaignKey(companyInput) {
     ? [...companyInput.platforms].sort().join(',')
     : '';
   return [
-    companyInput?.projectSlug ?? '',
-    companyInput?.eventId ?? '',
-    companyInput?.requestedMode ?? '',
+    typeof companyInput?.projectSlug === 'string' ? companyInput.projectSlug : '',
+    typeof companyInput?.eventId === 'string' ? companyInput.eventId : '',
+    typeof companyInput?.requestedMode === 'string' ? companyInput.requestedMode : '',
     platforms,
   ].join(':');
 }
@@ -143,27 +180,34 @@ function evaluateSealedEnvelope(envelope) {
   blockers.push(...resolvedLimits.blockers);
 
   const companyInput = envelope?.companyInput;
-  const requestedMode = companyInput?.requestedMode;
+  const requestedMode = typeof companyInput?.requestedMode === 'string'
+    ? companyInput.requestedMode
+    : '';
   const key = campaignKey(companyInput);
 
   if (envelope?.dataClassification !== 'synthetic') blockers.push('non_synthetic_envelope');
+  if (!companyInputShapeIsValid(companyInput)) blockers.push('invalid_company_input');
   if (!companyInput || companyInput.dataClassification !== 'synthetic') {
     blockers.push('non_synthetic_company_input');
   }
   if (envelope?.killSwitch === true) blockers.push('kill_switch_active');
+  if (typeof envelope?.killSwitch !== 'boolean') blockers.push('invalid_kill_switch');
 
   const requestedAuthority = envelope?.requestedAuthority;
   if (
-    requestedAuthority?.level !== 'L0'
-    || requestedAuthority?.mode !== 'simulation'
-    || requestedAuthority?.executionAllowed !== false
+    !isRecord(requestedAuthority)
+    || requestedAuthority.level !== 'L0'
+    || requestedAuthority.mode !== 'simulation'
+    || requestedAuthority.executionAllowed !== false
   ) {
     blockers.push('authority_escalation_attempt');
   }
 
   if (MUTATING_MODES.has(requestedMode)) {
     const approval = envelope?.approvalScope;
-    if (!approval?.id?.trim()) {
+    if (!isStringFieldRecord(approval, ['id', 'projectSlug', 'eventId', 'mode'])) {
+      blockers.push('invalid_approval_scope');
+    } else if (!approval.id.trim()) {
       blockers.push('approval_missing');
     } else {
       if (approval.id !== companyInput?.founderApprovalId) blockers.push('approval_id_mismatch');
@@ -171,10 +215,10 @@ function evaluateSealedEnvelope(envelope) {
       if (approval.eventId !== companyInput?.eventId) blockers.push('approval_event_mismatch');
       if (approval.mode !== requestedMode) blockers.push('approval_mode_mismatch');
 
-      const consumedApprovalIds = Array.isArray(envelope?.consumedApprovalIds)
+      const consumedApprovalIds = isStringArray(envelope?.consumedApprovalIds)
         ? envelope.consumedApprovalIds
         : [];
-      if (!Array.isArray(envelope?.consumedApprovalIds)) blockers.push('invalid_consumed_approvals');
+      if (!isStringArray(envelope?.consumedApprovalIds)) blockers.push('invalid_consumed_approvals');
       if (consumedApprovalIds.includes(approval.id)) blockers.push('approval_reuse_detected');
     }
   }
@@ -189,29 +233,27 @@ function evaluateSealedEnvelope(envelope) {
     if (proofAgeMs > limits.maxProofAgeMs) blockers.push('proof_stale');
   }
 
-  const seenCampaignKeys = Array.isArray(envelope?.seenCampaignKeys)
+  const seenCampaignKeys = isStringArray(envelope?.seenCampaignKeys)
     ? envelope.seenCampaignKeys
     : [];
-  if (!Array.isArray(envelope?.seenCampaignKeys)) blockers.push('invalid_campaign_history');
+  if (!isStringArray(envelope?.seenCampaignKeys)) blockers.push('invalid_campaign_history');
   if (seenCampaignKeys.includes(key)) blockers.push('duplicate_campaign');
 
-  const delegationChain = Array.isArray(envelope?.delegationChain)
+  const delegationChain = isStringArray(envelope?.delegationChain)
     ? envelope.delegationChain
     : [];
-  if (!Array.isArray(envelope?.delegationChain)) blockers.push('invalid_delegation_chain');
+  if (!isStringArray(envelope?.delegationChain)) blockers.push('invalid_delegation_chain');
   if (delegationChain.length === 0 || delegationChain[0] !== 'juss-chief-ai') {
     blockers.push('delegation_root_invalid');
   }
-  if (delegationChain.some((agent) => typeof agent !== 'string' || !ALLOWED_DELEGATES.has(agent))) {
+  if (delegationChain.some((agent) => !ALLOWED_DELEGATES.has(agent))) {
     blockers.push('delegation_agent_invalid');
   }
   if (delegationChain.length > limits.maxDelegationDepth) blockers.push('delegation_depth_exceeded');
   if (new Set(delegationChain).size !== delegationChain.length) blockers.push('delegation_loop_detected');
 
   const budget = envelope?.budget;
-  if (!budget || typeof budget !== 'object' || Array.isArray(budget)) {
-    blockers.push('invalid_budget');
-  }
+  if (!isRecord(budget)) blockers.push('invalid_budget');
   if (!Number.isInteger(budget?.steps) || !isFiniteNonNegative(budget?.steps) || budget.steps > limits.maxSteps) {
     blockers.push('step_budget_exceeded');
   }
@@ -222,7 +264,8 @@ function evaluateSealedEnvelope(envelope) {
     blockers.push('runtime_timeout');
   }
 
-  const prompt = String(envelope?.prompt ?? '');
+  const prompt = typeof envelope?.prompt === 'string' ? envelope.prompt : '';
+  if (typeof envelope?.prompt !== 'string') blockers.push('invalid_prompt');
   if (INJECTION_PATTERNS.some((pattern) => pattern.test(prompt))) {
     blockers.push('prompt_injection_detected');
   }
@@ -233,8 +276,7 @@ function evaluateSealedEnvelope(envelope) {
   const decisions = [];
   for (const vote of agentVotes) {
     if (
-      !vote
-      || typeof vote !== 'object'
+      !isRecord(vote)
       || !ALLOWED_VOTERS.has(vote.agent)
       || !VALID_VOTE_DECISIONS.has(vote.decision)
     ) {
