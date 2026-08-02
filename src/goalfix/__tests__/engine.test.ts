@@ -64,6 +64,43 @@ describe('buildGoalfixReport', () => {
     expect(report.nextGate).toContain('repair only its verified root cause');
   });
 
+  it('uses the latest same-SHA signal when a check rerun replaces an older failure', () => {
+    const report = buildGoalfixReport(baseInput({
+      verificationSignals: [
+        {
+          id: 'playwright-old',
+          name: 'Playwright',
+          status: 'failed',
+          commitSha: SHA,
+          provider: 'github',
+          startedAt: '2026-08-02T00:00:00.000Z',
+          completedAt: '2026-08-02T00:01:00.000Z',
+        },
+        {
+          id: 'playwright-new',
+          name: 'Playwright',
+          status: 'passed',
+          commitSha: SHA,
+          provider: 'github',
+          startedAt: '2026-08-02T00:02:00.000Z',
+          completedAt: '2026-08-02T00:03:00.000Z',
+        },
+        {
+          id: 'typecheck',
+          name: 'Typecheck',
+          status: 'passed',
+          commitSha: SHA,
+          provider: 'github',
+        },
+      ],
+    }));
+
+    expect(report.readiness).toBe('ready_for_founder_decision');
+    expect(report.evidence.blocked).toEqual([]);
+    expect(report.proof).toContain(`Playwright: passed at ${SHA}`);
+    expect(report.proof).not.toContain(`Playwright: failed at ${SHA}`);
+  });
+
   it('does not declare readiness when one named required check is absent', () => {
     const report = buildGoalfixReport(baseInput({
       verificationSignals: [
