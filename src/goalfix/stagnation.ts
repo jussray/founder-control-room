@@ -23,9 +23,14 @@ export function detectGoalfixStagnation(attempts: GoalfixAttempt[]): GoalfixStag
   const counts = new Map<string, number>();
 
   for (const attempt of attempts) {
-    if (attempt.result === 'passed') continue;
     const signature = normalize(attempt.failureSignature);
     if (!signature) continue;
+
+    if (attempt.result === 'passed') {
+      counts.delete(signature);
+      continue;
+    }
+
     counts.set(signature, (counts.get(signature) ?? 0) + 1);
   }
 
