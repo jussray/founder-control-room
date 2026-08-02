@@ -6,9 +6,23 @@ import {
   validateHairCommerceReceipt,
 } from '../../hairCommerce/receipt.js';
 
+export type HairCommerceReceiptDisposition = 'stored' | 'duplicate' | 'conflict';
+
 export type HairCommerceReceiptStore = (
   receipt: HairCommerceReceipt,
-) => Promise<'stored' | 'duplicate'>;
+) => Promise<HairCommerceReceiptDisposition>;
+
+type StoredHairCommerceReceipt = {
+  receipt_id: string;
+  source_repo: string;
+  order_ref_hash: string;
+  event_type: string;
+  group_count: number;
+  unresolved_count: number;
+  occurred_at: string;
+  exact_commit_sha: string;
+  evidence_url: string | null;
+};
 
 function safeToken(value: string): Buffer {
   return Buffer.from(value, 'utf8');
@@ -22,12 +36,30 @@ function tokenMatches(provided: string | undefined, expected: string): boolean {
   return timingSafeEqual(left, right);
 }
 
+function isIdenticalReplay(
+  stored: StoredHairCommerceReceipt,
+  receipt: HairCommerceReceipt,
+): boolean {
+  return (
+    stored.receipt_id === receipt.receiptId &&
+    stored.source_repo === receipt.sourceRepo &&
+    stored.order_ref_hash === receipt.orderRefHash &&
+    stored.event_type === receipt.event &&
+    Number(stored.group_count) === receipt.groupCount &&
+    Number(stored.unresolved_count) === receipt.unresolvedCount &&
+    new Date(stored.occurred_at).toISOString() === receipt.occurredAt &&
+    stored.exact_commit_sha === receipt.exactCommitSha &&
+    (stored.evidence_url ?? undefined) === receipt.evidenceUrl
+  );
+}
+
 export const persistHairCommerceReceipt: HairCommerceReceiptStore = async (receipt) => {
   // Keep the service-role dependency behind the real persistence path. This
   // lets injected-store tests execute without production Supabase bindings and
   // still fails closed when the live route actually needs persistence.
   const { supabaseAdmin } = await import('../../lib/supabase.js');
-  const { data, error } = await supabaseAdmin()
+  const client = supabaseAdmin();
+  const { data, error } = await client
     .from('hair_commerce_receipts')
     .upsert(
       {
@@ -46,7 +78,23 @@ export const persistHairCommerceReceipt: HairCommerceReceiptStore = async (recei
     .select('receipt_id');
 
   if (error) throw new Error('hair_commerce_receipt_store_failed');
-  return data && data.length > 0 ? 'stored' : 'duplicate';
+  if (data && data.length > 0) return 'stored';
+
+  const { data: existing, error: existingError } = await client
+    .from('hair_commerce_receipts')
+    .select(
+      'receipt_id,source_repo,order_ref_hash,event_type,group_count,unresolved_count,occurred_at,exact_commit_sha,evidence_url',
+    )
+    .eq('receipt_id', receipt.receiptId)
+    .maybeSingle();
+
+  if (existingError || !existing) {
+    throw new Error('hair_commerce_receipt_reconciliation_failed');
+  }
+
+  return isIdenticalReplay(existing as StoredHairCommerceReceipt, receipt)
+    ? 'duplicate'
+    : 'conflict';
 };
 
 export function createHairCommerceReceiptIngestHandler(
@@ -84,6 +132,15 @@ export function createHairCommerceReceiptIngestHandler(
 
     try {
       const disposition = await store(receipt);
+      if (disposition === 'conflict') {
+        return res.status(409).json({
+          accepted: false,
+          duplicate: false,
+          error: 'receipt_id_payload_conflict',
+          receiptId: receipt.receiptId,
+        });
+      }
+
       return res.status(disposition === 'stored' ? 201 : 200).json({
         accepted: true,
         duplicate: disposition === 'duplicate',
