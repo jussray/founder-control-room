@@ -7,7 +7,7 @@ describe('buildGoalfixSkillRuntimeDecision', () => {
       intent: { raw: 'Audit the skill artifact against current main.' },
       scope: {
         firstFilesOrLogs: ['src/goalfix/engine.ts', 'src/goalfix/engine.ts', 'package.json'],
-        maxInitialReads: 3,
+        maxInitialReads: 1,
         stopCondition: 'Stop after the focused runtime contract is verified.',
       },
       provenance: {
@@ -17,8 +17,22 @@ describe('buildGoalfixSkillRuntimeDecision', () => {
     });
 
     expect(decision.mayProceed).toBe(true);
-    expect(decision.scope.firstFilesOrLogs).toEqual(['src/goalfix/engine.ts', 'package.json']);
+    expect(decision.scope.firstFilesOrLogs).toEqual(['src/goalfix/engine.ts']);
+    expect(decision.scope.maxInitialReads).toBe(1);
     expect(decision.provenance.sourceName).toBe('ai-skill-suite.zip');
+  });
+
+  it('deduplicates before applying the read budget', () => {
+    const decision = buildGoalfixSkillRuntimeDecision({
+      intent: { raw: 'Inspect only the first two unique sources.' },
+      scope: {
+        firstFilesOrLogs: ['a.ts', 'a.ts', 'b.ts', 'c.ts'],
+        maxInitialReads: 2,
+        stopCondition: 'Stop after two unique sources are inspected.',
+      },
+    });
+
+    expect(decision.scope.firstFilesOrLogs).toEqual(['a.ts', 'b.ts']);
   });
 
   it('blocks low-confidence intent', () => {
