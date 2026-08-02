@@ -20,6 +20,9 @@ body{margin:0;background:#070b14;color:#e8eef8;font:16px/1.5 system-ui,-apple-sy
 .goalfix-form textarea{min-height:92px;resize:vertical}
 .goalfix-form button{border:0;border-radius:10px;background:#8a5cff;color:white;padding:.8rem 1rem;font-weight:800;cursor:pointer}
 .goalfix-form button:disabled{opacity:.55;cursor:wait}
+.goalfix-confirm{grid-template-columns:auto minmax(0,1fr);align-items:start;border:1px solid #34445f;border-radius:10px;background:#0b1220;padding:.75rem}
+.goalfix-form .goalfix-confirm input{width:auto;margin:.2rem 0 0;padding:0;accent-color:#8a5cff}
+.goalfix-confirm span{display:grid;gap:.2rem}
 .goalfix-kicker{color:#a7b7cd;text-transform:uppercase;letter-spacing:.16em;font-size:.76rem;font-weight:800}
 .goalfix-status{display:inline-flex;align-items:center;gap:.4rem;border-radius:999px;padding:.35rem .65rem;background:#18243a;font-weight:800}
 .goalfix-status[data-state="blocked"]{background:#421f2b;color:#ffb7ca}
@@ -60,6 +63,13 @@ body{margin:0;background:#070b14;color:#e8eef8;font:16px/1.5 system-ui,-apple-sy
         </label>
         <label>Desired outcome
           <textarea name="desiredOutcome" required placeholder="What must be true when this goal is complete?"></textarea>
+        </label>
+        <label class="goalfix-confirm">
+          <input name="intentConfirmed" type="checkbox" required />
+          <span>
+            Use this as the exact founder outcome, not shorthand.
+            <small class="goalfix-hint">Goalfix will not inspect a repository until this intent is explicitly confirmed or resolved.</small>
+          </span>
         </label>
         <label>Why it matters
           <textarea name="reason" placeholder="Founder, user, product, safety, or business value"></textarea>
