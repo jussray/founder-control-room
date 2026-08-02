@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "status": "schedule-with-review-window",
+  "status": "implemented-awaiting-live-provider-and-ingress-proof",
   "provider": "buffer",
   "zapier": {
     "action": "buffer_add_to_queue",
@@ -16,11 +16,13 @@
       "share_now",
       "schedule_draft"
     ],
-    "mappingComment": "method: schedule # computed fire time is exactly generated_at + 20 minutes; never rely on Buffer defaults"
+    "mappingComment": "method: schedule # exact live option and date-field mapping must be captured in the controlled Zap proof"
   },
   "api": {
     "mutation": "createPost",
     "required": {
+      "sharingMode": "customScheduled",
+      "dueAtSource": "scheduled_at",
       "saveToDraft": false
     }
   },
@@ -43,6 +45,7 @@
       "buffer_post_id",
       "review_token",
       "founder_sender",
+      "reply_to",
       "gmail_thread_id"
     ],
     "failurePolicy": "cancel_scheduled_batch",
@@ -51,11 +54,18 @@
       "<channel>: cancel",
       "<channel>: <requested tweak>"
     ],
-    "replyIdentityPolicy": "exact_founder_sender_and_original_gmail_thread",
+    "replyIdentityPolicy": "exact_founder_sender_and_retained_review_context",
     "replyParsingPolicy": "exactly_one_unquoted_command_on_first_nonempty_line",
     "quotedHistoryPolicy": "ignore_only_after_valid_command_boundary",
     "ambiguousReplyPolicy": "reject_multiple_unquoted_command_lines",
-    "editPolicy": "regenerate_and_revalidate_before_buffer_update"
+    "editPolicy": "regenerate_and_revalidate_before_buffer_update",
+    "replyIngress": {
+      "requiredLatencyClass": "instant_private_ingress",
+      "gmailPollingAllowed": false,
+      "preferredImplementation": "cloudflare_email_routing_worker",
+      "replyToMode": "private_domain_address_bound_to_review_context",
+      "reason": "a 15-minute polling trigger cannot reliably honor commands throughout a 20-minute review window"
+    }
   },
   "authority": {
     "publishAllowed": true,
@@ -64,7 +74,7 @@
     "requiresRuntimeMintedReceipt": true,
     "receiptFormat": "standing-policy:<grantId>:<invocationId>",
     "receiptPurpose": "exact runtime correlation",
-    "securityBoundary": "authenticated Founder Control Room middleware plus private Zapier hook",
+    "securityBoundary": "authenticated Founder Control Room middleware plus private provider ingress",
     "maximumGrantIdLength": 100,
     "maximumReceiptLength": 200,
     "requiresExactSourceCommit": true,
@@ -77,10 +87,13 @@
       "ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL",
       "FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON"
     ],
-    "zapierPlanMustSupport": [
+    "requiredCapabilities": [
       "webhook_trigger",
-      "multi_step_workflow"
+      "multi_step_workflow_or_backend_orchestration",
+      "instant_private_reply_ingress"
     ],
+    "freeTwoStepZapAloneSufficient": false,
+    "gmailPollingTriggerAcceptedForDeadlineCommands": false,
     "controlledSyntheticRunRequired": true,
     "exactReceiptCorrelationRequired": true
   }
