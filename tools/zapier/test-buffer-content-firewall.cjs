@@ -12,6 +12,8 @@ const {
   BUFFER_SCHEDULE_POLICY_ID,
   BUFFER_AUTHORIZATION_MODE,
   BUFFER_NOTIFICATION_MODE,
+  MAX_STEERING_GRANT_ID_LENGTH,
+  MAX_AUTHORIZATION_RECEIPT_LENGTH,
 } = require('./buffer-content-firewall.cjs');
 
 const sha = '205a239486b6b542648ce2f125178814e358b816';
@@ -20,6 +22,9 @@ const invocationId = '3f10e0f9-b0b4-4e64-b9ff-c5f10f848067';
 const steeringGrantId = 'founder-approved-auto-distribution-v1';
 const founderApprovalId = `standing-policy:${steeringGrantId}:${invocationId}`;
 const nowMs = Date.parse('2026-08-02T21:01:00.000Z');
+
+assert.equal(MAX_STEERING_GRANT_ID_LENGTH, 100);
+assert.equal(MAX_AUTHORIZATION_RECEIPT_LENGTH, 200);
 
 const founderLinkedInPost = `
 I deleted the marketing before I added the design.
@@ -103,6 +108,24 @@ assert.throws(
   /runtime-minted receipt/,
 );
 
+const overlongGrantId = 'g'.repeat(MAX_STEERING_GRANT_ID_LENGTH + 1);
+assert.throws(
+  () => validateBufferPublishInput({
+    ...validInput,
+    steering_grant_id: overlongGrantId,
+    founder_approval_id: `standing-policy:${overlongGrantId}:${invocationId}`,
+  }, { nowMs }),
+  /must not exceed 100 characters/,
+);
+
+assert.throws(
+  () => validateBufferPublishInput({
+    ...validInput,
+    founder_approval_id: 'r'.repeat(MAX_AUTHORIZATION_RECEIPT_LENGTH + 1),
+  }, { nowMs }),
+  /must not exceed 200 characters/,
+);
+
 assert.throws(
   () => validateBufferPublishInput({ ...validInput, schedule_policy_id: 'caller-owned-policy' }, { nowMs }),
   /checked-in scheduling contract/,
@@ -146,4 +169,4 @@ assert.equal(zapierLikeContext.output.buffer_method, 'schedule');
 assert.equal(zapierLikeContext.output.buffer_save_to_draft, false);
 assert.equal(zapierLikeContext.output.review_window_minutes, 20);
 
-console.log('Buffer scheduling firewall verified: approved finished copy receives one owned schedule 20 minutes after generation; stale timestamps, prompts, draft/queue/share-now modes, and caller overrides fail closed.');
+console.log('Buffer scheduling firewall verified: approved finished copy receives one owned schedule 20 minutes after generation; backend-aligned grant limits, stale timestamps, prompts, draft/queue/share-now modes, and caller overrides fail closed.');
