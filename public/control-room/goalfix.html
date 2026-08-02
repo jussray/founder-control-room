@@ -78,7 +78,8 @@ body{margin:0;background:#070b14;color:#e8eef8;font:16px/1.5 system-ui,-apple-sy
           <span class="goalfix-hint">Goalfix cannot declare decision readiness unless every named check appears and passes on the exact commit.</span>
         </label>
         <label>Stop condition
-          <input name="stopCondition" autocomplete="off" placeholder="Complete named proof exists or approval is required" />
+          <input name="stopCondition" required autocomplete="off" placeholder="Complete named proof exists or approval is required" />
+          <span class="goalfix-hint">Inspection cannot begin until the stopping point is explicit.</span>
         </label>
         <button id="goalfix-submit" type="submit">Inspect exact head</button>
       </form>
