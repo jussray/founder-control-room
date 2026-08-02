@@ -17,6 +17,7 @@ goalfixRouter.use(requireFounder);
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SAFE_REF_PATTERN = /^[A-Za-z0-9._/-]{1,200}$/;
+const COMMIT_SHA_PATTERN = /^[a-f0-9]{40}$/i;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/i;
 
 interface ProjectRow {
@@ -71,7 +72,7 @@ function boundedInteger(
 
 function attemptList(value: unknown): GoalfixAttempt[] | null {
   if (value === undefined || value === null) return [];
-  if (!Array.isArray(value) || value.length > 20) return null;
+  if (!Array.isArray(value) || value.length > 60) return null;
 
   const attempts: GoalfixAttempt[] = [];
   for (const item of value) {
@@ -80,10 +81,22 @@ function attemptList(value: unknown): GoalfixAttempt[] | null {
     const approach = optionalString(row['approach'], 500);
     const filesTouched = stringList(row['filesTouched'], 20, 300);
     const result = row['result'];
+    const commitSha = optionalString(row['commitSha'], 40);
     if (
       !approach
       || !filesTouched
-      || (result !== 'passed' && result !== 'failed' && result !== 'blocked')
+      || (
+        result !== 'passed'
+        && result !== 'failed'
+        && result !== 'blocked'
+        && result !== 'incomplete'
+      )
+      || (
+        row['commitSha'] !== undefined
+        && row['commitSha'] !== null
+        && row['commitSha'] !== ''
+        && (!commitSha || !COMMIT_SHA_PATTERN.test(commitSha))
+      )
     ) return null;
 
     attempts.push({
@@ -91,6 +104,7 @@ function attemptList(value: unknown): GoalfixAttempt[] | null {
       failureSignature: optionalString(row['failureSignature'], 500),
       filesTouched,
       verificationName: optionalString(row['verificationName'], 200),
+      commitSha: commitSha?.toLowerCase(),
       result,
     });
   }
@@ -110,6 +124,10 @@ function safeRef(value: unknown): string | null {
     || trimmed.endsWith('/')
   ) return null;
   return trimmed;
+}
+
+function normalizeSignalName(value?: string): string {
+  return (value ?? '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
 }
 
 function errorClass(error: unknown): string {
@@ -201,13 +219,12 @@ goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
     return res.status(400).json({ error: 'artifactSha256 must be a 64-character hexadecimal SHA-256 value' });
   }
 
-  const runtimeDecision = buildGoalfixSkillRuntimeDecision({
+  const runtimeInput = {
     intent: {
       raw: desiredOutcome,
       resolved: optionalString(body['resolvedIntent'], 1_000),
       assumptions: intentAssumptions,
     },
-    attempts,
     scope: {
       firstFilesOrLogs,
       maxInitialReads,
@@ -217,26 +234,21 @@ goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
       artifactSha256,
       sourceName: optionalString(body['artifactSourceName'], 300),
     },
+  };
+
+  const preflightDecision = buildGoalfixSkillRuntimeDecision({
+    ...runtimeInput,
+    attempts: [],
   });
 
-  if (!runtimeDecision.mayProceed) {
+  if (!preflightDecision.mayProceed) {
     res.set('Cache-Control', 'no-store');
     return res.status(409).json({
-      error: runtimeDecision.nextAction,
+      error: preflightDecision.nextAction,
       code: 'GOALFIX_RUNTIME_BLOCKED',
-      skillRuntime: runtimeDecision,
+      skillRuntime: preflightDecision,
     });
   }
-
-  const goal: FounderGoal = {
-    desiredOutcome: runtimeDecision.intent.resolved,
-    reason: optionalString(body['reason'], 2_000),
-    constraints,
-    suspectedFailureArea: optionalString(body['suspectedFailureArea'], 500),
-    firstFilesOrLogs: runtimeDecision.scope.firstFilesOrLogs,
-    expectedVerificationNames,
-    stopCondition: runtimeDecision.scope.stopCondition,
-  };
 
   const { data, error } = await supabase
     .from('projects')
@@ -297,6 +309,55 @@ goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
   } catch (providerError) {
     return providerFailure('resolve_ref', providerError);
   }
+
+  const expectedNameKeys = new Set(expectedVerificationNames.map(normalizeSignalName));
+  const exactHeadAttempts = attempts.filter((attempt) => (
+    attempt.commitSha?.toLowerCase() === target.commitSha.toLowerCase()
+    && expectedNameKeys.has(normalizeSignalName(attempt.verificationName))
+  ));
+  const runtimeDecision = buildGoalfixSkillRuntimeDecision({
+    ...runtimeInput,
+    attempts: exactHeadAttempts,
+  });
+
+  if (!runtimeDecision.mayProceed) {
+    const audited = await persistGoalfixAudit({
+      projectId: project.id,
+      founderUserId,
+      eventType: 'goalfix_inspection_failed',
+      severity: 'error',
+      stage: 'completed',
+      requestedRef: targetRef,
+      target,
+      readiness: 'blocked',
+      exactHeadSignalCount: 0,
+      expectedSignalCount: expectedVerificationNames.length,
+    });
+    if (!audited) {
+      return res.status(500).json({
+        error: 'Goalfix access audit persistence failed',
+        code: 'AUDIT_PERSISTENCE_FAILED',
+      });
+    }
+
+    res.set('Cache-Control', 'no-store');
+    return res.status(409).json({
+      error: runtimeDecision.nextAction,
+      code: 'GOALFIX_RUNTIME_BLOCKED',
+      skillRuntime: runtimeDecision,
+      target,
+    });
+  }
+
+  const goal: FounderGoal = {
+    desiredOutcome: runtimeDecision.intent.resolved,
+    reason: optionalString(body['reason'], 2_000),
+    constraints,
+    suspectedFailureArea: optionalString(body['suspectedFailureArea'], 500),
+    firstFilesOrLogs: runtimeDecision.scope.firstFilesOrLogs,
+    expectedVerificationNames,
+    stopCondition: runtimeDecision.scope.stopCondition,
+  };
 
   let verificationSignals: VerificationSignal[];
   try {
