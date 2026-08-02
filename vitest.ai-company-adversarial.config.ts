@@ -3,6 +3,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['test/ai-company-adversarial.test.ts'],
+    include: [
+      'test/ai-company-adversarial.test.ts',
+      'test/ai-company-sandboxes.test.ts',
+    ],
   },
 });
