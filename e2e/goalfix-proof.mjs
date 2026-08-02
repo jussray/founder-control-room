@@ -8,48 +8,69 @@ import { buildGoalfixSkillRuntimeDecision } from '../dist/goalfix/skillRuntime.j
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const ARTIFACT_DIR = join(ROOT, 'artifacts', 'goalfix');
-const SHA = 'abc123abc123abc123abc123abc123abc123abcd';
+const OLD_SHA = 'abc123abc123abc123abc123abc123abc123abcd';
+const NEW_SHA = 'fedcba9876543210fedcba9876543210fedcba98';
 const REQUIRED_CHECKS = ['Typecheck', 'Product Design Playwright Proof'];
 const STOP_CONDITION = 'Stop after the complete named exact-head proof set is classified.';
 const requestAttemptCounts = [];
-const report = buildGoalfixReport({
-  project: {
-    id: 'project-proof',
-    slug: 'sekret-bip',
-    name: "Se'kret Bip",
-    repository: 'jussray/Sekret-Bip',
+let currentSha = OLD_SHA;
+
+function normalizeSignalName(value) {
+  return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function buildProofReport(commitSha) {
+  const unrelatedSignals = Array.from({ length: 25 }, (_, index) => ({
+    id: `noise-${index}`,
+    name: `Unrelated proof ${index}`,
+    status: 'passed',
+    commitSha,
     provider: 'github',
-  },
-  target: { name: 'main', commitSha: SHA },
-  goal: {
-    desiredOutcome: 'Keep the public welcome available before login.',
-    reason: 'Preserve a usable front door without weakening protected routes.',
-    constraints: ['Read-only inspection', 'No deployment'],
-    firstFilesOrLogs: ['app/_layout.tsx', 'Product Design Playwright Proof'],
-    expectedVerificationNames: REQUIRED_CHECKS,
-    stopCondition: STOP_CONDITION,
-  },
-  verificationSignals: [
-    {
-      id: 'proof-typecheck',
-      name: 'Typecheck',
-      status: 'passed',
-      commitSha: SHA,
+  }));
+
+  return buildGoalfixReport({
+    project: {
+      id: 'project-proof',
+      slug: 'sekret-bip',
+      name: "Se'kret Bip",
+      repository: 'jussray/Sekret-Bip',
       provider: 'github',
     },
-    {
-      id: 'proof-playwright',
-      name: 'Product Design Playwright Proof',
-      status: 'failed',
-      commitSha: SHA,
-      provider: 'github',
+    target: { name: 'main', commitSha },
+    goal: {
+      desiredOutcome: 'Keep the public welcome available before login.',
+      reason: 'Preserve a usable front door without weakening protected routes.',
+      constraints: ['Read-only inspection', 'No deployment'],
+      firstFilesOrLogs: ['app/_layout.tsx', 'Product Design Playwright Proof'],
+      expectedVerificationNames: REQUIRED_CHECKS,
+      stopCondition: STOP_CONDITION,
     },
-  ],
-  observedAt: new Date('2026-07-27T20:00:00.000Z'),
-});
+    verificationSignals: [
+      {
+        id: 'proof-typecheck',
+        name: 'Typecheck',
+        status: 'passed',
+        commitSha,
+        provider: 'github',
+      },
+      {
+        id: 'proof-playwright',
+        name: 'Product Design Playwright Proof',
+        status: 'failed',
+        commitSha,
+        provider: 'github',
+      },
+      ...unrelatedSignals,
+    ],
+    observedAt: new Date('2026-07-27T20:00:00.000Z'),
+  });
+}
 
 mkdirSync(ARTIFACT_DIR, { recursive: true });
-writeFileSync(join(ARTIFACT_DIR, 'goalfix-report.json'), `${JSON.stringify(report, null, 2)}\n`);
+writeFileSync(
+  join(ARTIFACT_DIR, 'goalfix-report.json'),
+  `${JSON.stringify(buildProofReport(OLD_SHA), null, 2)}\n`,
+);
 
 const assets = new Map([
   ['/control-room/goalfix.html', ['text/html; charset=utf-8', readFileSync(join(ROOT, 'public/control-room/goalfix.html'))]],
@@ -90,9 +111,8 @@ const server = createServer((req, res) => {
 
         const attempts = Array.isArray(payload.attempts) ? payload.attempts : [];
         requestAttemptCounts.push(attempts.length);
-        const runtimeDecision = buildGoalfixSkillRuntimeDecision({
+        const runtimeInput = {
           intent: { raw: payload.desiredOutcome, resolved: payload.resolvedIntent },
-          attempts,
           scope: {
             firstFilesOrLogs: Array.isArray(payload.firstFilesOrLogs) ? payload.firstFilesOrLogs : [],
             maxInitialReads: Number.isInteger(payload.maxInitialReads)
@@ -100,6 +120,29 @@ const server = createServer((req, res) => {
               : Math.max(1, Math.min(payload.firstFilesOrLogs?.length || 1, 5)),
             stopCondition: payload.stopCondition,
           },
+        };
+        const preflightDecision = buildGoalfixSkillRuntimeDecision({
+          ...runtimeInput,
+          attempts: [],
+        });
+        if (!preflightDecision.mayProceed) {
+          res.writeHead(409, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+          res.end(JSON.stringify({
+            error: preflightDecision.nextAction,
+            code: 'GOALFIX_RUNTIME_BLOCKED',
+            skillRuntime: preflightDecision,
+          }));
+          return;
+        }
+
+        const requiredNames = new Set(REQUIRED_CHECKS.map(normalizeSignalName));
+        const exactHeadAttempts = attempts.filter((attempt) => (
+          attempt?.commitSha === currentSha
+          && requiredNames.has(normalizeSignalName(attempt?.verificationName))
+        ));
+        const runtimeDecision = buildGoalfixSkillRuntimeDecision({
+          ...runtimeInput,
+          attempts: exactHeadAttempts,
         });
 
         if (!runtimeDecision.mayProceed) {
@@ -108,10 +151,12 @@ const server = createServer((req, res) => {
             error: runtimeDecision.nextAction,
             code: 'GOALFIX_RUNTIME_BLOCKED',
             skillRuntime: runtimeDecision,
+            target: { name: 'main', commitSha: currentSha },
           }));
           return;
         }
 
+        const report = buildProofReport(currentSha);
         res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
         res.end(JSON.stringify({ ...report, skillRuntime: runtimeDecision }));
       } catch (error) {
@@ -168,6 +213,7 @@ async function storedAttemptCounts(page) {
 }
 
 async function proveViewport(name, viewport) {
+  currentSha = OLD_SHA;
   const context = await browser.newContext({ viewport });
   const page = await context.newPage();
   const pageErrors = [];
@@ -198,26 +244,27 @@ async function proveViewport(name, viewport) {
 
   const text = await page.locator('#goalfix-result').innerText();
   assert(text.includes("Se'kret Bip"), `${name}: project identity renders`);
-  assert(text.includes(SHA), `${name}: immutable exact head renders`);
+  assert(text.includes(OLD_SHA), `${name}: immutable exact head renders`);
   assert(text.includes('L1 · read-only'), `${name}: authority boundary renders`);
   assert(text.includes('Required exact-head checks: Typecheck, Product Design Playwright Proof.'), `${name}: complete named proof set renders`);
   assert(text.includes('Typecheck: passed'), `${name}: passing required proof remains visible`);
   assert(text.includes('Product Design Playwright Proof: failed'), `${name}: failed required proof remains visible`);
+  assert(text.includes('Unrelated proof 24: passed'), `${name}: provider proof noise remains visible in the report`);
   assert(text.includes('NEXT GATE'), `${name}: founder next gate renders`);
   assert(
     JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([2]),
-    `${name}: first verification result is retained in the current goal scope`,
+    `${name}: only named required checks enter the attempt ledger`,
   );
 
   const secondResponse = await submitInspection(page);
-  assert(secondResponse.status() === 200, `${name}: second inspection receives accumulated history`);
+  assert(secondResponse.status() === 200, `${name}: second inspection receives accumulated exact-head history`);
   assert(
     JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([4]),
-    `${name}: second verification result extends bounded history`,
+    `${name}: second verification result extends per-check history`,
   );
 
   const thirdResponse = await submitInspection(page);
-  assert(thirdResponse.status() === 409, `${name}: third repeated inspection is blocked before provider work`);
+  assert(thirdResponse.status() === 409, `${name}: third repeated same-head inspection is blocked`);
   const errorText = await page.locator('#goalfix-message').innerText();
   assert(errorText.includes('Stop retrying the same path'), `${name}: founder sees stagnation reorientation`);
   assert(
@@ -225,12 +272,22 @@ async function proveViewport(name, viewport) {
     `${name}: blocked inspection preserves prior evidence`,
   );
 
+  currentSha = NEW_SHA;
+  const advancedHeadResponse = await submitInspection(page);
+  assert(advancedHeadResponse.status() === 200, `${name}: advancing main opens the repaired exact head`);
+  const advancedText = await page.locator('#goalfix-result').innerText();
+  assert(advancedText.includes(NEW_SHA), `${name}: new immutable head replaces the stale ref result`);
+  assert(
+    JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([6]),
+    `${name}: old and new heads remain bounded per required check`,
+  );
+
   await page.fill('[name="suspectedFailureArea"]', 'Inspect a different provider evidence lane.');
   const reorientedResponse = await submitInspection(page);
   assert(reorientedResponse.status() === 200, `${name}: changed failure area opens a fresh evidence lane`);
   assert(
-    JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([2, 4]),
-    `${name}: reoriented lane is isolated from the blocked history`,
+    JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([2, 6]),
+    `${name}: reoriented lane is isolated from earlier history`,
   );
   assert(pageErrors.length === 0, `${name}: no uncaught browser errors`);
   assert(failedRequests.length === 0, `${name}: no failed network requests`);
@@ -243,8 +300,8 @@ try {
   await proveViewport('desktop', { width: 1440, height: 1000 });
   await proveViewport('mobile', { width: 390, height: 844 });
   assert(
-    JSON.stringify(requestAttemptCounts) === JSON.stringify([0, 2, 4, 0, 0, 2, 4, 0]),
-    'desktop and mobile retain repeated attempts while reoriented scopes start clean',
+    JSON.stringify(requestAttemptCounts) === JSON.stringify([0, 2, 4, 4, 0, 0, 2, 4, 4, 0]),
+    'desktop and mobile bind attempts to exact heads while fresh scopes start clean',
   );
 } finally {
   await browser.close();
@@ -255,5 +312,5 @@ if (failures > 0) {
   console.error(`Goalfix browser proof failed with ${failures} assertion(s).`);
   process.exitCode = 1;
 } else {
-  console.log('Goalfix browser proof passed for desktop and mobile, including confirmation, stagnation, and reorientation.');
+  console.log('Goalfix browser proof passed for desktop and mobile, including exact-head recovery and bounded required-check history.');
 }
