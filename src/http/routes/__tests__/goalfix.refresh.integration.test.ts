@@ -94,13 +94,19 @@ function projectsRow() {
   };
 }
 
-function signal(name: string, status: 'passed' | 'failed' | 'running') {
+function signal(
+  name: string,
+  status: 'passed' | 'failed' | 'running',
+  options: { id?: string; startedAt?: string; completedAt?: string } = {},
+) {
   return {
-    id: `${name}-${status}`,
+    id: options.id ?? `${name}-${status}`,
     name,
     status,
     commitSha: SHA,
     provider: 'github',
+    ...(options.startedAt ? { startedAt: options.startedAt } : {}),
+    ...(options.completedAt ? { completedAt: options.completedAt } : {}),
   };
 }
 
@@ -138,6 +144,32 @@ describe('Goalfix live exact-head refresh', () => {
     expect(response.body.readiness).toBe('ready_for_founder_decision');
     expect(response.body.skillRuntime.stagnation.stagnant).toBe(false);
     expect(auditInsertMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the latest same-SHA signal when a check rerun replaces an older failure', async () => {
+    providerMock.listVerificationSignals.mockResolvedValue([
+      signal('Typecheck', 'passed', { id: 'typecheck-pass' }),
+      signal('Playwright', 'failed', {
+        id: 'playwright-old',
+        startedAt: '2026-08-02T00:00:00.000Z',
+        completedAt: '2026-08-02T00:01:00.000Z',
+      }),
+      signal('Playwright', 'passed', {
+        id: 'playwright-new',
+        startedAt: '2026-08-02T00:02:00.000Z',
+        completedAt: '2026-08-02T00:03:00.000Z',
+      }),
+    ]);
+
+    const response = await request(buildApp())
+      .post('/goalfix/inspect')
+      .set('Authorization', BEARER)
+      .send(payload());
+
+    expect(response.status).toBe(200);
+    expect(response.body.readiness).toBe('ready_for_founder_decision');
+    expect(response.body.skillRuntime.stagnation.stagnant).toBe(false);
+    expect(response.body.evidence.blocked).toEqual([]);
   });
 
   it('keeps the inspection refreshable when the current check is still running', async () => {
