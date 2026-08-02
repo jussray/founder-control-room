@@ -36,6 +36,9 @@ function assertJsonSafe(value, path = '$', ancestors = []) {
 
   ancestors.push(value);
   if (Array.isArray(value)) {
+    if (Object.getPrototypeOf(value) !== Array.prototype) {
+      throw new TypeError(`${path}: custom array prototypes are not sandbox-safe`);
+    }
     value.forEach((item, index) => assertJsonSafe(item, `${path}[${index}]`, ancestors));
   } else {
     const prototype = Object.getPrototypeOf(value);
@@ -49,7 +52,7 @@ function assertJsonSafe(value, path = '$', ancestors = []) {
   ancestors.pop();
 }
 
-function cloneAndFreeze(value) {
+export function sealSandboxValue(value) {
   assertJsonSafe(value);
   return deepFreeze(JSON.parse(JSON.stringify(value)));
 }
@@ -111,7 +114,7 @@ export function inspectAuthorityBoundary(result) {
 }
 
 export function runCompanySandbox(companyInput, options = {}) {
-  const input = cloneAndFreeze(companyInput);
+  const input = sealSandboxValue(companyInput);
   const inputFingerprint = fingerprint(input);
   const killSwitch = options?.killSwitch === true;
   const expectedInputFingerprint = options?.expectedInputFingerprint;
@@ -153,7 +156,7 @@ export function runCompanySandbox(companyInput, options = {}) {
   const before = stableStringify(input);
   const rawResult = runCompanySimulation(input);
   const after = stableStringify(input);
-  const result = cloneAndFreeze(rawResult);
+  const result = sealSandboxValue(rawResult);
   const violations = [
     ...(before === after ? [] : ['sandbox_input_mutated']),
     ...inspectAuthorityBoundary(result),
