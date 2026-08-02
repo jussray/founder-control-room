@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { buildGoalfixReport, type FounderGoal } from '../../goalfix/engine.js';
+import { buildGoalfixSkillRuntimeDecision } from '../../goalfix/skillRuntime.js';
+import type { GoalfixAttempt } from '../../goalfix/stagnation.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { providerForProject } from '../../providers/providerFactory.js';
 import type {
@@ -15,6 +17,7 @@ goalfixRouter.use(requireFounder);
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SAFE_REF_PATTERN = /^[A-Za-z0-9._/-]{1,200}$/;
+const SHA256_PATTERN = /^[a-f0-9]{64}$/i;
 
 interface ProjectRow {
   id: string;
@@ -52,6 +55,47 @@ function stringList(value: unknown, maxItems: number, maxItemLength: number): st
   const items = value.map((item) => typeof item === 'string' ? item.trim() : null);
   if (items.some((item) => item === null || item.length === 0 || item.length > maxItemLength)) return null;
   return items as string[];
+}
+
+function boundedInteger(
+  value: unknown,
+  minimum: number,
+  maximum: number,
+  fallback: number,
+): number | null {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value !== 'number' || !Number.isInteger(value)) return null;
+  if (value < minimum || value > maximum) return null;
+  return value;
+}
+
+function attemptList(value: unknown): GoalfixAttempt[] | null {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.length > 20) return null;
+
+  const attempts: GoalfixAttempt[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+    const row = item as Record<string, unknown>;
+    const approach = optionalString(row['approach'], 500);
+    const filesTouched = stringList(row['filesTouched'], 20, 300);
+    const result = row['result'];
+    if (
+      !approach
+      || !filesTouched
+      || (result !== 'passed' && result !== 'failed' && result !== 'blocked')
+    ) return null;
+
+    attempts.push({
+      approach,
+      failureSignature: optionalString(row['failureSignature'], 500),
+      filesTouched,
+      verificationName: optionalString(row['verificationName'], 200),
+      result,
+    });
+  }
+
+  return attempts;
 }
 
 function safeRef(value: unknown): string | null {
@@ -93,6 +137,7 @@ async function persistGoalfixAudit(input: GoalfixAuditInput): Promise<boolean> {
       expected_signal_count: input.expectedSignalCount,
       error_class: input.errorClass ?? null,
       skill: 'goalfix',
+      skill_runtime: 'goalfix-skill-runtime-v1',
     },
   });
   return !error;
@@ -115,6 +160,8 @@ goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
   const constraints = stringList(body['constraints'], 20, 300);
   const firstFilesOrLogs = stringList(body['firstFilesOrLogs'], 20, 300);
   const expectedVerificationNames = stringList(body['expectedVerificationNames'], 20, 200);
+  const intentAssumptions = stringList(body['intentAssumptions'], 20, 300);
+  const attempts = attemptList(body['attempts']);
 
   if (!projectSlug || !SLUG_PATTERN.test(projectSlug)) {
     return res.status(400).json({ error: 'projectSlug must be lowercase alphanumeric segments separated by hyphens' });
@@ -125,23 +172,70 @@ goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
   if (!targetRef) {
     return res.status(400).json({ error: 'targetRef contains an unsupported ref format' });
   }
-  if (!constraints || !firstFilesOrLogs || !expectedVerificationNames) {
+  if (!constraints || !firstFilesOrLogs || !expectedVerificationNames || !intentAssumptions || !attempts) {
     return res.status(400).json({
-      error: 'constraints, firstFilesOrLogs, and expectedVerificationNames must be bounded arrays of non-empty strings',
+      error: 'constraints, firstFilesOrLogs, expectedVerificationNames, intentAssumptions, and attempts must be bounded valid values',
     });
   }
   if (expectedVerificationNames.length === 0) {
     return res.status(400).json({ error: 'expectedVerificationNames must contain at least one required check name' });
   }
 
+  const maxInitialReads = boundedInteger(
+    body['maxInitialReads'],
+    1,
+    20,
+    Math.max(1, Math.min(firstFilesOrLogs.length || 1, 5)),
+  );
+  if (maxInitialReads === null) {
+    return res.status(400).json({ error: 'maxInitialReads must be an integer between 1 and 20' });
+  }
+
+  const artifactSha256 = optionalString(body['artifactSha256'], 64);
+  if (
+    body['artifactSha256'] !== undefined
+    && body['artifactSha256'] !== null
+    && body['artifactSha256'] !== ''
+    && (!artifactSha256 || !SHA256_PATTERN.test(artifactSha256))
+  ) {
+    return res.status(400).json({ error: 'artifactSha256 must be a 64-character hexadecimal SHA-256 value' });
+  }
+
+  const runtimeDecision = buildGoalfixSkillRuntimeDecision({
+    intent: {
+      raw: desiredOutcome,
+      resolved: optionalString(body['resolvedIntent'], 1_000),
+      assumptions: intentAssumptions,
+    },
+    attempts,
+    scope: {
+      firstFilesOrLogs,
+      maxInitialReads,
+      stopCondition: optionalString(body['stopCondition'], 500) ?? '',
+    },
+    provenance: {
+      artifactSha256,
+      sourceName: optionalString(body['artifactSourceName'], 300),
+    },
+  });
+
+  if (!runtimeDecision.mayProceed) {
+    res.set('Cache-Control', 'no-store');
+    return res.status(409).json({
+      error: runtimeDecision.nextAction,
+      code: 'GOALFIX_RUNTIME_BLOCKED',
+      skillRuntime: runtimeDecision,
+    });
+  }
+
   const goal: FounderGoal = {
-    desiredOutcome,
+    desiredOutcome: runtimeDecision.intent.resolved,
     reason: optionalString(body['reason'], 2_000),
     constraints,
     suspectedFailureArea: optionalString(body['suspectedFailureArea'], 500),
-    firstFilesOrLogs,
+    firstFilesOrLogs: runtimeDecision.scope.firstFilesOrLogs,
     expectedVerificationNames,
-    stopCondition: optionalString(body['stopCondition'], 500),
+    stopCondition: runtimeDecision.scope.stopCondition,
   };
 
   const { data, error } = await supabase
@@ -248,5 +342,5 @@ goalfixRouter.post('/inspect', async (req: FounderRequest, res) => {
   }
 
   res.set('Cache-Control', 'no-store');
-  return res.json(report);
+  return res.json({ ...report, skillRuntime: runtimeDecision });
 });
