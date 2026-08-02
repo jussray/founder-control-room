@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { buildGoalfixSkillRuntimeDecision } from '../skillRuntime.js';
 
 describe('buildGoalfixSkillRuntimeDecision', () => {
-  it('permits a scoped high-confidence inspection', () => {
+  it('permits a scoped confirmed inspection', () => {
     const decision = buildGoalfixSkillRuntimeDecision({
-      intent: { raw: 'Audit the skill artifact against current main.' },
+      intent: { raw: 'Audit the skill artifact against current main.', confirmed: true },
       scope: {
         firstFilesOrLogs: ['src/goalfix/engine.ts', 'src/goalfix/engine.ts', 'package.json'],
         maxInitialReads: 1,
@@ -17,6 +17,7 @@ describe('buildGoalfixSkillRuntimeDecision', () => {
     });
 
     expect(decision.mayProceed).toBe(true);
+    expect(decision.intent.confirmed).toBe(true);
     expect(decision.scope.firstFilesOrLogs).toEqual(['src/goalfix/engine.ts']);
     expect(decision.scope.maxInitialReads).toBe(1);
     expect(decision.provenance.sourceName).toBe('ai-skill-suite.zip');
@@ -24,7 +25,7 @@ describe('buildGoalfixSkillRuntimeDecision', () => {
 
   it('deduplicates before applying the read budget', () => {
     const decision = buildGoalfixSkillRuntimeDecision({
-      intent: { raw: 'Inspect only the first two unique sources.' },
+      intent: { raw: 'Inspect only the first two unique sources.', confirmed: true },
       scope: {
         firstFilesOrLogs: ['a.ts', 'a.ts', 'b.ts', 'c.ts'],
         maxInitialReads: 2,
@@ -35,9 +36,9 @@ describe('buildGoalfixSkillRuntimeDecision', () => {
     expect(decision.scope.firstFilesOrLogs).toEqual(['a.ts', 'b.ts']);
   });
 
-  it('blocks low-confidence intent', () => {
+  it('blocks a nonempty raw-only goal without confirmation', () => {
     const decision = buildGoalfixSkillRuntimeDecision({
-      intent: { raw: '', resolved: '' },
+      intent: { raw: 'cont the skill thing' },
       scope: {
         firstFilesOrLogs: ['src/goalfix/engine.ts'],
         maxInitialReads: 1,
@@ -45,13 +46,14 @@ describe('buildGoalfixSkillRuntimeDecision', () => {
       },
     });
 
+    expect(decision.intent.confidence).toBe('low');
     expect(decision.mayProceed).toBe(false);
     expect(decision.nextAction).toContain('Resolve the founder intent');
   });
 
   it('blocks a repeated same-signature failure loop', () => {
     const decision = buildGoalfixSkillRuntimeDecision({
-      intent: { raw: 'Repair the exact failing check.' },
+      intent: { raw: 'Repair the exact failing check.', confirmed: true },
       attempts: [
         {
           approach: 'rerun',
@@ -80,7 +82,7 @@ describe('buildGoalfixSkillRuntimeDecision', () => {
 
   it('requires a stop condition and clamps the initial read budget', () => {
     const decision = buildGoalfixSkillRuntimeDecision({
-      intent: { raw: 'Inspect the branch.' },
+      intent: { raw: 'Inspect the branch.', confirmed: true },
       scope: {
         firstFilesOrLogs: ['package.json'],
         maxInitialReads: 0,
