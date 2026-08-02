@@ -81,16 +81,17 @@ const server = createServer((req, res) => {
         if (
           payload.projectSlug !== 'sekret-bip'
           || !payload.desiredOutcome
+          || payload.resolvedIntent !== payload.desiredOutcome
           || payload.stopCondition !== STOP_CONDITION
           || JSON.stringify(payload.expectedVerificationNames) !== JSON.stringify(REQUIRED_CHECKS)
         ) {
-          throw new Error('Proof request did not preserve the founder goal, stop condition, and required check set.');
+          throw new Error('Proof request did not preserve the confirmed founder goal, stop condition, and required check set.');
         }
 
         const attempts = Array.isArray(payload.attempts) ? payload.attempts : [];
         requestAttemptCounts.push(attempts.length);
         const runtimeDecision = buildGoalfixSkillRuntimeDecision({
-          intent: { raw: payload.desiredOutcome },
+          intent: { raw: payload.desiredOutcome, resolved: payload.resolvedIntent },
           attempts,
           scope: {
             firstFilesOrLogs: Array.isArray(payload.firstFilesOrLogs) ? payload.firstFilesOrLogs : [],
@@ -184,6 +185,7 @@ async function proveViewport(name, viewport) {
 
   await page.goto(`${baseUrl}/control-room/goalfix.html`, { waitUntil: 'networkidle' });
   await page.fill('[name="desiredOutcome"]', 'Keep the public welcome available before login.');
+  await page.check('[name="intentConfirmed"]');
   await page.fill('[name="reason"]', 'Preserve the front door without weakening protected routes.');
   await page.fill('[name="constraints"]', 'Read-only inspection\nNo deployment');
   await page.fill('[name="firstFilesOrLogs"]', 'app/_layout.tsx\nProduct Design Playwright Proof');
@@ -191,7 +193,7 @@ async function proveViewport(name, viewport) {
   await page.fill('[name="stopCondition"]', STOP_CONDITION);
 
   const firstResponse = await submitInspection(page);
-  assert(firstResponse.status() === 200, `${name}: first inspection executes`);
+  assert(firstResponse.status() === 200, `${name}: confirmed first inspection executes`);
   await page.locator('[data-state="blocked"]').waitFor({ state: 'visible' });
 
   const text = await page.locator('#goalfix-result').innerText();
@@ -253,5 +255,5 @@ if (failures > 0) {
   console.error(`Goalfix browser proof failed with ${failures} assertion(s).`);
   process.exitCode = 1;
 } else {
-  console.log('Goalfix browser proof passed for desktop and mobile, including stagnation and reorientation.');
+  console.log('Goalfix browser proof passed for desktop and mobile, including confirmation, stagnation, and reorientation.');
 }
