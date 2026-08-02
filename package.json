@@ -28,6 +28,7 @@
     "verify:mcp": "node scripts/verify-mcp-config.mjs",
     "verify:terminal-contract": "node scripts/verify-guarded-terminal-contract.mjs",
     "verify:juss-flow": "node scripts/verify-juss-flow-launch-loop.mjs",
+    "verify:production-authority": "node scripts/verify-production-deploy-authority.mjs",
     "verify:ai-skills": "node scripts/verify-ai-skill-contract.mjs && node scripts/verify-mirror-and-fact-check-contract.mjs && node scripts/verify-founder-intelligence-inheritance.mjs && node scripts/verify-agent-fleet-skills.mjs && node scripts/verify-zapier-task-budget.mjs && node tools/zapier/test-buffer-content-firewall.cjs && node tools/zapier/test-buffer-review-window.cjs && node tools/zapier/test-buffer-provider-contract.cjs",
     "verify:zapier-budget": "node scripts/verify-zapier-task-budget.mjs && node tools/zapier/test-buffer-content-firewall.cjs && node tools/zapier/test-buffer-review-window.cjs && node tools/zapier/test-buffer-provider-contract.cjs",
     "verify:buffer-content": "node tools/zapier/test-buffer-content-firewall.cjs && node tools/zapier/test-buffer-review-window.cjs && node tools/zapier/test-buffer-provider-contract.cjs",
@@ -62,7 +63,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260708.1",
     "@playwright/test": "^1.45.0",
-    "@types/cors": "^2.8.19",
+    "@types/cors": "^8.2.19",
     "@types/express": "^4.17.21",
     "@types/node": "^22.5.4",
     "@types/supertest": "^6.0.0",
