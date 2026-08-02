@@ -6,10 +6,10 @@ const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const LAB_ROOT = join(ROOT, 'src', 'founder-os-lab');
 
 const forbiddenPatterns = [
-  { pattern: /process\.env/, label: 'environment read' },
+  { pattern: /\bprocess\./, label: 'process access' },
   { pattern: /\bfetch\s*\(/, label: 'network fetch' },
   { pattern: /globalThis\.fetch/, label: 'global network fetch' },
-  { pattern: /from\s+['"](?:node:)?(?:fs|http|https|net|tls|child_process)['"]/, label: 'side-effecting Node import' },
+  { pattern: /from\s+['"](?:node:)?(?:fs|http|https|net|tls|child_process|worker_threads)['"]/, label: 'side-effecting Node import' },
   { pattern: /from\s+['"][^'"]*supabase/i, label: 'Supabase import' },
   { pattern: /from\s+['"][^'"]*providerFactory/i, label: 'provider factory import' },
   { pattern: /from\s+['"]@octokit\//, label: 'GitHub client import' },
@@ -19,6 +19,13 @@ const forbiddenPatterns = [
   { pattern: /\.update\s*\(/, label: 'database update' },
   { pattern: /\.delete\s*\(/, label: 'database delete' },
   { pattern: /executeFirstPartyPublication/, label: 'live social adapter execution' },
+  { pattern: /\beval\s*\(|new\s+Function\b|node:vm/, label: 'dynamic code evaluation' },
+  { pattern: /\bimport\s*\(/, label: 'dynamic import' },
+  { pattern: /\brequire\s*\(/, label: 'CommonJS module loading' },
+  { pattern: /\b(setTimeout|setInterval|setImmediate)\s*\(/, label: 'timer scheduling' },
+  { pattern: /Date\.now\s*\(|new\s+Date\s*\(|performance\.now\s*\(/, label: 'wall clock read' },
+  { pattern: /Math\.random\s*\(|randomUUID|node:crypto/, label: 'randomness' },
+  { pattern: /\bWorker\b/, label: 'worker execution' },
 ];
 
 async function collectTypeScriptFiles(directory) {
@@ -37,8 +44,8 @@ async function collectTypeScriptFiles(directory) {
 const failures = [];
 const files = await collectTypeScriptFiles(LAB_ROOT);
 
-if (files.length < 4) {
-  failures.push(`expected at least four TypeScript lab files, found ${files.length}`);
+if (files.length < 5) {
+  failures.push(`expected at least five TypeScript lab files, found ${files.length}`);
 }
 
 for (const file of files) {
@@ -52,6 +59,7 @@ for (const file of files) {
 const contracts = await readFile(join(LAB_ROOT, 'contracts.ts'), 'utf8');
 const engine = await readFile(join(LAB_ROOT, 'engine.ts'), 'utf8');
 const registry = await readFile(join(LAB_ROOT, 'registry.ts'), 'utf8');
+const sandbox = await readFile(join(LAB_ROOT, 'sandbox.ts'), 'utf8');
 
 for (const required of [
   'externalCalls: false',
@@ -63,7 +71,7 @@ for (const required of [
   "mode: 'simulation'",
   "level: 'L0'",
 ]) {
-  if (!contracts.includes(required) && !engine.includes(required)) {
+  if (!contracts.includes(required) && !engine.includes(required) && !sandbox.includes(required)) {
     failures.push(`missing isolation invariant ${JSON.stringify(required)}`);
   }
 }
@@ -77,6 +85,23 @@ for (const required of [
   if (!engine.includes(required) && !registry.includes(required)) {
     failures.push(`missing routing invariant ${JSON.stringify(required)}`);
   }
+}
+
+for (const required of [
+  "FOUNDER_OS_SANDBOX_VERSION = 'founder-os-sandbox-v1'",
+  'network: false',
+  'providers: false',
+  'database: false',
+  'filesystem: false',
+  'environment: false',
+  'subprocess: false',
+  'secrets: false',
+  'dynamicCode: false',
+  'wallClock: false',
+  'randomness: false',
+  'publicUrls: false',
+]) {
+  if (!sandbox.includes(required)) failures.push(`sandbox missing invariant ${JSON.stringify(required)}`);
 }
 
 if (failures.length > 0) {
