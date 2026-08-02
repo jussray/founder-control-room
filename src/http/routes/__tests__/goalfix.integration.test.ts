@@ -220,6 +220,7 @@ describe('POST /goalfix/inspect', () => {
       .set('Authorization', BEARER)
       .send({
         ...validPayload(),
+        maxInitialReads: 1,
         resolvedIntent: 'Preserve the public welcome while keeping protected routes guarded.',
         intentAssumptions: ['The public welcome is the current founder priority.'],
         artifactSha256: 'a'.repeat(64),
@@ -270,6 +271,7 @@ describe('POST /goalfix/inspect', () => {
       target: { name: 'main', commitSha: SHA },
       goal: {
         desiredOutcome: 'Preserve the public welcome while keeping protected routes guarded.',
+        firstFilesOrLogs: ['app/_layout.tsx'],
         expectedVerificationNames: ['Typecheck', 'Playwright'],
       },
       skillRuntime: {
@@ -280,6 +282,11 @@ describe('POST /goalfix/inspect', () => {
           resolved: 'Preserve the public welcome while keeping protected routes guarded.',
           confidence: 'medium',
           assumptions: ['The public welcome is the current founder priority.'],
+        },
+        scope: {
+          firstFilesOrLogs: ['app/_layout.tsx'],
+          maxInitialReads: 1,
+          stopCondition: 'Stop after every named exact-head check has completed.',
         },
         provenance: {
           artifactSha256: 'a'.repeat(64),
