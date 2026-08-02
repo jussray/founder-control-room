@@ -9,7 +9,8 @@ const {
   BUFFER_PROVIDER_METHOD,
   BUFFER_API_SAVE_TO_DRAFT,
   BUFFER_REVIEW_WINDOW_MINUTES,
-  BUFFER_SCHEDULE_AUTHORITY,
+  BUFFER_SCHEDULE_POLICY_ID,
+  BUFFER_AUTHORIZATION_MODE,
   BUFFER_NOTIFICATION_MODE,
 } = require('./buffer-content-firewall.cjs');
 
@@ -30,7 +31,9 @@ assert.equal(contract.notification.provider, 'gmail');
 assert.equal(contract.notification.required, true);
 assert.equal(contract.notification.failurePolicy, 'cancel_scheduled_batch');
 assert.equal(contract.authority.publishAllowed, true);
-assert.equal(contract.authority.standingAuthorityId, BUFFER_SCHEDULE_AUTHORITY);
+assert.equal(contract.authority.schedulePolicyId, BUFFER_SCHEDULE_POLICY_ID);
+assert.equal(contract.authority.requiredAuthorizationMode, BUFFER_AUTHORIZATION_MODE);
+assert.equal(contract.authority.requiresRuntimeMintedReceipt, true);
 assert.equal(contract.authority.liveProviderMutationIncluded, false);
 
 const baseInput = {
@@ -46,10 +49,14 @@ const baseInput = {
   proof_url: 'https://github.com/jussray/founder-control-room/pull/221',
   source_commit_sha: '38d8e5bd40594915407126915177f98c6ef983d9',
   generated_at: '2026-08-02T21:00:00.000Z',
+  invocation_id: '3f10e0f9-b0b4-4e64-b9ff-c5f10f848067',
+  steering_grant_id: 'founder-approved-auto-distribution-v1',
+  founder_approval_id: 'standing-policy:founder-approved-auto-distribution-v1:3f10e0f9-b0b4-4e64-b9ff-c5f10f848067',
+  authorization_mode: BUFFER_AUTHORIZATION_MODE,
   batch_id: '66cf315f-e1a0-4aad-9c76-355f1df30b54',
   batch_size: 1,
   batch_index: 1,
-  schedule_authority_id: BUFFER_SCHEDULE_AUTHORITY,
+  schedule_policy_id: BUFFER_SCHEDULE_POLICY_ID,
   notification_mode: BUFFER_NOTIFICATION_MODE,
 };
 
@@ -62,6 +69,7 @@ assert.equal(prepared.destination_mode, 'schedule');
 assert.equal(prepared.publish_allowed, true);
 assert.equal(prepared.review_window_minutes, contract.reviewWindow.minutes);
 assert.equal(prepared.notification_mode, BUFFER_NOTIFICATION_MODE);
+assert.equal(prepared.authorization_receipt_verified, true);
 
 for (const destinationMode of contract.zapier.rejectedMethods) {
   assert.throws(
@@ -81,6 +89,11 @@ assert.throws(
   /publish_allowed must be true/,
 );
 
+assert.throws(
+  () => validateBufferPublishInput({ ...baseInput, founder_approval_id: 'standing-policy:wrong:receipt' }, { nowMs }),
+  /runtime-minted receipt/,
+);
+
 const callerOverride = validateBufferPublishInput({
   ...baseInput,
   method: 'share_now',
@@ -93,4 +106,4 @@ assert.equal(callerOverride.buffer_method, 'schedule');
 assert.equal(callerOverride.buffer_save_to_draft, false);
 assert.equal(callerOverride.scheduled_at, '2026-08-02T21:20:00.000Z');
 
-console.log('Buffer provider contract verified against executable scheduling code: one owned 20-minute schedule, required Gmail review digest, fail-closed notification compensation, and no share-now override.');
+console.log('Buffer provider contract verified against executable scheduling code: runtime-minted standing authorization, one owned 20-minute schedule, required Gmail review digest, fail-closed notification compensation, and no share-now override.');
