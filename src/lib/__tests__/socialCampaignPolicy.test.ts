@@ -6,6 +6,7 @@ import {
 } from '../socialCampaignPolicy.js';
 
 const VALID_HEAD = 'a'.repeat(40);
+const APPROVED_PROOF_ROOT = 'https://github.com/jussray/example';
 
 function repo(overrides: Partial<RepositoryEvidence> = {}): RepositoryEvidence {
   return {
@@ -17,7 +18,7 @@ function repo(overrides: Partial<RepositoryEvidence> = {}): RepositoryEvidence {
     recentMergedPullRequests: 2,
     policy: {
       containsMinorOrSensitiveData: false,
-      publicProofUrls: [],
+      publicProofUrls: [APPROVED_PROOF_ROOT],
       neverClaim: [],
       neverExpose: [],
     },
@@ -70,7 +71,7 @@ describe('classifyRepositoryForContent', () => {
         policy: {
           containsMinorOrSensitiveData: false,
           configuredMode: 'blocked_pending_output_safeguard',
-          publicProofUrls: ['https://github.com/jussray/example'],
+          publicProofUrls: [APPROVED_PROOF_ROOT],
           neverClaim: [],
           neverExpose: [],
         },
@@ -121,7 +122,7 @@ describe('classifyRepositoryForContent', () => {
         policy: {
           containsMinorOrSensitiveData: false,
           configuredMode: 'full_campaign',
-          publicProofUrls: ['https://github.com/jussray/example'],
+          publicProofUrls: [APPROVED_PROOF_ROOT],
           neverClaim: [],
           neverExpose: [],
         },
@@ -148,7 +149,7 @@ describe('buildFirstPartySocialPostInput', () => {
     governanceAdvantage: 'Evidence-first, approval-gated by design.',
     audienceValue: 'See how the system actually verifies its own claims.',
     investorSignal: 'Consistent, reviewable shipping cadence.',
-    proofLinks: [{ label: 'PR', url: 'https://github.com/jussray/founder-control-room/pull/188' }],
+    proofLinks: [{ label: 'PR', url: `${APPROVED_PROOF_ROOT}/pull/188` }],
   };
 
   it('refuses to build input for an ineligible repository', () => {
@@ -186,7 +187,7 @@ describe('buildFirstPartySocialPostInput', () => {
     const source = repo({
       policy: {
         containsMinorOrSensitiveData: false,
-        publicProofUrls: ['https://github.com/jussray/example'],
+        publicProofUrls: [APPROVED_PROOF_ROOT],
         neverClaim: ['SOC 2 certified'],
         neverExpose: ['vendor margin'],
       },
@@ -206,6 +207,77 @@ describe('buildFirstPartySocialPostInput', () => {
         traction: 'The vendor margin is now visible.',
       }),
     ).toThrow(/neverExpose/);
+  });
+
+  it('blocks punctuation, whitespace, and Unicode obfuscation of prohibited claims', () => {
+    const source = repo({
+      policy: {
+        containsMinorOrSensitiveData: false,
+        publicProofUrls: [APPROVED_PROOF_ROOT],
+        neverClaim: ['SOC 2 certified'],
+        neverExpose: [],
+      },
+    });
+    const eligible = classifyRepositoryForContent(source);
+
+    expect(() =>
+      buildFirstPartySocialPostInput(eligible, source, {
+        ...draft,
+        text: `${draft.text} We are Ｓ.Ｏ.Ｃ.—２   certified.`,
+      }),
+    ).toThrow(/neverClaim/);
+  });
+
+  it('checks media alt text and percent-decoded URLs for prohibited exposure', () => {
+    const source = repo({
+      policy: {
+        containsMinorOrSensitiveData: false,
+        publicProofUrls: [APPROVED_PROOF_ROOT],
+        neverClaim: [],
+        neverExpose: ['vendor margin'],
+      },
+    });
+    const eligible = classifyRepositoryForContent(source);
+
+    expect(() =>
+      buildFirstPartySocialPostInput(eligible, source, {
+        ...draft,
+        media: [{ type: 'image', url: 'https://example.com/proof.png', altText: 'Vendor—margin chart' }],
+      }),
+    ).toThrow(/neverExpose/);
+
+    expect(() =>
+      buildFirstPartySocialPostInput(eligible, source, {
+        ...draft,
+        proofLinks: [{ label: 'Proof', url: `${APPROVED_PROOF_ROOT}/vendor%20margin` }],
+      }),
+    ).toThrow(/neverExpose/);
+  });
+
+  it('rejects proof links outside the repository-approved public roots', () => {
+    const source = repo();
+    const eligible = classifyRepositoryForContent(source);
+
+    expect(() =>
+      buildFirstPartySocialPostInput(eligible, source, {
+        ...draft,
+        proofLinks: [{ label: 'Unapproved proof', url: 'https://example.com/unapproved' }],
+      }),
+    ).toThrow(/unapproved proof URL/);
+  });
+
+  it('rejects draft construction when no public proof URL is approved', () => {
+    const source = repo({
+      policy: {
+        containsMinorOrSensitiveData: false,
+        publicProofUrls: [],
+        neverClaim: [],
+        neverExpose: [],
+      },
+    });
+    const eligible = classifyRepositoryForContent(source);
+
+    expect(() => buildFirstPartySocialPostInput(eligible, source, draft)).toThrow(/no approved public proof URLs/);
   });
 
   it('always builds draft-mode input, never queue or publish', () => {
