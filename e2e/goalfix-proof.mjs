@@ -19,6 +19,14 @@ function normalizeSignalName(value) {
   return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
+function normalizedRequiredNames(values) {
+  return [...new Set(
+    (Array.isArray(values) ? values : [])
+      .map(normalizeSignalName)
+      .filter(Boolean),
+  )].sort();
+}
+
 function buildProofReport(commitSha) {
   const unrelatedSignals = Array.from({ length: 25 }, (_, index) => ({
     id: `noise-${index}`,
@@ -111,7 +119,8 @@ const server = createServer((req, res) => {
           || !payload.desiredOutcome
           || payload.resolvedIntent !== payload.desiredOutcome
           || payload.stopCondition !== STOP_CONDITION
-          || JSON.stringify(payload.expectedVerificationNames) !== JSON.stringify(REQUIRED_CHECKS)
+          || JSON.stringify(normalizedRequiredNames(payload.expectedVerificationNames))
+            !== JSON.stringify(normalizedRequiredNames(REQUIRED_CHECKS))
         ) {
           throw new Error('Proof request did not preserve the confirmed founder goal, stop condition, and required check set.');
         }
@@ -270,6 +279,10 @@ async function proveViewport(name, viewport) {
     `${name}: second inspection adds one observation per required check`,
   );
 
+  await page.fill(
+    '[name="expectedVerificationNames"]',
+    [...REQUIRED_CHECKS].reverse().join('\n'),
+  );
   const thirdResponse = await submitInspection(page);
   assert(thirdResponse.status() === 409, `${name}: third repeated same-head inspection is blocked`);
   const errorText = await page.locator('#goalfix-message').innerText();
