@@ -10,12 +10,19 @@ import { runCompanySimulation } from '../labs/ai-company/src/company.mjs';
 
 const require = createRequire(import.meta.url);
 const { validateBufferPublishInput } = require('../tools/zapier/buffer-content-firewall.cjs') as {
-  validateBufferPublishInput(input: Record<string, unknown>): Record<string, unknown>;
+  validateBufferPublishInput(
+    input: Record<string, unknown>,
+    options?: { nowMs?: number },
+  ): Record<string, unknown>;
 };
 
 const ROOT = resolve(fileURLToPath(new URL('../', import.meta.url)));
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const PROOF_URL = 'https://proof.example.test/cross-lab-parity';
+const GENERATED_AT = '2026-08-02T21:00:00.000Z';
+const INVOCATION_ID = '3f10e0f9-b0b4-4e64-b9ff-c5f10f848067';
+const GRANT_ID = 'founder-approved-auto-distribution-v1';
+const REVIEW_BATCH_ID = '66cf315f-e1a0-4aad-9c76-355f1df30b54';
 
 function socialPost(
   mode: 'draft' | 'queue' | 'publish',
@@ -161,39 +168,67 @@ describe('Founder OS and AI Company cross-lab parity', () => {
     expect(company.receipts).toEqual([]);
   });
 
-  it('keeps Buffer provider output draft-only even when callers request unsafe overrides', () => {
-    const output = validateBufferPublishInput({
-      post_text: socialPost('draft').text,
+  it('keeps sandbox execution disabled while the external Buffer firewall requires exact schedule authority', () => {
+    const nowMs = Date.parse('2026-08-02T21:01:00.000Z');
+    const validSchedule = {
+      post_text: socialPost('publish').text,
       content_field: 'linkedin_draft',
       channel: 'synthetic-founder-linkedin',
-      destination_mode: 'draft',
-      publish_allowed: false,
+      destination_mode: 'schedule',
+      publish_allowed: true,
       proof_url: PROOF_URL,
       source_commit_sha: SHA,
+      generated_at: GENERATED_AT,
+      batch_id: REVIEW_BATCH_ID,
+      batch_size: 1,
+      batch_index: 1,
+      invocation_id: INVOCATION_ID,
+      steering_grant_id: GRANT_ID,
+      founder_approval_id: `standing-policy:${GRANT_ID}:${INVOCATION_ID}`,
+      authorization_mode: 'standing-policy',
+      schedule_policy_id: 'buffer-20-minute-review-v1',
+      notification_mode: 'gmail_campaign_digest',
       buffer_method: 'share_now',
-      buffer_save_to_draft: false,
-    });
+      scheduled_at: '2026-08-02T21:01:01.000Z',
+    };
 
+    const output = validateBufferPublishInput(validSchedule, { nowMs });
     expect(output).toMatchObject({
-      destination_mode: 'draft',
-      publish_allowed: false,
+      destination_mode: 'schedule',
+      publish_allowed: true,
+      authorization_receipt_verified: true,
       buffer_action: 'buffer_add_to_queue',
-      buffer_method: 'draft',
-      buffer_save_to_draft: true,
+      buffer_method: 'schedule',
+      buffer_save_to_draft: false,
+      scheduled_at: '2026-08-02T21:20:00.000Z',
+      share_now_allowed: false,
     });
 
-    for (const destinationMode of ['queue', 'publish']) {
+    expect(() => validateBufferPublishInput({
+      ...validSchedule,
+      founder_approval_id: 'standing-policy:copied:or-forged',
+    }, { nowMs })).toThrow(/runtime-minted receipt/);
+
+    for (const destinationMode of ['draft', 'queue', 'publish', 'share_now']) {
       expect(() => validateBufferPublishInput({
-        post_text: socialPost('draft').text,
-        content_field: 'linkedin_draft',
-        channel: 'synthetic-founder-linkedin',
+        ...validSchedule,
         destination_mode: destinationMode,
-        publish_allowed: true,
-        founder_approval_id: 'founder-approved:unsafe-override',
-        proof_url: PROOF_URL,
-        source_commit_sha: SHA,
-      })).toThrow(/destination_mode must remain draft[\s\S]*publish_allowed must remain false/);
+      }, { nowMs })).toThrow(/destination_mode must be schedule/);
     }
+
+    const founderPlan = planFounderOsLab({
+      goal: 'Simulate a scheduled founder post without giving the lab provider access.',
+      action: 'queue-social',
+      approval: { id: 'founder-approved:synthetic-parity', actions: ['queue-social'] },
+      evidence: {
+        repository: 'jussray/founder-control-room',
+        commitSha: SHA,
+        proofUrls: [PROOF_URL],
+      },
+      socialPost: socialPost('queue'),
+    });
+    expect(founderPlan.authority.executionAllowed).toBe(false);
+    expect(runCompanySimulation(companyInput()).liveSideEffects).toBe(false);
   });
 
   it('rejects provider, network, database, route, secret, and process capabilities in both runtime trees', () => {
