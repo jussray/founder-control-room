@@ -40,6 +40,33 @@ function isFiniteNonNegative(value) {
   return Number.isFinite(value) && value >= 0;
 }
 
+function resolveLimits(overrides) {
+  const limits = { ...DEFAULT_ADVERSARIAL_LIMITS };
+  const blockers = [];
+
+  if (overrides === undefined) return { limits, blockers };
+  if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides)) {
+    return { limits, blockers: ['invalid_limit_override'] };
+  }
+
+  const allowedKeys = new Set(Object.keys(DEFAULT_ADVERSARIAL_LIMITS));
+  for (const key of Object.keys(overrides)) {
+    if (!allowedKeys.has(key)) blockers.push('invalid_limit_override');
+  }
+
+  for (const [key, ceiling] of Object.entries(DEFAULT_ADVERSARIAL_LIMITS)) {
+    if (!(key in overrides)) continue;
+    const value = overrides[key];
+    if (!Number.isInteger(value) || !isFiniteNonNegative(value)) {
+      blockers.push('invalid_limit_override');
+      continue;
+    }
+    limits[key] = Math.min(ceiling, value);
+  }
+
+  return { limits, blockers: unique(blockers) };
+}
+
 function campaignKey(companyInput) {
   const platforms = [...(companyInput?.platforms ?? [])].sort().join(',');
   return [
@@ -67,10 +94,10 @@ function inspectClaimedReceipt(receipt, expectedEventId) {
 export function evaluateAdversarialEnvelope(envelope) {
   const blockers = [];
   const signals = [];
-  const limits = {
-    ...DEFAULT_ADVERSARIAL_LIMITS,
-    ...(envelope?.limits ?? {}),
-  };
+  const resolvedLimits = resolveLimits(envelope?.limits);
+  const limits = resolvedLimits.limits;
+  blockers.push(...resolvedLimits.blockers);
+
   const companyInput = envelope?.companyInput;
   const requestedMode = companyInput?.requestedMode;
   const key = campaignKey(companyInput);
