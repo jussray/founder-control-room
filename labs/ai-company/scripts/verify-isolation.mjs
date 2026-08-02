@@ -20,11 +20,12 @@ async function walk(directory) {
 }
 
 const bannedPatterns = [
-  ['environment variables', /process\.env/],
+  ['process access', /\bprocess\./],
   ['outbound fetch', /\bfetch\s*\(/],
   ['HTTP client', /node:https?|from\s+['"]https?['"]/],
   ['network socket', /node:(net|tls|dns|dgram)/],
   ['subprocess', /node:child_process/],
+  ['worker execution', /node:worker_threads|\bWorker\b/],
   ['WebSocket', /\bWebSocket\b/],
   ['Axios', /\baxios\b/i],
   ['GitHub client', /@octokit|github\.com\/repos/i],
@@ -33,6 +34,12 @@ const bannedPatterns = [
   ['Buffer live client', /BUFFER_ACCESS_TOKEN|api\.buffer\.com/i],
   ['HubSpot client', /HUBSPOT_ACCESS_TOKEN|api\.hubapi\.com/i],
   ['filesystem mutation', /\b(writeFile|appendFile|rm|unlink|rename|mkdir)\s*\(/],
+  ['dynamic code evaluation', /\beval\s*\(|new\s+Function\b|node:vm/],
+  ['dynamic import', /\bimport\s*\(/],
+  ['CommonJS module loading', /\brequire\s*\(/],
+  ['timers', /\b(setTimeout|setInterval|setImmediate)\s*\(/],
+  ['wall clock', /Date\.now\s*\(|new\s+Date\s*\(|performance\.now\s*\(/],
+  ['randomness', /Math\.random\s*\(|randomUUID|node:crypto/],
 ];
 
 const sourceFiles = (await walk(srcRoot)).filter((file) => file.endsWith('.mjs'));
@@ -74,6 +81,24 @@ for (const file of fixtureFiles) {
     'synthetic',
     `${path.relative(root, file)}: fixture must be synthetic`,
   );
+}
+
+const sandboxSource = await readFile(path.join(srcRoot, 'sandbox.mjs'), 'utf8');
+for (const invariant of [
+  "AI_COMPANY_SANDBOX_VERSION = 'ai-company-sandbox-v1'",
+  'network: false',
+  'providers: false',
+  'database: false',
+  'filesystem: false',
+  'environment: false',
+  'subprocess: false',
+  'secrets: false',
+  'dynamicCode: false',
+  'wallClock: false',
+  'randomness: false',
+  'publicUrls: false',
+]) {
+  assert.ok(sandboxSource.includes(invariant), `sandbox missing invariant ${invariant}`);
 }
 
 console.log(
