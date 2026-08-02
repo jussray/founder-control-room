@@ -1,6 +1,7 @@
 const RECEIPT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
 const COMMIT_SHA = /^[0-9a-f]{40}$/i;
+const SOURCE_REPO = 'jussray/jbh-private' as const;
 
 export const HAIR_COMMERCE_EVENTS = [
   'paid_order_recorded',
@@ -18,7 +19,7 @@ export type HairCommerceEvent = (typeof HAIR_COMMERCE_EVENTS)[number];
 
 export type HairCommerceReceipt = {
   receiptId: string;
-  sourceRepo: 'jussray/jbh-private';
+  sourceRepo: typeof SOURCE_REPO;
   orderRefHash: string;
   event: HairCommerceEvent;
   groupCount: number;
@@ -46,7 +47,7 @@ function boundedInteger(value: unknown, field: string): number {
   return value as number;
 }
 
-function githubEvidenceUrl(value: unknown): string | undefined {
+function githubEvidenceUrl(value: unknown, exactCommitSha: string): string | undefined {
   if (value === undefined) return undefined;
   if (typeof value !== 'string' || value.length > 500) {
     throw new HairCommerceReceiptError('invalid_evidence_url');
@@ -59,10 +60,22 @@ function githubEvidenceUrl(value: unknown): string | undefined {
     throw new HairCommerceReceiptError('invalid_evidence_url');
   }
 
-  if (parsed.protocol !== 'https:' || parsed.hostname !== 'github.com') {
+  const expectedPath = `/${SOURCE_REPO}/commit/${exactCommitSha}`;
+  const isBoundCommitUrl =
+    parsed.protocol === 'https:' &&
+    parsed.hostname === 'github.com' &&
+    parsed.port === '' &&
+    parsed.username === '' &&
+    parsed.password === '' &&
+    parsed.search === '' &&
+    parsed.hash === '' &&
+    parsed.pathname.toLowerCase() === expectedPath.toLowerCase();
+
+  if (!isBoundCommitUrl) {
     throw new HairCommerceReceiptError('invalid_evidence_url');
   }
-  return parsed.toString();
+
+  return `https://github.com${expectedPath}`;
 }
 
 export function validateHairCommerceReceipt(input: unknown): HairCommerceReceipt {
@@ -88,7 +101,7 @@ export function validateHairCommerceReceipt(input: unknown): HairCommerceReceipt
   if (typeof input.receiptId !== 'string' || !RECEIPT_ID.test(input.receiptId)) {
     throw new HairCommerceReceiptError('invalid_receipt_id');
   }
-  if (input.sourceRepo !== 'jussray/jbh-private') {
+  if (input.sourceRepo !== SOURCE_REPO) {
     throw new HairCommerceReceiptError('invalid_source_repo');
   }
   if (typeof input.orderRefHash !== 'string' || !SHA256.test(input.orderRefHash)) {
@@ -114,15 +127,17 @@ export function validateHairCommerceReceipt(input: unknown): HairCommerceReceipt
     throw new HairCommerceReceiptError('invalid_occurred_at');
   }
 
+  const exactCommitSha = input.exactCommitSha.toLowerCase();
+
   return {
     receiptId: input.receiptId.toLowerCase(),
-    sourceRepo: 'jussray/jbh-private',
+    sourceRepo: SOURCE_REPO,
     orderRefHash: input.orderRefHash.toLowerCase(),
     event: input.event as HairCommerceEvent,
     groupCount: boundedInteger(input.groupCount, 'group_count'),
     unresolvedCount: boundedInteger(input.unresolvedCount, 'unresolved_count'),
     occurredAt: occurredAt.toISOString(),
-    exactCommitSha: input.exactCommitSha.toLowerCase(),
-    evidenceUrl: githubEvidenceUrl(input.evidenceUrl),
+    exactCommitSha,
+    evidenceUrl: githubEvidenceUrl(input.evidenceUrl, exactCommitSha),
   };
 }
