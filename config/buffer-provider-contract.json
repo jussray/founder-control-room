@@ -41,7 +41,9 @@
       "channel",
       "fire_time",
       "buffer_post_id",
-      "review_token"
+      "review_token",
+      "founder_sender",
+      "gmail_thread_id"
     ],
     "failurePolicy": "cancel_scheduled_batch",
     "replyCommands": [
@@ -49,11 +51,15 @@
       "<channel>: cancel",
       "<channel>: <requested tweak>"
     ],
+    "replyIdentityPolicy": "exact_founder_sender_and_original_gmail_thread",
     "editPolicy": "regenerate_and_revalidate_before_buffer_update"
   },
   "authority": {
     "publishAllowed": true,
-    "standingAuthorityId": "checked-in-founder-policy:buffer-20-minute-review-v1",
+    "schedulePolicyId": "buffer-20-minute-review-v1",
+    "requiredAuthorizationMode": "standing-policy",
+    "requiresRuntimeMintedReceipt": true,
+    "receiptFormat": "standing-policy:<grantId>:<invocationId>",
     "requiresExactSourceCommit": true,
     "requiresHttpsProof": true,
     "liveProviderMutationIncluded": false
@@ -66,8 +72,7 @@
     ],
     "zapierPlanMustSupport": [
       "webhook_trigger",
-      "multi_step_workflow",
-      "delay"
+      "multi_step_workflow"
     ],
     "controlledSyntheticRunRequired": true,
     "exactReceiptCorrelationRequired": true
