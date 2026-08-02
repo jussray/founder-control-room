@@ -152,17 +152,18 @@ async function submitInspection(page) {
   return response;
 }
 
-async function storedAttemptCount(page) {
-  return page.evaluate(() => {
-    const key = Object.keys(sessionStorage).find((item) => item.startsWith('fcr_goalfix_attempts_v1:'));
-    if (!key) return 0;
-    try {
-      const value = JSON.parse(sessionStorage.getItem(key) ?? '[]');
-      return Array.isArray(value) ? value.length : 0;
-    } catch {
-      return -1;
-    }
-  });
+async function storedAttemptCounts(page) {
+  return page.evaluate(() => Object.keys(sessionStorage)
+    .filter((item) => item.startsWith('fcr_goalfix_attempts_v1:'))
+    .map((key) => {
+      try {
+        const value = JSON.parse(sessionStorage.getItem(key) ?? '[]');
+        return Array.isArray(value) ? value.length : -1;
+      } catch {
+        return -1;
+      }
+    })
+    .sort((left, right) => left - right));
 }
 
 async function proveViewport(name, viewport) {
@@ -201,17 +202,34 @@ async function proveViewport(name, viewport) {
   assert(text.includes('Typecheck: passed'), `${name}: passing required proof remains visible`);
   assert(text.includes('Product Design Playwright Proof: failed'), `${name}: failed required proof remains visible`);
   assert(text.includes('NEXT GATE'), `${name}: founder next gate renders`);
-  assert(await storedAttemptCount(page) === 2, `${name}: first verification result is retained in session`);
+  assert(
+    JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([2]),
+    `${name}: first verification result is retained in the current goal scope`,
+  );
 
   const secondResponse = await submitInspection(page);
   assert(secondResponse.status() === 200, `${name}: second inspection receives accumulated history`);
-  assert(await storedAttemptCount(page) === 4, `${name}: second verification result extends bounded history`);
+  assert(
+    JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([4]),
+    `${name}: second verification result extends bounded history`,
+  );
 
   const thirdResponse = await submitInspection(page);
   assert(thirdResponse.status() === 409, `${name}: third repeated inspection is blocked before provider work`);
   const errorText = await page.locator('#goalfix-message').innerText();
   assert(errorText.includes('Stop retrying the same path'), `${name}: founder sees stagnation reorientation`);
-  assert(await storedAttemptCount(page) === 4, `${name}: blocked inspection preserves prior evidence`);
+  assert(
+    JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([4]),
+    `${name}: blocked inspection preserves prior evidence`,
+  );
+
+  await page.fill('[name="suspectedFailureArea"]', 'Inspect a different provider evidence lane.');
+  const reorientedResponse = await submitInspection(page);
+  assert(reorientedResponse.status() === 200, `${name}: changed failure area opens a fresh evidence lane`);
+  assert(
+    JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([2, 4]),
+    `${name}: reoriented lane is isolated from the blocked history`,
+  );
   assert(pageErrors.length === 0, `${name}: no uncaught browser errors`);
   assert(failedRequests.length === 0, `${name}: no failed network requests`);
 
@@ -223,8 +241,8 @@ try {
   await proveViewport('desktop', { width: 1440, height: 1000 });
   await proveViewport('mobile', { width: 390, height: 844 });
   assert(
-    JSON.stringify(requestAttemptCounts) === JSON.stringify([0, 2, 4, 0, 2, 4]),
-    'desktop and mobile submit bounded attempt history in the expected sequence',
+    JSON.stringify(requestAttemptCounts) === JSON.stringify([0, 2, 4, 0, 0, 2, 4, 0]),
+    'desktop and mobile retain repeated attempts while reoriented scopes start clean',
   );
 } finally {
   await browser.close();
@@ -235,5 +253,5 @@ if (failures > 0) {
   console.error(`Goalfix browser proof failed with ${failures} assertion(s).`);
   process.exitCode = 1;
 } else {
-  console.log('Goalfix browser proof passed for desktop and mobile, including cross-request stagnation.');
+  console.log('Goalfix browser proof passed for desktop and mobile, including stagnation and reorientation.');
 }
