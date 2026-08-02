@@ -15,7 +15,7 @@ on:
       - scripts/**
       - src/**
       - e2e/**
-      - .github/workflows/repo-cycle.yml
+      - .github/workflows/**
   pull_request:
     branches:
       - main
@@ -30,7 +30,7 @@ on:
       - scripts/**
       - src/**
       - e2e/**
-      - .github/workflows/repo-cycle.yml
+      - .github/workflows/**
   workflow_dispatch:
     inputs:
       operation:
