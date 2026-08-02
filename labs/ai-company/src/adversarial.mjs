@@ -1,8 +1,24 @@
-import { inspectAuthorityBoundary, runCompanySandbox } from './sandbox.mjs';
+import {
+  inspectAuthorityBoundary,
+  runCompanySandbox,
+  sealSandboxValue,
+} from './sandbox.mjs';
 
 export { inspectAuthorityBoundary };
 
 const MUTATING_MODES = new Set(['queue', 'publish']);
+const ALLOWED_DELEGATES = new Set([
+  'juss-chief-ai',
+  'reality-agent',
+  'governance-agent',
+  'redteam-agent',
+  'story-agent',
+  'campaign-agent',
+  'learning-agent',
+]);
+const REQUIRED_VOTERS = ['reality-agent', 'governance-agent'];
+const ALLOWED_VOTERS = new Set([...REQUIRED_VOTERS, 'redteam-agent']);
+const VALID_VOTE_DECISIONS = new Set(['allow', 'block']);
 const INJECTION_PATTERNS = [
   /ignore\s+(all|any|previous)\s+instructions/i,
   /executionAllowed\s*[:=]\s*true/i,
@@ -10,6 +26,7 @@ const INJECTION_PATTERNS = [
   /reveal\s+(a\s+)?secret/i,
   /use\s+(a\s+)?live\s+adapter/i,
 ];
+const ISO_UTC_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 
 export const DEFAULT_ADVERSARIAL_LIMITS = Object.freeze({
   maxDelegationDepth: 4,
@@ -68,13 +85,40 @@ function resolveLimits(overrides) {
 }
 
 function campaignKey(companyInput) {
-  const platforms = [...(companyInput?.platforms ?? [])].sort().join(',');
+  const platforms = Array.isArray(companyInput?.platforms)
+    ? [...companyInput.platforms].sort().join(',')
+    : '';
   return [
     companyInput?.projectSlug ?? '',
     companyInput?.eventId ?? '',
     companyInput?.requestedMode ?? '',
     platforms,
   ].join(':');
+}
+
+function parseSyntheticTimestamp(value) {
+  if (typeof value !== 'string' || !ISO_UTC_PATTERN.test(value)) return Number.NaN;
+  return Date.parse(value);
+}
+
+function invalidEnvelopeVerdict() {
+  return {
+    authority: {
+      level: 'L0',
+      mode: 'simulation',
+      executionAllowed: false,
+    },
+    status: 'blocked',
+    campaignKey: '',
+    blockers: ['invalid_adversarial_envelope'],
+    signals: [],
+    limits: { ...DEFAULT_ADVERSARIAL_LIMITS },
+    budget: {
+      steps: undefined,
+      costUnits: undefined,
+      elapsedMs: undefined,
+    },
+  };
 }
 
 function inspectClaimedReceipt(receipt, expectedEventId) {
@@ -91,7 +135,7 @@ function inspectClaimedReceipt(receipt, expectedEventId) {
   return violations;
 }
 
-export function evaluateAdversarialEnvelope(envelope) {
+function evaluateSealedEnvelope(envelope) {
   const blockers = [];
   const signals = [];
   const resolvedLimits = resolveLimits(envelope?.limits);
@@ -126,14 +170,17 @@ export function evaluateAdversarialEnvelope(envelope) {
       if (approval.projectSlug !== companyInput?.projectSlug) blockers.push('approval_project_mismatch');
       if (approval.eventId !== companyInput?.eventId) blockers.push('approval_event_mismatch');
       if (approval.mode !== requestedMode) blockers.push('approval_mode_mismatch');
-      if ((envelope?.consumedApprovalIds ?? []).includes(approval.id)) {
-        blockers.push('approval_reuse_detected');
-      }
+
+      const consumedApprovalIds = Array.isArray(envelope?.consumedApprovalIds)
+        ? envelope.consumedApprovalIds
+        : [];
+      if (!Array.isArray(envelope?.consumedApprovalIds)) blockers.push('invalid_consumed_approvals');
+      if (consumedApprovalIds.includes(approval.id)) blockers.push('approval_reuse_detected');
     }
   }
 
-  const observedAt = Date.parse(envelope?.observedAt ?? '');
-  const proofObservedAt = Date.parse(envelope?.proofObservedAt ?? '');
+  const observedAt = parseSyntheticTimestamp(envelope?.observedAt);
+  const proofObservedAt = parseSyntheticTimestamp(envelope?.proofObservedAt);
   if (!Number.isFinite(observedAt) || !Number.isFinite(proofObservedAt)) {
     blockers.push('proof_time_invalid');
   } else {
@@ -142,20 +189,36 @@ export function evaluateAdversarialEnvelope(envelope) {
     if (proofAgeMs > limits.maxProofAgeMs) blockers.push('proof_stale');
   }
 
-  if ((envelope?.seenCampaignKeys ?? []).includes(key)) blockers.push('duplicate_campaign');
+  const seenCampaignKeys = Array.isArray(envelope?.seenCampaignKeys)
+    ? envelope.seenCampaignKeys
+    : [];
+  if (!Array.isArray(envelope?.seenCampaignKeys)) blockers.push('invalid_campaign_history');
+  if (seenCampaignKeys.includes(key)) blockers.push('duplicate_campaign');
 
-  const delegationChain = envelope?.delegationChain ?? [];
+  const delegationChain = Array.isArray(envelope?.delegationChain)
+    ? envelope.delegationChain
+    : [];
+  if (!Array.isArray(envelope?.delegationChain)) blockers.push('invalid_delegation_chain');
+  if (delegationChain.length === 0 || delegationChain[0] !== 'juss-chief-ai') {
+    blockers.push('delegation_root_invalid');
+  }
+  if (delegationChain.some((agent) => typeof agent !== 'string' || !ALLOWED_DELEGATES.has(agent))) {
+    blockers.push('delegation_agent_invalid');
+  }
   if (delegationChain.length > limits.maxDelegationDepth) blockers.push('delegation_depth_exceeded');
   if (new Set(delegationChain).size !== delegationChain.length) blockers.push('delegation_loop_detected');
 
-  const budget = envelope?.budget ?? {};
-  if (!isFiniteNonNegative(budget.steps) || budget.steps > limits.maxSteps) {
+  const budget = envelope?.budget;
+  if (!budget || typeof budget !== 'object' || Array.isArray(budget)) {
+    blockers.push('invalid_budget');
+  }
+  if (!Number.isInteger(budget?.steps) || !isFiniteNonNegative(budget?.steps) || budget.steps > limits.maxSteps) {
     blockers.push('step_budget_exceeded');
   }
-  if (!isFiniteNonNegative(budget.costUnits) || budget.costUnits > limits.maxCostUnits) {
+  if (!Number.isInteger(budget?.costUnits) || !isFiniteNonNegative(budget?.costUnits) || budget.costUnits > limits.maxCostUnits) {
     blockers.push('cost_budget_exceeded');
   }
-  if (!isFiniteNonNegative(budget.elapsedMs) || budget.elapsedMs > limits.maxElapsedMs) {
+  if (!Number.isInteger(budget?.elapsedMs) || !isFiniteNonNegative(budget?.elapsedMs) || budget.elapsedMs > limits.maxElapsedMs) {
     blockers.push('runtime_timeout');
   }
 
@@ -164,9 +227,32 @@ export function evaluateAdversarialEnvelope(envelope) {
     blockers.push('prompt_injection_detected');
   }
 
-  const decisions = unique((envelope?.agentVotes ?? []).map((vote) => vote?.decision).filter(Boolean));
-  if (decisions.length > 1) blockers.push('agent_disagreement_unresolved');
-  if (decisions.length === 1 && decisions[0] === 'block') blockers.push('agent_consensus_block');
+  const agentVotes = Array.isArray(envelope?.agentVotes) ? envelope.agentVotes : [];
+  if (!Array.isArray(envelope?.agentVotes)) blockers.push('invalid_agent_votes');
+  const voterIds = new Set();
+  const decisions = [];
+  for (const vote of agentVotes) {
+    if (
+      !vote
+      || typeof vote !== 'object'
+      || !ALLOWED_VOTERS.has(vote.agent)
+      || !VALID_VOTE_DECISIONS.has(vote.decision)
+    ) {
+      blockers.push('invalid_agent_vote');
+      continue;
+    }
+    if (voterIds.has(vote.agent)) blockers.push('duplicate_agent_vote');
+    voterIds.add(vote.agent);
+    decisions.push(vote.decision);
+  }
+  if (REQUIRED_VOTERS.some((agent) => !voterIds.has(agent))) {
+    blockers.push('agent_votes_incomplete');
+  }
+  const uniqueDecisions = unique(decisions);
+  if (uniqueDecisions.length > 1) blockers.push('agent_disagreement_unresolved');
+  if (uniqueDecisions.length === 1 && uniqueDecisions[0] === 'block') {
+    blockers.push('agent_consensus_block');
+  }
 
   if (blockers.length === 0) signals.push('preflight_clear');
 
@@ -182,15 +268,24 @@ export function evaluateAdversarialEnvelope(envelope) {
     signals,
     limits,
     budget: {
-      steps: budget.steps,
-      costUnits: budget.costUnits,
-      elapsedMs: budget.elapsedMs,
+      steps: budget?.steps,
+      costUnits: budget?.costUnits,
+      elapsedMs: budget?.elapsedMs,
     },
   };
 }
 
+export function evaluateAdversarialEnvelope(envelope) {
+  try {
+    return evaluateSealedEnvelope(sealSandboxValue(envelope));
+  } catch {
+    return invalidEnvelopeVerdict();
+  }
+}
+
 function inspectClaimedReceipts(claimedReceipts, actualReceipts, expectedEventId) {
-  if (!Array.isArray(claimedReceipts)) return [];
+  if (claimedReceipts === undefined) return [];
+  if (!Array.isArray(claimedReceipts)) return ['receipt_claim_invalid'];
 
   const violations = [];
   for (const receipt of claimedReceipts) {
@@ -205,7 +300,25 @@ function inspectClaimedReceipts(claimedReceipts, actualReceipts, expectedEventId
 }
 
 export function runAdversarialSimulation(envelope) {
-  const preflight = evaluateAdversarialEnvelope(envelope);
+  let sealedEnvelope;
+  try {
+    sealedEnvelope = sealSandboxValue(envelope);
+  } catch {
+    const verdict = invalidEnvelopeVerdict();
+    return {
+      status: 'blocked',
+      phase: 'preflight',
+      simulatorInvoked: false,
+      authority: verdict.authority,
+      blockers: verdict.blockers,
+      campaignKey: verdict.campaignKey,
+      sandbox: null,
+      result: null,
+      receipts: [],
+    };
+  }
+
+  const preflight = evaluateSealedEnvelope(sealedEnvelope);
   if (preflight.status === 'blocked') {
     return {
       status: 'blocked',
@@ -220,8 +333,8 @@ export function runAdversarialSimulation(envelope) {
     };
   }
 
-  const sandboxRun = runCompanySandbox(envelope.companyInput, {
-    expectedInputFingerprint: envelope.expectedInputFingerprint,
+  const sandboxRun = runCompanySandbox(sealedEnvelope.companyInput, {
+    expectedInputFingerprint: sealedEnvelope.expectedInputFingerprint,
   });
   if (sandboxRun.status !== 'simulated' || !sandboxRun.result) {
     return {
@@ -241,9 +354,9 @@ export function runAdversarialSimulation(envelope) {
   const postflightBlockers = [
     ...inspectAuthorityBoundary(result),
     ...inspectClaimedReceipts(
-      envelope.claimedReceipts,
+      sealedEnvelope.claimedReceipts,
       result.receipts,
-      result.campaign?.eventId ?? envelope.companyInput?.eventId,
+      result.campaign?.eventId ?? sealedEnvelope.companyInput?.eventId,
     ),
   ];
 
