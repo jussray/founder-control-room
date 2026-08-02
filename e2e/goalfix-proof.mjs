@@ -9,6 +9,7 @@ const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const ARTIFACT_DIR = join(ROOT, 'artifacts', 'goalfix');
 const SHA = 'abc123abc123abc123abc123abc123abc123abcd';
 const REQUIRED_CHECKS = ['Typecheck', 'Product Design Playwright Proof'];
+const STOP_CONDITION = 'Stop after the complete named exact-head proof set is classified.';
 const report = buildGoalfixReport({
   project: {
     id: 'project-proof',
@@ -24,7 +25,7 @@ const report = buildGoalfixReport({
     constraints: ['Read-only inspection', 'No deployment'],
     firstFilesOrLogs: ['app/_layout.tsx', 'Product Design Playwright Proof'],
     expectedVerificationNames: REQUIRED_CHECKS,
-    stopCondition: 'Stop before mutation.',
+    stopCondition: STOP_CONDITION,
   },
   verificationSignals: [
     {
@@ -78,9 +79,10 @@ const server = createServer((req, res) => {
         if (
           payload.projectSlug !== 'sekret-bip'
           || !payload.desiredOutcome
+          || payload.stopCondition !== STOP_CONDITION
           || JSON.stringify(payload.expectedVerificationNames) !== JSON.stringify(REQUIRED_CHECKS)
         ) {
-          throw new Error('Proof request did not preserve the founder goal and required check set.');
+          throw new Error('Proof request did not preserve the founder goal, stop condition, and required check set.');
         }
         res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
         res.end(JSON.stringify(report));
@@ -134,6 +136,7 @@ async function proveViewport(name, viewport) {
   await page.fill('[name="constraints"]', 'Read-only inspection\nNo deployment');
   await page.fill('[name="firstFilesOrLogs"]', 'app/_layout.tsx\nProduct Design Playwright Proof');
   await page.fill('[name="expectedVerificationNames"]', REQUIRED_CHECKS.join('\n'));
+  await page.fill('[name="stopCondition"]', STOP_CONDITION);
   await page.click('#goalfix-submit');
   await page.locator('[data-state="blocked"]').waitFor({ state: 'visible' });
 
