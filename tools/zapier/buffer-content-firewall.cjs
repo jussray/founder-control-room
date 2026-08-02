@@ -12,7 +12,8 @@ const BUFFER_REVIEW_WINDOW_MINUTES = 20;
 const BUFFER_REVIEW_WINDOW_MS = BUFFER_REVIEW_WINDOW_MINUTES * 60 * 1000;
 const MAX_GENERATION_AGE_MS = 5 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 60 * 1000;
-const BUFFER_SCHEDULE_AUTHORITY = 'checked-in-founder-policy:buffer-20-minute-review-v1';
+const BUFFER_SCHEDULE_POLICY_ID = 'buffer-20-minute-review-v1';
+const BUFFER_AUTHORIZATION_MODE = 'standing-policy';
 const BUFFER_NOTIFICATION_MODE = 'gmail_campaign_digest';
 const ALLOWED_DESTINATION_MODES = new Set(['schedule']);
 const ALLOWED_CONTENT_FIELDS = new Set([
@@ -83,7 +84,11 @@ function validateBufferPublishInput(input = {}, options = {}) {
   const batchId = asTrimmedString(input.batch_id);
   const batchSize = asInteger(input.batch_size);
   const batchIndex = asInteger(input.batch_index);
-  const scheduleAuthority = asTrimmedString(input.schedule_authority_id);
+  const invocationId = asTrimmedString(input.invocation_id);
+  const steeringGrantId = asTrimmedString(input.steering_grant_id);
+  const founderApprovalId = asTrimmedString(input.founder_approval_id);
+  const authorizationMode = asTrimmedString(input.authorization_mode);
+  const schedulePolicyId = asTrimmedString(input.schedule_policy_id);
   const notificationMode = asTrimmedString(input.notification_mode);
   const generatedAtMs = parseIsoTimestamp(input.generated_at);
   const nowMs = Number.isFinite(options.nowMs) ? options.nowMs : Date.now();
@@ -108,8 +113,21 @@ function validateBufferPublishInput(input = {}, options = {}) {
     errors.push('publish_allowed must be true for the approved schedule-with-review-window contract');
   }
 
-  if (scheduleAuthority !== BUFFER_SCHEDULE_AUTHORITY) {
-    errors.push('schedule_authority_id does not match the checked-in founder scheduling policy');
+  if (!UUID.test(invocationId)) errors.push('invocation_id must be a UUID');
+  if (!steeringGrantId || steeringGrantId.length > 200) {
+    errors.push('steering_grant_id is required and must not exceed 200 characters');
+  }
+  if (authorizationMode !== BUFFER_AUTHORIZATION_MODE) {
+    errors.push('authorization_mode must be standing-policy');
+  }
+  const expectedApprovalId = steeringGrantId && invocationId
+    ? `standing-policy:${steeringGrantId}:${invocationId}`
+    : null;
+  if (!expectedApprovalId || founderApprovalId !== expectedApprovalId) {
+    errors.push('founder_approval_id must be the runtime-minted receipt for this grant and invocation');
+  }
+  if (schedulePolicyId !== BUFFER_SCHEDULE_POLICY_ID) {
+    errors.push('schedule_policy_id does not match the checked-in scheduling contract');
   }
 
   if (notificationMode !== BUFFER_NOTIFICATION_MODE) {
@@ -177,8 +195,11 @@ function validateBufferPublishInput(input = {}, options = {}) {
     publish_allowed: true,
     proof_url: proofUrl,
     source_commit_sha: sourceCommitSha,
-    founder_approval_id: null,
-    standing_authority_id: BUFFER_SCHEDULE_AUTHORITY,
+    invocation_id: invocationId,
+    steering_grant_id: steeringGrantId,
+    authorization_mode: BUFFER_AUTHORIZATION_MODE,
+    authorization_receipt_verified: true,
+    schedule_policy_id: BUFFER_SCHEDULE_POLICY_ID,
     batch_id: batchId,
     batch_size: batchSize,
     batch_index: batchIndex,
@@ -208,7 +229,8 @@ if (typeof module !== 'undefined' && module.exports) {
     BUFFER_PROVIDER_METHOD,
     BUFFER_API_SAVE_TO_DRAFT,
     BUFFER_REVIEW_WINDOW_MINUTES,
-    BUFFER_SCHEDULE_AUTHORITY,
+    BUFFER_SCHEDULE_POLICY_ID,
+    BUFFER_AUTHORIZATION_MODE,
     BUFFER_NOTIFICATION_MODE,
     ALLOWED_CONTENT_FIELDS,
     FORBIDDEN_CONTENT_FIELDS,
