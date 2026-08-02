@@ -57,6 +57,27 @@ export interface CampaignClassification {
 }
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
+const COMMON_CONFUSABLES: Readonly<Record<string, string>> = {
+  а: 'a',
+  α: 'a',
+  е: 'e',
+  ε: 'e',
+  і: 'i',
+  ι: 'i',
+  о: 'o',
+  ο: 'o',
+  р: 'p',
+  ρ: 'p',
+  с: 'c',
+  х: 'x',
+  χ: 'x',
+  у: 'y',
+  к: 'k',
+  κ: 'k',
+  м: 'm',
+  т: 't',
+  τ: 't',
+};
 
 function classification(
   repo: RepositoryEvidence,
@@ -195,26 +216,95 @@ function assertClassificationMatchesRepository(
   }
 }
 
+function decodePublicValue(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function normalizedPolicyText(value: string): { spaced: string; compact: string } {
+  const confusableNormalized = [...decodePublicValue(value).normalize('NFKD').toLocaleLowerCase('en-US')]
+    .map((character) => COMMON_CONFUSABLES[character] ?? character)
+    .join('');
+  const spaced = confusableNormalized
+    .replace(/\p{Mark}+/gu, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+
+  return {
+    spaced,
+    compact: spaced.replace(/\s+/g, ''),
+  };
+}
+
+function containsPolicyTerm(publicSurface: string, prohibited: string): boolean {
+  const source = normalizedPolicyText(publicSurface);
+  const term = normalizedPolicyText(prohibited.trim());
+
+  if (!term.spaced) return false;
+  if (source.spaced.includes(term.spaced)) return true;
+
+  // Compact matching catches punctuation and whitespace inserted inside a
+  // prohibited phrase while avoiding noisy matches for very short tokens.
+  return term.compact.length >= 6 && source.compact.includes(term.compact);
+}
+
+function isApprovedProofUrl(candidate: string, approvedUrl: string): boolean {
+  try {
+    const candidateUrl = new URL(candidate);
+    const approved = new URL(approvedUrl);
+    if (candidateUrl.protocol !== 'https:' || approved.protocol !== 'https:') return false;
+    if (candidateUrl.origin !== approved.origin) return false;
+
+    const approvedPath = approved.pathname.replace(/\/+$/, '');
+    const candidatePath = candidateUrl.pathname.replace(/\/+$/, '');
+    if (!approvedPath) return true;
+
+    return candidatePath === approvedPath || candidatePath.startsWith(`${approvedPath}/`);
+  } catch {
+    return false;
+  }
+}
+
+function assertApprovedProofLinks(repo: RepositoryEvidence, draft: DraftMaterial): void {
+  if (repo.policy.publicProofUrls.length === 0) {
+    throw new Error(`${repo.fullName} has no approved public proof URLs.`);
+  }
+
+  for (const proof of draft.proofLinks) {
+    const approved = repo.policy.publicProofUrls.some((url) => isApprovedProofUrl(proof.url, url));
+    if (!approved) {
+      throw new Error(`Draft uses an unapproved proof URL: ${proof.url}`);
+    }
+  }
+}
+
 function assertRepositoryPolicyAllowsDraft(repo: RepositoryEvidence, draft: DraftMaterial): void {
-  const publicCopy = [
+  assertApprovedProofLinks(repo, draft);
+
+  const publicSurface = [
     draft.text,
     draft.traction,
     draft.governanceAdvantage,
     draft.audienceValue,
     draft.investorSignal,
-    ...draft.proofLinks.map((proof) => proof.label),
+    ...draft.proofLinks.flatMap((proof) => [proof.label, proof.url]),
+    ...(draft.media ?? []).flatMap((asset) => [asset.altText ?? '', asset.url]),
   ].join('\n');
 
   for (const prohibited of repo.policy.neverClaim) {
     const term = prohibited.trim();
-    if (term && publicCopy.toLocaleLowerCase().includes(term.toLocaleLowerCase())) {
+    if (term && containsPolicyTerm(publicSurface, term)) {
       throw new Error(`Draft violates neverClaim policy: ${term}`);
     }
   }
 
   for (const prohibited of repo.policy.neverExpose) {
     const term = prohibited.trim();
-    if (term && publicCopy.toLocaleLowerCase().includes(term.toLocaleLowerCase())) {
+    if (term && containsPolicyTerm(publicSurface, term)) {
       throw new Error(`Draft violates neverExpose policy: ${term}`);
     }
   }
