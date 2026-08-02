@@ -22,7 +22,7 @@ function deepFreeze(value) {
   return Object.freeze(value);
 }
 
-function assertJsonSafe(value, path = '$', seen = new WeakSet()) {
+function assertJsonSafe(value, path = '$', ancestors = []) {
   if (value === null) return;
 
   const type = typeof value;
@@ -32,21 +32,21 @@ function assertJsonSafe(value, path = '$', seen = new WeakSet()) {
     return;
   }
   if (type !== 'object') throw new TypeError(`${path}: ${type} is not sandbox-safe`);
-  if (seen.has(value)) throw new TypeError(`${path}: circular input is not sandbox-safe`);
+  if (ancestors.includes(value)) throw new TypeError(`${path}: circular input is not sandbox-safe`);
 
-  seen.add(value);
+  ancestors.push(value);
   if (Array.isArray(value)) {
-    value.forEach((item, index) => assertJsonSafe(item, `${path}[${index}]`, seen));
+    value.forEach((item, index) => assertJsonSafe(item, `${path}[${index}]`, ancestors));
   } else {
     const prototype = Object.getPrototypeOf(value);
     if (prototype !== Object.prototype && prototype !== null) {
       throw new TypeError(`${path}: custom prototypes are not sandbox-safe`);
     }
     for (const [key, nested] of Object.entries(value)) {
-      assertJsonSafe(nested, `${path}.${key}`, seen);
+      assertJsonSafe(nested, `${path}.${key}`, ancestors);
     }
   }
-  seen.delete(value);
+  ancestors.pop();
 }
 
 function cloneAndFreeze(value) {
