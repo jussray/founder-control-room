@@ -1,10 +1,11 @@
-export type GoalfixAttemptResult = 'passed' | 'failed' | 'blocked';
+export type GoalfixAttemptResult = 'passed' | 'failed' | 'blocked' | 'incomplete';
 
 export interface GoalfixAttempt {
   approach: string;
   failureSignature?: string;
   filesTouched: string[];
   verificationName?: string;
+  commitSha?: string;
   result: GoalfixAttemptResult;
 }
 
@@ -30,6 +31,7 @@ export function detectGoalfixStagnation(attempts: GoalfixAttempt[]): GoalfixStag
       counts.delete(signature);
       continue;
     }
+    if (attempt.result === 'incomplete') continue;
 
     counts.set(signature, (counts.get(signature) ?? 0) + 1);
   }
