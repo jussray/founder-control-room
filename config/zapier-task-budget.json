@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "plan": {
     "name": "Zapier Free",
     "monthly_task_limit": 100,
@@ -15,9 +15,9 @@
   "allocations": [
     {
       "id": "founder-signal-analysis",
-      "monthly_runs": 30,
+      "monthly_runs": 27,
       "tasks_per_run": 2,
-      "planned_tasks": 60,
+      "planned_tasks": 54,
       "billable_actions": [
         "one structured AI analysis",
         "one same-deal HubSpot result note"
@@ -26,10 +26,11 @@
     {
       "id": "approved-buffer-parallel-campaigns",
       "monthly_runs": 6,
-      "tasks_per_run": 3,
-      "planned_tasks": 18,
+      "tasks_per_run": 4,
+      "planned_tasks": 24,
       "billable_actions": [
-        "one Buffer draft or queue action for each of three founder-approved active channels"
+        "one Buffer scheduled action for each of three founder-approved active channels",
+        "one Gmail review digest for the complete campaign batch"
       ]
     },
     {
@@ -111,7 +112,7 @@
     }
   },
   "buffer_distribution": {
-    "mode": "parallel_review_first",
+    "mode": "parallel_schedule_review_window",
     "parallel_channel_slots": 3,
     "conservative_connected_channel_baseline": 3,
     "active_channels_source": "live_buffer_connections",
@@ -138,9 +139,20 @@
     ],
     "selected_channels_must_be_unique": true,
     "one_billable_buffer_action_per_selected_channel": true,
+    "one_billable_gmail_digest_per_campaign": true,
     "platform_native_copy_required": true,
     "unselected_platforms": "retain_as_review_drafts_in_hubspot_and_founder_control_room",
     "fallback_at_budget_ceiling": "keep_campaign_in_free_backlog_without_buffer_actions",
+    "review_window": {
+      "minutes": 20,
+      "starts_from": "generated_at",
+      "notification_provider": "gmail",
+      "notification_mode": "one_campaign_digest_for_up_to_three_posts",
+      "notification_failure_policy": "cancel_scheduled_batch",
+      "no_reply_behavior": "publish_by_existing_buffer_schedule",
+      "edit_policy": "regenerate_and_revalidate_before_buffer_update",
+      "share_now_allowed": false
+    },
     "publish_content_contract": {
       "source": "structured_ai_output_only",
       "validated_output_field": "validated_post_text",
@@ -149,8 +161,11 @@
       "require_exact_source_commit_sha": true,
       "reject_prompt_like_copy": true,
       "reject_unresolved_template_tokens": true,
-      "draft_mode_requires_founder_approval": false,
-      "queue_or_publish_requires_founder_approval": true,
+      "schedule_mode_requires_standing_authority": true,
+      "review_window_minutes": 20,
+      "notification_mode": "gmail_campaign_digest",
+      "notification_failure_policy": "cancel_scheduled_batch",
+      "share_now_allowed": false,
       "allowed_source_fields": [
         "linkedin_draft",
         "facebook_founder_draft",
@@ -202,6 +217,8 @@
     "future_you_and_me_share_core_ai_action": true,
     "buffer_parallel_distribution": true,
     "one_buffer_action_per_active_channel": true,
+    "one_gmail_review_digest_per_campaign": true,
+    "gmail_notification_failure_cancels_batch": true,
     "nonselected_social_channels_remain_review_drafts": true,
     "hubspot_result_note_is_canonical_writeback": true,
     "founder_control_room_reads_proof_without_a_second_zapier_write": true,
@@ -210,6 +227,7 @@
     "stop_new_billable_work_at_operating_ceiling": true,
     "buffer_never_receives_prompt_or_instructions": true,
     "buffer_content_must_pass_firewall": true,
+    "share_now_requires_named_run_authority": true,
     "delete_or_disable_existing_zaps_automatically": false
   }
 }
