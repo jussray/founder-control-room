@@ -119,6 +119,30 @@ describe('Founder OS provider evidence exact-head review contracts', () => {
     expect(plan.authority.executionAllowed).toBe(false);
   });
 
+  it('rejects HubSpot API record proof that is not bound to the selected workspace', () => {
+    const plan = planFounderOsLab({
+      goal: 'Preview a governed HubSpot outreach association.',
+      action: 'send-email',
+      provider: 'hubspot',
+      approval: approval('send-email'),
+      evidence: {
+        proofUrls: [
+          'https://app.hubspot.com/contacts/workspace-a',
+          'https://api.hubapi.com/crm/v3/objects/contacts/7',
+        ],
+        workspaceId: 'workspace-a',
+        recordIds: ['contact:7'],
+        associationPlan: 'Review contact:7 before any separately approved send.',
+      },
+    });
+
+    expect(plan.readiness).toBe('blocked');
+    expect(plan.truth.blocked.join(' ')).toContain(
+      'hubspot proof does not identify record contact:7 on its workspace-bound object-type route',
+    );
+    expect(plan.authority.executionAllowed).toBe(false);
+  });
+
   it('uses provider-neutral dispatch truth for a Zapier send-email preview', () => {
     const plan = planFounderOsLab({
       goal: 'Preview an approved outreach handoff without sending it.',
