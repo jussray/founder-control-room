@@ -76,21 +76,26 @@ describe('Founder OS isolated lab', () => {
     );
   });
 
-  it('requires a separate lab approval even when the social payload contains approval-looking fields', () => {
+  it('blocks approval-looking social payloads without lab approval or Zapier identity', () => {
     const plan = planFounderOsLab({
       goal: 'Queue the approved founder update.',
       action: 'queue-social',
       socialPost: socialPost('queue'),
     });
 
-    expect(plan.readiness).toBe('approval_required');
+    expect(plan.readiness).toBe('blocked');
     expect(plan.authority.approvalObserved).toBe(false);
     expect(plan.authority.executionAllowed).toBe(false);
     expect(plan.route.provider.preflightEvidenceMissing).toEqual([]);
+    expect(plan.truth.blocked.join(' ')).toContain('zapier preflight evidence requires automationId');
     expect(plan.truth.blocked.join(' ')).toContain('Explicit founder approval');
   });
 
-  it('recognizes scoped approval and source-bound social proof but still refuses provider execution', () => {
+  it('recognizes scoped approval and source-bound Zapier evidence but still refuses provider execution', () => {
+    const zapierEvidence = Object.assign(
+      { repository: 'jussray/founder-control-room' },
+      { automationId: 'zap-founder-signal-review-v1' },
+    );
     const plan = planFounderOsLab({
       goal: 'Queue one proof-backed founder update.',
       action: 'queue-social',
@@ -98,9 +103,7 @@ describe('Founder OS isolated lab', () => {
         id: 'founder-approved:queue-one-lab-post',
         actions: ['queue-social'],
       },
-      evidence: {
-        automationId: 'zap-founder-signal-review-v1',
-      } as never,
+      evidence: zapierEvidence,
       socialPost: socialPost('queue'),
     });
 
