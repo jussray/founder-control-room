@@ -18,7 +18,7 @@ create policy "control_room_service_role_only" on public.lanes
   to service_role
   using (true)
   with check (true);
-revoke all on table public.lanes from anon, authenticated;
+revoke all on table public.lanes from public, anon, authenticated;
 grant select, insert, update, delete on table public.lanes to service_role;
 
 alter table public.events enable row level security;
@@ -28,7 +28,7 @@ create policy "control_room_service_role_only" on public.events
   to service_role
   using (true)
   with check (true);
-revoke all on table public.events from anon, authenticated;
+revoke all on table public.events from public, anon, authenticated;
 grant select, insert, update, delete on table public.events to service_role;
 
 alter table public.ooda_steps enable row level security;
@@ -38,7 +38,7 @@ create policy "control_room_service_role_only" on public.ooda_steps
   to service_role
   using (true)
   with check (true);
-revoke all on table public.ooda_steps from anon, authenticated;
+revoke all on table public.ooda_steps from public, anon, authenticated;
 grant select, insert, update, delete on table public.ooda_steps to service_role;
 
 alter table public.escalations enable row level security;
@@ -48,7 +48,7 @@ create policy "control_room_service_role_only" on public.escalations
   to service_role
   using (true)
   with check (true);
-revoke all on table public.escalations from anon, authenticated;
+revoke all on table public.escalations from public, anon, authenticated;
 grant select, insert, update, delete on table public.escalations to service_role;
 
 alter table public.founder_users enable row level security;
@@ -58,7 +58,7 @@ create policy "control_room_service_role_only" on public.founder_users
   to service_role
   using (true)
   with check (true);
-revoke all on table public.founder_users from anon, authenticated;
+revoke all on table public.founder_users from public, anon, authenticated;
 grant select, insert, update, delete on table public.founder_users to service_role;
 
 alter table public.repository_capability_evidence enable row level security;
@@ -68,7 +68,7 @@ create policy "control_room_service_role_only" on public.repository_capability_e
   to service_role
   using (true)
   with check (true);
-revoke all on table public.repository_capability_evidence from anon, authenticated;
+revoke all on table public.repository_capability_evidence from public, anon, authenticated;
 grant select, insert, update, delete on table public.repository_capability_evidence to service_role;
 
 alter table public.repository_findings enable row level security;
@@ -78,7 +78,7 @@ create policy "control_room_service_role_only" on public.repository_findings
   to service_role
   using (true)
   with check (true);
-revoke all on table public.repository_findings from anon, authenticated;
+revoke all on table public.repository_findings from public, anon, authenticated;
 grant select, insert, update, delete on table public.repository_findings to service_role;
 
 alter table public.repository_verification_runs enable row level security;
@@ -88,7 +88,7 @@ create policy "control_room_service_role_only" on public.repository_verification
   to service_role
   using (true)
   with check (true);
-revoke all on table public.repository_verification_runs from anon, authenticated;
+revoke all on table public.repository_verification_runs from public, anon, authenticated;
 grant select, insert, update, delete on table public.repository_verification_runs to service_role;
 
 create or replace function public.update_onboarding_updated_at()
