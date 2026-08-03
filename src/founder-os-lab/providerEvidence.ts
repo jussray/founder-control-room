@@ -19,6 +19,9 @@ interface SourceEvidence {
   proofUrls: string[];
 }
 
+const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
+const REPOSITORY_NAME = /^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i;
+
 /**
  * Concrete evidence fields that must exist before a mutating preview may be
  * described as ready for a separately governed external executor.
@@ -48,11 +51,12 @@ function normalizedString(value: unknown): string | null {
 
 function normalizedRepository(value: unknown): string | null {
   const normalized = normalizedString(value)?.replace(/^\/+|\/+$/g, '').toLowerCase();
-  return normalized && normalized.split('/').length === 2 ? normalized : null;
+  return normalized && REPOSITORY_NAME.test(normalized) ? normalized : null;
 }
 
 function normalizedSha(value: unknown): string | null {
-  return normalizedString(value)?.toLowerCase() ?? null;
+  const normalized = normalizedString(value)?.toLowerCase();
+  return normalized && EXACT_COMMIT_SHA.test(normalized) ? normalized : null;
 }
 
 function providerContext(request: FounderOsLabRequest): ProviderEvidenceContext {
@@ -79,11 +83,28 @@ function sourceEvidence(request: FounderOsLabRequest): SourceEvidence {
 
 function sourceIdentityErrors(request: FounderOsLabRequest): string[] {
   const context = providerContext(request);
+  const rawEvidenceRepository = normalizedString(context.repository);
+  const rawSocialRepository = normalizedString(request.socialPost?.sourceRepository);
+  const rawEvidenceSha = normalizedString(context.commitSha);
+  const rawSocialSha = normalizedString(request.socialPost?.sourceCommitSha);
   const evidenceRepository = normalizedRepository(context.repository);
   const socialRepository = normalizedRepository(request.socialPost?.sourceRepository);
   const evidenceSha = normalizedSha(context.commitSha);
   const socialSha = normalizedSha(request.socialPost?.sourceCommitSha);
   const errors: string[] = [];
+
+  if (rawEvidenceRepository && !evidenceRepository) {
+    errors.push('Evidence repository must use the exact owner/repository format.');
+  }
+  if (rawSocialRepository && !socialRepository) {
+    errors.push('Social source repository must use the exact owner/repository format.');
+  }
+  if (rawEvidenceSha && !evidenceSha) {
+    errors.push('Evidence commit must be an exact 40-character hexadecimal SHA.');
+  }
+  if (rawSocialSha && !socialSha) {
+    errors.push('Social source commit must be an exact 40-character hexadecimal SHA.');
+  }
 
   if (evidenceRepository && socialRepository && evidenceRepository !== socialRepository) {
     errors.push(
@@ -107,11 +128,19 @@ function parseTrustedHttpsUrl(value: string): URL | null {
   }
 }
 
+function safeDecodePathSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment).toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
 function decodedSegments(parsed: URL): string[] {
   return parsed.pathname
     .split('/')
     .filter(Boolean)
-    .map((segment) => decodeURIComponent(segment).toLowerCase());
+    .map(safeDecodePathSegment);
 }
 
 function githubCommitProofBinds(
@@ -124,13 +153,13 @@ function githubCommitProofBinds(
 
   const [owner, repo] = repository.split('/');
   const segments = decodedSegments(parsed);
-  const normalizedSha = commitSha.toLowerCase();
+  const normalizedCommitSha = commitSha.toLowerCase();
 
   if (parsed.hostname.toLowerCase() === 'github.com') {
     return segments[0] === owner
       && segments[1] === repo
       && segments[2] === 'commit'
-      && segments[3] === normalizedSha;
+      && segments[3] === normalizedCommitSha;
   }
 
   if (parsed.hostname.toLowerCase() === 'api.github.com') {
@@ -138,7 +167,7 @@ function githubCommitProofBinds(
       && segments[1] === owner
       && segments[2] === repo
       && segments[3] === 'commits'
-      && segments[4] === normalizedSha;
+      && segments[4] === normalizedCommitSha;
   }
 
   return false;
