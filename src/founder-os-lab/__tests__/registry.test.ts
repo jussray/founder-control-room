@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { planFounderOsLab } from '../engine.js';
+import { FOUNDER_OS_LAB_PROVIDER_PREFLIGHT_EVIDENCE } from '../providerEvidence.js';
 import {
   FOUNDER_OS_LAB_ACTION_ROUTES,
   FOUNDER_OS_LAB_COMMANDS,
@@ -9,6 +10,7 @@ import {
 } from '../registry.js';
 
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const PROOF_URL = `https://github.com/jussray/founder-control-room/commit/${SHA}`;
 
 const EXPECTED_COMMANDS = [
   'goalfix',
@@ -49,6 +51,7 @@ describe('portable Founder OS registry', () => {
 
   it('contains the complete provider registry as preview-only, side-effect-free descriptors', () => {
     expect(FOUNDER_OS_LAB_PROVIDERS.map((provider) => provider.id)).toEqual(EXPECTED_PROVIDERS);
+    expect(Object.keys(FOUNDER_OS_LAB_PROVIDER_PREFLIGHT_EVIDENCE)).toEqual(EXPECTED_PROVIDERS);
 
     for (const provider of FOUNDER_OS_LAB_PROVIDERS) {
       expect(provider.mode).toBe('preview');
@@ -56,6 +59,7 @@ describe('portable Founder OS registry', () => {
       expect(provider.supportedActions.length).toBeGreaterThan(0);
       expect(provider.evidenceRequired.length).toBeGreaterThan(0);
       expect(provider.rollback.trim()).not.toBe('');
+      expect(FOUNDER_OS_LAB_PROVIDER_PREFLIGHT_EVIDENCE[provider.id]).toBeDefined();
     }
   });
 
@@ -78,7 +82,7 @@ describe('portable Founder OS registry', () => {
       evidence: {
         repository: 'jussray/founder-control-room',
         commitSha: SHA,
-        proofUrls: ['https://github.com/jussray/founder-control-room/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
+        proofUrls: [PROOF_URL],
       },
     });
 
@@ -93,6 +97,9 @@ describe('portable Founder OS registry', () => {
       supported: true,
       executionAllowed: false,
       credentialBoundary: 'connector-owned',
+      preflightEvidenceRequired: [],
+      preflightEvidenceObserved: [],
+      preflightEvidenceMissing: [],
     });
     expect(plan.authority.executionAllowed).toBe(false);
     expect(plan.isolation.providerCalls).toBe(false);
@@ -119,7 +126,35 @@ describe('portable Founder OS registry', () => {
     expect(plan.truth.blocked.join(' ')).toContain('figma does not support a merge-code preview');
   });
 
-  it('recognizes approval without transferring provider execution authority', () => {
+  it('blocks executor readiness when approval exists without required provider evidence', () => {
+    const plan = planFounderOsLab({
+      goal: 'Preview the exact-head merge gate.',
+      action: 'merge-code',
+      command: 'loop',
+      provider: 'github',
+      approval: {
+        id: 'founder-approved:merge-preview-only',
+        actions: ['merge-code'],
+      },
+    });
+
+    expect(plan.readiness).toBe('blocked');
+    expect(plan.authority.approvalObserved).toBe(true);
+    expect(plan.authority.executionAllowed).toBe(false);
+    expect(plan.route.provider).toMatchObject({
+      id: 'github',
+      executionAllowed: false,
+      preflightEvidenceRequired: ['repository', 'commitSha', 'proofUrls'],
+      preflightEvidenceObserved: [],
+      preflightEvidenceMissing: ['repository', 'commitSha', 'proofUrls'],
+    });
+    expect(plan.truth.blocked.join(' ')).toContain(
+      'Missing required github preflight evidence: repository, commitSha, proofUrls',
+    );
+    expect(plan.nextGate).toContain('Supply the missing github preflight evidence');
+  });
+
+  it('recognizes approval and complete evidence without transferring execution authority', () => {
     const plan = planFounderOsLab({
       goal: 'Preview the exact-head merge gate.',
       action: 'merge-code',
@@ -132,13 +167,19 @@ describe('portable Founder OS registry', () => {
       evidence: {
         repository: 'jussray/founder-control-room',
         commitSha: SHA,
+        proofUrls: [PROOF_URL],
       },
     });
 
     expect(plan.readiness).toBe('ready_for_external_executor');
     expect(plan.authority.approvalObserved).toBe(true);
     expect(plan.authority.executionAllowed).toBe(false);
-    expect(plan.route.provider.executionAllowed).toBe(false);
+    expect(plan.route.provider).toMatchObject({
+      executionAllowed: false,
+      preflightEvidenceRequired: ['repository', 'commitSha', 'proofUrls'],
+      preflightEvidenceObserved: ['repository', 'commitSha', 'proofUrls'],
+      preflightEvidenceMissing: [],
+    });
     expect(plan.nextGate).toContain('separately authorize one named external adapter for github');
   });
 });
