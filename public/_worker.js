@@ -1,5 +1,16 @@
 const API_ORIGIN = 'https://api.foundercontrolroom.org';
 const STATIC_METHODS = new Set(['GET', 'HEAD']);
+const STATIC_FILE_PATTERN = /\.(?:avif|css|gif|html|ico|jpe?g|js|map|png|svg|txt|webmanifest|webp|woff2?|xml)$/i;
+
+function shouldServeFromPages(request) {
+  if (!STATIC_METHODS.has(request.method)) return false;
+
+  const { pathname } = new URL(request.url);
+  return pathname === '/'
+    || pathname === '/control-room'
+    || pathname.startsWith('/control-room/')
+    || STATIC_FILE_PATTERN.test(pathname);
+}
 
 function createApiRequest(request) {
   const sourceUrl = new URL(request.url);
@@ -35,9 +46,8 @@ export default {
       return new Response('Founder Control Room proxy loop blocked.', { status: 508 });
     }
 
-    if (STATIC_METHODS.has(request.method)) {
-      const assetResponse = await env.ASSETS.fetch(request);
-      if (assetResponse.status !== 404) return assetResponse;
+    if (shouldServeFromPages(request)) {
+      return env.ASSETS.fetch(request);
     }
 
     return fetch(createApiRequest(request));
