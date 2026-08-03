@@ -1,0 +1,34 @@
+#!/usr/bin/env node
+
+import { access, cp, mkdir, rm } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
+
+const repositoryRoot = fileURLToPath(new URL('../', import.meta.url));
+const sourceDirectory = resolve(repositoryRoot, 'public');
+const outputDirectory = resolve(repositoryRoot, 'dist-pages');
+
+const requiredAssets = [
+  'index.html',
+  '_headers',
+  '_worker.js',
+  'control-room/index.html',
+  'control-room/app.js',
+  'control-room/styles.css',
+];
+
+await rm(outputDirectory, { recursive: true, force: true });
+await mkdir(outputDirectory, { recursive: true });
+await cp(sourceDirectory, outputDirectory, { recursive: true });
+
+for (const relativePath of requiredAssets) {
+  const absolutePath = resolve(outputDirectory, relativePath);
+  try {
+    await access(absolutePath, constants.R_OK);
+  } catch {
+    throw new Error(`Cloudflare Pages output is missing required asset: ${relativePath}`);
+  }
+}
+
+console.log(`Cloudflare Pages output ready: ${outputDirectory}`);
