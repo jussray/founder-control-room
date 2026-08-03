@@ -1,17 +1,8 @@
 import type {
-  FounderOsLabEvidence,
   FounderOsLabEvidenceField,
   FounderOsLabProviderId,
   FounderOsLabRequest,
 } from './contracts.js';
-
-interface ProviderEvidenceContext extends FounderOsLabEvidence {
-  projectId?: string;
-  automationId?: string;
-  workspaceId?: string;
-  recordIds?: string[];
-  associationPlan?: string;
-}
 
 interface SourceEvidence {
   repository: string | null;
@@ -37,12 +28,12 @@ export const FOUNDER_OS_LAB_PROVIDER_PREFLIGHT_EVIDENCE: Readonly<
   codex: ['repository', 'commitSha', 'proofUrls'],
   perplexity: [],
   github: ['repository', 'commitSha', 'proofUrls'],
-  supabase: ['repository', 'commitSha', 'proofUrls'],
-  cloudflare: ['repository', 'commitSha', 'proofUrls'],
-  zapier: ['repository', 'commitSha', 'proofUrls'],
+  supabase: ['repository', 'commitSha', 'proofUrls', 'projectId'],
+  cloudflare: ['repository', 'commitSha', 'proofUrls', 'projectId'],
+  zapier: ['repository', 'commitSha', 'proofUrls', 'automationId'],
   figma: [],
   'openai-platform': [],
-  hubspot: ['proofUrls'],
+  hubspot: ['proofUrls', 'workspaceId', 'recordIds', 'associationPlan'],
 } as const;
 
 function normalizedString(value: unknown): string | null {
@@ -59,8 +50,8 @@ function normalizedSha(value: unknown): string | null {
   return normalized && EXACT_COMMIT_SHA.test(normalized) ? normalized : null;
 }
 
-function providerContext(request: FounderOsLabRequest): ProviderEvidenceContext {
-  return (request.evidence ?? {}) as ProviderEvidenceContext;
+function providerContext(request: FounderOsLabRequest) {
+  return request.evidence ?? {};
 }
 
 function uniqueStrings(values: readonly string[]): string[] {
