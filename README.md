@@ -181,6 +181,21 @@ dashboard for this project, go to Authentication → URL Configuration → Redir
 URLs, and add `http://localhost:8787/**` (and your real deployed URL once you have
 one). Supabase silently drops `emailRedirectTo` if it isn't on this allowlist.
 
+## Production deployment
+
+Production does not deploy on a push or merge. The manual
+`.github/workflows/deploy.yml` workflow requires both the exact current `main`
+SHA and an auditable `deployment_approval_id`. Its authority job validates the
+Supabase, Cloudflare, Worker-binding, and smoke-test configuration before any
+migration can run. Only then may it preview and push migrations, install the
+required encrypted Worker secrets, deploy the exact approved SHA, and run the
+health, version, guardrail, and reconciliation checks.
+
+The production workflow writes Founder Signal auto-distribution as disabled by
+default and requires `/version` to read back
+`{"configured": true, "enabled": false}`. Repository configuration is not live
+runtime proof; the retained deployment and smoke evidence remains authoritative.
+
 ## Founder sign-in (magic link)
 
 ```bash
@@ -189,11 +204,12 @@ curl -X POST http://localhost:8787/auth/magic-link \
   -H 'content-type: application/json' \
   -d '{"email":"mcgill.raylene@gmail.com"}'
 
-# 2. Click the link in the email. It redirects to:
-#    http://localhost:8787/auth/callback?token_hash=...&type=magiclink
-#    which responds with { access_token, refresh_token, founder: { email } }
+# 2. Click the link in the email. The callback verifies the founder, writes the
+#    HttpOnly session cookie, and redirects the browser into /control-room/.
 
-# 3. Use the access_token as a Bearer token on founder-only routes
+# 3. API clients may exchange verified access and refresh tokens through
+#    POST /auth/session, then use the resulting session or a Bearer token on
+#    founder-only routes.
 curl http://localhost:8787/projects/sekret-bip \
   -H 'authorization: Bearer <access_token>'
 ```
@@ -204,9 +220,13 @@ curl http://localhost:8787/projects/sekret-bip \
 - fetches live repository state through its `RepositoryProvider`;
 - logs the read as an audited event.
 
-There's no Control Room web frontend yet, so `/auth/callback` returns the session
-as JSON. The guarded terminal is an authenticated API surface, not an interactive
-browser shell.
+`public/control-room/` is the static, mobile-first founder UI. In production,
+Cloudflare's Worker assets binding serves it at `/control-room/`; local Node runs
+may serve the same directory when static mode is enabled. `/auth/callback` serves
+the same-origin implicit-flow bridge when credentials arrive in the URL fragment,
+or verifies a `token_hash`, writes the HttpOnly founder cookie, and redirects the
+browser into the Control Room SPA. The guarded terminal remains an authenticated
+API surface, not an interactive browser shell.
 
 ## Guarded founder terminal
 
