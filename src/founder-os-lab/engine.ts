@@ -9,7 +9,10 @@ import {
   type FounderOsLabPlan,
   type FounderOsLabRequest,
 } from './contracts.js';
-import { FOUNDER_OS_LAB_PROVIDER_PREFLIGHT_EVIDENCE } from './providerEvidence.js';
+import {
+  FOUNDER_OS_LAB_PROVIDER_PREFLIGHT_EVIDENCE,
+  founderOsLabProviderEvidenceErrors,
+} from './providerEvidence.js';
 import {
   FOUNDER_OS_LAB_ACTION_ROUTES,
   founderOsLabCommand,
@@ -127,6 +130,10 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
   const missingPreflightEvidence = requiredPreflightEvidence.filter(
     (field) => !observedEvidence.includes(field),
   );
+  const semanticEvidenceErrors = mutatingAction && providerSupported
+    ? founderOsLabProviderEvidenceErrors(request, provider.id)
+    : [];
+  const socialErrors = socialValidationErrors(request);
   const validationErrors: string[] = [];
 
   if (!goal) validationErrors.push('goal is required.');
@@ -139,7 +146,7 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
       `Missing required ${provider.id} preflight evidence: ${missingPreflightEvidence.join(', ')}.`,
     );
   }
-  validationErrors.push(...socialValidationErrors(request));
+  validationErrors.push(...semanticEvidenceErrors, ...socialErrors);
 
   const blocked: string[] = [...validationErrors];
   if (approvalRequired && !approvalObserved) {
@@ -154,8 +161,7 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
         ? 'ready_for_external_executor'
         : 'ready_for_review';
 
-  const socialValidated = SOCIAL_ACTIONS.has(request.action)
-    && socialValidationErrors(request).length === 0;
+  const socialValidated = SOCIAL_ACTIONS.has(request.action) && socialErrors.length === 0;
   const verified = [
     'The plan was produced by a deterministic, in-process simulation.',
     'The lab performed no external call, provider call, database write, filesystem write, or environment read.',
@@ -165,21 +171,27 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
   if (socialValidated) {
     verified.push('The supplied social payload passed the existing first-party proof and content validator.');
   }
-  if (mutatingAction && missingPreflightEvidence.length === 0) {
+  if (
+    mutatingAction
+    && missingPreflightEvidence.length === 0
+    && semanticEvidenceErrors.length === 0
+  ) {
     verified.push(
-      `Required ${provider.id} preflight evidence fields are present: ${requiredPreflightEvidence.join(', ') || 'none'}.`,
+      `Required ${provider.id} preflight evidence is present and semantically valid.`,
     );
   }
 
   const nextGate = missingPreflightEvidence.length > 0
     ? `Supply the missing ${provider.id} preflight evidence (${missingPreflightEvidence.join(', ')}) and rerun the preview. No provider action will occur.`
-    : readiness === 'blocked'
-      ? 'Correct the rejected registry or payload input and rerun the pure preview path.'
-      : readiness === 'approval_required'
-        ? `Attach one explicit founder approval scoped to ${request.action}, then rerun the preview. No ${provider.id} action will occur.`
-        : readiness === 'ready_for_external_executor'
-          ? `Review the ${command.id} plan and evidence requirements, then separately authorize one named external adapter for ${provider.id} in a new change.`
-          : `Review the ${command.id} preview and promote only one ${provider.id} capability through a separately governed adapter experiment.`;
+    : semanticEvidenceErrors.length > 0
+      ? `Correct the ${provider.id} evidence semantics and rerun the preview: ${semanticEvidenceErrors.join(' ')} No provider action will occur.`
+      : readiness === 'blocked'
+        ? 'Correct the rejected registry or payload input and rerun the pure preview path.'
+        : readiness === 'approval_required'
+          ? `Attach one explicit founder approval scoped to ${request.action}, then rerun the preview. No ${provider.id} action will occur.`
+          : readiness === 'ready_for_external_executor'
+            ? `Review the ${command.id} plan and evidence requirements, then separately authorize one named external adapter for ${provider.id} in a new change.`
+            : `Review the ${command.id} preview and promote only one ${provider.id} capability through a separately governed adapter experiment.`;
 
   return {
     version: FOUNDER_OS_LAB_VERSION,
@@ -245,6 +257,7 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
         'A preview adapter could accidentally import a live provider client.',
         'An approval identifier could be mistaken for proof that an action executed.',
         'An approval could be mistaken for a substitute for exact-head or provider preflight evidence.',
+        'Unrelated evidence could be relabeled as proof for a different provider target.',
         'A successful draft validation could be mislabeled as publication success.',
       ],
     },
@@ -270,7 +283,7 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
         'Assert executionAllowed remains false for every action and provider.',
         `Assert ${provider.id} supports ${request.action} before presenting a proceedable preview.`,
         ...(mutatingAction
-          ? [`Assert required ${provider.id} preflight evidence is present before executor readiness.`]
+          ? [`Assert required ${provider.id} preflight evidence is present and semantically bound before executor readiness.`]
           : []),
         ...(socialValidated ? ['Assert the existing social validator accepts the supplied payload.'] : []),
       ],
