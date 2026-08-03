@@ -74,10 +74,38 @@ describe('POST /founder-os/preview provider evidence semantics', () => {
     expect(response.body.plan.readiness).toBe('blocked');
     expect(response.body.plan.route.provider.preflightEvidenceMissing).toEqual([]);
     expect(response.body.plan.truth.blocked.join(' ')).toContain(
-      `github proof URLs do not bind to repository jussray/founder-control-room at commit ${SHA}`,
+      `github proof requires an authoritative GitHub commit URL for repository jussray/founder-control-room at commit ${SHA}`,
     );
     expect(response.body.plan.authority.executionAllowed).toBe(false);
     expect(supabaseMock.from).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks attacker-host URLs that only imitate a GitHub repository and SHA path', async () => {
+    const response = await request(buildApp())
+      .post('/founder-os/preview')
+      .set('Authorization', BEARER)
+      .send({
+        goal: 'Preview the exact-head merge gate.',
+        action: 'merge-code',
+        command: 'loop',
+        provider: 'github',
+        approval: {
+          id: 'founder-approved:preview-only',
+          actions: ['merge-code'],
+        },
+        evidence: {
+          repository: 'jussray/founder-control-room',
+          commitSha: SHA,
+          proofUrls: [
+            `https://example.com/jussray/founder-control-room/commit/${SHA}`,
+          ],
+        },
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.plan.readiness).toBe('blocked');
+    expect(response.body.plan.truth.blocked.join(' ')).toContain('authoritative GitHub commit URL');
+    expect(response.body.plan.authority.executionAllowed).toBe(false);
   });
 
   it('blocks HubSpot outreach when an unrelated URL is the only evidence', async () => {
@@ -108,7 +136,7 @@ describe('POST /founder-os/preview provider evidence semantics', () => {
     expect(supabaseMock.from).toHaveBeenCalledTimes(1);
   });
 
-  it('accepts bounded HubSpot context but still returns a non-executing preview', async () => {
+  it('blocks populated HubSpot identities when proof comes from an unrelated issuer', async () => {
     const response = await request(buildApp())
       .post('/founder-os/preview')
       .set('Authorization', BEARER)
@@ -122,7 +150,40 @@ describe('POST /founder-os/preview provider evidence semantics', () => {
           actions: ['send-email'],
         },
         evidence: {
-          proofUrls: ['https://app.hubspot.com/contacts/123456/record/0-1/789'],
+          proofUrls: ['https://example.com/123456/789/456'],
+          workspaceId: '123456',
+          recordIds: ['contact:789', 'company:456'],
+          associationPlan: 'Associate contact:789 with company:456 before a separately approved send.',
+        },
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.plan.readiness).toBe('blocked');
+    const blocked = response.body.plan.truth.blocked.join(' ');
+    expect(blocked).toContain('hubspot proof does not identify workspace 123456');
+    expect(blocked).toContain('hubspot proof does not identify record contact:789');
+    expect(blocked).toContain('hubspot proof does not identify record company:456');
+    expect(response.body.plan.authority.executionAllowed).toBe(false);
+  });
+
+  it('accepts authoritative HubSpot context but still returns a non-executing preview', async () => {
+    const response = await request(buildApp())
+      .post('/founder-os/preview')
+      .set('Authorization', BEARER)
+      .send({
+        goal: 'Preview one approved founder outreach email.',
+        action: 'send-email',
+        command: 'build',
+        provider: 'hubspot',
+        approval: {
+          id: 'founder-approved:outreach-preview-v1',
+          actions: ['send-email'],
+        },
+        evidence: {
+          proofUrls: [
+            'https://app.hubspot.com/contacts/123456/record/0-1/789',
+            'https://app.hubspot.com/contacts/123456/record/0-2/456',
+          ],
           workspaceId: '123456',
           recordIds: ['contact:789', 'company:456'],
           associationPlan: 'Associate contact:789 with company:456 before a separately approved send.',
