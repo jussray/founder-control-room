@@ -82,7 +82,7 @@ That route:
 
 The authentication middleware may query only the existing `founder_users` allowlist. The lab runtime itself remains database-free. There is no browser surface in V1.
 
-Even when a founder approval reference is supplied, the lab sets both plan and provider `executionAllowed: false`. Approval can make a plan eligible for a future external executor, but it cannot execute inside the lab or preview route.
+Even when a founder approval reference is supplied, the lab sets both plan and provider `executionAllowed: false`. Approval can make some plans eligible for a future external executor, but it cannot execute inside the lab or preview route.
 
 ## Approval and evidence are separate gates
 
@@ -95,6 +95,7 @@ repository
 commitSha
 proofUrls
 projectId
+providerAccountId
 automationId
 workspaceId
 recordIds
@@ -109,12 +110,15 @@ The plan returns:
 
 Presence alone is not validity. Provider-specific semantic checks also apply:
 
-- GitHub and Codex proof must bind to the stated repository and exact commit SHA;
-- Supabase and Cloudflare previews require project identity plus source-bound proof;
-- Zapier previews require automation identity plus source-bound proof;
-- HubSpot previews require workspace identity, record identifiers, and an association plan.
+- GitHub and Codex proof must use an exact authoritative commit route bound to the stated repository and exact commit SHA;
+- Supabase proof must identify the selected project on an authoritative project route plus source-bound proof;
+- Cloudflare proof must identify the selected account and project together on one authoritative project route plus source-bound proof;
+- Zapier proof must identify the selected automation on an authoritative automation route plus source-bound proof;
+- HubSpot proof must identify the selected workspace and each typed record on workspace-bound application routes, with an association plan naming every complete typed record ID.
 
-An approval reference never substitutes for missing, unrelated, or mismatched evidence. A mutating preview remains `blocked` until required evidence is both present and semantically bound to the selected provider target. Only then may an approved plan become `ready_for_external_executor`, while `executionAllowed` remains `false`.
+An approval reference never substitutes for missing, unrelated, or mismatched evidence. A mutating preview remains `blocked` until required evidence is both present and semantically bound to the selected provider target.
+
+For queue, publish, merge, and deploy previews, an approved plan may then become `ready_for_external_executor`, while `executionAllowed` remains `false`. A `send-email` preview remains `ready_for_review` even after provider identity evidence passes. Outbound communication requires a separately governed adapter with a canonical allowed `DispatchDecision`, recipient identity, approved content, consent, suppression, and content-approval evidence.
 
 Provider or destination receipts remain post-execution evidence. They are not fabricated or required as inputs to a preview.
 
@@ -152,19 +156,22 @@ The focused tests prove:
 4. incompatible action/provider pairs fail closed;
 5. an approval reference never enables provider execution;
 6. approval without required provider evidence remains blocked;
-7. GitHub proof for a different repository or SHA remains blocked;
-8. HubSpot outreach lacks readiness without workspace, records, and association context;
-9. complete, semantically bound provider evidence is required before executor readiness;
-10. a valid social draft routes through `juss-chief-ai` and `proof-led-publishing`;
-11. all side-effect flags remain false;
-12. prompt leakage fails closed;
-13. merge planning remains preview-only even with approval and evidence;
-14. identical input produces identical output;
-15. the HTTP route requires a founder session;
-16. unknown or malformed request fields fail closed;
-17. HTTPS proof references and exact commit SHAs are bounded;
-18. malformed JSON returns `400 INVALID_JSON` before founder authentication;
-19. the route touches no persistence surface beyond founder allowlist authentication.
+7. GitHub proof for a different repository, SHA, host, or noncanonical path remains blocked;
+8. Cloudflare proof binds account and project together;
+9. HubSpot outreach lacks readiness without workspace, typed records, and association context;
+10. HubSpot API record URLs without workspace identity remain blocked;
+11. outbound email remains review-only without canonical dispatch evidence;
+12. complete, semantically bound provider evidence is required before applicable executor readiness;
+13. a valid social draft routes through `juss-chief-ai` and `proof-led-publishing`;
+14. all side-effect flags remain false;
+15. prompt leakage fails closed;
+16. merge planning remains preview-only even with approval and evidence;
+17. identical input produces identical output;
+18. the HTTP route requires a founder session;
+19. unknown or malformed request fields fail closed;
+20. HTTPS proof references and exact commit SHAs are bounded;
+21. malformed JSON returns `400 INVALID_JSON` before founder authentication;
+22. the route touches no persistence surface beyond founder allowlist authentication.
 
 The focused command runs:
 
@@ -194,7 +201,8 @@ A broad autonomous runtime would compound authority mistakes faster than it comp
 - treating a provider registry entry as proof of a live connection;
 - treating an approval ID as proof that an action executed;
 - treating approval as a substitute for exact-head or provider evidence;
-- relabeling unrelated proof as evidence for another repository, commit, workspace, or provider;
+- relabeling unrelated proof as evidence for another repository, commit, account, workspace, record, or provider;
+- treating provider identity evidence as consent or outbound dispatch authority;
 - importing a live provider client into a preview adapter;
 - treating successful content validation as a Buffer or platform receipt;
 - expanding one preview route into a second orchestration system.
@@ -218,4 +226,4 @@ No approval carries forward from a preview. The first graduated adapter must rem
 
 ## Rollback
 
-Revert the registry, planner, preview route, server mount, focused tests, verifier-script edit, and this document. No provider, account, credential, database, post, email, deployment, or repository state outside the branch requires cleanup.
+Revert the registry, planner, preview route, server mount, focused tests, package verifier wiring, and this document. No provider, account, credential, database, post, email, deployment, or repository state outside the branch requires cleanup.
