@@ -73,7 +73,12 @@ export type FounderOsLabReadiness =
 export type FounderOsLabEvidenceField =
   | 'repository'
   | 'commitSha'
-  | 'proofUrls';
+  | 'proofUrls'
+  | 'projectId'
+  | 'automationId'
+  | 'workspaceId'
+  | 'recordIds'
+  | 'associationPlan';
 
 export interface FounderOsLabApproval {
   id: string;
@@ -84,6 +89,11 @@ export interface FounderOsLabEvidence {
   repository?: string;
   commitSha?: string;
   proofUrls?: string[];
+  projectId?: string;
+  automationId?: string;
+  workspaceId?: string;
+  recordIds?: string[];
+  associationPlan?: string;
 }
 
 export interface FounderOsLabRequest {
