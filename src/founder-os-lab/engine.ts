@@ -134,7 +134,7 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
     : readiness === 'approval_required'
       ? `Attach one explicit founder approval scoped to ${request.action}, then rerun the preview. No ${provider.id} action will occur.`
       : readiness === 'ready_for_external_executor'
-        ? `Review the ${command.id} plan and evidence requirements, then separately authorize one named ${provider.id} adapter in a new change.`
+        ? `Review the ${command.id} plan and evidence requirements, then separately authorize one named external adapter for ${provider.id} in a new change.`
         : `Review the ${command.id} preview and promote only one ${provider.id} capability through a separately governed adapter experiment.`;
 
   return {
