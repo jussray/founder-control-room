@@ -223,13 +223,13 @@ export const FOUNDER_OS_LAB_PROVIDERS: readonly FounderOsLabProviderDescriptor[]
   },
   {
     id: 'cloudflare',
-    role: 'Worker, Pages, build, deployment, DNS, and runtime-readiness preview.',
+    role: 'Cloudflare compute, Pages, build, deployment, DNS, and runtime-readiness preview.',
     mode: 'preview',
     sideEffectClass: 'none',
     credentialBoundary: 'connector-owned',
     supportedActions: ['inspect', 'plan', 'deploy-code'],
     evidenceRequired: ['project name', 'source SHA', 'build or deployment receipt', 'runtime read-back plan'],
-    rollback: 'Discard the preview; no Worker, Pages, DNS, route, or secret state changes.',
+    rollback: 'Discard the preview; no Cloudflare compute, Pages, DNS, route, or secret state changes.',
   },
   {
     id: 'zapier',
