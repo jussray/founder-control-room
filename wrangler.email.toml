@@ -1,0 +1,23 @@
+name = "founder-control-room-review-email"
+main = "src/worker/founderSignalReviewEmail.ts"
+compatibility_date = "2025-06-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[observability]
+enabled = true
+
+# Non-secret values only. This Worker receives mail only after a separately
+# approved Cloudflare Email Routing rule is created. This file creates no DNS,
+# route, destination address, or live email binding.
+[vars]
+FOUNDER_REVIEW_EMAIL_DOMAIN = "foundercontrolroom.org"
+FOUNDER_REVIEW_INGEST_URL = "https://api.foundercontrolroom.org/ingest/founder-review-email"
+
+# Required Worker secrets:
+#   FOUNDER_REVIEW_FOUNDER_EMAIL
+#   FOUNDER_REVIEW_EMAIL_INGRESS_SECRET
+#
+# The same FOUNDER_REVIEW_EMAIL_INGRESS_SECRET value must be installed in the
+# founder-control-room2 API Worker secret store. Never place either value here.
