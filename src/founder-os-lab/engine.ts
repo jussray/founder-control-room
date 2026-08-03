@@ -11,6 +11,7 @@ import {
 } from './contracts.js';
 import {
   FOUNDER_OS_LAB_PROVIDER_PREFLIGHT_EVIDENCE,
+  founderOsLabObservedEvidenceFields,
   founderOsLabProviderEvidenceErrors,
 } from './providerEvidence.js';
 import {
@@ -25,6 +26,13 @@ const MUTATING_ACTIONS: ReadonlySet<FounderOsLabAction> = new Set([
   'merge-code',
   'deploy-code',
   'send-email',
+]);
+
+const EXECUTOR_READY_ACTIONS: ReadonlySet<FounderOsLabAction> = new Set([
+  'queue-social',
+  'publish-social',
+  'merge-code',
+  'deploy-code',
 ]);
 
 const SOCIAL_ACTIONS: ReadonlySet<FounderOsLabAction> = new Set([
@@ -67,23 +75,6 @@ function socialValidationErrors(request: FounderOsLabRequest): string[] {
   }
 }
 
-function observedEvidenceFields(request: FounderOsLabRequest): FounderOsLabEvidenceField[] {
-  const observed: FounderOsLabEvidenceField[] = [];
-  const evidence = request.evidence;
-  const socialPost = request.socialPost;
-
-  if (evidence?.repository || socialPost?.sourceRepository) observed.push('repository');
-  if (evidence?.commitSha || socialPost?.sourceCommitSha) observed.push('commitSha');
-  if (evidence?.proofUrls?.length || socialPost?.proofLinks?.length) observed.push('proofUrls');
-  if (evidence?.projectId) observed.push('projectId');
-  if (evidence?.automationId) observed.push('automationId');
-  if (evidence?.workspaceId) observed.push('workspaceId');
-  if (evidence?.recordIds?.length) observed.push('recordIds');
-  if (evidence?.associationPlan) observed.push('associationPlan');
-
-  return observed;
-}
-
 function evidenceUnknowns(
   request: FounderOsLabRequest,
   providerId: string,
@@ -113,7 +104,7 @@ function evidenceUnknowns(
     unknown.push('No Cloudflare, Supabase, or other deployment-provider state was queried.');
   }
   if (request.action === 'send-email') {
-    unknown.push('No Gmail, HubSpot, recipient, or delivery state was queried.');
+    unknown.push('No Gmail, HubSpot, recipient, consent, suppression, approved-content, or delivery state was queried.');
   }
 
   return [...new Set(unknown)];
@@ -128,7 +119,8 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
   const approvalRequired = actionRoute.approvalRequired;
   const approvalObserved = approvalCoversAction(request);
   const mutatingAction = MUTATING_ACTIONS.has(request.action);
-  const observedEvidence = observedEvidenceFields(request);
+  const executorReadyAction = EXECUTOR_READY_ACTIONS.has(request.action);
+  const observedEvidence = founderOsLabObservedEvidenceFields(request);
   const requiredPreflightEvidence = mutatingAction
     ? [...FOUNDER_OS_LAB_PROVIDER_PREFLIGHT_EVIDENCE[provider.id]]
     : [];
@@ -162,7 +154,7 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
     ? 'blocked'
     : approvalRequired && !approvalObserved
       ? 'approval_required'
-      : mutatingAction
+      : executorReadyAction
         ? 'ready_for_external_executor'
         : 'ready_for_review';
 
@@ -185,6 +177,11 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
       `Required ${provider.id} preflight evidence is present and semantically valid.`,
     );
   }
+  if (request.action === 'send-email' && validationErrors.length === 0) {
+    verified.push(
+      'HubSpot identity and association evidence is reviewable, but it is not outbound dispatch authorization.',
+    );
+  }
 
   const nextGate = missingPreflightEvidence.length > 0
     ? `Supply the missing ${provider.id} preflight evidence (${missingPreflightEvidence.join(', ')}) and rerun the preview. No provider action will occur.`
@@ -196,7 +193,9 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
           ? `Attach one explicit founder approval scoped to ${request.action}, then rerun the preview. No ${provider.id} action will occur.`
           : readiness === 'ready_for_external_executor'
             ? `Review the ${command.id} plan and evidence requirements, then separately authorize one named external adapter for ${provider.id} in a new change.`
-            : `Review the ${command.id} preview and promote only one ${provider.id} capability through a separately governed adapter experiment.`;
+            : request.action === 'send-email'
+              ? 'Keep this outreach at review-only until a canonical allowed DispatchDecision, recipient identity, approved content, consent, suppression, and content-approval evidence are supplied through a separately governed adapter change. No email will be sent.'
+              : `Review the ${command.id} preview and promote only one ${provider.id} capability through a separately governed adapter experiment.`;
 
   return {
     version: FOUNDER_OS_LAB_VERSION,
@@ -249,6 +248,9 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
         'The selected specialist is the narrowest match from the checked-in lab registry.',
         `The ${command.id} command is a reasoning lens, not executable authority.`,
         `The ${provider.id} entry is a provider preview contract, not proof of a live connection.`,
+        ...(request.action === 'send-email'
+          ? ['CRM identity evidence is not proof of recipient permission, suppression clearance, approved content, or dispatch eligibility.']
+          : []),
       ],
       unknown: evidenceUnknowns(request, provider.id, observedEvidence),
       blocked,
@@ -263,6 +265,7 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
         'An approval identifier could be mistaken for proof that an action executed.',
         'An approval could be mistaken for a substitute for exact-head or provider preflight evidence.',
         'Unrelated evidence could be relabeled as proof for a different provider target.',
+        'CRM record identity could be mistaken for consent or outbound dispatch authorization.',
         'A successful draft validation could be mislabeled as publication success.',
       ],
     },
@@ -289,6 +292,9 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
         `Assert ${provider.id} supports ${request.action} before presenting a proceedable preview.`,
         ...(mutatingAction
           ? [`Assert required ${provider.id} preflight evidence is present and semantically bound before executor readiness.`]
+          : []),
+        ...(request.action === 'send-email'
+          ? ['Assert CRM identity proof is never treated as an allowed outbound DispatchDecision.']
           : []),
         ...(socialValidated ? ['Assert the existing social validator accepts the supplied payload.'] : []),
       ],
