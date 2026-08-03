@@ -8,6 +8,7 @@ import {
 } from '../founderSignalReviewEmailIngress.js';
 
 const nowMs = Date.parse('2026-08-02T21:05:00.000Z');
+const TEST_SECRET = 'test-review-email-ingress-secret-32-bytes';
 const validReceipt = {
   version: 1,
   ingressId: 'ae4a3de8-c98c-52d0-af3a-8a4733c9142e',
@@ -20,7 +21,9 @@ const validReceipt = {
   commandType: 'edit_one',
   targetChannel: 'juss_rayy_linkedin',
   commandText: 'juss_rayy_linkedin: make the proof line more direct',
-  senderVerified: true,
+  senderAddressMatched: true,
+  authorizationState: 'intake_only_unresolved',
+  executionAllowed: false,
   providerActionsRequested: 0,
   receivedAt: '2026-08-02T21:05:00.000Z',
   source: 'cloudflare_email_routing',
@@ -36,7 +39,7 @@ function createTestApp(store: FounderSignalReviewEmailReceiptStore) {
   return app;
 }
 
-function sign(body: string, timestamp = String(nowMs), secret = 'test-ingress-secret') {
+function sign(body: string, timestamp = String(nowMs), secret = TEST_SECRET) {
   const signature = createHmac('sha256', secret)
     .update(timestamp, 'utf8')
     .update('.', 'utf8')
@@ -64,7 +67,7 @@ describe('Founder Signal review email ingest', () => {
   const originalSecret = process.env.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET;
 
   beforeEach(() => {
-    process.env.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET = 'test-ingress-secret';
+    process.env.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET = TEST_SECRET;
   });
 
   afterEach(() => {
@@ -76,7 +79,7 @@ describe('Founder Signal review email ingest', () => {
     }
   });
 
-  it('stores one sanitized receipt and returns no raw command content', async () => {
+  it('stores one sanitized unresolved receipt and returns no command content', async () => {
     const store = vi.fn<FounderSignalReviewEmailReceiptStore>().mockResolvedValue('stored');
     const response = await postReceipt(store);
 
@@ -87,6 +90,8 @@ describe('Founder Signal review email ingest', () => {
       ingressId: validReceipt.ingressId,
       replyContextId: validReceipt.replyContextId,
       commandType: validReceipt.commandType,
+      authorizationState: 'intake_only_unresolved',
+      executionAllowed: false,
       providerActionsRequested: 0,
     });
     expect(JSON.stringify(response.body)).not.toContain(validReceipt.commandText);
@@ -94,13 +99,17 @@ describe('Founder Signal review email ingest', () => {
     expect(store).toHaveBeenCalledWith(validReceipt);
   });
 
-  it('returns an idempotent duplicate receipt', async () => {
+  it('returns an idempotent unresolved duplicate receipt', async () => {
     const store = vi.fn<FounderSignalReviewEmailReceiptStore>().mockResolvedValue('duplicate');
     const response = await postReceipt(store);
 
     expect(response.status).toBe(200);
-    expect(response.body.duplicate).toBe(true);
-    expect(response.body.providerActionsRequested).toBe(0);
+    expect(response.body).toMatchObject({
+      duplicate: true,
+      authorizationState: 'intake_only_unresolved',
+      executionAllowed: false,
+      providerActionsRequested: 0,
+    });
   });
 
   it('rejects missing, forged, and stale signatures before persistence', async () => {
@@ -122,6 +131,19 @@ describe('Founder Signal review email ingest', () => {
     expect(store).not.toHaveBeenCalled();
   });
 
+  it('rejects missing and weak ingress secrets', async () => {
+    const store = vi.fn<FounderSignalReviewEmailReceiptStore>();
+
+    delete process.env.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET;
+    const missing = await postReceipt(store);
+    expect(missing.status).toBe(503);
+
+    process.env.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET = 'too-short';
+    const weak = await postReceipt(store);
+    expect(weak.status).toBe(503);
+    expect(store).not.toHaveBeenCalled();
+  });
+
   it('rejects malformed JSON and unknown or private fields', async () => {
     const store = vi.fn<FounderSignalReviewEmailReceiptStore>();
     const malformed = await postReceipt(store, null, { body: '{' });
@@ -134,6 +156,7 @@ describe('Founder Signal review email ingest', () => {
       { recipientEmail: 'review@example.com' },
       { quotedHistory: 'private thread' },
       { attachment: 'base64-data' },
+      { senderVerified: true },
     ]) {
       const response = await postReceipt(store, { ...validReceipt, ...privateField });
       expect(response.status).toBe(400);
@@ -142,26 +165,38 @@ describe('Founder Signal review email ingest', () => {
     expect(store).not.toHaveBeenCalled();
   });
 
-  it('rejects any request for provider execution', async () => {
+  it('rejects authorization and provider-execution escalation', async () => {
     const store = vi.fn<FounderSignalReviewEmailReceiptStore>();
-    const response = await postReceipt(store, {
-      ...validReceipt,
-      providerActionsRequested: 1,
-    });
 
-    expect(response.status).toBe(400);
-    expect(response.body).toEqual({ error: 'provider_action_not_allowed' });
+    for (const mutation of [
+      { providerActionsRequested: 1 },
+      { executionAllowed: true },
+      { authorizationState: 'authorized' },
+      { senderAddressMatched: false },
+    ]) {
+      const response = await postReceipt(store, {
+        ...validReceipt,
+        ...mutation,
+      });
+      expect(response.status).toBe(400);
+    }
     expect(store).not.toHaveBeenCalled();
   });
 
-  it('fails closed when the ingest secret or receipt store is unavailable', async () => {
+  it('rejects command semantic drift before persistence', async () => {
     const store = vi.fn<FounderSignalReviewEmailReceiptStore>();
-    delete process.env.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET;
-    const unconfigured = await postReceipt(store);
-    expect(unconfigured.status).toBe(503);
-    expect(store).not.toHaveBeenCalled();
+    const response = await postReceipt(store, {
+      ...validReceipt,
+      commandType: 'cancel_one',
+      commandText: 'juss_rayy_linkedin: publish now',
+    });
 
-    process.env.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET = 'test-ingress-secret';
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'command_semantics_mismatch' });
+    expect(store).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the receipt store is unavailable', async () => {
     const failedStore = vi
       .fn<FounderSignalReviewEmailReceiptStore>()
       .mockRejectedValue(new Error('database unavailable'));
