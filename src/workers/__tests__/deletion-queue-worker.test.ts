@@ -23,20 +23,54 @@ const env: DeletionQueueEnv = {
   CF_FEATURE_FLAGS_KV_NAMESPACE_ID: 'flags-namespace',
 };
 
-function emptyQueueClient() {
-  const query = {
-    select: vi.fn(),
-    eq: vi.fn(),
-    order: vi.fn(),
-    limit: vi.fn(),
-  };
-  query.select.mockReturnValue(query);
-  query.eq.mockReturnValue(query);
-  query.order.mockReturnValue(query);
-  query.limit.mockResolvedValue({ data: [], error: null });
+const envWithoutKv: DeletionQueueEnv = {
+  NEXT_PUBLIC_SUPABASE_URL: env.NEXT_PUBLIC_SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY,
+};
+
+interface QueueClientOptions {
+  readData?: unknown[];
+  readError?: unknown;
+  updateErrors?: unknown[];
+  rpcError?: unknown;
+}
+
+function queueClient(options: QueueClientOptions = {}) {
+  const updates: Array<Record<string, unknown>> = [];
+  const updateErrors = [...(options.updateErrors ?? [])];
+
+  const from = vi.fn(() => ({
+    select: vi.fn(() => {
+      const query = {
+        eq: vi.fn(),
+        order: vi.fn(),
+        limit: vi.fn(),
+      };
+      query.eq.mockReturnValue(query);
+      query.order.mockReturnValue(query);
+      query.limit.mockResolvedValue({
+        data: options.readData ?? [],
+        error: options.readError ?? null,
+      });
+      return query;
+    }),
+    update: vi.fn((payload: Record<string, unknown>) => {
+      updates.push(payload);
+      return {
+        eq: vi.fn().mockResolvedValue({
+          error: updateErrors.shift() ?? null,
+        }),
+      };
+    }),
+  }));
 
   return {
-    from: vi.fn().mockReturnValue(query),
+    client: {
+      from,
+      rpc: vi.fn().mockResolvedValue({ error: options.rpcError ?? null }),
+    },
+    from,
+    updates,
   };
 }
 
@@ -47,7 +81,7 @@ afterEach(() => {
 
 describe('deletion queue Worker runtime bindings', () => {
   it('passes the scheduled event env to the Supabase client', async () => {
-    const client = emptyQueueClient();
+    const { client, from } = queueClient();
     createClientMock.mockReturnValue(client);
 
     await deletionQueueWorker.scheduled({}, env, {});
@@ -57,7 +91,7 @@ describe('deletion queue Worker runtime bindings', () => {
       env.SUPABASE_SERVICE_ROLE_KEY,
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
-    expect(client.from).toHaveBeenCalledWith('deletion_queue');
+    expect(from).toHaveBeenCalledWith('deletion_queue');
   });
 
   it('fails closed when a required Supabase binding is missing', async () => {
@@ -100,5 +134,79 @@ describe('deletion queue Worker runtime bindings', () => {
     await expect(purgeCloudflareKV('user-id', env)).rejects.toThrow(
       'Cloudflare KV purge failed with status 403',
     );
+  });
+
+  it('surfaces queue-read errors before processing entries', async () => {
+    const { client } = queueClient({ readError: new Error('queue read failed') });
+    createClientMock.mockReturnValue(client);
+
+    await expect(runDeletionWorker(envWithoutKv)).rejects.toThrow('queue read failed');
+  });
+
+  it('rejects malformed queue rows instead of issuing broad mutations', async () => {
+    const { client, updates } = queueClient({
+      readData: [{ id: 'entry-without-user' }],
+    });
+    createClientMock.mockReturnValue(client);
+
+    await expect(runDeletionWorker(envWithoutKv)).rejects.toThrow(
+      'Deletion queue returned an invalid entry',
+    );
+    expect(updates).toEqual([]);
+  });
+
+  it('records an entry failure and rejects the cron run', async () => {
+    const { client, updates } = queueClient({
+      readData: [{ id: 'entry-1', user_id: 'user-1' }],
+      rpcError: new Error('audit anonymization failed'),
+    });
+    createClientMock.mockReturnValue(client);
+
+    await expect(runDeletionWorker(envWithoutKv)).rejects.toThrow(
+      'Deletion queue failed 1 of 1 entries',
+    );
+    expect(updates).toEqual([
+      { status: 'processing' },
+      { status: 'failed', error: 'audit anonymization failed' },
+    ]);
+  });
+
+  it('never reports success when the completion write fails', async () => {
+    const { client, updates } = queueClient({
+      readData: [{ id: 'entry-2', user_id: 'user-2' }],
+      updateErrors: [null, new Error('completion write failed'), null],
+    });
+    createClientMock.mockReturnValue(client);
+
+    await expect(runDeletionWorker(envWithoutKv)).rejects.toThrow(
+      'Deletion queue failed 1 of 1 entries',
+    );
+    expect(updates[0]).toEqual({ status: 'processing' });
+    expect(updates[1]).toMatchObject({ status: 'done' });
+    expect(updates[2]).toEqual({ status: 'failed', error: 'completion write failed' });
+  });
+
+  it('surfaces failure-state persistence errors', async () => {
+    const { client } = queueClient({
+      readData: [{ id: 'entry-3', user_id: 'user-3' }],
+      updateErrors: [null, new Error('failed-state write failed')],
+      rpcError: new Error('audit anonymization failed'),
+    });
+    createClientMock.mockReturnValue(client);
+
+    await expect(runDeletionWorker(envWithoutKv)).rejects.toThrow(
+      'Deletion queue failed 1 of 1 entries',
+    );
+  });
+
+  it('marks a fully processed entry done and resolves', async () => {
+    const { client, updates } = queueClient({
+      readData: [{ id: 'entry-4', user_id: 'user-4' }],
+    });
+    createClientMock.mockReturnValue(client);
+
+    await expect(runDeletionWorker(envWithoutKv)).resolves.toBeUndefined();
+    expect(updates[0]).toEqual({ status: 'processing' });
+    expect(updates[1]).toMatchObject({ status: 'done' });
   });
 });
