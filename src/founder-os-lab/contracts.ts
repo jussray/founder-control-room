@@ -75,6 +75,7 @@ export type FounderOsLabEvidenceField =
   | 'commitSha'
   | 'proofUrls'
   | 'projectId'
+  | 'providerAccountId'
   | 'automationId'
   | 'workspaceId'
   | 'recordIds'
@@ -90,6 +91,7 @@ export interface FounderOsLabEvidence {
   commitSha?: string;
   proofUrls?: string[];
   projectId?: string;
+  providerAccountId?: string;
   automationId?: string;
   workspaceId?: string;
   recordIds?: string[];
