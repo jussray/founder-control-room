@@ -43,6 +43,7 @@ const EVIDENCE_FIELDS = new Set([
   'commitSha',
   'proofUrls',
   'projectId',
+  'providerAccountId',
   'automationId',
   'workspaceId',
   'recordIds',
@@ -106,6 +107,9 @@ function parseEvidence(value: unknown): FounderOsLabEvidence | undefined | null 
   const projectId = value.projectId === undefined
     ? undefined
     : boundedString(value.projectId, 300) ?? null;
+  const providerAccountId = value.providerAccountId === undefined
+    ? undefined
+    : boundedString(value.providerAccountId, 300) ?? null;
   const automationId = value.automationId === undefined
     ? undefined
     : boundedString(value.automationId, 300) ?? null;
@@ -123,6 +127,7 @@ function parseEvidence(value: unknown): FounderOsLabEvidence | undefined | null 
     repository === null
     || commitSha === null
     || projectId === null
+    || providerAccountId === null
     || automationId === null
     || workspaceId === null
     || associationPlan === null
@@ -155,6 +160,7 @@ function parseEvidence(value: unknown): FounderOsLabEvidence | undefined | null 
     ...(commitSha ? { commitSha } : {}),
     ...(proofUrls ? { proofUrls } : {}),
     ...(projectId ? { projectId } : {}),
+    ...(providerAccountId ? { providerAccountId } : {}),
     ...(automationId ? { automationId } : {}),
     ...(workspaceId ? { workspaceId } : {}),
     ...(recordIds ? { recordIds } : {}),
