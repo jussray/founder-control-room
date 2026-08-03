@@ -35,10 +35,11 @@ const staleHeads = [
 ] as const;
 
 describe('storefront mission contract', () => {
-  it('keeps the executable workspace verifier and runbook on the reconciled targets', async () => {
-    const [runbook, verifier] = await Promise.all([
+  it('keeps executable verifiers and the runbook on the reconciled targets', async () => {
+    const [runbook, workspaceVerifier, terminalVerifier] = await Promise.all([
       readFile(new URL('../docs/LOCAL_WORKSPACE.md', import.meta.url), 'utf8'),
       readFile(new URL('./verify-local-workspace.mjs', import.meta.url), 'utf8'),
+      readFile(new URL('./verify-guarded-terminal-contract.mjs', import.meta.url), 'utf8'),
     ]);
 
     for (const target of targets) {
@@ -47,12 +48,14 @@ describe('storefront mission contract', () => {
       expect(runbook).toContain(target.branch);
       expect(runbook).toContain(target.head);
       expect(runbook).toContain(target.evidenceState);
-      expect(verifier).toContain(`head: '${target.head}'`);
+      expect(workspaceVerifier).toContain(`head: '${target.head}'`);
+      expect(terminalVerifier).toContain(target.head);
     }
 
     for (const staleHead of staleHeads) {
       expect(runbook).not.toContain(staleHead);
-      expect(verifier).not.toContain(staleHead);
+      expect(workspaceVerifier).not.toContain(staleHead);
+      expect(terminalVerifier).not.toContain(staleHead);
     }
 
     expect(runbook).not.toContain('| `17` |');
