@@ -19,10 +19,10 @@ interface HubSpotRecordIdentity {
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const REPOSITORY_NAME = /^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i;
 const HUBSPOT_OBJECT_TYPES = {
-  contact: { appCode: '0-1', apiName: 'contacts' },
-  company: { appCode: '0-2', apiName: 'companies' },
-  deal: { appCode: '0-3', apiName: 'deals' },
-  ticket: { appCode: '0-5', apiName: 'tickets' },
+  contact: { appCode: '0-1' },
+  company: { appCode: '0-2' },
+  deal: { appCode: '0-3' },
+  ticket: { appCode: '0-5' },
 } as const;
 const TYPED_HUBSPOT_ID = /(?:^|[^a-z0-9_-])((?:contact|company|deal|ticket):[a-z0-9_-]+)(?=$|[^a-z0-9_-])/gi;
 
@@ -386,6 +386,10 @@ function hubspotWorkspaceProofBinds(proofUrl: string, workspaceId: string): bool
     && segments[1] === workspaceId.toLowerCase();
 }
 
+/**
+ * HubSpot API object URLs do not carry the selected portal/workspace identity.
+ * Only the workspace-bound app route may prove a record for this preview gate.
+ */
 function hubspotRecordProofBinds(
   proofUrl: string,
   workspaceId: string,
@@ -393,28 +397,15 @@ function hubspotRecordProofBinds(
 ): boolean {
   const parsed = parseTrustedHttpsUrl(proofUrl);
   const segments = parsed ? decodedSegments(parsed) : null;
-  if (!parsed || !segments) return false;
+  if (!parsed || !segments || !exactHostname(parsed, ['app.hubspot.com'])) return false;
 
   const route = HUBSPOT_OBJECT_TYPES[identity.objectType];
-  if (exactHostname(parsed, ['app.hubspot.com'])) {
-    return segments.length === 5
-      && segments[0] === 'contacts'
-      && segments[1] === workspaceId.toLowerCase()
-      && segments[2] === 'record'
-      && segments[3] === route.appCode
-      && segments[4] === identity.recordId;
-  }
-
-  if (exactHostname(parsed, ['api.hubapi.com'])) {
-    return segments.length === 5
-      && segments[0] === 'crm'
-      && segments[1] === 'v3'
-      && segments[2] === 'objects'
-      && segments[3] === route.apiName
-      && segments[4] === identity.recordId;
-  }
-
-  return false;
+  return segments.length === 5
+    && segments[0] === 'contacts'
+    && segments[1] === workspaceId.toLowerCase()
+    && segments[2] === 'record'
+    && segments[3] === route.appCode
+    && segments[4] === identity.recordId;
 }
 
 function associationPlanMentionsRecords(
@@ -503,7 +494,7 @@ function providerIdentityErrors(
         if (!workspaceId || !proofUrls.some((proofUrl) => (
           hubspotRecordProofBinds(proofUrl, workspaceId, identity)
         ))) {
-          errors.push(`hubspot proof does not identify record ${identity.canonical} on its authoritative object-type route.`);
+          errors.push(`hubspot proof does not identify record ${identity.canonical} on its workspace-bound object-type route.`);
         }
       }
     }
