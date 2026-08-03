@@ -10,8 +10,20 @@ interface SourceEvidence {
   proofUrls: string[];
 }
 
+interface HubSpotRecordIdentity {
+  canonical: string;
+  objectType: keyof typeof HUBSPOT_OBJECT_TYPES;
+  recordId: string;
+}
+
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const REPOSITORY_NAME = /^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i;
+const HUBSPOT_OBJECT_TYPES = {
+  contact: { appCode: '0-1', apiName: 'contacts' },
+  company: { appCode: '0-2', apiName: 'companies' },
+  deal: { appCode: '0-3', apiName: 'deals' },
+  ticket: { appCode: '0-5', apiName: 'tickets' },
+} as const;
 
 /**
  * Concrete evidence fields that must exist before a mutating preview may be
@@ -58,6 +70,36 @@ function uniqueStrings(values: readonly string[]): string[] {
   return [...new Set(values)];
 }
 
+function parseTrustedHttpsUrl(value: string): URL | null {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function normalizedProofUrls(values: readonly unknown[]): string[] {
+  const normalized: string[] = [];
+  for (const value of values) {
+    const candidate = normalizedString(value);
+    if (!candidate) continue;
+    const parsed = parseTrustedHttpsUrl(candidate);
+    if (parsed && !normalized.includes(parsed.href)) normalized.push(parsed.href);
+  }
+  return normalized;
+}
+
+function normalizedRecordIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return uniqueStrings(
+    value
+      .map((recordId) => normalizedString(recordId)?.toLowerCase() ?? null)
+      .filter((recordId): recordId is string => Boolean(recordId)),
+  );
+}
+
 function sourceEvidence(request: FounderOsLabRequest): SourceEvidence {
   const context = providerContext(request);
   const evidenceProofUrls = context.proofUrls ?? [];
@@ -68,8 +110,39 @@ function sourceEvidence(request: FounderOsLabRequest): SourceEvidence {
       ?? normalizedRepository(request.socialPost?.sourceRepository),
     commitSha: normalizedSha(context.commitSha)
       ?? normalizedSha(request.socialPost?.sourceCommitSha),
-    proofUrls: uniqueStrings([...evidenceProofUrls, ...socialProofUrls]),
+    proofUrls: normalizedProofUrls([...evidenceProofUrls, ...socialProofUrls]),
   };
+}
+
+/**
+ * Returns only normalized, format-valid evidence fields. Direct planner callers
+ * therefore receive the same fail-closed behavior as the HTTP parser.
+ */
+export function founderOsLabObservedEvidenceFields(
+  request: FounderOsLabRequest,
+): FounderOsLabEvidenceField[] {
+  const observed: FounderOsLabEvidenceField[] = [];
+  const context = providerContext(request);
+  const source = sourceEvidence(request);
+
+  if (source.repository) observed.push('repository');
+  if (source.commitSha) observed.push('commitSha');
+  if (source.proofUrls.length > 0) observed.push('proofUrls');
+  if (normalizedString(context.projectId)) observed.push('projectId');
+  if (normalizedString(context.automationId)) observed.push('automationId');
+  if (normalizedString(context.workspaceId)) observed.push('workspaceId');
+
+  const recordIds = normalizedRecordIds(context.recordIds);
+  if (
+    recordIds.length > 0
+    && Array.isArray(context.recordIds)
+    && recordIds.length === context.recordIds.length
+  ) {
+    observed.push('recordIds');
+  }
+  if (normalizedString(context.associationPlan)) observed.push('associationPlan');
+
+  return observed;
 }
 
 function sourceIdentityErrors(request: FounderOsLabRequest): string[] {
@@ -82,6 +155,10 @@ function sourceIdentityErrors(request: FounderOsLabRequest): string[] {
   const socialRepository = normalizedRepository(request.socialPost?.sourceRepository);
   const evidenceSha = normalizedSha(context.commitSha);
   const socialSha = normalizedSha(request.socialPost?.sourceCommitSha);
+  const rawProofUrls = [
+    ...(context.proofUrls ?? []),
+    ...(request.socialPost?.proofLinks.map((link) => link.url) ?? []),
+  ];
   const errors: string[] = [];
 
   if (rawEvidenceRepository && !evidenceRepository) {
@@ -96,6 +173,12 @@ function sourceIdentityErrors(request: FounderOsLabRequest): string[] {
   if (rawSocialSha && !socialSha) {
     errors.push('Social source commit must be an exact 40-character hexadecimal SHA.');
   }
+  if (rawProofUrls.some((proofUrl) => {
+    const candidate = normalizedString(proofUrl);
+    return !candidate || !parseTrustedHttpsUrl(candidate);
+  })) {
+    errors.push('Evidence proof URLs must be valid HTTPS URLs without embedded credentials.');
+  }
 
   if (evidenceRepository && socialRepository && evidenceRepository !== socialRepository) {
     errors.push(
@@ -109,29 +192,22 @@ function sourceIdentityErrors(request: FounderOsLabRequest): string[] {
   return errors;
 }
 
-function parseTrustedHttpsUrl(value: string): URL | null {
-  try {
-    const parsed = new URL(value);
-    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return null;
-    return parsed;
-  } catch {
-    return null;
+function decodedSegments(parsed: URL): string[] | null {
+  const decoded: string[] = [];
+  for (const segment of parsed.pathname.split('/').filter(Boolean)) {
+    try {
+      const value = decodeURIComponent(segment).toLowerCase();
+      if (!value) return null;
+      decoded.push(value);
+    } catch {
+      return null;
+    }
   }
+  return decoded;
 }
 
-function safeDecodePathSegment(segment: string): string {
-  try {
-    return decodeURIComponent(segment).toLowerCase();
-  } catch {
-    return '';
-  }
-}
-
-function decodedSegments(parsed: URL): string[] {
-  return parsed.pathname
-    .split('/')
-    .filter(Boolean)
-    .map(safeDecodePathSegment);
+function exactHostname(parsed: URL, hosts: readonly string[]): boolean {
+  return hosts.includes(parsed.hostname.toLowerCase());
 }
 
 function githubCommitProofBinds(
@@ -140,21 +216,24 @@ function githubCommitProofBinds(
   commitSha: string,
 ): boolean {
   const parsed = parseTrustedHttpsUrl(proofUrl);
-  if (!parsed) return false;
+  if (!parsed || parsed.search || parsed.hash) return false;
 
   const [owner, repo] = repository.split('/');
   const segments = decodedSegments(parsed);
   const normalizedCommitSha = commitSha.toLowerCase();
+  if (!segments) return false;
 
   if (parsed.hostname.toLowerCase() === 'github.com') {
-    return segments[0] === owner
+    return segments.length === 4
+      && segments[0] === owner
       && segments[1] === repo
       && segments[2] === 'commit'
       && segments[3] === normalizedCommitSha;
   }
 
   if (parsed.hostname.toLowerCase() === 'api.github.com') {
-    return segments[0] === 'repos'
+    return segments.length === 5
+      && segments[0] === 'repos'
       && segments[1] === owner
       && segments[2] === repo
       && segments[3] === 'commits'
@@ -175,53 +254,130 @@ function sourceBindingErrors(request: FounderOsLabRequest, providerId: string): 
     ];
 }
 
-function hostnameMatches(parsed: URL, hosts: readonly string[]): boolean {
-  const hostname = parsed.hostname.toLowerCase();
-  return hosts.some((host) => hostname === host || hostname.endsWith(`.${host}`));
+function supabaseProjectProofBinds(proofUrl: string, projectId: string): boolean {
+  const parsed = parseTrustedHttpsUrl(proofUrl);
+  const segments = parsed ? decodedSegments(parsed) : null;
+  const normalizedProjectId = projectId.toLowerCase();
+  if (!parsed || !segments) return false;
+
+  if (parsed.hostname.toLowerCase() === `${normalizedProjectId}.supabase.co`) return true;
+  if (exactHostname(parsed, ['app.supabase.com'])) {
+    return segments[0] === 'project' && segments[1] === normalizedProjectId;
+  }
+  if (exactHostname(parsed, ['supabase.com', 'www.supabase.com'])) {
+    return segments[0] === 'dashboard'
+      && segments[1] === 'project'
+      && segments[2] === normalizedProjectId;
+  }
+  if (exactHostname(parsed, ['api.supabase.com'])) {
+    return segments[0] === 'v1'
+      && segments[1] === 'projects'
+      && segments[2] === normalizedProjectId;
+  }
+  return false;
 }
 
-function normalizedIdentifier(value: string): string {
-  return value.trim().toLowerCase();
-}
+function cloudflareProjectProofBinds(proofUrl: string, projectId: string): boolean {
+  const parsed = parseTrustedHttpsUrl(proofUrl);
+  const segments = parsed ? decodedSegments(parsed) : null;
+  const normalizedProjectId = projectId.toLowerCase();
+  if (!parsed || !segments) return false;
 
-function recordIdentifierToken(value: string): string {
-  const normalized = normalizedIdentifier(value);
-  return normalized.includes(':') ? normalized.slice(normalized.lastIndexOf(':') + 1) : normalized;
-}
-
-function urlContainsExactIdentifier(parsed: URL, identifier: string): boolean {
-  const normalized = normalizedIdentifier(identifier);
-  const pathSegments = decodedSegments(parsed);
-  const hostSegments = parsed.hostname.toLowerCase().split('.');
-  const queryValues = [...parsed.searchParams.values()].map((value) => value.toLowerCase());
-
-  return pathSegments.includes(normalized)
-    || hostSegments.includes(normalized)
-    || queryValues.includes(normalized);
-}
-
-function hasTrustedProviderIdentityProof(
-  proofUrls: readonly string[],
-  trustedHosts: readonly string[],
-  identifier: string,
-): boolean {
-  return proofUrls.some((proofUrl) => {
-    const parsed = parseTrustedHttpsUrl(proofUrl);
-    return Boolean(
-      parsed
-      && hostnameMatches(parsed, trustedHosts)
-      && urlContainsExactIdentifier(parsed, identifier),
+  if (exactHostname(parsed, ['dash.cloudflare.com'])) {
+    return (
+      segments[1] === 'pages'
+      && segments[2] === 'view'
+      && segments[3] === normalizedProjectId
+    ) || (
+      segments[1] === 'workers'
+      && segments[2] === 'services'
+      && (segments[3] === normalizedProjectId || segments[4] === normalizedProjectId)
     );
-  });
+  }
+
+  if (exactHostname(parsed, ['api.cloudflare.com'])) {
+    return segments[0] === 'client'
+      && segments[1] === 'v4'
+      && segments[2] === 'accounts'
+      && (
+        (segments[4] === 'pages' && segments[5] === 'projects' && segments[6] === normalizedProjectId)
+        || (segments[4] === 'workers' && segments[5] === 'services' && segments[6] === normalizedProjectId)
+      );
+  }
+
+  return false;
 }
 
-function associationPlanMentionsRecords(plan: string, recordIds: readonly string[]): boolean {
+function zapierAutomationProofBinds(proofUrl: string, automationId: string): boolean {
+  const parsed = parseTrustedHttpsUrl(proofUrl);
+  const segments = parsed ? decodedSegments(parsed) : null;
+  const normalizedAutomationId = automationId.toLowerCase();
+  if (!parsed || !segments || !exactHostname(parsed, ['zapier.com', 'www.zapier.com'])) return false;
+
+  return (
+    segments.length >= 3
+    && segments[0] === 'app'
+    && (segments[1] === 'editor' || segments[1] === 'zaps')
+    && segments[2] === normalizedAutomationId
+  );
+}
+
+function parseHubSpotRecordIdentity(value: string): HubSpotRecordIdentity | null {
+  const normalized = value.trim().toLowerCase();
+  const separator = normalized.indexOf(':');
+  if (separator <= 0 || separator === normalized.length - 1) return null;
+
+  const objectType = normalized.slice(0, separator) as keyof typeof HUBSPOT_OBJECT_TYPES;
+  const recordId = normalized.slice(separator + 1);
+  if (!HUBSPOT_OBJECT_TYPES[objectType] || !/^[a-z0-9_-]+$/i.test(recordId)) return null;
+
+  return { canonical: `${objectType}:${recordId}`, objectType, recordId };
+}
+
+function hubspotWorkspaceProofBinds(proofUrl: string, workspaceId: string): boolean {
+  const parsed = parseTrustedHttpsUrl(proofUrl);
+  const segments = parsed ? decodedSegments(parsed) : null;
+  if (!parsed || !segments || !exactHostname(parsed, ['app.hubspot.com'])) return false;
+  return segments[0] === 'contacts' && segments[1] === workspaceId.toLowerCase();
+}
+
+function hubspotRecordProofBinds(
+  proofUrl: string,
+  workspaceId: string,
+  identity: HubSpotRecordIdentity,
+): boolean {
+  const parsed = parseTrustedHttpsUrl(proofUrl);
+  const segments = parsed ? decodedSegments(parsed) : null;
+  if (!parsed || !segments) return false;
+
+  const route = HUBSPOT_OBJECT_TYPES[identity.objectType];
+  if (exactHostname(parsed, ['app.hubspot.com'])) {
+    return segments.length === 5
+      && segments[0] === 'contacts'
+      && segments[1] === workspaceId.toLowerCase()
+      && segments[2] === 'record'
+      && segments[3] === route.appCode
+      && segments[4] === identity.recordId;
+  }
+
+  if (exactHostname(parsed, ['api.hubapi.com'])) {
+    return segments.length === 5
+      && segments[0] === 'crm'
+      && segments[1] === 'v3'
+      && segments[2] === 'objects'
+      && segments[3] === route.apiName
+      && segments[4] === identity.recordId;
+  }
+
+  return false;
+}
+
+function associationPlanMentionsRecords(
+  plan: string,
+  recordIds: readonly HubSpotRecordIdentity[],
+): boolean {
   const normalizedPlan = plan.toLowerCase();
-  return recordIds.every((recordId) => {
-    const normalized = normalizedIdentifier(recordId);
-    const token = recordIdentifierToken(recordId);
-    return normalizedPlan.includes(normalized) || normalizedPlan.includes(token);
-  });
+  return recordIds.every((recordId) => normalizedPlan.includes(recordId.canonical));
 }
 
 function providerIdentityErrors(
@@ -236,12 +392,8 @@ function providerIdentityErrors(
     const projectId = normalizedString(context.projectId);
     if (!projectId) {
       errors.push('supabase preflight evidence requires projectId.');
-    } else if (!hasTrustedProviderIdentityProof(
-      proofUrls,
-      ['supabase.com', 'supabase.co'],
-      projectId,
-    )) {
-      errors.push(`supabase proof does not identify project ${projectId} on an authoritative Supabase URL.`);
+    } else if (!proofUrls.some((proofUrl) => supabaseProjectProofBinds(proofUrl, projectId))) {
+      errors.push(`supabase proof does not identify project ${projectId} on an authoritative Supabase project route.`);
     }
   }
 
@@ -249,12 +401,8 @@ function providerIdentityErrors(
     const projectId = normalizedString(context.projectId);
     if (!projectId) {
       errors.push('cloudflare preflight evidence requires projectId.');
-    } else if (!hasTrustedProviderIdentityProof(
-      proofUrls,
-      ['dash.cloudflare.com', 'api.cloudflare.com'],
-      projectId,
-    )) {
-      errors.push(`cloudflare proof does not identify project ${projectId} on an authoritative Cloudflare URL.`);
+    } else if (!proofUrls.some((proofUrl) => cloudflareProjectProofBinds(proofUrl, projectId))) {
+      errors.push(`cloudflare proof does not identify project ${projectId} on an authoritative Cloudflare project route.`);
     }
   }
 
@@ -262,44 +410,55 @@ function providerIdentityErrors(
     const automationId = normalizedString(context.automationId);
     if (!automationId) {
       errors.push('zapier preflight evidence requires automationId.');
-    } else if (!hasTrustedProviderIdentityProof(
-      proofUrls,
-      ['zapier.com'],
-      automationId,
-    )) {
-      errors.push(`zapier proof does not identify automation ${automationId} on an authoritative Zapier URL.`);
+    } else if (!proofUrls.some((proofUrl) => zapierAutomationProofBinds(proofUrl, automationId))) {
+      errors.push(`zapier proof does not identify automation ${automationId} on an authoritative Zapier automation route.`);
     }
   }
 
   if (providerId === 'hubspot') {
     const workspaceId = normalizedString(context.workspaceId);
-    const recordIds = Array.isArray(context.recordIds)
-      ? context.recordIds.map((recordId) => normalizedString(recordId)).filter((recordId): recordId is string => Boolean(recordId))
-      : [];
+    const rawRecordIds = Array.isArray(context.recordIds) ? context.recordIds : [];
+    const recordIds = normalizedRecordIds(context.recordIds);
+    const identities = recordIds.map(parseHubSpotRecordIdentity);
     const associationPlan = normalizedString(context.associationPlan);
-    const trustedHosts = ['app.hubspot.com', 'api.hubapi.com'];
 
     if (!workspaceId) {
       errors.push('hubspot preflight evidence requires workspaceId.');
-    } else if (!hasTrustedProviderIdentityProof(proofUrls, trustedHosts, workspaceId)) {
-      errors.push(`hubspot proof does not identify workspace ${workspaceId} on an authoritative HubSpot URL.`);
+    } else if (!proofUrls.some((proofUrl) => hubspotWorkspaceProofBinds(proofUrl, workspaceId))) {
+      errors.push(`hubspot proof does not identify workspace ${workspaceId} on an authoritative HubSpot workspace route.`);
     }
 
-    if (recordIds.length === 0) {
-      errors.push('hubspot preflight evidence requires at least one recordId.');
+    if (recordIds.length === 0 || recordIds.length !== rawRecordIds.length) {
+      errors.push('hubspot preflight evidence requires at least one nonempty typed recordId.');
     } else {
-      for (const recordId of recordIds) {
-        const token = recordIdentifierToken(recordId);
-        if (!hasTrustedProviderIdentityProof(proofUrls, trustedHosts, token)) {
-          errors.push(`hubspot proof does not identify record ${recordId} on an authoritative HubSpot URL.`);
+      for (let index = 0; index < recordIds.length; index += 1) {
+        const identity = identities[index];
+        if (!identity) {
+          errors.push(
+            `hubspot recordId ${recordIds[index]} must use a supported typed identifier: contact, company, deal, or ticket.`,
+          );
+          continue;
+        }
+        if (!workspaceId || !proofUrls.some((proofUrl) => (
+          hubspotRecordProofBinds(proofUrl, workspaceId, identity)
+        ))) {
+          errors.push(`hubspot proof does not identify record ${identity.canonical} on its authoritative object-type route.`);
         }
       }
     }
 
     if (!associationPlan) {
       errors.push('hubspot preflight evidence requires associationPlan.');
-    } else if (recordIds.length > 0 && !associationPlanMentionsRecords(associationPlan, recordIds)) {
-      errors.push('hubspot associationPlan must name every submitted recordId.');
+    } else {
+      const validIdentities = identities.filter(
+        (identity): identity is HubSpotRecordIdentity => Boolean(identity),
+      );
+      if (
+        validIdentities.length !== recordIds.length
+        || !associationPlanMentionsRecords(associationPlan, validIdentities)
+      ) {
+        errors.push('hubspot associationPlan must name every submitted typed recordId.');
+      }
     }
   }
 
