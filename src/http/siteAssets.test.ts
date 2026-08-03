@@ -37,8 +37,10 @@ describe('Founder Control Room Cloudflare topology', () => {
     const proxy = read('public/_worker.js');
 
     expect(proxy).toContain("const API_ORIGIN = 'https://api.foundercontrolroom.org'");
-    expect(proxy).toContain('env.ASSETS.fetch(request)');
-    expect(proxy).toContain('assetResponse.status !== 404');
+    expect(proxy).toContain('STATIC_FILE_PATTERN');
+    expect(proxy).toContain("pathname.startsWith('/control-room/')");
+    expect(proxy).toContain('if (shouldServeFromPages(request))');
+    expect(proxy).toContain('return env.ASSETS.fetch(request)');
     expect(proxy).toContain("headers.set('x-forwarded-host', sourceUrl.host)");
     expect(proxy).toContain("redirect: 'manual'");
     expect(proxy).toContain('return fetch(createApiRequest(request))');
