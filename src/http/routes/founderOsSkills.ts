@@ -19,6 +19,14 @@ import { requireFounder } from '../middleware/requireFounder.js';
 export const founderOsSkillsRouter = Router();
 founderOsSkillsRouter.use(requireFounder);
 
+interface ProviderEvidenceInput extends FounderOsLabEvidence {
+  projectId?: string;
+  automationId?: string;
+  workspaceId?: string;
+  recordIds?: string[];
+  associationPlan?: string;
+}
+
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const ACTIONS = new Set<FounderOsLabAction>(
   Object.keys(FOUNDER_OS_LAB_ACTION_ROUTES) as FounderOsLabAction[],
@@ -38,6 +46,16 @@ const TOP_LEVEL_FIELDS = new Set([
   'evidence',
   'socialPost',
 ]);
+const EVIDENCE_FIELDS = new Set([
+  'repository',
+  'commitSha',
+  'proofUrls',
+  'projectId',
+  'automationId',
+  'workspaceId',
+  'recordIds',
+  'associationPlan',
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -51,6 +69,18 @@ function boundedString(value: unknown, maximum: number): string | null {
   if (typeof value !== 'string') return null;
   const normalized = value.trim();
   return normalized && normalized.length <= maximum ? normalized : null;
+}
+
+function boundedStringList(value: unknown, maximumItems: number, maximumLength: number): string[] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > maximumItems) return null;
+
+  const result: string[] = [];
+  for (const item of value) {
+    const normalized = boundedString(item, maximumLength);
+    if (!normalized) return null;
+    if (!result.includes(normalized)) result.push(normalized);
+  }
+  return result;
 }
 
 function parseApproval(value: unknown): FounderOsLabApproval | undefined | null {
@@ -73,9 +103,7 @@ function parseApproval(value: unknown): FounderOsLabApproval | undefined | null 
 
 function parseEvidence(value: unknown): FounderOsLabEvidence | undefined | null {
   if (value === undefined || value === null) return undefined;
-  if (!isRecord(value) || !hasOnlyFields(value, new Set(['repository', 'commitSha', 'proofUrls']))) {
-    return null;
-  }
+  if (!isRecord(value) || !hasOnlyFields(value, EVIDENCE_FIELDS)) return null;
 
   const repository = value.repository === undefined
     ? undefined
@@ -83,8 +111,32 @@ function parseEvidence(value: unknown): FounderOsLabEvidence | undefined | null 
   const commitSha = value.commitSha === undefined
     ? undefined
     : boundedString(value.commitSha, 40)?.toLowerCase() ?? null;
+  const projectId = value.projectId === undefined
+    ? undefined
+    : boundedString(value.projectId, 300) ?? null;
+  const automationId = value.automationId === undefined
+    ? undefined
+    : boundedString(value.automationId, 300) ?? null;
+  const workspaceId = value.workspaceId === undefined
+    ? undefined
+    : boundedString(value.workspaceId, 300) ?? null;
+  const associationPlan = value.associationPlan === undefined
+    ? undefined
+    : boundedString(value.associationPlan, 1_000) ?? null;
+  const recordIds = value.recordIds === undefined
+    ? undefined
+    : boundedStringList(value.recordIds, 20, 300);
 
-  if (repository === null || commitSha === null || (commitSha && !EXACT_COMMIT_SHA.test(commitSha))) {
+  if (
+    repository === null
+    || commitSha === null
+    || projectId === null
+    || automationId === null
+    || workspaceId === null
+    || associationPlan === null
+    || recordIds === null
+    || (commitSha && !EXACT_COMMIT_SHA.test(commitSha))
+  ) {
     return null;
   }
 
@@ -106,11 +158,17 @@ function parseEvidence(value: unknown): FounderOsLabEvidence | undefined | null 
     }
   }
 
-  return {
+  const evidence: ProviderEvidenceInput = {
     ...(repository ? { repository } : {}),
     ...(commitSha ? { commitSha } : {}),
     ...(proofUrls ? { proofUrls } : {}),
+    ...(projectId ? { projectId } : {}),
+    ...(automationId ? { automationId } : {}),
+    ...(workspaceId ? { workspaceId } : {}),
+    ...(recordIds ? { recordIds } : {}),
+    ...(associationPlan ? { associationPlan } : {}),
   };
+  return evidence;
 }
 
 founderOsSkillsRouter.post('/preview', (req, res) => {
