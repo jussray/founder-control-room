@@ -75,6 +75,11 @@ function observedEvidenceFields(request: FounderOsLabRequest): FounderOsLabEvide
   if (evidence?.repository || socialPost?.sourceRepository) observed.push('repository');
   if (evidence?.commitSha || socialPost?.sourceCommitSha) observed.push('commitSha');
   if (evidence?.proofUrls?.length || socialPost?.proofLinks?.length) observed.push('proofUrls');
+  if (evidence?.projectId) observed.push('projectId');
+  if (evidence?.automationId) observed.push('automationId');
+  if (evidence?.workspaceId) observed.push('workspaceId');
+  if (evidence?.recordIds?.length) observed.push('recordIds');
+  if (evidence?.associationPlan) observed.push('associationPlan');
 
   return observed;
 }
