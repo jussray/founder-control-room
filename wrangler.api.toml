@@ -37,9 +37,15 @@ ENVIRONMENT = "production"
 #   GITHUB_APP_ID + GITHUB_PRIVATE_KEY  (preferred production path)
 #   GITHUB_TOKEN                        (local/development fallback)
 #
-# Founder Signal Engine review-only bridge bindings:
+# Founder Signal Engine bridge bindings:
 #   FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
 #   ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
+#   FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
+#
+# Founder review-email intake binding:
+#   FOUNDER_REVIEW_EMAIL_INGRESS_SECRET
+#   Must match the secret installed in founder-control-room-review-email.
+#
 # Optional:
 #   FOUNDER_SIGNAL_ENGINE_HOOK_TIMEOUT_MS
 #   REPOSITORY_INGEST_SECRET
