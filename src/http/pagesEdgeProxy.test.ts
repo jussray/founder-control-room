@@ -28,8 +28,8 @@ afterEach(() => {
 describe('Cloudflare Pages edge proxy', () => {
   it('serves an existing browser asset without calling the API Worker', async () => {
     const handler = await loadHandler();
-    const assetFetch = vi.fn(async () => new Response('asset', { status: 200 }));
-    const upstreamFetch = vi.fn();
+    const assetFetch = vi.fn(async (_request: Request) => new Response('asset', { status: 200 }));
+    const upstreamFetch = vi.fn(async (_request: Request) => new Response(null, { status: 500 }));
     vi.stubGlobal('fetch', upstreamFetch);
 
     const response = await handler.fetch(
@@ -45,8 +45,8 @@ describe('Cloudflare Pages edge proxy', () => {
 
   it('forwards a missing GET route to the surviving API Worker', async () => {
     const handler = await loadHandler();
-    const assetFetch = vi.fn(async () => new Response('missing', { status: 404 }));
-    const upstreamFetch = vi.fn(async () => new Response('{"ok":true}', {
+    const assetFetch = vi.fn(async (_request: Request) => new Response('missing', { status: 404 }));
+    const upstreamFetch = vi.fn(async (_request: Request) => new Response('{"ok":true}', {
       status: 200,
       headers: { 'content-type': 'application/json' },
     }));
@@ -59,17 +59,18 @@ describe('Cloudflare Pages edge proxy', () => {
 
     expect(response.status).toBe(200);
     expect(upstreamFetch).toHaveBeenCalledOnce();
-    const forwarded = upstreamFetch.mock.calls[0]?.[0] as Request;
-    expect(forwarded.url).toBe('https://api.foundercontrolroom.org/health?source=pages');
-    expect(forwarded.redirect).toBe('manual');
-    expect(forwarded.headers.get('x-forwarded-host')).toBe('foundercontrolroom.org');
-    expect(forwarded.headers.get('x-forwarded-proto')).toBe('https');
+    const forwarded = upstreamFetch.mock.calls[0]?.[0];
+    expect(forwarded).toBeInstanceOf(Request);
+    expect(forwarded?.url).toBe('https://api.foundercontrolroom.org/health?source=pages');
+    expect(forwarded?.redirect).toBe('manual');
+    expect(forwarded?.headers.get('x-forwarded-host')).toBe('foundercontrolroom.org');
+    expect(forwarded?.headers.get('x-forwarded-proto')).toBe('https');
   });
 
   it('sends mutations directly to the API Worker without probing static assets', async () => {
     const handler = await loadHandler();
-    const assetFetch = vi.fn();
-    const upstreamFetch = vi.fn(async () => new Response(null, { status: 202 }));
+    const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 500 }));
+    const upstreamFetch = vi.fn(async (_request: Request) => new Response(null, { status: 202 }));
     vi.stubGlobal('fetch', upstreamFetch);
 
     const response = await handler.fetch(
@@ -77,15 +78,16 @@ describe('Cloudflare Pages edge proxy', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
       }),
-      { ASSETS: { fetch: assetFetch as unknown as AssetBinding['fetch'] } },
+      { ASSETS: { fetch: assetFetch } },
     );
 
     expect(response.status).toBe(202);
     expect(assetFetch).not.toHaveBeenCalled();
     expect(upstreamFetch).toHaveBeenCalledOnce();
-    const forwarded = upstreamFetch.mock.calls[0]?.[0] as Request;
-    expect(forwarded.method).toBe('POST');
-    expect(forwarded.url).toBe('https://api.foundercontrolroom.org/auth/magic-link');
-    expect(forwarded.headers.get('x-founder-control-room-edge')).toBe('cloudflare-pages');
+    const forwarded = upstreamFetch.mock.calls[0]?.[0];
+    expect(forwarded).toBeInstanceOf(Request);
+    expect(forwarded?.method).toBe('POST');
+    expect(forwarded?.url).toBe('https://api.foundercontrolroom.org/auth/magic-link');
+    expect(forwarded?.headers.get('x-founder-control-room-edge')).toBe('cloudflare-pages');
   });
 });
