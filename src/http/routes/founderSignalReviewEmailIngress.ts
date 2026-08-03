@@ -13,15 +13,23 @@ export type FounderSignalReviewEmailReceiptStore = (
   receipt: FounderSignalReviewEmailReceipt,
 ) => Promise<'stored' | 'duplicate'>;
 
+function hexToBytes(value: string): Uint8Array {
+  const bytes = new Uint8Array(value.length / 2);
+  for (let index = 0; index < value.length; index += 2) {
+    bytes[index / 2] = Number.parseInt(value.slice(index, index + 2), 16);
+  }
+  return bytes;
+}
+
 function safeEqualHex(left: string, right: string): boolean {
   if (!HEX_SHA256.test(left) || !HEX_SHA256.test(right)) return false;
-  const leftBytes = Buffer.from(left, 'hex');
-  const rightBytes = Buffer.from(right, 'hex');
+  const leftBytes = hexToBytes(left);
+  const rightBytes = hexToBytes(right);
   return leftBytes.length === rightBytes.length && timingSafeEqual(leftBytes, rightBytes);
 }
 
 function verifySignedBody(
-  rawBody: Buffer,
+  rawBody: Uint8Array,
   timestampHeader: string | undefined,
   signatureHeader: string | undefined,
   secret: string,
@@ -90,7 +98,7 @@ export function createFounderSignalReviewEmailIngestHandler(
       return res.status(503).json({ error: 'Review email ingest is not configured' });
     }
 
-    if (!Buffer.isBuffer(req.body)) {
+    if (!(req.body instanceof Uint8Array)) {
       return res.status(400).json({ error: 'raw_json_body_required' });
     }
 
@@ -107,7 +115,7 @@ export function createFounderSignalReviewEmailIngestHandler(
 
     let parsed: unknown;
     try {
-      parsed = JSON.parse(req.body.toString('utf8'));
+      parsed = JSON.parse(new TextDecoder().decode(req.body));
     } catch {
       return res.status(400).json({ error: 'invalid_json' });
     }
