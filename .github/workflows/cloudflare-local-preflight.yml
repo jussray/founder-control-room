@@ -18,9 +18,12 @@ on:
 permissions:
   contents: read
 
+# Verification receipts belong to an immutable candidate head, not merely to a
+# mutable PR number. A second attempt for the same PR must not terminate a valid
+# exact-head run before its receipt is written.
 concurrency:
-  group: cloudflare-local-preflight-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: cloudflare-local-preflight-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
 
 jobs:
   verify:
