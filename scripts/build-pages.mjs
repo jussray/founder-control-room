@@ -16,6 +16,7 @@ const requiredAssets = [
   'control-room/index.html',
   'control-room/app.js',
   'control-room/styles.css',
+  'portable-founder-console/index.html',
 ];
 
 await rm(outputDirectory, { recursive: true, force: true });
