@@ -137,6 +137,23 @@ assert.ok(
   'all production configuration must be validated before Supabase mutation begins',
 );
 
+const validationStepStart = authoritySectionStart === -1
+  ? -1
+  : workflow.indexOf(
+      '      - name: Validate required production configuration',
+      authoritySectionStart,
+    );
+const receiptStepStart = validationStepStart === -1
+  ? -1
+  : workflow.indexOf(
+      '      - name: Record authority receipt',
+      validationStepStart,
+    );
+assert.notEqual(validationStepStart, -1, 'startup binding validation step must exist');
+assert.notEqual(receiptStepStart, -1, 'authority receipt step must follow configuration validation');
+const authorityBeforeValidation = workflow.slice(authoritySectionStart, validationStepStart);
+const validationStep = workflow.slice(validationStepStart, receiptStepStart);
+
 for (const name of [
   'SUPABASE_DB_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
@@ -148,16 +165,20 @@ for (const name of [
   'CLOUDFLARE_ACCOUNT_ID',
   'DEPLOY_URL',
 ]) {
-  assert.match(
-    workflow,
-    new RegExp(`^      ${name}: \\$\\{\\{ secrets\\.${name} \\}\\}$`, 'm'),
-    `${name} must be available to the pre-migration authority gate`,
+  assert.doesNotMatch(
+    authorityBeforeValidation,
+    new RegExp('^      ' + name + ': \\$\\{\\{ secrets\\.' + name + ' \\}\\}$', 'm'),
+    name + ' must not be exposed to checkout or receipt steps',
   );
   assert.match(
-    workflow,
-    new RegExp(`^            ${name}$`, 'm'),
-    `${name} must be checked by the pre-migration configuration gate`,
+    validationStep,
+    new RegExp('^          ' + name + ': \\$\\{\\{ secrets\\.' + name + ' \\}\\}$', 'm'),
+    name + ' must be scoped to the pre-migration configuration gate',
+  );
+  assert.match(
+    validationStep,
+    new RegExp('^            ' + name + '$', 'm'),
+    name + ' must be checked by the pre-migration configuration gate',
   );
 }
-
 console.log('Production deployment authority and Worker binding contract verified.');
