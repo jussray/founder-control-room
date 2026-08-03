@@ -53,7 +53,7 @@ describe("live Supabase security hardening", () => {
       );
       expect(block).toContain("for all\n  to service_role\n  using (true)\n  with check (true)");
       expect(block).toContain(
-        `revoke all on table public.${table} from anon, authenticated`,
+        `revoke all on table public.${table} from public, anon, authenticated`,
       );
       expect(block).toContain(
         `grant select, insert, update, delete on table public.${table} to service_role`,
