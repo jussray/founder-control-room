@@ -151,6 +151,29 @@ describe('Founder OS isolated lab', () => {
     expect(plan.truth.blocked.join(' ')).toContain('Missing required github preflight evidence');
   });
 
+  it('does not count whitespace-only direct evidence as observed', () => {
+    const plan = planFounderOsLab({
+      goal: 'Review and merge the focused routing change.',
+      action: 'merge-code',
+      approval: {
+        id: 'founder-approved:review-merge-routing-v1',
+        actions: ['merge-code'],
+      },
+      evidence: {
+        repository: ' ',
+        commitSha: ' ',
+        proofUrls: [' '],
+      },
+    });
+
+    expect(plan.readiness).toBe('blocked');
+    expect(plan.route.provider).toMatchObject({
+      preflightEvidenceObserved: [],
+      preflightEvidenceMissing: ['repository', 'commitSha', 'proofUrls'],
+    });
+    expect(plan.authority.executionAllowed).toBe(false);
+  });
+
   it('blocks exact-head evidence whose proof URL belongs to another repository or commit', () => {
     const plan = planFounderOsLab({
       goal: 'Review and merge the focused routing change.',
@@ -195,6 +218,52 @@ describe('Founder OS isolated lab', () => {
 
     expect(plan.readiness).toBe('blocked');
     expect(plan.truth.blocked.join(' ')).toContain('authoritative GitHub commit URL');
+    expect(plan.authority.executionAllowed).toBe(false);
+  });
+
+  it('rejects GitHub commit URLs with extra or malformed path segments', () => {
+    for (const proofUrl of [
+      `${PROOF_URL}/not-a-commit`,
+      `${PROOF_URL}/%ZZ`,
+    ]) {
+      const plan = planFounderOsLab({
+        goal: 'Review and merge the focused routing change.',
+        action: 'merge-code',
+        approval: {
+          id: 'founder-approved:review-merge-routing-v1',
+          actions: ['merge-code'],
+        },
+        evidence: {
+          repository: 'jussray/founder-control-room',
+          commitSha: SHA,
+          proofUrls: [proofUrl],
+        },
+      });
+
+      expect(plan.readiness).toBe('blocked');
+      expect(plan.truth.blocked.join(' ')).toContain('authoritative GitHub commit URL');
+    }
+  });
+
+  it('rejects provider homepages that mention an automation only in a query value', () => {
+    const plan = planFounderOsLab({
+      goal: 'Queue one proof-backed founder update.',
+      action: 'queue-social',
+      approval: {
+        id: 'founder-approved:queue-one-lab-post',
+        actions: ['queue-social'],
+      },
+      evidence: {
+        repository: 'jussray/founder-control-room',
+        commitSha: SHA,
+        proofUrls: [PROOF_URL, `https://zapier.com/?anything=${ZAPIER_AUTOMATION_ID}`],
+        automationId: ZAPIER_AUTOMATION_ID,
+      },
+      socialPost: socialPost('queue'),
+    });
+
+    expect(plan.readiness).toBe('blocked');
+    expect(plan.truth.blocked.join(' ')).toContain('authoritative Zapier automation route');
     expect(plan.authority.executionAllowed).toBe(false);
   });
 
@@ -284,9 +353,61 @@ describe('Founder OS isolated lab', () => {
       preflightEvidenceMissing: ['workspaceId', 'recordIds', 'associationPlan'],
     });
     expect(plan.truth.blocked.join(' ')).toContain('hubspot preflight evidence requires workspaceId');
-    expect(plan.truth.blocked.join(' ')).toContain('hubspot preflight evidence requires at least one recordId');
+    expect(plan.truth.blocked.join(' ')).toContain('hubspot preflight evidence requires at least one nonempty typed recordId');
     expect(plan.truth.blocked.join(' ')).toContain('hubspot preflight evidence requires associationPlan');
     expect(plan.authority.executionAllowed).toBe(false);
+  });
+
+  it('preserves HubSpot object types when record numbers collide', () => {
+    const plan = planFounderOsLab({
+      goal: 'Preview one approved founder outreach email.',
+      action: 'send-email',
+      provider: 'hubspot',
+      approval: {
+        id: 'founder-approved:outreach-preview-v1',
+        actions: ['send-email'],
+      },
+      evidence: {
+        proofUrls: ['https://app.hubspot.com/contacts/123456/record/0-1/789'],
+        workspaceId: '123456',
+        recordIds: ['contact:789', 'company:789'],
+        associationPlan: 'Associate contact:789 with company:789 before any separately approved send.',
+      },
+    });
+
+    expect(plan.readiness).toBe('blocked');
+    expect(plan.truth.blocked.join(' ')).toContain(
+      'hubspot proof does not identify record company:789 on its authoritative object-type route',
+    );
+    expect(plan.authority.executionAllowed).toBe(false);
+  });
+
+  it('keeps authoritative HubSpot outreach at review-only until canonical dispatch evidence exists', () => {
+    const plan = planFounderOsLab({
+      goal: 'Preview one approved founder outreach email.',
+      action: 'send-email',
+      provider: 'hubspot',
+      approval: {
+        id: 'founder-approved:outreach-preview-v1',
+        actions: ['send-email'],
+      },
+      evidence: {
+        proofUrls: [
+          'https://app.hubspot.com/contacts/123456/record/0-1/789',
+          'https://app.hubspot.com/contacts/123456/record/0-2/456',
+        ],
+        workspaceId: '123456',
+        recordIds: ['contact:789', 'company:456'],
+        associationPlan: 'Associate contact:789 with company:456 before any separately approved send.',
+      },
+    });
+
+    expect(plan.readiness).toBe('ready_for_review');
+    expect(plan.truth.blocked).toEqual([]);
+    expect(plan.authority.executionAllowed).toBe(false);
+    expect(plan.nextGate).toContain('DispatchDecision');
+    expect(plan.nextGate).toContain('consent');
+    expect(plan.nextGate).toContain('suppression');
   });
 
   it('is deterministic for identical inputs', () => {
