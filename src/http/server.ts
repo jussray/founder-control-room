@@ -23,6 +23,7 @@ import { futureYouRouter } from './routes/futureYou.js';
 import { goalfixRouter } from './routes/goalfix.js';
 import { mirrorRouter } from './routes/mirror.js';
 import { handleFounderSignalEngineMcp } from './routes/founderSignalEngineMcp.js';
+import { handleFounderSignalReviewEmailIngest } from './routes/founderSignalReviewEmailIngress.js';
 import { handleHairCommerceReceiptIngest } from './routes/hairCommerceReceipts.js';
 import { portfolioVerificationRouter } from './routes/portfolioVerification.js';
 import {
@@ -103,9 +104,10 @@ export function createServer(options: CreateServerOptions = {}) {
     app.use('/control-room', express.static(path.join(publicDir, 'control-room')));
   }
 
-  // Webhooks, remote MCP calls, repo-runner pings, and sanitized commerce
-  // receipts do not use browser cookies. Mount them before the browser
-  // same-origin mutation gate and give each endpoint strict parser/auth rules.
+  // Webhooks, remote MCP calls, repo-runner pings, sanitized commerce
+  // receipts, and signed review-email receipts do not use browser cookies.
+  // Mount them before the browser same-origin mutation gate and give each
+  // endpoint strict parser/auth rules.
   app.post(
     '/webhooks/github',
     express.raw({ type: 'application/json', limit: BODY_LIMIT }),
@@ -121,6 +123,12 @@ export function createServer(options: CreateServerOptions = {}) {
     rateLimitGeneral,
     express.json({ type: 'application/json', limit: '32kb' }),
     handleHairCommerceReceiptIngest,
+  );
+  app.post(
+    '/ingest/founder-review-email',
+    rateLimitGeneral,
+    express.raw({ type: 'application/json', limit: '16kb' }),
+    handleFounderSignalReviewEmailIngest,
   );
   app.post(
     '/mcp/founder-signal-engine',
