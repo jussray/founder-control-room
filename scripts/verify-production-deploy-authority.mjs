@@ -151,10 +151,15 @@ const receiptStepStart = validationStepStart === -1
     );
 assert.notEqual(validationStepStart, -1, 'startup binding validation step must exist');
 assert.notEqual(receiptStepStart, -1, 'authority receipt step must follow configuration validation');
-const authorityBeforeValidation = workflow.slice(authoritySectionStart, validationStepStart);
+const authoritySection = workflow.slice(authoritySectionStart, migrationSectionStart);
+const validationRelativeStart = validationStepStart - authoritySectionStart;
+const receiptRelativeStart = receiptStepStart - authoritySectionStart;
+const authorityOutsideValidation =
+  authoritySection.slice(0, validationRelativeStart)
+  + authoritySection.slice(receiptRelativeStart);
 const validationStep = workflow.slice(validationStepStart, receiptStepStart);
 
-for (const name of [
+const requiredAuthoritySecrets = [
   'SUPABASE_DB_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
   'SUPABASE_PUBLISHABLE_KEY',
@@ -164,12 +169,18 @@ for (const name of [
   'CLOUDFLARE_API_TOKEN',
   'CLOUDFLARE_ACCOUNT_ID',
   'DEPLOY_URL',
-]) {
-  assert.doesNotMatch(
-    authorityBeforeValidation,
-    new RegExp('^      ' + name + ': \\$\\{\\{ secrets\\.' + name + ' \\}\\}$', 'm'),
-    name + ' must not be exposed to checkout or receipt steps',
-  );
+];
+const outsideSecretMapping = new RegExp(
+  '^[ \\t]+(?:' + requiredAuthoritySecrets.join('|') + '): \\$\\{\\{ secrets\\.(?:' + requiredAuthoritySecrets.join('|') + ') \\}\\}$',
+  'm',
+);
+assert.doesNotMatch(
+  authorityOutsideValidation,
+  outsideSecretMapping,
+  'required production secrets must be scoped only to the validation step',
+);
+
+for (const name of requiredAuthoritySecrets) {
   assert.match(
     validationStep,
     new RegExp('^          ' + name + ': \\$\\{\\{ secrets\\.' + name + ' \\}\\}$', 'm'),
