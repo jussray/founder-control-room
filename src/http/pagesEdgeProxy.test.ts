@@ -43,9 +43,9 @@ describe('Cloudflare Pages edge proxy', () => {
     expect(upstreamFetch).not.toHaveBeenCalled();
   });
 
-  it('forwards a missing GET route to the surviving API Worker', async () => {
+  it('forwards dynamic GET routes without allowing Pages SPA fallback to intercept them', async () => {
     const handler = await loadHandler();
-    const assetFetch = vi.fn(async (_request: Request) => new Response('missing', { status: 404 }));
+    const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 200 }));
     const upstreamFetch = vi.fn(async (_request: Request) => new Response('{"ok":true}', {
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -58,6 +58,7 @@ describe('Cloudflare Pages edge proxy', () => {
     );
 
     expect(response.status).toBe(200);
+    expect(assetFetch).not.toHaveBeenCalled();
     expect(upstreamFetch).toHaveBeenCalledOnce();
     const forwarded = upstreamFetch.mock.calls[0]?.[0];
     expect(forwarded).toBeInstanceOf(Request);
@@ -65,6 +66,27 @@ describe('Cloudflare Pages edge proxy', () => {
     expect(forwarded?.redirect).toBe('manual');
     expect(forwarded?.headers.get('x-forwarded-host')).toBe('foundercontrolroom.org');
     expect(forwarded?.headers.get('x-forwarded-proto')).toBe('https');
+  });
+
+  it('forwards auth callbacks rather than serving the Pages landing page', async () => {
+    const handler = await loadHandler();
+    const assetFetch = vi.fn(async (_request: Request) => new Response('landing', { status: 200 }));
+    const upstreamFetch = vi.fn(async (_request: Request) => new Response(null, {
+      status: 303,
+      headers: { location: '/control-room/#verified' },
+    }));
+    vi.stubGlobal('fetch', upstreamFetch);
+
+    const response = await handler.fetch(
+      new Request('https://foundercontrolroom.org/auth/callback?token_hash=verified'),
+      { ASSETS: { fetch: assetFetch } },
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).toBe('/control-room/#verified');
+    expect(assetFetch).not.toHaveBeenCalled();
+    const forwarded = upstreamFetch.mock.calls[0]?.[0];
+    expect(forwarded?.url).toBe('https://api.foundercontrolroom.org/auth/callback?token_hash=verified');
   });
 
   it('sends mutations directly to the API Worker without probing static assets', async () => {
