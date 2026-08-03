@@ -19,6 +19,8 @@ const { validateBufferPublishInput } = require('../tools/zapier/buffer-content-f
 const ROOT = resolve(fileURLToPath(new URL('../', import.meta.url)));
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const PROOF_URL = `https://github.com/jussray/founder-control-room/commit/${SHA}`;
+const ZAPIER_AUTOMATION_ID = 'zap-founder-signal-review-v1';
+const ZAPIER_PROOF_URL = `https://zapier.com/app/editor/${ZAPIER_AUTOMATION_ID}`;
 const GENERATED_AT = '2026-08-02T21:00:00.000Z';
 const INVOCATION_ID = '3f10e0f9-b0b4-4e64-b9ff-c5f10f848067';
 const GRANT_ID = 'founder-approved-auto-distribution-v1';
@@ -29,9 +31,9 @@ function zapierEvidence() {
     {
       repository: 'jussray/founder-control-room',
       commitSha: SHA,
-      proofUrls: [PROOF_URL],
+      proofUrls: [PROOF_URL, ZAPIER_PROOF_URL],
     },
-    { automationId: 'zap-founder-signal-review-v1' },
+    { automationId: ZAPIER_AUTOMATION_ID },
   );
 }
 
