@@ -179,7 +179,7 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
   }
   if (request.action === 'send-email' && validationErrors.length === 0) {
     verified.push(
-      'HubSpot identity and association evidence is reviewable, but it is not outbound dispatch authorization.',
+      `${provider.id} identity evidence is reviewable, but it is not outbound dispatch authorization.`,
     );
   }
 
@@ -249,7 +249,7 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
         `The ${command.id} command is a reasoning lens, not executable authority.`,
         `The ${provider.id} entry is a provider preview contract, not proof of a live connection.`,
         ...(request.action === 'send-email'
-          ? ['CRM identity evidence is not proof of recipient permission, suppression clearance, approved content, or dispatch eligibility.']
+          ? ['Provider identity evidence is not proof of recipient permission, suppression clearance, approved content, or dispatch eligibility.']
           : []),
       ],
       unknown: evidenceUnknowns(request, provider.id, observedEvidence),
@@ -294,7 +294,7 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
           ? [`Assert required ${provider.id} preflight evidence is present and semantically bound before executor readiness.`]
           : []),
         ...(request.action === 'send-email'
-          ? ['Assert CRM identity proof is never treated as an allowed outbound DispatchDecision.']
+          ? ['Assert provider identity proof is never treated as an allowed outbound DispatchDecision.']
           : []),
         ...(socialValidated ? ['Assert the existing social validator accepts the supplied payload.'] : []),
       ],
