@@ -121,7 +121,19 @@ describe('controller outbox', () => {
         attemptCount: 2,
       },
     ]);
-    expect(mockRpc).toHaveBeenCalledWith('claim_outbox_work', { p_limit: 5 });
+    expect(mockRpc).toHaveBeenCalledWith('claim_outbox_work', {
+      p_limit: 5,
+      p_stale_after_seconds: 300,
+    });
+  });
+
+  it('passes an explicit stale-claim window to the ownership-aware RPC', async () => {
+    await claimWork(2, 90);
+
+    expect(mockRpc).toHaveBeenCalledWith('claim_outbox_work', {
+      p_limit: 2,
+      p_stale_after_seconds: 90,
+    });
   });
 
   it('rejects claimed rows that do not include an ownership token', async () => {
