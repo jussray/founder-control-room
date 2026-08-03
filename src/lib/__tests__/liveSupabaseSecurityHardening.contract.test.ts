@@ -9,6 +9,7 @@ const migration = readFileSync(
   ),
   "utf8",
 );
+const executableSql = migration.replace(/^\s*--.*$/gm, "");
 
 const SERVICE_ONLY_TABLES = [
   "lanes",
@@ -25,15 +26,15 @@ describe("live Supabase security hardening", () => {
   it("makes every live advisor table explicitly service-role-only", () => {
     for (const [index, table] of SERVICE_ONLY_TABLES.entries()) {
       const nextTable = SERVICE_ONLY_TABLES[index + 1];
-      const blockStart = migration.indexOf(
+      const blockStart = executableSql.indexOf(
         `alter table public.${table} enable row level security`,
       );
       const blockEnd = nextTable
-        ? migration.indexOf(
+        ? executableSql.indexOf(
             `alter table public.${nextTable} enable row level security`,
             blockStart + 1,
           )
-        : migration.indexOf(
+        : executableSql.indexOf(
             "create or replace function public.update_onboarding_updated_at()",
             blockStart + 1,
           );
@@ -43,7 +44,7 @@ describe("live Supabase security hardening", () => {
         blockStart,
       );
 
-      const block = migration.slice(blockStart, blockEnd);
+      const block = executableSql.slice(blockStart, blockEnd);
       expect(block).toContain(
         `drop policy if exists "control_room_service_role_only" on public.${table}`,
       );
@@ -60,20 +61,20 @@ describe("live Supabase security hardening", () => {
     }
   });
 
-  it("does not add per-row auth function evaluation to the policies", () => {
-    expect(migration).not.toContain("auth.role()");
-    expect(migration).not.toContain("auth.uid()");
+  it("does not add per-row auth function evaluation to executable policy SQL", () => {
+    expect(executableSql).not.toContain("auth.role()");
+    expect(executableSql).not.toContain("auth.uid()");
   });
 
   it("pins the onboarding trigger search path and qualifies the clock", () => {
-    expect(migration).toContain(
+    expect(executableSql).toContain(
       "create or replace function public.update_onboarding_updated_at()",
     );
-    expect(migration).toContain("set search_path = ''");
-    expect(migration).toContain("new.updated_at = pg_catalog.now()");
+    expect(executableSql).toContain("set search_path = ''");
+    expect(executableSql).toContain("new.updated_at = pg_catalog.now()");
   });
 
   it("contains no application-data mutation", () => {
-    expect(migration).not.toMatch(/^\s*(insert|update|delete)\s+/gim);
+    expect(executableSql).not.toMatch(/^\s*(insert|update|delete)\s+/gim);
   });
 });
