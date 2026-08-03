@@ -1,119 +1,92 @@
-# Cloudflare Worker Deployment Targets
+# Cloudflare Deployment Targets
 
-## Purpose
+## Canonical topology
 
-Keep the Founder Control Room root application, API-subdomain application, and deletion queue from overwriting one another during Cloudflare Git deployments.
+Founder Control Room uses Cloudflare Pages for the browser frontend and one HTTP Worker for backend execution.
 
-## Canonical targets
+| Cloudflare surface | Domain / role | Repository source | Build / deploy command | Cron |
+|---|---|---|---|---|
+| Pages project | `foundercontrolroom.org` static frontend | `public/` via `scripts/build-pages.mjs` | Build: `npm run build:pages`; output: `dist-pages` | none |
+| `founder-control-room` Worker | `api.foundercontrolroom.org` API, auth, MCP, reconciliation | `wrangler.worker.toml` | Build: `npm run build`; deploy: `npm run deploy` | every minute |
+| `founder-control-room-review-email` Worker | private email command intake | `wrangler.email.toml` | dedicated reviewed workflow | none |
+| `founder-control-room-deletion-queue` Worker | account-deletion processing | `wrangler.deletion-queue.toml` | dedicated reviewed workflow | every 6 hours |
 
-| Cloudflare Worker | Domain / role | Wrangler config | Build command | Deploy command | Cron |
-|---|---|---|---|---|---|
-| `founder-control-room` | `foundercontrolroom.org` application and reconciliation owner | `wrangler.toml` | `npm run build` | `npm run deploy` | every minute |
-| `founder-control-room2` | `api.foundercontrolroom.org` API and remote MCP surface | `wrangler.api.toml` | `npm run build` | `npm run deploy:api` | none |
-| `founder-control-room-deletion-queue` | account-deletion processing | `wrangler.deletion-queue.toml` | `npm run build` | `wrangler deploy --config wrangler.deletion-queue.toml` | every 6 hours |
+The former `founder-control-room2` Worker was deleted. Its identity and `wrangler.api.toml` must not be recreated or targeted.
 
-All three Worker names are immutable deployment identities. A config must never reuse another target's `name`, route, preview URL, or scheduled trigger.
+## Pages behavior
 
-The API Worker intentionally has no scheduled trigger. Running the same reconciliation cron in both HTTP Workers would duplicate control-loop work.
+The Pages project publishes `dist-pages`, which is a deterministic copy of `public/` containing the landing page, authenticated Control Room application, security headers, and `public/_worker.js`.
 
-## Cloudflare Git project configuration
+The Pages advanced-mode Worker follows this contract:
 
-Each Cloudflare Git project must invoke the deploy command that names its own Wrangler file. Do not connect multiple projects to plain `npx wrangler deploy`, because that command uses the root `wrangler.toml` and can replace another project's name, domain, preview, route, or trigger settings.
+1. serve an existing `GET` or `HEAD` asset from `env.ASSETS`;
+2. forward missing browser routes and all mutation methods to `https://api.foundercontrolroom.org`;
+3. preserve path, query, authorization, cookies, and manual redirect handling;
+4. stamp the original Pages host in forwarded headers;
+5. block proxy loops.
 
-Recommended project commands:
+This keeps the existing frontend's relative API requests same-origin while the backend remains isolated on the API custom domain.
+
+### Required Pages dashboard settings
 
 ```text
-founder-control-room
-Build:  npm run build
-Deploy: npm run deploy
-
-founder-control-room2
-Build:  npm run build
-Deploy: npm run deploy:api
-
-founder-control-room-deletion-queue
-Build:  npm run build
-Deploy: npx wrangler deploy --config wrangler.deletion-queue.toml
+Build command: npm run build:pages
+Build output directory: dist-pages
+Root directory: repository root / blank
+Production branch: main
 ```
 
-The deletion target must remain dormant until its exact-head gate passes and a separate production approval confirms the required runtime bindings. A repository merge alone does not deploy it.
+The literal build command `0` is invalid. Do not use it. A no-op command would be `exit 0`, but this repository intentionally uses `npm run build:pages` so required assets and the edge proxy are verified before upload.
 
-## Required bindings per HTTP Worker
+## Surviving Worker behavior
 
-Configure these separately in the secret store for each intended HTTP Worker:
+`wrangler.worker.toml` is the only HTTP Worker configuration. It must retain:
 
 ```text
-SUPABASE_URL
+name: founder-control-room
+route: api.foundercontrolroom.org
+FOUNDER_API_URL: https://foundercontrolroom.org
+FOUNDER_ALLOWED_ORIGINS: https://foundercontrolroom.org
+```
+
+`FOUNDER_API_URL` points to the Pages origin intentionally. Supabase magic links return through Pages, Pages proxies `/auth/callback` to the Worker, and the Worker's relative `/control-room/` redirect lands back on the browser frontend.
+
+The Worker owns the reconciliation cron because no duplicate HTTP Worker remains.
+
+## Required Worker secrets
+
+Configure these in the surviving `founder-control-room` Worker secret store and, where named by `.github/workflows/deploy.yml`, in the GitHub `production` environment:
+
+```text
 SUPABASE_SERVICE_ROLE_KEY
 SUPABASE_PUBLISHABLE_KEY
 GITHUB_WEBHOOK_SECRET
-FOUNDER_ALLOWED_ORIGINS
-FOUNDER_API_URL
-```
-
-Configure one GitHub authentication path:
-
-```text
-Preferred production path:
 GITHUB_APP_ID
 GITHUB_PRIVATE_KEY
-
-Fallback path:
-GITHUB_TOKEN
-```
-
-`GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` are a pair. A partial pair fails closed even when a fallback token exists, because half-configured production authentication is configuration drift.
-
-## Required deletion queue bindings
-
-Configure these only in the `founder-control-room-deletion-queue` Worker secret/binding plane:
-
-```text
-NEXT_PUBLIC_SUPABASE_URL
-SUPABASE_SERVICE_ROLE_KEY
-CF_API_TOKEN
-CF_ACCOUNT_ID
-CF_SESSIONS_KV_NAMESPACE_ID
-CF_FEATURE_FLAGS_KV_NAMESPACE_ID
-```
-
-The two KV namespace identifiers are optional only when that namespace does not exist. When either namespace identifier is configured, `CF_ACCOUNT_ID` and `CF_API_TOKEN` are required and every non-2xx delete fails the scheduled run.
-
-## Founder Signal Engine remote bridge
-
-The API Worker also needs these provider-held secrets before the ChatGPT fallback bridge can be activated:
-
-```text
+FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
 FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
 ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
 ```
 
-Optional:
-
-```text
-FOUNDER_SIGNAL_ENGINE_HOOK_TIMEOUT_MS
-```
-
-The existing OpenAI key reference remains `zapier-founder-signal-engine`. It is not stored in this repository and must not be recreated merely because a direct Zapier connector is absent.
+Do not reuse the OpenAI key as the MCP bearer token. The existing OpenAI key reference remains `zapier-founder-signal-engine`.
 
 ## Verification gate
 
-A repository merge does not prove deployment. Close the Cloudflare incident only after all of the following are captured:
+A merge does not prove activation. Production is verified only after all of these are captured against one exact main SHA:
 
-1. exact source SHA for each intended Worker;
-2. successful `npm run build`;
-3. successful deploy using the target's named Wrangler config;
-4. no missing-binding validation error;
-5. root-domain `/health` response;
-6. API-subdomain `/health` response;
-7. deletion queue scheduled test proves failed entries remain failed and make the run fail visibly;
-8. remote MCP discovery works on the API subdomain without exposing credentials;
-9. the Founder Signal Engine remains review-only until separate publication and CRM approval authority exists.
+1. `npm run build:pages` succeeds and contains `index.html`, `/control-room/`, `_headers`, and `_worker.js`;
+2. the Pages production deployment succeeds and `foundercontrolroom.org` renders the landing page;
+3. `npm run deploy` uses `wrangler.worker.toml` and reports no remote/local route collision;
+4. the Worker deploy reports no missing required secret;
+5. `https://api.foundercontrolroom.org/health` returns the expected payload;
+6. `https://foundercontrolroom.org/health` returns the same payload through the Pages proxy;
+7. authentication returns to `/control-room/` on the Pages origin;
+8. the review-only Founder Signal Engine probe returns a correlated receipt and explicit Zapier run ID before any Buffer claim.
 
-## Safety and rollback
+## Rollback
 
-- Never commit secret values or copy them into GitHub issues, PRs, logs, screenshots, HubSpot, Buffer, or Founder Control Room evidence.
-- Do not rotate keys merely to repair a missing Worker binding. Restore the existing provider-held secret reference unless a separate credential incident proves rotation is needed.
-- If an HTTP Worker config routes incorrectly, redeploy the prior known-good Worker version and preserve the failed build evidence.
-- If the deletion target is activated incorrectly, disable its cron first, preserve failed queue evidence, and redeploy the prior named deletion Worker version. Never point the deletion config at either HTTP Worker name.
-- Do not disconnect or delete any Cloudflare project until its role is confirmed from private dashboard evidence.
+- Pages: roll back to the prior successful Pages deployment.
+- API Worker: redeploy the prior exact Worker SHA with `wrangler.worker.toml`.
+- Proxy: revert `public/_worker.js`; do not point the frontend directly at an unverified origin.
+- Credentials: remove or revoke only the affected credential. Do not rotate the OpenAI key to repair Worker binding drift.
+- Preserve build logs, deployment IDs, probe receipts, and platform receipts.

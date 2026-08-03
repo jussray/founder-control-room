@@ -7,8 +7,8 @@ on:
       - 'docs/deployment/CLOUDFLARE_WORKER_TARGETS.md'
       - 'src/workers/deletion-queue-worker.ts'
       - 'src/workers/__tests__/deletion-queue-worker.test.ts'
-      - 'wrangler.toml'
-      - 'wrangler.api.toml'
+      - 'wrangler.worker.toml'
+      - 'wrangler.email.toml'
       - 'wrangler.deletion-queue.toml'
   workflow_dispatch:
 
@@ -51,11 +51,17 @@ jobs:
         shell: bash
         run: |
           node --input-type=module <<'NODE'
-          import { readFileSync } from 'node:fs';
+          import { existsSync, readFileSync } from 'node:fs';
+
+          for (const removedPath of ['wrangler.toml', 'wrangler.api.toml']) {
+            if (existsSync(removedPath)) {
+              throw new Error(`${removedPath} must remain absent from the Pages + one-Worker topology`);
+            }
+          }
 
           const targets = [
-            ['wrangler.toml', 'founder-control-room'],
-            ['wrangler.api.toml', 'founder-control-room2'],
+            ['wrangler.worker.toml', 'founder-control-room'],
+            ['wrangler.email.toml', 'founder-control-room-review-email'],
             ['wrangler.deletion-queue.toml', 'founder-control-room-deletion-queue'],
           ];
           const names = targets.map(([path, expected]) => {

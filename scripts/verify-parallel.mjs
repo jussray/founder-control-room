@@ -14,6 +14,7 @@ const waveOne = [
   { id: "lint", command: npmCommand, args: ["run", "lint"] },
   { id: "unit", command: npmCommand, args: ["run", "test"] },
   { id: "build", command: npmCommand, args: ["run", "build"] },
+  { id: "pages-build", command: npmCommand, args: ["run", "build:pages"] },
   { id: "cloudflare-dry-run", command: npmCommand, args: ["run", "cf:dry-run"] },
 ];
 
@@ -88,7 +89,7 @@ if (firstWavePassed) {
     id: "playwright-e2e",
     ok: false,
     skipped: true,
-    reason: "Skipped because a prerequisite typecheck, lint, unit, build, or Cloudflare dry-run task failed.",
+    reason: "Skipped because a prerequisite typecheck, lint, unit, build, Pages build, or Cloudflare dry-run task failed.",
   });
 }
 

@@ -1,0 +1,51 @@
+name = "founder-control-room"
+main = "src/worker/cf-entry.ts"
+compatibility_date = "2026-07-20"
+compatibility_flags = [
+  "nodejs_compat",
+  "enable_nodejs_http_modules",
+  "enable_nodejs_http_server_modules",
+]
+workers_dev = true
+preview_urls = true
+
+# Cloudflare Pages owns foundercontrolroom.org and serves ./public.
+# This single surviving Worker owns backend, auth, MCP, and reconciliation
+# traffic at api.foundercontrolroom.org. The deleted founder-control-room2
+# identity must never be recreated or targeted by deployment automation.
+
+[observability]
+enabled = true
+
+[[routes]]
+pattern = "api.foundercontrolroom.org"
+custom_domain = true
+
+# Public-safe runtime variables. Auth callbacks intentionally return through
+# the Pages origin so browser sessions and relative /control-room redirects
+# remain same-origin from the founder's point of view.
+[vars]
+ENVIRONMENT = "production"
+SUPABASE_URL = "https://oojzfmmywbvficgybaxd.supabase.co"
+FOUNDER_ALLOWED_ORIGINS = "https://foundercontrolroom.org"
+FOUNDER_API_URL = "https://foundercontrolroom.org"
+MCP_EXA_URL = "https://mcp.exa.ai/mcp"
+MCP_RESEND_URL = "https://mcp.resend.com/mcp"
+
+[secrets]
+required = [
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "SUPABASE_PUBLISHABLE_KEY",
+  "GITHUB_WEBHOOK_SECRET",
+  "GITHUB_APP_ID",
+  "GITHUB_PRIVATE_KEY",
+  "FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON",
+  "FOUNDER_SIGNAL_ENGINE_MCP_TOKEN",
+  "ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL",
+]
+
+# With the duplicate API Worker deleted, this Worker is also the sole owner of
+# the reconciliation schedule. Keeping the cron here prevents silent loss of
+# the control loop without duplicating execution.
+[triggers]
+crons = ["* * * * *"]
