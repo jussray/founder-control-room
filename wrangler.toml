@@ -40,23 +40,35 @@ custom_domain = true
 # ---------------------------------------------------------------------------
 [vars]
 ENVIRONMENT = "production"
+SUPABASE_URL = "https://oojzfmmywbvficgybaxd.supabase.co"
+FOUNDER_ALLOWED_ORIGINS = "https://foundercontrolroom.org"
+FOUNDER_API_URL = "https://foundercontrolroom.org"
 MCP_EXA_URL = "https://mcp.exa.ai/mcp"
 MCP_RESEND_URL = "https://mcp.resend.com/mcp"
+
+# Wrangler validates these encrypted bindings before a deploy can succeed.
+# The manual production workflow installs their values from the GitHub
+# production environment; no value belongs in this file.
+[secrets]
+required = [
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "SUPABASE_PUBLISHABLE_KEY",
+  "GITHUB_WEBHOOK_SECRET",
+  "GITHUB_APP_ID",
+  "GITHUB_PRIVATE_KEY",
+  "FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON",
+]
 
 # ---------------------------------------------------------------------------
 # Secrets — set in the founder-control-room Worker secret store, never commit
 # ---------------------------------------------------------------------------
 # Required service bindings:
-#   SUPABASE_URL
 #   SUPABASE_SERVICE_ROLE_KEY
 #   SUPABASE_PUBLISHABLE_KEY
 #   GITHUB_WEBHOOK_SECRET
-#   FOUNDER_ALLOWED_ORIGINS            # https://foundercontrolroom.org
-#   FOUNDER_API_URL                    # https://foundercontrolroom.org
 #
-# Required GitHub authentication, choose one path:
-#   GITHUB_APP_ID + GITHUB_PRIVATE_KEY  # preferred production path
-#   GITHUB_TOKEN                        # local/development fallback
+# Required production GitHub authentication:
+#   GITHUB_APP_ID + GITHUB_PRIVATE_KEY
 #
 # External code-use discovery and hourly digest:
 #   MCP_GITHUB_URL                     # GitHub MCP endpoint
