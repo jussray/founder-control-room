@@ -86,10 +86,11 @@ describe('Founder OS isolated lab', () => {
     expect(plan.readiness).toBe('approval_required');
     expect(plan.authority.approvalObserved).toBe(false);
     expect(plan.authority.executionAllowed).toBe(false);
+    expect(plan.route.provider.preflightEvidenceMissing).toEqual([]);
     expect(plan.truth.blocked.join(' ')).toContain('Explicit founder approval');
   });
 
-  it('recognizes scoped approval but still refuses to execute a provider action', () => {
+  it('recognizes scoped approval and social proof but still refuses provider execution', () => {
     const plan = planFounderOsLab({
       goal: 'Queue one proof-backed founder update.',
       action: 'queue-social',
@@ -103,7 +104,33 @@ describe('Founder OS isolated lab', () => {
     expect(plan.readiness).toBe('ready_for_external_executor');
     expect(plan.authority.approvalObserved).toBe(true);
     expect(plan.authority.executionAllowed).toBe(false);
+    expect(plan.route.provider).toMatchObject({
+      preflightEvidenceRequired: ['commitSha', 'proofUrls'],
+      preflightEvidenceObserved: ['commitSha', 'proofUrls'],
+      preflightEvidenceMissing: [],
+    });
     expect(plan.nextGate).toContain('separately authorize one named external adapter');
+  });
+
+  it('blocks a mutating preview when approval exists without provider evidence', () => {
+    const plan = planFounderOsLab({
+      goal: 'Review and merge the focused routing change.',
+      action: 'merge-code',
+      approval: {
+        id: 'founder-approved:review-merge-routing-v1',
+        actions: ['merge-code'],
+      },
+    });
+
+    expect(plan.readiness).toBe('blocked');
+    expect(plan.authority.approvalObserved).toBe(true);
+    expect(plan.authority.executionAllowed).toBe(false);
+    expect(plan.route.provider).toMatchObject({
+      preflightEvidenceRequired: ['repository', 'commitSha', 'proofUrls'],
+      preflightEvidenceObserved: [],
+      preflightEvidenceMissing: ['repository', 'commitSha', 'proofUrls'],
+    });
+    expect(plan.truth.blocked.join(' ')).toContain('Missing required github preflight evidence');
   });
 
   it('fails closed when finished post copy resembles a leaked prompt', () => {
@@ -118,7 +145,7 @@ describe('Founder OS isolated lab', () => {
     expect(plan.authority.executionAllowed).toBe(false);
   });
 
-  it('keeps merge planning isolated even with explicit approval', () => {
+  it('keeps merge planning isolated even with explicit approval and complete evidence', () => {
     const plan = planFounderOsLab({
       goal: 'Review and merge the focused routing change.',
       action: 'merge-code',
@@ -136,6 +163,7 @@ describe('Founder OS isolated lab', () => {
     expect(plan.readiness).toBe('ready_for_external_executor');
     expect(plan.route.specialistSkill).toBe('review-verify-merge');
     expect(plan.route.adapters).toContain('merge-preview');
+    expect(plan.route.provider.preflightEvidenceMissing).toEqual([]);
     expect(plan.authority.executionAllowed).toBe(false);
     expect(plan.isolation.providerCalls).toBe(false);
   });
