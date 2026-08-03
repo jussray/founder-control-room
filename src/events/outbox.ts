@@ -93,16 +93,29 @@ export interface ClaimedWork {
   attemptCount: number;
 }
 
+const DEFAULT_STALE_CLAIM_AFTER_SECONDS = 300;
+
 /**
  * Claim up to `limit` outbox entries for processing.
  * Uses row-level locking (FOR UPDATE SKIP LOCKED via Postgres function).
+ *
+ * Passing the stale-claim window is also a schema-parity gate. A database that
+ * still exposes the legacy one-argument RPC rejects this request before it can
+ * claim a row, preventing work from entering a lifecycle whose completion,
+ * retry, and abandonment functions cannot validate claim ownership.
  *
  * The returned `claimed_at` value is an ownership token. Every lifecycle write
  * must pass it back so stale workers cannot complete, fail, or abandon work
  * they no longer own after crash recovery reclaimed the row.
  */
-export async function claimWork(limit = 10): Promise<ClaimedWork[]> {
-  const { data, error } = await supabase.rpc('claim_outbox_work', { p_limit: limit });
+export async function claimWork(
+  limit = 10,
+  staleAfterSeconds = DEFAULT_STALE_CLAIM_AFTER_SECONDS,
+): Promise<ClaimedWork[]> {
+  const { data, error } = await supabase.rpc('claim_outbox_work', {
+    p_limit: limit,
+    p_stale_after_seconds: staleAfterSeconds,
+  });
 
   if (error) throw new Error(`Failed to claim outbox work: ${error.message}`);
   return (data ?? []).map((row: Record<string, unknown>) => {
