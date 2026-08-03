@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const workflowPath = new URL('../.github/workflows/deploy.yml', import.meta.url);
+const wranglerPath = new URL('../wrangler.toml', import.meta.url);
 const workflow = readFileSync(workflowPath, 'utf8');
+const wrangler = readFileSync(wranglerPath, 'utf8');
 
 assert.match(
   workflow,
@@ -65,4 +67,97 @@ assert.match(
   'post-deploy proof must fail unless social distribution reads back disabled',
 );
 
-console.log('Production deployment authority contract verified.');
+const publicBindings = new Map([
+  ['SUPABASE_URL', 'https://oojzfmmywbvficgybaxd.supabase.co'],
+  ['FOUNDER_ALLOWED_ORIGINS', 'https://foundercontrolroom.org'],
+  ['FOUNDER_API_URL', 'https://foundercontrolroom.org'],
+]);
+
+for (const [name, value] of publicBindings) {
+  assert.match(
+    wrangler,
+    new RegExp(`^${name} = "${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"$`, 'm'),
+    `${name} must be committed as a public-safe production binding`,
+  );
+}
+
+const requiredWorkerSecrets = [
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE_PUBLISHABLE_KEY',
+  'GITHUB_WEBHOOK_SECRET',
+  'GITHUB_APP_ID',
+  'GITHUB_PRIVATE_KEY',
+  'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
+];
+
+assert.match(
+  wrangler,
+  /^\[secrets\]\nrequired = \[/m,
+  'wrangler.toml must declare required Worker secrets',
+);
+
+const deploySectionStart = workflow.indexOf('  worker-deploy:');
+const deploySectionEnd = workflow.indexOf('  # ── 3.', deploySectionStart);
+assert.notEqual(deploySectionStart, -1, 'worker-deploy section must exist');
+assert.notEqual(deploySectionEnd, -1, 'worker-deploy section must have a bounded end');
+const deploySection = workflow.slice(deploySectionStart, deploySectionEnd);
+
+for (const name of requiredWorkerSecrets) {
+  assert.match(
+    wrangler,
+    new RegExp(`^  "${name}",$`, 'm'),
+    `${name} must be declared as a required Worker secret`,
+  );
+  assert.match(
+    deploySection,
+    new RegExp(`^            ${name}$`, 'm'),
+    `${name} must be listed in wrangler-action secrets`,
+  );
+}
+
+for (const name of requiredWorkerSecrets.filter(
+  (secretName) => secretName !== 'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
+)) {
+  assert.match(
+    deploySection,
+    new RegExp(`^          ${name}: \\$\\{\\{ secrets\\.${name} \\}\\}$`, 'm'),
+    `${name} must be mapped from the GitHub production environment`,
+  );
+}
+
+const authoritySectionStart = workflow.indexOf('  authority-gate:');
+const migrationSectionStart = workflow.indexOf('  # ── 1.');
+const startupValidationIndex = workflow.indexOf(
+  '      - name: Validate required production configuration',
+);
+assert.notEqual(authoritySectionStart, -1, 'authority-gate section must exist');
+assert.notEqual(startupValidationIndex, -1, 'startup binding validation step must exist');
+assert.ok(
+  startupValidationIndex > authoritySectionStart && startupValidationIndex < migrationSectionStart,
+  'all production configuration must be validated before Supabase mutation begins',
+);
+
+for (const name of [
+  'SUPABASE_DB_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE_PUBLISHABLE_KEY',
+  'GITHUB_WEBHOOK_SECRET',
+  'GITHUB_APP_ID',
+  'GITHUB_PRIVATE_KEY',
+  'CLOUDFLARE_API_TOKEN',
+  'CLOUDFLARE_ACCOUNT_ID',
+  'DEPLOY_URL',
+]) {
+  assert.match(
+    workflow,
+    new RegExp(`^      ${name}: \\$\\{\\{ secrets\\.${name} \\}\\}$`, 'm'),
+    `${name} must be available to the pre-migration authority gate`,
+  );
+  assert.match(
+    workflow,
+    new RegExp(`^            ${name}$`, 'm'),
+    `${name} must be checked by the pre-migration configuration gate`,
+  );
+}
+
+console.log('Production deployment authority and Worker binding contract verified.');
