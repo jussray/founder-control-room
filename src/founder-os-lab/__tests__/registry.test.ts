@@ -63,6 +63,21 @@ describe('portable Founder OS registry', () => {
     }
   });
 
+  it('keeps descriptive provider evidence aligned with executable preflight truth', () => {
+    expect(founderOsLabProvider('cloudflare').evidenceRequired).toEqual(
+      expect.arrayContaining(['account identifier', 'project name']),
+    );
+    expect(founderOsLabProvider('hubspot').evidenceRequired).toEqual(
+      expect.arrayContaining([
+        'portal or workspace identity',
+        'typed record identifiers',
+        'association plan',
+        'separate dispatch-gate plan',
+      ]),
+    );
+    expect(founderOsLabProvider('hubspot').evidenceRequired.join(' ')).not.toMatch(/mutation receipt/i);
+  });
+
   it('keeps every default action route inside its provider support contract', () => {
     for (const [action, route] of Object.entries(FOUNDER_OS_LAB_ACTION_ROUTES)) {
       const command = founderOsLabCommand(route.defaultCommand);
