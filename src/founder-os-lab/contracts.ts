@@ -70,6 +70,11 @@ export type FounderOsLabReadiness =
   | 'ready_for_external_executor'
   | 'blocked';
 
+export type FounderOsLabEvidenceField =
+  | 'repository'
+  | 'commitSha'
+  | 'proofUrls';
+
 export interface FounderOsLabApproval {
   id: string;
   actions: FounderOsLabAction[];
@@ -99,6 +104,9 @@ export interface FounderOsLabProviderRoute {
   approvalRequired: boolean;
   credentialBoundary: 'connector-owned' | 'server-side-secret-reference';
   evidenceRequired: string[];
+  preflightEvidenceRequired: FounderOsLabEvidenceField[];
+  preflightEvidenceObserved: FounderOsLabEvidenceField[];
+  preflightEvidenceMissing: FounderOsLabEvidenceField[];
   rollback: string;
 }
 
