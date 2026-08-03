@@ -1,0 +1,112 @@
+name: Deletion Queue Worker
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/deletion-queue-worker.yml'
+      - 'docs/deployment/CLOUDFLARE_WORKER_TARGETS.md'
+      - 'src/workers/deletion-queue-worker.ts'
+      - 'src/workers/__tests__/deletion-queue-worker.test.ts'
+      - 'wrangler.toml'
+      - 'wrangler.api.toml'
+      - 'wrangler.deletion-queue.toml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  verify:
+    name: Verify isolated scheduled deletion Worker
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Verify exact candidate head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify distinct Worker identities
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+
+          const targets = [
+            ['wrangler.toml', 'founder-control-room'],
+            ['wrangler.api.toml', 'founder-control-room2'],
+            ['wrangler.deletion-queue.toml', 'founder-control-room-deletion-queue'],
+          ];
+          const names = targets.map(([path, expected]) => {
+            const source = readFileSync(path, 'utf8');
+            const actual = source.match(/^name\s*=\s*"([^"]+)"/m)?.[1];
+            if (actual !== expected) {
+              throw new Error(`${path} expected ${expected}, found ${actual ?? 'missing'}`);
+            }
+            return actual;
+          });
+          if (new Set(names).size !== names.length) {
+            throw new Error(`Worker identity collision: ${names.join(', ')}`);
+          }
+
+          const deletionConfig = readFileSync('wrangler.deletion-queue.toml', 'utf8');
+          for (const required of [
+            'workers_dev = false',
+            'preview_urls = false',
+            'compatibility_flags = ["nodejs_compat"]',
+            'cron = "0 */6 * * *"',
+          ]) {
+            if (!deletionConfig.includes(required)) {
+              throw new Error(`Deletion config missing: ${required}`);
+            }
+          }
+          NODE
+
+      - name: Verify TypeScript
+        run: npm run typecheck
+
+      - name: Run focused deletion tests
+        run: npx vitest run src/workers/__tests__/deletion-queue-worker.test.ts
+
+      - name: Lint deletion runtime and tests
+        run: >-
+          npx eslint
+          src/workers/deletion-queue-worker.ts
+          src/workers/__tests__/deletion-queue-worker.test.ts
+          --max-warnings 0
+
+      - name: Bundle deletion Worker without deploying
+        run: >-
+          npx wrangler deploy
+          --dry-run
+          --config wrangler.deletion-queue.toml
+          --outdir .wrangler/deletion-queue-dry-run
+
+      - name: Retain deletion Worker bundle receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: deletion-queue-dry-run-${{ env.EXPECTED_HEAD_SHA }}
+          path: .wrangler/deletion-queue-dry-run
+          if-no-files-found: error
+          retention-days: 14
