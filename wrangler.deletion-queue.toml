@@ -8,8 +8,8 @@ preview_urls = false
 [vars]
 ENVIRONMENT = "production"
 
-[[triggers.crons]]
-cron = "0 */6 * * *"
+[triggers]
+crons = ["0 */6 * * *"]
 
 # This target must remain distinct from both HTTP Workers:
 #   founder-control-room   (root application)
