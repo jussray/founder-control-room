@@ -1,11 +1,21 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const workflowPath = new URL('../.github/workflows/deploy.yml', import.meta.url);
-const wranglerPath = new URL('../wrangler.toml', import.meta.url);
+const wranglerPath = new URL('../wrangler.worker.toml', import.meta.url);
 const workflow = readFileSync(workflowPath, 'utf8');
 const wrangler = readFileSync(wranglerPath, 'utf8');
 
+assert.equal(
+  existsSync(new URL('../wrangler.toml', import.meta.url)),
+  false,
+  'the repository root must not expose a Worker config to Cloudflare Pages',
+);
+assert.equal(
+  existsSync(new URL('../wrangler.api.toml', import.meta.url)),
+  false,
+  'the deleted founder-control-room2 config must stay removed',
+);
 assert.match(
   workflow,
   /^on:\n  workflow_dispatch:/m,
@@ -48,6 +58,16 @@ assert.match(
 );
 assert.match(
   workflow,
+  /command: deploy --config wrangler\.worker\.toml --var GIT_SHA:/,
+  'the production workflow must target the surviving Worker config explicitly',
+);
+assert.doesNotMatch(
+  workflow,
+  /wrangler\.api\.toml|--config wrangler\.toml/,
+  'production deployment must not target a deleted or Pages-visible config',
+);
+assert.match(
+  workflow,
   /--var GIT_SHA:\$\{\{ inputs\.expected_head_sha \}\}/,
   'the deployed version marker must use the approved exact head',
 );
@@ -73,6 +93,22 @@ const publicBindings = new Map([
   ['FOUNDER_API_URL', 'https://foundercontrolroom.org'],
 ]);
 
+assert.match(
+  wrangler,
+  /^name = "founder-control-room"$/m,
+  'the surviving Worker deployment identity must remain founder-control-room',
+);
+assert.match(
+  wrangler,
+  /^pattern = "api\.foundercontrolroom\.org"$/m,
+  'the surviving Worker must own the API custom domain',
+);
+assert.doesNotMatch(
+  wrangler,
+  /^\[assets\]$/m,
+  'the API Worker must not take static asset ownership from Pages',
+);
+
 for (const [name, value] of publicBindings) {
   assert.match(
     wrangler,
@@ -88,12 +124,14 @@ const requiredWorkerSecrets = [
   'GITHUB_APP_ID',
   'GITHUB_PRIVATE_KEY',
   'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
+  'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
+  'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
 ];
 
 assert.match(
   wrangler,
   /^\[secrets\]\nrequired = \[/m,
-  'wrangler.toml must declare required Worker secrets',
+  'wrangler.worker.toml must declare required Worker secrets',
 );
 
 const deploySectionStart = workflow.indexOf('  worker-deploy:');
@@ -169,6 +207,8 @@ const requiredAuthoritySecrets = [
   'CLOUDFLARE_API_TOKEN',
   'CLOUDFLARE_ACCOUNT_ID',
   'DEPLOY_URL',
+  'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
+  'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
 ];
 const outsideSecretMapping = new RegExp(
   '^[ \\t]+(?:' + requiredAuthoritySecrets.join('|') + '): \\$\\{\\{ secrets\\.(?:' + requiredAuthoritySecrets.join('|') + ') \\}\\}$',
@@ -192,4 +232,4 @@ for (const name of requiredAuthoritySecrets) {
     name + ' must be checked by the pre-migration configuration gate',
   );
 }
-console.log('Production deployment authority and Worker binding contract verified.');
+console.log('Production deployment authority and one-Worker binding contract verified.');

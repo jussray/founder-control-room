@@ -20,4 +20,5 @@ FOUNDER_REVIEW_INGEST_URL = "https://api.foundercontrolroom.org/ingest/founder-r
 #   FOUNDER_REVIEW_EMAIL_INGRESS_SECRET
 #
 # The same FOUNDER_REVIEW_EMAIL_INGRESS_SECRET value must be installed in the
-# founder-control-room2 API Worker secret store. Never place either value here.
+# surviving founder-control-room API Worker secret store. Never place either
+# value here.
