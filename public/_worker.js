@@ -1,14 +1,19 @@
 const API_ORIGIN = 'https://api.foundercontrolroom.org';
 const STATIC_METHODS = new Set(['GET', 'HEAD']);
 const STATIC_FILE_PATTERN = /\.(?:avif|css|gif|html|ico|jpe?g|js|map|png|svg|txt|webmanifest|webp|woff2?|xml)$/i;
+const STATIC_DIRECTORY_PREFIXES = [
+  '/control-room',
+  '/portable-founder-console',
+];
 
 function shouldServeFromPages(request) {
   if (!STATIC_METHODS.has(request.method)) return false;
 
   const { pathname } = new URL(request.url);
   return pathname === '/'
-    || pathname === '/control-room'
-    || pathname.startsWith('/control-room/')
+    || STATIC_DIRECTORY_PREFIXES.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    )
     || STATIC_FILE_PATTERN.test(pathname);
 }
 
