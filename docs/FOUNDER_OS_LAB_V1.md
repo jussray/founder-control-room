@@ -88,12 +88,17 @@ Even when a founder approval reference is supplied, the lab sets both plan and p
 
 Approval answers whether a separately governed executor may be considered. Evidence answers whether the exact provider/action state is sufficiently known to consider that executor.
 
-For mutating previews, the provider contract declares concrete preflight evidence fields from:
+For mutating previews, the provider contract declares concrete preflight fields such as:
 
 ```text
 repository
 commitSha
 proofUrls
+projectId
+automationId
+workspaceId
+recordIds
+associationPlan
 ```
 
 The plan returns:
@@ -102,7 +107,14 @@ The plan returns:
 - `preflightEvidenceObserved`;
 - `preflightEvidenceMissing`.
 
-An approval reference never substitutes for missing evidence. A mutating preview is `blocked` until the selected provider's required evidence fields are present. Only then may an approved plan become `ready_for_external_executor`, while `executionAllowed` remains `false`.
+Presence alone is not validity. Provider-specific semantic checks also apply:
+
+- GitHub and Codex proof must bind to the stated repository and exact commit SHA;
+- Supabase and Cloudflare previews require project identity plus source-bound proof;
+- Zapier previews require automation identity plus source-bound proof;
+- HubSpot previews require workspace identity, record identifiers, and an association plan.
+
+An approval reference never substitutes for missing, unrelated, or mismatched evidence. A mutating preview remains `blocked` until required evidence is both present and semantically bound to the selected provider target. Only then may an approved plan become `ready_for_external_executor`, while `executionAllowed` remains `false`.
 
 Provider or destination receipts remain post-execution evidence. They are not fabricated or required as inputs to a preview.
 
@@ -140,17 +152,19 @@ The focused tests prove:
 4. incompatible action/provider pairs fail closed;
 5. an approval reference never enables provider execution;
 6. approval without required provider evidence remains blocked;
-7. complete provider evidence is exposed before executor readiness;
-8. a valid social draft routes through `juss-chief-ai` and `proof-led-publishing`;
-9. all side-effect flags remain false;
-10. prompt leakage fails closed;
-11. merge planning remains preview-only even with approval and evidence;
-12. identical input produces identical output;
-13. the HTTP route requires a founder session;
-14. unknown or malformed request fields fail closed;
-15. HTTPS proof references and exact commit SHAs are bounded;
-16. malformed JSON returns `400 INVALID_JSON` before founder authentication;
-17. the route touches no persistence surface beyond founder allowlist authentication.
+7. GitHub proof for a different repository or SHA remains blocked;
+8. HubSpot outreach lacks readiness without workspace, records, and association context;
+9. complete, semantically bound provider evidence is required before executor readiness;
+10. a valid social draft routes through `juss-chief-ai` and `proof-led-publishing`;
+11. all side-effect flags remain false;
+12. prompt leakage fails closed;
+13. merge planning remains preview-only even with approval and evidence;
+14. identical input produces identical output;
+15. the HTTP route requires a founder session;
+16. unknown or malformed request fields fail closed;
+17. HTTPS proof references and exact commit SHAs are bounded;
+18. malformed JSON returns `400 INVALID_JSON` before founder authentication;
+19. the route touches no persistence surface beyond founder allowlist authentication.
 
 The focused command runs:
 
@@ -180,6 +194,7 @@ A broad autonomous runtime would compound authority mistakes faster than it comp
 - treating a provider registry entry as proof of a live connection;
 - treating an approval ID as proof that an action executed;
 - treating approval as a substitute for exact-head or provider evidence;
+- relabeling unrelated proof as evidence for another repository, commit, workspace, or provider;
 - importing a live provider client into a preview adapter;
 - treating successful content validation as a Buffer or platform receipt;
 - expanding one preview route into a second orchestration system.
