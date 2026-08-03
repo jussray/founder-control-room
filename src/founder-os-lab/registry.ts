@@ -228,7 +228,13 @@ export const FOUNDER_OS_LAB_PROVIDERS: readonly FounderOsLabProviderDescriptor[]
     sideEffectClass: 'none',
     credentialBoundary: 'connector-owned',
     supportedActions: ['inspect', 'plan', 'deploy-code'],
-    evidenceRequired: ['project name', 'source SHA', 'build or deployment receipt', 'runtime read-back plan'],
+    evidenceRequired: [
+      'account identifier',
+      'project name',
+      'source SHA',
+      'build or deployment receipt',
+      'runtime read-back plan',
+    ],
     rollback: 'Discard the preview; no Cloudflare compute, Pages, DNS, route, or secret state changes.',
   },
   {
@@ -268,7 +274,12 @@ export const FOUNDER_OS_LAB_PROVIDERS: readonly FounderOsLabProviderDescriptor[]
     sideEffectClass: 'none',
     credentialBoundary: 'connector-owned',
     supportedActions: ['inspect', 'plan', 'send-email'],
-    evidenceRequired: ['portal or workspace identity', 'record identifiers', 'association plan', 'mutation receipt plan'],
+    evidenceRequired: [
+      'portal or workspace identity',
+      'typed record identifiers',
+      'association plan',
+      'separate dispatch-gate plan',
+    ],
     rollback: 'Discard the preview; no CRM record, association, note, task, or message is changed.',
   },
 ] as const;
