@@ -21,6 +21,24 @@ function requireBinding(env: DeletionQueueEnv, name: string): string {
   return value;
 }
 
+function normalizeFailure(error: unknown): Error {
+  if (error instanceof Error) return error;
+  return new Error(typeof error === 'string' ? error : 'unknown deletion failure');
+}
+
+function storedFailureMessage(error: unknown): string {
+  return normalizeFailure(error).message.slice(0, 1000);
+}
+
+function isDeletionQueueEntry(value: unknown): value is DeletionQueueEntry {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.id === 'string' && candidate.id.trim().length > 0 &&
+    typeof candidate.user_id === 'string' && candidate.user_id.trim().length > 0
+  );
+}
+
 export function createSupabaseAdmin(env: DeletionQueueEnv): SupabaseClient {
   return createClient(
     requireBinding(env, 'NEXT_PUBLIC_SUPABASE_URL'),
@@ -70,7 +88,7 @@ export async function purgeCloudflareKV(
   }
 }
 
-async function processEntry(
+export async function processDeletionEntry(
   row: DeletionQueueEntry,
   supabaseAdmin: SupabaseClient,
   env: DeletionQueueEnv,
@@ -96,11 +114,20 @@ async function processEntry(
       .eq('id', row.id);
     if (completedError) throw completedError;
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'unknown';
-    await supabaseAdmin
+    const originalFailure = normalizeFailure(error);
+    const { error: failedStateError } = await supabaseAdmin
       .from('deletion_queue')
-      .update({ status: 'failed', error: message })
+      .update({ status: 'failed', error: storedFailureMessage(originalFailure) })
       .eq('id', row.id);
+
+    if (failedStateError) {
+      throw new AggregateError(
+        [originalFailure, normalizeFailure(failedStateError)],
+        'Deletion failed and the failed state could not be persisted for entry ' + row.id,
+      );
+    }
+
+    throw originalFailure;
   }
 }
 
@@ -117,12 +144,27 @@ export async function runDeletionWorker(
 
   if (error) throw error;
 
-  const pending = (data ?? []) as DeletionQueueEntry[];
+  const pendingValues: unknown[] = data ?? [];
+  if (!pendingValues.every(isDeletionQueueEntry)) {
+    throw new Error('Deletion queue returned an invalid entry');
+  }
+
+  const pending = pendingValues as DeletionQueueEntry[];
   if (pending.length === 0) return;
 
-  await Promise.allSettled(
-    pending.map((row) => processEntry(row, supabaseAdmin, env)),
+  const results = await Promise.allSettled(
+    pending.map((row) => processDeletionEntry(row, supabaseAdmin, env)),
   );
+  const failures = results
+    .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+    .map((result) => normalizeFailure(result.reason));
+
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures,
+      `Deletion queue failed ${failures.length} of ${pending.length} entries`,
+    );
+  }
 }
 
 export default {
