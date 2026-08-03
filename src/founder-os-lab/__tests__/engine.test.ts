@@ -3,7 +3,10 @@ import type { FirstPartySocialPostInput } from '../../lib/firstPartySocialPublis
 import { planFounderOsLab } from '../engine.js';
 
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const OTHER_SHA = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 const PROOF_URL = `https://github.com/jussray/founder-control-room/commit/${SHA}`;
+const ZAPIER_AUTOMATION_ID = 'zap-founder-signal-review-v1';
+const ZAPIER_PROOF_URL = `https://zapier.com/app/editor/${ZAPIER_AUTOMATION_ID}`;
 
 function socialPost(
   mode: FirstPartySocialPostInput['mode'],
@@ -29,6 +32,17 @@ function socialPost(
     publishAllowed: mode !== 'draft',
     founderApprovalId: mode === 'draft' ? null : 'founder-approved:lab-social',
   };
+}
+
+function zapierEvidence() {
+  return Object.assign(
+    {
+      repository: 'jussray/founder-control-room',
+      commitSha: SHA,
+      proofUrls: [PROOF_URL, ZAPIER_PROOF_URL],
+    },
+    { automationId: ZAPIER_AUTOMATION_ID },
+  );
 }
 
 describe('Founder OS isolated lab', () => {
@@ -91,11 +105,7 @@ describe('Founder OS isolated lab', () => {
     expect(plan.truth.blocked.join(' ')).toContain('Explicit founder approval');
   });
 
-  it('recognizes scoped approval and source-bound Zapier evidence but still refuses provider execution', () => {
-    const zapierEvidence = Object.assign(
-      { repository: 'jussray/founder-control-room' },
-      { automationId: 'zap-founder-signal-review-v1' },
-    );
+  it('recognizes scoped approval and authoritative Zapier evidence but still refuses provider execution', () => {
     const plan = planFounderOsLab({
       goal: 'Queue one proof-backed founder update.',
       action: 'queue-social',
@@ -103,7 +113,7 @@ describe('Founder OS isolated lab', () => {
         id: 'founder-approved:queue-one-lab-post',
         actions: ['queue-social'],
       },
-      evidence: zapierEvidence,
+      evidence: zapierEvidence(),
       socialPost: socialPost('queue'),
     });
 
@@ -151,7 +161,7 @@ describe('Founder OS isolated lab', () => {
         repository: 'jussray/founder-control-room',
         commitSha: SHA,
         proofUrls: [
-          'https://github.com/another-owner/another-repo/commit/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+          `https://github.com/another-owner/another-repo/commit/${OTHER_SHA}`,
         ],
       },
     });
@@ -159,7 +169,62 @@ describe('Founder OS isolated lab', () => {
     expect(plan.readiness).toBe('blocked');
     expect(plan.route.provider.preflightEvidenceMissing).toEqual([]);
     expect(plan.truth.blocked.join(' ')).toContain(
-      `github proof URLs do not bind to repository jussray/founder-control-room at commit ${SHA}`,
+      `github proof requires an authoritative GitHub commit URL for repository jussray/founder-control-room at commit ${SHA}`,
+    );
+    expect(plan.authority.executionAllowed).toBe(false);
+  });
+
+  it('rejects attacker-controlled URLs that merely contain repository and SHA text', () => {
+    const plan = planFounderOsLab({
+      goal: 'Review and merge the focused routing change.',
+      action: 'merge-code',
+      approval: {
+        id: 'founder-approved:review-merge-routing-v1',
+        actions: ['merge-code'],
+      },
+      evidence: {
+        repository: 'jussray/founder-control-room',
+        commitSha: SHA,
+        proofUrls: [
+          `https://example.com/jussray/founder-control-room/commit/${SHA}`,
+        ],
+      },
+    });
+
+    expect(plan.readiness).toBe('blocked');
+    expect(plan.truth.blocked.join(' ')).toContain('authoritative GitHub commit URL');
+    expect(plan.authority.executionAllowed).toBe(false);
+  });
+
+  it('rejects conflicting source identities between evidence and the validated social post', () => {
+    const conflictingEvidence = Object.assign(
+      {
+        repository: 'another-owner/another-repo',
+        commitSha: OTHER_SHA,
+        proofUrls: [
+          `https://github.com/another-owner/another-repo/commit/${OTHER_SHA}`,
+          ZAPIER_PROOF_URL,
+        ],
+      },
+      { automationId: ZAPIER_AUTOMATION_ID },
+    );
+    const plan = planFounderOsLab({
+      goal: 'Queue one proof-backed founder update.',
+      action: 'queue-social',
+      approval: {
+        id: 'founder-approved:queue-one-lab-post',
+        actions: ['queue-social'],
+      },
+      evidence: conflictingEvidence,
+      socialPost: socialPost('queue'),
+    });
+
+    expect(plan.readiness).toBe('blocked');
+    expect(plan.truth.blocked.join(' ')).toContain(
+      'Evidence repository another-owner/another-repo conflicts with social source repository jussray/founder-control-room',
+    );
+    expect(plan.truth.blocked.join(' ')).toContain(
+      `Evidence commit ${OTHER_SHA} conflicts with social source commit ${SHA}`,
     );
     expect(plan.authority.executionAllowed).toBe(false);
   });
@@ -176,7 +241,7 @@ describe('Founder OS isolated lab', () => {
     expect(plan.authority.executionAllowed).toBe(false);
   });
 
-  it('keeps merge planning isolated even with explicit approval and source-bound evidence', () => {
+  it('keeps merge planning isolated even with explicit approval and authoritative source evidence', () => {
     const plan = planFounderOsLab({
       goal: 'Review and merge the focused routing change.',
       action: 'merge-code',
@@ -227,5 +292,5 @@ describe('Founder OS isolated lab', () => {
     };
 
     expect(planFounderOsLab(request)).toEqual(planFounderOsLab(request));
-  });
+    });
 });
