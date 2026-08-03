@@ -1,13 +1,21 @@
-name = "founder-control-room2"
+name = "founder-control-room-deletion-queue"
 main = "src/workers/deletion-queue-worker.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
 
 [vars]
 ENVIRONMENT = "production"
 
 [[triggers.crons]]
 cron = "0 */6 * * *"
+
+# This target must remain distinct from both HTTP Workers:
+#   founder-control-room   (root application)
+#   founder-control-room2  (API and remote MCP surface)
+# Deploy only through the named config after exact-head proof and an explicit
+# production approval. A plain `wrangler deploy` uses the root config instead.
 
 # KV cleanup uses Cloudflare API namespace IDs supplied as secrets/env vars.
 # Do not bind placeholder KV namespaces here: Cloudflare connected builds reject
