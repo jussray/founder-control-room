@@ -1,0 +1,95 @@
+name: Founder Review Email Ingress
+
+on:
+  pull_request:
+    paths:
+      - '.env.example'
+      - '.github/workflows/founder-review-email-ingress.yml'
+      - 'package.json'
+      - 'scripts/verify-founder-review-email-ingress.mjs'
+      - 'scripts/verify-rls-contract.mjs'
+      - 'src/founderSignalEmailIngress/**'
+      - 'src/http/routes/founderSignalReviewEmailIngress.ts'
+      - 'src/http/routes/__tests__/founderSignalReviewEmailIngress.integration.test.ts'
+      - 'src/http/server.ts'
+      - 'src/worker/founderSignalReviewEmail.ts'
+      - 'src/worker/founderSignalReviewEmail.test.ts'
+      - 'supabase/migrations/20260802224500_founder_signal_review_email_receipts.sql'
+      - 'wrangler.api.toml'
+      - 'wrangler.email.toml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Verify exact candidate head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Classify email-ingress scope
+        id: scope
+        shell: bash
+        run: |
+          if test -f scripts/verify-founder-review-email-ingress.mjs \
+            && node -e "const p=require('./package.json'); process.exit(p.scripts?.['verify:founder-review-email'] ? 0 : 1)"; then
+            echo 'in_scope=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'in_scope=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Record refresh-only parent head
+        if: steps.scope.outputs.in_scope != 'true'
+        run: echo 'Email-ingress files are absent on this parent-refresh head; focused verification is not applicable.'
+
+      - name: Install canonical dependencies
+        if: steps.scope.outputs.in_scope == 'true'
+        run: npm ci
+
+      - name: Verify TypeScript contracts
+        if: steps.scope.outputs.in_scope == 'true'
+        run: npm run typecheck
+
+      - name: Verify intake isolation, tests, and email Worker bundle
+        if: steps.scope.outputs.in_scope == 'true'
+        run: npm run verify:founder-review-email
+
+      - name: Verify public-table RLS inventory
+        if: steps.scope.outputs.in_scope == 'true'
+        run: npm run verify:rls-contract
+
+      - name: Lint focused runtime files
+        if: steps.scope.outputs.in_scope == 'true'
+        run: >-
+          npx eslint
+          src/founderSignalEmailIngress/receipt.ts
+          src/founderSignalEmailIngress/email.ts
+          src/founderSignalEmailIngress/email.test.ts
+          src/http/routes/founderSignalReviewEmailIngress.ts
+          src/http/routes/__tests__/founderSignalReviewEmailIngress.integration.test.ts
+          src/worker/founderSignalReviewEmail.ts
+          src/worker/founderSignalReviewEmail.test.ts
+          --max-warnings 0
