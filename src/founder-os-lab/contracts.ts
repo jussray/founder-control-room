@@ -46,6 +46,9 @@ export type FounderOsLabProviderId =
   | 'openai-platform'
   | 'hubspot';
 
+export type FounderOsLabProjectAdapterId = 'sekret-bip';
+export type FounderOsLabProjectAudience = 'teen' | 'bip-jr';
+
 export type FounderOsLabCapabilityId =
   | 'founder-routing'
   | 'repository-inspection'
@@ -54,7 +57,9 @@ export type FounderOsLabCapabilityId =
   | 'buffer-handoff-preview'
   | 'merge-readiness-preview'
   | 'deployment-readiness-preview'
-  | 'outreach-readiness-preview';
+  | 'outreach-readiness-preview'
+  | 'project-canon-validation'
+  | 'editable-design-preview';
 
 export type FounderOsLabAdapterId =
   | 'repository-preview'
@@ -62,7 +67,8 @@ export type FounderOsLabAdapterId =
   | 'buffer-preview'
   | 'merge-preview'
   | 'deployment-preview'
-  | 'email-preview';
+  | 'email-preview'
+  | 'sekret-bip-project-preview';
 
 export type FounderOsLabReadiness =
   | 'ready_for_review'
@@ -98,6 +104,14 @@ export interface FounderOsLabEvidence {
   associationPlan?: string;
 }
 
+export interface FounderOsLabProjectContext {
+  id: FounderOsLabProjectAdapterId;
+  sourceRepository: string;
+  sourceCommitSha: string;
+  contractUrls: string[];
+  audience?: FounderOsLabProjectAudience;
+}
+
 export interface FounderOsLabRequest {
   goal: string;
   action: FounderOsLabAction;
@@ -105,6 +119,7 @@ export interface FounderOsLabRequest {
   provider?: FounderOsLabProviderId;
   approval?: FounderOsLabApproval;
   evidence?: FounderOsLabEvidence;
+  project?: FounderOsLabProjectContext;
   socialPost?: FirstPartySocialPostInput;
 }
 
@@ -122,6 +137,31 @@ export interface FounderOsLabProviderRoute {
   rollback: string;
 }
 
+export interface FounderOsLabProjectRoute {
+  id: FounderOsLabProjectAdapterId;
+  name: string;
+  mode: 'preview';
+  supported: boolean;
+  executionAllowed: false;
+  authorityOwner: 'founder-control-room';
+  repository: string;
+  sourceCommitSha: string;
+  auditedSourceHead: string;
+  audience: FounderOsLabProjectAudience | null;
+  allowedActions: FounderOsLabAction[];
+  allowedProviders: FounderOsLabProviderId[];
+  contractPathsRequired: string[];
+  contractPathsObserved: string[];
+  contractPathsMissing: string[];
+  canonicalDisplayNames: string[];
+  forbiddenDisplayNames: string[];
+  legacyInternalIdsPreserved: boolean;
+  editableOutputRequired: boolean;
+  sourceTraceRequired: boolean;
+  factualAiIdentityRequired: boolean;
+  rollback: string;
+}
+
 export interface FounderOsLabCommandRoute {
   id: FounderOsLabCommandId;
   specialistSkill: FounderOsLabSkillId;
@@ -133,6 +173,7 @@ export interface FounderOsLabRoute {
   specialistSkill: FounderOsLabSkillId;
   command: FounderOsLabCommandRoute;
   provider: FounderOsLabProviderRoute;
+  project: FounderOsLabProjectRoute | null;
   capabilities: FounderOsLabCapabilityId[];
   adapters: FounderOsLabAdapterId[];
 }
