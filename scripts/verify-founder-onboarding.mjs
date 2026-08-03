@@ -21,7 +21,7 @@ const files = {
     new URL('../supabase/migrations/20260723010000_add_hubspot_connection_type.sql', import.meta.url),
     'utf8',
   ),
-  wrangler: await readFile(new URL('../wrangler.toml', import.meta.url), 'utf8'),
+  workerConfig: await readFile(new URL('../wrangler.worker.toml', import.meta.url), 'utf8'),
 };
 
 const errors = [];
@@ -92,7 +92,9 @@ requireText('worker', 'current Worker composition', 'composeWorkerHandler');
 requireText('worker', 'current runtime validation', 'validateWorkerEnv(env)');
 requireText('workerHandler', 'runtime validation helper', 'validateWorkerEnv');
 requireText('workerHandler', 'scheduled reconciler composition', 'composeWorkerHandler');
-requireText('wrangler', 'Node HTTP compatibility flag', 'enable_nodejs_http_server_modules');
+requireText('workerConfig', 'surviving Worker identity', 'name = "founder-control-room"');
+requireText('workerConfig', 'surviving Worker entrypoint', 'main = "src/worker/cf-entry.ts"');
+requireText('workerConfig', 'Node HTTP compatibility flag', 'enable_nodejs_http_server_modules');
 
 if (files.ui.includes('sekretbip@gmail.com')) {
   errors.push('privacy: founder email must not be embedded in browser assets');
@@ -131,4 +133,5 @@ console.log('Workspace bootstrap: project registry + disconnected provider slots
 console.log('Provider credentials stored: no');
 console.log('Execution authority granted by onboarding: no');
 console.log('HubSpot catalog/schema parity: declared in source migration');
+console.log('Cloudflare topology: Pages frontend + surviving founder-control-room API Worker');
 console.log('Control Room-owned verification command: verify.founder-onboarding');
