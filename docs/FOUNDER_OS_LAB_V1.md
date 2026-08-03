@@ -84,6 +84,28 @@ The authentication middleware may query only the existing `founder_users` allowl
 
 Even when a founder approval reference is supplied, the lab sets both plan and provider `executionAllowed: false`. Approval can make a plan eligible for a future external executor, but it cannot execute inside the lab or preview route.
 
+## Approval and evidence are separate gates
+
+Approval answers whether a separately governed executor may be considered. Evidence answers whether the exact provider/action state is sufficiently known to consider that executor.
+
+For mutating previews, the provider contract declares concrete preflight evidence fields from:
+
+```text
+repository
+commitSha
+proofUrls
+```
+
+The plan returns:
+
+- `preflightEvidenceRequired`;
+- `preflightEvidenceObserved`;
+- `preflightEvidenceMissing`.
+
+An approval reference never substitutes for missing evidence. A mutating preview is `blocked` until the selected provider's required evidence fields are present. Only then may an approved plan become `ready_for_external_executor`, while `executionAllowed` remains `false`.
+
+Provider or destination receipts remain post-execution evidence. They are not fabricated or required as inputs to a preview.
+
 ## First vertical paths
 
 ```text
@@ -117,15 +139,18 @@ The focused tests prove:
 3. every default action route selects a provider that supports the previewed action;
 4. incompatible action/provider pairs fail closed;
 5. an approval reference never enables provider execution;
-6. a valid social draft routes through `juss-chief-ai` and `proof-led-publishing`;
-7. all side-effect flags remain false;
-8. prompt leakage fails closed;
-9. merge planning remains preview-only even with approval;
-10. identical input produces identical output;
-11. the HTTP route requires a founder session;
-12. unknown or malformed request fields fail closed;
-13. HTTPS proof references and exact commit SHAs are bounded;
-14. the route touches no persistence surface beyond founder allowlist authentication.
+6. approval without required provider evidence remains blocked;
+7. complete provider evidence is exposed before executor readiness;
+8. a valid social draft routes through `juss-chief-ai` and `proof-led-publishing`;
+9. all side-effect flags remain false;
+10. prompt leakage fails closed;
+11. merge planning remains preview-only even with approval and evidence;
+12. identical input produces identical output;
+13. the HTTP route requires a founder session;
+14. unknown or malformed request fields fail closed;
+15. HTTPS proof references and exact commit SHAs are bounded;
+16. malformed JSON returns `400 INVALID_JSON` before founder authentication;
+17. the route touches no persistence surface beyond founder allowlist authentication.
 
 The focused command runs:
 
@@ -154,6 +179,7 @@ A broad autonomous runtime would compound authority mistakes faster than it comp
 - treating a command alias as executable authority;
 - treating a provider registry entry as proof of a live connection;
 - treating an approval ID as proof that an action executed;
+- treating approval as a substitute for exact-head or provider evidence;
 - importing a live provider client into a preview adapter;
 - treating successful content validation as a Buffer or platform receipt;
 - expanding one preview route into a second orchestration system.
