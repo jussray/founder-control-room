@@ -23,21 +23,38 @@ const SERVICE_ONLY_TABLES = [
 
 describe("live Supabase security hardening", () => {
   it("makes every live advisor table explicitly service-role-only", () => {
-    for (const table of SERVICE_ONLY_TABLES) {
-      expect(migration).toContain(
+    for (const [index, table] of SERVICE_ONLY_TABLES.entries()) {
+      const nextTable = SERVICE_ONLY_TABLES[index + 1];
+      const blockStart = migration.indexOf(
         `alter table public.${table} enable row level security`,
       );
-      expect(migration).toContain(
+      const blockEnd = nextTable
+        ? migration.indexOf(
+            `alter table public.${nextTable} enable row level security`,
+            blockStart + 1,
+          )
+        : migration.indexOf(
+            "create or replace function public.update_onboarding_updated_at()",
+            blockStart + 1,
+          );
+
+      expect(blockStart, `missing migration block for ${table}`).toBeGreaterThanOrEqual(0);
+      expect(blockEnd, `missing migration block boundary after ${table}`).toBeGreaterThan(
+        blockStart,
+      );
+
+      const block = migration.slice(blockStart, blockEnd);
+      expect(block).toContain(
         `drop policy if exists "control_room_service_role_only" on public.${table}`,
       );
-      expect(migration).toContain(
+      expect(block).toContain(
         `create policy "control_room_service_role_only" on public.${table}`,
       );
-      expect(migration).toContain("for all\n  to service_role\n  using (true)\n  with check (true)");
-      expect(migration).toContain(
+      expect(block).toContain("for all\n  to service_role\n  using (true)\n  with check (true)");
+      expect(block).toContain(
         `revoke all on table public.${table} from anon, authenticated`,
       );
-      expect(migration).toContain(
+      expect(block).toContain(
         `grant select, insert, update, delete on table public.${table} to service_role`,
       );
     }
