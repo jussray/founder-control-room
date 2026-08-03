@@ -14,7 +14,9 @@ const ALLOWED_FIELDS = new Set([
   'commandType',
   'targetChannel',
   'commandText',
-  'senderVerified',
+  'senderAddressMatched',
+  'authorizationState',
+  'executionAllowed',
   'providerActionsRequested',
   'receivedAt',
   'source',
@@ -37,7 +39,9 @@ export interface FounderSignalReviewEmailReceipt {
   commandType: FounderSignalReviewCommandType;
   targetChannel: string | null;
   commandText: string;
-  senderVerified: true;
+  senderAddressMatched: true;
+  authorizationState: 'intake_only_unresolved';
+  executionAllowed: false;
   providerActionsRequested: 0;
   receivedAt: string;
   source: 'cloudflare_email_routing';
@@ -80,6 +84,45 @@ function exactIsoTimestamp(value: unknown): string {
   return text;
 }
 
+function validateCommandSemantics(
+  commandType: FounderSignalReviewCommandType,
+  targetChannel: string | null,
+  commandText: string,
+) {
+  if (/\r|\n/.test(commandText)) {
+    throw new FounderSignalReviewEmailReceiptError('invalid_command_text');
+  }
+
+  if (commandType === 'cancel_all') {
+    if (targetChannel !== null) {
+      throw new FounderSignalReviewEmailReceiptError('unexpected_target_channel');
+    }
+    if (commandText !== 'cancel all') {
+      throw new FounderSignalReviewEmailReceiptError('command_semantics_mismatch');
+    }
+    return;
+  }
+
+  if (targetChannel === null) {
+    throw new FounderSignalReviewEmailReceiptError('missing_target_channel');
+  }
+
+  if (commandType === 'cancel_one') {
+    if (commandText !== `${targetChannel}: cancel`) {
+      throw new FounderSignalReviewEmailReceiptError('command_semantics_mismatch');
+    }
+    return;
+  }
+
+  const prefix = `${targetChannel}: `;
+  const instruction = commandText.startsWith(prefix)
+    ? commandText.slice(prefix.length)
+    : '';
+  if (!instruction || instruction.toLowerCase() === 'cancel') {
+    throw new FounderSignalReviewEmailReceiptError('command_semantics_mismatch');
+  }
+}
+
 export function validateFounderSignalReviewEmailReceipt(
   value: unknown,
 ): FounderSignalReviewEmailReceipt {
@@ -97,12 +140,13 @@ export function validateFounderSignalReviewEmailReceipt(
     throw new FounderSignalReviewEmailReceiptError('invalid_version');
   }
 
-  const commandType = exactString(value.commandType, 'invalid_command_type', {
+  const commandTypeText = exactString(value.commandType, 'invalid_command_type', {
     maxLength: 32,
   });
-  if (!['cancel_all', 'cancel_one', 'edit_one'].includes(commandType)) {
+  if (!['cancel_all', 'cancel_one', 'edit_one'].includes(commandTypeText)) {
     throw new FounderSignalReviewEmailReceiptError('invalid_command_type');
   }
+  const commandType = commandTypeText as FounderSignalReviewCommandType;
 
   const targetChannel = value.targetChannel === null
     ? null
@@ -110,20 +154,19 @@ export function validateFounderSignalReviewEmailReceipt(
       maxLength: 100,
       pattern: CHANNEL,
     });
-
-  if (commandType === 'cancel_all' && targetChannel !== null) {
-    throw new FounderSignalReviewEmailReceiptError('unexpected_target_channel');
-  }
-  if (commandType !== 'cancel_all' && targetChannel === null) {
-    throw new FounderSignalReviewEmailReceiptError('missing_target_channel');
-  }
-
   const commandText = exactString(value.commandText, 'invalid_command_text', {
     maxLength: MAX_COMMAND_LENGTH,
   });
+  validateCommandSemantics(commandType, targetChannel, commandText);
 
-  if (value.senderVerified !== true) {
-    throw new FounderSignalReviewEmailReceiptError('sender_not_verified');
+  if (value.senderAddressMatched !== true) {
+    throw new FounderSignalReviewEmailReceiptError('sender_address_not_matched');
+  }
+  if (value.authorizationState !== 'intake_only_unresolved') {
+    throw new FounderSignalReviewEmailReceiptError('authorization_not_unresolved');
+  }
+  if (value.executionAllowed !== false) {
+    throw new FounderSignalReviewEmailReceiptError('execution_not_allowed');
   }
   if (value.providerActionsRequested !== 0) {
     throw new FounderSignalReviewEmailReceiptError('provider_action_not_allowed');
@@ -153,10 +196,12 @@ export function validateFounderSignalReviewEmailReceipt(
     commandHash: exactString(value.commandHash, 'invalid_command_hash', {
       pattern: SHA256,
     }),
-    commandType: commandType as FounderSignalReviewCommandType,
+    commandType,
     targetChannel,
     commandText,
-    senderVerified: true,
+    senderAddressMatched: true,
+    authorizationState: 'intake_only_unresolved',
+    executionAllowed: false,
     providerActionsRequested: 0,
     receivedAt: exactIsoTimestamp(value.receivedAt),
     source: 'cloudflare_email_routing',
