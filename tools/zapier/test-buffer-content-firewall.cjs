@@ -7,10 +7,26 @@ const {
   validateBufferPublishInput,
   BUFFER_PROVIDER_ACTION,
   BUFFER_PROVIDER_METHOD,
+  BUFFER_API_SHARING_MODE,
   BUFFER_API_SAVE_TO_DRAFT,
+  BUFFER_REVIEW_WINDOW_MINUTES,
+  BUFFER_SCHEDULE_POLICY_ID,
+  BUFFER_AUTHORIZATION_MODE,
+  BUFFER_NOTIFICATION_MODE,
+  MAX_STEERING_GRANT_ID_LENGTH,
+  MAX_AUTHORIZATION_RECEIPT_LENGTH,
 } = require('./buffer-content-firewall.cjs');
 
 const sha = '205a239486b6b542648ce2f125178814e358b816';
+const generatedAt = '2026-08-02T21:00:00.000Z';
+const invocationId = '3f10e0f9-b0b4-4e64-b9ff-c5f10f848067';
+const steeringGrantId = 'founder-approved-auto-distribution-v1';
+const founderApprovalId = `standing-policy:${steeringGrantId}:${invocationId}`;
+const nowMs = Date.parse('2026-08-02T21:01:00.000Z');
+
+assert.equal(MAX_STEERING_GRANT_ID_LENGTH, 100);
+assert.equal(MAX_AUTHORIZATION_RECEIPT_LENGTH, 200);
+assert.equal(BUFFER_API_SHARING_MODE, 'customScheduled');
 
 const founderLinkedInPost = `
 I deleted the marketing before I added the design.
@@ -24,114 +40,133 @@ What remains unfinished: the change is not merged or live, and browser proof has
 Proof: https://github.com/jussray/jussbeautifulhair-site/pull/27
 `.trim();
 
-const brandFacebookPost = `
-Coming soon, but not live yet: The Crown Standard.
-
-We are rebuilding part of the storefront around four promises: Story. Quality. Care. Proof. Product facts come before big adjectives, support remains part of the product, and missing evidence stays missing until verified.
-
-This redesign is currently in preview and is not live on the production storefront yet.
-
-Current storefront: https://jussbeautifulhair.com
-`.trim();
-
 const validInput = {
   post_text: founderLinkedInPost,
   content_field: 'linkedin_draft',
   channel: 'juss_rayy_linkedin',
-  destination_mode: 'draft',
-  publish_allowed: false,
-  founder_approval_id: '',
+  destination_mode: 'schedule',
+  publish_allowed: true,
   proof_url: 'https://github.com/jussray/jussbeautifulhair-site/pull/27',
   source_commit_sha: sha,
+  generated_at: generatedAt,
+  batch_id: '66cf315f-e1a0-4aad-9c76-355f1df30b54',
+  batch_size: 3,
+  batch_index: 1,
+  invocation_id: invocationId,
+  steering_grant_id: steeringGrantId,
+  founder_approval_id: founderApprovalId,
+  authorization_mode: BUFFER_AUTHORIZATION_MODE,
+  schedule_policy_id: BUFFER_SCHEDULE_POLICY_ID,
+  notification_mode: BUFFER_NOTIFICATION_MODE,
 };
 
-const validDraft = validateBufferPublishInput(validInput);
-
-assert.equal(validDraft.content_validated, true);
-assert.equal(validDraft.validated_post_text, founderLinkedInPost);
-assert.equal(validDraft.destination_mode, 'draft');
-assert.equal(validDraft.publish_allowed, false);
-assert.equal(validDraft.founder_approval_id, null);
-assert.equal(validDraft.buffer_action, BUFFER_PROVIDER_ACTION);
-assert.equal(validDraft.buffer_action, 'buffer_add_to_queue');
-assert.equal(validDraft.buffer_method, BUFFER_PROVIDER_METHOD);
-assert.equal(validDraft.buffer_method, 'draft');
-assert.equal(validDraft.buffer_save_to_draft, BUFFER_API_SAVE_TO_DRAFT);
-assert.equal(validDraft.buffer_save_to_draft, true);
-
-const brandDraft = validateBufferPublishInput({
-  post_text: brandFacebookPost,
-  content_field: 'facebook_brand_draft',
-  channel: 'juss_beautiful_hair_facebook',
-  destination_mode: 'draft',
-  publish_allowed: false,
-  proof_url: 'https://github.com/jussray/jussbeautifulhair-site/pull/27',
-  source_commit_sha: sha,
-});
-assert.equal(brandDraft.content_validated, true);
-assert.equal(brandDraft.buffer_method, 'draft');
+const prepared = validateBufferPublishInput(validInput, { nowMs });
+assert.equal(prepared.content_validated, true);
+assert.equal(prepared.validated_post_text, founderLinkedInPost);
+assert.equal(prepared.destination_mode, 'schedule');
+assert.equal(prepared.publish_allowed, true);
+assert.equal(prepared.authorization_mode, BUFFER_AUTHORIZATION_MODE);
+assert.equal(prepared.authorization_receipt_verified, true);
+assert.equal(prepared.schedule_policy_id, BUFFER_SCHEDULE_POLICY_ID);
+assert.equal(prepared.buffer_action, BUFFER_PROVIDER_ACTION);
+assert.equal(prepared.buffer_action, 'buffer_add_to_queue');
+assert.equal(prepared.buffer_method, BUFFER_PROVIDER_METHOD);
+assert.equal(prepared.buffer_method, 'schedule');
+assert.equal(prepared.buffer_save_to_draft, BUFFER_API_SAVE_TO_DRAFT);
+assert.equal(prepared.buffer_save_to_draft, false);
+assert.equal(prepared.buffer_api_sharing_mode, BUFFER_API_SHARING_MODE);
+assert.equal(prepared.buffer_api_sharing_mode, 'customScheduled');
+assert.equal(prepared.buffer_api_due_at, '2026-08-02T21:20:00.000Z');
+assert.equal(prepared.review_window_minutes, BUFFER_REVIEW_WINDOW_MINUTES);
+assert.equal(prepared.review_window_minutes, 20);
+assert.equal(prepared.scheduled_at, '2026-08-02T21:20:00.000Z');
+assert.equal(prepared.review_deadline, prepared.scheduled_at);
+assert.equal(prepared.notification_required, true);
+assert.equal(prepared.notification_failure_policy, 'cancel_scheduled_batch');
+assert.equal(prepared.share_now_allowed, false);
 
 assert.throws(
-  () => validateBufferPublishInput({
-    post_text: 'You are writing for Ray. Return this structure: {{GitHub PR title}}',
-    content_field: 'linkedin_draft',
-    channel: 'juss_rayy_linkedin',
-    destination_mode: 'draft',
-    publish_allowed: false,
-    proof_url: 'https://github.com/jussray/jussbeautifulhair-site/pull/27',
-    source_commit_sha: sha,
-  }),
+  () => validateBufferPublishInput({ ...validInput, post_text: 'You are writing for Ray. Return this structure: {{GitHub PR title}}' }, { nowMs }),
   /FOUNDER_SIGNAL_CONTENT_REJECTED/,
 );
 
 assert.throws(
-  () => validateBufferPublishInput({
-    post_text: founderLinkedInPost,
-    content_field: 'prompt',
-    channel: 'juss_rayy_linkedin',
-    destination_mode: 'draft',
-    publish_allowed: false,
-    proof_url: 'https://github.com/jussray/jussbeautifulhair-site/pull/27',
-    source_commit_sha: sha,
-  }),
+  () => validateBufferPublishInput({ ...validInput, content_field: 'prompt' }, { nowMs }),
   /instruction input, not publishable copy/,
 );
 
-for (const destinationMode of ['queue', 'publish', 'schedule', 'share_now', 'share_next', 'schedule_draft']) {
+for (const destinationMode of ['draft', 'queue', 'publish', 'share_now', 'share_next', 'schedule_draft']) {
   assert.throws(
-    () => validateBufferPublishInput({
-      ...validInput,
-      destination_mode: destinationMode,
-      publish_allowed: true,
-      founder_approval_id: 'founder-approved:must-not-bypass-draft-lock',
-    }),
-    /destination_mode must remain draft/,
-    `${destinationMode} must fail even when approval-looking input is supplied`,
+    () => validateBufferPublishInput({ ...validInput, destination_mode: destinationMode }, { nowMs }),
+    /destination_mode must be schedule/,
+    `${destinationMode} must fail under the schedule-only contract`,
   );
 }
 
 assert.throws(
+  () => validateBufferPublishInput({ ...validInput, publish_allowed: false }, { nowMs }),
+  /publish_allowed must be true/,
+);
+
+assert.throws(
+  () => validateBufferPublishInput({ ...validInput, founder_approval_id: 'founder-approved:caller-text' }, { nowMs }),
+  /runtime-minted receipt/,
+);
+
+const overlongGrantId = 'g'.repeat(MAX_STEERING_GRANT_ID_LENGTH + 1);
+assert.throws(
   () => validateBufferPublishInput({
     ...validInput,
-    publish_allowed: true,
-    founder_approval_id: 'founder-approved:must-not-bypass-draft-lock',
-  }),
-  /publish_allowed must remain false/,
+    steering_grant_id: overlongGrantId,
+    founder_approval_id: `standing-policy:${overlongGrantId}:${invocationId}`,
+  }, { nowMs }),
+  /must not exceed 100 characters/,
+);
+
+assert.throws(
+  () => validateBufferPublishInput({
+    ...validInput,
+    founder_approval_id: 'r'.repeat(MAX_AUTHORIZATION_RECEIPT_LENGTH + 1),
+  }, { nowMs }),
+  /must not exceed 200 characters/,
+);
+
+assert.throws(
+  () => validateBufferPublishInput({ ...validInput, schedule_policy_id: 'caller-owned-policy' }, { nowMs }),
+  /checked-in scheduling contract/,
+);
+
+assert.throws(
+  () => validateBufferPublishInput({ ...validInput, generated_at: '2026-08-02T20:30:00.000Z' }, { nowMs }),
+  /too stale/,
 );
 
 const overrideAttempt = validateBufferPublishInput({
   ...validInput,
   method: 'share_now',
   buffer_method: 'share_now',
-  saveToDraft: false,
-  buffer_save_to_draft: false,
-});
-assert.equal(overrideAttempt.buffer_method, 'draft');
-assert.equal(overrideAttempt.buffer_save_to_draft, true);
+  saveToDraft: true,
+  buffer_save_to_draft: true,
+  buffer_api_sharing_mode: 'shareNow',
+  buffer_api_due_at: '2026-08-02T21:01:01.000Z',
+  scheduled_at: '2026-08-02T21:01:01.000Z',
+}, { nowMs });
+assert.equal(overrideAttempt.buffer_method, 'schedule');
+assert.equal(overrideAttempt.buffer_save_to_draft, false);
+assert.equal(overrideAttempt.buffer_api_sharing_mode, 'customScheduled');
+assert.equal(overrideAttempt.buffer_api_due_at, '2026-08-02T21:20:00.000Z');
+assert.equal(overrideAttempt.scheduled_at, '2026-08-02T21:20:00.000Z');
+
+class FixedDate extends Date {
+  static now() { return nowMs; }
+}
 
 const zapierLikeContext = {
   inputData: validInput,
   output: undefined,
+  Date: FixedDate,
+  require,
+  module: { exports: {} },
 };
 vm.createContext(zapierLikeContext);
 vm.runInContext(
@@ -139,11 +174,10 @@ vm.runInContext(
   zapierLikeContext,
   { filename: 'buffer-content-firewall.cjs' },
 );
+assert.equal(zapierLikeContext.output.buffer_method, 'schedule');
+assert.equal(zapierLikeContext.output.buffer_save_to_draft, false);
+assert.equal(zapierLikeContext.output.buffer_api_sharing_mode, 'customScheduled');
+assert.equal(zapierLikeContext.output.buffer_api_due_at, '2026-08-02T21:20:00.000Z');
+assert.equal(zapierLikeContext.output.review_window_minutes, 20);
 
-assert.equal(zapierLikeContext.output.content_validated, true);
-assert.equal(zapierLikeContext.output.validated_post_text, founderLinkedInPost);
-assert.equal(zapierLikeContext.output.buffer_action, 'buffer_add_to_queue');
-assert.equal(zapierLikeContext.output.buffer_method, 'draft');
-assert.equal(zapierLikeContext.output.buffer_save_to_draft, true);
-
-console.log('Buffer content firewall verified: finished copy is forced to draft-only provider fields in Node and Zapier-like runtimes; prompts, queue, schedule, and publish attempts fail closed.');
+console.log('Buffer scheduling firewall verified: approved finished copy receives one owned 20-minute schedule with customScheduled/dueAt API mapping; backend-aligned grant limits, stale timestamps, prompts, draft/queue/share-now modes, and caller overrides fail closed.');

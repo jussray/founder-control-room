@@ -4,9 +4,18 @@ on:
   pull_request:
     paths:
       - 'config/buffer-provider-contract.json'
+      - 'config/zapier-task-budget.json'
       - 'docs/founder-signal-engine/day3-buffer-content-boundary.md'
+      - 'docs/founder-signal-engine/auto-distribution-grant-v1.md'
+      - 'docs/founder-signal-engine/claude-zapier-operator.md'
+      - 'docs/founder-signal-engine/remote-mcp-bridge.md'
+      - '.ai/skills/claude-zapier-founder-operator/SKILL.md'
+      - 'scripts/verify-zapier-task-budget.mjs'
+      - 'test/ai-company-parity.test.ts'
       - 'tools/zapier/buffer-content-firewall.cjs'
+      - 'tools/zapier/buffer-review-window.cjs'
       - 'tools/zapier/test-buffer-content-firewall.cjs'
+      - 'tools/zapier/test-buffer-review-window.cjs'
       - 'tools/zapier/test-buffer-provider-contract.cjs'
       - 'package.json'
       - '.github/workflows/buffer-provider-contract.yml'
@@ -14,6 +23,10 @@ on:
 
 permissions:
   contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   verify:
@@ -23,13 +36,23 @@ jobs:
       - name: Check out exact candidate head
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
           persist-credentials: false
+
+      - name: Verify exact candidate head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
 
-      - name: Verify executable Buffer draft-only guard
+      - name: Verify executable Buffer review-window contract
         run: npm run verify:buffer-content
+
+      - name: Verify planning envelope and live-capability gates
+        run: node scripts/verify-zapier-task-budget.mjs

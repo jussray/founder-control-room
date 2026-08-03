@@ -1,39 +1,111 @@
 {
-  "version": 1,
-  "status": "draft-only",
+  "version": 2,
+  "status": "implemented-awaiting-live-provider-and-ingress-proof",
   "provider": "buffer",
   "zapier": {
     "action": "buffer_add_to_queue",
-    "requiredMethod": "draft",
+    "requiredMethod": "schedule",
     "allowedMethods": [
-      "draft"
+      "schedule"
     ],
     "rejectedMethods": [
+      "draft",
       "queue",
-      "schedule",
+      "publish",
       "share_next",
       "share_now",
       "schedule_draft"
     ],
-    "mappingComment": "method: draft # required; never rely on Buffer default"
+    "mappingComment": "method: schedule # exact live option and date-field mapping must be captured in the controlled Zap proof"
   },
   "api": {
     "mutation": "createPost",
     "required": {
-      "saveToDraft": true
+      "sharingMode": "customScheduled",
+      "dueAtSource": "scheduled_at",
+      "saveToDraft": false
+    }
+  },
+  "reviewWindow": {
+    "minutes": 20,
+    "startsFrom": "generated_at",
+    "generatedAtMaximumAgeMinutes": 5,
+    "fireTimeOwnedByFirewall": true,
+    "noReplyBehavior": "publish_by_existing_buffer_schedule",
+    "shareNowAllowed": false
+  },
+  "notification": {
+    "provider": "gmail",
+    "required": true,
+    "mode": "one_campaign_digest_for_up_to_three_posts",
+    "requiredFields": [
+      "caption",
+      "channel",
+      "fire_time",
+      "buffer_post_id",
+      "review_token",
+      "reply_context_id",
+      "founder_sender",
+      "reply_to",
+      "gmail_thread_id"
+    ],
+    "failurePolicy": "cancel_scheduled_batch",
+    "replyCommands": [
+      "cancel all",
+      "<channel>: cancel",
+      "<channel>: <requested tweak>"
+    ],
+    "replyAuthorizationFields": [
+      "founder_sender",
+      "reply_to",
+      "reply_context_id",
+      "review_token",
+      "review_deadline"
+    ],
+    "evidenceOnlyFields": [
+      "gmail_thread_id"
+    ],
+    "replyIdentityPolicy": "exact_founder_sender_private_recipient_and_uuid_review_context",
+    "replyParsingPolicy": "exactly_one_unquoted_command_on_first_nonempty_line",
+    "quotedHistoryPolicy": "ignore_only_after_valid_command_boundary",
+    "ambiguousReplyPolicy": "reject_multiple_unquoted_command_lines",
+    "editPolicy": "regenerate_and_revalidate_before_buffer_update",
+    "replyIngress": {
+      "requiredLatencyClass": "instant_private_ingress",
+      "gmailPollingAllowed": false,
+      "preferredImplementation": "cloudflare_email_routing_worker",
+      "replyToMode": "private_domain_address_bound_to_uuid_review_context",
+      "reason": "a 15-minute polling trigger cannot reliably honor commands throughout a 20-minute review window"
     }
   },
   "authority": {
-    "publishAllowed": false,
-    "requiresFounderApprovalToChange": true,
+    "publishAllowed": true,
+    "schedulePolicyId": "buffer-20-minute-review-v1",
+    "requiredAuthorizationMode": "standing-policy",
+    "requiresRuntimeMintedReceipt": true,
+    "receiptFormat": "standing-policy:<grantId>:<invocationId>",
+    "receiptPurpose": "exact runtime correlation",
+    "securityBoundary": "authenticated Founder Control Room middleware plus private provider ingress",
+    "maximumGrantIdLength": 100,
+    "maximumReceiptLength": 200,
+    "requiresExactSourceCommit": true,
+    "requiresHttpsProof": true,
     "liveProviderMutationIncluded": false
   },
-  "defenseInDepth": {
-    "requiresApprovalRole": {
-      "optional": true,
-      "requiresTeamPlan": true,
-      "organizationOwnerEligible": false,
-      "note": "Use only when Buffer Team access and a separate restricted user are actually configured. It is not a free-plan control and does not replace the explicit draft method."
-    }
+  "activationGates": {
+    "requiredSecrets": [
+      "FOUNDER_SIGNAL_ENGINE_MCP_TOKEN",
+      "ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL",
+      "FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON"
+    ],
+    "requiredCapabilities": [
+      "webhook_trigger",
+      "multi_step_workflow_or_backend_orchestration",
+      "instant_private_reply_ingress"
+    ],
+    "freeTwoStepZapAloneSufficient": false,
+    "gmailPollingTriggerAcceptedForDeadlineCommands": false,
+    "controlledSyntheticRunRequired": true,
+    "exactReceiptCorrelationRequired": true
   }
 }
