@@ -3,7 +3,7 @@ import type { FirstPartySocialPostInput } from '../../lib/firstPartySocialPublis
 import { planFounderOsLab } from '../engine.js';
 
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-const PROOF_URL = 'https://github.com/jussray/founder-control-room/pull/189';
+const PROOF_URL = `https://github.com/jussray/founder-control-room/commit/${SHA}`;
 
 function socialPost(
   mode: FirstPartySocialPostInput['mode'],
@@ -90,7 +90,7 @@ describe('Founder OS isolated lab', () => {
     expect(plan.truth.blocked.join(' ')).toContain('Explicit founder approval');
   });
 
-  it('recognizes scoped approval and social proof but still refuses provider execution', () => {
+  it('recognizes scoped approval and source-bound social proof but still refuses provider execution', () => {
     const plan = planFounderOsLab({
       goal: 'Queue one proof-backed founder update.',
       action: 'queue-social',
@@ -98,6 +98,9 @@ describe('Founder OS isolated lab', () => {
         id: 'founder-approved:queue-one-lab-post',
         actions: ['queue-social'],
       },
+      evidence: {
+        automationId: 'zap-founder-signal-review-v1',
+      } as never,
       socialPost: socialPost('queue'),
     });
 
@@ -105,8 +108,8 @@ describe('Founder OS isolated lab', () => {
     expect(plan.authority.approvalObserved).toBe(true);
     expect(plan.authority.executionAllowed).toBe(false);
     expect(plan.route.provider).toMatchObject({
-      preflightEvidenceRequired: ['commitSha', 'proofUrls'],
-      preflightEvidenceObserved: ['commitSha', 'proofUrls'],
+      preflightEvidenceRequired: ['repository', 'commitSha', 'proofUrls'],
+      preflightEvidenceObserved: ['repository', 'commitSha', 'proofUrls'],
       preflightEvidenceMissing: [],
     });
     expect(plan.nextGate).toContain('separately authorize one named external adapter');
@@ -133,6 +136,31 @@ describe('Founder OS isolated lab', () => {
     expect(plan.truth.blocked.join(' ')).toContain('Missing required github preflight evidence');
   });
 
+  it('blocks exact-head evidence whose proof URL belongs to another repository or commit', () => {
+    const plan = planFounderOsLab({
+      goal: 'Review and merge the focused routing change.',
+      action: 'merge-code',
+      approval: {
+        id: 'founder-approved:review-merge-routing-v1',
+        actions: ['merge-code'],
+      },
+      evidence: {
+        repository: 'jussray/founder-control-room',
+        commitSha: SHA,
+        proofUrls: [
+          'https://github.com/another-owner/another-repo/commit/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        ],
+      },
+    });
+
+    expect(plan.readiness).toBe('blocked');
+    expect(plan.route.provider.preflightEvidenceMissing).toEqual([]);
+    expect(plan.truth.blocked.join(' ')).toContain(
+      `github proof URLs do not bind to repository jussray/founder-control-room at commit ${SHA}`,
+    );
+    expect(plan.authority.executionAllowed).toBe(false);
+  });
+
   it('fails closed when finished post copy resembles a leaked prompt', () => {
     const plan = planFounderOsLab({
       goal: 'Draft a founder update.',
@@ -145,7 +173,7 @@ describe('Founder OS isolated lab', () => {
     expect(plan.authority.executionAllowed).toBe(false);
   });
 
-  it('keeps merge planning isolated even with explicit approval and complete evidence', () => {
+  it('keeps merge planning isolated even with explicit approval and source-bound evidence', () => {
     const plan = planFounderOsLab({
       goal: 'Review and merge the focused routing change.',
       action: 'merge-code',
@@ -166,6 +194,27 @@ describe('Founder OS isolated lab', () => {
     expect(plan.route.provider.preflightEvidenceMissing).toEqual([]);
     expect(plan.authority.executionAllowed).toBe(false);
     expect(plan.isolation.providerCalls).toBe(false);
+  });
+
+  it('blocks HubSpot outreach readiness without workspace, records, and association context', () => {
+    const plan = planFounderOsLab({
+      goal: 'Preview one approved founder outreach email.',
+      action: 'send-email',
+      provider: 'hubspot',
+      approval: {
+        id: 'founder-approved:outreach-preview-v1',
+        actions: ['send-email'],
+      },
+      evidence: {
+        proofUrls: ['https://example.com/unrelated-proof'],
+      },
+    });
+
+    expect(plan.readiness).toBe('blocked');
+    expect(plan.truth.blocked.join(' ')).toContain('hubspot preflight evidence requires workspaceId');
+    expect(plan.truth.blocked.join(' ')).toContain('hubspot preflight evidence requires at least one recordId');
+    expect(plan.truth.blocked.join(' ')).toContain('hubspot preflight evidence requires associationPlan');
+    expect(plan.authority.executionAllowed).toBe(false);
   });
 
   it('is deterministic for identical inputs', () => {
