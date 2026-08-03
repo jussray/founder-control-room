@@ -7,10 +7,11 @@ on:
       - .node-version
       - package.json
       - package-lock.json
-      - wrangler.toml
+      - wrangler.worker.toml
       - public/**
       - src/**
       - e2e/**
+      - scripts/build-pages.mjs
       - scripts/verify-parallel.mjs
       - .github/workflows/cloudflare-local-preflight.yml
   workflow_dispatch:
@@ -54,6 +55,9 @@ jobs:
 
       - name: Install locked dependencies
         run: npm ci
+
+      - name: Build Cloudflare Pages output
+        run: npm run build:pages
 
       - name: Install Chromium for Playwright
         run: npx playwright install --with-deps chromium
