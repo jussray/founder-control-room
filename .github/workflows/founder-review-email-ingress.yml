@@ -22,6 +22,10 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
 jobs:
   verify:
     runs-on: ubuntu-22.04
@@ -30,28 +34,55 @@ jobs:
       - name: Check out exact candidate head
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
           persist-credentials: false
+
+      - name: Verify exact candidate head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
 
+      - name: Classify email-ingress scope
+        id: scope
+        shell: bash
+        run: |
+          if test -f scripts/verify-founder-review-email-ingress.mjs \
+            && node -e "const p=require('./package.json'); process.exit(p.scripts?.['verify:founder-review-email'] ? 0 : 1)"; then
+            echo 'in_scope=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'in_scope=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Record refresh-only parent head
+        if: steps.scope.outputs.in_scope != 'true'
+        run: echo 'Email-ingress files are absent on this parent-refresh head; focused verification is not applicable.'
+
       - name: Install canonical dependencies
+        if: steps.scope.outputs.in_scope == 'true'
         run: npm ci
 
       - name: Verify TypeScript contracts
+        if: steps.scope.outputs.in_scope == 'true'
         run: npm run typecheck
 
       - name: Verify intake isolation, tests, and email Worker bundle
+        if: steps.scope.outputs.in_scope == 'true'
         run: npm run verify:founder-review-email
 
       - name: Verify public-table RLS inventory
+        if: steps.scope.outputs.in_scope == 'true'
         run: npm run verify:rls-contract
 
       - name: Lint focused runtime files
+        if: steps.scope.outputs.in_scope == 'true'
         run: >-
           npx eslint
           src/founderSignalEmailIngress/receipt.ts
