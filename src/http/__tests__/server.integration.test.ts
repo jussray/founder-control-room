@@ -1,12 +1,20 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { mockGetUser } = vi.hoisted(() => ({
+  mockGetUser: vi.fn(),
+}));
 
 vi.mock('../../lib/supabaseAuthClient.js', () => ({
-  supabaseAuth: { auth: { getUser: vi.fn() } },
+  supabaseAuth: { auth: { getUser: mockGetUser } },
 }));
 vi.mock('../../lib/supabaseClient.js', () => ({ supabase: { from: vi.fn() } }));
 
 import request from 'supertest';
 import { createServer } from '../server.js';
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe('createServer', () => {
   it('responds to /health without auth', async () => {
@@ -37,5 +45,24 @@ describe('createServer', () => {
       .get('/health')
       .set('Origin', 'https://evil.example.com');
     expect(res.status).toBe(403);
+  });
+
+  it.each([
+    ['broken JSON syntax', '{"goal":'],
+    ['a forbidden top-level JSON primitive', '"preview"'],
+  ])('returns INVALID_JSON for %s before founder authentication', async (_label, body) => {
+    const res = await request(createServer())
+      .post('/founder-os/preview')
+      .set('Authorization', 'Bearer malformed-body-test')
+      .set('Content-Type', 'application/json')
+      .send(body);
+
+    expect(res.status).toBe(400);
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(res.body).toEqual({
+      error: 'Request body must be a valid JSON object or array.',
+      code: 'INVALID_JSON',
+    });
+    expect(mockGetUser).not.toHaveBeenCalled();
   });
 });

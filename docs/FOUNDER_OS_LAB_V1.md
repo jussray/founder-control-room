@@ -4,83 +4,208 @@
 
 The `juss-chief-ai` prompt contract is already merged into Founder Control Room under `.claude/skills/juss-chief-ai/SKILL.md`. It defines the constitutional routing behavior, but a prompt file is not an executable company runtime.
 
-Founder Control Room also already contains proof-led publishing, a first-party social validator, a Buffer content firewall, Zapier bridge contracts, approval policy, and evidence boundaries. Rebuilding those systems would create duplicate authority and drift.
+Founder Control Room also already contains proof-led publishing, a first-party social validator, a Buffer content firewall, Zapier bridge contracts, approval policy, evidence boundaries, and a sealed L0 Founder OS simulation. Rebuilding those systems would create duplicate authority and drift.
 
 ## Purpose
 
-`src/founder-os-lab/` is the first executable model of the AI company. It converts a founder goal into a deterministic route through Chief AI, one specialist skill, capability previews, authority state, Red Team findings, L99 state, and an OODA plan.
+`src/founder-os-lab/` is the executable simulation model of the AI company. It converts a founder goal into a deterministic route through Chief AI, one specialist skill, one portable command lens, one provider-preview contract, capability previews, authority state, Red Team findings, L99 state, and an OODA plan.
 
-The lab exists to test organizational behavior before any employee can touch a provider.
+The checked-in command registry contains:
+
+```text
+goalfix
+ultrathink
+truthmode
+confess
+redteam
+lindymode
+ooda
+visualize
+build
+billgates
+elonmusk
+loop
+```
+
+`elonmusk` is a first-principles and product-simplification lens only. It does not simulate a person or transfer identity authority.
+
+The provider-preview registry contains:
+
+```text
+ChatGPT
+Claude
+Codex
+Perplexity
+GitHub
+Supabase
+Cloudflare
+Zapier
+Figma
+OpenAI Platform
+HubSpot
+```
+
+Each provider descriptor declares supported preview actions, credential ownership, required evidence, and rollback. A registry entry is not proof that a provider is connected, authenticated, available, or authorized.
 
 ## Isolation contract
 
-V1 is **L0 simulation only**.
+The core lab remains **L0 simulation only**.
 
 It has:
 
-- no HTTP route;
-- no browser surface;
-- no Supabase query or write;
 - no provider client;
 - no Buffer or Zapier invocation;
 - no GitHub mutation;
 - no Cloudflare call;
 - no Gmail or HubSpot call;
+- no Supabase query or write;
 - no filesystem write;
 - no environment-variable read;
 - no secret access;
 - no merge, deploy, publish, queue, or send authority.
 
-Even when a founder approval reference is supplied, the lab sets `executionAllowed: false`. Approval can make a plan eligible for a future external executor, but it cannot execute inside the lab.
+The application exposes one founder-authenticated boundary:
 
-## First vertical path
+```text
+POST /founder-os/preview
+```
+
+That route:
+
+- uses the existing founder session and service-role-only founder allowlist;
+- accepts only checked-in actions, command IDs, provider IDs, bounded evidence, and optional social-validator input;
+- invokes the deterministic sandbox in memory;
+- sets `Cache-Control: no-store`;
+- persists no plan, receipt, approval, or provider state;
+- performs no provider call;
+- never changes `executionAllowed: false`.
+
+The authentication middleware may query only the existing `founder_users` allowlist. The lab runtime itself remains database-free. There is no browser surface in V1.
+
+Even when a founder approval reference is supplied, the lab sets both plan and provider `executionAllowed: false`. Approval can make some plans eligible for a future external executor, but it cannot execute inside the lab or preview route.
+
+## Approval and evidence are separate gates
+
+Approval answers whether a separately governed executor may be considered. Evidence answers whether the exact provider/action state is sufficiently known to consider that executor.
+
+For mutating previews, the provider contract declares concrete preflight fields such as:
+
+```text
+repository
+commitSha
+proofUrls
+projectId
+providerAccountId
+automationId
+workspaceId
+recordIds
+associationPlan
+```
+
+The plan returns:
+
+- `preflightEvidenceRequired`;
+- `preflightEvidenceObserved`;
+- `preflightEvidenceMissing`.
+
+Presence alone is not validity. Provider-specific semantic checks also apply:
+
+- GitHub and Codex proof must use an exact authoritative commit route bound to the stated repository and exact commit SHA;
+- Supabase proof must identify the selected project on an authoritative project route plus source-bound proof;
+- Cloudflare proof must identify the selected account and project together on one authoritative project route plus source-bound proof;
+- Zapier proof must identify the selected automation on an authoritative automation route plus source-bound proof;
+- HubSpot proof must identify the selected workspace and each typed record on workspace-bound application routes, with an association plan naming every complete typed record ID.
+
+An approval reference never substitutes for missing, unrelated, or mismatched evidence. A mutating preview remains `blocked` until required evidence is both present and semantically bound to the selected provider target.
+
+For queue, publish, merge, and deploy previews, an approved plan may then become `ready_for_external_executor`, while `executionAllowed` remains `false`. A `send-email` preview remains `ready_for_review` even after provider identity evidence passes. Outbound communication requires a separately governed adapter with a canonical allowed `DispatchDecision`, recipient identity, approved content, consent, suppression, and content-approval evidence.
+
+Provider or destination receipts remain post-execution evidence. They are not fabricated or required as inputs to a preview.
+
+## First vertical paths
+
+```text
+Founder goal
+  -> juss-chief-ai
+  -> portable command lens
+  -> specialist skill
+  -> provider preview contract
+  -> no provider call
+```
+
+The social path also reuses the existing first-party social validator:
 
 ```text
 Founder goal
   -> juss-chief-ai
   -> proof-led-publishing
   -> existing first-party social validator
-  -> Buffer handoff preview
+  -> Buffer or Zapier handoff preview
   -> no provider call
 ```
 
-This path reuses the existing social truth boundary. It can prove that finished copy contains required proof and metadata while still refusing to queue or publish it.
+A preview can prove that finished copy contains required proof and metadata while still refusing to queue or publish it.
 
 ## Test matrix
 
 The focused tests prove:
 
-1. a valid social draft routes through `juss-chief-ai` and `proof-led-publishing`;
-2. all side-effect flags remain false;
-3. a payload containing approval-looking fields does not count as lab approval;
-4. scoped approval is recognized without enabling execution;
-5. prompt leakage fails closed;
-6. merge planning remains preview-only even with approval;
-7. identical input produces identical output.
+1. the complete command and provider registry is present;
+2. every command and provider remains non-executing;
+3. every default action route selects a provider that supports the previewed action;
+4. incompatible action/provider pairs fail closed;
+5. an approval reference never enables provider execution;
+6. approval without required provider evidence remains blocked;
+7. GitHub proof for a different repository, SHA, host, or noncanonical path remains blocked;
+8. Cloudflare proof binds account and project together;
+9. HubSpot outreach lacks readiness without workspace, typed records, and association context;
+10. HubSpot API record URLs without workspace identity remain blocked;
+11. outbound email remains review-only without canonical dispatch evidence;
+12. complete, semantically bound provider evidence is required before applicable executor readiness;
+13. a valid social draft routes through `juss-chief-ai` and `proof-led-publishing`;
+14. all side-effect flags remain false;
+15. prompt leakage fails closed;
+16. merge planning remains preview-only even with approval and evidence;
+17. identical input produces identical output;
+18. the HTTP route requires a founder session;
+19. unknown or malformed request fields fail closed;
+20. HTTPS proof references and exact commit SHAs are bounded;
+21. malformed JSON returns `400 INVALID_JSON` before founder authentication;
+22. the route touches no persistence surface beyond founder allowlist authentication.
 
-The path-scoped workflow runs:
+The focused command runs:
+
+```bash
+npm run verify:juss-os-registry
+```
+
+The broader path-scoped workflow also runs:
 
 ```bash
 node scripts/verify-founder-os-lab-isolation.mjs
-npx vitest run src/founder-os-lab/__tests__/engine.test.ts
+npm run verify:ai-company-parity
 npm run typecheck
 ```
 
-The isolation verifier rejects provider clients, network calls, environment reads, database mutations, Express routes, filesystem/network/child-process imports, and live social-adapter execution inside the lab path.
+The isolation verifier rejects provider clients, network calls, environment reads, database mutations, Express routes inside the lab tree, filesystem/network/child-process imports, and live social-adapter execution. The authenticated HTTP membrane lives outside `src/founder-os-lab/` and may only call the pure sandbox.
 
 ## Red Team
 
 ### Why this should exist
 
-A broad autonomous runtime would compound authority mistakes faster than it compounds founder value. A pure lab lets the organization model be tested as data before connecting tools.
+A broad autonomous runtime would compound authority mistakes faster than it compounds founder value. A pure lab plus one read-only preview boundary lets the organization model be tested as data before connecting tools.
 
 ### Primary failure modes
 
-- treating the merged prompt as proof that a runtime exists;
+- treating a command alias as executable authority;
+- treating a provider registry entry as proof of a live connection;
 - treating an approval ID as proof that an action executed;
+- treating approval as a substitute for exact-head or provider evidence;
+- relabeling unrelated proof as evidence for another repository, commit, account, workspace, record, or provider;
+- treating provider identity evidence as consent or outbound dispatch authority;
 - importing a live provider client into a preview adapter;
 - treating successful content validation as a Buffer or platform receipt;
-- expanding from one vertical slice into a second orchestration system.
+- expanding one preview route into a second orchestration system.
 
 ## Graduation gates
 
@@ -97,8 +222,8 @@ A capability may leave the lab only through a separate focused change that provi
 9. real-path evidence when user-facing behavior changes;
 10. no success claim without a provider or destination receipt.
 
-The first graduation candidate should be **one review-only Buffer draft adapter**, not a general autonomous executor.
+No approval carries forward from a preview. The first graduated adapter must remain narrower than a general autonomous executor.
 
 ## Rollback
 
-Revert the lab directory, isolation verifier, workflow, and this document. No provider, account, credential, database, post, email, deployment, or repository state outside the branch requires cleanup.
+Revert the registry, planner, preview route, server mount, focused tests, package verifier wiring, and this document. No provider, account, credential, database, post, email, deployment, or repository state outside the branch requires cleanup.

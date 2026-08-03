@@ -19,6 +19,33 @@ export type FounderOsLabSkillId =
   | 'proof-led-publishing'
   | 'review-verify-merge';
 
+export type FounderOsLabCommandId =
+  | 'goalfix'
+  | 'ultrathink'
+  | 'truthmode'
+  | 'confess'
+  | 'redteam'
+  | 'lindymode'
+  | 'ooda'
+  | 'visualize'
+  | 'build'
+  | 'billgates'
+  | 'elonmusk'
+  | 'loop';
+
+export type FounderOsLabProviderId =
+  | 'chatgpt'
+  | 'claude'
+  | 'codex'
+  | 'perplexity'
+  | 'github'
+  | 'supabase'
+  | 'cloudflare'
+  | 'zapier'
+  | 'figma'
+  | 'openai-platform'
+  | 'hubspot';
+
 export type FounderOsLabCapabilityId =
   | 'founder-routing'
   | 'repository-inspection'
@@ -43,6 +70,17 @@ export type FounderOsLabReadiness =
   | 'ready_for_external_executor'
   | 'blocked';
 
+export type FounderOsLabEvidenceField =
+  | 'repository'
+  | 'commitSha'
+  | 'proofUrls'
+  | 'projectId'
+  | 'providerAccountId'
+  | 'automationId'
+  | 'workspaceId'
+  | 'recordIds'
+  | 'associationPlan';
+
 export interface FounderOsLabApproval {
   id: string;
   actions: FounderOsLabAction[];
@@ -52,19 +90,49 @@ export interface FounderOsLabEvidence {
   repository?: string;
   commitSha?: string;
   proofUrls?: string[];
+  projectId?: string;
+  providerAccountId?: string;
+  automationId?: string;
+  workspaceId?: string;
+  recordIds?: string[];
+  associationPlan?: string;
 }
 
 export interface FounderOsLabRequest {
   goal: string;
   action: FounderOsLabAction;
+  command?: FounderOsLabCommandId;
+  provider?: FounderOsLabProviderId;
   approval?: FounderOsLabApproval;
   evidence?: FounderOsLabEvidence;
   socialPost?: FirstPartySocialPostInput;
 }
 
+export interface FounderOsLabProviderRoute {
+  id: FounderOsLabProviderId;
+  mode: 'preview';
+  supported: boolean;
+  executionAllowed: false;
+  approvalRequired: boolean;
+  credentialBoundary: 'connector-owned' | 'server-side-secret-reference';
+  evidenceRequired: string[];
+  preflightEvidenceRequired: FounderOsLabEvidenceField[];
+  preflightEvidenceObserved: FounderOsLabEvidenceField[];
+  preflightEvidenceMissing: FounderOsLabEvidenceField[];
+  rollback: string;
+}
+
+export interface FounderOsLabCommandRoute {
+  id: FounderOsLabCommandId;
+  specialistSkill: FounderOsLabSkillId;
+  role: string;
+}
+
 export interface FounderOsLabRoute {
   chiefSkill: 'juss-chief-ai';
   specialistSkill: FounderOsLabSkillId;
+  command: FounderOsLabCommandRoute;
+  provider: FounderOsLabProviderRoute;
   capabilities: FounderOsLabCapabilityId[];
   adapters: FounderOsLabAdapterId[];
 }

@@ -21,6 +21,7 @@ import { mcpRouter } from './routes/mcp.js';
 import { externalUseRouter } from './routes/externalUse.js';
 import { futureYouRouter } from './routes/futureYou.js';
 import { goalfixRouter } from './routes/goalfix.js';
+import { founderOsSkillsRouter } from './routes/founderOsSkills.js';
 import { mirrorRouter } from './routes/mirror.js';
 import { handleFounderSignalEngineMcp } from './routes/founderSignalEngineMcp.js';
 import { handleFounderSignalReviewEmailIngest } from './routes/founderSignalReviewEmailIngress.js';
@@ -43,6 +44,7 @@ import {
   BODY_LIMIT,
 } from './middleware/security.js';
 import { requireSameOriginBrowserMutation } from './middleware/csrf.js';
+import { jsonParseErrorHandler } from './middleware/jsonParseError.js';
 import { requireProjectReadAudit } from './middleware/projectReadAudit.js';
 import { requireFounderSignalEngineMcpToken } from './middleware/founderSignalEngineMcpAuth.js';
 import { requireFounderSignalEngineReviewOnly } from './middleware/founderSignalEngineWriteGate.js';
@@ -190,6 +192,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/dashboard', dashboardRouter);
   app.use('/futureyou', futureYouRouter);
   app.use('/goalfix', goalfixRouter);
+  app.use('/founder-os', founderOsSkillsRouter);
   app.use('/mirror', mirrorRouter);
   app.use('/missions', missionsRouter);
   app.use('/promptos', promptosRouter);
@@ -206,6 +209,7 @@ export function createServer(options: CreateServerOptions = {}) {
   // Debug routes — CI and founder inspection only (no secrets exposed).
   app.use('/_debug', debugRouter);
 
+  app.use(jsonParseErrorHandler);
   app.use(errorHandler);
 
   return app;

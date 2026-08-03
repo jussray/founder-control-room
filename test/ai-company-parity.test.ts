@@ -18,11 +18,24 @@ const { validateBufferPublishInput } = require('../tools/zapier/buffer-content-f
 
 const ROOT = resolve(fileURLToPath(new URL('../', import.meta.url)));
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-const PROOF_URL = 'https://proof.example.test/cross-lab-parity';
+const PROOF_URL = `https://github.com/jussray/founder-control-room/commit/${SHA}`;
+const ZAPIER_AUTOMATION_ID = 'zap-founder-signal-review-v1';
+const ZAPIER_PROOF_URL = `https://zapier.com/app/editor/${ZAPIER_AUTOMATION_ID}`;
 const GENERATED_AT = '2026-08-02T21:00:00.000Z';
 const INVOCATION_ID = '3f10e0f9-b0b4-4e64-b9ff-c5f10f848067';
 const GRANT_ID = 'founder-approved-auto-distribution-v1';
 const REVIEW_BATCH_ID = '66cf315f-e1a0-4aad-9c76-355f1df30b54';
+
+function zapierEvidence() {
+  return Object.assign(
+    {
+      repository: 'jussray/founder-control-room',
+      commitSha: SHA,
+      proofUrls: [PROOF_URL, ZAPIER_PROOF_URL],
+    },
+    { automationId: ZAPIER_AUTOMATION_ID },
+  );
+}
 
 function socialPost(
   mode: 'draft' | 'queue' | 'publish',
@@ -100,11 +113,7 @@ describe('Founder OS and AI Company cross-lab parity', () => {
         id: 'founder-approved:synthetic-parity',
         actions: ['queue-social'],
       },
-      evidence: {
-        repository: 'jussray/founder-control-room',
-        commitSha: SHA,
-        proofUrls: [PROOF_URL],
-      },
+      evidence: zapierEvidence(),
       socialPost: socialPost('queue'),
     });
     const company = runCompanySimulation(companyInput());
@@ -220,11 +229,7 @@ describe('Founder OS and AI Company cross-lab parity', () => {
       goal: 'Simulate a scheduled founder post without giving the lab provider access.',
       action: 'queue-social',
       approval: { id: 'founder-approved:synthetic-parity', actions: ['queue-social'] },
-      evidence: {
-        repository: 'jussray/founder-control-room',
-        commitSha: SHA,
-        proofUrls: [PROOF_URL],
-      },
+      evidence: zapierEvidence(),
       socialPost: socialPost('queue'),
     });
     expect(founderPlan.authority.executionAllowed).toBe(false);
