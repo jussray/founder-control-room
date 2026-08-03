@@ -41,6 +41,7 @@ app.listen(port, () => {
   console.log(`  GET  /promptos/:id`);
   console.log(`  PATCH /promptos/:id`);
   console.log(`  POST /goalfix/inspect       (read-only proof-first inspection)`);
+  console.log(`  POST /founder-os/preview    (founder-only L0 skill/provider preview)`);
   console.log(`  POST /mirror/run            (founder-only draft Mirror Engine)`);
   console.log(`  GET  /terminal/:projectSlug/commands`);
   console.log(`  POST /terminal/:projectSlug/run`);
