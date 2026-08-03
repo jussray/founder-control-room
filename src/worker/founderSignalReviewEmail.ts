@@ -97,7 +97,7 @@ export async function handleFounderSignalReviewEmail(
     redirect: 'error',
     headers: {
       'content-type': 'application/json',
-      'content-length': String(Buffer.byteLength(body, 'utf8')),
+      'content-length': String(new TextEncoder().encode(body).byteLength),
       'x-founder-review-timestamp': timestamp,
       'x-founder-review-signature': signature,
     },
