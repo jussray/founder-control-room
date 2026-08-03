@@ -19,14 +19,6 @@ import { requireFounder } from '../middleware/requireFounder.js';
 export const founderOsSkillsRouter = Router();
 founderOsSkillsRouter.use(requireFounder);
 
-interface ProviderEvidenceInput extends FounderOsLabEvidence {
-  projectId?: string;
-  automationId?: string;
-  workspaceId?: string;
-  recordIds?: string[];
-  associationPlan?: string;
-}
-
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const ACTIONS = new Set<FounderOsLabAction>(
   Object.keys(FOUNDER_OS_LAB_ACTION_ROUTES) as FounderOsLabAction[],
@@ -158,7 +150,7 @@ function parseEvidence(value: unknown): FounderOsLabEvidence | undefined | null 
     }
   }
 
-  const evidence: ProviderEvidenceInput = {
+  return {
     ...(repository ? { repository } : {}),
     ...(commitSha ? { commitSha } : {}),
     ...(proofUrls ? { proofUrls } : {}),
@@ -168,7 +160,6 @@ function parseEvidence(value: unknown): FounderOsLabEvidence | undefined | null 
     ...(recordIds ? { recordIds } : {}),
     ...(associationPlan ? { associationPlan } : {}),
   };
-  return evidence;
 }
 
 founderOsSkillsRouter.post('/preview', (req, res) => {
