@@ -18,6 +18,7 @@ import { founderOsSkillsRouter } from '../founderOsSkills.js';
 const FOUNDER_EMAIL = 'founder@example.com';
 const BEARER = 'Bearer test-token';
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const PROOF_URL = `https://github.com/jussray/founder-control-room/commit/${SHA}`;
 
 function buildApp() {
   const app = express();
@@ -52,7 +53,7 @@ function validPreview() {
     evidence: {
       repository: 'jussray/founder-control-room',
       commitSha: SHA,
-      proofUrls: [`https://github.com/jussray/founder-control-room/commit/${SHA}`],
+      proofUrls: [PROOF_URL],
     },
   };
 }
@@ -156,6 +157,9 @@ describe('POST /founder-os/preview', () => {
             mode: 'preview',
             supported: true,
             executionAllowed: false,
+            preflightEvidenceRequired: [],
+            preflightEvidenceObserved: [],
+            preflightEvidenceMissing: [],
           },
         },
       },
@@ -205,7 +209,48 @@ describe('POST /founder-os/preview', () => {
     expect(supabaseMock.from).toHaveBeenCalledTimes(1);
   });
 
-  it('recognizes scoped approval while keeping a supported provider inert', async () => {
+  it('blocks scoped approval when required provider evidence is absent', async () => {
+    founderSession();
+
+    const response = await request(buildApp())
+      .post('/founder-os/preview')
+      .set('Authorization', BEARER)
+      .send({
+        goal: 'Preview the exact-head merge gate.',
+        action: 'merge-code',
+        command: 'loop',
+        provider: 'github',
+        approval: {
+          id: 'founder-approved:preview-only',
+          actions: ['merge-code'],
+        },
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.plan).toMatchObject({
+      readiness: 'blocked',
+      authority: {
+        approvalObserved: true,
+        executionAllowed: false,
+      },
+      route: {
+        provider: {
+          id: 'github',
+          supported: true,
+          executionAllowed: false,
+          preflightEvidenceRequired: ['repository', 'commitSha', 'proofUrls'],
+          preflightEvidenceObserved: [],
+          preflightEvidenceMissing: ['repository', 'commitSha', 'proofUrls'],
+        },
+      },
+    });
+    expect(response.body.plan.truth.blocked.join(' ')).toContain(
+      'Missing required github preflight evidence: repository, commitSha, proofUrls',
+    );
+    expect(supabaseMock.from).toHaveBeenCalledTimes(1);
+  });
+
+  it('recognizes scoped approval and complete evidence while keeping the provider inert', async () => {
     founderSession();
 
     const response = await request(buildApp())
@@ -223,6 +268,7 @@ describe('POST /founder-os/preview', () => {
         evidence: {
           repository: 'jussray/founder-control-room',
           commitSha: SHA,
+          proofUrls: [PROOF_URL],
         },
       });
 
@@ -238,6 +284,9 @@ describe('POST /founder-os/preview', () => {
           id: 'github',
           supported: true,
           executionAllowed: false,
+          preflightEvidenceRequired: ['repository', 'commitSha', 'proofUrls'],
+          preflightEvidenceObserved: ['repository', 'commitSha', 'proofUrls'],
+          preflightEvidenceMissing: [],
         },
       },
     });
