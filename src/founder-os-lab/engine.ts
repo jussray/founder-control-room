@@ -5,9 +5,11 @@ import {
 import {
   FOUNDER_OS_LAB_VERSION,
   type FounderOsLabAction,
+  type FounderOsLabEvidenceField,
   type FounderOsLabPlan,
   type FounderOsLabRequest,
 } from './contracts.js';
+import { FOUNDER_OS_LAB_PROVIDER_PREFLIGHT_EVIDENCE } from './providerEvidence.js';
 import {
   FOUNDER_OS_LAB_ACTION_ROUTES,
   founderOsLabCommand,
@@ -62,13 +64,34 @@ function socialValidationErrors(request: FounderOsLabRequest): string[] {
   }
 }
 
-function evidenceUnknowns(request: FounderOsLabRequest, providerId: string): string[] {
-  const unknown: string[] = [];
+function observedEvidenceFields(request: FounderOsLabRequest): FounderOsLabEvidenceField[] {
+  const observed: FounderOsLabEvidenceField[] = [];
   const evidence = request.evidence;
+  const socialPost = request.socialPost;
 
-  if (!evidence?.repository) unknown.push('Authoritative repository was not supplied to the lab.');
-  if (!evidence?.commitSha) unknown.push('Exact source commit SHA was not supplied to the lab.');
-  if (!evidence?.proofUrls?.length) unknown.push('No proof URLs were supplied to the lab.');
+  if (evidence?.repository || socialPost?.sourceRepository) observed.push('repository');
+  if (evidence?.commitSha || socialPost?.sourceCommitSha) observed.push('commitSha');
+  if (evidence?.proofUrls?.length || socialPost?.proofLinks?.length) observed.push('proofUrls');
+
+  return observed;
+}
+
+function evidenceUnknowns(
+  request: FounderOsLabRequest,
+  providerId: string,
+  observedEvidence: readonly FounderOsLabEvidenceField[],
+): string[] {
+  const unknown: string[] = [];
+
+  if (!observedEvidence.includes('repository')) {
+    unknown.push('Authoritative repository was not supplied to the lab.');
+  }
+  if (!observedEvidence.includes('commitSha')) {
+    unknown.push('Exact source commit SHA was not supplied to the lab.');
+  }
+  if (!observedEvidence.includes('proofUrls')) {
+    unknown.push('No proof URLs were supplied to the lab.');
+  }
 
   unknown.push(`No live ${providerId} provider call or destination receipt exists in preview mode.`);
 
@@ -96,12 +119,25 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
   const providerSupported = provider.supportedActions.includes(request.action);
   const approvalRequired = actionRoute.approvalRequired;
   const approvalObserved = approvalCoversAction(request);
+  const mutatingAction = MUTATING_ACTIONS.has(request.action);
+  const observedEvidence = observedEvidenceFields(request);
+  const requiredPreflightEvidence = mutatingAction
+    ? [...FOUNDER_OS_LAB_PROVIDER_PREFLIGHT_EVIDENCE[provider.id]]
+    : [];
+  const missingPreflightEvidence = requiredPreflightEvidence.filter(
+    (field) => !observedEvidence.includes(field),
+  );
   const validationErrors: string[] = [];
 
   if (!goal) validationErrors.push('goal is required.');
   if (goal.length > 2_000) validationErrors.push('goal must be at most 2000 characters.');
   if (!providerSupported) {
     validationErrors.push(`${provider.id} does not support a ${request.action} preview in the checked-in registry.`);
+  }
+  if (providerSupported && missingPreflightEvidence.length > 0) {
+    validationErrors.push(
+      `Missing required ${provider.id} preflight evidence: ${missingPreflightEvidence.join(', ')}.`,
+    );
   }
   validationErrors.push(...socialValidationErrors(request));
 
@@ -114,11 +150,12 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
     ? 'blocked'
     : approvalRequired && !approvalObserved
       ? 'approval_required'
-      : MUTATING_ACTIONS.has(request.action)
+      : mutatingAction
         ? 'ready_for_external_executor'
         : 'ready_for_review';
 
-  const socialValidated = SOCIAL_ACTIONS.has(request.action) && validationErrors.length === 0;
+  const socialValidated = SOCIAL_ACTIONS.has(request.action)
+    && socialValidationErrors(request).length === 0;
   const verified = [
     'The plan was produced by a deterministic, in-process simulation.',
     'The lab performed no external call, provider call, database write, filesystem write, or environment read.',
@@ -128,14 +165,21 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
   if (socialValidated) {
     verified.push('The supplied social payload passed the existing first-party proof and content validator.');
   }
+  if (mutatingAction && missingPreflightEvidence.length === 0) {
+    verified.push(
+      `Required ${provider.id} preflight evidence fields are present: ${requiredPreflightEvidence.join(', ') || 'none'}.`,
+    );
+  }
 
-  const nextGate = readiness === 'blocked'
-    ? 'Correct the rejected registry or payload input and rerun the pure preview path.'
-    : readiness === 'approval_required'
-      ? `Attach one explicit founder approval scoped to ${request.action}, then rerun the preview. No ${provider.id} action will occur.`
-      : readiness === 'ready_for_external_executor'
-        ? `Review the ${command.id} plan and evidence requirements, then separately authorize one named external adapter for ${provider.id} in a new change.`
-        : `Review the ${command.id} preview and promote only one ${provider.id} capability through a separately governed adapter experiment.`;
+  const nextGate = missingPreflightEvidence.length > 0
+    ? `Supply the missing ${provider.id} preflight evidence (${missingPreflightEvidence.join(', ')}) and rerun the preview. No provider action will occur.`
+    : readiness === 'blocked'
+      ? 'Correct the rejected registry or payload input and rerun the pure preview path.'
+      : readiness === 'approval_required'
+        ? `Attach one explicit founder approval scoped to ${request.action}, then rerun the preview. No ${provider.id} action will occur.`
+        : readiness === 'ready_for_external_executor'
+          ? `Review the ${command.id} plan and evidence requirements, then separately authorize one named external adapter for ${provider.id} in a new change.`
+          : `Review the ${command.id} preview and promote only one ${provider.id} capability through a separately governed adapter experiment.`;
 
   return {
     version: FOUNDER_OS_LAB_VERSION,
@@ -172,6 +216,11 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
         approvalRequired,
         credentialBoundary: provider.credentialBoundary,
         evidenceRequired: [...provider.evidenceRequired],
+        preflightEvidenceRequired: requiredPreflightEvidence,
+        preflightEvidenceObserved: observedEvidence.filter((field) => (
+          requiredPreflightEvidence.includes(field)
+        )),
+        preflightEvidenceMissing: missingPreflightEvidence,
         rollback: provider.rollback,
       },
       capabilities: [...actionRoute.capabilities],
@@ -184,7 +233,7 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
         `The ${command.id} command is a reasoning lens, not executable authority.`,
         `The ${provider.id} entry is a provider preview contract, not proof of a live connection.`,
       ],
-      unknown: evidenceUnknowns(request, provider.id),
+      unknown: evidenceUnknowns(request, provider.id, observedEvidence),
       blocked,
     },
     redteam: {
@@ -195,6 +244,7 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
         'A provider preview could be mistaken for a connected or authenticated provider.',
         'A preview adapter could accidentally import a live provider client.',
         'An approval identifier could be mistaken for proof that an action executed.',
+        'An approval could be mistaken for a substitute for exact-head or provider preflight evidence.',
         'A successful draft validation could be mislabeled as publication success.',
       ],
     },
@@ -219,6 +269,9 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
         'Assert all isolation flags remain false for side effects.',
         'Assert executionAllowed remains false for every action and provider.',
         `Assert ${provider.id} supports ${request.action} before presenting a proceedable preview.`,
+        ...(mutatingAction
+          ? [`Assert required ${provider.id} preflight evidence is present before executor readiness.`]
+          : []),
         ...(socialValidated ? ['Assert the existing social validator accepts the supplied payload.'] : []),
       ],
       loop: [nextGate],
