@@ -8,7 +8,11 @@ import {
   type FounderOsLabPlan,
   type FounderOsLabRequest,
 } from './contracts.js';
-import { FOUNDER_OS_LAB_ACTION_ROUTES } from './registry.js';
+import {
+  FOUNDER_OS_LAB_ACTION_ROUTES,
+  founderOsLabCommand,
+  founderOsLabProvider,
+} from './registry.js';
 
 const MUTATING_ACTIONS: ReadonlySet<FounderOsLabAction> = new Set([
   'queue-social',
@@ -58,13 +62,15 @@ function socialValidationErrors(request: FounderOsLabRequest): string[] {
   }
 }
 
-function evidenceUnknowns(request: FounderOsLabRequest): string[] {
+function evidenceUnknowns(request: FounderOsLabRequest, providerId: string): string[] {
   const unknown: string[] = [];
   const evidence = request.evidence;
 
   if (!evidence?.repository) unknown.push('Authoritative repository was not supplied to the lab.');
   if (!evidence?.commitSha) unknown.push('Exact source commit SHA was not supplied to the lab.');
   if (!evidence?.proofUrls?.length) unknown.push('No proof URLs were supplied to the lab.');
+
+  unknown.push(`No live ${providerId} provider call or destination receipt exists in preview mode.`);
 
   if (request.action === 'queue-social' || request.action === 'publish-social') {
     unknown.push('No live Buffer, Zapier, or destination-platform receipt exists in simulation mode.');
@@ -73,24 +79,30 @@ function evidenceUnknowns(request: FounderOsLabRequest): string[] {
     unknown.push('No live GitHub mergeability, review-thread, or exact-head check query was executed.');
   }
   if (request.action === 'deploy-code') {
-    unknown.push('No Cloudflare or other deployment-provider state was queried.');
+    unknown.push('No Cloudflare, Supabase, or other deployment-provider state was queried.');
   }
   if (request.action === 'send-email') {
     unknown.push('No Gmail, HubSpot, recipient, or delivery state was queried.');
   }
 
-  return unknown;
+  return [...new Set(unknown)];
 }
 
 export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan {
   const goal = request.goal.trim();
-  const route = FOUNDER_OS_LAB_ACTION_ROUTES[request.action];
-  const approvalRequired = route.approvalRequired;
+  const actionRoute = FOUNDER_OS_LAB_ACTION_ROUTES[request.action];
+  const command = founderOsLabCommand(request.command ?? actionRoute.defaultCommand);
+  const provider = founderOsLabProvider(request.provider ?? actionRoute.defaultProvider);
+  const providerSupported = provider.supportedActions.includes(request.action);
+  const approvalRequired = actionRoute.approvalRequired;
   const approvalObserved = approvalCoversAction(request);
   const validationErrors: string[] = [];
 
   if (!goal) validationErrors.push('goal is required.');
   if (goal.length > 2_000) validationErrors.push('goal must be at most 2000 characters.');
+  if (!providerSupported) {
+    validationErrors.push(`${provider.id} does not support a ${request.action} preview in the checked-in registry.`);
+  }
   validationErrors.push(...socialValidationErrors(request));
 
   const blocked: string[] = [...validationErrors];
@@ -111,18 +123,19 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
     'The plan was produced by a deterministic, in-process simulation.',
     'The lab performed no external call, provider call, database write, filesystem write, or environment read.',
     'Execution authority remains disabled even when an approval reference is supplied.',
+    `The ${command.id} command lens and ${provider.id} provider preview were resolved from the checked-in registry.`,
   ];
   if (socialValidated) {
     verified.push('The supplied social payload passed the existing first-party proof and content validator.');
   }
 
   const nextGate = readiness === 'blocked'
-    ? 'Correct the rejected lab input and rerun the pure test path.'
+    ? 'Correct the rejected registry or payload input and rerun the pure preview path.'
     : readiness === 'approval_required'
-      ? `Attach one explicit founder approval scoped to ${request.action}, then rerun the lab. No provider action will occur.`
+      ? `Attach one explicit founder approval scoped to ${request.action}, then rerun the preview. No ${provider.id} action will occur.`
       : readiness === 'ready_for_external_executor'
-        ? 'Review the generated plan and receipts, then separately authorize one named external adapter in a new change.'
-        : 'Review the simulated route and promote only one capability to a separately governed adapter experiment.';
+        ? `Review the ${command.id} plan and evidence requirements, then separately authorize one named ${provider.id} adapter in a new change.`
+        : `Review the ${command.id} preview and promote only one ${provider.id} capability through a separately governed adapter experiment.`;
 
   return {
     version: FOUNDER_OS_LAB_VERSION,
@@ -145,23 +158,41 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
     },
     route: {
       chiefSkill: 'juss-chief-ai',
-      specialistSkill: route.specialistSkill,
-      capabilities: [...route.capabilities],
-      adapters: [...route.adapters],
+      specialistSkill: actionRoute.specialistSkill,
+      command: {
+        id: command.id,
+        specialistSkill: command.specialistSkill,
+        role: command.role,
+      },
+      provider: {
+        id: provider.id,
+        mode: provider.mode,
+        supported: providerSupported,
+        executionAllowed: false,
+        approvalRequired,
+        credentialBoundary: provider.credentialBoundary,
+        evidenceRequired: [...provider.evidenceRequired],
+        rollback: provider.rollback,
+      },
+      capabilities: [...actionRoute.capabilities],
+      adapters: [...actionRoute.adapters],
     },
     truth: {
       verified,
       inferred: [
         'The selected specialist is the narrowest match from the checked-in lab registry.',
+        `The ${command.id} command is a reasoning lens, not executable authority.`,
+        `The ${provider.id} entry is a provider preview contract, not proof of a live connection.`,
       ],
-      unknown: evidenceUnknowns(request),
+      unknown: evidenceUnknowns(request, provider.id),
       blocked,
     },
     redteam: {
       shouldExist: true,
       premiseRisk: 'A broad autonomous-company runtime would compound authority mistakes faster than it compounds value.',
       failureModes: [
-        'A prompt could be mistaken for executable authority.',
+        'A prompt or command alias could be mistaken for executable authority.',
+        'A provider preview could be mistaken for a connected or authenticated provider.',
         'A preview adapter could accidentally import a live provider client.',
         'An approval identifier could be mistaken for proof that an action executed.',
         'A successful draft validation could be mislabeled as publication success.',
@@ -172,18 +203,22 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
       state: readiness,
       evidence: socialValidated
         ? 'Existing first-party social validation passed in memory.'
-        : 'Only the deterministic routing contract was evaluated.',
-      rollback: 'Delete or revert src/founder-os-lab; no external cleanup is required.',
-      compoundingValue: 'One provider-neutral contract can safely train and test future specialist adapters.',
+        : `Only the deterministic ${command.id} and ${provider.id} registry contracts were evaluated.`,
+      rollback: provider.rollback,
+      compoundingValue: 'One provider-neutral registry can safely train and test future specialist adapters without copying platform prompts.',
     },
     ooda: {
       observe: ['Read the founder goal and supplied evidence fields only.'],
-      orient: [`Route through juss-chief-ai to ${route.specialistSkill}.`],
-      decide: [`Select ${route.capabilities.join(', ')} without granting execution authority.`],
-      act: ['Produce an in-memory plan only.'],
+      orient: [
+        `Route through juss-chief-ai to ${actionRoute.specialistSkill}.`,
+        `Apply the ${command.id} reasoning lens to the ${provider.id} preview target.`,
+      ],
+      decide: [`Select ${actionRoute.capabilities.join(', ')} without granting execution authority.`],
+      act: ['Produce an in-memory preview only.'],
       verify: [
         'Assert all isolation flags remain false for side effects.',
-        'Assert executionAllowed remains false for every action.',
+        'Assert executionAllowed remains false for every action and provider.',
+        `Assert ${provider.id} supports ${request.action} before presenting a proceedable preview.`,
         ...(socialValidated ? ['Assert the existing social validator accepts the supplied payload.'] : []),
       ],
       loop: [nextGate],
