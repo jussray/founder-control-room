@@ -130,7 +130,7 @@ describe('POST /founder-os/preview provider evidence semantics', () => {
     expect(response.body.plan.readiness).toBe('blocked');
     const blocked = response.body.plan.truth.blocked.join(' ');
     expect(blocked).toContain('hubspot preflight evidence requires workspaceId');
-    expect(blocked).toContain('hubspot preflight evidence requires at least one recordId');
+    expect(blocked).toContain('hubspot preflight evidence requires at least one nonempty typed recordId');
     expect(blocked).toContain('hubspot preflight evidence requires associationPlan');
     expect(response.body.plan.authority.executionAllowed).toBe(false);
     expect(supabaseMock.from).toHaveBeenCalledTimes(1);
@@ -166,7 +166,7 @@ describe('POST /founder-os/preview provider evidence semantics', () => {
     expect(response.body.plan.authority.executionAllowed).toBe(false);
   });
 
-  it('accepts authoritative HubSpot context but still returns a non-executing preview', async () => {
+  it('accepts authoritative HubSpot context but keeps outbound dispatch at review-only', async () => {
     const response = await request(buildApp())
       .post('/founder-os/preview')
       .set('Authorization', BEARER)
@@ -192,7 +192,7 @@ describe('POST /founder-os/preview provider evidence semantics', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.plan).toMatchObject({
-      readiness: 'ready_for_external_executor',
+      readiness: 'ready_for_review',
       authority: {
         approvalObserved: true,
         executionAllowed: false,
@@ -209,6 +209,9 @@ describe('POST /founder-os/preview provider evidence semantics', () => {
       },
     });
     expect(response.body.plan.truth.blocked).toEqual([]);
+    expect(response.body.plan.nextGate).toContain('DispatchDecision');
+    expect(response.body.plan.nextGate).toContain('consent');
+    expect(response.body.plan.nextGate).toContain('suppression');
     expect(supabaseMock.from).toHaveBeenCalledTimes(1);
   });
 });
