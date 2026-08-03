@@ -168,7 +168,11 @@ export async function runDeletionWorker(
 }
 
 export default {
-  async scheduled(_event: unknown, env: DeletionQueueEnv, _ctx: unknown) {
+  async scheduled(
+    _event: unknown,
+    env: DeletionQueueEnv,
+    _ctx: unknown,
+  ): Promise<void> {
     await runDeletionWorker(env);
   },
 };
