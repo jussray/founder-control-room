@@ -35,14 +35,12 @@ function socialPost(
 }
 
 function zapierEvidence() {
-  return Object.assign(
-    {
-      repository: 'jussray/founder-control-room',
-      commitSha: SHA,
-      proofUrls: [PROOF_URL, ZAPIER_PROOF_URL],
-    },
-    { automationId: ZAPIER_AUTOMATION_ID },
-  );
+  return {
+    repository: 'jussray/founder-control-room',
+    commitSha: SHA,
+    proofUrls: [PROOF_URL, ZAPIER_PROOF_URL],
+    automationId: ZAPIER_AUTOMATION_ID,
+  };
 }
 
 describe('Founder OS isolated lab', () => {
@@ -100,7 +98,11 @@ describe('Founder OS isolated lab', () => {
     expect(plan.readiness).toBe('blocked');
     expect(plan.authority.approvalObserved).toBe(false);
     expect(plan.authority.executionAllowed).toBe(false);
-    expect(plan.route.provider.preflightEvidenceMissing).toEqual([]);
+    expect(plan.route.provider).toMatchObject({
+      preflightEvidenceRequired: ['repository', 'commitSha', 'proofUrls', 'automationId'],
+      preflightEvidenceObserved: ['repository', 'commitSha', 'proofUrls'],
+      preflightEvidenceMissing: ['automationId'],
+    });
     expect(plan.truth.blocked.join(' ')).toContain('zapier preflight evidence requires automationId');
     expect(plan.truth.blocked.join(' ')).toContain('Explicit founder approval');
   });
@@ -121,8 +123,8 @@ describe('Founder OS isolated lab', () => {
     expect(plan.authority.approvalObserved).toBe(true);
     expect(plan.authority.executionAllowed).toBe(false);
     expect(plan.route.provider).toMatchObject({
-      preflightEvidenceRequired: ['repository', 'commitSha', 'proofUrls'],
-      preflightEvidenceObserved: ['repository', 'commitSha', 'proofUrls'],
+      preflightEvidenceRequired: ['repository', 'commitSha', 'proofUrls', 'automationId'],
+      preflightEvidenceObserved: ['repository', 'commitSha', 'proofUrls', 'automationId'],
       preflightEvidenceMissing: [],
     });
     expect(plan.nextGate).toContain('separately authorize one named external adapter');
@@ -197,17 +199,6 @@ describe('Founder OS isolated lab', () => {
   });
 
   it('rejects conflicting source identities between evidence and the validated social post', () => {
-    const conflictingEvidence = Object.assign(
-      {
-        repository: 'another-owner/another-repo',
-        commitSha: OTHER_SHA,
-        proofUrls: [
-          `https://github.com/another-owner/another-repo/commit/${OTHER_SHA}`,
-          ZAPIER_PROOF_URL,
-        ],
-      },
-      { automationId: ZAPIER_AUTOMATION_ID },
-    );
     const plan = planFounderOsLab({
       goal: 'Queue one proof-backed founder update.',
       action: 'queue-social',
@@ -215,7 +206,15 @@ describe('Founder OS isolated lab', () => {
         id: 'founder-approved:queue-one-lab-post',
         actions: ['queue-social'],
       },
-      evidence: conflictingEvidence,
+      evidence: {
+        repository: 'another-owner/another-repo',
+        commitSha: OTHER_SHA,
+        proofUrls: [
+          `https://github.com/another-owner/another-repo/commit/${OTHER_SHA}`,
+          ZAPIER_PROOF_URL,
+        ],
+        automationId: ZAPIER_AUTOMATION_ID,
+      },
       socialPost: socialPost('queue'),
     });
 
@@ -279,6 +278,11 @@ describe('Founder OS isolated lab', () => {
     });
 
     expect(plan.readiness).toBe('blocked');
+    expect(plan.route.provider).toMatchObject({
+      preflightEvidenceRequired: ['proofUrls', 'workspaceId', 'recordIds', 'associationPlan'],
+      preflightEvidenceObserved: ['proofUrls'],
+      preflightEvidenceMissing: ['workspaceId', 'recordIds', 'associationPlan'],
+    });
     expect(plan.truth.blocked.join(' ')).toContain('hubspot preflight evidence requires workspaceId');
     expect(plan.truth.blocked.join(' ')).toContain('hubspot preflight evidence requires at least one recordId');
     expect(plan.truth.blocked.join(' ')).toContain('hubspot preflight evidence requires associationPlan');
@@ -292,5 +296,5 @@ describe('Founder OS isolated lab', () => {
     };
 
     expect(planFounderOsLab(request)).toEqual(planFounderOsLab(request));
-    });
+  });
 });
