@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 import { parseFounderSignalReviewEmail } from '../founderSignalEmailIngress/email.js';
 
 const MAX_RAW_BYTES = 128 * 1024;
+const MIN_INGRESS_SECRET_LENGTH = 32;
 const APPROVED_INGEST_URL = 'https://api.foundercontrolroom.org/ingest/founder-review-email';
 
 interface FounderSignalReviewEmailEnv {
@@ -27,6 +28,14 @@ function requireEnv(value: string | undefined, name: string): string {
   const trimmed = value?.trim();
   if (!trimmed) throw new Error(`missing_${name.toLowerCase()}`);
   return trimmed;
+}
+
+function requireStrongSecret(value: string | undefined, name: string): string {
+  const secret = requireEnv(value, name);
+  if (secret.length < MIN_INGRESS_SECRET_LENGTH) {
+    throw new Error(`weak_${name.toLowerCase()}`);
+  }
+  return secret;
 }
 
 function signEnvelope(timestamp: string, body: string, secret: string): string {
@@ -90,7 +99,7 @@ export async function handleFounderSignalReviewEmail(
     env.FOUNDER_REVIEW_EMAIL_DOMAIN,
     'FOUNDER_REVIEW_EMAIL_DOMAIN',
   );
-  const secret = requireEnv(
+  const secret = requireStrongSecret(
     env.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET,
     'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET',
   );
