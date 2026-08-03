@@ -139,6 +139,6 @@ describe('portable Founder OS registry', () => {
     expect(plan.authority.approvalObserved).toBe(true);
     expect(plan.authority.executionAllowed).toBe(false);
     expect(plan.route.provider.executionAllowed).toBe(false);
-    expect(plan.nextGate).toContain('separately authorize one named github adapter');
+    expect(plan.nextGate).toContain('separately authorize one named external adapter for github');
   });
 });
