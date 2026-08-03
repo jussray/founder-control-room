@@ -377,7 +377,7 @@ describe('Founder OS isolated lab', () => {
 
     expect(plan.readiness).toBe('blocked');
     expect(plan.truth.blocked.join(' ')).toContain(
-      'hubspot proof does not identify record company:789 on its authoritative object-type route',
+      'hubspot proof does not identify record company:789 on its workspace-bound object-type route',
     );
     expect(plan.authority.executionAllowed).toBe(false);
   });
