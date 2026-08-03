@@ -57,9 +57,7 @@ export type FounderOsLabCapabilityId =
   | 'buffer-handoff-preview'
   | 'merge-readiness-preview'
   | 'deployment-readiness-preview'
-  | 'outreach-readiness-preview'
-  | 'project-canon-validation'
-  | 'editable-design-preview';
+  | 'outreach-readiness-preview';
 
 export type FounderOsLabAdapterId =
   | 'repository-preview'
