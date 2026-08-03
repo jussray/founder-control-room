@@ -10,13 +10,15 @@ Keep the Founder Control Room root application, API-subdomain application, and d
 |---|---|---|---|---|---|
 | `founder-control-room` | `foundercontrolroom.org` application and reconciliation owner | `wrangler.toml` | `npm run build` | `npm run deploy` | every minute |
 | `founder-control-room2` | `api.foundercontrolroom.org` API and remote MCP surface | `wrangler.api.toml` | `npm run build` | `npm run deploy:api` | none |
-| deletion queue Worker | account-deletion processing | `wrangler.deletion-queue.toml` | repository-specific | `wrangler deploy --config wrangler.deletion-queue.toml` | config-owned |
+| `founder-control-room-deletion-queue` | account-deletion processing | `wrangler.deletion-queue.toml` | `npm run build` | `wrangler deploy --config wrangler.deletion-queue.toml` | every 6 hours |
+
+All three Worker names are immutable deployment identities. A config must never reuse another target's `name`, route, preview URL, or scheduled trigger.
 
 The API Worker intentionally has no scheduled trigger. Running the same reconciliation cron in both HTTP Workers would duplicate control-loop work.
 
 ## Cloudflare Git project configuration
 
-Each Cloudflare Git project must invoke the deploy command that names its own Wrangler file. Do not connect both projects to plain `npx wrangler deploy`, because that command uses the root `wrangler.toml` and can replace the second project's name, domain, preview, and route settings.
+Each Cloudflare Git project must invoke the deploy command that names its own Wrangler file. Do not connect multiple projects to plain `npx wrangler deploy`, because that command uses the root `wrangler.toml` and can replace another project's name, domain, preview, route, or trigger settings.
 
 Recommended project commands:
 
@@ -28,11 +30,17 @@ Deploy: npm run deploy
 founder-control-room2
 Build:  npm run build
 Deploy: npm run deploy:api
+
+founder-control-room-deletion-queue
+Build:  npm run build
+Deploy: npx wrangler deploy --config wrangler.deletion-queue.toml
 ```
+
+The deletion target must remain dormant until its exact-head gate passes and a separate production approval confirms the required runtime bindings. A repository merge alone does not deploy it.
 
 ## Required bindings per HTTP Worker
 
-Configure these separately in the secret store for each intended Worker:
+Configure these separately in the secret store for each intended HTTP Worker:
 
 ```text
 SUPABASE_URL
@@ -55,6 +63,21 @@ GITHUB_TOKEN
 ```
 
 `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` are a pair. A partial pair fails closed even when a fallback token exists, because half-configured production authentication is configuration drift.
+
+## Required deletion queue bindings
+
+Configure these only in the `founder-control-room-deletion-queue` Worker secret/binding plane:
+
+```text
+NEXT_PUBLIC_SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+CF_API_TOKEN
+CF_ACCOUNT_ID
+CF_SESSIONS_KV_NAMESPACE_ID
+CF_FEATURE_FLAGS_KV_NAMESPACE_ID
+```
+
+The two KV namespace identifiers are optional only when that namespace does not exist. When either namespace identifier is configured, `CF_ACCOUNT_ID` and `CF_API_TOKEN` are required and every non-2xx delete fails the scheduled run.
 
 ## Founder Signal Engine remote bridge
 
@@ -83,12 +106,14 @@ A repository merge does not prove deployment. Close the Cloudflare incident only
 4. no missing-binding validation error;
 5. root-domain `/health` response;
 6. API-subdomain `/health` response;
-7. remote MCP discovery works on the API subdomain without exposing credentials;
-8. the Founder Signal Engine remains review-only until separate publication and CRM approval authority exists.
+7. deletion queue scheduled test proves failed entries remain failed and make the run fail visibly;
+8. remote MCP discovery works on the API subdomain without exposing credentials;
+9. the Founder Signal Engine remains review-only until separate publication and CRM approval authority exists.
 
 ## Safety and rollback
 
 - Never commit secret values or copy them into GitHub issues, PRs, logs, screenshots, HubSpot, Buffer, or Founder Control Room evidence.
 - Do not rotate keys merely to repair a missing Worker binding. Restore the existing provider-held secret reference unless a separate credential incident proves rotation is needed.
-- If the API config routes incorrectly, redeploy the prior known-good Worker version and preserve the failed build evidence.
-- Do not disconnect or delete either Cloudflare project until its role is confirmed from private dashboard evidence.
+- If an HTTP Worker config routes incorrectly, redeploy the prior known-good Worker version and preserve the failed build evidence.
+- If the deletion target is activated incorrectly, disable its cron first, preserve failed queue evidence, and redeploy the prior named deletion Worker version. Never point the deletion config at either HTTP Worker name.
+- Do not disconnect or delete any Cloudflare project until its role is confirmed from private dashboard evidence.
