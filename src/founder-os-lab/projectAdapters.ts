@@ -5,6 +5,7 @@ import type {
   FounderOsLabCapabilityId,
   FounderOsLabCommandId,
   FounderOsLabProjectAdapterId,
+  FounderOsLabProjectAudience,
   FounderOsLabProjectRoute,
   FounderOsLabProviderId,
   FounderOsLabRequest,
@@ -37,9 +38,15 @@ export interface FounderOsLabProjectResolution {
   adapters: FounderOsLabAdapterId[];
 }
 
+interface NormalizedContractUrls {
+  values: string[];
+  validShape: boolean;
+}
+
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SEKRET_BIP_REPOSITORY = 'jussray/Sekret-Bip';
 const SEKRET_BIP_AUDITED_HEAD = '1dba83386eb0a0865d051f2c74ae9046dafb5eeb';
+const PROJECT_AUDIENCES: ReadonlySet<FounderOsLabProjectAudience> = new Set(['teen', 'bip-jr']);
 
 export const FOUNDER_OS_LAB_PROJECT_ADAPTERS: readonly FounderOsLabProjectAdapterDescriptor[] = [
   {
@@ -70,7 +77,7 @@ export const FOUNDER_OS_LAB_PROJECT_ADAPTERS: readonly FounderOsLabProjectAdapte
   },
 ] as const;
 
-function descriptorFor(id: FounderOsLabProjectAdapterId): FounderOsLabProjectAdapterDescriptor | null {
+function descriptorFor(id: unknown): FounderOsLabProjectAdapterDescriptor | null {
   return FOUNDER_OS_LAB_PROJECT_ADAPTERS.find((adapter) => adapter.id === id) ?? null;
 }
 
@@ -84,6 +91,28 @@ function normalizedSha(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const normalized = value.trim().toLowerCase();
   return EXACT_COMMIT_SHA.test(normalized) ? normalized : null;
+}
+
+function normalizedAudience(value: unknown): FounderOsLabProjectAudience | null {
+  if (value === undefined || value === null) return null;
+  return typeof value === 'string' && PROJECT_AUDIENCES.has(value as FounderOsLabProjectAudience)
+    ? value as FounderOsLabProjectAudience
+    : null;
+}
+
+function normalizedContractUrls(value: unknown): NormalizedContractUrls {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 20) {
+    return { values: [], validShape: false };
+  }
+
+  const values: string[] = [];
+  for (const item of value) {
+    if (typeof item !== 'string') return { values: [], validShape: false };
+    const normalized = item.trim();
+    if (!normalized || normalized.length > 2_000) return { values: [], validShape: false };
+    if (!values.includes(normalized)) values.push(normalized);
+  }
+  return { values, validShape: values.length === value.length };
 }
 
 function decodedSegments(parsed: URL): string[] | null {
@@ -165,6 +194,8 @@ function projectAdapterErrors(
   providerId: FounderOsLabProviderId,
   commandId: FounderOsLabCommandId,
   observedPaths: readonly string[],
+  contractUrlsValidShape: boolean,
+  audience: FounderOsLabProjectAudience | null,
 ): string[] {
   const project = request.project;
   if (!project) return [];
@@ -193,6 +224,12 @@ function projectAdapterErrors(
       `${descriptor.id} source head ${sourceCommitSha} has not been audited; expected ${descriptor.auditedSourceHead}.`,
     );
   }
+  if (!contractUrlsValidShape) {
+    errors.push(`${descriptor.id} contractUrls must contain 1 to 20 unique bounded HTTPS URL strings.`);
+  }
+  if (project.audience !== undefined && audience === null) {
+    errors.push(`${descriptor.id} audience must be teen or bip-jr when supplied.`);
+  }
   if (!descriptor.allowedActions.includes(request.action)) {
     errors.push(`${descriptor.id} adapter supports only inspect and plan previews in V1.`);
   }
@@ -200,7 +237,7 @@ function projectAdapterErrors(
     errors.push(`${providerId} is not an allowed ${descriptor.id} preview provider.`);
   }
   if (providerId === 'figma') {
-    if (!project.audience) {
+    if (!audience) {
       errors.push('figma Se’kret Bip previews require an explicit teen or bip-jr presentation audience.');
     }
     if (commandId !== 'visualize' && commandId !== 'build') {
@@ -238,15 +275,25 @@ export function resolveFounderOsLabProject(
     };
   }
 
-  const sourceRepository = normalizedRepository(project.sourceRepository) ?? project.sourceRepository;
-  const sourceCommitSha = normalizedSha(project.sourceCommitSha) ?? project.sourceCommitSha.trim().toLowerCase();
+  const sourceRepository = normalizedRepository(project.sourceRepository) ?? '';
+  const sourceCommitSha = normalizedSha(project.sourceCommitSha) ?? '';
+  const contractUrls = normalizedContractUrls(project.contractUrls);
+  const audience = normalizedAudience(project.audience);
   const observedPaths = observedContractPaths(
-    project.contractUrls,
+    contractUrls.values,
     descriptor.repository,
     descriptor.auditedSourceHead,
   );
   const missingPaths = descriptor.requiredContractPaths.filter((path) => !observedPaths.includes(path));
-  const errors = projectAdapterErrors(request, descriptor, providerId, commandId, observedPaths);
+  const errors = projectAdapterErrors(
+    request,
+    descriptor,
+    providerId,
+    commandId,
+    observedPaths,
+    contractUrls.validShape,
+    audience,
+  );
   const supported = descriptor.allowedActions.includes(request.action)
     && descriptor.allowedProviders.includes(providerId);
 
@@ -261,7 +308,7 @@ export function resolveFounderOsLabProject(
       repository: sourceRepository,
       sourceCommitSha,
       auditedSourceHead: descriptor.auditedSourceHead,
-      audience: project.audience ?? null,
+      audience,
       allowedActions: [...descriptor.allowedActions],
       allowedProviders: [...descriptor.allowedProviders],
       contractPathsRequired: [...descriptor.requiredContractPaths],
