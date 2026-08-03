@@ -24,6 +24,7 @@ const HUBSPOT_OBJECT_TYPES = {
   deal: { appCode: '0-3', apiName: 'deals' },
   ticket: { appCode: '0-5', apiName: 'tickets' },
 } as const;
+const TYPED_HUBSPOT_ID = /(?:^|[^a-z0-9_-])((?:contact|company|deal|ticket):[a-z0-9_-]+)(?=$|[^a-z0-9_-])/gi;
 
 /**
  * Concrete evidence fields that must exist before a mutating preview may be
@@ -41,7 +42,13 @@ export const FOUNDER_OS_LAB_PROVIDER_PREFLIGHT_EVIDENCE: Readonly<
   perplexity: [],
   github: ['repository', 'commitSha', 'proofUrls'],
   supabase: ['repository', 'commitSha', 'proofUrls', 'projectId'],
-  cloudflare: ['repository', 'commitSha', 'proofUrls', 'projectId'],
+  cloudflare: [
+    'repository',
+    'commitSha',
+    'proofUrls',
+    'projectId',
+    'providerAccountId',
+  ],
   zapier: ['repository', 'commitSha', 'proofUrls', 'automationId'],
   figma: [],
   'openai-platform': [],
@@ -129,6 +136,7 @@ export function founderOsLabObservedEvidenceFields(
   if (source.commitSha) observed.push('commitSha');
   if (source.proofUrls.length > 0) observed.push('proofUrls');
   if (normalizedString(context.projectId)) observed.push('projectId');
+  if (normalizedString(context.providerAccountId)) observed.push('providerAccountId');
   if (normalizedString(context.automationId)) observed.push('automationId');
   if (normalizedString(context.workspaceId)) observed.push('workspaceId');
 
@@ -192,12 +200,22 @@ function sourceIdentityErrors(request: FounderOsLabRequest): string[] {
   return errors;
 }
 
+/**
+ * Decodes an exact slash-delimited path. Empty segments, trailing separators,
+ * encoded separators, and malformed encoding all fail closed.
+ */
 function decodedSegments(parsed: URL): string[] | null {
+  const pathname = parsed.pathname;
+  if (!pathname.startsWith('/') || pathname === '/' || pathname.endsWith('/')) return null;
+
+  const rawSegments = pathname.slice(1).split('/');
+  if (rawSegments.length === 0 || rawSegments.some((segment) => !segment)) return null;
+
   const decoded: string[] = [];
-  for (const segment of parsed.pathname.split('/').filter(Boolean)) {
+  for (const segment of rawSegments) {
     try {
       const value = decodeURIComponent(segment).toLowerCase();
-      if (!value) return null;
+      if (!value || value.includes('/') || value.includes('\\')) return null;
       decoded.push(value);
     } catch {
       return null;
@@ -256,49 +274,76 @@ function sourceBindingErrors(request: FounderOsLabRequest, providerId: string): 
 
 function supabaseProjectProofBinds(proofUrl: string, projectId: string): boolean {
   const parsed = parseTrustedHttpsUrl(proofUrl);
-  const segments = parsed ? decodedSegments(parsed) : null;
-  const normalizedProjectId = projectId.toLowerCase();
-  if (!parsed || !segments) return false;
+  if (!parsed) return false;
 
-  if (parsed.hostname.toLowerCase() === `${normalizedProjectId}.supabase.co`) return true;
+  const normalizedProjectId = projectId.toLowerCase();
+  if (parsed.hostname.toLowerCase() === `${normalizedProjectId}.supabase.co`) {
+    return parsed.pathname === '/' && !parsed.search && !parsed.hash;
+  }
+
+  const segments = decodedSegments(parsed);
+  if (!segments) return false;
+
   if (exactHostname(parsed, ['app.supabase.com'])) {
-    return segments[0] === 'project' && segments[1] === normalizedProjectId;
+    return segments.length >= 2
+      && segments[0] === 'project'
+      && segments[1] === normalizedProjectId;
   }
   if (exactHostname(parsed, ['supabase.com', 'www.supabase.com'])) {
-    return segments[0] === 'dashboard'
+    return segments.length >= 3
+      && segments[0] === 'dashboard'
       && segments[1] === 'project'
       && segments[2] === normalizedProjectId;
   }
   if (exactHostname(parsed, ['api.supabase.com'])) {
-    return segments[0] === 'v1'
+    return segments.length === 3
+      && segments[0] === 'v1'
       && segments[1] === 'projects'
       && segments[2] === normalizedProjectId;
   }
   return false;
 }
 
-function cloudflareProjectProofBinds(proofUrl: string, projectId: string): boolean {
+function cloudflareProjectProofBinds(
+  proofUrl: string,
+  providerAccountId: string,
+  projectId: string,
+): boolean {
   const parsed = parseTrustedHttpsUrl(proofUrl);
   const segments = parsed ? decodedSegments(parsed) : null;
+  const normalizedAccountId = providerAccountId.toLowerCase();
   const normalizedProjectId = projectId.toLowerCase();
   if (!parsed || !segments) return false;
 
   if (exactHostname(parsed, ['dash.cloudflare.com'])) {
     return (
-      segments[1] === 'pages'
+      segments.length === 4
+      && segments[0] === normalizedAccountId
+      && segments[1] === 'pages'
       && segments[2] === 'view'
       && segments[3] === normalizedProjectId
     ) || (
-      segments[1] === 'workers'
+      segments.length === 4
+      && segments[0] === normalizedAccountId
+      && segments[1] === 'workers'
       && segments[2] === 'services'
-      && (segments[3] === normalizedProjectId || segments[4] === normalizedProjectId)
+      && segments[3] === normalizedProjectId
+    ) || (
+      segments.length === 5
+      && segments[0] === normalizedAccountId
+      && segments[1] === 'workers'
+      && segments[2] === 'services'
+      && segments[3] === 'view'
+      && segments[4] === normalizedProjectId
     );
   }
 
   if (exactHostname(parsed, ['api.cloudflare.com'])) {
-    return segments[0] === 'client'
+    return segments.length === 7
+      && segments[0] === 'client'
       && segments[1] === 'v4'
       && segments[2] === 'accounts'
+      && segments[3] === normalizedAccountId
       && (
         (segments[4] === 'pages' && segments[5] === 'projects' && segments[6] === normalizedProjectId)
         || (segments[4] === 'workers' && segments[5] === 'services' && segments[6] === normalizedProjectId)
@@ -314,12 +359,10 @@ function zapierAutomationProofBinds(proofUrl: string, automationId: string): boo
   const normalizedAutomationId = automationId.toLowerCase();
   if (!parsed || !segments || !exactHostname(parsed, ['zapier.com', 'www.zapier.com'])) return false;
 
-  return (
-    segments.length >= 3
+  return segments.length === 3
     && segments[0] === 'app'
     && (segments[1] === 'editor' || segments[1] === 'zaps')
-    && segments[2] === normalizedAutomationId
-  );
+    && segments[2] === normalizedAutomationId;
 }
 
 function parseHubSpotRecordIdentity(value: string): HubSpotRecordIdentity | null {
@@ -338,7 +381,9 @@ function hubspotWorkspaceProofBinds(proofUrl: string, workspaceId: string): bool
   const parsed = parseTrustedHttpsUrl(proofUrl);
   const segments = parsed ? decodedSegments(parsed) : null;
   if (!parsed || !segments || !exactHostname(parsed, ['app.hubspot.com'])) return false;
-  return segments[0] === 'contacts' && segments[1] === workspaceId.toLowerCase();
+  return segments.length >= 2
+    && segments[0] === 'contacts'
+    && segments[1] === workspaceId.toLowerCase();
 }
 
 function hubspotRecordProofBinds(
@@ -376,8 +421,11 @@ function associationPlanMentionsRecords(
   plan: string,
   recordIds: readonly HubSpotRecordIdentity[],
 ): boolean {
-  const normalizedPlan = plan.toLowerCase();
-  return recordIds.every((recordId) => normalizedPlan.includes(recordId.canonical));
+  const identities = new Set<string>();
+  for (const match of plan.toLowerCase().matchAll(TYPED_HUBSPOT_ID)) {
+    if (match[1]) identities.add(match[1]);
+  }
+  return recordIds.every((recordId) => identities.has(recordId.canonical));
 }
 
 function providerIdentityErrors(
@@ -399,10 +447,23 @@ function providerIdentityErrors(
 
   if (providerId === 'cloudflare') {
     const projectId = normalizedString(context.projectId);
+    const providerAccountId = normalizedString(context.providerAccountId);
     if (!projectId) {
       errors.push('cloudflare preflight evidence requires projectId.');
-    } else if (!proofUrls.some((proofUrl) => cloudflareProjectProofBinds(proofUrl, projectId))) {
-      errors.push(`cloudflare proof does not identify project ${projectId} on an authoritative Cloudflare project route.`);
+    }
+    if (!providerAccountId) {
+      errors.push('cloudflare preflight evidence requires providerAccountId.');
+    }
+    if (
+      projectId
+      && providerAccountId
+      && !proofUrls.some((proofUrl) => (
+        cloudflareProjectProofBinds(proofUrl, providerAccountId, projectId)
+      ))
+    ) {
+      errors.push(
+        `cloudflare proof does not identify account ${providerAccountId} and project ${projectId} on one authoritative Cloudflare project route.`,
+      );
     }
   }
 
@@ -457,7 +518,7 @@ function providerIdentityErrors(
         validIdentities.length !== recordIds.length
         || !associationPlanMentionsRecords(associationPlan, validIdentities)
       ) {
-        errors.push('hubspot associationPlan must name every submitted typed recordId.');
+        errors.push('hubspot associationPlan must name every submitted typed recordId exactly.');
       }
     }
   }
