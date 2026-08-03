@@ -185,14 +185,17 @@ one). Supabase silently drops `emailRedirectTo` if it isn't on this allowlist.
 
 Production does not deploy on a push or merge. The manual
 `.github/workflows/deploy.yml` workflow requires both the exact current `main`
-SHA and an auditable `deployment_approval_id`. Its authority job validates the
-Supabase, Cloudflare, Worker-binding, and smoke-test configuration before any
-migration can run. Only then may it preview and push migrations, install the
+SHA and an auditable `deployment_approval_id`. Its authority job checks that required Supabase, Cloudflare, Worker, and
+smoke-test configuration values are present before any migration can run.
+Later migration, Worker, and smoke-test stages perform the actual provider and
+runtime validation before release evidence is complete. Only then may it preview
+and push migrations, install the
 required encrypted Worker secrets, deploy the exact approved SHA, and run the
 health, version, guardrail, and reconciliation checks.
 
 The production workflow writes Founder Signal auto-distribution as disabled by
-default and requires `/version` to read back
+default and requires `/version` to read back a nested
+`founderSignalAutomationGrant` object with
 `{"configured": true, "enabled": false}`. Repository configuration is not live
 runtime proof; the retained deployment and smoke evidence remains authoritative.
 
@@ -204,8 +207,10 @@ curl -X POST http://localhost:8787/auth/magic-link \
   -H 'content-type: application/json' \
   -d '{"email":"mcgill.raylene@gmail.com"}'
 
-# 2. Click the link in the email. The callback verifies the founder, writes the
-#    HttpOnly session cookie, and redirects the browser into /control-room/.
+# 2. Click the link in the email. The fragment callback bridge posts the
+#    credentials to /auth/session, writes the HttpOnly session cookie, and
+#    returns to /. A token_hash callback instead verifies the token and
+#    redirects to /control-room/.
 
 # 3. API clients may exchange verified access and refresh tokens through
 #    POST /auth/session, then use the resulting session or a Bearer token on
@@ -223,9 +228,11 @@ curl http://localhost:8787/projects/sekret-bip \
 `public/control-room/` is the static, mobile-first founder UI. In production,
 Cloudflare's Worker assets binding serves it at `/control-room/`; local Node runs
 may serve the same directory when static mode is enabled. `/auth/callback` serves
-the same-origin implicit-flow bridge when credentials arrive in the URL fragment,
-or verifies a `token_hash`, writes the HttpOnly founder cookie, and redirects the
-browser into the Control Room SPA. The guarded terminal remains an authenticated
+the same-origin implicit-flow bridge when credentials arrive in the URL fragment.
+That bridge posts them to `/auth/session`, writes the HttpOnly founder cookie,
+and returns to /. With a `token_hash`, the server verifies the token, writes the
+cookie, and redirects to `/control-room/` with a fragment for the SPA. The
+guarded terminal remains an authenticated
 API surface, not an interactive browser shell.
 
 ## Guarded founder terminal
