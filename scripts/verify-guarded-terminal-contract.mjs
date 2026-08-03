@@ -114,9 +114,9 @@ requireText('Local workspace preflight', files.localWorkspace, 'CONTROL_ROOM_WOR
 requireText('Local workspace preflight', files.localWorkspace, 'jbh-private');
 requireText('Local workspace preflight', files.localWorkspace, 'jussbeautifulhair-site');
 requireText('Local workspace preflight', files.localWorkspace, 'untold-stories-storefront');
-requireText('Local workspace preflight', files.localWorkspace, 'a77bdcd4314eb9753da6354ffd35d17df5ba6927');
-requireText('Local workspace preflight', files.localWorkspace, '9444483d63d1d10823b80323f3b4c796b444be0c');
-requireText('Local workspace preflight', files.localWorkspace, 'eb23d6e364a483b28e0ea8d6577d050b293b9930');
+requireText('Local workspace preflight', files.localWorkspace, 'a8a4c4fd892f78ba8d6f239598fbe93cef80b7ca');
+requireText('Local workspace preflight', files.localWorkspace, '3a9f67c810fab470f4158b5f847b19a25a5b021f');
+requireText('Local workspace preflight', files.localWorkspace, 'ce86a74d7d6e3bc8238d1131d79d5b57c3911518');
 requireText('Local workspace preflight', files.localWorkspace, 'private checkout');
 requireText('Local workspace preflight', files.localWorkspace, 'must not be nested inside the public Control Room repository');
 requireText('Local workspace preflight', files.localWorkspace, "spawn('git'");

@@ -1,6 +1,6 @@
 # Guarded Local Workspace Runbook
 
-Version: `1.0.0`
+Version: `1.1.0`
 
 Founder Control Room can continue storefront verification without private GitHub-hosted runners only when a reviewed local workspace exists. This workspace is not stored in the public Control Room repository. It is a local sibling directory tree containing exact private checkouts.
 
@@ -23,17 +23,21 @@ Set `CONTROL_ROOM_WORKSPACE_ROOT` to an absolute path containing these sibling c
 
 Private repositories must never be copied or nested into `<workspace-root>/founder-control-room`. The public Control Room repository may reference private checkout paths through `CONTROL_ROOM_WORKSPACE_ROOT`, but it must not contain private source, credentials, customer data, vendor records, Shopify data, or unpublished story material.
 
-## Exact mission heads
+## Exact mission targets
 
-The current storefront missions require these immutable heads:
+The current storefront missions are bound to these immutable targets:
 
-| Project | Mission | Directory | Expected SHA |
-|---|---|---|---|
-| `juss-beautiful-hair-private` | `ae933e98-ec1d-4a94-b9de-804c4fa78ab8` | `jbh-private` | `a77bdcd4314eb9753da6354ffd35d17df5ba6927` |
-| `juss-beautiful-hair` | `887083a2-e347-4b5f-9f11-758117752c46` | `jussbeautifulhair-site` | `9444483d63d1d10823b80323f3b4c796b444be0c` |
-| `untold-stories` | `07e07483-cb88-4ac5-9952-32fbb051f8d5` | `untold-stories-storefront` | `eb23d6e364a483b28e0ea8d6577d050b293b9930` |
+| Project | Mission | PR | Branch | Expected SHA | Evidence state |
+|---|---|---:|---|---|---|
+| `juss-beautiful-hair-private` | `ae933e98-ec1d-4a94-b9de-804c4fa78ab8` | `38` | `fix/private-security-exact-head` | `a8a4c4fd892f78ba8d6f239598fbe93cef80b7ca` | `runner_startup_failure`; no mission evidence imported |
+| `juss-beautiful-hair` | `887083a2-e347-4b5f-9f11-758117752c46` | `32` | `fix/paid-order-reconciliation` | `3a9f67c810fab470f4158b5f847b19a25a5b021f` | exact-head required checks passed and evidence imported |
+| `untold-stories` | `07e07483-cb88-4ac5-9952-32fbb051f8d5` | `29` | `fix/hydrogen-build-baseline-current-main` | `ce86a74d7d6e3bc8238d1131d79d5b57c3911518` | exact-head required checks passed and evidence imported |
 
-If a PR head moves, do not reuse this workspace as proof. Update the Control Room mission through a reviewed exact-head change first.
+Private PR #38 remains draft and must stay `sandboxed` until a genuine exact-head job executes with real steps and logs. The current failed run created no jobs and is infrastructure evidence, not a code regression.
+
+Public PR #32 and Untold PR #29 are the reviewed successor proof carriers. Untold PR #17 is retired and must not be reopened, targeted, or used as evidence.
+
+If a target head moves, do not reuse this workspace as proof. Update the Control Room mission through a reviewed exact-head reconciliation first. Never copy evidence from a previous head.
 
 ## Preflight
 
@@ -99,3 +103,5 @@ Let `MissionController` advance the mission to `in_review`. Do not update status
 ## Rollback
 
 If the local workspace is wrong, dirty, stale, nested, or contains unexpected private material, stop before terminal execution. Fix the workspace outside the repository, rerun preflight, and preserve the failed preflight output as non-proof diagnostic context. Do not delete Control Room evidence rows.
+
+To reverse this target reconciliation, restore the previous mission target fields through a guarded transaction, preserve all evidence and reconciliation history, and revert the repository contract commit. Do not delete evidence rows as rollback.
