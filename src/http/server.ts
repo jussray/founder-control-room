@@ -21,6 +21,7 @@ import { mcpRouter } from './routes/mcp.js';
 import { externalUseRouter } from './routes/externalUse.js';
 import { futureYouRouter } from './routes/futureYou.js';
 import { goalfixRouter } from './routes/goalfix.js';
+import { founderOsSkillsRouter } from './routes/founderOsSkills.js';
 import { mirrorRouter } from './routes/mirror.js';
 import { handleFounderSignalEngineMcp } from './routes/founderSignalEngineMcp.js';
 import { handleFounderSignalReviewEmailIngest } from './routes/founderSignalReviewEmailIngress.js';
@@ -190,6 +191,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/dashboard', dashboardRouter);
   app.use('/futureyou', futureYouRouter);
   app.use('/goalfix', goalfixRouter);
+  app.use('/founder-os', founderOsSkillsRouter);
   app.use('/mirror', mirrorRouter);
   app.use('/missions', missionsRouter);
   app.use('/promptos', promptosRouter);
