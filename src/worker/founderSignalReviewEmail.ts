@@ -44,9 +44,35 @@ async function readBoundedRaw(
   if (!Number.isInteger(declaredSize) || declaredSize <= 0 || declaredSize > MAX_RAW_BYTES) {
     throw new Error('raw_email_size_rejected');
   }
-  const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
-  if (bytes.byteLength !== declaredSize || bytes.byteLength > MAX_RAW_BYTES) {
+
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > declaredSize || total > MAX_RAW_BYTES) {
+        throw new Error('raw_email_size_mismatch');
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (total !== declaredSize) {
     throw new Error('raw_email_size_mismatch');
+  }
+
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
   }
   return bytes;
 }
