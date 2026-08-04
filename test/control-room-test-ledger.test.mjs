@@ -65,6 +65,7 @@ test('builds a sanitized exact-SHA control-room ledger', () => {
     branch: 'main',
     runId: '30950000000',
     checks,
+    observerState: 'stable',
     observedAt: new Date('2026-08-04T20:05:00Z'),
   });
 
@@ -72,6 +73,27 @@ test('builds a sanitized exact-SHA control-room ledger', () => {
   assert.equal(ledger.aggregate.state, 'passed');
   assert.equal(ledger.source.includesAllDiscoveredChecks, true);
   assert.equal(ledger.source.excludesObserverCheck, true);
+  assert.equal(ledger.runner.observerState, 'stable');
+  assert.equal(ledger.runner.authoritativeForMerge, false);
   assert.equal(ledger.checks[0].detailsUrl.includes('github.com'), true);
   assert.equal(JSON.stringify(ledger).includes('token'), false);
+});
+
+test('reports failed native checks without becoming a duplicate merge authority', () => {
+  const checks = selectLatestChecks([
+    check({name: 'Cloudflare Pages', conclusion: 'failure', app: {slug: 'cloudflare-pages'}}),
+    check({name: 'Unit Tests'}),
+  ], SHA);
+  const ledger = buildTestLedger({
+    repository: 'jussray/founder-control-room',
+    sha: SHA,
+    branch: 'feature/test-ledger',
+    runId: '30950000001',
+    checks,
+    observerState: 'stable',
+  });
+
+  assert.equal(ledger.aggregate.state, 'failed');
+  assert.equal(ledger.aggregate.counts.failed, 1);
+  assert.equal(ledger.runner.authoritativeForMerge, false);
 });
