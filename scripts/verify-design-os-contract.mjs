@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 
 const files = {
   registry: await readFile(new URL("../src/design-os/registry.ts", import.meta.url), "utf8"),
+  l99Repository: await readFile(new URL("../src/config/l99Repository.ts", import.meta.url), "utf8"),
   types: await readFile(new URL("../src/design-os/types.ts", import.meta.url), "utf8"),
   route: await readFile(new URL("../src/http/routes/designOs.ts", import.meta.url), "utf8"),
   server: await readFile(new URL("../src/http/server.ts", import.meta.url), "utf8"),
@@ -16,19 +17,33 @@ function requireFragment(file, label, fragment) {
   }
 }
 
-const repositories = [
+const registryRepositories = [
   "jussray/founder-control-room",
   "jussray/Sekret-Bip",
-  "jussray/l99-StoryEngine",
   "jussray/chief-ai-machine",
   "jussray/jussbeautifulhair-site",
   "jussray/untold-stories-storefront",
   "jussray/jbh-private",
 ];
 
-for (const repository of repositories) {
+for (const repository of registryRepositories) {
   requireFragment("registry", "portfolio coverage", repository);
 }
+requireFragment(
+  "l99Repository",
+  "StoryEngine canonical repository",
+  'L99_REPOSITORY_IDENTIFIER = "jussray/StoryEngine"',
+);
+requireFragment(
+  "registry",
+  "StoryEngine canonical repository usage",
+  "repoIdentifier: L99_REPOSITORY_IDENTIFIER",
+);
+requireFragment(
+  "registry",
+  "StoryEngine canonical PR URL",
+  "`https://github.com/${L99_REPOSITORY_IDENTIFIER}/pull/28`",
+);
 
 requireFragment("registry", "Command Center registration", "QevLkXHXSzXfEsqsZltGRJ");
 requireFragment("registry", "design/runtime separation", "designIsNotRuntimeProof: true");
@@ -75,6 +90,6 @@ if (errors.length > 0) {
 }
 
 console.log("Portfolio Design OS contract verified.");
-console.log(`Repositories covered: ${repositories.length}`);
+console.log(`Repositories covered: ${registryRepositories.length + 1}`);
 console.log("Write routes: 0");
 console.log("Embedded credential patterns: 0");
