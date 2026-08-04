@@ -1,0 +1,73 @@
+name: Founder Control Room Test Catalog
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "control-room.manifest.json"
+      - ".control-room/repository.manifest.json"
+      - "scripts/verify-control-room-tests.mjs"
+      - "src/types/repositoryVerification.ts"
+      - "src/services/repositoryVerification.ts"
+      - "src/services/__tests__/repositoryVerification.test.ts"
+      - "package.json"
+      - ".github/workflows/**"
+  push:
+    branches: [main]
+    paths:
+      - "control-room.manifest.json"
+      - ".control-room/repository.manifest.json"
+      - "scripts/verify-control-room-tests.mjs"
+      - "src/types/repositoryVerification.ts"
+      - "src/services/repositoryVerification.ts"
+      - "src/services/__tests__/repositoryVerification.test.ts"
+      - "package.json"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  CONTROL_ROOM_TEST_REPORT_PATH: artifacts/control-room-tests.json
+
+concurrency:
+  group: fcr-control-room-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Discover and verify Founder Control Room test authority
+    runs-on: ubuntu-22.04
+    timeout-minutes: 8
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Verify dynamic package-script and workflow catalog
+        run: node scripts/verify-control-room-tests.mjs
+
+      - name: Retain sanitized self-test receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: founder-control-room-tests-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/control-room-tests.json
+          if-no-files-found: error
+          retention-days: 14
