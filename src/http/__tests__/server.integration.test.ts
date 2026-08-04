@@ -17,10 +17,11 @@ beforeEach(() => {
 });
 
 describe('createServer', () => {
-  it('responds to /health without auth', async () => {
+  it('responds to /health without auth and identifies the deployed service', async () => {
     const res = await request(createServer()).get('/health');
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ ok: true });
+    expect(res.headers['x-founder-control-room-service']).toBe('founder-control-room');
   });
 
   it('applies security headers to every response', async () => {
