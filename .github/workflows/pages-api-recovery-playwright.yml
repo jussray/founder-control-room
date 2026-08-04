@@ -1,0 +1,84 @@
+name: Pages API Recovery Playwright
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'public/_worker.js'
+      - 'src/http/server.ts'
+      - 'src/http/__tests__/pagesEdgeProxy.test.ts'
+      - 'src/http/__tests__/server.integration.test.ts'
+      - 'e2e/pages-api-recovery.spec.ts'
+      - '.github/workflows/pages-api-recovery-playwright.yml'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-api-recovery-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  verify-pages-api-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          printf 'Verified exact Pages recovery head: %s\n' "$actual"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run focused behavior tests
+        run: >-
+          npx vitest run
+          src/http/__tests__/pagesEdgeProxy.test.ts
+          src/http/__tests__/server.integration.test.ts
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run rendered desktop and mobile recovery proof
+        run: npx playwright test -c playwright.config.ts e2e/pages-api-recovery.spec.ts
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-api-recovery-playwright-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
