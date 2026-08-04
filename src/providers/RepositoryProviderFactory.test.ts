@@ -3,6 +3,7 @@ import {
   createRepositoryProvider,
   normalizeRepositoryConnection,
 } from "./RepositoryProviderFactory.js";
+import { L99_REPOSITORY_IDENTIFIER } from "../config/l99Repository.js";
 
 
 describe("RepositoryProviderFactory", () => {
@@ -23,11 +24,11 @@ describe("RepositoryProviderFactory", () => {
   it("normalizes the project_connections shape", () => {
     expect(
       normalizeRepositoryConnection({
-        slug: "l99-story-engine",
+        slug: "l99",
         provider: "github",
-        connectionConfig: { repository: "jussray/l99-StoryEngine" },
+        connectionConfig: { repository: L99_REPOSITORY_IDENTIFIER },
       }),
-    ).toMatchObject({ repository: "jussray/l99-StoryEngine" });
+    ).toMatchObject({ repository: L99_REPOSITORY_IDENTIFIER });
   });
 
   it("rejects malformed repository locators", () => {
