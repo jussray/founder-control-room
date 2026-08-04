@@ -22,7 +22,7 @@ async function loadHandler(): Promise<PagesHandler> {
   return module.default as PagesHandler;
 }
 
-function identifiedResponse(body: BodyInit | null, init: ResponseInit = {}): Response {
+function identifiedResponse(body: string | null, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
   headers.set(SERVICE_HEADER, SERVICE_IDENTITY);
   return new Response(body, { ...init, headers });
