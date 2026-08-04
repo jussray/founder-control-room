@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { L99_REPOSITORY_IDENTIFIER } from "../config/l99Repository.js";
 import {
   buildDesignOsSummary,
   getDesignOsProject,
@@ -19,6 +20,18 @@ describe("Portfolio Design OS registry", () => {
     expect(PORTFOLIO_DESIGN_REGISTRY).toHaveLength(7);
     expect(new Set(PORTFOLIO_DESIGN_REGISTRY.map((project) => project.slug)).size).toBe(7);
     expect(new Set(PORTFOLIO_DESIGN_REGISTRY.map((project) => project.repoIdentifier)).size).toBe(7);
+  });
+
+  it("tracks the renamed StoryEngine repository without changing the stable design slug", () => {
+    const project = getDesignOsProject("l99-story-engine");
+
+    expect(project?.repoIdentifier).toBe(L99_REPOSITORY_IDENTIFIER);
+    expect(project?.capabilityPrUrl).toBe(
+      `https://github.com/${L99_REPOSITORY_IDENTIFIER}/pull/28`,
+    );
+    expect(project?.verification[0]?.url).toBe(
+      `https://github.com/${L99_REPOSITORY_IDENTIFIER}/pull/28`,
+    );
   });
 
   it("registers the Command Center Figma file without claiming implementation proof", () => {
