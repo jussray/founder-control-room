@@ -11,6 +11,34 @@ export interface RequiredSignalDeclaration {
   required?: boolean;
 }
 
+export type RepositoryTestKind =
+  | "typecheck"
+  | "lint"
+  | "unit"
+  | "integration"
+  | "e2e"
+  | "contract"
+  | "security"
+  | "build"
+  | "deployment"
+  | "other";
+
+/**
+ * Repo-owned test declaration displayed by the local control room. Every test
+ * maps to one provider signal so the portfolio control room can summarize it
+ * without replacing the repository's native runner or retaining raw logs.
+ */
+export interface RepositoryTestDeclaration {
+  id: string;
+  name: string;
+  kind: RepositoryTestKind;
+  signalId: string;
+  required?: boolean;
+  command?: string;
+  workflow?: string;
+  artifactPaths?: string[];
+}
+
 /**
  * Proves that declared code is wired into another repository file. `marker`
  * must be a short symbol/import/route identifier, never source contents.
@@ -44,6 +72,7 @@ export interface RepositoryManifest {
   };
   verification: {
     requiredSignals: RequiredSignalDeclaration[];
+    testCatalog?: RepositoryTestDeclaration[];
   };
   capabilities: CapabilityDeclaration[];
   buildAssist?: {

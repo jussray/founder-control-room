@@ -12,6 +12,8 @@ import {
   type ManifestValidationResult,
   type RepositoryManifest,
   type RepositoryManifestInspection,
+  type RepositoryTestDeclaration,
+  type RepositoryTestKind,
   type RequiredSignalDeclaration,
   type UsageAssertionDeclaration,
   type UsageAssertionObservation,
@@ -22,6 +24,19 @@ export interface RegistryProjectIdentity {
   repo_provider: string;
   repo_identifier: string;
 }
+
+const TEST_KINDS = new Set<RepositoryTestKind>([
+  "typecheck",
+  "lint",
+  "unit",
+  "integration",
+  "e2e",
+  "contract",
+  "security",
+  "build",
+  "deployment",
+  "other",
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -45,11 +60,15 @@ function safeRepositoryPath(value: string): boolean {
     && !value.split("/").includes("..");
 }
 
-function validMarker(value: string): boolean {
-  return value.length <= 160
+function validSingleLine(value: string, maxLength: number): boolean {
+  return value.length <= maxLength
     && !value.includes("\n")
     && !value.includes("\r")
     && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value);
+}
+
+function validMarker(value: string): boolean {
+  return validSingleLine(value, 160);
 }
 
 function parseRequiredSignals(
@@ -90,6 +109,98 @@ function parseRequiredSignals(
     errors.push("verification.requiredSignals ids must be unique");
   }
   return signals;
+}
+
+function parseTestCatalog(
+  value: unknown,
+  signalIds: Set<string>,
+  errors: string[],
+): RepositoryTestDeclaration[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) {
+    errors.push("verification.testCatalog must be an array");
+    return [];
+  }
+
+  const tests: RepositoryTestDeclaration[] = [];
+  value.forEach((candidate, index) => {
+    const prefix = `verification.testCatalog[${index}]`;
+    if (!isRecord(candidate)) {
+      errors.push(`${prefix} must be an object`);
+      return;
+    }
+    if (!nonEmptyString(candidate.id)) {
+      errors.push(`${prefix}.id is required`);
+      return;
+    }
+    if (!nonEmptyString(candidate.name)) {
+      errors.push(`${prefix}.name is required`);
+      return;
+    }
+    if (!TEST_KINDS.has(candidate.kind as RepositoryTestKind)) {
+      errors.push(`${prefix}.kind is unsupported`);
+      return;
+    }
+    if (!nonEmptyString(candidate.signalId) || !signalIds.has(candidate.signalId)) {
+      errors.push(`${prefix}.signalId must reference a declared signal`);
+      return;
+    }
+    if (candidate.required !== undefined && typeof candidate.required !== "boolean") {
+      errors.push(`${prefix}.required must be boolean`);
+      return;
+    }
+
+    const command = candidate.command;
+    const workflow = candidate.workflow;
+    if (command === undefined && workflow === undefined) {
+      errors.push(`${prefix} must declare command or workflow`);
+      return;
+    }
+    if (
+      command !== undefined
+      && (!nonEmptyString(command) || !validSingleLine(command, 500))
+    ) {
+      errors.push(`${prefix}.command must be a single-line value of at most 500 characters`);
+      return;
+    }
+    if (
+      workflow !== undefined
+      && (!nonEmptyString(workflow) || !safeRepositoryPath(workflow))
+    ) {
+      errors.push(`${prefix}.workflow must be a safe repository-relative path`);
+      return;
+    }
+
+    const artifactPaths = candidate.artifactPaths ?? [];
+    if (!stringArray(artifactPaths)) {
+      errors.push(`${prefix}.artifactPaths must be a string array`);
+      return;
+    }
+    if (!artifactPaths.every(safeRepositoryPath)) {
+      errors.push(`${prefix}.artifactPaths must be repository-relative and traversal-free`);
+      return;
+    }
+    if (!unique(artifactPaths)) {
+      errors.push(`${prefix}.artifactPaths must be unique`);
+      return;
+    }
+
+    tests.push({
+      id: candidate.id,
+      name: candidate.name,
+      kind: candidate.kind as RepositoryTestKind,
+      signalId: candidate.signalId,
+      required: candidate.required ?? true,
+      command: command as string | undefined,
+      workflow: workflow as string | undefined,
+      artifactPaths,
+    });
+  });
+
+  if (!unique(tests.map((test) => test.id))) {
+    errors.push("verification.testCatalog ids must be unique");
+  }
+  return tests;
 }
 
 function parseUsageAssertions(
@@ -252,10 +363,14 @@ export function parseRepositoryManifest(
   const requiredSignals = isRecord(verification)
     ? parseRequiredSignals(verification.requiredSignals, errors)
     : (errors.push("verification must be an object"), []);
+  const signalIds = new Set(requiredSignals.map((signal) => signal.id));
+  const testCatalog = isRecord(verification)
+    ? parseTestCatalog(verification.testCatalog, signalIds, errors)
+    : [];
 
   const capabilities = parseCapabilities(
     decoded.capabilities,
-    new Set(requiredSignals.map((signal) => signal.id)),
+    signalIds,
     errors,
   );
 
@@ -304,7 +419,10 @@ export function parseRepositoryManifest(
       identifier: repository.identifier as string,
       defaultBranch: repository.defaultBranch as string,
     },
-    verification: { requiredSignals },
+    verification: {
+      requiredSignals,
+      testCatalog,
+    },
     capabilities,
     buildAssist: isRecord(buildAssist)
       ? {
