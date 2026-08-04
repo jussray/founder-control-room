@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 
 const files = {
+  workflow: await readFile(new URL("../.github/workflows/design-os-contract.yml", import.meta.url), "utf8"),
   registry: await readFile(new URL("../src/design-os/registry.ts", import.meta.url), "utf8"),
   l99Repository: await readFile(new URL("../src/config/l99Repository.ts", import.meta.url), "utf8"),
   types: await readFile(new URL("../src/design-os/types.ts", import.meta.url), "utf8"),
@@ -45,6 +46,7 @@ requireFragment(
   "`https://github.com/${L99_REPOSITORY_IDENTIFIER}/pull/28`",
 );
 
+requireFragment("workflow", "supported Node runtime", "node-version: 24");
 requireFragment("registry", "Command Center registration", "QevLkXHXSzXfEsqsZltGRJ");
 requireFragment("registry", "design/runtime separation", "designIsNotRuntimeProof: true");
 requireFragment(
@@ -91,5 +93,6 @@ if (errors.length > 0) {
 
 console.log("Portfolio Design OS contract verified.");
 console.log(`Repositories covered: ${registryRepositories.length + 1}`);
+console.log("Node runtime: 24");
 console.log("Write routes: 0");
 console.log("Embedded credential patterns: 0");
