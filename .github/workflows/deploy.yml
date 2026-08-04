@@ -283,11 +283,14 @@ jobs:
           ref: ${{ inputs.expected_head_sha }}
           persist-credentials: false
 
-      - name: Verify Worker health
+      - name: Verify Worker health and identity
         run: |
           set -euo pipefail
           DEPLOY_URL="${DEPLOY_URL%/}"
-          BODY=$(curl --fail --silent --show-error "$DEPLOY_URL/health")
+          HEADERS="$(mktemp)"
+          trap 'rm -f "$HEADERS"' EXIT
+          BODY=$(curl --fail --silent --show-error --dump-header "$HEADERS" "$DEPLOY_URL/health")
+          grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room\r?$' "$HEADERS"
           BODY="$BODY" python3 - <<'PY'
           import json
           import os
@@ -318,6 +321,8 @@ jobs:
           print(f'Grant configured: {grant.get("configured")}')
           print(f'Grant enabled: {grant.get("enabled")}')
 
+          if body.get('service') != 'founder-control-room':
+              raise SystemExit('service identity payload is missing or incorrect')
           if deployed_sha != expected_sha:
               raise SystemExit('exact deployment proof failed')
           if grant != {'configured': True, 'enabled': False}:
@@ -343,6 +348,41 @@ jobs:
           PY
         env:
           DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+
+      - name: Verify public Pages shell and exact API proxy
+        run: |
+          set -euo pipefail
+          PUBLIC_URL="${PUBLIC_URL%/}"
+
+          PAGE=$(curl --fail --silent --show-error "$PUBLIC_URL/")
+          grep -qi 'Founder Control Room' <<<"$PAGE"
+
+          HEADERS="$(mktemp)"
+          trap 'rm -f "$HEADERS"' EXIT
+          HEALTH_BODY=$(curl --fail --silent --show-error --dump-header "$HEADERS" "$PUBLIC_URL/health")
+          grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room\r?$' "$HEADERS"
+          HEALTH_BODY="$HEALTH_BODY" python3 - <<'PY'
+          import json
+          import os
+
+          body = json.loads(os.environ['HEALTH_BODY'])
+          if body != {'ok': True}:
+              raise SystemExit(f'unexpected public health payload: {body!r}')
+          PY
+
+          VERSION_BODY=$(curl --fail --silent --show-error "$PUBLIC_URL/version")
+          VERSION_BODY="$VERSION_BODY" EXPECTED_SHA="${{ inputs.expected_head_sha }}" python3 - <<'PY'
+          import json
+          import os
+
+          body = json.loads(os.environ['VERSION_BODY'])
+          if body.get('service') != 'founder-control-room':
+              raise SystemExit('public proxy reached the wrong service')
+          if body.get('gitSha') != os.environ['EXPECTED_SHA']:
+              raise SystemExit('public proxy exact deployment proof failed')
+          PY
+        env:
+          PUBLIC_URL: https://foundercontrolroom.org
 
   # ── 4. Post-deploy database reconciliation inspection ───────────────────────
   reconcile:
