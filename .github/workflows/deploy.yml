@@ -290,7 +290,7 @@ jobs:
           HEADERS="$(mktemp)"
           trap 'rm -f "$HEADERS"' EXIT
           BODY=$(curl --fail --silent --show-error --dump-header "$HEADERS" "$DEPLOY_URL/health")
-          grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room\r?$' "$HEADERS"
+          tr -d '\r' < "$HEADERS" | grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room$'
           BODY="$BODY" python3 - <<'PY'
           import json
           import os
@@ -360,7 +360,7 @@ jobs:
           HEADERS="$(mktemp)"
           trap 'rm -f "$HEADERS"' EXIT
           HEALTH_BODY=$(curl --fail --silent --show-error --dump-header "$HEADERS" "$PUBLIC_URL/health")
-          grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room\r?$' "$HEADERS"
+          tr -d '\r' < "$HEADERS" | grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room$'
           HEALTH_BODY="$HEALTH_BODY" python3 - <<'PY'
           import json
           import os
