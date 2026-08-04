@@ -20,10 +20,12 @@
     "retentionDays": 14
   },
   "policy": {
-    "failed": "block",
-    "pending": "block",
-    "unknown": "block",
-    "skippedOrNeutral": "warning",
+    "failed": "surface-failed",
+    "pending": "surface-pending",
+    "unknown": "surface-unknown",
+    "skippedOrNeutral": "surface-warning",
+    "observerConclusion": "collection-and-schema-only",
+    "aggregateDoesNotDuplicateNativeCheckConclusion": true,
     "requiredCheckAuthority": "repository-native-ruleset",
     "productionMutation": false,
     "secretMaterialAllowed": false
