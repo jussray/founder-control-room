@@ -50,6 +50,7 @@ import { requireFounderSignalEngineMcpToken } from './middleware/founderSignalEn
 import { requireFounderSignalEngineReviewOnly } from './middleware/founderSignalEngineWriteGate.js';
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
+const SERVICE_IDENTITY = 'founder-control-room';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -75,7 +76,7 @@ function founderSignalAutomationGrantStatus() {
 function deploymentVersion() {
   const configuredSha = process.env.GIT_SHA?.trim() ?? '';
   return {
-    service: 'founder-control-room',
+    service: SERVICE_IDENTITY,
     gitSha: EXACT_COMMIT_SHA.test(configuredSha) ? configuredSha.toLowerCase() : null,
     founderSignalAutomationGrant: founderSignalAutomationGrantStatus(),
   };
@@ -97,6 +98,10 @@ export function createServer(options: CreateServerOptions = {}) {
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
 
+  app.use((_req, res, next) => {
+    res.setHeader('X-Founder-Control-Room-Service', SERVICE_IDENTITY);
+    next();
+  });
   app.use(helmetMiddleware);
   app.use(corsMiddleware);
   app.use(requestAudit);
