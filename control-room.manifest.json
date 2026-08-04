@@ -1,0 +1,111 @@
+{
+  "schemaVersion": "1.0",
+  "repository": "jussray/founder-control-room",
+  "portfolioHub": "jussray/founder-control-room",
+  "role": "portfolio-control-room",
+  "authority": {
+    "sourceOfTruth": "Current main, repository-native verification scripts, exact-head GitHub workflows, deployment version receipts, and signed repository packets",
+    "portfolioMode": "self-owned-plus-sanitized-portfolio-rollup",
+    "productionMutation": "separate-founder-gate"
+  },
+  "controlRoom": {
+    "localSurface": true,
+    "surfaces": [
+      "public/control-room",
+      "src/http/routes/dashboard.ts",
+      "src/http/routes/repositoryVerification.ts",
+      "control-room.manifest.json",
+      ".control-room/repository.manifest.json",
+      "scripts/verify-control-room-tests.mjs",
+      ".github/workflows/control-room-tests.yml"
+    ],
+    "privateContentAllowed": false
+  },
+  "tests": {
+    "authority": "repo-native-dynamic-discovery",
+    "aggregation": "self-owned-exact-head-plus-sanitized-repository-packets",
+    "rawLogsAllowed": false,
+    "discovery": {
+      "source": "package.json#scripts",
+      "includedPrefixes": [
+        "test",
+        "verify",
+        "proof",
+        "audit",
+        "lint",
+        "typecheck",
+        "build"
+      ],
+      "excludedPrefixes": [
+        "deploy",
+        "start",
+        "dev",
+        "pages:dev",
+        "cf:dev"
+      ],
+      "receipt": "artifacts/control-room-tests.json"
+    },
+    "criticalScripts": [
+      "build",
+      "typecheck",
+      "lint",
+      "test",
+      "test:e2e",
+      "verify:parallel",
+      "verify:capability-contract",
+      "verify:mcp",
+      "verify:terminal-contract",
+      "verify:juss-flow",
+      "verify:juss-os-registry",
+      "verify:production-authority",
+      "verify:ai-skills",
+      "verify:founder-review-email",
+      "verify:ai-company-parity",
+      "verify:ai-company-adversarial",
+      "verify:ai-company-container",
+      "verify:founder-chief-pair",
+      "verify:cookies",
+      "verify:founder-onboarding",
+      "verify:growth-inbox",
+      "verify:design-os",
+      "verify:local-workspace",
+      "verify:rls-contract",
+      "verify:futureyou-v8",
+      "verify:goalfix",
+      "verify:mirror",
+      "verify:mirror-contract",
+      "proof:goalfix"
+    ],
+    "workflowCatalog": [
+      {"id": "quality-gate", "name": "Quality Gate", "kind": "contract", "required": true, "status": "active"},
+      {"id": "ci", "name": "CI", "kind": "integration", "required": true, "status": "active"},
+      {"id": "playwright-e2e", "name": "Playwright E2E", "kind": "e2e", "required": true, "status": "active"},
+      {"id": "pr-recovery", "name": "PR Recovery Exact-Head Driver", "kind": "integration", "required": true, "status": "active"},
+      {"id": "parallel-preflight", "name": "Cloudflare + Local Parallel Preflight", "kind": "deployment", "required": true, "status": "active"},
+      {"id": "founder-repo-cycle", "name": "Founder Repo Cycle", "kind": "contract", "required": true, "status": "active"},
+      {"id": "control-room-test-catalog", "name": "Founder Control Room Test Catalog", "kind": "contract", "required": true, "status": "active"}
+    ]
+  },
+  "evidence": {
+    "status": "integrated",
+    "commit": "6693a19a14198654e3e1107b3c5614e796358bb8",
+    "observedAt": "2026-08-04",
+    "proofRefs": [
+      "package.json",
+      "src/http/routes/repositoryVerification.ts",
+      "src/services/repositoryVerification.ts",
+      ".control-room/repository.manifest.json",
+      ".github/workflows"
+    ]
+  },
+  "risk": {
+    "level": "high",
+    "blockers": [
+      "Portfolio summaries must never replace repo-local test authority",
+      "Production deployment, migration, secrets, email, commerce, and provider actions remain separate approval gates",
+      "A discovered script or named workflow is not a pass until exact-head evidence exists",
+      "Raw repository logs, source, prompts, customer data, private content, and credentials must not enter sanitized packets"
+    ]
+  },
+  "nextGate": "Pass dynamic local catalog validation, preserve all six existing exact-head authorities, then expose repo-local catalogs through the typed federation contract."
+}
