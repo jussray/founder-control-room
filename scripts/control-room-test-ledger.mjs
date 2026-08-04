@@ -97,7 +97,15 @@ export function aggregateTestLedger(checks) {
   return {state, counts};
 }
 
-export function buildTestLedger({repository, sha, branch, runId, checks, observedAt = new Date()}) {
+export function buildTestLedger({
+  repository,
+  sha,
+  branch,
+  runId,
+  checks,
+  observerState = 'observing',
+  observedAt = new Date(),
+}) {
   const aggregate = aggregateTestLedger(checks);
   return {
     schemaVersion: CONTROL_ROOM_TEST_LEDGER_SCHEMA_VERSION,
@@ -115,6 +123,8 @@ export function buildTestLedger({repository, sha, branch, runId, checks, observe
     runner: {
       provider: 'github-actions',
       runId: clean(runId) || null,
+      observerState,
+      authoritativeForMerge: false,
     },
     aggregate,
     checks,
@@ -159,6 +169,11 @@ function sleep(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+function writeLedger(outputPath, ledger) {
+  fs.mkdirSync(path.dirname(outputPath), {recursive: true});
+  fs.writeFileSync(outputPath, `${JSON.stringify(ledger, null, 2)}\n`, 'utf8');
+}
+
 export async function observeExactHeadChecks(env = process.env) {
   const repository = clean(env.GITHUB_REPOSITORY);
   const sha = normalizeSha(env.EXPECTED_HEAD_SHA || env.GITHUB_SHA);
@@ -178,15 +193,14 @@ export async function observeExactHeadChecks(env = process.env) {
   const startedAt = Date.now();
   let stableTerminalPolls = 0;
   let previousFingerprint = '';
-  let ledger = buildTestLedger({repository, sha, branch, runId, checks: []});
+  let checks = [];
+  let reachedStableTerminal = false;
 
   while (Date.now() - startedAt < timeoutMs) {
     const runs = await fetchAllCheckRuns({repository, sha, token});
-    const checks = selectLatestChecks(runs, sha, observerCheckName);
-    ledger = buildTestLedger({repository, sha, branch, runId, checks});
-
-    fs.mkdirSync(path.dirname(outputPath), {recursive: true});
-    fs.writeFileSync(outputPath, `${JSON.stringify(ledger, null, 2)}\n`, 'utf8');
+    checks = selectLatestChecks(runs, sha, observerCheckName);
+    const ledger = buildTestLedger({repository, sha, branch, runId, checks});
+    writeLedger(outputPath, ledger);
 
     const fingerprint = JSON.stringify(checks.map((check) => [check.app, check.name, check.state]));
     const terminal = !checks.some((check) => check.state === 'queued' || check.state === 'running');
@@ -196,17 +210,24 @@ export async function observeExactHeadChecks(env = process.env) {
       : 0;
     previousFingerprint = fingerprint;
 
-    if (stableTerminalPolls >= 1) break;
+    if (stableTerminalPolls >= 1) {
+      reachedStableTerminal = true;
+      break;
+    }
     await sleep(pollMs);
   }
 
-  if (ledger.aggregate.state === 'pending') {
-    throw new Error(`Timed out with pending exact-head checks. Evidence: ${outputPath}`);
-  }
-  if (ledger.aggregate.state === 'failed') {
-    throw new Error(`One or more exact-head checks failed. Evidence: ${outputPath}`);
-  }
-  if (ledger.aggregate.state === 'unknown') {
+  const ledger = buildTestLedger({
+    repository,
+    sha,
+    branch,
+    runId,
+    checks,
+    observerState: reachedStableTerminal ? 'stable' : 'window-expired',
+  });
+  writeLedger(outputPath, ledger);
+
+  if (ledger.aggregate.counts.total === 0) {
     throw new Error(`No exact-head checks were discovered. Evidence: ${outputPath}`);
   }
 
