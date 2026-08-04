@@ -35,10 +35,11 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(existsSync(resolve(repoRoot, 'public/portable-founder-console/index.html'))).toBe(true);
   });
 
-  it('keeps browser API calls same-origin through the Pages edge proxy', () => {
+  it('keeps browser API calls same-origin and rejects an unverified upstream', () => {
     const proxy = read('public/_worker.js');
 
     expect(proxy).toContain("const API_ORIGIN = 'https://api.foundercontrolroom.org'");
+    expect(proxy).toContain("const EXPECTED_API_SERVICE = 'founder-control-room'");
     expect(proxy).toContain('STATIC_FILE_PATTERN');
     expect(proxy).toContain("'/control-room'");
     expect(proxy).toContain("'/portable-founder-console'");
@@ -46,7 +47,10 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(proxy).toContain('return env.ASSETS.fetch(request)');
     expect(proxy).toContain("headers.set('x-forwarded-host', sourceUrl.host)");
     expect(proxy).toContain("redirect: 'manual'");
-    expect(proxy).toContain('return fetch(createApiRequest(request))');
+    expect(proxy).toContain('const response = await fetch(createApiRequest(request))');
+    expect(proxy).toContain('const failureCode = upstreamFailureCode(response)');
+    expect(proxy).toContain('API_SERVICE_IDENTITY_MISMATCH');
+    expect(proxy).toContain('return failureCode ? degradedResponse(request, failureCode) : response');
   });
 
   it('deploys one API Worker and keeps Pages out of Worker configuration', () => {
