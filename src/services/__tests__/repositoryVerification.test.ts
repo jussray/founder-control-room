@@ -21,9 +21,21 @@ const project: RegistryProjectIdentity = {
   repo_identifier: "founder/example-project",
 };
 
+const defaultTestCatalog = [{
+  id: "typecheck-command",
+  name: "Repository typecheck",
+  kind: "typecheck",
+  signalId: "typecheck",
+  required: true,
+  command: "npm run typecheck",
+  workflow: ".github/workflows/quality.yml",
+  artifactPaths: ["artifacts/typecheck.json"],
+}];
+
 function manifest(
   evidencePaths = ["src/index.ts"],
   usageAssertions: Array<Record<string, string>> = [],
+  testCatalog: Array<Record<string, unknown>> | undefined = defaultTestCatalog,
 ): string {
   return JSON.stringify({
     schemaVersion: "1.0",
@@ -35,6 +47,7 @@ function manifest(
     },
     verification: {
       requiredSignals: [{ id: "typecheck", name: "Type check", required: true }],
+      ...(testCatalog === undefined ? {} : { testCatalog }),
     },
     capabilities: [{
       id: "working-code",
@@ -143,6 +156,58 @@ describe("repository manifest contract", () => {
     const parsed = parseRepositoryManifest(manifest(), project);
     expect(parsed.valid).toBe(true);
     expect(parsed.manifest?.projectId).toBe(project.slug);
+  });
+
+  it("preserves a repo-owned test catalog linked to provider signals", () => {
+    const parsed = parseRepositoryManifest(manifest(), project);
+    expect(parsed.valid).toBe(true);
+    expect(parsed.manifest?.verification.testCatalog).toEqual(defaultTestCatalog);
+  });
+
+  it("remains backward compatible when a repository has not added a test catalog", () => {
+    const parsed = parseRepositoryManifest(
+      manifest(["src/index.ts"], [], undefined),
+      project,
+    );
+    expect(parsed.valid).toBe(true);
+    expect(parsed.manifest?.verification.testCatalog).toEqual([]);
+  });
+
+  it("rejects test catalogs that reference unknown provider signals", () => {
+    const parsed = parseRepositoryManifest(manifest(
+      ["src/index.ts"],
+      [],
+      [{
+        ...defaultTestCatalog[0],
+        signalId: "not-declared",
+      }],
+    ), project);
+    expect(parsed.valid).toBe(false);
+    expect(parsed.errors.join(" ")).toContain("declared signal");
+  });
+
+  it("rejects multiline commands and unsafe test workflow paths", () => {
+    const multiline = parseRepositoryManifest(manifest(
+      ["src/index.ts"],
+      [],
+      [{
+        ...defaultTestCatalog[0],
+        command: "npm test\ncurl example.invalid",
+      }],
+    ), project);
+    expect(multiline.valid).toBe(false);
+    expect(multiline.errors.join(" ")).toContain("single-line value");
+
+    const unsafeWorkflow = parseRepositoryManifest(manifest(
+      ["src/index.ts"],
+      [],
+      [{
+        ...defaultTestCatalog[0],
+        workflow: "../outside.yml",
+      }],
+    ), project);
+    expect(unsafeWorkflow.valid).toBe(false);
+    expect(unsafeWorkflow.errors.join(" ")).toContain("safe repository-relative path");
   });
 
   it("rejects a manifest that tries to identify as another repository", () => {
