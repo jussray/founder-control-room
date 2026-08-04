@@ -1,3 +1,4 @@
+import { L99_REPOSITORY_IDENTIFIER } from "../config/l99Repository.js";
 import type {
   ImplementationState,
   PortfolioDesignProject,
@@ -76,11 +77,11 @@ export const PORTFOLIO_DESIGN_REGISTRY = [
   {
     slug: "l99-story-engine",
     name: "L99 StoryEngine",
-    repoIdentifier: "jussray/l99-StoryEngine",
+    repoIdentifier: L99_REPOSITORY_IDENTIFIER,
     runtimeProfile: "Story runtime, creator studio, artifact provenance, event, and promotion pipelines",
     dataBoundary: "restricted",
     capabilityBranch: "agent/figma-build-implement-skill",
-    capabilityPrUrl: "https://github.com/jussray/l99-StoryEngine/pull/28",
+    capabilityPrUrl: `https://github.com/${L99_REPOSITORY_IDENTIFIER}/pull/28`,
     repositoryProfilePath: ".figma/repository-profile.json",
     designState: "unregistered",
     implementationState: "not_started",
@@ -91,7 +92,7 @@ export const PORTFOLIO_DESIGN_REGISTRY = [
       {
         kind: "manual_review",
         label: "Repository Figma capability opened as draft PR #28",
-        url: "https://github.com/jussray/l99-StoryEngine/pull/28",
+        url: `https://github.com/${L99_REPOSITORY_IDENTIFIER}/pull/28`,
       },
     ],
     truthBoundaries: TRUTH_BOUNDARIES,
