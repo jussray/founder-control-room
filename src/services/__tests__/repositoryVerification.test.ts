@@ -35,7 +35,7 @@ const defaultTestCatalog = [{
 function manifest(
   evidencePaths = ["src/index.ts"],
   usageAssertions: Array<Record<string, string>> = [],
-  testCatalog: Array<Record<string, unknown>> | undefined = defaultTestCatalog,
+  testCatalog: Array<Record<string, unknown>> | null = defaultTestCatalog,
 ): string {
   return JSON.stringify({
     schemaVersion: "1.0",
@@ -47,7 +47,7 @@ function manifest(
     },
     verification: {
       requiredSignals: [{ id: "typecheck", name: "Type check", required: true }],
-      ...(testCatalog === undefined ? {} : { testCatalog }),
+      ...(testCatalog === null ? {} : { testCatalog }),
     },
     capabilities: [{
       id: "working-code",
@@ -166,7 +166,7 @@ describe("repository manifest contract", () => {
 
   it("remains backward compatible when a repository has not added a test catalog", () => {
     const parsed = parseRepositoryManifest(
-      manifest(["src/index.ts"], [], undefined),
+      manifest(["src/index.ts"], [], null),
       project,
     );
     expect(parsed.valid).toBe(true);
