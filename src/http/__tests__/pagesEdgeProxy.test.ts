@@ -164,11 +164,13 @@ describe('Cloudflare Pages edge proxy', () => {
       ok: false,
       error: 'Founder Control Room is temporarily unavailable.',
       code: 'API_SERVICE_IDENTITY_MISMATCH',
+      requestOutcome: 'unknown',
+      safeToRetry: true,
       retryAfterSeconds: 120,
     });
   });
 
-  it('renders an accessible recovery screen for browser navigation during a Cloudflare 52x', async () => {
+  it('renders conservative recovery guidance for a one-time auth callback during a Cloudflare 52x', async () => {
     const handler = await loadHandler();
     const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 500 }));
     const upstreamFetch = vi.fn(async (_request: Request) => new Response('Connection timed out', {
@@ -185,15 +187,49 @@ describe('Cloudflare Pages edge proxy', () => {
 
     expect(response.status).toBe(503);
     expect(response.headers.get('content-type')).toContain('text/html');
-    expect(response.headers.get('retry-after')).toBe('120');
+    expect(response.headers.get('retry-after')).toBeNull();
     expect(response.headers.get('x-founder-control-room-degraded')).toBe('API_UPSTREAM_52X');
     const html = await response.text();
     expect(html).toContain('<html lang="en">');
     expect(html).toContain('role="alert"');
     expect(html).toContain('aria-live="assertive"');
-    expect(html).toContain('href="/auth/callback?type=magiclink"');
-    expect(html).toContain('Try again');
-    expect(html).toContain('Return to control room');
+    expect(html).toContain('cannot confirm whether this request completed');
+    expect(html).toContain('Check the control room before repeating this request');
+    expect(html).not.toContain('href="/auth/callback?type=magiclink"');
+    expect(html).not.toContain('Try again');
+    expect(html).toContain('href="/">Check control room</a>');
+  });
+
+  it('marks a failed mutation outcome unknown without advertising automatic retry', async () => {
+    const handler = await loadHandler();
+    const assetFetch = vi.fn(async (_request: Request) => new Response('unexpected', { status: 500 }));
+    const upstreamFetch = vi.fn(async (_request: Request) => {
+      throw new Error('network unavailable');
+    });
+    vi.stubGlobal('fetch', upstreamFetch);
+
+    const response = await handler.fetch(
+      new Request('https://foundercontrolroom.org/auth/magic-link', {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ email: 'synthetic@example.com' }),
+      }),
+      { ASSETS: { fetch: assetFetch } },
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBeNull();
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Founder Control Room is temporarily unavailable.',
+      code: 'API_UPSTREAM_UNREACHABLE',
+      requestOutcome: 'unknown',
+      safeToRetry: false,
+      retryAfterSeconds: null,
+    });
   });
 
   it('returns a fail-closed JSON response when the API Worker cannot be reached', async () => {
@@ -212,9 +248,12 @@ describe('Cloudflare Pages edge proxy', () => {
     );
 
     expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('120');
     await expect(response.json()).resolves.toMatchObject({
       ok: false,
       code: 'API_UPSTREAM_UNREACHABLE',
+      requestOutcome: 'unknown',
+      safeToRetry: true,
     });
   });
 });
