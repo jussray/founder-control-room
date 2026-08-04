@@ -3,6 +3,8 @@ const API_SERVICE_HEADER = 'x-founder-control-room-service';
 const EXPECTED_API_SERVICE = 'founder-control-room';
 const RETRY_AFTER_SECONDS = '120';
 const STATIC_METHODS = new Set(['GET', 'HEAD']);
+const RETRYABLE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const NON_RETRYABLE_GET_PATHS = new Set(['/auth/callback']);
 const STATIC_FILE_PATTERN = /\.(?:avif|css|gif|html|ico|jpe?g|js|map|png|svg|txt|webmanifest|webp|woff2?|xml)$/i;
 const STATIC_DIRECTORY_PREFIXES = [
   '/control-room',
@@ -63,15 +65,30 @@ function wantsHtml(request) {
     && (request.headers.get('accept') ?? '').toLowerCase().includes('text/html');
 }
 
+function retryPolicy(request) {
+  const { pathname } = new URL(request.url);
+  const safeToRetry = RETRYABLE_METHODS.has(request.method)
+    && !NON_RETRYABLE_GET_PATHS.has(pathname);
+
+  return {
+    safeToRetry,
+    retryAfterSeconds: safeToRetry ? Number(RETRY_AFTER_SECONDS) : null,
+  };
+}
+
 function degradedResponse(request, code) {
+  const retry = retryPolicy(request);
   const headers = new Headers({
     'Cache-Control': 'no-store',
     'Referrer-Policy': 'no-referrer',
-    'Retry-After': RETRY_AFTER_SECONDS,
     'X-Content-Type-Options': 'nosniff',
     'X-Founder-Control-Room-Degraded': code,
     'X-Robots-Tag': 'noindex, nofollow',
   });
+
+  if (retry.safeToRetry) {
+    headers.set('Retry-After', RETRY_AFTER_SECONDS);
+  }
 
   if (!wantsHtml(request)) {
     headers.set('Content-Type', 'application/json; charset=utf-8');
@@ -81,7 +98,9 @@ function degradedResponse(request, code) {
         ok: false,
         error: 'Founder Control Room is temporarily unavailable.',
         code,
-        retryAfterSeconds: Number(RETRY_AFTER_SECONDS),
+        requestOutcome: 'unknown',
+        safeToRetry: retry.safeToRetry,
+        retryAfterSeconds: retry.retryAfterSeconds,
       });
     return new Response(body, { status: 503, headers });
   }
@@ -93,6 +112,14 @@ function degradedResponse(request, code) {
   );
 
   const retryPath = escapeHtml(requestPath(request));
+  const statusText = retry.safeToRetry
+    ? 'This read-only request can be tried again after the service reconnects.'
+    : 'Check the control room before repeating this request. Retrying could duplicate an action or reuse a one-time link.';
+  const retryAction = retry.safeToRetry
+    ? `<a class="primary" href="${retryPath}">Try again</a>`
+    : '';
+  const controlRoomClass = retry.safeToRetry ? 'secondary' : 'primary';
+  const controlRoomLabel = retry.safeToRetry ? 'Return to control room' : 'Check control room';
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -121,14 +148,14 @@ function degradedResponse(request, code) {
     <p class="eyebrow">Founder Control Room</p>
     <section role="alert" aria-live="assertive">
       <h1>Temporarily unavailable</h1>
-      <p>The control room could not verify its API service. Your request was stopped safely instead of showing stale or misleading information.</p>
-      <p class="status">No action was submitted. Try again after the service reconnects.</p>
+      <p>The control room could not verify its API service, so it cannot confirm whether this request completed.</p>
+      <p class="status">${statusText}</p>
     </section>
     <nav class="actions" aria-label="Recovery actions">
-      <a class="primary" href="${retryPath}">Try again</a>
-      <a class="secondary" href="/">Return to control room</a>
+      ${retryAction}
+      <a class="${controlRoomClass}" href="/">${controlRoomLabel}</a>
     </nav>
-    <p class="detail">Recovery code: ${escapeHtml(code)}</p>
+    <p class="detail">Request outcome: unknown · Recovery code: ${escapeHtml(code)}</p>
   </main>
 </body>
 </html>`;
