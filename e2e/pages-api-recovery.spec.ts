@@ -30,7 +30,7 @@ test.afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
-test('renders a usable degraded-service recovery screen on desktop and mobile', async ({ page }) => {
+test('renders conservative auth recovery guidance on desktop and mobile', async ({ page }) => {
   const handler = await loadHandler();
   globalThis.fetch = async () => new Response('Hello world', {
     status: 200,
@@ -45,7 +45,7 @@ test('renders a usable degraded-service recovery screen on desktop and mobile', 
   );
 
   expect(response.status).toBe(503);
-  expect(response.headers.get('retry-after')).toBe('120');
+  expect(response.headers.get('retry-after')).toBeNull();
   expect(response.headers.get('x-founder-control-room-degraded')).toBe(
     'API_SERVICE_IDENTITY_MISMATCH',
   );
@@ -55,17 +55,17 @@ test('renders a usable degraded-service recovery screen on desktop and mobile', 
   await expect(page).toHaveTitle('Founder Control Room temporarily unavailable');
   await expect(page.getByRole('main')).toBeVisible();
   await expect(page.getByRole('alert')).toContainText('Temporarily unavailable');
-  await expect(page.getByRole('link', { name: 'Try again' })).toHaveAttribute(
-    'href',
-    '/auth/callback?type=magiclink',
+  await expect(page.getByRole('alert')).toContainText(
+    'cannot confirm whether this request completed',
   );
-  await expect(page.getByRole('link', { name: 'Return to control room' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Try again' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Check control room' })).toHaveAttribute(
     'href',
     '/',
   );
 
-  await page.getByRole('link', { name: 'Try again' }).focus();
-  await expect(page.getByRole('link', { name: 'Try again' })).toBeFocused();
+  await page.getByRole('link', { name: 'Check control room' }).focus();
+  await expect(page.getByRole('link', { name: 'Check control room' })).toBeFocused();
 
   mkdirSync(outputDir, { recursive: true });
   await page.screenshot({
@@ -85,6 +85,27 @@ test('renders a usable degraded-service recovery screen on desktop and mobile', 
     path: resolve(outputDir, 'mobile-degraded-service.png'),
     fullPage: true,
   });
+});
+
+test('offers retry only for a safe read navigation', async ({ page }) => {
+  const handler = await loadHandler();
+  globalThis.fetch = async () => new Response('Connection timed out', { status: 522 });
+
+  const response = await handler.fetch(
+    new Request('https://foundercontrolroom.org/health', {
+      headers: { accept: 'text/html' },
+    }),
+    { ASSETS: assets },
+  );
+
+  expect(response.status).toBe(503);
+  expect(response.headers.get('retry-after')).toBe('120');
+  await page.setContent(await response.text());
+  await expect(page.getByRole('link', { name: 'Try again' })).toHaveAttribute('href', '/health');
+  await expect(page.getByRole('link', { name: 'Return to control room' })).toHaveAttribute(
+    'href',
+    '/',
+  );
 });
 
 test('preserves a verified Founder Control Room API response', async () => {
