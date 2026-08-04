@@ -22,12 +22,19 @@ import { supabase } from '../../lib/supabaseClient.js';
 import { runProofGate } from '../../proof-gate/gate.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import type { ProofEvidence } from '../../proof-gate/types.js';
+import {
+  L99_PROJECT_SLUG,
+  L99_REPOSITORY_IDENTIFIER,
+  L99_REPOSITORY_PROVIDER,
+  buildL99RepositoryFields,
+  needsL99RepositoryReconciliation,
+} from '../../config/l99Repository.js';
 
 export const l99Router = Router();
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-export const L99_SLUG = 'l99';
+export const L99_SLUG = L99_PROJECT_SLUG;
 
 /**
  * The five OODA gate IDs for L99 standalone release.
@@ -214,17 +221,47 @@ l99Router.post('/gate/:gateId', requireFounder, async (req: FounderRequest, res)
 // ─── POST /l99/seed ───────────────────────────────────────────────────────────
 /**
  * Idempotent. Registers L99 in the Control Room project registry if not
- * already present. Safe to call multiple times.
+ * already present, and repairs a stale repository locator without creating a
+ * second project identity.
  */
 l99Router.post('/seed', requireFounder, async (req: FounderRequest, res) => {
   const { project: existing, error: lookupError } = await getL99Project();
   if (lookupError) return res.status(500).json({ error: lookupError.message });
 
   if (existing) {
+    if (!needsL99RepositoryReconciliation(existing)) {
+      return res.json({
+        seeded: false,
+        reconciled: false,
+        message: 'L99 project already registered with the authoritative repository.',
+        project: existing,
+      });
+    }
+
+    const previousRepository = existing.repo_identifier ?? null;
+    const { data: reconciled, error: reconcileError } = await supabase
+      .from('projects')
+      .update(buildL99RepositoryFields(new Date().toISOString()))
+      .eq('id', existing.id)
+      .select()
+      .single();
+
+    if (reconcileError) {
+      return res.status(500).json({ error: reconcileError.message });
+    }
+
+    await auditEvent(reconciled.id, 'l99_project_repository_reconciled', {
+      reconciled_by: req.founder?.email,
+      previous_repository: previousRepository,
+      repository: L99_REPOSITORY_IDENTIFIER,
+      route: 'POST /l99/seed',
+    });
+
     return res.json({
       seeded: false,
-      message: 'L99 project already registered.',
-      project: existing,
+      reconciled: true,
+      message: 'L99 project repository locator reconciled.',
+      project: reconciled,
     });
   }
 
@@ -233,8 +270,8 @@ l99Router.post('/seed', requireFounder, async (req: FounderRequest, res) => {
     id: randomUUID(),
     slug: L99_SLUG,
     name: 'L99',
-    repo_provider: 'github',
-    repo_identifier: 'jussray/l99-',
+    repo_provider: L99_REPOSITORY_PROVIDER,
+    repo_identifier: L99_REPOSITORY_IDENTIFIER,
     stack: 'nextjs+supabase',
     status: 'active',
     risk_level: 'high',
@@ -257,6 +294,7 @@ l99Router.post('/seed', requireFounder, async (req: FounderRequest, res) => {
 
   return res.status(201).json({
     seeded: true,
+    reconciled: false,
     message: 'L99 registered in Control Room project registry.',
     project: inserted,
     nextStep: 'POST /l99/gate/l99-creator-journey with ProofEvidence to begin OODA loop.',

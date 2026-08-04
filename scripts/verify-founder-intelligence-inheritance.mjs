@@ -4,6 +4,7 @@ const root = new URL('../', import.meta.url);
 const registryPath = 'config/founder-intelligence.inheritance.json';
 const registry = JSON.parse(await readFile(new URL(registryPath, root), 'utf8'));
 const portfolio = await readFile(new URL('src/config/portfolio.ts', root), 'utf8');
+const l99Repository = await readFile(new URL('src/config/l99Repository.ts', root), 'utf8');
 const entrypoint = await readFile(new URL('AGENTS_FOUNDER_INTELLIGENCE.md', root), 'utf8');
 const constitution = await readFile(new URL('docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md', root), 'utf8');
 
@@ -37,8 +38,24 @@ requireValue(typeof registry.inheritanceRule === 'string' && registry.inheritanc
 requireValue(typeof registry.truthBoundary === 'string' && registry.truthBoundary.includes('does not prove runtime behavior'), 'truth boundary must separate instruction evidence from runtime proof');
 requireValue(/^\d{4}-\d{2}-\d{2}$/.test(registry.lastInspected), 'lastInspected must use YYYY-MM-DD');
 
-const projectBlocks = [...portfolio.matchAll(/\{\s*slug:\s*"([^"]+)"[\s\S]*?repository:\s*"([^"]+)"[\s\S]*?status:\s*"active"[\s\S]*?\}/g)]
-  .map((match) => ({ slug: match[1], repository: match[2] }));
+const repositoryConstants = new Map(
+  [...l99Repository.matchAll(/export const\s+([A-Z0-9_]+)\s*=\s*"([^"]+)"/g)]
+    .map((match) => [match[1], match[2]]),
+);
+
+const projectBlocks = [
+  ...portfolio.matchAll(
+    /\{\s*slug:\s*"([^"]+)"[\s\S]*?repository:\s*(?:"([^"]+)"|([A-Z0-9_]+))[\s\S]*?status:\s*"active"[\s\S]*?\}/g,
+  ),
+].map((match) => {
+  const repository = match[2] ?? repositoryConstants.get(match[3]);
+  requireValue(
+    typeof repository === 'string',
+    `${match[1]}: unresolved repository constant ${match[3] ?? 'unknown'}`,
+  );
+  return { slug: match[1], repository };
+});
+
 const portfolioBySlug = new Map(projectBlocks.map((project) => [project.slug, project.repository]));
 const registryProjects = Array.isArray(registry.projects) ? registry.projects : [];
 const registryBySlug = new Map();

@@ -1,3 +1,5 @@
+import { L99_REPOSITORY_IDENTIFIER } from "./l99Repository.js";
+
 export type PortfolioProjectStatus = "active" | "quarantined";
 
 export interface PortfolioProject {
@@ -45,7 +47,7 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
   {
     slug: "l99",
     name: "L99 StoryEngine",
-    repository: "jussray/l99-StoryEngine",
+    repository: L99_REPOSITORY_IDENTIFIER,
     status: "active",
     capabilities: ["story-runtime", "artifact-generation", "provenance"],
   },
