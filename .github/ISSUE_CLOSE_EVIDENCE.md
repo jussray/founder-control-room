@@ -1,6 +1,6 @@
 # Issue Closure Evidence Template
 
-Post this as a new issue comment immediately before closing an issue.
+Post this as a new issue comment immediately before closing an issue. If the issue was reopened, post a new evidence comment for the current close cycle. Do not reuse or edit an older closure comment after clicking close.
 
 ```md
 ## Closure Evidence
@@ -17,6 +17,7 @@ Founder approval: @jussray
 ## Rules
 
 - The comment must be posted by `@jussray`.
+- The comment must be created after the latest issue reopen and last edited before the current close event.
 - `Proof` may not be `none`.
 - Code and documentation work require the exact 40-character head SHA.
 - Operational or non-code work may use `not_applicable: <reason>` only when no repository mutation exists.
