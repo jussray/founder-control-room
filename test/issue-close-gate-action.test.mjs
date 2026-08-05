@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   closureReceiptComment,
+  isCurrentCloseEvent,
   selectFreshClosureEvidence,
   validateClosureEvidence,
 } from '../.github/actions/issue-close-gate/index.mjs';
@@ -26,6 +27,22 @@ describe('issue close action discovery contract', () => {
     })).toEqual([]);
   });
 
+  it('requires a real commit SHA for documentation scope', () => {
+    const failures = validateClosureEvidence({
+      body: complete.replace(
+        'Exact head: 0123456789abcdef0123456789abcdef01234567',
+        'Exact head: not_applicable: documentation only',
+      ),
+      authorLogin: 'jussray',
+      authorAssociation: 'OWNER',
+      founderLogin: 'jussray',
+    });
+
+    expect(failures).toContain(
+      '`Exact head:` must be a 40-character SHA for code or documentation scope.',
+    );
+  });
+
   it('rejects closure while risk remains', () => {
     const failures = validateClosureEvidence({
       body: complete.replace('Unresolved risks: none', 'Unresolved risks: one blocker remains'),
@@ -41,16 +58,25 @@ describe('issue close action discovery contract', () => {
     const selected = selectFreshClosureEvidence({
       closedAt: '2026-08-05T08:30:00.000Z',
       reopenedAt: '2026-08-05T08:20:00.000Z',
+      founderLogin: 'jussray',
       comments: [
         {
           body: complete,
           created_at: '2026-08-05T08:10:00.000Z',
           updated_at: '2026-08-05T08:10:00.000Z',
+          user: { login: 'jussray' },
         },
       ],
     });
 
     expect(selected).toBeNull();
+  });
+
+  it('does not mutate the current issue for a stale close event', () => {
+    expect(isCurrentCloseEvent({
+      state: 'closed',
+      closed_at: '2026-08-05T08:31:00.000Z',
+    }, '2026-08-05T08:30:00.000Z')).toBe(false);
   });
 
   it('produces a visible receipt without copying raw evidence', () => {
