@@ -23,6 +23,20 @@ The founder must post a fresh comment using [`.github/ISSUE_CLOSE_EVIDENCE.md`](
 
 If the issue was reopened, evidence from the earlier close cycle is invalid. A new evidence comment must be created after the latest reopen. The evidence comment must also be last edited before the current close event so proof cannot be repaired retroactively after the button is clicked.
 
+## Visible outcomes
+
+A failed gate reopens the issue and posts the precise missing or invalid fields.
+
+A passing gate leaves the issue closed and posts one idempotent receipt containing:
+
+- repository and issue number;
+- close timestamp;
+- evidence comment ID and author;
+- evidence creation and last-edit timestamps;
+- SHA-256 hash of the evidence body.
+
+The receipt does not copy raw evidence text. It is a durable witness for the gate decision, not a claim that deployment, production, provider, database, browser, device, payment, publication, or another separately gated state passed.
+
 ## Fail-closed rules
 
 - Only the configured founder login may submit closure evidence.
