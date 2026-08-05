@@ -8,7 +8,8 @@
  * requiresFounderApproval()  — convenience alias over isApprovalGate().
  *
  * Evidence is founder-attested, not CI-verified. A passing manual attestation
- * must not be the sole authorization signal for a merge or deployment action.
+ * must not be the sole authorization signal for a merge, deployment, or issue
+ * closure action.
  */
 
 import type { ProofEvidence, ProofGateResult, ProofStatus } from './types.js';
@@ -29,6 +30,30 @@ export class ProofGateError extends Error {
     this.name = 'ProofGateError';
     Object.setPrototypeOf(this, ProofGateError.prototype);
   }
+}
+
+function validateIssueClosureEvidence(evidence: ProofEvidence): string[] {
+  const failures: string[] = [];
+
+  if (!evidence.issueReference?.trim()) {
+    failures.push('Issue reference is missing — closure must identify the exact issue.');
+  }
+
+  if (!evidence.resolution?.trim()) {
+    failures.push('Resolution is missing — closure must state what was actually resolved.');
+  }
+
+  if (!evidence.nextGate?.trim()) {
+    failures.push('Next gate is missing — use "none" only when no follow-up remains.');
+  }
+
+  if (evidence.unresolvedRisks.length > 0) {
+    failures.push(
+      `${evidence.unresolvedRisks.length} unresolved risk(s) remain — an issue cannot be closed while its tracked risk is still open.`,
+    );
+  }
+
+  return failures;
 }
 
 export function runProofGate(
@@ -56,7 +81,9 @@ export function runProofGate(
     );
   }
 
-  if (evidence.unresolvedRisks.length > 0 && !approvedBy) {
+  if (gateId === 'close-issue') {
+    detectedFailures.push(...validateIssueClosureEvidence(evidence));
+  } else if (evidence.unresolvedRisks.length > 0 && !approvedBy) {
     detectedFailures.push(
       `${evidence.unresolvedRisks.length} unresolved risk(s) present without founder acknowledgement.`,
     );
