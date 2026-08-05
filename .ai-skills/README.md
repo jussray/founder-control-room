@@ -24,26 +24,30 @@ Five installable skills for Perplexity Computer:
 | `chatgpt-custom-instructions.md` | ChatGPT (chat.openai.com) | Paste into Settings → Custom Instructions |
 | `universal-commands.md` | All three | Reference for command behaviors |
 | `minimal-token-operating-protocol.md` | All three | Token economy strategy for free tiers |
+| `HUMAN_SAFE_BUILD.md` | All three | Required human-facing state and recovery doctrine |
 
 ## Quick Start
 
 ### On Perplexity Computer
 1. Install each skill from `perplexity-skills/` (use `save_custom_skill`)
-2. Skills auto-activate based on task context
-3. Type command shortcuts like `/lindy /artifact` in any conversation
+2. Load `HUMAN_SAFE_BUILD.md` as an always-on rule
+3. Skills auto-activate based on task context
+4. Type command shortcuts like `/lindy /artifact` in any conversation
 
 ### On Claude
 1. Create a Claude Project for each of your repos
 2. Paste `claude-project-instructions.md` into Project Instructions
 3. Add your repo files to the project knowledge base
-4. Type commands like `/redteam` or `/ooda` in chat
+4. Load `HUMAN_SAFE_BUILD.md` as an always-on project rule
+5. Type commands like `/redteam` or `/ooda` in chat
 
 ### On ChatGPT
 1. Go to Settings → Custom Instructions
 2. Paste the "About You" section into the first box
 3. Paste the "How to Respond" section into the second box
 4. Or create a Custom GPT with the full instructions as system prompt
-5. Type commands like `/lindy /artifact` in chat
+5. Keep `HUMAN_SAFE_BUILD.md` attached or copied into the project instructions
+6. Type commands like `/lindy /artifact` in chat
 
 ## Command Reference
 
