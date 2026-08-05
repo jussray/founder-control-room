@@ -5,9 +5,13 @@ import {
   type FounderOsLabApproval,
   type FounderOsLabCommandId,
   type FounderOsLabEvidence,
+  type FounderOsLabProjectAdapterId,
+  type FounderOsLabProjectAudience,
+  type FounderOsLabProjectContext,
   type FounderOsLabProviderId,
   type FounderOsLabRequest,
 } from '../../founder-os-lab/contracts.js';
+import { FOUNDER_OS_LAB_PROJECT_ADAPTERS } from '../../founder-os-lab/projectAdapters.js';
 import {
   FOUNDER_OS_LAB_ACTION_ROUTES,
   FOUNDER_OS_LAB_COMMANDS,
@@ -29,6 +33,10 @@ const COMMANDS = new Set<FounderOsLabCommandId>(
 const PROVIDERS = new Set<FounderOsLabProviderId>(
   FOUNDER_OS_LAB_PROVIDERS.map((provider) => provider.id),
 );
+const PROJECTS = new Set<FounderOsLabProjectAdapterId>(
+  FOUNDER_OS_LAB_PROJECT_ADAPTERS.map((project) => project.id),
+);
+const PROJECT_AUDIENCES = new Set<FounderOsLabProjectAudience>(['teen', 'bip-jr']);
 const TOP_LEVEL_FIELDS = new Set([
   'goal',
   'action',
@@ -36,6 +44,7 @@ const TOP_LEVEL_FIELDS = new Set([
   'provider',
   'approval',
   'evidence',
+  'project',
   'socialPost',
 ]);
 const EVIDENCE_FIELDS = new Set([
@@ -48,6 +57,13 @@ const EVIDENCE_FIELDS = new Set([
   'workspaceId',
   'recordIds',
   'associationPlan',
+]);
+const PROJECT_FIELDS = new Set([
+  'id',
+  'sourceRepository',
+  'sourceCommitSha',
+  'contractUrls',
+  'audience',
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -74,6 +90,24 @@ function boundedStringList(value: unknown, maximumItems: number, maximumLength: 
     if (!result.includes(normalized)) result.push(normalized);
   }
   return result;
+}
+
+function boundedHttpsUrls(value: unknown, maximumItems: number): string[] | null {
+  const values = boundedStringList(value, maximumItems, 2_000);
+  if (!values) return null;
+
+  const urls: string[] = [];
+  for (const candidate of values) {
+    let parsed: URL;
+    try {
+      parsed = new URL(candidate);
+    } catch {
+      return null;
+    }
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return null;
+    if (!urls.includes(parsed.href)) urls.push(parsed.href);
+  }
+  return urls;
 }
 
 function parseApproval(value: unknown): FounderOsLabApproval | undefined | null {
@@ -139,20 +173,8 @@ function parseEvidence(value: unknown): FounderOsLabEvidence | undefined | null 
 
   let proofUrls: string[] | undefined;
   if (value.proofUrls !== undefined) {
-    if (!Array.isArray(value.proofUrls) || value.proofUrls.length > 20) return null;
-    proofUrls = [];
-    for (const item of value.proofUrls) {
-      const candidate = boundedString(item, 2_000);
-      if (!candidate) return null;
-      let parsed: URL;
-      try {
-        parsed = new URL(candidate);
-      } catch {
-        return null;
-      }
-      if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return null;
-      if (!proofUrls.includes(parsed.href)) proofUrls.push(parsed.href);
-    }
+    proofUrls = boundedHttpsUrls(value.proofUrls, 20) ?? undefined;
+    if (!proofUrls) return null;
   }
 
   return {
@@ -165,6 +187,43 @@ function parseEvidence(value: unknown): FounderOsLabEvidence | undefined | null 
     ...(workspaceId ? { workspaceId } : {}),
     ...(recordIds ? { recordIds } : {}),
     ...(associationPlan ? { associationPlan } : {}),
+  };
+}
+
+function parseProject(value: unknown): FounderOsLabProjectContext | undefined | null {
+  if (value === undefined || value === null) return undefined;
+  if (!isRecord(value) || !hasOnlyFields(value, PROJECT_FIELDS)) return null;
+
+  const id = typeof value.id === 'string' && PROJECTS.has(value.id as FounderOsLabProjectAdapterId)
+    ? value.id as FounderOsLabProjectAdapterId
+    : null;
+  const sourceRepository = boundedString(value.sourceRepository, 300);
+  const sourceCommitSha = boundedString(value.sourceCommitSha, 40)?.toLowerCase() ?? null;
+  const contractUrls = boundedHttpsUrls(value.contractUrls, 20);
+  const audience = value.audience === undefined
+    ? undefined
+    : typeof value.audience === 'string'
+      && PROJECT_AUDIENCES.has(value.audience as FounderOsLabProjectAudience)
+      ? value.audience as FounderOsLabProjectAudience
+      : null;
+
+  if (
+    !id
+    || !sourceRepository
+    || !sourceCommitSha
+    || !EXACT_COMMIT_SHA.test(sourceCommitSha)
+    || !contractUrls
+    || audience === null
+  ) {
+    return null;
+  }
+
+  return {
+    id,
+    sourceRepository,
+    sourceCommitSha,
+    contractUrls,
+    ...(audience ? { audience } : {}),
   };
 }
 
@@ -190,13 +249,23 @@ founderOsSkillsRouter.post('/preview', (req, res) => {
       : null;
   const approval = parseApproval(body.approval);
   const evidence = parseEvidence(body.evidence);
+  const project = parseProject(body.project);
   const socialPost = body.socialPost === undefined
     ? undefined
     : isRecord(body.socialPost)
       ? body.socialPost as unknown as FirstPartySocialPostInput
       : null;
 
-  if (!goal || !action || command === null || provider === null || approval === null || evidence === null || socialPost === null) {
+  if (
+    !goal
+    || !action
+    || command === null
+    || provider === null
+    || approval === null
+    || evidence === null
+    || project === null
+    || socialPost === null
+  ) {
     return res.status(400).json({ error: 'Founder OS preview input is malformed or outside the checked-in registry.' });
   }
 
@@ -207,6 +276,7 @@ founderOsSkillsRouter.post('/preview', (req, res) => {
     ...(provider ? { provider } : {}),
     ...(approval ? { approval } : {}),
     ...(evidence ? { evidence } : {}),
+    ...(project ? { project } : {}),
     ...(socialPost ? { socialPost } : {}),
   };
 
