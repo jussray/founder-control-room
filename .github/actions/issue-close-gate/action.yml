@@ -1,11 +1,14 @@
 name: Issue Close Gate
-description: Reopen issues that are closed without founder-approved closure evidence.
+description: Reopen issues that are closed without fresh founder-approved closure evidence.
 inputs:
   token:
     description: GitHub token with issues:write permission.
     required: true
   issue-number:
     description: Issue number from the issues.closed event.
+    required: true
+  closed-at:
+    description: ISO timestamp from github.event.issue.closed_at.
     required: true
   founder-login:
     description: GitHub login authorized to submit closure evidence.
@@ -19,5 +22,6 @@ runs:
       env:
         ISSUE_CLOSE_GATE_TOKEN: ${{ inputs.token }}
         ISSUE_CLOSE_GATE_NUMBER: ${{ inputs.issue-number }}
+        ISSUE_CLOSE_GATE_CLOSED_AT: ${{ inputs.closed-at }}
         ISSUE_CLOSE_GATE_FOUNDER: ${{ inputs.founder-login }}
       run: node "$GITHUB_ACTION_PATH/index.mjs"
