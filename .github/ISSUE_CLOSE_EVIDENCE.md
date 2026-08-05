@@ -20,7 +20,7 @@ Founder approval: @jussray
 - The comment must be created after the latest issue reopen and last edited before the current close event.
 - Later evidence-shaped comments from other authors do not replace the founder's evidence.
 - `Proof` may not be `none`.
-- Code and documentation work require an exact 40-character SHA that is integrated into the repository default branch.
+- Code and documentation work require the exact 40-character SHA of the current repository default-branch head.
 - Operational or non-code work may use `not_applicable: <reason>` only when no repository mutation exists.
 - `Unresolved risks` must be exactly `none`. Approval cannot convert an unresolved tracked risk into completion.
 - A rerun for an older close timestamp must not reopen or otherwise mutate a newer closure cycle.
