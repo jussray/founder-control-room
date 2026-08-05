@@ -15,7 +15,7 @@ const FIELD_ALIASES = new Map([
 const ALLOWED_SCOPES = new Set(['code', 'docs', 'operations', 'non-code']);
 const REPOSITORY_SCOPES = new Set(['code', 'docs']);
 const TRUSTED_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
-const INTEGRATED_COMPARE_STATUSES = new Set(['ahead', 'identical']);
+const INTEGRATED_COMPARE_STATUSES = new Set(['identical']);
 
 function timestamp(value) {
   const parsed = Date.parse(String(value || ''));
@@ -232,7 +232,7 @@ async function validateIntegratedRepositoryHead({ apiUrl, repository, token, evi
 
     if (!isIntegratedCompareStatus(comparison?.status)) {
       return [
-        `\`Exact head:\` ${exactHead} is not integrated into the repository default branch \`${defaultBranch}\`.`,
+        `\`Exact head:\` ${exactHead} does not match the current repository default-branch head \`${defaultBranch}\`.`,
       ];
     }
   } catch (error) {
