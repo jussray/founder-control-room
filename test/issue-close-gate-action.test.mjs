@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  closureReceiptComment,
   selectFreshClosureEvidence,
   validateClosureEvidence,
 } from '../.github/actions/issue-close-gate/index.mjs';
@@ -50,5 +51,24 @@ describe('issue close action discovery contract', () => {
     });
 
     expect(selected).toBeNull();
+  });
+
+  it('produces a visible receipt without copying raw evidence', () => {
+    const receipt = closureReceiptComment({
+      repository: 'jussray/example',
+      issueNumber: 42,
+      closedAt: '2026-08-05T08:30:00.000Z',
+      evidenceComment: {
+        id: 9001,
+        body: complete,
+        created_at: '2026-08-05T08:25:00.000Z',
+        updated_at: '2026-08-05T08:25:00.000Z',
+        user: { login: 'jussray' },
+      },
+    });
+
+    expect(receipt.body).toContain('## Issue closure gate passed');
+    expect(receipt.body).toContain('Evidence SHA-256:');
+    expect(receipt.body).not.toContain(complete);
   });
 });
