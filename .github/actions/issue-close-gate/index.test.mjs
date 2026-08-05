@@ -197,8 +197,8 @@ describe('issue close gate evidence', () => {
     }, '2026-08-05T08:30:00.000Z')).toBe(true);
   });
 
-  it('accepts only default-branch integrated compare statuses', () => {
-    expect(isIntegratedCompareStatus('ahead')).toBe(true);
+  it('accepts only the exact current default-branch head', () => {
+    expect(isIntegratedCompareStatus('ahead')).toBe(false);
     expect(isIntegratedCompareStatus('identical')).toBe(true);
     expect(isIntegratedCompareStatus('behind')).toBe(false);
     expect(isIntegratedCompareStatus('diverged')).toBe(false);
