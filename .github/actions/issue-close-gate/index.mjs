@@ -13,7 +13,9 @@ const FIELD_ALIASES = new Map([
 ]);
 
 const ALLOWED_SCOPES = new Set(['code', 'docs', 'operations', 'non-code']);
+const REPOSITORY_SCOPES = new Set(['code', 'docs']);
 const TRUSTED_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+const INTEGRATED_COMPARE_STATUSES = new Set(['ahead', 'identical']);
 
 function timestamp(value) {
   const parsed = Date.parse(String(value || ''));
@@ -66,14 +68,17 @@ export function validateClosureEvidence({ body, authorLogin, authorAssociation, 
     failures.push('`Resolution:` is required.');
   }
 
-  if (!ALLOWED_SCOPES.has(String(evidence.scope || '').toLowerCase())) {
+  const scope = String(evidence.scope || '').toLowerCase();
+  if (!ALLOWED_SCOPES.has(scope)) {
     failures.push('`Scope:` must be one of: code, docs, operations, non-code.');
   }
 
   const exactHead = String(evidence.exactHead || '');
   const exactHeadIsSha = /^[0-9a-f]{40}$/i.test(exactHead);
   const exactHeadIsNotApplicable = /^not_applicable:\s+\S.+/i.test(exactHead);
-  if (!exactHeadIsSha && !exactHeadIsNotApplicable) {
+  if (REPOSITORY_SCOPES.has(scope) && !exactHeadIsSha) {
+    failures.push('`Exact head:` must be a 40-character SHA for code or documentation scope.');
+  } else if (!exactHeadIsSha && !exactHeadIsNotApplicable) {
     failures.push('`Exact head:` must be a 40-character SHA or `not_applicable: <reason>`.');
   }
 
@@ -113,13 +118,16 @@ export function latestReopenedAt(events, closedAt) {
   return candidates[0]?.value ?? null;
 }
 
-export function selectFreshClosureEvidence({ comments, closedAt, reopenedAt }) {
+export function selectFreshClosureEvidence({ comments, closedAt, reopenedAt, founderLogin }) {
   const closedAtMs = timestamp(closedAt);
   const reopenedAtMs = reopenedAt ? timestamp(reopenedAt) : null;
+  const normalizedFounder = String(founderLogin || '').trim().toLowerCase();
   if (closedAtMs === null || (reopenedAt && reopenedAtMs === null)) return null;
 
   return comments
     .filter((comment) => typeof comment.body === 'string' && /^##\s+Closure Evidence\s*$/im.test(comment.body))
+    .filter((comment) => !normalizedFounder
+      || String(comment.user?.login || '').trim().toLowerCase() === normalizedFounder)
     .map((comment) => ({
       comment,
       createdAt: timestamp(comment.created_at),
@@ -129,6 +137,19 @@ export function selectFreshClosureEvidence({ comments, closedAt, reopenedAt }) {
     .filter(({ createdAt, updatedAt }) => createdAt <= closedAtMs && updatedAt <= closedAtMs)
     .filter(({ createdAt }) => reopenedAtMs === null || createdAt > reopenedAtMs)
     .sort((a, b) => b.createdAt - a.createdAt)[0]?.comment ?? null;
+}
+
+export function isCurrentCloseEvent(issue, closedAt) {
+  const eventClosedAt = timestamp(closedAt);
+  const issueClosedAt = timestamp(issue?.closed_at);
+  return issue?.state === 'closed'
+    && eventClosedAt !== null
+    && issueClosedAt !== null
+    && issueClosedAt === eventClosedAt;
+}
+
+export function isIntegratedCompareStatus(status) {
+  return INTEGRATED_COMPARE_STATUSES.has(String(status || '').toLowerCase());
 }
 
 export function closureReceiptComment({ repository, issueNumber, closedAt, evidenceComment }) {
@@ -192,6 +213,36 @@ async function fetchAllPages({ apiUrl, repository, issueNumber, token, resource 
   return values;
 }
 
+async function validateIntegratedRepositoryHead({ apiUrl, repository, token, evidence }) {
+  const exactHead = String(evidence?.exactHead || '');
+  if (!/^[0-9a-f]{40}$/i.test(exactHead)) return [];
+
+  try {
+    const repositoryRecord = await githubRequest(`${apiUrl}/repos/${repository}`, token);
+    const defaultBranch = repositoryRecord?.default_branch;
+    if (!defaultBranch) {
+      return ['The repository default branch could not be determined for exact-head verification.'];
+    }
+
+    const compareRef = encodeURIComponent(`${exactHead}...${defaultBranch}`);
+    const comparison = await githubRequest(
+      `${apiUrl}/repos/${repository}/compare/${compareRef}`,
+      token,
+    );
+
+    if (!isIntegratedCompareStatus(comparison?.status)) {
+      return [
+        `\`Exact head:\` ${exactHead} is not integrated into the repository default branch \`${defaultBranch}\`.`,
+      ];
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return [`Exact-head repository verification failed: ${message}`];
+  }
+
+  return [];
+}
+
 function closureFailureComment(failures) {
   return [
     '<!-- issue-close-gate -->',
@@ -216,14 +267,21 @@ export async function enforceIssueCloseGate({
   token,
   founderLogin,
 }) {
-  const [comments, events] = await Promise.all([
+  const issueUrl = `${apiUrl}/repos/${repository}/issues/${issueNumber}`;
+  const [issue, comments, events] = await Promise.all([
+    githubRequest(issueUrl, token),
     fetchAllPages({ apiUrl, repository, issueNumber, token, resource: 'comments' }),
     fetchAllPages({ apiUrl, repository, issueNumber, token, resource: 'events' }),
   ]);
-  const reopenedAt = latestReopenedAt(events, closedAt);
-  const latest = selectFreshClosureEvidence({ comments, closedAt, reopenedAt });
 
-  const failures = latest
+  if (!isCurrentCloseEvent(issue, closedAt)) {
+    console.log(`Skipped stale issue close event for ${repository}#${issueNumber} at ${closedAt}.`);
+    return { passed: true, failures: [], skipped: true };
+  }
+
+  const reopenedAt = latestReopenedAt(events, closedAt);
+  const latest = selectFreshClosureEvidence({ comments, closedAt, reopenedAt, founderLogin });
+  const structuralFailures = latest
     ? validateClosureEvidence({
         body: latest.body,
         authorLogin: latest.user?.login,
@@ -232,9 +290,25 @@ export async function enforceIssueCloseGate({
       })
     : [
         reopenedAt
-          ? 'No fresh `## Closure Evidence` comment was created after the latest reopen and before this close event.'
-          : 'No fresh `## Closure Evidence` comment was created before this close event.',
+          ? 'No fresh founder-authored `## Closure Evidence` comment was created after the latest reopen and before this close event.'
+          : 'No fresh founder-authored `## Closure Evidence` comment was created before this close event.',
       ];
+
+  const repositoryFailures = structuralFailures.length === 0
+    ? await validateIntegratedRepositoryHead({
+        apiUrl,
+        repository,
+        token,
+        evidence: parseClosureEvidence(latest.body),
+      })
+    : [];
+  const failures = [...structuralFailures, ...repositoryFailures];
+
+  const currentIssue = await githubRequest(issueUrl, token);
+  if (!isCurrentCloseEvent(currentIssue, closedAt)) {
+    console.log(`Skipped stale issue close mutation for ${repository}#${issueNumber} at ${closedAt}.`);
+    return { passed: true, failures: [], skipped: true };
+  }
 
   if (failures.length === 0) {
     const receipt = closureReceiptComment({
@@ -248,27 +322,27 @@ export async function enforceIssueCloseGate({
     );
 
     if (!receiptExists) {
-      await githubRequest(`${apiUrl}/repos/${repository}/issues/${issueNumber}/comments`, token, {
+      await githubRequest(`${issueUrl}/comments`, token, {
         method: 'POST',
         body: JSON.stringify({ body: receipt.body }),
       });
     }
 
     console.log(`Issue close gate passed for ${repository}#${issueNumber}.`);
-    return { passed: true, failures: [] };
+    return { passed: true, failures: [], skipped: false };
   }
 
-  await githubRequest(`${apiUrl}/repos/${repository}/issues/${issueNumber}`, token, {
+  await githubRequest(issueUrl, token, {
     method: 'PATCH',
     body: JSON.stringify({ state: 'open' }),
   });
 
-  await githubRequest(`${apiUrl}/repos/${repository}/issues/${issueNumber}/comments`, token, {
+  await githubRequest(`${issueUrl}/comments`, token, {
     method: 'POST',
     body: JSON.stringify({ body: closureFailureComment(failures) }),
   });
 
-  return { passed: false, failures };
+  return { passed: false, failures, skipped: false };
 }
 
 async function main() {
