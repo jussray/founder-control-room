@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  closureReceiptComment,
   latestReopenedAt,
   parseClosureEvidence,
   selectFreshClosureEvidence,
@@ -130,5 +131,27 @@ describe('issue close gate evidence', () => {
     });
 
     expect(selected).toBeNull();
+  });
+
+  it('creates a source-bound visible closure receipt', () => {
+    const receipt = closureReceiptComment({
+      repository: 'jussray/example',
+      issueNumber: 42,
+      closedAt: '2026-08-05T08:30:00.000Z',
+      evidenceComment: {
+        id: 9001,
+        body: VALID_BODY,
+        created_at: '2026-08-05T08:25:00.000Z',
+        updated_at: '2026-08-05T08:25:00.000Z',
+        user: { login: 'jussray' },
+      },
+    });
+
+    expect(receipt.marker).toBe(
+      '<!-- issue-close-gate:passed:9001:2026-08-05T08:30:00.000Z -->',
+    );
+    expect(receipt.body).toContain('## Issue closure gate passed');
+    expect(receipt.body).toContain('Evidence SHA-256:');
+    expect(receipt.body).not.toContain(VALID_BODY);
   });
 });
