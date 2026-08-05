@@ -25,4 +25,5 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ github.event.issue.number }}
+          closed-at: ${{ github.event.issue.closed_at }}
           founder-login: jussray
