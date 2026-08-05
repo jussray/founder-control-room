@@ -6,11 +6,11 @@ Closing an issue is a separate authority gate. It is not implied by a merge, dep
 
 The gate prevents tracked work from disappearing while proof, risk, rollback, or follow-up obligations remain unresolved.
 
-A GitHub issue can be clicked closed before automation runs. The repository workflow therefore verifies the final evidence comment immediately after closure. When evidence is absent or invalid, it reopens the issue and posts the exact gate failures.
+A GitHub issue can be clicked closed before automation runs. The repository workflow therefore verifies the final evidence comment immediately after closure. When evidence is absent, stale, edited after closure, or otherwise invalid, it reopens the issue and posts the exact gate failures.
 
 ## Required evidence
 
-The founder must post a comment using [`.github/ISSUE_CLOSE_EVIDENCE.md`](../.github/ISSUE_CLOSE_EVIDENCE.md) with:
+The founder must post a fresh comment using [`.github/ISSUE_CLOSE_EVIDENCE.md`](../.github/ISSUE_CLOSE_EVIDENCE.md) with:
 
 - the truthful resolution;
 - scope classification;
@@ -21,10 +21,13 @@ The founder must post a comment using [`.github/ISSUE_CLOSE_EVIDENCE.md`](../.gi
 - `Unresolved risks: none`;
 - explicit founder approval.
 
+If the issue was reopened, evidence from the earlier close cycle is invalid. A new evidence comment must be created after the latest reopen. The evidence comment must also be last edited before the current close event so proof cannot be repaired retroactively after the button is clicked.
+
 ## Fail-closed rules
 
 - Only the configured founder login may submit closure evidence.
 - Evidence from an untrusted repository association is rejected.
+- Evidence must be created after the latest reopen and last edited no later than the current close timestamp.
 - A branch name, `main`, PR number, abbreviated SHA, or intention is not an exact head.
 - Proof may not be `none`.
 - Founder approval cannot erase unresolved risks.
@@ -48,7 +51,7 @@ Manual proof-gate attestation remains evidence, not CI verification. GitHub work
 
 ## Portfolio rollout
 
-The reusable action lives at `.github/actions/issue-close-gate/`. Active portfolio repositories should invoke the action from an `issues.closed` workflow pinned to a reviewed Founder Control Room commit. Quarantined or duplicate repositories remain read-only and must not receive rollout commits.
+The reusable action lives at `.github/actions/issue-close-gate/`. Active portfolio repositories should invoke the action from an `issues.closed` workflow pinned to a reviewed Founder Control Room commit and pass `github.event.issue.closed_at`. Quarantined or duplicate repositories remain read-only and must not receive rollout commits.
 
 ## Rollback
 
