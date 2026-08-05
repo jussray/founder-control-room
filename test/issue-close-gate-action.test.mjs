@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { validateClosureEvidence } from '../.github/actions/issue-close-gate/index.mjs';
+import {
+  selectFreshClosureEvidence,
+  validateClosureEvidence,
+} from '../.github/actions/issue-close-gate/index.mjs';
 
 const complete = `## Closure Evidence
 Resolution: Complete.
@@ -31,5 +34,21 @@ describe('issue close action discovery contract', () => {
     });
 
     expect(failures).toContain('`Unresolved risks:` must be exactly `none` before closure.');
+  });
+
+  it('does not reuse evidence from an earlier close cycle', () => {
+    const selected = selectFreshClosureEvidence({
+      closedAt: '2026-08-05T08:30:00.000Z',
+      reopenedAt: '2026-08-05T08:20:00.000Z',
+      comments: [
+        {
+          body: complete,
+          created_at: '2026-08-05T08:10:00.000Z',
+          updated_at: '2026-08-05T08:10:00.000Z',
+        },
+      ],
+    });
+
+    expect(selected).toBeNull();
   });
 });
