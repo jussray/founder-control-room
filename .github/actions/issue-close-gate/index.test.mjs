@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   closureReceiptComment,
   isCurrentCloseEvent,
+  isExpectedRepositoryHead,
   isIntegratedCompareStatus,
   latestReopenedAt,
   parseClosureEvidence,
@@ -9,10 +10,11 @@ import {
   validateClosureEvidence,
 } from './index.mjs';
 
+const EXACT_HEAD = '0123456789abcdef0123456789abcdef01234567';
 const VALID_BODY = `## Closure Evidence
 Resolution: The tracked defect is fixed and the issue scope is complete.
 Scope: code
-Exact head: 0123456789abcdef0123456789abcdef01234567
+Exact head: ${EXACT_HEAD}
 Proof: CI, focused regression tests, and Playwright passed on the exact head.
 Rollback: Revert the merge commit and reopen this issue.
 Next gate: none
@@ -25,7 +27,7 @@ describe('issue close gate evidence', () => {
     expect(parseClosureEvidence(VALID_BODY)).toEqual({
       resolution: 'The tracked defect is fixed and the issue scope is complete.',
       scope: 'code',
-      exactHead: '0123456789abcdef0123456789abcdef01234567',
+      exactHead: EXACT_HEAD,
       proof: 'CI, focused regression tests, and Playwright passed on the exact head.',
       rollback: 'Revert the merge commit and reopen this issue.',
       nextGate: 'none',
@@ -47,7 +49,7 @@ describe('issue close gate evidence', () => {
     const body = VALID_BODY
       .replace('Scope: code', 'Scope: operations')
       .replace(
-        'Exact head: 0123456789abcdef0123456789abcdef01234567',
+        `Exact head: ${EXACT_HEAD}`,
         'Exact head: not_applicable: vendor account activation has no repository mutation',
       );
 
@@ -64,7 +66,7 @@ describe('issue close gate evidence', () => {
       const body = VALID_BODY
         .replace('Scope: code', `Scope: ${scope}`)
         .replace(
-          'Exact head: 0123456789abcdef0123456789abcdef01234567',
+          `Exact head: ${EXACT_HEAD}`,
           'Exact head: not_applicable: no repository mutation',
         );
       const failures = validateClosureEvidence({
@@ -131,7 +133,7 @@ describe('issue close gate evidence', () => {
   it('blocks missing proof and malformed exact-head evidence', () => {
     const body = VALID_BODY
       .replace('Proof: CI, focused regression tests, and Playwright passed on the exact head.\n', '')
-      .replace('Exact head: 0123456789abcdef0123456789abcdef01234567', 'Exact head: main');
+      .replace(`Exact head: ${EXACT_HEAD}`, 'Exact head: main');
     const failures = validateClosureEvidence({
       body,
       authorLogin: 'jussray',
@@ -197,8 +199,15 @@ describe('issue close gate evidence', () => {
     }, '2026-08-05T08:30:00.000Z')).toBe(true);
   });
 
-  it('accepts only the exact current default-branch head', () => {
-    expect(isIntegratedCompareStatus('ahead')).toBe(false);
+  it('binds repository evidence to the default-branch head captured by the close event', () => {
+    expect(isExpectedRepositoryHead(EXACT_HEAD, EXACT_HEAD)).toBe(true);
+    expect(isExpectedRepositoryHead(EXACT_HEAD.toUpperCase(), EXACT_HEAD)).toBe(true);
+    expect(isExpectedRepositoryHead(EXACT_HEAD, 'f'.repeat(40))).toBe(false);
+    expect(isExpectedRepositoryHead('main', EXACT_HEAD)).toBe(false);
+  });
+
+  it('allows the captured head to remain current or become an ancestor after the close event', () => {
+    expect(isIntegratedCompareStatus('ahead')).toBe(true);
     expect(isIntegratedCompareStatus('identical')).toBe(true);
     expect(isIntegratedCompareStatus('behind')).toBe(false);
     expect(isIntegratedCompareStatus('diverged')).toBe(false);
@@ -209,6 +218,7 @@ describe('issue close gate evidence', () => {
       repository: 'jussray/example',
       issueNumber: 42,
       closedAt: '2026-08-05T08:30:00.000Z',
+      repositoryHead: EXACT_HEAD,
       evidenceComment: {
         id: 9001,
         body: VALID_BODY,
@@ -222,6 +232,7 @@ describe('issue close gate evidence', () => {
       '<!-- issue-close-gate:passed:9001:2026-08-05T08:30:00.000Z -->',
     );
     expect(receipt.body).toContain('## Issue closure gate passed');
+    expect(receipt.body).toContain(`Repository head at close: \`${EXACT_HEAD}\``);
     expect(receipt.body).toContain('Evidence SHA-256:');
     expect(receipt.body).not.toContain(VALID_BODY);
   });
