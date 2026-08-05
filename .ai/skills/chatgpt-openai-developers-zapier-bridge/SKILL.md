@@ -31,6 +31,97 @@ A key reference without an approved invocation path cannot inspect Zap history, 
 
 Zapier's GitHub app is a read/write metadata layer, not the GitHub Actions workflow-runtime layer. A repository, file, branch, issue, pull-request, or comment receipt does not prove Actions jobs, logs, artifacts, checks, or reruns.
 
+## L99 Founder-Ops operating card v2
+
+```text
+PUBLISH_ALLOWED = false
+```
+
+This card authorizes nothing. It makes evidence, freshness, target verification, rollback, and approval boundaries machine-readable so the same operating mistakes are not re-derived each run.
+
+### Claim-status gate
+
+Every operational claim must carry one of these states:
+
+- `VERIFIED`: read from the authoritative layer during the current run, with the source, exact object, run ID, record ID, branch, or SHA retained.
+- `INFERRED`: reasoned from verified evidence, with the reasoning named.
+- `UNKNOWN`: the authoritative layer could not be read, returned an ambiguous result, or the current tool cannot reach that layer. State the reason.
+
+A failed lookup is not proof of absence. A null, empty, timed-out, permission-denied, or structurally unsupported lookup is `UNKNOWN`, never `VERIFIED absence`. Do not report that a deal, PR, branch, file, deployment, migration, or record was deleted, moved, stale, or missing until an authoritative current-run read proves that conclusion.
+
+When an important lookup returns null or empty:
+
+1. retain the exact query, target, connector, and returned status;
+2. verify that the tool can structurally read the requested evidence layer;
+3. retry through the same authoritative reader only when the query or identifier was wrong;
+4. otherwise switch to the reader for that layer;
+5. keep the conclusion `UNKNOWN` until positive evidence proves absence.
+
+### Tool-to-evidence-layer routing
+
+Use the reader that owns the layer of truth. Equivalent authoritative connectors are allowed when the named capability is not exposed, but a weaker layer must not be promoted into proof.
+
+| Layer of truth | Reliable reader | Do not infer from |
+|---|---|---|
+| Private repository files, PRs, and branches | Zapier GitHub `Get File Contents`, `Find Pull Request`, `Find Branch`, or an authenticated GitHub connector | unauthenticated web fetches, cached summaries, or branch-name memory |
+| Applied database migrations, schema, and RLS drift | Supabase MCP `list_migrations`, `get_advisors`, or an equivalent authenticated Supabase reader | migration files in the repository alone |
+| Live Cloudflare deployment and Worker state | Cloudflare MCP `workers_list`, `workers_get_worker`, or an equivalent authenticated Cloudflare reader | CI status alone |
+| GitHub Actions jobs, logs, artifacts, and exact error text | authenticated GitHub Actions run page, Actions API, or an Actions-capable connector | Zapier's GitHub metadata actions |
+| HubSpot deal or CRM state | HubSpot MCP `search_crm_objects` plus identifier-based readback when available | a single null search result |
+
+When one tool structurally cannot reach a layer, switch tools. Do not convert the missing capability into a product-state conclusion.
+
+### Blocker-to-workaround routing
+
+| Blocker | Required route |
+|---|---|
+| Zapier cannot edit an existing GitHub file because the blob SHA is unavailable | use an authenticated GitHub contents/API path that reads the current blob SHA before update; do not overwrite blindly |
+| Zapier cannot read GitHub Actions logs | use an authenticated Actions run page or Actions-capable connector; a Gmail failure notification is triage evidence only |
+| Zapier resolves an issue, PR, comment, or record to the wrong target | pass the explicit numeric identifier and verify the returned `resolvedParams` plus a readback of the written object before trusting the write |
+| HubSpot write returns `No approval received` | stop at the founder approval gate; the agent cannot self-approve |
+| Required GitHub environment secret is unset | record the exact secret name and repository environment; founder-side configuration is required |
+
+Surface the blocker and exact route. Do not fake progress around a founder-side gate or a wrong-tool boundary.
+
+### Freshness and target-verification gates
+
+Immediately before a conclusion, mutation, PR body, issue comment, or evidence record:
+
+1. re-read the authoritative state;
+2. pin the finding to an immutable run ID, record ID, commit SHA, deployment version, migration identifier, or equivalent exact object;
+3. do not pin a mutable branch head when the run or event has its own SHA;
+4. compare the fresh read with the evidence already collected and downgrade stale conclusions to `UNKNOWN` or `INFERRED` as appropriate.
+
+Before trusting any write:
+
+1. use an explicit target identifier;
+2. inspect the returned `resolvedParams` or equivalent resolved target;
+3. verify repository, object type, numeric ID, and branch or record association;
+4. read the target back after the write;
+5. report the write as `VERIFIED` only when the readback matches the requested target and content.
+
+A successful connector response without target verification is not proof that the intended object changed.
+
+### Write-authority ladder
+
+- Reversible documentation-only changes, tracker issues, and evidence comments may move only when the current repository's standing authority already covers that exact action.
+- Production deploys, database migrations, secret or credential changes, external sends, publication, and gated CRM writes require explicit approval for the exact change.
+- Never merge, deploy, publish, send, delete, or mutate a gated path merely because this card or skill exists.
+- A documentation merge must not silently carry a gated runtime, credential, data, or external-communication action.
+
+### Required report shape
+
+```text
+REALITY:   what is VERIFIED right now
+FIX:       what changed, with files, commit, PR, record, or "nothing, and why"
+PROOF:     tests, logs, run IDs, advisor output, readbacks, screenshots, or traces
+RISK:      what could still be wrong in the next evidence layer
+ROLLBACK:  how to reverse safely
+NEXT GATE: one exact founder decision or next action
+```
+
+“Nothing to write, nothing to merge” is also a claim. It requires a fresh authoritative read and must be reversed when the evidence changes.
+
 ## Deterministic GitHub procedure
 
 For one-shot repository reads, prefer the exact exposed lookup actions:
@@ -139,4 +230,4 @@ For `jussray/founder-control-room`, stage issues, comments, and review tasks onl
 
 ## Failure behavior
 
-If target lookup or invocation fails, keep the raw key sealed, retain the exact error, do not create duplicate keys automatically, record the blocker, and repair the invocation path before generating another GitHub trigger. If Actions runtime access is missing, create a bounded triage issue and record the missing Actions-capable connector or webhook/API path.
+If target lookup or invocation fails, keep the raw key sealed, retain the exact error, classify the result as `UNKNOWN`, and do not create duplicate keys automatically. Verify that the current connector can reach the requested evidence layer, switch to the authoritative reader when it cannot, record the blocker, and repair the invocation path before generating another GitHub trigger. If Actions runtime access is missing, create a bounded triage issue and record the missing Actions-capable connector or webhook/API path. A null lookup must never be reported as verified deletion, movement, staleness, or absence.
