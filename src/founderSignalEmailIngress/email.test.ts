@@ -5,6 +5,10 @@ import {
   extractFounderReviewCommand,
   parseFounderSignalReviewEmail,
 } from './email.js';
+import {
+  FounderSignalReviewEmailReceiptError,
+  validateFounderSignalReviewEmailReceipt,
+} from './receipt.js';
 
 const contextId = '45bb874d-69d4-4b32-8df2-c7934bb888c5';
 const recipient = `review+${contextId}@foundercontrolroom.org`;
@@ -30,7 +34,7 @@ function parse(raw: Uint8Array, overrides: Partial<{ from: string; to: string }>
 }
 
 describe('Founder Signal review email parser', () => {
-  it('parses one plaintext cancel-all command into a sanitized deterministic receipt', () => {
+  it('parses plaintext into a deterministic unresolved intake receipt', () => {
     const raw = rawEmail(
       [
         'From: Juss Ray <juss@example.com>',
@@ -52,7 +56,9 @@ describe('Founder Signal review email parser', () => {
       commandType: 'cancel_all',
       targetChannel: null,
       commandText: 'cancel all',
-      senderVerified: true,
+      senderAddressMatched: true,
+      authorizationState: 'intake_only_unresolved',
+      executionAllowed: false,
       providerActionsRequested: 0,
       source: 'cloudflare_email_routing',
       receivedAt: '2026-08-02T21:05:00.000Z',
@@ -60,11 +66,26 @@ describe('Founder Signal review email parser', () => {
     expect(first.ingressId).toMatch(/^[0-9a-f-]{36}$/);
     expect(first.messageRefHash).toMatch(/^[0-9a-f]{64}$/);
     expect(first.rawMessageHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.stringify(first)).not.toContain('senderVerified');
     expect(JSON.stringify(first)).not.toContain('juss@example.com');
     expect(JSON.stringify(first)).not.toContain('quoted history');
   });
 
-  it('parses a multipart quoted-printable channel edit and ignores HTML', () => {
+  it('binds replay identity to both Message-ID and raw bytes', () => {
+    const headers = [
+      'From: juss@example.com',
+      `To: ${recipient}`,
+      'Message-ID: <shared-message-id@example.com>',
+      'Content-Type: text/plain; charset=utf-8',
+    ];
+    const cancel = parse(rawEmail(headers, 'cancel all'));
+    const edit = parse(rawEmail(headers, 'juss_rayy_linkedin: make it shorter'));
+
+    expect(cancel.messageRefHash).not.toBe(edit.messageRefHash);
+    expect(cancel.ingressId).not.toBe(edit.ingressId);
+  });
+
+  it('parses multipart quoted-printable edit copy and ignores HTML', () => {
     const boundary = 'review-boundary-123';
     const raw = rawEmail(
       [
@@ -91,6 +112,8 @@ describe('Founder Signal review email parser', () => {
       commandType: 'edit_one',
       targetChannel: 'juss_rayy_linkedin',
       commandText: 'juss_rayy_linkedin: make the proof line more direct',
+      authorizationState: 'intake_only_unresolved',
+      executionAllowed: false,
     });
   });
 
@@ -115,10 +138,7 @@ describe('Founder Signal review email parser', () => {
   });
 
   it('rejects sender, recipient, and context mismatches', () => {
-    const raw = rawEmail(
-      ['Content-Type: text/plain; charset=utf-8'],
-      'cancel all',
-    );
+    const raw = rawEmail(['Content-Type: text/plain; charset=utf-8'], 'cancel all');
 
     expect(() => parse(raw, { from: 'attacker@example.com' })).toThrowError(
       new FounderSignalReviewEmailError('founder_sender_mismatch'),
@@ -131,7 +151,7 @@ describe('Founder Signal review email parser', () => {
     );
   });
 
-  it('rejects HTML-only messages and attachments', () => {
+  it('rejects HTML-only mail and attachment-shaped plaintext', () => {
     const htmlOnly = rawEmail(
       ['Content-Type: text/html; charset=utf-8'],
       '<p>cancel all</p>',
@@ -140,16 +160,20 @@ describe('Founder Signal review email parser', () => {
       new FounderSignalReviewEmailError('text_plain_body_required'),
     );
 
-    const attachment = rawEmail(
+    for (const headers of [
       [
         'Content-Type: text/plain; charset=utf-8',
         'Content-Disposition: attachment; filename="command.txt"',
       ],
-      'cancel all',
-    );
-    expect(() => parse(attachment)).toThrowError(
-      new FounderSignalReviewEmailError('text_plain_body_required'),
-    );
+      [
+        'Content-Type: text/plain; charset=utf-8; name="command.txt"',
+        'Content-Disposition: inline; filename="command.txt"',
+      ],
+    ]) {
+      expect(() => parse(rawEmail(headers, 'cancel all'))).toThrowError(
+        new FounderSignalReviewEmailError('text_plain_body_required'),
+      );
+    }
   });
 
   it('rejects quoted-only, ambiguous, and unscoped commands', () => {
@@ -169,5 +193,38 @@ describe('Founder Signal review email parser', () => {
     expect(() => parse(raw)).toThrowError(
       new FounderSignalReviewEmailError('raw_email_size_rejected'),
     );
+  });
+
+  it('rejects receipt authorization and command-semantic escalation', () => {
+    const base = parse(rawEmail(
+      [
+        'From: juss@example.com',
+        `To: ${recipient}`,
+        'Message-ID: <review-4@example.com>',
+        'Content-Type: text/plain; charset=utf-8',
+      ],
+      'juss_rayy_linkedin: cancel',
+    ));
+
+    expect(() => validateFounderSignalReviewEmailReceipt({
+      ...base,
+      executionAllowed: true,
+    })).toThrowError(new FounderSignalReviewEmailReceiptError('execution_not_allowed'));
+
+    expect(() => validateFounderSignalReviewEmailReceipt({
+      ...base,
+      authorizationState: 'authorized',
+    })).toThrowError(new FounderSignalReviewEmailReceiptError('authorization_not_unresolved'));
+
+    expect(() => validateFounderSignalReviewEmailReceipt({
+      ...base,
+      commandText: 'juss_rayy_linkedin: publish now',
+    })).toThrowError(new FounderSignalReviewEmailReceiptError('command_semantics_mismatch'));
+
+    expect(() => validateFounderSignalReviewEmailReceipt({
+      ...base,
+      commandType: 'edit_one',
+      commandText: 'juss_rayy_linkedin: cancel',
+    })).toThrowError(new FounderSignalReviewEmailReceiptError('command_semantics_mismatch'));
   });
 });

@@ -203,9 +203,16 @@ function extractTextPlain(part: MimePart, depth = 0): string | null {
   }
 
   const disposition = (part.headers.get('content-disposition') ?? '').toLowerCase();
-  if (disposition.startsWith('attachment')) return null;
+  const contentTypeHeader = part.headers.get('content-type') ?? '';
+  if (
+    disposition.startsWith('attachment') ||
+    disposition.includes('filename=') ||
+    /(?:^|;)\s*name\s*=/i.test(contentTypeHeader)
+  ) {
+    return null;
+  }
 
-  const contentType = parseContentType(part.headers.get('content-type'));
+  const contentType = parseContentType(contentTypeHeader);
   if (contentType.mediaType.startsWith('multipart/')) {
     if (!contentType.boundary) {
       throw new FounderSignalReviewEmailError('missing_mime_boundary');
@@ -296,7 +303,8 @@ function parseReplyContext(recipient: string, domain: string, prefix: string): s
   if (recipientDomain !== normalizedDomain) {
     throw new FounderSignalReviewEmailError('unexpected_recipient_domain');
   }
-  const match = localPart.match(new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\+(.+)$`, 'i'));
+  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = localPart.match(new RegExp(`^${escapedPrefix}\\+(.+)$`, 'i'));
   const contextId = match?.[1]?.toLowerCase() ?? '';
   if (!UUID.test(contextId)) {
     throw new FounderSignalReviewEmailError('invalid_reply_context');
@@ -335,8 +343,8 @@ export function parseFounderSignalReviewEmail(
   const command = extractFounderReviewCommand(textBody);
 
   const rawMessageHash = sha256(envelope.raw);
-  const messageId = root.headers.get('message-id')?.trim().toLowerCase();
-  const messageRefHash = sha256(messageId || rawMessageHash);
+  const messageId = root.headers.get('message-id')?.trim().toLowerCase() ?? 'no-message-id';
+  const messageRefHash = sha256(`${messageId}|${rawMessageHash}`);
   const commandHash = sha256(command.commandText);
   const ingressId = uuidFromHash(messageRefHash);
   const receivedAt = (options.now ?? new Date()).toISOString();
@@ -353,7 +361,9 @@ export function parseFounderSignalReviewEmail(
     commandType: command.commandType,
     targetChannel: command.targetChannel,
     commandText: command.commandText,
-    senderVerified: true,
+    senderAddressMatched: true,
+    authorizationState: 'intake_only_unresolved',
+    executionAllowed: false,
     providerActionsRequested: 0,
     receivedAt,
     source: 'cloudflare_email_routing',

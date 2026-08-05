@@ -7,6 +7,7 @@ import {
 } from '../../founderSignalEmailIngress/receipt.js';
 
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
+const MIN_INGRESS_SECRET_LENGTH = 32;
 const HEX_SHA256 = /^[0-9a-f]{64}$/;
 
 export type FounderSignalReviewEmailReceiptStore = (
@@ -51,31 +52,31 @@ function verifySignedBody(
 export const persistFounderSignalReviewEmailReceipt:
 FounderSignalReviewEmailReceiptStore = async (receipt) => {
   const { supabaseAdmin } = await import('../../lib/supabase.js');
-  const { data, error } = await supabaseAdmin()
+  const { error } = await supabaseAdmin()
     .from('founder_signal_review_email_receipts')
-    .upsert(
-      {
-        ingress_id: receipt.ingressId,
-        reply_context_id: receipt.replyContextId,
-        message_ref_hash: receipt.messageRefHash,
-        raw_message_hash: receipt.rawMessageHash,
-        sender_ref_hash: receipt.senderRefHash,
-        recipient_ref_hash: receipt.recipientRefHash,
-        command_hash: receipt.commandHash,
-        command_type: receipt.commandType,
-        target_channel: receipt.targetChannel,
-        command_text: receipt.commandText,
-        sender_verified: receipt.senderVerified,
-        provider_actions_requested: receipt.providerActionsRequested,
-        received_at: receipt.receivedAt,
-        source: receipt.source,
-      },
-      { onConflict: 'message_ref_hash', ignoreDuplicates: true },
-    )
-    .select('ingress_id');
+    .insert({
+      ingress_id: receipt.ingressId,
+      reply_context_id: receipt.replyContextId,
+      message_ref_hash: receipt.messageRefHash,
+      raw_message_hash: receipt.rawMessageHash,
+      sender_ref_hash: receipt.senderRefHash,
+      recipient_ref_hash: receipt.recipientRefHash,
+      command_hash: receipt.commandHash,
+      command_type: receipt.commandType,
+      target_channel: receipt.targetChannel,
+      command_text: receipt.commandText,
+      sender_verified: receipt.senderAddressMatched,
+      sender_address_matched: receipt.senderAddressMatched,
+      authorization_state: receipt.authorizationState,
+      execution_allowed: receipt.executionAllowed,
+      provider_actions_requested: receipt.providerActionsRequested,
+      received_at: receipt.receivedAt,
+      source: receipt.source,
+    });
 
+  if (error?.code === '23505') return 'duplicate';
   if (error) throw new Error('founder_review_email_receipt_store_failed');
-  return data && data.length > 0 ? 'stored' : 'duplicate';
+  return 'stored';
 };
 
 export function createFounderSignalReviewEmailIngestHandler(
@@ -94,7 +95,7 @@ export function createFounderSignalReviewEmailIngestHandler(
     });
 
     const secret = process.env.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET?.trim();
-    if (!secret) {
+    if (!secret || secret.length < MIN_INGRESS_SECRET_LENGTH) {
       return res.status(503).json({ error: 'Review email ingest is not configured' });
     }
 
@@ -138,6 +139,8 @@ export function createFounderSignalReviewEmailIngestHandler(
         ingressId: receipt.ingressId,
         replyContextId: receipt.replyContextId,
         commandType: receipt.commandType,
+        authorizationState: receipt.authorizationState,
+        executionAllowed: false,
         providerActionsRequested: 0,
       });
     } catch {

@@ -7,7 +7,8 @@ const replyAddress = `review+${contextId}@foundercontrolroom.org`;
 const env = {
   FOUNDER_REVIEW_FOUNDER_EMAIL: 'juss@example.com',
   FOUNDER_REVIEW_EMAIL_DOMAIN: 'foundercontrolroom.org',
-  FOUNDER_REVIEW_EMAIL_INGRESS_SECRET: 'worker-ingress-secret',
+  FOUNDER_REVIEW_EMAIL_INGRESS_SECRET:
+    'worker-review-email-ingress-secret-32-bytes',
   FOUNDER_REVIEW_INGEST_URL:
     'https://api.foundercontrolroom.org/ingest/founder-review-email',
 };
@@ -49,7 +50,7 @@ describe('Founder Signal review email Worker', () => {
     vi.unstubAllGlobals();
   });
 
-  it('posts one signed sanitized receipt to the approved backend route', async () => {
+  it('posts one signed sanitized unresolved receipt to the approved backend route', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(1_775_165_100_000);
     const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 201 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -71,10 +72,13 @@ describe('Founder Signal review email Worker', () => {
       commandType: 'cancel_all',
       targetChannel: null,
       commandText: 'cancel all',
-      senderVerified: true,
+      senderAddressMatched: true,
+      authorizationState: 'intake_only_unresolved',
+      executionAllowed: false,
       providerActionsRequested: 0,
       source: 'cloudflare_email_routing',
     });
+    expect(body).not.toContain('senderVerified');
     expect(body).not.toContain('juss@example.com');
     expect(body).not.toContain(replyAddress);
 
@@ -111,6 +115,16 @@ describe('Founder Signal review email Worker', () => {
 
     expect(message.setReject).toHaveBeenCalledWith('Review command rejected');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a weak shared ingress secret before reading mail', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+    const message = fakeMessage();
+
+    await expect(handleFounderSignalReviewEmail(message, {
+      ...env,
+      FOUNDER_REVIEW_EMAIL_INGRESS_SECRET: 'too-short',
+    })).rejects.toThrow('weak_founder_review_email_ingress_secret');
   });
 
   it('throws on backend failure so valid founder mail is not silently lost', async () => {
