@@ -20,10 +20,11 @@ Founder approval: @jussray
 - The comment must be created after the latest issue reopen and last edited before the current close event.
 - Later evidence-shaped comments from other authors do not replace the founder's evidence.
 - `Proof` may not be `none`.
-- Code and documentation work require the exact 40-character SHA of the current repository default-branch head.
+- Code and documentation work require the exact 40-character default-branch SHA captured by the `issues.closed` event.
+- The close-event SHA remains valid if the default branch advances while the workflow is queued; an unrelated, unmerged, rewritten, or fabricated commit does not.
 - Operational or non-code work may use `not_applicable: <reason>` only when no repository mutation exists.
 - `Unresolved risks` must be exactly `none`. Approval cannot convert an unresolved tracked risk into completion.
 - A rerun for an older close timestamp must not reopen or otherwise mutate a newer closure cycle.
 - Merge, deployment, publication, payment, vendor activation, or verbal approval does not automatically authorize issue closure.
-- A passing gate posts one idempotent closure receipt with the evidence comment ID, timestamps, and SHA-256 witness. It does not copy the raw evidence text.
+- A passing gate posts one idempotent closure receipt with the close-event repository head, evidence comment ID, timestamps, and SHA-256 witness. It does not copy the raw evidence text.
 - If the gate fails, GitHub Actions reopens the issue and posts the missing evidence fields.

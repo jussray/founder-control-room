@@ -14,7 +14,7 @@ The founder must post a fresh comment using [`.github/ISSUE_CLOSE_EVIDENCE.md`](
 
 - the truthful resolution;
 - scope classification;
-- the exact 40-character SHA of the current repository default-branch head for code or documentation work, or a reasoned `not_applicable` statement for operational or non-code work with no repository mutation;
+- the exact 40-character default-branch SHA captured by the issue-close event for code or documentation work, or a reasoned `not_applicable` statement for operational or non-code work with no repository mutation;
 - authoritative proof;
 - rollback path;
 - the next gate;
@@ -27,9 +27,11 @@ The gate selects the latest fresh founder-authored evidence comment. A later evi
 
 ## Repository-head verification
 
-For `code` and `docs` scope, a syntactically valid SHA is not enough. The action reads the repository default branch and verifies that the supplied commit exactly matches its current head. A commit from another repository, an older ancestor, an unmerged branch, a fabricated SHA, an abbreviated SHA, a branch name, or `not_applicable` fails the closure gate.
+For the `issues` event, GitHub exposes the last commit on the default branch as `github.sha`. Each caller passes that event-bound SHA to the reusable action.
 
-Operational and non-code scope may use `not_applicable: <specific reason>` only when no repository mutation exists. They may still provide the current default-branch SHA when the operation included repository changes.
+For `code` and `docs` scope, the evidence SHA must equal that captured event SHA. The action then verifies that the captured commit is still the current default-branch head or an ancestor of it. This preserves valid evidence when the branch advances while a workflow is queued, while still rejecting a commit from another repository, an unmerged branch, a rewritten history, a fabricated SHA, an abbreviated SHA, a branch name, or `not_applicable`.
+
+Operational and non-code scope may use `not_applicable: <specific reason>` only when no repository mutation exists. They may still provide the captured default-branch SHA when the operation included repository changes.
 
 ## Close-cycle isolation
 
@@ -45,6 +47,7 @@ A passing gate leaves the issue closed and posts one idempotent receipt containi
 
 - repository and issue number;
 - close timestamp;
+- default-branch head captured by the close event;
 - evidence comment ID and author;
 - evidence creation and last-edit timestamps;
 - SHA-256 hash of the evidence body.
@@ -56,8 +59,8 @@ The receipt does not copy raw evidence text. It is a durable witness for the gat
 - Only the configured founder login may submit closure evidence.
 - Evidence from an untrusted repository association is rejected.
 - Evidence must be created after the latest reopen and last edited no later than the current close timestamp.
-- Code and documentation closure requires the current default-branch commit SHA.
-- A branch name, `main`, PR number, abbreviated SHA, old ancestor, unmerged commit, fabricated SHA, or intention is not an exact head.
+- Code and documentation closure requires the default-branch SHA captured by the close event.
+- A branch name, `main`, PR number, abbreviated SHA, unrelated commit, unmerged commit, rewritten commit, fabricated SHA, or intention is not an exact head.
 - Proof may not be `none`.
 - Founder approval cannot erase unresolved risks.
 - A missing next gate is a blocker, even when the next gate is simply `none`.
@@ -81,7 +84,7 @@ Manual proof-gate attestation remains evidence, not CI verification. GitHub work
 
 ## Portfolio rollout
 
-The reusable action lives at `.github/actions/issue-close-gate/`. Active portfolio repositories should invoke the action from an `issues.closed` workflow pinned to a reviewed Founder Control Room commit and pass `github.event.issue.closed_at`. Quarantined or duplicate repositories remain read-only and must not receive rollout commits.
+The reusable action lives at `.github/actions/issue-close-gate/`. Active portfolio repositories should invoke the action from an `issues.closed` workflow pinned to a reviewed Founder Control Room commit and pass both `github.event.issue.closed_at` and `github.sha`. Quarantined or duplicate repositories remain read-only and must not receive rollout commits.
 
 ## Rollback
 
