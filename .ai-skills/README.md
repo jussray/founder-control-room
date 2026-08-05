@@ -60,6 +60,21 @@ Five installable skills for Perplexity Computer:
 
 Commands stack: `/lindy /ooda /artifact` = proven-tech incremental build with decision loop, shipping code each cycle.
 
+## Human-safe build contract
+
+Build for the human receiving the system, not merely for code completion.
+
+- A user-facing screen, component, route gate, approval flow, or workflow must not resolve to silence when the system can show a truthful state.
+- Do not use `return null` for loading, error, empty, denied, offline, unavailable, recovery, or transitional states that can block understanding or action.
+- Render clear loading, success, empty, denied, degraded, error, and recovery states with an honest next action.
+- Data and service functions may return `null` only as an explicit typed or tested `not found`, `not configured`, or `not applicable` contract.
+- Human-facing callers must translate meaningful absence into a visible state.
+- Optional decorative elements may render nothing only when their absence cannot hide progress, failure, denial, important data, or a required action.
+- Never replace `null` mechanically across a repository. Red-team privacy, authorization, false-success, and data-exposure risks first.
+- Use the smallest proven repair, add a focused regression test, and require Playwright or device proof for changed rendered behavior.
+
+The human must be able to tell what the system is doing, what happened, whether their action or data is safe, what they can do next, and how to recover.
+
 ## Cross-Tool Workflow
 
 ```
