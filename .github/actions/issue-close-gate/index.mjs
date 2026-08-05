@@ -15,7 +15,8 @@ const FIELD_ALIASES = new Map([
 const ALLOWED_SCOPES = new Set(['code', 'docs', 'operations', 'non-code']);
 const REPOSITORY_SCOPES = new Set(['code', 'docs']);
 const TRUSTED_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
-const INTEGRATED_COMPARE_STATUSES = new Set(['identical']);
+const INTEGRATED_COMPARE_STATUSES = new Set(['ahead', 'identical']);
+const SHA_PATTERN = /^[0-9a-f]{40}$/i;
 
 function timestamp(value) {
   const parsed = Date.parse(String(value || ''));
@@ -74,7 +75,7 @@ export function validateClosureEvidence({ body, authorLogin, authorAssociation, 
   }
 
   const exactHead = String(evidence.exactHead || '');
-  const exactHeadIsSha = /^[0-9a-f]{40}$/i.test(exactHead);
+  const exactHeadIsSha = SHA_PATTERN.test(exactHead);
   const exactHeadIsNotApplicable = /^not_applicable:\s+\S.+/i.test(exactHead);
   if (REPOSITORY_SCOPES.has(scope) && !exactHeadIsSha) {
     failures.push('`Exact head:` must be a 40-character SHA for code or documentation scope.');
@@ -152,7 +153,21 @@ export function isIntegratedCompareStatus(status) {
   return INTEGRATED_COMPARE_STATUSES.has(String(status || '').toLowerCase());
 }
 
-export function closureReceiptComment({ repository, issueNumber, closedAt, evidenceComment }) {
+export function isExpectedRepositoryHead(evidenceHead, repositoryHead) {
+  const normalizedEvidence = String(evidenceHead || '').trim().toLowerCase();
+  const normalizedRepository = String(repositoryHead || '').trim().toLowerCase();
+  return SHA_PATTERN.test(normalizedEvidence)
+    && SHA_PATTERN.test(normalizedRepository)
+    && normalizedEvidence === normalizedRepository;
+}
+
+export function closureReceiptComment({
+  repository,
+  issueNumber,
+  closedAt,
+  repositoryHead,
+  evidenceComment,
+}) {
   const evidenceHash = createHash('sha256')
     .update(String(evidenceComment.body || ''), 'utf8')
     .digest('hex');
@@ -166,6 +181,7 @@ export function closureReceiptComment({ repository, issueNumber, closedAt, evide
       '',
       `- Issue: \`${repository}#${issueNumber}\``,
       `- Closed at: \`${closedAt}\``,
+      `- Repository head at close: \`${repositoryHead}\``,
       `- Evidence comment: \`${evidenceComment.id}\``,
       `- Evidence author: \`@${evidenceComment.user?.login || 'unknown'}\``,
       `- Evidence created: \`${evidenceComment.created_at || 'unknown'}\``,
@@ -213,9 +229,25 @@ async function fetchAllPages({ apiUrl, repository, issueNumber, token, resource 
   return values;
 }
 
-async function validateIntegratedRepositoryHead({ apiUrl, repository, token, evidence }) {
+async function validateIntegratedRepositoryHead({
+  apiUrl,
+  repository,
+  token,
+  evidence,
+  repositoryHead,
+}) {
   const exactHead = String(evidence?.exactHead || '');
-  if (!/^[0-9a-f]{40}$/i.test(exactHead)) return [];
+  if (!SHA_PATTERN.test(exactHead)) return [];
+
+  if (!SHA_PATTERN.test(String(repositoryHead || ''))) {
+    return ['The default-branch head captured by the close event is missing or malformed.'];
+  }
+
+  if (!isExpectedRepositoryHead(exactHead, repositoryHead)) {
+    return [
+      `\`Exact head:\` ${exactHead} does not match the default-branch head captured by the close event \`${repositoryHead}\`.`,
+    ];
+  }
 
   try {
     const repositoryRecord = await githubRequest(`${apiUrl}/repos/${repository}`, token);
@@ -224,7 +256,7 @@ async function validateIntegratedRepositoryHead({ apiUrl, repository, token, evi
       return ['The repository default branch could not be determined for exact-head verification.'];
     }
 
-    const compareRef = encodeURIComponent(`${exactHead}...${defaultBranch}`);
+    const compareRef = encodeURIComponent(`${repositoryHead}...${defaultBranch}`);
     const comparison = await githubRequest(
       `${apiUrl}/repos/${repository}/compare/${compareRef}`,
       token,
@@ -232,7 +264,7 @@ async function validateIntegratedRepositoryHead({ apiUrl, repository, token, evi
 
     if (!isIntegratedCompareStatus(comparison?.status)) {
       return [
-        `\`Exact head:\` ${exactHead} does not match the current repository default-branch head \`${defaultBranch}\`.`,
+        `The close-event head \`${repositoryHead}\` is no longer the current or an ancestor of default branch \`${defaultBranch}\`.`,
       ];
     }
   } catch (error) {
@@ -264,6 +296,7 @@ export async function enforceIssueCloseGate({
   repository,
   issueNumber,
   closedAt,
+  repositoryHead,
   token,
   founderLogin,
 }) {
@@ -300,6 +333,7 @@ export async function enforceIssueCloseGate({
         repository,
         token,
         evidence: parseClosureEvidence(latest.body),
+        repositoryHead,
       })
     : [];
   const failures = [...structuralFailures, ...repositoryFailures];
@@ -315,6 +349,7 @@ export async function enforceIssueCloseGate({
       repository,
       issueNumber,
       closedAt,
+      repositoryHead,
       evidenceComment: latest,
     });
     const receiptExists = comments.some(
@@ -350,6 +385,7 @@ async function main() {
   const repository = process.env.GITHUB_REPOSITORY;
   const issueNumber = Number(process.env.ISSUE_CLOSE_GATE_NUMBER);
   const closedAt = process.env.ISSUE_CLOSE_GATE_CLOSED_AT;
+  const repositoryHead = process.env.ISSUE_CLOSE_GATE_REPOSITORY_HEAD;
   const founderLogin = process.env.ISSUE_CLOSE_GATE_FOUNDER || 'jussray';
   const apiUrl = process.env.GITHUB_API_URL || 'https://api.github.com';
 
@@ -361,12 +397,16 @@ async function main() {
   if (timestamp(closedAt) === null) {
     throw new Error('ISSUE_CLOSE_GATE_CLOSED_AT must be a valid ISO timestamp.');
   }
+  if (!SHA_PATTERN.test(String(repositoryHead || ''))) {
+    throw new Error('ISSUE_CLOSE_GATE_REPOSITORY_HEAD must be a 40-character SHA.');
+  }
 
   const result = await enforceIssueCloseGate({
     apiUrl,
     repository,
     issueNumber,
     closedAt,
+    repositoryHead,
     token,
     founderLogin,
   });
