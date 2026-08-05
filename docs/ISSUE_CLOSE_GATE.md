@@ -14,7 +14,7 @@ The founder must post a fresh comment using [`.github/ISSUE_CLOSE_EVIDENCE.md`](
 
 - the truthful resolution;
 - scope classification;
-- an exact 40-character repository head integrated into the default branch for code or documentation work, or a reasoned `not_applicable` statement for operational or non-code work with no repository mutation;
+- the exact 40-character SHA of the current repository default-branch head for code or documentation work, or a reasoned `not_applicable` statement for operational or non-code work with no repository mutation;
 - authoritative proof;
 - rollback path;
 - the next gate;
@@ -27,9 +27,9 @@ The gate selects the latest fresh founder-authored evidence comment. A later evi
 
 ## Repository-head verification
 
-For `code` and `docs` scope, a syntactically valid SHA is not enough. The action reads the repository default branch and verifies that the supplied commit is identical to, or an ancestor of, that branch. A commit from another repository, an unmerged branch, a fabricated SHA, an abbreviated SHA, a branch name, or `not_applicable` fails the closure gate.
+For `code` and `docs` scope, a syntactically valid SHA is not enough. The action reads the repository default branch and verifies that the supplied commit exactly matches its current head. A commit from another repository, an older ancestor, an unmerged branch, a fabricated SHA, an abbreviated SHA, a branch name, or `not_applicable` fails the closure gate.
 
-Operational and non-code scope may use `not_applicable: <specific reason>` only when no repository mutation exists. They may still provide a real integrated SHA when the operation included repository changes.
+Operational and non-code scope may use `not_applicable: <specific reason>` only when no repository mutation exists. They may still provide the current default-branch SHA when the operation included repository changes.
 
 ## Close-cycle isolation
 
@@ -56,8 +56,8 @@ The receipt does not copy raw evidence text. It is a durable witness for the gat
 - Only the configured founder login may submit closure evidence.
 - Evidence from an untrusted repository association is rejected.
 - Evidence must be created after the latest reopen and last edited no later than the current close timestamp.
-- Code and documentation closure requires an integrated default-branch commit SHA.
-- A branch name, `main`, PR number, abbreviated SHA, unmerged commit, fabricated SHA, or intention is not an exact head.
+- Code and documentation closure requires the current default-branch commit SHA.
+- A branch name, `main`, PR number, abbreviated SHA, old ancestor, unmerged commit, fabricated SHA, or intention is not an exact head.
 - Proof may not be `none`.
 - Founder approval cannot erase unresolved risks.
 - A missing next gate is a blocker, even when the next gate is simply `none`.
