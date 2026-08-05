@@ -1,0 +1,63 @@
+name: Live Outage Product Design Audit
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/live-outage-audit.mjs'
+      - '.github/workflows/live-outage-product-design-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-outage-product-design-audit-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  capture-live-outage-experience:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      AUDIT_OUTPUT_DIR: artifacts/live-outage-audit
+
+    steps:
+      - name: Check out exact audit head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          printf 'Verified exact audit head: %s\n' "$actual"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Capture live desktop and mobile evidence
+        run: node scripts/live-outage-audit.mjs
+
+      - name: Upload screenshots, traces, and manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-outage-product-design-audit-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/live-outage-audit/
+          if-no-files-found: warn
+          retention-days: 14
