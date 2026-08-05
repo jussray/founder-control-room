@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   closureReceiptComment,
+  isCurrentCloseEvent,
+  isIntegratedCompareStatus,
   latestReopenedAt,
   parseClosureEvidence,
   selectFreshClosureEvidence,
@@ -57,6 +59,27 @@ describe('issue close gate evidence', () => {
     })).toEqual([]);
   });
 
+  it('rejects not_applicable exact-head evidence for code and documentation scope', () => {
+    for (const scope of ['code', 'docs']) {
+      const body = VALID_BODY
+        .replace('Scope: code', `Scope: ${scope}`)
+        .replace(
+          'Exact head: 0123456789abcdef0123456789abcdef01234567',
+          'Exact head: not_applicable: no repository mutation',
+        );
+      const failures = validateClosureEvidence({
+        body,
+        authorLogin: 'jussray',
+        authorAssociation: 'OWNER',
+        founderLogin: 'jussray',
+      });
+
+      expect(failures).toContain(
+        '`Exact head:` must be a 40-character SHA for code or documentation scope.',
+      );
+    }
+  });
+
   it('blocks unresolved risk even with founder approval', () => {
     const failures = validateClosureEvidence({
       body: VALID_BODY.replace('Unresolved risks: none', 'Unresolved risks: production proof missing'),
@@ -79,6 +102,32 @@ describe('issue close gate evidence', () => {
     expect(failures).toContain('Closure evidence must be posted by @jussray.');
   });
 
+  it('ignores a later evidence-shaped comment from a non-founder', () => {
+    const selected = selectFreshClosureEvidence({
+      closedAt: '2026-08-05T08:30:00.000Z',
+      reopenedAt: null,
+      founderLogin: 'jussray',
+      comments: [
+        {
+          id: 1,
+          body: VALID_BODY,
+          created_at: '2026-08-05T08:20:00.000Z',
+          updated_at: '2026-08-05T08:20:00.000Z',
+          user: { login: 'jussray' },
+        },
+        {
+          id: 2,
+          body: VALID_BODY.replace('Proof: CI, focused regression tests, and Playwright passed on the exact head.', 'Proof: none'),
+          created_at: '2026-08-05T08:25:00.000Z',
+          updated_at: '2026-08-05T08:25:00.000Z',
+          user: { login: 'someone-else' },
+        },
+      ],
+    });
+
+    expect(selected?.id).toBe(1);
+  });
+
   it('blocks missing proof and malformed exact-head evidence', () => {
     const body = VALID_BODY
       .replace('Proof: CI, focused regression tests, and Playwright passed on the exact head.\n', '')
@@ -92,7 +141,7 @@ describe('issue close gate evidence', () => {
 
     expect(failures).toContain('`Proof:` is required and may not be `none`.');
     expect(failures).toContain(
-      '`Exact head:` must be a 40-character SHA or `not_applicable: <reason>`.',
+      '`Exact head:` must be a 40-character SHA for code or documentation scope.',
     );
   });
 
@@ -104,11 +153,13 @@ describe('issue close gate evidence', () => {
     const selected = selectFreshClosureEvidence({
       closedAt,
       reopenedAt,
+      founderLogin: 'jussray',
       comments: [
         {
           body: VALID_BODY,
           created_at: '2026-08-05T08:10:00.000Z',
           updated_at: '2026-08-05T08:10:00.000Z',
+          user: { login: 'jussray' },
         },
       ],
     });
@@ -121,16 +172,36 @@ describe('issue close gate evidence', () => {
     const selected = selectFreshClosureEvidence({
       closedAt: '2026-08-05T08:30:00.000Z',
       reopenedAt: null,
+      founderLogin: 'jussray',
       comments: [
         {
           body: VALID_BODY,
           created_at: '2026-08-05T08:25:00.000Z',
           updated_at: '2026-08-05T08:31:00.000Z',
+          user: { login: 'jussray' },
         },
       ],
     });
 
     expect(selected).toBeNull();
+  });
+
+  it('treats reruns for an older close timestamp as stale', () => {
+    expect(isCurrentCloseEvent({
+      state: 'closed',
+      closed_at: '2026-08-05T08:35:00.000Z',
+    }, '2026-08-05T08:30:00.000Z')).toBe(false);
+    expect(isCurrentCloseEvent({
+      state: 'closed',
+      closed_at: '2026-08-05T08:30:00.000Z',
+    }, '2026-08-05T08:30:00.000Z')).toBe(true);
+  });
+
+  it('accepts only default-branch integrated compare statuses', () => {
+    expect(isIntegratedCompareStatus('ahead')).toBe(true);
+    expect(isIntegratedCompareStatus('identical')).toBe(true);
+    expect(isIntegratedCompareStatus('behind')).toBe(false);
+    expect(isIntegratedCompareStatus('diverged')).toBe(false);
   });
 
   it('creates a source-bound visible closure receipt', () => {
