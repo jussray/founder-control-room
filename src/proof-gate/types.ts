@@ -10,6 +10,12 @@ export interface ProofEvidence {
   deploymentImpact: string;
   rollbackPath: string;
   unresolvedRisks: string[];
+  /** Required by the close-issue gate. Use owner/repository#number or a canonical issue URL. */
+  issueReference?: string;
+  /** Required by the close-issue gate. State what was resolved without overstating proof. */
+  resolution?: string;
+  /** Required by the close-issue gate. Use "none" only when no follow-up gate remains. */
+  nextGate?: string;
 }
 
 export interface ProofGateResult {
@@ -27,6 +33,7 @@ export const APPROVAL_GATES = [
   'merge',
   'deploy',
   'rollback',
+  'close-issue',
   'billing-change',
   'auth-change',
   'secrets-change',
