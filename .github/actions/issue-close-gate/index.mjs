@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
 const FIELD_ALIASES = new Map([
@@ -130,6 +131,33 @@ export function selectFreshClosureEvidence({ comments, closedAt, reopenedAt }) {
     .sort((a, b) => b.createdAt - a.createdAt)[0]?.comment ?? null;
 }
 
+export function closureReceiptComment({ repository, issueNumber, closedAt, evidenceComment }) {
+  const evidenceHash = createHash('sha256')
+    .update(String(evidenceComment.body || ''), 'utf8')
+    .digest('hex');
+  const marker = `<!-- issue-close-gate:passed:${evidenceComment.id}:${closedAt} -->`;
+
+  return {
+    marker,
+    body: [
+      marker,
+      '## Issue closure gate passed',
+      '',
+      `- Issue: \`${repository}#${issueNumber}\``,
+      `- Closed at: \`${closedAt}\``,
+      `- Evidence comment: \`${evidenceComment.id}\``,
+      `- Evidence author: \`@${evidenceComment.user?.login || 'unknown'}\``,
+      `- Evidence created: \`${evidenceComment.created_at || 'unknown'}\``,
+      `- Evidence last edited: \`${evidenceComment.updated_at || 'unknown'}\``,
+      `- Evidence SHA-256: \`${evidenceHash}\``,
+      '',
+      'The issue remained closed because fresh founder-approved evidence passed the close-issue gate with zero unresolved risks.',
+      '',
+      'This receipt proves the gate decision for this close event. It does not silently prove deployment, production, provider, database, browser, device, payment, publication, or other separately gated state.',
+    ].join('\n'),
+  };
+}
+
 async function githubRequest(url, token, init = {}) {
   const response = await fetch(url, {
     ...init,
@@ -209,6 +237,23 @@ export async function enforceIssueCloseGate({
       ];
 
   if (failures.length === 0) {
+    const receipt = closureReceiptComment({
+      repository,
+      issueNumber,
+      closedAt,
+      evidenceComment: latest,
+    });
+    const receiptExists = comments.some(
+      (comment) => typeof comment.body === 'string' && comment.body.includes(receipt.marker),
+    );
+
+    if (!receiptExists) {
+      await githubRequest(`${apiUrl}/repos/${repository}/issues/${issueNumber}/comments`, token, {
+        method: 'POST',
+        body: JSON.stringify({ body: receipt.body }),
+      });
+    }
+
     console.log(`Issue close gate passed for ${repository}#${issueNumber}.`);
     return { passed: true, failures: [] };
   }
