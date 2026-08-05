@@ -23,4 +23,5 @@ Founder approval: @jussray
 - Operational or non-code work may use `not_applicable: <reason>` only when no repository mutation exists.
 - `Unresolved risks` must be exactly `none`. Approval cannot convert an unresolved tracked risk into completion.
 - Merge, deployment, publication, payment, vendor activation, or verbal approval does not automatically authorize issue closure.
+- A passing gate posts one idempotent closure receipt with the evidence comment ID, timestamps, and SHA-256 witness. It does not copy the raw evidence text.
 - If the gate fails, GitHub Actions reopens the issue and posts the missing evidence fields.
