@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { parseClosureEvidence, validateClosureEvidence } from './index.mjs';
+import {
+  latestReopenedAt,
+  parseClosureEvidence,
+  selectFreshClosureEvidence,
+  validateClosureEvidence,
+} from './index.mjs';
 
 const VALID_BODY = `## Closure Evidence
 Resolution: The tracked defect is fixed and the issue scope is complete.
@@ -88,5 +93,42 @@ describe('issue close gate evidence', () => {
     expect(failures).toContain(
       '`Exact head:` must be a 40-character SHA or `not_applicable: <reason>`.',
     );
+  });
+
+  it('rejects evidence from before the latest reopen', () => {
+    const closedAt = '2026-08-05T08:30:00.000Z';
+    const reopenedAt = latestReopenedAt([
+      { event: 'reopened', created_at: '2026-08-05T08:20:00.000Z' },
+    ], closedAt);
+    const selected = selectFreshClosureEvidence({
+      closedAt,
+      reopenedAt,
+      comments: [
+        {
+          body: VALID_BODY,
+          created_at: '2026-08-05T08:10:00.000Z',
+          updated_at: '2026-08-05T08:10:00.000Z',
+        },
+      ],
+    });
+
+    expect(reopenedAt).toBe('2026-08-05T08:20:00.000Z');
+    expect(selected).toBeNull();
+  });
+
+  it('rejects evidence edited after the close event', () => {
+    const selected = selectFreshClosureEvidence({
+      closedAt: '2026-08-05T08:30:00.000Z',
+      reopenedAt: null,
+      comments: [
+        {
+          body: VALID_BODY,
+          created_at: '2026-08-05T08:25:00.000Z',
+          updated_at: '2026-08-05T08:31:00.000Z',
+        },
+      ],
+    });
+
+    expect(selected).toBeNull();
   });
 });
