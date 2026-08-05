@@ -14,6 +14,11 @@ const FIELD_ALIASES = new Map([
 const ALLOWED_SCOPES = new Set(['code', 'docs', 'operations', 'non-code']);
 const TRUSTED_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 
+function timestamp(value) {
+  const parsed = Date.parse(String(value || ''));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function parseClosureEvidence(body) {
   if (typeof body !== 'string') return null;
 
@@ -94,6 +99,37 @@ export function validateClosureEvidence({ body, authorLogin, authorAssociation, 
   return failures;
 }
 
+export function latestReopenedAt(events, closedAt) {
+  const closedAtMs = timestamp(closedAt);
+  if (closedAtMs === null) return null;
+
+  const candidates = events
+    .filter((event) => event?.event === 'reopened')
+    .map((event) => ({ value: event.created_at, time: timestamp(event.created_at) }))
+    .filter((event) => event.time !== null && event.time < closedAtMs)
+    .sort((a, b) => b.time - a.time);
+
+  return candidates[0]?.value ?? null;
+}
+
+export function selectFreshClosureEvidence({ comments, closedAt, reopenedAt }) {
+  const closedAtMs = timestamp(closedAt);
+  const reopenedAtMs = reopenedAt ? timestamp(reopenedAt) : null;
+  if (closedAtMs === null || (reopenedAt && reopenedAtMs === null)) return null;
+
+  return comments
+    .filter((comment) => typeof comment.body === 'string' && /^##\s+Closure Evidence\s*$/im.test(comment.body))
+    .map((comment) => ({
+      comment,
+      createdAt: timestamp(comment.created_at),
+      updatedAt: timestamp(comment.updated_at),
+    }))
+    .filter(({ createdAt, updatedAt }) => createdAt !== null && updatedAt !== null)
+    .filter(({ createdAt, updatedAt }) => createdAt <= closedAtMs && updatedAt <= closedAtMs)
+    .filter(({ createdAt }) => reopenedAtMs === null || createdAt > reopenedAtMs)
+    .sort((a, b) => b.createdAt - a.createdAt)[0]?.comment ?? null;
+}
+
 async function githubRequest(url, token, init = {}) {
   const response = await fetch(url, {
     ...init,
@@ -115,17 +151,17 @@ async function githubRequest(url, token, init = {}) {
   return response.json();
 }
 
-async function fetchAllComments({ apiUrl, repository, issueNumber, token }) {
-  const comments = [];
+async function fetchAllPages({ apiUrl, repository, issueNumber, token, resource }) {
+  const values = [];
   for (let page = 1; page <= 10; page += 1) {
     const batch = await githubRequest(
-      `${apiUrl}/repos/${repository}/issues/${issueNumber}/comments?per_page=100&page=${page}`,
+      `${apiUrl}/repos/${repository}/issues/${issueNumber}/${resource}?per_page=100&page=${page}`,
       token,
     );
-    comments.push(...batch);
+    values.push(...batch);
     if (batch.length < 100) break;
   }
-  return comments;
+  return values;
 }
 
 function closureFailureComment(failures) {
@@ -138,7 +174,7 @@ function closureFailureComment(failures) {
     '### Missing or invalid',
     ...failures.map((failure) => `- ${failure}`),
     '',
-    'Post a new comment using `.github/ISSUE_CLOSE_EVIDENCE.md`, then close the issue again.',
+    'Post a fresh comment using `.github/ISSUE_CLOSE_EVIDENCE.md`, then close the issue again.',
     '',
     'Closing an issue is a separate authority gate. Merge, deployment, documentation, or verbal approval does not automatically authorize closure.',
   ].join('\n');
@@ -148,21 +184,29 @@ export async function enforceIssueCloseGate({
   apiUrl,
   repository,
   issueNumber,
+  closedAt,
   token,
   founderLogin,
 }) {
-  const comments = await fetchAllComments({ apiUrl, repository, issueNumber, token });
-  const candidates = comments
-    .filter((comment) => typeof comment.body === 'string' && /^##\s+Closure Evidence\s*$/im.test(comment.body))
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  const latest = candidates[0];
+  const [comments, events] = await Promise.all([
+    fetchAllPages({ apiUrl, repository, issueNumber, token, resource: 'comments' }),
+    fetchAllPages({ apiUrl, repository, issueNumber, token, resource: 'events' }),
+  ]);
+  const reopenedAt = latestReopenedAt(events, closedAt);
+  const latest = selectFreshClosureEvidence({ comments, closedAt, reopenedAt });
 
-  const failures = validateClosureEvidence({
-    body: latest?.body,
-    authorLogin: latest?.user?.login,
-    authorAssociation: latest?.author_association,
-    founderLogin,
-  });
+  const failures = latest
+    ? validateClosureEvidence({
+        body: latest.body,
+        authorLogin: latest.user?.login,
+        authorAssociation: latest.author_association,
+        founderLogin,
+      })
+    : [
+        reopenedAt
+          ? 'No fresh `## Closure Evidence` comment was created after the latest reopen and before this close event.'
+          : 'No fresh `## Closure Evidence` comment was created before this close event.',
+      ];
 
   if (failures.length === 0) {
     console.log(`Issue close gate passed for ${repository}#${issueNumber}.`);
@@ -186,6 +230,7 @@ async function main() {
   const token = process.env.ISSUE_CLOSE_GATE_TOKEN;
   const repository = process.env.GITHUB_REPOSITORY;
   const issueNumber = Number(process.env.ISSUE_CLOSE_GATE_NUMBER);
+  const closedAt = process.env.ISSUE_CLOSE_GATE_CLOSED_AT;
   const founderLogin = process.env.ISSUE_CLOSE_GATE_FOUNDER || 'jussray';
   const apiUrl = process.env.GITHUB_API_URL || 'https://api.github.com';
 
@@ -194,11 +239,15 @@ async function main() {
   if (!Number.isInteger(issueNumber) || issueNumber <= 0) {
     throw new Error('ISSUE_CLOSE_GATE_NUMBER must be a positive integer.');
   }
+  if (timestamp(closedAt) === null) {
+    throw new Error('ISSUE_CLOSE_GATE_CLOSED_AT must be a valid ISO timestamp.');
+  }
 
   const result = await enforceIssueCloseGate({
     apiUrl,
     repository,
     issueNumber,
+    closedAt,
     token,
     founderLogin,
   });
