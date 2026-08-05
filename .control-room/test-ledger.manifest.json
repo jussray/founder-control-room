@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0",
+  "repository": "jussray/founder-control-room",
+  "controlRoom": {
+    "scope": "repository-local",
+    "portfolioHub": "jussray/founder-control-room",
+    "authority": "read-only-test-evidence"
+  },
+  "source": {
+    "provider": "github-check-runs",
+    "exactRef": "commit-sha",
+    "includeAllDiscoveredChecks": true,
+    "dedupe": "latest-by-app-and-name",
+    "excludeObserverCheck": true
+  },
+  "workflow": ".github/workflows/control-room-test-ledger.yml",
+  "artifact": {
+    "namePattern": "control-room-test-ledger-{sha}",
+    "reportPath": "artifacts/control-room-test-ledger.json",
+    "retentionDays": 14
+  },
+  "policy": {
+    "failed": "surface-failed",
+    "pending": "surface-pending",
+    "unknown": "surface-unknown",
+    "skippedOrNeutral": "surface-warning",
+    "observerConclusion": "collection-and-schema-only",
+    "aggregateDoesNotDuplicateNativeCheckConclusion": true,
+    "requiredCheckAuthority": "repository-native-ruleset",
+    "productionMutation": false,
+    "secretMaterialAllowed": false
+  }
+}
