@@ -63,6 +63,12 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
 
+      - name: Prove mobile Content Manager flow
+        shell: bash
+        run: |
+          set -euo pipefail
+          node e2e/content-manager-proof.mjs 2>&1 | tee logs/content-manager-proof.log
+
       - name: Upload Playwright HTML report
         if: always()
         uses: actions/upload-artifact@v4
