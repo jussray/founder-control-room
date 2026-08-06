@@ -4,7 +4,6 @@ import {
   classifyRepositoryForContent,
   type RepositoryEvidence,
 } from '../socialCampaignPolicy.js';
-import type { FounderSignalAutomationGrant } from '../founderSignalAutomationPolicy.js';
 
 const VALID_HEAD = 'a'.repeat(40);
 const APPROVED_PROOF_ROOT = 'https://github.com/jussray/example';
