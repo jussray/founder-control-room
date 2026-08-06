@@ -5,6 +5,7 @@ import {
   evaluateFounderSignalAutomation,
   type FounderSignalAutomationGrant,
   type FounderSignalCandidate,
+  type FounderSignalRepositoryScope,
   type FounderSignalEvidenceReceipt,
   type FounderSignalPolicyResult,
 } from '../../lib/founderSignalAutomationPolicy.js';
@@ -230,11 +231,22 @@ function parseGrant(raw: string): FounderSignalAutomationGrant {
     throw new Error('Founder Signal automation grant expiresAt must be null or a string');
   }
 
+  const repositoryScope = parseRepositoryScope(parsed.repositoryScope);
+  const repositories =
+    parsed.repositories === undefined || parsed.repositories === null
+      ? []
+      : parseStringArray(parsed.repositories, 'repositories');
+
+  if (!repositoryScope && repositories.length === 0) {
+    throw new Error('Founder Signal automation grant requires repositoryScope or repositories');
+  }
+
   return {
     id,
     enabled: parsed.enabled,
     routes,
-    repositories: parseStringArray(parsed.repositories, 'repositories'),
+    repositories,
+    repositoryScope,
     approvedRecipientIds: Array.isArray(parsed.approvedRecipientIds)
       ? (parsed.approvedRecipientIds
           .map((entry) => boundedText(entry, 200))
@@ -242,6 +254,20 @@ function parseGrant(raw: string): FounderSignalAutomationGrant {
       : [],
     expiresAt,
   };
+}
+
+function parseRepositoryScope(value: unknown): FounderSignalRepositoryScope | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!isRecord(value) || value.mode !== 'all_owned') {
+    throw new Error('repositoryScope must use mode all_owned');
+  }
+
+  const owner = boundedText(value.owner, 39);
+  if (!owner || !/^[A-Za-z0-9-]+$/.test(owner)) {
+    throw new Error('repositoryScope.owner must be a valid GitHub owner');
+  }
+
+  return { mode: 'all_owned', owner };
 }
 
 async function defaultLoadGrant(
