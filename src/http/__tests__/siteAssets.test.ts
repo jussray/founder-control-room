@@ -41,11 +41,13 @@ describe('Founder Control Room Cloudflare topology', () => {
 
     expect(app).toContain('Every output fuels the next prompt');
     expect(app).toContain('data-lane="chat"');
-    expect(app).toContain('data-lane="cowork"');
+    expect(app).toContain('data-lane="workflows"');
     expect(app).toContain('data-lane="code"');
     expect(app).toContain('data-lane="projects"');
     expect(app).toContain('data-lane="skills"');
-    expect(app).toContain('Cowork output becomes the Code prompt');
+    expect(app).toContain('Workflows output becomes the Code prompt');
+    expect(app).not.toContain('Cowork');
+    expect(app).not.toContain('data-lane="cowork"');
     expect(app).toContain('Terminal build/test');
     expect(app).toContain('href="/control-room/?tab=terminal"');
     expect(app).toContain('Create / Add to Project');
@@ -58,13 +60,15 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(stackRouter).toContain('new MutationObserver');
   });
 
-  it('routes Cowork through a review-first Cambiante content lifecycle', () => {
+  it('routes Workflows through a review-first Cambiante content lifecycle', () => {
     const app = read('public/control-room/index.html');
     const contentManager = read('public/control-room/content-manager.html');
     const playwrightProof = read('e2e/content-manager-proof.mjs');
 
     expect(app).toContain('href="/control-room/content-manager.html"');
     expect(app).toContain('Content manager');
+    expect(contentManager).toContain('Workflow content lifecycle');
+    expect(contentManager).not.toContain('Cowork');
     expect(contentManager).toContain('Proof → draft → review → approval → schedule → publish → metrics');
     expect(contentManager).toContain('create_linkedin_post');
     expect(contentManager).toContain('add_post_comment');
