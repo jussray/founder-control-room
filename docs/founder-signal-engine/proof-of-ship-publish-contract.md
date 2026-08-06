@@ -75,8 +75,6 @@ The sender posts one JSON object to the dedicated Catch Hook:
   "PUBLISH_ALLOWED": true,
   "invocation_id": "uuid",
   "batch_id": "uuid",
-  "batch_size": 1,
-  "batch_index": 1,
   "steering_grant_id": "proof-of-ship-publish-v1",
   "founder_approval_id": "standing-policy:proof-of-ship-publish-v1:uuid",
   "authorization_mode": "standing-policy",
@@ -114,7 +112,7 @@ A `not_applicable` Supabase receipt is valid only when `migration_versions` is e
 3. **Allowlist filter** — require `repository_allowed=true`, `live_state=verified`, `publish_allowed=true`, `PUBLISH_ALLOWED=true`, and reject `jussray/Sekret-Bip`.
 4. **ChatGPT Conversation** — use the Responses API action. Feed only the verified change fields and receipts. Return JSON with `x` and `linkedin`; do not invent impact, metrics, or URLs.
 5. **Output validation** — require the proof URLs in the generated copy to equal the supplied URLs. Reject unresolved prompts, empty copy, or altered URLs.
-6. **Buffer Add to Buffer** — create one item per selected channel with `content_field`, `post_text`, `channel`, `proof_url`, `source_commit_sha`, `generated_at`, `scheduled_at`, `invocation_id`, `steering_grant_id`, `founder_approval_id`, `authorization_mode`, `schedule_policy_id`, and the batch fields from the payload.
+6. **Buffer Add to Buffer** — create one item per selected channel with `content_field`, `post_text`, `channel`, `proof_url`, `source_commit_sha`, `generated_at`, `scheduled_at`, `invocation_id`, `steering_grant_id`, `founder_approval_id`, `authorization_mode`, `schedule_policy_id`, and the batch fields derived from the channel fan-out. Keep the source `batch_id`; set `batch_size` to the number of final posts and `batch_index` to each post's 1-based position.
 7. **Gmail campaign digest** — retain the existing private review notification and reply-ingress contract. A notification failure cancels the scheduled batch.
 
 The existing `tools/zapier/buffer-content-firewall.cjs` is the final deterministic validator. The Zap must pass its required runtime receipt, source SHA, HTTPS proof URL, schedule policy, and content-field checks.
