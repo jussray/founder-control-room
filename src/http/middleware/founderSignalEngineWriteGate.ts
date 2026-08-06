@@ -235,7 +235,9 @@ function parseGrant(raw: string): FounderSignalAutomationGrant {
   const repositories =
     parsed.repositories === undefined || parsed.repositories === null
       ? []
-      : parseStringArray(parsed.repositories, 'repositories');
+      : Array.isArray(parsed.repositories) && parsed.repositories.length === 0
+        ? []
+        : parseStringArray(parsed.repositories, 'repositories');
 
   if (!repositoryScope && repositories.length === 0) {
     throw new Error('Founder Signal automation grant requires repositoryScope or repositories');
