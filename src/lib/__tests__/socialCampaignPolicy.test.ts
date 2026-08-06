@@ -27,7 +27,7 @@ function repo(overrides: Partial<RepositoryEvidence> = {}): RepositoryEvidence {
 }
 
 describe('classifyRepositoryForContent', () => {
-  it('blocks a sensitive-data repository even when configuredMode requests a full campaign', () => {
+  it('keeps sensitive-data repositories in the portfolio through sanitized progress mode', () => {
     const source = repo({
       fullName: 'jussray/Sekret-Bip',
       policy: {
@@ -40,9 +40,9 @@ describe('classifyRepositoryForContent', () => {
     });
     const result = classifyRepositoryForContent(source);
 
-    expect(result.mode).toBe('blocked_pending_output_safeguard');
-    expect(result.eligibleForDraftGeneration).toBe(false);
-    expect(result.daysAllocated).toBe(0);
+    expect(result.mode).toBe('sanitized_product_only');
+    expect(result.eligibleForDraftGeneration).toBe(true);
+    expect(result.daysAllocated).toBe(2);
     expect(result.authorizedRepository).toBe(source.fullName);
     expect(result.authorizedExactHead).toBe(source.exactHead);
   });
@@ -55,6 +55,23 @@ describe('classifyRepositoryForContent', () => {
         policy: {
           containsMinorOrSensitiveData: true,
           publicProofUrls: [],
+          neverClaim: [],
+          neverExpose: [],
+        },
+      }),
+    );
+
+    expect(result.mode).toBe('blocked_pending_output_safeguard');
+    expect(result.eligibleForDraftGeneration).toBe(false);
+  });
+
+  it('blocks a sensitive repository when the sanitized public surface is incomplete', () => {
+    const result = classifyRepositoryForContent(
+      repo({
+        fullName: 'jussray/Sekret-Bip',
+        policy: {
+          containsMinorOrSensitiveData: true,
+          publicProofUrls: ['https://sekretbip.net'],
           neverClaim: [],
           neverExpose: [],
         },
@@ -152,7 +169,7 @@ describe('buildFirstPartySocialPostInput', () => {
     proofLinks: [{ label: 'PR', url: `${APPROVED_PROOF_ROOT}/pull/188` }],
   };
 
-  it('refuses to build input for an ineligible repository', () => {
+  it('refuses to build input when a sensitive repository has no reviewed public surface', () => {
     const source = repo({
       fullName: 'jussray/Sekret-Bip',
       policy: {
