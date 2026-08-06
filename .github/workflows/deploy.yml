@@ -386,7 +386,7 @@ jobs:
 
   # ── 4. Verified proof-of-ship payload ───────────────────────────────────────
   proof-of-ship:
-    name: Proof of Ship — Verify and Stage Review Draft
+    name: Proof of Ship — Verify and Publish via Review Window
     runs-on: ubuntu-latest
     timeout-minutes: 12
     environment: production
@@ -396,9 +396,9 @@ jobs:
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
       DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-      ZAPIER_CATCH_HOOK_URL: ${{ secrets.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL }}
+      ZAPIER_CATCH_HOOK_URL: ${{ secrets.ZAPIER_CATCH_HOOK_URL }}
       GITHUB_TOKEN: ${{ github.token }}
-      PUBLISH_ALLOWED: 'false'
+      PUBLISH_ALLOWED: 'true'
     steps:
       - name: Check out the exact deployed commit
         uses: actions/checkout@v4
@@ -482,6 +482,7 @@ jobs:
           pr_title="$(jq -r '.[0].title // empty' <<<"$pr_response" 2>/dev/null || true)"
           merged_at="$(jq -r '.[0].merged_at // empty' <<<"$pr_response" 2>/dev/null || true)"
 
+          conventional_commit_re='^(feat|fix|perf)(\([^)]*\))?!?:'
           commit_type=''
           for title in "$commit_message" "$pr_title"; do
             if [[ "$title" =~ $conventional_commit_re ]]; then
@@ -677,8 +678,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ "${PUBLISH_ALLOWED:-true}" != false ]]; then
-            echo '::error title=Publication gate violated::PUBLISH_ALLOWED must remain false.'
+          if [[ "${PUBLISH_ALLOWED:-false}" != true ]]; then
+            echo '::error title=Publication gate blocked::PUBLISH_ALLOWED must be true for the scheduled-publication contract.'
             exit 1
           fi
           if [[ -z "${ZAPIER_CATCH_HOOK_URL:-}" ]]; then
@@ -689,6 +690,8 @@ jobs:
           jq -e '
             (.meaningful == true) and
             (.repository_allowed == true) and
+            (.repo != "jussray/Sekret-Bip") and
+            (. as $payload | ($payload.repository_allowlist | index($payload.repo)) != null) and
             (.commit_sha | test("^[0-9a-f]{40}$")) and
             ((.supabase_state == "verified") or (.supabase_state == "not_applicable")) and
             (.cloudflare_live_sha == .commit_sha)
@@ -697,24 +700,71 @@ jobs:
           run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           idempotency_key="${GITHUB_REPOSITORY}:${EXPECTED_HEAD_SHA}"
           verified_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          scheduled_at="$(date -u -d "$verified_at + 20 minutes" +%Y-%m-%dT%H:%M:%SZ)"
+          invocation_id="$(python3 - <<'PY'
+          import uuid
+          print(uuid.uuid4())
+          PY
+          )"
+          batch_id="$invocation_id"
+          steering_grant_id='proof-of-ship-publish-v1'
+          founder_approval_id="standing-policy:${steering_grant_id}:${invocation_id}"
           jq --arg run_url "$run_url" \
             --arg idempotency_key "$idempotency_key" \
             --arg verified_at "$verified_at" \
+            --arg scheduled_at "$scheduled_at" \
+            --arg invocation_id "$invocation_id" \
+            --arg batch_id "$batch_id" \
+            --arg steering_grant_id "$steering_grant_id" \
+            --arg founder_approval_id "$founder_approval_id" \
             '.live_state = "verified" |
-             .publish_allowed = false |
-             .PUBLISH_ALLOWED = false |
+             .publish_allowed = true |
+             .PUBLISH_ALLOWED = true |
              .idempotency_key = $idempotency_key |
              .proof_url = $run_url |
              .github_actions_run_url = $run_url |
              .source_event = "workflow_dispatch" |
              .verified_at = $verified_at |
-             .buffer_terminal_action = "draft_or_paused_queue_only"' \
+             .source_commit_sha = .commit_sha |
+             .invocation_id = $invocation_id |
+             .batch_id = $batch_id |
+             .batch_size = 1 |
+             .batch_index = 1 |
+             .steering_grant_id = $steering_grant_id |
+             .founder_approval_id = $founder_approval_id |
+             .authorization_mode = "standing-policy" |
+             .schedule_policy_id = "buffer-20-minute-review-v1" |
+             .notification_mode = "gmail_campaign_digest" |
+             .generated_at = $verified_at |
+             .scheduled_at = $scheduled_at |
+             .review_deadline = $scheduled_at |
+             .review_window_minutes = 20 |
+             .share_now_allowed = false |
+             .destination_mode = "schedule" |
+             .buffer_provider_action = "buffer_add_to_queue" |
+             .buffer_method = "schedule" |
+             .buffer_save_to_draft = false |
+             .buffer_api_sharing_mode = "customScheduled" |
+             .content_mode = "proof-led-build-in-public" |
+             .requested_channels = ["x", "linkedin"] |
+             .requested_content_fields = ["x_draft", "linkedin_draft"] |
+             .buffer_terminal_action = "schedule"' \
             proof-context.json > proof-payload.json
 
           jq -e '
             .live_state == "verified" and
-            .publish_allowed == false and
-            .PUBLISH_ALLOWED == false and
+            .publish_allowed == true and
+            .PUBLISH_ALLOWED == true and
+            (.repo != "jussray/Sekret-Bip") and
+            (. as $payload | ($payload.repository_allowlist | index($payload.repo)) != null) and
+            .destination_mode == "schedule" and
+            .buffer_method == "schedule" and
+            .buffer_save_to_draft == false and
+            .share_now_allowed == false and
+            .schedule_policy_id == "buffer-20-minute-review-v1" and
+            .authorization_mode == "standing-policy" and
+            (.invocation_id | test("^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")) and
+            (.founder_approval_id | startswith("standing-policy:proof-of-ship-publish-v1:")) and
             (.proof_url | startswith("https://")) and
             (.idempotency_key | length > 0) and
             .cloudflare_live_sha == .commit_sha
@@ -729,10 +779,10 @@ jobs:
             "$ZAPIER_CATCH_HOOK_URL"
 
           {
-            echo '### Verified proof payload staged'
-            jq '{repo, commit_sha, pr_url, commit_url, live_state, supabase_state, supabase_migration_version, cloudflare_live_sha, proof_url, idempotency_key, publish_allowed, PUBLISH_ALLOWED, buffer_terminal_action}' proof-payload.json
+            echo '### Verified proof payload sent for scheduled publication'
+            jq '{repo, commit_sha, pr_url, commit_url, live_state, supabase_state, supabase_migration_version, cloudflare_live_sha, proof_url, idempotency_key, publish_allowed, PUBLISH_ALLOWED, destination_mode, buffer_method, scheduled_at, review_deadline, buffer_terminal_action}' proof-payload.json
             echo
-            echo 'The downstream Zap must retain this idempotency key, use ChatGPT Conversation, and add only a draft or paused-queue item to Buffer.'
+            echo 'The downstream Zap must dedupe by idempotency_key, use ChatGPT Conversation, validate proof URLs, and schedule the Buffer post under the 20-minute review-window contract.'
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ── 5. Post-deploy database reconciliation inspection ───────────────────────
