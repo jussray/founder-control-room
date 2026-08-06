@@ -8,6 +8,10 @@ Authoritative code:
 - `src/lib/__tests__/socialCampaignPolicy.test.ts`
 - `config/social-campaign-repositories.json`
 
+## Portfolio coverage
+
+The intake scope is dynamic `all_owned` for GitHub owner `jussray`. There is no fixed four-repository allowlist and no Sekret-Bip exclusion. Every repository event can create a sanitized proof signal, including work after a public launch. Privacy, visibility, sensitive-data, and proof-surface policy decide whether the signal becomes a public draft, a founder-review item, or a blocked item; they do not erase the underlying progress event.
+
 Builds on, not alongside:
 
 - `src/lib/firstPartySocialPublisher.ts` (`docs/founder-signal-engine/first-party-multichannel-publisher-v1.md`) — this module's output feeds `validateFirstPartySocialPost` directly. It reuses that module's platform list and per-platform `contentField`/character-limit capabilities rather than redefining them.
