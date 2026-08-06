@@ -47,6 +47,63 @@ function candidate(overrides: Partial<FounderSignalCandidate> = {}): FounderSign
 }
 
 describe('evaluateFounderSignalAutomation', () => {
+  it('covers every repository owned by jussray without a fixed social allowlist', () => {
+    const allOwnedGrant: FounderSignalAutomationGrant = {
+      ...grant,
+      repositories: [],
+      repositoryScope: { mode: 'all_owned', owner: 'jussray' },
+    };
+
+    for (const repository of [
+      'jussray/Sekret-Bip',
+      'jussray/StoryEngine',
+      'jussray/jbh-private',
+      'jussray/promptos',
+      'jussray/solcontinuity',
+    ]) {
+      const proofUrl = `https://github.com/${repository}/commit/${SHA}`;
+      const result = evaluateFounderSignalAutomation(
+        allOwnedGrant,
+        candidate({
+          repository,
+          proofUrl,
+          evidenceReceipt: {
+            verified: true,
+            provider: 'github',
+            repository,
+            sourceCommitSha: SHA,
+            proofUrl,
+          },
+        }),
+      );
+
+      expect(result).toEqual({
+        decision: 'auto-distribute',
+        reasons: [],
+        grantId: allOwnedGrant.id,
+      });
+    }
+
+    const outsideOwner = evaluateFounderSignalAutomation(
+      allOwnedGrant,
+      candidate({
+        repository: 'someone-else/private-repo',
+        proofUrl: 'https://github.com/someone-else/private-repo/commit/' + SHA,
+        evidenceReceipt: {
+          verified: true,
+          provider: 'github',
+          repository: 'someone-else/private-repo',
+          sourceCommitSha: SHA,
+          proofUrl: 'https://github.com/someone-else/private-repo/commit/' + SHA,
+        },
+      }),
+    );
+
+    expect(outsideOwner.decision).toBe('blocked');
+    expect(outsideOwner.reasons).toContain('repository is outside the grant scope');
+  });
+
+
   it('allows automatic social distribution only with trusted evidence inside an approved route', () => {
     expect(evaluateFounderSignalAutomation(grant, candidate())).toEqual({
       decision: 'auto-distribute',
