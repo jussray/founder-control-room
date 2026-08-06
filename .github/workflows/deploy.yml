@@ -593,7 +593,8 @@ jobs:
 
       - name: Skip non-meaningful activity
         if: steps.classify.outputs.meaningful != 'true'
-        run: echo 'No verified build-in-public event: filtered by commit, author, or changed paths.'
+        run: |
+          echo 'No verified build-in-public event: filtered by commit, author, or changed paths.'
 
       - name: Verify changed Supabase migrations on the remote database
         if: steps.classify.outputs.meaningful == 'true'
