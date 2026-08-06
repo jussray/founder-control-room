@@ -20,7 +20,7 @@
 .loop-mark{flex:0 0 auto;color:#f8fafc;font-size:1.5rem;line-height:1}
 .stack-lane{--lane:#7dd3fc;display:grid;grid-template-columns:8rem minmax(0,1fr);gap:.75rem;align-items:center;padding:.72rem;border:1px solid color-mix(in srgb,var(--lane) 42%,transparent);border-radius:1rem;background:linear-gradient(90deg,color-mix(in srgb,var(--lane) 10%,transparent),rgba(15,23,42,.7));box-shadow:inset 0 0 28px color-mix(in srgb,var(--lane) 5%,transparent)}
 .stack-lane[data-lane='chat']{--lane:#67e8f9}
-.stack-lane[data-lane='cowork']{--lane:#c084fc}
+.stack-lane[data-lane='workflows']{--lane:#c084fc}
 .stack-lane[data-lane='code']{--lane:#f472b6}
 .stack-lane[data-lane='projects']{--lane:#fb7185}
 .stack-lane[data-lane='skills']{--lane:#fde047}
@@ -73,10 +73,10 @@ a.stage:focus-visible,.launch-dock summary:focus-visible{outline:3px solid #f8fa
         <a class="stage" href="/control-room/?tab=promptos"><small>Handoff</small>Refined prompting</a>
       </div>
     </section>
-    <div class="handoff">Chat output becomes the Cowork prompt</div>
+    <div class="handoff">Chat output becomes the Workflows prompt</div>
 
-    <section class="stack-lane" data-lane="cowork" aria-labelledby="stack-cowork">
-      <h2 class="lane-heading" id="stack-cowork"><span class="lane-number">2</span>Cowork</h2>
+    <section class="stack-lane" data-lane="workflows" aria-labelledby="stack-workflows">
+      <h2 class="lane-heading" id="stack-workflows"><span class="lane-number">2</span>Workflows</h2>
       <div class="lane-flow">
         <a class="stage" href="/control-room/futureyou-v8.html"><small>Start</small>Prompt</a>
         <a class="stage" href="/control-room/?tab=missions"><small>Plan</small>Task planning</a>
@@ -87,7 +87,7 @@ a.stage:focus-visible,.launch-dock summary:focus-visible{outline:3px solid #f8fa
         <a class="stage" href="/control-room/?tab=activity"><small>Handoff</small>Output</a>
       </div>
     </section>
-    <div class="handoff">Cowork output becomes the Code prompt</div>
+    <div class="handoff">Workflows output becomes the Code prompt</div>
 
     <section class="stack-lane" data-lane="code" aria-labelledby="stack-code">
       <h2 class="lane-heading" id="stack-code"><span class="lane-number">3</span>Code</h2>
