@@ -477,7 +477,7 @@ jobs:
 
           commit_type=''
           for title in "$commit_message" "$pr_title"; do
-            if [[ "$title" =~ ^(feat|fix|perf)(\([^)]*\))?!?: ]]; then
+            if [[ "$title" =~ $conventional_commit_re ]]; then
               commit_type="${BASH_REMATCH[1]}"
               break
             fi
