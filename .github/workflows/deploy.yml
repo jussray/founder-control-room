@@ -141,6 +141,10 @@ jobs:
           ref: ${{ inputs.expected_head_sha }}
           persist-credentials: false
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
       - uses: supabase/setup-cli@v2
         with:
           version: 2.101.0
@@ -201,6 +205,20 @@ jobs:
           print('Supabase deployment configuration is present and structurally valid.')
           PY
 
+      - name: Capture pre-deploy migration ledger
+        shell: bash
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          REMOTE_MIGRATION_LIST_PATH: test-results/migration-ledger-before.txt
+          MIGRATION_LEDGER_RECEIPT_PATH: test-results/migration-ledger-before.json
+          MIGRATION_LEDGER_PHASE: preflight
+          REQUIRED_MIGRATION_VERSIONS: 20260723000000,20260803011000
+        run: |
+          set -euo pipefail
+          mkdir -p test-results
+          supabase migration list --db-url "$SUPABASE_DB_URL" | tee "$REMOTE_MIGRATION_LIST_PATH"
+          node scripts/verify-production-migration-ledger.mjs
+
       - name: Preview migrations
         run: |
           set -euo pipefail
@@ -218,6 +236,46 @@ jobs:
             --db-url "$SUPABASE_DB_URL"
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+
+      - name: Verify post-push migration ledger
+        shell: bash
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          REMOTE_MIGRATION_LIST_PATH: test-results/migration-ledger-after.txt
+          MIGRATION_LEDGER_RECEIPT_PATH: test-results/migration-ledger-after.json
+          MIGRATION_LEDGER_PHASE: post-push
+          REQUIRED_MIGRATION_VERSIONS: 20260723000000,20260803011000
+        run: |
+          set -euo pipefail
+          supabase migration list --db-url "$SUPABASE_DB_URL" | tee "$REMOTE_MIGRATION_LIST_PATH"
+          node scripts/verify-production-migration-ledger.mjs
+
+      - name: Record migration ledger summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Supabase migration ledger"
+            echo
+            echo "- Required security migrations: \`20260723000000\`, \`20260803011000\`"
+            echo "- Pre-deploy receipt: \`migration-ledger-before.json\`"
+            echo "- Post-push receipt: \`migration-ledger-after.json\`"
+            echo "- Remote-only versions are blocked before mutation."
+            echo "- Any local-only version remaining after push fails the deployment."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload migration ledger receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-migration-ledger-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            test-results/migration-ledger-before.txt
+            test-results/migration-ledger-before.json
+            test-results/migration-ledger-after.txt
+            test-results/migration-ledger-after.json
+          if-no-files-found: warn
+          retention-days: 30
 
   # ── 2. Cloudflare Worker deploy ──────────────────────────────────────────────
   worker-deploy:

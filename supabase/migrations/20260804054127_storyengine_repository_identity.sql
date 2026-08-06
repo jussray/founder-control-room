@@ -1,6 +1,6 @@
 -- Reconcile the stable L99 project slug with the authoritative renamed repository.
 -- This is idempotent and changes only the provider locator used by repository federation.
-update projects
+update public.projects
 set
   repo_provider = 'github',
   repo_identifier = 'jussray/StoryEngine',
