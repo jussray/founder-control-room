@@ -35,6 +35,29 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(existsSync(resolve(repoRoot, 'public/portable-founder-console/index.html'))).toBe(true);
   });
 
+  it('turns the founder stack into a five-lane execution loop', () => {
+    const app = read('public/control-room/index.html');
+    const stackRouter = read('public/control-room/stack-router.js');
+
+    expect(app).toContain('Every output fuels the next prompt');
+    expect(app).toContain('data-lane="chat"');
+    expect(app).toContain('data-lane="cowork"');
+    expect(app).toContain('data-lane="code"');
+    expect(app).toContain('data-lane="projects"');
+    expect(app).toContain('data-lane="skills"');
+    expect(app).toContain('Cowork output becomes the Code prompt');
+    expect(app).toContain('Terminal build/test');
+    expect(app).toContain('href="/control-room/?tab=terminal"');
+    expect(app).toContain('Create / Add to Project');
+    expect(app).toContain('Consistent output becomes the next Chat prompt');
+    expect(app).toContain('src="/control-room/stack-router.js"');
+
+    expect(stackRouter).toContain("const PENDING_TAB_KEY = 'fcr_pending_tab'");
+    expect(stackRouter).toContain("'terminal'");
+    expect(stackRouter).toContain('.tabs button[data-tab=');
+    expect(stackRouter).toContain('new MutationObserver');
+  });
+
   it('keeps browser API calls same-origin and rejects an unverified upstream', () => {
     const proxy = read('public/_worker.js');
 
