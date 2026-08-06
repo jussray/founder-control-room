@@ -24,7 +24,7 @@
         "customer information",
         "internal Supabase data"
       ],
-      "_gate": "config/repository-visibility-policy.json currently targets this repository for privatization (priority: critical, action: privatize_then_create_clean_showcase_export). containsMinorOrSensitiveData short-circuits classifyRepositoryForContent() regardless of configuredMode — see socialCampaignPolicy.ts."
+      "_gate": "config/repository-visibility-policy.json currently targets this repository for privatization (priority: critical, action: privatize_then_create_clean_showcase_export). containsMinorOrSensitiveData is allowed only through sanitized_product_only when reviewed publicProofUrls and a non-empty neverExpose output denylist exist; otherwise classifyRepositoryForContent() blocks draft generation — see socialCampaignPolicy.ts."
     }
   }
 }
