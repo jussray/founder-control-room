@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const verifier = resolve(repositoryRoot, 'scripts/verify-production-migration-ledger.mjs');
+const deployWorkflow = readFileSync(resolve(repositoryRoot, '.github/workflows/deploy.yml'), 'utf8');
 const requiredVersions = '20260723000000,20260803011000';
 const temporaryDirectories: string[] = [];
 
@@ -107,5 +108,20 @@ describe('production migration ledger verifier', () => {
     expect(existsSync(resolve(repositoryRoot, 'supabase/migrations/20260805235708_harden_outbox_claim_ownership.sql'))).toBe(true);
     expect(existsSync(resolve(repositoryRoot, 'supabase/migrations/20260804_storyengine_repository_identity.sql'))).toBe(false);
     expect(existsSync(resolve(repositoryRoot, 'supabase/migrations/20260721105000_harden_outbox_claim_ownership.sql'))).toBe(false);
+  });
+
+  it('wires exact preflight and post-push ledger receipts into the manual Deploy workflow', () => {
+    for (const phrase of [
+      'Capture pre-deploy migration ledger',
+      'Verify post-push migration ledger',
+      'node scripts/verify-production-migration-ledger.mjs',
+      'REQUIRED_MIGRATION_VERSIONS: 20260723000000,20260803011000',
+      'Upload migration ledger receipts',
+      'supabase-migration-ledger-${{ github.run_id }}-${{ github.run_attempt }}',
+      'test-results/migration-ledger-before.json',
+      'test-results/migration-ledger-after.json',
+    ]) {
+      expect(deployWorkflow).toContain(phrase);
+    }
   });
 });
