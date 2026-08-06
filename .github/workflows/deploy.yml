@@ -384,7 +384,7 @@ jobs:
         env:
           PUBLIC_URL: https://foundercontrolroom.org
 
-  # ── 4. Post-deploy database reconciliation inspection ───────────────────────
+  # ── 4. Verified proof-of-ship payload ───────────────────────────────────────
   proof-of-ship:
     name: Proof of Ship — Verify and Stage Review Draft
     runs-on: ubuntu-latest
@@ -721,6 +721,7 @@ jobs:
             echo 'The downstream Zap must retain this idempotency key, use ChatGPT Conversation, and add only a draft or paused-queue item to Buffer.'
           } >> "$GITHUB_STEP_SUMMARY"
 
+  # ── 5. Post-deploy database reconciliation inspection ───────────────────────
   reconcile:
     name: Post-Deploy Reconciliation
     runs-on: ubuntu-latest
