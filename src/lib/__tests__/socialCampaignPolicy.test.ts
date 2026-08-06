@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildFirstPartySocialPostInput,
   classifyRepositoryForContent,
+  type FounderSignalAutomationGrant,
   type RepositoryEvidence,
 } from '../socialCampaignPolicy.js';
 
