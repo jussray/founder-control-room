@@ -58,6 +58,32 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(stackRouter).toContain('new MutationObserver');
   });
 
+  it('routes Cowork through a review-first Cambiante content lifecycle', () => {
+    const app = read('public/control-room/index.html');
+    const contentManager = read('public/control-room/content-manager.html');
+    const playwrightProof = read('e2e/content-manager-proof.mjs');
+
+    expect(app).toContain('href="/control-room/content-manager.html"');
+    expect(app).toContain('Content manager');
+    expect(contentManager).toContain('Proof → draft → review → approval → schedule → publish → metrics');
+    expect(contentManager).toContain('create_linkedin_post');
+    expect(contentManager).toContain('add_post_comment');
+    expect(contentManager).toContain('approve_post');
+    expect(contentManager).toContain('reschedule_post / bulk_schedule_posts');
+    expect(contentManager).toContain('publish_now(confirmPublication: true)');
+    expect(contentManager).toContain('get_post_status / sync_post_metrics');
+    expect(contentManager).toContain('A provider limit, authorization error, or failed write is BLOCKED.');
+
+    const approval = contentManager.indexOf('data-content-stage="approval"');
+    const publish = contentManager.indexOf('data-content-stage="publish"');
+    expect(approval).toBeGreaterThan(-1);
+    expect(publish).toBeGreaterThan(approval);
+
+    expect(playwrightProof).toContain("viewport: { width: 390, height: 844 }");
+    expect(playwrightProof).toContain("'content-manager-mobile.png'");
+    expect(playwrightProof).toContain('page must not overflow the mobile viewport');
+  });
+
   it('keeps browser API calls same-origin and rejects an unverified upstream', () => {
     const proxy = read('public/_worker.js');
 
