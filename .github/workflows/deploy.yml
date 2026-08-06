@@ -748,8 +748,6 @@ jobs:
              .source_commit_sha = .commit_sha |
              .invocation_id = $invocation_id |
              .batch_id = $batch_id |
-             .batch_size = 1 |
-             .batch_index = 1 |
              .steering_grant_id = $steering_grant_id |
              .founder_approval_id = $founder_approval_id |
              .authorization_mode = "standing-policy" |
