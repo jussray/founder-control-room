@@ -29,7 +29,7 @@ The GitHub Actions job runs after the existing production smoke test and stops b
 4. The repository is in the allowlist and is not `jussray/Sekret-Bip`.
 5. Every changed Supabase migration version is present in the remote `supabase_migrations.schema_migrations` table. If no migration changed, the receipt is `not_applicable`.
 6. The live Worker `/version` response reports `service=founder-control-room` and `gitSha` equal to the deployed SHA.
-7. `PUBLISH_ALLOWED=true` and the dedicated `ZAPIER_CATCH_HOOK_URL` secret is present.
+7. `PUBLISH_ALLOWED=true`, the dedicated `ZAPIER_CATCH_HOOK_URL` secret is present, and the revocable `PROOF_OF_SHIP_STEERING_GRANT_ID` secret is present.
 
 A failed proof exits non-zero. No webhook is sent and no post is generated.
 
@@ -109,7 +109,7 @@ A `not_applicable` Supabase receipt is valid only when `migration_versions` is e
 
 ## Required Zap sequence
 
-1. **Catch Hook** — use the dedicated `ZAPIER_CATCH_HOOK_URL`.
+1. **Catch Hook** — use the dedicated `ZAPIER_CATCH_HOOK_URL`; the suggested grant value is `proof-of-ship-publish-v1`.
 2. **Dedupe** — look up `idempotency_key` in Zapier Tables or Storage by Zapier; stop when already processed.
 3. **Allowlist filter** — require `repository_allowed=true`, `live_state=verified`, `publish_allowed=true`, `PUBLISH_ALLOWED=true`, and reject `jussray/Sekret-Bip`.
 4. **ChatGPT Conversation** — use the Responses API action. Feed only the verified change fields and receipts. Return JSON with `x` and `linkedin`; do not invent impact, metrics, or URLs.
@@ -121,7 +121,7 @@ The existing `tools/zapier/buffer-content-firewall.cjs` is the final determinist
 
 ## Rollback
 
-To stop publication, disable the dedicated Zap and cancel scheduled Buffer items. Do not delete the GitHub Actions evidence. To return to fail-closed staging, set the workflow publication flag back to `false` in a reviewed change and keep the dedicated hook configured only for validation.
+To stop publication, remove or rotate `PROOF_OF_SHIP_STEERING_GRANT_ID`, disable the dedicated Zap, and cancel scheduled Buffer items. Do not delete the GitHub Actions evidence. To return to fail-closed staging, set the workflow publication flag back to `false` in a reviewed change and keep the dedicated hook configured only for validation.
 
 ## Day 3 completion proof
 
