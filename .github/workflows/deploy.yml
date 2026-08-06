@@ -491,6 +491,11 @@ jobs:
             fi
           done
 
+          is_wip=false
+          case "${commit_message,,}" in
+            wip|wip:*|'wip '*|'wip('*|'[wip]'*) is_wip=true ;;
+          esac
+
           merged_to_main=false
           if ((parent_count >= 2)) || [[ -n "$merged_at" ]]; then
             merged_to_main=true
@@ -500,6 +505,7 @@ jobs:
           if [[ "$commit_message" != *'[skip ci]'* ]] \
             && [[ "$commit_message" != *'[skip post]'* ]] \
             && ! grep -Eiq 'dependabot' <<<"$commit_author" \
+            && [[ "$is_wip" == false ]] \
             && [[ "$repository_allowed" == true ]] \
             && [[ "$has_non_doc_path" == true ]] \
             && { [[ -n "$commit_type" ]] || [[ "$merged_to_main" == true ]]; }; then
@@ -524,6 +530,8 @@ jobs:
 
           meaningful_json=false
           [[ "$meaningful" == true ]] && meaningful_json=true
+          wip_json=false
+          [[ "$is_wip" == true ]] && wip_json=true
 
           jq -n \
             --arg repo "$GITHUB_REPOSITORY" \
@@ -540,6 +548,7 @@ jobs:
             --argjson changed_paths "$changed_paths_json" \
             --argjson meaningful_paths "$meaningful_paths_json" \
             --argjson migration_versions "$migration_versions_json" \
+            --argjson is_wip "$wip_json" \
             --arg meaningful_reason "$(if [[ "$merged_to_main" == true ]]; then echo merged-pr-to-main; elif [[ -n "$commit_type" ]]; then echo conventional-commit; else echo filtered; fi)" \
             --argjson meaningful "$meaningful_json" \
             '{
@@ -558,6 +567,7 @@ jobs:
               changed_paths: $changed_paths,
               changed_paths_summary: ($meaningful_paths | join(", ")),
               migration_versions: $migration_versions,
+              is_wip: $is_wip,
               meaningful: $meaningful,
               meaningful_reason: $meaningful_reason,
               live_state: "not_verified",
