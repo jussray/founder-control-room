@@ -397,6 +397,7 @@ jobs:
       DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       ZAPIER_CATCH_HOOK_URL: ${{ secrets.ZAPIER_CATCH_HOOK_URL }}
+      PROOF_OF_SHIP_STEERING_GRANT_ID: ${{ secrets.PROOF_OF_SHIP_STEERING_GRANT_ID }}
       GITHUB_TOKEN: ${{ github.token }}
       PUBLISH_ALLOWED: 'true'
     steps:
@@ -696,6 +697,14 @@ jobs:
             echo '::error title=Zapier proof blocked::The configured Catch Hook URL is missing.'
             exit 1
           fi
+          if [[ -z "${PROOF_OF_SHIP_STEERING_GRANT_ID:-}" ]]; then
+            echo '::error title=Publication grant blocked::Set PROOF_OF_SHIP_STEERING_GRANT_ID to explicitly activate scheduled publication.'
+            exit 1
+          fi
+          if [[ ! "$PROOF_OF_SHIP_STEERING_GRANT_ID" =~ ^[A-Za-z0-9._:-]{1,100}$ ]]; then
+            echo '::error title=Publication grant blocked::PROOF_OF_SHIP_STEERING_GRANT_ID contains unsupported characters.'
+            exit 1
+          fi
 
           jq -e '
             (.meaningful == true) and
@@ -717,7 +726,7 @@ jobs:
           PY
           )"
           batch_id="$invocation_id"
-          steering_grant_id='proof-of-ship-publish-v1'
+          steering_grant_id="$PROOF_OF_SHIP_STEERING_GRANT_ID"
           founder_approval_id="standing-policy:${steering_grant_id}:${invocation_id}"
           jq --arg run_url "$run_url" \
             --arg idempotency_key "$idempotency_key" \
