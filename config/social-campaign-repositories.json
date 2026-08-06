@@ -16,7 +16,7 @@
     },
     "jussray/Sekret-Bip": {
       "containsMinorOrSensitiveData": true,
-      "publicProofUrls": [],
+      "publicProofUrls": ["https://sekretbip.net"],
       "neverClaim": [],
       "neverExpose": [
         "teen records",
