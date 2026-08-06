@@ -769,7 +769,7 @@ jobs:
              .buffer_terminal_action = "schedule"' \
             proof-context.json > proof-payload.json
 
-          jq -e '
+          jq -e --arg expected_receipt "$founder_approval_id" '
             .live_state == "verified" and
             .publish_allowed == true and
             .PUBLISH_ALLOWED == true and
@@ -782,7 +782,7 @@ jobs:
             .schedule_policy_id == "buffer-20-minute-review-v1" and
             .authorization_mode == "standing-policy" and
             (.invocation_id | test("^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")) and
-            (.founder_approval_id | startswith("standing-policy:proof-of-ship-publish-v1:")) and
+            .founder_approval_id == $expected_receipt and
             (.proof_url | startswith("https://")) and
             (.idempotency_key | length > 0) and
             .cloudflare_live_sha == .commit_sha
