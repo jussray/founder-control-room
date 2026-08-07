@@ -1,5 +1,6 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { supabase } from '../../lib/supabaseClient.js';
+import { selectPortfolioPolicyAuditProjectId } from '../../lib/founderSignalPolicyAuditScope.js';
 import {
   FOUNDER_SIGNAL_CHANNELS,
   evaluateFounderSignalAutomation,
@@ -314,7 +315,7 @@ async function defaultResolveTrustedEvidence(
   for (const rawRow of data ?? []) {
     const row = rawRow as JsonRecord;
     if (!exactProofUrls(row).includes(lookup.proofUrl)) continue;
-    const runner = isRecord(row.runner) ? row.runner : null;
+    const runner = isRecord(row.runner) ? runnerRecord(row.runner) : null;
     const rawProvider =
       boundedText(runner?.provider, 50) ?? boundedText(row.repository_provider, 50);
     const provider = rawProvider?.toLowerCase();
@@ -332,40 +333,8 @@ async function defaultResolveTrustedEvidence(
   return null;
 }
 
-function repositoryOwnerAndName(value: string): [string, string] | null {
-  const segments = value.split('/');
-  if (segments.length !== 2) return null;
-  const [owner, repository] = segments;
-  return owner && repository ? [owner, repository] : null;
-}
-
-function connectionMatchesAllOwnedScope(config: unknown, sourceRepository: string): boolean {
-  const repository = repositoryOwnerAndName(sourceRepository);
-  if (!repository || !isRecord(config)) return false;
-  const scope = config.repositoryScope;
-  if (!isRecord(scope) || scope.mode !== 'all_owned') return false;
-  const owner = boundedText(scope.owner, 39);
-  return Boolean(owner) && owner?.toLowerCase() === repository[0].toLowerCase();
-}
-
-export function selectPortfolioPolicyAuditProjectId(
-  connections: unknown,
-  sourceRepository: string,
-): string | null {
-  if (!Array.isArray(connections) || !repositoryOwnerAndName(sourceRepository)) return null;
-
-  const matchingIds = new Set<string>();
-  for (const connection of connections) {
-    if (!isRecord(connection)) continue;
-    const projectId = boundedText(connection.project_id, 100);
-    if (!projectId || !connectionMatchesAllOwnedScope(connection.config, sourceRepository)) continue;
-    matchingIds.add(projectId);
-  }
-
-  if (matchingIds.size > 1) {
-    throw new Error(`POLICY_PORTFOLIO_SCOPE_AMBIGUOUS:${sourceRepository}`);
-  }
-  return [...matchingIds][0] ?? null;
+function runnerRecord(value: JsonRecord): JsonRecord {
+  return value;
 }
 
 async function defaultWritePolicyAudit(input: PolicyAuditInput): Promise<void> {
