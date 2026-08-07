@@ -93,9 +93,10 @@ function classification(
 /**
  * Pure, deterministic classification. No network calls and no side effects.
  *
- * Sensitive-data and explicit-block checks run before every eligibility path.
- * A repository cannot self-approve past either boundary through another
- * configured mode.
+ * Exact identity, explicit blocks, and archival state outrank every eligibility
+ * path. Sensitive repositories may become sanitized_product_only only after
+ * those hard stops have passed and both public-proof and output-denylist
+ * safeguards are configured.
  */
 export function classifyRepositoryForContent(repo: RepositoryEvidence): CampaignClassification {
   if (!EXACT_COMMIT_SHA.test(repo.exactHead)) {
@@ -104,26 +105,6 @@ export function classifyRepositoryForContent(repo: RepositoryEvidence): Campaign
       reason: 'exactHead is not a valid 40-character commit SHA — refusing to classify unverified state.',
       eligibleForDraftGeneration: false,
       daysAllocated: 0,
-    });
-  }
-
-  if (repo.policy.containsMinorOrSensitiveData) {
-    if (repo.policy.publicProofUrls.length === 0 || repo.policy.neverExpose.length === 0) {
-      return classification(repo, {
-        mode: 'blocked_pending_output_safeguard',
-        reason:
-          'Repository is flagged containsMinorOrSensitiveData and has no reviewed public proof plus output denylist. It remains observable, but cannot produce a public draft until the sanitized surface is configured.',
-        eligibleForDraftGeneration: false,
-        daysAllocated: 0,
-      });
-    }
-
-    return classification(repo, {
-      mode: 'sanitized_product_only',
-      reason:
-        'Repository progress is eligible only as a sanitized product update. Every generated field and proof asset must pass the repository neverExpose/neverClaim output firewall.',
-      eligibleForDraftGeneration: true,
-      daysAllocated: 2,
     });
   }
 
@@ -151,6 +132,26 @@ export function classifyRepositoryForContent(repo: RepositoryEvidence): Campaign
       reason: 'Repository policy explicitly excludes it from content generation.',
       eligibleForDraftGeneration: false,
       daysAllocated: 0,
+    });
+  }
+
+  if (repo.policy.containsMinorOrSensitiveData) {
+    if (repo.policy.publicProofUrls.length === 0 || repo.policy.neverExpose.length === 0) {
+      return classification(repo, {
+        mode: 'blocked_pending_output_safeguard',
+        reason:
+          'Repository is flagged containsMinorOrSensitiveData and has no reviewed public proof plus output denylist. It remains observable, but cannot produce a public draft until the sanitized surface is configured.',
+        eligibleForDraftGeneration: false,
+        daysAllocated: 0,
+      });
+    }
+
+    return classification(repo, {
+      mode: 'sanitized_product_only',
+      reason:
+        'Repository progress is eligible only as a sanitized product update. Every generated field and proof asset must pass the repository neverExpose/neverClaim output firewall.',
+      eligibleForDraftGeneration: true,
+      daysAllocated: 2,
     });
   }
 
