@@ -110,8 +110,10 @@ function repositoryIsApproved(
   candidate: FounderSignalCandidate,
 ): boolean {
   if (grant.repositoryScope?.mode === 'all_owned') {
-    const [owner, repositoryName] = candidate.repository.split('/', 2);
-    return Boolean(repositoryName)
+    const segments = candidate.repository.split('/');
+    if (segments.length !== 2) return false;
+    const [owner, repositoryName] = segments;
+    return Boolean(owner && repositoryName)
       && owner.toLowerCase() === grant.repositoryScope.owner.toLowerCase();
   }
 
