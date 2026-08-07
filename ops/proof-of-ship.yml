@@ -1,0 +1,108 @@
+# STAGED — move to .github/workflows/proof-of-ship.yml via:  git mv ops/proof-of-ship.yml .github/workflows/proof-of-ship.yml
+# Staged outside .github/workflows/ because the automation connection lacks the
+# GitHub `workflow` OAuth scope required to write workflow files (returns 404).
+# Pushing the rename from your machine/Codespaces carries your workflow scope.
+#
+# Proof-of-Ship — verified build-in-public auto-post (VERIFY-ONLY)
+# When meaningful work lands on main, confirm it actually shipped (Supabase
+# migration applied + Cloudflare Worker serving THIS commit's SHA), then POST a
+# draft to a Zapier Catch Hook -> Buffer PAUSED draft -> human approves. Nothing
+# publishes here. No deploy, no DB write, no secret change. Reads only.
+# Inert until wired: triggers only on src/supabase/workers paths + feat|fix|perf;
+# if ZAPIER_CATCH_HOOK_URL is unset it verifies and no-ops.
+
+name: proof-of-ship
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'supabase/migrations/**'
+      - 'workers/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: proof-of-ship-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  proof-of-ship:
+    name: Proof of Ship
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Classify commit
+        id: gate
+        run: |
+          set -euo pipefail
+          MSG="$(git log -1 --pretty=%s)"
+          echo "title=$MSG" >> "$GITHUB_OUTPUT"
+          if printf '%s' "$MSG" | grep -Eq '^(feat|fix|perf)(\(.+\))?!?:'; then
+            echo "meaningful=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "meaningful=false" >> "$GITHUB_OUTPUT"
+            echo "Commit '$MSG' is not feat/fix/perf — no post."
+          fi
+
+      - name: Verify Supabase migration receipt
+        id: supabase
+        if: steps.gate.outputs.meaningful == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: oojzfmmywbvficgybaxd
+        run: |
+          set -euo pipefail
+          RES="$(curl -sf -X POST \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"query":"select version from supabase_migrations.schema_migrations order by version desc limit 1;"}')"
+          VER="$(printf '%s' "$RES" | jq -r '.[0].version // empty')"
+          if [ -z "$VER" ]; then echo "::error::No migration rows returned from remote"; exit 1; fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "Latest applied migration: $VER"
+
+      - name: Verify Cloudflare deploy receipt
+        id: cloudflare
+        if: steps.gate.outputs.meaningful == 'true'
+        env:
+          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+        run: |
+          set -euo pipefail
+          LIVE=""
+          for i in 1 2 3 4 5 6; do
+            LIVE="$(curl -sf "${DEPLOY_URL}/version" | jq -r '.gitSha // .sha // empty')" && [ -n "$LIVE" ] && break
+            echo "waiting for deploy to propagate ($i)…"; sleep 10
+          done
+          if [ "$LIVE" != "${GITHUB_SHA}" ]; then
+            echo "::error::Live SHA ($LIVE) != commit (${GITHUB_SHA}) — deploy not confirmed, skipping post."
+            exit 1
+          fi
+          echo "Cloudflare serving verified SHA $LIVE"
+
+      - name: Notify Zapier (verified proof-of-ship)
+        if: steps.gate.outputs.meaningful == 'true'
+        env:
+          HOOK: ${{ secrets.ZAPIER_CATCH_HOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${HOOK:-}" ]; then
+            echo "Receipts verified, but ZAPIER_CATCH_HOOK_URL is unset — no webhook yet. No-op."
+            exit 0
+          fi
+          jq -n \
+            --arg repo "${GITHUB_REPOSITORY}" \
+            --arg sha "${GITHUB_SHA}" \
+            --arg title "${{ steps.gate.outputs.title }}" \
+            --arg commit_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}" \
+            --arg supabase_version "${{ steps.supabase.outputs.version }}" \
+            '{repo:$repo, commit_sha:$sha, commit_title:$title, commit_url:$commit_url, live_state:"verified", supabase_migration_version:$supabase_version, cloudflare_live_sha:$sha, publish_allowed:false, idempotency_key:($repo+":"+$sha)}' \
+          | curl -sf -X POST "$HOOK" -H "Content-Type: application/json" -d @-
+          echo "Posted verified proof-of-ship to Zapier (Buffer draft queue; PUBLISH_ALLOWED=false)."
