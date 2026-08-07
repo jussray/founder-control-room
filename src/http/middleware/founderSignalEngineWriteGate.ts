@@ -332,6 +332,42 @@ async function defaultResolveTrustedEvidence(
   return null;
 }
 
+function repositoryOwnerAndName(value: string): [string, string] | null {
+  const segments = value.split('/');
+  if (segments.length !== 2) return null;
+  const [owner, repository] = segments;
+  return owner && repository ? [owner, repository] : null;
+}
+
+function connectionMatchesAllOwnedScope(config: unknown, sourceRepository: string): boolean {
+  const repository = repositoryOwnerAndName(sourceRepository);
+  if (!repository || !isRecord(config)) return false;
+  const scope = config.repositoryScope;
+  if (!isRecord(scope) || scope.mode !== 'all_owned') return false;
+  const owner = boundedText(scope.owner, 39);
+  return Boolean(owner) && owner?.toLowerCase() === repository[0].toLowerCase();
+}
+
+export function selectPortfolioPolicyAuditProjectId(
+  connections: unknown,
+  sourceRepository: string,
+): string | null {
+  if (!Array.isArray(connections) || !repositoryOwnerAndName(sourceRepository)) return null;
+
+  const matchingIds = new Set<string>();
+  for (const connection of connections) {
+    if (!isRecord(connection)) continue;
+    const projectId = boundedText(connection.project_id, 100);
+    if (!projectId || !connectionMatchesAllOwnedScope(connection.config, sourceRepository)) continue;
+    matchingIds.add(projectId);
+  }
+
+  if (matchingIds.size > 1) {
+    throw new Error(`POLICY_PORTFOLIO_SCOPE_AMBIGUOUS:${sourceRepository}`);
+  }
+  return [...matchingIds][0] ?? null;
+}
+
 async function defaultWritePolicyAudit(input: PolicyAuditInput): Promise<void> {
   const { data: project, error: projectError } = await supabase
     .from('projects')
@@ -341,12 +377,26 @@ async function defaultWritePolicyAudit(input: PolicyAuditInput): Promise<void> {
   if (projectError) {
     throw new Error(`POLICY_PROJECT_LOOKUP_FAILED:${projectError.message}`);
   }
-  if (!project?.id) {
+
+  let projectId = boundedText(project?.id, 100);
+  if (!projectId) {
+    const { data: scopedConnections, error: scopedError } = await supabase
+      .from('project_connections')
+      .select('project_id,config')
+      .eq('connection_type', 'git')
+      .eq('status', 'active');
+    if (scopedError) {
+      throw new Error(`POLICY_PORTFOLIO_SCOPE_LOOKUP_FAILED:${scopedError.message}`);
+    }
+    projectId = selectPortfolioPolicyAuditProjectId(scopedConnections, input.sourceRepository);
+  }
+
+  if (!projectId) {
     throw new Error(`POLICY_PROJECT_NOT_REGISTERED:${input.sourceRepository}`);
   }
 
   const { error } = await supabase.from('project_events').insert({
-    project_id: project.id,
+    project_id: projectId,
     source_event_id: `fse-policy:${input.invocationId}`,
     event_type: 'founder_signal_engine_policy_decision',
     severity:
