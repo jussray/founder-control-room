@@ -1,10 +1,12 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { supabase } from '../../lib/supabaseClient.js';
+import { selectPortfolioPolicyAuditProjectId } from '../../lib/founderSignalPolicyAuditScope.js';
 import {
   FOUNDER_SIGNAL_CHANNELS,
   evaluateFounderSignalAutomation,
   type FounderSignalAutomationGrant,
   type FounderSignalCandidate,
+  type FounderSignalRepositoryScope,
   type FounderSignalEvidenceReceipt,
   type FounderSignalPolicyResult,
 } from '../../lib/founderSignalAutomationPolicy.js';
@@ -230,11 +232,24 @@ function parseGrant(raw: string): FounderSignalAutomationGrant {
     throw new Error('Founder Signal automation grant expiresAt must be null or a string');
   }
 
+  const repositoryScope = parseRepositoryScope(parsed.repositoryScope);
+  const repositories =
+    parsed.repositories === undefined || parsed.repositories === null
+      ? []
+      : Array.isArray(parsed.repositories) && parsed.repositories.length === 0
+        ? []
+        : parseStringArray(parsed.repositories, 'repositories');
+
+  if (!repositoryScope && repositories.length === 0) {
+    throw new Error('Founder Signal automation grant requires repositoryScope or repositories');
+  }
+
   return {
     id,
     enabled: parsed.enabled,
     routes,
-    repositories: parseStringArray(parsed.repositories, 'repositories'),
+    repositories,
+    repositoryScope,
     approvedRecipientIds: Array.isArray(parsed.approvedRecipientIds)
       ? (parsed.approvedRecipientIds
           .map((entry) => boundedText(entry, 200))
@@ -242,6 +257,20 @@ function parseGrant(raw: string): FounderSignalAutomationGrant {
       : [],
     expiresAt,
   };
+}
+
+function parseRepositoryScope(value: unknown): FounderSignalRepositoryScope | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!isRecord(value) || value.mode !== 'all_owned') {
+    throw new Error('repositoryScope must use mode all_owned');
+  }
+
+  const owner = boundedText(value.owner, 39);
+  if (!owner || !/^[A-Za-z0-9-]+$/.test(owner)) {
+    throw new Error('repositoryScope.owner must be a valid GitHub owner');
+  }
+
+  return { mode: 'all_owned', owner };
 }
 
 async function defaultLoadGrant(
@@ -286,7 +315,7 @@ async function defaultResolveTrustedEvidence(
   for (const rawRow of data ?? []) {
     const row = rawRow as JsonRecord;
     if (!exactProofUrls(row).includes(lookup.proofUrl)) continue;
-    const runner = isRecord(row.runner) ? row.runner : null;
+    const runner = isRecord(row.runner) ? runnerRecord(row.runner) : null;
     const rawProvider =
       boundedText(runner?.provider, 50) ?? boundedText(row.repository_provider, 50);
     const provider = rawProvider?.toLowerCase();
@@ -304,6 +333,10 @@ async function defaultResolveTrustedEvidence(
   return null;
 }
 
+function runnerRecord(value: JsonRecord): JsonRecord {
+  return value;
+}
+
 async function defaultWritePolicyAudit(input: PolicyAuditInput): Promise<void> {
   const { data: project, error: projectError } = await supabase
     .from('projects')
@@ -313,12 +346,26 @@ async function defaultWritePolicyAudit(input: PolicyAuditInput): Promise<void> {
   if (projectError) {
     throw new Error(`POLICY_PROJECT_LOOKUP_FAILED:${projectError.message}`);
   }
-  if (!project?.id) {
+
+  let projectId = boundedText(project?.id, 100);
+  if (!projectId) {
+    const { data: scopedConnections, error: scopedError } = await supabase
+      .from('project_connections')
+      .select('project_id,config')
+      .eq('connection_type', 'git')
+      .eq('status', 'active');
+    if (scopedError) {
+      throw new Error(`POLICY_PORTFOLIO_SCOPE_LOOKUP_FAILED:${scopedError.message}`);
+    }
+    projectId = selectPortfolioPolicyAuditProjectId(scopedConnections, input.sourceRepository);
+  }
+
+  if (!projectId) {
     throw new Error(`POLICY_PROJECT_NOT_REGISTERED:${input.sourceRepository}`);
   }
 
   const { error } = await supabase.from('project_events').insert({
-    project_id: project.id,
+    project_id: projectId,
     source_event_id: `fse-policy:${input.invocationId}`,
     event_type: 'founder_signal_engine_policy_decision',
     severity:

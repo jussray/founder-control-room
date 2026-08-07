@@ -329,7 +329,7 @@ jobs:
           CF_FEATURE_FLAGS_KV_NAMESPACE_ID: ${{ secrets.CF_FEATURE_FLAGS_KV_NAMESPACE_ID }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON: >-
-            {"id":"founder-signal-draft-only-v1","enabled":false,"routes":[{"channel":"linkedin","audienceSegment":"build-in-public"},{"channel":"facebook","audienceSegment":"build-in-public"}],"repositories":["jussray/Sekret-Bip"],"approvedRecipientIds":[],"expiresAt":null}
+            {"id":"founder-signal-draft-only-v2","enabled":false,"routes":[{"channel":"linkedin","audienceSegment":"build-in-public"},{"channel":"facebook","audienceSegment":"build-in-public"}],"repositories":[],"repositoryScope":{"mode":"all_owned","owner":"jussray"},"approvedRecipientIds":[],"expiresAt":null}
 
   # ── 3. Post-deploy exact-SHA and fail-closed grant proof ─────────────────────
   smoke-test:

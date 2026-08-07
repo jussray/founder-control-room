@@ -22,11 +22,24 @@ export interface FounderSignalRouteGrant {
   audienceSegment: string;
 }
 
+export interface FounderSignalRepositoryScope {
+  /**
+   * Dynamic portfolio scope. This intentionally follows the founder's GitHub
+   * owner instead of freezing social proof to a hand-maintained repository list.
+   */
+  mode: 'all_owned';
+  owner: string;
+}
+
 export interface FounderSignalAutomationGrant {
   id: string;
   enabled: boolean;
   routes: FounderSignalRouteGrant[];
+  /**
+   * Legacy explicit scope. Keep empty when repositoryScope is all_owned.
+   */
   repositories: string[];
+  repositoryScope?: FounderSignalRepositoryScope;
   approvedRecipientIds: string[];
   expiresAt: string | null;
 }
@@ -92,6 +105,21 @@ function routeIsApproved(
   );
 }
 
+function repositoryIsApproved(
+  grant: FounderSignalAutomationGrant,
+  candidate: FounderSignalCandidate,
+): boolean {
+  if (grant.repositoryScope?.mode === 'all_owned') {
+    const segments = candidate.repository.split('/');
+    if (segments.length !== 2) return false;
+    const [owner, repositoryName] = segments;
+    return Boolean(owner && repositoryName)
+      && owner.toLowerCase() === grant.repositoryScope.owner.toLowerCase();
+  }
+
+  return grant.repositories.includes(candidate.repository);
+}
+
 function evidenceIsBound(candidate: FounderSignalCandidate): boolean {
   const receipt = candidate.evidenceReceipt;
   if (!receipt?.verified) return false;
@@ -115,7 +143,7 @@ export function evaluateFounderSignalAutomation(
 
   if (!grant.enabled) reasons.push('automation grant is disabled');
   if (isExpired(grant.expiresAt, now)) reasons.push('automation grant is expired or invalid');
-  if (!grant.repositories.includes(candidate.repository)) {
+  if (!repositoryIsApproved(grant, candidate)) {
     reasons.push('repository is outside the grant scope');
   }
   if (!routeIsApproved(grant, candidate)) {
