@@ -146,6 +146,57 @@ describe('GitHub webhook ingestion', () => {
     });
   });
 
+  it('routes a future repository through the explicit all-owned portfolio connection', async () => {
+    const directChain = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      filter: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+    };
+    const portfolioQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      then: (
+        resolve: (value: { data: Array<{ project_id: string; config: unknown }>; error: null }) => unknown,
+        reject: (reason: unknown) => unknown,
+      ) => Promise.resolve({
+        data: [{
+          project_id: 'portfolio-123',
+          config: {
+            repositoryScope: { mode: 'all_owned', owner: 'jussray' },
+          },
+        }],
+        error: null,
+      }).then(resolve, reject),
+    };
+
+    mockFrom.mockReset();
+    mockFrom
+      .mockReturnValueOnce(directChain)
+      .mockReturnValueOnce(portfolioQuery);
+
+    const payload = {
+      repository: { full_name: 'jussray/brand-new-repo' },
+      pull_request: { number: 481 },
+    };
+    const req = signedRequest(payload);
+    const res = makeResponse();
+
+    await handleGitHubWebhook(req, res as unknown as Response);
+
+    expect(mockPersistProviderEvent).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: 'portfolio-123',
+      providerEventId: 'delivery-123',
+      eventType: 'pull_request',
+      resourceId: '481',
+    }));
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      accepted: true,
+      controllers: ['ChangeProposalController'],
+    }));
+  });
+
   it('strips fields the controllers never read — sender, organization, installation, review bodies', async () => {
     const payload = {
       repository: { full_name: 'jussray/Sekret-Bip', private: true, owner: { login: 'jussray' } },

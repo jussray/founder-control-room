@@ -18,7 +18,7 @@ A verified build event may automatically become:
 
 A standing automation grant is:
 
-- **scoped** to named repositories;
+- **scoped** to every repository owned by `jussray` by default through `repositoryScope.mode: all_owned`; an explicit repository list is only a deliberate narrowing, never the portfolio default;
 - **route-scoped** to explicit channel and audience combinations rather than independent lists;
 - **recipient-scoped** to approved CRM contact IDs for investor email;
 - **revocable** by setting `enabled` to `false`;
@@ -66,7 +66,8 @@ The caller cannot supply an `evidenceReceipt`. That field is rejected rather tha
     { "channel": "instagram", "audienceSegment": "build-in-public" },
     { "channel": "gmail", "audienceSegment": "preapproved-potential-investors" }
   ],
-  "repositories": ["jussray/Sekret-Bip"],
+  "repositories": [],
+  "repositoryScope": { "mode": "all_owned", "owner": "jussray" },
   "approvedRecipientIds": [],
   "expiresAt": null
 }
@@ -86,7 +87,7 @@ A self-labeled segment, generic scraped list, arbitrary contact ID, or missing r
 
 ## SOCIAL RULE
 
-Build-in-public posts may auto-distribute only through an explicitly approved social-channel plus build-in-public route. The evidence receipt must be verified by a trusted provider and match the candidate repository, commit, and proof URL. The Zapier layer remains responsible for channel formatting, duplicate prevention, scheduling, and retaining the final Buffer or platform receipt.
+Build-in-public posts may auto-distribute only through an explicitly approved social-channel plus build-in-public route. Repository coverage is portfolio-wide: every `jussray` repository can produce a proof signal, including repositories created or launched later. Repository visibility, sensitive-data flags, and missing public proof change the output mode or hold state; they do not silently remove the repository from observation. The evidence receipt must be verified by a trusted provider and match the candidate repository, commit, and proof URL. The Zapier layer remains responsible for channel formatting, duplicate prevention, scheduling, and retaining the final Buffer or platform receipt.
 
 ## REMAINING PROOF GATE
 

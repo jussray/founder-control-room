@@ -53,9 +53,32 @@ function parseVerifiedPayload(body: Buffer): Record<string, unknown> | null {
   }
 }
 
-/** Resolve project_id from the live project_connections schema. */
+/**
+ * Resolve a project for a GitHub repository.
+ *
+ * Exact repository connections remain authoritative when present. The
+ * portfolio connection is an explicit, non-secret owner-scoped fallback:
+ * it covers future repositories without silently treating every GitHub
+ * installation as trusted.
+ */
+function matchesAllOwnedRepositoryScope(config: unknown, repoFullName: string): boolean {
+  const [owner, repo, extra] = repoFullName.split("/");
+  if (!owner || !repo || extra) return false;
+
+  const configRecord = config && typeof config === "object"
+    ? config as Record<string, unknown>
+    : null;
+  const scope = configRecord?.["repositoryScope"];
+  if (!scope || typeof scope !== "object") return false;
+
+  const scopeRecord = scope as Record<string, unknown>;
+  return scopeRecord["mode"] === "all_owned" &&
+    typeof scopeRecord["owner"] === "string" &&
+    scopeRecord["owner"].toLowerCase() === owner.toLowerCase();
+}
+
 async function resolveProject(repoFullName: string): Promise<string | null> {
-  const { data, error } = await supabase
+  const { data: directConnection, error: directError } = await supabase
     .from('project_connections')
     .select('project_id')
     .eq('connection_type', 'git')
@@ -64,11 +87,26 @@ async function resolveProject(repoFullName: string): Promise<string | null> {
     .limit(1)
     .maybeSingle();
 
-  if (error) {
-    throw new Error(`webhook_project_lookup_failed:${error.message}`);
+  if (directError) {
+    throw new Error("webhook_project_lookup_failed:" + directError.message);
+  }
+  if (directConnection?.project_id) {
+    return directConnection.project_id;
   }
 
-  return data?.project_id ?? null;
+  const { data: scopedConnections, error: scopedError } = await supabase
+    .from('project_connections')
+    .select('project_id, config')
+    .eq('connection_type', 'git')
+    .eq('status', 'active');
+
+  if (scopedError) {
+    throw new Error("webhook_portfolio_scope_lookup_failed:" + scopedError.message);
+  }
+
+  return (scopedConnections ?? [])
+    .find((connection) => matchesAllOwnedRepositoryScope(connection.config, repoFullName))
+    ?.project_id ?? null;
 }
 
 function routeToControllers(

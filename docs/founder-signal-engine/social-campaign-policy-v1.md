@@ -8,6 +8,10 @@ Authoritative code:
 - `src/lib/__tests__/socialCampaignPolicy.test.ts`
 - `config/social-campaign-repositories.json`
 
+## Portfolio coverage
+
+The intake scope is dynamic `all_owned` for GitHub owner `jussray`. There is no fixed four-repository allowlist and no Sekret-Bip exclusion. Every repository event can create a sanitized proof signal, including work after a public launch. Privacy, visibility, sensitive-data, and proof-surface policy decide whether the signal becomes a public draft, a founder-review item, or a blocked item; they do not erase the underlying progress event.
+
 Builds on, not alongside:
 
 - `src/lib/firstPartySocialPublisher.ts` (`docs/founder-signal-engine/first-party-multichannel-publisher-v1.md`) — this module's output feeds `validateFirstPartySocialPost` directly. It reuses that module's platform list and per-platform `contentField`/character-limit capabilities rather than redefining them.
@@ -32,17 +36,15 @@ This is the part of that request that's safe to build without any of those gates
 
 ## The sensitive-data gate
 
-`RepositoryContentPolicy.containsMinorOrSensitiveData` short-circuits classification before any other branch runs, including a permissive `configuredMode`. A config author cannot set `full_campaign` and also `containsMinorOrSensitiveData: true` and get anything but `blocked_pending_output_safeguard` — see the test `blocks a sensitive-data repository even when configuredMode requests a full campaign`.
+`RepositoryContentPolicy.containsMinorOrSensitiveData` never permits an unrestricted campaign. It requires both a reviewed public proof URL and a non-empty `neverExpose` output denylist, then routes the repository to `sanitized_product_only`. Missing either safeguard keeps the repository observable but blocks public draft generation. A config author cannot set `full_campaign` and bypass the sanitized mode.
 
-`jussray/Sekret-Bip` is configured this way in `config/social-campaign-repositories.json` today.
+`jussray/Sekret-Bip` is configured for this sanitized path in `config/social-campaign-repositories.json` today. The output firewall still rejects prohibited claims, private data, prompt leakage, and secret-like material after generation.
 
-### What would need to be true before that flag could become `false`
+### What the sanitized path still requires
 
-Not covered by this pass, and not something this module should decide unilaterally:
-
-1. **An output-side filter, not a prompt-side instruction.** `firstPartySocialPublisher.ts` already sets the bar: `SECRETISH_PATTERN` and `PROMPT_LEAK_PATTERNS` reject generated text by pattern-matching the actual output, after generation, before anything downstream sees it. A teen-safety equivalent — a reviewed denylist/classifier that rejects generated text referencing teen users, private reflections, or specific product internals — would need to exist and be tested the same way, not merely instructed for in a Perplexity prompt.
-2. **Resolution of `config/repository-visibility-policy.json`'s existing privatization action for this repository.** Generating public content about a product mid-privatization is working against that policy's own goal.
-3. **An explicit founder decision**, recorded the way `docs/PORTABLE_FOUNDER_APPROVALS.md` describes for scope changes like this — not inferred from silence or a prior unrelated approval.
+1. **An output-side filter, not a prompt-side instruction.** `firstPartySocialPublisher.ts` rejects generated text by pattern-matching the actual output, after generation, before anything downstream sees it. The repository's `neverExpose` and `neverClaim` terms are checked across copy, proof links, and media alt text.
+2. **A reviewed public proof surface.** The proof URL must be explicitly configured for the repository; a private GitHub URL is not treated as public proof.
+3. **An explicit founder decision** for any further scope change, provider activation, or publication authority, recorded the way `docs/PORTABLE_FOUNDER_APPROVALS.md` describes — not inferred from silence or a prior unrelated approval.
 
 ## What this pass deliberately does not build
 
