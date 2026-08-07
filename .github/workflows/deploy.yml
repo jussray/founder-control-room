@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: deploy-production
@@ -442,7 +443,426 @@ jobs:
         env:
           PUBLIC_URL: https://foundercontrolroom.org
 
-  # ── 4. Post-deploy database reconciliation inspection ───────────────────────
+  # ── 4. Verified proof-of-ship payload ───────────────────────────────────────
+  proof-of-ship:
+    name: Proof of Ship — Verify and Publish via Review Window
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: production
+    needs: smoke-test
+    if: needs.smoke-test.result == 'success'
+    env:
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+      DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      ZAPIER_CATCH_HOOK_URL: ${{ secrets.ZAPIER_CATCH_HOOK_URL }}
+      PROOF_OF_SHIP_STEERING_GRANT_ID: ${{ secrets.PROOF_OF_SHIP_STEERING_GRANT_ID }}
+      GITHUB_TOKEN: ${{ github.token }}
+      PUBLISH_ALLOWED: 'true'
+    steps:
+      - name: Check out the exact deployed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Classify meaningful release
+        id: classify
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          commit_message="$(git show -s --format=%s "$EXPECTED_HEAD_SHA")"
+          commit_author="$(git show -s --format='%an <%ae>' "$EXPECTED_HEAD_SHA")"
+          commit_body="$(git show -s --format=%b "$EXPECTED_HEAD_SHA")"
+          parent_line="$(git rev-list --parents -n 1 "$EXPECTED_HEAD_SHA")"
+          parent_count=$(( $(wc -w <<<"$parent_line") - 1 ))
+
+          repository_allowed=false
+          case "$GITHUB_REPOSITORY" in
+            jussray/founder-control-room|jussray/jussbeautifulhair-site|jussray/untold-stories-storefront|jussray/chief-ai-machine)
+              repository_allowed=true
+              ;;
+          esac
+
+          mapfile -t changed_paths < <(
+            git diff-tree --root --no-commit-id --name-only -r -m "$EXPECTED_HEAD_SHA" \
+              | sed '/^$/d' \
+              | sort -u
+          )
+
+          has_non_doc_path=false
+          meaningful_paths=()
+          migration_versions=()
+          for path in "${changed_paths[@]}"; do
+            case "$path" in
+              docs/*|*.md|*.mdx)
+                continue
+                ;;
+            esac
+
+            has_non_doc_path=true
+            meaningful_paths+=("$path")
+            if [[ "$path" =~ ^supabase/migrations/([0-9]+)_[^/]+\.sql$ ]]; then
+              migration_versions+=("${BASH_REMATCH[1]}")
+            fi
+          done
+
+          if ((${#changed_paths[@]} > 0)); then
+            changed_paths_json="$(printf '%s\n' "${changed_paths[@]}" | jq -Rsc 'split("\n") | map(select(length > 0)) | .[0:40]')"
+          else
+            changed_paths_json='[]'
+          fi
+          if ((${#meaningful_paths[@]} > 0)); then
+            meaningful_paths_json="$(printf '%s\n' "${meaningful_paths[@]}" | jq -Rsc 'split("\n") | map(select(length > 0)) | .[0:40]')"
+          else
+            meaningful_paths_json='[]'
+          fi
+          if ((${#migration_versions[@]} > 0)); then
+            migration_versions_json="$(printf '%s\n' "${migration_versions[@]}" | jq -Rsc 'split("\n") | map(select(length > 0)) | unique')"
+          else
+            migration_versions_json='[]'
+          fi
+
+          pr_response='[]'
+          if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+            pr_response="$(curl --silent --show-error --fail \
+              --proto '=https' --proto-redir '=https' --max-redirs 0 \
+              --connect-timeout 10 --max-time 20 \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/commits/$EXPECTED_HEAD_SHA/pulls" \
+              || true)"
+            [[ "$pr_response" == \[* ]] || pr_response='[]'
+          fi
+
+          pr_url="$(jq -r '.[0].html_url // empty' <<<"$pr_response" 2>/dev/null || true)"
+          pr_title="$(jq -r '.[0].title // empty' <<<"$pr_response" 2>/dev/null || true)"
+          merged_at="$(jq -r '.[0].merged_at // empty' <<<"$pr_response" 2>/dev/null || true)"
+
+          conventional_commit_re='^(feat|fix|perf)(\([^)]*\))?!?:'
+          commit_type=''
+          for title in "$commit_message" "$pr_title"; do
+            if [[ "$title" =~ $conventional_commit_re ]]; then
+              commit_type="${BASH_REMATCH[1]}"
+              break
+            fi
+          done
+
+          is_wip=false
+          case "${commit_message,,}" in
+            wip|wip:*|'wip '*|'wip('*|'[wip]'*) is_wip=true ;;
+          esac
+
+          merged_to_main=false
+          if ((parent_count >= 2)) || [[ -n "$merged_at" ]]; then
+            merged_to_main=true
+          fi
+
+          meaningful=false
+          if [[ "$commit_message" != *'[skip ci]'* ]] \
+            && [[ "$commit_message" != *'[skip post]'* ]] \
+            && ! grep -Eiq 'dependabot' <<<"$commit_author" \
+            && [[ "$is_wip" == false ]] \
+            && [[ "$repository_allowed" == true ]] \
+            && [[ "$has_non_doc_path" == true ]] \
+            && { [[ -n "$commit_type" ]] || [[ "$merged_to_main" == true ]]; }; then
+            meaningful=true
+          fi
+
+          commit_body_summary="$(BODY="$commit_body" python3 - <<'PY'
+          import os
+          import re
+
+          text = os.environ.get('BODY', '').strip()
+          text = re.split(r'\n\s*\n', text, maxsplit=1)[0]
+          text = re.sub(
+              r'(?i)\b(?:bearer|token|secret|password|api[_ -]?key)\s*[:=]\s*\S+',
+              '[redacted]',
+              text,
+          )
+          text = re.sub(r'\s+', ' ', text)
+          print(text[:1000])
+          PY
+          )"
+
+          meaningful_json=false
+          [[ "$meaningful" == true ]] && meaningful_json=true
+          wip_json=false
+          [[ "$is_wip" == true ]] && wip_json=true
+
+          jq -n \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --arg commit_sha "$EXPECTED_HEAD_SHA" \
+            --arg commit_title "$commit_message" \
+            --arg commit_body "$commit_body_summary" \
+            --arg commit_author "$commit_author" \
+            --arg commit_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${EXPECTED_HEAD_SHA}" \
+            --arg pr_url "$pr_url" \
+            --arg pr_title "$pr_title" \
+            --arg commit_type "$commit_type" \
+            --argjson repository_allowed "$(if [[ "$repository_allowed" == true ]]; then echo true; else echo false; fi)" \
+            --argjson repository_allowlist '["jussray/founder-control-room","jussray/jussbeautifulhair-site","jussray/untold-stories-storefront","jussray/chief-ai-machine"]' \
+            --argjson changed_paths "$changed_paths_json" \
+            --argjson meaningful_paths "$meaningful_paths_json" \
+            --argjson migration_versions "$migration_versions_json" \
+            --argjson is_wip "$wip_json" \
+            --arg meaningful_reason "$(if [[ "$merged_to_main" == true ]]; then echo merged-pr-to-main; elif [[ -n "$commit_type" ]]; then echo conventional-commit; else echo filtered; fi)" \
+            --argjson meaningful "$meaningful_json" \
+            '{
+              repo: $repo,
+              commit_sha: $commit_sha,
+              commit_title: $commit_title,
+              commit_body: $commit_body,
+              commit_author: $commit_author,
+              commit_url: $commit_url,
+              pr_url: $pr_url,
+              pr_title: $pr_title,
+              commit_type: (if $commit_type == "" then "merge" else $commit_type end),
+              repository_allowed: $repository_allowed,
+              repository_allowlist: $repository_allowlist,
+              excluded_repositories: ["jussray/Sekret-Bip"],
+              changed_paths: $changed_paths,
+              changed_paths_summary: ($meaningful_paths | join(", ")),
+              migration_versions: $migration_versions,
+              is_wip: $is_wip,
+              meaningful: $meaningful,
+              meaningful_reason: $meaningful_reason,
+              live_state: "not_verified",
+              supabase_state: "pending",
+              supabase_migration_version: null,
+              supabase_receipt: null,
+              cloudflare_deployment_id: null,
+              cloudflare_live_sha: null,
+              cloudflare_receipt: null,
+              publish_allowed: false,
+              idempotency_key: null,
+              proof_url: null,
+              github_actions_run_url: null
+            }' > proof-context.json
+
+          echo "meaningful=$meaningful_json" >> "$GITHUB_OUTPUT"
+          {
+            echo '### Proof-of-Ship classification'
+            jq '{repo, commit_sha, repository_allowed, meaningful, meaningful_reason, changed_paths_summary, migration_versions}' proof-context.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Skip non-meaningful activity
+        if: steps.classify.outputs.meaningful != 'true'
+        run: |
+          echo 'No verified build-in-public event: filtered by commit, author, or changed paths.'
+
+      - name: Verify changed Supabase migrations on the remote database
+        if: steps.classify.outputs.meaningful == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t target_versions < <(jq -r '.migration_versions[]' proof-context.json)
+          if ((${#target_versions[@]} == 0)); then
+            jq '.supabase_state = "not_applicable" | .supabase_receipt = null | .supabase_migration_version = null' \
+              proof-context.json > proof-context.next.json
+            mv proof-context.next.json proof-context.json
+            echo 'No migration changed in this release; Supabase receipt is not applicable.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [[ -z "${SUPABASE_DB_URL:-}" ]]; then
+            echo '::error title=Supabase proof blocked::SUPABASE_DB_URL is required when a migration changed.'
+            exit 1
+          fi
+          if ! command -v psql >/dev/null 2>&1; then
+            echo '::error title=Supabase proof blocked::The runner does not provide psql.'
+            exit 1
+          fi
+
+          if ! remote_versions="$(PGCONNECT_TIMEOUT=15 psql "$SUPABASE_DB_URL" \
+            -v ON_ERROR_STOP=1 -Atq \
+            -c 'SELECT version::text FROM supabase_migrations.schema_migrations ORDER BY version DESC;' \
+            2>/dev/null)"; then
+            echo '::error title=Supabase proof failed::The remote migration history could not be queried.'
+            exit 1
+          fi
+
+          for target in "${target_versions[@]}"; do
+            if ! grep -Fxq "$target" <<<"$remote_versions"; then
+              echo "::error title=Supabase migration not verified::Migration $target is not present in the remote schema_migrations table."
+              exit 1
+            fi
+          done
+
+          target_versions_csv="$(IFS=', '; echo "${target_versions[*]}")"
+          jq --arg receipt "schema_migrations: $target_versions_csv" \
+            --arg version "$target_versions_csv" \
+            '.supabase_state = "verified" | .supabase_receipt = $receipt | .supabase_migration_version = $version' \
+            proof-context.json > proof-context.next.json
+          mv proof-context.next.json proof-context.json
+          echo "Supabase receipt verified for migration version(s): $target_versions_csv" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify the live Worker still reports the deployed SHA
+        if: steps.classify.outputs.meaningful == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DEPLOY_URL="${DEPLOY_URL%/}"
+          if [[ "$DEPLOY_URL" != https://* ]]; then
+            echo '::error title=Cloudflare proof blocked::DEPLOY_URL must be an HTTPS origin.'
+            exit 1
+          fi
+
+          version_body=''
+          for attempt in 1 2 3 4 5 6; do
+            candidate="$(curl --silent --show-error \
+              --proto '=https' --proto-redir '=https' --max-redirs 0 \
+              --connect-timeout 10 --max-time 20 \
+              "$DEPLOY_URL/version" 2>/dev/null || true)"
+            if [[ -n "$candidate" ]] && jq -e --arg expected "$EXPECTED_HEAD_SHA" \
+              '.service == "founder-control-room" and .gitSha == $expected' \
+              <<<"$candidate" >/dev/null 2>&1; then
+              version_body="$candidate"
+              break
+            fi
+            sleep 10
+          done
+
+          if [[ -z "$version_body" ]]; then
+            echo '::error title=Cloudflare SHA proof failed::The live Worker did not report the exact deployed commit SHA.'
+            exit 1
+          fi
+
+          live_sha="$(jq -r '.gitSha' <<<"$version_body")"
+          deployment_id="$(jq -r '.deploymentId // .deployment_id // empty' <<<"$version_body")"
+          jq --arg live_sha "$live_sha" \
+            --arg deployment_id "$deployment_id" \
+            --arg receipt "$DEPLOY_URL/version -> gitSha=$live_sha" \
+            '.cloudflare_live_sha = $live_sha | .cloudflare_deployment_id = (if $deployment_id == "" then null else $deployment_id end) | .cloudflare_receipt = $receipt' \
+            proof-context.json > proof-context.next.json
+          mv proof-context.next.json proof-context.json
+          echo "Cloudflare receipt verified: $DEPLOY_URL/version reports $live_sha" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: POST verified proof payload to Zapier Catch Hook
+        if: steps.classify.outputs.meaningful == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${PUBLISH_ALLOWED:-false}" != true ]]; then
+            echo '::error title=Publication gate blocked::PUBLISH_ALLOWED must be true for the scheduled-publication contract.'
+            exit 1
+          fi
+          if [[ -z "${ZAPIER_CATCH_HOOK_URL:-}" ]]; then
+            echo '::error title=Zapier proof blocked::The configured Catch Hook URL is missing.'
+            exit 1
+          fi
+          if [[ -z "${PROOF_OF_SHIP_STEERING_GRANT_ID:-}" ]]; then
+            echo '::error title=Publication grant blocked::Set PROOF_OF_SHIP_STEERING_GRANT_ID to explicitly activate scheduled publication.'
+            exit 1
+          fi
+          if [[ ! "$PROOF_OF_SHIP_STEERING_GRANT_ID" =~ ^[A-Za-z0-9._:-]{1,100}$ ]]; then
+            echo '::error title=Publication grant blocked::PROOF_OF_SHIP_STEERING_GRANT_ID contains unsupported characters.'
+            exit 1
+          fi
+
+          jq -e '
+            (.meaningful == true) and
+            (.repository_allowed == true) and
+            (.repo != "jussray/Sekret-Bip") and
+            (. as $payload | ($payload.repository_allowlist | index($payload.repo)) != null) and
+            (.commit_sha | test("^[0-9a-f]{40}$")) and
+            ((.supabase_state == "verified") or (.supabase_state == "not_applicable")) and
+            (.cloudflare_live_sha == .commit_sha)
+          ' proof-context.json >/dev/null
+
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          idempotency_key="${GITHUB_REPOSITORY}:${EXPECTED_HEAD_SHA}"
+          verified_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          scheduled_at="$(date -u -d "$verified_at + 20 minutes" +%Y-%m-%dT%H:%M:%SZ)"
+          invocation_id="$(python3 - <<'PY'
+          import uuid
+          print(uuid.uuid4())
+          PY
+          )"
+          batch_id="$invocation_id"
+          steering_grant_id="$PROOF_OF_SHIP_STEERING_GRANT_ID"
+          founder_approval_id="standing-policy:${steering_grant_id}:${invocation_id}"
+          jq --arg run_url "$run_url" \
+            --arg idempotency_key "$idempotency_key" \
+            --arg verified_at "$verified_at" \
+            --arg scheduled_at "$scheduled_at" \
+            --arg invocation_id "$invocation_id" \
+            --arg batch_id "$batch_id" \
+            --arg steering_grant_id "$steering_grant_id" \
+            --arg founder_approval_id "$founder_approval_id" \
+            '.live_state = "verified" |
+             .publish_allowed = true |
+             .PUBLISH_ALLOWED = true |
+             .idempotency_key = $idempotency_key |
+             .proof_url = $run_url |
+             .github_actions_run_url = $run_url |
+             .source_event = "workflow_dispatch" |
+             .verified_at = $verified_at |
+             .source_commit_sha = .commit_sha |
+             .invocation_id = $invocation_id |
+             .batch_id = $batch_id |
+             .steering_grant_id = $steering_grant_id |
+             .founder_approval_id = $founder_approval_id |
+             .authorization_mode = "standing-policy" |
+             .schedule_policy_id = "buffer-20-minute-review-v1" |
+             .notification_mode = "gmail_campaign_digest" |
+             .generated_at = $verified_at |
+             .scheduled_at = $scheduled_at |
+             .review_deadline = $scheduled_at |
+             .review_window_minutes = 20 |
+             .share_now_allowed = false |
+             .destination_mode = "schedule" |
+             .buffer_provider_action = "buffer_add_to_queue" |
+             .buffer_method = "schedule" |
+             .buffer_save_to_draft = false |
+             .buffer_api_sharing_mode = "customScheduled" |
+             .content_mode = "proof-led-build-in-public" |
+             .requested_channels = ["x", "linkedin"] |
+             .requested_content_fields = ["x_draft", "linkedin_draft"] |
+             .buffer_terminal_action = "schedule"' \
+            proof-context.json > proof-payload.json
+
+          jq -e --arg expected_receipt "$founder_approval_id" '
+            .live_state == "verified" and
+            .publish_allowed == true and
+            .PUBLISH_ALLOWED == true and
+            (.repo != "jussray/Sekret-Bip") and
+            (. as $payload | ($payload.repository_allowlist | index($payload.repo)) != null) and
+            .destination_mode == "schedule" and
+            .buffer_method == "schedule" and
+            .buffer_save_to_draft == false and
+            .share_now_allowed == false and
+            .schedule_policy_id == "buffer-20-minute-review-v1" and
+            .authorization_mode == "standing-policy" and
+            (.invocation_id | test("^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")) and
+            .founder_approval_id == $expected_receipt and
+            (.proof_url | startswith("https://")) and
+            (.idempotency_key | length > 0) and
+            .cloudflare_live_sha == .commit_sha
+          ' proof-payload.json >/dev/null
+
+          curl --silent --show-error --fail \
+            --proto '=https' --proto-redir '=https' --max-redirs 0 \
+            --connect-timeout 10 --max-time 30 \
+            -H 'Content-Type: application/json' \
+            --data-binary @proof-payload.json \
+            --output /dev/null \
+            "$ZAPIER_CATCH_HOOK_URL"
+
+          {
+            echo '### Verified proof payload sent for scheduled publication'
+            jq '{repo, commit_sha, pr_url, commit_url, live_state, supabase_state, supabase_migration_version, cloudflare_live_sha, proof_url, idempotency_key, publish_allowed, PUBLISH_ALLOWED, destination_mode, buffer_method, scheduled_at, review_deadline, buffer_terminal_action}' proof-payload.json
+            echo
+            echo 'The downstream Zap must dedupe by idempotency_key, use ChatGPT Conversation, validate proof URLs, and schedule the Buffer post under the 20-minute review-window contract.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── 5. Post-deploy database reconciliation inspection ───────────────────────
   reconcile:
     name: Post-Deploy Reconciliation
     runs-on: ubuntu-latest
