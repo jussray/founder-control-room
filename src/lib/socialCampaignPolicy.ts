@@ -108,12 +108,22 @@ export function classifyRepositoryForContent(repo: RepositoryEvidence): Campaign
   }
 
   if (repo.policy.containsMinorOrSensitiveData) {
+    if (repo.policy.publicProofUrls.length === 0 || repo.policy.neverExpose.length === 0) {
+      return classification(repo, {
+        mode: 'blocked_pending_output_safeguard',
+        reason:
+          'Repository is flagged containsMinorOrSensitiveData and has no reviewed public proof plus output denylist. It remains observable, but cannot produce a public draft until the sanitized surface is configured.',
+        eligibleForDraftGeneration: false,
+        daysAllocated: 0,
+      });
+    }
+
     return classification(repo, {
-      mode: 'blocked_pending_output_safeguard',
+      mode: 'sanitized_product_only',
       reason:
-        'Repository is flagged containsMinorOrSensitiveData. Prompt-side instructions are not a sufficient boundary for this data class; an output-side safeguard is required before eligibility.',
-      eligibleForDraftGeneration: false,
-      daysAllocated: 0,
+        'Repository progress is eligible only as a sanitized product update. Every generated field and proof asset must pass the repository neverExpose/neverClaim output firewall.',
+      eligibleForDraftGeneration: true,
+      daysAllocated: 2,
     });
   }
 
