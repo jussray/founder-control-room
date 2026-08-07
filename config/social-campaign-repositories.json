@@ -1,6 +1,11 @@
 {
   "schema_version": 1,
-  "note": "Starting policy for src/lib/socialCampaignPolicy.ts. Deliberately minimal — add a repository entry only once its containsMinorOrSensitiveData and publicProofUrls values have been reviewed, not by copying a template. See docs/founder-signal-engine/social-campaign-policy-v1.md.",
+  "portfolio_scope": {
+    "mode": "all_owned",
+    "owner": "jussray",
+    "meaning": "Observe progress from every repository owned by jussray; per-repository entries are privacy/output overlays, not an allowlist."
+  },
+  "note": "Per-repository entries are optional privacy/output overlays. Repository scope is dynamic all_owned and must not be narrowed by this file. Review containsMinorOrSensitiveData, publicProofUrls, neverClaim, and neverExpose before a public draft is generated. See docs/founder-signal-engine/social-campaign-policy-v1.md.",
   "repositories": {
     "jussray/founder-control-room": {
       "containsMinorOrSensitiveData": false,
@@ -11,7 +16,7 @@
     },
     "jussray/Sekret-Bip": {
       "containsMinorOrSensitiveData": true,
-      "publicProofUrls": [],
+      "publicProofUrls": ["https://sekretbip.net"],
       "neverClaim": [],
       "neverExpose": [
         "teen records",
@@ -19,7 +24,7 @@
         "customer information",
         "internal Supabase data"
       ],
-      "_gate": "config/repository-visibility-policy.json currently targets this repository for privatization (priority: critical, action: privatize_then_create_clean_showcase_export). containsMinorOrSensitiveData short-circuits classifyRepositoryForContent() regardless of configuredMode — see socialCampaignPolicy.ts."
+      "_gate": "config/repository-visibility-policy.json currently targets this repository for privatization (priority: critical, action: privatize_then_create_clean_showcase_export). containsMinorOrSensitiveData is allowed only through sanitized_product_only when reviewed publicProofUrls and a non-empty neverExpose output denylist exist; otherwise classifyRepositoryForContent() blocks draft generation — see socialCampaignPolicy.ts."
     }
   }
 }
