@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { selectPortfolioPolicyAuditProjectId } from '../founderSignalEngineWriteGate.js';
+import { selectPortfolioPolicyAuditProjectId } from '../../../lib/founderSignalPolicyAuditScope.js';
 
 describe('Founder Signal portfolio policy-audit resolver', () => {
   const portfolio = {
@@ -27,7 +27,7 @@ describe('Founder Signal portfolio policy-audit resolver', () => {
     ).toBeNull();
   });
 
-  it('ignores unrelated, inactive-shaped, and malformed scope payloads supplied to the selector', () => {
+  it('ignores unrelated and malformed scope payloads supplied to the selector', () => {
     expect(
       selectPortfolioPolicyAuditProjectId(
         [
