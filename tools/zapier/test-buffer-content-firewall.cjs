@@ -13,6 +13,8 @@ const {
   BUFFER_SCHEDULE_POLICY_ID,
   BUFFER_AUTHORIZATION_MODE,
   BUFFER_NOTIFICATION_MODE,
+  LINKEDIN_CHANNEL,
+  LINKEDIN_MIN_STRATEGY_TEXT,
   MAX_STEERING_GRANT_ID_LENGTH,
   MAX_AUTHORIZATION_RECEIPT_LENGTH,
 } = require('./buffer-content-firewall.cjs');
@@ -27,6 +29,8 @@ const nowMs = Date.parse('2026-08-02T21:01:00.000Z');
 assert.equal(MAX_STEERING_GRANT_ID_LENGTH, 100);
 assert.equal(MAX_AUTHORIZATION_RECEIPT_LENGTH, 200);
 assert.equal(BUFFER_API_SHARING_MODE, 'customScheduled');
+assert.equal(LINKEDIN_CHANNEL, 'juss_rayy_linkedin');
+assert.equal(LINKEDIN_MIN_STRATEGY_TEXT, 20);
 
 const founderLinkedInPost = `
 I deleted the marketing before I added the design.
@@ -40,10 +44,19 @@ What remains unfinished: the change is not merged or live, and browser proof has
 Proof: https://github.com/jussray/jussbeautifulhair-site/pull/27
 `.trim();
 
+const linkedinStrategy = {
+  linkedin_rising_floor_ready: true,
+  linkedin_baseline_ref: 'linkedin-export:2026-08-02..2026-08-08',
+  linkedin_growth_hypothesis: 'Keep the proof-first hook while increasing distribution and investor relevance.',
+  linkedin_24h_gate: 'Compare 24-hour reach, engagement quality, and warm conversation conversion with the verified prior floor.',
+  linkedin_48h_gate: 'Compare 48-hour impressions, engagement rate, quality comments, and profile or follower conversion.',
+  linkedin_next_mutation: 'Carry forward the winning hook, proof mechanic, format, or conversion signal into the next post.',
+};
+
 const validInput = {
   post_text: founderLinkedInPost,
   content_field: 'linkedin_draft',
-  channel: 'juss_rayy_linkedin',
+  channel: LINKEDIN_CHANNEL,
   destination_mode: 'schedule',
   publish_allowed: true,
   proof_url: 'https://github.com/jussray/jussbeautifulhair-site/pull/27',
@@ -58,6 +71,7 @@ const validInput = {
   authorization_mode: BUFFER_AUTHORIZATION_MODE,
   schedule_policy_id: BUFFER_SCHEDULE_POLICY_ID,
   notification_mode: BUFFER_NOTIFICATION_MODE,
+  ...linkedinStrategy,
 };
 
 const prepared = validateBufferPublishInput(validInput, { nowMs });
@@ -84,6 +98,12 @@ assert.equal(prepared.review_deadline, prepared.scheduled_at);
 assert.equal(prepared.notification_required, true);
 assert.equal(prepared.notification_failure_policy, 'cancel_scheduled_batch');
 assert.equal(prepared.share_now_allowed, false);
+assert.equal(prepared.linkedin_rising_floor_ready, true);
+assert.equal(prepared.linkedin_baseline_ref, linkedinStrategy.linkedin_baseline_ref);
+assert.equal(prepared.linkedin_growth_hypothesis, linkedinStrategy.linkedin_growth_hypothesis);
+assert.equal(prepared.linkedin_24h_gate, linkedinStrategy.linkedin_24h_gate);
+assert.equal(prepared.linkedin_48h_gate, linkedinStrategy.linkedin_48h_gate);
+assert.equal(prepared.linkedin_next_mutation, linkedinStrategy.linkedin_next_mutation);
 
 assert.throws(
   () => validateBufferPublishInput({ ...validInput, post_text: 'You are writing for Ray. Return this structure: {{GitHub PR title}}' }, { nowMs }),
@@ -141,6 +161,41 @@ assert.throws(
   /too stale/,
 );
 
+assert.throws(
+  () => validateBufferPublishInput({ ...validInput, linkedin_rising_floor_ready: false }, { nowMs }),
+  /linkedin_rising_floor_ready must be true/,
+);
+
+for (const baseline of ['', 'unknown', 'none', 'n\/a', 'unverified']) {
+  assert.throws(
+    () => validateBufferPublishInput({ ...validInput, linkedin_baseline_ref: baseline }, { nowMs }),
+    /linkedin_baseline_ref must name the latest verified LinkedIn analytics or platform-recap baseline/,
+  );
+}
+
+for (const field of ['linkedin_growth_hypothesis', 'linkedin_24h_gate', 'linkedin_48h_gate', 'linkedin_next_mutation']) {
+  assert.throws(
+    () => validateBufferPublishInput({ ...validInput, [field]: 'too short' }, { nowMs }),
+    new RegExp(`${field} must contain at least 20 characters`),
+  );
+}
+
+assert.throws(
+  () => validateBufferPublishInput({ ...validInput, content_field: 'facebook_founder_draft' }, { nowMs }),
+  /juss_rayy_linkedin must publish only linkedin_draft/,
+);
+
+const facebookInput = {
+  ...validInput,
+  content_field: 'facebook_founder_draft',
+  channel: 'juss_and_co_facebook',
+};
+for (const field of Object.keys(linkedinStrategy)) delete facebookInput[field];
+const facebookPrepared = validateBufferPublishInput(facebookInput, { nowMs });
+assert.equal(facebookPrepared.content_validated, true);
+assert.equal(facebookPrepared.channel, 'juss_and_co_facebook');
+assert.equal('linkedin_rising_floor_ready' in facebookPrepared, false);
+
 const overrideAttempt = validateBufferPublishInput({
   ...validInput,
   method: 'share_now',
@@ -179,5 +234,6 @@ assert.equal(zapierLikeContext.output.buffer_save_to_draft, false);
 assert.equal(zapierLikeContext.output.buffer_api_sharing_mode, 'customScheduled');
 assert.equal(zapierLikeContext.output.buffer_api_due_at, '2026-08-02T21:20:00.000Z');
 assert.equal(zapierLikeContext.output.review_window_minutes, 20);
+assert.equal(zapierLikeContext.output.linkedin_rising_floor_ready, true);
 
-console.log('Buffer scheduling firewall verified: approved finished copy receives one owned 20-minute schedule with customScheduled/dueAt API mapping; backend-aligned grant limits, stale timestamps, prompts, draft/queue/share-now modes, and caller overrides fail closed.');
+console.log('Buffer scheduling firewall verified: approved finished copy receives one owned 20-minute schedule; LinkedIn additionally requires a verified rising-floor baseline, growth hypothesis, 24h/48h gates, and next mutation while non-LinkedIn channels remain unchanged.');
