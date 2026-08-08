@@ -460,6 +460,7 @@ jobs:
       GITHUB_TOKEN: ${{ github.token }}
       PUBLISH_ALLOWED: 'true'
       LINKEDIN_BASELINE_PATH: config/linkedin-rising-floor-baseline.json
+      REPOSITORY_PUBLICATION_POLICY_PATH: config/proof-of-ship-repository-policy.json
     steps:
       - name: Check out the exact deployed commit
         uses: actions/checkout@v4
@@ -481,11 +482,23 @@ jobs:
           parent_count=$(( $(wc -w <<<"$parent_line") - 1 ))
 
           repository_allowed=false
-          case "$GITHUB_REPOSITORY" in
-            jussray/*)
-              repository_allowed=true
-              ;;
-          esac
+          repository_policy_sha256=''
+          repository_contract_id=''
+          repository_sensitive=true
+          if [[ -f "$REPOSITORY_PUBLICATION_POLICY_PATH" ]] && jq -e --arg repo "$GITHUB_REPOSITORY" '
+            .version == 1 and
+            .repository == $repo and
+            .owner == "jussray" and
+            .publication_eligible == true and
+            (.sensitive_repository | type == "boolean") and
+            .privacy_safe_marketing_contract.approved == true and
+            (.privacy_safe_marketing_contract.contract_id | type == "string" and length > 0)
+          ' "$REPOSITORY_PUBLICATION_POLICY_PATH" >/dev/null; then
+            repository_allowed=true
+            repository_policy_sha256="$(sha256sum "$REPOSITORY_PUBLICATION_POLICY_PATH" | awk '{print $1}')"
+            repository_contract_id="$(jq -r '.privacy_safe_marketing_contract.contract_id' "$REPOSITORY_PUBLICATION_POLICY_PATH")"
+            repository_sensitive="$(jq -r '.sensitive_repository' "$REPOSITORY_PUBLICATION_POLICY_PATH")"
+          fi
 
           mapfile -t changed_paths < <(
             git diff-tree --root --no-commit-id --name-only -r -m "$EXPECTED_HEAD_SHA" \
@@ -604,6 +617,9 @@ jobs:
             --arg pr_url "$pr_url" \
             --arg pr_title "$pr_title" \
             --arg commit_type "$commit_type" \
+            --arg repository_policy_sha256 "$repository_policy_sha256" \
+            --arg repository_contract_id "$repository_contract_id" \
+            --argjson repository_sensitive "$repository_sensitive" \
             --argjson repository_allowed "$(if [[ "$repository_allowed" == true ]]; then echo true; else echo false; fi)" \
             --argjson changed_paths "$changed_paths_json" \
             --argjson meaningful_paths "$meaningful_paths_json" \
@@ -622,7 +638,15 @@ jobs:
               pr_title: $pr_title,
               commit_type: (if $commit_type == "" then "merge" else $commit_type end),
               repository_allowed: $repository_allowed,
-              repository_policy: {mode: "all_owned_proof_gated", owner: "jussray"},
+              repository_policy: {mode: "repo_owned_privacy_receipt", owner: "jussray"},
+              repository_eligibility_receipt: (if $repository_allowed then {
+                repository: $repo,
+                commit_sha: $commit_sha,
+                policy_sha256: $repository_policy_sha256,
+                privacy_safe_marketing_approved: true,
+                contract_id: $repository_contract_id,
+                sensitive_repository: $repository_sensitive
+              } else null end),
               changed_paths: $changed_paths,
               changed_paths_summary: ($meaningful_paths | join(", ")),
               migration_versions: $migration_versions,
@@ -645,13 +669,13 @@ jobs:
           echo "meaningful=$meaningful_json" >> "$GITHUB_OUTPUT"
           {
             echo '### Proof-of-Ship classification'
-            jq '{repo, commit_sha, repository_allowed, repository_policy, meaningful, meaningful_reason, changed_paths_summary, migration_versions}' proof-context.json
+            jq '{repo, commit_sha, repository_allowed, repository_policy, repository_eligibility_receipt, meaningful, meaningful_reason, changed_paths_summary, migration_versions}' proof-context.json
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Skip non-meaningful activity
         if: steps.classify.outputs.meaningful != 'true'
         run: |
-          echo 'No verified build-in-public event: filtered by commit, author, or changed paths.'
+          echo 'No verified build-in-public event: filtered by commit, author, repository privacy eligibility, or changed paths.'
 
       - name: Verify changed Supabase migrations on the remote database
         if: steps.classify.outputs.meaningful == 'true'
@@ -773,20 +797,73 @@ jobs:
             .version == 1 and
             .platform == "linkedin" and
             .source.verified == true and
-            (.baseline_ref | length > 0) and
-            .period.complete == false and
-            .partial_day_receipt.complete == false and
-            .comparable_window.interpretation == "no_like_for_like_decline" and
+            (.source.created_at_utc | type == "string" and length > 0) and
+            (.baseline_ref | type == "string" and length > 0) and
+            (.period.end | type == "string" and length > 0) and
+            (.period.complete == true or (.period.complete == false and .partial_day_receipt.complete == false)) and
+            (.policy.max_age_hours | type == "number" and . > 0) and
+            (.policy.max_period_lag_days | type == "number" and . >= 0) and
+            .policy.stale_behavior == "fail_closed_before_linkedin_schedule" and
             .policy.partial_window_policy == "never_classify_an_incomplete_or_rolling_window_as_a_decline_without_like_for_like_evidence" and
             .policy.target_mode == "beat_previous_verified_floor_without_sacrificing_quality"
           ' "$LINKEDIN_BASELINE_PATH" >/dev/null
 
+          LINKEDIN_BASELINE_PATH="$LINKEDIN_BASELINE_PATH" python3 - <<'PY'
+          import json
+          import os
+          from datetime import date, datetime, timedelta, timezone
+
+          path = os.environ['LINKEDIN_BASELINE_PATH']
+          with open(path, encoding='utf-8') as handle:
+              baseline = json.load(handle)
+
+          source_created = datetime.fromisoformat(
+              baseline['source']['created_at_utc'].replace('Z', '+00:00')
+          )
+          if source_created.tzinfo is None:
+              raise SystemExit('LinkedIn baseline stale: source timestamp must include timezone')
+          source_created = source_created.astimezone(timezone.utc)
+
+          now = datetime.now(timezone.utc)
+          if source_created > now + timedelta(minutes=5):
+              raise SystemExit('LinkedIn baseline stale: source timestamp is in the future')
+
+          max_age_hours = int(baseline['policy']['max_age_hours'])
+          age = now - source_created
+          if age > timedelta(hours=max_age_hours):
+              raise SystemExit(
+                  f'LinkedIn baseline stale: source age {age} exceeds {max_age_hours} hours'
+              )
+
+          period_end = date.fromisoformat(baseline['period']['end'])
+          period_lag_days = (now.date() - period_end).days
+          max_period_lag_days = int(baseline['policy']['max_period_lag_days'])
+          if period_lag_days < 0:
+              raise SystemExit('LinkedIn baseline stale: period end is in the future')
+          if period_lag_days > max_period_lag_days:
+              raise SystemExit(
+                  'LinkedIn baseline stale: '
+                  f'period lag {period_lag_days} days exceeds {max_period_lag_days}'
+              )
+
+          print(
+              'LinkedIn baseline freshness verified: '
+              f'age_hours={age.total_seconds() / 3600:.2f}, '
+              f'period_lag_days={period_lag_days}'
+          )
+          PY
+
           jq -e '
             (.meaningful == true) and
             (.repository_allowed == true) and
-            (.repository_policy.mode == "all_owned_proof_gated") and
+            (.repository_policy.mode == "repo_owned_privacy_receipt") and
             (.repository_policy.owner == "jussray") and
             (.repo | startswith("jussray/")) and
+            (.repository_eligibility_receipt.repository == .repo) and
+            (.repository_eligibility_receipt.commit_sha == .commit_sha) and
+            (.repository_eligibility_receipt.privacy_safe_marketing_approved == true) and
+            (.repository_eligibility_receipt.policy_sha256 | test("^[0-9a-f]{64}$")) and
+            (.repository_eligibility_receipt.contract_id | length > 0) and
             (.commit_sha | test("^[0-9a-f]{40}$")) and
             ((.supabase_state == "verified") or (.supabase_state == "not_applicable")) and
             (.cloudflare_live_sha == .commit_sha)
@@ -850,6 +927,7 @@ jobs:
              .linkedin_rising_floor_ready = false |
              .linkedin_baseline_ref = $linkedin_baseline_ref |
              .linkedin_baseline = $linkedin_baseline |
+             .linkedin_baseline_freshness_checked_at = $verified_at |
              .linkedin_required_output_fields = [
                "linkedin_rising_floor_ready",
                "linkedin_baseline_ref",
@@ -865,9 +943,14 @@ jobs:
             .live_state == "verified" and
             .publish_allowed == true and
             .PUBLISH_ALLOWED == true and
-            .repository_policy.mode == "all_owned_proof_gated" and
+            .repository_policy.mode == "repo_owned_privacy_receipt" and
             .repository_policy.owner == "jussray" and
             (.repo | startswith("jussray/")) and
+            (.repository_eligibility_receipt.repository == .repo) and
+            (.repository_eligibility_receipt.commit_sha == .commit_sha) and
+            (.repository_eligibility_receipt.privacy_safe_marketing_approved == true) and
+            (.repository_eligibility_receipt.policy_sha256 | test("^[0-9a-f]{64}$")) and
+            (.repository_eligibility_receipt.contract_id | length > 0) and
             .destination_mode == "schedule" and
             .buffer_method == "schedule" and
             .buffer_save_to_draft == false and
@@ -878,6 +961,7 @@ jobs:
             .linkedin_rising_floor_ready == false and
             .linkedin_baseline.source.verified == true and
             .linkedin_baseline_ref == .linkedin_baseline.baseline_ref and
+            (.linkedin_baseline_freshness_checked_at | length > 0) and
             (.linkedin_required_output_fields | index("linkedin_rising_floor_ready") != null) and
             (.linkedin_required_output_fields | index("linkedin_growth_hypothesis") != null) and
             (.linkedin_required_output_fields | index("linkedin_24h_gate") != null) and
@@ -900,9 +984,9 @@ jobs:
 
           {
             echo '### Verified proof payload sent for scheduled publication'
-            jq '{repo, commit_sha, pr_url, commit_url, live_state, supabase_state, supabase_migration_version, cloudflare_live_sha, proof_url, idempotency_key, publish_allowed, PUBLISH_ALLOWED, repository_policy, destination_mode, buffer_method, scheduled_at, review_deadline, linkedin_strategy_required, linkedin_rising_floor_ready, linkedin_baseline_ref, linkedin_required_output_fields, buffer_terminal_action}' proof-payload.json
+            jq '{repo, commit_sha, pr_url, commit_url, live_state, supabase_state, supabase_migration_version, cloudflare_live_sha, proof_url, idempotency_key, publish_allowed, PUBLISH_ALLOWED, repository_policy, repository_eligibility_receipt, destination_mode, buffer_method, scheduled_at, review_deadline, linkedin_strategy_required, linkedin_rising_floor_ready, linkedin_baseline_ref, linkedin_baseline_freshness_checked_at, linkedin_required_output_fields, buffer_terminal_action}' proof-payload.json
             echo
-            echo 'The downstream Zap must dedupe by idempotency_key, use ChatGPT Conversation with the verified LinkedIn baseline, populate the required rising-floor strategy fields, validate proof URLs, and schedule through the Buffer firewall under the 20-minute review-window contract.'
+            echo 'The downstream Zap must dedupe by idempotency_key, use ChatGPT Conversation with the verified fresh LinkedIn baseline, populate the required rising-floor strategy fields, validate proof URLs, and schedule through the Buffer firewall under the 20-minute review-window contract.'
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ── 5. Post-deploy database reconciliation inspection ───────────────────────
