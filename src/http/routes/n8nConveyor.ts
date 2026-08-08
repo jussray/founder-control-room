@@ -2,10 +2,11 @@ import { Router } from 'express';
 import {
   FOUNDER_CONVEYOR_STAGES,
   dispatchFounderConveyorAdvance,
-  readFounderConveyorConfig,
   type FounderConveyorAdvanceInput,
   type FounderConveyorStage,
 } from '../../lib/n8nConveyor.js';
+import { founderConveyorReadiness } from '../../lib/n8nConveyorReadiness.js';
+import { FOUNDER_CONVEYOR_CONTRACT } from '../../lib/founderConveyorReceipt.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 export const n8nConveyorRouter = Router();
@@ -28,12 +29,11 @@ function stringArray(value: unknown): string[] | null {
 }
 
 n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
-  const config = readFounderConveyorConfig();
+  const readiness = founderConveyorReadiness();
   return res.json({
-    contract: 'founder-control-room/n8n-conveyor@v1',
+    contract: FOUNDER_CONVEYOR_CONTRACT,
     stages: FOUNDER_CONVEYOR_STAGES,
-    configured: config.configured,
-    enabled: config.enabled,
+    readiness,
     authority: {
       advanceStage: true,
       merge: false,
@@ -55,6 +55,7 @@ n8nConveyorRouter.post('/advance', async (req: FounderRequest, res) => {
       ok: false,
       code: 'INVALID_PAYLOAD',
       reasons: ['fromStage, toStage, and evidenceUrls must use the conveyor contract'],
+      contract: FOUNDER_CONVEYOR_CONTRACT,
     });
   }
 
@@ -71,6 +72,6 @@ n8nConveyorRouter.post('/advance', async (req: FounderRequest, res) => {
   const result = await dispatchFounderConveyorAdvance(input);
   return res.status(result.status).json({
     ...result,
-    contract: 'founder-control-room/n8n-conveyor@v1',
+    contract: FOUNDER_CONVEYOR_CONTRACT,
   });
 });
