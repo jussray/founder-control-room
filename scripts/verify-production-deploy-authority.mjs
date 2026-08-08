@@ -4,9 +4,21 @@ import { existsSync, readFileSync } from 'node:fs';
 const workflowPath = new URL('../.github/workflows/deploy.yml', import.meta.url);
 const wranglerPath = new URL('../wrangler.worker.toml', import.meta.url);
 const linkedinBaselinePath = new URL('../config/linkedin-rising-floor-baseline.json', import.meta.url);
+const repositoryPolicyPath = new URL('../config/proof-of-ship-repository-policy.json', import.meta.url);
 const workflow = readFileSync(workflowPath, 'utf8');
 const wrangler = readFileSync(wranglerPath, 'utf8');
 const linkedinBaseline = JSON.parse(readFileSync(linkedinBaselinePath, 'utf8'));
+const repositoryPolicy = JSON.parse(readFileSync(repositoryPolicyPath, 'utf8'));
+
+function assertNonNegativeInteger(value, label) {
+  assert.equal(Number.isInteger(value), true, `${label} must be an integer`);
+  assert.ok(value >= 0, `${label} must be non-negative`);
+}
+
+function assertIsoDate(value, label) {
+  assert.equal(typeof value, 'string', `${label} must be a string`);
+  assert.equal(Number.isFinite(Date.parse(value)), true, `${label} must be parseable as a date`);
+}
 
 assert.equal(
   existsSync(new URL('../wrangler.toml', import.meta.url)),
@@ -96,18 +108,99 @@ assert.doesNotMatch(
 );
 assert.match(
   workflow,
-  /repository_policy: \{mode: "all_owned_proof_gated", owner: "jussray"\}/,
-  'proof-of-ship must encode all-owned proof-gated repository policy',
+  /REPOSITORY_PUBLICATION_POLICY_PATH: config\/proof-of-ship-repository-policy\.json/,
+  'proof-of-ship must bind a repo-owned privacy/publication policy',
+);
+assert.match(
+  workflow,
+  /sha256sum "\$REPOSITORY_PUBLICATION_POLICY_PATH"/,
+  'proof-of-ship must hash the repo-owned publication policy before sending metadata',
+);
+assert.match(
+  workflow,
+  /repository_eligibility_receipt/,
+  'proof-of-ship must mint an exact-SHA repository eligibility receipt',
+);
+assert.match(
+  workflow,
+  /\.repository_eligibility_receipt\.commit_sha == \.commit_sha/,
+  'proof-of-ship must bind repository privacy eligibility to the exact commit SHA',
+);
+assert.match(
+  workflow,
+  /\.repository_eligibility_receipt\.privacy_safe_marketing_approved == true/,
+  'proof-of-ship must require positive privacy-safe marketing approval',
+);
+assert.match(
+  workflow,
+  /repository_policy: \{mode: "repo_owned_privacy_receipt", owner: "jussray"\}/,
+  'proof-of-ship must encode repo-owned privacy-receipt policy rather than namespace-only authority',
 );
 assert.match(
   workflow,
   /\(\.repo \| startswith\("jussray\/"\)\)/,
-  'proof-of-ship must require the jussray owner namespace instead of a repo-name allowlist',
+  'proof-of-ship may retain the jussray owner namespace only as a secondary assertion',
 );
+
+assert.equal(repositoryPolicy.version, 1, 'repository publication policy schema must remain version 1');
+assert.equal(repositoryPolicy.repository, 'jussray/founder-control-room');
+assert.equal(repositoryPolicy.owner, 'jussray');
+assert.equal(repositoryPolicy.publication_eligible, true);
+assert.equal(repositoryPolicy.sensitive_repository, false);
+assert.equal(repositoryPolicy.privacy_safe_marketing_contract?.approved, true);
+assert.equal(
+  typeof repositoryPolicy.privacy_safe_marketing_contract?.contract_id,
+  'string',
+  'repository publication policy must name an approved privacy contract',
+);
+assert.ok(
+  repositoryPolicy.privacy_safe_marketing_contract.contract_id.length > 0,
+  'repository privacy contract id must not be empty',
+);
+assert.equal(
+  Array.isArray(repositoryPolicy.privacy_safe_marketing_contract?.metadata_scope),
+  true,
+  'repository publication policy must enumerate allowed metadata scope',
+);
+assert.equal(
+  Array.isArray(repositoryPolicy.privacy_safe_marketing_contract?.prohibited_metadata),
+  true,
+  'repository publication policy must enumerate prohibited metadata',
+);
+for (const prohibited of [
+  'secrets',
+  'credentials',
+  'private_user_content',
+  'teen_or_family_content',
+  'journal_content',
+  'voice_or_media_content',
+  'wellness_content',
+]) {
+  assert.ok(
+    repositoryPolicy.privacy_safe_marketing_contract.prohibited_metadata.includes(prohibited),
+    `repository publication policy must prohibit ${prohibited}`,
+  );
+}
+
 assert.match(
   workflow,
   /LINKEDIN_BASELINE_PATH: config\/linkedin-rising-floor-baseline\.json/,
   'proof-of-ship must bind the checked-in LinkedIn baseline receipt',
+);
+assert.match(
+  workflow,
+  /LinkedIn baseline stale/,
+  'proof-of-ship must fail closed when the LinkedIn baseline is stale',
+);
+assert.match(
+  workflow,
+  /max_age_hours/,
+  'proof-of-ship must enforce a maximum LinkedIn baseline age',
+);
+assert.match(
+  workflow,
+  /max_period_lag_days/,
+  'proof-of-ship must enforce a maximum LinkedIn baseline period lag',
 );
 assert.match(
   workflow,
@@ -136,65 +229,85 @@ for (const field of [
 
 assert.equal(linkedinBaseline.version, 1, 'LinkedIn baseline receipt schema must remain version 1');
 assert.equal(linkedinBaseline.platform, 'linkedin');
-assert.equal(linkedinBaseline.account, 'Juss Rayy');
+assert.equal(typeof linkedinBaseline.account, 'string');
+assert.ok(linkedinBaseline.account.length > 0, 'LinkedIn baseline account must not be empty');
+assert.equal(typeof linkedinBaseline.baseline_ref, 'string');
+assert.ok(
+  linkedinBaseline.baseline_ref.startsWith('linkedin-export:'),
+  'LinkedIn baseline reference must identify a verified export window',
+);
+assert.equal(linkedinBaseline.source?.kind, 'linkedin_aggregate_analytics_export');
+assert.equal(typeof linkedinBaseline.source?.file_name, 'string');
+assert.ok(linkedinBaseline.source.file_name.length > 0, 'LinkedIn source export filename must not be empty');
+assertIsoDate(linkedinBaseline.source?.created_at_utc, 'LinkedIn source created_at_utc');
+assert.equal(linkedinBaseline.source?.verified, true);
+assertIsoDate(linkedinBaseline.period?.start, 'LinkedIn period start');
+assertIsoDate(linkedinBaseline.period?.end, 'LinkedIn period end');
+assert.equal(typeof linkedinBaseline.period?.complete, 'boolean');
+if (linkedinBaseline.period.complete === false) {
+  assert.equal(
+    linkedinBaseline.partial_day_receipt?.complete,
+    false,
+    'an incomplete LinkedIn window must retain an explicitly incomplete partial-day receipt',
+  );
+  assert.equal(
+    linkedinBaseline.partial_day_receipt?.date,
+    linkedinBaseline.period?.partial_day,
+    'partial-day receipt date must match the declared partial day',
+  );
+}
+
+for (const metric of ['impressions', 'members_reached', 'engagements', 'new_followers', 'total_followers']) {
+  assertNonNegativeInteger(linkedinBaseline.current_window?.[metric], `current_window.${metric}`);
+}
+for (const metric of [
+  'current_export_impressions',
+  'previous_export_impressions',
+  'current_export_engagements',
+  'previous_export_engagements',
+]) {
+  assertNonNegativeInteger(linkedinBaseline.comparable_window?.[metric], `comparable_window.${metric}`);
+}
 assert.equal(
-  linkedinBaseline.baseline_ref,
-  'linkedin-export:2026-08-02..2026-08-08',
-  'LinkedIn baseline reference must identify the latest verified export window',
-);
-assert.equal(
-  linkedinBaseline.source.file_name,
-  'AggregateAnalytics_Juss Rayy_2026-08-02_2026-08-08.xlsx',
-  'LinkedIn baseline receipt must point to the verified source export',
-);
-assert.equal(linkedinBaseline.source.verified, true);
-assert.equal(linkedinBaseline.period.complete, false);
-assert.equal(linkedinBaseline.period.partial_day, '2026-08-08');
-assert.deepEqual(
-  linkedinBaseline.current_window,
-  {
-    impressions: 1248,
-    members_reached: 830,
-    engagements: 19,
-    new_followers: 13,
-    total_followers: 40,
-  },
-  'current LinkedIn baseline metrics must match the verified export',
-);
-assert.deepEqual(
-  linkedinBaseline.partial_day_receipt,
-  {
-    date: '2026-08-08',
-    impressions: 5,
-    engagements: 0,
-    complete: false,
-  },
-  'the partial Aug 8 day must remain explicitly incomplete',
-);
-assert.deepEqual(
-  linkedinBaseline.comparable_window,
-  {
-    start: '2026-08-02',
-    end: '2026-08-07',
-    current_export_impressions: 1243,
-    previous_export_impressions: 1224,
-    impressions_delta: 19,
-    current_export_engagements: 19,
-    previous_export_engagements: 19,
-    engagements_delta: 0,
-    interpretation: 'no_like_for_like_decline',
-  },
-  'like-for-like LinkedIn comparison must remain the authoritative trend receipt',
+  linkedinBaseline.comparable_window?.impressions_delta,
+  linkedinBaseline.comparable_window.current_export_impressions
+    - linkedinBaseline.comparable_window.previous_export_impressions,
+  'LinkedIn impressions delta must reconcile to the comparable-window inputs',
 );
 assert.equal(
-  linkedinBaseline.policy.partial_window_policy,
+  linkedinBaseline.comparable_window?.engagements_delta,
+  linkedinBaseline.comparable_window.current_export_engagements
+    - linkedinBaseline.comparable_window.previous_export_engagements,
+  'LinkedIn engagements delta must reconcile to the comparable-window inputs',
+);
+assert.equal(typeof linkedinBaseline.comparable_window?.interpretation, 'string');
+assert.ok(
+  linkedinBaseline.comparable_window.interpretation.length > 0,
+  'LinkedIn comparable-window interpretation must not be empty',
+);
+assert.equal(
+  linkedinBaseline.policy?.partial_window_policy,
   'never_classify_an_incomplete_or_rolling_window_as_a_decline_without_like_for_like_evidence',
 );
 assert.equal(
-  linkedinBaseline.policy.target_mode,
+  linkedinBaseline.policy?.target_mode,
   'beat_previous_verified_floor_without_sacrificing_quality',
 );
-assert.equal(linkedinBaseline.policy.one_off_virality_is_the_goal, false);
+assert.equal(Number.isInteger(linkedinBaseline.policy?.max_age_hours), true);
+assert.ok(
+  linkedinBaseline.policy.max_age_hours > 0 && linkedinBaseline.policy.max_age_hours <= 168,
+  'LinkedIn baseline max_age_hours must be a positive bounded freshness window',
+);
+assert.equal(Number.isInteger(linkedinBaseline.policy?.max_period_lag_days), true);
+assert.ok(
+  linkedinBaseline.policy.max_period_lag_days >= 0 && linkedinBaseline.policy.max_period_lag_days <= 7,
+  'LinkedIn baseline max_period_lag_days must be a bounded non-negative lag',
+);
+assert.equal(
+  linkedinBaseline.policy?.stale_behavior,
+  'fail_closed_before_linkedin_schedule',
+);
+assert.equal(linkedinBaseline.policy?.one_off_virality_is_the_goal, false);
 
 const publicBindings = new Map([
   ['SUPABASE_URL', 'https://oojzfmmywbvficgybaxd.supabase.co'],
@@ -341,4 +454,4 @@ for (const name of requiredAuthoritySecrets) {
     name + ' must be checked by the pre-migration configuration gate',
   );
 }
-console.log('Production deployment authority, proof-of-ship parity, LinkedIn baseline, and one-Worker binding contract verified.');
+console.log('Production deployment authority, privacy receipt, LinkedIn freshness, and one-Worker binding contract verified.');
