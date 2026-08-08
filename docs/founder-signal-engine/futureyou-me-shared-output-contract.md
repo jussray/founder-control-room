@@ -119,6 +119,55 @@ Rules:
 - The Buffer lane may distribute to three approved active channels in parallel, costing one Buffer action per channel.
 - Non-selected platform drafts remain available in HubSpot and Founder Control Room without another AI task.
 
+## LinkedIn rising-floor lens
+
+LinkedIn is not optimized for one-off virality. The standing goal is a **steady or accelerating verified floor**: preserve the strongest mechanics from the last proven winner, improve one or more weak dimensions, measure the result, and use that result as the next baseline.
+
+Required fields:
+
+```text
+linkedin_rising_floor_ready
+linkedin_baseline_ref
+linkedin_growth_hypothesis
+linkedin_business_signal
+linkedin_warm_conversation_action
+linkedin_visual_brief
+linkedin_24h_gate
+linkedin_48h_gate
+linkedin_next_mutation
+```
+
+Rules:
+
+- `linkedin_baseline_ref` must point to the latest verified LinkedIn analytics export, platform recap, or equally authoritative measurement source. Never invent a baseline from memory.
+- Never classify an incomplete day, partial export, or rolling-window replacement effect as a true decline without a like-for-like comparison.
+- The target is to beat the previous verified floor **without sacrificing engagement quality or business relevance**.
+- Every post must combine: verified build/operating proof, a founder-specific point of view, a clear business or investor consequence, and an honest unresolved truth or next gate.
+- When relevant warm comments, messages, invitations, or partnership threads require a response, treat them as conversion signals and surface the next conversation action before chasing extra distribution.
+- Use a visual only when it improves product comprehension or attention capture. Decorative media alone does not satisfy the strategy.
+- Measure at 24 hours and 48 hours. Compare impressions, engagement rate, quality comments, profile/follower conversion, and warm-conversation conversion where those metrics are available.
+- Classify weak results instead of hand-waving them: `distribution_failure`, `content_failure`, or `conversion_failure`.
+- `linkedin_next_mutation` must name what winning mechanism carries forward: hook structure, proof mechanic, format, visual, CTA, or conversion behavior.
+- `linkedin_rising_floor_ready=false` whenever the baseline is missing, the comparison is not like-for-like, or the post has no explicit growth hypothesis.
+- A LinkedIn post may remain review copy when the rising-floor gate is not ready, but it must not enter the scheduled Buffer lane as if the growth contract passed.
+
+The system should therefore behave like:
+
+```text
+latest verified baseline
+-> warm-conversation check
+-> proof-backed post hypothesis
+-> optional comprehension visual
+-> founder review
+-> schedule only when rising-floor-ready
+-> 24h measurement
+-> 48h measurement
+-> classify result
+-> carry winner mechanics into next post
+```
+
+Do not hard-code today's numeric thresholds into this contract. The floor must move upward as the account improves.
+
 ## Shared truth boundary
 
 The AI result must keep these categories separate:
@@ -164,6 +213,15 @@ future_you_valid_fear
 chief_ai_decision
 social_campaign_angle
 social_campaign_media_brief
+linkedin_rising_floor_ready
+linkedin_baseline_ref
+linkedin_growth_hypothesis
+linkedin_business_signal
+linkedin_warm_conversation_action
+linkedin_visual_brief
+linkedin_24h_gate
+linkedin_48h_gate
+linkedin_next_mutation
 linkedin_draft
 facebook_draft
 instagram_draft
@@ -181,9 +239,11 @@ publish_allowed
 
 `publish_allowed` remains `false` until an exact founder approval event reaches the separate approval lane.
 
+`linkedin_rising_floor_ready` is a second, LinkedIn-specific strategy gate. Founder approval does not override a missing verified LinkedIn baseline; the post must stay review-only until the strategy input is repaired.
+
 ## Zapier task effect
 
-Adding FutureYou, ME, and the wider social matrix changes the structured response schema only.
+Adding FutureYou, ME, the wider social matrix, and the LinkedIn rising-floor fields changes the structured response schema only.
 
 ```text
 Before: 1 AI action per signal
@@ -221,7 +281,12 @@ The verifier must fail when:
 - FutureYou fields are removed;
 - ME fields are removed;
 - a required social-platform draft is removed;
-- FutureYou, ME, or social drafting are split into separate AI actions;
+- LinkedIn rising-floor fields or guardrails are removed;
+- the LinkedIn baseline stops requiring verified analytics/platform evidence;
+- partial rolling windows can be labeled decline without like-for-like evidence;
+- the 24h/48h measurement windows drift;
+- winner mechanics stop compounding into the next post;
+- FutureYou, ME, social drafting, or LinkedIn strategy are split into separate AI actions;
 - the Buffer allocation does not equal the number of configured parallel channel slots;
 - platform-native copy is no longer required;
 - the planned task total exceeds the 90-task operating ceiling;
@@ -229,4 +294,4 @@ The verifier must fail when:
 
 ## Rollback
 
-Revert this contract, the matching JSON fields, and verifier assertions together. Do not delete Zapier workflows, HubSpot evidence, Buffer drafts/posts, Zap History, or queue records.
+Revert this contract, the matching JSON fields, verifier assertions, and LinkedIn Buffer firewall gate together. Do not delete Zapier workflows, HubSpot evidence, Buffer drafts/posts, Zap History, analytics exports, or queue records.
