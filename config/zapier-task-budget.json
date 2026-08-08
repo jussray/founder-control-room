@@ -85,6 +85,15 @@
       "chief_ai_decision",
       "social_campaign_angle",
       "social_campaign_media_brief",
+      "linkedin_rising_floor_ready",
+      "linkedin_baseline_ref",
+      "linkedin_growth_hypothesis",
+      "linkedin_business_signal",
+      "linkedin_warm_conversation_action",
+      "linkedin_visual_brief",
+      "linkedin_24h_gate",
+      "linkedin_48h_gate",
+      "linkedin_next_mutation",
       "linkedin_draft",
       "facebook_draft",
       "facebook_founder_draft",
@@ -114,6 +123,39 @@
       "must_choose_one_smallest_next_action": true,
       "must_preserve_founder_voice": true,
       "profile_angle_only_when_relevant": true
+    },
+    "linkedin_rising_floor": {
+      "enabled": true,
+      "goal": "steady_or_accelerating_verified_floor",
+      "target_mode": "beat_previous_verified_floor_without_sacrificing_quality",
+      "baseline_source": "latest_verified_linkedin_analytics_or_platform_recap",
+      "partial_window_policy": "never_classify_an_incomplete_or_rolling_window_as_a_decline_without_like_for_like_evidence",
+      "required_post_elements": [
+        "verified_build_or_operating_proof",
+        "founder_specific_point_of_view",
+        "business_or_investor_consequence",
+        "honest_unresolved_truth_or_next_gate"
+      ],
+      "primary_metrics": [
+        "impressions",
+        "engagement_rate",
+        "quality_comments",
+        "profile_or_follower_conversion",
+        "warm_conversation_conversion"
+      ],
+      "measurement_windows_hours": [
+        24,
+        48
+      ],
+      "warm_conversation_priority": "convert_relevant_warm_threads_before_chasing_additional_distribution_when_they_require_a_response",
+      "visual_policy": "use_a_visual_when_it_improves_product_comprehension_or_attention_capture_not_as_decoration",
+      "failure_classes": [
+        "distribution_failure",
+        "content_failure",
+        "conversion_failure"
+      ],
+      "winner_mutation_policy": "carry_the_winning_hook_structure_proof_mechanic_format_or_conversion_mechanic_into_the_next_post",
+      "one_off_virality_is_the_goal": false
     }
   },
   "buffer_distribution": {
@@ -127,7 +169,8 @@
       "platform_readiness",
       "media_compatibility",
       "queue_capacity",
-      "recent_coverage"
+      "recent_coverage",
+      "linkedin_rising_floor_readiness"
     ],
     "supported_draft_platforms": [
       "linkedin",
@@ -177,6 +220,15 @@
       "share_now_allowed": false,
       "buffer_api_sharing_mode": "customScheduled",
       "buffer_api_due_at_source": "scheduled_at",
+      "linkedin_rising_floor_required_channel": "juss_rayy_linkedin",
+      "linkedin_rising_floor_required_fields": [
+        "linkedin_rising_floor_ready",
+        "linkedin_baseline_ref",
+        "linkedin_growth_hypothesis",
+        "linkedin_24h_gate",
+        "linkedin_48h_gate",
+        "linkedin_next_mutation"
+      ],
       "allowed_source_fields": [
         "linkedin_draft",
         "facebook_founder_draft",
@@ -246,6 +298,10 @@
     "buffer_never_receives_prompt_or_instructions": true,
     "buffer_content_must_pass_firewall": true,
     "share_now_requires_named_run_authority": true,
+    "linkedin_rising_floor_gate_before_schedule": true,
+    "partial_rolling_windows_never_define_decline": true,
+    "warm_linkedin_conversations_are_conversion_signals": true,
+    "linkedin_winner_mechanics_compound_into_next_post": true,
     "delete_or_disable_existing_zaps_automatically": false
   }
 }
