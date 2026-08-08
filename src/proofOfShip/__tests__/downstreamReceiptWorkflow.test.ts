@@ -6,6 +6,10 @@ const workflow = readFileSync(
   'utf8',
 );
 const server = readFileSync(new URL('../../http/server.ts', import.meta.url), 'utf8');
+const receiptRoute = readFileSync(
+  new URL('../../http/routes/proofOfShipReceipts.ts', import.meta.url),
+  'utf8',
+);
 const migration = readFileSync(
   new URL('../../../supabase/migrations/20260808061500_proof_of_ship_receipts.sql', import.meta.url),
   'utf8',
@@ -28,9 +32,21 @@ describe('proof-of-ship downstream receipt workflow contract', () => {
     expect(workflow).toMatch(/proof-of-ship-receipts\/by-commit\/jussray\/\$repo_name\/\$EXPECTED_SHA/);
   });
 
-  it('uses a private receipt token and a bounded polling window', () => {
-    expect(workflow).toMatch(/PROOF_OF_SHIP_RECEIPT_TOKEN: \$\{\{ secrets\.PROOF_OF_SHIP_RECEIPT_TOKEN \}\}/);
-    expect(workflow).toMatch(/x-proof-of-ship-receipt-token: \$PROOF_OF_SHIP_RECEIPT_TOKEN/);
+  it('derives a receipt-only token from the existing production MCP secret', () => {
+    expect(workflow).toMatch(/FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: \$\{\{ secrets\.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN \}\}/);
+    expect(workflow).toContain('RECEIPT_TOKEN_CONTEXT: founder-control-room/proof-of-ship-receipts/v1');
+    expect(workflow).toContain('createHmac("sha256", process.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN)');
+    expect(workflow).toContain('update(process.env.RECEIPT_TOKEN_CONTEXT)');
+    expect(workflow).toMatch(/x-proof-of-ship-receipt-token: \$receipt_token/);
+    expect(workflow).not.toContain('PROOF_OF_SHIP_RECEIPT_TOKEN');
+
+    expect(receiptRoute).toContain("const RECEIPT_TOKEN_CONTEXT = 'founder-control-room/proof-of-ship-receipts/v1'");
+    expect(receiptRoute).toContain("process.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN?.trim()");
+    expect(receiptRoute).toContain("createHmac('sha256', mcpToken)");
+    expect(receiptRoute).not.toContain('process.env.PROOF_OF_SHIP_RECEIPT_TOKEN');
+  });
+
+  it('uses a bounded polling window and fails closed without downstream proof', () => {
     expect(workflow).toMatch(/RECEIPT_LOOKUP_ATTEMPTS: '30'/);
     expect(workflow).toMatch(/RECEIPT_LOOKUP_DELAY_SECONDS: '10'/);
     expect(workflow).toMatch(/"\$attempts" -gt 60/);
