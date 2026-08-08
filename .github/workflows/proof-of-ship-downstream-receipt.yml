@@ -1,0 +1,190 @@
+name: Proof-of-Ship Downstream Receipt
+
+on:
+  workflow_run:
+    workflows: ["Deploy"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact deployed commit SHA to verify
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: proof-of-ship-downstream-receipt-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.expected_sha }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  RECEIPT_LOOKUP_ATTEMPTS: '30'
+  RECEIPT_LOOKUP_DELAY_SECONDS: '10'
+  RECEIPT_TOKEN_CONTEXT: founder-control-room/proof-of-ship-receipts/v1
+
+jobs:
+  verify-downstream-receipt:
+    name: Verify exact-head Zapier and Buffer receipt
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        github.event.workflow_run.conclusion == 'success'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    environment: production
+    env:
+      DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+      FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
+      EXPECTED_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.expected_sha }}
+    steps:
+      - name: Validate exact-head receipt configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error title=Invalid exact head::Expected receipt SHA must be a lowercase 40-character commit SHA.'
+            exit 1
+          fi
+          if [[ -z "$DEPLOY_URL" || "$DEPLOY_URL" != https://* ]]; then
+            echo '::error title=Receipt lookup URL missing::DEPLOY_URL must be a configured HTTPS production origin.'
+            exit 1
+          fi
+          if [[ -z "$FOUNDER_SIGNAL_ENGINE_MCP_TOKEN" ]]; then
+            echo '::error title=Existing production secret missing::FOUNDER_SIGNAL_ENGINE_MCP_TOKEN must be configured in the production environment.'
+            exit 1
+          fi
+
+      - name: Check out the exact deployed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify checkout and resolve expected LinkedIn baseline
+        id: expected
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          baseline_ref="$(jq -er '.baseline_ref | select(type == "string" and startswith("linkedin-export:"))' config/linkedin-rising-floor-baseline.json)"
+          idempotency_key="${GITHUB_REPOSITORY}:${EXPECTED_SHA}"
+
+          echo "baseline_ref=$baseline_ref" >> "$GITHUB_OUTPUT"
+          echo "idempotency_key=$idempotency_key" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for canonical downstream receipt
+        id: receipt
+        shell: bash
+        env:
+          EXPECTED_BASELINE_REF: ${{ steps.expected.outputs.baseline_ref }}
+          EXPECTED_IDEMPOTENCY_KEY: ${{ steps.expected.outputs.idempotency_key }}
+        run: |
+          set -euo pipefail
+
+          origin="${DEPLOY_URL%/}"
+          repo_name="${GITHUB_REPOSITORY#jussray/}"
+          lookup_url="$origin/ingest/proof-of-ship-receipts/by-commit/jussray/$repo_name/$EXPECTED_SHA"
+          attempts="$RECEIPT_LOOKUP_ATTEMPTS"
+          delay="$RECEIPT_LOOKUP_DELAY_SECONDS"
+          receipt_token="$(node -e 'const { createHmac } = require("node:crypto"); process.stdout.write(createHmac("sha256", process.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN).update(process.env.RECEIPT_TOKEN_CONTEXT).digest("hex"));')"
+
+          if [[ ! "$receipt_token" =~ ^[0-9a-f]{64}$ ]]; then
+            echo '::error title=Receipt token derivation failed::The domain-separated receipt token was not derived correctly.'
+            exit 1
+          fi
+          if [[ ! "$attempts" =~ ^[1-9][0-9]*$ || "$attempts" -gt 60 ]]; then
+            echo '::error title=Invalid receipt polling policy::RECEIPT_LOOKUP_ATTEMPTS must be between 1 and 60.'
+            exit 1
+          fi
+          if [[ ! "$delay" =~ ^[1-9][0-9]*$ || "$delay" -gt 30 ]]; then
+            echo '::error title=Invalid receipt polling policy::RECEIPT_LOOKUP_DELAY_SECONDS must be between 1 and 30.'
+            exit 1
+          fi
+
+          rm -f receipt.json
+          for attempt in $(seq 1 "$attempts"); do
+            status="$(curl --silent --show-error \
+              --connect-timeout 10 \
+              --max-time 20 \
+              --output receipt.json \
+              --write-out '%{http_code}' \
+              --header "x-proof-of-ship-receipt-token: $receipt_token" \
+              "$lookup_url")"
+
+            if [[ "$status" == 200 ]]; then
+              break
+            fi
+            if [[ "$status" == 404 ]]; then
+              echo "Downstream receipt not present yet (attempt $attempt/$attempts)."
+              rm -f receipt.json
+              if [[ "$attempt" -lt "$attempts" ]]; then sleep "$delay"; fi
+              continue
+            fi
+
+            echo "::error title=Downstream receipt lookup failed::Receipt endpoint returned HTTP $status."
+            cat receipt.json 2>/dev/null || true
+            exit 1
+          done
+
+          if [[ ! -s receipt.json ]]; then
+            echo '::error title=Downstream completion unproven::Zapier dispatch may have been accepted, but no exact-head downstream receipt was proven before the bounded lookup window expired.'
+            exit 1
+          fi
+
+          jq -e \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --arg sha "$EXPECTED_SHA" \
+            --arg key "$EXPECTED_IDEMPOTENCY_KEY" \
+            --arg baseline "$EXPECTED_BASELINE_REF" '
+              .found == true and
+              .receipt.source == "zapier" and
+              .receipt.sourceRepo == $repo and
+              .receipt.exactCommitSha == $sha and
+              .receipt.idempotencyKey == $key and
+              .receipt.linkedinBaselineRef == $baseline and
+              .receipt.linkedinRisingFloorReady == true and
+              (.receipt.linkedinGrowthHypothesis | type == "string" and length > 0) and
+              (.receipt.linkedin24hGate | type == "string" and length > 0) and
+              (.receipt.linkedin48hGate | type == "string" and length > 0) and
+              (.receipt.linkedinNextMutation | type == "string" and length > 0) and
+              (.receipt.linkedinDraftSha256 | test("^[0-9a-f]{64}$")) and
+              .receipt.bufferTerminalAction == "schedule" and
+              (.receipt.bufferScheduleId | type == "string" and length > 0) and
+              (.receipt.scheduledAt | type == "string" and length > 0) and
+              (.receipt.occurredAt | type == "string" and length > 0)
+            ' receipt.json >/dev/null
+
+          receipt_id="$(jq -r '.receipt.receiptId' receipt.json)"
+          buffer_schedule_id="$(jq -r '.receipt.bufferScheduleId' receipt.json)"
+          scheduled_at="$(jq -r '.receipt.scheduledAt' receipt.json)"
+          echo "receipt_id=$receipt_id" >> "$GITHUB_OUTPUT"
+          echo "buffer_schedule_id=$buffer_schedule_id" >> "$GITHUB_OUTPUT"
+          echo "scheduled_at=$scheduled_at" >> "$GITHUB_OUTPUT"
+
+      - name: Publish exact-head downstream proof summary
+        shell: bash
+        env:
+          BASELINE_REF: ${{ steps.expected.outputs.baseline_ref }}
+          RECEIPT_ID: ${{ steps.receipt.outputs.receipt_id }}
+          BUFFER_SCHEDULE_ID: ${{ steps.receipt.outputs.buffer_schedule_id }}
+          SCHEDULED_AT: ${{ steps.receipt.outputs.scheduled_at }}
+        run: |
+          set -euo pipefail
+          {
+            echo '### Proof-of-Ship downstream receipt VERIFIED'
+            echo
+            echo "- repository: $GITHUB_REPOSITORY"
+            echo "- exact SHA: $EXPECTED_SHA"
+            echo "- LinkedIn baseline: $BASELINE_REF"
+            echo "- receipt: $RECEIPT_ID"
+            echo "- Buffer schedule receipt: $BUFFER_SCHEDULE_ID"
+            echo "- scheduled at: $SCHEDULED_AT"
+            echo
+            echo 'The exact commit earned a sanitized Zapier receipt proving rising-floor strategy completion and Buffer scheduling. The receipt stores only hashes/strategy proof, never the LinkedIn post body.'
+          } >> "$GITHUB_STEP_SUMMARY"
