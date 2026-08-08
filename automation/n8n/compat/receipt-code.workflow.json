@@ -1,0 +1,39 @@
+{
+  "id": "fcrN8nCompatV1",
+  "name": "FCR n8n Runtime Compatibility Receipt",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst seed = JSON.stringify(['fcr-conveyor-v2:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','compat-run','founder-control-room','Verify canonical receipt hashing inside pinned n8n runtime.','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','workflows','code',['lean-build-orchestrator','regression-stagnation-guard','capability-mode-router'],['https://github.com/jussray/founder-control-room/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa']]);\nconst receiptId = `fcr-conveyor-receipt-v2:${crypto.createHash('sha256').update(seed).digest('hex')}`;\nconst expected = 'fcr-conveyor-receipt-v2:1a86c0f18a9f22d0bb12fe59757f48028a113810527324ebcf1f89b90f256c8e';\nif (receiptId !== expected) throw new Error(`receipt mismatch: ${receiptId}`);\nreturn [{ json: { verified: true, receiptId, runtimeContract: 'n8n@2.32.6+crypto' } }];"
+      },
+      "id": "canonical-receipt",
+      "name": "Canonical Receipt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 0]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{
+        "node": "Canonical Receipt",
+        "type": "main",
+        "index": 0
+      }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {},
+  "versionId": "00000000-0000-0000-0000-000000000326"
+}
