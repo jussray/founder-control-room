@@ -69,6 +69,12 @@ jobs:
           set -euo pipefail
           node e2e/content-manager-proof.mjs 2>&1 | tee logs/content-manager-proof.log
 
+      - name: Prove mobile conveyor readiness states
+        shell: bash
+        run: |
+          set -euo pipefail
+          node e2e/conveyor-readiness-proof.mjs 2>&1 | tee logs/conveyor-readiness-proof.log
+
       - name: Upload Playwright HTML report
         if: always()
         uses: actions/upload-artifact@v4

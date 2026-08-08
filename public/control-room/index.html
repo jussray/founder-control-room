@@ -17,6 +17,14 @@
 .stack-intro{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin:0 0 .7rem;padding:.75rem .8rem;border:1px solid rgba(148,163,184,.2);border-radius:1rem;background:rgba(15,23,42,.78)}
 .stack-intro strong{display:block;color:#f8fafc;font:800 1rem/1.2 system-ui,sans-serif}
 .stack-intro span{display:block;margin-top:.2rem;color:#aebbd0;font:500 .78rem/1.35 system-ui,sans-serif}
+.stack-intro .conveyor-readiness{display:inline-flex;align-items:center;gap:.42rem;width:max-content;max-width:100%;margin-top:.58rem;padding:.32rem .55rem;border:1px solid rgba(148,163,184,.28);border-radius:999px;background:rgba(2,6,23,.55);color:#dbe7f7;font:750 .7rem/1.25 system-ui,sans-serif}
+.conveyor-readiness::before{content:'';display:block;flex:0 0 auto;width:.5rem;height:.5rem;margin:0;border-radius:999px;background:#94a3b8}
+.conveyor-readiness[data-state='ready-for-probe']{border-color:rgba(103,232,165,.42)}
+.conveyor-readiness[data-state='ready-for-probe']::before{background:#67e8a5}
+.conveyor-readiness[data-state='not-configured'],.conveyor-readiness[data-state='enabled-awaiting-proof']{border-color:rgba(255,209,102,.45)}
+.conveyor-readiness[data-state='not-configured']::before,.conveyor-readiness[data-state='enabled-awaiting-proof']::before{background:#ffd166}
+.conveyor-readiness[data-state='error']{border-color:rgba(255,125,139,.48)}
+.conveyor-readiness[data-state='error']::before{background:#ff7d8b}
 .loop-mark{flex:0 0 auto;color:#f8fafc;font-size:1.5rem;line-height:1}
 .stack-lane{--lane:#7dd3fc;display:grid;grid-template-columns:8rem minmax(0,1fr);gap:.75rem;align-items:center;padding:.72rem;border:1px solid color-mix(in srgb,var(--lane) 42%,transparent);border-radius:1rem;background:linear-gradient(90deg,color-mix(in srgb,var(--lane) 10%,transparent),rgba(15,23,42,.7));box-shadow:inset 0 0 28px color-mix(in srgb,var(--lane) 5%,transparent)}
 .stack-lane[data-lane='chat']{--lane:#67e8f9}
@@ -59,6 +67,9 @@ a.stage:focus-visible,.launch-dock summary:focus-visible{outline:3px solid #f8fa
       <div>
         <strong>Founder Control Room execution loop</strong>
         <span>Move from thinking to verified code, then create or update the project that carries the work forward.</span>
+        <span class="conveyor-readiness" data-conveyor-readiness data-state="checking" role="status" aria-live="polite" aria-atomic="true">
+          <span data-conveyor-readiness-label>Checking n8n readiness…</span>
+        </span>
       </div>
       <span class="loop-mark" aria-hidden="true">🔁</span>
     </header>
