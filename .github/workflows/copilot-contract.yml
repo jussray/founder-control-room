@@ -1,0 +1,59 @@
+name: Copilot Contract
+
+on:
+  pull_request:
+    paths:
+      - '.mcp.json'
+      - '.mcp.example.json'
+      - '.vscode/mcp.json'
+      - '.github/copilot-instructions.md'
+      - 'config/mcp-skill-routing.json'
+      - 'scripts/verify-mcp-config.mjs'
+      - '.github/workflows/copilot-contract.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - '.mcp.json'
+      - '.mcp.example.json'
+      - '.vscode/mcp.json'
+      - '.github/copilot-instructions.md'
+      - 'config/mcp-skill-routing.json'
+      - 'scripts/verify-mcp-config.mjs'
+      - '.github/workflows/copilot-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-copilot-contract:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify MCP contract
+        run: node scripts/verify-mcp-config.mjs
+
+      - name: Verify Copilot operating contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s .github/copilot-instructions.md
+          grep -q 'VERIFIED' .github/copilot-instructions.md
+          grep -q 'INFERRED' .github/copilot-instructions.md
+          grep -q 'UNKNOWN' .github/copilot-instructions.md
+          grep -q 'BLOCKED' .github/copilot-instructions.md
+          grep -q 'Playwright' .github/copilot-instructions.md
+          grep -q 'REALITY:' .github/copilot-instructions.md
+          grep -q 'ROLLBACK:' .github/copilot-instructions.md
+          grep -q 'NEXT GATE:' .github/copilot-instructions.md
+
+      - name: Contract green
+        run: echo 'Copilot MCP and operating contract verified.'
