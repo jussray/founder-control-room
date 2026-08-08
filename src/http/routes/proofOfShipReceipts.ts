@@ -7,11 +7,15 @@ import {
   validateProofOfShipReceipt,
 } from '../../proofOfShip/receipt.js';
 
+const COMMIT_SHA = /^[0-9a-f]{40}$/i;
+const REPO_NAME = /^[A-Za-z0-9._-]{1,100}$/;
+
 export type ProofOfShipReceiptStoreDisposition = 'stored' | 'duplicate' | 'conflict';
 
 export interface ProofOfShipReceiptRepository {
   store(receipt: ProofOfShipReceipt): Promise<ProofOfShipReceiptStoreDisposition>;
   find(receiptId: string): Promise<ProofOfShipReceipt | null>;
+  findByCommit(sourceRepo: string, exactCommitSha: string): Promise<ProofOfShipReceipt | null>;
 }
 
 const RECEIPT_COLUMNS = [
@@ -51,6 +55,20 @@ function tokenMatches(provided: string | undefined, expected: string): boolean {
   return timingSafeEqual(left, right);
 }
 
+function normalizeSourceRepo(owner: unknown, repo: unknown): string {
+  if (owner !== 'jussray' || typeof repo !== 'string' || !REPO_NAME.test(repo)) {
+    throw new ProofOfShipReceiptError('invalid_source_repo');
+  }
+  return `jussray/${repo}`;
+}
+
+function normalizeCommitSha(value: unknown): string {
+  if (typeof value !== 'string' || !COMMIT_SHA.test(value)) {
+    throw new ProofOfShipReceiptError('invalid_exact_commit_sha');
+  }
+  return value.toLowerCase();
+}
+
 function rowToProofOfShipReceipt(row: unknown): ProofOfShipReceipt | null {
   if (!isRecord(row)) return null;
 
@@ -87,18 +105,29 @@ export function storedProofOfShipReceiptMatches(
   return JSON.stringify(normalized) === JSON.stringify(receipt);
 }
 
-export const proofOfShipReceiptRepository: ProofOfShipReceiptRepository = {
-  async find(receiptId) {
-    const { supabaseAdmin } = await import('../../lib/supabase.js');
-    const admin = supabaseAdmin();
-    const { data, error } = await admin
-      .from('proof_of_ship_receipts')
-      .select(RECEIPT_COLUMNS)
-      .eq('receipt_id', receiptId)
-      .maybeSingle();
+async function findReceipt(
+  filters: { receiptId?: string; sourceRepo?: string; exactCommitSha?: string },
+): Promise<ProofOfShipReceipt | null> {
+  const { supabaseAdmin } = await import('../../lib/supabase.js');
+  const admin = supabaseAdmin();
+  let query = admin.from('proof_of_ship_receipts').select(RECEIPT_COLUMNS);
 
-    if (error) throw new Error('proof_of_ship_receipt_lookup_failed');
-    return rowToProofOfShipReceipt(data);
+  if (filters.receiptId) query = query.eq('receipt_id', filters.receiptId);
+  if (filters.sourceRepo) query = query.eq('source_repo', filters.sourceRepo);
+  if (filters.exactCommitSha) query = query.eq('exact_commit_sha', filters.exactCommitSha);
+
+  const { data, error } = await query.maybeSingle();
+  if (error) throw new Error('proof_of_ship_receipt_lookup_failed');
+  return rowToProofOfShipReceipt(data);
+}
+
+export const proofOfShipReceiptRepository: ProofOfShipReceiptRepository = {
+  find(receiptId) {
+    return findReceipt({ receiptId });
+  },
+
+  findByCommit(sourceRepo, exactCommitSha) {
+    return findReceipt({ sourceRepo, exactCommitSha });
   },
 
   async store(receipt) {
@@ -224,5 +253,35 @@ export function createProofOfShipReceiptLookupHandler(
   };
 }
 
+export function createProofOfShipCommitLookupHandler(
+  repository: ProofOfShipReceiptRepository = proofOfShipReceiptRepository,
+): RequestHandler {
+  return async function handleProofOfShipCommitLookup(req: Request, res: Response) {
+    receiptHeaders(res);
+    if (!authorize(req, res)) return;
+
+    let sourceRepo: string;
+    let exactCommitSha: string;
+    try {
+      sourceRepo = normalizeSourceRepo(req.params.owner, req.params.repo);
+      exactCommitSha = normalizeCommitSha(req.params.sha);
+    } catch (error) {
+      const code = error instanceof ProofOfShipReceiptError ? error.code : 'invalid_receipt_lookup';
+      return res.status(400).json({ error: code });
+    }
+
+    try {
+      const receipt = await repository.findByCommit(sourceRepo, exactCommitSha);
+      if (!receipt) {
+        return res.status(404).json({ found: false, sourceRepo, exactCommitSha });
+      }
+      return res.status(200).json({ found: true, receipt });
+    } catch {
+      return res.status(503).json({ error: 'Receipt store unavailable' });
+    }
+  };
+}
+
 export const handleProofOfShipReceiptIngest = createProofOfShipReceiptIngestHandler();
 export const handleProofOfShipReceiptLookup = createProofOfShipReceiptLookupHandler();
+export const handleProofOfShipCommitLookup = createProofOfShipCommitLookupHandler();
