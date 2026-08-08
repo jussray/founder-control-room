@@ -459,6 +459,7 @@ jobs:
       PROOF_OF_SHIP_STEERING_GRANT_ID: ${{ secrets.PROOF_OF_SHIP_STEERING_GRANT_ID }}
       GITHUB_TOKEN: ${{ github.token }}
       PUBLISH_ALLOWED: 'true'
+      LINKEDIN_BASELINE_PATH: config/linkedin-rising-floor-baseline.json
     steps:
       - name: Check out the exact deployed commit
         uses: actions/checkout@v4
@@ -481,7 +482,7 @@ jobs:
 
           repository_allowed=false
           case "$GITHUB_REPOSITORY" in
-            jussray/founder-control-room|jussray/jussbeautifulhair-site|jussray/untold-stories-storefront|jussray/chief-ai-machine)
+            jussray/*)
               repository_allowed=true
               ;;
           esac
@@ -604,7 +605,6 @@ jobs:
             --arg pr_title "$pr_title" \
             --arg commit_type "$commit_type" \
             --argjson repository_allowed "$(if [[ "$repository_allowed" == true ]]; then echo true; else echo false; fi)" \
-            --argjson repository_allowlist '["jussray/founder-control-room","jussray/jussbeautifulhair-site","jussray/untold-stories-storefront","jussray/chief-ai-machine"]' \
             --argjson changed_paths "$changed_paths_json" \
             --argjson meaningful_paths "$meaningful_paths_json" \
             --argjson migration_versions "$migration_versions_json" \
@@ -622,8 +622,7 @@ jobs:
               pr_title: $pr_title,
               commit_type: (if $commit_type == "" then "merge" else $commit_type end),
               repository_allowed: $repository_allowed,
-              repository_allowlist: $repository_allowlist,
-              excluded_repositories: ["jussray/Sekret-Bip"],
+              repository_policy: {mode: "all_owned_proof_gated", owner: "jussray"},
               changed_paths: $changed_paths,
               changed_paths_summary: ($meaningful_paths | join(", ")),
               migration_versions: $migration_versions,
@@ -646,7 +645,7 @@ jobs:
           echo "meaningful=$meaningful_json" >> "$GITHUB_OUTPUT"
           {
             echo '### Proof-of-Ship classification'
-            jq '{repo, commit_sha, repository_allowed, meaningful, meaningful_reason, changed_paths_summary, migration_versions}' proof-context.json
+            jq '{repo, commit_sha, repository_allowed, repository_policy, meaningful, meaningful_reason, changed_paths_summary, migration_versions}' proof-context.json
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Skip non-meaningful activity
@@ -765,12 +764,29 @@ jobs:
             echo '::error title=Publication grant blocked::PROOF_OF_SHIP_STEERING_GRANT_ID contains unsupported characters.'
             exit 1
           fi
+          if [[ ! -f "$LINKEDIN_BASELINE_PATH" ]]; then
+            echo '::error title=LinkedIn baseline missing::The checked-in rising-floor baseline receipt is required before scheduling LinkedIn.'
+            exit 1
+          fi
+
+          jq -e '
+            .version == 1 and
+            .platform == "linkedin" and
+            .source.verified == true and
+            (.baseline_ref | length > 0) and
+            .period.complete == false and
+            .partial_day_receipt.complete == false and
+            .comparable_window.interpretation == "no_like_for_like_decline" and
+            .policy.partial_window_policy == "never_classify_an_incomplete_or_rolling_window_as_a_decline_without_like_for_like_evidence" and
+            .policy.target_mode == "beat_previous_verified_floor_without_sacrificing_quality"
+          ' "$LINKEDIN_BASELINE_PATH" >/dev/null
 
           jq -e '
             (.meaningful == true) and
             (.repository_allowed == true) and
-            (.repo != "jussray/Sekret-Bip") and
-            (. as $payload | ($payload.repository_allowlist | index($payload.repo)) != null) and
+            (.repository_policy.mode == "all_owned_proof_gated") and
+            (.repository_policy.owner == "jussray") and
+            (.repo | startswith("jussray/")) and
             (.commit_sha | test("^[0-9a-f]{40}$")) and
             ((.supabase_state == "verified") or (.supabase_state == "not_applicable")) and
             (.cloudflare_live_sha == .commit_sha)
@@ -788,6 +804,9 @@ jobs:
           batch_id="$invocation_id"
           steering_grant_id="$PROOF_OF_SHIP_STEERING_GRANT_ID"
           founder_approval_id="standing-policy:${steering_grant_id}:${invocation_id}"
+          linkedin_baseline_json="$(jq -c '.' "$LINKEDIN_BASELINE_PATH")"
+          linkedin_baseline_ref="$(jq -r '.baseline_ref' "$LINKEDIN_BASELINE_PATH")"
+
           jq --arg run_url "$run_url" \
             --arg idempotency_key "$idempotency_key" \
             --arg verified_at "$verified_at" \
@@ -796,6 +815,8 @@ jobs:
             --arg batch_id "$batch_id" \
             --arg steering_grant_id "$steering_grant_id" \
             --arg founder_approval_id "$founder_approval_id" \
+            --arg linkedin_baseline_ref "$linkedin_baseline_ref" \
+            --argjson linkedin_baseline "$linkedin_baseline_json" \
             '.live_state = "verified" |
              .publish_allowed = true |
              .PUBLISH_ALLOWED = true |
@@ -825,6 +846,18 @@ jobs:
              .content_mode = "proof-led-build-in-public" |
              .requested_channels = ["x", "linkedin"] |
              .requested_content_fields = ["x_draft", "linkedin_draft"] |
+             .linkedin_strategy_required = true |
+             .linkedin_rising_floor_ready = false |
+             .linkedin_baseline_ref = $linkedin_baseline_ref |
+             .linkedin_baseline = $linkedin_baseline |
+             .linkedin_required_output_fields = [
+               "linkedin_rising_floor_ready",
+               "linkedin_baseline_ref",
+               "linkedin_growth_hypothesis",
+               "linkedin_24h_gate",
+               "linkedin_48h_gate",
+               "linkedin_next_mutation"
+             ] |
              .buffer_terminal_action = "schedule"' \
             proof-context.json > proof-payload.json
 
@@ -832,14 +865,24 @@ jobs:
             .live_state == "verified" and
             .publish_allowed == true and
             .PUBLISH_ALLOWED == true and
-            (.repo != "jussray/Sekret-Bip") and
-            (. as $payload | ($payload.repository_allowlist | index($payload.repo)) != null) and
+            .repository_policy.mode == "all_owned_proof_gated" and
+            .repository_policy.owner == "jussray" and
+            (.repo | startswith("jussray/")) and
             .destination_mode == "schedule" and
             .buffer_method == "schedule" and
             .buffer_save_to_draft == false and
             .share_now_allowed == false and
             .schedule_policy_id == "buffer-20-minute-review-v1" and
             .authorization_mode == "standing-policy" and
+            .linkedin_strategy_required == true and
+            .linkedin_rising_floor_ready == false and
+            .linkedin_baseline.source.verified == true and
+            .linkedin_baseline_ref == .linkedin_baseline.baseline_ref and
+            (.linkedin_required_output_fields | index("linkedin_rising_floor_ready") != null) and
+            (.linkedin_required_output_fields | index("linkedin_growth_hypothesis") != null) and
+            (.linkedin_required_output_fields | index("linkedin_24h_gate") != null) and
+            (.linkedin_required_output_fields | index("linkedin_48h_gate") != null) and
+            (.linkedin_required_output_fields | index("linkedin_next_mutation") != null) and
             (.invocation_id | test("^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")) and
             .founder_approval_id == $expected_receipt and
             (.proof_url | startswith("https://")) and
@@ -857,9 +900,9 @@ jobs:
 
           {
             echo '### Verified proof payload sent for scheduled publication'
-            jq '{repo, commit_sha, pr_url, commit_url, live_state, supabase_state, supabase_migration_version, cloudflare_live_sha, proof_url, idempotency_key, publish_allowed, PUBLISH_ALLOWED, destination_mode, buffer_method, scheduled_at, review_deadline, buffer_terminal_action}' proof-payload.json
+            jq '{repo, commit_sha, pr_url, commit_url, live_state, supabase_state, supabase_migration_version, cloudflare_live_sha, proof_url, idempotency_key, publish_allowed, PUBLISH_ALLOWED, repository_policy, destination_mode, buffer_method, scheduled_at, review_deadline, linkedin_strategy_required, linkedin_rising_floor_ready, linkedin_baseline_ref, linkedin_required_output_fields, buffer_terminal_action}' proof-payload.json
             echo
-            echo 'The downstream Zap must dedupe by idempotency_key, use ChatGPT Conversation, validate proof URLs, and schedule the Buffer post under the 20-minute review-window contract.'
+            echo 'The downstream Zap must dedupe by idempotency_key, use ChatGPT Conversation with the verified LinkedIn baseline, populate the required rising-floor strategy fields, validate proof URLs, and schedule through the Buffer firewall under the 20-minute review-window contract.'
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ── 5. Post-deploy database reconciliation inspection ───────────────────────
