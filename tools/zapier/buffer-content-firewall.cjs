@@ -18,6 +18,9 @@ const MAX_AUTHORIZATION_RECEIPT_LENGTH = 200;
 const BUFFER_SCHEDULE_POLICY_ID = 'buffer-20-minute-review-v1';
 const BUFFER_AUTHORIZATION_MODE = 'standing-policy';
 const BUFFER_NOTIFICATION_MODE = 'gmail_campaign_digest';
+const LINKEDIN_CHANNEL = 'juss_rayy_linkedin';
+const LINKEDIN_MIN_STRATEGY_TEXT = 20;
+const LINKEDIN_UNKNOWN_BASELINE_VALUES = new Set(['unknown', 'none', 'n/a', 'na', 'unverified']);
 const ALLOWED_DESTINATION_MODES = new Set(['schedule']);
 const ALLOWED_CONTENT_FIELDS = new Set([
   'linkedin_draft',
@@ -76,6 +79,48 @@ function parseIsoTimestamp(value) {
   return text && Number.isFinite(timestamp) ? timestamp : null;
 }
 
+function validateLinkedInRisingFloor(input, errors) {
+  const linkedinRisingFloorReady = asBoolean(input.linkedin_rising_floor_ready);
+  const linkedinBaselineRef = asTrimmedString(input.linkedin_baseline_ref);
+  const linkedinGrowthHypothesis = asTrimmedString(input.linkedin_growth_hypothesis);
+  const linkedin24hGate = asTrimmedString(input.linkedin_24h_gate);
+  const linkedin48hGate = asTrimmedString(input.linkedin_48h_gate);
+  const linkedinNextMutation = asTrimmedString(input.linkedin_next_mutation);
+
+  if (!linkedinRisingFloorReady) {
+    errors.push('linkedin_rising_floor_ready must be true before LinkedIn can be scheduled');
+  }
+
+  if (
+    !linkedinBaselineRef ||
+    LINKEDIN_UNKNOWN_BASELINE_VALUES.has(linkedinBaselineRef.toLowerCase())
+  ) {
+    errors.push('linkedin_baseline_ref must name the latest verified LinkedIn analytics or platform-recap baseline');
+  }
+
+  const strategyFields = [
+    ['linkedin_growth_hypothesis', linkedinGrowthHypothesis],
+    ['linkedin_24h_gate', linkedin24hGate],
+    ['linkedin_48h_gate', linkedin48hGate],
+    ['linkedin_next_mutation', linkedinNextMutation],
+  ];
+
+  for (const [name, value] of strategyFields) {
+    if (value.length < LINKEDIN_MIN_STRATEGY_TEXT) {
+      errors.push(`${name} must contain at least ${LINKEDIN_MIN_STRATEGY_TEXT} characters of finished strategy`);
+    }
+  }
+
+  return {
+    linkedin_rising_floor_ready: linkedinRisingFloorReady,
+    linkedin_baseline_ref: linkedinBaselineRef,
+    linkedin_growth_hypothesis: linkedinGrowthHypothesis,
+    linkedin_24h_gate: linkedin24hGate,
+    linkedin_48h_gate: linkedin48hGate,
+    linkedin_next_mutation: linkedinNextMutation,
+  };
+}
+
 function validateBufferPublishInput(input = {}, options = {}) {
   const postText = asTrimmedString(input.post_text);
   const contentField = asTrimmedString(input.content_field);
@@ -107,6 +152,14 @@ function validateBufferPublishInput(input = {}, options = {}) {
   }
 
   if (!channel) errors.push('channel is required');
+
+  let linkedinStrategy = null;
+  if (channel === LINKEDIN_CHANNEL) {
+    if (contentField !== 'linkedin_draft') {
+      errors.push('juss_rayy_linkedin must publish only linkedin_draft');
+    }
+    linkedinStrategy = validateLinkedInRisingFloor(input, errors);
+  }
 
   if (!ALLOWED_DESTINATION_MODES.has(destinationMode)) {
     errors.push('destination_mode must be schedule under the 20-minute review-window contract');
@@ -228,6 +281,7 @@ function validateBufferPublishInput(input = {}, options = {}) {
     buffer_api_sharing_mode: BUFFER_API_SHARING_MODE,
     buffer_api_due_at: scheduledAt,
     share_now_allowed: false,
+    ...(linkedinStrategy ?? {}),
   };
 }
 
@@ -238,6 +292,7 @@ if (typeof inputData !== 'undefined') {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     validateBufferPublishInput,
+    validateLinkedInRisingFloor,
     BUFFER_PROVIDER_ACTION,
     BUFFER_PROVIDER_METHOD,
     BUFFER_API_SHARING_MODE,
@@ -246,6 +301,8 @@ if (typeof module !== 'undefined' && module.exports) {
     BUFFER_SCHEDULE_POLICY_ID,
     BUFFER_AUTHORIZATION_MODE,
     BUFFER_NOTIFICATION_MODE,
+    LINKEDIN_CHANNEL,
+    LINKEDIN_MIN_STRATEGY_TEXT,
     MAX_STEERING_GRANT_ID_LENGTH,
     MAX_AUTHORIZATION_RECEIPT_LENGTH,
     ALLOWED_CONTENT_FIELDS,

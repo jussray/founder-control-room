@@ -79,6 +79,9 @@ const requiredOutputFields = [
   'me_smallest_next_action', 'me_founder_voice', 'future_you_guidance',
   'future_you_what_mattered', 'future_you_what_did_not', 'future_you_valid_fear',
   'chief_ai_decision', 'social_campaign_angle', 'social_campaign_media_brief',
+  'linkedin_rising_floor_ready', 'linkedin_baseline_ref', 'linkedin_growth_hypothesis',
+  'linkedin_business_signal', 'linkedin_warm_conversation_action', 'linkedin_visual_brief',
+  'linkedin_24h_gate', 'linkedin_48h_gate', 'linkedin_next_mutation',
   'linkedin_draft', 'facebook_draft', 'facebook_founder_draft',
   'facebook_brand_draft', 'instagram_draft', 'threads_draft', 'x_draft',
   'tiktok_caption', 'youtube_shorts_draft', 'pinterest_draft', 'bluesky_draft',
@@ -95,6 +98,44 @@ if (!outputContract?.future_you?.required_opener) fail('FutureYou must retain it
 if (outputContract?.future_you?.generic_advice_allowed !== false) fail('FutureYou must not allow generic advice');
 requireTrue(outputContract?.me?.must_choose_one_smallest_next_action, 'Me must choose one smallest next action');
 
+const linkedinRisingFloor = outputContract?.linkedin_rising_floor;
+requireTrue(linkedinRisingFloor?.enabled, 'LinkedIn rising-floor strategy must remain enabled');
+if (linkedinRisingFloor?.goal !== 'steady_or_accelerating_verified_floor') {
+  fail('LinkedIn rising-floor goal must be a steady or accelerating verified floor');
+}
+if (linkedinRisingFloor?.target_mode !== 'beat_previous_verified_floor_without_sacrificing_quality') {
+  fail('LinkedIn target mode must beat the previous verified floor without sacrificing quality');
+}
+if (linkedinRisingFloor?.baseline_source !== 'latest_verified_linkedin_analytics_or_platform_recap') {
+  fail('LinkedIn baseline must come from the latest verified analytics or platform recap');
+}
+if (linkedinRisingFloor?.partial_window_policy !== 'never_classify_an_incomplete_or_rolling_window_as_a_decline_without_like_for_like_evidence') {
+  fail('LinkedIn partial rolling windows must not be classified as decline without like-for-like evidence');
+}
+const requiredLinkedInPostElements = new Set(linkedinRisingFloor?.required_post_elements ?? []);
+for (const element of [
+  'verified_build_or_operating_proof',
+  'founder_specific_point_of_view',
+  'business_or_investor_consequence',
+  'honest_unresolved_truth_or_next_gate',
+]) {
+  if (!requiredLinkedInPostElements.has(element)) fail(`LinkedIn rising-floor contract is missing post element ${element}`);
+}
+const linkedinWindows = linkedinRisingFloor?.measurement_windows_hours ?? [];
+if (!Array.isArray(linkedinWindows) || linkedinWindows.length !== 2 || linkedinWindows[0] !== 24 || linkedinWindows[1] !== 48) {
+  fail('LinkedIn rising-floor measurement windows must be exactly 24h and 48h');
+}
+if (linkedinRisingFloor?.warm_conversation_priority !== 'convert_relevant_warm_threads_before_chasing_additional_distribution_when_they_require_a_response') {
+  fail('LinkedIn rising-floor contract must prioritize relevant warm conversation conversion');
+}
+if (linkedinRisingFloor?.visual_policy !== 'use_a_visual_when_it_improves_product_comprehension_or_attention_capture_not_as_decoration') {
+  fail('LinkedIn visual policy must be comprehension/attention driven rather than decorative');
+}
+if (linkedinRisingFloor?.winner_mutation_policy !== 'carry_the_winning_hook_structure_proof_mechanic_format_or_conversion_mechanic_into_the_next_post') {
+  fail('LinkedIn winner mechanics must compound into the next post');
+}
+requireFalse(linkedinRisingFloor?.one_off_virality_is_the_goal, 'one-off virality must not be the LinkedIn optimization goal');
+
 if (bufferDistribution?.mode !== 'parallel_schedule_review_window') {
   fail('Buffer distribution must use the parallel 20-minute schedule review window');
 }
@@ -105,6 +146,9 @@ requireTrue(bufferDistribution?.selected_channels_must_be_unique, 'Buffer distri
 requireTrue(bufferDistribution?.one_billable_buffer_action_per_selected_channel, 'Buffer distribution must account for one Buffer action per selected channel');
 requireTrue(bufferDistribution?.one_billable_gmail_digest_per_campaign, 'Buffer distribution must account for one Gmail digest per campaign');
 requireTrue(bufferDistribution?.platform_native_copy_required, 'Buffer distribution must require platform-native copy');
+if (!(bufferDistribution?.selection_policy ?? []).includes('linkedin_rising_floor_readiness')) {
+  fail('Buffer selection policy must include LinkedIn rising-floor readiness');
+}
 
 const campaignAllocation = allocations.find((allocation) => allocation.id === 'approved-buffer-parallel-campaigns');
 if (!campaignAllocation) {
@@ -160,6 +204,20 @@ if (contentContract?.notification_failure_policy !== 'cancel_scheduled_batch') f
 if (contentContract?.share_now_allowed !== false) fail('content contract must reject share_now');
 if (contentContract?.buffer_api_sharing_mode !== 'customScheduled') fail('Buffer API sharing mode must be customScheduled');
 if (contentContract?.buffer_api_due_at_source !== 'scheduled_at') fail('Buffer API dueAt must derive from scheduled_at');
+if (contentContract?.linkedin_rising_floor_required_channel !== 'juss_rayy_linkedin') {
+  fail('LinkedIn rising-floor publish gate must target juss_rayy_linkedin');
+}
+const requiredLinkedInPublishFields = new Set(contentContract?.linkedin_rising_floor_required_fields ?? []);
+for (const field of [
+  'linkedin_rising_floor_ready',
+  'linkedin_baseline_ref',
+  'linkedin_growth_hypothesis',
+  'linkedin_24h_gate',
+  'linkedin_48h_gate',
+  'linkedin_next_mutation',
+]) {
+  if (!requiredLinkedInPublishFields.has(field)) fail(`LinkedIn publish gate is missing ${field}`);
+}
 
 const requiredDraftPlatforms = [
   'linkedin', 'facebook', 'instagram', 'threads', 'x', 'tiktok',
@@ -217,6 +275,8 @@ const requiredGuardrails = [
   'external_send_or_publish_requires_founder_approval', 'budget_gate_runs_before_billable_actions',
   'stop_new_billable_work_at_operating_ceiling', 'buffer_never_receives_prompt_or_instructions',
   'buffer_content_must_pass_firewall', 'share_now_requires_named_run_authority',
+  'linkedin_rising_floor_gate_before_schedule', 'partial_rolling_windows_never_define_decline',
+  'warm_linkedin_conversations_are_conversion_signals', 'linkedin_winner_mechanics_compound_into_next_post',
 ];
 for (const key of requiredGuardrails) {
   requireTrue(guardrails?.[key], `required guardrail ${key} must be true`);
@@ -231,5 +291,5 @@ console.log(
   `Founder Signal planning envelope verified: ${calculatedTotal}/${plan.monthly_task_limit} planned tasks, ` +
   `${calculatedHeadroom} operating headroom, ${plan.emergency_reserve} emergency reserve, ` +
   `${bufferDistribution.parallel_channel_slots} Buffer schedules plus one Gmail digest per campaign; ` +
-  'live plan capability and instant reply ingress remain explicit activation gates.',
+  'LinkedIn rising-floor strategy is fail-closed and live plan capability plus instant reply ingress remain explicit activation gates.',
 );

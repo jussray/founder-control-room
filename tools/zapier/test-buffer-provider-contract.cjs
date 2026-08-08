@@ -86,6 +86,12 @@ const baseInput = {
   batch_index: 1,
   schedule_policy_id: BUFFER_SCHEDULE_POLICY_ID,
   notification_mode: BUFFER_NOTIFICATION_MODE,
+  linkedin_rising_floor_ready: true,
+  linkedin_baseline_ref: 'linkedin-export:2026-08-02..2026-08-08',
+  linkedin_growth_hypothesis: 'Preserve proof-first resonance while testing for stronger distribution and business relevance.',
+  linkedin_24h_gate: 'Compare 24-hour reach, engagement quality, and warm conversation conversion to the verified prior floor.',
+  linkedin_48h_gate: 'Compare 48-hour impressions, engagement rate, quality comments, and profile or follower conversion.',
+  linkedin_next_mutation: 'Carry the winning hook, proof mechanic, format, visual, or conversion behavior into the next post.',
 };
 
 const nowMs = Date.parse('2026-08-02T21:00:30.000Z');
@@ -100,6 +106,8 @@ assert.equal(prepared.publish_allowed, true);
 assert.equal(prepared.review_window_minutes, contract.reviewWindow.minutes);
 assert.equal(prepared.notification_mode, BUFFER_NOTIFICATION_MODE);
 assert.equal(prepared.authorization_receipt_verified, true);
+assert.equal(prepared.linkedin_rising_floor_ready, true);
+assert.equal(prepared.linkedin_baseline_ref, baseInput.linkedin_baseline_ref);
 
 for (const destinationMode of contract.zapier.rejectedMethods) {
   assert.throws(
@@ -124,6 +132,11 @@ assert.throws(
   /runtime-minted receipt/,
 );
 
+assert.throws(
+  () => validateBufferPublishInput({ ...baseInput, linkedin_rising_floor_ready: false }, { nowMs }),
+  /linkedin_rising_floor_ready must be true/,
+);
+
 const callerOverride = validateBufferPublishInput({
   ...baseInput,
   method: 'share_now',
@@ -140,4 +153,4 @@ assert.equal(callerOverride.buffer_api_due_at, '2026-08-02T21:20:00.000Z');
 assert.equal(callerOverride.buffer_save_to_draft, false);
 assert.equal(callerOverride.scheduled_at, '2026-08-02T21:20:00.000Z');
 
-console.log('Buffer provider contract verified against executable scheduling code: exact customScheduled/dueAt mapping, runtime receipt correlation, private recipient/context authority, Gmail thread evidence separation, instant reply-ingress gate, fail-closed compensation, and no share-now override.');
+console.log('Buffer provider contract verified against executable scheduling code: exact customScheduled/dueAt mapping, LinkedIn rising-floor receipt, runtime receipt correlation, private recipient/context authority, Gmail thread evidence separation, instant reply-ingress gate, fail-closed compensation, and no share-now override.');
