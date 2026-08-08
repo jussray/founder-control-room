@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 export const FOUNDER_CONVEYOR_STAGES = [
   'chat',
   'workflows',
@@ -34,6 +36,7 @@ export interface FounderConveyorDispatchResult {
     | 'INVALID_TRANSITION'
     | 'INVALID_PAYLOAD'
     | 'UPSTREAM_REJECTED'
+    | 'UPSTREAM_RECEIPT_MISSING'
     | 'UPSTREAM_UNREACHABLE';
   status: number;
   receiptId: string | null;
@@ -47,7 +50,9 @@ interface DispatchOptions {
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const MAX_GOAL_LENGTH = 4000;
+const MAX_ID_LENGTH = 200;
 const MAX_EVIDENCE_URLS = 20;
+const SECRETISH_PATTERN = /(github_pat_|gh[pousr]_[A-Za-z0-9_]{12,}|Bearer\s+[A-Za-z0-9._-]{12,}|SERVICE_ROLE|API_KEY|ACCESS_KEY|PASSWORD|SECRET|TOKEN)/i;
 
 const NEXT_STAGE: Record<FounderConveyorStage, FounderConveyorStage> = {
   chat: 'workflows',
@@ -83,7 +88,7 @@ export function readFounderConveyorConfig(env: NodeJS.ProcessEnv = process.env):
   const enabled = text(env.N8N_CONVEYOR_ENABLED).toLowerCase() === 'true';
 
   return {
-    configured: Boolean(webhookUrl && validHttpUrl(webhookUrl)),
+    configured: Boolean(webhookUrl && bearerToken && validHttpUrl(webhookUrl)),
     enabled,
     webhookUrl,
     bearerToken,
@@ -92,11 +97,17 @@ export function readFounderConveyorConfig(env: NodeJS.ProcessEnv = process.env):
 
 export function validateFounderConveyorAdvance(input: FounderConveyorAdvanceInput): string[] {
   const reasons: string[] = [];
+  const runId = text(input.runId);
+  const projectSlug = text(input.projectSlug);
+  const goal = text(input.goal);
 
-  if (!text(input.runId)) reasons.push('runId is required');
-  if (!text(input.projectSlug)) reasons.push('projectSlug is required');
-  if (!text(input.goal)) reasons.push('goal is required');
-  if (text(input.goal).length > MAX_GOAL_LENGTH) reasons.push(`goal must be ${MAX_GOAL_LENGTH} characters or fewer`);
+  if (!runId) reasons.push('runId is required');
+  if (runId.length > MAX_ID_LENGTH) reasons.push(`runId must be ${MAX_ID_LENGTH} characters or fewer`);
+  if (!projectSlug) reasons.push('projectSlug is required');
+  if (projectSlug.length > MAX_ID_LENGTH) reasons.push(`projectSlug must be ${MAX_ID_LENGTH} characters or fewer`);
+  if (!goal) reasons.push('goal is required');
+  if (goal.length > MAX_GOAL_LENGTH) reasons.push(`goal must be ${MAX_GOAL_LENGTH} characters or fewer`);
+  if (SECRETISH_PATTERN.test(goal)) reasons.push('goal must not contain credential-like material');
 
   if (!FOUNDER_CONVEYOR_STAGES.includes(input.fromStage)) reasons.push('fromStage is invalid');
   if (!FOUNDER_CONVEYOR_STAGES.includes(input.toStage)) reasons.push('toStage is invalid');
@@ -136,6 +147,17 @@ function receiptIdFrom(value: unknown): string | null {
   return text(candidate) || null;
 }
 
+export function founderConveyorIdempotencyKey(input: FounderConveyorAdvanceInput): string {
+  const identity = [
+    text(input.runId),
+    text(input.projectSlug),
+    input.fromStage,
+    input.toStage,
+    text(input.expectedHeadSha).toLowerCase(),
+  ].join(':');
+  return `fcr-conveyor-v1:${createHash('sha256').update(identity).digest('hex')}`;
+}
+
 export async function dispatchFounderConveyorAdvance(
   input: FounderConveyorAdvanceInput,
   options: DispatchOptions = {},
@@ -152,13 +174,13 @@ export async function dispatchFounderConveyorAdvance(
     };
   }
 
-  if (!config.configured || !config.webhookUrl) {
+  if (!config.configured || !config.webhookUrl || !config.bearerToken) {
     return {
       ok: false,
       code: 'CONVEYOR_NOT_CONFIGURED',
       status: 503,
       receiptId: null,
-      reasons: ['n8n conveyor webhook is not configured with an allowed URL'],
+      reasons: ['n8n conveyor webhook and bearer token must be configured'],
     };
   }
 
@@ -175,16 +197,19 @@ export async function dispatchFounderConveyorAdvance(
     };
   }
 
+  const idempotencyKey = founderConveyorIdempotencyKey(input);
   const fetchImpl = options.fetchImpl ?? fetch;
   const headers: Record<string, string> = {
+    Authorization: `Bearer ${config.bearerToken}`,
     'Content-Type': 'application/json',
+    'Idempotency-Key': idempotencyKey,
     'X-FCR-Conveyor-Contract': 'v1',
   };
-  if (config.bearerToken) headers.Authorization = `Bearer ${config.bearerToken}`;
 
   const payload = {
     contract: 'founder-control-room/n8n-conveyor@v1',
     event: 'conveyor.stage.advance',
+    idempotencyKey,
     runId: text(input.runId),
     projectSlug: text(input.projectSlug),
     goal: text(input.goal),
@@ -216,13 +241,25 @@ export async function dispatchFounderConveyorAdvance(
       responseBody = null;
     }
 
+    const receiptId = receiptIdFrom(responseBody);
+
     if (!response.ok) {
       return {
         ok: false,
         code: 'UPSTREAM_REJECTED',
         status: 502,
-        receiptId: receiptIdFrom(responseBody),
+        receiptId,
         reasons: [`n8n rejected the conveyor transition with HTTP ${response.status}`],
+      };
+    }
+
+    if (!receiptId) {
+      return {
+        ok: false,
+        code: 'UPSTREAM_RECEIPT_MISSING',
+        status: 502,
+        receiptId: null,
+        reasons: ['n8n accepted the transition without returning a receiptId'],
       };
     }
 
@@ -230,7 +267,7 @@ export async function dispatchFounderConveyorAdvance(
       ok: true,
       code: 'DISPATCHED',
       status: 202,
-      receiptId: receiptIdFrom(responseBody),
+      receiptId,
       reasons: [],
     };
   } catch {
