@@ -6,6 +6,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "founder-control-room/conveyor",
+        "authentication": "headerAuth",
         "responseMode": "responseNode",
         "options": {}
       },
@@ -13,7 +14,13 @@
       "name": "FCR Conveyor Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 0]
+      "position": [0, 0],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "fcr-conveyor-bearer-auth",
+          "name": "FCR Conveyor Bearer Auth"
+        }
+      }
     },
     {
       "parameters": {
