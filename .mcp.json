@@ -15,6 +15,15 @@
       "type": "http",
       "url": "https://mcp.figma.com/mcp"
     },
+    "playwright": {
+      "type": "local",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "tools": ["*"]
+    },
     "supabase": {
       "type": "http",
       "url": "https://mcp.supabase.com/mcp?project_ref=oojzfmmywbvficgybaxd&read_only=true&features=database,docs"

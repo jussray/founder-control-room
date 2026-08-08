@@ -11,6 +11,7 @@ const expectedServerNames = [
   'context7',
   'figma',
   'github',
+  'playwright',
   'supabase',
 ];
 const expectedCloudflareServerNames = [
@@ -34,6 +35,7 @@ const expectedRemoteUrls = {
 
 const expectedGithubToolsets =
   'repos,issues,pull_requests,actions,code_security,secret_protection';
+const expectedPlaywrightArgs = ['-y', '@playwright/mcp@latest'];
 
 function fail(message) {
   throw new Error(`[verify:mcp] ${message}`);
@@ -84,6 +86,22 @@ function validateRemoteServers(relativePath, servers) {
 
   assert(!servers.figma?.headers, `${relativePath}:figma must authenticate through the supported client`);
   assert(!servers.figma?.env, `${relativePath}:figma must not commit environment credentials`);
+}
+
+function validatePlaywright(relativePath, server, expectedType, requireTools) {
+  assert(server?.type === expectedType, `${relativePath}:playwright must use ${expectedType}`);
+  assert(server?.command === 'npx', `${relativePath}:playwright command must remain npx`);
+  assert(
+    JSON.stringify(server?.args ?? []) === JSON.stringify(expectedPlaywrightArgs),
+    `${relativePath}:playwright args drifted`,
+  );
+  assert(!server?.env, `${relativePath}:playwright must not commit environment credentials`);
+  if (requireTools) {
+    assert(
+      Array.isArray(server?.tools) && server.tools.includes('*'),
+      `${relativePath}:playwright must expose its tools to Copilot`,
+    );
+  }
 }
 
 function validateCursorCloudflareServers(relativePath, servers) {
@@ -168,6 +186,15 @@ function validateSkillRouting(routing) {
     for (const skill of route.skills) allSkills.add(skill);
   }
 
+  assert(
+    routedServers.playwright?.skills?.includes('control-room-repo-contract'),
+    'playwright routing must include control-room-repo-contract',
+  );
+  assert(
+    /browser|playwright|runtime/i.test(routedServers.playwright?.boundary ?? ''),
+    'playwright routing must remain explicitly bound to browser/runtime proof',
+  );
+
   for (const serverName of expectedCloudflareServerNames) {
     assert(
       routedServers[serverName]?.skills?.includes('control-room-cloudflare-agent-fleet'),
@@ -218,6 +245,9 @@ validateCloudflareServerSet('config/agent-fleet/windsurf-mcp_config.json', winds
 validateRemoteServers('.mcp.json', projectServers);
 validateRemoteServers('.mcp.example.json', exampleServers);
 validateRemoteServers('.vscode/mcp.json', vscodeServers);
+validatePlaywright('.mcp.json', projectServers.playwright, 'local', true);
+validatePlaywright('.mcp.example.json', exampleServers.playwright, 'local', true);
+validatePlaywright('.vscode/mcp.json', vscodeServers.playwright, 'stdio', false);
 validateCursorCloudflareServers('.cursor/mcp.json', cursorServers);
 validateOpenCodeCloudflareServers('config/agent-fleet/opencode.jsonc', openCodeServers);
 validateWindsurfCloudflareServers('config/agent-fleet/windsurf-mcp_config.json', windsurfServers);
@@ -237,7 +267,7 @@ for (const [relativePath, parsed] of [
 ]) {
   assertNoCommittedSecrets(relativePath, parsed);
   const servers = parsed.mcpServers ?? parsed.servers ?? parsed.mcp;
-  for (const forbidden of ['playwright', 'dbhub', 'netdata-cloud']) {
+  for (const forbidden of ['dbhub', 'netdata-cloud']) {
     assert(!servers[forbidden], `${relativePath}:${forbidden} is not justified in the current Control Room phase`);
   }
   if (servers.supabase) {
@@ -248,4 +278,4 @@ for (const [relativePath, parsed] of [
   }
 }
 
-console.log('[verify:mcp] Control Room MCP configuration and Cloudflare agent-fleet routing are scoped, credential-free, and repository-bound.');
+console.log('[verify:mcp] Control Room MCP configuration, Playwright proof authority, and Cloudflare agent-fleet routing are scoped, credential-free, and repository-bound.');
