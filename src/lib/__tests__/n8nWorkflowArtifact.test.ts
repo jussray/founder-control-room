@@ -18,10 +18,11 @@ describe('n8n conveyor workflow artifact', () => {
     ]);
   });
 
-  it('requires instance-bound header auth without committing the bearer secret', () => {
+  it('requires persistent webhook identity and instance-bound header auth without committing the bearer secret', () => {
     const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
     const webhook = workflow.nodes.find((node: { name: string }) => node.name === 'FCR Conveyor Webhook');
 
+    expect(webhook.webhookId).toBe('deed0a71-6ba7-590e-a725-6ae7e2d5b63a');
     expect(webhook.parameters.authentication).toBe('headerAuth');
     expect(webhook.credentials.httpHeaderAuth).toEqual({
       id: 'fcr-conveyor-bearer-auth',
