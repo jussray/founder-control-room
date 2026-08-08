@@ -1,4 +1,6 @@
 const PENDING_TAB_KEY = 'fcr_pending_tab';
+const SESSION_KEY = 'fcr_session';
+const CONVEYOR_CONTRACT = 'founder-control-room/n8n-conveyor@v2';
 const ALLOWED_TABS = new Set([
   'projects',
   'missions',
@@ -8,6 +10,12 @@ const ALLOWED_TABS = new Set([
   'analytics',
   'terminal',
 ]);
+
+const READINESS_COPY = {
+  'not-configured': 'n8n not configured',
+  'ready-for-probe': 'n8n configured · live probe required',
+  'enabled-awaiting-proof': 'n8n enabled · live proof missing',
+};
 
 function safeSessionGet(key) {
   try {
@@ -30,6 +38,76 @@ function safeSessionRemove(key) {
     sessionStorage.removeItem(key);
   } catch {
     // Nothing else is required when storage is unavailable.
+  }
+}
+
+function founderAccessToken() {
+  const raw = safeSessionGet(SESSION_KEY);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    return typeof parsed?.access_token === 'string' && parsed.access_token.trim()
+      ? parsed.access_token.trim()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function setConveyorReadiness(state, label) {
+  const status = document.querySelector('[data-conveyor-readiness]');
+  const text = document.querySelector('[data-conveyor-readiness-label]');
+  if (!(status instanceof HTMLElement) || !(text instanceof HTMLElement)) return;
+
+  status.dataset.state = state;
+  text.textContent = label;
+}
+
+async function refreshConveyorReadiness() {
+  const token = founderAccessToken();
+  if (!token) {
+    setConveyorReadiness('signed-out', 'Sign in to check n8n readiness');
+    return;
+  }
+
+  setConveyorReadiness('checking', 'Checking n8n readiness…');
+
+  try {
+    const response = await fetch('/automation/conveyor/', {
+      method: 'GET',
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.status === 401) {
+      setConveyorReadiness('signed-out', 'Sign in to check n8n readiness');
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(`readiness request failed with HTTP ${response.status}`);
+    }
+
+    const body = await response.json();
+    if (body?.contract !== CONVEYOR_CONTRACT) {
+      setConveyorReadiness('error', 'n8n contract mismatch');
+      return;
+    }
+
+    const state = body?.readiness?.state;
+    const label = READINESS_COPY[state];
+    if (!label) {
+      setConveyorReadiness('error', 'n8n readiness unavailable');
+      return;
+    }
+
+    setConveyorReadiness(state, label);
+  } catch {
+    setConveyorReadiness('error', 'n8n readiness unavailable');
   }
 }
 
@@ -72,3 +150,12 @@ if (pendingTab && ALLOWED_TABS.has(pendingTab) && !activateTab(pendingTab)) {
     observer.observe(root, { childList: true, subtree: true });
   }
 }
+
+const launchDock = document.querySelector('.launch-dock');
+if (launchDock instanceof HTMLDetailsElement) {
+  launchDock.addEventListener('toggle', () => {
+    if (launchDock.open) void refreshConveyorReadiness();
+  });
+}
+
+void refreshConveyorReadiness();
