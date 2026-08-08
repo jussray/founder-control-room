@@ -49,8 +49,11 @@ describe('n8n founder conveyor contract', () => {
     expect(validateFounderConveyorAdvance(candidate())).toEqual([]);
     expect(validateFounderConveyorAdvance(candidate({ fromStage: 'chat', toStage: 'code' })))
       .toContain('transition must advance chat -> workflows');
-    expect(validateFounderConveyorAdvance(candidate({ fromStage: 'skills', toStage: 'chat' })))
-      .toEqual([]);
+    expect(validateFounderConveyorAdvance(candidate({
+      fromStage: 'skills',
+      toStage: 'chat',
+      evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
+    }))).toEqual([]);
   });
 
   it('requires proof before code can become project state', () => {
