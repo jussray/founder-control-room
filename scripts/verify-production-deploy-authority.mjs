@@ -3,8 +3,10 @@ import { existsSync, readFileSync } from 'node:fs';
 
 const workflowPath = new URL('../.github/workflows/deploy.yml', import.meta.url);
 const wranglerPath = new URL('../wrangler.worker.toml', import.meta.url);
+const linkedinBaselinePath = new URL('../config/linkedin-rising-floor-baseline.json', import.meta.url);
 const workflow = readFileSync(workflowPath, 'utf8');
 const wrangler = readFileSync(wranglerPath, 'utf8');
+const linkedinBaseline = JSON.parse(readFileSync(linkedinBaselinePath, 'utf8'));
 
 assert.equal(
   existsSync(new URL('../wrangler.toml', import.meta.url)),
@@ -86,6 +88,113 @@ assert.match(
   /grant != \{'configured': True, 'enabled': False\}/,
   'post-deploy proof must fail unless social distribution reads back disabled',
 );
+
+assert.doesNotMatch(
+  workflow,
+  /repository_allowlist|excluded_repositories|\.repo != "jussray\/Sekret-Bip"/,
+  'proof-of-ship eligibility must never regress to a permanent repository allowlist or denylist',
+);
+assert.match(
+  workflow,
+  /repository_policy: \{mode: "all_owned_proof_gated", owner: "jussray"\}/,
+  'proof-of-ship must encode all-owned proof-gated repository policy',
+);
+assert.match(
+  workflow,
+  /\(\.repo \| startswith\("jussray\/"\)\)/,
+  'proof-of-ship must require the jussray owner namespace instead of a repo-name allowlist',
+);
+assert.match(
+  workflow,
+  /LINKEDIN_BASELINE_PATH: config\/linkedin-rising-floor-baseline\.json/,
+  'proof-of-ship must bind the checked-in LinkedIn baseline receipt',
+);
+assert.match(
+  workflow,
+  /linkedin_strategy_required = true/,
+  'proof-of-ship must mark LinkedIn strategy as required before downstream generation',
+);
+assert.match(
+  workflow,
+  /linkedin_rising_floor_ready = false/,
+  'the upstream proof payload must remain not-ready until downstream AI completes the strategy fields',
+);
+for (const field of [
+  'linkedin_rising_floor_ready',
+  'linkedin_baseline_ref',
+  'linkedin_growth_hypothesis',
+  'linkedin_24h_gate',
+  'linkedin_48h_gate',
+  'linkedin_next_mutation',
+]) {
+  assert.match(
+    workflow,
+    new RegExp(field),
+    `proof-of-ship must hand off required LinkedIn field ${field}`,
+  );
+}
+
+assert.equal(linkedinBaseline.version, 1, 'LinkedIn baseline receipt schema must remain version 1');
+assert.equal(linkedinBaseline.platform, 'linkedin');
+assert.equal(linkedinBaseline.account, 'Juss Rayy');
+assert.equal(
+  linkedinBaseline.baseline_ref,
+  'linkedin-export:2026-08-02..2026-08-08',
+  'LinkedIn baseline reference must identify the latest verified export window',
+);
+assert.equal(
+  linkedinBaseline.source.file_name,
+  'AggregateAnalytics_Juss Rayy_2026-08-02_2026-08-08.xlsx',
+  'LinkedIn baseline receipt must point to the verified source export',
+);
+assert.equal(linkedinBaseline.source.verified, true);
+assert.equal(linkedinBaseline.period.complete, false);
+assert.equal(linkedinBaseline.period.partial_day, '2026-08-08');
+assert.deepEqual(
+  linkedinBaseline.current_window,
+  {
+    impressions: 1248,
+    members_reached: 830,
+    engagements: 19,
+    new_followers: 13,
+    total_followers: 40,
+  },
+  'current LinkedIn baseline metrics must match the verified export',
+);
+assert.deepEqual(
+  linkedinBaseline.partial_day_receipt,
+  {
+    date: '2026-08-08',
+    impressions: 5,
+    engagements: 0,
+    complete: false,
+  },
+  'the partial Aug 8 day must remain explicitly incomplete',
+);
+assert.deepEqual(
+  linkedinBaseline.comparable_window,
+  {
+    start: '2026-08-02',
+    end: '2026-08-07',
+    current_export_impressions: 1243,
+    previous_export_impressions: 1224,
+    impressions_delta: 19,
+    current_export_engagements: 19,
+    previous_export_engagements: 19,
+    engagements_delta: 0,
+    interpretation: 'no_like_for_like_decline',
+  },
+  'like-for-like LinkedIn comparison must remain the authoritative trend receipt',
+);
+assert.equal(
+  linkedinBaseline.policy.partial_window_policy,
+  'never_classify_an_incomplete_or_rolling_window_as_a_decline_without_like_for_like_evidence',
+);
+assert.equal(
+  linkedinBaseline.policy.target_mode,
+  'beat_previous_verified_floor_without_sacrificing_quality',
+);
+assert.equal(linkedinBaseline.policy.one_off_virality_is_the_goal, false);
 
 const publicBindings = new Map([
   ['SUPABASE_URL', 'https://oojzfmmywbvficgybaxd.supabase.co'],
@@ -232,4 +341,4 @@ for (const name of requiredAuthoritySecrets) {
     name + ' must be checked by the pre-migration configuration gate',
   );
 }
-console.log('Production deployment authority and one-Worker binding contract verified.');
+console.log('Production deployment authority, proof-of-ship parity, LinkedIn baseline, and one-Worker binding contract verified.');
