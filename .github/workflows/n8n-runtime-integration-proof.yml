@@ -1,0 +1,170 @@
+name: n8n Runtime Integration Proof
+# CI-only runtime proof. It does not activate production n8n or change Cloudflare deployment state.
+
+on:
+  pull_request:
+    paths:
+      - 'automation/n8n/**'
+      - 'src/lib/n8nActivationProbe.ts'
+      - 'src/lib/n8nConveyor.ts'
+      - 'scripts/verify-n8n-conveyor-live.ts'
+      - '.github/workflows/n8n-runtime-integration-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: n8n-runtime-integration-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  runtime-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      COMPOSE_FILE: automation/n8n/self-hosted/docker-compose.yml
+      EXACT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      POSTGRES_DB: n8n
+      POSTGRES_USER: n8n
+      POSTGRES_PASSWORD: runtime-proof-postgres-password
+      N8N_PUBLIC_HOST: localhost
+      N8N_PUBLIC_BASE_URL: http://127.0.0.1:5678/
+      N8N_LOCAL_PORT: 5678
+      GENERIC_TIMEZONE: America/New_York
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXACT_SHA }}
+
+      - name: Verify immutable target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXACT_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Generate ephemeral runtime credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp
+          bearer="$(openssl rand -hex 32)"
+          encryption_key="$(openssl rand -hex 32)"
+          printf 'N8N_RUNTIME_PROOF_BEARER=%s\n' "$bearer" >> "$GITHUB_ENV"
+          printf 'N8N_ENCRYPTION_KEY=%s\n' "$encryption_key" >> "$GITHUB_ENV"
+          jq -n \
+            --arg id 'fcr-conveyor-bearer-auth' \
+            --arg name 'FCR Conveyor Bearer Auth' \
+            --arg value "Bearer $bearer" \
+            '[{id:$id,name:$name,type:"httpHeaderAuth",data:{name:"Authorization",value:$value}}]' \
+            > .tmp/n8n-runtime-proof-credential.json
+
+      - name: Start pinned Postgres
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f "$COMPOSE_FILE" up -d postgres
+          for attempt in $(seq 1 30); do
+            if docker compose -f "$COMPOSE_FILE" exec -T postgres \
+              pg_isready -h localhost -U "$POSTGRES_USER" -d "$POSTGRES_DB"; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f "$COMPOSE_FILE" logs postgres
+          exit 1
+
+      - name: Import credential and conveyor into real n8n
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f "$COMPOSE_FILE" run --rm --no-deps \
+            -v "$PWD:/workspace:ro" --entrypoint n8n n8n \
+            import:credentials --input=/workspace/.tmp/n8n-runtime-proof-credential.json
+          docker compose -f "$COMPOSE_FILE" run --rm --no-deps \
+            -v "$PWD:/workspace:ro" --entrypoint n8n n8n \
+            import:workflow --input=/workspace/automation/n8n/founder-conveyor.workflow.json
+          docker compose -f "$COMPOSE_FILE" run --rm --no-deps \
+            --entrypoint n8n n8n \
+            publish:workflow --id=fcrFounderConveyorV2
+
+      - name: Start pinned n8n runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f "$COMPOSE_FILE" up -d n8n
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:5678/healthz >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f "$COMPOSE_FILE" logs n8n
+          exit 1
+
+      - name: Wait for published webhook and reject unauthenticated request
+        shell: bash
+        run: |
+          set -euo pipefail
+          webhook='http://127.0.0.1:5678/webhook/founder-control-room/conveyor'
+          for attempt in $(seq 1 30); do
+            status="$(curl -sS -o .tmp/n8n-no-auth-response.txt -w '%{http_code}' \
+              -X POST "$webhook" \
+              -H 'content-type: application/json' \
+              --data '{}')"
+            case "$status" in
+              401|403)
+                exit 0
+                ;;
+              404)
+                sleep 2
+                ;;
+              *)
+                cat .tmp/n8n-no-auth-response.txt || true
+                echo "Expected 404 while registering or 401/403 after registration, got HTTP $status" >&2
+                exit 1
+                ;;
+            esac
+          done
+          cat .tmp/n8n-no-auth-response.txt || true
+          docker compose -f "$COMPOSE_FILE" logs n8n
+          echo 'Published webhook never registered before timeout' >&2
+          exit 1
+
+      - name: Prove canonical authenticated receipt
+        shell: bash
+        env:
+          N8N_CONVEYOR_WEBHOOK_URL: http://127.0.0.1:5678/webhook/founder-control-room/conveyor
+          N8N_CONVEYOR_BEARER_TOKEN: ${{ env.N8N_RUNTIME_PROOF_BEARER }}
+          N8N_CONVEYOR_PROBE_HEAD_SHA: ${{ env.EXACT_SHA }}
+        run: |
+          set -euo pipefail
+          npx tsx scripts/verify-n8n-conveyor-live.ts | tee n8n-runtime-integration-receipt.json
+
+      - name: Upload retained runtime receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: n8n-runtime-integration-${{ env.EXACT_SHA }}
+          path: n8n-runtime-integration-receipt.json
+          if-no-files-found: error
+
+      - name: Dump runtime logs on failure
+        if: failure()
+        shell: bash
+        run: docker compose -f "$COMPOSE_FILE" logs --no-color || true
+
+      - name: Tear down ephemeral runtime
+        if: always()
+        shell: bash
+        run: docker compose -f "$COMPOSE_FILE" down -v --remove-orphans || true
