@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "platform": "linkedin",
+  "account": "Juss Rayy",
+  "baseline_ref": "linkedin-export:2026-08-02..2026-08-08",
+  "source": {
+    "kind": "linkedin_aggregate_analytics_export",
+    "file_name": "AggregateAnalytics_Juss Rayy_2026-08-02_2026-08-08.xlsx",
+    "library_file_id": "file_00000000b9f081f7b7e84d59c602c6fe",
+    "created_at_utc": "2026-08-08T03:56:54Z",
+    "verified": true
+  },
+  "period": {
+    "start": "2026-08-02",
+    "end": "2026-08-08",
+    "complete": false,
+    "partial_day": "2026-08-08"
+  },
+  "current_window": {
+    "impressions": 1248,
+    "members_reached": 830,
+    "engagements": 19,
+    "new_followers": 13,
+    "total_followers": 40
+  },
+  "partial_day_receipt": {
+    "date": "2026-08-08",
+    "impressions": 5,
+    "engagements": 0,
+    "complete": false
+  },
+  "comparable_window": {
+    "start": "2026-08-02",
+    "end": "2026-08-07",
+    "current_export_impressions": 1243,
+    "previous_export_impressions": 1224,
+    "impressions_delta": 19,
+    "current_export_engagements": 19,
+    "previous_export_engagements": 19,
+    "engagements_delta": 0,
+    "interpretation": "no_like_for_like_decline"
+  },
+  "policy": {
+    "partial_window_policy": "never_classify_an_incomplete_or_rolling_window_as_a_decline_without_like_for_like_evidence",
+    "target_mode": "beat_previous_verified_floor_without_sacrificing_quality",
+    "one_off_virality_is_the_goal": false
+  }
+}
