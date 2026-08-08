@@ -1,6 +1,8 @@
 name: Cloudflare Build Diagnostic
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       expected_head_sha:
@@ -17,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+      EXPECTED_HEAD_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_head_sha || '683390ab724501e15a55b8222adf052e982487c3' }}
       CF_WORKER_NAME: founder-control-room
       CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CF_API_TOKEN: ${{ secrets.CLOUDFLARE_BUILDS_API_TOKEN }}
