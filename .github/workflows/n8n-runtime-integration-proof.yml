@@ -1,4 +1,5 @@
 name: n8n Runtime Integration Proof
+# CI-only runtime proof. It does not activate production n8n or change Cloudflare deployment state.
 
 on:
   pull_request:
