@@ -18,13 +18,19 @@ describe('n8n conveyor workflow artifact', () => {
     ]);
   });
 
-  it('preserves the governed authority and skill-routing contract', () => {
+  it('preserves the governed authority, skill routing, and canonical v2 receipt contract', () => {
     const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
     const code = workflow.nodes
       .filter((node: { type: string }) => node.type === 'n8n-nodes-base.code')
       .map((node: { parameters: { jsCode: string } }) => node.parameters.jsCode)
       .join('\n');
 
+    expect(code).toContain("founder-control-room/n8n-conveyor@v2");
+    expect(code).toContain("fcr-conveyor-v2:");
+    expect(code).toContain("fcr-conveyor-receipt-v2:");
+    expect(code).toContain('JSON.stringify([');
+    expect(code).toContain('text(input.goal)');
+    expect(code).toContain('evidenceUrls');
     expect(code).toContain("authority.merge !== false");
     expect(code).toContain("authority.deploy !== false");
     expect(code).toContain("authority.publish !== false");
@@ -34,6 +40,7 @@ describe('n8n conveyor workflow artifact', () => {
     expect(code).toContain('truth-research-optimizer');
     expect(code).toContain('intent-repair-reader');
     expect(code).toContain('capability-mode-router');
-    expect(code).toContain("fcr-n8n-v1:");
+    expect(code).not.toContain('n8n-fcr-v1:');
+    expect(code).not.toContain('fcr-n8n-v1:');
   });
 });

@@ -1,4 +1,10 @@
 import { createHash } from 'node:crypto';
+import { founderConveyorSkillsForStage } from './founderConveyorSkills.js';
+import {
+  FOUNDER_CONVEYOR_CONTRACT,
+  FOUNDER_CONVEYOR_IDEMPOTENCY_PREFIX,
+  founderConveyorReceiptId,
+} from './founderConveyorReceipt.js';
 
 export const FOUNDER_CONVEYOR_STAGES = [
   'chat',
@@ -37,6 +43,7 @@ export interface FounderConveyorDispatchResult {
     | 'INVALID_PAYLOAD'
     | 'UPSTREAM_REJECTED'
     | 'UPSTREAM_RECEIPT_MISSING'
+    | 'UPSTREAM_RECEIPT_MISMATCH'
     | 'UPSTREAM_UNREACHABLE';
   status: number;
   receiptId: string | null;
@@ -155,7 +162,22 @@ export function founderConveyorIdempotencyKey(input: FounderConveyorAdvanceInput
     input.toStage,
     text(input.expectedHeadSha).toLowerCase(),
   ].join(':');
-  return `fcr-conveyor-v1:${createHash('sha256').update(identity).digest('hex')}`;
+  return `${FOUNDER_CONVEYOR_IDEMPOTENCY_PREFIX}${createHash('sha256').update(identity).digest('hex')}`;
+}
+
+export function expectedFounderConveyorReceiptId(input: FounderConveyorAdvanceInput): string {
+  const idempotencyKey = founderConveyorIdempotencyKey(input);
+  return founderConveyorReceiptId({
+    idempotencyKey,
+    runId: text(input.runId),
+    projectSlug: text(input.projectSlug),
+    goal: text(input.goal),
+    expectedHeadSha: text(input.expectedHeadSha).toLowerCase(),
+    fromStage: input.fromStage,
+    toStage: input.toStage,
+    skillIds: founderConveyorSkillsForStage(input.toStage),
+    evidenceUrls: input.evidenceUrls.map((url) => text(url)),
+  });
 }
 
 export async function dispatchFounderConveyorAdvance(
@@ -203,11 +225,11 @@ export async function dispatchFounderConveyorAdvance(
     Authorization: `Bearer ${config.bearerToken}`,
     'Content-Type': 'application/json',
     'Idempotency-Key': idempotencyKey,
-    'X-FCR-Conveyor-Contract': 'v1',
+    'X-FCR-Conveyor-Contract': 'v2',
   };
 
   const payload = {
-    contract: 'founder-control-room/n8n-conveyor@v1',
+    contract: FOUNDER_CONVEYOR_CONTRACT,
     event: 'conveyor.stage.advance',
     idempotencyKey,
     runId: text(input.runId),
@@ -260,6 +282,17 @@ export async function dispatchFounderConveyorAdvance(
         status: 502,
         receiptId: null,
         reasons: ['n8n accepted the transition without returning a receiptId'],
+      };
+    }
+
+    const expectedReceiptId = expectedFounderConveyorReceiptId(input);
+    if (receiptId !== expectedReceiptId) {
+      return {
+        ok: false,
+        code: 'UPSTREAM_RECEIPT_MISMATCH',
+        status: 502,
+        receiptId,
+        reasons: ['n8n receipt does not match the canonical v2 transition identity'],
       };
     }
 

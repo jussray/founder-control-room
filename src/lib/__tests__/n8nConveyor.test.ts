@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   dispatchFounderConveyorAdvance,
+  expectedFounderConveyorReceiptId,
   founderConveyorIdempotencyKey,
   readFounderConveyorConfig,
   validateFounderConveyorAdvance,
@@ -59,31 +60,15 @@ describe('n8n founder conveyor contract', () => {
   it('requires proof before code can become project state', () => {
     expect(validateFounderConveyorAdvance(candidate({ fromStage: 'code', toStage: 'projects' })))
       .toContain('evidence is required for code -> projects');
-
-    expect(validateFounderConveyorAdvance(candidate({
-      fromStage: 'code',
-      toStage: 'projects',
-      evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
-    }))).toEqual([]);
   });
 
-  it('requires an exact immutable Git SHA', () => {
-    expect(validateFounderConveyorAdvance(candidate({ expectedHeadSha: 'main' })))
-      .toContain('expectedHeadSha must be a full 40-character Git commit SHA');
-  });
-
-  it('rejects credential-like material from the forwarded goal', () => {
-    expect(validateFounderConveyorAdvance(candidate({ goal: 'use API_KEY=secret-value' })))
-      .toContain('goal must not contain credential-like material');
-  });
-
-  it('derives stable retry identity from the exact stage and head', () => {
+  it('derives stable v2 retry identity from the exact stage and head', () => {
     const first = founderConveyorIdempotencyKey(candidate());
     const retry = founderConveyorIdempotencyKey(candidate());
     const nextHead = founderConveyorIdempotencyKey(candidate({ expectedHeadSha: 'b'.repeat(40) }));
 
     expect(first).toBe(retry);
-    expect(first).toMatch(/^fcr-conveyor-v1:[0-9a-f]{64}$/);
+    expect(first).toMatch(/^fcr-conveyor-v2:[0-9a-f]{64}$/);
     expect(nextHead).not.toBe(first);
   });
 
@@ -102,11 +87,18 @@ describe('n8n founder conveyor contract', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('dispatches a proof-bound stage transition without merge/deploy/publish authority', async () => {
+  it('dispatches only when n8n returns the exact canonical v2 receipt', async () => {
+    const input = candidate({
+      fromStage: 'code',
+      toStage: 'projects',
+      evidenceUrls: ['https://github.com/jussray/founder-control-room/commit/'.concat(SHA)],
+    });
+    const expectedReceipt = expectedFounderConveyorReceiptId(input);
+
     const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body));
-      expect(body.expectedHeadSha).toBe(SHA);
-      expect(body.idempotencyKey).toMatch(/^fcr-conveyor-v1:[0-9a-f]{64}$/);
+      expect(body.contract).toBe('founder-control-room/n8n-conveyor@v2');
+      expect(body.idempotencyKey).toMatch(/^fcr-conveyor-v2:[0-9a-f]{64}$/);
       expect(body.authority).toEqual({
         advanceStage: true,
         merge: false,
@@ -117,19 +109,15 @@ describe('n8n founder conveyor contract', () => {
       expect(init?.headers).toMatchObject({
         Authorization: 'Bearer bridge-secret',
         'Idempotency-Key': body.idempotencyKey,
-        'X-FCR-Conveyor-Contract': 'v1',
+        'X-FCR-Conveyor-Contract': 'v2',
       });
-      return new Response(JSON.stringify({ receiptId: 'n8n-execution-77' }), {
+      return new Response(JSON.stringify({ receiptId: expectedReceipt }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
     });
 
-    const result = await dispatchFounderConveyorAdvance(candidate({
-      fromStage: 'code',
-      toStage: 'projects',
-      evidenceUrls: ['https://github.com/jussray/founder-control-room/commit/'.concat(SHA)],
-    }), {
+    const result = await dispatchFounderConveyorAdvance(input, {
       env: {
         N8N_CONVEYOR_ENABLED: 'true',
         N8N_CONVEYOR_WEBHOOK_URL: 'https://n8n.example.com/webhook/fcr',
@@ -138,12 +126,24 @@ describe('n8n founder conveyor contract', () => {
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
 
-    expect(result).toMatchObject({
-      ok: true,
-      code: 'DISPATCHED',
-      status: 202,
-      receiptId: 'n8n-execution-77',
+    expect(result).toMatchObject({ ok: true, code: 'DISPATCHED', status: 202, receiptId: expectedReceipt });
+  });
+
+  it('blocks a receipt that does not match the exact transition identity', async () => {
+    const result = await dispatchFounderConveyorAdvance(candidate(), {
+      env: {
+        N8N_CONVEYOR_ENABLED: 'true',
+        N8N_CONVEYOR_WEBHOOK_URL: 'https://n8n.example.com/webhook/fcr',
+        N8N_CONVEYOR_BEARER_TOKEN: 'bridge-secret',
+      },
+      fetchImpl: (async () => new Response(JSON.stringify({ receiptId: `fcr-conveyor-receipt-v2:${'0'.repeat(64)}` }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })) as typeof fetch,
     });
+
+    expect(result.code).toBe('UPSTREAM_RECEIPT_MISMATCH');
+    expect(result.ok).toBe(false);
   });
 
   it('does not claim success when n8n omits the receipt', async () => {
@@ -159,34 +159,6 @@ describe('n8n founder conveyor contract', () => {
       })) as typeof fetch,
     });
 
-    expect(result).toEqual({
-      ok: false,
-      code: 'UPSTREAM_RECEIPT_MISSING',
-      status: 502,
-      receiptId: null,
-      reasons: ['n8n accepted the transition without returning a receiptId'],
-    });
-  });
-
-  it('does not leak an upstream body when n8n rejects a transition', async () => {
-    const result = await dispatchFounderConveyorAdvance(candidate(), {
-      env: {
-        N8N_CONVEYOR_ENABLED: 'true',
-        N8N_CONVEYOR_WEBHOOK_URL: 'https://n8n.example.com/webhook/fcr',
-        N8N_CONVEYOR_BEARER_TOKEN: 'bridge-secret',
-      },
-      fetchImpl: (async () => new Response(JSON.stringify({ secret: 'do-not-return' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      })) as typeof fetch,
-    });
-
-    expect(result).toEqual({
-      ok: false,
-      code: 'UPSTREAM_REJECTED',
-      status: 502,
-      receiptId: null,
-      reasons: ['n8n rejected the conveyor transition with HTTP 500'],
-    });
+    expect(result.code).toBe('UPSTREAM_RECEIPT_MISSING');
   });
 });

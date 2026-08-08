@@ -4,15 +4,18 @@ import {
   validateN8nConveyorRuntimeInput,
   type N8nConveyorRuntimeInput,
 } from '../n8nConveyorRuntime.js';
+import {
+  expectedFounderConveyorReceiptId,
+  founderConveyorIdempotencyKey,
+} from '../n8nConveyor.js';
 
 const SHA = 'a'.repeat(40);
-const KEY = `fcr-conveyor-v1:${'b'.repeat(64)}`;
 
 function candidate(overrides: Partial<N8nConveyorRuntimeInput> = {}): N8nConveyorRuntimeInput {
-  return {
-    contract: 'founder-control-room/n8n-conveyor@v1',
+  const input: N8nConveyorRuntimeInput = {
+    contract: 'founder-control-room/n8n-conveyor@v2',
     event: 'conveyor.stage.advance',
-    idempotencyKey: KEY,
+    idempotencyKey: '',
     runId: 'run-123',
     projectSlug: 'founder-control-room',
     goal: 'Move one verified increment through the conveyor.',
@@ -29,16 +32,40 @@ function candidate(overrides: Partial<N8nConveyorRuntimeInput> = {}): N8nConveyo
     },
     ...overrides,
   };
+
+  if (!overrides.idempotencyKey) {
+    input.idempotencyKey = founderConveyorIdempotencyKey({
+      runId: input.runId,
+      projectSlug: input.projectSlug,
+      goal: input.goal,
+      fromStage: input.fromStage,
+      toStage: input.toStage,
+      expectedHeadSha: input.expectedHeadSha,
+      evidenceUrls: input.evidenceUrls,
+    });
+  }
+
+  return input;
 }
 
 describe('n8n conveyor runtime', () => {
-  it('accepts a bounded transition and returns a deterministic receipt', () => {
-    const first = acceptN8nConveyorRuntimeInput(candidate());
-    const retry = acceptN8nConveyorRuntimeInput(candidate());
+  it('accepts a bounded transition and returns a deterministic canonical v2 receipt', () => {
+    const input = candidate();
+    const first = acceptN8nConveyorRuntimeInput(input);
+    const retry = acceptN8nConveyorRuntimeInput(input);
 
     expect(first.ok).toBe(true);
-    expect(first.receipt?.receiptId).toMatch(/^n8n-fcr-v1:[0-9a-f]{64}$/);
+    expect(first.receipt?.receiptId).toMatch(/^fcr-conveyor-receipt-v2:[0-9a-f]{64}$/);
     expect(retry.receipt?.receiptId).toBe(first.receipt?.receiptId);
+    expect(first.receipt?.receiptId).toBe(expectedFounderConveyorReceiptId({
+      runId: input.runId,
+      projectSlug: input.projectSlug,
+      goal: input.goal,
+      fromStage: input.fromStage,
+      toStage: input.toStage,
+      expectedHeadSha: input.expectedHeadSha,
+      evidenceUrls: input.evidenceUrls,
+    }));
     expect(first.receipt?.skillIds).toEqual([
       'lean-build-orchestrator',
       'regression-stagnation-guard',
@@ -68,10 +95,12 @@ describe('n8n conveyor runtime', () => {
     }))).toContain('evidence is required for code -> projects');
   });
 
-  it('binds the receipt to the exact Git head', () => {
+  it('binds the receipt to the exact Git head and goal', () => {
     const first = acceptN8nConveyorRuntimeInput(candidate()).receipt?.receiptId;
     const second = acceptN8nConveyorRuntimeInput(candidate({ expectedHeadSha: 'c'.repeat(40) })).receipt?.receiptId;
+    const third = acceptN8nConveyorRuntimeInput(candidate({ goal: 'A materially different goal.' })).receipt?.receiptId;
     expect(second).not.toBe(first);
+    expect(third).not.toBe(first);
   });
 
   it('routes truth research into the reusable skills stage', () => {
