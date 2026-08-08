@@ -133,10 +133,12 @@ async function expectReadiness(state, label) {
 
 try {
   await page.goto(`${baseUrl}/control-room/`, { waitUntil: 'domcontentloaded' });
+
+  // The readiness badge intentionally lives inside the closed founder-stack dock.
+  // Open the real dock first, which also triggers a fresh authenticated readiness read.
+  await page.locator('.launch-dock > summary').click();
   await expectReadiness('ready-for-probe', 'n8n configured · live probe required');
   assert.equal(lastAuthorization, `Bearer ${TOKEN}`);
-
-  await page.locator('.launch-dock > summary').click();
   await page.locator('.conveyor-readiness').scrollIntoViewIfNeeded();
 
   const initialText = await page.locator('.conveyor-readiness').innerText();
