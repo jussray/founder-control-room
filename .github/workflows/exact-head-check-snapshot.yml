@@ -1,0 +1,54 @@
+name: Exact Head Check Snapshot
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  checks: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Snapshot target check runs
+        uses: actions/github-script@v7
+        env:
+          TARGET_SHA: 1e86fcfce07bcced9aeb08389446b217c112f198
+        with:
+          script: |
+            const fs = require('fs');
+            const target = process.env.TARGET_SHA;
+            const {owner, repo} = context.repo;
+            const runs = await github.paginate(github.rest.checks.listForRef, {
+              owner,
+              repo,
+              ref: target,
+              filter: 'all',
+              per_page: 100,
+            });
+            const snapshot = runs
+              .filter((run) => run.head_sha === target)
+              .map((run) => ({
+                id: run.id,
+                name: run.name,
+                app: run.app?.slug || run.app?.name || 'unknown',
+                status: run.status,
+                conclusion: run.conclusion,
+                started_at: run.started_at,
+                completed_at: run.completed_at,
+                details_url: run.details_url,
+              }))
+              .sort((a, b) => `${a.app}:${a.name}`.localeCompare(`${b.app}:${b.name}`));
+            fs.writeFileSync('exact-head-check-snapshot.json', JSON.stringify({target, snapshot}, null, 2));
+            console.log(JSON.stringify({target, snapshot}, null, 2));
+
+      - name: Upload check snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: exact-head-check-snapshot
+          path: exact-head-check-snapshot.json
+          if-no-files-found: error
+          retention-days: 7
