@@ -22,6 +22,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   RECEIPT_LOOKUP_ATTEMPTS: '30'
   RECEIPT_LOOKUP_DELAY_SECONDS: '10'
+  RECEIPT_TOKEN_CONTEXT: founder-control-room/proof-of-ship-receipts/v1
 
 jobs:
   verify-downstream-receipt:
@@ -36,7 +37,7 @@ jobs:
     environment: production
     env:
       DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
-      PROOF_OF_SHIP_RECEIPT_TOKEN: ${{ secrets.PROOF_OF_SHIP_RECEIPT_TOKEN }}
+      FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
       EXPECTED_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.expected_sha }}
     steps:
       - name: Validate exact-head receipt configuration
@@ -52,8 +53,8 @@ jobs:
             echo '::error title=Receipt lookup URL missing::DEPLOY_URL must be a configured HTTPS production origin.'
             exit 1
           fi
-          if [[ -z "$PROOF_OF_SHIP_RECEIPT_TOKEN" ]]; then
-            echo '::error title=Receipt token missing::PROOF_OF_SHIP_RECEIPT_TOKEN must be configured in the production environment.'
+          if [[ -z "$FOUNDER_SIGNAL_ENGINE_MCP_TOKEN" ]]; then
+            echo '::error title=Existing production secret missing::FOUNDER_SIGNAL_ENGINE_MCP_TOKEN must be configured in the production environment.'
             exit 1
           fi
 
@@ -91,7 +92,12 @@ jobs:
           lookup_url="$origin/ingest/proof-of-ship-receipts/by-commit/jussray/$repo_name/$EXPECTED_SHA"
           attempts="$RECEIPT_LOOKUP_ATTEMPTS"
           delay="$RECEIPT_LOOKUP_DELAY_SECONDS"
+          receipt_token="$(node -e 'const { createHmac } = require("node:crypto"); process.stdout.write(createHmac("sha256", process.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN).update(process.env.RECEIPT_TOKEN_CONTEXT).digest("hex"));')"
 
+          if [[ ! "$receipt_token" =~ ^[0-9a-f]{64}$ ]]; then
+            echo '::error title=Receipt token derivation failed::The domain-separated receipt token was not derived correctly.'
+            exit 1
+          fi
           if [[ ! "$attempts" =~ ^[1-9][0-9]*$ || "$attempts" -gt 60 ]]; then
             echo '::error title=Invalid receipt polling policy::RECEIPT_LOOKUP_ATTEMPTS must be between 1 and 60.'
             exit 1
@@ -108,7 +114,7 @@ jobs:
               --max-time 20 \
               --output receipt.json \
               --write-out '%{http_code}' \
-              --header "x-proof-of-ship-receipt-token: $PROOF_OF_SHIP_RECEIPT_TOKEN" \
+              --header "x-proof-of-ship-receipt-token: $receipt_token" \
               "$lookup_url")"
 
             if [[ "$status" == 200 ]]; then
