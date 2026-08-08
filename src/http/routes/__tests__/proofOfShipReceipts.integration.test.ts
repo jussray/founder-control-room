@@ -2,6 +2,7 @@ import express from 'express';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  createProofOfShipCommitLookupHandler,
   createProofOfShipReceiptIngestHandler,
   createProofOfShipReceiptLookupHandler,
   storedProofOfShipReceiptMatches,
@@ -31,6 +32,7 @@ function createRepository(): ProofOfShipReceiptRepository {
   return {
     store: vi.fn<ProofOfShipReceiptRepository['store']>().mockResolvedValue('stored'),
     find: vi.fn<ProofOfShipReceiptRepository['find']>().mockResolvedValue(null),
+    findByCommit: vi.fn<ProofOfShipReceiptRepository['findByCommit']>().mockResolvedValue(null),
   };
 }
 
@@ -38,6 +40,10 @@ function createTestApp(repository: ProofOfShipReceiptRepository) {
   const app = express();
   app.use(express.json({ limit: '32kb' }));
   app.post('/ingest/proof-of-ship-receipts', createProofOfShipReceiptIngestHandler(repository));
+  app.get(
+    '/ingest/proof-of-ship-receipts/by-commit/:owner/:repo/:sha',
+    createProofOfShipCommitLookupHandler(repository),
+  );
   app.get('/ingest/proof-of-ship-receipts/:receiptId', createProofOfShipReceiptLookupHandler(repository));
   return app;
 }
@@ -167,7 +173,7 @@ describe('proof-of-ship receipt ingest and lookup', () => {
     expect(response.body).toEqual({ found: false, receiptId: validReceipt.receiptId });
   });
 
-  it('returns the sanitized downstream receipt for exact-head verification', async () => {
+  it('returns the sanitized downstream receipt for receipt-id verification', async () => {
     const repository = createRepository();
     vi.mocked(repository.find).mockResolvedValue(validReceipt);
     const response = await request(createTestApp(repository))
@@ -176,6 +182,64 @@ describe('proof-of-ship receipt ingest and lookup', () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ found: true, receipt: validReceipt });
+  });
+
+  it('requires the private token for exact-commit lookup', async () => {
+    const repository = createRepository();
+    const response = await request(createTestApp(repository))
+      .get(`/ingest/proof-of-ship-receipts/by-commit/jussray/founder-control-room/${validReceipt.exactCommitSha}`);
+
+    expect(response.status).toBe(401);
+    expect(repository.findByCommit).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid exact-commit lookup target', async () => {
+    const repository = createRepository();
+    const badOwner = await request(createTestApp(repository))
+      .get(`/ingest/proof-of-ship-receipts/by-commit/not-jussray/founder-control-room/${validReceipt.exactCommitSha}`)
+      .set('x-proof-of-ship-receipt-token', 'test-proof-receipt-token');
+    const badSha = await request(createTestApp(repository))
+      .get('/ingest/proof-of-ship-receipts/by-commit/jussray/founder-control-room/not-a-sha')
+      .set('x-proof-of-ship-receipt-token', 'test-proof-receipt-token');
+
+    expect(badOwner.status).toBe(400);
+    expect(badOwner.body).toEqual({ error: 'invalid_source_repo' });
+    expect(badSha.status).toBe(400);
+    expect(badSha.body).toEqual({ error: 'invalid_exact_commit_sha' });
+    expect(repository.findByCommit).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 until the exact commit has a downstream receipt', async () => {
+    const repository = createRepository();
+    const response = await request(createTestApp(repository))
+      .get(`/ingest/proof-of-ship-receipts/by-commit/jussray/founder-control-room/${validReceipt.exactCommitSha}`)
+      .set('x-proof-of-ship-receipt-token', 'test-proof-receipt-token');
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({
+      found: false,
+      sourceRepo: validReceipt.sourceRepo,
+      exactCommitSha: validReceipt.exactCommitSha,
+    });
+    expect(repository.findByCommit).toHaveBeenCalledWith(
+      validReceipt.sourceRepo,
+      validReceipt.exactCommitSha,
+    );
+  });
+
+  it('returns the exact-commit receipt for post-deploy verification', async () => {
+    const repository = createRepository();
+    vi.mocked(repository.findByCommit).mockResolvedValue(validReceipt);
+    const response = await request(createTestApp(repository))
+      .get(`/ingest/proof-of-ship-receipts/by-commit/jussray/founder-control-room/${validReceipt.exactCommitSha}`)
+      .set('x-proof-of-ship-receipt-token', 'test-proof-receipt-token');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ found: true, receipt: validReceipt });
+    expect(repository.findByCommit).toHaveBeenCalledWith(
+      validReceipt.sourceRepo,
+      validReceipt.exactCommitSha,
+    );
   });
 
   it('compares every immutable field before classifying a duplicate', () => {
