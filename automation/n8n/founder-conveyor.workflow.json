@@ -1,0 +1,69 @@
+{
+  "name": "Founder Control Room Conveyor",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "founder-control-room/conveyor",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "FCR Conveyor Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json.body ?? $json;\nconst expectedStages = ['chat','workflows','code','projects','skills'];\nconst next = {chat:'workflows',workflows:'code',code:'projects',projects:'skills',skills:'chat'};\nconst requiredEvidence = new Set(['code:projects','projects:skills','skills:chat']);\nconst skillRoutes = {\n  chat:['intent-repair-reader','capability-mode-router'],\n  workflows:['lean-build-orchestrator','capability-mode-router'],\n  code:['lean-build-orchestrator','regression-stagnation-guard','capability-mode-router'],\n  projects:['regression-stagnation-guard','truth-research-optimizer'],\n  skills:['truth-research-optimizer','capability-mode-router']\n};\nconst fail = (reason) => { throw new Error(reason); };\nif (input.contract !== 'founder-control-room/n8n-conveyor@v1') fail('invalid contract');\nif (input.event !== 'conveyor.stage.advance') fail('invalid event');\nif (!/^fcr-conveyor-v1:[0-9a-f]{64}$/i.test(input.idempotencyKey ?? '')) fail('invalid idempotency key');\nif (!/^[0-9a-f]{40}$/i.test(input.expectedHeadSha ?? '')) fail('expectedHeadSha must be exact');\nif (!expectedStages.includes(input.fromStage) || !expectedStages.includes(input.toStage)) fail('invalid stage');\nif (next[input.fromStage] !== input.toStage) fail('invalid stage transition');\nif (requiredEvidence.has(`${input.fromStage}:${input.toStage}`) && (!Array.isArray(input.evidenceUrls) || input.evidenceUrls.length === 0)) fail('evidence required');\nconst authority = input.authority ?? {};\nif (authority.advanceStage !== true || authority.merge !== false || authority.deploy !== false || authority.publish !== false || authority.sendExternal !== false) fail('authority envelope rejected');\nconst skillIds = skillRoutes[input.toStage];\nconst receiptSeed = [input.idempotencyKey,input.runId,input.projectSlug,input.fromStage,input.toStage,input.expectedHeadSha,...skillIds].join(':');\nreturn [{json:{accepted:true,receiptSeed,runId:input.runId,projectSlug:input.projectSlug,fromStage:input.fromStage,toStage:input.toStage,expectedHeadSha:input.expectedHeadSha,evidenceUrls:input.evidenceUrls ?? [],skillIds}}];"
+      },
+      "id": "validate-route",
+      "name": "Validate + Route Skills",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst receiptId = `fcr-n8n-v1:${crypto.createHash('sha256').update($json.receiptSeed).digest('hex')}`;\nreturn [{json:{receiptId,status:'accepted',runId:$json.runId,projectSlug:$json.projectSlug,fromStage:$json.fromStage,toStage:$json.toStage,expectedHeadSha:$json.expectedHeadSha,skillIds:$json.skillIds,evidenceUrls:$json.evidenceUrls}}];"
+      },
+      "id": "receipt",
+      "name": "Create Bound Receipt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "respond",
+      "name": "Return Receipt",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [780, 0]
+    }
+  ],
+  "connections": {
+    "FCR Conveyor Webhook": {
+      "main": [[{"node":"Validate + Route Skills","type":"main","index":0}]]
+    },
+    "Validate + Route Skills": {
+      "main": [[{"node":"Create Bound Receipt","type":"main","index":0}]]
+    },
+    "Create Bound Receipt": {
+      "main": [[{"node":"Return Receipt","type":"main","index":0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {},
+  "versionId": "00000000-0000-0000-0000-000000000001"
+}
