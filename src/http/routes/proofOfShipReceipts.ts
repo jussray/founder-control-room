@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { Request, RequestHandler, Response } from 'express';
 import {
   normalizeProofOfShipReceiptId,
@@ -9,6 +9,7 @@ import {
 
 const COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const REPO_NAME = /^[A-Za-z0-9._-]{1,100}$/;
+const RECEIPT_TOKEN_CONTEXT = 'founder-control-room/proof-of-ship-receipts/v1';
 
 export type ProofOfShipReceiptStoreDisposition = 'stored' | 'duplicate' | 'conflict';
 
@@ -53,6 +54,12 @@ function tokenMatches(provided: string | undefined, expected: string): boolean {
   const right = safeToken(expected);
   if (left.length !== right.length) return false;
   return timingSafeEqual(left, right);
+}
+
+export function deriveProofOfShipReceiptToken(mcpToken: string): string {
+  return createHmac('sha256', mcpToken)
+    .update(RECEIPT_TOKEN_CONTEXT)
+    .digest('hex');
 }
 
 function normalizeSourceRepo(owner: unknown, repo: unknown): string {
@@ -178,12 +185,13 @@ function receiptHeaders(res: Response) {
 }
 
 function authorize(req: Request, res: Response): boolean {
-  const expectedToken = process.env.PROOF_OF_SHIP_RECEIPT_TOKEN?.trim();
-  if (!expectedToken) {
+  const mcpToken = process.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN?.trim();
+  if (!mcpToken) {
     res.status(503).json({ error: 'Proof-of-ship receipt ingest is not configured' });
     return false;
   }
 
+  const expectedToken = deriveProofOfShipReceiptToken(mcpToken);
   const provided = req.get('x-proof-of-ship-receipt-token');
   if (!tokenMatches(provided, expectedToken)) {
     res.status(401).json({ error: 'Unauthorized' });
