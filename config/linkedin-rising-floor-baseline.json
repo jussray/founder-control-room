@@ -42,6 +42,9 @@
   "policy": {
     "partial_window_policy": "never_classify_an_incomplete_or_rolling_window_as_a_decline_without_like_for_like_evidence",
     "target_mode": "beat_previous_verified_floor_without_sacrificing_quality",
+    "max_age_hours": 48,
+    "max_period_lag_days": 1,
+    "stale_behavior": "fail_closed_before_linkedin_schedule",
     "one_off_virality_is_the_goal": false
   }
 }
