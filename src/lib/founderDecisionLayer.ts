@@ -94,7 +94,7 @@ export function evaluateFounderFinalDecision(input: FounderFinalDecisionInput): 
   } else if (input.githubProof.status === 'red') {
     decision = 'BLOCK';
     reasons.push('GitHub exact-head proof is red');
-  } else if (input.githubProof.status === 'unknown' && decision !== 'BLOCK') {
+  } else if (input.githubProof.status === 'unknown') {
     decision = 'NEEDS_PROOF';
     reasons.push('GitHub exact-head proof is unknown');
   }
