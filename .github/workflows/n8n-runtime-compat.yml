@@ -1,0 +1,47 @@
+name: n8n Runtime Compatibility
+
+on:
+  pull_request:
+    paths:
+      - 'automation/n8n/**'
+      - 'scripts/verify-n8n-runtime-compat.sh'
+      - '.github/workflows/n8n-runtime-compat.yml'
+      - 'src/lib/__tests__/n8nRuntimeCompat.contract.test.ts'
+  push:
+    branches: [main]
+    paths:
+      - 'automation/n8n/**'
+      - 'scripts/verify-n8n-runtime-compat.sh'
+      - '.github/workflows/n8n-runtime-compat.yml'
+      - 'src/lib/__tests__/n8nRuntimeCompat.contract.test.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pinned-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+
+      - name: Verify immutable head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+
+      - name: Execute pinned n8n compatibility proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/verify-n8n-runtime-compat.sh | tee n8n-runtime-compat-receipt.json
+
+      - name: Upload runtime receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: n8n-runtime-compat-${{ github.sha }}
+          path: n8n-runtime-compat-receipt.json
+          if-no-files-found: error
