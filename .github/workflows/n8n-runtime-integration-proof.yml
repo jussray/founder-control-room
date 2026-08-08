@@ -112,22 +112,34 @@ jobs:
           docker compose -f "$COMPOSE_FILE" logs n8n
           exit 1
 
-      - name: Reject unauthenticated conveyor request
+      - name: Wait for published webhook and reject unauthenticated request
         shell: bash
         run: |
           set -euo pipefail
-          status="$(curl -sS -o .tmp/n8n-no-auth-response.txt -w '%{http_code}' \
-            -X POST 'http://127.0.0.1:5678/webhook/founder-control-room/conveyor' \
-            -H 'content-type: application/json' \
-            --data '{}')"
-          case "$status" in
-            401|403) ;;
-            *)
-              cat .tmp/n8n-no-auth-response.txt || true
-              echo "Expected authenticated webhook rejection, got HTTP $status" >&2
-              exit 1
-              ;;
-          esac
+          webhook='http://127.0.0.1:5678/webhook/founder-control-room/conveyor'
+          for attempt in $(seq 1 30); do
+            status="$(curl -sS -o .tmp/n8n-no-auth-response.txt -w '%{http_code}' \
+              -X POST "$webhook" \
+              -H 'content-type: application/json' \
+              --data '{}')"
+            case "$status" in
+              401|403)
+                exit 0
+                ;;
+              404)
+                sleep 2
+                ;;
+              *)
+                cat .tmp/n8n-no-auth-response.txt || true
+                echo "Expected 404 while registering or 401/403 after registration, got HTTP $status" >&2
+                exit 1
+                ;;
+            esac
+          done
+          cat .tmp/n8n-no-auth-response.txt || true
+          docker compose -f "$COMPOSE_FILE" logs n8n
+          echo 'Published webhook never registered before timeout' >&2
+          exit 1
 
       - name: Prove canonical authenticated receipt
         shell: bash
