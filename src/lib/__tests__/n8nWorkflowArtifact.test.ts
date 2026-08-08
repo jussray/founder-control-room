@@ -18,6 +18,15 @@ describe('n8n conveyor workflow artifact', () => {
     ]);
   });
 
+  it('requires n8n-side header auth without committing credentials', () => {
+    const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+    const webhook = workflow.nodes.find((node: { name: string }) => node.name === 'FCR Conveyor Webhook');
+
+    expect(webhook?.type).toBe('n8n-nodes-base.webhook');
+    expect(webhook?.parameters?.authentication).toBe('headerAuth');
+    expect(webhook?.credentials).toBeUndefined();
+  });
+
   it('preserves the governed authority, skill routing, and canonical v2 receipt contract', () => {
     const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
     const code = workflow.nodes
