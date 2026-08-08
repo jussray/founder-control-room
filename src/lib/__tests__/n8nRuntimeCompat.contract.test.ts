@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 const workflowPath = path.resolve(process.cwd(), '.github/workflows/n8n-runtime-compat.yml');
 const scriptPath = path.resolve(process.cwd(), 'scripts/verify-n8n-runtime-compat.sh');
 const fixturePath = path.resolve(process.cwd(), 'automation/n8n/compat/receipt-code.workflow.json');
+const conveyorPath = path.resolve(process.cwd(), 'automation/n8n/founder-conveyor.workflow.json');
 
 describe('n8n pinned runtime compatibility contract', () => {
   it('pins stable n8n 2.32.6 and never uses latest or wildcard module access', () => {
@@ -14,6 +15,13 @@ describe('n8n pinned runtime compatibility contract', () => {
     expect(script).not.toContain('n8nio/n8n:latest');
     expect(script).toContain('NODE_FUNCTION_ALLOW_BUILTIN=crypto');
     expect(script).not.toContain('NODE_FUNCTION_ALLOW_BUILTIN=*');
+  });
+
+  it('keeps the production-shaped conveyor directly importable with a stable workflow id', () => {
+    const conveyor = JSON.parse(fs.readFileSync(conveyorPath, 'utf8'));
+    expect(conveyor.id).toBe('fcrFounderConveyorV2');
+    expect(conveyor.name).toBe('Founder Control Room Conveyor');
+    expect(conveyor.active).toBe(false);
   });
 
   it('imports the real conveyor before executing the isolated receipt fixture', () => {
