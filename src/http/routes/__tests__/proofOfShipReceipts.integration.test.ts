@@ -5,9 +5,13 @@ import {
   createProofOfShipCommitLookupHandler,
   createProofOfShipReceiptIngestHandler,
   createProofOfShipReceiptLookupHandler,
+  deriveProofOfShipReceiptToken,
   storedProofOfShipReceiptMatches,
   type ProofOfShipReceiptRepository,
 } from '../proofOfShipReceipts.js';
+
+const testMcpToken = 'test-founder-signal-engine-mcp-token';
+const testReceiptToken = deriveProofOfShipReceiptToken(testMcpToken);
 
 const validReceipt = {
   receiptId: '8fa23f1e-2844-4c65-a91a-e88bb91ecab4',
@@ -49,25 +53,37 @@ function createTestApp(repository: ProofOfShipReceiptRepository) {
 }
 
 describe('proof-of-ship receipt ingest and lookup', () => {
-  const originalToken = process.env.PROOF_OF_SHIP_RECEIPT_TOKEN;
+  const originalMcpToken = process.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN;
 
   beforeEach(() => {
-    process.env.PROOF_OF_SHIP_RECEIPT_TOKEN = 'test-proof-receipt-token';
+    process.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN = testMcpToken;
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    if (originalToken === undefined) delete process.env.PROOF_OF_SHIP_RECEIPT_TOKEN;
-    else process.env.PROOF_OF_SHIP_RECEIPT_TOKEN = originalToken;
+    if (originalMcpToken === undefined) delete process.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN;
+    else process.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN = originalMcpToken;
   });
 
-  it('rejects receipt ingestion without the private token', async () => {
+  it('derives a narrow deterministic receipt token instead of accepting the MCP token directly', () => {
+    expect(testReceiptToken).toMatch(/^[0-9a-f]{64}$/);
+    expect(testReceiptToken).not.toBe(testMcpToken);
+    expect(deriveProofOfShipReceiptToken(testMcpToken)).toBe(testReceiptToken);
+    expect(deriveProofOfShipReceiptToken(`${testMcpToken}-other`)).not.toBe(testReceiptToken);
+  });
+
+  it('rejects receipt ingestion without the derived receipt token', async () => {
     const repository = createRepository();
-    const response = await request(createTestApp(repository))
+    const missing = await request(createTestApp(repository))
       .post('/ingest/proof-of-ship-receipts')
       .send(validReceipt);
+    const broadSecret = await request(createTestApp(repository))
+      .post('/ingest/proof-of-ship-receipts')
+      .set('x-proof-of-ship-receipt-token', testMcpToken)
+      .send(validReceipt);
 
-    expect(response.status).toBe(401);
+    expect(missing.status).toBe(401);
+    expect(broadSecret.status).toBe(401);
     expect(repository.store).not.toHaveBeenCalled();
   });
 
@@ -75,7 +91,7 @@ describe('proof-of-ship receipt ingest and lookup', () => {
     const repository = createRepository();
     const response = await request(createTestApp(repository))
       .post('/ingest/proof-of-ship-receipts')
-      .set('x-proof-of-ship-receipt-token', 'test-proof-receipt-token')
+      .set('x-proof-of-ship-receipt-token', testReceiptToken)
       .send({ ...validReceipt, linkedinDraft: 'full post body must not be persisted here' });
 
     expect(response.status).toBe(400);
@@ -87,7 +103,7 @@ describe('proof-of-ship receipt ingest and lookup', () => {
     const repository = createRepository();
     const response = await request(createTestApp(repository))
       .post('/ingest/proof-of-ship-receipts')
-      .set('x-proof-of-ship-receipt-token', 'test-proof-receipt-token')
+      .set('x-proof-of-ship-receipt-token', testReceiptToken)
       .send({ ...validReceipt, linkedinRisingFloorReady: false });
 
     expect(response.status).toBe(400);
@@ -98,7 +114,7 @@ describe('proof-of-ship receipt ingest and lookup', () => {
     const repository = createRepository();
     const response = await request(createTestApp(repository))
       .post('/ingest/proof-of-ship-receipts')
-      .set('x-proof-of-ship-receipt-token', 'test-proof-receipt-token')
+      .set('x-proof-of-ship-receipt-token', testReceiptToken)
       .send({ ...validReceipt, idempotencyKey: `jussray/founder-control-room:${'d'.repeat(40)}` });
 
     expect(response.status).toBe(400);
@@ -109,15 +125,11 @@ describe('proof-of-ship receipt ingest and lookup', () => {
     const repository = createRepository();
     const response = await request(createTestApp(repository))
       .post('/ingest/proof-of-ship-receipts')
-      .set('x-proof-of-ship-receipt-token', 'test-proof-receipt-token')
+      .set('x-proof-of-ship-receipt-token', testReceiptToken)
       .send(validReceipt);
 
     expect(response.status).toBe(201);
-    expect(response.body).toEqual({
-      accepted: true,
-      duplicate: false,
-      receiptId: validReceipt.receiptId,
-    });
+    expect(response.body).toEqual({ accepted: true, duplicate: false, receiptId: validReceipt.receiptId });
     expect(repository.store).toHaveBeenCalledOnce();
     expect(repository.store).toHaveBeenCalledWith(validReceipt);
   });
@@ -127,15 +139,11 @@ describe('proof-of-ship receipt ingest and lookup', () => {
     vi.mocked(repository.store).mockResolvedValue('duplicate');
     const response = await request(createTestApp(repository))
       .post('/ingest/proof-of-ship-receipts')
-      .set('x-proof-of-ship-receipt-token', 'test-proof-receipt-token')
+      .set('x-proof-of-ship-receipt-token', testReceiptToken)
       .send(validReceipt);
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({
-      accepted: true,
-      duplicate: true,
-      receiptId: validReceipt.receiptId,
-    });
+    expect(response.body).toEqual({ accepted: true, duplicate: true, receiptId: validReceipt.receiptId });
   });
 
   it('rejects receipt-id reuse with a different immutable payload', async () => {
@@ -143,18 +151,14 @@ describe('proof-of-ship receipt ingest and lookup', () => {
     vi.mocked(repository.store).mockResolvedValue('conflict');
     const response = await request(createTestApp(repository))
       .post('/ingest/proof-of-ship-receipts')
-      .set('x-proof-of-ship-receipt-token', 'test-proof-receipt-token')
+      .set('x-proof-of-ship-receipt-token', testReceiptToken)
       .send(validReceipt);
 
     expect(response.status).toBe(409);
-    expect(response.body).toEqual({
-      accepted: false,
-      error: 'receipt_id_conflict',
-      receiptId: validReceipt.receiptId,
-    });
+    expect(response.body).toEqual({ accepted: false, error: 'receipt_id_conflict', receiptId: validReceipt.receiptId });
   });
 
-  it('requires the private token for receipt lookup', async () => {
+  it('requires the derived token for receipt-id lookup', async () => {
     const repository = createRepository();
     const response = await request(createTestApp(repository))
       .get(`/ingest/proof-of-ship-receipts/${validReceipt.receiptId}`);
@@ -167,7 +171,7 @@ describe('proof-of-ship receipt ingest and lookup', () => {
     const repository = createRepository();
     const response = await request(createTestApp(repository))
       .get(`/ingest/proof-of-ship-receipts/${validReceipt.receiptId}`)
-      .set('x-proof-of-ship-receipt-token', 'test-proof-receipt-token');
+      .set('x-proof-of-ship-receipt-token', testReceiptToken);
 
     expect(response.status).toBe(404);
     expect(response.body).toEqual({ found: false, receiptId: validReceipt.receiptId });
@@ -178,13 +182,13 @@ describe('proof-of-ship receipt ingest and lookup', () => {
     vi.mocked(repository.find).mockResolvedValue(validReceipt);
     const response = await request(createTestApp(repository))
       .get(`/ingest/proof-of-ship-receipts/${validReceipt.receiptId}`)
-      .set('x-proof-of-ship-receipt-token', 'test-proof-receipt-token');
+      .set('x-proof-of-ship-receipt-token', testReceiptToken);
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ found: true, receipt: validReceipt });
   });
 
-  it('requires the private token for exact-commit lookup', async () => {
+  it('requires the derived token for exact-commit lookup', async () => {
     const repository = createRepository();
     const response = await request(createTestApp(repository))
       .get(`/ingest/proof-of-ship-receipts/by-commit/jussray/founder-control-room/${validReceipt.exactCommitSha}`);
@@ -197,10 +201,10 @@ describe('proof-of-ship receipt ingest and lookup', () => {
     const repository = createRepository();
     const badOwner = await request(createTestApp(repository))
       .get(`/ingest/proof-of-ship-receipts/by-commit/not-jussray/founder-control-room/${validReceipt.exactCommitSha}`)
-      .set('x-proof-of-ship-receipt-token', 'test-proof-receipt-token');
+      .set('x-proof-of-ship-receipt-token', testReceiptToken);
     const badSha = await request(createTestApp(repository))
       .get('/ingest/proof-of-ship-receipts/by-commit/jussray/founder-control-room/not-a-sha')
-      .set('x-proof-of-ship-receipt-token', 'test-proof-receipt-token');
+      .set('x-proof-of-ship-receipt-token', testReceiptToken);
 
     expect(badOwner.status).toBe(400);
     expect(badOwner.body).toEqual({ error: 'invalid_source_repo' });
@@ -213,7 +217,7 @@ describe('proof-of-ship receipt ingest and lookup', () => {
     const repository = createRepository();
     const response = await request(createTestApp(repository))
       .get(`/ingest/proof-of-ship-receipts/by-commit/jussray/founder-control-room/${validReceipt.exactCommitSha}`)
-      .set('x-proof-of-ship-receipt-token', 'test-proof-receipt-token');
+      .set('x-proof-of-ship-receipt-token', testReceiptToken);
 
     expect(response.status).toBe(404);
     expect(response.body).toEqual({
@@ -221,10 +225,7 @@ describe('proof-of-ship receipt ingest and lookup', () => {
       sourceRepo: validReceipt.sourceRepo,
       exactCommitSha: validReceipt.exactCommitSha,
     });
-    expect(repository.findByCommit).toHaveBeenCalledWith(
-      validReceipt.sourceRepo,
-      validReceipt.exactCommitSha,
-    );
+    expect(repository.findByCommit).toHaveBeenCalledWith(validReceipt.sourceRepo, validReceipt.exactCommitSha);
   });
 
   it('returns the exact-commit receipt for post-deploy verification', async () => {
@@ -232,14 +233,11 @@ describe('proof-of-ship receipt ingest and lookup', () => {
     vi.mocked(repository.findByCommit).mockResolvedValue(validReceipt);
     const response = await request(createTestApp(repository))
       .get(`/ingest/proof-of-ship-receipts/by-commit/jussray/founder-control-room/${validReceipt.exactCommitSha}`)
-      .set('x-proof-of-ship-receipt-token', 'test-proof-receipt-token');
+      .set('x-proof-of-ship-receipt-token', testReceiptToken);
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ found: true, receipt: validReceipt });
-    expect(repository.findByCommit).toHaveBeenCalledWith(
-      validReceipt.sourceRepo,
-      validReceipt.exactCommitSha,
-    );
+    expect(repository.findByCommit).toHaveBeenCalledWith(validReceipt.sourceRepo, validReceipt.exactCommitSha);
   });
 
   it('compares every immutable field before classifying a duplicate', () => {
@@ -268,12 +266,12 @@ describe('proof-of-ship receipt ingest and lookup', () => {
     expect(storedProofOfShipReceiptMatches({ ...stored, exact_commit_sha: 'd'.repeat(40) }, validReceipt)).toBe(false);
   });
 
-  it('fails closed when the receipt token is not configured', async () => {
-    delete process.env.PROOF_OF_SHIP_RECEIPT_TOKEN;
+  it('fails closed when the existing MCP secret is not configured', async () => {
+    delete process.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN;
     const repository = createRepository();
     const response = await request(createTestApp(repository))
       .post('/ingest/proof-of-ship-receipts')
-      .set('x-proof-of-ship-receipt-token', 'test-proof-receipt-token')
+      .set('x-proof-of-ship-receipt-token', testReceiptToken)
       .send(validReceipt);
 
     expect(response.status).toBe(503);
