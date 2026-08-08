@@ -1,0 +1,57 @@
+name: n8n Conveyor Live Probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact Founder Control Room commit SHA to probe
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: n8n-conveyor-live-probe-${{ inputs.target_sha }}
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      N8N_CONVEYOR_WEBHOOK_URL: ${{ secrets.N8N_CONVEYOR_WEBHOOK_URL }}
+      N8N_CONVEYOR_BEARER_TOKEN: ${{ secrets.N8N_CONVEYOR_BEARER_TOKEN }}
+      N8N_CONVEYOR_PROBE_HEAD_SHA: ${{ inputs.target_sha }}
+    steps:
+      - name: Check out exact target
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha }}
+
+      - name: Verify immutable target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${N8N_CONVEYOR_PROBE_HEAD_SHA}"
+          test -n "${N8N_CONVEYOR_WEBHOOK_URL}"
+          test -n "${N8N_CONVEYOR_BEARER_TOKEN}"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run bounded live receipt probe
+        run: npm run verify:n8n-live | tee n8n-live-probe-receipt.json
+
+      - name: Upload retained receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: n8n-live-probe-${{ inputs.target_sha }}
+          path: n8n-live-probe-receipt.json
+          if-no-files-found: error
