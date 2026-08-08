@@ -4,9 +4,9 @@ A set of skills and instructions for maximizing build output across Claude, Chat
 
 ## What's Inside
 
-### Perplexity Agent Skills (`perplexity-skills/`)
+### Skill Files (`skills/`)
 
-Five installable skills for Perplexity Computer:
+Five installable skills — for Perplexity Computer (`save_custom_skill`) or as Claude Projects knowledge base files:
 
 | Skill | Purpose |
 |-------|---------|
@@ -15,6 +15,10 @@ Five installable skills for Perplexity Computer:
 | **truth-research-optimizer** | Source discipline, contradiction detection, confidence labeling, anti-hallucination |
 | **intent-repair-reader** | Parse human intent from typos using context clues, keyboard analysis, phonics |
 | **capability-mode-router** | Command system: /redteam, /lindy, /ooda, /human, /confess, /truth, /ultrathink, /artifact |
+
+### Custom GPT System Prompts (`gpts/`)
+
+The same five skills, rewritten as standalone Custom GPT system prompts (paste into GPT Builder → Instructions) — use these when you want one skill as its own dedicated GPT instead of the combined `custom-gpt-system-prompt.md`.
 
 ### Cross-Platform Adapters (`cross-platform/`)
 
@@ -29,7 +33,7 @@ Five installable skills for Perplexity Computer:
 ## Quick Start
 
 ### On Perplexity Computer
-1. Install each skill from `perplexity-skills/` (use `save_custom_skill`)
+1. Install each skill from `skills/` (use `save_custom_skill`)
 2. Load `HUMAN_SAFE_BUILD.md` as an always-on rule
 3. Skills auto-activate based on task context
 4. Type command shortcuts like `/lindy /artifact` in any conversation

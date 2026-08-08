@@ -159,7 +159,7 @@ Use `/lindy /confess` together — prefer proven solutions AND honestly state wh
 - DALL-E integration available for UI mockups alongside code
 
 ### On Perplexity Computer
-- All commands available as Agent Skills (see perplexity-skills/ directory)
+- All commands available as Agent Skills (see `.ai-skills/skills/` directory)
 - `/artifact` pairs with file system — writes actual files to workspace
 - Browser automation available for testing flows
 - Subagents for parallel work with different modes active
