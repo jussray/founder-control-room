@@ -28,6 +28,7 @@ import { handleFounderSignalEngineMcp } from './routes/founderSignalEngineMcp.js
 import { handleFounderSignalReviewEmailIngest } from './routes/founderSignalReviewEmailIngress.js';
 import { handleHairCommerceReceiptIngest } from './routes/hairCommerceReceipts.js';
 import {
+  handleProofOfShipCommitLookup,
   handleProofOfShipReceiptIngest,
   handleProofOfShipReceiptLookup,
 } from './routes/proofOfShipReceipts.js';
@@ -141,6 +142,11 @@ export function createServer(options: CreateServerOptions = {}) {
     rateLimitGeneral,
     express.json({ type: 'application/json', limit: '32kb' }),
     handleProofOfShipReceiptIngest,
+  );
+  app.get(
+    '/ingest/proof-of-ship-receipts/by-commit/:owner/:repo/:sha',
+    rateLimitGeneral,
+    handleProofOfShipCommitLookup,
   );
   app.get(
     '/ingest/proof-of-ship-receipts/:receiptId',
