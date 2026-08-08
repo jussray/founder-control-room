@@ -16,6 +16,12 @@
       ],
       "boundary": "Current public library documentation only; never runtime or release proof."
     },
+    "playwright": {
+      "skills": [
+        "control-room-repo-contract"
+      ],
+      "boundary": "Browser-visible verification and recovery-path evidence only. Source inspection alone is never proof that a UI or runtime flow works."
+    },
     "supabase": {
       "skills": [
         "control-room-repo-contract"
