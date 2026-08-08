@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "jussray/founder-control-room",
+  "owner": "jussray",
+  "publication_eligible": true,
+  "sensitive_repository": false,
+  "privacy_safe_marketing_contract": {
+    "approved": true,
+    "contract_id": "founder-control-room-public-build-metadata-v1",
+    "metadata_scope": [
+      "repository",
+      "commit_sha",
+      "commit_title",
+      "commit_body_summary",
+      "changed_paths_summary",
+      "proof_urls"
+    ],
+    "prohibited_metadata": [
+      "secrets",
+      "credentials",
+      "private_user_content",
+      "teen_or_family_content",
+      "journal_content",
+      "voice_or_media_content",
+      "wellness_content"
+    ]
+  }
+}
