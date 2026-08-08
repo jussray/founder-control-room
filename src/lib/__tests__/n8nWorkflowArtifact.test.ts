@@ -18,6 +18,21 @@ describe('n8n conveyor workflow artifact', () => {
     ]);
   });
 
+  it('requires instance-bound header auth without committing the bearer secret', () => {
+    const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+    const webhook = workflow.nodes.find((node: { name: string }) => node.name === 'FCR Conveyor Webhook');
+
+    expect(webhook.parameters.authentication).toBe('headerAuth');
+    expect(webhook.credentials.httpHeaderAuth).toEqual({
+      id: 'fcr-conveyor-bearer-auth',
+      name: 'FCR Conveyor Bearer Auth',
+    });
+
+    const serialized = JSON.stringify(workflow);
+    expect(serialized).not.toContain('N8N_CONVEYOR_BEARER_TOKEN');
+    expect(serialized).not.toMatch(/Bearer\s+[A-Za-z0-9._-]{12,}/i);
+  });
+
   it('preserves the governed authority, skill routing, and canonical v2 receipt contract', () => {
     const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
     const code = workflow.nodes
