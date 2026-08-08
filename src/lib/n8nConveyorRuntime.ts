@@ -1,15 +1,18 @@
-import { createHash } from 'node:crypto';
 import {
   FOUNDER_CONVEYOR_SKILLS,
   founderConveyorSkillsForStage,
   type FounderConveyorSkillId,
   type FounderConveyorSkillStage,
 } from './founderConveyorSkills.js';
+import {
+  FOUNDER_CONVEYOR_ACCEPTED_EVENT,
+  FOUNDER_CONVEYOR_ADVANCE_EVENT,
+  FOUNDER_CONVEYOR_CONTRACT,
+  founderConveyorReceiptId,
+} from './founderConveyorReceipt.js';
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
-const IDEMPOTENCY_KEY = /^fcr-conveyor-v1:[0-9a-f]{64}$/;
-const CONTRACT = 'founder-control-room/n8n-conveyor@v1';
-const EVENT = 'conveyor.stage.advance';
+const IDEMPOTENCY_KEY = /^fcr-conveyor-v2:[0-9a-f]{64}$/;
 
 export interface N8nConveyorRuntimeInput {
   contract: string;
@@ -33,8 +36,8 @@ export interface N8nConveyorRuntimeInput {
 
 export interface N8nConveyorReceipt {
   receiptId: string;
-  contract: typeof CONTRACT;
-  event: 'conveyor.stage.accepted';
+  contract: typeof FOUNDER_CONVEYOR_CONTRACT;
+  event: typeof FOUNDER_CONVEYOR_ACCEPTED_EVENT;
   idempotencyKey: string;
   runId: string;
   projectSlug: string;
@@ -100,8 +103,8 @@ function authorityIsBounded(value: N8nConveyorRuntimeInput['authority']): boolea
 
 export function validateN8nConveyorRuntimeInput(input: N8nConveyorRuntimeInput): string[] {
   const errors: string[] = [];
-  if (input.contract !== CONTRACT) errors.push('unsupported contract');
-  if (input.event !== EVENT) errors.push('unsupported event');
+  if (input.contract !== FOUNDER_CONVEYOR_CONTRACT) errors.push('unsupported contract');
+  if (input.event !== FOUNDER_CONVEYOR_ADVANCE_EVENT) errors.push('unsupported event');
   if (!IDEMPOTENCY_KEY.test(text(input.idempotencyKey))) errors.push('invalid idempotency key');
   if (!text(input.runId)) errors.push('runId is required');
   if (!text(input.projectSlug)) errors.push('projectSlug is required');
@@ -130,16 +133,17 @@ export function acceptN8nConveyorRuntimeInput(input: N8nConveyorRuntimeInput): N
   if (errors.length > 0) return { ok: false, status: 400, errors, receipt: null };
 
   const skillIds = [...founderConveyorSkillsForStage(input.toStage)];
-  const identity = [
-    input.idempotencyKey,
-    input.projectSlug,
-    input.expectedHeadSha.toLowerCase(),
-    input.fromStage,
-    input.toStage,
-    ...skillIds,
-  ].join(':');
-
-  const receiptId = `n8n-fcr-v1:${createHash('sha256').update(identity).digest('hex')}`;
+  const receiptId = founderConveyorReceiptId({
+    idempotencyKey: input.idempotencyKey,
+    runId: input.runId,
+    projectSlug: input.projectSlug,
+    goal: input.goal,
+    expectedHeadSha: input.expectedHeadSha,
+    fromStage: input.fromStage,
+    toStage: input.toStage,
+    skillIds,
+    evidenceUrls: input.evidenceUrls,
+  });
 
   return {
     ok: true,
@@ -147,8 +151,8 @@ export function acceptN8nConveyorRuntimeInput(input: N8nConveyorRuntimeInput): N
     errors: [],
     receipt: {
       receiptId,
-      contract: CONTRACT,
-      event: 'conveyor.stage.accepted',
+      contract: FOUNDER_CONVEYOR_CONTRACT,
+      event: FOUNDER_CONVEYOR_ACCEPTED_EVENT,
       idempotencyKey: input.idempotencyKey,
       runId: input.runId.trim(),
       projectSlug: input.projectSlug.trim(),
@@ -156,7 +160,7 @@ export function acceptN8nConveyorRuntimeInput(input: N8nConveyorRuntimeInput): N
       fromStage: input.fromStage,
       toStage: input.toStage,
       skillIds,
-      evidenceUrls: [...input.evidenceUrls],
+      evidenceUrls: [...new Set(input.evidenceUrls.map((url) => url.trim()).filter(Boolean))].sort(),
       authority: {
         advanceStage: true,
         merge: false,
