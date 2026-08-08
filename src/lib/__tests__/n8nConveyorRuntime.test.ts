@@ -4,16 +4,18 @@ import {
   validateN8nConveyorRuntimeInput,
   type N8nConveyorRuntimeInput,
 } from '../n8nConveyorRuntime.js';
-import { expectedFounderConveyorReceiptId } from '../n8nConveyor.js';
+import {
+  expectedFounderConveyorReceiptId,
+  founderConveyorIdempotencyKey,
+} from '../n8nConveyor.js';
 
 const SHA = 'a'.repeat(40);
-const KEY = `fcr-conveyor-v2:${'b'.repeat(64)}`;
 
 function candidate(overrides: Partial<N8nConveyorRuntimeInput> = {}): N8nConveyorRuntimeInput {
-  return {
+  const input: N8nConveyorRuntimeInput = {
     contract: 'founder-control-room/n8n-conveyor@v2',
     event: 'conveyor.stage.advance',
-    idempotencyKey: KEY,
+    idempotencyKey: '',
     runId: 'run-123',
     projectSlug: 'founder-control-room',
     goal: 'Move one verified increment through the conveyor.',
@@ -30,6 +32,20 @@ function candidate(overrides: Partial<N8nConveyorRuntimeInput> = {}): N8nConveyo
     },
     ...overrides,
   };
+
+  if (!overrides.idempotencyKey) {
+    input.idempotencyKey = founderConveyorIdempotencyKey({
+      runId: input.runId,
+      projectSlug: input.projectSlug,
+      goal: input.goal,
+      fromStage: input.fromStage,
+      toStage: input.toStage,
+      expectedHeadSha: input.expectedHeadSha,
+      evidenceUrls: input.evidenceUrls,
+    });
+  }
+
+  return input;
 }
 
 describe('n8n conveyor runtime', () => {
