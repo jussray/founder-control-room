@@ -5,11 +5,13 @@ import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
+import { CONSTITUTIONAL_REQUIRED_MIGRATIONS } from '../../../scripts/verify-production-migration-ledger.mjs';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const verifier = resolve(repositoryRoot, 'scripts/verify-production-migration-ledger.mjs');
 const deployWorkflow = readFileSync(resolve(repositoryRoot, '.github/workflows/deploy.yml'), 'utf8');
 const requiredVersions = '20260723000000,20260803011000';
+const V10_MIGRATION = '20260809072500';
 const temporaryDirectories: string[] = [];
 
 async function fixture(localVersions: string[], remoteRows: Array<[string, string]>): Promise<string> {
@@ -60,30 +62,55 @@ afterEach(async () => {
 });
 
 describe('production migration ledger verifier', () => {
+  it('makes the V10 capability-governance migration constitutional even if workflow configuration omits it', () => {
+    expect(CONSTITUTIONAL_REQUIRED_MIGRATIONS).toContain(V10_MIGRATION);
+    expect(requiredVersions).not.toContain(V10_MIGRATION);
+    expect(existsSync(resolve(
+      repositoryRoot,
+      `supabase/migrations/${V10_MIGRATION}_v10_capability_governance.sql`,
+    ))).toBe(true);
+  });
+
   it('keeps pending local migrations visible during preflight without mistaking the local column for remote proof', async () => {
     const directory = await fixture(
-      ['20260723000000', '20260803011000', '20260804054127', '20260805235708'],
+      ['20260723000000', '20260803011000', '20260804054127', '20260805235708', V10_MIGRATION],
       [
         ['20260723000000', ''],
         ['20260803011000', ''],
         ['20260804054127', '20260804054127'],
         ['20260805235708', '20260805235708'],
+        [V10_MIGRATION, ''],
       ],
     );
 
     expect(runVerifier(directory, 'preflight')).toBe(0);
     const receipt = JSON.parse(await readFile(resolve(directory, 'test-results/ledger.json'), 'utf8'));
-    expect(receipt.localOnly).toEqual(['20260723000000', '20260803011000']);
+    expect(receipt.localOnly).toEqual(['20260723000000', '20260803011000', V10_MIGRATION]);
     expect(receipt.remoteOnly).toEqual([]);
-    expect(receipt.missingRequiredRemote).toEqual(['20260723000000', '20260803011000']);
+    expect(receipt.requiredVersions).toEqual(['20260723000000', '20260803011000', V10_MIGRATION]);
+    expect(receipt.missingRequiredRemote).toEqual(['20260723000000', '20260803011000', V10_MIGRATION]);
   });
 
   it('fails post-push proof when any checked-in migration remains absent remotely', async () => {
     const directory = await fixture(
-      ['20260723000000', '20260803011000'],
+      ['20260723000000', '20260803011000', V10_MIGRATION],
       [
         ['20260723000000', '20260723000000'],
         ['20260803011000', ''],
+        [V10_MIGRATION, V10_MIGRATION],
+      ],
+    );
+
+    expect(runVerifier(directory, 'post-push')).not.toBe(0);
+  });
+
+  it('fails post-push proof when the V10 constitutional migration is missing remotely', async () => {
+    const directory = await fixture(
+      ['20260723000000', '20260803011000', V10_MIGRATION],
+      [
+        ['20260723000000', '20260723000000'],
+        ['20260803011000', '20260803011000'],
+        [V10_MIGRATION, ''],
       ],
     );
 
@@ -92,10 +119,11 @@ describe('production migration ledger verifier', () => {
 
   it('fails when production contains a migration version that is absent from the repository', async () => {
     const directory = await fixture(
-      ['20260723000000', '20260803011000'],
+      ['20260723000000', '20260803011000', V10_MIGRATION],
       [
         ['20260723000000', '20260723000000'],
         ['20260803011000', '20260803011000'],
+        [V10_MIGRATION, V10_MIGRATION],
         ['', '20260805235708'],
       ],
     );
@@ -106,6 +134,7 @@ describe('production migration ledger verifier', () => {
   it('uses the exact production migration identities and rejects the forked filenames', () => {
     expect(existsSync(resolve(repositoryRoot, 'supabase/migrations/20260804054127_storyengine_repository_identity.sql'))).toBe(true);
     expect(existsSync(resolve(repositoryRoot, 'supabase/migrations/20260805235708_harden_outbox_claim_ownership.sql'))).toBe(true);
+    expect(existsSync(resolve(repositoryRoot, `supabase/migrations/${V10_MIGRATION}_v10_capability_governance.sql`))).toBe(true);
     expect(existsSync(resolve(repositoryRoot, 'supabase/migrations/20260804_storyengine_repository_identity.sql'))).toBe(false);
     expect(existsSync(resolve(repositoryRoot, 'supabase/migrations/20260721105000_harden_outbox_claim_ownership.sql'))).toBe(false);
   });
