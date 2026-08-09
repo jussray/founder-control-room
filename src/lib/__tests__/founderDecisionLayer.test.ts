@@ -2,6 +2,12 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  V10_CAPABILITY_PLAN_CONTRACT,
+  V10_CAPABILITY_SELECTOR,
+  v10CapabilityPlanHash,
+  type V10CapabilityPlan,
+} from '../../founder-os-lab/capabilityKernel.js';
+import {
   evaluateFounderFinalDecision,
   type FounderFinalDecisionInput,
 } from '../founderDecisionLayer.js';
@@ -14,7 +20,34 @@ import {
 import { expectedFounderConveyorReceiptId } from '../n8nConveyor.js';
 
 const SHA = 'a'.repeat(40);
+const REGISTRY_HASH = 'b'.repeat(64);
 const scriptPath = path.resolve(process.cwd(), 'scripts/research_summary.py');
+
+function capabilityPlan(): V10CapabilityPlan {
+  const base: Omit<V10CapabilityPlan, 'planHash'> = {
+    contract: V10_CAPABILITY_PLAN_CONTRACT,
+    selectedBy: V10_CAPABILITY_SELECTOR,
+    goal: 'Advance one verified founder workflow stage.',
+    projectSlug: 'founder-control-room',
+    expectedHeadSha: SHA,
+    registryHash: REGISTRY_HASH,
+    requestedAuthority: 'draft',
+    strategicLenses: ['me', 'futureyou', 'truthmode'],
+    routingReason: 'Chief AI selected the smallest evidence-bound decision capability set.',
+    capabilities: [{
+      id: 'goalfix',
+      version: '1.0.0',
+      origin: 'founder-native',
+      owner: 'juss',
+      sourceHash: 'c'.repeat(64),
+      authorityCeiling: 'privileged',
+    }],
+    proofRequirements: ['exact-head GitHub proof', 'canonical n8n receipt'],
+    outcomeSignals: ['decision-evidence-complete'],
+    rollback: 'Discard the decision packet and keep execution blocked.',
+  };
+  return { ...base, planHash: v10CapabilityPlanHash(base) };
+}
 
 function pythonSummary(overrides: Record<string, unknown> = {}): FounderResearchSummaryEnvelope {
   const raw = {
@@ -49,6 +82,7 @@ function candidate(summary: FounderResearchSummaryEnvelope): FounderFinalDecisio
     fromStage: 'workflows' as const,
     toStage: 'code' as const,
     expectedHeadSha: SHA,
+    capabilityPlan: capabilityPlan(),
     evidenceUrls: ['https://github.com/jussray/founder-control-room/commit/'.concat(SHA)],
   };
   return {
@@ -110,9 +144,9 @@ describe('founder final decision layer', () => {
   it('blocks receipt drift instead of averaging it into confidence', () => {
     const summary = pythonSummary();
     const input = candidate(summary);
-    input.n8nReceiptId = `fcr-conveyor-receipt-v2:${'0'.repeat(64)}`;
+    input.n8nReceiptId = `fcr-conveyor-receipt-v3:${'0'.repeat(64)}`;
     const result = evaluateFounderFinalDecision(input);
     expect(result.decision).toBe('BLOCK');
-    expect(result.reasons).toContain('n8n receipt does not match the canonical v2 transition identity');
+    expect(result.reasons).toContain('n8n receipt does not match the canonical v3 capability-plan-bound transition identity');
   });
 });
