@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 export const V10_CAPABILITY_PLAN_CONTRACT = 'juss-v10/capability-plan@v1' as const;
+export const V10_CAPABILITY_REGISTRY_CONTRACT = 'juss-v10/capability-registry@v1' as const;
 export const V10_CAPABILITY_SELECTOR = 'chief-ai-machine' as const;
 
 export const V10_CAPABILITY_ORIGINS = [
@@ -63,6 +64,30 @@ const ORIGIN_AUTHORITY_CEILING: Readonly<Record<V10CapabilityOrigin, V10Capabili
   community: 'draft',
   vendor: 'draft',
 };
+const PLAN_FIELDS = new Set([
+  'contract',
+  'selectedBy',
+  'goal',
+  'projectSlug',
+  'expectedHeadSha',
+  'registryHash',
+  'requestedAuthority',
+  'strategicLenses',
+  'routingReason',
+  'capabilities',
+  'proofRequirements',
+  'outcomeSignals',
+  'rollback',
+  'planHash',
+]);
+const CAPABILITY_FIELDS = new Set([
+  'id',
+  'version',
+  'origin',
+  'owner',
+  'sourceHash',
+  'authorityCeiling',
+]);
 
 function text(value: unknown, maxLength = 2_000): string {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
@@ -72,10 +97,15 @@ function stringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
-function capabilityRefShape(value: unknown): value is V10CapabilityRef {
+function hasOnlyFields(value: Record<string, unknown>, allowed: ReadonlySet<string>): boolean {
+  return Object.keys(value).every((key) => allowed.has(key));
+}
+
+export function isV10CapabilityRef(value: unknown): value is V10CapabilityRef {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const capability = value as Record<string, unknown>;
-  return typeof capability.id === 'string'
+  return hasOnlyFields(capability, CAPABILITY_FIELDS)
+    && typeof capability.id === 'string'
     && typeof capability.version === 'string'
     && typeof capability.origin === 'string'
     && typeof capability.owner === 'string'
@@ -86,11 +116,13 @@ function capabilityRefShape(value: unknown): value is V10CapabilityRef {
 /**
  * Runtime shape guard for capability plans crossing JSON/provider boundaries.
  * Semantic authority, hashes, provenance, and execution bindings are validated separately.
+ * Unknown fields are rejected so a valid plan hash cannot authenticate an unhashed payload.
  */
 export function isV10CapabilityPlan(value: unknown): value is V10CapabilityPlan {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const plan = value as Record<string, unknown>;
-  return typeof plan.contract === 'string'
+  return hasOnlyFields(plan, PLAN_FIELDS)
+    && typeof plan.contract === 'string'
     && typeof plan.selectedBy === 'string'
     && typeof plan.goal === 'string'
     && typeof plan.projectSlug === 'string'
@@ -100,7 +132,7 @@ export function isV10CapabilityPlan(value: unknown): value is V10CapabilityPlan 
     && stringArray(plan.strategicLenses)
     && typeof plan.routingReason === 'string'
     && Array.isArray(plan.capabilities)
-    && plan.capabilities.every(capabilityRefShape)
+    && plan.capabilities.every(isV10CapabilityRef)
     && stringArray(plan.proofRequirements)
     && stringArray(plan.outcomeSignals)
     && typeof plan.rollback === 'string'
@@ -119,6 +151,24 @@ function normalizedStrings(values: readonly string[]): string[] {
 
 function sortedCapabilities(values: readonly V10CapabilityRef[]): V10CapabilityRef[] {
   return [...values].sort((left, right) => left.id.localeCompare(right.id));
+}
+
+export function v10CapabilityRegistrySeed(entries: readonly V10CapabilityRef[]): string {
+  return JSON.stringify([
+    V10_CAPABILITY_REGISTRY_CONTRACT,
+    sortedCapabilities(entries).map((capability) => [
+      capability.id.trim(),
+      capability.version.trim(),
+      capability.origin,
+      capability.owner.trim(),
+      capability.sourceHash.trim().toLowerCase(),
+      capability.authorityCeiling,
+    ]),
+  ]);
+}
+
+export function v10CapabilityRegistryHash(entries: readonly V10CapabilityRef[]): string {
+  return createHash('sha256').update(v10CapabilityRegistrySeed(entries)).digest('hex');
 }
 
 export function v10CapabilityPlanSeed(plan: Omit<V10CapabilityPlan, 'planHash'> | V10CapabilityPlan): string {
@@ -164,9 +214,12 @@ export function validateV10CapabilityPlan(plan: V10CapabilityPlan): string[] {
   if (!AUTHORITIES.has(plan.requestedAuthority)) errors.push('unsupported requested authority');
   if (!text(plan.routingReason)) errors.push('capability plan routing reason is required');
   if (!text(plan.rollback)) errors.push('capability plan rollback is required');
-  if (plan.strategicLenses.length === 0) errors.push('capability plan strategic lenses are required');
-  if (plan.proofRequirements.length === 0) errors.push('capability plan proof requirements are required');
-  if (plan.outcomeSignals.length === 0) errors.push('capability plan outcome signals are required');
+  if (normalizedStrings(plan.strategicLenses).length === 0) errors.push('capability plan strategic lenses are required');
+  if (normalizedStrings(plan.proofRequirements).length === 0) errors.push('capability plan proof requirements are required');
+  if (normalizedStrings(plan.outcomeSignals).length === 0) errors.push('capability plan outcome signals are required');
+  if (plan.strategicLenses.some((value) => !value.trim())) errors.push('capability plan strategic lenses cannot contain blank values');
+  if (plan.proofRequirements.some((value) => !value.trim())) errors.push('capability plan proof requirements cannot contain blank values');
+  if (plan.outcomeSignals.some((value) => !value.trim())) errors.push('capability plan outcome signals cannot contain blank values');
 
   if (plan.capabilities.length === 0) {
     errors.push('capability plan requires at least one capability');
