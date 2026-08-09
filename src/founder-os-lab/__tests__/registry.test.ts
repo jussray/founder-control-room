@@ -215,7 +215,7 @@ describe('portable Founder OS registry', () => {
     );
   });
 
-  it('recognizes plan-bound approval and complete evidence without transferring execution authority', () => {
+  it('recognizes plan-bound approval and complete evidence but requires approved registry resolution before executor readiness', () => {
     const cp = capabilityPlan();
     const plan = planFounderOsLab({
       goal: cp.goal,
@@ -237,7 +237,7 @@ describe('portable Founder OS registry', () => {
       },
     });
 
-    expect(plan.readiness).toBe('ready_for_external_executor');
+    expect(plan.readiness).toBe('blocked');
     expect(plan.authority.approvalObserved).toBe(true);
     expect(plan.authority.capabilityPlanBound).toBe(true);
     expect(plan.authority.executionAllowed).toBe(false);
@@ -255,6 +255,7 @@ describe('portable Founder OS registry', () => {
       preflightEvidenceObserved: ['repository', 'commitSha', 'proofUrls'],
       preflightEvidenceMissing: [],
     });
-    expect(plan.nextGate).toContain('Chief AI capability plan');
+    expect(plan.truth.blocked.join(' ')).toContain('Founder-approved capability registry snapshot');
+    expect(plan.nextGate).toContain('founder-approved capability registry snapshot');
   });
 });
