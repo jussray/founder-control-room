@@ -29,9 +29,6 @@ on:
 permissions:
   contents: read
 
-env:
-  PAIR_REF: ${{ github.event_name == 'pull_request' && github.head_ref || 'main' }}
-
 jobs:
   verify-pair-contract:
     runs-on: ubuntu-latest
@@ -43,11 +40,11 @@ jobs:
           path: founder-control-room
           persist-credentials: false
 
-      - name: Check out paired Chief AI ref
+      - name: Check out canonical Chief AI main
         uses: actions/checkout@v4
         with:
           repository: jussray/chief-ai-machine
-          ref: ${{ env.PAIR_REF }}
+          ref: main
           path: chief-ai-machine
           persist-credentials: false
 
