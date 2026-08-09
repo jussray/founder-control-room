@@ -119,12 +119,36 @@ function rowToProofOfShipReceipt(row: unknown): ProofOfShipReceipt | null {
   }
 }
 
+function sameReceipt(left: ProofOfShipReceipt, right: ProofOfShipReceipt): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function sameIdempotentReceipt(left: ProofOfShipReceipt, right: ProofOfShipReceipt): boolean {
+  const { receiptId: _leftReceiptId, ...leftProof } = left;
+  const { receiptId: _rightReceiptId, ...rightProof } = right;
+  return JSON.stringify(leftProof) === JSON.stringify(rightProof);
+}
+
+export function classifyProofOfShipReceiptCollision(
+  receipt: ProofOfShipReceipt,
+  existingByReceiptId: ProofOfShipReceipt | null,
+  existingByCommit: ProofOfShipReceipt | null,
+): ProofOfShipReceiptStoreDisposition | null {
+  if (existingByReceiptId) {
+    return sameReceipt(existingByReceiptId, receipt) ? 'duplicate' : 'conflict';
+  }
+  if (existingByCommit) {
+    return sameIdempotentReceipt(existingByCommit, receipt) ? 'duplicate' : 'conflict';
+  }
+  return null;
+}
+
 export function storedProofOfShipReceiptMatches(
   stored: unknown,
   receipt: ProofOfShipReceipt,
 ): boolean {
   const normalized = rowToProofOfShipReceipt(stored);
-  return normalized ? JSON.stringify(normalized) === JSON.stringify(receipt) : false;
+  return normalized ? sameReceipt(normalized, receipt) : false;
 }
 
 async function findReceipt(
@@ -154,9 +178,8 @@ export const proofOfShipReceiptRepository: ProofOfShipReceiptRepository = {
 
   async store(receipt) {
     const existing = await this.find(receipt.receiptId);
-    if (existing) {
-      return JSON.stringify(existing) === JSON.stringify(receipt) ? 'duplicate' : 'conflict';
-    }
+    const existingDisposition = classifyProofOfShipReceiptCollision(receipt, existing, null);
+    if (existingDisposition) return existingDisposition;
 
     const { supabaseAdmin } = await import('../../lib/supabase.js');
     const admin = supabaseAdmin();
@@ -192,9 +215,17 @@ export const proofOfShipReceiptRepository: ProofOfShipReceiptRepository = {
       throw new Error('proof_of_ship_receipt_store_failed');
     }
 
-    const raced = await this.find(receipt.receiptId);
-    if (!raced) throw new Error('proof_of_ship_receipt_store_failed');
-    return JSON.stringify(raced) === JSON.stringify(receipt) ? 'duplicate' : 'conflict';
+    const racedByReceiptId = await this.find(receipt.receiptId);
+    const racedByCommit = racedByReceiptId
+      ? null
+      : await this.findByCommit(receipt.sourceRepo, receipt.exactCommitSha);
+    const racedDisposition = classifyProofOfShipReceiptCollision(
+      receipt,
+      racedByReceiptId,
+      racedByCommit,
+    );
+    if (!racedDisposition) throw new Error('proof_of_ship_receipt_store_failed');
+    return racedDisposition;
   },
 };
 
