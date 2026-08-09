@@ -62,12 +62,13 @@ afterEach(async () => {
 describe('production migration ledger verifier', () => {
   it('keeps pending local migrations visible during preflight without mistaking the local column for remote proof', async () => {
     const directory = await fixture(
-      ['20260723000000', '20260803011000', '20260804054127', '20260805235708'],
+      ['20260723000000', '20260803011000', '20260804054127', '20260805235708', '20260809000109'],
       [
         ['20260723000000', ''],
         ['20260803011000', ''],
         ['20260804054127', '20260804054127'],
         ['20260805235708', '20260805235708'],
+        ['20260809000109', '20260809000109'],
       ],
     );
 
@@ -106,8 +107,10 @@ describe('production migration ledger verifier', () => {
   it('uses the exact production migration identities and rejects the forked filenames', () => {
     expect(existsSync(resolve(repositoryRoot, 'supabase/migrations/20260804054127_storyengine_repository_identity.sql'))).toBe(true);
     expect(existsSync(resolve(repositoryRoot, 'supabase/migrations/20260805235708_harden_outbox_claim_ownership.sql'))).toBe(true);
+    expect(existsSync(resolve(repositoryRoot, 'supabase/migrations/20260809000109_proof_of_ship_receipts.sql'))).toBe(true);
     expect(existsSync(resolve(repositoryRoot, 'supabase/migrations/20260804_storyengine_repository_identity.sql'))).toBe(false);
     expect(existsSync(resolve(repositoryRoot, 'supabase/migrations/20260721105000_harden_outbox_claim_ownership.sql'))).toBe(false);
+    expect(existsSync(resolve(repositoryRoot, 'supabase/migrations/20260808061500_proof_of_ship_receipts.sql'))).toBe(false);
   });
 
   it('wires exact preflight and post-push ledger receipts into the manual Deploy workflow', () => {
