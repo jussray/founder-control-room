@@ -21,7 +21,6 @@ export type ProofOfShipReceipt = {
   bufferTerminalAction: 'schedule';
   bufferScheduleId: string;
   scheduledAt: string;
-  publicationPlatform: 'linkedin';
   bufferPublicationStatus: 'published';
   bufferPostId: string;
   livePostUrl: string;
@@ -110,7 +109,6 @@ export function validateProofOfShipReceipt(input: unknown): ProofOfShipReceipt {
     'bufferTerminalAction',
     'bufferScheduleId',
     'scheduledAt',
-    'publicationPlatform',
     'bufferPublicationStatus',
     'bufferPostId',
     'livePostUrl',
@@ -157,9 +155,6 @@ export function validateProofOfShipReceipt(input: unknown): ProofOfShipReceipt {
   }
   if (typeof input.bufferScheduleId !== 'string' || !SAFE_TOKEN.test(input.bufferScheduleId)) {
     throw new ProofOfShipReceiptError('invalid_buffer_schedule_id');
-  }
-  if (input.publicationPlatform !== 'linkedin') {
-    throw new ProofOfShipReceiptError('invalid_publication_platform');
   }
   if (input.bufferPublicationStatus !== 'published') {
     throw new ProofOfShipReceiptError('invalid_buffer_publication_status');
@@ -208,7 +203,6 @@ export function validateProofOfShipReceipt(input: unknown): ProofOfShipReceipt {
     bufferTerminalAction: 'schedule',
     bufferScheduleId: input.bufferScheduleId,
     scheduledAt,
-    publicationPlatform: 'linkedin',
     bufferPublicationStatus: 'published',
     bufferPostId: input.bufferPostId,
     livePostUrl: canonicalLinkedInUrl(input.livePostUrl),
