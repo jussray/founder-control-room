@@ -28,6 +28,9 @@ jobs:
       N8N_CONVEYOR_BEARER_TOKEN: ${{ secrets.N8N_CONVEYOR_BEARER_TOKEN }}
       N8N_CONVEYOR_PROBE_HEAD_SHA: ${{ inputs.target_sha }}
       N8N_CONVEYOR_CAPABILITY_PLAN_JSON: ${{ inputs.capability_plan_json }}
+      SUPABASE_URL: https://oojzfmmywbvficgybaxd.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      FCR_V10_RECEIPT_PERSISTENCE_REQUIRED: 'true'
     steps:
       - name: Check out exact target
         uses: actions/checkout@v4
@@ -42,6 +45,9 @@ jobs:
           test -n "${N8N_CONVEYOR_WEBHOOK_URL}"
           test -n "${N8N_CONVEYOR_BEARER_TOKEN}"
           test -n "${N8N_CONVEYOR_CAPABILITY_PLAN_JSON}"
+          test -n "${SUPABASE_URL}"
+          test -n "${SUPABASE_SERVICE_ROLE_KEY}"
+          test "${FCR_V10_RECEIPT_PERSISTENCE_REQUIRED}" = "true"
 
       - name: Set up Node
         uses: actions/setup-node@v4
