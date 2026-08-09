@@ -6,7 +6,6 @@ on:
       - 'config/founder-chief-pair.contract.json'
       - 'docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md'
       - 'scripts/verify-founder-chief-pair.mjs'
-      - 'package.json'
       - '.github/workflows/founder-chief-pair-contract.yml'
   push:
     branches: [main]
@@ -14,19 +13,41 @@ on:
       - 'config/founder-chief-pair.contract.json'
       - 'docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md'
       - 'scripts/verify-founder-chief-pair.mjs'
-      - 'package.json'
       - '.github/workflows/founder-chief-pair-contract.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
+env:
+  PAIR_REF: ${{ github.event_name == 'pull_request' && github.head_ref || 'main' }}
+
 jobs:
   verify-pair-contract:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact Founder Control Room source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          path: founder-control-room
+          persist-credentials: false
+
+      - name: Check out paired Chief AI ref
+        uses: actions/checkout@v4
+        with:
+          repository: jussray/chief-ai-machine
+          ref: ${{ env.PAIR_REF }}
+          path: chief-ai-machine
+          persist-credentials: false
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm run verify:founder-chief-pair
+
+      - name: Verify local and cross-repository pair contract
+        working-directory: founder-control-room
+        env:
+          PAIR_CONTRACT_PATH: ../chief-ai-machine/config/founder-chief-pair.contract.json
+          PAIR_CROSS_REPO_REQUIRED: 'true'
+        run: node scripts/verify-founder-chief-pair.mjs
