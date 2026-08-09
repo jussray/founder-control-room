@@ -1,0 +1,62 @@
+name: Firewall v10
+
+on:
+  pull_request:
+    paths:
+      - security/firewall-v10.policy.json
+      - scripts/verify-firewall-v10.mjs
+      - .github/workflows/firewall-v10.yml
+      - src/http/server.ts
+      - src/http/routes/n8nConveyor.ts
+      - src/http/middleware/requireFounder.ts
+      - src/http/middleware/csrf.ts
+      - src/http/middleware/security.ts
+  push:
+    branches:
+      - main
+    paths:
+      - security/firewall-v10.policy.json
+      - scripts/verify-firewall-v10.mjs
+      - .github/workflows/firewall-v10.yml
+      - src/http/server.ts
+      - src/http/routes/n8nConveyor.ts
+      - src/http/middleware/requireFounder.ts
+      - src/http/middleware/csrf.ts
+      - src/http/middleware/security.ts
+
+permissions:
+  contents: read
+
+jobs:
+  verify-firewall-v10:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact target
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify immutable target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify policy-as-code against runtime bindings
+        run: node scripts/verify-firewall-v10.mjs
+
+      - name: Upload exact-head firewall proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: firewall-v10-proof-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/firewall-v10-proof.json
+          if-no-files-found: error
+          retention-days: 30
