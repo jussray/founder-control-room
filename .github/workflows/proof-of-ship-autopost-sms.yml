@@ -1,9 +1,6 @@
-name: Proof-of-Ship Autopost + SMS
+name: Proof-of-Ship Publish + SMS
 
 on:
-  workflow_run:
-    workflows: ["Deploy"]
-    types: [completed]
   workflow_dispatch:
     inputs:
       expected_sha:
@@ -14,13 +11,17 @@ on:
         description: Deploy workflow run that produced the verified proof artifact
         required: true
         type: string
+      founder_approval_id:
+        description: Auditable founder approval reference for this publication
+        required: true
+        type: string
 
 permissions:
   contents: read
   actions: read
 
 concurrency:
-  group: proof-of-ship-autopost-sms-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.expected_sha }}
+  group: proof-of-ship-publish-sms-${{ inputs.expected_sha }}
   cancel-in-progress: false
 
 env:
@@ -30,26 +31,22 @@ env:
   RECEIPT_TOKEN_CONTEXT: founder-control-room/proof-of-ship-receipts/v1
 
 jobs:
-  autopost:
-    name: Autopost verified accomplishment and prove SMS receipt
-    if: >-
-      ${{
-        github.event_name == 'workflow_dispatch' ||
-        github.event.workflow_run.conclusion == 'success'
-      }}
+  publish:
+    name: Publish approved accomplishment and prove SMS receipt
     runs-on: ubuntu-latest
     timeout-minutes: 40
     environment: production
     env:
-      EXPECTED_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.expected_sha }}
-      DEPLOY_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || inputs.deploy_run_id }}
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      DEPLOY_RUN_ID: ${{ inputs.deploy_run_id }}
+      FOUNDER_APPROVAL_ID: ${{ inputs.founder_approval_id }}
       DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
       ZAPIER_CATCH_HOOK_URL: ${{ secrets.ZAPIER_CATCH_HOOK_URL }}
       PROOF_OF_SHIP_STEERING_GRANT_ID: ${{ secrets.PROOF_OF_SHIP_STEERING_GRANT_ID }}
       FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
 
     steps:
-      - name: Validate standing autopost authority
+      - name: Validate explicit publication authority
         shell: bash
         run: |
           set -euo pipefail
@@ -61,16 +58,20 @@ jobs:
             echo '::error title=Invalid deploy run::DEPLOY_RUN_ID must identify the completed Deploy run.'
             exit 1
           }
+          [[ "$FOUNDER_APPROVAL_ID" =~ ^[A-Za-z0-9._:-]{8,200}$ ]] || {
+            echo '::error title=Founder approval missing::founder_approval_id must be an auditable 8-200 character reference.'
+            exit 1
+          }
           [[ "$DEPLOY_URL" == https://* ]] || {
             echo '::error title=Production origin missing::DEPLOY_URL must be an HTTPS production origin.'
             exit 1
           }
           [[ "$ZAPIER_CATCH_HOOK_URL" == https://* ]] || {
-            echo '::error title=Autopost downstream missing::ZAPIER_CATCH_HOOK_URL must be configured.'
+            echo '::error title=Publication downstream missing::ZAPIER_CATCH_HOOK_URL must be configured.'
             exit 1
           }
           [[ "$PROOF_OF_SHIP_STEERING_GRANT_ID" =~ ^[A-Za-z0-9._:-]{1,100}$ ]] || {
-            echo '::error title=Standing authority missing::PROOF_OF_SHIP_STEERING_GRANT_ID must be configured.'
+            echo '::error title=Publication grant missing::PROOF_OF_SHIP_STEERING_GRANT_ID must be configured.'
             exit 1
           }
           [[ -n "$FOUNDER_SIGNAL_ENGINE_MCP_TOKEN" ]] || {
@@ -92,8 +93,6 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
 
       - name: Download verified Deploy proof artifact
-        id: proof_download
-        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: proof-of-ship-founder-review-${{ env.EXPECTED_SHA }}
@@ -101,19 +100,7 @@ jobs:
           run-id: ${{ env.DEPLOY_RUN_ID }}
           github-token: ${{ github.token }}
 
-      - name: Skip activity that did not earn a proof artifact
-        if: steps.proof_download.outcome != 'success'
-        shell: bash
-        run: |
-          {
-            echo '### Proof-of-Ship autopost skipped'
-            echo
-            echo "No verified meaningful-release artifact exists for $EXPECTED_SHA."
-            echo 'The conveyor only posts accomplishments that passed the Deploy proof gate.'
-          } >> "$GITHUB_STEP_SUMMARY"
-
       - name: Validate exact verified release proof
-        if: steps.proof_download.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
@@ -134,7 +121,6 @@ jobs:
           ' "$proof" >/dev/null
 
       - name: Validate fresh LinkedIn rising-floor baseline
-        if: steps.proof_download.outcome == 'success'
         shell: bash
         env:
           LINKEDIN_BASELINE_PATH: config/linkedin-rising-floor-baseline.json
@@ -178,8 +164,7 @@ jobs:
               raise SystemExit('LinkedIn baseline period is stale')
           PY
 
-      - name: Build autonomous publication payload
-        if: steps.proof_download.outcome == 'success'
+      - name: Build explicitly approved publication payload
         shell: bash
         env:
           LINKEDIN_BASELINE_PATH: config/linkedin-rising-floor-baseline.json
@@ -196,27 +181,26 @@ jobs:
           baseline_json="$(jq -c '.' "$LINKEDIN_BASELINE_PATH")"
           baseline_ref="$(jq -r '.baseline_ref' "$LINKEDIN_BASELINE_PATH")"
           idempotency_key="${GITHUB_REPOSITORY}:${EXPECTED_SHA}"
-          standing_approval="standing-policy:${PROOF_OF_SHIP_STEERING_GRANT_ID}:${invocation_id}"
 
           jq \
             --arg verified_at "$verified_at" \
             --arg scheduled_at "$scheduled_at" \
             --arg invocation_id "$invocation_id" \
             --arg steering_grant_id "$PROOF_OF_SHIP_STEERING_GRANT_ID" \
-            --arg founder_approval_id "$standing_approval" \
+            --arg founder_approval_id "$FOUNDER_APPROVAL_ID" \
             --arg idempotency_key "$idempotency_key" \
             --arg baseline_ref "$baseline_ref" \
             --argjson baseline "$baseline_json" '
               .publish_allowed = true |
               .PUBLISH_ALLOWED = true |
-              .authorization_mode = "standing-policy" |
+              .authorization_mode = "explicit-founder-approval" |
               .destination_mode = "schedule" |
               .buffer_provider_action = "buffer_add_to_queue" |
               .buffer_method = "schedule" |
               .buffer_save_to_draft = false |
               .buffer_api_sharing_mode = "customScheduled" |
               .buffer_terminal_action = "schedule" |
-              .schedule_policy_id = "buffer-autopost-rising-floor-v1" |
+              .schedule_policy_id = "buffer-approved-rising-floor-v1" |
               .review_window_minutes = 0 |
               .share_now_allowed = false |
               .notification_mode = "sms_after_publish" |
@@ -244,23 +228,23 @@ jobs:
               .steering_grant_id = $steering_grant_id |
               .founder_approval_id = $founder_approval_id |
               .idempotency_key = $idempotency_key
-          ' "$proof" > proof-autopost.json
+          ' "$proof" > proof-publish.json
 
-          jq -e --arg sha "$EXPECTED_SHA" '
+          jq -e --arg sha "$EXPECTED_SHA" --arg approval "$FOUNDER_APPROVAL_ID" '
             .commit_sha == $sha and
             .cloudflare_live_sha == $sha and
             .publish_allowed == true and
             .PUBLISH_ALLOWED == true and
-            .authorization_mode == "standing-policy" and
+            .authorization_mode == "explicit-founder-approval" and
+            .founder_approval_id == $approval and
             .notification_mode == "sms_after_publish" and
             .notification_required == true and
             .completion_contract == "published_live_url_and_sms_delivered_v1" and
             .buffer_terminal_action == "schedule" and
             .linkedin_strategy_required == true
-          ' proof-autopost.json >/dev/null
+          ' proof-publish.json >/dev/null
 
-      - name: Send verified accomplishment to publication conveyor
-        if: steps.proof_download.outcome == 'success'
+      - name: Send approved accomplishment to publication conveyor
         shell: bash
         run: |
           set -euo pipefail
@@ -268,12 +252,11 @@ jobs:
             --proto '=https' --proto-redir '=https' --max-redirs 0 \
             --connect-timeout 10 --max-time 30 \
             -H 'Content-Type: application/json' \
-            --data-binary @proof-autopost.json \
+            --data-binary @proof-publish.json \
             --output /dev/null \
             "$ZAPIER_CATCH_HOOK_URL"
 
       - name: Wait for live publication and delivered SMS receipt
-        if: steps.proof_download.outcome == 'success'
         id: receipt
         shell: bash
         run: |
@@ -283,7 +266,7 @@ jobs:
           lookup_url="$origin/ingest/proof-of-ship-receipts/by-commit/jussray/$repo_name/$EXPECTED_SHA"
           receipt_token="$(node -e 'const { createHmac } = require("node:crypto"); process.stdout.write(createHmac("sha256", process.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN).update(process.env.RECEIPT_TOKEN_CONTEXT).digest("hex"));')"
           expected_key="${GITHUB_REPOSITORY}:${EXPECTED_SHA}"
-          baseline_ref="$(jq -r '.linkedin_baseline_ref' proof-autopost.json)"
+          baseline_ref="$(jq -r '.linkedin_baseline_ref' proof-publish.json)"
 
           rm -f receipt.json
           for attempt in $(seq 1 "$RECEIPT_LOOKUP_ATTEMPTS"); do
@@ -331,7 +314,7 @@ jobs:
           done
 
           if [[ ! -s receipt.json ]]; then
-            echo '::error title=Autopost completion unproven::No exact-head receipt proved a live post plus delivered SMS before the bounded verification window expired.'
+            echo '::error title=Publication completion unproven::No exact-head receipt proved a live post plus delivered SMS before the bounded verification window expired.'
             exit 1
           fi
 
@@ -340,8 +323,7 @@ jobs:
           echo "sms_message_id=$(jq -r '.receipt.smsMessageId' receipt.json)" >> "$GITHUB_OUTPUT"
           echo "published_at=$(jq -r '.receipt.publishedAt' receipt.json)" >> "$GITHUB_OUTPUT"
 
-      - name: Publish autonomous conveyor proof summary
-        if: steps.proof_download.outcome == 'success'
+      - name: Publish approved conveyor proof summary
         shell: bash
         env:
           LIVE_POST_URL: ${{ steps.receipt.outputs.live_post_url }}
@@ -350,14 +332,15 @@ jobs:
           PUBLISHED_AT: ${{ steps.receipt.outputs.published_at }}
         run: |
           {
-            echo '### Autonomous proof-of-ship conveyor VERIFIED'
+            echo '### Approved proof-of-ship conveyor VERIFIED'
             echo
             echo "- repository: $GITHUB_REPOSITORY"
             echo "- exact SHA: $EXPECTED_SHA"
+            echo "- founder approval: $FOUNDER_APPROVAL_ID"
             echo "- live post: $LIVE_POST_URL"
             echo "- Buffer post receipt: $BUFFER_POST_ID"
             echo "- published at: $PUBLISHED_AT"
             echo "- SMS delivery receipt: $SMS_MESSAGE_ID"
             echo
-            echo 'Completion means shipped, published, live URL proven, and founder SMS delivered.'
+            echo 'Completion means explicitly approved, published, live URL proven, and founder SMS delivered.'
           } >> "$GITHUB_STEP_SUMMARY"
