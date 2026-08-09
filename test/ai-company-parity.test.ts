@@ -4,6 +4,10 @@ import { extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { planFounderOsLab } from '../src/founder-os-lab/engine.js';
+import {
+  v10CapabilityPlanHash,
+  type V10CapabilityPlan,
+} from '../src/founder-os-lab/capabilityKernel.js';
 // The isolated JavaScript lab intentionally owns no generated TypeScript surface.
 // @ts-expect-error Runtime parity is verified directly through Vitest.
 import { runCompanySimulation } from '../labs/ai-company/src/company.mjs';
@@ -25,6 +29,36 @@ const GENERATED_AT = '2026-08-02T21:00:00.000Z';
 const INVOCATION_ID = '3f10e0f9-b0b4-4e64-b9ff-c5f10f848067';
 const GRANT_ID = 'founder-approved-auto-distribution-v1';
 const REVIEW_BATCH_ID = '66cf315f-e1a0-4aad-9c76-355f1df30b54';
+const REGISTRY_HASH = 'b'.repeat(64);
+const CAPABILITY_SOURCE_HASH = 'c'.repeat(64);
+
+function chiefCapabilityPlan(goal: string): V10CapabilityPlan {
+  const plan: Omit<V10CapabilityPlan, 'planHash'> = {
+    contract: 'juss-v10/capability-plan@v1',
+    selectedBy: 'chief-ai-machine',
+    goal,
+    projectSlug: 'founder-control-room',
+    expectedHeadSha: SHA,
+    registryHash: REGISTRY_HASH,
+    requestedAuthority: 'draft',
+    strategicLenses: ['governance', 'distribution'],
+    routingReason: 'Synthetic parity uses one reviewable social capability without granting live execution authority.',
+    capabilities: [
+      {
+        id: 'synthetic-social-drafting',
+        version: '1.0.0',
+        origin: 'repo-native',
+        owner: 'chief-ai-machine',
+        sourceHash: CAPABILITY_SOURCE_HASH,
+        authorityCeiling: 'draft',
+      },
+    ],
+    proofRequirements: ['exact source commit', 'clickable proof'],
+    outcomeSignals: ['reviewable governed output'],
+    rollback: 'Discard the synthetic plan; no live side effect occurs.',
+  };
+  return { ...plan, planHash: v10CapabilityPlanHash(plan) };
+}
 
 function zapierEvidence() {
   return Object.assign(
@@ -106,12 +140,18 @@ function collectRuntimeSources(directory: string): string[] {
 
 describe('Founder OS and AI Company cross-lab parity', () => {
   it('keeps approved work at L0 simulation without turning approval into execution', () => {
+    const goal = 'Prepare one approved founder post for an external executor.';
+    const capabilityPlan = chiefCapabilityPlan(goal);
     const founderPlan = planFounderOsLab({
-      goal: 'Prepare one approved founder post for an external executor.',
+      goal,
       action: 'queue-social',
+      capabilityPlan,
       approval: {
         id: 'founder-approved:synthetic-parity',
         actions: ['queue-social'],
+        projectSlug: capabilityPlan.projectSlug,
+        expectedHeadSha: capabilityPlan.expectedHeadSha,
+        capabilityPlanHash: capabilityPlan.planHash,
       },
       evidence: zapierEvidence(),
       socialPost: socialPost('queue'),
@@ -125,6 +165,7 @@ describe('Founder OS and AI Company cross-lab parity', () => {
       executionAllowed: false,
       approvalRequired: true,
       approvalObserved: true,
+      capabilityPlanBound: true,
     });
     expect(founderPlan.isolation).toEqual({
       externalCalls: false,
@@ -257,8 +298,10 @@ describe('Founder OS and AI Company cross-lab parity', () => {
     for (const root of runtimeRoots) {
       for (const file of collectRuntimeSources(root)) {
         const source = readFileSync(file, 'utf8');
+        const sourceWithoutHashUpdates = source.replace(/createHash\([^)]*\)\.update\b/g, 'hashUpdate');
         for (const rule of forbiddenPatterns) {
-          if (rule.pattern.test(source)) failures.push(`${relative(ROOT, file)}: ${rule.label}`);
+          const candidate = rule.label === 'database mutation' ? sourceWithoutHashUpdates : source;
+          if (rule.pattern.test(candidate)) failures.push(`${relative(ROOT, file)}: ${rule.label}`);
         }
       }
     }

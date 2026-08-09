@@ -33,7 +33,9 @@ export function createFakeGitHubServer() {
 
     const rootTreeSha = sha();
     trees.set(rootTreeSha, new Map(Object.entries(seedFiles)));
-    const rootCommit = rootCommitSha ?? sha();
+    const configuredRootSha = String(process.env.E2E_FAKE_GITHUB_ROOT_SHA ?? '').trim().toLowerCase();
+    const rootCommit = rootCommitSha
+      ?? (/^[0-9a-f]{40}$/.test(configuredRootSha) ? configuredRootSha : sha());
     commits.set(rootCommit, { treeSha: rootTreeSha, parents: [] });
     branches.set(defaultBranch, { sha: rootCommit, treeSha: rootTreeSha });
 

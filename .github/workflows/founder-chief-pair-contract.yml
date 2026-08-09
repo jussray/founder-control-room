@@ -6,7 +6,11 @@ on:
       - 'config/founder-chief-pair.contract.json'
       - 'docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md'
       - 'scripts/verify-founder-chief-pair.mjs'
-      - 'package.json'
+      - 'src/founder-os-lab/capabilityKernel.ts'
+      - 'src/founder-os-lab/engine.ts'
+      - 'src/lib/n8nConveyor.ts'
+      - 'src/lib/n8nConveyorRuntime.ts'
+      - 'automation/n8n/founder-conveyor.workflow.json'
       - '.github/workflows/founder-chief-pair-contract.yml'
   push:
     branches: [main]
@@ -14,7 +18,11 @@ on:
       - 'config/founder-chief-pair.contract.json'
       - 'docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md'
       - 'scripts/verify-founder-chief-pair.mjs'
-      - 'package.json'
+      - 'src/founder-os-lab/capabilityKernel.ts'
+      - 'src/founder-os-lab/engine.ts'
+      - 'src/lib/n8nConveyor.ts'
+      - 'src/lib/n8nConveyorRuntime.ts'
+      - 'automation/n8n/founder-conveyor.workflow.json'
       - '.github/workflows/founder-chief-pair-contract.yml'
   workflow_dispatch:
 
@@ -25,8 +33,28 @@ jobs:
   verify-pair-contract:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact Founder Control Room source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          path: founder-control-room
+          persist-credentials: false
+
+      - name: Check out canonical Chief AI main
+        uses: actions/checkout@v4
+        with:
+          repository: jussray/chief-ai-machine
+          ref: main
+          path: chief-ai-machine
+          persist-credentials: false
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm run verify:founder-chief-pair
+
+      - name: Verify local and cross-repository pair contract
+        working-directory: founder-control-room
+        env:
+          PAIR_CONTRACT_PATH: ../chief-ai-machine/config/founder-chief-pair.contract.json
+          PAIR_CROSS_REPO_REQUIRED: 'true'
+        run: node scripts/verify-founder-chief-pair.mjs

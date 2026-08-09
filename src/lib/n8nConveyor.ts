@@ -1,10 +1,18 @@
 import { createHash } from 'node:crypto';
-import { founderConveyorSkillsForStage } from './founderConveyorSkills.js';
+import type { V10CapabilityPlan } from '../founder-os-lab/capabilityKernel.js';
+import {
+  founderConveyorSkillsFromPlan,
+  validateFounderConveyorCapabilityPlan,
+} from './founderConveyorSkills.js';
 import {
   FOUNDER_CONVEYOR_CONTRACT,
   FOUNDER_CONVEYOR_IDEMPOTENCY_PREFIX,
   founderConveyorReceiptId,
 } from './founderConveyorReceipt.js';
+import {
+  v10ConveyorEvidenceDigest,
+  type V10ConveyorReceiptStore,
+} from './v10ConveyorReceiptStore.js';
 
 export const FOUNDER_CONVEYOR_STAGES = [
   'chat',
@@ -23,6 +31,7 @@ export interface FounderConveyorAdvanceInput {
   fromStage: FounderConveyorStage;
   toStage: FounderConveyorStage;
   expectedHeadSha: string;
+  capabilityPlan: V10CapabilityPlan;
   evidenceUrls: string[];
 }
 
@@ -37,6 +46,7 @@ export interface FounderConveyorDispatchResult {
   ok: boolean;
   code:
     | 'DISPATCHED'
+    | 'DISPATCH_AUDIT_INCOMPLETE'
     | 'CONVEYOR_DISABLED'
     | 'CONVEYOR_NOT_CONFIGURED'
     | 'INVALID_TRANSITION'
@@ -53,6 +63,7 @@ export interface FounderConveyorDispatchResult {
 interface DispatchOptions {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
+  receiptStore?: V10ConveyorReceiptStore;
 }
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
@@ -102,6 +113,10 @@ export function readFounderConveyorConfig(env: NodeJS.ProcessEnv = process.env):
   };
 }
 
+export function v10ReceiptPersistenceRequired(env: NodeJS.ProcessEnv = process.env): boolean {
+  return text(env.FCR_V10_RECEIPT_PERSISTENCE_REQUIRED).toLowerCase() === 'true';
+}
+
 export function validateFounderConveyorAdvance(input: FounderConveyorAdvanceInput): string[] {
   const reasons: string[] = [];
   const runId = text(input.runId);
@@ -145,7 +160,20 @@ export function validateFounderConveyorAdvance(input: FounderConveyorAdvanceInpu
     }
   }
 
-  return reasons;
+  if (!input.capabilityPlan || typeof input.capabilityPlan !== 'object') {
+    reasons.push('Chief AI capability plan is required');
+  } else {
+    reasons.push(...validateFounderConveyorCapabilityPlan(input.capabilityPlan, {
+      goal,
+      projectSlug,
+      expectedHeadSha: input.expectedHeadSha,
+    }));
+    if (!['reason', 'draft'].includes(input.capabilityPlan.requestedAuthority)) {
+      reasons.push('conveyor stage advancement cannot carry reversible or privileged execution authority');
+    }
+  }
+
+  return [...new Set(reasons)];
 }
 
 function receiptIdFrom(value: unknown): string | null {
@@ -161,6 +189,7 @@ export function founderConveyorIdempotencyKey(input: FounderConveyorAdvanceInput
     input.fromStage,
     input.toStage,
     text(input.expectedHeadSha).toLowerCase(),
+    text(input.capabilityPlan?.planHash).toLowerCase(),
   ].join(':');
   return `${FOUNDER_CONVEYOR_IDEMPOTENCY_PREFIX}${createHash('sha256').update(identity).digest('hex')}`;
 }
@@ -175,8 +204,31 @@ export function expectedFounderConveyorReceiptId(input: FounderConveyorAdvanceIn
     expectedHeadSha: text(input.expectedHeadSha).toLowerCase(),
     fromStage: input.fromStage,
     toStage: input.toStage,
-    skillIds: founderConveyorSkillsForStage(input.toStage),
+    capabilityPlanHash: input.capabilityPlan.planHash,
+    registryHash: input.capabilityPlan.registryHash,
+    skillIds: founderConveyorSkillsFromPlan(input.capabilityPlan),
     evidenceUrls: input.evidenceUrls.map((url) => text(url)),
+  });
+}
+
+async function persistAcceptedReceipt(
+  input: FounderConveyorAdvanceInput,
+  receiptId: string,
+  receiptStore?: V10ConveyorReceiptStore,
+) {
+  const store = receiptStore ?? (await import('./v10ConveyorReceiptStore.js')).supabaseV10ConveyorReceiptStore;
+  return store.store({
+    receiptId,
+    runId: text(input.runId),
+    projectSlug: text(input.projectSlug),
+    expectedHeadSha: text(input.expectedHeadSha).toLowerCase(),
+    capabilityPlanHash: input.capabilityPlan.planHash.toLowerCase(),
+    registryHash: input.capabilityPlan.registryHash.toLowerCase(),
+    fromStage: input.fromStage,
+    toStage: input.toStage,
+    requestedAuthority: input.capabilityPlan.requestedAuthority,
+    executionStatus: 'accepted',
+    evidenceDigest: v10ConveyorEvidenceDigest(input.evidenceUrls),
   });
 }
 
@@ -184,7 +236,8 @@ export async function dispatchFounderConveyorAdvance(
   input: FounderConveyorAdvanceInput,
   options: DispatchOptions = {},
 ): Promise<FounderConveyorDispatchResult> {
-  const config = readFounderConveyorConfig(options.env);
+  const env = options.env ?? process.env;
+  const config = readFounderConveyorConfig(env);
 
   if (!config.enabled) {
     return {
@@ -225,7 +278,7 @@ export async function dispatchFounderConveyorAdvance(
     Authorization: `Bearer ${config.bearerToken}`,
     'Content-Type': 'application/json',
     'Idempotency-Key': idempotencyKey,
-    'X-FCR-Conveyor-Contract': 'v2',
+    'X-FCR-Conveyor-Contract': 'v3',
   };
 
   const payload = {
@@ -238,6 +291,7 @@ export async function dispatchFounderConveyorAdvance(
     fromStage: input.fromStage,
     toStage: input.toStage,
     expectedHeadSha: text(input.expectedHeadSha).toLowerCase(),
+    capabilityPlan: input.capabilityPlan,
     evidenceUrls: input.evidenceUrls.map((url) => text(url)),
     authority: {
       advanceStage: true,
@@ -292,8 +346,35 @@ export async function dispatchFounderConveyorAdvance(
         code: 'UPSTREAM_RECEIPT_MISMATCH',
         status: 502,
         receiptId,
-        reasons: ['n8n receipt does not match the canonical v2 transition identity'],
+        reasons: ['n8n receipt does not match the canonical v3 capability-plan-bound transition identity'],
       };
+    }
+
+    if (v10ReceiptPersistenceRequired(env)) {
+      try {
+        const disposition = await persistAcceptedReceipt(input, receiptId, options.receiptStore);
+        if (disposition === 'conflict') {
+          return {
+            ok: false,
+            code: 'DISPATCH_AUDIT_INCOMPLETE',
+            status: 500,
+            receiptId,
+            reasons: [
+              'n8n accepted the transition but the Supabase V10 receipt identity conflicts with an existing audit record; do not retry automatically',
+            ],
+          };
+        }
+      } catch {
+        return {
+          ok: false,
+          code: 'DISPATCH_AUDIT_INCOMPLETE',
+          status: 500,
+          receiptId,
+          reasons: [
+            'n8n accepted the transition but the Supabase V10 receipt could not be persisted; do not retry automatically',
+          ],
+        };
+      }
     }
 
     return {

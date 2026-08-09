@@ -7,10 +7,15 @@ import {
   type FounderOsLabAction,
   type FounderOsLabAdapterId,
   type FounderOsLabCapabilityId,
+  type FounderOsLabCapabilityPlanRoute,
   type FounderOsLabEvidenceField,
   type FounderOsLabPlan,
   type FounderOsLabRequest,
 } from './contracts.js';
+import {
+  validateV10CapabilityPlan,
+  validateV10CapabilityPlanContext,
+} from './capabilityKernel.js';
 import {
   FOUNDER_OS_LAB_PROVIDER_PREFLIGHT_EVIDENCE,
   founderOsLabObservedEvidenceFields,
@@ -48,13 +53,75 @@ function unique<T>(values: readonly T[]): T[] {
   return [...new Set(values)];
 }
 
-function approvalCoversAction(request: FounderOsLabRequest): boolean {
+function expectedProjectSlug(request: FounderOsLabRequest): string | null {
+  if (request.project?.id) return request.project.id;
+  const repository = request.evidence?.repository?.trim();
+  if (!repository) return null;
+  return repository.split('/').filter(Boolean).at(-1) ?? null;
+}
+
+function expectedHeadSha(request: FounderOsLabRequest): string | null {
+  return request.project?.sourceCommitSha?.trim()
+    || request.evidence?.commitSha?.trim()
+    || null;
+}
+
+function capabilityPlanRoute(request: FounderOsLabRequest): FounderOsLabCapabilityPlanRoute {
+  const plan = request.capabilityPlan;
+  if (!plan) {
+    return {
+      observed: false,
+      valid: false,
+      selectedBy: null,
+      planHash: null,
+      registryHash: null,
+      capabilityIds: [],
+      strategicLenses: [],
+      outcomeSignals: [],
+      errors: [],
+    };
+  }
+
+  const projectSlug = expectedProjectSlug(request) ?? plan.projectSlug;
+  const headSha = expectedHeadSha(request) ?? plan.expectedHeadSha;
+  const errors = unique([
+    ...validateV10CapabilityPlan(plan),
+    ...validateV10CapabilityPlanContext(plan, {
+      goal: request.goal,
+      projectSlug,
+      expectedHeadSha: headSha,
+    }),
+  ]);
+
+  return {
+    observed: true,
+    valid: errors.length === 0,
+    selectedBy: plan.selectedBy === 'chief-ai-machine' ? 'chief-ai-machine' : null,
+    planHash: plan.planHash || null,
+    registryHash: plan.registryHash || null,
+    capabilityIds: unique(plan.capabilities?.map((capability) => capability.id.trim()).filter(Boolean) ?? []).sort(),
+    strategicLenses: unique(plan.strategicLenses ?? []).sort(),
+    outcomeSignals: unique(plan.outcomeSignals ?? []).sort(),
+    errors,
+  };
+}
+
+function approvalCoversAction(request: FounderOsLabRequest, mutatingAction: boolean): boolean {
   const approval = request.approval;
-  return Boolean(
+  const base = Boolean(
     approval
     && approval.id.trim()
     && approval.actions.includes(request.action),
   );
+  if (!base) return false;
+  if (!mutatingAction) return true;
+
+  const plan = request.capabilityPlan;
+  if (!plan || !approval) return false;
+
+  return approval.projectSlug?.trim() === plan.projectSlug.trim()
+    && approval.expectedHeadSha?.trim().toLowerCase() === plan.expectedHeadSha.trim().toLowerCase()
+    && approval.capabilityPlanHash?.trim().toLowerCase() === plan.planHash.trim().toLowerCase();
 }
 
 function expectedSocialMode(action: FounderOsLabAction): 'draft' | 'queue' | 'publish' | null {
@@ -89,15 +156,10 @@ function evidenceUnknowns(
 ): string[] {
   const unknown: string[] = [];
 
-  if (!observedEvidence.includes('repository')) {
-    unknown.push('Authoritative repository was not supplied to the lab.');
-  }
-  if (!observedEvidence.includes('commitSha')) {
-    unknown.push('Exact source commit SHA was not supplied to the lab.');
-  }
-  if (!observedEvidence.includes('proofUrls')) {
-    unknown.push('No proof URLs were supplied to the lab.');
-  }
+  if (!observedEvidence.includes('repository')) unknown.push('Authoritative repository was not supplied to the lab.');
+  if (!observedEvidence.includes('commitSha')) unknown.push('Exact source commit SHA was not supplied to the lab.');
+  if (!observedEvidence.includes('proofUrls')) unknown.push('No proof URLs were supplied to the lab.');
+  if (!request.capabilityPlan) unknown.push('No Chief AI capability plan was supplied; FCR will not infer specialist selection.');
 
   unknown.push(`No live ${providerId} provider call or destination receipt exists in preview mode.`);
 
@@ -127,10 +189,18 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
   const provider = founderOsLabProvider(request.provider ?? actionRoute.defaultProvider);
   const projectResolution = resolveFounderOsLabProject(request, provider.id, command.id);
   const providerSupported = provider.supportedActions.includes(request.action);
-  const approvalRequired = actionRoute.approvalRequired;
-  const approvalObserved = approvalCoversAction(request);
   const mutatingAction = MUTATING_ACTIONS.has(request.action);
   const executorReadyAction = EXECUTOR_READY_ACTIONS.has(request.action);
+  const capabilityPlan = capabilityPlanRoute(request);
+  const capabilityPlanRequired = mutatingAction;
+  const capabilityErrors = [
+    ...capabilityPlan.errors,
+    ...(capabilityPlanRequired && !capabilityPlan.observed
+      ? ['A valid Chief AI capability plan is required before a mutating action may reach an external executor.']
+      : []),
+  ];
+  const approvalRequired = actionRoute.approvalRequired;
+  const approvalObserved = approvalCoversAction(request, mutatingAction);
   const observedEvidence = founderOsLabObservedEvidenceFields(request);
   const requiredPreflightEvidence = mutatingAction
     ? [...FOUNDER_OS_LAB_PROVIDER_PREFLIGHT_EVIDENCE[provider.id]]
@@ -150,11 +220,10 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
     validationErrors.push(`${provider.id} does not support a ${request.action} preview in the checked-in registry.`);
   }
   if (providerSupported && missingPreflightEvidence.length > 0) {
-    validationErrors.push(
-      `Missing required ${provider.id} preflight evidence: ${missingPreflightEvidence.join(', ')}.`,
-    );
+    validationErrors.push(`Missing required ${provider.id} preflight evidence: ${missingPreflightEvidence.join(', ')}.`);
   }
   validationErrors.push(
+    ...capabilityErrors,
     ...semanticEvidenceErrors,
     ...projectResolution.errors,
     ...socialErrors,
@@ -162,7 +231,11 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
 
   const blocked: string[] = [...validationErrors];
   if (approvalRequired && !approvalObserved) {
-    blocked.push(`Explicit founder approval covering ${request.action} is required before an external executor may act.`);
+    blocked.push(
+      capabilityPlan.observed
+        ? `Explicit founder approval bound to ${request.action}, project, exact head, and capability plan hash is required before an external executor may act.`
+        : `Explicit founder approval covering ${request.action} is required, but approval cannot become executor-ready until a Chief AI capability plan is present.`,
+    );
   }
 
   const readiness = validationErrors.length > 0
@@ -181,11 +254,16 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
     'The plan was produced by a deterministic, in-process simulation.',
     'The lab performed no external call, provider call, database write, filesystem write, or environment read.',
     'Execution authority remains disabled even when an approval reference is supplied.',
-    `The ${command.id} command lens and ${provider.id} provider preview were resolved from the checked-in registry.`,
+    `The ${command.id} command lens and ${provider.id} provider preview were resolved from the checked-in governance registry.`,
+    'Founder Control Room did not choose a specialist capability from the command or conveyor stage.',
   ];
-  if (socialValidated) {
-    verified.push('The supplied social payload passed the existing first-party proof and content validator.');
+  if (capabilityPlan.valid && request.capabilityPlan) {
+    verified.push(
+      `Chief AI capability plan ${request.capabilityPlan.planHash} passed goal, project, exact-head, provenance, registry-hash, and authority-ceiling validation.`,
+      `Outcome signals are declared before execution: ${capabilityPlan.outcomeSignals.join(', ')}.`,
+    );
   }
+  if (socialValidated) verified.push('The supplied social payload passed the existing first-party proof and content validator.');
   if (projectValidated && projectResolution.route) {
     verified.push(
       `${projectResolution.route.name} is bound to ${projectResolution.route.repository} at audited source head ${projectResolution.route.auditedSourceHead}.`,
@@ -193,38 +271,32 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
       'Se’kret Bip display canon, legacy internal-id compatibility, audience separation, editable output, source trace, and factual AI identity boundaries remain required.',
     );
   }
-  if (
-    mutatingAction
-    && missingPreflightEvidence.length === 0
-    && semanticEvidenceErrors.length === 0
-  ) {
-    verified.push(
-      `Required ${provider.id} preflight evidence is present and semantically valid.`,
-    );
+  if (mutatingAction && missingPreflightEvidence.length === 0 && semanticEvidenceErrors.length === 0) {
+    verified.push(`Required ${provider.id} preflight evidence is present and semantically valid.`);
   }
   if (request.action === 'send-email' && validationErrors.length === 0) {
-    verified.push(
-      `${provider.id} identity evidence is reviewable, but it is not outbound dispatch authorization.`,
-    );
+    verified.push(`${provider.id} identity evidence is reviewable, but it is not outbound dispatch authorization.`);
   }
 
-  const nextGate = projectResolution.errors.length > 0
-    ? `Correct the project adapter evidence and rerun the preview: ${projectResolution.errors.join(' ')} No repository, design, or provider action will occur.`
-    : missingPreflightEvidence.length > 0
-      ? `Supply the missing ${provider.id} preflight evidence (${missingPreflightEvidence.join(', ')}) and rerun the preview. No provider action will occur.`
-      : semanticEvidenceErrors.length > 0
-        ? `Correct the ${provider.id} evidence semantics and rerun the preview: ${semanticEvidenceErrors.join(' ')} No provider action will occur.`
-        : readiness === 'blocked'
-          ? 'Correct the rejected registry or payload input and rerun the pure preview path.'
-          : readiness === 'approval_required'
-            ? `Attach one explicit founder approval scoped to ${request.action}, then rerun the preview. No ${provider.id} action will occur.`
-            : readiness === 'ready_for_external_executor'
-              ? `Review the ${command.id} plan and evidence requirements, then separately authorize one named external adapter for ${provider.id} in a new change.`
-              : request.action === 'send-email'
-                ? 'Keep this outreach at review-only until a canonical allowed DispatchDecision, recipient identity, approved content, consent, suppression, and content-approval evidence are supplied through a separately governed adapter change. No email will be sent.'
-                : request.project
-                  ? `Review the ${request.project.id} preview against its exact source contracts. Any implementation requires a separate change in the authoritative project repository with exact-head proof.`
-                  : `Review the ${command.id} preview and promote only one ${provider.id} capability through a separately governed adapter experiment.`;
+  const nextGate = capabilityErrors.length > 0
+    ? `Correct or supply the Chief AI capability plan and rerun the preview: ${capabilityErrors.join(' ')} No provider action will occur.`
+    : projectResolution.errors.length > 0
+      ? `Correct the project adapter evidence and rerun the preview: ${projectResolution.errors.join(' ')} No repository, design, or provider action will occur.`
+      : missingPreflightEvidence.length > 0
+        ? `Supply the missing ${provider.id} preflight evidence (${missingPreflightEvidence.join(', ')}) and rerun the preview. No provider action will occur.`
+        : semanticEvidenceErrors.length > 0
+          ? `Correct the ${provider.id} evidence semantics and rerun the preview: ${semanticEvidenceErrors.join(' ')} No provider action will occur.`
+          : readiness === 'blocked'
+            ? 'Correct the rejected governance or payload input and rerun the pure preview path.'
+            : readiness === 'approval_required'
+              ? `Attach one founder approval bound to ${request.action}, project, exact head, and capability plan hash, then rerun the preview. No ${provider.id} action will occur.`
+              : readiness === 'ready_for_external_executor'
+                ? `Review the ${command.id} governance plan, Chief AI capability plan, and evidence requirements, then separately authorize one named external adapter for ${provider.id}.`
+                : request.action === 'send-email'
+                  ? 'Keep this outreach at review-only until a canonical allowed DispatchDecision, recipient identity, approved content, consent, suppression, and content-approval evidence are supplied through a separately governed adapter change. No email will be sent.'
+                  : request.project
+                    ? `Review the ${request.project.id} preview against its exact source contracts. Any implementation requires a separate change in the authoritative project repository with exact-head proof.`
+                    : `Review the ${command.id} preview and Chief AI capability plan; promote only one bounded provider capability through a separately governed adapter experiment.`;
 
   const capabilities = unique<FounderOsLabCapabilityId>([
     ...actionRoute.capabilities,
@@ -253,14 +325,14 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
       executionAllowed: false,
       approvalRequired,
       approvalObserved,
+      capabilityPlanBound: capabilityPlan.valid && capabilityPlan.observed,
     },
     route: {
       chiefSkill: 'juss-chief-ai',
-      specialistSkill: actionRoute.specialistSkill,
       command: {
         id: command.id,
-        specialistSkill: command.specialistSkill,
         role: command.role,
+        class: command.class,
       },
       provider: {
         id: provider.id,
@@ -271,28 +343,23 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
         credentialBoundary: provider.credentialBoundary,
         evidenceRequired: [...provider.evidenceRequired],
         preflightEvidenceRequired: requiredPreflightEvidence,
-        preflightEvidenceObserved: observedEvidence.filter((field) => (
-          requiredPreflightEvidence.includes(field)
-        )),
+        preflightEvidenceObserved: observedEvidence.filter((field) => requiredPreflightEvidence.includes(field)),
         preflightEvidenceMissing: missingPreflightEvidence,
         rollback: provider.rollback,
       },
       project: projectResolution.route,
+      capabilityPlan,
       capabilities,
       adapters,
     },
     truth: {
       verified,
       inferred: [
-        'The selected specialist is the narrowest match from the checked-in lab registry.',
-        `The ${command.id} command is a reasoning lens, not executable authority.`,
+        `The ${command.id} command is a reasoning lens, not specialist selection or executable authority.`,
         `The ${provider.id} entry is a provider preview contract, not proof of a live connection.`,
-        ...(request.project
-          ? ['The project adapter constrains a future project change; it does not copy project code or grant cross-repository authority.']
-          : []),
-        ...(request.action === 'send-email'
-          ? ['Provider identity evidence is not proof of recipient permission, suppression clearance, approved content, or dispatch eligibility.']
-          : []),
+        'Chief AI may recommend capabilities; only Founder Control Room may validate authority and evidence for execution.',
+        ...(request.project ? ['The project adapter constrains a future project change; it does not copy project code or grant cross-repository authority.'] : []),
+        ...(request.action === 'send-email' ? ['Provider identity evidence is not proof of recipient permission, suppression clearance, approved content, or dispatch eligibility.'] : []),
       ],
       unknown: evidenceUnknowns(request, provider.id, observedEvidence),
       blocked,
@@ -301,10 +368,12 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
       shouldExist: true,
       premiseRisk: 'A broad autonomous-company runtime would compound authority mistakes faster than it compounds value.',
       failureModes: [
-        'A prompt or command alias could be mistaken for executable authority.',
+        'A prompt, command alias, model response, imported skill, workflow payload, or external content could be mistaken for executable authority.',
+        'A stale or forged capability registry hash could route a different capability set than the founder reviewed.',
+        'A community, vendor, generated, or provider skill could attempt to self-promote beyond its authority ceiling.',
         'A provider preview could be mistaken for a connected or authenticated provider.',
         'A preview adapter could accidentally import a live provider client.',
-        'An approval identifier could be mistaken for proof that an action executed.',
+        'An approval identifier could be replayed against a different project, exact head, or capability plan.',
         'An approval could be mistaken for a substitute for exact-head or provider preflight evidence.',
         'Unrelated evidence could be relabeled as proof for a different provider target.',
         'A project adapter could drift from the authoritative project head or copy project authority into Founder Control Room.',
@@ -312,46 +381,50 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
         'Legacy companion identifiers could be renamed without a compatibility migration.',
         'CRM record identity could be mistaken for consent or outbound dispatch authorization.',
         'A successful draft validation could be mislabeled as publication success.',
+        'An activity metric could be optimized instead of the declared founder outcome signal.',
       ],
     },
     l99: {
       authority: 'L0 simulation only. No mutation authority is present.',
       state: readiness,
-      evidence: projectValidated && projectResolution.route
-        ? `The checked-in ${projectResolution.route.id} adapter and exact-head canon contract URLs were evaluated in memory.`
-        : socialValidated
-          ? 'Existing first-party social validation passed in memory.'
-          : `Only the deterministic ${command.id} and ${provider.id} registry contracts were evaluated.`,
-      rollback: projectResolution.route?.rollback ?? provider.rollback,
-      compoundingValue: request.project
-        ? 'One canon-bound project adapter can constrain future design and implementation handoffs without copying project code or provider authority.'
-        : 'One provider-neutral registry can safely train and test future specialist adapters without copying platform prompts.',
+      evidence: capabilityPlan.valid && request.capabilityPlan
+        ? `Governance evaluated Chief AI capability plan ${request.capabilityPlan.planHash} against registry ${request.capabilityPlan.registryHash} in memory.`
+        : projectValidated && projectResolution.route
+          ? `The checked-in ${projectResolution.route.id} adapter and exact-head canon contract URLs were evaluated in memory.`
+          : socialValidated
+            ? 'Existing first-party social validation passed in memory.'
+            : `Only deterministic ${command.id} governance and ${provider.id} provider-preview contracts were evaluated.`,
+      rollback: request.capabilityPlan?.rollback ?? projectResolution.route?.rollback ?? provider.rollback,
+      compoundingValue: request.capabilityPlan
+        ? 'One hash-bound capability-plan contract lets Chief AI evolve routing while FCR preserves stable governance, provenance, measurement, and authority boundaries.'
+        : 'One provider-neutral governance registry can safely evaluate future capability plans without duplicating provider prompts.',
     },
     ooda: {
       observe: [
-        'Read the founder goal and supplied evidence fields only.',
+        'Read the founder goal, supplied evidence, and Chief AI capability plan without inventing missing runtime truth.',
         ...(request.project ? ['Read the submitted project identity, exact head, audience, and canon contract URLs.'] : []),
       ],
       orient: [
-        `Route through juss-chief-ai to ${actionRoute.specialistSkill}.`,
         `Apply the ${command.id} reasoning lens to the ${provider.id} preview target.`,
+        'Treat Chief AI as capability selector and Founder Control Room as governance/evidence authority.',
         ...(request.project ? [`Apply the ${request.project.id} project adapter without transferring repository authority.`] : []),
       ],
-      decide: [`Select ${capabilities.join(', ')} without granting execution authority.`],
+      decide: [
+        capabilityPlan.valid
+          ? `Govern the declared Chief AI capabilities (${capabilityPlan.capabilityIds.join(', ')}) without granting execution authority.`
+          : 'Do not infer a specialist; require a valid Chief AI capability plan before executor readiness.',
+      ],
       act: ['Produce an in-memory preview only.'],
       verify: [
         'Assert all isolation flags remain false for side effects.',
         'Assert executionAllowed remains false for every action and provider.',
+        'Assert capability selection is Chief-AI-owned and plan-hash/registry-hash bound when present.',
+        'Assert untrusted skill origins cannot raise their own authority ceiling.',
+        'Assert mutating approvals are bound to project, exact head, and capability plan hash.',
         `Assert ${provider.id} supports ${request.action} before presenting a proceedable preview.`,
-        ...(request.project
-          ? ['Assert project repository, audited head, required canon contracts, audience rules, editable output, source trace, and AI identity boundaries.']
-          : []),
-        ...(mutatingAction
-          ? [`Assert required ${provider.id} preflight evidence is present and semantically bound before executor readiness.`]
-          : []),
-        ...(request.action === 'send-email'
-          ? ['Assert provider identity proof is never treated as an allowed outbound DispatchDecision.']
-          : []),
+        ...(request.project ? ['Assert project repository, audited head, required canon contracts, audience rules, editable output, source trace, and AI identity boundaries.'] : []),
+        ...(mutatingAction ? [`Assert required ${provider.id} preflight evidence is present and semantically bound before executor readiness.`] : []),
+        ...(request.action === 'send-email' ? ['Assert provider identity proof is never treated as an allowed outbound DispatchDecision.'] : []),
         ...(socialValidated ? ['Assert the existing social validator accepts the supplied payload.'] : []),
       ],
       loop: [nextGate],

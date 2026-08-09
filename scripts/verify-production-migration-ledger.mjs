@@ -5,6 +5,9 @@ import { basename, dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const VERSION_PATTERN = /^\d{14}$/;
+export const CONSTITUTIONAL_REQUIRED_MIGRATIONS = Object.freeze([
+  '20260809072500',
+]);
 
 export function parseLocalVersion(fileName) {
   const match = /^(\d{14})_.+\.sql$/.exec(fileName);
@@ -21,6 +24,13 @@ export function parseRemoteVersions(text) {
   }
 
   return [...versions].sort();
+}
+
+export function requiredMigrationVersions(configuredVersions = []) {
+  return [...new Set([
+    ...configuredVersions,
+    ...CONSTITUTIONAL_REQUIRED_MIGRATIONS,
+  ])].sort();
 }
 
 export function buildReceipt({
@@ -56,7 +66,7 @@ export async function main() {
     ? resolve(process.cwd(), process.env.MIGRATION_LEDGER_RECEIPT_PATH)
     : resolve(process.cwd(), 'test-results/production-migration-ledger.json');
   const phase = process.env.MIGRATION_LEDGER_PHASE || 'preflight';
-  const requiredVersions = String(process.env.REQUIRED_MIGRATION_VERSIONS || '')
+  const configuredRequiredVersions = String(process.env.REQUIRED_MIGRATION_VERSIONS || '')
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
@@ -67,10 +77,11 @@ export async function main() {
   if (!['preflight', 'post-push'].includes(phase)) {
     throw new Error('MIGRATION_LEDGER_PHASE must be preflight or post-push');
   }
-  if (requiredVersions.some((version) => !VERSION_PATTERN.test(version))) {
+  if (configuredRequiredVersions.some((version) => !VERSION_PATTERN.test(version))) {
     throw new Error('REQUIRED_MIGRATION_VERSIONS must contain comma-separated 14-digit versions');
   }
 
+  const requiredVersions = requiredMigrationVersions(configuredRequiredVersions);
   const localFiles = (await readdir(migrationsDir))
     .filter((name) => name.endsWith('.sql'))
     .sort();

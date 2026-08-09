@@ -13,11 +13,18 @@ vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
 
 import express from 'express';
 import request from 'supertest';
+import {
+  V10_CAPABILITY_PLAN_CONTRACT,
+  V10_CAPABILITY_SELECTOR,
+  v10CapabilityPlanHash,
+  type V10CapabilityPlan,
+} from '../../../founder-os-lab/capabilityKernel.js';
 import { founderOsSkillsRouter } from '../founderOsSkills.js';
 
 const FOUNDER_EMAIL = 'founder@example.com';
 const BEARER = 'Bearer test-token';
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const PROJECT = 'founder-control-room';
 const PROOF_URL = `https://github.com/jussray/founder-control-room/commit/${SHA}`;
 
 function buildApp() {
@@ -42,6 +49,42 @@ function founderSession() {
     data: { user: { id: 'founder-user-1', email: FOUNDER_EMAIL } },
     error: null,
   });
+}
+
+function capabilityPlan(goal: string): V10CapabilityPlan {
+  const base: Omit<V10CapabilityPlan, 'planHash'> = {
+    contract: V10_CAPABILITY_PLAN_CONTRACT,
+    selectedBy: V10_CAPABILITY_SELECTOR,
+    goal,
+    projectSlug: PROJECT,
+    expectedHeadSha: SHA,
+    registryHash: 'b'.repeat(64),
+    requestedAuthority: 'draft',
+    strategicLenses: ['futureyou', 'truthmode', 'redteam'],
+    routingReason: 'Chief AI selected the smallest preview capability set.',
+    capabilities: [{
+      id: 'goalfix',
+      version: '1.0.0',
+      origin: 'founder-native',
+      owner: 'juss',
+      sourceHash: 'c'.repeat(64),
+      authorityCeiling: 'privileged',
+    }],
+    proofRequirements: ['exact-head provider evidence'],
+    outcomeSignals: ['preview-gate-classified'],
+    rollback: 'Discard the preview and keep all provider execution disabled.',
+  };
+  return { ...base, planHash: v10CapabilityPlanHash(base) };
+}
+
+function boundApproval(action: 'merge-code', plan: V10CapabilityPlan) {
+  return {
+    id: 'founder-approved:preview-only',
+    actions: [action],
+    projectSlug: plan.projectSlug,
+    expectedHeadSha: plan.expectedHeadSha,
+    capabilityPlanHash: plan.planHash,
+  };
 }
 
 function validPreview() {
@@ -113,6 +156,26 @@ describe('POST /founder-os/preview', () => {
     expect(supabaseMock.from).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects malformed capability-plan and plan-bound approval shapes', async () => {
+    founderSession();
+
+    const response = await request(buildApp())
+      .post('/founder-os/preview')
+      .set('Authorization', BEARER)
+      .send({
+        ...validPreview(),
+        capabilityPlan: { contract: V10_CAPABILITY_PLAN_CONTRACT },
+        approval: {
+          id: 'founder-approved:preview-only',
+          actions: ['merge-code'],
+          expectedHeadSha: 'main',
+        },
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain('malformed or outside the checked-in registry');
+  });
+
   it('returns a deterministic L0 preview without provider or persistence authority', async () => {
     founderSession();
 
@@ -151,7 +214,12 @@ describe('POST /founder-os/preview', () => {
           executionAllowed: false,
         },
         route: {
-          command: { id: 'confess', specialistSkill: 'repo-truth' },
+          command: { id: 'confess' },
+          capabilityPlan: {
+            observed: false,
+            valid: false,
+            selectedBy: null,
+          },
           provider: {
             id: 'github',
             mode: 'preview',
@@ -170,19 +238,19 @@ describe('POST /founder-os/preview', () => {
 
   it('returns a blocked plan when the provider cannot preview the selected action', async () => {
     founderSession();
+    const goal = 'Preview the exact-head merge gate in Figma.';
+    const selectedPlan = capabilityPlan(goal);
 
     const response = await request(buildApp())
       .post('/founder-os/preview')
       .set('Authorization', BEARER)
       .send({
-        goal: 'Preview the exact-head merge gate in Figma.',
+        goal,
         action: 'merge-code',
         command: 'loop',
         provider: 'figma',
-        approval: {
-          id: 'founder-approved:preview-only',
-          actions: ['merge-code'],
-        },
+        capabilityPlan: selectedPlan,
+        approval: boundApproval('merge-code', selectedPlan),
       });
 
     expect(response.status).toBe(200);
@@ -192,9 +260,15 @@ describe('POST /founder-os/preview', () => {
         readiness: 'blocked',
         authority: {
           approvalObserved: true,
+          capabilityPlanBound: true,
           executionAllowed: false,
         },
         route: {
+          capabilityPlan: {
+            observed: true,
+            valid: true,
+            planHash: selectedPlan.planHash,
+          },
           provider: {
             id: 'figma',
             supported: false,
@@ -211,19 +285,19 @@ describe('POST /founder-os/preview', () => {
 
   it('blocks scoped approval when required provider evidence is absent', async () => {
     founderSession();
+    const goal = 'Preview the exact-head merge gate.';
+    const selectedPlan = capabilityPlan(goal);
 
     const response = await request(buildApp())
       .post('/founder-os/preview')
       .set('Authorization', BEARER)
       .send({
-        goal: 'Preview the exact-head merge gate.',
+        goal,
         action: 'merge-code',
         command: 'loop',
         provider: 'github',
-        approval: {
-          id: 'founder-approved:preview-only',
-          actions: ['merge-code'],
-        },
+        capabilityPlan: selectedPlan,
+        approval: boundApproval('merge-code', selectedPlan),
       });
 
     expect(response.status).toBe(200);
@@ -231,6 +305,7 @@ describe('POST /founder-os/preview', () => {
       readiness: 'blocked',
       authority: {
         approvalObserved: true,
+        capabilityPlanBound: true,
         executionAllowed: false,
       },
       route: {
@@ -250,21 +325,21 @@ describe('POST /founder-os/preview', () => {
     expect(supabaseMock.from).toHaveBeenCalledTimes(1);
   });
 
-  it('recognizes scoped approval and complete evidence while keeping the provider inert', async () => {
+  it('recognizes plan-bound approval and complete evidence while keeping the provider inert', async () => {
     founderSession();
+    const goal = 'Preview the exact-head merge gate.';
+    const selectedPlan = capabilityPlan(goal);
 
     const response = await request(buildApp())
       .post('/founder-os/preview')
       .set('Authorization', BEARER)
       .send({
-        goal: 'Preview the exact-head merge gate.',
+        goal,
         action: 'merge-code',
         command: 'loop',
         provider: 'github',
-        approval: {
-          id: 'founder-approved:preview-only',
-          actions: ['merge-code'],
-        },
+        capabilityPlan: selectedPlan,
+        approval: boundApproval('merge-code', selectedPlan),
         evidence: {
           repository: 'jussray/founder-control-room',
           commitSha: SHA,
@@ -277,9 +352,16 @@ describe('POST /founder-os/preview', () => {
       readiness: 'ready_for_external_executor',
       authority: {
         approvalObserved: true,
+        capabilityPlanBound: true,
         executionAllowed: false,
       },
       route: {
+        capabilityPlan: {
+          observed: true,
+          valid: true,
+          selectedBy: 'chief-ai-machine',
+          planHash: selectedPlan.planHash,
+        },
         provider: {
           id: 'github',
           supported: true,

@@ -1,6 +1,7 @@
+import type { V10CapabilityPlan } from '../founder-os-lab/capabilityKernel.js';
 import {
-  FOUNDER_CONVEYOR_SKILLS,
-  founderConveyorSkillsForStage,
+  founderConveyorSkillsFromPlan,
+  validateFounderConveyorCapabilityPlan,
   type FounderConveyorSkillId,
   type FounderConveyorSkillStage,
 } from './founderConveyorSkills.js';
@@ -12,7 +13,7 @@ import {
 } from './founderConveyorReceipt.js';
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
-const IDEMPOTENCY_KEY = /^fcr-conveyor-v2:[0-9a-f]{64}$/;
+const IDEMPOTENCY_KEY = /^fcr-conveyor-v3:[0-9a-f]{64}$/;
 
 export interface N8nConveyorRuntimeInput {
   contract: string;
@@ -24,6 +25,7 @@ export interface N8nConveyorRuntimeInput {
   fromStage: FounderConveyorSkillStage;
   toStage: FounderConveyorSkillStage;
   expectedHeadSha: string;
+  capabilityPlan: V10CapabilityPlan;
   evidenceUrls: string[];
   authority: {
     advanceStage: boolean;
@@ -44,7 +46,10 @@ export interface N8nConveyorReceipt {
   expectedHeadSha: string;
   fromStage: FounderConveyorSkillStage;
   toStage: FounderConveyorSkillStage;
+  capabilityPlanHash: string;
+  registryHash: string;
   skillIds: FounderConveyorSkillId[];
+  outcomeSignals: string[];
   evidenceUrls: string[];
   authority: {
     advanceStage: true;
@@ -125,14 +130,28 @@ export function validateN8nConveyorRuntimeInput(input: N8nConveyorRuntimeInput):
     errors.push(`evidence is required for ${input.fromStage} -> ${input.toStage}`);
   }
   if (!authorityIsBounded(input.authority)) errors.push('authority envelope is broader than conveyor policy');
-  return errors;
+
+  if (!input.capabilityPlan || typeof input.capabilityPlan !== 'object') {
+    errors.push('Chief AI capability plan is required');
+  } else {
+    errors.push(...validateFounderConveyorCapabilityPlan(input.capabilityPlan, {
+      goal: input.goal,
+      projectSlug: input.projectSlug,
+      expectedHeadSha: input.expectedHeadSha,
+    }));
+    if (!['reason', 'draft'].includes(input.capabilityPlan.requestedAuthority)) {
+      errors.push('conveyor stage advancement cannot carry reversible or privileged execution authority');
+    }
+  }
+
+  return [...new Set(errors)];
 }
 
 export function acceptN8nConveyorRuntimeInput(input: N8nConveyorRuntimeInput): N8nConveyorRuntimeResult {
   const errors = validateN8nConveyorRuntimeInput(input);
   if (errors.length > 0) return { ok: false, status: 400, errors, receipt: null };
 
-  const skillIds = [...founderConveyorSkillsForStage(input.toStage)];
+  const skillIds = founderConveyorSkillsFromPlan(input.capabilityPlan);
   const receiptId = founderConveyorReceiptId({
     idempotencyKey: input.idempotencyKey,
     runId: input.runId,
@@ -141,6 +160,8 @@ export function acceptN8nConveyorRuntimeInput(input: N8nConveyorRuntimeInput): N
     expectedHeadSha: input.expectedHeadSha,
     fromStage: input.fromStage,
     toStage: input.toStage,
+    capabilityPlanHash: input.capabilityPlan.planHash,
+    registryHash: input.capabilityPlan.registryHash,
     skillIds,
     evidenceUrls: input.evidenceUrls,
   });
@@ -159,7 +180,10 @@ export function acceptN8nConveyorRuntimeInput(input: N8nConveyorRuntimeInput): N
       expectedHeadSha: input.expectedHeadSha.toLowerCase(),
       fromStage: input.fromStage,
       toStage: input.toStage,
+      capabilityPlanHash: input.capabilityPlan.planHash,
+      registryHash: input.capabilityPlan.registryHash,
       skillIds,
+      outcomeSignals: [...new Set(input.capabilityPlan.outcomeSignals)].sort(),
       evidenceUrls: [...new Set(input.evidenceUrls.map((url) => url.trim()).filter(Boolean))].sort(),
       authority: {
         advanceStage: true,
@@ -170,8 +194,4 @@ export function acceptN8nConveyorRuntimeInput(input: N8nConveyorRuntimeInput): N
       },
     },
   };
-}
-
-export function isFounderConveyorSkillId(value: string): value is FounderConveyorSkillId {
-  return FOUNDER_CONVEYOR_SKILLS.includes(value as FounderConveyorSkillId);
 }

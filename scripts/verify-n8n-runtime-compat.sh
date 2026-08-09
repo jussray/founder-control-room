@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMAGE="${N8N_COMPAT_IMAGE:-docker.n8n.io/n8nio/n8n:2.32.6}"
 EXPECTED_VERSION="2.32.6"
-EXPECTED_RECEIPT="fcr-conveyor-receipt-v2:1a86c0f18a9f22d0bb12fe59757f48028a113810527324ebcf1f89b90f256c8e"
+EXPECTED_RECEIPT="fcr-conveyor-receipt-v3:4cbb74cbfdcc3937a91b3d25c1c25722c766d239bae42a2132851f0228eb90bf"
 VOLUME="fcr-n8n-compat-${GITHUB_RUN_ID:-local}-${RANDOM}"
 OUTPUT="$(mktemp)"
 
@@ -31,14 +31,15 @@ run_n8n() {
 version="$(run_n8n --version | tail -n 1 | tr -d '\r')"
 test "$version" = "$EXPECTED_VERSION"
 
-# First prove the production-shaped artifact is accepted by the pinned runtime.
+# First prove the production-shaped V3 artifact is accepted by the pinned runtime.
 run_n8n import:workflow --input=/workflows/founder-conveyor.workflow.json
 
-# Then execute a manual fixture that uses the same crypto receipt algorithm.
+# Then execute a manual fixture that recomputes a valid Chief-owned V10 plan,
+# its V3 idempotency key, and the bound canonical receipt inside n8n itself.
 run_n8n import:workflow --input=/workflows/compat/receipt-code.workflow.json
 run_n8n execute --id=fcrN8nCompatV1 >"$OUTPUT"
 
-# The fixture throws on receipt drift, so a zero exit code is already proof.
-# Retain the expected identity in a compact machine-readable receipt as well.
+# The fixture throws on plan/idempotency/receipt drift, so a zero exit code is already proof.
+# Retain the expected receipt identity in a compact machine-readable result as well.
 printf '{"verified":true,"n8nVersion":"%s","image":"%s","receiptId":"%s"}\n' \
   "$version" "$IMAGE" "$EXPECTED_RECEIPT"

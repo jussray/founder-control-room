@@ -87,6 +87,14 @@ describe('public guardrail contract', () => {
       expect(res.body).toEqual({
         service: 'founder-control-room',
         gitSha,
+        v10: {
+          capabilityPlanContract: 'juss-v10/capability-plan@v1',
+          conveyorContract: 'founder-control-room/n8n-conveyor@v3',
+          supabaseProjectRef: null,
+          maxRuntimeAuthority: null,
+          trustedRegistryRequiredBeforeL1: false,
+          receiptPersistenceRequired: false,
+        },
         founderSignalAutomationGrant: {
           configured: true,
           enabled: true,
@@ -96,6 +104,7 @@ describe('public guardrail contract', () => {
       expect(serialized).not.toContain(grant.id);
       expect(serialized).not.toContain(grant.approvedRecipientIds[0]);
       expect(serialized).not.toMatch(/TOKEN|SECRET|PASSWORD|SERVICE_ROLE/i);
+      expect(serialized).not.toMatch(/private-grant-id|private-contact-id/i);
     } finally {
       vi.unstubAllEnvs();
     }

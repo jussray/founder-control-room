@@ -11,8 +11,10 @@ on:
       - public/**
       - src/**
       - e2e/**
+      - supabase/migrations/**
       - scripts/build-pages.mjs
       - scripts/verify-parallel.mjs
+      - scripts/verify-production-migration-ledger.mjs
       - .github/workflows/cloudflare-local-preflight.yml
   workflow_dispatch:
 

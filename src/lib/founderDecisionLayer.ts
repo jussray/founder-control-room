@@ -43,6 +43,8 @@ export interface FounderFinalDecisionReceipt {
   expectedHeadSha: string;
   fromStage: string;
   toStage: string;
+  capabilityPlanHash: string;
+  registryHash: string;
   n8nReceiptId: string | null;
   pythonSummaryIds: string[];
   githubProofUrls: string[];
@@ -69,6 +71,8 @@ function decisionId(receipt: Omit<FounderFinalDecisionReceipt, 'decisionId'>): s
     receipt.expectedHeadSha,
     receipt.fromStage,
     receipt.toStage,
+    receipt.capabilityPlanHash,
+    receipt.registryHash,
     receipt.n8nReceiptId,
     receipt.pythonSummaryIds,
     receipt.githubProofUrls,
@@ -104,7 +108,7 @@ export function evaluateFounderFinalDecision(input: FounderFinalDecisionInput): 
     reasons.push('n8n receipt is missing');
   } else if (input.n8nReceiptId && input.n8nReceiptId !== expectedReceiptId) {
     decision = 'BLOCK';
-    reasons.push('n8n receipt does not match the canonical v2 transition identity');
+    reasons.push('n8n receipt does not match the canonical v3 capability-plan-bound transition identity');
   }
 
   if (input.researchRequired && input.pythonSummaries.length === 0 && decision !== 'BLOCK') {
@@ -158,6 +162,8 @@ export function evaluateFounderFinalDecision(input: FounderFinalDecisionInput): 
     expectedHeadSha: expectedSha,
     fromStage: input.fromStage,
     toStage: input.toStage,
+    capabilityPlanHash: input.capabilityPlan.planHash,
+    registryHash: input.capabilityPlan.registryHash,
     n8nReceiptId: input.n8nReceiptId,
     pythonSummaryIds: uniqueSorted(input.pythonSummaries.map((summary) => summary.summaryId)),
     githubProofUrls: uniqueSorted(input.githubProof.proofUrls),

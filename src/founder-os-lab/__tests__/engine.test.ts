@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { FirstPartySocialPostInput } from '../../lib/firstPartySocialPublisher.js';
+import {
+  V10_CAPABILITY_PLAN_CONTRACT,
+  V10_CAPABILITY_SELECTOR,
+  v10CapabilityPlanHash,
+  type V10CapabilityPlan,
+} from '../capabilityKernel.js';
 import { planFounderOsLab } from '../engine.js';
 
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -43,8 +49,48 @@ function zapierEvidence() {
   };
 }
 
+function capabilityPlan(goal: string, capabilityId = 'goalfix'): V10CapabilityPlan {
+  const base: Omit<V10CapabilityPlan, 'planHash'> = {
+    contract: V10_CAPABILITY_PLAN_CONTRACT,
+    selectedBy: V10_CAPABILITY_SELECTOR,
+    goal,
+    projectSlug: 'founder-control-room',
+    expectedHeadSha: SHA,
+    registryHash: 'c'.repeat(64),
+    requestedAuthority: 'draft',
+    strategicLenses: ['human', 'futureyou', 'truthmode', 'redteam'],
+    routingReason: `Chief AI selected ${capabilityId} as the smallest evidence-bound capability for this preview.`,
+    capabilities: [{
+      id: capabilityId,
+      version: '1.0.0',
+      origin: 'founder-native',
+      owner: 'juss',
+      sourceHash: 'd'.repeat(64),
+      authorityCeiling: 'privileged',
+    }],
+    proofRequirements: ['exact-head evidence', 'provider-specific preflight evidence'],
+    outcomeSignals: ['verification-pass'],
+    rollback: 'Discard the isolated preview; no provider mutation occurred.',
+  };
+  return { ...base, planHash: v10CapabilityPlanHash(base) };
+}
+
+function boundApproval(
+  id: string,
+  action: 'queue-social' | 'merge-code' | 'send-email',
+  cp: V10CapabilityPlan,
+) {
+  return {
+    id,
+    actions: [action],
+    projectSlug: cp.projectSlug,
+    expectedHeadSha: cp.expectedHeadSha,
+    capabilityPlanHash: cp.planHash,
+  };
+}
+
 describe('Founder OS isolated lab', () => {
-  it('routes a social draft through @juss and proof-led publishing without external effects', () => {
+  it('routes a social draft through @juss governance without external effects or inferred specialist selection', () => {
     const plan = planFounderOsLab({
       goal: 'Prepare a proof-backed founder update for Buffer review.',
       action: 'draft-social',
@@ -59,22 +105,29 @@ describe('Founder OS isolated lab', () => {
     expect(plan.readiness).toBe('ready_for_review');
     expect(plan.route).toMatchObject({
       chiefSkill: 'juss-chief-ai',
-      specialistSkill: 'proof-led-publishing',
+      capabilityPlan: {
+        observed: false,
+        valid: false,
+      },
       capabilities: expect.arrayContaining([
         'social-draft-validation',
         'buffer-handoff-preview',
+        'capability-plan-validation',
+        'capability-provenance-validation',
       ]),
       adapters: expect.arrayContaining([
         'first-party-social-validator',
         'buffer-preview',
       ]),
     });
+    expect(plan.route).not.toHaveProperty('specialistSkill');
     expect(plan.authority).toEqual({
       level: 'L0',
       mode: 'simulation',
       executionAllowed: false,
       approvalRequired: false,
       approvalObserved: false,
+      capabilityPlanBound: false,
     });
     expect(plan.isolation).toEqual({
       externalCalls: false,
@@ -105,23 +158,32 @@ describe('Founder OS isolated lab', () => {
     });
     expect(plan.truth.blocked.join(' ')).toContain('zapier preflight evidence requires automationId');
     expect(plan.truth.blocked.join(' ')).toContain('Explicit founder approval');
+    expect(plan.truth.blocked.join(' ')).toContain('valid Chief AI capability plan');
   });
 
-  it('recognizes scoped approval and authoritative Zapier evidence but still refuses provider execution', () => {
+  it('recognizes plan-bound approval and authoritative Zapier evidence but still refuses provider execution', () => {
+    const goal = 'Queue one proof-backed founder update.';
+    const cp = capabilityPlan(goal, 'proof-led-publishing');
     const plan = planFounderOsLab({
-      goal: 'Queue one proof-backed founder update.',
+      goal,
       action: 'queue-social',
-      approval: {
-        id: 'founder-approved:queue-one-lab-post',
-        actions: ['queue-social'],
-      },
+      capabilityPlan: cp,
+      approval: boundApproval('founder-approved:queue-one-lab-post', 'queue-social', cp),
       evidence: zapierEvidence(),
       socialPost: socialPost('queue'),
     });
 
     expect(plan.readiness).toBe('ready_for_external_executor');
     expect(plan.authority.approvalObserved).toBe(true);
+    expect(plan.authority.capabilityPlanBound).toBe(true);
     expect(plan.authority.executionAllowed).toBe(false);
+    expect(plan.route.capabilityPlan).toMatchObject({
+      observed: true,
+      valid: true,
+      selectedBy: 'chief-ai-machine',
+      planHash: cp.planHash,
+      capabilityIds: ['proof-led-publishing'],
+    });
     expect(plan.route.provider).toMatchObject({
       preflightEvidenceRequired: ['repository', 'commitSha', 'proofUrls', 'automationId'],
       preflightEvidenceObserved: ['repository', 'commitSha', 'proofUrls', 'automationId'],
@@ -130,18 +192,19 @@ describe('Founder OS isolated lab', () => {
     expect(plan.nextGate).toContain('separately authorize one named external adapter');
   });
 
-  it('blocks a mutating preview when approval exists without provider evidence', () => {
+  it('blocks a mutating preview when plan-bound approval exists without provider evidence', () => {
+    const goal = 'Review and merge the focused routing change.';
+    const cp = capabilityPlan(goal, 'review-verify-merge');
     const plan = planFounderOsLab({
-      goal: 'Review and merge the focused routing change.',
+      goal,
       action: 'merge-code',
-      approval: {
-        id: 'founder-approved:review-merge-routing-v1',
-        actions: ['merge-code'],
-      },
+      capabilityPlan: cp,
+      approval: boundApproval('founder-approved:review-merge-routing-v1', 'merge-code', cp),
     });
 
     expect(plan.readiness).toBe('blocked');
     expect(plan.authority.approvalObserved).toBe(true);
+    expect(plan.authority.capabilityPlanBound).toBe(true);
     expect(plan.authority.executionAllowed).toBe(false);
     expect(plan.route.provider).toMatchObject({
       preflightEvidenceRequired: ['repository', 'commitSha', 'proofUrls'],
@@ -309,14 +372,14 @@ describe('Founder OS isolated lab', () => {
     expect(plan.authority.executionAllowed).toBe(false);
   });
 
-  it('keeps merge planning isolated even with explicit approval and authoritative source evidence', () => {
+  it('keeps merge planning isolated with plan-bound approval and authoritative source evidence', () => {
+    const goal = 'Review and merge the focused routing change.';
+    const cp = capabilityPlan(goal, 'review-verify-merge');
     const plan = planFounderOsLab({
-      goal: 'Review and merge the focused routing change.',
+      goal,
       action: 'merge-code',
-      approval: {
-        id: 'founder-approved:review-merge-routing-v1',
-        actions: ['merge-code'],
-      },
+      capabilityPlan: cp,
+      approval: boundApproval('founder-approved:review-merge-routing-v1', 'merge-code', cp),
       evidence: {
         repository: 'jussray/founder-control-room',
         commitSha: SHA,
@@ -325,9 +388,16 @@ describe('Founder OS isolated lab', () => {
     });
 
     expect(plan.readiness).toBe('ready_for_external_executor');
-    expect(plan.route.specialistSkill).toBe('review-verify-merge');
+    expect(plan.route.capabilityPlan).toMatchObject({
+      observed: true,
+      valid: true,
+      capabilityIds: ['review-verify-merge'],
+      planHash: cp.planHash,
+    });
     expect(plan.route.adapters).toContain('merge-preview');
     expect(plan.route.provider.preflightEvidenceMissing).toEqual([]);
+    expect(plan.authority.approvalObserved).toBe(true);
+    expect(plan.authority.capabilityPlanBound).toBe(true);
     expect(plan.authority.executionAllowed).toBe(false);
     expect(plan.isolation.providerCalls).toBe(false);
   });
@@ -383,14 +453,14 @@ describe('Founder OS isolated lab', () => {
   });
 
   it('keeps authoritative HubSpot outreach at review-only until canonical dispatch evidence exists', () => {
+    const goal = 'Preview one approved founder outreach email.';
+    const cp = capabilityPlan(goal, 'proof-led-publishing');
     const plan = planFounderOsLab({
-      goal: 'Preview one approved founder outreach email.',
+      goal,
       action: 'send-email',
       provider: 'hubspot',
-      approval: {
-        id: 'founder-approved:outreach-preview-v1',
-        actions: ['send-email'],
-      },
+      capabilityPlan: cp,
+      approval: boundApproval('founder-approved:outreach-preview-v1', 'send-email', cp),
       evidence: {
         proofUrls: [
           'https://app.hubspot.com/contacts/123456/record/0-1/789',
@@ -404,6 +474,8 @@ describe('Founder OS isolated lab', () => {
 
     expect(plan.readiness).toBe('ready_for_review');
     expect(plan.truth.blocked).toEqual([]);
+    expect(plan.authority.approvalObserved).toBe(true);
+    expect(plan.authority.capabilityPlanBound).toBe(true);
     expect(plan.authority.executionAllowed).toBe(false);
     expect(plan.nextGate).toContain('DispatchDecision');
     expect(plan.nextGate).toContain('consent');

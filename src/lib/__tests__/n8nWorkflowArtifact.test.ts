@@ -7,12 +7,13 @@ const workflowPath = path.resolve(process.cwd(), 'automation/n8n/founder-conveyo
 describe('n8n conveyor workflow artifact', () => {
   it('is importable JSON and disabled by default', () => {
     const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+    expect(workflow.id).toBe('fcrFounderConveyorV3');
     expect(workflow.name).toBe('Founder Control Room Conveyor');
     expect(workflow.active).toBe(false);
     expect(Array.isArray(workflow.nodes)).toBe(true);
     expect(workflow.nodes.map((node: { name: string }) => node.name)).toEqual([
       'FCR Conveyor Webhook',
-      'Validate + Route Skills',
+      'Validate Capability Plan',
       'Create Bound Receipt',
       'Return Receipt',
     ]);
@@ -76,29 +77,30 @@ describe('n8n conveyor workflow artifact', () => {
     }
   });
 
-  it('preserves the governed authority, skill routing, and canonical v2 receipt contract', () => {
+  it('moves capability selection out of n8n and binds the canonical v3 receipt to Chief AI output', () => {
     const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
     const code = workflow.nodes
       .filter((node: { type: string }) => node.type === 'n8n-nodes-base.code')
       .map((node: { parameters: { jsCode: string } }) => node.parameters.jsCode)
       .join('\n');
 
-    expect(code).toContain("founder-control-room/n8n-conveyor@v2");
-    expect(code).toContain("fcr-conveyor-v2:");
-    expect(code).toContain("fcr-conveyor-receipt-v2:");
-    expect(code).toContain('JSON.stringify([');
-    expect(code).toContain('text(input.goal)');
-    expect(code).toContain('evidenceUrls');
-    expect(code).toContain("authority.merge !== false");
-    expect(code).toContain("authority.deploy !== false");
-    expect(code).toContain("authority.publish !== false");
-    expect(code).toContain("authority.sendExternal !== false");
-    expect(code).toContain('lean-build-orchestrator');
-    expect(code).toContain('regression-stagnation-guard');
-    expect(code).toContain('truth-research-optimizer');
-    expect(code).toContain('intent-repair-reader');
-    expect(code).toContain('capability-mode-router');
-    expect(code).not.toContain('n8n-fcr-v1:');
-    expect(code).not.toContain('fcr-n8n-v1:');
+    expect(code).toContain('founder-control-room/n8n-conveyor@v3');
+    expect(code).toContain('juss-v10/capability-plan@v1');
+    expect(code).toContain("plan.selectedBy !== 'chief-ai-machine'");
+    expect(code).toContain('capabilityPlanHash');
+    expect(code).toContain('registryHash');
+    expect(code).toContain('outcomeSignals');
+    expect(code).toContain('fcr-conveyor-v3:');
+    expect(code).toContain('fcr-conveyor-receipt-v3:');
+    expect(code).toContain('capability plan hash mismatch');
+    expect(code).toContain('capability origin authority exceeded');
+    expect(code).toContain('authority.merge !== false');
+    expect(code).toContain('authority.deploy !== false');
+    expect(code).toContain('authority.publish !== false');
+    expect(code).toContain('authority.sendExternal !== false');
+    expect(code).not.toContain('const skillRoutes =');
+    expect(code).not.toContain("chat:['intent-repair-reader'");
+    expect(code).not.toContain('fcr-conveyor-v2:');
+    expect(code).not.toContain('fcr-conveyor-receipt-v2:');
   });
 });

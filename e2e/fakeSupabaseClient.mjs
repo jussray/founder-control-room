@@ -191,6 +191,14 @@ async function fakeRpc(name, args) {
     return { data: null, error: null };
   }
 
+  if (name === 'is_v10_registry_approved') {
+    const candidateHash = String(args?.candidate_hash ?? '').trim().toLowerCase();
+    const approved = table('capability_registry_snapshots').some((row) => (
+      String(row.registry_hash ?? '').toLowerCase() === candidateHash && row.status === 'approved'
+    ));
+    return { data: approved, error: null };
+  }
+
   console.warn(`[fake supabase] unhandled rpc "${name}" — returning null`);
   return { data: null, error: null };
 }
@@ -210,4 +218,29 @@ export function makeSupabaseClient() {
 // the HTTP server accepts any request.
 if (process.env.E2E_SEED_FOUNDER_EMAIL) {
   table('founder_users').push({ email: process.env.E2E_SEED_FOUNDER_EMAIL, created_at: new Date().toISOString() });
+}
+
+// E2E-only mirror of the V10 founder approval boundary. The harness must
+// explicitly provide one exact registry hash and its canonical entries;
+// unlike an "always true" fake, every other registry remains unapproved and
+// the real middleware still verifies the entry hash and capability identity.
+const approvedV10RegistryHash = String(process.env.E2E_APPROVED_V10_REGISTRY_HASH ?? '').trim().toLowerCase();
+if (/^[0-9a-f]{64}$/.test(approvedV10RegistryHash)) {
+  let entries = [];
+  try {
+    const parsed = JSON.parse(process.env.E2E_APPROVED_V10_REGISTRY_ENTRIES_JSON ?? '[]');
+    if (Array.isArray(parsed)) entries = parsed;
+  } catch {
+    throw new Error('E2E_APPROVED_V10_REGISTRY_ENTRIES_JSON must be valid JSON');
+  }
+
+  table('capability_registry_snapshots').push({
+    registry_hash: approvedV10RegistryHash,
+    contract: 'juss-v10/capability-registry@v1',
+    status: 'approved',
+    entries,
+    approved_by: process.env.E2E_SEED_FOUNDER_EMAIL ?? 'e2e-founder',
+    approved_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+  });
 }

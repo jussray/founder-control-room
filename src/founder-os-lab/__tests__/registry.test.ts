@@ -1,4 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import {
+  V10_CAPABILITY_PLAN_CONTRACT,
+  V10_CAPABILITY_SELECTOR,
+  v10CapabilityPlanHash,
+  type V10CapabilityPlan,
+} from '../capabilityKernel.js';
 import { planFounderOsLab } from '../engine.js';
 import { FOUNDER_OS_LAB_PROVIDER_PREFLIGHT_EVIDENCE } from '../providerEvidence.js';
 import {
@@ -13,6 +19,9 @@ const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const PROOF_URL = `https://github.com/jussray/founder-control-room/commit/${SHA}`;
 
 const EXPECTED_COMMANDS = [
+  'human',
+  'futureyou',
+  'v10',
   'goalfix',
   'ultrathink',
   'truthmode',
@@ -24,6 +33,12 @@ const EXPECTED_COMMANDS = [
   'build',
   'billgates',
   'elonmusk',
+  'firstprinciples',
+  'socrates',
+  'ycombinator',
+  'antiadvice',
+  'hormozi',
+  'unlearn',
   'loop',
 ] as const;
 
@@ -41,12 +56,41 @@ const EXPECTED_PROVIDERS = [
   'hubspot',
 ] as const;
 
+function capabilityPlan(overrides: Partial<V10CapabilityPlan> = {}): V10CapabilityPlan {
+  const base: Omit<V10CapabilityPlan, 'planHash'> = {
+    contract: V10_CAPABILITY_PLAN_CONTRACT,
+    selectedBy: V10_CAPABILITY_SELECTOR,
+    goal: 'Preview the exact-head merge gate.',
+    projectSlug: 'founder-control-room',
+    expectedHeadSha: SHA,
+    registryHash: 'b'.repeat(64),
+    requestedAuthority: 'draft',
+    strategicLenses: ['human', 'futureyou', 'truthmode'],
+    routingReason: 'Chief AI selected the smallest evidence-bound review capability.',
+    capabilities: [{
+      id: 'review-verify-merge',
+      version: '1.0.0',
+      origin: 'founder-native',
+      owner: 'juss',
+      sourceHash: 'c'.repeat(64),
+      authorityCeiling: 'privileged',
+    }],
+    proofRequirements: ['exact-head checks', 'review-thread evidence'],
+    outcomeSignals: ['merge-readiness-verified'],
+    rollback: 'Discard the preview; no mutation occurs.',
+  };
+  const merged = { ...base, ...overrides } as Omit<V10CapabilityPlan, 'planHash'>;
+  return { ...merged, planHash: v10CapabilityPlanHash(merged) };
+}
+
 describe('portable Founder OS registry', () => {
-  it('contains the complete checked-in command contract with no execution authority', () => {
+  it('contains the complete checked-in V10 command contract with no execution authority', () => {
     expect(FOUNDER_OS_LAB_COMMANDS.map((command) => command.id)).toEqual(EXPECTED_COMMANDS);
     expect(FOUNDER_OS_LAB_COMMANDS.every((command) => command.mayExecute === false)).toBe(true);
-    expect(founderOsLabCommand('elonmusk').role).toMatch(/lens only/i);
-    expect(founderOsLabCommand('elonmusk').role).toMatch(/never simulate a person/i);
+    expect(founderOsLabCommand('human').class).toBe('founder');
+    expect(founderOsLabCommand('futureyou').class).toBe('founder');
+    expect(founderOsLabCommand('elonmusk').role).toMatch(/first-principles/i);
+    expect(founderOsLabCommand('elonmusk').role).toMatch(/without simulating a person/i);
   });
 
   it('contains the complete provider registry as preview-only, side-effect-free descriptors', () => {
@@ -78,13 +122,14 @@ describe('portable Founder OS registry', () => {
     expect(founderOsLabProvider('hubspot').evidenceRequired.join(' ')).not.toMatch(/mutation receipt/i);
   });
 
-  it('keeps every default action route inside its provider support contract', () => {
+  it('keeps every default action route inside its provider support contract without choosing a specialist', () => {
     for (const [action, route] of Object.entries(FOUNDER_OS_LAB_ACTION_ROUTES)) {
       const command = founderOsLabCommand(route.defaultCommand);
       const provider = founderOsLabProvider(route.defaultProvider);
 
       expect(command.mayExecute).toBe(false);
       expect(provider.supportedActions).toContain(action);
+      expect(route).not.toHaveProperty('specialistSkill');
     }
   });
 
@@ -102,10 +147,9 @@ describe('portable Founder OS registry', () => {
     });
 
     expect(plan.readiness).toBe('ready_for_review');
-    expect(plan.route.command).toMatchObject({
-      id: 'confess',
-      specialistSkill: 'repo-truth',
-    });
+    expect(plan.route.command).toMatchObject({ id: 'confess', class: 'truth' });
+    expect(plan.route).not.toHaveProperty('specialistSkill');
+    expect(plan.route.capabilityPlan.observed).toBe(false);
     expect(plan.route.provider).toMatchObject({
       id: 'github',
       mode: 'preview',
@@ -117,6 +161,7 @@ describe('portable Founder OS registry', () => {
       preflightEvidenceMissing: [],
     });
     expect(plan.authority.executionAllowed).toBe(false);
+    expect(plan.authority.capabilityPlanBound).toBe(false);
     expect(plan.isolation.providerCalls).toBe(false);
   });
 
@@ -139,9 +184,10 @@ describe('portable Founder OS registry', () => {
       executionAllowed: false,
     });
     expect(plan.truth.blocked.join(' ')).toContain('figma does not support a merge-code preview');
+    expect(plan.truth.blocked.join(' ')).toContain('valid Chief AI capability plan is required');
   });
 
-  it('blocks executor readiness when approval exists without required provider evidence', () => {
+  it('blocks executor readiness when approval exists without provider evidence or a Chief AI plan', () => {
     const plan = planFounderOsLab({
       goal: 'Preview the exact-head merge gate.',
       action: 'merge-code',
@@ -154,7 +200,7 @@ describe('portable Founder OS registry', () => {
     });
 
     expect(plan.readiness).toBe('blocked');
-    expect(plan.authority.approvalObserved).toBe(true);
+    expect(plan.authority.approvalObserved).toBe(false);
     expect(plan.authority.executionAllowed).toBe(false);
     expect(plan.route.provider).toMatchObject({
       id: 'github',
@@ -163,21 +209,26 @@ describe('portable Founder OS registry', () => {
       preflightEvidenceObserved: [],
       preflightEvidenceMissing: ['repository', 'commitSha', 'proofUrls'],
     });
+    expect(plan.truth.blocked.join(' ')).toContain('valid Chief AI capability plan is required');
     expect(plan.truth.blocked.join(' ')).toContain(
       'Missing required github preflight evidence: repository, commitSha, proofUrls',
     );
-    expect(plan.nextGate).toContain('Supply the missing github preflight evidence');
   });
 
-  it('recognizes approval and complete evidence without transferring execution authority', () => {
+  it('recognizes plan-bound approval and complete evidence without transferring execution authority', () => {
+    const cp = capabilityPlan();
     const plan = planFounderOsLab({
-      goal: 'Preview the exact-head merge gate.',
+      goal: cp.goal,
       action: 'merge-code',
       command: 'loop',
       provider: 'github',
+      capabilityPlan: cp,
       approval: {
         id: 'founder-approved:merge-preview-only',
         actions: ['merge-code'],
+        projectSlug: cp.projectSlug,
+        expectedHeadSha: cp.expectedHeadSha,
+        capabilityPlanHash: cp.planHash,
       },
       evidence: {
         repository: 'jussray/founder-control-room',
@@ -188,13 +239,22 @@ describe('portable Founder OS registry', () => {
 
     expect(plan.readiness).toBe('ready_for_external_executor');
     expect(plan.authority.approvalObserved).toBe(true);
+    expect(plan.authority.capabilityPlanBound).toBe(true);
     expect(plan.authority.executionAllowed).toBe(false);
+    expect(plan.route.capabilityPlan).toMatchObject({
+      observed: true,
+      valid: true,
+      selectedBy: 'chief-ai-machine',
+      planHash: cp.planHash,
+      registryHash: cp.registryHash,
+      capabilityIds: ['review-verify-merge'],
+    });
     expect(plan.route.provider).toMatchObject({
       executionAllowed: false,
       preflightEvidenceRequired: ['repository', 'commitSha', 'proofUrls'],
       preflightEvidenceObserved: ['repository', 'commitSha', 'proofUrls'],
       preflightEvidenceMissing: [],
     });
-    expect(plan.nextGate).toContain('separately authorize one named external adapter for github');
+    expect(plan.nextGate).toContain('Chief AI capability plan');
   });
 });

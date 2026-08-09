@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  V10_CAPABILITY_PLAN_CONTRACT,
+  V10_CAPABILITY_SELECTOR,
+  v10CapabilityPlanHash,
+  type V10CapabilityPlan,
+} from '../../founder-os-lab/capabilityKernel.js';
+import {
   acceptN8nConveyorRuntimeInput,
   validateN8nConveyorRuntimeInput,
   type N8nConveyorRuntimeInput,
@@ -10,10 +16,43 @@ import {
 } from '../n8nConveyor.js';
 
 const SHA = 'a'.repeat(40);
+const REGISTRY_HASH = 'b'.repeat(64);
+
+function capabilityPlan(overrides: Partial<V10CapabilityPlan> = {}): V10CapabilityPlan {
+  const base: Omit<V10CapabilityPlan, 'planHash'> = {
+    contract: V10_CAPABILITY_PLAN_CONTRACT,
+    selectedBy: V10_CAPABILITY_SELECTOR,
+    goal: 'Move one verified increment through the conveyor.',
+    projectSlug: 'founder-control-room',
+    expectedHeadSha: SHA,
+    registryHash: REGISTRY_HASH,
+    requestedAuthority: 'draft',
+    strategicLenses: ['me', 'futureyou', 'truthmode'],
+    routingReason: 'Chief AI selected the smallest evidence-bound build capability.',
+    capabilities: [{
+      id: 'goalfix',
+      version: '1.0.0',
+      origin: 'founder-native',
+      owner: 'juss',
+      sourceHash: 'c'.repeat(64),
+      authorityCeiling: 'privileged',
+    }],
+    proofRequirements: ['focused tests', 'exact-head evidence'],
+    outcomeSignals: ['verification-pass', 'founder-override-rate'],
+    rollback: 'Revert the focused change.',
+  };
+  const merged = { ...base, ...overrides } as Omit<V10CapabilityPlan, 'planHash'>;
+  return { ...merged, planHash: v10CapabilityPlanHash(merged) };
+}
 
 function candidate(overrides: Partial<N8nConveyorRuntimeInput> = {}): N8nConveyorRuntimeInput {
+  const plan = overrides.capabilityPlan ?? capabilityPlan({
+    goal: overrides.goal ?? 'Move one verified increment through the conveyor.',
+    projectSlug: overrides.projectSlug ?? 'founder-control-room',
+    expectedHeadSha: overrides.expectedHeadSha ?? SHA,
+  });
   const input: N8nConveyorRuntimeInput = {
-    contract: 'founder-control-room/n8n-conveyor@v2',
+    contract: 'founder-control-room/n8n-conveyor@v3',
     event: 'conveyor.stage.advance',
     idempotencyKey: '',
     runId: 'run-123',
@@ -22,6 +61,7 @@ function candidate(overrides: Partial<N8nConveyorRuntimeInput> = {}): N8nConveyo
     fromStage: 'workflows',
     toStage: 'code',
     expectedHeadSha: SHA,
+    capabilityPlan: plan,
     evidenceUrls: [],
     authority: {
       advanceStage: true,
@@ -34,43 +74,26 @@ function candidate(overrides: Partial<N8nConveyorRuntimeInput> = {}): N8nConveyo
   };
 
   if (!overrides.idempotencyKey) {
-    input.idempotencyKey = founderConveyorIdempotencyKey({
-      runId: input.runId,
-      projectSlug: input.projectSlug,
-      goal: input.goal,
-      fromStage: input.fromStage,
-      toStage: input.toStage,
-      expectedHeadSha: input.expectedHeadSha,
-      evidenceUrls: input.evidenceUrls,
-    });
+    input.idempotencyKey = founderConveyorIdempotencyKey(input);
   }
 
   return input;
 }
 
 describe('n8n conveyor runtime', () => {
-  it('accepts a bounded transition and returns a deterministic canonical v2 receipt', () => {
+  it('accepts a Chief-AI-selected capability plan and returns a deterministic canonical v3 receipt', () => {
     const input = candidate();
     const first = acceptN8nConveyorRuntimeInput(input);
     const retry = acceptN8nConveyorRuntimeInput(input);
 
     expect(first.ok).toBe(true);
-    expect(first.receipt?.receiptId).toMatch(/^fcr-conveyor-receipt-v2:[0-9a-f]{64}$/);
+    expect(first.receipt?.receiptId).toMatch(/^fcr-conveyor-receipt-v3:[0-9a-f]{64}$/);
     expect(retry.receipt?.receiptId).toBe(first.receipt?.receiptId);
-    expect(first.receipt?.receiptId).toBe(expectedFounderConveyorReceiptId({
-      runId: input.runId,
-      projectSlug: input.projectSlug,
-      goal: input.goal,
-      fromStage: input.fromStage,
-      toStage: input.toStage,
-      expectedHeadSha: input.expectedHeadSha,
-      evidenceUrls: input.evidenceUrls,
-    }));
-    expect(first.receipt?.skillIds).toEqual([
-      'lean-build-orchestrator',
-      'regression-stagnation-guard',
-      'capability-mode-router',
-    ]);
+    expect(first.receipt?.receiptId).toBe(expectedFounderConveyorReceiptId(input));
+    expect(first.receipt?.skillIds).toEqual(['goalfix']);
+    expect(first.receipt?.capabilityPlanHash).toBe(input.capabilityPlan.planHash);
+    expect(first.receipt?.registryHash).toBe(REGISTRY_HASH);
+    expect(first.receipt?.outcomeSignals).toContain('verification-pass');
   });
 
   it('refuses authority expansion', () => {
@@ -95,21 +118,43 @@ describe('n8n conveyor runtime', () => {
     }))).toContain('evidence is required for code -> projects');
   });
 
-  it('binds the receipt to the exact Git head and goal', () => {
-    const first = acceptN8nConveyorRuntimeInput(candidate()).receipt?.receiptId;
-    const second = acceptN8nConveyorRuntimeInput(candidate({ expectedHeadSha: 'c'.repeat(40) })).receipt?.receiptId;
-    const third = acceptN8nConveyorRuntimeInput(candidate({ goal: 'A materially different goal.' })).receipt?.receiptId;
-    expect(second).not.toBe(first);
-    expect(third).not.toBe(first);
+  it('rejects a capability plan selected by n8n or bound to different reality', () => {
+    const selectedByN8n = capabilityPlan();
+    const spoofed = {
+      ...selectedByN8n,
+      selectedBy: 'n8n',
+    } as unknown as V10CapabilityPlan;
+
+    expect(validateN8nConveyorRuntimeInput(candidate({ capabilityPlan: spoofed })))
+      .toContain('capability selection must be owned by Chief AI Machine');
+
+    const wrongHeadPlan = capabilityPlan({ expectedHeadSha: 'd'.repeat(40) });
+    expect(validateN8nConveyorRuntimeInput(candidate({ capabilityPlan: wrongHeadPlan })))
+      .toContain('capability plan head does not match execution head');
   });
 
-  it('routes truth research into the reusable skills stage', () => {
-    const result = acceptN8nConveyorRuntimeInput(candidate({
-      fromStage: 'projects',
-      toStage: 'skills',
-      evidenceUrls: ['https://github.com/jussray/founder-control-room/commit/'.concat(SHA)],
-    }));
+  it('binds idempotency and receipt identity to the capability plan', () => {
+    const firstInput = candidate();
+    const secondPlan = capabilityPlan({
+      capabilities: [{
+        id: 'repo-truth',
+        version: '1.0.0',
+        origin: 'repo-native',
+        owner: 'chief-ai-machine',
+        sourceHash: 'd'.repeat(64),
+        authorityCeiling: 'privileged',
+      }],
+    });
+    const secondInput = candidate({ capabilityPlan: secondPlan });
 
-    expect(result.receipt?.skillIds).toContain('truth-research-optimizer');
+    expect(founderConveyorIdempotencyKey(secondInput)).not.toBe(founderConveyorIdempotencyKey(firstInput));
+    expect(acceptN8nConveyorRuntimeInput(secondInput).receipt?.receiptId)
+      .not.toBe(acceptN8nConveyorRuntimeInput(firstInput).receipt?.receiptId);
+  });
+
+  it('does not let stage advancement smuggle privileged execution authority', () => {
+    const privileged = capabilityPlan({ requestedAuthority: 'privileged' });
+    expect(validateN8nConveyorRuntimeInput(candidate({ capabilityPlan: privileged })))
+      .toContain('conveyor stage advancement cannot carry reversible or privileged execution authority');
   });
 });
