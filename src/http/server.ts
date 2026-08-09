@@ -54,7 +54,7 @@ import {
 import { requireSameOriginBrowserMutation } from './middleware/csrf.js';
 import { jsonParseErrorHandler } from './middleware/jsonParseError.js';
 import { requireProjectReadAudit } from './middleware/projectReadAudit.js';
-import { requireFounder, type FounderRequest } from './middleware/requireFounder.js';
+import { requireFounder } from './middleware/requireFounder.js';
 import { requireV10PrivilegedApprovalBinding } from './middleware/v10PrivilegedApprovalBinding.js';
 import { requireFounderSignalEngineMcpToken } from './middleware/founderSignalEngineMcpAuth.js';
 import { requireFounderSignalEngineReviewOnly } from './middleware/founderSignalEngineWriteGate.js';
