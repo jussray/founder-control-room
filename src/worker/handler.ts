@@ -133,7 +133,7 @@ function withServiceIdentity(response: WorkerResponse): WorkerResponse {
   const headers = new Headers(response.headers);
   headers.set(SERVICE_IDENTITY_HEADER, SERVICE_IDENTITY);
 
-  return new Response(response.body as unknown as BodyInit, {
+  return new Response(response.body as unknown as ConstructorParameters<typeof Response>[0], {
     status: response.status,
     statusText: response.statusText,
     headers,
