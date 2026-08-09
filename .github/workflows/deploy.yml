@@ -445,7 +445,7 @@ jobs:
 
   # ── 4. Verified proof-of-ship payload ───────────────────────────────────────
   proof-of-ship:
-    name: Proof of Ship — Verify and Publish via Review Window
+    name: Proof of Ship — Verify and Hold for Founder Review
     runs-on: ubuntu-latest
     timeout-minutes: 12
     environment: production
@@ -458,7 +458,7 @@ jobs:
       ZAPIER_CATCH_HOOK_URL: ${{ secrets.ZAPIER_CATCH_HOOK_URL }}
       PROOF_OF_SHIP_STEERING_GRANT_ID: ${{ secrets.PROOF_OF_SHIP_STEERING_GRANT_ID }}
       GITHUB_TOKEN: ${{ github.token }}
-      PUBLISH_ALLOWED: 'true'
+      PUBLISH_ALLOWED: 'false'
       LINKEDIN_BASELINE_PATH: config/linkedin-rising-floor-baseline.json
       REPOSITORY_PUBLICATION_POLICY_PATH: config/proof-of-ship-repository-policy.json
     steps:
@@ -766,8 +766,66 @@ jobs:
           mv proof-context.next.json proof-context.json
           echo "Cloudflare receipt verified: $DEPLOY_URL/version reports $live_sha" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Retain verified proof for founder review
+        if: steps.classify.outputs.meaningful == 'true' && env.PUBLISH_ALLOWED != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          idempotency_key="${GITHUB_REPOSITORY}:${EXPECTED_HEAD_SHA}"
+          verified_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          jq --arg run_url "$run_url" \
+            --arg idempotency_key "$idempotency_key" \
+            --arg verified_at "$verified_at" \
+            '.live_state = "verified" |
+             .publish_allowed = false |
+             .PUBLISH_ALLOWED = false |
+             .idempotency_key = $idempotency_key |
+             .proof_url = $run_url |
+             .github_actions_run_url = $run_url |
+             .source_event = "workflow_dispatch" |
+             .verified_at = $verified_at |
+             .source_commit_sha = .commit_sha |
+             .authorization_mode = "founder-review-required" |
+             .destination_mode = "founder_review" |
+             .buffer_method = "none" |
+             .buffer_save_to_draft = false |
+             .buffer_terminal_action = "hold" |
+             .share_now_allowed = false' \
+            proof-context.json > proof-review.json
+
+          jq -e '
+            .live_state == "verified" and
+            .publish_allowed == false and
+            .PUBLISH_ALLOWED == false and
+            .authorization_mode == "founder-review-required" and
+            .destination_mode == "founder_review" and
+            .buffer_method == "none" and
+            .buffer_terminal_action == "hold" and
+            .share_now_allowed == false and
+            .cloudflare_live_sha == .commit_sha
+          ' proof-review.json >/dev/null
+
+          {
+            echo '### Verified proof retained for founder review'
+            jq '{repo, commit_sha, pr_url, commit_url, live_state, supabase_state, cloudflare_live_sha, proof_url, idempotency_key, publish_allowed, PUBLISH_ALLOWED, authorization_mode, destination_mode, buffer_method, buffer_terminal_action}' proof-review.json
+            echo
+            echo 'No Zapier Catch Hook or Buffer scheduling request was sent. Publication remains blocked until a separately reviewed authority change.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload founder-review proof artifact
+        if: steps.classify.outputs.meaningful == 'true' && env.PUBLISH_ALLOWED != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: proof-of-ship-founder-review-${{ inputs.expected_head_sha }}
+          path: proof-review.json
+          if-no-files-found: error
+          retention-days: 30
+
       - name: POST verified proof payload to Zapier Catch Hook
-        if: steps.classify.outputs.meaningful == 'true'
+        if: steps.classify.outputs.meaningful == 'true' && env.PUBLISH_ALLOWED == 'true'
         shell: bash
         run: |
           set -euo pipefail
