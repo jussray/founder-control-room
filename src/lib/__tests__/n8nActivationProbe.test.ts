@@ -158,7 +158,7 @@ describe('n8n live activation probe', () => {
     })).rejects.toThrow(/UPSTREAM_RECEIPT_MISMATCH|canonical v3/);
   });
 
-  it('keeps the GitHub live probe manual-only, exact-head bound, plan-required, persistence-required, and receipt retaining', () => {
+  it('keeps the GitHub live probe manual-only, current-main-bound, plan-required, persistence-required, and secret-scoped', () => {
     const workflow = fs.readFileSync(workflowPath, 'utf8');
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).not.toMatch(/\npull_request:/);
@@ -166,8 +166,11 @@ describe('n8n live activation probe', () => {
     expect(workflow).toContain('target_sha:');
     expect(workflow).toContain('capability_plan_json:');
     expect(workflow).toContain('N8N_CONVEYOR_CAPABILITY_PLAN_JSON: ${{ inputs.capability_plan_json }}');
-    expect(workflow).toContain('ref: ${{ inputs.target_sha }}');
-    expect(workflow).toContain('N8N_CONVEYOR_WEBHOOK_URL: ${{ secrets.N8N_CONVEYOR_WEBHOOK_URL }}');
+    expect(workflow).toContain('ref: ${{ github.event.repository.default_branch }}');
+    expect(workflow).toContain('persist-credentials: false');
+    expect(workflow).toContain('test "$(git rev-parse HEAD)" = "${N8N_CONVEYOR_PROBE_HEAD_SHA}"');
+    expect(workflow).not.toContain('ref: ${{ inputs.target_sha }}');
+    expect(workflow.indexOf('Install locked trusted dependencies')).toBeLessThan(workflow.indexOf('N8N_CONVEYOR_WEBHOOK_URL: ${{ secrets.N8N_CONVEYOR_WEBHOOK_URL }}'));
     expect(workflow).toContain('N8N_CONVEYOR_BEARER_TOKEN: ${{ secrets.N8N_CONVEYOR_BEARER_TOKEN }}');
     expect(workflow).toContain('SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}');
     expect(workflow).toContain('FCR_V10_RECEIPT_PERSISTENCE_REQUIRED:');
