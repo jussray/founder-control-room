@@ -3,6 +3,7 @@ const COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
 const SOURCE_REPO = /^jussray\/[A-Za-z0-9._-]{1,100}$/;
 const SAFE_TOKEN = /^[A-Za-z0-9._:-]{1,200}$/;
+const SAFE_PROVIDER = /^[A-Za-z0-9._-]{1,80}$/;
 
 export type ProofOfShipReceipt = {
   receiptId: string;
@@ -20,6 +21,14 @@ export type ProofOfShipReceipt = {
   bufferTerminalAction: 'schedule';
   bufferScheduleId: string;
   scheduledAt: string;
+  bufferPublicationStatus: 'published';
+  bufferPostId: string;
+  livePostUrl: string;
+  publishedAt: string;
+  smsNotificationStatus: 'delivered';
+  smsProvider: string;
+  smsMessageId: string;
+  smsDeliveredAt: string;
   occurredAt: string;
 };
 
@@ -54,6 +63,20 @@ function canonicalIsoTimestamp(value: unknown, field: string): string {
   return parsed.toISOString();
 }
 
+function canonicalHttpsUrl(value: unknown, field: string): string {
+  const normalized = boundedText(value, field, 1000);
+  let parsed: URL;
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    throw new ProofOfShipReceiptError(`invalid_${field}`);
+  }
+  if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
+    throw new ProofOfShipReceiptError(`invalid_${field}`);
+  }
+  return parsed.toString();
+}
+
 export function normalizeProofOfShipReceiptId(value: unknown): string {
   if (typeof value !== 'string' || !RECEIPT_ID.test(value)) {
     throw new ProofOfShipReceiptError('invalid_receipt_id');
@@ -80,6 +103,14 @@ export function validateProofOfShipReceipt(input: unknown): ProofOfShipReceipt {
     'bufferTerminalAction',
     'bufferScheduleId',
     'scheduledAt',
+    'bufferPublicationStatus',
+    'bufferPostId',
+    'livePostUrl',
+    'publishedAt',
+    'smsNotificationStatus',
+    'smsProvider',
+    'smsMessageId',
+    'smsDeliveredAt',
     'occurredAt',
   ]);
   for (const key of Object.keys(input)) {
@@ -119,6 +150,36 @@ export function validateProofOfShipReceipt(input: unknown): ProofOfShipReceipt {
   if (typeof input.bufferScheduleId !== 'string' || !SAFE_TOKEN.test(input.bufferScheduleId)) {
     throw new ProofOfShipReceiptError('invalid_buffer_schedule_id');
   }
+  if (input.bufferPublicationStatus !== 'published') {
+    throw new ProofOfShipReceiptError('invalid_buffer_publication_status');
+  }
+  if (typeof input.bufferPostId !== 'string' || !SAFE_TOKEN.test(input.bufferPostId)) {
+    throw new ProofOfShipReceiptError('invalid_buffer_post_id');
+  }
+  if (input.smsNotificationStatus !== 'delivered') {
+    throw new ProofOfShipReceiptError('invalid_sms_notification_status');
+  }
+  if (typeof input.smsProvider !== 'string' || !SAFE_PROVIDER.test(input.smsProvider)) {
+    throw new ProofOfShipReceiptError('invalid_sms_provider');
+  }
+  if (typeof input.smsMessageId !== 'string' || !SAFE_TOKEN.test(input.smsMessageId)) {
+    throw new ProofOfShipReceiptError('invalid_sms_message_id');
+  }
+
+  const scheduledAt = canonicalIsoTimestamp(input.scheduledAt, 'scheduled_at');
+  const publishedAt = canonicalIsoTimestamp(input.publishedAt, 'published_at');
+  const smsDeliveredAt = canonicalIsoTimestamp(input.smsDeliveredAt, 'sms_delivered_at');
+  const occurredAt = canonicalIsoTimestamp(input.occurredAt, 'occurred_at');
+
+  if (Date.parse(publishedAt) < Date.parse(scheduledAt)) {
+    throw new ProofOfShipReceiptError('invalid_publication_timeline');
+  }
+  if (Date.parse(smsDeliveredAt) < Date.parse(publishedAt)) {
+    throw new ProofOfShipReceiptError('invalid_sms_timeline');
+  }
+  if (Date.parse(occurredAt) < Date.parse(smsDeliveredAt)) {
+    throw new ProofOfShipReceiptError('invalid_receipt_timeline');
+  }
 
   return {
     receiptId,
@@ -135,7 +196,15 @@ export function validateProofOfShipReceipt(input: unknown): ProofOfShipReceipt {
     linkedinDraftSha256: input.linkedinDraftSha256.toLowerCase(),
     bufferTerminalAction: 'schedule',
     bufferScheduleId: input.bufferScheduleId,
-    scheduledAt: canonicalIsoTimestamp(input.scheduledAt, 'scheduled_at'),
-    occurredAt: canonicalIsoTimestamp(input.occurredAt, 'occurred_at'),
+    scheduledAt,
+    bufferPublicationStatus: 'published',
+    bufferPostId: input.bufferPostId,
+    livePostUrl: canonicalHttpsUrl(input.livePostUrl, 'live_post_url'),
+    publishedAt,
+    smsNotificationStatus: 'delivered',
+    smsProvider: input.smsProvider,
+    smsMessageId: input.smsMessageId,
+    smsDeliveredAt,
+    occurredAt,
   };
 }
