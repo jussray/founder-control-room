@@ -161,7 +161,7 @@ describe('Founder OS isolated lab', () => {
     expect(plan.truth.blocked.join(' ')).toContain('valid Chief AI capability plan');
   });
 
-  it('recognizes plan-bound approval and authoritative Zapier evidence but still refuses provider execution', () => {
+  it('recognizes plan-bound approval and authoritative Zapier evidence but blocks executor readiness until the approved registry is resolved', () => {
     const goal = 'Queue one proof-backed founder update.';
     const cp = capabilityPlan(goal, 'proof-led-publishing');
     const plan = planFounderOsLab({
@@ -173,7 +173,7 @@ describe('Founder OS isolated lab', () => {
       socialPost: socialPost('queue'),
     });
 
-    expect(plan.readiness).toBe('ready_for_external_executor');
+    expect(plan.readiness).toBe('blocked');
     expect(plan.authority.approvalObserved).toBe(true);
     expect(plan.authority.capabilityPlanBound).toBe(true);
     expect(plan.authority.executionAllowed).toBe(false);
@@ -189,7 +189,8 @@ describe('Founder OS isolated lab', () => {
       preflightEvidenceObserved: ['repository', 'commitSha', 'proofUrls', 'automationId'],
       preflightEvidenceMissing: [],
     });
-    expect(plan.nextGate).toContain('separately authorize one named external adapter');
+    expect(plan.truth.blocked.join(' ')).toContain('Founder-approved capability registry snapshot');
+    expect(plan.nextGate).toContain('founder-approved capability registry snapshot');
   });
 
   it('blocks a mutating preview when plan-bound approval exists without provider evidence', () => {
@@ -372,7 +373,7 @@ describe('Founder OS isolated lab', () => {
     expect(plan.authority.executionAllowed).toBe(false);
   });
 
-  it('keeps merge planning isolated with plan-bound approval and authoritative source evidence', () => {
+  it('keeps merge planning isolated and blocks executor readiness until the approved registry is resolved', () => {
     const goal = 'Review and merge the focused routing change.';
     const cp = capabilityPlan(goal, 'review-verify-merge');
     const plan = planFounderOsLab({
@@ -387,7 +388,7 @@ describe('Founder OS isolated lab', () => {
       },
     });
 
-    expect(plan.readiness).toBe('ready_for_external_executor');
+    expect(plan.readiness).toBe('blocked');
     expect(plan.route.capabilityPlan).toMatchObject({
       observed: true,
       valid: true,
@@ -400,6 +401,8 @@ describe('Founder OS isolated lab', () => {
     expect(plan.authority.capabilityPlanBound).toBe(true);
     expect(plan.authority.executionAllowed).toBe(false);
     expect(plan.isolation.providerCalls).toBe(false);
+    expect(plan.truth.blocked.join(' ')).toContain('Founder-approved capability registry snapshot');
+    expect(plan.nextGate).toContain('founder-approved capability registry snapshot');
   });
 
   it('blocks HubSpot outreach readiness without workspace, records, and association context', () => {
