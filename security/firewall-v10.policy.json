@@ -2,50 +2,115 @@
   "version": "10",
   "name": "Founder Firewall v10",
   "repository": "jussray/founder-control-room",
+  "mode": "desired-state-with-observed-app-bindings",
   "activationStage": "policy-ci-only",
+  "evidence": {
+    "productionCloudflareApplied": "unknown",
+    "securityEventsReviewed": "unknown",
+    "productionBlockModeAuthorized": false,
+    "openApiV3SchemaEvidence": "unknown"
+  },
   "cloudflare": {
     "primaryHosts": ["foundercontrolroom.org", "api.foundercontrolroom.org"],
-    "activeWorker": "founder-control-room",
-    "retiredWorkersNoNewAuthority": ["founder-control-room2"],
     "managedWaf": {
-      "enabled": true,
-      "mode": "prevention-ready",
-      "ruleFamilies": ["OWASP Core Rules", "Cloudflare Managed Rules", "Known bad bots"]
+      "desired": true,
+      "planAware": true,
+      "productionApplied": "unknown",
+      "blockModeAuthorized": false,
+      "baseline": "best-available-managed-ruleset-for-plan",
+      "upgradeWhenAvailable": ["Cloudflare Managed Ruleset", "OWASP Core Ruleset"]
     },
     "apiShield": {
-      "schemaValidation": "log-then-block",
-      "jwtValidation": "required-on-private-api",
-      "sessionIdentifier": "Authorization"
+      "schemaValidation": {
+        "desired": true,
+        "planAware": true,
+        "activationReady": false,
+        "productionApplied": "unknown",
+        "requiresVerifiedOpenApiV3": true,
+        "repositoryOpenApiV3Evidence": "unknown"
+      },
+      "sessionAuth": {
+        "edgeJwtRequired": false,
+        "applicationAuthority": "supabase-bearer-or-httponly-founder-cookie-plus-founder_users-allowlist"
+      }
     },
-    "authenticatedOriginPulls": "required-before-direct-origin-exposure"
+    "botDefense": {
+      "desired": true,
+      "planAware": true,
+      "productionApplied": "unknown",
+      "zoneWideChallengeAuthorized": false,
+      "activationReady": false,
+      "requiresMachineClientCompatibilityProof": true,
+      "machineClientsToPreserve": [
+        "github-webhooks",
+        "n8n",
+        "mcp",
+        "proof-of-ship-receipts",
+        "founder-review-email-ingress"
+      ]
+    },
+    "authenticatedOriginPulls": {
+      "desiredBeforeDirectOriginExposure": true,
+      "productionApplied": "unknown"
+    }
+  },
+  "bindings": {
+    "conveyor": {
+      "mountPath": "/automation/conveyor",
+      "readPath": "/",
+      "advancePath": "/advance",
+      "fullMutationPath": "/automation/conveyor/advance",
+      "founderAuthMiddleware": "requireFounder",
+      "sameOriginBrowserMutationGateBeforeMount": true
+    }
   },
   "controls": {
     "rateLimiting": {
-      "enabled": true,
-      "strategy": "per-ip-plus-session-key",
-      "routes": [
-        { "match": "/api/*", "limit": 60, "periodSeconds": 10, "action": "challenge-then-block" },
-        { "match": "/api/founder-conveyor/*", "limit": 20, "periodSeconds": 60, "action": "block" },
-        { "match": "/health", "limit": 120, "periodSeconds": 60, "action": "log" }
+      "desired": true,
+      "productionApplied": "unknown",
+      "strategy": "edge-observe-then-enforce-plus-application-baseline",
+      "applicationBaseline": {
+        "generalPerIp": { "limit": 60, "periodSeconds": 60 },
+        "magicLinkPerIp": { "limit": 5, "periodSeconds": 900 }
+      },
+      "edgeRoutes": [
+        {
+          "method": "GET",
+          "path": "/automation/conveyor/",
+          "limit": 60,
+          "periodSeconds": 60,
+          "enforcement": "observe-before-block"
+        },
+        {
+          "method": "POST",
+          "path": "/automation/conveyor/advance",
+          "limit": 20,
+          "periodSeconds": 60,
+          "enforcement": "observe-before-block"
+        }
       ]
-    },
-    "botDefense": {
-      "enabled": true,
-      "mode": "challenge_unknown_automation",
-      "allowVerifiedGoodBots": true,
-      "preserveHumanSignupAndLogin": true
     },
     "auth": {
       "failClosed": true,
       "privateRoutesRequireServerVerifiedSession": true,
-      "serverOnlySecrets": ["GITHUB_WEBHOOK_SECRET", "FOUNDER_SIGNAL_ENGINE_MCP_TOKEN", "HUBSPOT_PRIVATE_APP_TOKEN", "SUPABASE_SERVICE_ROLE_KEY"],
-      "forbiddenClientSecrets": true
+      "founderSessionMethods": ["supabase-bearer", "httponly-founder-session-cookie"],
+      "founderAllowlist": "founder_users",
+      "edgeJwtRequired": false,
+      "forbiddenClientSecrets": true,
+      "criticalServerOnlySecrets": ["SUPABASE_SERVICE_ROLE_KEY", "N8N_CONVEYOR_BEARER_TOKEN"]
     },
     "headers": {
-      "csp": true,
-      "hsts": true,
-      "xFrameOptions": "DENY",
-      "referrerPolicy": "strict-origin-when-cross-origin",
+      "runtimeObserved": {
+        "hstsInProduction": true,
+        "referrerPolicy": "no-referrer",
+        "xFrameOptions": "SAMEORIGIN"
+      },
+      "csp": {
+        "desired": true,
+        "productionApplied": "unknown",
+        "activationMode": "report-only-until-surface-proof",
+        "surfaceProofRequired": true
+      },
       "controlRoomCache": "no-store"
     },
     "integrations": {
@@ -62,7 +127,7 @@
     },
     "productDesign": {
       "blockedStateMustBeHumanReadable": true,
-      "doNotUseCAPTCHAOnFirstPassWhenChallengeWorks": true,
+      "doNotUseCaptchaOnFirstPassWhenChallengeWorks": true,
       "legitimateUsersGetRecoveryPath": true,
       "noMisleadingConnectedOrProtectedClaims": true
     }
