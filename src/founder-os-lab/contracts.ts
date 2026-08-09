@@ -108,7 +108,6 @@ export interface FounderOsLabApproval {
   projectSlug?: string;
   expectedHeadSha?: string;
   capabilityPlanHash?: string;
-  expiresAt?: string;
 }
 
 export interface FounderOsLabEvidence {
