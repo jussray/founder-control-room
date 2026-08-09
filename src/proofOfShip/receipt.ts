@@ -72,11 +72,14 @@ function canonicalLinkedInUrl(value: unknown): string {
     throw new ProofOfShipReceiptError('invalid_live_post_url');
   }
   const hostname = parsed.hostname.toLowerCase();
+  const isLinkedInHost = hostname === 'linkedin.com' || hostname.endsWith('.linkedin.com');
+  const isPostRoute = parsed.pathname.startsWith('/feed/update/') || parsed.pathname.startsWith('/posts/');
   if (
     parsed.protocol !== 'https:' ||
     parsed.username ||
     parsed.password ||
-    (hostname !== 'linkedin.com' && !hostname.endsWith('.linkedin.com'))
+    !isLinkedInHost ||
+    !isPostRoute
   ) {
     throw new ProofOfShipReceiptError('invalid_live_post_url');
   }
