@@ -9,6 +9,10 @@ import {
   FOUNDER_CONVEYOR_IDEMPOTENCY_PREFIX,
   founderConveyorReceiptId,
 } from './founderConveyorReceipt.js';
+import {
+  v10ConveyorEvidenceDigest,
+  type V10ConveyorReceiptStore,
+} from './v10ConveyorReceiptStore.js';
 
 export const FOUNDER_CONVEYOR_STAGES = [
   'chat',
@@ -42,6 +46,7 @@ export interface FounderConveyorDispatchResult {
   ok: boolean;
   code:
     | 'DISPATCHED'
+    | 'DISPATCH_AUDIT_INCOMPLETE'
     | 'CONVEYOR_DISABLED'
     | 'CONVEYOR_NOT_CONFIGURED'
     | 'INVALID_TRANSITION'
@@ -58,6 +63,7 @@ export interface FounderConveyorDispatchResult {
 interface DispatchOptions {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
+  receiptStore?: V10ConveyorReceiptStore;
 }
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
@@ -105,6 +111,10 @@ export function readFounderConveyorConfig(env: NodeJS.ProcessEnv = process.env):
     webhookUrl,
     bearerToken,
   };
+}
+
+export function v10ReceiptPersistenceRequired(env: NodeJS.ProcessEnv = process.env): boolean {
+  return text(env.FCR_V10_RECEIPT_PERSISTENCE_REQUIRED).toLowerCase() === 'true';
 }
 
 export function validateFounderConveyorAdvance(input: FounderConveyorAdvanceInput): string[] {
@@ -201,11 +211,33 @@ export function expectedFounderConveyorReceiptId(input: FounderConveyorAdvanceIn
   });
 }
 
+async function persistAcceptedReceipt(
+  input: FounderConveyorAdvanceInput,
+  receiptId: string,
+  receiptStore?: V10ConveyorReceiptStore,
+) {
+  const store = receiptStore ?? (await import('./v10ConveyorReceiptStore.js')).supabaseV10ConveyorReceiptStore;
+  return store.store({
+    receiptId,
+    runId: text(input.runId),
+    projectSlug: text(input.projectSlug),
+    expectedHeadSha: text(input.expectedHeadSha).toLowerCase(),
+    capabilityPlanHash: input.capabilityPlan.planHash.toLowerCase(),
+    registryHash: input.capabilityPlan.registryHash.toLowerCase(),
+    fromStage: input.fromStage,
+    toStage: input.toStage,
+    requestedAuthority: input.capabilityPlan.requestedAuthority,
+    executionStatus: 'accepted',
+    evidenceDigest: v10ConveyorEvidenceDigest(input.evidenceUrls),
+  });
+}
+
 export async function dispatchFounderConveyorAdvance(
   input: FounderConveyorAdvanceInput,
   options: DispatchOptions = {},
 ): Promise<FounderConveyorDispatchResult> {
-  const config = readFounderConveyorConfig(options.env);
+  const env = options.env ?? process.env;
+  const config = readFounderConveyorConfig(env);
 
   if (!config.enabled) {
     return {
@@ -316,6 +348,33 @@ export async function dispatchFounderConveyorAdvance(
         receiptId,
         reasons: ['n8n receipt does not match the canonical v3 capability-plan-bound transition identity'],
       };
+    }
+
+    if (v10ReceiptPersistenceRequired(env)) {
+      try {
+        const disposition = await persistAcceptedReceipt(input, receiptId, options.receiptStore);
+        if (disposition === 'conflict') {
+          return {
+            ok: false,
+            code: 'DISPATCH_AUDIT_INCOMPLETE',
+            status: 500,
+            receiptId,
+            reasons: [
+              'n8n accepted the transition but the Supabase V10 receipt identity conflicts with an existing audit record; do not retry automatically',
+            ],
+          };
+        }
+      } catch {
+        return {
+          ok: false,
+          code: 'DISPATCH_AUDIT_INCOMPLETE',
+          status: 500,
+          receiptId,
+          reasons: [
+            'n8n accepted the transition but the Supabase V10 receipt could not be persisted; do not retry automatically',
+          ],
+        };
+      }
     }
 
     return {
