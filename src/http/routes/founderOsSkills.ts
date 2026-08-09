@@ -11,6 +11,10 @@ import {
   type FounderOsLabProviderId,
   type FounderOsLabRequest,
 } from '../../founder-os-lab/contracts.js';
+import {
+  isV10CapabilityPlan,
+  type V10CapabilityPlan,
+} from '../../founder-os-lab/capabilityKernel.js';
 import { FOUNDER_OS_LAB_PROJECT_ADAPTERS } from '../../founder-os-lab/projectAdapters.js';
 import {
   FOUNDER_OS_LAB_ACTION_ROUTES,
@@ -24,6 +28,7 @@ export const founderOsSkillsRouter = Router();
 founderOsSkillsRouter.use(requireFounder);
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
+const SHA256 = /^[0-9a-f]{64}$/i;
 const ACTIONS = new Set<FounderOsLabAction>(
   Object.keys(FOUNDER_OS_LAB_ACTION_ROUTES) as FounderOsLabAction[],
 );
@@ -45,6 +50,7 @@ const TOP_LEVEL_FIELDS = new Set([
   'approval',
   'evidence',
   'project',
+  'capabilityPlan',
   'socialPost',
 ]);
 const EVIDENCE_FIELDS = new Set([
@@ -64,6 +70,13 @@ const PROJECT_FIELDS = new Set([
   'sourceCommitSha',
   'contractUrls',
   'audience',
+]);
+const APPROVAL_FIELDS = new Set([
+  'id',
+  'actions',
+  'projectSlug',
+  'expectedHeadSha',
+  'capabilityPlanHash',
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -112,7 +125,7 @@ function boundedHttpsUrls(value: unknown, maximumItems: number): string[] | null
 
 function parseApproval(value: unknown): FounderOsLabApproval | undefined | null {
   if (value === undefined || value === null) return undefined;
-  if (!isRecord(value) || !hasOnlyFields(value, new Set(['id', 'actions']))) return null;
+  if (!isRecord(value) || !hasOnlyFields(value, APPROVAL_FIELDS)) return null;
 
   const id = boundedString(value.id, 300);
   if (!id || !Array.isArray(value.actions) || value.actions.length === 0 || value.actions.length > 20) {
@@ -125,7 +138,33 @@ function parseApproval(value: unknown): FounderOsLabApproval | undefined | null 
     if (!actions.includes(action as FounderOsLabAction)) actions.push(action as FounderOsLabAction);
   }
 
-  return { id, actions };
+  const projectSlug = value.projectSlug === undefined
+    ? undefined
+    : boundedString(value.projectSlug, 300) ?? null;
+  const expectedHeadSha = value.expectedHeadSha === undefined
+    ? undefined
+    : boundedString(value.expectedHeadSha, 40)?.toLowerCase() ?? null;
+  const capabilityPlanHash = value.capabilityPlanHash === undefined
+    ? undefined
+    : boundedString(value.capabilityPlanHash, 64)?.toLowerCase() ?? null;
+
+  if (
+    projectSlug === null
+    || expectedHeadSha === null
+    || capabilityPlanHash === null
+    || (expectedHeadSha && !EXACT_COMMIT_SHA.test(expectedHeadSha))
+    || (capabilityPlanHash && !SHA256.test(capabilityPlanHash))
+  ) {
+    return null;
+  }
+
+  return {
+    id,
+    actions,
+    ...(projectSlug ? { projectSlug } : {}),
+    ...(expectedHeadSha ? { expectedHeadSha } : {}),
+    ...(capabilityPlanHash ? { capabilityPlanHash } : {}),
+  };
 }
 
 function parseEvidence(value: unknown): FounderOsLabEvidence | undefined | null {
@@ -227,6 +266,11 @@ function parseProject(value: unknown): FounderOsLabProjectContext | undefined | 
   };
 }
 
+function parseCapabilityPlan(value: unknown): V10CapabilityPlan | undefined | null {
+  if (value === undefined || value === null) return undefined;
+  return isV10CapabilityPlan(value) ? value : null;
+}
+
 founderOsSkillsRouter.post('/preview', (req, res) => {
   const body = req.body as unknown;
   if (!isRecord(body) || !hasOnlyFields(body, TOP_LEVEL_FIELDS)) {
@@ -250,6 +294,7 @@ founderOsSkillsRouter.post('/preview', (req, res) => {
   const approval = parseApproval(body.approval);
   const evidence = parseEvidence(body.evidence);
   const project = parseProject(body.project);
+  const capabilityPlan = parseCapabilityPlan(body.capabilityPlan);
   const socialPost = body.socialPost === undefined
     ? undefined
     : isRecord(body.socialPost)
@@ -264,6 +309,7 @@ founderOsSkillsRouter.post('/preview', (req, res) => {
     || approval === null
     || evidence === null
     || project === null
+    || capabilityPlan === null
     || socialPost === null
   ) {
     return res.status(400).json({ error: 'Founder OS preview input is malformed or outside the checked-in registry.' });
@@ -277,6 +323,7 @@ founderOsSkillsRouter.post('/preview', (req, res) => {
     ...(approval ? { approval } : {}),
     ...(evidence ? { evidence } : {}),
     ...(project ? { project } : {}),
+    ...(capabilityPlan ? { capabilityPlan } : {}),
     ...(socialPost ? { socialPost } : {}),
   };
 
