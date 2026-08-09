@@ -169,7 +169,88 @@ revoke all on function public.is_v10_registry_approved(text) from public, anon, 
 grant execute on function public.is_v10_registry_approved(text) to service_role;
 
 -- -----------------------------------------------------------------------------
--- 4. Sanitized V10 execution receipts.
+-- 4. Stop the legacy privileged mission executor from bypassing V10.
+--    The current HTTP route writes its request payload into approval_executions
+--    before any provider mutation. Once this migration is live, merge and
+--    create_branch reservations must carry a verified V10 envelope in
+--    request._v10. Until that route is migrated to supply the envelope, the
+--    database rejects the reservation BEFORE GitHub is touched.
+-- -----------------------------------------------------------------------------
+create schema if not exists private;
+revoke all on schema private from public, anon, authenticated;
+
+create or replace function private.enforce_v10_approval_execution_binding()
+returns trigger
+language plpgsql
+set search_path = pg_catalog, public, private
+as $$
+declare
+  envelope jsonb;
+  required_authority text;
+  candidate_plan_hash text;
+  candidate_registry_hash text;
+  candidate_head_sha text;
+begin
+  if new.action_type not in ('merge', 'create_branch') then
+    return new;
+  end if;
+
+  envelope := coalesce(new.request, '{}'::jsonb) -> '_v10';
+  if envelope is null or jsonb_typeof(envelope) <> 'object' then
+    raise exception 'V10_BINDING_REQUIRED: privileged approval execution requires request._v10';
+  end if;
+
+  if envelope ->> 'planContract' <> 'juss-v10/capability-plan@v1' then
+    raise exception 'V10_PLAN_CONTRACT_INVALID';
+  end if;
+
+  candidate_plan_hash := lower(coalesce(envelope ->> 'capabilityPlanHash', ''));
+  candidate_registry_hash := lower(coalesce(envelope ->> 'registryHash', ''));
+  candidate_head_sha := lower(coalesce(envelope ->> 'expectedHeadSha', ''));
+
+  if candidate_plan_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'V10_PLAN_HASH_INVALID';
+  end if;
+  if candidate_registry_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'V10_REGISTRY_HASH_INVALID';
+  end if;
+  if candidate_head_sha !~ '^[0-9a-f]{40}$' then
+    raise exception 'V10_EXPECTED_HEAD_INVALID';
+  end if;
+  if length(trim(coalesce(envelope ->> 'projectSlug', ''))) = 0 then
+    raise exception 'V10_PROJECT_BINDING_REQUIRED';
+  end if;
+
+  required_authority := case
+    when new.action_type = 'merge' then 'privileged'
+    else 'reversible'
+  end;
+  if envelope ->> 'requestedAuthority' <> required_authority then
+    raise exception 'V10_AUTHORITY_MISMATCH: % requires %', new.action_type, required_authority;
+  end if;
+
+  if not public.is_v10_registry_approved(candidate_registry_hash) then
+    raise exception 'V10_REGISTRY_NOT_APPROVED';
+  end if;
+
+  new.capability_plan_hash := candidate_plan_hash;
+  new.registry_hash := candidate_registry_hash;
+  new.plan_contract := 'juss-v10/capability-plan@v1';
+  new.requested_authority := required_authority;
+  return new;
+end;
+$$;
+
+revoke all on function private.enforce_v10_approval_execution_binding() from public, anon, authenticated;
+grant execute on function private.enforce_v10_approval_execution_binding() to service_role;
+
+drop trigger if exists approval_executions_require_v10_binding on public.approval_executions;
+create trigger approval_executions_require_v10_binding
+before insert on public.approval_executions
+for each row execute function private.enforce_v10_approval_execution_binding();
+
+-- -----------------------------------------------------------------------------
+-- 5. Sanitized V10 conveyor receipts.
 --    No raw founder goal, prompt, provider token, or private content is stored.
 --    A receipt records the registry identity that Chief AI used; it does NOT
 --    imply that registry is approved. L1+ promotion must separately resolve
@@ -219,7 +300,7 @@ create index if not exists capability_execution_receipts_registry_idx
   on public.capability_execution_receipts (registry_hash, created_at desc);
 
 -- -----------------------------------------------------------------------------
--- 5. Resolve the live Supabase security-advisor warning on the public trigger
+-- 6. Resolve the live Supabase security-advisor warning on the public trigger
 --    function without touching managed Stripe schema functions.
 -- -----------------------------------------------------------------------------
 do $$
