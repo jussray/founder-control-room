@@ -104,7 +104,7 @@ export function evaluateFounderFinalDecision(input: FounderFinalDecisionInput): 
     reasons.push('n8n receipt is missing');
   } else if (input.n8nReceiptId && input.n8nReceiptId !== expectedReceiptId) {
     decision = 'BLOCK';
-    reasons.push('n8n receipt does not match the canonical v2 transition identity');
+    reasons.push('n8n receipt does not match the canonical v3 capability-plan-bound transition identity');
   }
 
   if (input.researchRequired && input.pythonSummaries.length === 0 && decision !== 'BLOCK') {
