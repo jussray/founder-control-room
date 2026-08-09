@@ -26,7 +26,7 @@ env:
 
 jobs:
   verify-downstream-receipt:
-    name: Verify exact-head Zapier and Buffer receipt
+    name: Verify exact-head downstream publication state
     if: >-
       ${{
         github.event_name == 'workflow_dispatch' ||
@@ -40,7 +40,15 @@ jobs:
       FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
       EXPECTED_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.expected_sha }}
     steps:
-      - name: Validate exact-head receipt configuration
+      - name: Check out the exact deployed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Resolve exact-head publication mode
+        id: mode
         shell: bash
         run: |
           set -euo pipefail
@@ -49,6 +57,37 @@ jobs:
             echo '::error title=Invalid exact head::Expected receipt SHA must be a lowercase 40-character commit SHA.'
             exit 1
           fi
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+          if grep -Eq "^[[:space:]]+PUBLISH_ALLOWED: 'false'$" .github/workflows/deploy.yml; then
+            echo 'receipt_required=false' >> "$GITHUB_OUTPUT"
+            {
+              echo '### Proof-of-Ship downstream state: founder review hold'
+              echo
+              echo "- repository: $GITHUB_REPOSITORY"
+              echo "- exact SHA: $EXPECTED_SHA"
+              echo '- publication allowed: false'
+              echo '- downstream receipt required: false'
+              echo
+              echo 'The deployed exact head is intentionally review-only. No Zapier or Buffer scheduling receipt is expected.'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if grep -Eq "^[[:space:]]+PUBLISH_ALLOWED: 'true'$" .github/workflows/deploy.yml; then
+            echo 'receipt_required=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo '::error title=Publication mode unknown::deploy.yml must declare an explicit PUBLISH_ALLOWED true/false authority state.'
+          exit 1
+
+      - name: Validate exact-head receipt configuration
+        if: steps.mode.outputs.receipt_required == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
           if [[ -z "$DEPLOY_URL" || "$DEPLOY_URL" != https://* ]]; then
             echo '::error title=Receipt lookup URL missing::DEPLOY_URL must be a configured HTTPS production origin.'
             exit 1
@@ -58,14 +97,8 @@ jobs:
             exit 1
           fi
 
-      - name: Check out the exact deployed commit
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.EXPECTED_SHA }}
-          fetch-depth: 1
-          persist-credentials: false
-
       - name: Verify checkout and resolve expected LinkedIn baseline
+        if: steps.mode.outputs.receipt_required == 'true'
         id: expected
         shell: bash
         run: |
@@ -79,6 +112,7 @@ jobs:
           echo "idempotency_key=$idempotency_key" >> "$GITHUB_OUTPUT"
 
       - name: Wait for canonical downstream receipt
+        if: steps.mode.outputs.receipt_required == 'true'
         id: receipt
         shell: bash
         env:
@@ -168,6 +202,7 @@ jobs:
           echo "scheduled_at=$scheduled_at" >> "$GITHUB_OUTPUT"
 
       - name: Publish exact-head downstream proof summary
+        if: steps.mode.outputs.receipt_required == 'true'
         shell: bash
         env:
           BASELINE_REF: ${{ steps.expected.outputs.baseline_ref }}
