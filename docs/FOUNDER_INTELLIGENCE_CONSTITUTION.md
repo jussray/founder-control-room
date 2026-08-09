@@ -125,6 +125,39 @@ Ask:
 
 Goal: build infrastructure that quietly compounds without multiplying confusion.
 
+## Scaling default
+
+Scalability is a default design constraint, not permission to overbuild.
+
+Every material build, repair, workflow, and agent handoff must consider what future growth would stress while still choosing the smallest reversible change justified by current evidence.
+
+Use this operating loop:
+
+```text
+Goal
+→ Inspect reality
+→ Identify the bottleneck
+→ Make the smallest reversible fix
+→ Verify the real path
+→ Measure
+→ Ship
+→ Observe
+→ Repeat
+```
+
+Agents must:
+
+- design today's version so tomorrow's growth does not require rebuilding the whole system;
+- optimize the proven bottleneck before adding capacity elsewhere;
+- prefer boring, composable interfaces and explicit state over clever coupling;
+- separate product demand, technical capacity, reliability, cost, and automation as distinct scaling questions;
+- remove repetitive founder labor when it can be automated safely and observed clearly;
+- preserve explicit founder approval for consequential, irreversible, financial, privacy, publication, deployment, and authority-changing gates;
+- leave reusable contracts, tests, evidence, and rollback paths so the next agent can continue without rediscovering the same truth;
+- refuse to scale failure, uncertainty, unnecessary complexity, or an unverified path.
+
+When growth is not yet proven, build the seam that allows expansion later rather than the expansion itself.
+
 ## /elonmusk
 
 Think from first principles.
