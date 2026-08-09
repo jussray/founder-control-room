@@ -8,6 +8,7 @@ on:
       - 'src/lib/n8nActivationProbe.ts'
       - 'src/lib/n8nConveyor.ts'
       - 'scripts/verify-n8n-conveyor-live.ts'
+      - 'scripts/generate-n8n-runtime-proof-plan.ts'
       - '.github/workflows/n8n-runtime-integration-proof.yml'
   workflow_dispatch:
 
@@ -54,6 +55,14 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Generate exact-head Chief capability plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp
+          N8N_CONVEYOR_PROBE_HEAD_SHA="$EXACT_SHA" npx tsx scripts/generate-n8n-runtime-proof-plan.ts > .tmp/n8n-runtime-proof-plan.json
+          printf 'N8N_CONVEYOR_CAPABILITY_PLAN_JSON=%s\n' "$(cat .tmp/n8n-runtime-proof-plan.json)" >> "$GITHUB_ENV"
+
       - name: Generate ephemeral runtime credentials
         shell: bash
         run: |
@@ -97,7 +106,7 @@ jobs:
             import:workflow --input=/workspace/automation/n8n/founder-conveyor.workflow.json
           docker compose -f "$COMPOSE_FILE" run --rm --no-deps \
             --entrypoint n8n n8n \
-            publish:workflow --id=fcrFounderConveyorV2
+            publish:workflow --id=fcrFounderConveyorV3
 
       - name: Start pinned n8n runtime
         shell: bash
@@ -148,6 +157,7 @@ jobs:
           N8N_CONVEYOR_WEBHOOK_URL: http://127.0.0.1:5678/webhook/founder-control-room/conveyor
           N8N_CONVEYOR_BEARER_TOKEN: ${{ env.N8N_RUNTIME_PROOF_BEARER }}
           N8N_CONVEYOR_PROBE_HEAD_SHA: ${{ env.EXACT_SHA }}
+          N8N_CONVEYOR_CAPABILITY_PLAN_JSON: ${{ env.N8N_CONVEYOR_CAPABILITY_PLAN_JSON }}
         run: |
           set -euo pipefail
           npx tsx scripts/verify-n8n-conveyor-live.ts | tee n8n-runtime-integration-receipt.json
