@@ -34,6 +34,18 @@ describe('n8n conveyor workflow artifact', () => {
     expect(serialized).not.toMatch(/Bearer\s+[A-Za-z0-9._-]{12,}/i);
   });
 
+  it('uses cloud-safe URL validation without relying on the sandbox URL global', () => {
+    const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+    const code = workflow.nodes
+      .filter((node: { type: string }) => node.type === 'n8n-nodes-base.code')
+      .map((node: { parameters: { jsCode: string } }) => node.parameters.jsCode)
+      .join('\n');
+
+    expect(code).toContain('const validEvidenceUrl = (value) =>');
+    expect(code).not.toContain('new URL(');
+    expect(code).toContain("fail('invalid evidence URL')");
+  });
+
   it('preserves the governed authority, skill routing, and canonical v2 receipt contract', () => {
     const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
     const code = workflow.nodes
