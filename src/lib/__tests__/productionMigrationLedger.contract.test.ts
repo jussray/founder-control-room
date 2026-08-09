@@ -11,6 +11,7 @@ const verifier = resolve(repositoryRoot, 'scripts/verify-production-migration-le
 const verifierSource = readFileSync(verifier, 'utf8');
 const deployWorkflow = readFileSync(resolve(repositoryRoot, '.github/workflows/deploy.yml'), 'utf8');
 const requiredVersions = '20260723000000,20260803011000';
+const PROOF_OF_SHIP_PRODUCTION_MIGRATION = '20260809000109';
 const V10_MIGRATION = '20260809072500';
 const temporaryDirectories: string[] = [];
 
@@ -74,12 +75,20 @@ describe('production migration ledger verifier', () => {
 
   it('keeps pending local migrations visible during preflight without mistaking the local column for remote proof', async () => {
     const directory = await fixture(
-      ['20260723000000', '20260803011000', '20260804054127', '20260805235708', V10_MIGRATION],
+      [
+        '20260723000000',
+        '20260803011000',
+        '20260804054127',
+        '20260805235708',
+        PROOF_OF_SHIP_PRODUCTION_MIGRATION,
+        V10_MIGRATION,
+      ],
       [
         ['20260723000000', ''],
         ['20260803011000', ''],
         ['20260804054127', '20260804054127'],
         ['20260805235708', '20260805235708'],
+        [PROOF_OF_SHIP_PRODUCTION_MIGRATION, PROOF_OF_SHIP_PRODUCTION_MIGRATION],
         [V10_MIGRATION, ''],
       ],
     );
@@ -135,9 +144,14 @@ describe('production migration ledger verifier', () => {
   it('uses the exact production migration identities and rejects the forked filenames', () => {
     expect(existsSync(resolve(repositoryRoot, 'supabase/migrations/20260804054127_storyengine_repository_identity.sql'))).toBe(true);
     expect(existsSync(resolve(repositoryRoot, 'supabase/migrations/20260805235708_harden_outbox_claim_ownership.sql'))).toBe(true);
+    expect(existsSync(resolve(
+      repositoryRoot,
+      `supabase/migrations/${PROOF_OF_SHIP_PRODUCTION_MIGRATION}_proof_of_ship_receipts.sql`,
+    ))).toBe(true);
     expect(existsSync(resolve(repositoryRoot, `supabase/migrations/${V10_MIGRATION}_v10_capability_governance.sql`))).toBe(true);
     expect(existsSync(resolve(repositoryRoot, 'supabase/migrations/20260804_storyengine_repository_identity.sql'))).toBe(false);
     expect(existsSync(resolve(repositoryRoot, 'supabase/migrations/20260721105000_harden_outbox_claim_ownership.sql'))).toBe(false);
+    expect(existsSync(resolve(repositoryRoot, 'supabase/migrations/20260808061500_proof_of_ship_receipts.sql'))).toBe(false);
   });
 
   it('wires exact preflight and post-push ledger receipts into the manual Deploy workflow', () => {
