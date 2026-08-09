@@ -13,6 +13,7 @@ import {
   validateFounderConveyorAdvance,
   type FounderConveyorAdvanceInput,
 } from '../n8nConveyor.js';
+import type { V10ConveyorReceiptRecord } from '../v10ConveyorReceiptStore.js';
 
 const SHA = 'a'.repeat(40);
 const REGISTRY_HASH = 'b'.repeat(64);
@@ -191,7 +192,7 @@ describe('n8n founder conveyor contract', () => {
       evidenceUrls: [proofUrl],
     });
     const expectedReceipt = expectedFounderConveyorReceiptId(input);
-    const store = vi.fn(async (receipt: Record<string, unknown>) => {
+    const store = vi.fn(async (receipt: V10ConveyorReceiptRecord) => {
       expect(receipt).toMatchObject({
         receiptId: expectedReceipt,
         runId: 'run-123',
