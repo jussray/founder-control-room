@@ -7,6 +7,10 @@ on:
         description: Exact Founder Control Room commit SHA to probe
         required: true
         type: string
+      capability_plan_json:
+        description: Exact juss-v10/capability-plan@v1 JSON supplied from the Chief AI boundary
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -23,19 +27,21 @@ jobs:
       N8N_CONVEYOR_WEBHOOK_URL: ${{ secrets.N8N_CONVEYOR_WEBHOOK_URL }}
       N8N_CONVEYOR_BEARER_TOKEN: ${{ secrets.N8N_CONVEYOR_BEARER_TOKEN }}
       N8N_CONVEYOR_PROBE_HEAD_SHA: ${{ inputs.target_sha }}
+      N8N_CONVEYOR_CAPABILITY_PLAN_JSON: ${{ inputs.capability_plan_json }}
     steps:
       - name: Check out exact target
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.target_sha }}
 
-      - name: Verify immutable target
+      - name: Verify immutable target and required probe inputs
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${N8N_CONVEYOR_PROBE_HEAD_SHA}"
           test -n "${N8N_CONVEYOR_WEBHOOK_URL}"
           test -n "${N8N_CONVEYOR_BEARER_TOKEN}"
+          test -n "${N8N_CONVEYOR_CAPABILITY_PLAN_JSON}"
 
       - name: Set up Node
         uses: actions/setup-node@v4
