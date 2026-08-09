@@ -142,16 +142,19 @@ alter table public.capability_registry_snapshots enable row level security;
 drop policy if exists "control_room_service_role_only" on public.capability_registry_snapshots;
 create policy "control_room_service_role_only" on public.capability_registry_snapshots
   for all
-  using ((select auth.role()) = 'service_role')
-  with check ((select auth.role()) = 'service_role');
+  to service_role
+  using (true)
+  with check (true);
 revoke all on table public.capability_registry_snapshots from anon, authenticated;
 grant select, insert, update on table public.capability_registry_snapshots to service_role;
 
+-- Deliberately SECURITY INVOKER: service_role already owns the server-side
+-- authority needed here, so the exposed public schema does not gain a security-
+-- definer escalation surface.
 create or replace function public.is_v10_registry_approved(candidate_hash text)
 returns boolean
 language sql
 stable
-security definer
 set search_path = pg_catalog, public
 as $$
   select exists (
@@ -199,8 +202,9 @@ alter table public.capability_execution_receipts enable row level security;
 drop policy if exists "control_room_service_role_only" on public.capability_execution_receipts;
 create policy "control_room_service_role_only" on public.capability_execution_receipts
   for all
-  using ((select auth.role()) = 'service_role')
-  with check ((select auth.role()) = 'service_role');
+  to service_role
+  using (true)
+  with check (true);
 revoke all on table public.capability_execution_receipts from anon, authenticated;
 grant select, insert, update on table public.capability_execution_receipts to service_role;
 
