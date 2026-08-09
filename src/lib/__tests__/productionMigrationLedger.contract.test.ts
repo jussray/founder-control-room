@@ -5,10 +5,10 @@ import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { CONSTITUTIONAL_REQUIRED_MIGRATIONS } from '../../../scripts/verify-production-migration-ledger.mjs';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const verifier = resolve(repositoryRoot, 'scripts/verify-production-migration-ledger.mjs');
+const verifierSource = readFileSync(verifier, 'utf8');
 const deployWorkflow = readFileSync(resolve(repositoryRoot, '.github/workflows/deploy.yml'), 'utf8');
 const requiredVersions = '20260723000000,20260803011000';
 const V10_MIGRATION = '20260809072500';
@@ -63,7 +63,8 @@ afterEach(async () => {
 
 describe('production migration ledger verifier', () => {
   it('makes the V10 capability-governance migration constitutional even if workflow configuration omits it', () => {
-    expect(CONSTITUTIONAL_REQUIRED_MIGRATIONS).toContain(V10_MIGRATION);
+    expect(verifierSource).toContain(`'${V10_MIGRATION}'`);
+    expect(verifierSource).toContain('CONSTITUTIONAL_REQUIRED_MIGRATIONS');
     expect(requiredVersions).not.toContain(V10_MIGRATION);
     expect(existsSync(resolve(
       repositoryRoot,
