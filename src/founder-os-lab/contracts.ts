@@ -1,4 +1,5 @@
 import type { FirstPartySocialPostInput } from '../lib/firstPartySocialPublisher.js';
+import type { V10CapabilityPlan } from './capabilityKernel.js';
 
 export const FOUNDER_OS_LAB_VERSION = 'founder-os-lab-v1' as const;
 
@@ -20,6 +21,9 @@ export type FounderOsLabSkillId =
   | 'review-verify-merge';
 
 export type FounderOsLabCommandId =
+  | 'human'
+  | 'futureyou'
+  | 'v10'
   | 'goalfix'
   | 'ultrathink'
   | 'truthmode'
@@ -31,6 +35,12 @@ export type FounderOsLabCommandId =
   | 'build'
   | 'billgates'
   | 'elonmusk'
+  | 'firstprinciples'
+  | 'socrates'
+  | 'ycombinator'
+  | 'antiadvice'
+  | 'hormozi'
+  | 'unlearn'
   | 'loop';
 
 export type FounderOsLabProviderId =
@@ -53,6 +63,11 @@ export type FounderOsLabCapabilityId =
   | 'founder-routing'
   | 'repository-inspection'
   | 'proof-validation'
+  | 'capability-plan-validation'
+  | 'capability-provenance-validation'
+  | 'authority-boundary-validation'
+  | 'decision-card-preview'
+  | 'outcome-observation-preview'
   | 'social-draft-validation'
   | 'buffer-handoff-preview'
   | 'merge-readiness-preview'
@@ -90,6 +105,10 @@ export type FounderOsLabEvidenceField =
 export interface FounderOsLabApproval {
   id: string;
   actions: FounderOsLabAction[];
+  projectSlug?: string;
+  expectedHeadSha?: string;
+  capabilityPlanHash?: string;
+  expiresAt?: string;
 }
 
 export interface FounderOsLabEvidence {
@@ -120,6 +139,7 @@ export interface FounderOsLabRequest {
   approval?: FounderOsLabApproval;
   evidence?: FounderOsLabEvidence;
   project?: FounderOsLabProjectContext;
+  capabilityPlan?: V10CapabilityPlan;
   socialPost?: FirstPartySocialPostInput;
 }
 
@@ -164,16 +184,28 @@ export interface FounderOsLabProjectRoute {
 
 export interface FounderOsLabCommandRoute {
   id: FounderOsLabCommandId;
-  specialistSkill: FounderOsLabSkillId;
   role: string;
+  class: 'founder' | 'strategic' | 'truth' | 'execution' | 'creative';
+}
+
+export interface FounderOsLabCapabilityPlanRoute {
+  observed: boolean;
+  valid: boolean;
+  selectedBy: 'chief-ai-machine' | null;
+  planHash: string | null;
+  registryHash: string | null;
+  capabilityIds: string[];
+  strategicLenses: string[];
+  outcomeSignals: string[];
+  errors: string[];
 }
 
 export interface FounderOsLabRoute {
   chiefSkill: 'juss-chief-ai';
-  specialistSkill: FounderOsLabSkillId;
   command: FounderOsLabCommandRoute;
   provider: FounderOsLabProviderRoute;
   project: FounderOsLabProjectRoute | null;
+  capabilityPlan: FounderOsLabCapabilityPlanRoute;
   capabilities: FounderOsLabCapabilityId[];
   adapters: FounderOsLabAdapterId[];
 }
@@ -196,6 +228,7 @@ export interface FounderOsLabPlan {
     executionAllowed: false;
     approvalRequired: boolean;
     approvalObserved: boolean;
+    capabilityPlanBound: boolean;
   };
   route: FounderOsLabRoute;
   truth: {
