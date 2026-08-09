@@ -15,28 +15,32 @@ function section(source: string, start: string, end: string): string {
   return source.slice(startIndex, endIndex);
 }
 
-describe('autonomous proof-of-ship publication contract', () => {
-  it('starts only after a successful Deploy and consumes its verified proof artifact', () => {
-    expect(workflow).toContain('workflow_run:');
-    expect(workflow).toContain('workflows: ["Deploy"]');
-    expect(workflow).toContain("github.event.workflow_run.conclusion == 'success'");
+describe('explicit proof-of-ship publication contract', () => {
+  it('requires manual exact-SHA dispatch and auditable founder approval', () => {
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).not.toContain('workflow_run:');
+    expect(workflow).toContain('founder_approval_id:');
+    expect(workflow).toContain('FOUNDER_APPROVAL_ID: ${{ inputs.founder_approval_id }}');
     expect(workflow).toContain('proof-of-ship-founder-review-${{ env.EXPECTED_SHA }}');
     expect(workflow).toContain('run-id: ${{ env.DEPLOY_RUN_ID }}');
     expect(workflow).toContain('.cloudflare_live_sha == $sha');
     expect(workflow).toContain('((.supabase_state == "verified") or (.supabase_state == "not_applicable"))');
   });
 
-  it('uses standing authority without restoring a manual approval gate', () => {
+  it('promotes held proof only through explicit founder approval', () => {
     const payload = section(
       workflow,
-      '      - name: Build autonomous publication payload',
-      '      - name: Send verified accomplishment to publication conveyor',
+      '      - name: Build explicitly approved publication payload',
+      '      - name: Send approved accomplishment to publication conveyor',
     );
 
     expect(payload).toContain('.publish_allowed = true');
     expect(payload).toContain('.PUBLISH_ALLOWED = true');
-    expect(payload).toContain('.authorization_mode = "standing-policy"');
-    expect(payload).toContain('.review_window_minutes = 0');
+    expect(payload).toContain('.authorization_mode = "explicit-founder-approval"');
+    expect(payload).toContain('--arg founder_approval_id "$FOUNDER_APPROVAL_ID"');
+    expect(payload).toContain('.founder_approval_id == $approval');
+    expect(payload).not.toContain('.authorization_mode = "standing-policy"');
+    expect(payload).not.toContain('standing-policy:');
     expect(payload).toContain('.notification_mode = "sms_after_publish"');
     expect(payload).toContain('.completion_contract = "published_live_url_and_sms_delivered_v1"');
   });
@@ -45,7 +49,7 @@ describe('autonomous proof-of-ship publication contract', () => {
     const receipt = section(
       workflow,
       '      - name: Wait for live publication and delivered SMS receipt',
-      '      - name: Publish autonomous conveyor proof summary',
+      '      - name: Publish approved conveyor proof summary',
     );
 
     expect(receipt).toContain('.receipt.bufferTerminalAction == "schedule"');
@@ -53,7 +57,7 @@ describe('autonomous proof-of-ship publication contract', () => {
     expect(receipt).toContain('(.receipt.livePostUrl | startswith("https://"))');
     expect(receipt).toContain('.receipt.smsNotificationStatus == "delivered"');
     expect(receipt).toContain('(.receipt.smsMessageId | type == "string" and length > 0)');
-    expect(receipt).toContain('Autopost completion unproven');
+    expect(receipt).toContain('Publication completion unproven');
   });
 
   it('keeps phone numbers and post bodies out of the database migration', () => {
