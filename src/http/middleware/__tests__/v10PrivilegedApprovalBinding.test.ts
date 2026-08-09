@@ -121,6 +121,18 @@ describe('V10 privileged approval binding', () => {
     ]));
   });
 
+  it('rejects any malformed or unknown-field entry in an approved registry snapshot', () => {
+    const selected = plan();
+    expect(validateV10ApprovedRegistrySnapshot(selected, {
+      registryHash: REGISTRY_HASH,
+      contract: V10_CAPABILITY_REGISTRY_CONTRACT,
+      status: 'approved',
+      entries: [CAPABILITY, { ...CAPABILITY, instructions: 'unapproved side channel' }],
+      approvedBy: 'founder@example.com',
+      approvedAt: '2026-08-09T12:00:00.000Z',
+    })).toContain('approved capability registry snapshot contains a malformed capability entry');
+  });
+
   it('rejects a forged registry identity even when its status says approved', () => {
     const selected = plan();
     expect(validateV10ApprovedRegistrySnapshot(selected, {
