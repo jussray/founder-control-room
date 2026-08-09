@@ -129,7 +129,10 @@ describe('Cloudflare Worker handler composition', () => {
     if (!handler.fetch) throw new Error('fetch handler is missing');
     const result = await handler.fetch(request as never, env, ctx);
 
-    expect(result).toBe(response);
+    expect(result).not.toBe(response);
+    expect(result.status).toBe(202);
+    expect(result.headers.get('x-founder-control-room-service')).toBe('founder-control-room');
+    await expect(result.text()).resolves.toBe('ok');
     expect(mockFetch).toHaveBeenCalledWith(request, env, ctx);
     expect(loadReconciler).not.toHaveBeenCalled();
   });
