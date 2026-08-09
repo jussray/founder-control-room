@@ -28,18 +28,35 @@ const receipt = {
   occurredAt: '2026-08-08T06:41:06.000Z',
 } as const;
 
+function expectInvalidLivePostUrl(livePostUrl: string) {
+  try {
+    validateProofOfShipReceipt({ ...receipt, livePostUrl });
+    throw new Error('expected validation to fail');
+  } catch (error) {
+    expect(error).toBeInstanceOf(ProofOfShipReceiptError);
+    expect((error as ProofOfShipReceiptError).code).toBe('invalid_live_post_url');
+  }
+}
+
 describe('proof-of-ship live publication platform', () => {
   it('accepts a canonical LinkedIn live-post URL', () => {
     expect(validateProofOfShipReceipt(receipt).livePostUrl).toBe(receipt.livePostUrl);
   });
 
   it('rejects an X-only receipt as canonical LinkedIn completion proof', () => {
-    try {
-      validateProofOfShipReceipt({ ...receipt, livePostUrl: 'https://x.com/jussray/status/12345' });
-      throw new Error('expected validation to fail');
-    } catch (error) {
-      expect(error).toBeInstanceOf(ProofOfShipReceiptError);
-      expect((error as ProofOfShipReceiptError).code).toBe('invalid_live_post_url');
-    }
+    expectInvalidLivePostUrl('https://x.com/jussray/status/12345');
+  });
+
+  it('rejects a generic LinkedIn page that is not a post route', () => {
+    expectInvalidLivePostUrl('https://www.linkedin.com/');
+    expectInvalidLivePostUrl('https://www.linkedin.com/in/example/');
+  });
+
+  it('accepts LinkedIn posts routes as canonical completion proof', () => {
+    const postsReceipt = validateProofOfShipReceipt({
+      ...receipt,
+      livePostUrl: 'https://www.linkedin.com/posts/example_verified-build-activity-12345-abcd/',
+    });
+    expect(postsReceipt.livePostUrl).toContain('/posts/');
   });
 });
