@@ -7,7 +7,7 @@ const { mockGetUser } = vi.hoisted(() => ({
 vi.mock('../../lib/supabaseAuthClient.js', () => ({
   supabaseAuth: { auth: { getUser: mockGetUser } },
 }));
-vi.mock('../../lib/supabaseClient.js', () => ({ supabase: { from: vi.fn() } }));
+vi.mock('../../lib/supabaseClient.js', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }));
 
 import request from 'supertest';
 import { createServer } from '../server.js';
@@ -34,6 +34,7 @@ describe('createServer', () => {
     vi.stubEnv('SUPABASE_PROJECT_REF', 'abcdefghijklmnopqrst');
     vi.stubEnv('FCR_V10_MAX_RUNTIME_AUTHORITY', 'draft');
     vi.stubEnv('FCR_V10_REGISTRY_RESOLUTION_REQUIRED', 'true');
+    vi.stubEnv('FCR_V10_RECEIPT_PERSISTENCE_REQUIRED', 'true');
 
     const res = await request(createServer()).get('/version');
 
@@ -48,6 +49,7 @@ describe('createServer', () => {
         supabaseProjectRef: 'abcdefghijklmnopqrst',
         maxRuntimeAuthority: 'draft',
         trustedRegistryRequiredBeforeL1: true,
+        receiptPersistenceRequired: true,
       },
     });
     expect(JSON.stringify(res.body)).not.toMatch(/service-role|private-key|bearer|token/i);
