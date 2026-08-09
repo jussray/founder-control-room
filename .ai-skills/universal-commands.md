@@ -1,6 +1,6 @@
 # Universal Commands Reference
 
-> These commands work across Claude, ChatGPT, and Perplexity Computer. Type them at the start of your message to activate a behavioral mode. Modes can stack (e.g., `/lindy /artifact`).
+> These commands describe behavioral modes across Claude, ChatGPT, and Perplexity Computer. Modes can stack (for example, `/lindy /artifact`). A command may shape reasoning or output, but it never creates tool access that the current account, workspace, model, or session does not actually expose.
 
 ## Command Quick Reference
 
@@ -11,9 +11,17 @@
 | `/ooda` | Decision Loop | Observe → Orient → Decide → Act cycle | Medium |
 | `/human` | Humanized Output | Natural, direct, no AI-tells, match energy | Low |
 | `/confess` | Honest Limitations | State what you can't do, label guesses, admit unknowns | Low |
-| `/truth` | Truth Mode | No hedging, direct, no false agreement | Low |
+| `/truth` | Truth Mode | No hedging, direct truth, no false agreement | Low |
 | `/ultrathink` | Deep Reasoning | Maximum reasoning depth, systematic analysis | High |
-| `/artifact` | Working Deliverable | Must produce runnable code/file/test/command, not just text | Medium |
+| `/artifact` | Working Deliverable | Produce the strongest usable artifact the current capabilities can actually create | Medium |
+
+## Capability Truth Rule
+
+- A mode is not a permission grant.
+- Use browsing, Code Interpreter & Data Analysis, terminal, repository, file, app, action, browser automation, or external-send tools only when they are actually available in the current session.
+- Never claim a file was written, code executed, a website browsed, a repository changed, or an external action completed unless it actually happened.
+- When execution is unavailable, provide the exact verification command/test and label the result **NOT RUN**.
+- When live/current research is unavailable, label version-sensitive claims **UNVERIFIED** and preserve the exact source/query needed to verify them.
 
 ## Detailed Usage
 
@@ -23,11 +31,9 @@
 **What the AI does:**
 1. Identifies the 3 most likely failure points
 2. Lists edge cases not handled
-3. Proposes specific attacks (malformed input, empty states, concurrent access)
+3. Proposes specific attacks such as malformed input, empty states, concurrent access, or resource exhaustion
 4. Rates each: Critical / High / Medium / Low
-5. Ends with: "Top fix priority: [one thing]"
-
-**Example:** `/redteam this auth function` → AI attacks the function, finds token expiry not handled, missing rate limiting, plaintext password comparison. Rates severity. Suggests top fix.
+5. Ends with the top fix priority
 
 ---
 
@@ -36,130 +42,111 @@
 
 **What the AI does:**
 - Prefers solutions with longer proven track records
-- Standard library > third-party package
-- SQL > NoSQL (unless specific proven need)
-- Monolith > microservices (for small/medium projects)
-- Flags libraries under 1 year old: "Novel — consider [proven alternative]"
-- Decision rule: "If two solutions are equally capable, choose the older, more boring one."
+- Standard library > third-party package when equally capable
+- SQL > NoSQL unless a specific need proves otherwise
+- Monolith > microservices for small/medium systems unless scale or isolation requires more
+- Flags unusually new dependencies for additional proof
 
-**Grounding:** The Lindy effect — things with longer pasts tend to have longer futures ([Ord, 2023](https://arxiv.org/abs/2308.09045)).
+**Grounding:** Lindy-style reasoning favors solutions that have survived real use over equally capable novelty.
 
 ---
 
 ### /ooda
-**When to use:** Starting a work session, making architecture decisions, when stuck.
+**When to use:** Starting a work session, making architecture decisions, or recovering when stuck.
 
 **What the AI does:**
-- **Observe:** Current code state, available info, what changed since last check
-- **Orient:** What the info means, constraints, the actual problem (not symptom)
-- **Decide:** The single next action, alternatives, risk assessment
-- **Act:** Execute the decision, test the result, feed back into Observe
-
-**Grounding:** John Boyd's OODA loop, extensively applied to AI systems and decision-making ([Sehgal, 2024](https://www.ijfmr.com/research-paper.php?id=26389)).
+- **Observe:** Current evidence and state
+- **Orient:** Meaning, constraints, actual problem
+- **Decide:** Single next action, alternatives, risk
+- **Act:** Execute when capability and authority exist; otherwise provide the exact actionable next step and mark execution **NOT RUN**
 
 ---
 
 ### /human
-**When to use:** Always, unless you need structured/formal output.
+**When to use:** When natural, direct output is preferred.
 
 **What the AI does:**
-- Removes all AI-tells: "Great question", "I'd be happy to", "Let me break this down"
-- Uses contractions (don't, can't, won't)
-- Matches your energy level
-- Uses sentences instead of bullet lists when a sentence works
-- Talks like a competent colleague, not a help desk
+- Removes filler and canned AI phrasing
+- Uses natural contractions where appropriate
+- Matches the user's energy without sacrificing accuracy
+- Uses sentences instead of bullet lists when structure adds no value
 
 ---
 
 ### /confess
-**When to use:** At the start of any task where capabilities matter.
+**When to use:** When capability, access, or uncertainty matters.
 
 **What the AI does:**
-- States limitations upfront: "I can't run X, I can't access Y, I'm unsure about Z"
-- Labels guesses: "This is my best guess based on [evidence]"
-- Says "I don't know" — then offers to find out
-- Corrects its own errors immediately and explicitly
-- Never hedges with false confidence
-
-**Grounding:** Honest uncertainty reporting is core to AI safety ([Badea & Gilpin, 2022](https://arxiv.org/abs/2210.00608)).
+- States material limitations and unknowns
+- Labels guesses and unverified claims
+- Corrects errors immediately when new evidence changes the conclusion
+- Never converts missing access into fake certainty
 
 ---
 
 ### /truth
-**When to use:** When you need honest assessment, not encouragement.
+**When to use:** When accuracy should dominate social smoothing.
 
 **What the AI does:**
-- Direct statements only. No "It seems like" or "I believe that"
-- If something is bad, says it's bad
-- If a plan won't work, says so and explains why
-- If you're wrong, says so respectfully but directly
-- No false agreement or social lubrication
+- Uses direct statements
+- Rejects plans that do not work and explains why
+- Avoids false agreement
+- Preserves evidence labels when the answer is incomplete
 
 ---
 
 ### /ultrathink
-**When to use:** Complex architecture, tricky bugs, security design, multi-system integration.
+**When to use:** Complex architecture, difficult debugging, security design, or multi-system integration.
 
-**When NOT to use:** Simple syntax, file creation, formatting, straightforward features.
+**When NOT to use:** Simple syntax, routine formatting, or straightforward file edits.
 
 **What the AI does:**
-1. Restates the problem in precise terms
-2. Identifies all known constraints
-3. Lists possible approaches
-4. Evaluates trade-offs of each
-5. Selects approach and justifies it
-6. Executes
-7. Verifies result against original problem
-
-**Note:** Uses more tokens. Use sparingly.
+1. Restates the problem precisely
+2. Identifies constraints
+3. Enumerates approaches
+4. Evaluates trade-offs
+5. Selects the strongest approach
+6. Executes only where capability and authority exist
+7. Verifies the result, or marks the missing execution **NOT RUN**
 
 ---
 
 ### /artifact
-**When to use:** Always, unless you specifically want explanation only.
+**When to use:** When the response must end in something operationally useful.
 
 **What the AI does:**
-- Ensures every response ends with something usable:
-  - A file written to disk
-  - A command you can run
-  - A test that passes or fails
-  - A specific, actionable next step
-- "Working" means it runs, compiles, or executes — not pseudocode
+- If file/code/execution capability exists, produce the strongest working deliverable available
+- If the capability is unavailable, provide the exact runnable command, patch, test, or next action needed to complete verification
+- Never label unexecuted output as passing or shipped
 
 ---
 
 ### Stacking Lindy + Confess
-Use `/lindy /confess` together — prefer proven solutions AND honestly state when you're not sure. No standalone alias in this suite; that name is already in use elsewhere in Juss's projects.
-
----
+Use `/lindy /confess` together to prefer proven solutions while preserving uncertainty and access limits. No standalone alias is introduced here for names already used elsewhere in the project.
 
 ## Mode Stacking Examples
 
 | Stack | Use Case |
 |-------|----------|
 | `/ultrathink /redteam` | Deep security analysis before deployment |
-| `/lindy /artifact` | Ship proven-tech solution as working code |
+| `/lindy /artifact` | Produce a proven-tech deliverable or exact verification step |
 | `/ooda /confess` | Honest assessment of project state and next step |
 | `/truth /human` | Direct, natural feedback without padding |
-| `/lindy /ooda /artifact` | Proven-tech incremental build with decision loop |
-| `/redteam /truth /artifact` | Brutally honest code review with fixes |
-
----
+| `/lindy /ooda /artifact` | Proven-tech incremental build with explicit evidence |
+| `/redteam /truth /artifact` | Adversarial review with a concrete repair path |
 
 ## Platform-Specific Notes
 
 ### On Claude
-- `/artifact` pairs with Claude's Artifacts feature (interactive code preview)
-- Long context window means you can paste entire files with the command
-- Use Claude Projects to store these instructions persistently
+- Use Artifacts, Projects, Claude Code, terminal, or repository capabilities only when the current product/session exposes them
+- Long-context input is useful where the selected model/product supports it
 
 ### On ChatGPT
-- `/artifact` pairs with Code Interpreter (actually runs the code)
-- Use Custom GPTs to store these instructions as system prompts
-- DALL-E integration available for UI mockups alongside code
+- Use Code Interpreter & Data Analysis, web search, files, apps/actions, image generation, or GPT Builder only when those capabilities are enabled for the current account/workspace/session
+- GPT creation/editing and capability availability may depend on plan and workspace permissions
 
 ### On Perplexity Computer
-- All commands available as Agent Skills (see perplexity-skills/ directory)
-- `/artifact` pairs with file system — writes actual files to workspace
-- Browser automation available for testing flows
-- Subagents for parallel work with different modes active
+- Use Agent Skills, filesystem, browser automation, or subagents only when the current product/session exposes those capabilities
+- Treat capability names as routing preferences, not proof that a tool is active
+
+Across all platforms, preserve `VERIFIED`, `UNVERIFIED`, and `NOT RUN` state across handoffs.
