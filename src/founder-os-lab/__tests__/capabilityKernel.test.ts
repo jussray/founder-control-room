@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   V10_CAPABILITY_PLAN_CONTRACT,
   V10_CAPABILITY_SELECTOR,
+  isV10CapabilityPlan,
   validateV10CapabilityPlan,
   validateV10CapabilityPlanContext,
   v10CapabilityPlanHash,
@@ -67,7 +68,35 @@ describe('V10 capability kernel security boundaries', () => {
   });
 
   it('accepts a correctly bound Chief AI plan', () => {
+    expect(isV10CapabilityPlan(plan())).toBe(true);
     expect(validateV10CapabilityPlan(plan())).toEqual([]);
+  });
+
+  it('fails closed on object-shaped malformed plans without throwing', () => {
+    const malformed = {
+      contract: V10_CAPABILITY_PLAN_CONTRACT,
+      selectedBy: V10_CAPABILITY_SELECTOR,
+      goal: 'Malformed plan.',
+      projectSlug: 'founder-control-room',
+      expectedHeadSha: SHA,
+      registryHash: 'b'.repeat(64),
+      requestedAuthority: 'draft',
+      strategicLenses: null,
+      routingReason: 'Malformed on purpose.',
+      capabilities: [null],
+      proofRequirements: ['proof'],
+      outcomeSignals: ['signal'],
+      rollback: 'Discard.',
+      planHash: 'c'.repeat(64),
+    };
+    expect(isV10CapabilityPlan(malformed)).toBe(false);
+    expect(() => validateV10CapabilityPlan(malformed as unknown as V10CapabilityPlan)).not.toThrow();
+    expect(validateV10CapabilityPlan(malformed as unknown as V10CapabilityPlan)).toContain('capability plan shape is invalid');
+    expect(validateV10CapabilityPlanContext(malformed as unknown as V10CapabilityPlan, {
+      goal: 'Malformed plan.',
+      projectSlug: 'founder-control-room',
+      expectedHeadSha: SHA,
+    })).toContain('capability plan shape is invalid');
   });
 
   it('detects plan tampering after hashing', () => {
