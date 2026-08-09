@@ -61,6 +61,15 @@ function candidate(overrides: Partial<FounderConveyorAdvanceInput> = {}): Founde
   };
 }
 
+function enabledEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
+  return {
+    N8N_CONVEYOR_ENABLED: 'true',
+    N8N_CONVEYOR_WEBHOOK_URL: 'https://n8n.example.com/webhook/fcr',
+    N8N_CONVEYOR_BEARER_TOKEN: 'bridge-secret',
+    ...extra,
+  };
+}
+
 describe('n8n founder conveyor contract', () => {
   it('keeps the bridge disabled by default', () => {
     expect(readFounderConveyorConfig({})).toEqual({
@@ -77,11 +86,7 @@ describe('n8n founder conveyor contract', () => {
       N8N_CONVEYOR_WEBHOOK_URL: 'https://n8n.example.com/webhook/fcr',
     }).configured).toBe(false);
 
-    expect(readFounderConveyorConfig({
-      N8N_CONVEYOR_ENABLED: 'true',
-      N8N_CONVEYOR_WEBHOOK_URL: 'https://n8n.example.com/webhook/fcr',
-      N8N_CONVEYOR_BEARER_TOKEN: 'bridge-secret',
-    }).configured).toBe(true);
+    expect(readFounderConveyorConfig(enabledEnv()).configured).toBe(true);
   });
 
   it('accepts only the five-stage loop in order and requires a valid Chief AI plan', () => {
@@ -171,24 +176,100 @@ describe('n8n founder conveyor contract', () => {
     });
 
     const result = await dispatchFounderConveyorAdvance(input, {
-      env: {
-        N8N_CONVEYOR_ENABLED: 'true',
-        N8N_CONVEYOR_WEBHOOK_URL: 'https://n8n.example.com/webhook/fcr',
-        N8N_CONVEYOR_BEARER_TOKEN: 'bridge-secret',
-      },
+      env: enabledEnv(),
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
 
     expect(result).toMatchObject({ ok: true, code: 'DISPATCHED', status: 202, receiptId: expectedReceipt });
   });
 
+  it('persists only sanitized V10 receipt identity when production persistence is required', async () => {
+    const proofUrl = `https://github.com/jussray/founder-control-room/commit/${SHA}`;
+    const input = candidate({
+      fromStage: 'code',
+      toStage: 'projects',
+      evidenceUrls: [proofUrl],
+    });
+    const expectedReceipt = expectedFounderConveyorReceiptId(input);
+    const store = vi.fn(async (receipt: Record<string, unknown>) => {
+      expect(receipt).toMatchObject({
+        receiptId: expectedReceipt,
+        runId: 'run-123',
+        projectSlug: 'founder-control-room',
+        expectedHeadSha: SHA,
+        capabilityPlanHash: input.capabilityPlan.planHash,
+        registryHash: REGISTRY_HASH,
+        fromStage: 'code',
+        toStage: 'projects',
+        requestedAuthority: 'draft',
+        executionStatus: 'accepted',
+      });
+      expect(receipt.evidenceDigest).toMatch(/^[0-9a-f]{64}$/);
+      const serialized = JSON.stringify(receipt);
+      expect(serialized).not.toContain(input.goal);
+      expect(serialized).not.toContain(proofUrl);
+      return 'stored' as const;
+    });
+
+    const result = await dispatchFounderConveyorAdvance(input, {
+      env: enabledEnv({ FCR_V10_RECEIPT_PERSISTENCE_REQUIRED: 'true' }),
+      fetchImpl: (async () => new Response(JSON.stringify({ receiptId: expectedReceipt }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })) as typeof fetch,
+      receiptStore: { store },
+    });
+
+    expect(result).toMatchObject({ ok: true, code: 'DISPATCHED', receiptId: expectedReceipt });
+    expect(store).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports audit-incomplete and preserves the receipt when n8n succeeds but Supabase persistence fails', async () => {
+    const input = candidate();
+    const expectedReceipt = expectedFounderConveyorReceiptId(input);
+
+    const result = await dispatchFounderConveyorAdvance(input, {
+      env: enabledEnv({ FCR_V10_RECEIPT_PERSISTENCE_REQUIRED: 'true' }),
+      fetchImpl: (async () => new Response(JSON.stringify({ receiptId: expectedReceipt }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })) as typeof fetch,
+      receiptStore: {
+        async store() {
+          throw new Error('supabase unavailable');
+        },
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'DISPATCH_AUDIT_INCOMPLETE',
+      status: 500,
+      receiptId: expectedReceipt,
+    });
+    expect(result.reasons.join(' ')).toContain('do not retry automatically');
+  });
+
+  it('reports audit-incomplete on a conflicting durable receipt instead of overwriting history', async () => {
+    const input = candidate();
+    const expectedReceipt = expectedFounderConveyorReceiptId(input);
+
+    const result = await dispatchFounderConveyorAdvance(input, {
+      env: enabledEnv({ FCR_V10_RECEIPT_PERSISTENCE_REQUIRED: 'true' }),
+      fetchImpl: (async () => new Response(JSON.stringify({ receiptId: expectedReceipt }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })) as typeof fetch,
+      receiptStore: { store: async () => 'conflict' },
+    });
+
+    expect(result.code).toBe('DISPATCH_AUDIT_INCOMPLETE');
+    expect(result.receiptId).toBe(expectedReceipt);
+  });
+
   it('blocks a receipt that does not match the exact V10 transition identity', async () => {
     const result = await dispatchFounderConveyorAdvance(candidate(), {
-      env: {
-        N8N_CONVEYOR_ENABLED: 'true',
-        N8N_CONVEYOR_WEBHOOK_URL: 'https://n8n.example.com/webhook/fcr',
-        N8N_CONVEYOR_BEARER_TOKEN: 'bridge-secret',
-      },
+      env: enabledEnv(),
       fetchImpl: (async () => new Response(JSON.stringify({ receiptId: `fcr-conveyor-receipt-v3:${'0'.repeat(64)}` }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -201,11 +282,7 @@ describe('n8n founder conveyor contract', () => {
 
   it('does not claim success when n8n omits the receipt', async () => {
     const result = await dispatchFounderConveyorAdvance(candidate(), {
-      env: {
-        N8N_CONVEYOR_ENABLED: 'true',
-        N8N_CONVEYOR_WEBHOOK_URL: 'https://n8n.example.com/webhook/fcr',
-        N8N_CONVEYOR_BEARER_TOKEN: 'bridge-secret',
-      },
+      env: enabledEnv(),
       fetchImpl: (async () => new Response(JSON.stringify({ accepted: true }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
