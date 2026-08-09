@@ -9,6 +9,7 @@ import {
 } from '../capabilityKernel.js';
 
 const SHA = 'a'.repeat(40);
+const CONFORMANCE_HASH = '7a2f344b9086b8a5a86ece6f027ad727bd76c2ac8a1e0efe2fb41133727c153d';
 
 function plan(overrides: Partial<V10CapabilityPlan> = {}): V10CapabilityPlan {
   const base: Omit<V10CapabilityPlan, 'planHash'> = {
@@ -38,6 +39,33 @@ function plan(overrides: Partial<V10CapabilityPlan> = {}): V10CapabilityPlan {
 }
 
 describe('V10 capability kernel security boundaries', () => {
+  it('matches the shared Chief/FCR/n8n capability-plan conformance hash', () => {
+    const fixture: Omit<V10CapabilityPlan, 'planHash'> = {
+      contract: V10_CAPABILITY_PLAN_CONTRACT,
+      selectedBy: V10_CAPABILITY_SELECTOR,
+      goal: 'Conformance fixture.',
+      projectSlug: 'founder-control-room',
+      expectedHeadSha: 'a'.repeat(40),
+      registryHash: 'b'.repeat(64),
+      requestedAuthority: 'draft',
+      strategicLenses: ['futureyou', 'truthmode'],
+      routingReason: 'Verify cross-runtime capability-plan hashing.',
+      capabilities: [{
+        id: 'goalfix',
+        version: '1.0.0',
+        origin: 'founder-native',
+        owner: 'juss',
+        sourceHash: 'c'.repeat(64),
+        authorityCeiling: 'privileged',
+      }],
+      proofRequirements: ['exact-head evidence'],
+      outcomeSignals: ['verification-pass'],
+      rollback: 'Discard fixture.',
+    };
+
+    expect(v10CapabilityPlanHash(fixture)).toBe(CONFORMANCE_HASH);
+  });
+
   it('accepts a correctly bound Chief AI plan', () => {
     expect(validateV10CapabilityPlan(plan())).toEqual([]);
   });
