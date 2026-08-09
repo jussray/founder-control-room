@@ -1,24 +1,64 @@
 import { describe, expect, it } from 'vitest';
+import {
+  V10_CAPABILITY_PLAN_CONTRACT,
+  V10_CAPABILITY_SELECTOR,
+  v10CapabilityPlanHash,
+  type V10CapabilityPlan,
+} from '../capabilityKernel.js';
+import type { FounderOsLabAction, FounderOsLabApproval } from '../contracts.js';
 import { planFounderOsLab } from '../engine.js';
 
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const REPOSITORY = 'jussray/founder-control-room';
+const PROJECT = 'founder-control-room';
 const GITHUB_PROOF = `https://github.com/${REPOSITORY}/commit/${SHA}`;
 
-function approval(action: 'merge-code' | 'deploy-code' | 'send-email') {
+function capabilityPlan(goal: string): V10CapabilityPlan {
+  const base: Omit<V10CapabilityPlan, 'planHash'> = {
+    contract: V10_CAPABILITY_PLAN_CONTRACT,
+    selectedBy: V10_CAPABILITY_SELECTOR,
+    goal,
+    projectSlug: PROJECT,
+    expectedHeadSha: SHA,
+    registryHash: 'b'.repeat(64),
+    requestedAuthority: 'draft',
+    strategicLenses: ['futureyou', 'truthmode', 'redteam'],
+    routingReason: 'Chief AI selected the smallest provider-preview capability set.',
+    capabilities: [{
+      id: 'goalfix',
+      version: '1.0.0',
+      origin: 'founder-native',
+      owner: 'juss',
+      sourceHash: 'c'.repeat(64),
+      authorityCeiling: 'privileged',
+    }],
+    proofRequirements: ['provider identity evidence', 'exact-head binding'],
+    outcomeSignals: ['preview-evidence-complete'],
+    rollback: 'Discard the preview and keep provider execution disabled.',
+  };
+  return { ...base, planHash: v10CapabilityPlanHash(base) };
+}
+
+function approval(action: Extract<FounderOsLabAction, 'merge-code' | 'deploy-code' | 'send-email'>, plan: V10CapabilityPlan): FounderOsLabApproval {
   return {
     id: `founder-approved:${action}:review-contract`,
     actions: [action],
+    projectSlug: plan.projectSlug,
+    expectedHeadSha: plan.expectedHeadSha,
+    capabilityPlanHash: plan.planHash,
   };
 }
 
 describe('Founder OS provider evidence exact-head review contracts', () => {
   it('rejects repeated separators in an otherwise matching GitHub commit URL', () => {
+    const goal = 'Preview the exact-head merge gate.';
+    const selectedPlan = capabilityPlan(goal);
     const plan = planFounderOsLab({
-      goal: 'Preview the exact-head merge gate.',
+      goal,
       action: 'merge-code',
       provider: 'github',
-      approval: approval('merge-code'),
+      capabilityPlan: selectedPlan,
+      approval: approval('merge-code', selectedPlan),
       evidence: {
         repository: REPOSITORY,
         commitSha: SHA,
@@ -34,11 +74,14 @@ describe('Founder OS provider evidence exact-head review contracts', () => {
   });
 
   it('binds Cloudflare project evidence to the selected account and project together', () => {
+    const goal = 'Preview a Cloudflare deployment handoff.';
+    const selectedPlan = capabilityPlan(goal);
     const valid = planFounderOsLab({
-      goal: 'Preview a Cloudflare deployment handoff.',
+      goal,
       action: 'deploy-code',
       provider: 'cloudflare',
-      approval: approval('deploy-code'),
+      capabilityPlan: selectedPlan,
+      approval: approval('deploy-code', selectedPlan),
       evidence: {
         repository: REPOSITORY,
         commitSha: SHA,
@@ -72,10 +115,11 @@ describe('Founder OS provider evidence exact-head review contracts', () => {
     expect(valid.authority.executionAllowed).toBe(false);
 
     const wrongAccount = planFounderOsLab({
-      goal: 'Preview a Cloudflare deployment handoff.',
+      goal,
       action: 'deploy-code',
       provider: 'cloudflare',
-      approval: approval('deploy-code'),
+      capabilityPlan: selectedPlan,
+      approval: approval('deploy-code', selectedPlan),
       evidence: {
         repository: REPOSITORY,
         commitSha: SHA,
@@ -96,11 +140,14 @@ describe('Founder OS provider evidence exact-head review contracts', () => {
   });
 
   it('matches complete typed HubSpot IDs rather than prefixes in association plans', () => {
+    const goal = 'Preview a governed HubSpot outreach association.';
+    const selectedPlan = capabilityPlan(goal);
     const plan = planFounderOsLab({
-      goal: 'Preview a governed HubSpot outreach association.',
+      goal,
       action: 'send-email',
       provider: 'hubspot',
-      approval: approval('send-email'),
+      capabilityPlan: selectedPlan,
+      approval: approval('send-email', selectedPlan),
       evidence: {
         proofUrls: [
           'https://app.hubspot.com/contacts/123456/record/0-1/7',
@@ -120,11 +167,14 @@ describe('Founder OS provider evidence exact-head review contracts', () => {
   });
 
   it('rejects HubSpot API record proof that is not bound to the selected workspace', () => {
+    const goal = 'Preview a governed HubSpot outreach association.';
+    const selectedPlan = capabilityPlan(goal);
     const plan = planFounderOsLab({
-      goal: 'Preview a governed HubSpot outreach association.',
+      goal,
       action: 'send-email',
       provider: 'hubspot',
-      approval: approval('send-email'),
+      capabilityPlan: selectedPlan,
+      approval: approval('send-email', selectedPlan),
       evidence: {
         proofUrls: [
           'https://app.hubspot.com/contacts/workspace-a',
@@ -144,11 +194,14 @@ describe('Founder OS provider evidence exact-head review contracts', () => {
   });
 
   it('uses provider-neutral dispatch truth for a Zapier send-email preview', () => {
+    const goal = 'Preview an approved outreach handoff without sending it.';
+    const selectedPlan = capabilityPlan(goal);
     const plan = planFounderOsLab({
-      goal: 'Preview an approved outreach handoff without sending it.',
+      goal,
       action: 'send-email',
       provider: 'zapier',
-      approval: approval('send-email'),
+      capabilityPlan: selectedPlan,
+      approval: approval('send-email', selectedPlan),
       evidence: {
         repository: REPOSITORY,
         commitSha: SHA,
