@@ -54,6 +54,8 @@ import {
 import { requireSameOriginBrowserMutation } from './middleware/csrf.js';
 import { jsonParseErrorHandler } from './middleware/jsonParseError.js';
 import { requireProjectReadAudit } from './middleware/projectReadAudit.js';
+import { requireFounder, type FounderRequest } from './middleware/requireFounder.js';
+import { requireV10PrivilegedApprovalBinding } from './middleware/v10PrivilegedApprovalBinding.js';
 import { requireFounderSignalEngineMcpToken } from './middleware/founderSignalEngineMcpAuth.js';
 import { requireFounderSignalEngineReviewOnly } from './middleware/founderSignalEngineWriteGate.js';
 
@@ -87,6 +89,7 @@ function deploymentVersion() {
   const supabaseProjectRef = process.env.SUPABASE_PROJECT_REF?.trim() ?? '';
   const maxRuntimeAuthority = process.env.FCR_V10_MAX_RUNTIME_AUTHORITY?.trim() ?? '';
   const registryResolutionRequired = process.env.FCR_V10_REGISTRY_RESOLUTION_REQUIRED?.trim() ?? '';
+  const receiptPersistenceRequired = process.env.FCR_V10_RECEIPT_PERSISTENCE_REQUIRED?.trim() ?? '';
 
   return {
     service: SERVICE_IDENTITY,
@@ -97,6 +100,7 @@ function deploymentVersion() {
       supabaseProjectRef: SUPABASE_PROJECT_REF.test(supabaseProjectRef) ? supabaseProjectRef : null,
       maxRuntimeAuthority: maxRuntimeAuthority === 'draft' ? 'draft' : null,
       trustedRegistryRequiredBeforeL1: registryResolutionRequired === 'true',
+      receiptPersistenceRequired: receiptPersistenceRequired === 'true',
     },
     founderSignalAutomationGrant: founderSignalAutomationGrantStatus(),
   };
@@ -227,6 +231,14 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/portfolio', portfolioVerificationRouter);
   app.use('/projects', repositoryVerificationRouter);
   app.use('/projects', requireProjectReadAudit, projectsRouter);
+  // Privileged mission execution still uses the existing approvals router, but
+  // it must now pass founder authentication + V10 plan/registry/exact-head
+  // binding before the route may reserve an approval_executions row.
+  app.post(
+    '/approvals/:missionId/execute',
+    requireFounder,
+    requireV10PrivilegedApprovalBinding,
+  );
   app.use('/approvals', approvalsRouter);
   app.use('/l99', l99Router);
   app.use('/terminal', terminalRouter);
