@@ -34,6 +34,48 @@ describe('n8n conveyor workflow artifact', () => {
     expect(serialized).not.toMatch(/Bearer\s+[A-Za-z0-9._-]{12,}/i);
   });
 
+  it('uses cloud-safe URL validation and rejects malformed evidence authorities', () => {
+    const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+    const code = workflow.nodes
+      .filter((node: { type: string }) => node.type === 'n8n-nodes-base.code')
+      .map((node: { parameters: { jsCode: string } }) => node.parameters.jsCode)
+      .join('\n');
+
+    expect(code).toContain('const validEvidenceUrl = (value) =>');
+    expect(code).not.toContain('new URL(');
+    expect(code).toContain("fail('invalid evidence URL')");
+
+    const validationStart = code.indexOf('const validPort = (value) =>');
+    const validationEnd = code.indexOf('\nfor (const value of evidenceUrls)', validationStart);
+    expect(validationStart).toBeGreaterThanOrEqual(0);
+    expect(validationEnd).toBeGreaterThan(validationStart);
+
+    const validationBlock = code.slice(validationStart, validationEnd);
+    const validEvidenceUrl = new Function(`${validationBlock}\nreturn validEvidenceUrl;`)() as (value: string) => boolean;
+
+    for (const value of [
+      'https://github.com/jussray/founder-control-room/commit/0123456789abcdef0123456789abcdef01234567',
+      'https://example.com:443/path?ok=1#proof',
+      'http://localhost:5678/webhook/founder-control-room/conveyor',
+      'http://127.0.0.1:5678/proof',
+    ]) {
+      expect(validEvidenceUrl(value), value).toBe(true);
+    }
+
+    for (const value of [
+      'https://:',
+      'https://example.com:',
+      'https://example.com:0/proof',
+      'https://example.com:65536/proof',
+      'https://-bad.example/proof',
+      'https://999.999.999.999/proof',
+      'http://example.com/proof',
+      'https://example.com/has whitespace',
+    ]) {
+      expect(validEvidenceUrl(value), value).toBe(false);
+    }
+  });
+
   it('preserves the governed authority, skill routing, and canonical v2 receipt contract', () => {
     const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
     const code = workflow.nodes
