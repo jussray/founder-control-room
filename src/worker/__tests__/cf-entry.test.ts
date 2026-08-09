@@ -25,6 +25,7 @@ const VALID_ENV: ControlRoomWorkerEnv = {
   FCR_V10_CONVEYOR_CONTRACT: 'founder-control-room/n8n-conveyor@v3',
   FCR_V10_MAX_RUNTIME_AUTHORITY: 'draft',
   FCR_V10_REGISTRY_RESOLUTION_REQUIRED: 'true',
+  FCR_V10_RECEIPT_PERSISTENCE_REQUIRED: 'true',
 };
 
 describe('Cloudflare Worker binding validation', () => {
@@ -89,7 +90,7 @@ describe('Cloudflare Worker binding validation', () => {
     })).toThrow('Worker V10 capability-plan contract does not match checked-in runtime contract');
   });
 
-  it('rejects authority escalation and disabling the trusted-registry gate', () => {
+  it('rejects authority escalation, disabling trusted-registry resolution, or disabling Supabase receipt persistence', () => {
     expect(() => validateWorkerEnv({
       ...VALID_ENV,
       FCR_V10_MAX_RUNTIME_AUTHORITY: 'privileged',
@@ -99,6 +100,11 @@ describe('Cloudflare Worker binding validation', () => {
       ...VALID_ENV,
       FCR_V10_REGISTRY_RESOLUTION_REQUIRED: 'false',
     })).toThrow('Worker V10 runtime must require trusted registry resolution before L1+ promotion');
+
+    expect(() => validateWorkerEnv({
+      ...VALID_ENV,
+      FCR_V10_RECEIPT_PERSISTENCE_REQUIRED: 'false',
+    })).toThrow('Worker V10 runtime must persist accepted conveyor receipts to the Supabase audit ledger');
   });
 
   it('rejects origins containing paths or invalid URLs', () => {
