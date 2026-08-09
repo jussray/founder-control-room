@@ -21,6 +21,7 @@ export type ProofOfShipReceipt = {
   bufferTerminalAction: 'schedule';
   bufferScheduleId: string;
   scheduledAt: string;
+  publicationPlatform: 'linkedin';
   bufferPublicationStatus: 'published';
   bufferPostId: string;
   livePostUrl: string;
@@ -63,16 +64,22 @@ function canonicalIsoTimestamp(value: unknown, field: string): string {
   return parsed.toISOString();
 }
 
-function canonicalHttpsUrl(value: unknown, field: string): string {
-  const normalized = boundedText(value, field, 1000);
+function canonicalLinkedInUrl(value: unknown): string {
+  const normalized = boundedText(value, 'live_post_url', 1000);
   let parsed: URL;
   try {
     parsed = new URL(normalized);
   } catch {
-    throw new ProofOfShipReceiptError(`invalid_${field}`);
+    throw new ProofOfShipReceiptError('invalid_live_post_url');
   }
-  if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
-    throw new ProofOfShipReceiptError(`invalid_${field}`);
+  const hostname = parsed.hostname.toLowerCase();
+  if (
+    parsed.protocol !== 'https:' ||
+    parsed.username ||
+    parsed.password ||
+    (hostname !== 'linkedin.com' && !hostname.endsWith('.linkedin.com'))
+  ) {
+    throw new ProofOfShipReceiptError('invalid_live_post_url');
   }
   return parsed.toString();
 }
@@ -103,6 +110,7 @@ export function validateProofOfShipReceipt(input: unknown): ProofOfShipReceipt {
     'bufferTerminalAction',
     'bufferScheduleId',
     'scheduledAt',
+    'publicationPlatform',
     'bufferPublicationStatus',
     'bufferPostId',
     'livePostUrl',
@@ -149,6 +157,9 @@ export function validateProofOfShipReceipt(input: unknown): ProofOfShipReceipt {
   }
   if (typeof input.bufferScheduleId !== 'string' || !SAFE_TOKEN.test(input.bufferScheduleId)) {
     throw new ProofOfShipReceiptError('invalid_buffer_schedule_id');
+  }
+  if (input.publicationPlatform !== 'linkedin') {
+    throw new ProofOfShipReceiptError('invalid_publication_platform');
   }
   if (input.bufferPublicationStatus !== 'published') {
     throw new ProofOfShipReceiptError('invalid_buffer_publication_status');
@@ -197,9 +208,10 @@ export function validateProofOfShipReceipt(input: unknown): ProofOfShipReceipt {
     bufferTerminalAction: 'schedule',
     bufferScheduleId: input.bufferScheduleId,
     scheduledAt,
+    publicationPlatform: 'linkedin',
     bufferPublicationStatus: 'published',
     bufferPostId: input.bufferPostId,
-    livePostUrl: canonicalHttpsUrl(input.livePostUrl, 'live_post_url'),
+    livePostUrl: canonicalLinkedInUrl(input.livePostUrl),
     publishedAt,
     smsNotificationStatus: 'delivered',
     smsProvider: input.smsProvider,
