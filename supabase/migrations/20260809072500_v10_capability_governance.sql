@@ -2,7 +2,7 @@
 --
 -- This migration keeps existing approval/execution rows valid while giving new
 -- V10 flows durable bindings to the exact Chief AI capability plan, registry
--- snapshot, project, and Git head. New registry and receipt tables are
+-- snapshot identity, project, and Git head. New registry and receipt tables are
 -- service-role-only; no browser/client policy is introduced here.
 
 begin;
@@ -171,6 +171,9 @@ grant execute on function public.is_v10_registry_approved(text) to service_role;
 -- -----------------------------------------------------------------------------
 -- 4. Sanitized V10 execution receipts.
 --    No raw founder goal, prompt, provider token, or private content is stored.
+--    A receipt records the registry identity that Chief AI used; it does NOT
+--    imply that registry is approved. L1+ promotion must separately resolve
+--    the hash through is_v10_registry_approved().
 -- -----------------------------------------------------------------------------
 create table if not exists public.capability_execution_receipts (
   receipt_id text primary key
@@ -182,7 +185,7 @@ create table if not exists public.capability_execution_receipts (
   capability_plan_hash text not null
     check (capability_plan_hash ~ '^[0-9a-f]{64}$'),
   registry_hash text not null
-    references public.capability_registry_snapshots(registry_hash),
+    check (registry_hash ~ '^[0-9a-f]{64}$'),
   from_stage text not null check (length(from_stage) between 1 and 80),
   to_stage text not null check (length(to_stage) between 1 and 80),
   requested_authority text not null
@@ -196,7 +199,7 @@ create table if not exists public.capability_execution_receipts (
 );
 
 comment on table public.capability_execution_receipts is
-  'Sanitized V10 execution identity: exact head + plan hash + trusted registry hash + authority. No raw prompt or founder content.';
+  'Sanitized V10 execution identity: exact head + plan hash + registry identity + authority. Registry approval is checked separately. No raw prompt or founder content.';
 
 alter table public.capability_execution_receipts enable row level security;
 drop policy if exists "control_room_service_role_only" on public.capability_execution_receipts;
@@ -212,6 +215,8 @@ create index if not exists capability_execution_receipts_project_created_idx
   on public.capability_execution_receipts (project_slug, created_at desc);
 create index if not exists capability_execution_receipts_plan_idx
   on public.capability_execution_receipts (capability_plan_hash);
+create index if not exists capability_execution_receipts_registry_idx
+  on public.capability_execution_receipts (registry_hash, created_at desc);
 
 -- -----------------------------------------------------------------------------
 -- 5. Resolve the live Supabase security-advisor warning on the public trigger
