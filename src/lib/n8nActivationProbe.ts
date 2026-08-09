@@ -1,3 +1,4 @@
+import type { V10CapabilityPlan } from '../founder-os-lab/capabilityKernel.js';
 import {
   dispatchFounderConveyorAdvance,
   expectedFounderConveyorReceiptId,
@@ -9,6 +10,7 @@ const FULL_SHA = /^[0-9a-f]{40}$/i;
 
 export interface N8nActivationProbeOptions {
   expectedHeadSha: string;
+  capabilityPlan: V10CapabilityPlan;
   webhookUrl: string;
   bearerToken: string;
   fetchImpl?: typeof fetch;
@@ -19,22 +21,28 @@ export interface N8nActivationProbeReceipt {
   runId: string;
   projectSlug: 'founder-control-room';
   expectedHeadSha: string;
+  capabilityPlanHash: string;
+  registryHash: string;
   fromStage: 'chat';
   toStage: 'workflows';
   receiptId: string;
 }
 
-export function createN8nActivationProbeInput(expectedHeadSha: string): FounderConveyorAdvanceInput {
+export function createN8nActivationProbeInput(
+  expectedHeadSha: string,
+  capabilityPlan: V10CapabilityPlan,
+): FounderConveyorAdvanceInput {
   const sha = expectedHeadSha.trim().toLowerCase();
   if (!FULL_SHA.test(sha)) throw new Error('expectedHeadSha must be a full 40-character Git commit SHA');
 
   return {
     runId: `n8n-live-probe-${sha}`,
     projectSlug: 'founder-control-room',
-    goal: 'Verify one bounded Founder Control Room chat-to-workflows transition returns the canonical v2 n8n receipt.',
+    goal: capabilityPlan.goal,
     fromStage: 'chat',
     toStage: 'workflows',
     expectedHeadSha: sha,
+    capabilityPlan,
     evidenceUrls: [],
   };
 }
@@ -48,12 +56,12 @@ function assertProbeSuccess(
   }
   const expectedReceiptId = expectedFounderConveyorReceiptId(input);
   if (result.receiptId !== expectedReceiptId) {
-    throw new Error('n8n activation probe returned a receipt that does not match the canonical v2 identity');
+    throw new Error('n8n activation probe returned a receipt that does not match the canonical v3 capability-plan-bound identity');
   }
 }
 
 export async function runN8nActivationProbe(options: N8nActivationProbeOptions): Promise<N8nActivationProbeReceipt> {
-  const input = createN8nActivationProbeInput(options.expectedHeadSha);
+  const input = createN8nActivationProbeInput(options.expectedHeadSha, options.capabilityPlan);
   const result = await dispatchFounderConveyorAdvance(input, {
     env: {
       N8N_CONVEYOR_ENABLED: 'true',
@@ -70,6 +78,8 @@ export async function runN8nActivationProbe(options: N8nActivationProbeOptions):
     runId: input.runId,
     projectSlug: 'founder-control-room',
     expectedHeadSha: input.expectedHeadSha,
+    capabilityPlanHash: input.capabilityPlan.planHash,
+    registryHash: input.capabilityPlan.registryHash,
     fromStage: 'chat',
     toStage: 'workflows',
     receiptId: result.receiptId,
