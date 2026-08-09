@@ -111,11 +111,14 @@ describe('founder final decision layer', () => {
     expect(summary.summaryId).toBe(founderResearchSummaryId(summary));
   });
 
-  it('approves only a fully proof-backed evidence packet and records Python summary IDs', () => {
+  it('approves only a fully proof-backed evidence packet and preserves V10 route identity', () => {
     const summary = pythonSummary();
-    const result = evaluateFounderFinalDecision(candidate(summary));
+    const input = candidate(summary);
+    const result = evaluateFounderFinalDecision(input);
     expect(result.decision).toBe('APPROVE');
     expect(result.pythonSummaryIds).toEqual([summary.summaryId]);
+    expect(result.capabilityPlanHash).toBe(input.capabilityPlan.planHash);
+    expect(result.registryHash).toBe(input.capabilityPlan.registryHash);
     expect(result.decisionId).toMatch(/^fcr-final-decision-v1:[0-9a-f]{64}$/);
     expect(result.authority).toEqual({
       advanceStage: false,
