@@ -106,6 +106,6 @@
       "nextAction": "Preserve the existing primary AGENTS.md entrypoint and the human agency, prompt provenance, privacy, evidence, disablement, rollback, and non-deletion boundaries it loads."
     }
   ],
-  "lastInspected": "2026-08-04",
+  "lastInspected": "2026-08-09",
   "truthBoundary": "This registry records repository instruction inheritance only. It does not prove runtime behavior, deployment, provider execution, user outcomes, compliance, or that an external agent actually loaded the files."
 }
