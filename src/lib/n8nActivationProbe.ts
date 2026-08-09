@@ -5,6 +5,7 @@ import {
   type FounderConveyorAdvanceInput,
   type FounderConveyorDispatchResult,
 } from './n8nConveyor.js';
+import type { V10ConveyorReceiptStore } from './v10ConveyorReceiptStore.js';
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 
@@ -14,6 +15,7 @@ export interface N8nActivationProbeOptions {
   webhookUrl: string;
   bearerToken: string;
   fetchImpl?: typeof fetch;
+  receiptStore?: V10ConveyorReceiptStore;
 }
 
 export interface N8nActivationProbeReceipt {
@@ -67,8 +69,10 @@ export async function runN8nActivationProbe(options: N8nActivationProbeOptions):
       N8N_CONVEYOR_ENABLED: 'true',
       N8N_CONVEYOR_WEBHOOK_URL: options.webhookUrl,
       N8N_CONVEYOR_BEARER_TOKEN: options.bearerToken,
+      FCR_V10_RECEIPT_PERSISTENCE_REQUIRED: 'true',
     },
     fetchImpl: options.fetchImpl,
+    receiptStore: options.receiptStore,
   });
 
   assertProbeSuccess(input, result);
