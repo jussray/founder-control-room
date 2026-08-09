@@ -9,17 +9,29 @@ vi.mock('../../../providers/providerFactory.js', () => ({
 
 import {
   V10_CAPABILITY_PLAN_CONTRACT,
+  V10_CAPABILITY_REGISTRY_CONTRACT,
   V10_CAPABILITY_SELECTOR,
   v10CapabilityPlanHash,
+  v10CapabilityRegistryHash,
   type V10CapabilityPlan,
+  type V10CapabilityRef,
 } from '../../../founder-os-lab/capabilityKernel.js';
 import {
+  validateV10ApprovedRegistrySnapshot,
   validateV10PrivilegedExecutionContext,
   v10PrivilegedEnvelope,
 } from '../v10PrivilegedApprovalBinding.js';
 
 const SHA = 'a'.repeat(40);
-const REGISTRY_HASH = 'b'.repeat(64);
+const CAPABILITY: V10CapabilityRef = {
+  id: 'review-verify-merge',
+  version: '1.0.0',
+  origin: 'founder-native',
+  owner: 'juss',
+  sourceHash: 'c'.repeat(64),
+  authorityCeiling: 'privileged',
+};
+const REGISTRY_HASH = v10CapabilityRegistryHash([CAPABILITY]);
 
 function plan(overrides: Partial<V10CapabilityPlan> = {}): V10CapabilityPlan {
   const base: Omit<V10CapabilityPlan, 'planHash'> = {
@@ -32,14 +44,7 @@ function plan(overrides: Partial<V10CapabilityPlan> = {}): V10CapabilityPlan {
     requestedAuthority: 'privileged',
     strategicLenses: ['me', 'futureyou', 'truthmode', 'redteam'],
     routingReason: 'Chief AI selected the smallest privileged capability set for the approved exact-head merge.',
-    capabilities: [{
-      id: 'review-verify-merge',
-      version: '1.0.0',
-      origin: 'founder-native',
-      owner: 'juss',
-      sourceHash: 'c'.repeat(64),
-      authorityCeiling: 'privileged',
-    }],
+    capabilities: [CAPABILITY],
     proofRequirements: ['fresh founder proof gate', 'exact-head GitHub evidence', 'approved registry snapshot'],
     outcomeSignals: ['merge-receipt', 'exact-head-preserved'],
     rollback: 'Revert the merge commit if verified post-merge proof fails.',
@@ -91,6 +96,44 @@ describe('V10 privileged approval binding', () => {
       registryApproved: true,
       plan: selected,
     })).toContain('create_branch requires V10 reversible authority');
+  });
+
+  it('binds planned capabilities to the canonical founder-approved registry entries', () => {
+    const selected = plan();
+    const snapshot = {
+      registryHash: REGISTRY_HASH,
+      contract: V10_CAPABILITY_REGISTRY_CONTRACT,
+      status: 'approved',
+      entries: [CAPABILITY],
+      approvedBy: 'founder@example.com',
+      approvedAt: '2026-08-09T12:00:00.000Z',
+    };
+
+    expect(validateV10ApprovedRegistrySnapshot(selected, snapshot)).toEqual([]);
+
+    const substituted = {
+      ...snapshot,
+      entries: [{ ...CAPABILITY, sourceHash: 'd'.repeat(64) }],
+    };
+    expect(validateV10ApprovedRegistrySnapshot(selected, substituted)).toEqual(expect.arrayContaining([
+      'approved capability registry snapshot hash does not match its canonical entries',
+      'capability review-verify-merge is not exactly authorized by the approved registry snapshot',
+    ]));
+  });
+
+  it('rejects a forged registry identity even when its status says approved', () => {
+    const selected = plan();
+    expect(validateV10ApprovedRegistrySnapshot(selected, {
+      registryHash: 'e'.repeat(64),
+      contract: V10_CAPABILITY_REGISTRY_CONTRACT,
+      status: 'approved',
+      entries: [CAPABILITY],
+      approvedBy: 'founder@example.com',
+      approvedAt: '2026-08-09T12:00:00.000Z',
+    })).toEqual(expect.arrayContaining([
+      'capability plan registry hash does not match the approved snapshot identity',
+      'approved capability registry snapshot hash does not match its canonical entries',
+    ]));
   });
 
   it('emits only the sanitized identity needed by the durable execution ledger', () => {
