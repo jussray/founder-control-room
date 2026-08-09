@@ -62,10 +62,13 @@ describe('n8n live activation probe', () => {
     expect(() => createN8nActivationProbeInput('abc123', capabilityPlan())).toThrow(/40-character Git commit SHA/);
   });
 
-  it('passes only when n8n returns the canonical v3 plan-bound receipt', async () => {
+  it('passes only when n8n returns the canonical v3 plan-bound receipt and Supabase audit persistence succeeds', async () => {
     const cp = capabilityPlan();
     const input = createN8nActivationProbeInput(SHA, cp);
     const expectedReceipt = expectedFounderConveyorReceiptId(input);
+    const receiptStore = {
+      store: vi.fn(async () => 'stored' as const),
+    };
     const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body));
       expect(body.fromStage).toBe('chat');
@@ -95,6 +98,7 @@ describe('n8n live activation probe', () => {
       webhookUrl: 'https://n8n.example.com/webhook/fcr',
       bearerToken: 'test-secret',
       fetchImpl: fetchImpl as unknown as typeof fetch,
+      receiptStore,
     });
 
     expect(receipt).toMatchObject({
@@ -106,7 +110,37 @@ describe('n8n live activation probe', () => {
       toStage: 'workflows',
       receiptId: expectedReceipt,
     });
+    expect(receiptStore.store).toHaveBeenCalledTimes(1);
+    expect(receiptStore.store).toHaveBeenCalledWith(expect.objectContaining({
+      receiptId: expectedReceipt,
+      expectedHeadSha: SHA,
+      capabilityPlanHash: cp.planHash,
+      registryHash: cp.registryHash,
+      executionStatus: 'accepted',
+    }));
     expect(JSON.stringify(receipt)).not.toContain('test-secret');
+  });
+
+  it('fails closed when required receipt persistence fails after n8n accepts the transition', async () => {
+    const cp = capabilityPlan();
+    const input = createN8nActivationProbeInput(SHA, cp);
+    const expectedReceipt = expectedFounderConveyorReceiptId(input);
+
+    await expect(runN8nActivationProbe({
+      expectedHeadSha: SHA,
+      capabilityPlan: cp,
+      webhookUrl: 'https://n8n.example.com/webhook/fcr',
+      bearerToken: 'test-secret',
+      fetchImpl: (async () => new Response(JSON.stringify({ receiptId: expectedReceipt }), {
+        status: 202,
+        headers: { 'Content-Type': 'application/json' },
+      })) as typeof fetch,
+      receiptStore: {
+        store: vi.fn(async () => {
+          throw new Error('audit store unavailable');
+        }),
+      },
+    })).rejects.toThrow(/DISPATCH_AUDIT_INCOMPLETE|could not be persisted/);
   });
 
   it('fails closed on receipt drift', async () => {
@@ -124,7 +158,7 @@ describe('n8n live activation probe', () => {
     })).rejects.toThrow(/UPSTREAM_RECEIPT_MISMATCH|canonical v3/);
   });
 
-  it('keeps the GitHub live probe manual-only, exact-head bound, plan-required, and receipt retaining', () => {
+  it('keeps the GitHub live probe manual-only, exact-head bound, plan-required, persistence-required, and receipt retaining', () => {
     const workflow = fs.readFileSync(workflowPath, 'utf8');
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).not.toMatch(/\npull_request:/);
@@ -135,6 +169,8 @@ describe('n8n live activation probe', () => {
     expect(workflow).toContain('ref: ${{ inputs.target_sha }}');
     expect(workflow).toContain('N8N_CONVEYOR_WEBHOOK_URL: ${{ secrets.N8N_CONVEYOR_WEBHOOK_URL }}');
     expect(workflow).toContain('N8N_CONVEYOR_BEARER_TOKEN: ${{ secrets.N8N_CONVEYOR_BEARER_TOKEN }}');
+    expect(workflow).toContain('SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}');
+    expect(workflow).toContain('FCR_V10_RECEIPT_PERSISTENCE_REQUIRED:');
     expect(workflow).toContain('npx tsx scripts/verify-n8n-conveyor-live.ts');
     expect(workflow).toContain('n8n-live-probe-receipt.json');
     expect(workflow).toContain('actions/upload-artifact@v4');
