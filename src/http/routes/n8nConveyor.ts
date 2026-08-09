@@ -1,5 +1,8 @@
 import { Router } from 'express';
-import type { V10CapabilityPlan } from '../../founder-os-lab/capabilityKernel.js';
+import {
+  isV10CapabilityPlan,
+  type V10CapabilityPlan,
+} from '../../founder-os-lab/capabilityKernel.js';
 import {
   FOUNDER_CONVEYOR_STAGES,
   dispatchFounderConveyorAdvance,
@@ -30,8 +33,7 @@ function stringArray(value: unknown): string[] | null {
 }
 
 function capabilityPlan(value: unknown): V10CapabilityPlan | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  return value as V10CapabilityPlan;
+  return isV10CapabilityPlan(value) ? value : null;
 }
 
 n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
