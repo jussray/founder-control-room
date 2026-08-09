@@ -68,6 +68,45 @@ function text(value: unknown, maxLength = 2_000): string {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
 }
 
+function stringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function capabilityRefShape(value: unknown): value is V10CapabilityRef {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const capability = value as Record<string, unknown>;
+  return typeof capability.id === 'string'
+    && typeof capability.version === 'string'
+    && typeof capability.origin === 'string'
+    && typeof capability.owner === 'string'
+    && typeof capability.sourceHash === 'string'
+    && typeof capability.authorityCeiling === 'string';
+}
+
+/**
+ * Runtime shape guard for capability plans crossing JSON/provider boundaries.
+ * Semantic authority, hashes, provenance, and execution bindings are validated separately.
+ */
+export function isV10CapabilityPlan(value: unknown): value is V10CapabilityPlan {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const plan = value as Record<string, unknown>;
+  return typeof plan.contract === 'string'
+    && typeof plan.selectedBy === 'string'
+    && typeof plan.goal === 'string'
+    && typeof plan.projectSlug === 'string'
+    && typeof plan.expectedHeadSha === 'string'
+    && typeof plan.registryHash === 'string'
+    && typeof plan.requestedAuthority === 'string'
+    && stringArray(plan.strategicLenses)
+    && typeof plan.routingReason === 'string'
+    && Array.isArray(plan.capabilities)
+    && plan.capabilities.every(capabilityRefShape)
+    && stringArray(plan.proofRequirements)
+    && stringArray(plan.outcomeSignals)
+    && typeof plan.rollback === 'string'
+    && typeof plan.planHash === 'string';
+}
+
 function authorityAllows(requested: string, ceiling: string): boolean {
   const requestedRank = AUTHORITY_RANK.get(requested);
   const ceilingRank = AUTHORITY_RANK.get(ceiling);
@@ -112,6 +151,8 @@ export function v10CapabilityPlanHash(plan: Omit<V10CapabilityPlan, 'planHash'> 
 }
 
 export function validateV10CapabilityPlan(plan: V10CapabilityPlan): string[] {
+  if (!isV10CapabilityPlan(plan)) return ['capability plan shape is invalid'];
+
   const errors: string[] = [];
 
   if (plan.contract !== V10_CAPABILITY_PLAN_CONTRACT) errors.push('unsupported capability plan contract');
@@ -123,17 +164,11 @@ export function validateV10CapabilityPlan(plan: V10CapabilityPlan): string[] {
   if (!AUTHORITIES.has(plan.requestedAuthority)) errors.push('unsupported requested authority');
   if (!text(plan.routingReason)) errors.push('capability plan routing reason is required');
   if (!text(plan.rollback)) errors.push('capability plan rollback is required');
-  if (!Array.isArray(plan.strategicLenses) || plan.strategicLenses.length === 0) {
-    errors.push('capability plan strategic lenses are required');
-  }
-  if (!Array.isArray(plan.proofRequirements) || plan.proofRequirements.length === 0) {
-    errors.push('capability plan proof requirements are required');
-  }
-  if (!Array.isArray(plan.outcomeSignals) || plan.outcomeSignals.length === 0) {
-    errors.push('capability plan outcome signals are required');
-  }
+  if (plan.strategicLenses.length === 0) errors.push('capability plan strategic lenses are required');
+  if (plan.proofRequirements.length === 0) errors.push('capability plan proof requirements are required');
+  if (plan.outcomeSignals.length === 0) errors.push('capability plan outcome signals are required');
 
-  if (!Array.isArray(plan.capabilities) || plan.capabilities.length === 0) {
+  if (plan.capabilities.length === 0) {
     errors.push('capability plan requires at least one capability');
   } else if (plan.capabilities.length > 30) {
     errors.push('capability plan exceeds the capability limit');
@@ -179,6 +214,7 @@ export function validateV10CapabilityPlanContext(
   context: { goal: string; projectSlug: string; expectedHeadSha: string },
 ): string[] {
   const errors = validateV10CapabilityPlan(plan);
+  if (!isV10CapabilityPlan(plan)) return errors;
   if (plan.goal.trim() !== context.goal.trim()) errors.push('capability plan goal does not match execution goal');
   if (plan.projectSlug.trim() !== context.projectSlug.trim()) errors.push('capability plan project does not match execution project');
   if (plan.expectedHeadSha.toLowerCase() !== context.expectedHeadSha.trim().toLowerCase()) {
