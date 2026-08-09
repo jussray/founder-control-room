@@ -124,18 +124,20 @@ export function validateWorkerEnv(
   }
 }
 
+type WorkerResponse = Awaited<ReturnType<NonNullable<ExportedHandler<unknown>['fetch']>>>;
+
 const SERVICE_IDENTITY_HEADER = 'X-Founder-Control-Room-Service';
 const SERVICE_IDENTITY = 'founder-control-room';
 
-function withServiceIdentity(response: Response): Response {
+function withServiceIdentity(response: WorkerResponse): WorkerResponse {
   const headers = new Headers(response.headers);
   headers.set(SERVICE_IDENTITY_HEADER, SERVICE_IDENTITY);
 
-  return new Response(response.body, {
+  return new Response(response.body as unknown as BodyInit, {
     status: response.status,
     statusText: response.statusText,
     headers,
-  });
+  }) as unknown as WorkerResponse;
 }
 
 /**
