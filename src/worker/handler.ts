@@ -124,6 +124,20 @@ export function validateWorkerEnv(
   }
 }
 
+const SERVICE_IDENTITY_HEADER = 'X-Founder-Control-Room-Service';
+const SERVICE_IDENTITY = 'founder-control-room';
+
+function withServiceIdentity(response: Response): Response {
+  const headers = new Headers(response.headers);
+  headers.set(SERVICE_IDENTITY_HEADER, SERVICE_IDENTITY);
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 /**
  * Combine Cloudflare's supported Node HTTP adapter with the scheduled
  * reconciliation callback. The reconciler remains lazy so HTTP-only isolates
@@ -137,8 +151,9 @@ export function composeWorkerHandler<Env>(
   if (!httpFetch) throw new Error('Cloudflare HTTP handler is missing fetch');
 
   return {
-    fetch(request, env, ctx) {
-      return httpFetch.call(httpHandler, request, env, ctx);
+    async fetch(request, env, ctx) {
+      const response = await httpFetch.call(httpHandler, request, env, ctx);
+      return withServiceIdentity(response);
     },
 
     async scheduled(_controller, _env, ctx) {
