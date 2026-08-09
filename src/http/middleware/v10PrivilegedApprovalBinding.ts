@@ -56,7 +56,7 @@ export interface V10ApprovedRegistrySnapshot {
   registryHash: string;
   contract: string;
   status: string;
-  entries: V10CapabilityRef[];
+  entries: unknown[];
   approvedBy: string | null;
   approvedAt: string | null;
 }
@@ -123,16 +123,18 @@ export function validateV10ApprovedRegistrySnapshot(
     reasons.push('approved capability registry snapshot contains no entries');
     return reasons;
   }
-  if (snapshot.entries.some((entry) => !isV10CapabilityRef(entry))) {
+
+  const validEntries = snapshot.entries.filter(isV10CapabilityRef);
+  if (validEntries.length !== snapshot.entries.length) {
     reasons.push('approved capability registry snapshot contains a malformed capability entry');
     return reasons;
   }
-  if (v10CapabilityRegistryHash(snapshot.entries) !== snapshotHash) {
+  if (v10CapabilityRegistryHash(validEntries) !== snapshotHash) {
     reasons.push('approved capability registry snapshot hash does not match its canonical entries');
   }
 
   const registryById = new Map<string, V10CapabilityRef>();
-  for (const entry of snapshot.entries) {
+  for (const entry of validEntries) {
     const id = entry.id.trim();
     if (registryById.has(id)) {
       reasons.push(`approved capability registry contains duplicate capability id: ${id}`);
@@ -220,7 +222,7 @@ async function approvedRegistrySnapshot(registryHash: string): Promise<V10Approv
     registryHash: text(row.registry_hash).toLowerCase(),
     contract: text(row.contract),
     status: text(row.status),
-    entries: Array.isArray(row.entries) ? row.entries.filter(isV10CapabilityRef) : [],
+    entries: Array.isArray(row.entries) ? row.entries : [],
     approvedBy: row.approved_by,
     approvedAt: row.approved_at,
   };
