@@ -1,12 +1,12 @@
 # AI Skill Suite — Cross-Platform Build Toolkit
 
-A set of skills and instructions for maximizing build output across Claude, ChatGPT, and Perplexity Computer on free tiers. Built for incremental, working-code-first development with minimum token waste.
+A set of skills and instructions for maximizing build output across Claude, ChatGPT, and Perplexity Computer. Built for incremental, working-code-first development with minimum token waste and explicit capability truth.
 
 ## What's Inside
 
-### Perplexity Agent Skills (`perplexity-skills/`)
+### Skill Files (`skills/`)
 
-Five installable skills for Perplexity Computer:
+Five installable skills — for Perplexity Computer (`save_custom_skill`) or as Claude Projects knowledge base files:
 
 | Skill | Purpose |
 |-------|---------|
@@ -16,38 +16,53 @@ Five installable skills for Perplexity Computer:
 | **intent-repair-reader** | Parse human intent from typos using context clues, keyboard analysis, phonics |
 | **capability-mode-router** | Command system: /redteam, /lindy, /ooda, /human, /confess, /truth, /ultrathink, /artifact |
 
+### ChatGPT GPT Instruction Templates (`gpts/`)
+
+The same five skills, rewritten as standalone GPT instruction templates. Where GPT creation/editing is available for the current ChatGPT plan or managed workspace, paste these into GPT Builder → Instructions. Where GPT creation is unavailable, reuse the files as instruction references instead of claiming a dedicated GPT exists.
+
+Tool-dependent rules inside these templates are capability-aware: web search, Code Interpreter & Data Analysis, file tools, apps, actions, repository tools, and external execution must only be used when they are actually enabled for the current account/workspace/session.
+
 ### Cross-Platform Adapters (`cross-platform/`)
 
 | File | For | How to Use |
 |------|-----|-----------|
-| `claude-project-instructions.md` | Claude (claude.ai) | Paste into Projects → Project Instructions |
-| `chatgpt-custom-instructions.md` | ChatGPT (chat.openai.com) | Paste into Settings → Custom Instructions |
+| `claude-project-instructions.md` | Claude (claude.ai) | Paste into Projects → Project Instructions where that feature is available |
+| `chatgpt-custom-instructions.md` | ChatGPT | Use as reusable custom/project instruction text where supported |
 | `universal-commands.md` | All three | Reference for command behaviors |
-| `minimal-token-operating-protocol.md` | All three | Token economy strategy for free tiers |
+| `minimal-token-operating-protocol.md` | All three | Token economy strategy when usage is constrained |
 | `HUMAN_SAFE_BUILD.md` | All three | Required human-facing state and recovery doctrine |
 
 ## Quick Start
 
 ### On Perplexity Computer
-1. Install each skill from `perplexity-skills/` (use `save_custom_skill`)
-2. Load `HUMAN_SAFE_BUILD.md` as an always-on rule
-3. Skills auto-activate based on task context
-4. Type command shortcuts like `/lindy /artifact` in any conversation
+1. Install each skill from `skills/` using the current supported skill mechanism.
+2. Load `HUMAN_SAFE_BUILD.md` as an always-on rule where persistent instructions are supported.
+3. Let skills activate based on task context.
+4. Type command shortcuts like `/lindy /artifact` in a conversation.
 
 ### On Claude
-1. Create a Claude Project for each of your repos
-2. Paste `claude-project-instructions.md` into Project Instructions
-3. Add your repo files to the project knowledge base
-4. Load `HUMAN_SAFE_BUILD.md` as an always-on project rule
-5. Type commands like `/redteam` or `/ooda` in chat
+1. Create or use a persistent project/workspace when that feature is available.
+2. Add `claude-project-instructions.md` to the persistent instruction surface.
+3. Add repo files to the project knowledge/context surface as supported.
+4. Load `HUMAN_SAFE_BUILD.md` as an always-on project rule.
+5. Type commands like `/redteam` or `/ooda` in chat.
 
 ### On ChatGPT
-1. Go to Settings → Custom Instructions
-2. Paste the "About You" section into the first box
-3. Paste the "How to Respond" section into the second box
-4. Or create a Custom GPT with the full instructions as system prompt
-5. Keep `HUMAN_SAFE_BUILD.md` attached or copied into the project instructions
-6. Type commands like `/lindy /artifact` in chat
+1. Use the available Custom Instructions, project/workspace instructions, or equivalent persistent instruction surface.
+2. Add the relevant ChatGPT adapter text without assuming unavailable tools.
+3. If the current paid plan or managed workspace permits GPT creation/editing, create a GPT and use a file from `gpts/` as its Instructions.
+4. Enable only the GPT capabilities the workflow actually needs and that the account/workspace allows.
+5. Keep `HUMAN_SAFE_BUILD.md` attached or copied into the persistent instruction context where supported.
+6. Type commands like `/lindy /artifact` in chat.
+
+## Capability Truth Rule
+
+Across every platform:
+
+- Never claim browsing, code execution, terminal access, repository access, file access, external sends, or other tool actions occurred unless the current session actually exposed and ran that capability.
+- When execution is unavailable, provide the exact verification command/test and label the result **NOT RUN**.
+- When live research is unavailable, label current/version-specific claims **UNVERIFIED** and provide the exact source/query needed to verify them.
+- Plan limits, workspace policies, region, and account configuration may change which capabilities are available. The skill files must degrade gracefully instead of inventing access.
 
 ## Command Reference
 
@@ -60,9 +75,9 @@ Five installable skills for Perplexity Computer:
 | `/confess` | Honest limitations, label guesses, admit unknowns |
 | `/truth` | No hedging, direct truth, no false agreement |
 | `/ultrathink` | Maximum reasoning depth for complex problems |
-| `/artifact` | Must produce working code/file/test, not just text |
+| `/artifact` | Must produce working code/file/test when the capability exists, or an exact actionable verification step when it does not |
 
-Commands stack: `/lindy /ooda /artifact` = proven-tech incremental build with decision loop, shipping code each cycle.
+Commands stack: `/lindy /ooda /artifact` = proven-tech incremental build with decision loop, shipping only what can be evidenced.
 
 ## Human-safe build contract
 
@@ -82,13 +97,15 @@ The human must be able to tell what the system is doing, what happened, whether 
 ## Cross-Tool Workflow
 
 ```
-Research → Perplexity (web search, source verification)
-Build   → Claude (long context, code generation, Artifacts)
-Iterate → ChatGPT (Code Interpreter, quick prototyping)
-Verify  → Perplexity (fact-check, regression check)
-Ship    → From whichever tool has the most current working state
-Sync    → GitHub repo (commit from each tool, pull before starting)
+Research → strongest available live-source tool
+Build    → strongest available repository/code tool
+Iterate  → strongest available execution/prototyping tool
+Verify   → independent evidence source or executable proof
+Ship     → only from the tool/session with current authority and exact state
+Sync     → GitHub or another explicit source of truth when repository access exists
 ```
+
+A tool name is a routing preference, not proof that the capability exists in every plan/session. Preserve `VERIFIED`, `UNVERIFIED`, and `NOT RUN` state across handoffs.
 
 ## Academic Grounding
 
@@ -100,13 +117,13 @@ Sync    → GitHub repo (commit from each tool, pull before starting)
 
 ## Token Philosophy
 
-Every token costs something. On free tiers, tokens are scarce. This suite optimizes for:
+Every token costs something. When usage or context is constrained, this suite optimizes for:
 
 - **Working code over explanations** — code first, explanation only if asked
-- **Smallest next increment** — one feature, tested, committed, then next
-- **File-first state** — write specs and state to files, reference paths in chat
+- **Smallest next increment** — one feature, tested, committed when commit access exists, then next
+- **File-first state** — write specs and state to files when file tools are available; otherwise keep state concise and explicit
 - **No filler** — no preamble, no postamble, no AI-tells
-- **Tool switching** — use each AI tool for what it's best at, relay between them
+- **Capability-aware routing** — choose tools by actual current access, not assumed product marketing
 
 ## License
 
