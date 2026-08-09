@@ -94,7 +94,8 @@ describe('Founder OS provider evidence exact-head review contracts', () => {
       },
     });
 
-    expect(valid.readiness).toBe('ready_for_external_executor');
+    expect(valid.readiness).toBe('blocked');
+    expect(valid.truth.blocked.join(' ')).toContain('Founder-approved capability registry snapshot');
     expect(valid.route.provider).toMatchObject({
       preflightEvidenceRequired: [
         'repository',
