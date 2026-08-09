@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
 import {
   V10_CAPABILITY_PLAN_CONTRACT,
@@ -20,6 +21,10 @@ process.env.NO_PROXY = '*';
 process.env.no_proxy = '*';
 
 const E2E_DEMO_ROOT_SHA = 'a'.repeat(40);
+const REAL_REPO_HEAD_SHA = execFileSync('git', ['rev-parse', 'HEAD'], {
+  cwd: process.cwd(),
+  encoding: 'utf8',
+}).trim().toLowerCase();
 const E2E_CAPABILITY = {
   id: 'review-verify-merge',
   version: '1.0.0',
@@ -34,12 +39,14 @@ process.env.E2E_FAKE_GITHUB_ROOT_SHA = E2E_DEMO_ROOT_SHA;
 process.env.E2E_APPROVED_V10_REGISTRY_HASH = E2E_REGISTRY_HASH;
 process.env.E2E_APPROVED_V10_REGISTRY_ENTRIES_JSON = JSON.stringify([E2E_CAPABILITY]);
 
-function chiefPlan(requestedAuthority, expectedHeadSha) {
+function chiefPlan(projectSlug, requestedAuthority, expectedHeadSha) {
   const base = {
     contract: V10_CAPABILITY_PLAN_CONTRACT,
     selectedBy: V10_CAPABILITY_SELECTOR,
-    goal: 'Ship the onboarding flow',
-    projectSlug: 'demo-project',
+    goal: projectSlug === 'founder-control-room'
+      ? 'Create the exact-head guarded terminal proof branch.'
+      : 'Ship the onboarding flow',
+    projectSlug,
     expectedHeadSha: String(expectedHeadSha).trim().toLowerCase(),
     registryHash: E2E_REGISTRY_HASH,
     requestedAuthority,
@@ -55,13 +62,33 @@ function chiefPlan(requestedAuthority, expectedHeadSha) {
   return { ...base, planHash: v10CapabilityPlanHash(base) };
 }
 
+// run.mjs performs one privileged create_branch directly with Node fetch for
+// the guarded-terminal proof. Bind that provider-boundary call to the same
+// canonical Chief plan/approved registry used by the real browser forms.
+const originalFetch = globalThis.fetch.bind(globalThis);
+globalThis.fetch = async (input, init = {}) => {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  if (url.includes('/approvals/') && url.endsWith('/execute') && typeof init.body === 'string') {
+    try {
+      const body = JSON.parse(init.body);
+      if (body?.actionType === 'create_branch' && !body.capabilityPlan) {
+        body.capabilityPlan = chiefPlan('founder-control-room', 'reversible', REAL_REPO_HEAD_SHA);
+        init = { ...init, body: JSON.stringify(body) };
+      }
+    } catch {
+      // Preserve malformed requests unchanged so the real route can reject them.
+    }
+  }
+  return originalFetch(input, init);
+};
+
 async function withV10PlanAwarePage(page) {
   const originalClick = page.click.bind(page);
   page.click = async (selector, options) => {
     if (selector === '#create-branch-form button[type=submit]') {
       await page.fill(
         '#create-branch-form textarea[name="capabilityPlan"]',
-        JSON.stringify(chiefPlan('reversible', E2E_DEMO_ROOT_SHA)),
+        JSON.stringify(chiefPlan('demo-project', 'reversible', E2E_DEMO_ROOT_SHA)),
       );
     }
 
@@ -69,7 +96,7 @@ async function withV10PlanAwarePage(page) {
       const expectedHeadSha = await page.locator('#execute-merge-form input[name="expectedHeadSha"]').inputValue();
       await page.fill(
         '#execute-merge-form textarea[name="capabilityPlan"]',
-        JSON.stringify(chiefPlan('privileged', expectedHeadSha)),
+        JSON.stringify(chiefPlan('demo-project', 'privileged', expectedHeadSha)),
       );
     }
 
