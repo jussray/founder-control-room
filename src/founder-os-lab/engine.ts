@@ -229,6 +229,9 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
     ...socialErrors,
   );
 
+  const registryResolutionRequired = executorReadyAction
+    && validationErrors.length === 0
+    && (!approvalRequired || approvalObserved);
   const blocked: string[] = [...validationErrors];
   if (approvalRequired && !approvalObserved) {
     blocked.push(
@@ -237,14 +240,19 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
         : `Explicit founder approval covering ${request.action} is required, but approval cannot become executor-ready until a Chief AI capability plan is present.`,
     );
   }
+  if (registryResolutionRequired) {
+    blocked.push('Founder-approved capability registry snapshot was not resolved in isolated preview mode; external executor readiness cannot be claimed.');
+  }
 
   const readiness = validationErrors.length > 0
     ? 'blocked'
     : approvalRequired && !approvalObserved
       ? 'approval_required'
-      : executorReadyAction
-        ? 'ready_for_external_executor'
-        : 'ready_for_review';
+      : registryResolutionRequired
+        ? 'blocked'
+        : executorReadyAction
+          ? 'ready_for_external_executor'
+          : 'ready_for_review';
 
   const socialValidated = SOCIAL_ACTIONS.has(request.action) && socialErrors.length === 0;
   const projectValidated = Boolean(request.project)
@@ -259,7 +267,8 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
   ];
   if (capabilityPlan.valid && request.capabilityPlan) {
     verified.push(
-      `Chief AI capability plan ${request.capabilityPlan.planHash} passed goal, project, exact-head, provenance, registry-hash, and authority-ceiling validation.`,
+      `Chief AI capability plan ${request.capabilityPlan.planHash} passed goal, project, exact-head, provenance, declared registry-hash, and authority-ceiling validation.`,
+      'The founder-approved capability registry snapshot itself was not resolved in this isolated preview.',
       `Outcome signals are declared before execution: ${capabilityPlan.outcomeSignals.join(', ')}.`,
     );
   }
@@ -286,17 +295,19 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
         ? `Supply the missing ${provider.id} preflight evidence (${missingPreflightEvidence.join(', ')}) and rerun the preview. No provider action will occur.`
         : semanticEvidenceErrors.length > 0
           ? `Correct the ${provider.id} evidence semantics and rerun the preview: ${semanticEvidenceErrors.join(' ')} No provider action will occur.`
-          : readiness === 'blocked'
-            ? 'Correct the rejected governance or payload input and rerun the pure preview path.'
-            : readiness === 'approval_required'
-              ? `Attach one founder approval bound to ${request.action}, project, exact head, and capability plan hash, then rerun the preview. No ${provider.id} action will occur.`
-              : readiness === 'ready_for_external_executor'
-                ? `Review the ${command.id} governance plan, Chief AI capability plan, and evidence requirements, then separately authorize one named external adapter for ${provider.id}.`
-                : request.action === 'send-email'
-                  ? 'Keep this outreach at review-only until a canonical allowed DispatchDecision, recipient identity, approved content, consent, suppression, and content-approval evidence are supplied through a separately governed adapter change. No email will be sent.'
-                  : request.project
-                    ? `Review the ${request.project.id} preview against its exact source contracts. Any implementation requires a separate change in the authoritative project repository with exact-head proof.`
-                    : `Review the ${command.id} preview and Chief AI capability plan; promote only one bounded provider capability through a separately governed adapter experiment.`;
+          : registryResolutionRequired
+            ? 'Resolve and verify the founder-approved capability registry snapshot and exact capability entries in a governed execution boundary before external executor readiness. No provider action will occur.'
+            : readiness === 'blocked'
+              ? 'Correct the rejected governance or payload input and rerun the pure preview path.'
+              : readiness === 'approval_required'
+                ? `Attach one founder approval bound to ${request.action}, project, exact head, and capability plan hash, then rerun the preview. No ${provider.id} action will occur.`
+                : readiness === 'ready_for_external_executor'
+                  ? `Review the ${command.id} governance plan, Chief AI capability plan, and evidence requirements, then separately authorize one named external adapter for ${provider.id}.`
+                  : request.action === 'send-email'
+                    ? 'Keep this outreach at review-only until a canonical allowed DispatchDecision, recipient identity, approved content, consent, suppression, and content-approval evidence are supplied through a separately governed adapter change. No email will be sent.'
+                    : request.project
+                      ? `Review the ${request.project.id} preview against its exact source contracts. Any implementation requires a separate change in the authoritative project repository with exact-head proof.`
+                      : `Review the ${command.id} preview and Chief AI capability plan; promote only one bounded provider capability through a separately governed adapter experiment.`;
 
   const capabilities = unique<FounderOsLabCapabilityId>([
     ...actionRoute.capabilities,
@@ -388,7 +399,7 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
       authority: 'L0 simulation only. No mutation authority is present.',
       state: readiness,
       evidence: capabilityPlan.valid && request.capabilityPlan
-        ? `Governance evaluated Chief AI capability plan ${request.capabilityPlan.planHash} against registry ${request.capabilityPlan.registryHash} in memory.`
+        ? `Governance validated Chief AI capability plan ${request.capabilityPlan.planHash} with declared registry hash ${request.capabilityPlan.registryHash} in memory; founder-approved registry snapshot resolution remains pending outside isolated preview.`
         : projectValidated && projectResolution.route
           ? `The checked-in ${projectResolution.route.id} adapter and exact-head canon contract URLs were evaluated in memory.`
           : socialValidated
@@ -419,6 +430,7 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
         'Assert all isolation flags remain false for side effects.',
         'Assert executionAllowed remains false for every action and provider.',
         'Assert capability selection is Chief-AI-owned and plan-hash/registry-hash bound when present.',
+        'Assert founder-approved registry snapshot resolution occurs before any external executor readiness claim.',
         'Assert untrusted skill origins cannot raise their own authority ceiling.',
         'Assert mutating approvals are bound to project, exact head, and capability plan hash.',
         `Assert ${provider.id} supports ${request.action} before presenting a proceedable preview.`,
