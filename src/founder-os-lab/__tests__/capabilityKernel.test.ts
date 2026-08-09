@@ -99,6 +99,33 @@ describe('V10 capability kernel security boundaries', () => {
     })).toContain('capability plan shape is invalid');
   });
 
+  it('rejects unhashed extra fields on plans and nested capability refs', () => {
+    const canonical = plan();
+    const extraPlanField = { ...canonical, privatePayload: 'must-not-cross-boundary' };
+    expect(isV10CapabilityPlan(extraPlanField)).toBe(false);
+    expect(validateV10CapabilityPlan(extraPlanField as unknown as V10CapabilityPlan))
+      .toContain('capability plan shape is invalid');
+
+    const extraCapabilityField = {
+      ...canonical,
+      capabilities: [{ ...canonical.capabilities[0]!, providerPayload: 'unhashed' }],
+    };
+    expect(isV10CapabilityPlan(extraCapabilityField)).toBe(false);
+    expect(validateV10CapabilityPlan(extraCapabilityField as unknown as V10CapabilityPlan))
+      .toContain('capability plan shape is invalid');
+  });
+
+  it('rejects whitespace-only strategic, proof, and outcome entries', () => {
+    for (const overrides of [
+      { strategicLenses: [' '] },
+      { proofRequirements: [' '] },
+      { outcomeSignals: [' '] },
+    ] satisfies Array<Partial<V10CapabilityPlan>>) {
+      const candidate = plan(overrides);
+      expect(validateV10CapabilityPlan(candidate).length).toBeGreaterThan(0);
+    }
+  });
+
   it('detects plan tampering after hashing', () => {
     const original = plan();
     expect(validateV10CapabilityPlan({ ...original, routingReason: 'tampered' }))
