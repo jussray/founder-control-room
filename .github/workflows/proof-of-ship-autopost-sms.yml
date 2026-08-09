@@ -1,0 +1,363 @@
+name: Proof-of-Ship Autopost + SMS
+
+on:
+  workflow_run:
+    workflows: ["Deploy"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact deployed commit SHA to publish from
+        required: true
+        type: string
+      deploy_run_id:
+        description: Deploy workflow run that produced the verified proof artifact
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: proof-of-ship-autopost-sms-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.expected_sha }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  RECEIPT_LOOKUP_ATTEMPTS: '210'
+  RECEIPT_LOOKUP_DELAY_SECONDS: '10'
+  RECEIPT_TOKEN_CONTEXT: founder-control-room/proof-of-ship-receipts/v1
+
+jobs:
+  autopost:
+    name: Autopost verified accomplishment and prove SMS receipt
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        github.event.workflow_run.conclusion == 'success'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: production
+    env:
+      EXPECTED_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.expected_sha }}
+      DEPLOY_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || inputs.deploy_run_id }}
+      DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+      ZAPIER_CATCH_HOOK_URL: ${{ secrets.ZAPIER_CATCH_HOOK_URL }}
+      PROOF_OF_SHIP_STEERING_GRANT_ID: ${{ secrets.PROOF_OF_SHIP_STEERING_GRANT_ID }}
+      FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
+
+    steps:
+      - name: Validate standing autopost authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo '::error title=Invalid exact head::EXPECTED_SHA must be a lowercase 40-character commit SHA.'
+            exit 1
+          }
+          [[ "$DEPLOY_RUN_ID" =~ ^[1-9][0-9]*$ ]] || {
+            echo '::error title=Invalid deploy run::DEPLOY_RUN_ID must identify the completed Deploy run.'
+            exit 1
+          }
+          [[ "$DEPLOY_URL" == https://* ]] || {
+            echo '::error title=Production origin missing::DEPLOY_URL must be an HTTPS production origin.'
+            exit 1
+          }
+          [[ "$ZAPIER_CATCH_HOOK_URL" == https://* ]] || {
+            echo '::error title=Autopost downstream missing::ZAPIER_CATCH_HOOK_URL must be configured.'
+            exit 1
+          }
+          [[ "$PROOF_OF_SHIP_STEERING_GRANT_ID" =~ ^[A-Za-z0-9._:-]{1,100}$ ]] || {
+            echo '::error title=Standing authority missing::PROOF_OF_SHIP_STEERING_GRANT_ID must be configured.'
+            exit 1
+          }
+          [[ -n "$FOUNDER_SIGNAL_ENGINE_MCP_TOKEN" ]] || {
+            echo '::error title=Receipt proof missing::FOUNDER_SIGNAL_ENGINE_MCP_TOKEN must be configured.'
+            exit 1
+          }
+
+      - name: Check out exact deployed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Download verified Deploy proof artifact
+        id: proof_download
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: proof-of-ship-founder-review-${{ env.EXPECTED_SHA }}
+          path: verified-proof
+          run-id: ${{ env.DEPLOY_RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Skip activity that did not earn a proof artifact
+        if: steps.proof_download.outcome != 'success'
+        shell: bash
+        run: |
+          {
+            echo '### Proof-of-Ship autopost skipped'
+            echo
+            echo "No verified meaningful-release artifact exists for $EXPECTED_SHA."
+            echo 'The conveyor only posts accomplishments that passed the Deploy proof gate.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate exact verified release proof
+        if: steps.proof_download.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          proof='verified-proof/proof-review.json'
+          test -s "$proof"
+          jq -e --arg sha "$EXPECTED_SHA" '
+            .meaningful == true and
+            .repository_allowed == true and
+            .commit_sha == $sha and
+            .source_commit_sha == $sha and
+            .live_state == "verified" and
+            ((.supabase_state == "verified") or (.supabase_state == "not_applicable")) and
+            .cloudflare_live_sha == $sha and
+            .publish_allowed == false and
+            .PUBLISH_ALLOWED == false and
+            .authorization_mode == "founder-review-required" and
+            .buffer_terminal_action == "hold"
+          ' "$proof" >/dev/null
+
+      - name: Validate fresh LinkedIn rising-floor baseline
+        if: steps.proof_download.outcome == 'success'
+        shell: bash
+        env:
+          LINKEDIN_BASELINE_PATH: config/linkedin-rising-floor-baseline.json
+        run: |
+          set -euo pipefail
+          jq -e '
+            .version == 1 and
+            .platform == "linkedin" and
+            .source.verified == true and
+            (.source.created_at_utc | type == "string" and length > 0) and
+            (.baseline_ref | type == "string" and startswith("linkedin-export:")) and
+            (.period.end | type == "string" and length > 0) and
+            (.policy.max_age_hours | type == "number" and . > 0) and
+            (.policy.max_period_lag_days | type == "number" and . >= 0) and
+            .policy.stale_behavior == "fail_closed_before_linkedin_schedule" and
+            .policy.target_mode == "beat_previous_verified_floor_without_sacrificing_quality"
+          ' "$LINKEDIN_BASELINE_PATH" >/dev/null
+
+          python3 - <<'PY'
+          import json
+          import os
+          from datetime import date, datetime, timedelta, timezone
+
+          path = os.environ['LINKEDIN_BASELINE_PATH']
+          with open(path, encoding='utf-8') as handle:
+              baseline = json.load(handle)
+
+          created = datetime.fromisoformat(baseline['source']['created_at_utc'].replace('Z', '+00:00'))
+          if created.tzinfo is None:
+              raise SystemExit('LinkedIn baseline source timestamp must include timezone')
+          created = created.astimezone(timezone.utc)
+          now = datetime.now(timezone.utc)
+          if created > now + timedelta(minutes=5):
+              raise SystemExit('LinkedIn baseline source timestamp is in the future')
+          if now - created > timedelta(hours=int(baseline['policy']['max_age_hours'])):
+              raise SystemExit('LinkedIn baseline is stale')
+
+          period_end = date.fromisoformat(baseline['period']['end'])
+          lag = (now.date() - period_end).days
+          if lag < 0 or lag > int(baseline['policy']['max_period_lag_days']):
+              raise SystemExit('LinkedIn baseline period is stale')
+          PY
+
+      - name: Build autonomous publication payload
+        if: steps.proof_download.outcome == 'success'
+        shell: bash
+        env:
+          LINKEDIN_BASELINE_PATH: config/linkedin-rising-floor-baseline.json
+        run: |
+          set -euo pipefail
+          proof='verified-proof/proof-review.json'
+          verified_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          scheduled_at="$(date -u -d "$verified_at + 20 minutes" +%Y-%m-%dT%H:%M:%SZ)"
+          invocation_id="$(python3 - <<'PY'
+          import uuid
+          print(uuid.uuid4())
+          PY
+          )"
+          baseline_json="$(jq -c '.' "$LINKEDIN_BASELINE_PATH")"
+          baseline_ref="$(jq -r '.baseline_ref' "$LINKEDIN_BASELINE_PATH")"
+          idempotency_key="${GITHUB_REPOSITORY}:${EXPECTED_SHA}"
+          standing_approval="standing-policy:${PROOF_OF_SHIP_STEERING_GRANT_ID}:${invocation_id}"
+
+          jq \
+            --arg verified_at "$verified_at" \
+            --arg scheduled_at "$scheduled_at" \
+            --arg invocation_id "$invocation_id" \
+            --arg steering_grant_id "$PROOF_OF_SHIP_STEERING_GRANT_ID" \
+            --arg founder_approval_id "$standing_approval" \
+            --arg idempotency_key "$idempotency_key" \
+            --arg baseline_ref "$baseline_ref" \
+            --argjson baseline "$baseline_json" '
+              .publish_allowed = true |
+              .PUBLISH_ALLOWED = true |
+              .authorization_mode = "standing-policy" |
+              .destination_mode = "schedule" |
+              .buffer_provider_action = "buffer_add_to_queue" |
+              .buffer_method = "schedule" |
+              .buffer_save_to_draft = false |
+              .buffer_api_sharing_mode = "customScheduled" |
+              .buffer_terminal_action = "schedule" |
+              .schedule_policy_id = "buffer-autopost-rising-floor-v1" |
+              .review_window_minutes = 0 |
+              .share_now_allowed = false |
+              .notification_mode = "sms_after_publish" |
+              .notification_required = true |
+              .completion_contract = "published_live_url_and_sms_delivered_v1" |
+              .content_mode = "proof-led-build-in-public" |
+              .requested_channels = ["x", "linkedin"] |
+              .requested_content_fields = ["x_draft", "linkedin_draft"] |
+              .linkedin_strategy_required = true |
+              .linkedin_rising_floor_ready = false |
+              .linkedin_baseline_ref = $baseline_ref |
+              .linkedin_baseline = $baseline |
+              .linkedin_baseline_freshness_checked_at = $verified_at |
+              .linkedin_required_output_fields = [
+                "linkedin_rising_floor_ready",
+                "linkedin_growth_hypothesis",
+                "linkedin_24h_gate",
+                "linkedin_48h_gate",
+                "linkedin_next_mutation"
+              ] |
+              .verified_at = $verified_at |
+              .scheduled_at = $scheduled_at |
+              .invocation_id = $invocation_id |
+              .batch_id = $invocation_id |
+              .steering_grant_id = $steering_grant_id |
+              .founder_approval_id = $founder_approval_id |
+              .idempotency_key = $idempotency_key
+          ' "$proof" > proof-autopost.json
+
+          jq -e --arg sha "$EXPECTED_SHA" '
+            .commit_sha == $sha and
+            .cloudflare_live_sha == $sha and
+            .publish_allowed == true and
+            .PUBLISH_ALLOWED == true and
+            .authorization_mode == "standing-policy" and
+            .notification_mode == "sms_after_publish" and
+            .notification_required == true and
+            .completion_contract == "published_live_url_and_sms_delivered_v1" and
+            .buffer_terminal_action == "schedule" and
+            .linkedin_strategy_required == true
+          ' proof-autopost.json >/dev/null
+
+      - name: Send verified accomplishment to publication conveyor
+        if: steps.proof_download.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --silent --show-error --fail \
+            --proto '=https' --proto-redir '=https' --max-redirs 0 \
+            --connect-timeout 10 --max-time 30 \
+            -H 'Content-Type: application/json' \
+            --data-binary @proof-autopost.json \
+            --output /dev/null \
+            "$ZAPIER_CATCH_HOOK_URL"
+
+      - name: Wait for live publication and delivered SMS receipt
+        if: steps.proof_download.outcome == 'success'
+        id: receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          origin="${DEPLOY_URL%/}"
+          repo_name="${GITHUB_REPOSITORY#jussray/}"
+          lookup_url="$origin/ingest/proof-of-ship-receipts/by-commit/jussray/$repo_name/$EXPECTED_SHA"
+          receipt_token="$(node -e 'const { createHmac } = require("node:crypto"); process.stdout.write(createHmac("sha256", process.env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN).update(process.env.RECEIPT_TOKEN_CONTEXT).digest("hex"));')"
+          expected_key="${GITHUB_REPOSITORY}:${EXPECTED_SHA}"
+          baseline_ref="$(jq -r '.linkedin_baseline_ref' proof-autopost.json)"
+
+          rm -f receipt.json
+          for attempt in $(seq 1 "$RECEIPT_LOOKUP_ATTEMPTS"); do
+            status="$(curl --silent --show-error \
+              --connect-timeout 10 --max-time 20 \
+              --output receipt.json --write-out '%{http_code}' \
+              --header "x-proof-of-ship-receipt-token: $receipt_token" \
+              "$lookup_url")"
+
+            if [[ "$status" == 200 ]] && jq -e \
+              --arg repo "$GITHUB_REPOSITORY" \
+              --arg sha "$EXPECTED_SHA" \
+              --arg key "$expected_key" \
+              --arg baseline "$baseline_ref" '
+                .found == true and
+                .receipt.source == "zapier" and
+                .receipt.sourceRepo == $repo and
+                .receipt.exactCommitSha == $sha and
+                .receipt.idempotencyKey == $key and
+                .receipt.linkedinBaselineRef == $baseline and
+                .receipt.linkedinRisingFloorReady == true and
+                (.receipt.linkedinGrowthHypothesis | type == "string" and length > 0) and
+                (.receipt.linkedin24hGate | type == "string" and length > 0) and
+                (.receipt.linkedin48hGate | type == "string" and length > 0) and
+                (.receipt.linkedinNextMutation | type == "string" and length > 0) and
+                (.receipt.linkedinDraftSha256 | test("^[0-9a-f]{64}$")) and
+                .receipt.bufferTerminalAction == "schedule" and
+                (.receipt.bufferScheduleId | type == "string" and length > 0) and
+                .receipt.bufferPublicationStatus == "published" and
+                (.receipt.bufferPostId | type == "string" and length > 0) and
+                (.receipt.livePostUrl | startswith("https://")) and
+                (.receipt.publishedAt | type == "string" and length > 0) and
+                .receipt.smsNotificationStatus == "delivered" and
+                (.receipt.smsProvider | type == "string" and length > 0) and
+                (.receipt.smsMessageId | type == "string" and length > 0) and
+                (.receipt.smsDeliveredAt | type == "string" and length > 0)
+              ' receipt.json >/dev/null; then
+              break
+            fi
+
+            rm -f receipt.json
+            if [[ "$attempt" -lt "$RECEIPT_LOOKUP_ATTEMPTS" ]]; then
+              sleep "$RECEIPT_LOOKUP_DELAY_SECONDS"
+            fi
+          done
+
+          if [[ ! -s receipt.json ]]; then
+            echo '::error title=Autopost completion unproven::No exact-head receipt proved a live post plus delivered SMS before the bounded verification window expired.'
+            exit 1
+          fi
+
+          echo "live_post_url=$(jq -r '.receipt.livePostUrl' receipt.json)" >> "$GITHUB_OUTPUT"
+          echo "buffer_post_id=$(jq -r '.receipt.bufferPostId' receipt.json)" >> "$GITHUB_OUTPUT"
+          echo "sms_message_id=$(jq -r '.receipt.smsMessageId' receipt.json)" >> "$GITHUB_OUTPUT"
+          echo "published_at=$(jq -r '.receipt.publishedAt' receipt.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish autonomous conveyor proof summary
+        if: steps.proof_download.outcome == 'success'
+        shell: bash
+        env:
+          LIVE_POST_URL: ${{ steps.receipt.outputs.live_post_url }}
+          BUFFER_POST_ID: ${{ steps.receipt.outputs.buffer_post_id }}
+          SMS_MESSAGE_ID: ${{ steps.receipt.outputs.sms_message_id }}
+          PUBLISHED_AT: ${{ steps.receipt.outputs.published_at }}
+        run: |
+          {
+            echo '### Autonomous proof-of-ship conveyor VERIFIED'
+            echo
+            echo "- repository: $GITHUB_REPOSITORY"
+            echo "- exact SHA: $EXPECTED_SHA"
+            echo "- live post: $LIVE_POST_URL"
+            echo "- Buffer post receipt: $BUFFER_POST_ID"
+            echo "- published at: $PUBLISHED_AT"
+            echo "- SMS delivery receipt: $SMS_MESSAGE_ID"
+            echo
+            echo 'Completion means shipped, published, live URL proven, and founder SMS delivered.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -29,7 +29,15 @@ const validReceipt = {
   bufferTerminalAction: 'schedule',
   bufferScheduleId: 'buffer:scheduled:12345',
   scheduledAt: '2026-08-08T06:40:00.000Z',
-  occurredAt: '2026-08-08T06:20:00.000Z',
+  bufferPublicationStatus: 'published',
+  bufferPostId: 'buffer:post:12345',
+  livePostUrl: 'https://www.linkedin.com/feed/update/urn:li:activity:12345/',
+  publishedAt: '2026-08-08T06:41:00.000Z',
+  smsNotificationStatus: 'delivered',
+  smsProvider: 'twilio',
+  smsMessageId: 'SM1234567890abcdef',
+  smsDeliveredAt: '2026-08-08T06:41:05.000Z',
+  occurredAt: '2026-08-08T06:41:06.000Z',
 } as const;
 
 function createRepository(): ProofOfShipReceiptRepository {
@@ -108,6 +116,50 @@ describe('proof-of-ship receipt ingest and lookup', () => {
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: 'linkedin_rising_floor_not_ready' });
+  });
+
+  it('rejects scheduled-only receipts until the post is live and SMS is delivered', async () => {
+    const repository = createRepository();
+    const scheduledOnly = { ...validReceipt } as Record<string, unknown>;
+    delete scheduledOnly.bufferPublicationStatus;
+    delete scheduledOnly.bufferPostId;
+    delete scheduledOnly.livePostUrl;
+    delete scheduledOnly.publishedAt;
+    delete scheduledOnly.smsNotificationStatus;
+    delete scheduledOnly.smsProvider;
+    delete scheduledOnly.smsMessageId;
+    delete scheduledOnly.smsDeliveredAt;
+
+    const response = await request(createTestApp(repository))
+      .post('/ingest/proof-of-ship-receipts')
+      .set('x-proof-of-ship-receipt-token', testReceiptToken)
+      .send(scheduledOnly);
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'invalid_buffer_publication_status' });
+    expect(repository.store).not.toHaveBeenCalled();
+  });
+
+  it('rejects a receipt whose SMS was not delivered', async () => {
+    const repository = createRepository();
+    const response = await request(createTestApp(repository))
+      .post('/ingest/proof-of-ship-receipts')
+      .set('x-proof-of-ship-receipt-token', testReceiptToken)
+      .send({ ...validReceipt, smsNotificationStatus: 'queued' });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'invalid_sms_notification_status' });
+  });
+
+  it('rejects a receipt whose publication/SMS timeline is impossible', async () => {
+    const repository = createRepository();
+    const response = await request(createTestApp(repository))
+      .post('/ingest/proof-of-ship-receipts')
+      .set('x-proof-of-ship-receipt-token', testReceiptToken)
+      .send({ ...validReceipt, smsDeliveredAt: '2026-08-08T06:39:00.000Z' });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'invalid_sms_timeline' });
   });
 
   it('rejects a receipt that is not bound to the exact repo and commit idempotency key', async () => {
@@ -257,11 +309,20 @@ describe('proof-of-ship receipt ingest and lookup', () => {
       buffer_terminal_action: validReceipt.bufferTerminalAction,
       buffer_schedule_id: validReceipt.bufferScheduleId,
       scheduled_at: validReceipt.scheduledAt,
+      buffer_publication_status: validReceipt.bufferPublicationStatus,
+      buffer_post_id: validReceipt.bufferPostId,
+      live_post_url: validReceipt.livePostUrl,
+      published_at: validReceipt.publishedAt,
+      sms_notification_status: validReceipt.smsNotificationStatus,
+      sms_provider: validReceipt.smsProvider,
+      sms_message_id: validReceipt.smsMessageId,
+      sms_delivered_at: validReceipt.smsDeliveredAt,
       occurred_at: validReceipt.occurredAt,
     };
 
     expect(storedProofOfShipReceiptMatches(stored, validReceipt)).toBe(true);
-    expect(storedProofOfShipReceiptMatches({ ...stored, buffer_schedule_id: 'buffer:other' }, validReceipt)).toBe(false);
+    expect(storedProofOfShipReceiptMatches({ ...stored, buffer_post_id: 'buffer:post:other' }, validReceipt)).toBe(false);
+    expect(storedProofOfShipReceiptMatches({ ...stored, sms_message_id: 'SMother' }, validReceipt)).toBe(false);
     expect(storedProofOfShipReceiptMatches({ ...stored, linkedin_baseline_ref: 'linkedin-export:other' }, validReceipt)).toBe(false);
     expect(storedProofOfShipReceiptMatches({ ...stored, exact_commit_sha: 'd'.repeat(40) }, validReceipt)).toBe(false);
   });

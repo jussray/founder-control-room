@@ -35,6 +35,14 @@ const RECEIPT_COLUMNS = [
   'buffer_terminal_action',
   'buffer_schedule_id',
   'scheduled_at',
+  'buffer_publication_status',
+  'buffer_post_id',
+  'live_post_url',
+  'published_at',
+  'sms_notification_status',
+  'sms_provider',
+  'sms_message_id',
+  'sms_delivered_at',
   'occurred_at',
 ].join(',');
 
@@ -96,6 +104,14 @@ function rowToProofOfShipReceipt(row: unknown): ProofOfShipReceipt | null {
       bufferTerminalAction: row.buffer_terminal_action,
       bufferScheduleId: row.buffer_schedule_id,
       scheduledAt: row.scheduled_at,
+      bufferPublicationStatus: row.buffer_publication_status,
+      bufferPostId: row.buffer_post_id,
+      livePostUrl: row.live_post_url,
+      publishedAt: row.published_at,
+      smsNotificationStatus: row.sms_notification_status,
+      smsProvider: row.sms_provider,
+      smsMessageId: row.sms_message_id,
+      smsDeliveredAt: row.sms_delivered_at,
       occurredAt: row.occurred_at,
     });
   } catch {
@@ -108,8 +124,7 @@ export function storedProofOfShipReceiptMatches(
   receipt: ProofOfShipReceipt,
 ): boolean {
   const normalized = rowToProofOfShipReceipt(stored);
-  if (!normalized) return false;
-  return JSON.stringify(normalized) === JSON.stringify(receipt);
+  return normalized ? JSON.stringify(normalized) === JSON.stringify(receipt) : false;
 }
 
 async function findReceipt(
@@ -161,6 +176,14 @@ export const proofOfShipReceiptRepository: ProofOfShipReceiptRepository = {
       buffer_terminal_action: receipt.bufferTerminalAction,
       buffer_schedule_id: receipt.bufferScheduleId,
       scheduled_at: receipt.scheduledAt,
+      buffer_publication_status: receipt.bufferPublicationStatus,
+      buffer_post_id: receipt.bufferPostId,
+      live_post_url: receipt.livePostUrl,
+      published_at: receipt.publishedAt,
+      sms_notification_status: receipt.smsNotificationStatus,
+      sms_provider: receipt.smsProvider,
+      sms_message_id: receipt.smsMessageId,
+      sms_delivered_at: receipt.smsDeliveredAt,
       occurred_at: receipt.occurredAt,
     });
 
