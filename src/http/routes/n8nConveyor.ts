@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { V10CapabilityPlan } from '../../founder-os-lab/capabilityKernel.js';
 import {
   FOUNDER_CONVEYOR_STAGES,
   dispatchFounderConveyorAdvance,
@@ -28,10 +29,17 @@ function stringArray(value: unknown): string[] | null {
   return value.map((item) => item.trim());
 }
 
+function capabilityPlan(value: unknown): V10CapabilityPlan | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as V10CapabilityPlan;
+}
+
 n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
   const readiness = founderConveyorReadiness();
   return res.json({
     contract: FOUNDER_CONVEYOR_CONTRACT,
+    capabilityPlanContract: 'juss-v10/capability-plan@v1',
+    capabilitySelector: 'chief-ai-machine',
     stages: FOUNDER_CONVEYOR_STAGES,
     readiness,
     authority: {
@@ -49,12 +57,13 @@ n8nConveyorRouter.post('/advance', async (req: FounderRequest, res) => {
   const fromStage = stage(body.fromStage);
   const toStage = stage(body.toStage);
   const evidenceUrls = stringArray(body.evidenceUrls);
+  const selectedCapabilityPlan = capabilityPlan(body.capabilityPlan);
 
-  if (!fromStage || !toStage || evidenceUrls === null) {
+  if (!fromStage || !toStage || evidenceUrls === null || !selectedCapabilityPlan) {
     return res.status(400).json({
       ok: false,
       code: 'INVALID_PAYLOAD',
-      reasons: ['fromStage, toStage, and evidenceUrls must use the conveyor contract'],
+      reasons: ['fromStage, toStage, evidenceUrls, and a Chief AI capabilityPlan must use the V10 conveyor contract'],
       contract: FOUNDER_CONVEYOR_CONTRACT,
     });
   }
@@ -66,6 +75,7 @@ n8nConveyorRouter.post('/advance', async (req: FounderRequest, res) => {
     fromStage,
     toStage,
     expectedHeadSha: text(body.expectedHeadSha),
+    capabilityPlan: selectedCapabilityPlan,
     evidenceUrls,
   };
 
