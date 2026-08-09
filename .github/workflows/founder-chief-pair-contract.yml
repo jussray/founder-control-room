@@ -6,6 +6,11 @@ on:
       - 'config/founder-chief-pair.contract.json'
       - 'docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md'
       - 'scripts/verify-founder-chief-pair.mjs'
+      - 'src/founder-os-lab/capabilityKernel.ts'
+      - 'src/founder-os-lab/engine.ts'
+      - 'src/lib/n8nConveyor.ts'
+      - 'src/lib/n8nConveyorRuntime.ts'
+      - 'automation/n8n/founder-conveyor.workflow.json'
       - '.github/workflows/founder-chief-pair-contract.yml'
   push:
     branches: [main]
@@ -13,6 +18,11 @@ on:
       - 'config/founder-chief-pair.contract.json'
       - 'docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md'
       - 'scripts/verify-founder-chief-pair.mjs'
+      - 'src/founder-os-lab/capabilityKernel.ts'
+      - 'src/founder-os-lab/engine.ts'
+      - 'src/lib/n8nConveyor.ts'
+      - 'src/lib/n8nConveyorRuntime.ts'
+      - 'automation/n8n/founder-conveyor.workflow.json'
       - '.github/workflows/founder-chief-pair-contract.yml'
   workflow_dispatch:
 
