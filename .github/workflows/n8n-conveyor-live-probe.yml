@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       target_sha:
-        description: Exact Founder Control Room commit SHA to probe
+        description: Exact current Founder Control Room main SHA to probe
         required: true
         type: string
       capability_plan_json:
@@ -21,26 +21,28 @@ concurrency:
 
 jobs:
   probe:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment: production
     env:
-      N8N_CONVEYOR_WEBHOOK_URL: ${{ secrets.N8N_CONVEYOR_WEBHOOK_URL }}
-      N8N_CONVEYOR_BEARER_TOKEN: ${{ secrets.N8N_CONVEYOR_BEARER_TOKEN }}
       N8N_CONVEYOR_PROBE_HEAD_SHA: ${{ inputs.target_sha }}
       N8N_CONVEYOR_CAPABILITY_PLAN_JSON: ${{ inputs.capability_plan_json }}
     steps:
-      - name: Check out exact target
+      - name: Check out protected default branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.target_sha }}
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
 
-      - name: Verify immutable target and required probe inputs
+      - name: Verify immutable current-main target and probe inputs
         shell: bash
         run: |
           set -euo pipefail
+          test "${{ github.event.repository.default_branch }}" = "main"
+          test "${GITHUB_REF}" = "refs/heads/main"
+          [[ "${N8N_CONVEYOR_PROBE_HEAD_SHA}" =~ ^[0-9a-fA-F]{40}$ ]]
           test "$(git rev-parse HEAD)" = "${N8N_CONVEYOR_PROBE_HEAD_SHA}"
-          test -n "${N8N_CONVEYOR_WEBHOOK_URL}"
-          test -n "${N8N_CONVEYOR_BEARER_TOKEN}"
           test -n "${N8N_CONVEYOR_CAPABILITY_PLAN_JSON}"
 
       - name: Set up Node
@@ -49,11 +51,24 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install locked dependencies
+      - name: Install locked trusted dependencies
         run: npm ci
 
       - name: Run bounded live receipt probe
-        run: npx tsx scripts/verify-n8n-conveyor-live.ts | tee n8n-live-probe-receipt.json
+        env:
+          N8N_CONVEYOR_WEBHOOK_URL: ${{ secrets.N8N_CONVEYOR_WEBHOOK_URL }}
+          N8N_CONVEYOR_BEARER_TOKEN: ${{ secrets.N8N_CONVEYOR_BEARER_TOKEN }}
+          SUPABASE_URL: https://oojzfmmywbvficgybaxd.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FCR_V10_RECEIPT_PERSISTENCE_REQUIRED: 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${N8N_CONVEYOR_WEBHOOK_URL}"
+          test -n "${N8N_CONVEYOR_BEARER_TOKEN}"
+          test -n "${SUPABASE_SERVICE_ROLE_KEY}"
+          test "${FCR_V10_RECEIPT_PERSISTENCE_REQUIRED}" = "true"
+          npx tsx scripts/verify-n8n-conveyor-live.ts | tee n8n-live-probe-receipt.json
 
       - name: Upload retained receipt
         uses: actions/upload-artifact@v4

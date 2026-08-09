@@ -37,7 +37,7 @@ function capabilityPlan(): V10CapabilityPlan {
 }
 
 describe('V10 approval binding', () => {
-  it('accepts approval only when action, project, head, and plan hash all match', () => {
+  it('accepts bound approval but keeps executor readiness blocked until the approved registry is resolved', () => {
     const cp = capabilityPlan();
     const plan = planFounderOsLab({
       goal: cp.goal,
@@ -58,7 +58,8 @@ describe('V10 approval binding', () => {
     });
 
     expect(plan.authority.approvalObserved).toBe(true);
-    expect(plan.readiness).toBe('ready_for_external_executor');
+    expect(plan.readiness).toBe('blocked');
+    expect(plan.truth.blocked.join(' ')).toContain('Founder-approved capability registry snapshot');
   });
 
   it('rejects approval replay against a different capability plan hash', () => {

@@ -158,7 +158,8 @@ describe('Founder OS and AI Company cross-lab parity', () => {
     });
     const company = runCompanySimulation(companyInput());
 
-    expect(founderPlan.readiness).toBe('ready_for_external_executor');
+    expect(founderPlan.readiness).toBe('blocked');
+    expect(founderPlan.truth.blocked.join(' ')).toContain('Founder-approved capability registry snapshot');
     expect(founderPlan.authority).toEqual({
       level: 'L0',
       mode: 'simulation',

@@ -111,7 +111,7 @@ function previewBody(proofAccountId: string) {
 }
 
 describe('POST /founder-os/preview Cloudflare account evidence', () => {
-  it('accepts the canonical account and project tuple without provider execution', async () => {
+  it('accepts the canonical account and project tuple while keeping executor readiness behind registry resolution', async () => {
     const body = previewBody('account-a');
     const response = await request(buildApp())
       .post('/founder-os/preview')
@@ -120,7 +120,7 @@ describe('POST /founder-os/preview Cloudflare account evidence', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.plan).toMatchObject({
-      readiness: 'ready_for_external_executor',
+      readiness: 'blocked',
       authority: {
         approvalObserved: true,
         capabilityPlanBound: true,
@@ -153,6 +153,7 @@ describe('POST /founder-os/preview Cloudflare account evidence', () => {
         },
       },
     });
+    expect(response.body.plan.truth.blocked.join(' ')).toContain('Founder-approved capability registry snapshot');
     expect(supabaseMock.from).toHaveBeenCalledTimes(1);
   });
 

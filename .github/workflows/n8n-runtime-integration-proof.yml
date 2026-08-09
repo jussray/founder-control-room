@@ -1,5 +1,5 @@
 name: n8n Runtime Integration Proof
-# CI-only runtime proof. It does not activate production n8n or change Cloudflare deployment state.
+# CI-only runtime proof. It does not activate production n8n, write production Supabase, or change Cloudflare deployment state.
 
 on:
   pull_request:
@@ -7,7 +7,9 @@ on:
       - 'automation/n8n/**'
       - 'src/lib/n8nActivationProbe.ts'
       - 'src/lib/n8nConveyor.ts'
+      - 'src/lib/v10ConveyorReceiptStore.ts'
       - 'scripts/verify-n8n-conveyor-live.ts'
+      - 'scripts/verify-n8n-runtime-integration.ts'
       - 'scripts/generate-n8n-runtime-proof-plan.ts'
       - '.github/workflows/n8n-runtime-integration-proof.yml'
   workflow_dispatch:
@@ -151,7 +153,7 @@ jobs:
           echo 'Published webhook never registered before timeout' >&2
           exit 1
 
-      - name: Prove canonical authenticated receipt
+      - name: Prove canonical authenticated receipt and persistence code path
         shell: bash
         env:
           N8N_CONVEYOR_WEBHOOK_URL: http://127.0.0.1:5678/webhook/founder-control-room/conveyor
@@ -160,7 +162,7 @@ jobs:
           N8N_CONVEYOR_CAPABILITY_PLAN_JSON: ${{ env.N8N_CONVEYOR_CAPABILITY_PLAN_JSON }}
         run: |
           set -euo pipefail
-          npx tsx scripts/verify-n8n-conveyor-live.ts | tee n8n-runtime-integration-receipt.json
+          npx tsx scripts/verify-n8n-runtime-integration.ts | tee n8n-runtime-integration-receipt.json
 
       - name: Upload retained runtime receipt
         uses: actions/upload-artifact@v4

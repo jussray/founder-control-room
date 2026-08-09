@@ -120,4 +120,20 @@ describe('V10 founder-facing and analytics contracts', () => {
       evidenceUrls: [],
     })).toContain('goal success cannot be claimed before the outcome is verified');
   });
+
+  it('rejects placeholder evidence before a verified success can be recorded', () => {
+    expect(validateV10OutcomeObservation({
+      capabilityPlanHash: HASH,
+      executionReceiptId: RECEIPT,
+      observedAt: '2026-08-09T06:30:00.000Z',
+      verified: true,
+      goalSucceeded: true,
+      founderOverride: false,
+      rollbackUsed: false,
+      retries: 0,
+      evidenceCompleteness: 100,
+      outcomeSignals: ['verification-pass'],
+      evidenceUrls: ['placeholder'],
+    })).toContain('evidence URLs must be valid HTTPS URLs or localhost/127.0.0.1 HTTP URLs');
+  });
 });

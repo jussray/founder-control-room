@@ -325,7 +325,7 @@ describe('POST /founder-os/preview', () => {
     expect(supabaseMock.from).toHaveBeenCalledTimes(1);
   });
 
-  it('recognizes plan-bound approval and complete evidence while keeping the provider inert', async () => {
+  it('recognizes plan-bound approval and complete evidence but keeps executor readiness behind registry resolution', async () => {
     founderSession();
     const goal = 'Preview the exact-head merge gate.';
     const selectedPlan = capabilityPlan(goal);
@@ -349,7 +349,7 @@ describe('POST /founder-os/preview', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.plan).toMatchObject({
-      readiness: 'ready_for_external_executor',
+      readiness: 'blocked',
       authority: {
         approvalObserved: true,
         capabilityPlanBound: true,
@@ -372,6 +372,7 @@ describe('POST /founder-os/preview', () => {
         },
       },
     });
+    expect(response.body.plan.truth.blocked.join(' ')).toContain('Founder-approved capability registry snapshot');
     expect(supabaseMock.from).toHaveBeenCalledTimes(1);
   });
 });

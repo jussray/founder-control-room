@@ -40,6 +40,17 @@ function uniqueStrings(values: readonly string[]): string[] {
   return [...new Set(values.map((value) => text(value)).filter(Boolean))].sort();
 }
 
+function validEvidenceUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (!url.hostname || url.username || url.password) return false;
+    if (url.protocol === 'https:') return true;
+    return url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1');
+  } catch {
+    return false;
+  }
+}
+
 function normalizeMetrics(values: readonly V10OutcomeMetric[] | undefined): V10OutcomeMetric[] {
   if (!Array.isArray(values)) return [];
   return values.slice(0, 30).map((metric) => ({
@@ -66,7 +77,11 @@ export function validateV10OutcomeObservation(input: V10OutcomeObservationInput)
   if (!Array.isArray(input.outcomeSignals) || uniqueStrings(input.outcomeSignals).length === 0) {
     errors.push('at least one declared outcome signal is required');
   }
-  if (!Array.isArray(input.evidenceUrls)) errors.push('evidenceUrls must be an array');
+  if (!Array.isArray(input.evidenceUrls)) {
+    errors.push('evidenceUrls must be an array');
+  } else if (input.evidenceUrls.some((value) => !validEvidenceUrl(text(value)))) {
+    errors.push('evidence URLs must be valid HTTPS URLs or localhost/127.0.0.1 HTTP URLs');
+  }
   if (input.verified && uniqueStrings(input.evidenceUrls ?? []).length === 0) {
     errors.push('verified outcomes require evidence URLs');
   }
