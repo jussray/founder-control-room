@@ -19,6 +19,7 @@ export interface ControlRoomWorkerEnv {
   FCR_V10_CONVEYOR_CONTRACT: string;
   FCR_V10_MAX_RUNTIME_AUTHORITY: string;
   FCR_V10_REGISTRY_RESOLUTION_REQUIRED: string;
+  FCR_V10_RECEIPT_PERSISTENCE_REQUIRED: string;
   /** HMAC secret for POST /ingest/repository-verification. Optional — that route 401s without it. */
   REPOSITORY_INGEST_SECRET?: string;
 }
@@ -41,6 +42,7 @@ const REQUIRED_BINDINGS = [
   'FCR_V10_CONVEYOR_CONTRACT',
   'FCR_V10_MAX_RUNTIME_AUTHORITY',
   'FCR_V10_REGISTRY_RESOLUTION_REQUIRED',
+  'FCR_V10_RECEIPT_PERSISTENCE_REQUIRED',
 ] as const satisfies readonly (keyof ControlRoomWorkerEnv)[];
 
 function hasNonEmptyString(value: unknown): value is string {
@@ -103,6 +105,9 @@ export function validateWorkerEnv(
   }
   if (validated.FCR_V10_REGISTRY_RESOLUTION_REQUIRED !== 'true') {
     throw new Error('Worker V10 runtime must require trusted registry resolution before L1+ promotion');
+  }
+  if (validated.FCR_V10_RECEIPT_PERSISTENCE_REQUIRED !== 'true') {
+    throw new Error('Worker V10 runtime must persist accepted conveyor receipts to the Supabase audit ledger');
   }
 
   const origins = validated.FOUNDER_ALLOWED_ORIGINS
