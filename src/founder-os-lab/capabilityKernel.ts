@@ -37,9 +37,13 @@ export interface V10CapabilityPlan {
   goal: string;
   projectSlug: string;
   expectedHeadSha: string;
+  registryHash: string;
   requestedAuthority: V10CapabilityAuthority;
+  strategicLenses: string[];
+  routingReason: string;
   capabilities: V10CapabilityRef[];
   proofRequirements: string[];
+  outcomeSignals: string[];
   rollback: string;
   planHash: string;
 }
@@ -85,7 +89,10 @@ export function v10CapabilityPlanSeed(plan: Omit<V10CapabilityPlan, 'planHash'> 
     plan.goal.trim(),
     plan.projectSlug.trim(),
     plan.expectedHeadSha.trim().toLowerCase(),
+    plan.registryHash.trim().toLowerCase(),
     plan.requestedAuthority,
+    normalizedStrings(plan.strategicLenses),
+    plan.routingReason.trim(),
     sortedCapabilities(plan.capabilities).map((capability) => [
       capability.id.trim(),
       capability.version.trim(),
@@ -95,6 +102,7 @@ export function v10CapabilityPlanSeed(plan: Omit<V10CapabilityPlan, 'planHash'> 
       capability.authorityCeiling,
     ]),
     normalizedStrings(plan.proofRequirements),
+    normalizedStrings(plan.outcomeSignals),
     plan.rollback.trim(),
   ]);
 }
@@ -111,10 +119,18 @@ export function validateV10CapabilityPlan(plan: V10CapabilityPlan): string[] {
   if (!text(plan.goal)) errors.push('capability plan goal is required');
   if (!text(plan.projectSlug, 160)) errors.push('capability plan projectSlug is required');
   if (!FULL_SHA.test(text(plan.expectedHeadSha, 40))) errors.push('capability plan expectedHeadSha must be a full Git SHA');
+  if (!HASH.test(text(plan.registryHash, 64))) errors.push('capability plan registryHash must be sha256');
   if (!AUTHORITIES.has(plan.requestedAuthority)) errors.push('unsupported requested authority');
+  if (!text(plan.routingReason)) errors.push('capability plan routing reason is required');
   if (!text(plan.rollback)) errors.push('capability plan rollback is required');
+  if (!Array.isArray(plan.strategicLenses) || plan.strategicLenses.length === 0) {
+    errors.push('capability plan strategic lenses are required');
+  }
   if (!Array.isArray(plan.proofRequirements) || plan.proofRequirements.length === 0) {
     errors.push('capability plan proof requirements are required');
+  }
+  if (!Array.isArray(plan.outcomeSignals) || plan.outcomeSignals.length === 0) {
+    errors.push('capability plan outcome signals are required');
   }
 
   if (!Array.isArray(plan.capabilities) || plan.capabilities.length === 0) {
@@ -155,5 +171,18 @@ export function validateV10CapabilityPlan(plan: V10CapabilityPlan): string[] {
     errors.push('capability plan hash does not match plan content');
   }
 
+  return errors;
+}
+
+export function validateV10CapabilityPlanContext(
+  plan: V10CapabilityPlan,
+  context: { goal: string; projectSlug: string; expectedHeadSha: string },
+): string[] {
+  const errors = validateV10CapabilityPlan(plan);
+  if (plan.goal.trim() !== context.goal.trim()) errors.push('capability plan goal does not match execution goal');
+  if (plan.projectSlug.trim() !== context.projectSlug.trim()) errors.push('capability plan project does not match execution project');
+  if (plan.expectedHeadSha.toLowerCase() !== context.expectedHeadSha.trim().toLowerCase()) {
+    errors.push('capability plan head does not match execution head');
+  }
   return errors;
 }
