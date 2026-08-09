@@ -19,7 +19,7 @@ const waveOne = [
 ];
 
 const waveTwo = [
-  { id: "playwright-e2e", command: process.execPath, args: ["e2e/run.mjs"] },
+  { id: "playwright-e2e", command: process.execPath, args: ["e2e/direct-browser-run.mjs"] },
 ];
 
 function redactFailureExcerpt(value) {
