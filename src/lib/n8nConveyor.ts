@@ -1,5 +1,9 @@
 import { createHash } from 'node:crypto';
-import { founderConveyorSkillsForStage } from './founderConveyorSkills.js';
+import type { V10CapabilityPlan } from '../founder-os-lab/capabilityKernel.js';
+import {
+  founderConveyorSkillsFromPlan,
+  validateFounderConveyorCapabilityPlan,
+} from './founderConveyorSkills.js';
 import {
   FOUNDER_CONVEYOR_CONTRACT,
   FOUNDER_CONVEYOR_IDEMPOTENCY_PREFIX,
@@ -23,6 +27,7 @@ export interface FounderConveyorAdvanceInput {
   fromStage: FounderConveyorStage;
   toStage: FounderConveyorStage;
   expectedHeadSha: string;
+  capabilityPlan: V10CapabilityPlan;
   evidenceUrls: string[];
 }
 
@@ -145,7 +150,20 @@ export function validateFounderConveyorAdvance(input: FounderConveyorAdvanceInpu
     }
   }
 
-  return reasons;
+  if (!input.capabilityPlan || typeof input.capabilityPlan !== 'object') {
+    reasons.push('Chief AI capability plan is required');
+  } else {
+    reasons.push(...validateFounderConveyorCapabilityPlan(input.capabilityPlan, {
+      goal,
+      projectSlug,
+      expectedHeadSha: input.expectedHeadSha,
+    }));
+    if (!['reason', 'draft'].includes(input.capabilityPlan.requestedAuthority)) {
+      reasons.push('conveyor stage advancement cannot carry reversible or privileged execution authority');
+    }
+  }
+
+  return [...new Set(reasons)];
 }
 
 function receiptIdFrom(value: unknown): string | null {
@@ -161,6 +179,7 @@ export function founderConveyorIdempotencyKey(input: FounderConveyorAdvanceInput
     input.fromStage,
     input.toStage,
     text(input.expectedHeadSha).toLowerCase(),
+    text(input.capabilityPlan?.planHash).toLowerCase(),
   ].join(':');
   return `${FOUNDER_CONVEYOR_IDEMPOTENCY_PREFIX}${createHash('sha256').update(identity).digest('hex')}`;
 }
@@ -175,7 +194,9 @@ export function expectedFounderConveyorReceiptId(input: FounderConveyorAdvanceIn
     expectedHeadSha: text(input.expectedHeadSha).toLowerCase(),
     fromStage: input.fromStage,
     toStage: input.toStage,
-    skillIds: founderConveyorSkillsForStage(input.toStage),
+    capabilityPlanHash: input.capabilityPlan.planHash,
+    registryHash: input.capabilityPlan.registryHash,
+    skillIds: founderConveyorSkillsFromPlan(input.capabilityPlan),
     evidenceUrls: input.evidenceUrls.map((url) => text(url)),
   });
 }
@@ -225,7 +246,7 @@ export async function dispatchFounderConveyorAdvance(
     Authorization: `Bearer ${config.bearerToken}`,
     'Content-Type': 'application/json',
     'Idempotency-Key': idempotencyKey,
-    'X-FCR-Conveyor-Contract': 'v2',
+    'X-FCR-Conveyor-Contract': 'v3',
   };
 
   const payload = {
@@ -238,6 +259,7 @@ export async function dispatchFounderConveyorAdvance(
     fromStage: input.fromStage,
     toStage: input.toStage,
     expectedHeadSha: text(input.expectedHeadSha).toLowerCase(),
+    capabilityPlan: input.capabilityPlan,
     evidenceUrls: input.evidenceUrls.map((url) => text(url)),
     authority: {
       advanceStage: true,
@@ -292,7 +314,7 @@ export async function dispatchFounderConveyorAdvance(
         code: 'UPSTREAM_RECEIPT_MISMATCH',
         status: 502,
         receiptId,
-        reasons: ['n8n receipt does not match the canonical v2 transition identity'],
+        reasons: ['n8n receipt does not match the canonical v3 capability-plan-bound transition identity'],
       };
     }
 
