@@ -11,7 +11,7 @@ const receiptRoute = readFileSync(
   'utf8',
 );
 const migration = readFileSync(
-  new URL('../../../supabase/migrations/20260808061500_proof_of_ship_receipts.sql', import.meta.url),
+  new URL('../../../supabase/migrations/20260809000109_proof_of_ship_receipts.sql', import.meta.url),
   'utf8',
 );
 
