@@ -89,20 +89,24 @@ jobs:
       FOUNDER_APPROVAL_ID: ${{ inputs.founder_approval_id || '' }}
 
     steps:
-      - name: Checkout exact approved commit
+      - name: Checkout target branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          ref: ${{ env.TARGET_BRANCH }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify approved head before installing dependencies
+      - name: Verify approved branch and head before installing dependencies
         shell: bash
         run: |
           set -euo pipefail
+          ACTUAL_BRANCH="$(git branch --show-current)"
           ACTUAL_HEAD_SHA="$(git rev-parse HEAD)"
-          echo "Expected: ${EXPECTED_HEAD_SHA}"
-          echo "Actual:   ${ACTUAL_HEAD_SHA}"
+          echo "Expected branch: ${TARGET_BRANCH}"
+          echo "Actual branch:   ${ACTUAL_BRANCH}"
+          echo "Expected head:   ${EXPECTED_HEAD_SHA}"
+          echo "Actual head:     ${ACTUAL_HEAD_SHA}"
+          test "${ACTUAL_BRANCH}" = "${TARGET_BRANCH}"
           test "${ACTUAL_HEAD_SHA}" = "${EXPECTED_HEAD_SHA}"
 
       - name: Setup Node
