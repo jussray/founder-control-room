@@ -92,6 +92,7 @@ jobs:
       - name: Checkout target branch
         uses: actions/checkout@v4
         with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ env.TARGET_BRANCH }}
           fetch-depth: 0
           persist-credentials: false
