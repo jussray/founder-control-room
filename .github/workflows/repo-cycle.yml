@@ -52,10 +52,19 @@ on:
       target_branch:
         description: Branch expected to be checked out
         required: true
-        default: codex/founder-control-room-master-build-spec-20260730
+        default: main
         type: string
+      approval_source:
+        description: Where the founder issued/carried the approval
+        required: false
+        default: founder
+        type: choice
+        options:
+          - founder
+          - chatgpt
+          - claude
       founder_approval_id:
-        description: External Founder Control Room approval or decision ID
+        description: Approval receipt/conversation/decision ID; required by merge_gate
         required: false
         type: string
 
@@ -76,6 +85,7 @@ jobs:
       REPO_CYCLE_OPERATION: ${{ inputs.operation || 'verify' }}
       TARGET_BRANCH: ${{ inputs.target_branch || github.head_ref || github.ref_name }}
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha || github.event.pull_request.head.sha || github.sha }}
+      APPROVAL_SOURCE: ${{ inputs.approval_source || '' }}
       FOUNDER_APPROVAL_ID: ${{ inputs.founder_approval_id || '' }}
 
     steps:
@@ -114,21 +124,28 @@ jobs:
           "${REPO_CYCLE_OPERATION}"
           "--target-branch=${TARGET_BRANCH}"
           "--expected-sha=${EXPECTED_HEAD_SHA}"
+          "--approval-source=${APPROVAL_SOURCE}"
+          "--approval-id=${FOUNDER_APPROVAL_ID}"
 
       - name: Publish job summary
         if: always()
         shell: bash
         run: |
+          MERGE_AUTHORIZED="false"
+          if [ -f repo-cycle-result.json ]; then
+            MERGE_AUTHORIZED="$(node -e "const r=require('./repo-cycle-result.json'); process.stdout.write(String(r.merge_authorized === true))")"
+          fi
           {
             echo "## Founder Repo Cycle"
             echo
             echo "- Operation: \`${REPO_CYCLE_OPERATION}\`"
             echo "- Target branch: \`${TARGET_BRANCH}\`"
             echo "- Approved head: \`${EXPECTED_HEAD_SHA}\`"
-            echo "- Founder approval ID: \`${FOUNDER_APPROVAL_ID:-not supplied}\`"
-            echo "- Merge authorized: \`false\`"
+            echo "- Approval source: \`${APPROVAL_SOURCE:-not supplied}\`"
+            echo "- Approval ID: \`${FOUNDER_APPROVAL_ID:-not supplied}\`"
+            echo "- Merge authorized: \`${MERGE_AUTHORIZED}\`"
             echo
-            echo "> This workflow is evidence-only. Its token has read-only repository permissions and cannot push or merge."
+            echo "> Authorization may be carried from a founder decision issued through Founder Control Room, ChatGPT, or Claude. This workflow remains evidence-only and read-only; the exact-SHA receipt is consumed by a separate merge executor."
             if [ -f repo-cycle-result.json ]; then
               echo
               echo "### Result"
