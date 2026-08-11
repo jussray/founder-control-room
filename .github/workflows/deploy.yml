@@ -84,6 +84,7 @@ jobs:
           DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
           FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
           ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL: ${{ secrets.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL }}
+          FOUNDER_REVIEW_EMAIL_INGRESS_SECRET: ${{ secrets.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET }}
         shell: bash
         run: |
           set -euo pipefail
@@ -100,6 +101,7 @@ jobs:
             DEPLOY_URL
             FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
             ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
+            FOUNDER_REVIEW_EMAIL_INGRESS_SECRET
           )
           missing=()
 
@@ -225,6 +227,7 @@ jobs:
           set -euo pipefail
           supabase db push \
             --dry-run \
+            --include-all \
             --db-url "$SUPABASE_DB_URL"
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
@@ -234,6 +237,7 @@ jobs:
           set -euo pipefail
           supabase db push \
             --yes \
+            --include-all \
             --db-url "$SUPABASE_DB_URL"
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
@@ -262,6 +266,7 @@ jobs:
             echo "- Pre-deploy receipt: \`migration-ledger-before.json\`"
             echo "- Post-push receipt: \`migration-ledger-after.json\`"
             echo "- Remote-only versions are blocked before mutation."
+            echo "- Missing local migrations are included even when production already has newer migration versions."
             echo "- Any local-only version remaining after push fails the deployment."
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -315,6 +320,7 @@ jobs:
             FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
             FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
             ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
+            FOUNDER_REVIEW_EMAIL_INGRESS_SECRET
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
@@ -323,6 +329,7 @@ jobs:
           GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}
           FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
           ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL: ${{ secrets.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL }}
+          FOUNDER_REVIEW_EMAIL_INGRESS_SECRET: ${{ secrets.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET }}
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CF_SESSIONS_KV_NAMESPACE_ID: ${{ secrets.CF_SESSIONS_KV_NAMESPACE_ID }}
