@@ -21,6 +21,9 @@ concurrency:
   group: n8n-runtime-integration-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   runtime-proof:
     runs-on: ubuntu-latest
@@ -51,7 +54,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24'
           cache: npm
 
       - name: Install locked dependencies
