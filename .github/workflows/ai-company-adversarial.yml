@@ -21,6 +21,9 @@ concurrency:
   group: ai-company-adversarial-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   verify-adversarial-sandboxes:
     runs-on: ubuntu-22.04
@@ -47,7 +50,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24'
           cache: npm
 
       - name: Install locked dependencies
