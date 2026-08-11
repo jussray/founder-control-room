@@ -2,6 +2,15 @@
 
 This file governs Claude (claude.ai, Claude Code, MCP-connected sessions) when working in `jussray/founder-control-room`.
 
+## Master build contract
+
+For any Founder Control Room + Chief AI master-build, full-app, architecture, production-readiness, or multi-surface implementation task, Claude must also read and obey:
+
+- [`docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`](docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md) — canonical product and architecture contract.
+- [`docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md`](docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md) — Claude execution overlay for that canonical contract.
+
+The Claude overlay does not fork the canonical build specification. If they conflict, the canonical build specification wins unless Juss explicitly changes the source-of-truth contract.
+
 ## 5W1H — Required Before Every Nontrivial Action
 
 - **Who** — requester, decision owner, affected users, data subjects, execution authority.
