@@ -115,3 +115,45 @@ jobs:
       - name: Lint migrations
         run: supabase db lint --local
         continue-on-error: true
+
+  required-gate:
+    name: Required Gate
+    if: ${{ always() }}
+    needs:
+      - typecheck
+      - lint
+      - test
+      - e2e
+      - rls-contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce load-bearing CI results
+        shell: bash
+        env:
+          TYPECHECK_RESULT: ${{ needs.typecheck.result }}
+          LINT_RESULT: ${{ needs.lint.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+          RLS_RESULT: ${{ needs.rls-contract.result }}
+        run: |
+          set -euo pipefail
+          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\nrls=%s\n' \
+            "$TYPECHECK_RESULT" \
+            "$LINT_RESULT" \
+            "$TEST_RESULT" \
+            "$E2E_RESULT" \
+            "$RLS_RESULT"
+
+          for result in \
+            "$TYPECHECK_RESULT" \
+            "$LINT_RESULT" \
+            "$TEST_RESULT" \
+            "$E2E_RESULT" \
+            "$RLS_RESULT"; do
+            if [ "$result" != "success" ]; then
+              echo "Required Gate blocked: at least one load-bearing CI job is not successful."
+              exit 1
+            fi
+          done
+
+          echo "Required Gate passed for ${GITHUB_SHA}."
