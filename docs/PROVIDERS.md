@@ -2,13 +2,15 @@
 
 The Control Room uses providers as replaceable capabilities. Product authority, approvals, event history, and recovery remain owned by the Control Room.
 
+Provider-specific instructions may become stricter, but they do not replace the canonical product contract in `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md` or the repository entry contract in `AGENTS.md`.
+
 ## Claude / Claude Code
 
-Best for long-context repository analysis, provider-interface work, structured implementation, and documentation. Must read `CLAUDE.md` and `GLOBAL_AI.md`. It may not infer unseen dashboard state or deployment success.
+Best for long-context repository analysis, provider-interface work, structured implementation, and documentation. Must read `CLAUDE.md` and `GLOBAL_AI.md`. For Founder Control Room + Chief AI master-build, full-app, architecture, production-readiness, or multi-surface work, also read the canonical master build spec plus `docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md`. Product/UX work also follows the existing Product Design gate and parallel-build contract. It may not infer unseen dashboard state or deployment success.
 
 ## Codex / ChatGPT
 
-Best for debugging, code review, tests, repository operations, data analysis, and founder-readable decisions. Must read `AGENTS.md` and `GLOBAL_AI.md`. Tool proof is required for claimed writes.
+Best for debugging, code review, tests, repository operations, data analysis, and founder-readable decisions. Must read `AGENTS.md`, `CHATGPT.md`, and `GLOBAL_AI.md`. For master-build work, the canonical master build spec remains the product/architecture source of truth. Tool proof is required for claimed writes.
 
 ## OpenAI Platform / Developers
 
@@ -20,9 +22,11 @@ Keep keys off clients, repositories, CRM records, logs, screenshots, and chat-vi
 
 Server-side model capability behind replaceable adapters. Keep keys off clients. Conversation context is not durable Control Room memory. Validate outputs before writes or provider actions.
 
-## Perplexity
+## Perplexity / Perplexity MCP
 
-Current public research and source discovery. It does not know private repository, Supabase, provider, or production state unless those sources were explicitly connected and inspected.
+Best for current public research, source validation, adversarial verification, and implementation-ready evidence handoff. Must read `PERPLEXITY.md`. For Founder Control Room + Chief AI master-build, architecture, production-readiness, provider, research, or multi-surface work, also read the canonical master build spec plus `docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md`.
+
+Perplexity does not know private repository, Supabase, provider, or production state unless those sources were explicitly connected and inspected. Connected MCP capability may support bounded repository/provider actions only when the exact action is exposed and separately authorized. Before externally using factual claims, numbers, quotations, dates, or action guidance, apply `skills/fact-check-every-claim/SKILL.md`. Product Design research cannot substitute for inspected screenshots or exact-head browser evidence.
 
 ## GitHub
 

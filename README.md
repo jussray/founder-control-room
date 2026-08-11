@@ -14,7 +14,7 @@ So I built one.
 
 This is the command center I run Se'kret Bip from — a provider-independent control plane with approval gates, change proposals, mission verification, and a guarded terminal that only executes exact, pre-approved commands against a confirmed repo HEAD.
 
-Every action requires explicit founder approval. No step carries forward to the next. Built by a single mom of 8 in Pittsburgh, at $0, because the alternative was shipping blind.
+Every material action requires the applicable founder authority, evidence, and rollback boundary. Repository merges may use the standing evidence-based authority in `docs/FOUNDER_MERGE_AUTHORITY.md`; deployment, migration, auth/RLS, credentials, billing, publication, destructive changes, and other separately gated actions still require their own exact authority. No step silently carries forward to the next. Built by a single mom of 8 in Pittsburgh, at $0, because the alternative was shipping blind.
 
 ---
 
@@ -34,10 +34,18 @@ phased no-GitHub migration plan.
 ## AI operating contracts
 
 - [`GLOBAL_AI.md`](GLOBAL_AI.md) — provider-neutral founder contract
-- [`CLAUDE.md`](CLAUDE.md) — Claude / Claude Code repository instructions
-- [`AGENTS.md`](AGENTS.md) — Codex, ChatGPT, and repository-agent instructions
+- [`AGENTS.md`](AGENTS.md) — repository entry contract for Codex, ChatGPT, and repository agents
+- [`CHATGPT.md`](CHATGPT.md) — ChatGPT repository operating contract
+- [`CLAUDE.md`](CLAUDE.md) — Claude / Claude Code repository operating contract
+- [`PERPLEXITY.md`](PERPLEXITY.md) — Perplexity / Perplexity MCP repository operating contract
+- [`docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`](docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md) — canonical Founder Control Room + Chief AI product and architecture contract
+- [`docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md`](docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md) — Claude execution overlay for the canonical master build
+- [`docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md`](docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md) — Perplexity MCP research + bounded-execution overlay for the canonical master build
+- [`docs/PRODUCT_DESIGN_PARALLEL_BUILD_SPEC.md`](docs/PRODUCT_DESIGN_PARALLEL_BUILD_SPEC.md) — Product Design parallel-build contract for product/UX work
 - [`docs/PROVIDERS.md`](docs/PROVIDERS.md) — OpenAI, Anthropic, Perplexity, GitHub, Supabase, and tool handoffs
 - [`docs/CLOUDFLARE_REASONING.md`](docs/CLOUDFLARE_REASONING.md) — deterministic Cloudflare OODA/L99 recovery contract
+
+Provider overlays may become stricter, but they do not become competing product constitutions. The canonical master build spec remains the product/architecture source of truth, while repository and task-specific authority, privacy, verification, Product Design, fact-check, and rollback contracts remain additive gates.
 
 ## Strategy and research
 
@@ -298,11 +306,11 @@ check immediately before integration.
 | Install dependencies or browsers | Explicit write-risk confirmation |
 | Create sandbox workspace | Separate founder approval |
 | Create internal branch | Separate founder approval + reservation |
-| Integrate into main | Separate founder approval + exact-head machine proof + reservation |
+| Integrate into main | Standing evidence-based merge authority + exact-head machine proof + reservation |
 | Deploy | Separate founder approval |
 | Rollback | Separate founder approval |
 
-No approval carries forward to the next step.
+No approval carries forward to a separately gated next step. Standing merge authority does not authorize deployment, migration, auth/RLS, credentials, publication, billing, destructive actions, or rollback.
 
 ## License
 
