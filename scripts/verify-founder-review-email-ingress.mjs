@@ -14,6 +14,7 @@ const [
   baseMigration,
   hardeningMigration,
   manifest,
+  apiManifest,
   server,
   workflow,
 ] = await Promise.all([
@@ -24,6 +25,7 @@ const [
   read('supabase/migrations/20260802224500_founder_signal_review_email_receipts.sql'),
   read('supabase/migrations/20260803030000_harden_founder_signal_review_email_receipts.sql'),
   read('wrangler.email.toml'),
+  read('wrangler.worker.toml'),
   read('src/http/server.ts'),
   read('.github/workflows/founder-review-email-ingress.yml'),
 ]);
@@ -166,6 +168,12 @@ if (/\[\[routes\]\]/.test(manifest)) {
 if (/FOUNDER_REVIEW_EMAIL_INGRESS_SECRET\s*=/.test(manifest)) {
   fail('email Worker manifest must not contain the ingress secret value');
 }
+if (!apiManifest.includes('"FOUNDER_REVIEW_EMAIL_INGRESS_SECRET"')) {
+  fail('api Worker deployment contract must require FOUNDER_REVIEW_EMAIL_INGRESS_SECRET');
+}
+if (/FOUNDER_REVIEW_EMAIL_INGRESS_SECRET\s*=/.test(apiManifest)) {
+  fail('api Worker manifest must not contain the ingress secret value');
+}
 if (!workflow.includes('20260803030000_harden_founder_signal_review_email_receipts.sql')) {
   fail('focused workflow must run when the forward hardening migration changes');
 }
@@ -176,5 +184,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  'Founder review-email ingress verified: isolated Email Worker, bounded parser, strong signed intake, unresolved RLS ledger, execution disabled, exact command semantics, explicit duplicate handling, no HTTP route, and no embedded secrets.',
+  'Founder review-email ingress verified: isolated Email Worker, bounded parser, strong signed intake, unresolved RLS ledger, execution disabled, exact command semantics, explicit duplicate handling, no HTTP route, required API ingress secret, and no embedded secrets.',
 );
