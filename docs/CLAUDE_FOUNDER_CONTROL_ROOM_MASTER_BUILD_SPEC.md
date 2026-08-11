@@ -1,7 +1,7 @@
 # Founder Control Room + Chief AI
 ## Claude Master Build Execution Specification
 
-Version: 1.1
+Version: 1.2
 Date: 2026-08-11
 Owner: Juss Ray
 Repository: `jussray/founder-control-room`
@@ -17,7 +17,7 @@ Claude must treat `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md` 
 
 This file is a Claude execution overlay. It does not fork, weaken, summarize away, or replace the canonical contract. If the two documents conflict, the canonical build specification wins unless Juss explicitly changes the source-of-truth document.
 
-Claude must also obey `CLAUDE.md`, `docs/FOUNDER_MERGE_AUTHORITY.md`, `docs/PORTABLE_FOUNDER_APPROVALS.md`, and the repository's existing security, privacy, evidence, and rollback contracts.
+Claude must also obey `CLAUDE.md`, `AGENTS.md`, `GLOBAL_AI.md`, `docs/FOUNDER_MERGE_AUTHORITY.md`, `docs/PORTABLE_FOUNDER_APPROVALS.md`, and the repository's existing security, privacy, evidence, and rollback contracts.
 
 ---
 
@@ -31,9 +31,19 @@ The objective is production-grade implementation with the smallest reversible ve
 
 ---
 
-## 2. Mandatory read order
+## 2. Mandatory repository preflight and read order
 
-Before any nontrivial implementation, read only what is needed in this order:
+Before any nontrivial implementation, first load the repository entry contract in `AGENTS.md` and obey every item it marks mandatory for the current work. At minimum, the repository preflight includes:
+
+1. `.ai/skills/juss-founder-os/SKILL.md` first
+2. `AGENTS_FOUNDER_INTELLIGENCE.md`
+3. `.agents/skills/founder-control-room-operator/SKILL.md`
+4. `GLOBAL_AI.md`
+5. `docs/FOUNDER_MERGE_AUTHORITY.md`
+6. `skills/portfolio-control-plane/SKILL.md`
+7. the additional task-specific skills required by `AGENTS.md`
+
+After that repository preflight, continue narrowly in this order:
 
 1. `CLAUDE.md`
 2. `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`
@@ -41,9 +51,9 @@ Before any nontrivial implementation, read only what is needed in this order:
 4. the narrow governing authority/evidence docs for the action
 5. recent diff, CI, runtime, or Playwright evidence when relevant
 
-For Product Design, UX, visual QA, Figma, dashboard, onboarding, or user-flow work, also read `skills/product-design-gate/SKILL.md` and `docs/PRODUCT_DESIGN_PARALLEL_BUILD_SPEC.md` before implementation or design claims.
+For Product Design, UX, visual QA, Figma, dashboard, onboarding, or user-flow work, also read `skills/product-design-gate/SKILL.md` and `docs/PRODUCT_DESIGN_PARALLEL_BUILD_SPEC.md` before implementation or design claims. Apply any additional Figma/design contracts required by `AGENTS.md`.
 
-Do not scan the entire repository unless narrow inspection cannot resolve the blocker.
+Do not scan the entire repository unless narrow inspection cannot resolve the blocker. Narrow reading reduces context use; it does not permit skipping mandatory authority, privacy, project-isolation, or evidence contracts.
 
 ---
 
@@ -210,27 +220,43 @@ UNKNOWN is not absence. BLOCKED is not success.
 
 ## 10. Required final report
 
-Return only:
+Keep the founder-facing top-level format concise, but do not omit the mandatory repository evidence fields. Return these six headings, with the required evidence nested inside them:
 
 ```text
 REALITY:
-What is verified right now.
+- goal and verified current reality
+- authoritative repo / branch / exact SHA
+- VERIFIED / INFERRED / UNKNOWN / BLOCKED where material
+- premise attack, Lindy choice, and L99 authority/state boundaries
 
 FIX:
-What changed, with files/commit/PR if applicable.
+- selected decision and OODA action
+- files changed and behavior changed
+- Bill Gates bottleneck/leverage finding
+- Elon Musk requirement/deletion/simplification/feedback/automation finding
 
 PROOF:
-Tests, logs, screenshots, traces, CI, or runtime evidence.
+- exact tests/checks run and results
+- behavior-test status
+- Playwright result/artifacts or explicit inapplicability
+- CI, provider, Cloudflare, Control Room, deployment, or runtime evidence when applicable
+- failures and skips
+- Product Design evidence status when applicable
 
 RISK:
-What could still be wrong.
+- selected-plan attack
+- unresolved risk
+- security, provider, Supabase, commercial, disqualifier, brand/IP, privacy, or project-boundary impact when applicable
 
 ROLLBACK:
-How to reverse safely.
+- exact safe reversal path
 
 NEXT GATE:
-One exact founder decision or next action.
+- stop condition reached or remaining blocker
+- one exact next authority/owner/action gate
 ```
+
+The six headings are a presentation shell, not permission to discard the evidence report required by `AGENTS.md`.
 
 ---
 
