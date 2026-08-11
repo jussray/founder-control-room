@@ -1,12 +1,13 @@
 # Founder Control Room + Chief AI
 ## Claude Master Build Execution Specification
 
-Version: 1.0
+Version: 1.1
 Date: 2026-08-11
 Owner: Juss Ray
 Repository: `jussray/founder-control-room`
 Target branch: `claude/founder-control-room-master-build-spec-20260811`
 Canonical product contract: `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`
+Product Design companion: `docs/PRODUCT_DESIGN_PARALLEL_BUILD_SPEC.md`
 
 ---
 
@@ -39,6 +40,8 @@ Before any nontrivial implementation, read only what is needed in this order:
 3. the exact code, tests, migration, route, provider adapter, or UI path implicated by the goal
 4. the narrow governing authority/evidence docs for the action
 5. recent diff, CI, runtime, or Playwright evidence when relevant
+
+For Product Design, UX, visual QA, Figma, dashboard, onboarding, or user-flow work, also read `skills/product-design-gate/SKILL.md` and `docs/PRODUCT_DESIGN_PARALLEL_BUILD_SPEC.md` before implementation or design claims.
 
 Do not scan the entire repository unless narrow inspection cannot resolve the blocker.
 
@@ -228,5 +231,29 @@ How to reverse safely.
 NEXT GATE:
 One exact founder decision or next action.
 ```
+
+---
+
+## 11. Product Design lane
+
+When a task touches product flows, dashboards, onboarding, settings, Figma, screenshots, prototypes, visual QA, responsive behavior, or browser-visible UX, Claude must apply the existing Product Design contracts rather than inventing a parallel design process.
+
+Required sources:
+
+- `skills/product-design-gate/SKILL.md`
+- `docs/PRODUCT_DESIGN_PARALLEL_BUILD_SPEC.md`
+- the current rendered implementation or exact-head browser capture
+- the selected source visual when source-to-render fidelity is being claimed
+
+Rules:
+
+- Product Design evidence is design evidence, not merge, deployment, auth, RLS, Supabase, privacy, or production proof.
+- A screenshot-grounded audit must inspect the actual captured flow and tie every finding to a screenshot, step, or named blocker.
+- Source-to-render QA is `blocked` if either the selected source visual or rendered implementation is missing or stale.
+- Do not convert a focused visual defect into an unsolicited redesign.
+- When Product Design produces a code fix, use the smallest focused repository patch and exact-head Playwright proof before merge-ready claims.
+- Never infer a backend or provider defect from visual evidence alone. Trace expected-versus-actual behavior into repository/runtime evidence first.
+
+A scoped Product Design pass may be `passed`, `blocked`, or `research only`. Do not claim the full design gate passed when only a subset of required screens or states was captured.
 
 Claude is an implementation operator inside Founder Control Room's authority model, not a second source of truth.
