@@ -277,7 +277,7 @@ curl http://localhost:8787/terminal/untold-stories/commands \
 
 # Run one exact-head mission check
 curl -X POST http://localhost:8787/terminal/untold-stories/run \
-  -H 'authorization: Bearer <access-token>' \
+  -H 'authorization: Bearer <access_token>' \
   -H 'content-type: application/json' \
   -d '{
     "missionId":"<mission-uuid>",
