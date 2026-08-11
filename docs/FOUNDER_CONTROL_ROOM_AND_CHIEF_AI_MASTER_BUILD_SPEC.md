@@ -1,10 +1,11 @@
 # Founder Control Room + Chief AI
 ## Canonical Codex Master Build Specification
-Version: 1.0
+Version: 1.1
 Date: 2026-07-30
+Reality refresh: 2026-08-11
 Owner: Juss Ray
 Repository: `jussray/founder-control-room`
-Target branch: `codex/founder-control-room-master-build-spec-20260730`
+Target branch: `main` through focused branches and pull requests
 
 ---
 
@@ -123,26 +124,31 @@ Do not implement slash commands as unvalidated free-text prompt concatenation.
 
 ## 3. Current Repository Reality
 
-The existing repository already contains:
-- TypeScript + Node 20;
-- Express API;
+As of the 2026-08-11 reality refresh, the existing repository already contains:
+- TypeScript with Node 20+ support and Node 24 CI/deployment paths;
+- Express API and Cloudflare Worker runtime surfaces;
+- a founder-facing browser UI under `public/control-room/`;
 - Supabase integration;
 - GitHub provider abstraction;
-- Cloudflare Workers deployment paths;
+- Cloudflare Workers and Pages deployment paths;
 - founder magic-link authentication;
 - founder allowlist;
-- guarded exact-head terminal;
-- approval reservations;
+- guarded exact-head terminal execution;
+- approval reservations and founder approval receipts;
 - missions and change proposals;
-- MCP Hub phase 1;
+- MCP Hub and bounded provider capabilities;
 - Cloudflare reasoning;
 - FutureYOU verification surfaces;
 - Goalfix verification surfaces;
 - Design OS;
-- Vitest and Playwright dependencies;
-- explicit founder approval and L99 authority contracts.
+- Vitest and Playwright verification;
+- explicit founder approval, merge-authority, provenance, rollback, and L99 contracts.
 
-The repository currently states there is no web frontend. The complete build must add one without weakening the backend contracts.
+The web frontend is no longer a future-only requirement. The current browser surface must be preserved and evolved incrementally while the longer-term modular web architecture is introduced. Do not remove or broadly rewrite the working UI merely to satisfy the folder layout proposed later in this document.
+
+Guarded execution existing in the repository does not create blanket mutation authority. Terminal runs, repository writes, merges, deployments, migrations, provider actions, publication, sending, destructive operations, and credential changes remain subject to their exact policy, evidence, and founder-authority gates.
+
+Repository code, exact branch/SHA, tests, provider state, and runtime observation outrank stale phase descriptions in this document. When implementation truth advances, update this reality section and affected governing contracts rather than forcing current code back into an obsolete description.
 
 ---
 
@@ -215,8 +221,8 @@ Use a modular monolith first. Preserve the ability to separate services later.
 
 ```text
 apps/
-  api/                       # existing Express/Worker API surface
-  web/                       # mobile-first Founder Control Room + Chief AI UI
+  api/                       # target modular boundary for existing Express/Worker API surface
+  web/                       # target modular boundary for Founder Control Room + Chief AI UI
 packages/
   contracts/                 # schemas and shared API types
   authority/                 # L99 policy, approvals, risk, reservations
@@ -228,7 +234,9 @@ packages/
   image-director/            # image edit specifications and QA
   provider-adapters/         # GitHub, Supabase, Cloudflare, HubSpot, Slack, etc.
   ui/                        # design tokens and reusable components
-src/                         # retain compatibility while migrating incrementally
+public/
+  control-room/              # current founder-facing browser UI; preserve during incremental migration
+src/                         # current API/domain implementation; retain compatibility while migrating incrementally
 supabase/
   migrations/
 e2e/
@@ -236,7 +244,7 @@ docs/
 artifacts/
 ```
 
-Do not perform a broad folder migration in the first patch. Introduce packages incrementally and preserve imports until focused tests prove each boundary.
+Do not perform a broad folder migration in the first patch. Introduce packages incrementally and preserve imports and the working `public/control-room/` surface until focused tests and Playwright prove each migrated boundary.
 
 ---
 
