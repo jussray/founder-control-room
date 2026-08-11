@@ -54,17 +54,8 @@ on:
         required: true
         default: main
         type: string
-      approval_source:
-        description: Where the founder issued/carried the approval
-        required: false
-        default: founder
-        type: choice
-        options:
-          - founder
-          - chatgpt
-          - claude
       founder_approval_id:
-        description: Approval receipt/conversation/decision ID; required by merge_gate
+        description: Founder approval receipt/decision ID; required by merge_gate
         required: false
         type: string
 
@@ -85,7 +76,7 @@ jobs:
       REPO_CYCLE_OPERATION: ${{ inputs.operation || 'verify' }}
       TARGET_BRANCH: ${{ inputs.target_branch || github.head_ref || github.ref_name }}
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha || github.event.pull_request.head.sha || github.sha }}
-      APPROVAL_SOURCE: ${{ inputs.approval_source || '' }}
+      APPROVAL_SOURCE: founder
       FOUNDER_APPROVAL_ID: ${{ inputs.founder_approval_id || '' }}
 
     steps:
@@ -146,11 +137,11 @@ jobs:
             echo "- Operation: \`${REPO_CYCLE_OPERATION}\`"
             echo "- Target branch: \`${TARGET_BRANCH}\`"
             echo "- Approved head: \`${EXPECTED_HEAD_SHA}\`"
-            echo "- Approval source: \`${APPROVAL_SOURCE:-not supplied}\`"
+            echo "- Approval source: \`founder\`"
             echo "- Approval ID: \`${FOUNDER_APPROVAL_ID:-not supplied}\`"
             echo "- Merge authorized: \`${MERGE_AUTHORIZED}\`"
             echo
-            echo "> Authorization may be carried from a founder decision issued through Founder Control Room, ChatGPT, or Claude. This workflow remains evidence-only and read-only; the exact-SHA receipt is consumed by a separate merge executor."
+            echo "> Only a founder-issued receipt can authorize this exact SHA. This workflow remains evidence-only and read-only; the exact-SHA receipt is consumed by a separate merge executor."
             if [ -f repo-cycle-result.json ]; then
               echo
               echo "### Result"

@@ -5,9 +5,9 @@
 // Run via: node scripts/repo-cycle.mjs <operation> [--target-branch=X] [--expected-sha=Y]
 //
 // Mirrors the run_founder_repo_cycle contract from the Codex/Playground design.
-// This script does not merge. It can attest that an exact SHA is merge-authorized
-// when the founder approval was issued directly or carried through an approved
-// ChatGPT/Claude session and the merge gate itself is green.
+// This script never merges. It may emit a merge-authorized receipt only when
+// the exact checked-out SHA passes the gate, the working tree remains clean,
+// and the founder supplied the approval receipt directly.
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -16,7 +16,7 @@ import { writeFile } from "node:fs/promises";
 const execFileAsync = promisify(execFile);
 const REPOSITORY = "jussray/founder-control-room";
 const VALID_OPS = ["preflight", "inspect", "test", "build", "verify", "merge_gate"];
-const VALID_APPROVAL_SOURCES = new Set(["founder", "chatgpt", "claude"]);
+const VALID_APPROVAL_SOURCES = new Set(["founder"]);
 
 const [, , operation, ...rest] = process.argv;
 const flags = Object.fromEntries(
@@ -105,15 +105,18 @@ if (flags["expected-sha"] && localHead !== flags["expected-sha"]) {
   blocker = `Checked-out branch is ${branch}, expected ${flags["target-branch"]}.`;
 } else if (firstFailed) {
   blocker = `Command failed: ${firstFailed.command} (exit ${firstFailed.exit_code}).`;
+} else if (operation === "merge_gate" && status !== "") {
+  blocker = "Merge gate requires a clean working tree after verification.";
 } else if (operation === "merge_gate" && !approvalSourceValid) {
-  blocker = "Merge gate requires approval-source=founder|chatgpt|claude.";
+  blocker = "Merge gate requires approval-source=founder.";
 } else if (operation === "merge_gate" && !approvalId) {
-  blocker = "Merge gate requires a non-empty approval-id receipt.";
+  blocker = "Merge gate requires a non-empty founder approval receipt.";
 }
 
 const mergeAuthorized =
   operation === "merge_gate" &&
   blocker === null &&
+  status === "" &&
   approvalSourceValid &&
   approvalId.length > 0;
 
@@ -130,8 +133,9 @@ const result = {
     source: approvalSource || null,
     id: approvalId || null,
   },
-  // Authorization is scoped to this exact checked-out SHA and this green gate.
-  // The runner remains evidence-only; a separate executor performs the merge.
+  // Authorization is scoped to this exact checked-out SHA, a clean post-verify
+  // working tree, and a founder-issued approval receipt. The runner remains
+  // evidence-only; a separate executor performs the merge.
   merge_authorized: mergeAuthorized,
 };
 
