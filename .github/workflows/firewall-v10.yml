@@ -27,6 +27,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   verify-firewall-v10:
     runs-on: ubuntu-latest
@@ -48,7 +51,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24'
 
       - name: Verify policy-as-code against runtime bindings
         run: node scripts/verify-firewall-v10.mjs

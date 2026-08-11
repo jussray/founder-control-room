@@ -16,6 +16,9 @@ concurrency:
   group: ai-company-container-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   verify-container-sandbox:
     runs-on: ubuntu-22.04
@@ -42,7 +45,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22.23.1
+          node-version: '24'
           cache: npm
 
       - name: Install locked dependencies

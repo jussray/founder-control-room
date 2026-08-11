@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - .node-version
       - package.json
       - package-lock.json
       - public/**
@@ -20,6 +21,7 @@ on:
     branches:
       - main
     paths:
+      - .node-version
       - package.json
       - package-lock.json
       - public/**
@@ -67,6 +69,9 @@ concurrency:
   group: founder-repo-cycle-${{ github.repository }}-${{ github.event.pull_request.number || inputs.target_branch || github.ref }}
   cancel-in-progress: false
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   repo-cycle:
     name: ${{ inputs.operation || 'verify' }}
@@ -104,8 +109,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '24'
           cache: npm
+
+      - name: Verify Node 24 runtime authority
+        run: node scripts/verify-node24-runtime-authority.mjs
 
       - name: Install locked dependencies
         run: npm ci

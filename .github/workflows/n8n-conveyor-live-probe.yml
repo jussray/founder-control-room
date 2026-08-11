@@ -19,6 +19,9 @@ concurrency:
   group: n8n-conveyor-live-probe-${{ inputs.target_sha }}
   cancel-in-progress: false
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   probe:
     if: github.ref == 'refs/heads/main'
@@ -48,7 +51,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24'
           cache: npm
 
       - name: Install locked trusted dependencies
