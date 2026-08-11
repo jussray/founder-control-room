@@ -36,3 +36,20 @@ jobs:
 
       - name: Verify redaction contract
         run: npm --prefix tools/zapier test
+
+  minimum-supported-node:
+    name: Minimum supported Node 20
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prove Node 20 consumer compatibility
+        shell: bash
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/workspace" \
+            --workdir /workspace/tools/zapier \
+            node:20-bookworm-slim \
+            sh -lc 'npm ci --ignore-scripts --no-audit --no-fund && npm run typecheck && npm test'
