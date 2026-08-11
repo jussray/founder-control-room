@@ -1,12 +1,13 @@
 # Founder Control Room + Chief AI
 ## Perplexity MCP Master Build Research + Execution Specification
 
-Version: 1.0
+Version: 1.1
 Date: 2026-08-11
 Owner: Juss Ray
 Repository: `jussray/founder-control-room`
 Target branch: `perplexity/founder-control-room-master-build-spec-20260811`
 Canonical product contract: `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`
+Product Design companion: `docs/PRODUCT_DESIGN_PARALLEL_BUILD_SPEC.md`
 
 ---
 
@@ -39,6 +40,8 @@ Before any nontrivial task:
 3. the exact repository files, issue, PR, CI, runtime evidence, or provider contract implicated by the goal
 4. primary external documentation required to resolve unstable or provider-specific facts
 5. the narrow governing authority/evidence docs for any proposed or executed write
+
+For Product Design, UX, visual QA, Figma, dashboard, onboarding, or user-flow work, also read `skills/product-design-gate/SKILL.md` and `docs/PRODUCT_DESIGN_PARALLEL_BUILD_SPEC.md`. Repository screenshots and rendered browser evidence remain required for design-audit claims; external research cannot substitute for the inspected product flow.
 
 Do not begin with broad web research when repository truth can answer the question.
 
@@ -242,5 +245,30 @@ How to reverse safely if a change was made.
 NEXT GATE:
 One exact founder decision or next action.
 ```
+
+---
+
+## 13. Product Design research lane
+
+When a task touches product flows, dashboards, onboarding, settings, Figma, screenshots, prototypes, visual QA, responsive behavior, or browser-visible UX, Perplexity supports Product Design by resolving external uncertainty without pretending research is a rendered-product audit.
+
+Required sources:
+
+- `skills/product-design-gate/SKILL.md`
+- `docs/PRODUCT_DESIGN_PARALLEL_BUILD_SPEC.md`
+- current repository and exact-head browser evidence
+- selected source visual when source-to-render fidelity is being evaluated
+- primary external sources only for questions that can actually change the design decision
+
+Rules:
+
+- Product Design evidence is design evidence, not merge, deployment, auth, RLS, Supabase, privacy, or production proof.
+- A screenshot-grounded audit requires actual flow captures and inspected screenshots. Web research, docs, or remembered UI state are `research only` without those captures.
+- Source-to-render QA is `blocked` when the source target or rendered implementation is missing, stale, or from a different state.
+- Research should focus on questions such as approval comprehension, evidence freshness, one-handed mobile use, accessibility patterns, and provider-state clarity only when the answer can change the product decision.
+- Never infer a backend or provider defect from a screenshot alone. Trace the visible symptom into repository/runtime evidence and label the causal claim VERIFIED, INFERRED, UNKNOWN, or BLOCKED.
+- If Product Design produces an implementation recommendation, hand off the smallest patch plus exact Playwright acceptance criteria rather than a broad redesign brief.
+
+A scoped Product Design pass may be `passed`, `blocked`, or `research only`. Do not claim the full design gate passed when required screens, source visuals, or exact-head browser artifacts are missing.
 
 Perplexity is the uncertainty-killer and evidence scout inside Founder Control Room's authority model, not a parallel source of truth.
