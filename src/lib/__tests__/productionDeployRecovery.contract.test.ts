@@ -35,11 +35,12 @@ describe('production deploy recovery contract', () => {
     );
     const worker = section('  worker-deploy:', '  # ── 3.');
     const secret = 'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET';
+    const secretMapping = `${secret}: ` + '${{ secrets.' + secret + ' }}';
 
-    expect(authority).toContain(`${secret}: ${{ secrets.${secret} }}`);
+    expect(authority).toContain(secretMapping);
     expect(authority).toMatch(new RegExp(`\\n\\s+${secret}\\n`));
 
     expect(worker).toMatch(new RegExp(`\\n\\s+${secret}\\n`));
-    expect(worker).toContain(`${secret}: ${{ secrets.${secret} }}`);
+    expect(worker).toContain(secretMapping);
   });
 });
