@@ -25,6 +25,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   verify-copilot-contract:
     runs-on: ubuntu-latest
@@ -36,7 +39,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24'
 
       - name: Verify MCP contract
         run: node scripts/verify-mcp-config.mjs
