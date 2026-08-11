@@ -1,28 +1,38 @@
 # Cursor Rules — founder-control-room
 
+Before nontrivial work, also read `AGENTS.md`, `GLOBAL_AI.md`, `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`, and `docs/FOUNDER_MERGE_AUTHORITY.md`.
+
+Repository and runtime evidence outrank stale prose. When an older instruction conflicts with inspected current code, record the drift and repair the contract rather than reverting reality to the obsolete description.
+
 ## 5W1H Operating Contract
 
 Before every nontrivial edit, establish and state:
 
 - **Who** — requester, decision owner, affected data subjects, execution authority
-- **What** — exact outcome, deliverable, non-goals, preserved dashboard work
-- **Where** — `jussray/founder-control-room`, exact branch, environment, dashboard data sources
+- **What** — exact outcome, deliverable, non-goals, preserved work
+- **Where** — `jussray/founder-control-room`, exact branch, environment, runtime, dashboard data sources, provider boundary
 - **When** — lifecycle state, ordering constraint, rollback window
 - **Why** — verified founder decision or oversight need
 - **How** — smallest safe implementation, verification plan, rollback
 
 ## Repository Identity
 
-Read-only founder operational dashboard aggregating health, metrics, and status across the Chief AI ecosystem. This is a status surface, not an execution layer.
+Founder Control Room is a founder-facing operational control plane with an existing browser UI under `public/control-room/`, founder-gated APIs, missions, approvals, evidence, release truth, and narrowly guarded execution.
+
+It is **not** a status-only/read-only dashboard. It is also **not** a general mutation layer or unrestricted shell. Guarded execution remains bounded by founder authorization, mission state, exact-head evidence, allowlisted commands, provider policy, and rollback requirements.
 
 ## Rules
 
-- Dashboard is read-only — no execution, mutations, or secrets storage.
-- Never expose credentials, private business data, vendor details, or customer records in UI.
-- All changes via branch + PR, never direct to `main`.
-- Credentials and integration tokens must stay in vault.
-- Run `lint` and `build` before PR.
-- Adding execution capabilities requires explicit founder approval.
+- Never expose credentials, private business data, vendor details, customer records, or managed-product private user data in UI, prompts, logs, or model output.
+- Preserve the `RepositoryProvider` abstraction and project trust boundaries.
+- Keep Control Room credentials and data separate from managed projects such as Se’kret Bip.
+- Ordinary implementation changes use a focused branch + PR, not direct pushes to `main`.
+- Never convert guarded terminal or provider capabilities into unrestricted mutation authority.
+- Never signal success after a thrown or failed operation.
+- Credentials and integration tokens stay in vault/backend secret storage.
+- Run the narrowest valid type, lint, test, and build checks for touched code.
+- Changed user-facing browser/runtime paths require targeted Playwright evidence.
+- Compilation, CI, provider build status, deployment identity, and runtime observation remain separate evidence layers.
 
 ## Cloudflare agent fleet
 
@@ -31,17 +41,12 @@ Before Cloudflare work, also read:
 - `.agents/skills/control-room-cloudflare-agent-fleet/SKILL.md`
 - `docs/CLOUDFLARE_AGENT_FLEET.md`
 
-Use Cloudflare Skills for platform conventions, `cloudflare-docs` for current
-product behavior, the API Code Mode MCP for scoped account operations, focused
-MCP servers for bindings/builds/observability, and Wrangler for local and
-deployment commands.
+Use Cloudflare Skills for platform conventions, `cloudflare-docs` for current product behavior, the API Code Mode MCP for scoped account operations, focused MCP servers for bindings/builds/observability, and Wrangler for local and deployment commands.
 
-A valid MCP config is not runtime proof. Keep changes focused and reversible.
-Never expose secrets or perform production deployment, rollback, DNS, domain,
-billing, auth, or destructive account changes without the required founder
-approval. Browser-visible work requires targeted Playwright evidence against the
-exact preview artifact.
+A valid MCP config is not runtime proof. Keep changes focused and reversible. Never expose secrets or perform production deployment, rollback, DNS, domain, billing, auth, or destructive account changes without the required founder authority. Browser-visible work requires targeted Playwright evidence against the exact preview artifact.
 
-## Approval Gates
+## Merge and Approval Gates
 
-Require explicit founder approval before: merging, deploying, adding data sources, extending integration scope, rotating secrets, or adding execution capabilities.
+Repository merges follow `docs/FOUNDER_MERGE_AUTHORITY.md` and may proceed under its standing evidence-based conditions when the exact PR/head is verified and required proof is green.
+
+Merge authority does not silently authorize production deployment, migrations, new provider/data-source scope, credential changes, auth/RLS changes, DNS, billing, destructive writes, publication, sending, external communication, or other separately gated actions.
