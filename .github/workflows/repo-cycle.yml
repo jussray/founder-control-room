@@ -67,6 +67,9 @@ concurrency:
   group: founder-repo-cycle-${{ github.repository }}-${{ github.event.pull_request.number || inputs.target_branch || github.ref }}
   cancel-in-progress: false
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   repo-cycle:
     name: ${{ inputs.operation || 'verify' }}
