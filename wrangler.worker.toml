@@ -48,6 +48,7 @@ required = [
   "FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON",
   "FOUNDER_SIGNAL_ENGINE_MCP_TOKEN",
   "ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL",
+  "FOUNDER_REVIEW_EMAIL_INGRESS_SECRET",
 ]
 
 # With the duplicate API Worker deleted, this Worker is also the sole owner of
