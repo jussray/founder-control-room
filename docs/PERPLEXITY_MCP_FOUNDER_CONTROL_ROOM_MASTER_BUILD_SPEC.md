@@ -1,7 +1,7 @@
 # Founder Control Room + Chief AI
 ## Perplexity MCP Master Build Research + Execution Specification
 
-Version: 1.1
+Version: 1.2
 Date: 2026-08-11
 Owner: Juss Ray
 Repository: `jussray/founder-control-room`
@@ -17,7 +17,7 @@ Perplexity must treat `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.
 
 This file is a Perplexity MCP execution overlay. It does not fork, weaken, summarize away, or replace the canonical contract. If the two documents conflict, the canonical build specification wins unless Juss explicitly changes the source-of-truth document.
 
-Perplexity must also obey `PERPLEXITY.md`, `docs/FOUNDER_MERGE_AUTHORITY.md`, `docs/PORTABLE_FOUNDER_APPROVALS.md`, and the repository's security, privacy, evidence, and rollback contracts.
+Perplexity must also obey `PERPLEXITY.md`, `AGENTS.md`, `GLOBAL_AI.md`, `docs/FOUNDER_MERGE_AUTHORITY.md`, `docs/PORTABLE_FOUNDER_APPROVALS.md`, and the repository's security, privacy, evidence, and rollback contracts.
 
 ---
 
@@ -31,9 +31,11 @@ Tool availability is not permission.
 
 ---
 
-## 2. Mandatory read order
+## 2. Mandatory repository preflight and read order
 
-Before any nontrivial task:
+Before any nontrivial task, first load `AGENTS.md` and obey every repository entry contract it marks mandatory for the current work. That includes the Juss Founder OS, Founder Intelligence entry point, founder-control-room operator, `GLOBAL_AI.md`, Founder Merge Authority, portfolio-control-plane skill, and any task-specific contracts required by the repository.
+
+After the repository preflight, continue narrowly:
 
 1. `PERPLEXITY.md`
 2. `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`
@@ -41,9 +43,11 @@ Before any nontrivial task:
 4. primary external documentation required to resolve unstable or provider-specific facts
 5. the narrow governing authority/evidence docs for any proposed or executed write
 
+Before externally using factual claims, numbers, quotations, dates, or action guidance, read and apply `skills/fact-check-every-claim/SKILL.md`, including on research-only reports. Primary-source discovery alone does not waive the repository fact-check contract or its claim-ledger requirements.
+
 For Product Design, UX, visual QA, Figma, dashboard, onboarding, or user-flow work, also read `skills/product-design-gate/SKILL.md` and `docs/PRODUCT_DESIGN_PARALLEL_BUILD_SPEC.md`. Repository screenshots and rendered browser evidence remain required for design-audit claims; external research cannot substitute for the inspected product flow.
 
-Do not begin with broad web research when repository truth can answer the question.
+Do not begin with broad web research when repository truth can answer the question. Narrow research reduces noise; it does not permit skipping mandatory authority, fact-check, privacy, or evidence contracts.
 
 ---
 
@@ -97,7 +101,7 @@ Use this order whenever possible:
 
 Never let an SEO page, generated summary, forum answer, or search-result snippet outrank repository evidence or an authoritative primary source.
 
-For every material external claim, record enough source context that another agent can reproduce the conclusion.
+For every material external claim, record enough source context that another agent can reproduce the conclusion, and apply the repository fact-check contract before external use.
 
 ---
 
@@ -141,16 +145,18 @@ AUTHORITATIVE REPO/BRANCH/SHA
 VERIFIED REPOSITORY REALITY
 EXTERNAL FACTS THAT MATTER
 PRIMARY SOURCES
+CLAIM / FACT-CHECK STATUS
 CAUSAL BLOCKER
 SMALLEST SAFE FIX
 EXACT FILES/ROUTES/CONFIGS TO INSPECT
 TEST/PLAYWRIGHT/RUNTIME PROOF REQUIRED
 FAILURE MODES
+SECURITY / PROVIDER / SUPABASE / PRODUCT DESIGN IMPACT WHEN APPLICABLE
 ROLLBACK
 STOP CONDITION
 ```
 
-Clearly label every conclusion as VERIFIED, INFERRED, UNKNOWN, or BLOCKED.
+Clearly label every conclusion as VERIFIED, INFERRED, UNKNOWN, or BLOCKED. This packet is mandatory evidence for a material research-only handoff, not optional detail that may be dropped by the presentation format.
 
 ---
 
@@ -224,27 +230,42 @@ UNKNOWN is not absence. Search depth is not proof quality.
 
 ## 12. Required final report
 
-Return only:
+Keep the founder-facing top-level report concise, but preserve the complete research packet and repository evidence inside these six headings:
 
 ```text
 REALITY:
-What is verified right now.
+- goal
+- authoritative repo / branch / exact SHA
+- VERIFIED / INFERRED / UNKNOWN / BLOCKED repository reality
+- external facts that matter, primary sources, dates/freshness, and claim/fact-check status
+- premise attack, Lindy choice, and L99 authority/state boundaries when material
 
 FIX:
-What changed, or the smallest implementation-ready correction if Perplexity is research-only in this session.
+- causal blocker
+- selected decision / smallest safe correction
+- exact files, routes, configs, or provider primitives to inspect/change
+- OODA action plus Bill Gates and Elon Musk implementation findings when material
 
 PROOF:
-Repository evidence, primary sources, tests, logs, screenshots, traces, CI, or runtime evidence.
+- source/claim ledger required by the fact-check contract
+- exact tests/checks run, Playwright result or inapplicability, CI/provider/runtime evidence
+- failures and skips
+- implementation-ready proof requirements when research-only
 
 RISK:
-What could still be wrong.
+- selected-plan attack and failure modes
+- unresolved risk
+- security, provider, Supabase, privacy, Product Design, commercial, disqualifier, or brand/IP impact when applicable
 
 ROLLBACK:
-How to reverse safely if a change was made.
+- exact safe reversal path if a change was made or proposed
 
 NEXT GATE:
-One exact founder decision or next action.
+- stop condition
+- one exact founder/implementer decision, owner, or authority gate
 ```
+
+For research-only work, Section 6's implementation-ready packet fields must all appear within this six-heading shell. `Return only` never means “drop the evidence.”
 
 ---
 
