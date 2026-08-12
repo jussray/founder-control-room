@@ -16,9 +16,8 @@ function section(source: string, start: string, end: string): string {
 }
 
 describe('proof-of-ship publication authority', () => {
-  it('defaults the deploy proof lane to founder review with publication disabled', () => {
-    expect(deployWorkflow).toContain('Proof of Ship — Verify and Hold for Founder Review');
-    expect(deployWorkflow).toMatch(/^\s+PUBLISH_ALLOWED: 'false'$/m);
+  it('activates the scheduled proof lane while preserving the founder-review rollback path', () => {
+    expect(deployWorkflow).toMatch(/^\s+PUBLISH_ALLOWED: 'true'$/m);
 
     const reviewHold = section(
       deployWorkflow,
@@ -37,7 +36,7 @@ describe('proof-of-ship publication authority', () => {
     expect(reviewHold).not.toMatch(/\bcurl\b/);
   });
 
-  it('keeps the legacy scheduled-publication code unreachable under the default authority state', () => {
+  it('keeps scheduled publication behind the explicit true authority state', () => {
     const scheduledPublish = section(
       deployWorkflow,
       '      - name: POST verified proof payload to Zapier Catch Hook',
@@ -49,9 +48,11 @@ describe('proof-of-ship publication authority', () => {
     );
     expect(scheduledPublish).toContain('.PUBLISH_ALLOWED = true');
     expect(scheduledPublish).toContain('.buffer_terminal_action = "schedule"');
+    expect(scheduledPublish).toContain('.schedule_policy_id = "buffer-20-minute-review-v1"');
+    expect(scheduledPublish).toContain('.share_now_allowed = false');
   });
 
-  it('retains an immutable founder-review artifact instead of sending downstream', () => {
+  it('retains the immutable founder-review artifact as the fail-closed rollback mode', () => {
     expect(deployWorkflow).toContain('name: proof-of-ship-founder-review-${{ inputs.expected_head_sha }}');
     expect(deployWorkflow).toContain('path: proof-review.json');
     expect(deployWorkflow).toContain('retention-days: 30');
@@ -60,10 +61,12 @@ describe('proof-of-ship publication authority', () => {
     );
   });
 
-  it('treats review-only mode as an intentional downstream hold, not a missing receipt failure', () => {
+  it('requires an exact-head downstream receipt in scheduled mode and preserves review-only fallback semantics', () => {
     expect(receiptWorkflow).toContain('Resolve exact-head publication mode');
     expect(receiptWorkflow).toContain("PUBLISH_ALLOWED: 'false'");
+    expect(receiptWorkflow).toContain("PUBLISH_ALLOWED: 'true'");
     expect(receiptWorkflow).toContain("echo 'receipt_required=false' >> \"$GITHUB_OUTPUT\"");
+    expect(receiptWorkflow).toContain("echo 'receipt_required=true' >> \"$GITHUB_OUTPUT\"");
     expect(receiptWorkflow).toContain('The deployed exact head is intentionally review-only. No Zapier or Buffer scheduling receipt is expected.');
 
     for (const stepName of [

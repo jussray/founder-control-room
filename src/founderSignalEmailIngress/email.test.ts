@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
   FounderSignalReviewEmailError,
@@ -12,14 +13,20 @@ import {
 
 const contextId = '45bb874d-69d4-4b32-8df2-c7934bb888c5';
 const recipient = `review+${contextId}@foundercontrolroom.org`;
+const reviewToken = '4'.repeat(64);
+const reviewSubject = `[Founder Signal Review ${reviewToken}] 3 scheduled posts · 2026-08-02T21:20:00.000Z`;
 const options = {
   founderEmail: 'juss@example.com',
   reviewDomain: 'foundercontrolroom.org',
   now: new Date('2026-08-02T21:05:00.000Z'),
 };
 
-function rawEmail(headers: string[], body: string): Uint8Array {
-  return Buffer.from([...headers, '', body].join('\r\n'), 'utf8');
+function rawEmail(headers: string[], body: string, includeDefaultSubject = true): Uint8Array {
+  const hasSubject = headers.some(header => /^subject:/i.test(header));
+  const effectiveHeaders = includeDefaultSubject && !hasSubject
+    ? [...headers, `Subject: ${reviewSubject}`]
+    : headers;
+  return Buffer.from([...effectiveHeaders, '', body].join('\r\n'), 'utf8');
 }
 
 function parse(raw: Uint8Array, overrides: Partial<{ from: string; to: string }> = {}) {
@@ -34,7 +41,7 @@ function parse(raw: Uint8Array, overrides: Partial<{ from: string; to: string }>
 }
 
 describe('Founder Signal review email parser', () => {
-  it('parses plaintext into a deterministic unresolved intake receipt', () => {
+  it('parses plaintext into a deterministic unresolved intake receipt with hashed capability proof', () => {
     const raw = rawEmail(
       [
         'From: Juss Ray <juss@example.com>',
@@ -53,6 +60,7 @@ describe('Founder Signal review email parser', () => {
     expect(first).toMatchObject({
       version: 1,
       replyContextId: contextId,
+      reviewTokenHash: createHash('sha256').update(reviewToken).digest('hex'),
       commandType: 'cancel_all',
       targetChannel: null,
       commandText: 'cancel all',
@@ -69,6 +77,53 @@ describe('Founder Signal review email parser', () => {
     expect(JSON.stringify(first)).not.toContain('senderVerified');
     expect(JSON.stringify(first)).not.toContain('juss@example.com');
     expect(JSON.stringify(first)).not.toContain('quoted history');
+    expect(JSON.stringify(first)).not.toContain(reviewToken);
+  });
+
+  it('accepts normal reply subject prefixes while preserving capability proof', () => {
+    const raw = rawEmail(
+      [
+        'From: juss@example.com',
+        `To: ${recipient}`,
+        'Message-ID: <review-reply-subject@example.com>',
+        `Subject: Re: ${reviewSubject}`,
+        'Content-Type: text/plain; charset=utf-8',
+      ],
+      'cancel all',
+    );
+    expect(parse(raw).reviewTokenHash).toBe(
+      createHash('sha256').update(reviewToken).digest('hex'),
+    );
+  });
+
+  it('rejects missing or malformed review capability subjects', () => {
+    const missing = rawEmail(
+      [
+        'From: juss@example.com',
+        `To: ${recipient}`,
+        'Message-ID: <review-no-subject@example.com>',
+        'Content-Type: text/plain; charset=utf-8',
+      ],
+      'cancel all',
+      false,
+    );
+    expect(() => parse(missing)).toThrowError(
+      new FounderSignalReviewEmailError('invalid_review_subject'),
+    );
+
+    const malformed = rawEmail(
+      [
+        'From: juss@example.com',
+        `To: ${recipient}`,
+        'Message-ID: <review-bad-subject@example.com>',
+        'Subject: [Founder Signal Review not-a-token] test',
+        'Content-Type: text/plain; charset=utf-8',
+      ],
+      'cancel all',
+    );
+    expect(() => parse(malformed)).toThrowError(
+      new FounderSignalReviewEmailError('invalid_review_subject'),
+    );
   });
 
   it('binds replay identity to both Message-ID and raw bytes', () => {
@@ -205,6 +260,11 @@ describe('Founder Signal review email parser', () => {
       ],
       'juss_rayy_linkedin: cancel',
     ));
+
+    expect(() => validateFounderSignalReviewEmailReceipt({
+      ...base,
+      reviewTokenHash: 'not-a-hash',
+    })).toThrowError(new FounderSignalReviewEmailReceiptError('invalid_review_token_hash'));
 
     expect(() => validateFounderSignalReviewEmailReceipt({
       ...base,

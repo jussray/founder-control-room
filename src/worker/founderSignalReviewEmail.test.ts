@@ -1,9 +1,11 @@
-import { createHmac } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { handleFounderSignalReviewEmail } from './founderSignalReviewEmail.js';
 
 const contextId = '45bb874d-69d4-4b32-8df2-c7934bb888c5';
 const replyAddress = `review+${contextId}@foundercontrolroom.org`;
+const reviewToken = '4'.repeat(64);
+const reviewSubject = `[Founder Signal Review ${reviewToken}] 1 scheduled post · 2026-08-02T21:20:00.000Z`;
 const env = {
   FOUNDER_REVIEW_FOUNDER_EMAIL: 'juss@example.com',
   FOUNDER_REVIEW_EMAIL_DOMAIN: 'foundercontrolroom.org',
@@ -17,6 +19,7 @@ function rawMessage(command = 'cancel all') {
   return new TextEncoder().encode([
     'From: Juss Ray <juss@example.com>',
     `To: ${replyAddress}`,
+    `Subject: Re: ${reviewSubject}`,
     'Message-ID: <worker-test@example.com>',
     'Content-Type: text/plain; charset=utf-8',
     '',
@@ -50,7 +53,7 @@ describe('Founder Signal review email Worker', () => {
     vi.unstubAllGlobals();
   });
 
-  it('posts one signed sanitized unresolved receipt to the approved backend route', async () => {
+  it('posts one signed sanitized unresolved receipt with hashed review capability', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(1_775_165_100_000);
     const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 201 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -69,6 +72,7 @@ describe('Founder Signal review email Worker', () => {
     const parsed = JSON.parse(body) as Record<string, unknown>;
     expect(parsed).toMatchObject({
       replyContextId: contextId,
+      reviewTokenHash: createHash('sha256').update(reviewToken).digest('hex'),
       commandType: 'cancel_all',
       targetChannel: null,
       commandText: 'cancel all',
@@ -81,6 +85,7 @@ describe('Founder Signal review email Worker', () => {
     expect(body).not.toContain('senderVerified');
     expect(body).not.toContain('juss@example.com');
     expect(body).not.toContain(replyAddress);
+    expect(body).not.toContain(reviewToken);
 
     const headers = init.headers as Record<string, string>;
     const timestamp = headers['x-founder-review-timestamp'];

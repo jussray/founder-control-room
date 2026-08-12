@@ -83,7 +83,7 @@ Other channels keep their existing publication contract and are not blocked by m
 
 ## Catch Hook payload
 
-The sender posts one JSON object to the dedicated Catch Hook:
+The sender posts one JSON object to the dedicated Catch Hook. Field names below match the checked-in runtime producer. In particular, `repository_allowed` is the canonical proof-gated eligibility boolean; do not introduce a second `repository_eligible` alias that could drift independently.
 
 ```json
 {
@@ -104,9 +104,9 @@ The sender posts one JSON object to the dedicated Catch Hook:
   "cloudflare_receipt": "https://api.example/version -> gitSha=...",
   "proof_url": "https://github.com/jussray/founder-control-room/actions/runs/123",
   "idempotency_key": "jussray/founder-control-room:40-char-lowercase-sha",
-  "repository_eligible": true,
+  "repository_allowed": true,
   "repository_policy": {
-    "mode": "all_owned_proof_gated",
+    "mode": "repo_owned_privacy_receipt",
     "owner": "jussray"
   },
   "publish_allowed": true,
@@ -140,11 +140,13 @@ A `not_applicable` Supabase receipt is valid only when `migration_versions` is e
 
 1. **Catch Hook** — use the dedicated `ZAPIER_CATCH_HOOK_URL`; the suggested grant value is `proof-of-ship-publish-v1`.
 2. **Dedupe** — look up `idempotency_key` in Zapier Tables or Storage by Zapier; stop when already processed.
-3. **Repository + proof filter** — require `repository_eligible=true`, `live_state=verified`, `publish_allowed=true`, and `PUBLISH_ALLOWED=true`. Repository eligibility comes from verified ownership and runtime proof, not a permanent name denylist.
+3. **Repository + proof filter** — require `repository_allowed=true`, `live_state=verified`, `publish_allowed=true`, and `PUBLISH_ALLOWED=true`. Repository eligibility comes from the repo-owned privacy/publication receipt plus verified ownership and runtime proof, not a permanent name denylist.
 4. **ChatGPT Conversation** — use the Responses API action. Feed only the verified change fields and receipts. Return JSON with platform-native copy. For LinkedIn, also return the rising-floor strategy fields from the latest verified analytics context; if that context is unavailable, return `linkedin_rising_floor_ready=false`. Do not invent impact, metrics, baselines, or URLs.
 5. **Output validation** — require the proof URLs in the generated copy to equal the supplied URLs. Reject unresolved prompts, empty copy, altered URLs, or invented metrics. For `juss_rayy_linkedin`, additionally require the rising-floor fields and a true readiness gate.
 6. **Buffer Add to Buffer** — create one item per selected channel with `content_field`, `post_text`, `channel`, `proof_url`, `source_commit_sha`, `generated_at`, `scheduled_at`, `invocation_id`, `steering_grant_id`, `founder_approval_id`, `authorization_mode`, `schedule_policy_id`, and the batch fields derived from the channel fan-out. For LinkedIn, also pass `linkedin_rising_floor_ready`, `linkedin_baseline_ref`, `linkedin_growth_hypothesis`, `linkedin_24h_gate`, `linkedin_48h_gate`, and `linkedin_next_mutation`. Keep the source `batch_id`; set `batch_size` to the number of final posts and `batch_index` to each post's 1-based position.
-7. **Gmail campaign digest** — retain the existing private review notification and reply-ingress contract. A notification failure cancels the scheduled batch.
+7. **Register private review context** — after Buffer returns exact schedule IDs and before Gmail sends the digest, register the exact source SHA, batch/context UUID, review deadline/token, and scheduled post IDs with Founder Control Room. A context conflict or registration failure cancels the scheduled batch.
+8. **Gmail campaign digest** — send the private review notification only after context registration succeeds. A notification failure cancels the scheduled batch.
+9. **Reply command execution** — Cloudflare Email Routing sends the immutable intake receipt to Founder Control Room. The backend resolves the trusted context, checks sender/recipient hashes, context, channel, and deadline, then dispatches the bounded cancel/edit operation through the existing private orchestration hook. A hook 2xx proves dispatch acceptance only; downstream provider receipts are still required to prove Buffer execution.
 
 The existing `tools/zapier/buffer-content-firewall.cjs` is the final deterministic validator. The Zap must pass its required runtime receipt, source SHA, HTTPS proof URL, schedule policy, content-field checks, and the LinkedIn rising-floor gate when the LinkedIn channel is selected.
 
@@ -165,7 +167,10 @@ Day 3 is complete only after one controlled real run records all of:
 - ChatGPT Conversation result with URL-integrity validation;
 - for LinkedIn, a validated rising-floor baseline/hypothesis/24h/48h/next-mutation receipt;
 - Buffer post ID with `schedule`, `customScheduled`, and `saveToDraft=false`;
+- successful private review-context registration before notification;
 - Gmail review notification;
+- one exact reply-ingress receipt for a controlled cancel/edit test;
+- downstream provider evidence proving the corresponding Buffer mutation;
 - final Buffer publication or an explicit founder cancellation during the 20-minute window.
 
 A checked-in workflow and a successful GitHub deploy alone do not prove that Buffer published.

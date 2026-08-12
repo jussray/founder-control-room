@@ -10,6 +10,7 @@ const ALLOWED_FIELDS = new Set([
   'rawMessageHash',
   'senderRefHash',
   'recipientRefHash',
+  'reviewTokenHash',
   'commandHash',
   'commandType',
   'targetChannel',
@@ -35,6 +36,7 @@ export interface FounderSignalReviewEmailReceipt {
   rawMessageHash: string;
   senderRefHash: string;
   recipientRefHash: string;
+  reviewTokenHash: string;
   commandHash: string;
   commandType: FounderSignalReviewCommandType;
   targetChannel: string | null;
@@ -191,6 +193,9 @@ export function validateFounderSignalReviewEmailReceipt(
       pattern: SHA256,
     }),
     recipientRefHash: exactString(value.recipientRefHash, 'invalid_recipient_ref_hash', {
+      pattern: SHA256,
+    }),
+    reviewTokenHash: exactString(value.reviewTokenHash, 'invalid_review_token_hash', {
       pattern: SHA256,
     }),
     commandHash: exactString(value.commandHash, 'invalid_command_hash', {

@@ -8,6 +8,7 @@ import {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CHANNEL = /^[a-z0-9][a-z0-9_-]{0,99}$/;
+const REVIEW_SUBJECT = /^(?:re:\s*)*\[Founder Signal Review ([0-9a-f]{64})\](?:\s|$)/i;
 const MAX_RAW_BYTES = 128 * 1024;
 const MAX_TEXT_BYTES = 12 * 1024;
 const MAX_MIME_DEPTH = 3;
@@ -63,6 +64,15 @@ function normalizeAddress(value: string): string | null {
 
 function sha256(value: string | Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+function reviewTokenHashFromSubject(value: string | undefined): string {
+  const subject = value?.trim() ?? '';
+  const token = subject.match(REVIEW_SUBJECT)?.[1]?.toLowerCase() ?? '';
+  if (!token) {
+    throw new FounderSignalReviewEmailError('invalid_review_subject');
+  }
+  return sha256(token);
 }
 
 function uuidFromHash(hash: string): string {
@@ -336,6 +346,7 @@ export function parseFounderSignalReviewEmail(
 
   const rawText = Buffer.from(envelope.raw).toString('utf8');
   const root = splitPart(rawText);
+  const reviewTokenHash = reviewTokenHashFromSubject(root.headers.get('subject'));
   const textBody = extractTextPlain(root);
   if (textBody === null) {
     throw new FounderSignalReviewEmailError('text_plain_body_required');
@@ -357,6 +368,7 @@ export function parseFounderSignalReviewEmail(
     rawMessageHash,
     senderRefHash: sha256(sender),
     recipientRefHash: sha256(recipient),
+    reviewTokenHash,
     commandHash,
     commandType: command.commandType,
     targetChannel: command.targetChannel,

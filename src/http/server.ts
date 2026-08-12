@@ -25,6 +25,7 @@ import { founderOsSkillsRouter } from './routes/founderOsSkills.js';
 import { mirrorRouter } from './routes/mirror.js';
 import { n8nConveyorRouter } from './routes/n8nConveyor.js';
 import { handleFounderSignalEngineMcp } from './routes/founderSignalEngineMcp.js';
+import { handleFounderSignalReviewContextIngest } from './routes/founderSignalReviewContexts.js';
 import { handleFounderSignalReviewEmailIngest } from './routes/founderSignalReviewEmailIngress.js';
 import { handleHairCommerceReceiptIngest } from './routes/hairCommerceReceipts.js';
 import {
@@ -136,9 +137,9 @@ export function createServer(options: CreateServerOptions = {}) {
   }
 
   // Webhooks, remote MCP calls, repo-runner pings, sanitized commerce
-  // receipts, downstream publication receipts, and signed review-email receipts
-  // do not use browser cookies. Mount them before the browser same-origin
-  // mutation gate and give each endpoint strict parser/auth rules.
+  // receipts, downstream publication receipts, review contexts, and signed
+  // review-email receipts do not use browser cookies. Mount them before the
+  // browser same-origin mutation gate and give each endpoint strict parser/auth rules.
   app.post(
     '/webhooks/github',
     express.raw({ type: 'application/json', limit: BODY_LIMIT }),
@@ -170,6 +171,12 @@ export function createServer(options: CreateServerOptions = {}) {
     '/ingest/proof-of-ship-receipts/:receiptId',
     rateLimitGeneral,
     handleProofOfShipReceiptLookup,
+  );
+  app.post(
+    '/ingest/founder-review-contexts',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '32kb' }),
+    handleFounderSignalReviewContextIngest,
   );
   app.post(
     '/ingest/founder-review-email',
