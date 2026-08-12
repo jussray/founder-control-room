@@ -1,6 +1,6 @@
 # Founder Control Room + Chief AI
 ## Canonical Codex Master Build Specification
-Version: 1.1
+Version: 1.2
 Date: 2026-07-30
 Reality refresh: 2026-08-11
 Owner: Juss Ray
@@ -11,18 +11,20 @@ Target branch: `main` through focused branches and pull requests
 
 ## 0. Build Command
 
-Codex must treat this document as the canonical implementation contract for the complete Founder Control Room and Chief AI build.
+Codex must treat this document as the canonical implementation contract for the complete Founder Control Room, Chief AI, and governed execution build.
 
 The system is not a demo. It is a production control plane and orchestration layer for a solo founder managing multiple repositories, products, automations, launch surfaces, family constraints, and sensitive information.
 
-Build both tracks in parallel:
+Build three coordinated planes in parallel:
 
-1. **Founder Control Room**: authority, project truth, approvals, missions, evidence, guarded execution, release truth, provider boundaries, and rollback.
-2. **Chief AI**: friend intake, context retrieval, decision compression, tiny moves, tone guard, FutureYOU, PromptOS, memory, content intelligence, social strategy, image direction, and governed orchestration.
+1. **Founder Control Room**: authority, operational truth, approvals, missions, evidence, guarded execution, release truth, provider boundaries, outcome receipts, and rollback.
+2. **Chief AI**: friend intake, founder/context memory, decision compression, tiny moves, tone guard, FutureYOU, PromptOS, capability composition, content intelligence, social strategy, image direction, and executive recommendations.
+3. **n8n execution plane**: governed workflow execution, retries, timers, API orchestration, and execution receipts behind Founder Control Room authority. n8n does not select its own capabilities and does not gain merge, deploy, publish, or external-send authority from a workflow payload.
 
-Neither subsystem may bypass the other:
-- Chief AI proposes, explains, compresses, drafts, and routes.
-- Founder Control Room decides authority, records proof, gates writes, and preserves rollback.
+No plane may bypass the others:
+- Chief AI proposes, explains, compresses, drafts, and composes a deterministic capability plan.
+- Founder Control Room validates authority, project and exact-head truth, records proof, gates writes, and preserves rollback.
+- n8n executes only the bounded workflow contract it receives and returns execution receipts; acceptance is not proof of provider completion or founder-goal success.
 - All material actions receive provenance and exact evidence.
 - No approval silently carries forward.
 - No "green" claim without proof.
@@ -36,17 +38,20 @@ Neither subsystem may bypass the other:
 
 Founder Control Room is the command center Juss uses to run Se'kret Bip and future ventures without needing a full DevOps, QA, release-management, product-operations, or CTO staff.
 
-Chief AI is the orchestration and decision-compression layer that helps Juss think, remember, prioritize, draft, and move one useful thing forward despite limited time, low energy, interruptions, and multiple concurrent projects.
+Chief AI is the intelligence and decision-compression layer that helps Juss think, remember, prioritize, compose capabilities, draft, and move one useful thing forward despite limited time, low energy, interruptions, and multiple concurrent projects.
+
+n8n is the governed execution/orchestration plane for workflows that benefit from retries, timers, fan-out/fan-in, and cross-provider API choreography. GitHub Actions remains the repository CI/exact-head/release-proof plane, and privileged domain operations may remain inside Founder Control Room when transactional authority requires it.
 
 Together they form a founder operating system:
 
 ```text
 Raw life + business signal
--> Chief AI understands and compresses
--> Founder Control Room checks authority and truth
--> Provider adapters perform bounded work
--> Evidence returns to the Control Room
--> Chief AI explains the result and proposes the next tiny move
+-> Chief AI understands, composes capabilities, and emits juss-v10/capability-plan@v1
+-> Founder Control Room checks authority, project truth, exact head, registry identity, and proof requirements
+-> n8n validates the same plan and orchestrates only bounded work when orchestration is appropriate
+-> Provider adapters perform the actual provider actions
+-> Dispatch, execution, and outcome evidence return to Founder Control Room
+-> Chief AI explains the verified result and proposes the next tiny move
 ```
 
 The product must feel like an intelligent command deck, not a generic admin panel and not a chatbot with scattered buttons.
@@ -142,7 +147,17 @@ As of the 2026-08-11 reality refresh, the existing repository already contains:
 - Goalfix verification surfaces;
 - Design OS;
 - Vitest and Playwright verification;
-- explicit founder approval, merge-authority, provenance, rollback, and L99 contracts.
+- explicit founder approval, merge-authority, provenance, rollback, and L99 contracts;
+- a synchronized Founder Control Room / Chief AI pair contract at `config/founder-chief-pair.contract.json`;
+- Chief AI capability composition through `juss-v10/capability-plan@v1`, selected by `chief-ai-machine` and bound to goal, project, exact Git head, registry hash, capability provenance, authority ceiling, proof requirements, outcome signals, rollback, and plan hash;
+- a governed n8n conveyor contract at `founder-control-room/n8n-conveyor@v3`;
+- an importable n8n workflow at `automation/n8n/founder-conveyor.workflow.json`, Header Auth, persistent webhook identity, pinned-runtime compatibility proof, and an ephemeral real n8n + Postgres integration proof;
+- a manual exact-current-main n8n live-probe workflow that requires a Chief-authored capability plan and, when production persistence is required, a durable Supabase receipt;
+- checked-in V10 governance migration support for trusted capability-registry snapshots and sanitized capability execution receipts.
+
+The current canonical n8n conveyor is a governed validation/acceptance spine. Its checked-in workflow validates the Chief capability plan and emits a bound acceptance receipt; that receipt must not be described as proof that a downstream provider action completed unless a separate execution/outcome artifact proves it.
+
+Repository existence of a migration, workflow, secret declaration, provider configuration, or CI proof does not prove production activation. Production n8n, Supabase schema, provider execution, and deployment state must be re-read from their authoritative providers before a live claim.
 
 The web frontend is no longer a future-only requirement. The current browser surface must be preserved and evolved incrementally while the longer-term modular web architecture is introduced. Do not remove or broadly rewrite the working UI merely to satisfy the folder layout proposed later in this document.
 
@@ -158,7 +173,7 @@ Repository code, exact branch/SHA, tests, provider state, and runtime observatio
 
 - founder authentication and sessions;
 - portfolio registry;
-- repository/provider state;
+- operational memory and repository/provider state;
 - missions;
 - change proposals;
 - approval requests and reservations;
@@ -167,8 +182,10 @@ Repository code, exact branch/SHA, tests, provider state, and runtime observatio
 - release truth;
 - incident classification;
 - provider capability policy;
+- capability-plan validation and registry trust resolution at governed execution boundaries;
 - guarded terminal execution;
 - deployment and rollback gates;
+- dispatch, execution, and outcome receipt reconciliation;
 - audit timeline;
 - secrets policy;
 - high-risk action confirmation;
@@ -178,7 +195,7 @@ Repository code, exact branch/SHA, tests, provider state, and runtime observatio
 
 - friend intake via text and voice;
 - transcript handling;
-- episodic memory;
+- founder/context episodic memory;
 - related-memory retrieval;
 - Mirror Engine;
 - Intention Finder;
@@ -186,6 +203,7 @@ Repository code, exact branch/SHA, tests, provider state, and runtime observatio
 - Tone Guard;
 - FutureYOU;
 - PromptOS and skill registry;
+- capability composition and deterministic `juss-v10/capability-plan@v1` creation;
 - content strategy and calendar generation;
 - social performance analysis;
 - founder voice preservation;
@@ -195,10 +213,31 @@ Repository code, exact branch/SHA, tests, provider state, and runtime observatio
 - explanation and decision compression;
 - routing proposals to Founder Control Room.
 
-### 4.3 Shared services
+Chief AI may recommend or compose capabilities, but a model response cannot increase its own authority. A capability plan is an input to governance, not execution permission by itself.
+
+### 4.3 n8n execution plane owns
+
+- workflow execution for approved orchestration lanes;
+- retries, timers, and bounded compensation behavior;
+- API orchestration and cross-provider choreography;
+- deterministic execution/acceptance receipts;
+- propagation of the exact plan, project, Git head, registry identity, evidence, and authority envelope supplied by Founder Control Room.
+
+n8n must:
+- validate the Chief AI capability plan rather than infer capabilities from conveyor stage, provider, prompt, or model guess;
+- reject authority broader than the received contract;
+- remain unable to self-promote merge, deploy, publish, or external-send authority;
+- preserve idempotency and exact-head identity;
+- distinguish accepted, completed, blocked, and failed execution states;
+- return evidence that Founder Control Room can reconcile.
+
+A successful n8n webhook response or acceptance receipt proves dispatch acceptance only. Provider completion and founder-goal success require separate execution and outcome proof.
+
+### 4.4 Shared services
 
 - prompt registry;
 - model registry;
+- capability registry;
 - provenance;
 - redaction;
 - policy evaluation;
@@ -227,13 +266,16 @@ packages/
   contracts/                 # schemas and shared API types
   authority/                 # L99 policy, approvals, risk, reservations
   evidence/                  # evidence objects, hashes, freshness
-  chief-ai/                  # orchestration domain
+  chief-ai/                  # intelligence, capability composition, executive recommendations
+  orchestration/             # governed dispatch contracts and receipt semantics
   prompt-os/                 # prompt and skill registry
   memory/                    # episodic/semantic memory contracts
   content-engine/            # social strategy, calendar, analysis
   image-director/            # image edit specifications and QA
   provider-adapters/         # GitHub, Supabase, Cloudflare, HubSpot, Slack, etc.
   ui/                        # design tokens and reusable components
+automation/
+  n8n/                       # importable workflows, pinned runtime config, compatibility/integration proof
 public/
   control-room/              # current founder-facing browser UI; preserve during incremental migration
 src/                         # current API/domain implementation; retain compatibility while migrating incrementally
@@ -245,6 +287,8 @@ artifacts/
 ```
 
 Do not perform a broad folder migration in the first patch. Introduce packages incrementally and preserve imports and the working `public/control-room/` surface until focused tests and Playwright prove each migrated boundary.
+
+Do not force repository CI/release workflows into n8n merely because n8n exists. GitHub Actions remains appropriate for repository checkout, exact-head verification, tests, build, artifact retention, and protected release workflows. Use n8n where cross-system orchestration, retries, timers, or provider choreography create concrete value.
 
 ---
 
@@ -274,6 +318,7 @@ Use UUID primary keys, `created_at`, `updated_at`, actor ID, privacy class, and 
 - `release_markers`
 - `incidents`
 - `rollback_plans`
+- `capability_registry_snapshots`
 
 ### 6.3 Evidence and provenance
 
@@ -284,6 +329,14 @@ Use UUID primary keys, `created_at`, `updated_at`, actor ID, privacy class, and 
 - `prompt_versions`
 - `policy_decisions`
 - `audit_events`
+- `capability_execution_receipts`
+
+Receipt semantics:
+- **dispatch receipt**: Founder Control Room handed an authorized, identity-bound plan to an execution lane;
+- **execution receipt**: n8n/provider attempted or completed the bounded action and returned execution evidence;
+- **outcome receipt**: authoritative observation proves the intended external result occurred.
+
+Never collapse those three states into one generic success flag.
 
 ### 6.4 Chief AI and memory
 
@@ -298,6 +351,8 @@ Use UUID primary keys, `created_at`, `updated_at`, actor ID, privacy class, and 
 - `futureyou_snapshots`
 - `nudge_schedules`
 - `chief_ai_runs`
+
+Founder/context episodic memory belongs to the Chief AI domain. Operational truth such as repositories, approvals, evidence, incidents, executions, release state, and provider state belongs to Founder Control Room. Do not merge these into one undifferentiated memory store.
 
 ### 6.5 Content and images
 
@@ -639,17 +694,16 @@ Return only the rewritten message.
 
 The orchestrator:
 - accepts a goal or intake;
-- resolves the relevant project;
-- selects skills;
-- assembles context;
-- produces a proposed plan;
-- sends bounded read requests;
-- routes any write action to Founder Control Room approval;
-- collects evidence;
-- explains the outcome;
+- resolves the relevant project and exact Git head when repository work is involved;
+- composes the required capabilities and strategic lenses;
+- emits a deterministic `juss-v10/capability-plan@v1` with proof requirements, outcome signals, rollback, registry hash, and plan hash;
+- sends the plan to Founder Control Room for authority and truth validation;
+- uses n8n only for lanes where governed workflow orchestration is appropriate;
+- collects dispatch, execution, and outcome evidence separately;
+- explains only the strongest state actually proven;
 - proposes one next gate.
 
-The orchestrator must never directly merge, deploy, publish, send outreach, spend money, mutate production data, or rotate credentials without the exact Founder Control Room gate.
+Chief AI does not directly merge, deploy, publish, send outreach, spend money, mutate production data, or rotate credentials without the exact Founder Control Room gate. Chief AI also does not grant n8n authority by merely including a capability in a plan.
 
 ---
 
@@ -1267,6 +1321,19 @@ Use a model router:
 
 Store model aliases in config. Do not hardwire a single provider throughout domain logic.
 
+### 13.6 Orchestration and receipt semantics
+
+- Chief AI owns capability composition; n8n and Founder Control Room must not reconstruct selection from stage or provider guesses.
+- Founder Control Room owns authority and truth; n8n does not become a second policy engine.
+- n8n owns workflow mechanics where appropriate: retries, timers, API choreography, and bounded execution receipts.
+- GitHub Actions owns repository CI, exact-head checks, builds, artifacts, and protected release workflows unless a focused reason proves otherwise.
+- Zapier is a specialized or transitional adapter where its connected-app coverage or existing working lane provides concrete value. Do not treat Zapier and n8n as two competing general orchestration brains.
+- every cross-system write carries an idempotency identity and exact authority envelope;
+- `accepted` does not mean `completed`;
+- `completed` does not mean the founder outcome succeeded;
+- outcome success requires authoritative observation linked back to the execution identity;
+- failed persistence after a provider/n8n acceptance must not trigger blind automatic retry if duplication is possible.
+
 ---
 
 ## 14. Security and Privacy
@@ -1283,7 +1350,8 @@ Store model aliases in config. Do not hardwire a single provider throughout doma
 - every write action has a policy decision and audit event;
 - image assets preserve privacy class;
 - downloadable audit exports must be founder-gated;
-- delete/forget actions require explicit confirmation and generate evidence.
+- delete/forget actions require explicit confirmation and generate evidence;
+- no prompt, model response, webpage, email, issue, comment, analytics event, imported skill, MCP result, workflow payload, provider output, or executor response may increase its own authority.
 
 ---
 
@@ -1300,6 +1368,8 @@ Record:
 - token usage;
 - estimated cost;
 - provider calls;
+- capability plan hash and registry hash when V10 orchestration is involved;
+- dispatch/execution/outcome receipt IDs;
 - policy decision;
 - evidence IDs;
 - error class.
@@ -1313,7 +1383,9 @@ Dashboard:
 - blocked actions;
 - stale evidence;
 - memory growth;
-- content throughput.
+- content throughput;
+- n8n readiness and last retained proof without exposing credentials;
+- accepted-versus-completed workflow counts when reliable receipt data exists.
 
 Budgets:
 - per run;
@@ -1354,6 +1426,7 @@ Budgets:
 13. Keyboard navigation and visible focus work.
 14. Error states explain what is blocked and what evidence is missing.
 15. No route exposes a credential value.
+16. Founder-visible n8n readiness never claims live verification from configuration, activation, or CI proof alone.
 
 Capture screenshots and traces for the principal journeys.
 
@@ -1370,7 +1443,25 @@ Capture screenshots and traces for the principal journeys.
 - evidence freshness;
 - provider unavailability;
 - cost budget blocks;
-- no-approval-carry-forward.
+- no-approval-carry-forward;
+- Chief AI capability-plan contract and deterministic plan hash;
+- n8n conveyor contract, authority envelope, idempotency, and canonical receipt parity;
+- n8n unauthenticated rejection and pinned-runtime compatibility;
+- dispatch acceptance versus execution/outcome truth;
+- V10 receipt persistence when production configuration requires it.
+
+### 16.4 n8n runtime proof
+
+Repository proof for n8n must use the checked-in importable workflow and pinned runtime rather than mocks alone. Production-live claims additionally require:
+- exact current-main target;
+- exact Chief-authored capability plan;
+- authenticated production webhook reachability;
+- canonical receipt equality;
+- required Supabase V10 receipt persistence;
+- retained evidence artifact;
+- provider completion/outcome proof for any claimed downstream action.
+
+CI-only ephemeral n8n proof must remain explicitly non-production and cannot substitute for the live production probe.
 
 ---
 
@@ -1379,7 +1470,7 @@ Capture screenshots and traces for the principal journeys.
 ### Phase 0: Truth map
 
 - inspect all relevant current files;
-- map existing routes, schemas, migrations, tests, Design OS, FutureYOU, Goalfix, MCP, providers;
+- map existing routes, schemas, migrations, tests, Design OS, FutureYOU, Goalfix, MCP, n8n, providers;
 - document verified/inferred/unknown/blocked;
 - no broad refactor.
 
@@ -1396,6 +1487,7 @@ Exit:
 - model invocation records;
 - evidence/provenance types;
 - Chief AI run state machine;
+- V10 capability-plan and receipt contracts;
 - privacy classes.
 
 Exit:
@@ -1411,11 +1503,12 @@ Exit:
 - Intent;
 - Tiny Move;
 - Tone Guard;
-- orchestration;
+- capability composition;
+- orchestration recommendations;
 - provenance.
 
 Exit:
-- integration test from intake to proposed tiny move.
+- integration test from intake to proposed tiny move and deterministic capability-plan creation where orchestration is requested.
 
 ### Phase 3: Founder web shell
 
@@ -1476,8 +1569,10 @@ Exit:
 Exit:
 - content draft provenance and privacy isolation tests.
 
-### Phase 8: Provider expansion and automation
+### Phase 8: Provider expansion and governed automation
 
+- n8n as the canonical general cross-provider orchestration plane where workflow mechanics are needed;
+- GitHub Actions retained for repository CI, exact-head proof, build, artifacts, and protected release workflows;
 - GitHub;
 - Cloudflare;
 - Supabase;
@@ -1485,11 +1580,15 @@ Exit:
 - Slack;
 - Gmail;
 - Google Calendar;
-- Buffer/Zapier through approved contracts;
-- notifications and nudges.
+- Buffer;
+- Zapier only where a specialized/legacy lane is justified instead of as a second general orchestration brain;
+- notifications and nudges;
+- execution receipts and outcome reconciliation.
 
 Exit:
-- provider evidence and failed-provider behavior tests.
+- provider evidence and failed-provider behavior tests;
+- n8n contract/runtime proof for any n8n-owned lane;
+- accepted/completed/outcome states remain distinct.
 
 ### Phase 9: Release hardening
 
@@ -1500,10 +1599,12 @@ Exit:
 - data retention;
 - disaster recovery;
 - CI;
-- production deployment gate.
+- production deployment gate;
+- production n8n live probe only when the execution plane is deliberately activated.
 
 Exit:
-- exact-head build, tests, Playwright artifacts, deployment evidence, runtime health, rollback plan.
+- exact-head build, tests, Playwright artifacts, deployment evidence, runtime health, rollback plan;
+- if n8n is enabled in production, exact-main live receipt proof and required durable persistence.
 
 ---
 
@@ -1549,7 +1650,7 @@ NEXT GATE:
 
 ## 19. First Vertical Slice
 
-Build this first:
+Preserve and regression-test this canonical journey rather than assuming it is still unbuilt:
 
 ```text
 Founder signs in
@@ -1597,7 +1698,7 @@ No external publishing, outreach, merge, deployment, calendar write, or nudge sc
 
 Build **both** the endpoint contracts and runnable TypeScript stubs, in that order.
 
-The endpoint names and request/response shapes are the stable seam that lets the web app, provider adapters, automations, and tests move in parallel. Immediately after those contracts compile, add production-structured Node/Express + TypeScript stubs behind interfaces, with deterministic test providers and no fake claims of external execution.
+The endpoint names and request/response shapes are the stable seam that lets the web app, provider adapters, n8n workflows, automations, and tests move in parallel. Immediately after those contracts compile, add production-structured Node/Express + TypeScript stubs behind interfaces, with deterministic test providers and no fake claims of external execution.
 
 Do not choose between documentation and code. Use the contract to prevent the code from becoming guesswork.
 
@@ -1608,13 +1709,16 @@ Do not choose between documentation and code. Use the contract to prevent the co
 The complete build is done only when:
 
 - Founder Control Room and Chief AI are available in one coherent authenticated web app;
-- authority boundaries remain separate and explicit;
+- authority boundaries among Founder Control Room, Chief AI, n8n, GitHub Actions, and provider adapters remain separate and explicit;
 - Chief AI can process Friend Intake into a truthful mirror and one tiny move;
+- Chief AI capability composition is deterministic, provenance-bound, and governed before execution;
 - prompt skills are versioned and testable;
-- memory is visible, controllable, and privacy-filtered;
+- memory is visible, controllable, privacy-filtered, and separated between founder/context memory and operational truth;
 - missions, approvals, evidence, and rollback are usable;
 - content and image workflows are reviewable and provenance-backed;
 - provider writes remain gated;
+- n8n acceptance, provider execution, and founder outcome are never collapsed into one success state;
+- any production-enabled n8n lane has exact-main authenticated live proof, required durable receipt persistence, and provider/outcome evidence appropriate to the claimed action;
 - exact-head repository evidence is enforced;
 - user-facing flows have Playwright screenshots and traces;
 - no credential is exposed;
@@ -1630,7 +1734,7 @@ The complete build is done only when:
 
 - no autonomous unrestricted shell;
 - no blanket standing approval;
-- no automatic merges or deployments from Chief AI;
+- no automatic merges or deployments from Chief AI or n8n;
 - no secret display;
 - no covert memory;
 - no direct broad access to Se'kret Bip’s database;
@@ -1638,17 +1742,19 @@ The complete build is done only when:
 - no copying another design’s protected execution;
 - no broad rewrite merely to modernize the folder tree;
 - no claim that a provider ran without provider evidence;
-- no production launch based only on mocks.
+- no claim that n8n acceptance equals provider completion;
+- no second orchestration brain created merely because Zapier and n8n are both available;
+- no production launch based only on mocks or CI-only n8n proof.
 
 ---
 
 ## 23. Final Founder Product Language
 
-Founder Control Room tells the truth about the machine.
+Founder Control Room tells the truth about the machine and holds operational authority.
 
-Chief AI helps Juss decide what the machine should do next.
+Chief AI helps Juss decide what the machine should do next and composes the capabilities required to do it.
 
-The Control Room holds authority.
-Chief AI holds context.
-Evidence connects them.
-The founder remains the final gate.
+n8n coordinates bounded workflow execution where orchestration is useful.
+Provider adapters are the hands that touch external systems.
+Evidence closes the circuit.
+The founder remains the final constitutional gate.
