@@ -36,9 +36,11 @@ const [
   read('.github/workflows/founder-review-email-ingress.yml'),
 ]);
 
+const providerBufferImport = /from\s+['"](?!node:buffer['"])[^'"]*buffer[^'"]*['"]/i;
+
 const edgeForbidden = [
   /buffer_(?:post|method|action|api)/i,
-  /from\s+['"][^'"]*buffer/i,
+  providerBufferImport,
   /zapier/i,
   /hubspot/i,
   /supabase/i,
@@ -54,7 +56,7 @@ for (const pattern of edgeForbidden) {
 
 const intakeForbidden = [
   /buffer_(?:post|method|action|api)/i,
-  /from\s+['"][^'"]*buffer/i,
+  providerBufferImport,
   /zapier/i,
   /hubspot/i,
   /executeFirstPartyPublication/i,
