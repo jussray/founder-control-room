@@ -76,7 +76,7 @@ function dispatchRepository(): FounderSignalReviewDispatchRepository {
   return {
     reserve: vi.fn(async candidate => {
       record = candidate;
-      return 'reserved';
+      return 'reserved' as const;
     }),
     find: vi.fn(async () => record),
     recordAttempt: vi.fn(async (ingressId, state, providerHttpStatus, providerResponseHash) => {
