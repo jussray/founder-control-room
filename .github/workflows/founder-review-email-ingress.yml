@@ -19,6 +19,8 @@ on:
       - 'supabase/migrations/20260802224500_founder_signal_review_email_receipts.sql'
       - 'supabase/migrations/20260803030000_harden_founder_signal_review_email_receipts.sql'
       - 'supabase/migrations/20260812004000_founder_signal_review_execution_bridge.sql'
+      - 'tools/zapier/buffer-review-window.cjs'
+      - 'tools/zapier/test-buffer-review-window.cjs'
       - 'wrangler.worker.toml'
       - 'wrangler.email.toml'
   workflow_dispatch:
@@ -92,6 +94,8 @@ jobs:
           src/founderSignalEmailIngress/receipt.ts
           src/founderSignalEmailIngress/email.ts
           src/founderSignalEmailIngress/email.test.ts
+          src/founderSignalEmailIngress/reviewAuthorization.ts
+          src/founderSignalEmailIngress/reviewAuthorization.test.ts
           src/founderSignalEmailIngress/reviewExecution.ts
           src/founderSignalEmailIngress/reviewExecution.test.ts
           src/http/routes/founderSignalReviewContexts.ts
