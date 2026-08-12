@@ -1,8 +1,8 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { Request, RequestHandler, Response } from 'express';
+import { processFounderSignalReviewCommandWithCapability } from '../../founderSignalEmailIngress/reviewAuthorization.js';
 import {
   FounderSignalReviewExecutionError,
-  processFounderSignalReviewCommand,
   type FounderSignalReviewProcessingResult,
 } from '../../founderSignalEmailIngress/reviewExecution.js';
 import {
@@ -70,6 +70,7 @@ FounderSignalReviewEmailReceiptStore = async (receipt) => {
       raw_message_hash: receipt.rawMessageHash,
       sender_ref_hash: receipt.senderRefHash,
       recipient_ref_hash: receipt.recipientRefHash,
+      review_token_hash: receipt.reviewTokenHash,
       command_hash: receipt.commandHash,
       command_type: receipt.commandType,
       target_channel: receipt.targetChannel,
@@ -95,7 +96,7 @@ export function createFounderSignalReviewEmailIngestHandler(
     processor?: FounderSignalReviewCommandProcessor;
   } = {},
 ): RequestHandler {
-  const processor = options.processor ?? processFounderSignalReviewCommand;
+  const processor = options.processor ?? processFounderSignalReviewCommandWithCapability;
 
   return async function handleFounderSignalReviewEmailIngest(
     req: Request,
