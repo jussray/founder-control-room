@@ -3,12 +3,14 @@
 const assert = require('node:assert/strict');
 const {
   buildGmailReviewDigest,
+  buildReviewContextRegistration,
   processFounderReviewReply,
   buildNotificationFailureCompensation,
   resolveNoReplyDeadline,
   extractReplyCommand,
 } = require('./buffer-review-window.cjs');
 
+const batchId = '66cf315f-e1a0-4aad-9c76-355f1df30b54';
 const replyContextId = '45bb874d-69d4-4b32-8df2-c7934bb888c5';
 const replyToAddress = `review+${replyContextId}@foundercontrolroom.org`;
 
@@ -60,7 +62,7 @@ assert.throws(
 );
 
 const digest = buildGmailReviewDigest({
-  batch_id: '66cf315f-e1a0-4aad-9c76-355f1df30b54',
+  batch_id: batchId,
   reply_context_id: replyContextId,
   reply_to_address: replyToAddress,
   scheduled_posts: structuredClone(scheduledPosts),
@@ -79,9 +81,48 @@ assert.match(digest.gmail_body, /first non-empty line/);
 assert.match(digest.gmail_body, new RegExp(replyContextId));
 assert.equal(digest.review_token.length, 64);
 
+const contextRegistration = buildReviewContextRegistration({
+  source_repo: 'jussray/founder-control-room',
+  source_commit_sha: 'a'.repeat(40),
+  founder_sender: 'Juss Ray <juss@example.com>',
+  batch_id: batchId,
+  reply_context_id: replyContextId,
+  reply_to_address: replyToAddress,
+  scheduled_posts: structuredClone(scheduledPosts),
+});
+assert.deepEqual(contextRegistration, {
+  version: 1,
+  sourceRepo: 'jussray/founder-control-room',
+  sourceCommitSha: 'a'.repeat(40),
+  batchId,
+  replyContextId,
+  founderSender: 'juss@example.com',
+  replyToAddress,
+  reviewDeadline: digest.review_deadline,
+  reviewToken: digest.review_token,
+  scheduledPosts: scheduledPosts.map((post) => ({
+    channel: post.channel,
+    bufferPostId: post.buffer_post_id,
+    validatedPostText: post.validated_post_text,
+    scheduledAt: post.scheduled_at,
+  })),
+});
+assert.throws(
+  () => buildReviewContextRegistration({
+    source_repo: 'someone-else/repo',
+    source_commit_sha: 'a'.repeat(40),
+    founder_sender: 'juss@example.com',
+    batch_id: batchId,
+    reply_context_id: replyContextId,
+    reply_to_address: replyToAddress,
+    scheduled_posts: structuredClone(scheduledPosts),
+  }),
+  /source_repo must be an owned jussray repository/,
+);
+
 assert.throws(
   () => buildGmailReviewDigest({
-    batch_id: '66cf315f-e1a0-4aad-9c76-355f1df30b54',
+    batch_id: batchId,
     reply_context_id: 'not-a-uuid',
     reply_to_address: replyToAddress,
     scheduled_posts: structuredClone(scheduledPosts),
@@ -256,4 +297,4 @@ assert.equal(noReply.review_action, 'no_change');
 assert.equal(noReply.publish_behavior, 'publish_by_existing_buffer_schedule');
 assert.equal(noReply.external_writes_required, 0);
 
-console.log('Buffer review window verified: one Gmail digest binds up to three schedules to a private reply address and UUID context; one safe unquoted command, founder/recipient/context/token/deadline checks, channel-scoped edits/cancels, compensation, and no-reply behavior fail closed.');
+console.log('Buffer review window verified: exact schedule IDs bind to a private FCR review-context registration before Gmail; one safe unquoted command, founder/recipient/context/token/deadline checks, channel-scoped edits/cancels, compensation, and no-reply behavior fail closed.');
