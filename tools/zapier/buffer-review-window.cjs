@@ -214,7 +214,7 @@ function buildGmailReviewDigest(input = {}) {
     notification_required: true,
     gmail_action: 'gmail_send_email',
     gmail_reply_to: replyToAddress,
-    gmail_subject: `[Founder Signal Review] ${posts.length} scheduled post${posts.length === 1 ? '' : 's'} · ${reviewDeadline}`,
+    gmail_subject: `[Founder Signal Review ${reviewToken}] ${posts.length} scheduled post${posts.length === 1 ? '' : 's'} · ${reviewDeadline}`,
     gmail_body: [
       `Review window closes at ${reviewDeadline}.`,
       '',
