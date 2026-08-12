@@ -18,6 +18,7 @@ const validReceipt = {
   rawMessageHash: 'b'.repeat(64),
   senderRefHash: 'c'.repeat(64),
   recipientRefHash: 'd'.repeat(64),
+  reviewTokenHash: 'f'.repeat(64),
   commandHash: 'e'.repeat(64),
   commandType: 'edit_one',
   targetChannel: 'juss_rayy_linkedin',
@@ -123,6 +124,7 @@ describe('Founder Signal review email ingest', () => {
       idempotencyKey: null,
     });
     expect(JSON.stringify(response.body)).not.toContain(validReceipt.commandText);
+    expect(JSON.stringify(response.body)).not.toContain(validReceipt.reviewTokenHash);
     expect(store).toHaveBeenCalledOnce();
     expect(store).toHaveBeenCalledWith(validReceipt);
   });
@@ -209,6 +211,7 @@ describe('Founder Signal review email ingest', () => {
       { rawEmail: 'private message' },
       { senderEmail: 'juss@example.com' },
       { recipientEmail: 'review@example.com' },
+      { reviewToken: 'private-capability' },
       { quotedHistory: 'private thread' },
       { attachment: 'base64-data' },
       { senderVerified: true },
@@ -224,6 +227,7 @@ describe('Founder Signal review email ingest', () => {
     const store = vi.fn<FounderSignalReviewEmailReceiptStore>();
 
     for (const mutation of [
+      { reviewTokenHash: 'not-a-hash' },
       { providerActionsRequested: 1 },
       { executionAllowed: true },
       { authorizationState: 'authorized' },
