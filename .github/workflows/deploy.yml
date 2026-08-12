@@ -128,7 +128,8 @@ jobs:
             echo "- Approval reference: \`$DEPLOYMENT_APPROVAL_ID\`"
             echo "- Reason: ${DEPLOYMENT_REASON:-not supplied}"
             echo "- Trigger: manual workflow dispatch"
-            echo "- Founder Signal auto-distribution: disabled"
+            echo "- Broad Founder Signal automation grant: disabled"
+            echo "- Proof-of-ship scheduled publication: enabled with 20-minute founder review"
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ── 1. Supabase migrations ──────────────────────────────────────────────────────
@@ -303,7 +304,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Deploy Worker with distribution disabled
+      - name: Deploy Worker with broad Founder Signal grant disabled
         id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
@@ -338,7 +339,7 @@ jobs:
           FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON: >-
             {"id":"founder-signal-draft-only-v2","enabled":false,"routes":[{"channel":"linkedin","audienceSegment":"build-in-public"},{"channel":"facebook","audienceSegment":"build-in-public"}],"repositories":[],"repositoryScope":{"mode":"all_owned","owner":"jussray"},"approvedRecipientIds":[],"expiresAt":null}
 
-  # ── 3. Post-deploy exact-SHA and fail-closed grant proof ─────────────────────
+  # ── 3. Post-deploy exact-SHA and fail-closed broad grant proof ───────────────
   smoke-test:
     name: Smoke Test
     runs-on: ubuntu-latest
@@ -368,7 +369,7 @@ jobs:
         env:
           DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
 
-      - name: Verify exact deployed commit and disabled social grant
+      - name: Verify exact deployed commit and disabled broad automation grant
         run: |
           set -euo pipefail
           DEPLOY_URL="${DEPLOY_URL%/}"
@@ -392,7 +393,7 @@ jobs:
           if deployed_sha != expected_sha:
               raise SystemExit('exact deployment proof failed')
           if grant != {'configured': True, 'enabled': False}:
-              raise SystemExit('social distribution fail-closed read-back failed')
+              raise SystemExit('broad Founder Signal automation grant fail-closed read-back failed')
           PY
         env:
           DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
@@ -452,7 +453,7 @@ jobs:
 
   # ── 4. Verified proof-of-ship payload ───────────────────────────────────────
   proof-of-ship:
-    name: Proof of Ship — Verify and Hold for Founder Review
+    name: Proof of Ship — Verify and Schedule with Founder Review
     runs-on: ubuntu-latest
     timeout-minutes: 12
     environment: production
