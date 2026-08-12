@@ -10,9 +10,12 @@ const [
   worker,
   parser,
   receipt,
-  route,
+  execution,
+  emailRoute,
+  contextRoute,
   baseMigration,
   hardeningMigration,
+  executionMigration,
   manifest,
   apiManifest,
   server,
@@ -21,9 +24,12 @@ const [
   read('src/worker/founderSignalReviewEmail.ts'),
   read('src/founderSignalEmailIngress/email.ts'),
   read('src/founderSignalEmailIngress/receipt.ts'),
+  read('src/founderSignalEmailIngress/reviewExecution.ts'),
   read('src/http/routes/founderSignalReviewEmailIngress.ts'),
+  read('src/http/routes/founderSignalReviewContexts.ts'),
   read('supabase/migrations/20260802224500_founder_signal_review_email_receipts.sql'),
   read('supabase/migrations/20260803030000_harden_founder_signal_review_email_receipts.sql'),
+  read('supabase/migrations/20260812004000_founder_signal_review_execution_bridge.sql'),
   read('wrangler.email.toml'),
   read('wrangler.worker.toml'),
   read('src/http/server.ts'),
@@ -46,7 +52,7 @@ for (const pattern of edgeForbidden) {
   if (pattern.test(worker)) fail(`email Worker contains forbidden authority pattern ${pattern}`);
 }
 
-const routeForbidden = [
+const intakeForbidden = [
   /buffer_(?:post|method|action|api)/i,
   /from\s+['"][^'"]*buffer/i,
   /zapier/i,
@@ -55,20 +61,22 @@ const routeForbidden = [
   /providerFactory/i,
   /publish_or_send/i,
 ];
-for (const pattern of routeForbidden) {
-  if (pattern.test(route)) fail(`intake route contains forbidden execution pattern ${pattern}`);
+for (const source of [parser, receipt, emailRoute]) {
+  for (const pattern of intakeForbidden) {
+    if (pattern.test(source)) fail(`raw intake boundary contains forbidden execution pattern ${pattern}`);
+  }
 }
 
-for (const source of [worker, parser, receipt, route]) {
+for (const source of [worker, parser, receipt, emailRoute, contextRoute]) {
   if (/console\.(?:log|info|warn|error)/.test(source)) {
-    fail('review-email runtime must not log raw or sanitized message content');
+    fail('review-email ingress must not log raw or sanitized message content');
   }
 }
 
 if (!worker.includes('MIN_INGRESS_SECRET_LENGTH = 32')) {
   fail('email Worker must require a minimum 32-character shared secret');
 }
-if (!route.includes('MIN_INGRESS_SECRET_LENGTH = 32')) {
+if (!emailRoute.includes('MIN_INGRESS_SECRET_LENGTH = 32')) {
   fail('backend ingest must require a minimum 32-character shared secret');
 }
 if (!worker.includes("redirect: 'error'")) {
@@ -96,28 +104,69 @@ if (!receipt.includes('command_semantics_mismatch')) {
   fail('receipt contract must couple command type, channel, and text');
 }
 if (receipt.includes('senderVerified')) {
-  fail('receipt contract must not claim envelope sender verification');
+  fail('receipt contract must not claim envelope sender authentication');
 }
 if (!receipt.includes('unknown_or_private_field')) {
   fail('receipt contract must reject unknown/private fields');
 }
-if (!route.includes('authorization_state: receipt.authorizationState')) {
-  fail('backend must persist the unresolved authorization state');
+if (!emailRoute.includes('authorization_state: receipt.authorizationState')) {
+  fail('backend must persist the unresolved intake authorization state');
 }
-if (!route.includes('execution_allowed: receipt.executionAllowed')) {
-  fail('backend must persist the false execution flag');
+if (!emailRoute.includes('execution_allowed: receipt.executionAllowed')) {
+  fail('backend must persist the false intake execution flag');
 }
-if (!route.includes('provider_actions_requested: receipt.providerActionsRequested')) {
-  fail('backend must persist the zero-action receipt field');
+if (!emailRoute.includes('provider_actions_requested: receipt.providerActionsRequested')) {
+  fail('backend must persist the zero-action intake receipt field');
 }
-if (!route.includes("error?.code === '23505'")) {
-  fail('duplicate persistence must be classified from the unique-violation code');
+if (!emailRoute.includes("error?.code === '23505'")) {
+  fail('duplicate intake persistence must be classified from the unique-violation code');
+}
+if (!emailRoute.includes('processFounderSignalReviewCommand')) {
+  fail('signed intake must hand off to the separately bounded review command processor');
 }
 if (!server.includes("express.raw({ type: 'application/json', limit: '16kb' })")) {
-  fail('signed ingest must use the exact raw JSON body');
+  fail('signed email ingest must use the exact raw JSON body');
 }
 if (!server.includes("'/ingest/founder-review-email'")) {
   fail('signed review-email ingest route is not mounted');
+}
+if (!server.includes("'/ingest/founder-review-contexts'")) {
+  fail('private review-context ingest route is not mounted');
+}
+
+if (!contextRoute.includes("req.get('x-proof-of-ship-receipt-token')")) {
+  fail('review-context registration must reuse the existing private proof-receipt token boundary');
+}
+if (!contextRoute.includes('validateFounderSignalReviewContextRegistration')) {
+  fail('review-context registration must validate the deterministic token/context contract');
+}
+if (!execution.includes("event_type: 'founder_review_command'")) {
+  fail('execution bridge must emit a dedicated founder_review_command event');
+}
+if (!execution.includes('provider_execution_receipt_required: true')) {
+  fail('provider dispatch must require a downstream execution receipt');
+}
+if (!execution.includes('providerExecutionProven: false')) {
+  fail('provider hook acceptance must never be called provider execution proof');
+}
+if (!execution.includes('blocked_context_missing')) {
+  fail('execution bridge must fail closed when no exact context exists');
+}
+if (!execution.includes('blocked_deadline_elapsed')) {
+  fail('execution bridge must fail closed after the review deadline');
+}
+if (!execution.includes('ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL')) {
+  fail('execution bridge must use the existing private Zapier orchestration hook');
+}
+for (const forbidden of [
+  'BUFFER_API_KEY',
+  'BUFFER_ACCESS_TOKEN',
+  'OPENAI_API_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+]) {
+  if (execution.includes(forbidden)) {
+    fail(`execution bridge must not introduce provider credential ${forbidden}`);
+  }
 }
 
 if (!/ENABLE ROW LEVEL SECURITY/i.test(baseMigration)) {
@@ -139,20 +188,39 @@ if (!/command_semantics_check/i.test(hardeningMigration)) {
   fail('review-email ledger must enforce exact command semantics');
 }
 if (!/provider_actions_requested\s+INTEGER\s+NOT NULL\s+CHECK\s*\(provider_actions_requested\s*=\s*0\)/i.test(baseMigration)) {
-  fail('review-email receipt ledger must enforce zero provider actions');
+  fail('review-email intake ledger must enforce zero provider actions');
 }
+if (!executionMigration.includes('founder_signal_review_contexts')) {
+  fail('execution bridge must persist exact private review contexts');
+}
+if (!executionMigration.includes('founder_signal_review_command_dispatches')) {
+  fail('execution bridge must persist idempotent provider dispatch evidence');
+}
+if ((executionMigration.match(/ENABLE ROW LEVEL SECURITY/gi) ?? []).length < 2) {
+  fail('both execution-bridge tables must enable RLS');
+}
+if (/CREATE POLICY/i.test(executionMigration)) {
+  fail('execution-bridge tables must not create anon/authenticated policies');
+}
+if (!executionMigration.includes("provider 2xx proves hook acceptance, never Buffer execution")) {
+  fail('execution migration must preserve provider-acceptance proof semantics');
+}
+
 for (const forbiddenColumn of [
   'raw_email',
   'sender_email',
   'recipient_email',
   'quoted_history',
   'attachment',
-  'buffer_post_id',
-  'provider_receipt',
+  'provider_response_body',
 ]) {
   const columnPattern = new RegExp(`^\\s*${forbiddenColumn}\\s+`, 'im');
-  if (columnPattern.test(baseMigration) || columnPattern.test(hardeningMigration)) {
-    fail(`migration includes forbidden column ${forbiddenColumn}`);
+  if (
+    columnPattern.test(baseMigration)
+    || columnPattern.test(hardeningMigration)
+    || columnPattern.test(executionMigration)
+  ) {
+    fail(`review-email migrations include forbidden column ${forbiddenColumn}`);
   }
 }
 
@@ -177,6 +245,9 @@ if (/FOUNDER_REVIEW_EMAIL_INGRESS_SECRET\s*=/.test(apiManifest)) {
 if (!workflow.includes('20260803030000_harden_founder_signal_review_email_receipts.sql')) {
   fail('focused workflow must run when the forward hardening migration changes');
 }
+if (!workflow.includes('20260812004000_founder_signal_review_execution_bridge.sql')) {
+  fail('focused workflow must run when the execution-bridge migration changes');
+}
 
 if (failures.length > 0) {
   for (const failure of failures) console.error(`Review email ingress verification failed: ${failure}`);
@@ -184,5 +255,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  'Founder review-email ingress verified: isolated Email Worker, bounded parser, strong signed intake, unresolved RLS ledger, execution disabled, exact command semantics, explicit duplicate handling, no HTTP route, required API ingress secret, and no embedded secrets.',
+  'Founder review-email ingress verified: isolated Email Worker, immutable intake receipt, deterministic private context registration, RLS-only correlation ledgers, idempotent post-intake Zapier dispatch, deadline and context fail-closed behavior, exact provider-acceptance semantics, and no embedded provider credentials.',
 );
