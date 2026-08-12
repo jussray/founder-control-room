@@ -1,6 +1,11 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { Request, RequestHandler, Response } from 'express';
 import {
+  FounderSignalReviewExecutionError,
+  processFounderSignalReviewCommand,
+  type FounderSignalReviewProcessingResult,
+} from '../../founderSignalEmailIngress/reviewExecution.js';
+import {
   FounderSignalReviewEmailReceiptError,
   type FounderSignalReviewEmailReceipt,
   validateFounderSignalReviewEmailReceipt,
@@ -13,6 +18,10 @@ const HEX_SHA256 = /^[0-9a-f]{64}$/;
 export type FounderSignalReviewEmailReceiptStore = (
   receipt: FounderSignalReviewEmailReceipt,
 ) => Promise<'stored' | 'duplicate'>;
+
+export type FounderSignalReviewCommandProcessor = (
+  receipt: FounderSignalReviewEmailReceipt,
+) => Promise<FounderSignalReviewProcessingResult>;
 
 function hexToBytes(value: string): Uint8Array {
   const bytes = new Uint8Array(value.length / 2);
@@ -81,8 +90,13 @@ FounderSignalReviewEmailReceiptStore = async (receipt) => {
 
 export function createFounderSignalReviewEmailIngestHandler(
   store: FounderSignalReviewEmailReceiptStore = persistFounderSignalReviewEmailReceipt,
-  options: { now?: () => number } = {},
+  options: {
+    now?: () => number;
+    processor?: FounderSignalReviewCommandProcessor;
+  } = {},
 ): RequestHandler {
+  const processor = options.processor ?? processFounderSignalReviewCommand;
+
   return async function handleFounderSignalReviewEmailIngest(
     req: Request,
     res: Response,
@@ -131,21 +145,43 @@ export function createFounderSignalReviewEmailIngestHandler(
       return res.status(400).json({ error: code });
     }
 
+    let disposition: 'stored' | 'duplicate';
     try {
-      const disposition = await store(receipt);
-      return res.status(disposition === 'stored' ? 201 : 200).json({
-        accepted: true,
-        duplicate: disposition === 'duplicate',
-        ingressId: receipt.ingressId,
-        replyContextId: receipt.replyContextId,
-        commandType: receipt.commandType,
-        authorizationState: receipt.authorizationState,
-        executionAllowed: false,
-        providerActionsRequested: 0,
-      });
+      disposition = await store(receipt);
     } catch {
       return res.status(503).json({ error: 'Review email receipt store unavailable' });
     }
+
+    let processing: FounderSignalReviewProcessingResult;
+    try {
+      processing = await processor(receipt);
+    } catch (error) {
+      const code = error instanceof FounderSignalReviewExecutionError
+        ? error.code
+        : 'review_command_processing_failed';
+      return res.status(503).json({
+        error: 'Review command dispatch unavailable',
+        code,
+        ingressId: receipt.ingressId,
+        replyContextId: receipt.replyContextId,
+      });
+    }
+
+    return res.status(disposition === 'stored' ? 201 : 200).json({
+      accepted: true,
+      duplicate: disposition === 'duplicate',
+      ingressId: receipt.ingressId,
+      replyContextId: receipt.replyContextId,
+      commandType: receipt.commandType,
+      authorizationState: receipt.authorizationState,
+      executionAllowed: receipt.executionAllowed,
+      providerActionsRequested: receipt.providerActionsRequested,
+      commandAuthorizationState: processing.authorizationState,
+      providerDispatchAccepted: processing.providerDispatchAccepted,
+      providerExecutionProven: processing.providerExecutionProven,
+      authorizedProviderActionsRequested: processing.providerActionsRequested,
+      idempotencyKey: processing.idempotencyKey,
+    });
   };
 }
 
