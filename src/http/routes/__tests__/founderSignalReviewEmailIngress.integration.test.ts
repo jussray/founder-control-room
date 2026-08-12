@@ -4,6 +4,7 @@ import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createFounderSignalReviewEmailIngestHandler,
+  type FounderSignalReviewCommandProcessor,
   type FounderSignalReviewEmailReceiptStore,
 } from '../founderSignalReviewEmailIngress.js';
 
@@ -29,12 +30,29 @@ const validReceipt = {
   source: 'cloudflare_email_routing',
 } as const;
 
-function createTestApp(store: FounderSignalReviewEmailReceiptStore) {
+function blockedProcessor(): FounderSignalReviewCommandProcessor {
+  return vi.fn().mockResolvedValue({
+    authorizationState: 'blocked_context_missing',
+    executionAllowed: false,
+    providerDispatchAccepted: false,
+    providerExecutionProven: false,
+    providerActionsRequested: 0,
+    idempotencyKey: null,
+  });
+}
+
+function createTestApp(
+  store: FounderSignalReviewEmailReceiptStore,
+  processor: FounderSignalReviewCommandProcessor = blockedProcessor(),
+) {
   const app = express();
   app.post(
     '/ingest/founder-review-email',
     express.raw({ type: 'application/json', limit: '16kb' }),
-    createFounderSignalReviewEmailIngestHandler(store, { now: () => nowMs }),
+    createFounderSignalReviewEmailIngestHandler(store, {
+      now: () => nowMs,
+      processor,
+    }),
   );
   return app;
 }
@@ -51,11 +69,16 @@ function sign(body: string, timestamp = String(nowMs), secret = TEST_SECRET) {
 async function postReceipt(
   store: FounderSignalReviewEmailReceiptStore,
   receipt: unknown = validReceipt,
-  overrides: { timestamp?: string; signature?: string; body?: string } = {},
+  overrides: {
+    timestamp?: string;
+    signature?: string;
+    body?: string;
+    processor?: FounderSignalReviewCommandProcessor;
+  } = {},
 ) {
   const body = overrides.body ?? JSON.stringify(receipt);
   const signed = sign(body, overrides.timestamp);
-  return request(createTestApp(store))
+  return request(createTestApp(store, overrides.processor))
     .post('/ingest/founder-review-email')
     .set('content-type', 'application/json')
     .set('x-founder-review-timestamp', overrides.timestamp ?? signed.timestamp)
@@ -79,7 +102,7 @@ describe('Founder Signal review email ingest', () => {
     }
   });
 
-  it('stores one sanitized unresolved receipt and returns no command content', async () => {
+  it('stores one sanitized unresolved intake receipt before command resolution', async () => {
     const store = vi.fn<FounderSignalReviewEmailReceiptStore>().mockResolvedValue('stored');
     const response = await postReceipt(store);
 
@@ -93,10 +116,42 @@ describe('Founder Signal review email ingest', () => {
       authorizationState: 'intake_only_unresolved',
       executionAllowed: false,
       providerActionsRequested: 0,
+      commandAuthorizationState: 'blocked_context_missing',
+      providerDispatchAccepted: false,
+      providerExecutionProven: false,
+      authorizedProviderActionsRequested: 0,
+      idempotencyKey: null,
     });
     expect(JSON.stringify(response.body)).not.toContain(validReceipt.commandText);
     expect(store).toHaveBeenCalledOnce();
     expect(store).toHaveBeenCalledWith(validReceipt);
+  });
+
+  it('reports provider dispatch separately from the immutable intake authority fields', async () => {
+    const store = vi.fn<FounderSignalReviewEmailReceiptStore>().mockResolvedValue('stored');
+    const processor = vi.fn<FounderSignalReviewCommandProcessor>().mockResolvedValue({
+      authorizationState: 'context_authorized',
+      executionAllowed: true,
+      providerDispatchAccepted: true,
+      providerExecutionProven: false,
+      providerActionsRequested: 1,
+      idempotencyKey: `founder-review:${validReceipt.ingressId}`,
+    });
+    const response = await postReceipt(store, validReceipt, { processor });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({
+      authorizationState: 'intake_only_unresolved',
+      executionAllowed: false,
+      providerActionsRequested: 0,
+      commandAuthorizationState: 'context_authorized',
+      providerDispatchAccepted: true,
+      providerExecutionProven: false,
+      authorizedProviderActionsRequested: 1,
+      idempotencyKey: `founder-review:${validReceipt.ingressId}`,
+    });
+    expect(processor).toHaveBeenCalledOnce();
+    expect(processor).toHaveBeenCalledWith(validReceipt);
   });
 
   it('returns an idempotent unresolved duplicate receipt', async () => {
@@ -165,7 +220,7 @@ describe('Founder Signal review email ingest', () => {
     expect(store).not.toHaveBeenCalled();
   });
 
-  it('rejects authorization and provider-execution escalation', async () => {
+  it('rejects authorization and provider-execution escalation in the signed intake body', async () => {
     const store = vi.fn<FounderSignalReviewEmailReceiptStore>();
 
     for (const mutation of [
@@ -196,7 +251,7 @@ describe('Founder Signal review email ingest', () => {
     expect(store).not.toHaveBeenCalled();
   });
 
-  it('fails closed when the receipt store is unavailable', async () => {
+  it('fails closed when the receipt store or provider dispatch path is unavailable', async () => {
     const failedStore = vi
       .fn<FounderSignalReviewEmailReceiptStore>()
       .mockRejectedValue(new Error('database unavailable'));
@@ -204,6 +259,19 @@ describe('Founder Signal review email ingest', () => {
     expect(unavailable.status).toBe(503);
     expect(unavailable.body).toEqual({
       error: 'Review email receipt store unavailable',
+    });
+
+    const store = vi.fn<FounderSignalReviewEmailReceiptStore>().mockResolvedValue('stored');
+    const failedProcessor = vi.fn<FounderSignalReviewCommandProcessor>()
+      .mockRejectedValue(new Error('provider unavailable'));
+    const providerUnavailable = await postReceipt(store, validReceipt, {
+      processor: failedProcessor,
+    });
+    expect(providerUnavailable.status).toBe(503);
+    expect(providerUnavailable.body).toMatchObject({
+      error: 'Review command dispatch unavailable',
+      ingressId: validReceipt.ingressId,
+      replyContextId: validReceipt.replyContextId,
     });
   });
 });
