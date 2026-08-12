@@ -10,6 +10,7 @@ const [
   worker,
   parser,
   receipt,
+  authorization,
   execution,
   emailRoute,
   contextRoute,
@@ -20,10 +21,13 @@ const [
   apiManifest,
   server,
   workflow,
+  packageJson,
+  zapierReviewWindow,
 ] = await Promise.all([
   read('src/worker/founderSignalReviewEmail.ts'),
   read('src/founderSignalEmailIngress/email.ts'),
   read('src/founderSignalEmailIngress/receipt.ts'),
+  read('src/founderSignalEmailIngress/reviewAuthorization.ts'),
   read('src/founderSignalEmailIngress/reviewExecution.ts'),
   read('src/http/routes/founderSignalReviewEmailIngress.ts'),
   read('src/http/routes/founderSignalReviewContexts.ts'),
@@ -34,6 +38,8 @@ const [
   read('wrangler.worker.toml'),
   read('src/http/server.ts'),
   read('.github/workflows/founder-review-email-ingress.yml'),
+  read('package.json'),
+  read('tools/zapier/buffer-review-window.cjs'),
 ]);
 
 const providerBufferImport = /from\s+['"](?!node:buffer['"])[^'"]*buffer[^'"]*['"]/i;
@@ -69,7 +75,7 @@ for (const source of [parser, receipt, emailRoute]) {
   }
 }
 
-for (const source of [worker, parser, receipt, emailRoute, contextRoute]) {
+for (const source of [worker, parser, receipt, authorization, emailRoute, contextRoute]) {
   if (/console\.(?:log|info|warn|error)/.test(source)) {
     fail('review-email ingress must not log raw or sanitized message content');
   }
@@ -90,11 +96,26 @@ if (!worker.includes('Review command rejected')) {
 if (!parser.includes("sha256(`${messageId}|${rawMessageHash}`)")) {
   fail('replay identity must bind Message-ID and raw message bytes');
 }
+if (!parser.includes('REVIEW_SUBJECT')) {
+  fail('email parser must require the private review capability in the Subject header');
+}
+if (!parser.includes('reviewTokenHashFromSubject')) {
+  fail('email parser must hash the review capability before building the intake receipt');
+}
+if (!parser.includes('reviewTokenHash,')) {
+  fail('email parser must pass only the review-token hash into the intake receipt');
+}
 if (!parser.includes("authorizationState: 'intake_only_unresolved'")) {
   fail('parser must emit unresolved intake state');
 }
 if (!receipt.includes("authorizationState: 'intake_only_unresolved'")) {
   fail('receipt contract must remain explicitly unresolved');
+}
+if (!receipt.includes('reviewTokenHash: string')) {
+  fail('receipt contract must require a hashed private review capability');
+}
+if (receipt.includes('reviewToken: string')) {
+  fail('receipt contract must never accept the raw review capability');
 }
 if (!receipt.includes('executionAllowed: false')) {
   fail('receipt contract must hard-code executionAllowed false');
@@ -111,6 +132,9 @@ if (receipt.includes('senderVerified')) {
 if (!receipt.includes('unknown_or_private_field')) {
   fail('receipt contract must reject unknown/private fields');
 }
+if (!emailRoute.includes('review_token_hash: receipt.reviewTokenHash')) {
+  fail('backend must persist only the hashed private review capability');
+}
 if (!emailRoute.includes('authorization_state: receipt.authorizationState')) {
   fail('backend must persist the unresolved intake authorization state');
 }
@@ -123,8 +147,20 @@ if (!emailRoute.includes('provider_actions_requested: receipt.providerActionsReq
 if (!emailRoute.includes("error?.code === '23505'")) {
   fail('duplicate intake persistence must be classified from the unique-violation code');
 }
-if (!emailRoute.includes('processFounderSignalReviewCommand')) {
-  fail('signed intake must hand off to the separately bounded review command processor');
+if (!emailRoute.includes('processFounderSignalReviewCommandWithCapability')) {
+  fail('signed intake must hand off through the separate capability authorization gate');
+}
+if (!authorization.includes('receipt.reviewTokenHash')) {
+  fail('capability gate must read the receipt review-token hash');
+}
+if (!authorization.includes('context.reviewTokenHash')) {
+  fail('capability gate must bind the receipt to the server-side review-token hash');
+}
+if (!authorization.includes('timingSafeEqual')) {
+  fail('capability gate must compare token hashes in constant time');
+}
+if (!authorization.includes("authorizationState: 'blocked_context_mismatch'")) {
+  fail('capability mismatch must fail closed before provider dispatch');
 }
 if (!server.includes("express.raw({ type: 'application/json', limit: '16kb' })")) {
   fail('signed email ingest must use the exact raw JSON body');
@@ -166,8 +202,8 @@ for (const forbidden of [
   'OPENAI_API_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
 ]) {
-  if (execution.includes(forbidden)) {
-    fail(`execution bridge must not introduce provider credential ${forbidden}`);
+  if (execution.includes(forbidden) || authorization.includes(forbidden)) {
+    fail(`review execution boundary must not introduce provider credential ${forbidden}`);
   }
 }
 
@@ -191,6 +227,12 @@ if (!/command_semantics_check/i.test(hardeningMigration)) {
 }
 if (!/provider_actions_requested\s+INTEGER\s+NOT NULL\s+CHECK\s*\(provider_actions_requested\s*=\s*0\)/i.test(baseMigration)) {
   fail('review-email intake ledger must enforce zero provider actions');
+}
+if (!executionMigration.includes('ADD COLUMN IF NOT EXISTS review_token_hash TEXT')) {
+  fail('execution migration must add the nullable historical review-token hash column');
+}
+if (!executionMigration.includes('NULL historical rows are non-executable')) {
+  fail('execution migration must preserve historical intake rows as non-executable');
 }
 if (!executionMigration.includes('founder_signal_review_contexts')) {
   fail('execution bridge must persist exact private review contexts');
@@ -226,6 +268,13 @@ for (const forbiddenColumn of [
   }
 }
 
+if (!zapierReviewWindow.includes('gmail_subject: `[Founder Signal Review ${reviewToken}]')) {
+  fail('Gmail review digest must carry the private review capability in the Subject header');
+}
+if (!zapierReviewWindow.includes('buildReviewContextRegistration')) {
+  fail('Zapier helper must build the exact private review-context registration payload');
+}
+
 if (!manifest.includes('workers_dev = false')) {
   fail('email Worker must not expose a workers.dev route');
 }
@@ -250,6 +299,9 @@ if (!workflow.includes('20260803030000_harden_founder_signal_review_email_receip
 if (!workflow.includes('20260812004000_founder_signal_review_execution_bridge.sql')) {
   fail('focused workflow must run when the execution-bridge migration changes');
 }
+if (!packageJson.includes('reviewAuthorization.test.ts')) {
+  fail('focused founder-review verification must execute the capability authorization test');
+}
 
 if (failures.length > 0) {
   for (const failure of failures) console.error(`Review email ingress verification failed: ${failure}`);
@@ -257,5 +309,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  'Founder review-email ingress verified: isolated Email Worker, immutable intake receipt, deterministic private context registration, RLS-only correlation ledgers, idempotent post-intake Zapier dispatch, deadline and context fail-closed behavior, exact provider-acceptance semantics, and no embedded provider credentials.',
+  'Founder review-email ingress verified: isolated Email Worker, immutable intake receipt, private subject capability hashed at ingress, constant-time server-side capability binding, deterministic private context registration, RLS-only correlation ledgers, idempotent post-intake Zapier dispatch, deadline and context fail-closed behavior, exact provider-acceptance semantics, and no embedded provider credentials.',
 );
