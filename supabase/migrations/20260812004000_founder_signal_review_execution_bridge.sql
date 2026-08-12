@@ -5,6 +5,33 @@
 -- provider-dispatch evidence. It stores no raw email, credentials, quoted mail,
 -- customer/user data, attachments, or provider response bodies.
 
+-- Historical intake receipts predate executable review commands. Keep their
+-- capability hash NULL rather than inventing/backfilling authority. New runtime
+-- receipts require the hash structurally before they can reach command execution.
+ALTER TABLE public.founder_signal_review_email_receipts
+  ADD COLUMN IF NOT EXISTS review_token_hash TEXT;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'founder_signal_review_email_receipts_review_token_hash_check'
+      AND conrelid = 'public.founder_signal_review_email_receipts'::regclass
+  ) THEN
+    ALTER TABLE public.founder_signal_review_email_receipts
+      ADD CONSTRAINT founder_signal_review_email_receipts_review_token_hash_check
+      CHECK (
+        review_token_hash IS NULL
+        OR review_token_hash ~ '^[0-9a-f]{64}$'
+      );
+  END IF;
+END
+$$;
+
+COMMENT ON COLUMN public.founder_signal_review_email_receipts.review_token_hash IS
+  'SHA-256 capability proof from the private review email subject. NULL historical rows are non-executable.';
+
 CREATE TABLE IF NOT EXISTS public.founder_signal_review_contexts (
   reply_context_id UUID PRIMARY KEY,
   batch_id UUID NOT NULL UNIQUE,
