@@ -59,6 +59,7 @@ const baseReceipt: FounderSignalReviewEmailReceipt = {
   rawMessageHash: '2'.repeat(64),
   senderRefHash: createHash('sha256').update(founderSender).digest('hex'),
   recipientRefHash: createHash('sha256').update(replyToAddress).digest('hex'),
+  reviewTokenHash: createHash('sha256').update(registration.reviewToken).digest('hex'),
   commandHash: '3'.repeat(64),
   commandType: 'cancel_one',
   targetChannel: 'linkedin',
