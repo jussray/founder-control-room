@@ -6,6 +6,8 @@ const MAX_REPLY_LENGTH = 2000;
 const CHANNEL_COMMAND = /^([^:]+):\s*(.+)$/s;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const COMMIT_SHA = /^[0-9a-f]{40}$/i;
+const SOURCE_REPO = /^jussray\/[A-Za-z0-9._-]{1,100}$/;
 const QUOTE_OR_SIGNATURE_BOUNDARIES = [
   /^>/,
   /^-{2,}\s*original message\s*-{2,}$/i,
@@ -127,6 +129,56 @@ function buildReviewToken({ batchId, replyContextId, replyToAddress, scheduledPo
       .sort(),
   ].join('\n');
   return createHash('sha256').update(canonical).digest('hex');
+}
+
+function buildReviewContextRegistration(input = {}) {
+  const sourceRepo = asTrimmedString(input.source_repo);
+  if (!SOURCE_REPO.test(sourceRepo)) {
+    throw new Error('FOUNDER_REVIEW_REJECTED: source_repo must be an owned jussray repository');
+  }
+  const sourceCommitSha = asTrimmedString(input.source_commit_sha).toLowerCase();
+  if (!COMMIT_SHA.test(sourceCommitSha)) {
+    throw new Error('FOUNDER_REVIEW_REJECTED: source_commit_sha must be a 40-character commit SHA');
+  }
+  const founderSender = normalizeEmail(input.founder_sender);
+  if (!founderSender) {
+    throw new Error('FOUNDER_REVIEW_REJECTED: founder_sender must be a valid email address');
+  }
+  const batchId = asTrimmedString(input.batch_id).toLowerCase();
+  if (!UUID.test(batchId)) {
+    throw new Error('FOUNDER_REVIEW_REJECTED: batch_id must be a UUID');
+  }
+  const { replyContextId, replyToAddress } = requireReplyContext(input);
+  const posts = requireScheduledPosts(input.scheduled_posts);
+  const uniqueDeadlines = new Set(posts.map((post) => post.scheduled_at));
+  if (uniqueDeadlines.size !== 1) {
+    throw new Error('FOUNDER_REVIEW_REJECTED: campaign posts must share one review deadline');
+  }
+  const reviewDeadline = posts[0].scheduled_at;
+  const reviewToken = buildReviewToken({
+    batchId,
+    replyContextId,
+    replyToAddress,
+    scheduledPosts: posts,
+  });
+
+  return {
+    version: 1,
+    sourceRepo,
+    sourceCommitSha,
+    batchId,
+    replyContextId,
+    founderSender,
+    replyToAddress,
+    reviewDeadline,
+    reviewToken,
+    scheduledPosts: posts.map((post) => ({
+      channel: post.channel,
+      bufferPostId: post.buffer_post_id,
+      validatedPostText: post.validated_post_text,
+      scheduledAt: post.scheduled_at,
+    })),
+  };
 }
 
 function buildGmailReviewDigest(input = {}) {
@@ -354,6 +406,7 @@ function resolveNoReplyDeadline(input = {}, options = {}) {
 
 module.exports = {
   buildGmailReviewDigest,
+  buildReviewContextRegistration,
   processFounderReviewReply,
   buildNotificationFailureCompensation,
   resolveNoReplyDeadline,
