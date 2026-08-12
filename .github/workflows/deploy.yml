@@ -465,7 +465,7 @@ jobs:
       ZAPIER_CATCH_HOOK_URL: ${{ secrets.ZAPIER_CATCH_HOOK_URL }}
       PROOF_OF_SHIP_STEERING_GRANT_ID: ${{ secrets.PROOF_OF_SHIP_STEERING_GRANT_ID }}
       GITHUB_TOKEN: ${{ github.token }}
-      PUBLISH_ALLOWED: 'false'
+      PUBLISH_ALLOWED: 'true'
       LINKEDIN_BASELINE_PATH: config/linkedin-rising-floor-baseline.json
       REPOSITORY_PUBLICATION_POLICY_PATH: config/proof-of-ship-repository-policy.json
     steps:
