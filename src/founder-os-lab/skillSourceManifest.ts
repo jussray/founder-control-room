@@ -31,7 +31,7 @@ export interface FcrSkillSourceManifestV1 {
   manifestHash: string;
 }
 
-const REQUIRED_FRONTMATTER = ['name', 'description', 'version', 'status', 'scope', 'owner'] as const;
+const REQUIRED_FOUNDER_FRONTMATTER = ['name', 'description', 'version', 'status', 'scope', 'owner'] as const;
 
 function sha256(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
@@ -49,7 +49,7 @@ function stripScalarQuotes(value: string): string {
   return trimmed;
 }
 
-export function parseSkillFrontmatter(source: string): Record<string, string> {
+function parseFrontmatterScalars(source: string): Record<string, string> {
   const normalized = source.replace(/\r\n/g, '\n');
   if (!normalized.startsWith('---\n')) throw new Error('SKILL.md must start with YAML frontmatter');
   const closing = normalized.indexOf('\n---\n', 4);
@@ -65,11 +65,19 @@ export function parseSkillFrontmatter(source: string): Record<string, string> {
     const value = stripScalarQuotes(trimmed.slice(separator + 1));
     if (key && value) result[key] = value;
   }
+  return result;
+}
 
-  for (const key of REQUIRED_FRONTMATTER) {
+export function parseSkillFrontmatter(source: string): Record<string, string> {
+  const result = parseFrontmatterScalars(source);
+  for (const key of REQUIRED_FOUNDER_FRONTMATTER) {
     if (!result[key]?.trim()) throw new Error(`SKILL.md missing required frontmatter: ${key}`);
   }
   return result;
+}
+
+function isFounderOwnedSkill(metadata: Readonly<Record<string, string>>): boolean {
+  return metadata.owner?.trim().toLowerCase() === 'juss';
 }
 
 function manifestSeed(entries: readonly FcrSkillSourceEntryV1[]): string {
@@ -127,7 +135,18 @@ export async function discoverFcrSkillSources(skillsRoot: string): Promise<FcrSk
     if (!canonicalFile.startsWith(rootPrefix)) throw new Error(`skill source escaped configured root: ${file}`);
 
     const source = await readFile(canonicalFile, 'utf8');
-    const metadata = parseSkillFrontmatter(source);
+    const candidateMetadata = parseFrontmatterScalars(source);
+    if (!isFounderOwnedSkill(candidateMetadata)) continue;
+
+    let metadata: Record<string, string>;
+    try {
+      metadata = parseSkillFrontmatter(source);
+    } catch (error) {
+      const relativePath = path.relative(canonicalRoot, canonicalFile).split(path.sep).join('/');
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`${relativePath}: ${message}`);
+    }
+
     const name = metadata.name.trim();
     if (names.has(name)) throw new Error(`duplicate skill name: ${name}`);
     names.add(name);
@@ -146,6 +165,8 @@ export async function discoverFcrSkillSources(skillsRoot: string): Promise<FcrSk
       mcp: { prompt: true, resource: true, tool: false },
     });
   }
+
+  if (entries.length === 0) throw new Error('no founder-owned SKILL.md sources discovered');
 
   entries.sort((left, right) => left.id.localeCompare(right.id));
   return {
