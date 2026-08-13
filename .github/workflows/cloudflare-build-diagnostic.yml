@@ -7,12 +7,6 @@ on:
         description: Exact 40-character commit SHA to inspect
         required: true
         type: string
-  push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/cloudflare-build-diagnostic.yml
-      - scripts/inspect-cloudflare-build.mjs
 
 permissions:
   contents: read
@@ -24,24 +18,27 @@ jobs:
     timeout-minutes: 10
     environment: production
     env:
-      EXPECTED_HEAD_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_head_sha || github.sha }}
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
       CF_WORKER_NAME: founder-control-room
       CF_API_HOSTNAME: api.foundercontrolroom.org
-      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CF_API_TOKEN: ${{ github.event_name == 'push' && secrets.CLOUDFLARE_API_TOKEN || secrets.CLOUDFLARE_BUILDS_API_TOKEN }}
 
     steps:
-      - name: Checkout exact head
+      - name: Checkout trusted main diagnostic code
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          ref: refs/heads/main
           persist-credentials: false
 
-      - name: Verify exact head
+      - name: Validate inspection target and trusted code
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          if [[ ! "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=Invalid inspection target::expected_head_sha must be a lowercase 40-character commit SHA."
+            exit 1
+          fi
+          echo "Inspection target:       $EXPECTED_HEAD_SHA"
+          echo "Trusted diagnostic code: $(git rev-parse HEAD)"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -49,6 +46,9 @@ jobs:
           node-version-file: .node-version
 
       - name: Inspect exact Cloudflare build and custom-domain ownership
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_BUILDS_API_TOKEN }}
         run: node scripts/inspect-cloudflare-build.mjs
 
       - name: Publish diagnostic summary
