@@ -4,8 +4,11 @@ import { mkdir, writeFile } from "node:fs/promises";
 
 const accountId = process.env.CF_ACCOUNT_ID?.trim();
 const apiToken = process.env.CF_API_TOKEN?.trim();
-const expectedHeadSha = process.env.EXPECTED_HEAD_SHA?.trim();
+const expectedHeadSha =
+  process.env.EXPECTED_HEAD_SHA?.trim() || process.env.GITHUB_SHA?.trim();
 const workerName = process.env.CF_WORKER_NAME?.trim() || "founder-control-room";
+const apiHostname =
+  process.env.CF_API_HOSTNAME?.trim() || "api.foundercontrolroom.org";
 const receiptPath = "test-results/cloudflare-build-diagnostic.json";
 const apiBase = "https://api.cloudflare.com/client/v4";
 
@@ -33,7 +36,9 @@ async function cloudflare(path) {
       ...(body?.errors ?? []).map((entry) => entry?.message),
       ...(body?.messages ?? []),
     ].filter(Boolean);
-    throw new Error(`Cloudflare API ${response.status}: ${redact(messages.join("; ") || "request failed")}`);
+    throw new Error(
+      `Cloudflare API ${response.status}: ${redact(messages.join("; ") || "request failed")}`,
+    );
   }
   return body?.result;
 }
@@ -41,8 +46,18 @@ async function cloudflare(path) {
 function normalizeBuilds(result) {
   if (Array.isArray(result)) return result;
   if (Array.isArray(result?.builds)) return result.builds;
-  if (result?.builds && typeof result.builds === "object") return Object.values(result.builds);
-  if (result && typeof result === "object") return Object.values(result).filter((value) => value?.build_uuid);
+  if (result?.builds && typeof result.builds === "object") {
+    return Object.values(result.builds);
+  }
+  if (result && typeof result === "object") {
+    return Object.values(result).filter((value) => value?.build_uuid);
+  }
+  return [];
+}
+
+function normalizeDomains(result) {
+  if (Array.isArray(result)) return result;
+  if (Array.isArray(result?.domains)) return result.domains;
   return [];
 }
 
@@ -54,8 +69,10 @@ function normalizeLogLine(line) {
 const receipt = {
   ok: false,
   workerName,
+  apiHostname,
   expectedHeadSha: expectedHeadSha || null,
   inspectedAt: new Date().toISOString(),
+  domain: null,
   build: null,
   relevantLogLines: [],
   error: null,
@@ -63,14 +80,51 @@ const receipt = {
 
 try {
   if (!accountId || !apiToken || !expectedHeadSha) {
-    throw new Error("CF_ACCOUNT_ID, CF_API_TOKEN, and EXPECTED_HEAD_SHA are required.");
+    throw new Error(
+      "CF_ACCOUNT_ID, CF_API_TOKEN, and EXPECTED_HEAD_SHA or GITHUB_SHA are required.",
+    );
+  }
+
+  const domains = normalizeDomains(
+    await cloudflare(
+      `/accounts/${accountId}/workers/domains?hostname=${encodeURIComponent(apiHostname)}`,
+    ),
+  );
+  const matchingDomains = domains.filter(
+    (entry) => String(entry?.hostname ?? "").toLowerCase() === apiHostname.toLowerCase(),
+  );
+
+  if (matchingDomains.length !== 1) {
+    throw new Error(
+      `Expected exactly one Cloudflare Worker domain for ${apiHostname}; found ${matchingDomains.length}.`,
+    );
+  }
+
+  const domain = matchingDomains[0];
+  receipt.domain = {
+    hostname: domain?.hostname ?? null,
+    service: domain?.service ?? null,
+    environment: domain?.environment ?? null,
+    zoneName: domain?.zone_name ?? null,
+  };
+
+  if (domain?.service !== workerName) {
+    throw new Error(
+      `Custom domain ${apiHostname} is attached to Worker ${domain?.service || "unknown"}; expected ${workerName}.`,
+    );
   }
 
   const scripts = await cloudflare(`/accounts/${accountId}/workers/scripts`);
-  const worker = (Array.isArray(scripts) ? scripts : []).find((entry) => entry?.id === workerName);
-  if (!worker?.tag) throw new Error(`Worker ${workerName} was not found or has no immutable tag.`);
+  const worker = (Array.isArray(scripts) ? scripts : []).find(
+    (entry) => entry?.id === workerName,
+  );
+  if (!worker?.tag) {
+    throw new Error(`Worker ${workerName} was not found or has no immutable tag.`);
+  }
 
-  const buildResult = await cloudflare(`/accounts/${accountId}/builds/workers/${worker.tag}/builds`);
+  const buildResult = await cloudflare(
+    `/accounts/${accountId}/builds/workers/${worker.tag}/builds`,
+  );
   const builds = normalizeBuilds(buildResult);
   const build = builds.find(
     (entry) => entry?.build_trigger_metadata?.commit_hash === expectedHeadSha,
@@ -79,10 +133,14 @@ try {
     throw new Error(`No Cloudflare build matched exact head ${expectedHeadSha}.`);
   }
 
-  const logs = await cloudflare(`/accounts/${accountId}/builds/builds/${build.build_uuid}/logs`);
+  const logs = await cloudflare(
+    `/accounts/${accountId}/builds/builds/${build.build_uuid}/logs`,
+  );
   const lines = (logs?.lines ?? []).map(normalizeLogLine).map(redact);
   const relevant = lines.filter((line) =>
-    /error|fail|fatal|exception|permission|unauthor|route|domain|zone|wrangler|deploy|node|limit|quota/i.test(line),
+    /error|fail|fatal|exception|permission|unauthor|route|domain|zone|wrangler|deploy|node|limit|quota/i.test(
+      line,
+    ),
   );
 
   receipt.ok = true;
@@ -98,7 +156,9 @@ try {
     rootDirectory: build.build_trigger_metadata?.root_directory ?? null,
     triggerSource: build.build_trigger_metadata?.build_trigger_source ?? null,
   };
-  receipt.relevantLogLines = (relevant.length > 0 ? relevant : lines.slice(-40)).slice(-120);
+  receipt.relevantLogLines = (relevant.length > 0 ? relevant : lines.slice(-40)).slice(
+    -120,
+  );
 } catch (error) {
   receipt.error = redact(error instanceof Error ? error.message : error);
   console.error(receipt.error);
