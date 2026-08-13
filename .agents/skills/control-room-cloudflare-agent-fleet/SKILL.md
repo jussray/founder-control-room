@@ -6,6 +6,8 @@ description: >
   Use for Cloudflare documentation, API Code Mode, Workers bindings, builds,
   observability, Wrangler, preview verification, deployment review, and rollback.
 version: 1.0
+status: active
+scope: founder-control-room
 owner: Juss
 ---
 
