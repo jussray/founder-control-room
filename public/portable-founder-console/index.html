@@ -27,18 +27,24 @@
   section:first-of-type{border-top:none}
   .hero{padding-top:72px}
   .hero p.sub{font-size:18px;color:var(--text-dim);max-width:46ch;margin-top:16px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:22px;margin-top:40px;max-width:420px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:22px;margin-top:40px;max-width:520px}
   .tabs{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
   .tab{font-family:var(--mono);font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);color:var(--text-dim);cursor:pointer;background:transparent}
   .tab[aria-selected="true"]{color:var(--ink);background:var(--amber);border-color:var(--amber)}
   .carried-by{font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:14px}
   .carried-by b{color:var(--text)}
-  .brief-row{display:flex;justify-content:space-between;font-size:14px;padding:7px 0;border-bottom:1px dashed var(--line)}
+  .brief-row{display:flex;justify-content:space-between;gap:16px;font-size:14px;padding:7px 0;border-bottom:1px dashed var(--line)}
   .brief-row:last-of-type{border-bottom:none}
   .brief-row .k{color:var(--text-dim)}
-  .brief-row .v{font-family:var(--mono);font-size:13px}
+  .brief-row .v{font-family:var(--mono);font-size:13px;text-align:right}
   .v.ok{color:var(--green)}
   .v.warn{color:var(--amber)}
+  .evidence-box{margin-top:16px;padding:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2)}
+  .evidence-title{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);margin-bottom:8px}
+  .evidence-row{display:flex;justify-content:space-between;gap:16px;padding:5px 0;font-size:12px}
+  .evidence-row .k{color:var(--text-dim)}
+  .evidence-row code{font-family:var(--mono);font-size:11px;color:var(--text);text-align:right;overflow-wrap:anywhere}
+  .evidence-note{font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-top:9px;line-height:1.5}
   .actions{display:flex;gap:8px;margin-top:18px}
   .btn{font-family:var(--sans);font-size:14px;font-weight:600;padding:10px 14px;border-radius:7px;border:1px solid var(--line);cursor:pointer;flex:1}
   .btn.approve{background:var(--green);color:#06231A;border-color:var(--green)}
@@ -62,6 +68,10 @@
   button[type=submit]{background:var(--amber);color:var(--ink);border:none;border-radius:7px;padding:11px 18px;font-weight:700;font-size:14px;cursor:pointer}
   .form-note{font-size:12px;margin-top:10px}
   footer{padding:32px 0;color:var(--text-dim);font-size:12px;font-family:var(--mono)}
+  @media (max-width:560px){
+    .brief-row,.evidence-row{align-items:flex-start}
+    .actions{flex-direction:column}
+  }
   @media (prefers-reduced-motion: no-preference){
     .card{animation:rise .5s ease both}
     @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
@@ -86,11 +96,23 @@
       </div>
       <div class="carried-by">Carried by <b id="carried-by">ChatGPT</b> · decided by Founder Control Room</div>
       <div class="brief-row"><span class="k">Action</span><span class="v">Publish LinkedIn post</span></div>
-      <div class="brief-row"><span class="k">Evidence</span><span class="v ok">Verified</span></div>
-      <div class="brief-row"><span class="k">Content hash</span><span class="v ok">Matched</span></div>
+      <div class="brief-row"><span class="k">State</span><span class="v ok">VALIDATED</span></div>
+      <div class="brief-row"><span class="k">Evidence witness</span><span class="v ok">GitHub exact-head proof</span></div>
+      <div class="brief-row"><span class="k">Content hash</span><span class="v ok">SHA-256 matched</span></div>
+      <div class="brief-row"><span class="k">Execution receipt</span><span class="v warn">Not issued yet</span></div>
       <div class="brief-row"><span class="k">Risk</span><span class="v warn">Medium</span></div>
       <div class="brief-row"><span class="k">Dissent</span><span class="v warn">1 unresolved note</span></div>
       <div class="brief-row"><span class="k">Expires</span><span class="v">22 min</span></div>
+
+      <div class="evidence-box" data-evidence-contract="state-evidence-claim" aria-label="Evidence behind the current claim">
+        <div class="evidence-title">Evidence behind this state</div>
+        <div class="evidence-row"><span class="k">Claim allowed</span><code>ready_for_founder_decision</code></div>
+        <div class="evidence-row"><span class="k">Exact head</span><code>40-char Git SHA matched</code></div>
+        <div class="evidence-row"><span class="k">Payload</span><code>sha256 matched</code></div>
+        <div class="evidence-row"><span class="k">Execution receipt</span><code>pending until EXECUTED</code></div>
+        <p class="evidence-note">The console names the witness behind every claim. EXECUTED is unavailable until the execution receipt and downstream evidence exist.</p>
+      </div>
+
       <div class="actions">
         <button class="btn approve">Approve</button>
         <button class="btn reject">Reject</button>
@@ -108,10 +130,10 @@
     <p>A queued request is not an approved one. A received request is not an executed one. The console keeps those apart on purpose.</p>
     <div class="strip">
       <div class="state"><span class="n">1</span><span class="label">SUBMITTED</span><span class="rule">Decision package received. Nothing has run.</span></div>
-      <div class="state"><span class="n">2</span><span class="label">VALIDATED</span><span class="rule">Identity, expiry, and content hash checked.</span></div>
+      <div class="state"><span class="n">2</span><span class="label">VALIDATED</span><span class="rule">Identity, expiry, exact head, and content hash checked.</span></div>
       <div class="state"><span class="n">3</span><span class="label">APPROVED</span><span class="rule">You approved this exact commit and payload.</span></div>
       <div class="state"><span class="n">4</span><span class="label">EXECUTION_STARTED</span><span class="rule">SHA and checks revalidated. Any new commit voids it.</span></div>
-      <div class="state"><span class="n">5</span><span class="label">EXECUTED</span><span class="rule">Done. A receipt exists. Nothing before this said "approved."</span></div>
+      <div class="state"><span class="n">5</span><span class="label">EXECUTED</span><span class="rule">Done only when a receipt ID, exact SHA, and downstream witness are attached.</span></div>
     </div>
   </div>
 </section>
@@ -133,12 +155,15 @@
   <div class="wrap">
     <div class="eyebrow">Proof, not promises</div>
     <h2>Every execution returns an immutable receipt.</h2>
-    <p>Not a screenshot. Not a claim. A record, tied to the commit and the person who approved it.</p>
+    <p>Not a screenshot. Not a claim. A record tied to the exact commit, founder decision, and downstream outcome.</p>
     <pre>{
   "receiptId": "rcpt_01K...",
   "decisionId": "dec_01K...",
   "status": <b>"executed"</b>,
+  "exactCommitSha": "40-character-git-sha",
+  "githubProofUrl": "https://github.com/.../checks/...",
   "executor": "zapier-linkedin",
+  "downstreamReceipt": "buffer:post:...",
   "payloadHash": "sha256:...",
   "approvedBy": "founder:juss",
   "approvedThrough": "chatgpt-mobile",
