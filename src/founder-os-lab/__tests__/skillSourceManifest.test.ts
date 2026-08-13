@@ -1,6 +1,7 @@
 import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
@@ -9,6 +10,7 @@ import {
   parseSkillFrontmatter,
 } from '../skillSourceManifest.js';
 
+const REPOSITORY_SKILLS_ROOT = fileURLToPath(new URL('../../../.agents/skills/', import.meta.url));
 const temporaryRoots: string[] = [];
 
 async function tempRoot(): Promise<string> {
@@ -31,7 +33,7 @@ afterEach(async () => {
 
 describe('FCR skill source manifest', () => {
   it('discovers real founder-owned SKILL.md sources with deterministic hashes', async () => {
-    const manifest = await discoverFcrSkillSources(path.join(process.cwd(), '.agents', 'skills'));
+    const manifest = await discoverFcrSkillSources(REPOSITORY_SKILLS_ROOT);
 
     expect(manifest.contract).toBe(FCR_SKILL_SOURCE_MANIFEST_CONTRACT);
     expect(manifest.entries.length).toBeGreaterThan(0);
