@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 export const CAPABILITY_REQUEST_CONTRACT = 'fcr/capability-request@v1' as const;
 export const CAPABILITY_RECEIPT_CONTRACT = 'fcr/capability-receipt@v1' as const;
 
@@ -65,6 +67,21 @@ export interface CapabilityReceiptV1 {
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
+const EVIDENCE_KINDS = new Set(['test', 'log', 'artifact', 'playwright', 'review']);
+const EVIDENCE_VERDICTS = new Set(['PASS', 'FAIL', 'INCONCLUSIVE']);
+
+function isIsoDate(value: string): boolean {
+  return Boolean(value) && !Number.isNaN(Date.parse(value));
+}
+
+function canonicalReceiptWithoutDigest(receipt: CapabilityReceiptV1): string {
+  const { receiptDigest: _receiptDigest, ...payload } = receipt;
+  return JSON.stringify(payload, Object.keys(payload).sort(), 0);
+}
+
+export function computeCapabilityReceiptDigest(receipt: CapabilityReceiptV1): string {
+  return createHash('sha256').update(canonicalReceiptWithoutDigest(receipt), 'utf8').digest('hex');
+}
 
 export function validateCapabilityRequest(request: CapabilityRequestV1): string[] {
   const reasons: string[] = [];
@@ -102,14 +119,27 @@ export function validateCapabilityReceipt(
   if (receipt.execution === 'COMPLETED' && receipt.observedHeadSha !== request.expectedHeadSha) {
     reasons.push('completed receipt must bind to the exact requested head SHA');
   }
-  if (!SHA256.test(receipt.receiptDigest)) reasons.push('receiptDigest must be a sha256 hex digest');
+  if (!isIsoDate(receipt.startedAt) || !isIsoDate(receipt.completedAt)) reasons.push('receipt timestamps must be valid ISO dates');
+  if (isIsoDate(receipt.startedAt) && isIsoDate(receipt.completedAt) && Date.parse(receipt.completedAt) < Date.parse(receipt.startedAt)) {
+    reasons.push('receipt completedAt must not precede startedAt');
+  }
+  if (!SHA256.test(receipt.receiptDigest)) {
+    reasons.push('receiptDigest must be a sha256 hex digest');
+  } else if (receipt.receiptDigest !== computeCapabilityReceiptDigest(receipt)) {
+    reasons.push('receiptDigest does not match canonical receipt content');
+  }
   for (const item of receipt.evidence) {
     if (!item.evidenceId.trim()) reasons.push('evidenceId is required');
+    if (!EVIDENCE_KINDS.has(item.kind)) reasons.push('unsupported evidence kind');
+    if (!EVIDENCE_VERDICTS.has(item.verdict)) reasons.push('unsupported evidence verdict');
     if (!SHA256.test(item.digest)) reasons.push('evidence digest must be a sha256 hex digest');
     if (!FULL_SHA.test(item.requestedHeadSha)) reasons.push('evidence requestedHeadSha must be a full Git SHA');
     if (item.requestedHeadSha !== request.expectedHeadSha) reasons.push('evidence requestedHeadSha does not match request');
     if (item.observedHeadSha !== null && !FULL_SHA.test(item.observedHeadSha)) reasons.push('evidence observedHeadSha must be a full Git SHA or null');
+    if (item.verdict === 'PASS' && item.observedHeadSha !== request.expectedHeadSha) reasons.push('PASS evidence must bind to the exact requested head SHA');
     if (!Number.isInteger(item.size) || item.size < 0) reasons.push('evidence size must be a non-negative integer');
+    if (!item.mediaType.trim()) reasons.push('evidence mediaType is required');
+    if (!isIsoDate(item.observedAt)) reasons.push('evidence observedAt must be a valid ISO date');
   }
   return reasons;
 }
