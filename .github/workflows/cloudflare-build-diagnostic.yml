@@ -16,6 +16,7 @@ jobs:
     name: Redacted provider receipt
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment: production
     env:
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
       CF_WORKER_NAME: founder-control-room
