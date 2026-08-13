@@ -1,0 +1,65 @@
+name: Portable Founder Console Evidence Proof
+
+on:
+  pull_request:
+    paths:
+      - 'public/portable-founder-console/index.html'
+      - 'e2e/portable-founder-console-proof.mjs'
+      - '.github/workflows/portable-founder-console-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portable-founder-console-proof-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          printf 'Verified exact head: %s\n' "$actual"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify evidence-named UI with Playwright
+        run: node e2e/portable-founder-console-proof.mjs
+
+      - name: Upload Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portable-founder-console-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/portable-founder-console
+          if-no-files-found: error
+          retention-days: 30
