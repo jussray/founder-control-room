@@ -36,13 +36,154 @@ jobs:
             echo "REQUESTED_ACTION=run_openai_step"
             echo "WORKFLOW_HEAD_SHA=$GITHUB_SHA"
             echo "WORKFLOW_RUN_ID=$GITHUB_RUN_ID"
+            echo "APPROVED_API_ORIGIN=https://api.foundercontrolroom.org"
           } >> "$GITHUB_ENV"
+
+      - name: Verify live API service identity
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          write_routing_failure() {
+            local code="$1"
+            local message="$2"
+            local http_status="${3:-null}"
+            local content_type="${4:-}"
+            local service_identity="${5:-}"
+            local response_bytes="${6:-0}"
+            local response_sha256="${7:-}"
+            local live_sha="${8:-}"
+            local main_sha="${9:-}"
+
+            jq -n \
+              --arg code "$code" \
+              --arg message "$message" \
+              --arg invocation_id "$INVOCATION_ID" \
+              --arg workflow_head_sha "$WORKFLOW_HEAD_SHA" \
+              --arg workflow_run_id "$WORKFLOW_RUN_ID" \
+              --arg content_type "$content_type" \
+              --arg service_identity "$service_identity" \
+              --arg response_sha256 "$response_sha256" \
+              --arg live_sha "$live_sha" \
+              --arg main_sha "$main_sha" \
+              --argjson response_bytes "${response_bytes:-0}" \
+              --argjson http_status "$http_status" \
+              '{
+                receiptVersion: 2,
+                state: "routing_failure",
+                workflowHeadSha: $workflow_head_sha,
+                workflowRunId: $workflow_run_id,
+                invocationId: $invocation_id,
+                httpStatus: $http_status,
+                routing: {
+                  contentType: (if $content_type == "" then null else $content_type end),
+                  serviceIdentity: (if $service_identity == "" then null else $service_identity end),
+                  responseBytes: $response_bytes,
+                  responseSha256: (if $response_sha256 == "" then null else $response_sha256 end),
+                  liveSha: (if $live_sha == "" then null else $live_sha end),
+                  mainSha: (if $main_sha == "" then null else $main_sha end)
+                },
+                error: {code: $code, message: $message},
+                result: null
+              }' > founder-signal-engine-receipt.json
+          }
+
+          main_sha="$(curl --silent --show-error --fail \
+            --proto '=https' --proto-redir '=https' --max-redirs 0 \
+            --connect-timeout 10 --max-time 20 \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/branches/main" \
+            | jq -r '.commit.sha')"
+
+          version_curl_exit=0
+          version_status="$(curl --silent --show-error \
+            --proto '=https' --proto-redir '=https' --max-redirs 0 \
+            --connect-timeout 10 --max-time 30 \
+            --dump-header version.headers \
+            --output version.body \
+            --write-out '%{http_code}' \
+            "$APPROVED_API_ORIGIN/version" \
+            2>version-curl-error.txt)" || version_curl_exit=$?
+          version_status="${version_status:-000}"
+
+          version_content_type="$(awk 'BEGIN{IGNORECASE=1} /^content-type:/ {sub(/^[^:]+:[[:space:]]*/, ""); sub(/\r$/, ""); value=$0} END{print value}' version.headers 2>/dev/null || true)"
+          version_service_identity="$(awk 'BEGIN{IGNORECASE=1} /^x-founder-control-room-service:/ {sub(/^[^:]+:[[:space:]]*/, ""); sub(/\r$/, ""); value=$0} END{print value}' version.headers 2>/dev/null || true)"
+          version_bytes="$(wc -c < version.body 2>/dev/null || echo 0)"
+          version_sha256="$(sha256sum version.body 2>/dev/null | awk '{print $1}' || true)"
+          live_sha=''
+          if jq -e . version.body >/dev/null 2>&1; then
+            live_sha="$(jq -r '.gitSha // empty' version.body)"
+          fi
+
+          if [[ "$version_curl_exit" -ne 0 ]]; then
+            write_routing_failure \
+              "VERSION_TRANSPORT_FAILURE" \
+              "The approved API origin could not return a usable /version response." \
+              null "$version_content_type" "$version_service_identity" "$version_bytes" "$version_sha256" "$live_sha" "$main_sha"
+            echo '::error title=API routing probe failed::The approved API origin failed before an HTTP response.'
+            exit 1
+          fi
+
+          if [[ "$version_status" -lt 200 || "$version_status" -ge 300 ]]; then
+            write_routing_failure \
+              "VERSION_HTTP_FAILURE" \
+              "The approved API origin returned a non-success status for /version." \
+              "$version_status" "$version_content_type" "$version_service_identity" "$version_bytes" "$version_sha256" "$live_sha" "$main_sha"
+            echo "::error title=API routing probe failed::/version returned HTTP $version_status."
+            exit 1
+          fi
+
+          if [[ "$version_service_identity" != 'founder-control-room' ]]; then
+            write_routing_failure \
+              "WRONG_SERVICE_ORIGIN" \
+              "The approved API hostname did not return the Founder Control Room service identity header." \
+              "$version_status" "$version_content_type" "$version_service_identity" "$version_bytes" "$version_sha256" "$live_sha" "$main_sha"
+            echo '::error title=Wrong API origin::api.foundercontrolroom.org is not reaching the canonical Founder Control Room Worker.'
+            exit 1
+          fi
+
+          if ! jq -e '.service == "founder-control-room" and (.gitSha | type == "string" and test("^[0-9a-f]{40}$"))' version.body >/dev/null 2>&1; then
+            write_routing_failure \
+              "INVALID_VERSION_DOCUMENT" \
+              "The canonical Worker identity header was present, but /version was not the expected JSON document." \
+              "$version_status" "$version_content_type" "$version_service_identity" "$version_bytes" "$version_sha256" "$live_sha" "$main_sha"
+            echo '::error title=Invalid Worker version document::The canonical Worker returned an unexpected /version representation.'
+            exit 1
+          fi
+
+          if [[ "$live_sha" != "$main_sha" ]]; then
+            write_routing_failure \
+              "STALE_LIVE_DEPLOYMENT" \
+              "The API Worker is not serving the current main commit." \
+              "$version_status" "$version_content_type" "$version_service_identity" "$version_bytes" "$version_sha256" "$live_sha" "$main_sha"
+            echo "::error title=Stale live Worker::Live SHA $live_sha does not match main $main_sha."
+            exit 1
+          fi
+
+          {
+            echo "MAIN_HEAD_SHA=$main_sha"
+            echo "LIVE_WORKER_SHA=$live_sha"
+          } >> "$GITHUB_ENV"
+
+          {
+            echo '### Live API routing preflight'
+            echo
+            echo "- Service identity: \`$version_service_identity\`"
+            echo "- Content-Type: \`${version_content_type:-unknown}\`"
+            echo "- Main SHA: \`$main_sha\`"
+            echo "- Live Worker SHA: \`$live_sha\`"
+            echo "- Version response bytes: \`$version_bytes\`"
+            echo "- Version response SHA-256: \`$version_sha256\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Call review-only Founder Signal Engine bridge
         id: invoke
         shell: bash
         env:
-          FOUNDER_API_URL: ${{ secrets.FOUNDER_API_URL }}
           MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
         run: |
           set -euo pipefail
@@ -57,12 +198,13 @@ jobs:
               --arg workflow_head_sha "$WORKFLOW_HEAD_SHA" \
               --arg workflow_run_id "$WORKFLOW_RUN_ID" \
               '{
-                receiptVersion: 1,
+                receiptVersion: 2,
                 state: "configuration_failure",
                 workflowHeadSha: $workflow_head_sha,
                 workflowRunId: $workflow_run_id,
                 invocationId: $invocation_id,
                 httpStatus: null,
+                routing: null,
                 error: {code: $code, message: $message},
                 result: null
               }' > founder-signal-engine-receipt.json
@@ -70,17 +212,10 @@ jobs:
 
           if [[ -z "${MCP_TOKEN:-}" ]]; then
             write_local_failure "MISSING_MCP_TOKEN" "The sealed Founder Signal Engine MCP token is not configured."
-            echo "::error title=Missing sealed MCP token::FOUNDER_SIGNAL_ENGINE_MCP_TOKEN is not configured."
+            echo '::error title=Missing sealed MCP token::FOUNDER_SIGNAL_ENGINE_MCP_TOKEN is not configured.'
             exit 2
           fi
           echo "::add-mask::$MCP_TOKEN"
-
-          resolved_api_url="${FOUNDER_API_URL:-https://api.foundercontrolroom.org}"
-          if [[ "$resolved_api_url" != "https://api.foundercontrolroom.org" ]]; then
-            write_local_failure "UNAPPROVED_API_URL" "The configured Founder API URL is not the approved HTTPS origin."
-            echo "::error title=Unapproved API endpoint::Only https://api.foundercontrolroom.org is permitted for this probe."
-            exit 2
-          fi
 
           request_body="$(jq -n \
             --arg invocation_id "$INVOCATION_ID" \
@@ -116,72 +251,72 @@ jobs:
 
           curl_exit=0
           http_status="$(curl --silent --show-error \
-            --proto '=https' \
-            --proto-redir '=https' \
-            --max-redirs 0 \
-            --connect-timeout 10 \
-            --max-time 45 \
-            --output response.json \
+            --proto '=https' --proto-redir '=https' --max-redirs 0 \
+            --connect-timeout 10 --max-time 45 \
+            --dump-header response.headers \
+            --output response.body \
             --write-out '%{http_code}' \
             --request POST \
-            --url "https://api.foundercontrolroom.org/mcp/founder-signal-engine" \
+            --url "$APPROVED_API_ORIGIN/mcp/founder-signal-engine" \
             --header 'content-type: application/json' \
             --header "authorization: Bearer $MCP_TOKEN" \
             --data "$request_body" \
             2>curl-error.txt)" || curl_exit=$?
           http_status="${http_status:-000}"
 
-          if [[ "$curl_exit" -ne 0 ]]; then
-            transport_code="TRANSPORT_FAILURE"
-            transport_message="Founder API request failed before a usable HTTP response."
-            case "$curl_exit" in
-              6)
-                transport_code="DNS_RESOLUTION_FAILED"
-                transport_message="The Founder API hostname could not be resolved."
-                ;;
-              7)
-                transport_code="CONNECTION_FAILED"
-                transport_message="The Founder API connection could not be established."
-                ;;
-              28)
-                transport_code="REQUEST_TIMEOUT"
-                transport_message="The Founder API request timed out."
-                ;;
-              35|60)
-                transport_code="TLS_FAILURE"
-                transport_message="The Founder API TLS connection could not be verified."
-                ;;
-            esac
+          response_content_type="$(awk 'BEGIN{IGNORECASE=1} /^content-type:/ {sub(/^[^:]+:[[:space:]]*/, ""); sub(/\r$/, ""); value=$0} END{print value}' response.headers 2>/dev/null || true)"
+          response_service_identity="$(awk 'BEGIN{IGNORECASE=1} /^x-founder-control-room-service:/ {sub(/^[^:]+:[[:space:]]*/, ""); sub(/\r$/, ""); value=$0} END{print value}' response.headers 2>/dev/null || true)"
+          response_bytes="$(wc -c < response.body 2>/dev/null || echo 0)"
+          response_sha256="$(sha256sum response.body 2>/dev/null | awk '{print $1}' || true)"
 
+          routing_json="$(jq -n \
+            --arg content_type "$response_content_type" \
+            --arg service_identity "$response_service_identity" \
+            --arg response_sha256 "$response_sha256" \
+            --arg live_sha "$LIVE_WORKER_SHA" \
+            --arg main_sha "$MAIN_HEAD_SHA" \
+            --argjson response_bytes "${response_bytes:-0}" \
+            '{
+              contentType: (if $content_type == "" then null else $content_type end),
+              serviceIdentity: (if $service_identity == "" then null else $service_identity end),
+              responseBytes: $response_bytes,
+              responseSha256: (if $response_sha256 == "" then null else $response_sha256 end),
+              liveSha: $live_sha,
+              mainSha: $main_sha
+            }')"
+
+          if [[ "$curl_exit" -ne 0 ]]; then
             jq -n \
-              --arg code "$transport_code" \
-              --arg message "$transport_message" \
               --arg invocation_id "$INVOCATION_ID" \
               --arg workflow_head_sha "$WORKFLOW_HEAD_SHA" \
               --arg workflow_run_id "$WORKFLOW_RUN_ID" \
+              --argjson routing "$routing_json" \
               --argjson curl_exit "$curl_exit" \
               '{
-                receiptVersion: 1,
+                receiptVersion: 2,
                 state: "transport_failure",
                 workflowHeadSha: $workflow_head_sha,
                 workflowRunId: $workflow_run_id,
                 invocationId: $invocation_id,
                 httpStatus: null,
+                routing: $routing,
                 transport: {curlExitCode: $curl_exit},
-                error: {code: $code, message: $message},
+                error: {code: "TRANSPORT_FAILURE", message: "Founder API request failed before a usable HTTP response."},
                 result: null
               }' > founder-signal-engine-receipt.json
-          elif jq -e . response.json >/dev/null 2>&1; then
+          elif jq -e . response.body >/dev/null 2>&1; then
             jq \
               --arg http_status "$http_status" \
               --arg workflow_head_sha "$WORKFLOW_HEAD_SHA" \
               --arg workflow_run_id "$WORKFLOW_RUN_ID" \
+              --argjson routing "$routing_json" \
               '{
-                receiptVersion: 1,
+                receiptVersion: 2,
                 state: (if (.result.structuredContent.accepted // false) then "bridge_response" else "bridge_rejection" end),
                 workflowHeadSha: $workflow_head_sha,
                 workflowRunId: $workflow_run_id,
                 httpStatus: ($http_status | tonumber),
+                routing: $routing,
                 jsonrpc: (.jsonrpc // null),
                 id: (.id // null),
                 error: (if .error then {
@@ -207,21 +342,35 @@ jobs:
                     nextGate: ((.result.structuredContent.nextGate // null) | if type == "string" then .[0:240] else . end)
                   }
                 } else null end)
-              }' response.json > founder-signal-engine-receipt.json
+              }' response.body > founder-signal-engine-receipt.json
           else
+            non_json_code='NON_JSON_RESPONSE'
+            non_json_message='The canonical Founder API returned a non-JSON response; raw body omitted.'
+            if [[ "$response_service_identity" != 'founder-control-room' ]]; then
+              non_json_code='WRONG_SERVICE_ORIGIN'
+              non_json_message='The MCP request was answered without the canonical Founder Control Room service identity header.'
+            elif [[ "${response_content_type,,}" != application/json* ]]; then
+              non_json_code='WORKER_NON_JSON_RESPONSE'
+              non_json_message='The canonical Worker answered the MCP route with a non-JSON Content-Type.'
+            fi
+
             jq -n \
               --arg http_status "$http_status" \
               --arg invocation_id "$INVOCATION_ID" \
               --arg workflow_head_sha "$WORKFLOW_HEAD_SHA" \
               --arg workflow_run_id "$WORKFLOW_RUN_ID" \
+              --arg code "$non_json_code" \
+              --arg message "$non_json_message" \
+              --argjson routing "$routing_json" \
               '{
-                receiptVersion: 1,
+                receiptVersion: 2,
                 state: "non_json_response",
                 workflowHeadSha: $workflow_head_sha,
                 workflowRunId: $workflow_run_id,
                 invocationId: $invocation_id,
                 httpStatus: ($http_status | tonumber),
-                error: {code: "NON_JSON_RESPONSE", message: "Founder API returned a non-JSON response; raw body omitted."},
+                routing: $routing,
+                error: {code: $code, message: $message},
                 result: null
               }' > founder-signal-engine-receipt.json
           fi
@@ -239,13 +388,18 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [[ "$curl_exit" -ne 0 ]]; then
-            error_code="$(jq -r '.error.code' founder-signal-engine-receipt.json)"
-            echo "::error title=Bridge transport failure::$error_code prevented an HTTP response."
+            echo '::error title=Bridge transport failure::The review-only bridge did not return a usable HTTP response.'
             exit 1
           fi
 
           if [[ "$http_status" -lt 200 || "$http_status" -ge 300 ]]; then
             echo "::error title=Bridge HTTP failure::Founder Signal Engine returned HTTP $http_status."
+            exit 1
+          fi
+
+          if ! jq -e '.state == "bridge_response"' founder-signal-engine-receipt.json >/dev/null; then
+            error_code="$(jq -r '.error.code // "BRIDGE_RESPONSE_INVALID"' founder-signal-engine-receipt.json)"
+            echo "::error title=Bridge response invalid::$error_code prevented a correlated JSON-RPC receipt."
             exit 1
           fi
 
@@ -266,7 +420,7 @@ jobs:
               .result.structuredContent.sourceCommitSha == $source_commit_sha and
               .result.structuredContent.requestedAction == $requested_action
             ' founder-signal-engine-receipt.json >/dev/null || {
-              echo "::error title=Receipt correlation failure::The bridge response did not match the exact invocation and source evidence."
+              echo '::error title=Receipt correlation failure::The bridge response did not match the exact invocation and source evidence.'
               exit 1
             }
 
@@ -274,7 +428,7 @@ jobs:
             (.result.structuredContent.zapierRunIdentified == true) and
             ((.result.structuredContent.zapierRunId // "") | type == "string" and length > 0)
           ' founder-signal-engine-receipt.json >/dev/null || {
-            echo "::error title=Zapier execution proof missing::The bridge did not return an explicit matching Zapier run ID."
+            echo '::error title=Zapier execution proof missing::The bridge did not return an explicit matching Zapier run ID.'
             exit 1
           }
 
