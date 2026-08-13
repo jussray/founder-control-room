@@ -135,6 +135,7 @@ export async function discoverFcrSkillSources(skillsRoot: string): Promise<FcrSk
     if (!canonicalFile.startsWith(rootPrefix)) throw new Error(`skill source escaped configured root: ${file}`);
 
     const source = await readFile(canonicalFile, 'utf8');
+    if (!source.replace(/\r\n/g, '\n').startsWith('---\n')) continue;
     const candidateMetadata = parseFrontmatterScalars(source);
     if (!isFounderOwnedSkill(candidateMetadata)) continue;
 
