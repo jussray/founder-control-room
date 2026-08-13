@@ -7,6 +7,12 @@ on:
         description: Exact 40-character commit SHA to inspect
         required: true
         type: string
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/cloudflare-build-diagnostic.yml
+      - scripts/inspect-cloudflare-build.mjs
 
 permissions:
   contents: read
@@ -18,8 +24,9 @@ jobs:
     timeout-minutes: 10
     environment: production
     env:
-      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+      EXPECTED_HEAD_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_head_sha || github.sha }}
       CF_WORKER_NAME: founder-control-room
+      CF_API_HOSTNAME: api.foundercontrolroom.org
       CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CF_API_TOKEN: ${{ secrets.CLOUDFLARE_BUILDS_API_TOKEN }}
 
@@ -41,7 +48,7 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - name: Inspect exact Cloudflare build
+      - name: Inspect exact Cloudflare build and custom-domain ownership
         run: node scripts/inspect-cloudflare-build.mjs
 
       - name: Publish diagnostic summary
