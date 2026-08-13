@@ -21,19 +21,25 @@ function skillSource(name: string, description = 'Example skill'): string {
   return `---\nname: ${name}\ndescription: ${description}\nversion: 1.0.0\nstatus: active\nscope: founder-control-room\nowner: Juss\n---\n\n# ${name}\n\nBody.\n`;
 }
 
+function importedSkillSource(name: string): string {
+  return `---\nname: ${name}\ndescription: Imported provider skill\n---\n\n# ${name}\n`;
+}
+
 afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
 describe('FCR skill source manifest', () => {
-  it('discovers real repository SKILL.md sources with deterministic hashes', async () => {
+  it('discovers real founder-owned SKILL.md sources with deterministic hashes', async () => {
     const manifest = await discoverFcrSkillSources(path.join(process.cwd(), '.agents', 'skills'));
 
     expect(manifest.contract).toBe(FCR_SKILL_SOURCE_MANIFEST_CONTRACT);
     expect(manifest.entries.length).toBeGreaterThan(0);
     expect(new Set(manifest.entries.map((entry) => entry.id)).size).toBe(manifest.entries.length);
     expect(manifest.manifestHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(manifest.entries.map((entry) => entry.id)).not.toContain('skill:agents-sdk');
     for (const entry of manifest.entries) {
+      expect(entry.owner.toLowerCase()).toBe('juss');
       expect(entry.sourceHash).toMatch(/^[0-9a-f]{64}$/);
       expect(entry.sourcePath.endsWith('SKILL.md')).toBe(true);
       expect(entry.exposure).toEqual({ fcr: true, chief: true });
@@ -41,7 +47,20 @@ describe('FCR skill source manifest', () => {
     }
   });
 
-  it('changes source and manifest hashes when SKILL.md content changes', async () => {
+  it('skips imported skills that are not explicitly founder-owned', async () => {
+    const root = await tempRoot();
+    const ownedDirectory = path.join(root, 'owned');
+    const importedDirectory = path.join(root, 'vendor');
+    await mkdir(ownedDirectory);
+    await mkdir(importedDirectory);
+    await writeFile(path.join(ownedDirectory, 'SKILL.md'), skillSource('owned'), 'utf8');
+    await writeFile(path.join(importedDirectory, 'SKILL.md'), importedSkillSource('vendor'), 'utf8');
+
+    const manifest = await discoverFcrSkillSources(root);
+    expect(manifest.entries.map((entry) => entry.id)).toEqual(['skill:owned']);
+  });
+
+  it('changes source and manifest hashes when founder-owned SKILL.md content changes', async () => {
     const root = await tempRoot();
     const skillDirectory = path.join(root, 'alpha');
     await mkdir(skillDirectory);
@@ -56,7 +75,7 @@ describe('FCR skill source manifest', () => {
     expect(second.manifestHash).not.toBe(first.manifestHash);
   });
 
-  it('rejects duplicate skill identities', async () => {
+  it('rejects duplicate founder-owned skill identities', async () => {
     const root = await tempRoot();
     for (const directory of ['one', 'two']) {
       const skillDirectory = path.join(root, directory);
@@ -77,7 +96,22 @@ describe('FCR skill source manifest', () => {
     await expect(discoverFcrSkillSources(root)).rejects.toThrow('may not be a symlink');
   });
 
-  it('fails closed when required frontmatter is missing', () => {
+  it('fails closed when founder-owned frontmatter is incomplete', async () => {
+    const root = await tempRoot();
+    const skillDirectory = path.join(root, 'owned');
+    await mkdir(skillDirectory);
+    await writeFile(
+      path.join(skillDirectory, 'SKILL.md'),
+      '---\nname: incomplete\ndescription: Incomplete\nowner: Juss\n---\n\n# Incomplete\n',
+      'utf8',
+    );
+
+    await expect(discoverFcrSkillSources(root)).rejects.toThrow(
+      'owned/SKILL.md: SKILL.md missing required frontmatter: version',
+    );
+  });
+
+  it('keeps the strict parser available for explicit founder-owned validation', () => {
     expect(() => parseSkillFrontmatter('---\nname: incomplete\n---\n\n# Incomplete\n')).toThrow(
       'SKILL.md missing required frontmatter: description',
     );
