@@ -7,7 +7,7 @@ import {
   type CapabilityRequestV1,
   validateCapabilityReceipt,
   validateCapabilityRequest,
-} from '../capabilityExecutionContracts';
+} from '../capabilityExecutionContracts.js';
 
 const SHA = 'a'.repeat(40);
 const OTHER_SHA = 'b'.repeat(40);
