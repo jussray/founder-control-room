@@ -74,9 +74,20 @@ function isIsoDate(value: string): boolean {
   return Boolean(value) && !Number.isNaN(Date.parse(value));
 }
 
+function sortJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortJsonValue);
+  if (value === null || typeof value !== 'object') return value;
+
+  const sorted: Record<string, unknown> = {};
+  for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+    sorted[key] = sortJsonValue((value as Record<string, unknown>)[key]);
+  }
+  return sorted;
+}
+
 function canonicalReceiptWithoutDigest(receipt: CapabilityReceiptV1): string {
   const { receiptDigest: _receiptDigest, ...payload } = receipt;
-  return JSON.stringify(payload, Object.keys(payload).sort(), 0);
+  return JSON.stringify(sortJsonValue(payload));
 }
 
 export function computeCapabilityReceiptDigest(receipt: CapabilityReceiptV1): string {
