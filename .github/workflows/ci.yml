@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -162,6 +163,37 @@ jobs:
         run: supabase db lint --local
         continue-on-error: true
 
+  gate0-diagnostic:
+    name: Gate 0 base diagnostic
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require successful Cloudflare diagnostic for exact base main
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          test -n "$BASE_SHA"
+          printf 'gate0_base_sha=%s\n' "$BASE_SHA"
+
+          run_id="$(
+            gh api "/repos/${REPOSITORY}/actions/workflows/cloudflare-build-diagnostic.yml/runs?branch=main&status=completed&per_page=100" \
+              | jq -r --arg sha "$BASE_SHA" \
+                '.workflow_runs[] | select(.head_sha == $sha and .conclusion == "success") | .id' \
+              | head -n 1
+          )"
+
+          if [ -z "$run_id" ]; then
+            echo "Gate 0 blocked: no successful Cloudflare Build Diagnostic exists for exact base main ${BASE_SHA}."
+            exit 1
+          fi
+
+          printf 'gate0_diagnostic_run_id=%s\n' "$run_id"
+          echo "Gate 0 base diagnostic passed for ${BASE_SHA}."
+
   required-gate:
     name: Required Gate
     if: ${{ always() }}
@@ -171,24 +203,29 @@ jobs:
       - test
       - e2e
       - rls-contract
+      - gate0-diagnostic
     runs-on: ubuntu-latest
     steps:
       - name: Enforce load-bearing CI results
         shell: bash
         env:
+          EVENT_NAME: ${{ github.event_name }}
           TYPECHECK_RESULT: ${{ needs.typecheck.result }}
           LINT_RESULT: ${{ needs.lint.result }}
           TEST_RESULT: ${{ needs.test.result }}
           E2E_RESULT: ${{ needs.e2e.result }}
           RLS_RESULT: ${{ needs.rls-contract.result }}
+          GATE0_RESULT: ${{ needs.gate0-diagnostic.result }}
         run: |
           set -euo pipefail
-          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\nrls=%s\n' \
+          printf 'event=%s\ntypecheck=%s\nlint=%s\ntest=%s\ne2e=%s\nrls=%s\ngate0=%s\n' \
+            "$EVENT_NAME" \
             "$TYPECHECK_RESULT" \
             "$LINT_RESULT" \
             "$TEST_RESULT" \
             "$E2E_RESULT" \
-            "$RLS_RESULT"
+            "$RLS_RESULT" \
+            "$GATE0_RESULT"
 
           for result in \
             "$TYPECHECK_RESULT" \
@@ -201,5 +238,15 @@ jobs:
               exit 1
             fi
           done
+
+          if [ "$EVENT_NAME" = "pull_request" ] && [ "$GATE0_RESULT" != "success" ]; then
+            echo "Required Gate blocked: exact base main does not have a successful Gate 0 diagnostic receipt."
+            exit 1
+          fi
+
+          if [ "$EVENT_NAME" != "pull_request" ] && [ "$GATE0_RESULT" != "skipped" ]; then
+            echo "Required Gate blocked: unexpected Gate 0 diagnostic state for non-PR event."
+            exit 1
+          fi
 
           echo "Required Gate passed for ${EXPECTED_HEAD_SHA}."
