@@ -10,9 +10,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - .github/workflows/cloudflare-build-diagnostic.yml
-      - scripts/inspect-cloudflare-build.mjs
 
 permissions:
   contents: read
