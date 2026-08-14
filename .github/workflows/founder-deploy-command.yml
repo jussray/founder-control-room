@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   dispatch:
-    name: Dispatch canonical exact-head deploy
+    name: Dispatch bounded exact-head Worker reconcile
     if: >-
       github.event.issue.number == 182 &&
       github.event.comment.user.login == 'jussray' &&
@@ -68,7 +68,7 @@ jobs:
           echo "Current main:         $CURRENT_MAIN_SHA"
           test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"
 
-      - name: Dispatch canonical production workflow
+      - name: Dispatch bounded Worker reconciliation workflow
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_HEAD_SHA: ${{ steps.command.outputs.expected_head_sha }}
@@ -93,14 +93,16 @@ jobs:
             -H 'Accept: application/vnd.github+json' \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H 'X-GitHub-Api-Version: 2022-11-28' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/deploy.yml/dispatches" \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/worker-reconcile.yml/dispatches" \
             --data "$payload"
 
           {
-            echo '## Founder deploy command accepted'
+            echo '## Founder Worker reconciliation command accepted'
             echo
             echo "- Exact head: \`$EXPECTED_HEAD_SHA\`"
             echo "- Approval reference: \`$DEPLOYMENT_APPROVAL_ID\`"
-            echo '- Mutation authority: existing `.github/workflows/deploy.yml` only'
+            echo '- Mutation authority: bounded `.github/workflows/worker-reconcile.yml` only'
+            echo '- Supabase database mutation: absent from target workflow'
+            echo '- Proof-of-ship/publication: absent from target workflow'
             echo '- Direct Cloudflare/Supabase/secret mutation in this bridge: none'
           } >> "$GITHUB_STEP_SUMMARY"
