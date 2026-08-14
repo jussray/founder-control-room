@@ -20,6 +20,23 @@ for (const key of proxyEnvKeys) delete process.env[key];
 process.env.NO_PROXY = '*';
 process.env.no_proxy = '*';
 
+// Keep the public package-script contract stable while proving each long
+// journey against a fresh real server. The application correctly enforces a
+// per-IP general request limit; running all three journeys in one process
+// would test shared limiter exhaustion instead of their independent behavior.
+if (!process.env.FCR_E2E_SCENARIO) {
+  const runnerPath = new URL('./direct-browser-run.mjs', import.meta.url).pathname;
+  for (const scenario of ['full', 'capability-workbench', 'guarded-terminal']) {
+    console.log(`\n=== direct-browser scenario: ${scenario} ===`);
+    execFileSync(process.execPath, [runnerPath], {
+      cwd: process.cwd(),
+      env: { ...process.env, FCR_E2E_SCENARIO: scenario },
+      stdio: 'inherit',
+    });
+  }
+  process.exit(0);
+}
+
 const E2E_DEMO_ROOT_SHA = 'a'.repeat(40);
 const REAL_REPO_HEAD_SHA = execFileSync('git', ['rev-parse', 'HEAD'], {
   cwd: process.cwd(),
