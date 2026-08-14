@@ -67,7 +67,10 @@ jobs:
           set -euo pipefail
           npx wrangler pages dev dist-pages --port 8788 > /tmp/capability-workbench-pages.log 2>&1 &
           printf '%s' "$!" > /tmp/capability-workbench-pages.pid
-          if ! npx wait-on --timeout 60000 tcp:127.0.0.1:8788; then\n            cat /tmp/capability-workbench-pages.log\n            exit 1\n          fi
+          if ! npx wait-on --timeout 60000 tcp:127.0.0.1:8788; then
+            cat /tmp/capability-workbench-pages.log
+            exit 1
+          fi
 
       - name: Run desktop and mobile capability proof
         env:
