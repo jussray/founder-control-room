@@ -110,3 +110,8 @@ textarea.code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; min
 .toolbar { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 .muted { color: var(--muted); }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+
+.capabilities-link { color: var(--text); text-decoration: none; border: 1px solid var(--panel-border); border-radius: 8px; padding: 0.45rem 0.75rem; font-size: 0.85rem; }
+.capabilities-link:hover { border-color: #8558ff; color: #cbbcff; }
+.capabilities-link:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
