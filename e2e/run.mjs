@@ -424,6 +424,21 @@ async function main() {
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       'mobile workbench avoids document-level horizontal overflow',
     );
+    assert(
+      await page.locator('[data-category="integrations"]').evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return box.left >= 0 && box.right <= window.innerWidth;
+      }),
+      'mobile category filters keep Integrations fully visible without sideways scrolling',
+    );
+    assert(
+      await page.locator('.keyboard-help').evaluate((element) => {
+        const helper = element.getBoundingClientRect();
+        const results = document.querySelector('.results')?.getBoundingClientRect();
+        return Boolean(results) && helper.top >= results.top && helper.bottom <= results.bottom;
+      }),
+      'mobile results reserve visible space for keyboard guidance',
+    );
     mkdirSync(join(REPO_ROOT, 'test-results'), { recursive: true });
     await page.screenshot({
       path: join(REPO_ROOT, 'test-results', 'capabilities-workbench-mobile.png'),
