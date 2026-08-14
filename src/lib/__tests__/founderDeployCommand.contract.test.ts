@@ -54,4 +54,14 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).not.toContain('ZAPIER_CATCH_HOOK_URL');
     expect(reconcileWorkflow).not.toContain('PUBLISH_ALLOWED');
   });
+
+  it('preserves existing Worker runtime secrets instead of requiring or rewriting them', () => {
+    expect(reconcileWorkflow).toContain('Existing Worker runtime secrets: preserved; not rewritten by this workflow');
+    expect(reconcileWorkflow).toContain('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}');
+    expect(reconcileWorkflow).toContain('CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}');
+    expect(reconcileWorkflow).not.toContain('SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}');
+    expect(reconcileWorkflow).not.toContain('GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}');
+    expect(reconcileWorkflow).not.toContain('FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}');
+    expect(reconcileWorkflow).not.toContain('secrets: |');
+  });
 });
