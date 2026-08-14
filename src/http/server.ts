@@ -12,6 +12,7 @@ import { dashboardRouter } from './routes/dashboard.js';
 import { missionsRouter } from './routes/missions.js';
 import { promptosRouter } from './routes/promptos.js';
 import { agentsRouter } from './routes/agents.js';
+import { capabilitiesRouter } from './routes/capabilities.js';
 import { authorityLevelsRouter } from './routes/authorityLevels.js';
 import { pluginCenterRouter } from './routes/pluginCenter.js';
 import { commandBridgeRouter } from './routes/commandBridge.js';
@@ -257,6 +258,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/missions', missionsRouter);
   app.use('/promptos', promptosRouter);
   app.use('/agents', agentsRouter);
+  app.use('/capabilities', capabilitiesRouter);
   app.use('/authority-levels', authorityLevelsRouter);
   app.use('/plugin-center', pluginCenterRouter);
   app.use('/command-bridge', commandBridgeRouter);

@@ -28,8 +28,8 @@
 
 import { spawn, execFileSync } from 'node:child_process';
 import { createHmac, randomUUID } from 'node:crypto';
-import { readFileSync, existsSync, unlinkSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { mkdirSync, readFileSync, existsSync, unlinkSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { chromium } from 'playwright';
@@ -42,6 +42,11 @@ const BRIDGE_FILE = new URL('./.auth-bridge.json', import.meta.url).pathname;
 const GITHUB_OWNER = 'jussray';
 const GITHUB_REPO = 'demo-project';
 const GITHUB_WEBHOOK_SECRET = 'e2e-webhook-secret';
+const E2E_SCENARIO = process.env.FCR_E2E_SCENARIO ?? 'full';
+
+if (!['full', 'capability-workbench', 'guarded-terminal'].includes(E2E_SCENARIO)) {
+  throw new Error(`Unsupported FCR_E2E_SCENARIO: ${E2E_SCENARIO}`);
+}
 
 // The guarded terminal's command registry (src/terminal/registry.ts) hard-codes
 // project slug "founder-control-room" with relativeCwd "founder-control-room"
@@ -254,6 +259,87 @@ async function sendCheckRunWebhook({ headSha, conclusion }) {
   if (!res.ok) throw new Error(`check_run webhook rejected: ${res.status} ${await res.text()}`);
 }
 
+async function runGuardedTerminalProof(page) {
+  console.log('\n[terminal] Guarded terminal: run a real read-only command against this actual checked-out repo, through the real UI');
+  // The terminal runs a real `git` process in this checkout. The fake GitHub
+  // server is used only to establish the exact-head proof prerequisite through
+  // the same real approval routes; it does not stand in for terminal execution.
+  const founderToken = await page.evaluate(() => JSON.parse(sessionStorage.getItem('fcr_session')).access_token);
+  const projectRes = await fetch(`${BASE_URL}/projects`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${founderToken}` },
+    body: JSON.stringify({
+      slug: TERMINAL_PROOF_REPO,
+      name: 'Founder Control Room (self)',
+      repoIdentifier: `${GITHUB_OWNER}/${TERMINAL_PROOF_REPO}`,
+    }),
+  });
+  assert(projectRes.ok, `registered the ${TERMINAL_PROOF_REPO} project so the terminal's command registry (keyed on this exact slug) has somewhere real to run (status ${projectRes.status})`);
+
+  const missionRes = await fetch(`${BASE_URL}/projects/${TERMINAL_PROOF_REPO}/missions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${founderToken}` },
+    body: JSON.stringify({ title: 'Prove the guarded terminal end to end' }),
+  });
+  const missionBody = await missionRes.json();
+  assert(missionRes.ok, `created a mission on ${TERMINAL_PROOF_REPO} (status ${missionRes.status})`);
+  const terminalMissionId = missionBody.mission.id;
+
+  const gateRes = await fetch(`${BASE_URL}/approvals/${terminalMissionId}/run-proof-gate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${founderToken}` },
+    body: JSON.stringify({
+      gateId: 'create_branch',
+      evidence: {
+        filesChanged: ['mission-plan'],
+        behaviorChanged: 'No behavior change yet — opening the sandbox.',
+        checksRun: ['plan_reviewed'],
+        failures: [],
+        securityImpact: 'none',
+        deploymentImpact: 'none',
+        rollbackPath: 'Delete the sandbox branch.',
+        unresolvedRisks: [],
+      },
+    }),
+  });
+  assert(gateRes.ok, `create_branch proof gate passed for the terminal mission (status ${gateRes.status})`);
+
+  const executeRes = await fetch(`${BASE_URL}/approvals/${terminalMissionId}/execute`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${founderToken}` },
+    body: JSON.stringify({
+      actionType: 'create_branch',
+      idempotencyKey: `terminal-proof-branch-${terminalMissionId}`,
+      payload: { branchName: 'terminal-proof', baseRef: 'main' },
+    }),
+  });
+  const executeBody = await executeRes.json();
+  assert(
+    executeRes.ok && executeBody.result?.expectedHeadSha === REAL_REPO_HEAD_SHA,
+    `branch creation pinned policy_snapshot.expectedHeadSha to this real repo's actual HEAD (${REAL_REPO_HEAD_SHA}), not just a fake sha — this is the fix for bug #7 below (expectedHeadSha was previously only ever written at merge time, which the guarded terminal's own sandboxed/in_review precondition can never reach)`,
+  );
+  assert(
+    getRepo(GITHUB_OWNER, TERMINAL_PROOF_REPO)?.branches.get('terminal-proof')?.sha === REAL_REPO_HEAD_SHA,
+    "the fake repo's new branch head really does equal this checkout's real git HEAD",
+  );
+
+  await page.click('.tabs button[data-tab=terminal]');
+  await page.waitForSelector('#terminal-project-slug');
+  await page.fill('#terminal-project-slug', TERMINAL_PROOF_REPO);
+  await page.click('#terminal-load-commands');
+  await waitForCount(page, '#terminal-commands .card', 1);
+  await page.click('#terminal-commands .card[data-id="git.head"]');
+  await page.waitForSelector('#terminal-run-form');
+  await page.fill('#terminal-run-form input[name=missionId]', terminalMissionId);
+  await page.fill('#terminal-run-form input[name=expectedCommitSha]', REAL_REPO_HEAD_SHA);
+  await page.click('#terminal-run-form button[type=submit]');
+  const terminalResultText = await waitForText(page, '#terminal-run-result', REAL_REPO_HEAD_SHA);
+  assert(
+    terminalResultText.toLowerCase().includes(REAL_REPO_HEAD_SHA) && terminalResultText.toLowerCase().includes('"status": "passed"'),
+    'the guarded terminal spawned a real `git rev-parse HEAD` against this real checkout and returned its real, correct output through the real UI',
+  );
+}
+
 async function main() {
   await waitForServer(`${BASE_URL}/health`);
   console.log(`Server up on ${BASE_URL}, fake GitHub up on ${fakeGitHubUrl}`);
@@ -298,6 +384,82 @@ async function main() {
   await page.goto(`${BASE_URL}/auth/callback?token_hash=${bridge.tokenHash}`);
   await page.waitForSelector('.topbar', { timeout: 5000 });
   assert(await page.locator('.founder-email').innerText() === FOUNDER_EMAIL, 'landed on the app shell signed in as the founder');
+
+  if (E2E_SCENARIO === 'capability-workbench') {
+    // Run the workbench browser journey in an isolated server process. The full
+    // founder journey intentionally exercises enough API calls to approach the
+    // real 60-requests/minute per-IP protection; adding this independent page
+    // test to that same process turned its final connection-health proof into a
+    // rate-limit race rather than a product signal.
+    console.log('\n[3a] Capability workbench denies anonymous browser access through the real API boundary');
+    const anonymousContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const anonymousPage = await anonymousContext.newPage();
+    try {
+      await anonymousPage.goto(`${BASE_URL}/control-room/capabilities.html`, { waitUntil: 'networkidle' });
+      await anonymousPage.waitForSelector('.signin h1');
+      assert(
+        (await anonymousPage.locator('.signin h1').innerText()) === 'Capabilities are founder-only.',
+        'anonymous browser receives the founder-only boundary instead of the registry',
+      );
+    } finally {
+      await anonymousContext.close();
+    }
+
+    console.log('\n[3b] Capability workbench loads only after real founder authorization and remains usable on mobile');
+    await page.goto(`${BASE_URL}/control-room/capabilities.html`, { waitUntil: 'networkidle' });
+    await page.waitForSelector('.workbench');
+    assert(
+      (await page.locator('.result-list').innerText()).includes('webhook-verify-hmac-worker-v1'),
+      'authorized browser receives the reviewed capability registry',
+    );
+    await page.fill('#capability-search', 'event dedupe');
+    await page.waitForSelector('[data-id="event-dedupe-supabase-v1"]');
+    await page.click('[data-id="event-dedupe-supabase-v1"]');
+    await waitForText(page, '.detail', 'Stop duplicate deliveries');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForSelector('.workbench');
+    assert(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      'mobile workbench avoids document-level horizontal overflow',
+    );
+    assert(
+      await page.locator('[data-category="integrations"]').evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return box.left >= 0 && box.right <= window.innerWidth;
+      }),
+      'mobile category filters keep Integrations fully visible without sideways scrolling',
+    );
+    assert(
+      await page.locator('.keyboard-help').evaluate((element) => {
+        const helper = element.getBoundingClientRect();
+        const results = document.querySelector('.results')?.getBoundingClientRect();
+        return Boolean(results) && helper.top >= results.top && helper.bottom <= results.bottom;
+      }),
+      'mobile results reserve visible space for keyboard guidance',
+    );
+    mkdirSync(join(REPO_ROOT, 'test-results'), { recursive: true });
+    await page.screenshot({
+      path: join(REPO_ROOT, 'test-results', 'capabilities-workbench-mobile.png'),
+      fullPage: true,
+    });
+    assert(jsExceptions.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(jsExceptions)})`);
+    if (networkDiagnostics.length) console.log(`  (${networkDiagnostics.length} expected network diagnostic message(s), not counted as failures: ${JSON.stringify(networkDiagnostics)})`);
+    await browser.close();
+    return;
+  }
+
+  if (E2E_SCENARIO === 'guarded-terminal') {
+    await runGuardedTerminalProof(page);
+    assert(jsExceptions.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(jsExceptions)})`);
+    if (networkDiagnostics.length) console.log(`  (${networkDiagnostics.length} expected network diagnostic message(s), not counted as failures: ${JSON.stringify(networkDiagnostics)})`);
+    await browser.close();
+    return;
+  }
+
+  await page.goto(`${BASE_URL}/control-room/`);
+  await page.waitForSelector('#new-project-form');
 
   console.log('\n[4] Register a project (with a real repo identifier) through the real UI');
   await page.fill('#new-project-form input[name="slug"]', 'demo-project');
@@ -461,91 +623,6 @@ async function main() {
   await figmaCard.locator('.connection-check-btn').click();
   const connectionText = await waitForText(page, '[data-connection-id]:has-text("figma")', 'last checked');
   assert(connectionText.toLowerCase().includes('last checked'), 'connector health check recorded a real last_checked_at');
-
-  console.log('\n[9] Guarded terminal: run a real read-only command against this actual checked-out repo, through the real UI');
-  // Unlike every step above, this one doesn't touch the fake GitHub repo at
-  // all for its actual execution — CONTROL_ROOM_WORKSPACE_ROOT points at this
-  // real repo's real parent directory, and the terminal spawns a real `git`
-  // process against it (src/terminal/runner.ts). The fake repo above is only
-  // used to legitimately pin policy_snapshot.expectedHeadSha to the real
-  // local HEAD sha, through the same real create_branch proof-gate + execute
-  // flow already proven in [6b] — not a shortcut around it.
-  {
-    const founderToken = await page.evaluate(() => JSON.parse(sessionStorage.getItem('fcr_session')).access_token);
-    const projectRes = await fetch(`${BASE_URL}/projects`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${founderToken}` },
-      body: JSON.stringify({
-        slug: TERMINAL_PROOF_REPO,
-        name: 'Founder Control Room (self)',
-        repoIdentifier: `${GITHUB_OWNER}/${TERMINAL_PROOF_REPO}`,
-      }),
-    });
-    assert(projectRes.ok, `registered the ${TERMINAL_PROOF_REPO} project so the terminal's command registry (keyed on this exact slug) has somewhere real to run (status ${projectRes.status})`);
-
-    const missionRes = await fetch(`${BASE_URL}/projects/${TERMINAL_PROOF_REPO}/missions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${founderToken}` },
-      body: JSON.stringify({ title: 'Prove the guarded terminal end to end' }),
-    });
-    const missionBody = await missionRes.json();
-    assert(missionRes.ok, `created a mission on ${TERMINAL_PROOF_REPO} (status ${missionRes.status})`);
-    const terminalMissionId = missionBody.mission.id;
-
-    const gateRes = await fetch(`${BASE_URL}/approvals/${terminalMissionId}/run-proof-gate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${founderToken}` },
-      body: JSON.stringify({
-        gateId: 'create_branch',
-        evidence: {
-          filesChanged: ['mission-plan'],
-          behaviorChanged: 'No behavior change yet — opening the sandbox.',
-          checksRun: ['plan_reviewed'],
-          failures: [],
-          securityImpact: 'none',
-          deploymentImpact: 'none',
-          rollbackPath: 'Delete the sandbox branch.',
-          unresolvedRisks: [],
-        },
-      }),
-    });
-    assert(gateRes.ok, `create_branch proof gate passed for the terminal mission (status ${gateRes.status})`);
-
-    const executeRes = await fetch(`${BASE_URL}/approvals/${terminalMissionId}/execute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${founderToken}` },
-      body: JSON.stringify({
-        actionType: 'create_branch',
-        idempotencyKey: `terminal-proof-branch-${terminalMissionId}`,
-        payload: { branchName: 'terminal-proof', baseRef: 'main' },
-      }),
-    });
-    const executeBody = await executeRes.json();
-    assert(
-      executeRes.ok && executeBody.result?.expectedHeadSha === REAL_REPO_HEAD_SHA,
-      `branch creation pinned policy_snapshot.expectedHeadSha to this real repo's actual HEAD (${REAL_REPO_HEAD_SHA}), not just a fake sha — this is the fix for bug #7 below (expectedHeadSha was previously only ever written at merge time, which the guarded terminal's own sandboxed/in_review precondition can never reach)`,
-    );
-    assert(
-      getRepo(GITHUB_OWNER, TERMINAL_PROOF_REPO)?.branches.get('terminal-proof')?.sha === REAL_REPO_HEAD_SHA,
-      "the fake repo's new branch head really does equal this checkout's real git HEAD",
-    );
-
-    await page.click('.tabs button[data-tab=terminal]');
-    await page.waitForSelector('#terminal-project-slug');
-    await page.fill('#terminal-project-slug', TERMINAL_PROOF_REPO);
-    await page.click('#terminal-load-commands');
-    await waitForCount(page, '#terminal-commands .card', 1);
-    await page.click('#terminal-commands .card[data-id="git.head"]');
-    await page.waitForSelector('#terminal-run-form');
-    await page.fill('#terminal-run-form input[name=missionId]', terminalMissionId);
-    await page.fill('#terminal-run-form input[name=expectedCommitSha]', REAL_REPO_HEAD_SHA);
-    await page.click('#terminal-run-form button[type=submit]');
-    const terminalResultText = await waitForText(page, '#terminal-run-result', REAL_REPO_HEAD_SHA);
-    assert(
-      terminalResultText.toLowerCase().includes(REAL_REPO_HEAD_SHA) && terminalResultText.toLowerCase().includes('"status": "passed"'),
-      'the guarded terminal spawned a real `git rev-parse HEAD` against this real checkout and returned its real, correct output through the real UI',
-    );
-  }
 
   console.log('\n[10] No uncaught JS exceptions during the whole run');
   assert(jsExceptions.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(jsExceptions)})`);

@@ -72,6 +72,12 @@ describe('createServer', () => {
     expect(res.text).toContain('Founder Control Room');
   });
 
+  it('does not publish the capability registry as a static asset', async () => {
+    const res = await request(createServer({ serveStatic: true }))
+      .get('/control-room/capability-registry.js');
+    expect(res.status).toBe(404);
+  });
+
   it('rejects a cross-origin request from a non-allowlisted origin', async () => {
     const res = await request(createServer())
       .get('/health')
