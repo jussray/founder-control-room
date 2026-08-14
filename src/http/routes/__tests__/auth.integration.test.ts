@@ -88,15 +88,30 @@ beforeEach(() => {
 });
 
 describe('POST /auth/magic-link', () => {
-  it('requires an email', async () => {
+  it('requires an email with the standard error envelope', async () => {
     const res = await request(buildApp()).post('/auth/magic-link').send({});
     expect(res.status).toBe(400);
+    expect(res.body).toEqual({
+      success: false,
+      error: {
+        code: 'BAD_REQUEST',
+        message: 'A valid email is required.',
+        details: [],
+      },
+    });
   });
 
   it('sends the same generic response for a non-allowlisted email without sending an OTP', async () => {
     supabaseMock.from.mockImplementation(() => founderUsersRow(false));
     const res = await request(buildApp()).post('/auth/magic-link').send({ email: 'stranger@example.com' });
     expect(res.status).toBe(202);
+    expect(res.body).toEqual({
+      success: true,
+      data: {
+        message: 'If this email is on the founder allowlist, a secure login link has been sent.',
+      },
+      meta: {},
+    });
     expect(mockSignInWithOtp).not.toHaveBeenCalled();
   });
 
@@ -104,6 +119,9 @@ describe('POST /auth/magic-link', () => {
     supabaseMock.from.mockImplementation(() => founderUsersRow(true));
     const res = await request(buildApp()).post('/auth/magic-link').send({ email: FOUNDER_EMAIL });
     expect(res.status).toBe(202);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.message).toMatch(/secure login link has been sent/);
+    expect(res.body.meta).toEqual({});
     expect(mockSignInWithOtp).toHaveBeenCalledWith(
       expect.objectContaining({
         email: FOUNDER_EMAIL,
@@ -158,12 +176,6 @@ describe('GET /auth/callback', () => {
     expect(res.status).toBe(303);
     expectSessionCookie(res);
 
-    // The HttpOnly cookie above authenticates same-origin requests (e.g. the
-    // onboarding shell's /auth/me check). The dashboard SPA at /control-room/
-    // (public/control-room/app.js) additionally keeps its own Bearer-token
-    // session in sessionStorage, read once from this redirect's URL
-    // *fragment* — fragments never reach the server or appear in Referer
-    // headers, so this is the standard implicit-flow handoff, not a leak.
     const location = String(res.headers.location);
     expect(location.startsWith('/control-room/#')).toBe(true);
     const fragment = new URLSearchParams(location.split('#')[1]);
@@ -178,6 +190,8 @@ describe('POST /auth/session', () => {
   it('rejects missing implicit-flow credentials and clears the browser session', async () => {
     const res = await request(buildApp()).post('/auth/session').send({});
     expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('BAD_REQUEST');
+    expect(res.body.error.details).toEqual([]);
     expectClearedSessionCookie(res);
     expect(mockSetSession).not.toHaveBeenCalled();
   });
@@ -189,6 +203,8 @@ describe('POST /auth/session', () => {
       .send({ access_token: 'bad-at', refresh_token: 'bad-rt' });
 
     expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('UNAUTHENTICATED');
+    expect(res.body.error.details).toEqual([]);
     expectClearedSessionCookie(res);
   });
 
@@ -204,7 +220,11 @@ describe('POST /auth/session', () => {
       .send({ access_token: 'at', refresh_token: 'rt' });
 
     expect(res.status).toBe(201);
-    expect(res.body).toEqual({ ok: true, founder: { email: FOUNDER_EMAIL } });
+    expect(res.body).toEqual({
+      success: true,
+      data: { founder: { email: FOUNDER_EMAIL } },
+      meta: {},
+    });
     expectSessionCookie(res);
   });
 });
