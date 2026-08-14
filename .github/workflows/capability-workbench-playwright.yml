@@ -11,6 +11,7 @@ on:
       - 'e2e/capabilities-workbench.spec.ts'
       - 'scripts/build-pages.mjs'
       - 'playwright.config.ts'
+      - 'design-qa.md'
       - '.github/workflows/capability-workbench-playwright.yml'
   workflow_dispatch:
 
