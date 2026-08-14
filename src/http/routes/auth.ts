@@ -261,7 +261,7 @@ authRouter.post('/password', requireFounder, async (req: FounderRequest, res) =>
 
   const { error: updateError } = await requestAuth.auth.updateUser({ password });
   if (updateError) {
-    console.warn('Founder password update failed:', updateError.message);
+    console.warn('Founder credential update failed:', updateError.message);
     return respondError(
       res,
       400,
