@@ -1,0 +1,88 @@
+name: Capability Workbench Playwright Proof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'public/control-room/capabilities.html'
+      - 'public/control-room/capabilities.css'
+      - 'public/control-room/capabilities.js'
+      - 'public/control-room/capability-registry.js'
+      - 'e2e/capabilities-workbench.spec.ts'
+      - 'scripts/build-pages.mjs'
+      - 'playwright.config.ts'
+      - '.github/workflows/capability-workbench-playwright.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: capability-workbench-playwright-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  prove-capability-workbench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          printf 'Verified exact capability workbench head: %s\n' "$actual"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build Cloudflare Pages artifact
+        run: npm run build:pages
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start production-equivalent Pages preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler pages dev dist-pages --port 8788 > /tmp/capability-workbench-pages.log 2>&1 &
+          printf '%s' "$!" > /tmp/capability-workbench-pages.pid
+          npx wait-on http://127.0.0.1:8788/control-room/capabilities.html
+
+      - name: Run desktop and mobile capability proof
+        env:
+          BASE_URL: http://127.0.0.1:8788
+        run: npx playwright test -c playwright.config.ts e2e/capabilities-workbench.spec.ts
+
+      - name: Upload exact-head Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capability-workbench-playwright-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            playwright-report/
+            test-results/capabilities-workbench/
+            test-results/**/*.zip
+            /tmp/capability-workbench-pages.log
+          if-no-files-found: warn
+          retention-days: 14
