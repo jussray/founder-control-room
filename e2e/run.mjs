@@ -28,8 +28,8 @@
 
 import { spawn, execFileSync } from 'node:child_process';
 import { createHmac, randomUUID } from 'node:crypto';
-import { readFileSync, existsSync, unlinkSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { mkdirSync, readFileSync, existsSync, unlinkSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { chromium } from 'playwright';
@@ -298,6 +298,48 @@ async function main() {
   await page.goto(`${BASE_URL}/auth/callback?token_hash=${bridge.tokenHash}`);
   await page.waitForSelector('.topbar', { timeout: 5000 });
   assert(await page.locator('.founder-email').innerText() === FOUNDER_EMAIL, 'landed on the app shell signed in as the founder');
+
+  console.log('\n[3a] Capability workbench denies anonymous browser access through the real API boundary');
+  const anonymousContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const anonymousPage = await anonymousContext.newPage();
+  try {
+    await anonymousPage.goto(`${BASE_URL}/control-room/capabilities.html`, { waitUntil: 'networkidle' });
+    await anonymousPage.waitForSelector('.signin h1');
+    assert(
+      (await anonymousPage.locator('.signin h1').innerText()) === 'Capabilities are founder-only.',
+      'anonymous browser receives the founder-only boundary instead of the registry',
+    );
+  } finally {
+    await anonymousContext.close();
+  }
+
+  console.log('\n[3b] Capability workbench loads only after real founder authorization and remains usable on mobile');
+  await page.goto(`${BASE_URL}/control-room/capabilities.html`, { waitUntil: 'networkidle' });
+  await page.waitForSelector('.workbench');
+  assert(
+    (await page.locator('.result-list').innerText()).includes('webhook-verify-hmac-worker-v1'),
+    'authorized browser receives the reviewed capability registry',
+  );
+  await page.fill('#capability-search', 'event dedupe');
+  await page.waitForSelector('[data-id="event-dedupe-supabase-v1"]');
+  await page.click('[data-id="event-dedupe-supabase-v1"]');
+  await waitForText(page, '.detail', 'Stop duplicate deliveries');
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForSelector('.workbench');
+  assert(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    'mobile workbench avoids document-level horizontal overflow',
+  );
+  mkdirSync(join(REPO_ROOT, 'test-results'), { recursive: true });
+  await page.screenshot({
+    path: join(REPO_ROOT, 'test-results', 'capabilities-workbench-mobile.png'),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(`${BASE_URL}/control-room/`);
+  await page.waitForSelector('#new-project-form');
 
   console.log('\n[4] Register a project (with a real repo identifier) through the real UI');
   await page.fill('#new-project-form input[name="slug"]', 'demo-project');
