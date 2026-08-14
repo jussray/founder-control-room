@@ -112,7 +112,7 @@ describe('POST /auth/password provider failure', () => {
       },
     });
     expect(JSON.stringify(response.body)).not.toContain(providerMessage);
-    expect(warn).toHaveBeenCalledWith('Founder password update failed:', providerMessage);
+    expect(warn).toHaveBeenCalledWith('Founder credential update failed:', providerMessage);
 
     warn.mockRestore();
   });
