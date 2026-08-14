@@ -66,6 +66,9 @@ export interface FcrEvidenceScaleMetrics {
   p95LatencyMs: number | null;
   costPerPassUsd: number | null;
   retryRate: number | null;
+  latencyCoverage: number | null;
+  costCoverage: number | null;
+  retryCoverage: number | null;
 }
 
 export interface FcrOptimizationRecommendation {
@@ -103,6 +106,25 @@ export interface FcrEvidenceScaleDecision {
 }
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
+const EVIDENCE_KINDS = new Set<FcrEvidenceKind>([
+  'test',
+  'log',
+  'artifact',
+  'playwright',
+  'review',
+  'runtime',
+  'deployment',
+  'security',
+  'quality',
+]);
+const EVIDENCE_VERDICTS = new Set<FcrEvidenceVerdict>(['PASS', 'FAIL', 'INCONCLUSIVE']);
+const EVIDENCE_SOURCES = new Set<FcrEvidenceSource>([
+  'capability-receipt',
+  'test-ledger',
+  'proof-of-ship',
+  'runtime',
+  'manual',
+]);
 
 function isFiniteNonNegative(value: number | undefined): value is number {
   return value !== undefined && Number.isFinite(value) && value >= 0;
@@ -127,6 +149,9 @@ function policyErrors(policy: FcrEvidenceScalePolicy): string[] {
   if (policy.requiredEvidenceKinds.length === 0) errors.push('policy requires at least one evidence kind');
   if (new Set(policy.requiredEvidenceKinds).size !== policy.requiredEvidenceKinds.length) {
     errors.push('policy requiredEvidenceKinds must be unique');
+  }
+  for (const kind of policy.requiredEvidenceKinds) {
+    if (!EVIDENCE_KINDS.has(kind)) errors.push(`policy contains unsupported evidence kind: ${String(kind)}`);
   }
   if (!Number.isInteger(policy.maxEvidenceAgeMs) || policy.maxEvidenceAgeMs <= 0) {
     errors.push('policy maxEvidenceAgeMs must be a positive integer');
@@ -163,6 +188,7 @@ function evidenceIntegrityFailures(
   const ids = new Set<string>();
 
   for (const entry of input.evidence) {
+    const evidenceLabel = entry.evidenceId || '<missing>';
     if (!entry.evidenceId.trim()) {
       failures.push('evidenceId is required');
     } else if (ids.has(entry.evidenceId)) {
@@ -171,28 +197,38 @@ function evidenceIntegrityFailures(
       ids.add(entry.evidenceId);
     }
 
+    if (!EVIDENCE_KINDS.has(entry.kind)) {
+      failures.push(`evidence ${evidenceLabel} has unsupported kind: ${String(entry.kind)}`);
+    }
+    if (!EVIDENCE_VERDICTS.has(entry.verdict)) {
+      failures.push(`evidence ${evidenceLabel} has unsupported verdict: ${String(entry.verdict)}`);
+    }
+    if (!EVIDENCE_SOURCES.has(entry.source)) {
+      failures.push(`evidence ${evidenceLabel} has unsupported source: ${String(entry.source)}`);
+    }
+
     if (!FULL_SHA.test(entry.requestedHeadSha)) {
-      failures.push(`evidence ${entry.evidenceId || '<missing>'} requestedHeadSha is invalid`);
+      failures.push(`evidence ${evidenceLabel} requestedHeadSha is invalid`);
     }
     if (entry.observedHeadSha !== null && !FULL_SHA.test(entry.observedHeadSha)) {
-      failures.push(`evidence ${entry.evidenceId || '<missing>'} observedHeadSha is invalid`);
+      failures.push(`evidence ${evidenceLabel} observedHeadSha is invalid`);
     }
 
     const observedAtMs = Date.parse(entry.observedAt);
     if (Number.isNaN(observedAtMs)) {
-      failures.push(`evidence ${entry.evidenceId || '<missing>'} observedAt is invalid`);
+      failures.push(`evidence ${evidenceLabel} observedAt is invalid`);
     } else if (observedAtMs > evaluatedAtMs) {
-      failures.push(`evidence ${entry.evidenceId || '<missing>'} is dated after evaluatedAt`);
+      failures.push(`evidence ${evidenceLabel} is dated after evaluatedAt`);
     }
 
     if (entry.latencyMs !== undefined && !isFiniteNonNegative(entry.latencyMs)) {
-      failures.push(`evidence ${entry.evidenceId || '<missing>'} latencyMs must be finite and non-negative`);
+      failures.push(`evidence ${evidenceLabel} latencyMs must be finite and non-negative`);
     }
     if (entry.costUsd !== undefined && !isFiniteNonNegative(entry.costUsd)) {
-      failures.push(`evidence ${entry.evidenceId || '<missing>'} costUsd must be finite and non-negative`);
+      failures.push(`evidence ${evidenceLabel} costUsd must be finite and non-negative`);
     }
     if (entry.attempts !== undefined && (!Number.isInteger(entry.attempts) || entry.attempts < 1)) {
-      failures.push(`evidence ${entry.evidenceId || '<missing>'} attempts must be an integer of at least 1`);
+      failures.push(`evidence ${evidenceLabel} attempts must be an integer of at least 1`);
     }
 
     if (
@@ -200,7 +236,7 @@ function evidenceIntegrityFailures(
       && entry.requestedHeadSha.toLowerCase() === input.expectedHeadSha.toLowerCase()
       && entry.observedHeadSha?.toLowerCase() !== input.expectedHeadSha.toLowerCase()
     ) {
-      failures.push(`PASS evidence ${entry.evidenceId || '<missing>'} is not bound to the exact expected head`);
+      failures.push(`PASS evidence ${evidenceLabel} is not bound to the exact expected head`);
     }
   }
 
@@ -278,6 +314,7 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
     .map((entry) => entry.latencyMs)
     .filter(isFiniteNonNegative);
   const p95LatencyMs = p95(latencySamples);
+  const latencyCoverage = ratio(latencySamples.length, freshCurrentEntries.length);
 
   const costSamples = freshCurrentEntries
     .map((entry) => entry.costUsd)
@@ -286,6 +323,7 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
   const costPerPassUsd = costSamples.length === 0 || freshExactHeadPasses.length === 0
     ? null
     : totalCostUsd / freshExactHeadPasses.length;
+  const costCoverage = ratio(costSamples.length, freshCurrentEntries.length);
 
   const attemptSamples = freshCurrentEntries
     .map((entry) => entry.attempts)
@@ -293,20 +331,22 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
   const retryRate = attemptSamples.length === 0
     ? null
     : attemptSamples.filter((value) => value > 1).length / attemptSamples.length;
+  const retryCoverage = ratio(attemptSamples.length, freshCurrentEntries.length);
 
-  if (input.policy.maxP95LatencyMs !== undefined && p95LatencyMs === null) {
-    blockers.push('latency telemetry required by policy is unavailable');
+  if (input.policy.maxP95LatencyMs !== undefined && latencyCoverage !== 1) {
+    blockers.push(`latency telemetry coverage ${latencyCoverage === null ? 'unavailable' : latencyCoverage.toFixed(4)} is below required 1`);
   }
-  if (input.policy.maxCostPerPassUsd !== undefined && costPerPassUsd === null) {
-    blockers.push('cost telemetry required by policy is unavailable');
+  if (input.policy.maxCostPerPassUsd !== undefined && costCoverage !== 1) {
+    blockers.push(`cost telemetry coverage ${costCoverage === null ? 'unavailable' : costCoverage.toFixed(4)} is below required 1`);
   }
-  if (input.policy.maxRetryRate !== undefined && retryRate === null) {
-    blockers.push('retry telemetry required by policy is unavailable');
+  if (input.policy.maxRetryRate !== undefined && retryCoverage !== 1) {
+    blockers.push(`retry telemetry coverage ${retryCoverage === null ? 'unavailable' : retryCoverage.toFixed(4)} is below required 1`);
   }
 
   const recommendations: FcrOptimizationRecommendation[] = [];
   if (
     input.policy.maxP95LatencyMs !== undefined
+    && latencyCoverage === 1
     && p95LatencyMs !== null
     && p95LatencyMs > input.policy.maxP95LatencyMs
   ) {
@@ -319,6 +359,7 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
   }
   if (
     input.policy.maxCostPerPassUsd !== undefined
+    && costCoverage === 1
     && costPerPassUsd !== null
     && costPerPassUsd > input.policy.maxCostPerPassUsd
   ) {
@@ -331,6 +372,7 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
   }
   if (
     input.policy.maxRetryRate !== undefined
+    && retryCoverage === 1
     && retryRate !== null
     && retryRate > input.policy.maxRetryRate
   ) {
@@ -372,6 +414,9 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
       p95LatencyMs,
       costPerPassUsd,
       retryRate,
+      latencyCoverage,
+      costCoverage,
+      retryCoverage,
     },
     evaluation: {
       status: proofBlocked ? 'blocked' : 'meets_proof_floor',
