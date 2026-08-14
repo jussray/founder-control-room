@@ -239,10 +239,10 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const undeclaredSkillIds = candidateSkills.filter(skill => !declared.has(skill));
 
   const nextGate = undeclaredSkillIds.length > 0 || runtimeSkillRequests.length > 0
-    ? 'Discover runtime skill availability, then invoke only the selected available specialists in order.'
+    ? 'Discover runtime skill availability, resolve only the requested specialists, then invoke the smallest available stack in order.'
     : mutationRequested
-      ? 'Use the selected declared skills to inspect first; mutate only after repository authority and required proof gates are satisfied.'
-      : 'Invoke the selected declared skills read-first and return evidence-bound guidance.';
+      ? 'Discover runtime skill availability, then use only available selected declared skills to inspect first; mutate only after repository authority and required proof gates are satisfied.'
+      : 'Discover runtime skill availability, then invoke only available selected declared skills read-first and return evidence-bound guidance.';
 
   return {
     contract: FCR_SKILL_ROUTER_CONTRACT,
