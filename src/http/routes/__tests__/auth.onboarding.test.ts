@@ -146,7 +146,9 @@ describe('founder browser onboarding', () => {
     const response = await request(app()).get('/auth/google');
 
     expect(response.status).toBe(503);
-    expect(response.body.error).toMatch(/temporarily unavailable/);
+    expect(response.body.error.code).toBe('OAUTH_UNAVAILABLE');
+    expect(response.body.error.message).toMatch(/temporarily unavailable/);
+    expect(response.body.error.details).toEqual([]);
   });
 
   it('sends a first-login magic link only for the allowlisted email', async () => {
@@ -171,7 +173,8 @@ describe('founder browser onboarding', () => {
       .send({ email: 'not-founder@example.com' });
 
     expect(response.status).toBe(202);
-    expect(response.body.message).toMatch(/If this email is on the founder allowlist/);
+    expect(response.body.data.message).toMatch(/If this email is on the founder allowlist/);
+    expect(response.body.meta).toEqual({});
     expect(mockSignInWithOtp).not.toHaveBeenCalled();
   });
 
@@ -186,7 +189,11 @@ describe('founder browser onboarding', () => {
       .send({ access_token: ACCESS_TOKEN, refresh_token: REFRESH_TOKEN });
 
     expect(response.status).toBe(201);
-    expect(response.body).toEqual({ ok: true, founder: { email: EMAIL } });
+    expect(response.body).toEqual({
+      success: true,
+      data: { founder: { email: EMAIL } },
+      meta: {},
+    });
     const cookie = response.headers['set-cookie']?.[0] ?? '';
     expect(cookie).toContain('fcr_session=');
     expect(cookie).toContain('HttpOnly');
@@ -208,6 +215,7 @@ describe('founder browser onboarding', () => {
       .send({ access_token: ACCESS_TOKEN, refresh_token: REFRESH_TOKEN });
 
     expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe('FORBIDDEN');
     expect(response.headers['set-cookie']?.[0]).toContain('Max-Age=0');
     expect(response.headers['cache-control']).toBe('private, no-store');
   });
@@ -218,7 +226,8 @@ describe('founder browser onboarding', () => {
       .set('Cookie', browserCookie());
 
     expect(response.status).toBe(200);
-    expect(response.body.founder).toEqual({ email: EMAIL, userId: 'founder-user' });
+    expect(response.body.data.founder).toEqual({ email: EMAIL, userId: 'founder-user' });
+    expect(response.body.meta).toEqual({});
     expect(mockGetUser).toHaveBeenCalledWith(ACCESS_TOKEN);
   });
 
