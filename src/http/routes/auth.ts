@@ -9,6 +9,7 @@ import {
   readFounderSession,
   writeFounderSession,
 } from '../../auth/founderSession.js';
+import { respondError, respondSuccess } from '../apiResponse.js';
 import { FOUNDER_API_URL, rateLimitMagicLink } from '../middleware/security.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import { founderCallbackHtml } from './onboarding.js';
@@ -58,7 +59,12 @@ authRouter.get('/google', async (_req, res) => {
 
     if (error || !data.url) {
       console.error('Google OAuth start failed:', error?.message ?? 'No redirect URL returned');
-      return res.status(503).json({ error: 'Google sign-in is temporarily unavailable' });
+      return respondError(
+        res,
+        503,
+        'OAUTH_UNAVAILABLE',
+        'Google sign-in is temporarily unavailable.',
+      );
     }
 
     return res.redirect(303, data.url);
@@ -67,7 +73,12 @@ authRouter.get('/google', async (_req, res) => {
       'Google OAuth start failed:',
       error instanceof Error ? error.message : String(error),
     );
-    return res.status(503).json({ error: 'Google sign-in is temporarily unavailable' });
+    return respondError(
+      res,
+      503,
+      'OAUTH_UNAVAILABLE',
+      'Google sign-in is temporarily unavailable.',
+    );
   }
 });
 
@@ -78,7 +89,7 @@ authRouter.get('/google', async (_req, res) => {
 authRouter.post('/magic-link', rateLimitMagicLink, async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   if (!email || !email.includes('@')) {
-    return res.status(400).json({ error: 'A valid email is required' });
+    return respondError(res, 400, 'BAD_REQUEST', 'A valid email is required.');
   }
 
   try {
@@ -99,7 +110,7 @@ authRouter.post('/magic-link', rateLimitMagicLink, async (req, res) => {
     );
   }
 
-  return res.status(202).json({ message: GENERIC_MAGIC_LINK_MESSAGE });
+  return respondSuccess(res, { message: GENERIC_MAGIC_LINK_MESSAGE }, 202);
 });
 
 /**
@@ -161,7 +172,12 @@ authRouter.post('/session', async (req, res) => {
 
   if (!accessToken || !refreshToken || accessToken.length > 16_384 || refreshToken.length > 16_384) {
     clearFounderSession(res);
-    return res.status(400).json({ error: 'Session credentials are missing or malformed' });
+    return respondError(
+      res,
+      400,
+      'BAD_REQUEST',
+      'Session credentials are missing or malformed.',
+    );
   }
 
   const requestAuth = createSupabaseAuthClient();
@@ -173,21 +189,26 @@ authRouter.post('/session', async (req, res) => {
   const email = normalizeEmail(data.user?.email);
   if (error || !data.session || !email) {
     clearFounderSession(res);
-    return res.status(401).json({ error: 'The login link is invalid or expired' });
+    return respondError(
+      res,
+      401,
+      'UNAUTHENTICATED',
+      'The login link is invalid or expired.',
+    );
   }
 
   if (!(await isAllowlisted(email))) {
     clearFounderSession(res);
-    return res.status(403).json({ error: 'Not on the founder allowlist' });
+    return respondError(res, 403, 'FORBIDDEN', 'Not on the founder allowlist.');
   }
 
   writeFounderSession(res, data.session);
-  return res.status(201).json({ ok: true, founder: { email } });
+  return respondSuccess(res, { founder: { email } }, 201);
 });
 
 authRouter.get('/me', requireFounder, (req: FounderRequest, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  return res.json({ founder: req.founder });
+  return respondSuccess(res, { founder: req.founder });
 });
 
 /**
@@ -200,18 +221,21 @@ authRouter.post('/password', requireFounder, async (req: FounderRequest, res) =>
   const confirmPassword = normalizePassword(req.body?.confirmPassword);
 
   if (password.length < MIN_FOUNDER_PASSWORD_LENGTH) {
-    return res.status(400).json({
-      error: `Password must be at least ${MIN_FOUNDER_PASSWORD_LENGTH} characters.`,
-    });
+    return respondError(
+      res,
+      400,
+      'BAD_REQUEST',
+      `Password must be at least ${MIN_FOUNDER_PASSWORD_LENGTH} characters.`,
+    );
   }
   if (confirmPassword && confirmPassword !== password) {
-    return res.status(400).json({ error: 'Passwords do not match.' });
+    return respondError(res, 400, 'BAD_REQUEST', 'Passwords do not match.');
   }
 
   const cookieSession = readFounderSession(req);
   if (!cookieSession) {
     clearFounderSession(res);
-    return res.status(401).json({ error: 'Browser founder session required' });
+    return respondError(res, 401, 'UNAUTHENTICATED', 'Browser founder session required.');
   }
 
   const requestAuth = createSupabaseAuthClient();
@@ -223,22 +247,33 @@ authRouter.post('/password', requireFounder, async (req: FounderRequest, res) =>
   const email = normalizeEmail(sessionData.user?.email);
   if (sessionError || !sessionData.session || !email || email !== req.founder?.email) {
     clearFounderSession(res);
-    return res.status(401).json({ error: 'Founder session could not be verified' });
+    return respondError(
+      res,
+      401,
+      'UNAUTHENTICATED',
+      'Founder session could not be verified.',
+    );
   }
   if (!(await isAllowlisted(email))) {
     clearFounderSession(res);
-    return res.status(403).json({ error: 'Not on the founder allowlist' });
+    return respondError(res, 403, 'FORBIDDEN', 'Not on the founder allowlist.');
   }
 
   const { error: updateError } = await requestAuth.auth.updateUser({ password });
   if (updateError) {
-    return res.status(400).json({ error: updateError.message });
+    console.warn('Founder credential update failed:', updateError.message);
+    return respondError(
+      res,
+      400,
+      'PASSWORD_UPDATE_FAILED',
+      'The password could not be updated.',
+    );
   }
 
   const { data: refreshed } = await requestAuth.auth.getSession();
   if (refreshed.session) writeFounderSession(res, refreshed.session);
 
-  return res.status(200).json({ ok: true, message: 'Founder password updated.' });
+  return respondSuccess(res, { message: 'Founder password updated.' });
 });
 
 authRouter.post('/logout', (_req, res) => {
