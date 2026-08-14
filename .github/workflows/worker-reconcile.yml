@@ -72,31 +72,15 @@ jobs:
 
       - name: Validate Worker-only production configuration
         env:
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
-          GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
-          GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
-          ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL: ${{ secrets.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL }}
-          FOUNDER_REVIEW_EMAIL_INGRESS_SECRET: ${{ secrets.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET }}
         shell: bash
         run: |
           set -euo pipefail
 
           required=(
-            SUPABASE_SERVICE_ROLE_KEY
-            SUPABASE_PUBLISHABLE_KEY
-            GITHUB_WEBHOOK_SECRET
-            GITHUB_APP_ID
-            GITHUB_PRIVATE_KEY
             CLOUDFLARE_API_TOKEN
             CLOUDFLARE_ACCOUNT_ID
-            FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
-            ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
-            FOUNDER_REVIEW_EMAIL_INGRESS_SECRET
           )
           missing=()
 
@@ -111,7 +95,7 @@ jobs:
             exit 1
           fi
 
-          echo "All required Worker-only production configuration names are present."
+          echo "Cloudflare Worker reconciliation credentials are present."
 
       - name: Record bounded authority receipt
         shell: bash
@@ -123,6 +107,7 @@ jobs:
             echo "- Approval reference: \`$DEPLOYMENT_APPROVAL_ID\`"
             echo "- Reason: ${DEPLOYMENT_REASON:-not supplied}"
             echo "- Mutation scope: Cloudflare Worker \`founder-control-room\` via \`wrangler.worker.toml\`"
+            echo "- Existing Worker runtime secrets: preserved; not rewritten by this workflow"
             echo "- Supabase database mutation: skipped by workflow design"
             echo "- Publication scheduling: absent by workflow design"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -156,29 +141,12 @@ jobs:
           wranglerVersion: '4.110.0'
           command: deploy --config wrangler.worker.toml --var GIT_SHA:${{ inputs.expected_head_sha }}
           secrets: |
-            SUPABASE_SERVICE_ROLE_KEY
-            SUPABASE_PUBLISHABLE_KEY
-            GITHUB_WEBHOOK_SECRET
-            GITHUB_APP_ID
-            GITHUB_PRIVATE_KEY
             FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
-            FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
-            ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
-            FOUNDER_REVIEW_EMAIL_INGRESS_SECRET
         env:
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
-          GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
-          GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}
-          FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
-          ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL: ${{ secrets.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL }}
-          FOUNDER_REVIEW_EMAIL_INGRESS_SECRET: ${{ secrets.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET }}
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CF_SESSIONS_KV_NAMESPACE_ID: ${{ secrets.CF_SESSIONS_KV_NAMESPACE_ID }}
-          CF_FEATURE_FLAGS_KV_NAMESPACE_ID: ${{ secrets.CF_FEATURE_FLAGS_KV_NAMESPACE_ID }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          # Reconciliation never activates external publication. This is a
+          # literal disabled policy, not a copied GitHub production secret.
           FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON: >-
             {"id":"founder-signal-draft-only-v2","enabled":false,"routes":[{"channel":"linkedin","audienceSegment":"build-in-public"},{"channel":"facebook","audienceSegment":"build-in-public"}],"repositories":[],"repositoryScope":{"mode":"all_owned","owner":"jussray"},"approvedRecipientIds":[],"expiresAt":null}
 
@@ -216,7 +184,7 @@ jobs:
 
             if tr -d '\r' < "$headers" | grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room$' \
               && jq -e '.ok == true' <<<"$candidate_health" >/dev/null 2>&1 \
-              && jq -e --arg expected "$EXPECTED_HEAD_SHA" '.service == "founder-control-room" and .gitSha == $expected' <<<"$candidate_version" >/dev/null 2>&1; then
+              && jq -e --arg expected "$EXPECTED_HEAD_SHA" '.service == "founder-control-room" and .gitSha == $expected and .founderSignalAutomationGrant.configured == true and .founderSignalAutomationGrant.enabled == false' <<<"$candidate_version" >/dev/null 2>&1; then
               health_body="$candidate_health"
               version_body="$candidate_version"
               break
