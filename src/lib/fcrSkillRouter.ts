@@ -1,262 +1,211 @@
+import {
+  validateV10CapabilityPlanContext,
+  type V10CapabilityPlan,
+} from '../founder-os-lab/capabilityKernel.js';
+
 export const FCR_SKILL_ROUTER_CONTRACT = 'juss/fcr-skill-router@v1' as const;
 
-export type FcrSkillRoutingIntent =
-  | 'strategy'
-  | 'repository-truth'
-  | 'repair'
-  | 'review-merge'
-  | 'security'
-  | 'ui-runtime'
-  | 'incident'
-  | 'publishing'
-  | 'research'
-  | 'provider-coordination';
+export type FcrSkillRouterAction =
+  | 'inspect'
+  | 'plan'
+  | 'review'
+  | 'draft'
+  | 'write'
+  | 'merge'
+  | 'deploy'
+  | 'migrate'
+  | 'rollback'
+  | 'publish'
+  | 'send'
+  | 'delete';
 
-export type FcrRuntimeSkillRequest =
-  | 'codex-security:security-diff-scan'
-  | 'codex-security:security-scan'
-  | 'codex-security:fix-finding'
-  | 'openai-developers:openai-api-troubleshooting'
-  | 'product-design'
-  | 'web-research';
-
-const REPO_TRUTH = 'skill:repo-truth';
-const GOALFIX = 'skill:goalfix';
-const REVIEW_VERIFY_MERGE = 'skill:review-verify-merge';
-const PROOF_LED_PUBLISHING = 'skill:proof-led-publishing';
-const CHIEF_AI = 'skill:juss-chief-ai';
-const AGENT_ROUTER = 'skill:control-room-agent-router';
-const PROOF_LADDER = 'skill:control-room-proof-ladder';
-const INCIDENT_TRIAGE = 'skill:control-room-incident-triage';
-const DESIGN_IMPLEMENTATION = 'skill:control-room-design-implementation';
-const SKILL_ROUTER = 'skill:control-room-skill-router';
-
-export const FCR_DECLARED_ROUTABLE_SKILL_IDS: readonly string[] = Object.freeze([
-  CHIEF_AI,
-  GOALFIX,
-  REPO_TRUTH,
-  PROOF_LED_PUBLISHING,
-  REVIEW_VERIFY_MERGE,
-  AGENT_ROUTER,
-  PROOF_LADDER,
-  INCIDENT_TRIAGE,
-  SKILL_ROUTER,
-]);
+export interface FcrSkillRouterRepositoryContext {
+  projectId: string;
+  provider: string;
+}
 
 export interface RouteFcrSkillsInput {
   goal: string;
-  declaredSkillIds?: readonly string[];
-  explicitSkillIds?: readonly string[];
+  action: FcrSkillRouterAction;
+  projectSlug: string;
+  expectedHeadSha: string;
+  expectedRegistryHash: string;
+  capabilityPlan?: V10CapabilityPlan;
+  repository?: FcrSkillRouterRepositoryContext;
 }
 
 export interface FcrSkillRoutingDecision {
   contract: typeof FCR_SKILL_ROUTER_CONTRACT;
+  status: 'blocked' | 'ready_for_runtime_discovery';
   goal: string;
-  intents: FcrSkillRoutingIntent[];
-  requestedSkillIds: string[];
-  selectedDeclaredSkillIds: string[];
-  undeclaredSkillIds: string[];
-  runtimeSkillRequests: FcrRuntimeSkillRequest[];
+  action: FcrSkillRouterAction;
+  planHash: string | null;
+  plannedCapabilityIds: string[];
+  policyRequiredCapabilityIds: string[];
+  missingPolicyCapabilityIds: string[];
   requiredTools: string[];
   requiredProof: string[];
   mutationRequested: boolean;
   runtimeDiscoveryRequired: true;
-  reasons: string[];
+  executionAllowed: false;
+  errors: string[];
   nextGate: string;
 }
 
+const MUTATING_ACTIONS = new Set<FcrSkillRouterAction>([
+  'write',
+  'merge',
+  'deploy',
+  'migrate',
+  'rollback',
+  'publish',
+  'send',
+  'delete',
+]);
+
 const EXPLICIT_SKILL_ALIASES: Readonly<Record<string, string>> = {
-  goalfix: GOALFIX,
-  'repo-truth': REPO_TRUTH,
-  'review-verify-merge': REVIEW_VERIFY_MERGE,
-  'proof-led-publishing': PROOF_LED_PUBLISHING,
-  'juss-chief-ai': CHIEF_AI,
-  'control-room-agent-router': AGENT_ROUTER,
-  'control-room-proof-ladder': PROOF_LADDER,
-  'control-room-incident-triage': INCIDENT_TRIAGE,
-  'control-room-design-implementation': DESIGN_IMPLEMENTATION,
-  'control-room-skill-router': SKILL_ROUTER,
+  goalfix: 'goalfix',
+  'repo-truth': 'repo-truth',
+  'review-verify-merge': 'review-verify-merge',
+  'proof-led-publishing': 'proof-led-publishing',
+  'juss-chief-ai': 'juss-chief-ai',
+  'control-room-agent-router': 'control-room-agent-router',
+  'control-room-proof-ladder': 'control-room-proof-ladder',
+  'control-room-incident-triage': 'control-room-incident-triage',
+  'control-room-design-implementation': 'control-room-design-implementation',
+  'control-room-skill-router': 'control-room-skill-router',
+  sales: 'sales',
+  devil: 'devil',
 };
 
 function normalize(value: string): string {
   return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
 }
 
-function matches(goal: string, expression: RegExp): boolean {
-  expression.lastIndex = 0;
-  return expression.test(goal);
+function pushUnique(values: string[], value: string): void {
+  if (value && !values.includes(value)) values.push(value);
 }
 
-function pushUnique<T>(values: T[], value: T): void {
-  if (!values.includes(value)) values.push(value);
+function canonicalCapabilityId(value: string): string {
+  return normalize(value).replace(/^(skill|command):/, '');
 }
 
 function explicitSkillsFromGoal(goal: string): string[] {
-  const selected: string[] = [];
+  const required: string[] = [];
   for (const match of goal.matchAll(/\/([a-z0-9-]+)/g)) {
     const skill = EXPLICIT_SKILL_ALIASES[match[1]];
-    if (skill) pushUnique(selected, skill);
+    if (skill) pushUnique(required, skill);
   }
-  return selected;
+  return required;
 }
 
-function isMutationRequested(goal: string): boolean {
-  return matches(
-    goal,
-    /\b(fix|repair|implement|build|merge|deploy|publish|send|update|create|delete|close|write|patch|ship|launch)\b/,
-  );
+function isRepositoryGoal(goal: string): boolean {
+  return /\b(repo|repository|github|git|branch|commit|pull request|\bpr\b|main|code|test|tests|ci|actions|workflow|merge)\b/.test(goal);
+}
+
+function isUiGoal(goal: string): boolean {
+  return /\b(ui|screen|design|figma|layout|responsive|mobile|browser|playwright|frontend|visual)\b/.test(goal);
+}
+
+function isMessagingGoal(goal: string): boolean {
+  return /\b(email|sms|call|calls|webchat|instagram|facebook|whatsapp|telegram|viber|message|messaging|outreach|unified inbox)\b/.test(goal);
+}
+
+function isCommercialGoal(goal: string): boolean {
+  return /\b(sales|offer|pricing|discount|revenue|conversion|retention|checkout|commercial)\b/.test(goal);
 }
 
 export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecision {
   const goal = normalize(input.goal);
-  const declared = new Set(input.declaredSkillIds ?? FCR_DECLARED_ROUTABLE_SKILL_IDS);
-  const candidateSkills: string[] = [];
-  const runtimeSkillRequests: FcrRuntimeSkillRequest[] = [];
+  const errors: string[] = [];
   const requiredTools: string[] = [];
   const requiredProof: string[] = [];
-  const intents: FcrSkillRoutingIntent[] = [];
-  const reasons: string[] = [];
-  const mutationRequested = isMutationRequested(goal);
+  const policyRequiredCapabilityIds = explicitSkillsFromGoal(goal);
+  const mutationRequested = MUTATING_ACTIONS.has(input.action);
+  const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository);
+  const uiGoal = isUiGoal(goal);
+  const messagingGoal = isMessagingGoal(goal);
+  const commercialGoal = isCommercialGoal(goal);
+  const mergeReviewGoal = repositoryGoal && (input.action === 'merge' || input.action === 'review');
 
-  for (const skill of input.explicitSkillIds ?? []) pushUnique(candidateSkills, skill);
-  for (const skill of explicitSkillsFromGoal(goal)) pushUnique(candidateSkills, skill);
-
-  const repositoryTask = matches(
-    goal,
-    /\b(repo|repository|github|branch|commit|pull request|pr|main|code|test|tests|ci|actions|workflow|merge)\b/,
-  );
-  const repairTask = matches(goal, /\b(fix|repair|broken|failing|failure|bug|patch|implement|build|regression)\b/);
-  const reviewMergeTask = matches(goal, /\b(review|verify|merge|pull request|pr|exact-head|exact head)\b/);
-  const auditTask = matches(goal, /\b(audit|inspect|evidence|proof|truth|verify|status|receipt)\b/);
-  const securityTask = matches(
-    goal,
-    /\b(security|vulnerability|vulnerabilities|threat|attack|secret|auth|permission|rls|injection|xss|csrf)\b/,
-  );
-  const uiTask = matches(
-    goal,
-    /\b(ui|screen|design|figma|layout|responsive|mobile|browser|playwright|frontend|visual)\b/,
-  );
-  const incidentTask = matches(goal, /\b(outage|incident|down|timeout|500|502|503|522|production failure)\b/);
-  const publishingTask = matches(
-    goal,
-    /\b(post|publish|linkedin|instagram|threads|campaign|content|social|caption)\b/,
-  );
-  const researchTask = matches(goal, /\b(research|latest|current docs|source verification|fact-check|fact check)\b/);
-  const providerTask = matches(
-    goal,
-    /\b(cloudflare|supabase|hubspot|figma|github|slack|asana|shopify|vercel|stripe|plugin|connector|provider)\b/,
-  );
-  const strategyTask = matches(goal, /\b(strategy|architecture|plan|coordinate|router|routing|skill router)\b/);
-
-  if (strategyTask) {
-    pushUnique(intents, 'strategy');
-    pushUnique(candidateSkills, CHIEF_AI);
-    reasons.push('Strategy or coordination language selects Chief AI for bounded synthesis.');
+  if (commercialGoal) {
+    pushUnique(policyRequiredCapabilityIds, 'sales');
+    pushUnique(policyRequiredCapabilityIds, 'devil');
+    pushUnique(requiredProof, 'truthful commercial claims and adversarial plan review');
   }
 
-  if (repositoryTask || auditTask) {
-    pushUnique(intents, 'repository-truth');
-    pushUnique(candidateSkills, REPO_TRUTH);
-    pushUnique(requiredTools, 'github');
-    pushUnique(requiredProof, 'authoritative repository, branch, and exact commit SHA');
-    reasons.push('Repository or audit language requires repository truth before conversational memory.');
+  if (messagingGoal) {
+    pushUnique(policyRequiredCapabilityIds, 'unified-growth-inbox');
+    pushUnique(requiredProof, 'unified-growth-inbox consent/compliance gate with draft_only as the default mode');
   }
 
-  if (repairTask) {
-    pushUnique(intents, 'repair');
-    pushUnique(candidateSkills, GOALFIX);
-    pushUnique(requiredProof, 'focused cause, reversible patch, and narrow verification');
-    reasons.push('Repair language selects goalfix for the smallest reversible fix.');
+  if (repositoryGoal) {
+    if (!input.repository?.projectId.trim() || !input.repository.provider.trim()) {
+      errors.push('authoritative repository context is required for repository work');
+    } else {
+      pushUnique(requiredTools, input.repository.provider.trim());
+      pushUnique(requiredProof, `repository evidence resolved through RepositoryProvider:${input.repository.provider.trim()}`);
+    }
+    pushUnique(requiredProof, 'authoritative project, branch/ref, and exact commit SHA');
   }
 
-  if (reviewMergeTask) {
-    pushUnique(intents, 'review-merge');
-    pushUnique(candidateSkills, REVIEW_VERIFY_MERGE);
+  if (mergeReviewGoal) {
     pushUnique(requiredProof, 'exact-head checks and unresolved review-thread state');
-    reasons.push('Review or merge language selects review-verify-merge.');
   }
 
-  if (auditTask) {
-    pushUnique(candidateSkills, PROOF_LADDER);
-    pushUnique(requiredProof, 'state → evidence → claim trace');
-  }
-
-  if (securityTask) {
-    pushUnique(intents, 'security');
-    const diffScoped = matches(goal, /\b(pr|pull request|diff|commit|patch|changed files|branch)\b/);
-    const fixingFinding = matches(goal, /\b(fix|repair|patch|remediate)\b.*\b(finding|vulnerability|security)\b|\b(finding|vulnerability)\b.*\b(fix|repair|patch|remediate)\b/);
-    pushUnique(runtimeSkillRequests, diffScoped
-      ? 'codex-security:security-diff-scan'
-      : 'codex-security:security-scan');
-    if (fixingFinding) pushUnique(runtimeSkillRequests, 'codex-security:fix-finding');
-    pushUnique(requiredProof, 'security finding validation bound to the inspected source');
-    reasons.push('Security routing requests a Codex Security specialist at runtime; repository policy does not claim installation state.');
-  }
-
-  if (uiTask) {
-    pushUnique(intents, 'ui-runtime');
-    pushUnique(runtimeSkillRequests, 'product-design');
+  if (uiGoal) {
     pushUnique(requiredTools, 'playwright');
     pushUnique(requiredProof, 'exact-head Playwright evidence for UI/runtime claims');
-    reasons.push('UI or design language requests runtime Product Design support and requires Playwright proof without assuming a design skill is installed.');
   }
 
-  if (incidentTask) {
-    pushUnique(intents, 'incident');
-    pushUnique(candidateSkills, INCIDENT_TRIAGE);
-    pushUnique(requiredProof, 'failure classification and provider/runtime receipt');
+  if (mutationRequested) {
+    pushUnique(requiredProof, 'action-specific authority, approval, rollback, and execution receipt');
   }
 
-  if (publishingTask) {
-    pushUnique(intents, 'publishing');
-    pushUnique(candidateSkills, PROOF_LED_PUBLISHING);
-    pushUnique(requiredProof, 'public claim backed by current proof');
+  if (!input.capabilityPlan) {
+    errors.push('Chief AI capability plan is required before FCR may accept a skill route');
+  } else {
+    errors.push(...validateV10CapabilityPlanContext(input.capabilityPlan, {
+      goal: input.goal,
+      projectSlug: input.projectSlug,
+      expectedHeadSha: input.expectedHeadSha,
+    }));
+
+    if (input.capabilityPlan.registryHash.toLowerCase() !== input.expectedRegistryHash.trim().toLowerCase()) {
+      errors.push('capability plan registry hash does not match the authoritative registry');
+    }
   }
 
-  if (researchTask) {
-    pushUnique(intents, 'research');
-    pushUnique(runtimeSkillRequests, 'web-research');
-    pushUnique(requiredProof, 'fresh source receipts');
+  const plannedCapabilityIds = input.capabilityPlan
+    ? input.capabilityPlan.capabilities.map((capability) => canonicalCapabilityId(capability.id))
+    : [];
+  const planned = new Set(plannedCapabilityIds);
+  const missingPolicyCapabilityIds = policyRequiredCapabilityIds.filter((id) => !planned.has(canonicalCapabilityId(id)));
+
+  for (const missing of missingPolicyCapabilityIds) {
+    errors.push(`Chief AI capability plan is missing repository-required capability: ${missing}`);
   }
 
-  if (providerTask) {
-    pushUnique(intents, 'provider-coordination');
-    pushUnique(candidateSkills, AGENT_ROUTER);
-    reasons.push('Provider or connector language selects the agent router to keep one execution owner and one authority boundary.');
-  }
-
-  if (matches(goal, /\b(openai|api|agent sdk|agents sdk)\b/) && matches(goal, /\b(error|fail|failure|broken|debug|troubleshoot)\b/)) {
-    pushUnique(runtimeSkillRequests, 'openai-developers:openai-api-troubleshooting');
-  }
-
-  if (candidateSkills.length === 0) {
-    pushUnique(candidateSkills, CHIEF_AI);
-    pushUnique(intents, 'strategy');
-    reasons.push('No specialist rule matched, so Chief AI is the narrow fallback rather than fan-out to every skill.');
-  }
-
-  const selectedDeclaredSkillIds = candidateSkills.filter(skill => declared.has(skill));
-  const undeclaredSkillIds = candidateSkills.filter(skill => !declared.has(skill));
-
-  const nextGate = undeclaredSkillIds.length > 0 || runtimeSkillRequests.length > 0
-    ? 'Discover runtime skill availability, resolve only the requested specialists, then invoke the smallest available stack in order.'
-    : mutationRequested
-      ? 'Discover runtime skill availability, then use only available selected declared skills to inspect first; mutate only after repository authority and required proof gates are satisfied.'
-      : 'Discover runtime skill availability, then invoke only available selected declared skills read-first and return evidence-bound guidance.';
+  const status = errors.length === 0 ? 'ready_for_runtime_discovery' : 'blocked';
+  const nextGate = status === 'blocked'
+    ? 'Return the policy failures to Chief AI and require a corrected hash-bound capability plan before runtime discovery or mutation.'
+    : 'Discover runtime availability for only the capabilities in the validated Chief AI plan; preserve provider, proof, approval, and execution boundaries.';
 
   return {
     contract: FCR_SKILL_ROUTER_CONTRACT,
+    status,
     goal: input.goal.trim(),
-    intents,
-    requestedSkillIds: candidateSkills,
-    selectedDeclaredSkillIds,
-    undeclaredSkillIds,
-    runtimeSkillRequests,
+    action: input.action,
+    planHash: input.capabilityPlan?.planHash ?? null,
+    plannedCapabilityIds,
+    policyRequiredCapabilityIds,
+    missingPolicyCapabilityIds,
     requiredTools,
     requiredProof,
     mutationRequested,
     runtimeDiscoveryRequired: true,
-    reasons,
+    executionAllowed: false,
+    errors,
     nextGate,
   };
 }
