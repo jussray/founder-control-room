@@ -28,6 +28,7 @@ describe('FCR skill router', () => {
     ]));
     expect(decision.mutationRequested).toBe(true);
     expect(decision.runtimeDiscoveryRequired).toBe(true);
+    expect(decision.nextGate).toMatch(/discover runtime skill availability/i);
   });
 
   it('requires Playwright and runtime Product Design discovery for UI/runtime work', () => {
@@ -98,6 +99,7 @@ describe('FCR skill router', () => {
     expect(decision.selectedDeclaredSkillIds).toEqual(['skill:juss-chief-ai']);
     expect(decision.intents).toEqual(['strategy']);
     expect(decision.runtimeSkillRequests).toEqual([]);
+    expect(decision.nextGate).toMatch(/discover runtime skill availability/i);
   });
 
   it('keeps the checked-in router policy explicit and finite', () => {
