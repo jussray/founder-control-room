@@ -214,6 +214,7 @@ function renderShell() {
       <div class="topbar">
         <div class="brand">Founder Control Room</div>
         <div style="display:flex; align-items:center; gap:0.75rem;">
+          <a class="capabilities-link" href="/control-room/capabilities.html">Capabilities</a>
           <span class="founder-email">${escapeHtml(state.session.email)}</span>
           <button id="sign-out">Sign out</button>
         </div>
