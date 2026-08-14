@@ -1,0 +1,259 @@
+name: FCR Worker Reconcile
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_head_sha:
+        description: Exact current main commit approved for Worker reconciliation
+        required: true
+        type: string
+      deployment_approval_id:
+        description: Auditable founder approval reference
+        required: true
+        type: string
+      deployment_reason:
+        description: Short reason for this Worker reconciliation
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fcr-worker-reconcile-production
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  authority-gate:
+    name: Worker Reconcile Authority and Exact-Head Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    env:
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+      DEPLOYMENT_APPROVAL_ID: ${{ inputs.deployment_approval_id }}
+      DEPLOYMENT_REASON: ${{ inputs.deployment_reason }}
+    steps:
+      - name: Checkout exact approved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify production authority and current main
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=Invalid exact head::expected_head_sha must be a lowercase 40-character commit SHA."
+            exit 1
+          fi
+          if [[ ! "$DEPLOYMENT_APPROVAL_ID" =~ ^[A-Za-z0-9._:-]{8,200}$ ]]; then
+            echo "::error title=Invalid production approval reference::deployment_approval_id must be an auditable 8-200 character reference."
+            exit 1
+          fi
+
+          ACTUAL_HEAD_SHA="$(git rev-parse HEAD)"
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          CURRENT_MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
+
+          echo "Expected approved SHA: $EXPECTED_HEAD_SHA"
+          echo "Checked-out SHA:       $ACTUAL_HEAD_SHA"
+          echo "Current main SHA:       $CURRENT_MAIN_SHA"
+          echo "Approval reference:     $DEPLOYMENT_APPROVAL_ID"
+
+          test "$ACTUAL_HEAD_SHA" = "$EXPECTED_HEAD_SHA"
+          test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"
+
+      - name: Validate Worker-only production configuration
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
+          GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
+          GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
+          ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL: ${{ secrets.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL }}
+          FOUNDER_REVIEW_EMAIL_INGRESS_SECRET: ${{ secrets.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          required=(
+            SUPABASE_SERVICE_ROLE_KEY
+            SUPABASE_PUBLISHABLE_KEY
+            GITHUB_WEBHOOK_SECRET
+            GITHUB_APP_ID
+            GITHUB_PRIVATE_KEY
+            CLOUDFLARE_API_TOKEN
+            CLOUDFLARE_ACCOUNT_ID
+            FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
+            ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
+            FOUNDER_REVIEW_EMAIL_INGRESS_SECRET
+          )
+          missing=()
+
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+
+          if (( ${#missing[@]} > 0 )); then
+            printf '::error title=Missing Worker reconcile configuration::Set these GitHub production environment secrets before reconciliation: %s\n' "${missing[*]}"
+            exit 1
+          fi
+
+          echo "All required Worker-only production configuration names are present."
+
+      - name: Record bounded authority receipt
+        shell: bash
+        run: |
+          {
+            echo "## Worker reconciliation authority receipt"
+            echo
+            echo "- Exact approved head: \`$EXPECTED_HEAD_SHA\`"
+            echo "- Approval reference: \`$DEPLOYMENT_APPROVAL_ID\`"
+            echo "- Reason: ${DEPLOYMENT_REASON:-not supplied}"
+            echo "- Mutation scope: Cloudflare Worker \`founder-control-room\` via \`wrangler.worker.toml\`"
+            echo "- Supabase database mutation: skipped by workflow design"
+            echo "- Proof-of-ship/publication: absent by workflow design"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  worker-deploy:
+    name: Reconcile Canonical Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    needs: authority-gate
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_head_sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy only the canonical Worker configuration
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4.110.0'
+          command: deploy --config wrangler.worker.toml --var GIT_SHA:${{ inputs.expected_head_sha }}
+          secrets: |
+            SUPABASE_SERVICE_ROLE_KEY
+            SUPABASE_PUBLISHABLE_KEY
+            GITHUB_WEBHOOK_SECRET
+            GITHUB_APP_ID
+            GITHUB_PRIVATE_KEY
+            FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
+            FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
+            ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
+            FOUNDER_REVIEW_EMAIL_INGRESS_SECRET
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
+          GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
+          GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}
+          FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
+          ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL: ${{ secrets.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL }}
+          FOUNDER_REVIEW_EMAIL_INGRESS_SECRET: ${{ secrets.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET }}
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_SESSIONS_KV_NAMESPACE_ID: ${{ secrets.CF_SESSIONS_KV_NAMESPACE_ID }}
+          CF_FEATURE_FLAGS_KV_NAMESPACE_ID: ${{ secrets.CF_FEATURE_FLAGS_KV_NAMESPACE_ID }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON: >-
+            {"id":"founder-signal-draft-only-v2","enabled":false,"routes":[{"channel":"linkedin","audienceSegment":"build-in-public"},{"channel":"facebook","audienceSegment":"build-in-public"}],"repositories":[],"repositoryScope":{"mode":"all_owned","owner":"jussray"},"approvedRecipientIds":[],"expiresAt":null}
+
+  runtime-proof:
+    name: Prove Canonical API Origin and Exact SHA
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: worker-deploy
+    env:
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+      API_ORIGIN: https://api.foundercontrolroom.org
+    steps:
+      - name: Verify health, service identity, and exact deployed SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-results
+
+          headers="$(mktemp)"
+          trap 'rm -f "$headers"' EXIT
+
+          health_body=''
+          version_body=''
+          for attempt in 1 2 3 4 5 6; do
+            : > "$headers"
+            candidate_health="$(curl --silent --show-error --fail \
+              --proto '=https' --proto-redir '=https' --max-redirs 0 \
+              --connect-timeout 10 --max-time 20 \
+              --dump-header "$headers" \
+              "$API_ORIGIN/health" 2>/dev/null || true)"
+            candidate_version="$(curl --silent --show-error --fail \
+              --proto '=https' --proto-redir '=https' --max-redirs 0 \
+              --connect-timeout 10 --max-time 20 \
+              "$API_ORIGIN/version" 2>/dev/null || true)"
+
+            if tr -d '\r' < "$headers" | grep -Eiq '^x-founder-control-room-service:[[:space:]]*founder-control-room$' \
+              && jq -e '.ok == true' <<<"$candidate_health" >/dev/null 2>&1 \
+              && jq -e --arg expected "$EXPECTED_HEAD_SHA" '.service == "founder-control-room" and .gitSha == $expected' <<<"$candidate_version" >/dev/null 2>&1; then
+              health_body="$candidate_health"
+              version_body="$candidate_version"
+              break
+            fi
+            sleep 10
+          done
+
+          if [[ -z "$health_body" || -z "$version_body" ]]; then
+            echo '::error title=Worker reconciliation proof failed::api.foundercontrolroom.org did not prove canonical service identity and exact deployed SHA.'
+            exit 1
+          fi
+
+          jq -n \
+            --arg scope "worker_reconcile" \
+            --arg api_origin "$API_ORIGIN" \
+            --arg expected_sha "$EXPECTED_HEAD_SHA" \
+            --arg service "$(jq -r '.service' <<<"$version_body")" \
+            --arg live_sha "$(jq -r '.gitSha' <<<"$version_body")" \
+            --argjson health "$health_body" \
+            '{
+              scope: $scope,
+              api_origin: $api_origin,
+              expected_sha: $expected_sha,
+              service: $service,
+              live_sha: $live_sha,
+              health: $health,
+              supabase_db_mutation: false,
+              proof_of_ship: false
+            }' > test-results/fcr-worker-reconcile.json
+
+          cat test-results/fcr-worker-reconcile.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload redacted reconciliation receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fcr-worker-reconcile-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/fcr-worker-reconcile.json
+          if-no-files-found: warn
+          retention-days: 30
