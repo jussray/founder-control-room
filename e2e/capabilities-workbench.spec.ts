@@ -11,6 +11,9 @@ const session = JSON.stringify({
 });
 
 test.beforeEach(async ({ context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], {
+    origin: 'http://127.0.0.1:8788',
+  });
   await context.addInitScript(value => {
     window.sessionStorage.setItem('fcr_session', value);
   }, session);
