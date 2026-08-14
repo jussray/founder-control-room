@@ -73,6 +73,9 @@ describe('FCR evidence-to-scale decision kernel', () => {
     expect(decision.evaluation.blockers).toContain('no evidence supplied');
     expect(decision.metrics.passRate).toBeNull();
     expect(decision.metrics.p95LatencyMs).toBeNull();
+    expect(decision.metrics.latencyCoverage).toBeNull();
+    expect(decision.metrics.costCoverage).toBeNull();
+    expect(decision.metrics.retryCoverage).toBeNull();
     expect(decision.scaleGate.status).toBe('blocked');
     expect(decision.scaleGate.scaleAuthorized).toBe(false);
     expect(decision.scaleGate.executionAllowed).toBe(false);
@@ -91,6 +94,9 @@ describe('FCR evidence-to-scale decision kernel', () => {
       proofCoverage: 1,
       p95LatencyMs: 500,
       retryRate: 0,
+      latencyCoverage: 1,
+      costCoverage: 1,
+      retryCoverage: 1,
     });
     expect(decision.metrics.costPerPassUsd).toBeCloseTo(0.25 / 3);
     expect(decision.optimization.status).toBe('none');
@@ -146,7 +152,7 @@ describe('FCR evidence-to-scale decision kernel', () => {
     expect(decision.scaleGate.status).toBe('ready_for_founder_scale_review');
   });
 
-  it('requires telemetry when the explicit policy contains an efficiency budget', () => {
+  it('requires complete telemetry when the explicit policy contains an efficiency budget', () => {
     const entries = completeEvidence().map(({ latencyMs: _latency, costUsd: _cost, attempts: _attempts, ...entry }) => entry);
 
     const decision = evaluate(entries);
@@ -154,11 +160,33 @@ describe('FCR evidence-to-scale decision kernel', () => {
     expect(decision.metrics.p95LatencyMs).toBeNull();
     expect(decision.metrics.costPerPassUsd).toBeNull();
     expect(decision.metrics.retryRate).toBeNull();
+    expect(decision.metrics.latencyCoverage).toBe(0);
+    expect(decision.metrics.costCoverage).toBe(0);
+    expect(decision.metrics.retryCoverage).toBe(0);
     expect(decision.evaluation.blockers).toEqual(expect.arrayContaining([
-      'latency telemetry required by policy is unavailable',
-      'cost telemetry required by policy is unavailable',
-      'retry telemetry required by policy is unavailable',
+      'latency telemetry coverage 0.0000 is below required 1',
+      'cost telemetry coverage 0.0000 is below required 1',
+      'retry telemetry coverage 0.0000 is below required 1',
     ]));
+    expect(decision.scaleGate.status).toBe('blocked');
+  });
+
+  it('blocks partial telemetry so healthy samples cannot hide unmeasured work', () => {
+    const entries = completeEvidence();
+    const { latencyMs: _latency, costUsd: _cost, attempts: _attempts, ...unmeasuredRuntime } = entries[2];
+    entries[2] = unmeasuredRuntime;
+
+    const decision = evaluate(entries);
+
+    expect(decision.metrics.latencyCoverage).toBeCloseTo(2 / 3);
+    expect(decision.metrics.costCoverage).toBeCloseTo(2 / 3);
+    expect(decision.metrics.retryCoverage).toBeCloseTo(2 / 3);
+    expect(decision.evaluation.blockers).toEqual(expect.arrayContaining([
+      'latency telemetry coverage 0.6667 is below required 1',
+      'cost telemetry coverage 0.6667 is below required 1',
+      'retry telemetry coverage 0.6667 is below required 1',
+    ]));
+    expect(decision.optimization.status).toBe('blocked_by_proof');
     expect(decision.scaleGate.status).toBe('blocked');
   });
 
@@ -195,6 +223,25 @@ describe('FCR evidence-to-scale decision kernel', () => {
     expect(decision.metrics.failureRate).toBe(0.25);
     expect(decision.evaluation.blockers.join(' ')).toMatch(/pass rate|failure rate/);
     expect(decision.optimization.status).toBe('blocked_by_proof');
+    expect(decision.scaleGate.status).toBe('blocked');
+  });
+
+  it('rejects unsupported runtime enum values instead of trusting TypeScript callers', () => {
+    const entries = completeEvidence();
+    entries[0] = {
+      ...entries[0],
+      kind: 'mystery' as FcrEvidenceLedgerEntry['kind'],
+      verdict: 'MAYBE' as FcrEvidenceLedgerEntry['verdict'],
+      source: 'shadow-ledger' as FcrEvidenceLedgerEntry['source'],
+    };
+
+    const decision = evaluate(entries);
+
+    expect(decision.ledger.integrityFailures).toEqual(expect.arrayContaining([
+      'evidence test-green has unsupported kind: mystery',
+      'evidence test-green has unsupported verdict: MAYBE',
+      'evidence test-green has unsupported source: shadow-ledger',
+    ]));
     expect(decision.scaleGate.status).toBe('blocked');
   });
 
