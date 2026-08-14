@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "contract": "juss/chatgpt-plugin-management@v1",
+  "repository": "jussray/founder-control-room",
+  "authorityRepository": "jussray/founder-control-room",
+  "controlPlane": "ChatGPT Plugin Management",
+  "runtimeDiscoveryRequired": true,
+  "liveStateStored": false,
+  "writesRequireExplicitUserIntent": true,
+  "writesRequireFreshRepositoryAuthority": true,
+  "permissionStateSource": "chatgpt-runtime",
+  "connectionStateSource": "chatgpt-runtime",
+  "truthBoundary": "This file declares intended plugin capability only. It does not prove that a plugin is installed, connected, permitted, or that any action executed.",
+  "plugins": [
+    {
+      "name": "GitHub",
+      "role": "Authoritative repository, branch, pull request, review, and exact-head evidence.",
+      "runtimeDiscoveryRequired": true,
+      "defaultMode": "read-first"
+    },
+    {
+      "name": "Supabase",
+      "role": "Database, auth, migration, advisor, and policy-readiness evidence.",
+      "runtimeDiscoveryRequired": true,
+      "defaultMode": "read-first"
+    },
+    {
+      "name": "Slack",
+      "role": "Founder and project status coordination after destination resolution.",
+      "runtimeDiscoveryRequired": true,
+      "defaultMode": "read-first"
+    },
+    {
+      "name": "Asana",
+      "role": "Project and task-state coordination with named-project scope.",
+      "runtimeDiscoveryRequired": true,
+      "defaultMode": "read-first"
+    },
+    {
+      "name": "HubSpot",
+      "role": "CRM evidence and gated follow-up coordination.",
+      "runtimeDiscoveryRequired": true,
+      "defaultMode": "read-first"
+    },
+    {
+      "name": "Figma",
+      "role": "Editable design evidence and handoff; never runtime proof.",
+      "runtimeDiscoveryRequired": true,
+      "defaultMode": "read-first"
+    }
+  ]
+}
