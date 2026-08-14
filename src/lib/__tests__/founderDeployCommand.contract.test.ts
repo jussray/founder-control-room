@@ -9,6 +9,24 @@ const reconcileWorkflow = readFileSync(
   new URL('../../../.github/workflows/worker-reconcile.yml', import.meta.url),
   'utf8',
 );
+const workerConfig = readFileSync(
+  new URL('../../../wrangler.worker.toml', import.meta.url),
+  'utf8',
+);
+
+function configuredWorkerSecretNames() {
+  const secretBlock = workerConfig.match(/\[secrets\]\s+required\s*=\s*\[([\s\S]*?)\]/);
+  expect(secretBlock).not.toBeNull();
+  return Array.from(secretBlock![1].matchAll(/"([A-Z0-9_]+)"/g), ([, name]) => name);
+}
+
+function workerReconcileUploadedSecretNames() {
+  const secretBlock = reconcileWorkflow.match(
+    /secrets:\s*\|\n((?:\s{12}[A-Z][A-Z0-9_]*\n)+)\s{8}env:/,
+  );
+  expect(secretBlock).not.toBeNull();
+  return secretBlock![1].trim().split(/\s+/);
+}
 
 describe('Founder deploy command authority contract', () => {
   it('accepts only the founder command on canonical issue 182', () => {
@@ -47,6 +65,7 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).toContain('https://api.foundercontrolroom.org');
     expect(reconcileWorkflow).toContain('x-founder-control-room-service');
     expect(reconcileWorkflow).toContain('.service == "founder-control-room" and .gitSha == $expected');
+    expect(reconcileWorkflow).toContain('.founderSignalAutomationGrant.configured == true and .founderSignalAutomationGrant.enabled == false');
 
     expect(reconcileWorkflow).not.toContain('supabase db push');
     expect(reconcileWorkflow).not.toContain('SUPABASE_DB_URL');
@@ -55,13 +74,27 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).not.toContain('PUBLISH_ALLOWED');
   });
 
-  it('preserves existing Worker runtime secrets instead of requiring or rewriting them', () => {
+  it('preserves required Worker bindings while forcing the publication grant disabled', () => {
     expect(reconcileWorkflow).toContain('Existing Worker runtime secrets: preserved; not rewritten by this workflow');
     expect(reconcileWorkflow).toContain('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}');
     expect(reconcileWorkflow).toContain('CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}');
     expect(reconcileWorkflow).not.toContain('SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}');
     expect(reconcileWorkflow).not.toContain('GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}');
     expect(reconcileWorkflow).not.toContain('FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}');
-    expect(reconcileWorkflow).not.toContain('secrets: |');
+    expect(configuredWorkerSecretNames()).toEqual([
+      'SUPABASE_SERVICE_ROLE_KEY',
+      'SUPABASE_PUBLISHABLE_KEY',
+      'GITHUB_WEBHOOK_SECRET',
+      'GITHUB_APP_ID',
+      'GITHUB_PRIVATE_KEY',
+      'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
+      'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
+      'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
+      'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET',
+    ]);
+    expect(workerReconcileUploadedSecretNames()).toEqual([
+      'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
+    ]);
+    expect(reconcileWorkflow).toContain('"id":"founder-signal-draft-only-v2","enabled":false');
   });
 });
