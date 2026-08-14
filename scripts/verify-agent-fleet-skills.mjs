@@ -30,11 +30,14 @@ for (const phrase of [
 ]) requireText('router invariant', skills.router, phrase);
 
 for (const phrase of [
-  'Explicit skill requests remain authoritative',
-  'runtime skill/plugin availability',
-  'narrowest Codex Security runtime skill',
+  'Chief AI Machine owns reasoning, capability composition, and skill/tool routing',
+  'MUST NOT reconstruct specialist selection from prompt keywords',
+  'hash-bound `juss-v10/capability-plan@v1`',
+  '/sales /devil',
+  '`unified-growth-inbox` capability',
+  'authoritative `RepositoryProvider`',
   'Playwright evidence for UI/runtime claims',
-  'Skill selection never grants write authority',
+  'Skill routing never grants write authority',
 ]) requireText('skill router invariant', skills.skillRouter, phrase);
 
 for (const phrase of [
