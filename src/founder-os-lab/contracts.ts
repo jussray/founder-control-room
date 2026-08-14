@@ -1,5 +1,4 @@
 import type { FirstPartySocialPostInput } from '../lib/firstPartySocialPublisher.js';
-import type { FcrSkillRoutingDecision } from '../lib/fcrSkillRouter.js';
 import type { V10CapabilityPlan } from './capabilityKernel.js';
 
 export const FOUNDER_OS_LAB_VERSION = 'founder-os-lab-v1' as const;
@@ -202,7 +201,6 @@ export interface FounderOsLabCapabilityPlanRoute {
 
 export interface FounderOsLabRoute {
   chiefSkill: 'juss-chief-ai';
-  skillSelection: FcrSkillRoutingDecision;
   command: FounderOsLabCommandRoute;
   provider: FounderOsLabProviderRoute;
   project: FounderOsLabProjectRoute | null;
