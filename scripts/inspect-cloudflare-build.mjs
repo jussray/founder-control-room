@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 
 const accountId = process.env.CF_ACCOUNT_ID?.trim();
@@ -66,12 +67,17 @@ function normalizeLogLine(line) {
   return String(line ?? "");
 }
 
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
 const receipt = {
   ok: false,
   workerName,
   apiHostname,
   expectedHeadSha: expectedHeadSha || null,
   inspectedAt: new Date().toISOString(),
+  origin: null,
   domain: null,
   build: null,
   relevantLogLines: [],
@@ -79,9 +85,73 @@ const receipt = {
 };
 
 try {
-  if (!accountId || !apiToken || !expectedHeadSha) {
+  if (!expectedHeadSha) {
+    throw new Error("EXPECTED_HEAD_SHA or GITHUB_SHA is required.");
+  }
+
+  let originResponse;
+  try {
+    originResponse = await fetch(`https://${apiHostname}/version`, {
+      headers: { Accept: "application/json" },
+      redirect: "error",
+    });
+  } catch (error) {
     throw new Error(
-      "CF_ACCOUNT_ID, CF_API_TOKEN, and EXPECTED_HEAD_SHA or GITHUB_SHA are required.",
+      `PUBLIC_ORIGIN_TRANSPORT_FAILURE: ${redact(error instanceof Error ? error.message : error)}`,
+    );
+  }
+
+  const originBody = Buffer.from(await originResponse.arrayBuffer());
+  const originText = originBody.toString("utf8");
+  const originContentType = originResponse.headers.get("content-type");
+  const originServiceIdentity = originResponse.headers.get(
+    "x-founder-control-room-service",
+  );
+  let originJson = null;
+  try {
+    originJson = JSON.parse(originText);
+  } catch {
+    originJson = null;
+  }
+
+  const liveSha =
+    originJson && typeof originJson.gitSha === "string" ? originJson.gitSha : null;
+  receipt.origin = {
+    httpStatus: originResponse.status,
+    contentType: originContentType,
+    serviceIdentity: originServiceIdentity,
+    responseBytes: originBody.byteLength,
+    responseSha256: sha256(originBody),
+    liveSha,
+  };
+
+  if (!originResponse.ok) {
+    throw new Error(
+      `PUBLIC_ORIGIN_HTTP_FAILURE: ${apiHostname}/version returned HTTP ${originResponse.status}.`,
+    );
+  }
+
+  if (originServiceIdentity !== workerName || originJson?.service !== workerName) {
+    throw new Error(
+      `WRONG_SERVICE_ORIGIN: ${apiHostname} is not reaching the canonical ${workerName} Worker.`,
+    );
+  }
+
+  if (!/^[0-9a-f]{40}$/.test(liveSha ?? "")) {
+    throw new Error(
+      `INVALID_VERSION_DOCUMENT: ${apiHostname}/version did not return a valid exact gitSha.`,
+    );
+  }
+
+  if (liveSha !== expectedHeadSha) {
+    throw new Error(
+      `STALE_LIVE_DEPLOYMENT: live Worker SHA ${liveSha} does not match expected head ${expectedHeadSha}.`,
+    );
+  }
+
+  if (!accountId || !apiToken) {
+    throw new Error(
+      "PROVIDER_CREDENTIALS_UNAVAILABLE: CF_ACCOUNT_ID and CF_API_TOKEN are required for Cloudflare domain/build ownership inspection after public-origin proof passes.",
     );
   }
 
