@@ -74,6 +74,7 @@
     "@types/supertest": "^6.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
+    "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^9.0.0",
     "playwright": "^1.61.1",
     "supertest": "^7.0.0",
