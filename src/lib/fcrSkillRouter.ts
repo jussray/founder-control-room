@@ -20,27 +20,6 @@ export type FcrRuntimeSkillRequest =
   | 'product-design'
   | 'web-research';
 
-export interface RouteFcrSkillsInput {
-  goal: string;
-  availableSkillIds: readonly string[];
-  explicitSkillIds?: readonly string[];
-}
-
-export interface FcrSkillRoutingDecision {
-  contract: typeof FCR_SKILL_ROUTER_CONTRACT;
-  goal: string;
-  intents: FcrSkillRoutingIntent[];
-  selectedSkillIds: string[];
-  unavailableSkillIds: string[];
-  runtimeSkillRequests: FcrRuntimeSkillRequest[];
-  requiredTools: string[];
-  requiredProof: string[];
-  mutationRequested: boolean;
-  runtimeDiscoveryRequired: true;
-  reasons: string[];
-  nextGate: string;
-}
-
 const REPO_TRUTH = 'skill:repo-truth';
 const GOALFIX = 'skill:goalfix';
 const REVIEW_VERIFY_MERGE = 'skill:review-verify-merge';
@@ -50,6 +29,41 @@ const AGENT_ROUTER = 'skill:control-room-agent-router';
 const PROOF_LADDER = 'skill:control-room-proof-ladder';
 const INCIDENT_TRIAGE = 'skill:control-room-incident-triage';
 const DESIGN_IMPLEMENTATION = 'skill:control-room-design-implementation';
+const SKILL_ROUTER = 'skill:control-room-skill-router';
+
+export const FCR_DECLARED_ROUTABLE_SKILL_IDS: readonly string[] = Object.freeze([
+  CHIEF_AI,
+  GOALFIX,
+  REPO_TRUTH,
+  PROOF_LED_PUBLISHING,
+  REVIEW_VERIFY_MERGE,
+  AGENT_ROUTER,
+  PROOF_LADDER,
+  INCIDENT_TRIAGE,
+  SKILL_ROUTER,
+]);
+
+export interface RouteFcrSkillsInput {
+  goal: string;
+  declaredSkillIds?: readonly string[];
+  explicitSkillIds?: readonly string[];
+}
+
+export interface FcrSkillRoutingDecision {
+  contract: typeof FCR_SKILL_ROUTER_CONTRACT;
+  goal: string;
+  intents: FcrSkillRoutingIntent[];
+  requestedSkillIds: string[];
+  selectedDeclaredSkillIds: string[];
+  undeclaredSkillIds: string[];
+  runtimeSkillRequests: FcrRuntimeSkillRequest[];
+  requiredTools: string[];
+  requiredProof: string[];
+  mutationRequested: boolean;
+  runtimeDiscoveryRequired: true;
+  reasons: string[];
+  nextGate: string;
+}
 
 const EXPLICIT_SKILL_ALIASES: Readonly<Record<string, string>> = {
   goalfix: GOALFIX,
@@ -61,6 +75,7 @@ const EXPLICIT_SKILL_ALIASES: Readonly<Record<string, string>> = {
   'control-room-proof-ladder': PROOF_LADDER,
   'control-room-incident-triage': INCIDENT_TRIAGE,
   'control-room-design-implementation': DESIGN_IMPLEMENTATION,
+  'control-room-skill-router': SKILL_ROUTER,
 };
 
 function normalize(value: string): string {
@@ -94,7 +109,7 @@ function isMutationRequested(goal: string): boolean {
 
 export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecision {
   const goal = normalize(input.goal);
-  const available = new Set(input.availableSkillIds);
+  const declared = new Set(input.declaredSkillIds ?? FCR_DECLARED_ROUTABLE_SKILL_IDS);
   const candidateSkills: string[] = [];
   const runtimeSkillRequests: FcrRuntimeSkillRequest[] = [];
   const requiredTools: string[] = [];
@@ -180,11 +195,10 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
 
   if (uiTask) {
     pushUnique(intents, 'ui-runtime');
-    pushUnique(candidateSkills, DESIGN_IMPLEMENTATION);
     pushUnique(runtimeSkillRequests, 'product-design');
     pushUnique(requiredTools, 'playwright');
     pushUnique(requiredProof, 'exact-head Playwright evidence for UI/runtime claims');
-    reasons.push('UI or design language requires design implementation guidance plus Playwright proof.');
+    reasons.push('UI or design language requests runtime Product Design support and requires Playwright proof without assuming a design skill is installed.');
   }
 
   if (incidentTask) {
@@ -221,21 +235,22 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
     reasons.push('No specialist rule matched, so Chief AI is the narrow fallback rather than fan-out to every skill.');
   }
 
-  const selectedSkillIds = candidateSkills.filter(skill => available.has(skill));
-  const unavailableSkillIds = candidateSkills.filter(skill => !available.has(skill));
+  const selectedDeclaredSkillIds = candidateSkills.filter(skill => declared.has(skill));
+  const undeclaredSkillIds = candidateSkills.filter(skill => !declared.has(skill));
 
-  const nextGate = unavailableSkillIds.length > 0 || runtimeSkillRequests.length > 0
+  const nextGate = undeclaredSkillIds.length > 0 || runtimeSkillRequests.length > 0
     ? 'Discover runtime skill availability, then invoke only the selected available specialists in order.'
     : mutationRequested
-      ? 'Use the selected skills to inspect first; mutate only after repository authority and required proof gates are satisfied.'
-      : 'Invoke the selected skills read-first and return evidence-bound guidance.';
+      ? 'Use the selected declared skills to inspect first; mutate only after repository authority and required proof gates are satisfied.'
+      : 'Invoke the selected declared skills read-first and return evidence-bound guidance.';
 
   return {
     contract: FCR_SKILL_ROUTER_CONTRACT,
     goal: input.goal.trim(),
     intents,
-    selectedSkillIds,
-    unavailableSkillIds,
+    requestedSkillIds: candidateSkills,
+    selectedDeclaredSkillIds,
+    undeclaredSkillIds,
     runtimeSkillRequests,
     requiredTools,
     requiredProof,
