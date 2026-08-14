@@ -2,6 +2,7 @@ import {readFile} from 'node:fs/promises';
 
 const skills = {
   router: await readFile(new URL('../.agents/skills/control-room-agent-router/SKILL.md', import.meta.url), 'utf8'),
+  skillRouter: await readFile(new URL('../.agents/skills/control-room-skill-router/SKILL.md', import.meta.url), 'utf8'),
   proof: await readFile(new URL('../.agents/skills/control-room-proof-ladder/SKILL.md', import.meta.url), 'utf8'),
   incident: await readFile(new URL('../.agents/skills/control-room-incident-triage/SKILL.md', import.meta.url), 'utf8'),
   handoff: await readFile(new URL('../.agents/skills/control-room-agent-handoff/SKILL.md', import.meta.url), 'utf8'),
@@ -27,6 +28,17 @@ for (const phrase of [
   'Routing decision record',
   'A previous agent',
 ]) requireText('router invariant', skills.router, phrase);
+
+for (const phrase of [
+  'Chief AI Machine owns reasoning, capability composition, and skill/tool routing',
+  'MUST NOT reconstruct specialist selection from prompt keywords',
+  'hash-bound `juss-v10/capability-plan@v1`',
+  '/sales /devil',
+  '`unified-growth-inbox` capability',
+  'authoritative `RepositoryProvider`',
+  'Playwright evidence for UI/runtime claims',
+  'Skill routing never grants write authority',
+]) requireText('skill router invariant', skills.skillRouter, phrase);
 
 for (const phrase of [
   'Evidence ladder',
