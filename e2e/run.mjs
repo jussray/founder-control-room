@@ -42,6 +42,11 @@ const BRIDGE_FILE = new URL('./.auth-bridge.json', import.meta.url).pathname;
 const GITHUB_OWNER = 'jussray';
 const GITHUB_REPO = 'demo-project';
 const GITHUB_WEBHOOK_SECRET = 'e2e-webhook-secret';
+const E2E_SCENARIO = process.env.FCR_E2E_SCENARIO ?? 'full';
+
+if (E2E_SCENARIO !== 'full' && E2E_SCENARIO !== 'capability-workbench') {
+  throw new Error(`Unsupported FCR_E2E_SCENARIO: ${E2E_SCENARIO}`);
+}
 
 // The guarded terminal's command registry (src/terminal/registry.ts) hard-codes
 // project slug "founder-control-room" with relativeCwd "founder-control-room"
@@ -299,45 +304,55 @@ async function main() {
   await page.waitForSelector('.topbar', { timeout: 5000 });
   assert(await page.locator('.founder-email').innerText() === FOUNDER_EMAIL, 'landed on the app shell signed in as the founder');
 
-  console.log('\n[3a] Capability workbench denies anonymous browser access through the real API boundary');
-  const anonymousContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  const anonymousPage = await anonymousContext.newPage();
-  try {
-    await anonymousPage.goto(`${BASE_URL}/control-room/capabilities.html`, { waitUntil: 'networkidle' });
-    await anonymousPage.waitForSelector('.signin h1');
+  if (E2E_SCENARIO === 'capability-workbench') {
+    // Run the workbench browser journey in an isolated server process. The full
+    // founder journey intentionally exercises enough API calls to approach the
+    // real 60-requests/minute per-IP protection; adding this independent page
+    // test to that same process turned its final connection-health proof into a
+    // rate-limit race rather than a product signal.
+    console.log('\n[3a] Capability workbench denies anonymous browser access through the real API boundary');
+    const anonymousContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const anonymousPage = await anonymousContext.newPage();
+    try {
+      await anonymousPage.goto(`${BASE_URL}/control-room/capabilities.html`, { waitUntil: 'networkidle' });
+      await anonymousPage.waitForSelector('.signin h1');
+      assert(
+        (await anonymousPage.locator('.signin h1').innerText()) === 'Capabilities are founder-only.',
+        'anonymous browser receives the founder-only boundary instead of the registry',
+      );
+    } finally {
+      await anonymousContext.close();
+    }
+
+    console.log('\n[3b] Capability workbench loads only after real founder authorization and remains usable on mobile');
+    await page.goto(`${BASE_URL}/control-room/capabilities.html`, { waitUntil: 'networkidle' });
+    await page.waitForSelector('.workbench');
     assert(
-      (await anonymousPage.locator('.signin h1').innerText()) === 'Capabilities are founder-only.',
-      'anonymous browser receives the founder-only boundary instead of the registry',
+      (await page.locator('.result-list').innerText()).includes('webhook-verify-hmac-worker-v1'),
+      'authorized browser receives the reviewed capability registry',
     );
-  } finally {
-    await anonymousContext.close();
+    await page.fill('#capability-search', 'event dedupe');
+    await page.waitForSelector('[data-id="event-dedupe-supabase-v1"]');
+    await page.click('[data-id="event-dedupe-supabase-v1"]');
+    await waitForText(page, '.detail', 'Stop duplicate deliveries');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForSelector('.workbench');
+    assert(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      'mobile workbench avoids document-level horizontal overflow',
+    );
+    mkdirSync(join(REPO_ROOT, 'test-results'), { recursive: true });
+    await page.screenshot({
+      path: join(REPO_ROOT, 'test-results', 'capabilities-workbench-mobile.png'),
+      fullPage: true,
+    });
+    assert(jsExceptions.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(jsExceptions)})`);
+    if (networkDiagnostics.length) console.log(`  (${networkDiagnostics.length} expected network diagnostic message(s), not counted as failures: ${JSON.stringify(networkDiagnostics)})`);
+    await browser.close();
+    return;
   }
-
-  console.log('\n[3b] Capability workbench loads only after real founder authorization and remains usable on mobile');
-  await page.goto(`${BASE_URL}/control-room/capabilities.html`, { waitUntil: 'networkidle' });
-  await page.waitForSelector('.workbench');
-  assert(
-    (await page.locator('.result-list').innerText()).includes('webhook-verify-hmac-worker-v1'),
-    'authorized browser receives the reviewed capability registry',
-  );
-  await page.fill('#capability-search', 'event dedupe');
-  await page.waitForSelector('[data-id="event-dedupe-supabase-v1"]');
-  await page.click('[data-id="event-dedupe-supabase-v1"]');
-  await waitForText(page, '.detail', 'Stop duplicate deliveries');
-
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.reload({ waitUntil: 'networkidle' });
-  await page.waitForSelector('.workbench');
-  assert(
-    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-    'mobile workbench avoids document-level horizontal overflow',
-  );
-  mkdirSync(join(REPO_ROOT, 'test-results'), { recursive: true });
-  await page.screenshot({
-    path: join(REPO_ROOT, 'test-results', 'capabilities-workbench-mobile.png'),
-    fullPage: true,
-  });
-  await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto(`${BASE_URL}/control-room/`);
   await page.waitForSelector('#new-project-form');
 
