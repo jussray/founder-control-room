@@ -124,7 +124,7 @@ jobs:
             echo "- Reason: ${DEPLOYMENT_REASON:-not supplied}"
             echo "- Mutation scope: Cloudflare Worker \`founder-control-room\` via \`wrangler.worker.toml\`"
             echo "- Supabase database mutation: skipped by workflow design"
-            echo "- Proof-of-ship/publication: absent by workflow design"
+            echo "- Publication scheduling: absent by workflow design"
           } >> "$GITHUB_STEP_SUMMARY"
 
   worker-deploy:
