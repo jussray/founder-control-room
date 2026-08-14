@@ -7,7 +7,6 @@ interface PluginEntry {
   role: string;
   runtimeDiscoveryRequired: boolean;
   defaultMode: 'read-first';
-  [key: string]: unknown;
 }
 
 interface PluginManagementManifest {
@@ -31,16 +30,55 @@ const manifest = JSON.parse(
 ) as PluginManagementManifest;
 
 const expectedPlugins = ['GitHub', 'Supabase', 'Slack', 'Asana', 'HubSpot', 'Figma'];
+const allowedManifestKeys = [
+  'schemaVersion',
+  'contract',
+  'repository',
+  'authorityRepository',
+  'controlPlane',
+  'runtimeDiscoveryRequired',
+  'liveStateStored',
+  'writesRequireExplicitUserIntent',
+  'writesRequireFreshRepositoryAuthority',
+  'permissionStateSource',
+  'connectionStateSource',
+  'truthBoundary',
+  'plugins',
+].sort();
+const allowedPluginKeys = ['name', 'role', 'runtimeDiscoveryRequired', 'defaultMode'].sort();
 const forbiddenLiveStateKeys = new Set([
   'installed',
   'connected',
+  'connection',
   'permission',
-  'permissionMode',
-  'permission_mode',
-  'oauthScopes',
+  'permissions',
+  'permissionmode',
+  'oauthscopes',
   'token',
+  'accesstoken',
+  'refreshtoken',
   'secret',
+  'secrets',
 ]);
+
+function normalizedKey(key: string): string {
+  return key.replace(/[_-]/g, '').toLowerCase();
+}
+
+function forbiddenLiveStatePaths(value: unknown, path = 'manifest'): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((entry, index) => forbiddenLiveStatePaths(entry, `${path}[${index}]`));
+  }
+  if (value === null || typeof value !== 'object') return [];
+
+  const failures: string[] = [];
+  for (const [key, child] of Object.entries(value)) {
+    const childPath = `${path}.${key}`;
+    if (forbiddenLiveStateKeys.has(normalizedKey(key))) failures.push(childPath);
+    failures.push(...forbiddenLiveStatePaths(child, childPath));
+  }
+  return failures;
+}
 
 describe('ChatGPT plugin management repository contract', () => {
   it('declares intent without claiming live ChatGPT state', () => {
@@ -60,15 +98,18 @@ describe('ChatGPT plugin management repository contract', () => {
     expect(manifest.truthBoundary).toMatch(/does not prove.*installed.*connected.*permitted.*executed/i);
   });
 
+  it('uses a closed manifest schema and rejects live-state keys at any depth', () => {
+    expect(Object.keys(manifest).sort()).toEqual(allowedManifestKeys);
+    expect(forbiddenLiveStatePaths(manifest)).toEqual([]);
+  });
+
   it('keeps the active control-room plugin set explicit and runtime-discovered', () => {
     expect(manifest.plugins.map((plugin) => plugin.name)).toEqual(expectedPlugins);
     for (const plugin of manifest.plugins) {
+      expect(Object.keys(plugin).sort()).toEqual(allowedPluginKeys);
       expect(plugin.role.trim()).not.toBe('');
       expect(plugin.runtimeDiscoveryRequired).toBe(true);
       expect(plugin.defaultMode).toBe('read-first');
-      for (const key of Object.keys(plugin)) {
-        expect(forbiddenLiveStateKeys.has(key)).toBe(false);
-      }
     }
   });
 });
