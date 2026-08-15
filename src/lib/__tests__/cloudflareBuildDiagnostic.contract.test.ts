@@ -20,6 +20,13 @@ describe("Cloudflare build diagnostic authority", () => {
     expect(workflow).toContain("permissions:\n  contents: read");
   });
 
+  it("treats the known Cloudflare account id as public configuration, not a secret dependency", () => {
+    expect(workflow).toContain(
+      "CF_ACCOUNT_ID: 9b59861bd1747cf7525571b4c51d2aa0",
+    );
+    expect(workflow).not.toContain("secrets.CLOUDFLARE_ACCOUNT_ID");
+  });
+
   it("keeps collecting provider evidence when the public runtime identity is wrong", () => {
     expect(inspector).toContain("const failures = [];");
     expect(inspector).toContain("WRONG_SERVICE_ORIGIN");
