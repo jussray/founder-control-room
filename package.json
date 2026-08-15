@@ -17,7 +17,7 @@
     "cf:dev": "wrangler dev --config wrangler.worker.toml --port 8787",
     "cf:dry-run": "wrangler deploy --dry-run --config wrangler.worker.toml --outdir .wrangler/dry-run",
     "cf:dry-run:email": "wrangler deploy --dry-run --config wrangler.email.toml --outdir .wrangler/email-dry-run",
-    "deploy": "wrangler deploy --config wrangler.worker.toml",
+    "deploy": "node scripts/assert-production-deploy-authority.mjs && wrangler deploy --config wrangler.worker.toml",
     "lint": "eslint 'src/**/*.ts'",
     "lint:design-os": "eslint 'src/design-os/**/*.ts' 'src/http/routes/designOs.ts' 'src/http/routes/designOs.test.ts' --max-warnings 0",
     "test": "vitest run",
