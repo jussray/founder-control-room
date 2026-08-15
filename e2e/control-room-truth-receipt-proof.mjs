@@ -117,35 +117,44 @@ const repositories = [
   },
 ];
 
-const detailPayload = {
+const detailFixtures = Object.fromEntries(repositories.map((repository) => [repository.slug, {
   project: {
-    name: 'Verified Product',
-    repo_identifier: 'jussray/verified-product',
+    name: repository.name,
+    repo_identifier: repository.repository.identifier,
   },
-  latestRun: {
-    overall_status: 'passed',
-    commit_sha: 'a'.repeat(40),
+  latestRun: repository.latestRun ? {
+    overall_status: repository.latestRun.overall_status,
+    commit_sha: repository.latestRun.commit_sha,
     branch: 'main',
     source: 'repo_ping',
     received_at: now,
     checks: [
-      { name: 'CI', status: 'passed' },
+      { name: 'CI', status: repository.latestRun.overall_status === 'passed' ? 'passed' : 'failed' },
       { name: 'Playwright E2E', status: 'passed' },
     ],
-  },
-  capabilities: [
+  } : null,
+  capabilities: repository.capabilities.total ? [
     {
       capability_id: 'truth-receipts',
-      observed_status: 'verified',
+      observed_status: repository.truth.state === 'attention' ? 'drifted' : 'verified',
       claimed_status: 'active',
-      reason: 'Fresh exact-head evidence.',
+      reason: repository.truth.blocker || 'Fresh exact-head evidence.',
     },
-  ],
-  findings: [],
-};
+  ] : [],
+  findings: repository.findings.total ? [
+    {
+      id: 'attention-finding',
+      status: 'open',
+      severity: 'high',
+      title: 'Latest verification failed',
+      detail: repository.truth.blocker,
+      mission_id: null,
+    },
+  ] : [],
+}]));
 
 function installFetchFixtureScript(page) {
-  return page.evaluate(({ repositoriesFixture, detailFixture, generatedAt }) => {
+  return page.evaluate(({ repositoriesFixture, detailFixtureMap, generatedAt }) => {
     window.alert = () => {};
     window.fetch = async (input) => {
       const path = typeof input === 'string' ? input : input.url;
@@ -153,11 +162,15 @@ function installFetchFixtureScript(page) {
       let status = 200;
       if (path === '/portfolio/repositories') {
         payload = { repositories: repositoriesFixture, generatedAt };
-      } else if (path === '/projects/verified-repo/verification') {
-        payload = detailFixture;
       } else {
-        status = 404;
-        payload = { error: 'fixture_not_found' };
+        const match = path.match(/^\/projects\/([^/]+)\/verification$/);
+        const slug = match ? decodeURIComponent(match[1]) : null;
+        if (slug && detailFixtureMap[slug]) {
+          payload = detailFixtureMap[slug];
+        } else {
+          status = 404;
+          payload = { error: 'fixture_not_found' };
+        }
       }
       return {
         ok: status >= 200 && status < 300,
@@ -165,7 +178,7 @@ function installFetchFixtureScript(page) {
         async json() { return payload; },
       };
     };
-  }, { repositoriesFixture: repositories, detailFixture: detailPayload, generatedAt: now });
+  }, { repositoriesFixture: repositories, detailFixtureMap: detailFixtures, generatedAt: now });
 }
 
 async function proveViewport(browser, { name, width, height, isMobile = false }) {
@@ -195,6 +208,22 @@ async function proveViewport(browser, { name, width, height, isMobile = false })
   assert.match(summaryText, /Attention\s+1/i, `${name}: attention summary is explicit`);
   assert.match(summaryText, /Stale\s+1/i, `${name}: stale summary is explicit`);
   assert.match(summaryText, /Unknown\s+1/i, `${name}: unknown summary is explicit`);
+
+  const brief = page.locator('#founder-brief');
+  await brief.waitFor({ state: 'visible' });
+  assert.equal(await brief.getAttribute('data-status'), 'attention', `${name}: founder brief ranks attention first`);
+  const briefText = await brief.innerText();
+  assert.match(briefText, /1 repository needs intervention/i, `${name}: founder brief states the portfolio reality`);
+  assert.match(briefText, /Attention Product/i, `${name}: founder brief names the priority repository`);
+  assert.match(briefText, /Latest repository run is failed/i, `${name}: founder brief explains why`);
+  assert.match(briefText, /Prepare one bounded repair mission/i, `${name}: founder brief exposes the next gate`);
+  assert.match(briefText, /Founder approval still controls merge, deploy, rollback, secrets, and destructive work/i, `${name}: founder authority stays explicit`);
+
+  const openNextGate = page.locator('#brief-open');
+  assert.equal(await openNextGate.getAttribute('data-slug'), 'attention-repo', `${name}: next gate targets the highest-priority repository`);
+  await openNextGate.click();
+  await page.locator('.truth-receipt').waitFor({ state: 'visible' });
+  assert.match(await page.locator('#repository-detail').innerText(), /Attention Product/i, `${name}: next gate opens the priority repository detail`);
 
   const staleCard = page.locator('.repository-card[data-status="stale"]');
   assert.equal(await staleCard.count(), 1, `${name}: stale truth cannot masquerade as verified`);
@@ -242,6 +271,8 @@ async function proveViewport(browser, { name, width, height, isMobile = false })
 
   await mkdir(outputDir, { recursive: true });
   const screenshot = resolve(outputDir, `${name}.png`);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(50);
   await page.screenshot({ path: screenshot, fullPage: true });
   await context.close();
 
