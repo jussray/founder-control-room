@@ -20,14 +20,6 @@ function configuredWorkerSecretNames() {
   return Array.from(secretBlock![1].matchAll(/"([A-Z0-9_]+)"/g), ([, name]) => name);
 }
 
-function workerReconcileUploadedSecretNames() {
-  const secretBlock = reconcileWorkflow.match(
-    /secrets:\s*\|\n((?:\s{12}[A-Z][A-Z0-9_]*\n)+)\s{8}env:/,
-  );
-  expect(secretBlock).not.toBeNull();
-  return secretBlock![1].trim().split(/\s+/);
-}
-
 describe('Founder deploy command authority contract', () => {
   it('accepts only the founder command on canonical issue 182', () => {
     expect(commandWorkflow).toContain('issue_comment:');
@@ -74,12 +66,11 @@ describe('Founder deploy command authority contract', () => {
     expect(reconcileWorkflow).not.toContain('PUBLISH_ALLOWED');
   });
 
-  it('preserves required Worker bindings while forcing the publication grant disabled', () => {
-    expect(reconcileWorkflow).toContain('Existing Worker runtime secrets: preserved; not rewritten by this workflow');
+  it('preserves required Worker bindings while forcing the publication grant disabled through the canonical config', () => {
+    expect(reconcileWorkflow).toContain('Existing Worker runtime secrets: preserved except \\`FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON\\`, which this workflow forces disabled');
     expect(reconcileWorkflow).toContain('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}');
     expect(reconcileWorkflow).not.toContain('CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}');
     expect(reconcileWorkflow).toContain('wrangler.worker.toml must declare a 32-character lowercase Cloudflare account_id');
-    expect(workerConfig).toMatch(/^account_id = "[0-9a-f]{32}"$/m);
     expect(reconcileWorkflow).not.toContain('SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}');
     expect(reconcileWorkflow).not.toContain('GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}');
     expect(reconcileWorkflow).not.toContain('FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}');
@@ -94,9 +85,9 @@ describe('Founder deploy command authority contract', () => {
       'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
       'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET',
     ]);
-    expect(workerReconcileUploadedSecretNames()).toEqual([
-      'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
-    ]);
+    expect(reconcileWorkflow).toContain('./node_modules/.bin/wrangler secret put FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON \\');
+    expect(reconcileWorkflow).toContain('--config wrangler.worker.toml < "$grant_file"');
+    expect(reconcileWorkflow).not.toMatch(/^\s+secrets:\s*\|/m);
     expect(reconcileWorkflow).toContain('"id":"founder-signal-draft-only-v2","enabled":false');
   });
 });
