@@ -150,9 +150,11 @@ function validateReceipt(review: IndependentReviewReceipt, context: IndependentR
     for (const finding of review.findings) {
       const findingId = text(finding?.id);
       if (!findingId || ids.has(findingId)) errors.push("Review finding ids must be present and unique");
-      ids.add(findingId);
+      if (findingId) ids.add(findingId);
       if (!SEVERITIES.has(finding?.severity)) errors.push(`Unsupported finding severity: ${String(finding?.severity)}`);
       if (!text(finding?.title) || !text(finding?.evidence)) errors.push("Review findings require title and evidence");
+      if (typeof finding?.path !== "string") errors.push("Review finding path must be a string");
+      if (typeof finding?.recommendation !== "string") errors.push("Review finding recommendation must be a string");
       if (finding?.line !== null && (!Number.isInteger(finding?.line) || Number(finding?.line) <= 0)) errors.push("Review finding line must be null or a positive integer");
     }
   }
@@ -171,8 +173,10 @@ function validateReceipt(review: IndependentReviewReceipt, context: IndependentR
 function isMatchingDeterministicWitness(
   signal: VerificationSignal,
   review: IndependentReviewReceipt,
+  expectedProvider: string,
 ): boolean {
-  return signal.name === expectedReviewSignalName(review)
+  return lower(signal.provider) === lower(expectedProvider)
+    && signal.name === expectedReviewSignalName(review)
     && signal.status === "passed"
     && lower(signal.commitSha) === lower(review.headSha);
 }
@@ -184,11 +188,27 @@ function expectedSemanticReviewState(review: IndependentReviewReceipt): ReviewSi
 function isMatchingSemanticWitness(
   signal: ReviewSignal,
   review: IndependentReviewReceipt,
+  expectedProvider: string,
 ): boolean {
-  return lower(signal.reviewerId) === lower(review.reviewer.id)
+  return lower(signal.provider) === lower(expectedProvider)
+    && lower(signal.reviewerId) === lower(review.reviewer.id)
     && signal.state === expectedSemanticReviewState(review)
     && lower(signal.commitSha) === lower(review.headSha)
     && lower(signal.receiptHash) === lower(review.reviewHash);
+}
+
+function latestReviewSignalForReviewer(
+  signals: ReviewSignal[],
+  reviewerId: string,
+): ReviewSignal | undefined {
+  const matches = signals.filter((signal) => lower(signal.reviewerId) === lower(reviewerId));
+  if (matches.length <= 1) return matches[0];
+  if (matches.some((signal) => Number.isNaN(Date.parse(text(signal.submittedAt))))) return undefined;
+  return [...matches].sort((a, b) => {
+    const timeDelta = Date.parse(text(a.submittedAt)) - Date.parse(text(b.submittedAt));
+    if (timeDelta !== 0) return timeDelta;
+    return text(a.id).localeCompare(text(b.id), undefined, { numeric: true });
+  }).at(-1);
 }
 
 function blockedResult(blockers: string[]): IndependentReviewGateResult {
@@ -270,13 +290,16 @@ export async function evaluateIndependentReviewGate(
 
   for (const review of reviews) {
     const witnessed = review.reviewer.kind === "semantic"
-      ? reviewSignals.some((signal) => isMatchingSemanticWitness(signal, review))
-      : verificationSignals.some((signal) => isMatchingDeterministicWitness(signal, review));
+      ? (() => {
+          const latest = latestReviewSignalForReviewer(reviewSignals, review.reviewer.id);
+          return latest ? isMatchingSemanticWitness(latest, review, provider.name) : false;
+        })()
+      : verificationSignals.some((signal) => isMatchingDeterministicWitness(signal, review, provider.name));
 
     if (!witnessed) {
       blockers.push(
         review.reviewer.kind === "semantic"
-          ? `Missing exact-head provider PR-review witness for ${review.reviewer.id}`
+          ? `Missing current exact-head provider PR-review witness for ${review.reviewer.id}`
           : `Missing passed exact-head deterministic witness for ${review.reviewer.id}`,
       );
       continue;
