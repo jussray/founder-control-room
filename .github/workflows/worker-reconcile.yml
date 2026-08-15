@@ -102,7 +102,7 @@ jobs:
             echo "- Reason: ${DEPLOYMENT_REASON:-not supplied}"
             echo "- Mutation scope: Cloudflare Worker \`founder-control-room\` via \`wrangler.worker.toml\`"
             echo "- Cloudflare account authority: declarative \`wrangler.worker.toml account_id\`"
-            echo "- Existing Worker runtime secrets: preserved; not rewritten by this workflow"
+            echo "- Existing Worker runtime secrets: preserved except \`FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON\`, which this workflow forces disabled"
             echo "- Supabase database mutation: skipped by workflow design"
             echo "- Publication scheduling: absent by workflow design"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -127,6 +127,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Force publication grant disabled on canonical Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON: >-
+            {"id":"founder-signal-draft-only-v2","enabled":false,"routes":[{"channel":"linkedin","audienceSegment":"build-in-public"},{"channel":"facebook","audienceSegment":"build-in-public"}],"repositories":[],"repositoryScope":{"mode":"all_owned","owner":"jussray"},"approvedRecipientIds":[],"expiresAt":null}
+        shell: bash
+        run: |
+          set -euo pipefail
+          grant_file="$(mktemp)"
+          trap 'rm -f "$grant_file"' EXIT
+          chmod 600 "$grant_file"
+          printf '%s' "$FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON" > "$grant_file"
+          ./node_modules/.bin/wrangler secret put FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON \
+            --config wrangler.worker.toml < "$grant_file"
+
       - name: Deploy only the canonical Worker configuration
         id: deploy
         uses: cloudflare/wrangler-action@v3
@@ -134,14 +149,6 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           wranglerVersion: '4.110.0'
           command: deploy --config wrangler.worker.toml --var GIT_SHA:${{ inputs.expected_head_sha }}
-          secrets: |
-            FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
-        env:
-          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          # Reconciliation never activates external publication. This is a
-          # literal disabled policy, not a copied GitHub production secret.
-          FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON: >-
-            {"id":"founder-signal-draft-only-v2","enabled":false,"routes":[{"channel":"linkedin","audienceSegment":"build-in-public"},{"channel":"facebook","audienceSegment":"build-in-public"}],"repositories":[],"repositoryScope":{"mode":"all_owned","owner":"jussray"},"approvedRecipientIds":[],"expiresAt":null}
 
   runtime-proof:
     name: Prove Canonical API Origin and Exact SHA
