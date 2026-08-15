@@ -11,9 +11,11 @@ It manages Se'kret Bip and related founder systems without making GitHub, Cloudf
 ## Current repository truth
 
 **Last refreshed:** 2026-08-15  
-**Current `main` at this audit:** `0ad37586d408f3dcf92d427c939879a8809de248`
+**Implementation baseline audited for this documentation:** `2c632243fc8bae1331624e08d279c7fb4ad904ed`
 
-Current `main` includes:
+A documentation-only merge may advance `main` beyond that baseline without changing the implementation evidence summarized here. Resolve fresh current `main` before making any new exact-head claim.
+
+The audited implementation baseline includes:
 
 - provider-independent repository abstractions and guarded exact-head execution;
 - founder approval and reservation boundaries;
@@ -23,6 +25,7 @@ Current `main` includes:
 - Founder OS / Chief AI coordination contracts;
 - freshness-aware federated truth receipts surfaced into founder decisions;
 - a durable founder-only **Founder Switchboard** with explicit BUILT / CONFIGURED / ACTIVE / PROVEN states, desired-state overrides, stale-head detection, atomic audit receipts, an enforced privileged-execution kill switch, observe-only provider intent, and locked-off high-consequence gates;
+- a privacy-safe public skill-testing evidence loop with `/devil` v1 round registry, structured receipts, KPI calculations, aggregate field reporting, and focused tests;
 - desktop/mobile Playwright proof for scoped truth-receipt and Switchboard behavior; and
 - bounded production Worker reconciliation that does not silently inherit database mutation authority.
 
@@ -30,7 +33,7 @@ Repository configuration, a green CI badge, provider upload, or HTTP success doe
 
 ## Current production gate
 
-The newest founder-approved Worker reconciliation evidence is GitHub Actions run `31864568036`, executed against exact then-current `main@eebdfb718a24fc04b574d28611a62b6041f1d4e6` before the later Switchboard merge advanced `main`.
+The newest founder-approved Worker reconciliation evidence is GitHub Actions run `31864568036`, executed against exact then-current `main@eebdfb718a24fc04b574d28611a62b6041f1d4e6` before later repository work advanced `main`.
 
 Verified execution:
 
@@ -46,7 +49,7 @@ Issue #182 records that the GitHub `production` environment supplied an **empty 
 - runtime `/health` / `/version` release proof did not run; and
 - that guarded production attempt remains blocked evidence, not a successful deployment receipt.
 
-Because `main` has since advanced to `0ad37586d408f3dcf92d427c939879a8809de248`, any future production attempt must re-establish exact-current-main authority for the then-current SHA after the production credential binding is reconciled.
+Because the repository has advanced beyond the SHA proven by that production attempt, any future production action must re-establish exact-current-main authority for the then-current SHA after the production credential binding is reconciled.
 
 Do not bypass that gate, create a second production deploy path, or resurrect the retired `founder-control-room2` Worker.
 
@@ -171,9 +174,21 @@ Project skills are selected under repository authority, privacy, proof, runtime-
 
 ### Federated truth receipts
 
-Current `main` can assess freshness-aware repository truth receipts and surface bounded founder recommendations in the Control Room UI.
+The audited implementation can assess freshness-aware repository truth receipts and surface bounded founder recommendations in the Control Room UI.
 
 The current browser proof covers desktop and mobile rendering for the scoped truth-receipt behavior. It is not a claim that every upstream provider or production surface is healthy.
+
+### Public skill-testing evidence loop
+
+The repository now contains an instrumented, privacy-safe field-testing loop for public skills. The first registered round is `/devil` v1 and includes:
+
+- a structured public-safe receipt model;
+- a named round registry bound to the skill/version under test;
+- KPI calculations for valid-test submission rate, iteration yield, and repeat testers;
+- aggregate reporting that does not expose raw submission content; and
+- focused tests for analytics and reporting behavior.
+
+This proves the repository instrumentation exists. It does **not** by itself prove that a public campaign has run, that testers submitted data, that distribution occurred, or that a new skill version earned promotion.
 
 ## Production deployment authority
 
