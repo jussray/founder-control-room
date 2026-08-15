@@ -22,6 +22,10 @@ function receiptIdentity(): FounderConveyorReceiptIdentity {
   };
 }
 
+function truthIdentity(identity: FounderConveyorReceiptIdentity) {
+  return { projectSlug: identity.projectSlug, headSha: identity.expectedHeadSha };
+}
+
 function truth(overrides: Partial<RepositoryTruthAssessment> = {}): RepositoryTruthAssessment {
   return {
     state: 'verified',
@@ -49,6 +53,7 @@ describe('V10 closed-loop outcome sealing', () => {
     const observation = createV10ClosedLoopOutcome({
       receiptIdentity: identity,
       executionReceiptId,
+      truthIdentity: truthIdentity(identity),
       truth: truth(),
       observedAt: '2026-08-15T02:30:00.000Z',
       goalSucceeded: true,
@@ -76,6 +81,7 @@ describe('V10 closed-loop outcome sealing', () => {
     expect(() => createV10ClosedLoopOutcome({
       receiptIdentity: identity,
       executionReceiptId: `fcr-conveyor-receipt-v3:${'f'.repeat(64)}`,
+      truthIdentity: truthIdentity(identity),
       truth: truth(),
       observedAt: '2026-08-15T02:30:00.000Z',
       goalSucceeded: true,
@@ -86,11 +92,38 @@ describe('V10 closed-loop outcome sealing', () => {
     })).toThrow('executionReceiptId does not match the bound conveyor receipt identity');
   });
 
+  it('rejects fresh truth from another project or head', () => {
+    const identity = receiptIdentity();
+    const executionReceiptId = founderConveyorReceiptId(identity);
+    const base = {
+      receiptIdentity: identity,
+      executionReceiptId,
+      truth: truth(),
+      observedAt: '2026-08-15T02:30:00.000Z',
+      goalSucceeded: true,
+      founderOverride: false,
+      rollbackUsed: false,
+      retries: 0,
+      outcomeSignals: ['exact-head verification passed'],
+    };
+
+    expect(() => createV10ClosedLoopOutcome({
+      ...base,
+      truthIdentity: { projectSlug: 'another-project', headSha: identity.expectedHeadSha },
+    })).toThrow('truth project does not match the bound conveyor project');
+
+    expect(() => createV10ClosedLoopOutcome({
+      ...base,
+      truthIdentity: { projectSlug: identity.projectSlug, headSha: 'd'.repeat(40) },
+    })).toThrow('truth head does not match the bound conveyor expected head');
+  });
+
   it('refuses to convert stale repository truth into a successful verified outcome', () => {
     const identity = receiptIdentity();
     expect(() => createV10ClosedLoopOutcome({
       receiptIdentity: identity,
       executionReceiptId: founderConveyorReceiptId(identity),
+      truthIdentity: truthIdentity(identity),
       truth: truth({ state: 'stale', freshness: 'stale', recommendation: 'hold', confidence: 40 }),
       observedAt: '2026-08-15T02:30:00.000Z',
       goalSucceeded: true,
@@ -106,6 +139,7 @@ describe('V10 closed-loop outcome sealing', () => {
     const observation = createV10ClosedLoopOutcome({
       receiptIdentity: identity,
       executionReceiptId: founderConveyorReceiptId(identity),
+      truthIdentity: truthIdentity(identity),
       truth: truth({ state: 'stale', freshness: 'stale', recommendation: 'hold', confidence: 40, evidenceCompleteness: 72 }),
       observedAt: '2026-08-15T02:30:00.000Z',
       goalSucceeded: null,
