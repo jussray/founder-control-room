@@ -481,7 +481,9 @@ h3 { font-size: 1rem; }
 .truth-receipt[data-status="verified"] { border-color: color-mix(in srgb, var(--passed) 45%, var(--border)); }
 .truth-receipt[data-status="attention"] { border-color: color-mix(in srgb, var(--failed) 45%, var(--border)); }
 .truth-receipt[data-status="stale"] { border-color: color-mix(in srgb, var(--warning) 45%, var(--border)); }
-.truth-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 .9rem; margin-top: .6rem; }
+.truth-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem .9rem; margin-top: .6rem; }
+.truth-grid .definition-row { grid-template-columns: 1fr; gap: .18rem; min-width: 0; }
+.truth-grid dd { font-weight: 700; overflow-wrap: anywhere; }
 .truth-blocker, .truth-clear, .truth-next { margin: .75rem 0 0; padding: .65rem .75rem; border-radius: .7rem; font-size: .82rem; }
 .truth-blocker { background: rgba(255, 126, 141, .08); color: #ffb3bc; border: 1px solid rgba(255, 126, 141, .2); }
 .truth-clear { background: rgba(112, 214, 163, .08); color: #a8e8c7; border: 1px solid rgba(112, 214, 163, .2); }
