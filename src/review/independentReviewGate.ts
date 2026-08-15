@@ -1,0 +1,244 @@
+import { hash } from "node:crypto";
+import type { RepositoryProvider, VerificationSignal } from "../providers/RepositoryProvider.js";
+
+export const INDEPENDENT_REVIEW_CONTRACT = "juss-v10/independent-review@v1" as const;
+
+export type ReviewerKind = "semantic" | "deterministic";
+export type ReviewSeverity = "P0" | "P1" | "P2" | "P3";
+export type ReviewVerdict = "clear" | "needs_review" | "blocked";
+
+export interface IndependentReviewFinding {
+  id: string;
+  severity: ReviewSeverity;
+  title: string;
+  path: string;
+  line: number | null;
+  evidence: string;
+  recommendation: string;
+}
+
+export interface IndependentReviewReceipt {
+  contract: typeof INDEPENDENT_REVIEW_CONTRACT;
+  repository: string;
+  pullRequestNumber: number;
+  baseSha: string;
+  headSha: string;
+  diffHash: string;
+  policyHash: string;
+  reviewer: {
+    id: string;
+    kind: ReviewerKind;
+    provider: string;
+    runtime: string;
+  };
+  authorIdentity: string;
+  findings: IndependentReviewFinding[];
+  verdict: ReviewVerdict;
+  summary: string;
+  proposalOnly: true;
+  mergeAuthorized: false;
+  executionAuthorized: false;
+  reviewHash: string;
+}
+
+export interface IndependentReviewContext {
+  projectId: string;
+  repository: string;
+  pullRequestNumber: number;
+  baseSha: string;
+  headSha: string;
+  diffHash: string;
+  policyHash: string;
+  authorIdentity: string;
+}
+
+export interface IndependentReviewPolicy {
+  requiredSemanticReviews: number;
+  requireDeterministicReview: boolean;
+  blockOnP2: boolean;
+  trustedReviewerIds?: string[];
+}
+
+export interface IndependentReviewGateResult {
+  reviewGateSatisfied: boolean;
+  mergeAuthorized: false;
+  executionAuthorized: false;
+  witnessedReviewHashes: string[];
+  semanticClearCount: number;
+  deterministicClearCount: number;
+  blockers: string[];
+}
+
+const FULL_SHA = /^[0-9a-f]{40}$/i;
+const SHA256 = /^[0-9a-f]{64}$/i;
+const REVIEWER_KINDS = new Set<ReviewerKind>(["semantic", "deterministic"]);
+const SEVERITIES = new Set<ReviewSeverity>(["P0", "P1", "P2", "P3"]);
+const VERDICTS = new Set<ReviewVerdict>(["clear", "needs_review", "blocked"]);
+
+function reviewSeed(review: IndependentReviewReceipt): string {
+  return JSON.stringify([
+    review.contract,
+    review.repository,
+    review.pullRequestNumber,
+    review.baseSha,
+    review.headSha,
+    review.diffHash,
+    review.policyHash,
+    review.reviewer.id,
+    review.reviewer.kind,
+    review.reviewer.provider,
+    review.reviewer.runtime,
+    review.authorIdentity,
+    review.findings.map((finding) => [
+      finding.id,
+      finding.severity,
+      finding.title,
+      finding.path,
+      finding.line,
+      finding.evidence,
+      finding.recommendation,
+    ]),
+    review.verdict,
+    review.summary,
+  ]);
+}
+
+export function independentReviewHash(review: IndependentReviewReceipt): string {
+  return hash("sha256", reviewSeed(review), "hex");
+}
+
+export function expectedReviewSignalName(review: IndependentReviewReceipt): string {
+  return `Independent Review / ${review.reviewer.id} / ${review.reviewHash.slice(0, 12)}`;
+}
+
+function verdictFromFindings(findings: IndependentReviewFinding[]): ReviewVerdict {
+  if (findings.some((finding) => finding.severity === "P0" || finding.severity === "P1")) return "blocked";
+  if (findings.some((finding) => finding.severity === "P2")) return "needs_review";
+  return "clear";
+}
+
+function validateReceipt(review: IndependentReviewReceipt, context: IndependentReviewContext): string[] {
+  const errors: string[] = [];
+  if (!review || typeof review !== "object") return ["Review receipt must be an object"];
+  if (review.contract !== INDEPENDENT_REVIEW_CONTRACT) errors.push("Unsupported review contract");
+  if (review.repository.toLowerCase() !== context.repository.toLowerCase()) errors.push("Review repository does not match gate context");
+  if (review.pullRequestNumber !== context.pullRequestNumber) errors.push("Review PR does not match gate context");
+  if (review.baseSha.toLowerCase() !== context.baseSha.toLowerCase()) errors.push("Review base SHA does not match gate context");
+  if (review.headSha.toLowerCase() !== context.headSha.toLowerCase()) errors.push("Review head SHA does not match gate context");
+  if (review.diffHash.toLowerCase() !== context.diffHash.toLowerCase()) errors.push("Review diff hash does not match gate context");
+  if (review.policyHash.toLowerCase() !== context.policyHash.toLowerCase()) errors.push("Review policy hash does not match gate context");
+  if (review.authorIdentity.toLowerCase() !== context.authorIdentity.toLowerCase()) errors.push("Review author identity does not match gate context");
+  if (!FULL_SHA.test(review.baseSha) || !FULL_SHA.test(review.headSha)) errors.push("Review SHAs must be full Git SHAs");
+  if (!SHA256.test(review.diffHash) || !SHA256.test(review.policyHash) || !SHA256.test(review.reviewHash)) errors.push("Review hashes must be sha256");
+  if (!review.reviewer?.id?.trim()) errors.push("Reviewer id is required");
+  if (!REVIEWER_KINDS.has(review.reviewer?.kind)) errors.push("Unsupported reviewer kind");
+  if (!review.reviewer?.provider?.trim() || !review.reviewer?.runtime?.trim()) errors.push("Reviewer provider/runtime are required");
+  if (review.reviewer?.id?.toLowerCase() === context.authorIdentity.toLowerCase()) errors.push("Patch author cannot satisfy independent review");
+  if (!Array.isArray(review.findings) || review.findings.length > 100) errors.push("Review findings must contain at most 100 items");
+  else {
+    const ids = new Set<string>();
+    for (const finding of review.findings) {
+      if (!finding?.id?.trim() || ids.has(finding.id)) errors.push("Review finding ids must be present and unique");
+      ids.add(finding?.id);
+      if (!SEVERITIES.has(finding?.severity)) errors.push(`Unsupported finding severity: ${String(finding?.severity)}`);
+      if (!finding?.title?.trim() || !finding?.evidence?.trim()) errors.push("Review findings require title and evidence");
+    }
+  }
+  if (!VERDICTS.has(review.verdict)) errors.push("Unsupported review verdict");
+  else if (verdictFromFindings(review.findings ?? []) !== review.verdict) errors.push("Review verdict does not match findings");
+  if (!review.summary?.trim()) errors.push("Review summary is required");
+  if (review.proposalOnly !== true || review.mergeAuthorized !== false || review.executionAuthorized !== false) {
+    errors.push("Review receipt must be proposal-only and non-authorizing");
+  }
+  if (independentReviewHash(review) !== review.reviewHash.toLowerCase()) errors.push("Review hash does not match review content");
+  return errors;
+}
+
+function isMatchingWitness(signal: VerificationSignal, review: IndependentReviewReceipt): boolean {
+  return signal.name === expectedReviewSignalName(review)
+    && signal.status === "passed"
+    && signal.commitSha.toLowerCase() === review.headSha.toLowerCase();
+}
+
+export async function evaluateIndependentReviewGate(
+  provider: RepositoryProvider,
+  context: IndependentReviewContext,
+  reviews: IndependentReviewReceipt[],
+  policy: IndependentReviewPolicy,
+): Promise<IndependentReviewGateResult> {
+  const blockers: string[] = [];
+  if (!FULL_SHA.test(context.baseSha) || !FULL_SHA.test(context.headSha)) blockers.push("Gate context requires full base/head SHAs");
+  if (!SHA256.test(context.diffHash) || !SHA256.test(context.policyHash)) blockers.push("Gate context requires sha256 diff/policy hashes");
+  if (!Number.isInteger(policy.requiredSemanticReviews) || policy.requiredSemanticReviews < 1 || policy.requiredSemanticReviews > 4) {
+    blockers.push("Policy requires between 1 and 4 semantic reviews");
+  }
+  if (!Array.isArray(reviews) || reviews.length === 0 || reviews.length > 12) blockers.push("Gate requires 1-12 review receipts");
+
+  const reviewerIds = new Set<string>();
+  for (const review of reviews ?? []) {
+    const validation = validateReceipt(review, context);
+    blockers.push(...validation.map((error) => `${review?.reviewer?.id || "unknown-reviewer"}: ${error}`));
+    if (reviewerIds.has(review?.reviewer?.id)) blockers.push(`Duplicate reviewer identity: ${review?.reviewer?.id}`);
+    reviewerIds.add(review?.reviewer?.id);
+  }
+
+  const trusted = policy.trustedReviewerIds ? new Set(policy.trustedReviewerIds) : null;
+  if (trusted) {
+    for (const review of reviews ?? []) {
+      if (!trusted.has(review.reviewer.id)) blockers.push(`Reviewer is not trusted by policy: ${review.reviewer.id}`);
+    }
+  }
+
+  if (blockers.length > 0) {
+    return {
+      reviewGateSatisfied: false,
+      mergeAuthorized: false,
+      executionAuthorized: false,
+      witnessedReviewHashes: [],
+      semanticClearCount: 0,
+      deterministicClearCount: 0,
+      blockers,
+    };
+  }
+
+  const exactHead = await provider.getRef(context.projectId, context.headSha);
+  if (exactHead.commitSha.toLowerCase() !== context.headSha.toLowerCase()) blockers.push("Repository provider did not resolve the exact requested head");
+  const signals = await provider.listVerificationSignals(context.projectId, context.headSha);
+
+  let semanticClearCount = 0;
+  let deterministicClearCount = 0;
+  const witnessedReviewHashes: string[] = [];
+
+  for (const review of reviews) {
+    const witness = signals.find((signal) => isMatchingWitness(signal, review));
+    if (!witness) {
+      blockers.push(`Missing passed exact-head repository witness for ${review.reviewer.id}`);
+      continue;
+    }
+    witnessedReviewHashes.push(review.reviewHash);
+    if (review.verdict === "blocked") blockers.push(`${review.reviewer.id} reported a blocking review verdict`);
+    if (review.verdict === "needs_review") blockers.push(`${review.reviewer.id} reported unresolved P2 review findings`);
+    if (policy.blockOnP2 && review.findings.some((finding) => finding.severity === "P2")) {
+      blockers.push(`${review.reviewer.id} contains P2 findings blocked by policy`);
+    }
+    if (review.verdict === "clear") {
+      if (review.reviewer.kind === "semantic") semanticClearCount += 1;
+      else deterministicClearCount += 1;
+    }
+  }
+
+  if (semanticClearCount < policy.requiredSemanticReviews) {
+    blockers.push(`Semantic review requirement not met: ${semanticClearCount}/${policy.requiredSemanticReviews}`);
+  }
+  if (policy.requireDeterministicReview && deterministicClearCount < 1) blockers.push("Deterministic review requirement not met");
+
+  return {
+    reviewGateSatisfied: blockers.length === 0,
+    mergeAuthorized: false,
+    executionAuthorized: false,
+    witnessedReviewHashes: [...new Set(witnessedReviewHashes)].sort(),
+    semanticClearCount,
+    deterministicClearCount,
+    blockers,
+  };
+}
