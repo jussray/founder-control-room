@@ -209,6 +209,20 @@ async function proveViewport(browser, { name, width, height, isMobile = false })
   assert.match(receiptText, /Next gate:/i, `${name}: next founder gate is visible`);
   assert.match(receiptText, /founder-gated/i, `${name}: promotion authority remains bounded`);
 
+  const metricLayout = await page.locator('.truth-grid .definition-row').evaluateAll((rows) => rows.map((row) => {
+    const label = row.querySelector('dt')?.getBoundingClientRect();
+    const value = row.querySelector('dd')?.getBoundingClientRect();
+    const bounds = row.getBoundingClientRect();
+    return label && value ? {
+      labelBottom: label.bottom,
+      valueTop: value.top,
+      valueRight: value.right,
+      rowRight: bounds.right,
+    } : null;
+  }));
+  assert(metricLayout.every((metric) => metric && metric.valueTop >= metric.labelBottom - 1), `${name}: truth metric labels and values must not collide`);
+  assert(metricLayout.every((metric) => metric && metric.valueRight <= metric.rowRight + 1), `${name}: truth metric values must stay inside their cells`);
+
   const receiptIndex = await page.locator('#repository-detail').evaluate((root) => {
     const children = Array.from(root.children);
     return {
