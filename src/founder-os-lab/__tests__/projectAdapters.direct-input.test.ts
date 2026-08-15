@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { FounderOsLabProjectContext } from '../contracts.js';
 import { planFounderOsLab } from '../engine.js';
 
-const VALID_HEAD = '91206da6530369ba3fac97828d33e41e08e704ee';
+const VALID_HEAD = 'cba061ae58ad3cfeb7f7fea2c666a7c85ae13e';
 
 describe('Se’kret Bip direct planner input hardening', () => {
   it('returns a blocked plan instead of throwing for malformed casted project fields', () => {
