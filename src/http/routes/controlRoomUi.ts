@@ -55,6 +55,32 @@ const DASHBOARD_HTML = `<!doctype html>
   <main class="dashboard-shell">
     <section id="summary" class="summary-grid" aria-label="Portfolio truth summary"></section>
 
+    <section id="founder-brief" class="founder-brief" aria-live="polite">
+      <div class="founder-brief-heading">
+        <div>
+          <p class="eyebrow">FOUNDER BRIEF</p>
+          <h2>What needs your attention now</h2>
+        </div>
+        <span id="brief-status" class="status-badge">Calculating</span>
+      </div>
+      <div class="brief-grid">
+        <article class="brief-cell brief-primary">
+          <span class="brief-label">NOW</span>
+          <h3 id="brief-now">Reading portfolio truth...</h3>
+          <p id="brief-why" class="muted">The Control Room is ranking current evidence before making a recommendation.</p>
+        </article>
+        <article class="brief-cell">
+          <span class="brief-label">NEXT GATE</span>
+          <p id="brief-next">Verify current evidence before acting.</p>
+          <button id="brief-open" type="button" hidden>Open next gate</button>
+        </article>
+        <article class="brief-cell">
+          <span class="brief-label">AUTHORITY</span>
+          <p class="muted">The brief can rank evidence and recommend a bounded next move. Founder approval still controls merge, deploy, rollback, secrets, and destructive work.</p>
+        </article>
+      </div>
+    </section>
+
     <section class="workspace">
       <div class="panel repository-panel">
         <div class="panel-heading">
@@ -117,6 +143,12 @@ const DASHBOARD_JS = `(() => {
   const detail = document.getElementById('repository-detail');
   const syncStatus = document.getElementById('sync-status');
   const generatedAt = document.getElementById('generated-at');
+  const founderBrief = document.getElementById('founder-brief');
+  const briefStatus = document.getElementById('brief-status');
+  const briefNow = document.getElementById('brief-now');
+  const briefWhy = document.getElementById('brief-why');
+  const briefNext = document.getElementById('brief-next');
+  const briefOpen = document.getElementById('brief-open');
 
   function csrfToken() {
     const row = document.cookie.split(';').map(value => value.trim()).find(value => value.startsWith('fcr_csrf='));
@@ -186,6 +218,58 @@ const DASHBOARD_JS = `(() => {
       card.dataset.status = status;
       return card;
     }));
+  }
+
+  function rankRepository(repository) {
+    const statusRank = { attention: 0, stale: 1, unknown: 2, verified: 3 };
+    return statusRank[statusOf(repository)] ?? 4;
+  }
+
+  function renderFounderBrief() {
+    if (!state.repositories.length) {
+      founderBrief.dataset.status = 'unknown';
+      briefStatus.textContent = 'Unknown';
+      briefNow.textContent = 'No repositories are enabled for portfolio truth.';
+      briefWhy.textContent = 'The Control Room cannot rank work until at least one repository is registered.';
+      briefNext.textContent = 'Register or enable a repository before making a portfolio claim.';
+      briefOpen.hidden = true;
+      delete briefOpen.dataset.slug;
+      return;
+    }
+
+    const ranked = [...state.repositories].sort((left, right) => {
+      const statusDifference = rankRepository(left) - rankRepository(right);
+      if (statusDifference !== 0) return statusDifference;
+      const findingDifference = (right.findings?.total || 0) - (left.findings?.total || 0);
+      if (findingDifference !== 0) return findingDifference;
+      return (left.truth?.confidence ?? 0) - (right.truth?.confidence ?? 0);
+    });
+    const priority = ranked[0];
+    const priorityStatus = statusOf(priority);
+    const truth = priority.truth || {};
+    const counts = { attention: 0, stale: 0, unknown: 0, verified: 0 };
+    state.repositories.forEach(repository => { counts[statusOf(repository)] += 1; });
+
+    founderBrief.dataset.status = priorityStatus;
+    briefStatus.textContent = statusLabel(priorityStatus);
+    briefWhy.textContent = priority.name + ': ' + (truth.blocker || 'No current evidence blocker.');
+    briefNext.textContent = truth.nextAction || 'Verify now before making a current-state claim.';
+    briefOpen.hidden = false;
+    briefOpen.dataset.slug = priority.slug;
+
+    if (priorityStatus === 'attention') {
+      const count = counts.attention;
+      briefNow.textContent = count + ' ' + (count === 1 ? 'repository needs' : 'repositories need') + ' intervention before the portfolio can be called clear.';
+    } else if (priorityStatus === 'stale') {
+      const count = counts.stale;
+      briefNow.textContent = count + ' ' + (count === 1 ? 'repository has' : 'repositories have') + ' stale evidence that must be refreshed before a new claim.';
+    } else if (priorityStatus === 'unknown') {
+      const count = counts.unknown;
+      briefNow.textContent = count + ' ' + (count === 1 ? 'repository lacks' : 'repositories lack') + ' enough current evidence for a verified claim.';
+    } else {
+      briefNow.textContent = 'All ' + state.repositories.length + ' repositories are currently verified.';
+      briefWhy.textContent = 'Fresh portfolio truth contains no current attention, stale, or unknown state. Highest-priority receipt: ' + priority.name + '.';
+    }
   }
 
   function renderRepositories() {
@@ -399,12 +483,17 @@ const DASHBOARD_JS = `(() => {
       generatedAt.textContent = 'Updated ' + new Date(payload.generatedAt).toLocaleTimeString();
       syncStatus.textContent = 'Portfolio truth loaded';
       renderSummary();
+      renderFounderBrief();
       renderRepositories();
     } catch (error) {
       syncStatus.textContent = error.message;
     }
   }
 
+  briefOpen.addEventListener('click', () => {
+    const slug = briefOpen.dataset.slug;
+    if (slug) selectRepository(slug);
+  });
   document.getElementById('refresh-button').addEventListener('click', loadPortfolio);
   document.getElementById('logout-button').addEventListener('click', async () => {
     await api('/auth/logout', { method: 'POST', body: '{}' }).catch(() => null);
@@ -458,6 +547,19 @@ h3 { font-size: 1rem; }
 .summary-card[data-status="unknown"] { border-color: color-mix(in srgb, var(--unknown) 45%, var(--border)); }
 .summary-label { display: block; color: var(--muted); font-size: .78rem; }
 .summary-value { display: block; margin-top: .2rem; font-size: 1.75rem; }
+.founder-brief { position: relative; overflow: hidden; margin-bottom: 1rem; border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--border)); border-radius: 1.15rem; padding: 1rem; background: linear-gradient(135deg, rgba(165, 139, 255, .15), rgba(18, 21, 33, .96) 42%, rgba(18, 21, 33, .96)); }
+.founder-brief::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--accent); }
+.founder-brief[data-status="verified"]::before { background: var(--passed); }
+.founder-brief[data-status="attention"]::before { background: var(--failed); }
+.founder-brief[data-status="stale"]::before { background: var(--warning); }
+.founder-brief[data-status="unknown"]::before { background: var(--unknown); }
+.founder-brief-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.brief-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(14rem, 1fr) minmax(14rem, .9fr); gap: .75rem; margin-top: 1rem; }
+.brief-cell { min-width: 0; padding: .9rem; border: 1px solid rgba(165, 139, 255, .14); border-radius: .9rem; background: rgba(8, 10, 17, .42); }
+.brief-cell p:last-child { margin-bottom: 0; }
+.brief-primary h3 { margin-bottom: .45rem; font-size: clamp(1.05rem, 2vw, 1.35rem); line-height: 1.35; }
+.brief-label { display: block; margin-bottom: .45rem; color: var(--muted); font-size: .65rem; font-weight: 800; letter-spacing: .14em; }
+#brief-open { margin-top: .25rem; }
 .workspace { display: grid; grid-template-columns: minmax(18rem, .85fr) minmax(24rem, 1.5fr); gap: 1rem; align-items: start; }
 .panel { background: rgba(18, 21, 33, .94); border: 1px solid var(--border); border-radius: 1.1rem; padding: 1rem; min-width: 0; }
 .detail-panel { position: sticky; top: 7.25rem; max-height: calc(100vh - 8.5rem); overflow: auto; }
@@ -507,6 +609,8 @@ footer { padding: 1rem clamp(1rem, 4vw, 3rem) 2rem; color: var(--muted); font-si
 .status-copy { min-height: 1.5rem; margin: 1rem 0 0; color: var(--muted); }
 @media (max-width: 900px) {
   .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .brief-grid { grid-template-columns: 1fr 1fr; }
+  .brief-primary { grid-column: 1 / -1; }
   .workspace { grid-template-columns: 1fr; }
   .detail-panel { position: static; max-height: none; }
 }
@@ -514,6 +618,9 @@ footer { padding: 1rem clamp(1rem, 4vw, 3rem) 2rem; color: var(--muted); font-si
   .topbar { align-items: flex-start; flex-direction: column; }
   .topbar-actions { justify-content: flex-start; }
   .summary-grid { grid-template-columns: 1fr 1fr; }
+  .founder-brief-heading { align-items: flex-start; flex-direction: column; }
+  .brief-grid { grid-template-columns: 1fr; }
+  .brief-primary { grid-column: auto; }
   .truth-grid { grid-template-columns: 1fr; }
   .definition-row { grid-template-columns: 1fr; gap: .25rem; }
 }`;
