@@ -74,6 +74,7 @@ const pluginCenter = {
       type: 'github',
       status: 'active',
       authorityLevel: 'L5',
+      capabilities: ['inspect_repos', 'create_branch', 'integrate_main'],
       secretRef: 'github/fcr/builder-secret-ref',
     },
     {
@@ -84,6 +85,7 @@ const pluginCenter = {
       type: 'cloudflare',
       status: 'active',
       authorityLevel: 'L6',
+      capabilities: ['inspect_operational_data', 'deploy'],
       secretRef: 'cloudflare/fcr/provider-secret-ref',
     },
     {
@@ -94,6 +96,7 @@ const pluginCenter = {
       type: 'github',
       status: 'active',
       authorityLevel: 'L4',
+      capabilities: ['inspect_repos', 'create_branch'],
       secretRef: 'github/bip/builder-secret-ref',
     },
     {
@@ -104,6 +107,7 @@ const pluginCenter = {
       type: 'cloudflare',
       status: 'active',
       authorityLevel: 'L6',
+      capabilities: ['inspect_operational_data', 'deploy'],
       secretRef: 'cloudflare/bip/provider-secret-ref',
     },
   ],
