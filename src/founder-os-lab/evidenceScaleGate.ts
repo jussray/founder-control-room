@@ -8,6 +8,7 @@ import {
 } from './capabilityExecutionContracts.js';
 
 export const FCR_EVIDENCE_SCALE_GATE_CONTRACT = 'juss/fcr-evidence-scale-gate@v2' as const;
+export const FCR_EVALUATION_TIME_AUTHORITY_CONTRACT = 'juss/fcr-evaluation-time-authority@v1' as const;
 
 export type FcrEvidenceKind =
   | 'test'
@@ -57,11 +58,23 @@ export interface FcrEvidenceScalePolicy {
   maxRetryRate?: number;
 }
 
+export interface FcrEvaluationTimeAuthority {
+  contract: typeof FCR_EVALUATION_TIME_AUTHORITY_CONTRACT;
+  authorityId: 'control-room-runtime';
+  projectSlug: string;
+  expectedHeadSha: string;
+  policyDigest: string;
+  evaluatedAt: string;
+  validUntil: string;
+  provenanceId: string;
+}
+
 export interface FcrEvidenceScaleInput {
   projectSlug: string;
   expectedHeadSha: string;
   evidence: FcrEvidenceLedgerEntry[];
   policy: FcrEvidenceScalePolicy;
+  timeAuthority: FcrEvaluationTimeAuthority;
 }
 
 export interface FcrEvidenceScaleMetrics {
@@ -96,7 +109,8 @@ export interface FcrEvidenceScaleDecision {
   expectedHeadSha: string;
   evaluatedAt: string;
   expiresAt: string;
-  clockSource: 'system';
+  clockSource: 'authority-receipt';
+  timeAuthority: FcrEvaluationTimeAuthority;
   policy: {
     policyId: string;
     policyVersion: string;
@@ -200,7 +214,7 @@ function stablePolicySnapshot(policy: FcrEvidenceScalePolicy): FcrEvidenceScaleP
   };
 }
 
-function policyDigest(policy: FcrEvidenceScalePolicy): string {
+export function computeEvidenceScalePolicyDigest(policy: FcrEvidenceScalePolicy): string {
   return createHash('sha256')
     .update(JSON.stringify(stablePolicySnapshot(policy)), 'utf8')
     .digest('hex');
@@ -288,6 +302,71 @@ function normalizePolicy(raw: unknown): { policy: FcrEvidenceScalePolicy; failur
   }
 
   return { policy, failures: unique(failures) };
+}
+
+function normalizeTimeAuthority(
+  raw: unknown,
+  projectSlug: string,
+  expectedHeadSha: string,
+  expectedPolicyDigest: string,
+): { authority: FcrEvaluationTimeAuthority; failures: string[] } {
+  const failures: string[] = [];
+  const record = isRecord(raw) ? raw : {};
+  if (!isRecord(raw)) failures.push('timeAuthority must be an object');
+
+  const contract = asString(record.contract) ?? '';
+  const authorityId = asString(record.authorityId) ?? '';
+  const receiptProject = asString(record.projectSlug) ?? '';
+  const receiptHead = asString(record.expectedHeadSha) ?? '';
+  const receiptPolicyDigest = asString(record.policyDigest) ?? '';
+  const evaluatedAt = asString(record.evaluatedAt) ?? '';
+  const validUntil = asString(record.validUntil) ?? '';
+  const provenanceId = asString(record.provenanceId) ?? '';
+
+  if (contract !== FCR_EVALUATION_TIME_AUTHORITY_CONTRACT) {
+    failures.push('timeAuthority contract is unsupported');
+  }
+  if (authorityId !== 'control-room-runtime') {
+    failures.push('timeAuthority authorityId must be control-room-runtime');
+  }
+  if (receiptProject !== projectSlug) {
+    failures.push('timeAuthority projectSlug does not match evaluated project');
+  }
+  if (receiptHead.toLowerCase() !== expectedHeadSha.toLowerCase()) {
+    failures.push('timeAuthority expectedHeadSha does not match evaluated head');
+  }
+  if (receiptPolicyDigest !== expectedPolicyDigest) {
+    failures.push('timeAuthority policyDigest does not match evaluated policy');
+  }
+  if (!/^fcr-time:[0-9a-f]{64}$/i.test(provenanceId)) {
+    failures.push('timeAuthority provenanceId must be an fcr-time sha256 receipt id');
+  }
+
+  const evaluatedAtMs = Date.parse(evaluatedAt);
+  const validUntilMs = Date.parse(validUntil);
+  if (!evaluatedAt || Number.isNaN(evaluatedAtMs)) {
+    failures.push('timeAuthority evaluatedAt must be an ISO-compatible timestamp');
+  }
+  if (!validUntil || Number.isNaN(validUntilMs)) {
+    failures.push('timeAuthority validUntil must be an ISO-compatible timestamp');
+  }
+  if (!Number.isNaN(evaluatedAtMs) && !Number.isNaN(validUntilMs) && validUntilMs < evaluatedAtMs) {
+    failures.push('timeAuthority validUntil must not precede evaluatedAt');
+  }
+
+  return {
+    authority: {
+      contract: FCR_EVALUATION_TIME_AUTHORITY_CONTRACT,
+      authorityId: 'control-room-runtime',
+      projectSlug: receiptProject,
+      expectedHeadSha: receiptHead,
+      policyDigest: receiptPolicyDigest,
+      evaluatedAt,
+      validUntil,
+      provenanceId,
+    },
+    failures: unique(failures),
+  };
 }
 
 function normalizeEvidenceEntry(raw: unknown, index: number): {
@@ -504,6 +583,14 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
 
   const { policy, failures: policyFailures } = normalizePolicy(rawInput.policy);
   blockers.push(...policyFailures);
+  const evaluatedPolicyDigest = computeEvidenceScalePolicyDigest(policy);
+  const { authority: timeAuthority, failures: timeAuthorityFailures } = normalizeTimeAuthority(
+    rawInput.timeAuthority,
+    projectSlug,
+    expectedHeadSha,
+    evaluatedPolicyDigest,
+  );
+  blockers.push(...timeAuthorityFailures);
 
   const evidenceRaw = Array.isArray(rawInput.evidence) ? rawInput.evidence : [];
   if (!Array.isArray(rawInput.evidence)) blockers.push('evidence must be an array');
@@ -545,8 +632,9 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
 
   blockers.push(...integrityFailures);
 
-  const evaluatedAtMs = Date.now();
-  const evaluatedAt = new Date(evaluatedAtMs).toISOString();
+  const evaluatedAtMs = Date.parse(timeAuthority.evaluatedAt);
+  const validUntilMs = Date.parse(timeAuthority.validUntil);
+  const evaluatedAt = timeAuthority.evaluatedAt;
   const expectedHead = expectedHeadSha.toLowerCase();
 
   const currentHeadEntries = evidence.filter(
@@ -554,13 +642,24 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
   );
   const historicalEntries = evidence.length - currentHeadEntries.length;
 
-  const freshCurrentEntries = currentHeadEntries.filter((entry) => {
-    const observedAtMs = Date.parse(entry.observedAt);
-    return !Number.isNaN(observedAtMs)
-      && observedAtMs <= evaluatedAtMs
-      && evaluatedAtMs - observedAtMs <= policy.maxEvidenceAgeMs;
-  });
+  const freshCurrentEntries = Number.isNaN(evaluatedAtMs)
+    ? []
+    : currentHeadEntries.filter((entry) => {
+      const observedAtMs = Date.parse(entry.observedAt);
+      return !Number.isNaN(observedAtMs)
+        && observedAtMs <= evaluatedAtMs
+        && evaluatedAtMs - observedAtMs <= policy.maxEvidenceAgeMs;
+    });
   const staleCurrentEntries = currentHeadEntries.length - freshCurrentEntries.length;
+
+  if (!Number.isNaN(validUntilMs)) {
+    for (const entry of freshCurrentEntries) {
+      const evidenceDeadlineMs = Date.parse(entry.observedAt) + policy.maxEvidenceAgeMs;
+      if (validUntilMs > evidenceDeadlineMs) {
+        blockers.push(`timeAuthority validity exceeds evidence freshness window for ${entry.evidenceId}`);
+      }
+    }
+  }
 
   const freshExactHeadPassEvidence = freshCurrentEntries.filter(
     (entry) => entry.verdict === 'PASS' && entry.observedHeadSha?.toLowerCase() === expectedHead,
@@ -679,13 +778,6 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
       ? 'optimize_first'
       : 'ready_for_founder_scale_review';
 
-  const freshnessDeadlines = freshCurrentEntries
-    .map((entry) => Date.parse(entry.observedAt) + policy.maxEvidenceAgeMs)
-    .filter((value) => Number.isFinite(value) && value >= evaluatedAtMs);
-  const expiresAtMs = freshnessDeadlines.length > 0
-    ? Math.min(...freshnessDeadlines)
-    : evaluatedAtMs;
-
   const policySnapshot = stablePolicySnapshot(policy);
 
   return {
@@ -693,12 +785,13 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
     projectSlug: projectSlug.trim(),
     expectedHeadSha,
     evaluatedAt,
-    expiresAt: new Date(expiresAtMs).toISOString(),
-    clockSource: 'system',
+    expiresAt: timeAuthority.validUntil,
+    clockSource: 'authority-receipt',
+    timeAuthority,
     policy: {
       policyId: policy.policyId,
       policyVersion: policy.policyVersion,
-      digest: policyDigest(policy),
+      digest: evaluatedPolicyDigest,
       thresholds: policySnapshot,
     },
     ledger: {
