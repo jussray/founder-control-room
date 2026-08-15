@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { supabase } from "../../lib/supabaseClient.js";
+import { assessRepositoryTruth } from "../../lib/repositoryTruthAssessment.js";
 import { requireFounder, type FounderRequest } from "../middleware/requireFounder.js";
 
 export const portfolioVerificationRouter = Router();
@@ -141,6 +142,39 @@ portfolioVerificationRouter.get(
             total + (capability.failed_usage_assertion_ids?.length ?? 0),
           0,
         );
+        const findingSummary = {
+          total: projectFindings.length,
+          critical: projectFindings.filter(
+            (finding) => finding.severity === "critical",
+          ).length,
+          high: projectFindings.filter(
+            (finding) => finding.severity === "high",
+          ).length,
+          assignedToMission: projectFindings.filter(
+            (finding) => Boolean(finding.mission_id),
+          ).length,
+        };
+        const capabilitySummary = {
+          total: projectCapabilities.length,
+          verified: projectCapabilities.filter(
+            (capability) => capability.observed_status === "verified",
+          ).length,
+          drifted: projectCapabilities.filter(
+            (capability) => capability.observed_status === "drifted",
+          ).length,
+          unverified: projectCapabilities.filter(
+            (capability) => capability.observed_status === "unverified",
+          ).length,
+          usageAssertions: usageAssertionCount,
+          failedUsageAssertions: failedUsageAssertionCount,
+        };
+        const truth = assessRepositoryTruth({
+          latestRun,
+          verificationCadenceMinutes: cadenceMinutes,
+          findings: findingSummary,
+          capabilities: capabilitySummary,
+          openMissionCount: projectMissions.length,
+        });
 
         return {
           id: project.id,
@@ -160,36 +194,13 @@ portfolioVerificationRouter.get(
             source: latestRun?.source ?? null,
             branch: latestRun?.branch ?? null,
           },
+          truth,
           latestRun,
           nextDueAt: receivedAt > 0
             ? new Date(receivedAt + cadenceMinutes * 60_000).toISOString()
             : new Date().toISOString(),
-          findings: {
-            total: projectFindings.length,
-            critical: projectFindings.filter(
-              (finding) => finding.severity === "critical",
-            ).length,
-            high: projectFindings.filter(
-              (finding) => finding.severity === "high",
-            ).length,
-            assignedToMission: projectFindings.filter(
-              (finding) => Boolean(finding.mission_id),
-            ).length,
-          },
-          capabilities: {
-            total: projectCapabilities.length,
-            verified: projectCapabilities.filter(
-              (capability) => capability.observed_status === "verified",
-            ).length,
-            drifted: projectCapabilities.filter(
-              (capability) => capability.observed_status === "drifted",
-            ).length,
-            unverified: projectCapabilities.filter(
-              (capability) => capability.observed_status === "unverified",
-            ).length,
-            usageAssertions: usageAssertionCount,
-            failedUsageAssertions: failedUsageAssertionCount,
-          },
+          findings: findingSummary,
+          capabilities: capabilitySummary,
           openMissions: projectMissions,
         };
       });
