@@ -25,7 +25,7 @@ jobs:
       CF_WORKER_NAME: founder-control-room
       CF_API_HOSTNAME: api.foundercontrolroom.org
       CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CF_API_TOKEN: ${{ github.event_name == 'push' && secrets.CLOUDFLARE_API_TOKEN || secrets.CLOUDFLARE_BUILDS_API_TOKEN }}
+      CF_API_TOKEN: ${{ secrets.CLOUDFLARE_BUILDS_API_TOKEN }}
 
     steps:
       - name: Checkout exact head
