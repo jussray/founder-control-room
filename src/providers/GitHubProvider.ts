@@ -7,6 +7,8 @@ import type {
   RepositoryRef,
   VerificationSignal,
   VerificationSignalStatus,
+  ReviewSignal,
+  ReviewSignalState,
   Diff,
   DiffFile,
   Patch,
@@ -155,6 +157,34 @@ export class GitHubProvider implements RepositoryProvider {
       startedAt: run.started_at ?? undefined,
       completedAt: run.completed_at ?? undefined,
       detailsUrl: run.details_url ?? undefined,
+    }));
+  }
+
+  async listReviewSignals(
+    projectId: string,
+    pullRequestNumber: number,
+  ): Promise<ReviewSignal[]> {
+    const { owner, repo } = this.locate(projectId);
+    if (!Number.isInteger(pullRequestNumber) || pullRequestNumber <= 0) {
+      throw new Error("GitHubProvider: pullRequestNumber must be a positive integer");
+    }
+
+    const reviews = await this.octokit.paginate(this.octokit.pulls.listReviews, {
+      owner,
+      repo,
+      pull_number: pullRequestNumber,
+      per_page: 100,
+    });
+
+    return reviews.map((review) => ({
+      id: String(review.id),
+      reviewerId: review.user?.login ?? "",
+      state: mapReviewState(review.state),
+      commitSha: review.commit_id ?? "",
+      provider: this.name,
+      receiptHash: extractReviewReceiptHash(review.body),
+      submittedAt: review.submitted_at ?? undefined,
+      detailsUrl: review._links?.html?.href ?? undefined,
     }));
   }
 
@@ -382,6 +412,29 @@ export class GitHubProvider implements RepositoryProvider {
       : await this.octokit.repos.createRepoRuleset(payload);
 
     return { id: String(data.id), name: data.name, enforcement: data.enforcement };
+  }
+}
+
+function extractReviewReceiptHash(body: string | null | undefined): string | undefined {
+  if (typeof body !== "string") return undefined;
+  const match = body.match(/(?:^|\n)Review-Receipt:\s*([0-9a-f]{64})(?:\s|$)/i);
+  return match?.[1]?.toLowerCase();
+}
+
+function mapReviewState(state: string): ReviewSignalState {
+  switch (state.toUpperCase()) {
+    case "APPROVED":
+      return "approved";
+    case "CHANGES_REQUESTED":
+      return "changes_requested";
+    case "COMMENTED":
+      return "commented";
+    case "DISMISSED":
+      return "dismissed";
+    case "PENDING":
+      return "pending";
+    default:
+      return "unknown";
   }
 }
 
