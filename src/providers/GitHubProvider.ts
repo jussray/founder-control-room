@@ -182,7 +182,7 @@ export class GitHubProvider implements RepositoryProvider {
       state: mapReviewState(review.state),
       commitSha: review.commit_id ?? "",
       provider: this.name,
-      receiptHash: extractReviewReceiptHash(review.body),
+      receiptHash: extractSingleReviewReceiptHash(review.body),
       submittedAt: review.submitted_at ?? undefined,
       detailsUrl: review._links?.html?.href ?? undefined,
     }));
@@ -315,8 +315,6 @@ export class GitHubProvider implements RepositoryProvider {
       );
     }
 
-    // Consume the attestation once. A retry must resolve the branch again and
-    // therefore cannot accidentally reuse an old approval after the ref moves.
     this.resolvedRefs.delete(key);
 
     const { data } = await this.octokit.repos.merge({
@@ -402,8 +400,6 @@ export class GitHubProvider implements RepositoryProvider {
       rules,
     };
 
-    // Idempotent by name: re-applying the same config updates the existing
-    // ruleset rather than creating a duplicate with the same intent.
     const { data: existing } = await this.octokit.repos.getRepoRulesets({ owner, repo, per_page: 100 });
     const match = existing.find((ruleset) => ruleset.name === config.name);
 
@@ -415,10 +411,11 @@ export class GitHubProvider implements RepositoryProvider {
   }
 }
 
-function extractReviewReceiptHash(body: string | null | undefined): string | undefined {
+function extractSingleReviewReceiptHash(body: string | null | undefined): string | undefined {
   if (typeof body !== "string") return undefined;
-  const match = body.match(/(?:^|\n)Review-Receipt:\s*([0-9a-f]{64})(?:\s|$)/i);
-  return match?.[1]?.toLowerCase();
+  const matches = [...body.matchAll(/(?:^|\n)Review-Receipt:\s*([0-9a-f]{64})(?=\s|$)/gi)];
+  if (matches.length !== 1) return undefined;
+  return matches[0]?.[1]?.toLowerCase();
 }
 
 function mapReviewState(state: string): ReviewSignalState {
