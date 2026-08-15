@@ -58,6 +58,31 @@ export interface VerificationSignal {
   detailsUrl?: string;
 }
 
+export type ReviewSignalState =
+  | "approved"
+  | "changes_requested"
+  | "commented"
+  | "dismissed"
+  | "pending"
+  | "unknown";
+
+/**
+ * A provider-backed pull-request review witness. Unlike a CI check name, this
+ * carries the review actor and exact commit GitHub (or a future provider)
+ * recorded for the review event. receiptHash is parsed from the review body
+ * and binds the provider event to one immutable Chief AI review receipt.
+ */
+export interface ReviewSignal {
+  id: string;
+  reviewerId: string;
+  state: ReviewSignalState;
+  commitSha: string;
+  provider: string;
+  receiptHash?: string;
+  submittedAt?: string;
+  detailsUrl?: string;
+}
+
 export interface DiffFile {
   path: string;
   status: "added" | "modified" | "removed" | "renamed";
@@ -159,6 +184,13 @@ export interface RepositoryProvider {
 
   /** Returns provider CI/check evidence for the exact ref/commit. */
   listVerificationSignals(projectId: string, ref: string): Promise<VerificationSignal[]>;
+
+  /**
+   * Returns provider-recorded pull-request review events. Optional because
+   * not every repository provider exposes a PR-review concept. Review gates
+   * must fail closed when semantic review is required and this is absent.
+   */
+  listReviewSignals?(projectId: string, pullRequestNumber: number): Promise<ReviewSignal[]>;
 
   /** Creates a new branch from `baseRef`. Returns the created branch name. */
   createBranch(projectId: string, baseRef: string, name: string): Promise<string>;

@@ -7,6 +7,8 @@ import type {
   RepositoryRef,
   VerificationSignal,
   VerificationSignalStatus,
+  ReviewSignal,
+  ReviewSignalState,
   Diff,
   DiffFile,
   Patch,
@@ -158,6 +160,34 @@ export class GitHubProvider implements RepositoryProvider {
     }));
   }
 
+  async listReviewSignals(
+    projectId: string,
+    pullRequestNumber: number,
+  ): Promise<ReviewSignal[]> {
+    const { owner, repo } = this.locate(projectId);
+    if (!Number.isInteger(pullRequestNumber) || pullRequestNumber <= 0) {
+      throw new Error("GitHubProvider: pullRequestNumber must be a positive integer");
+    }
+
+    const reviews = await this.octokit.paginate(this.octokit.pulls.listReviews, {
+      owner,
+      repo,
+      pull_number: pullRequestNumber,
+      per_page: 100,
+    });
+
+    return reviews.map((review) => ({
+      id: String(review.id),
+      reviewerId: review.user?.login ?? "",
+      state: mapReviewState(review.state),
+      commitSha: review.commit_id ?? "",
+      provider: this.name,
+      receiptHash: extractSingleReviewReceiptHash(review.body),
+      submittedAt: review.submitted_at ?? undefined,
+      detailsUrl: review._links?.html?.href ?? undefined,
+    }));
+  }
+
   async createBranch(
     projectId: string,
     baseRef: string,
@@ -285,8 +315,6 @@ export class GitHubProvider implements RepositoryProvider {
       );
     }
 
-    // Consume the attestation once. A retry must resolve the branch again and
-    // therefore cannot accidentally reuse an old approval after the ref moves.
     this.resolvedRefs.delete(key);
 
     const { data } = await this.octokit.repos.merge({
@@ -372,8 +400,6 @@ export class GitHubProvider implements RepositoryProvider {
       rules,
     };
 
-    // Idempotent by name: re-applying the same config updates the existing
-    // ruleset rather than creating a duplicate with the same intent.
     const { data: existing } = await this.octokit.repos.getRepoRulesets({ owner, repo, per_page: 100 });
     const match = existing.find((ruleset) => ruleset.name === config.name);
 
@@ -382,6 +408,30 @@ export class GitHubProvider implements RepositoryProvider {
       : await this.octokit.repos.createRepoRuleset(payload);
 
     return { id: String(data.id), name: data.name, enforcement: data.enforcement };
+  }
+}
+
+function extractSingleReviewReceiptHash(body: string | null | undefined): string | undefined {
+  if (typeof body !== "string") return undefined;
+  const matches = [...body.matchAll(/(?:^|\n)Review-Receipt:\s*([0-9a-f]{64})(?=\s|$)/gi)];
+  if (matches.length !== 1) return undefined;
+  return matches[0]?.[1]?.toLowerCase();
+}
+
+function mapReviewState(state: string): ReviewSignalState {
+  switch (state.toUpperCase()) {
+    case "APPROVED":
+      return "approved";
+    case "CHANGES_REQUESTED":
+      return "changes_requested";
+    case "COMMENTED":
+      return "commented";
+    case "DISMISSED":
+      return "dismissed";
+    case "PENDING":
+      return "pending";
+    default:
+      return "unknown";
   }
 }
 
