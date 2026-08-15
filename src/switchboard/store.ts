@@ -56,6 +56,19 @@ function mergeSwitch(
   };
 }
 
+async function readOverride(switchId: string): Promise<SwitchOverrideRow | null> {
+  const { data, error } = await supabase
+    .from('founder_switch_overrides')
+    .select('switch_id,desired_state,reason,updated_by,updated_at')
+    .eq('switch_id', switchId)
+    .maybeSingle();
+
+  if (error) {
+    throw new SwitchboardError('read_failed', `Could not read founder switch ${switchId}: ${error.message}`);
+  }
+  return data as SwitchOverrideRow | null;
+}
+
 export async function readSwitchboard(): Promise<PortfolioSwitchView[]> {
   const ids = portfolioSwitchCatalog.map((item) => item.id);
   const { data, error } = await supabase
@@ -79,18 +92,7 @@ export async function readEffectiveDesiredState(switchId: string): Promise<Desir
   if (!definition) {
     throw new SwitchboardError('unknown_switch', `Unknown portfolio switch: ${switchId}`);
   }
-
-  const { data, error } = await supabase
-    .from('founder_switch_overrides')
-    .select('switch_id,desired_state,reason,updated_by,updated_at')
-    .eq('switch_id', switchId)
-    .maybeSingle();
-
-  if (error) {
-    throw new SwitchboardError('read_failed', `Could not read founder switch ${switchId}: ${error.message}`);
-  }
-
-  return (data as SwitchOverrideRow | null)?.desired_state ?? definition.defaultDesiredState;
+  return (await readOverride(switchId))?.desired_state ?? definition.defaultDesiredState;
 }
 
 export async function setFounderDesiredState(input: {
@@ -114,53 +116,39 @@ export async function setFounderDesiredState(input: {
   const previousState = await readEffectiveDesiredState(input.switchId);
 
   if (previousState === input.desiredState) {
-    const { data, error } = await supabase
-      .from('founder_switch_overrides')
-      .select('switch_id,desired_state,reason,updated_by,updated_at')
-      .eq('switch_id', input.switchId)
-      .maybeSingle();
-    if (error) {
-      throw new SwitchboardError('read_failed', `Could not re-read founder switch ${input.switchId}: ${error.message}`);
-    }
-    return mergeSwitch(definition, (data as SwitchOverrideRow | null) ?? undefined);
+    return mergeSwitch(definition, (await readOverride(input.switchId)) ?? undefined);
   }
 
-  const { data: override, error: writeError } = await supabase
-    .from('founder_switch_overrides')
-    .upsert({
-      switch_id: input.switchId,
-      desired_state: input.desiredState,
-      reason: normalizedReason,
-      updated_by: input.actorEmail,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'switch_id' })
-    .select('switch_id,desired_state,reason,updated_by,updated_at')
-    .single();
+  // This RPC updates the current override and appends its audit event inside
+  // one Postgres transaction. A caller can therefore never receive a failed
+  // response after the switch changed without its evidence receipt, or a
+  // receipt claiming a state change that rolled back.
+  const { data, error } = await supabase.rpc('set_founder_switch_state', {
+    p_switch_id: input.switchId,
+    p_desired_state: input.desiredState,
+    p_reason: normalizedReason,
+    p_actor_email: input.actorEmail,
+  });
 
-  if (writeError || !override) {
-    throw new SwitchboardError('write_failed', `Could not persist founder switch ${input.switchId}: ${writeError?.message ?? 'missing write result'}`);
+  if (error) {
+    throw new SwitchboardError('write_failed', `Could not persist founder switch ${input.switchId}: ${error.message}`);
   }
 
-  const { error: eventError } = await supabase
-    .from('founder_switch_events')
-    .insert({
-      switch_id: input.switchId,
-      previous_state: previousState,
-      desired_state: input.desiredState,
-      reason: normalizedReason,
-      actor_email: input.actorEmail,
-    });
-
-  if (eventError) {
-    // The current state has already been durably written. Surface the audit
-    // failure instead of pretending the entire operation was uncommitted.
-    throw new SwitchboardError(
-      'write_failed',
-      `Switch state changed but its audit event failed to persist: ${eventError.message}`,
-    );
+  const result = Array.isArray(data) ? data[0] : data;
+  if (!result || typeof result !== 'object') {
+    throw new SwitchboardError('write_failed', `Could not persist founder switch ${input.switchId}: missing atomic write receipt`);
   }
 
-  return mergeSwitch(definition, override as SwitchOverrideRow);
+  const row = result as Record<string, unknown>;
+  const override: SwitchOverrideRow = {
+    switch_id: String(row.switch_id ?? input.switchId),
+    desired_state: row.desired_state === 'off' ? 'off' : 'on',
+    reason: typeof row.reason === 'string' ? row.reason : null,
+    updated_by: typeof row.updated_by === 'string' ? row.updated_by : input.actorEmail,
+    updated_at: typeof row.updated_at === 'string' ? row.updated_at : new Date().toISOString(),
+  };
+
+  return mergeSwitch(definition, override);
 }
 
 export async function readSwitchHistory(switchId: string): Promise<SwitchEventRow[]> {
