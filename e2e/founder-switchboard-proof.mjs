@@ -184,10 +184,10 @@ async function proveViewport(browser, { name, width, height, isMobile = false })
 
   await page.setContent(html, { waitUntil: 'domcontentloaded' });
   await page.addStyleTag({ content: css });
-  await page.evaluate(() => sessionStorage.setItem('fcr_session', JSON.stringify({
-    access_token: 'fixture-founder-token',
-    email: 'founder@example.com',
-  })));
+  // This isolated visual fixture intentionally has no real storage origin.
+  // switchboard.js already treats an unavailable sessionStorage as no token,
+  // and the mocked fetch layer below is the auth-independent UI seam. Founder
+  // authorization itself is covered by the real API integration tests.
   await installFetchFixture(page);
   await page.addScriptTag({ content: js, type: 'module' });
 
