@@ -125,6 +125,7 @@ export async function setFounderDesiredState(input: {
   // receipt claiming a state change that rolled back.
   const { data, error } = await supabase.rpc('set_founder_switch_state', {
     p_switch_id: input.switchId,
+    p_previous_state: previousState,
     p_desired_state: input.desiredState,
     p_reason: normalizedReason,
     p_actor_email: input.actorEmail,
