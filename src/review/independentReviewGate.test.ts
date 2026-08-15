@@ -75,6 +75,7 @@ interface ProviderOptions {
   omitReviewCapability?: boolean;
   mutateVerification?: (signal: VerificationSignal) => VerificationSignal;
   mutateReview?: (signal: ReviewSignal) => ReviewSignal;
+  additionalReviewSignals?: ReviewSignal[];
 }
 
 function providerFor(
@@ -98,15 +99,18 @@ function providerFor(
     .filter((review) => review.reviewer.kind === "semantic")
     .map((review, index) => {
       const signal: ReviewSignal = {
-        id: `review-${index + 1}`,
+        id: String(index + 100),
         reviewerId: review.reviewer.id,
         state: review.verdict === "clear" ? "approved" : "changes_requested",
         commitSha: HEAD,
         provider: "github",
         receiptHash: review.reviewHash,
+        submittedAt: `2026-08-15T02:30:0${index}Z`,
       };
       return options.mutateReview ? options.mutateReview(signal) : signal;
     });
+
+  reviewSignals.push(...(options.additionalReviewSignals ?? []));
 
   return {
     name: "github",
@@ -126,7 +130,7 @@ const policy = {
 };
 
 describe("independent review receipt gate", () => {
-  it("accepts provider-backed semantic approval plus Python check without granting merge authority", async () => {
+  it("accepts current provider-backed semantic approval plus Python check without granting merge authority", async () => {
     const reviews = [
       receipt(TRUSTED_SEMANTIC, "semantic"),
       receipt("python-static-review-v1", "deterministic"),
@@ -147,11 +151,16 @@ describe("independent review receipt gate", () => {
   });
 
   it("does not let a semantic-looking check substitute for a provider PR review", async () => {
-    const semantic = receipt(TRUSTED_SEMANTIC, "semantic");
-    const python = receipt("python-static-review-v1", "deterministic");
-    const reviews = [semantic, python];
-    const provider = providerFor(reviews, { omitReviewCapability: true });
-    const result = await evaluateIndependentReviewGate(provider, context, reviews, policy);
+    const reviews = [
+      receipt(TRUSTED_SEMANTIC, "semantic"),
+      receipt("python-static-review-v1", "deterministic"),
+    ];
+    const result = await evaluateIndependentReviewGate(
+      providerFor(reviews, { omitReviewCapability: true }),
+      context,
+      reviews,
+      policy,
+    );
     expect(result.reviewGateSatisfied).toBe(false);
     expect(result.blockers.join(" ")).toMatch(/cannot supply provider-backed semantic review witnesses/);
   });
@@ -161,12 +170,11 @@ describe("independent review receipt gate", () => {
       receipt(TRUSTED_SEMANTIC, "semantic"),
       receipt("python-static-review-v1", "deterministic"),
     ];
-    const provider = providerFor(reviews, {
+    const result = await evaluateIndependentReviewGate(providerFor(reviews, {
       mutateReview: (signal) => ({ ...signal, receiptHash: "f".repeat(64) }),
-    });
-    const result = await evaluateIndependentReviewGate(provider, context, reviews, policy);
+    }), context, reviews, policy);
     expect(result.reviewGateSatisfied).toBe(false);
-    expect(result.blockers.join(" ")).toMatch(/Missing exact-head provider PR-review witness/);
+    expect(result.blockers.join(" ")).toMatch(/provider PR-review witness/);
   });
 
   it("requires semantic approval to be attached to the exact head", async () => {
@@ -174,12 +182,47 @@ describe("independent review receipt gate", () => {
       receipt(TRUSTED_SEMANTIC, "semantic"),
       receipt("python-static-review-v1", "deterministic"),
     ];
-    const provider = providerFor(reviews, {
+    const result = await evaluateIndependentReviewGate(providerFor(reviews, {
       mutateReview: (signal) => ({ ...signal, commitSha: "c".repeat(40) }),
-    });
-    const result = await evaluateIndependentReviewGate(provider, context, reviews, policy);
+    }), context, reviews, policy);
     expect(result.reviewGateSatisfied).toBe(false);
-    expect(result.blockers.join(" ")).toMatch(/Missing exact-head provider PR-review witness/);
+    expect(result.blockers.join(" ")).toMatch(/provider PR-review witness/);
+  });
+
+  it("invalidates an older approval when the same reviewer later requests changes", async () => {
+    const semantic = receipt(TRUSTED_SEMANTIC, "semantic");
+    const reviews = [semantic, receipt("python-static-review-v1", "deterministic")];
+    const result = await evaluateIndependentReviewGate(providerFor(reviews, {
+      additionalReviewSignals: [{
+        id: "999",
+        reviewerId: TRUSTED_SEMANTIC,
+        state: "changes_requested",
+        commitSha: HEAD,
+        provider: "github",
+        receiptHash: semantic.reviewHash,
+        submittedAt: "2026-08-15T02:31:00Z",
+      }],
+    }), context, reviews, policy);
+    expect(result.reviewGateSatisfied).toBe(false);
+    expect(result.blockers.join(" ")).toMatch(/current exact-head provider PR-review witness/);
+  });
+
+  it("fails closed when multiple semantic review events cannot be ordered", async () => {
+    const semantic = receipt(TRUSTED_SEMANTIC, "semantic");
+    const reviews = [semantic, receipt("python-static-review-v1", "deterministic")];
+    const result = await evaluateIndependentReviewGate(providerFor(reviews, {
+      mutateReview: (signal) => ({ ...signal, submittedAt: undefined }),
+      additionalReviewSignals: [{
+        id: "999",
+        reviewerId: TRUSTED_SEMANTIC,
+        state: "approved",
+        commitSha: HEAD,
+        provider: "github",
+        receiptHash: semantic.reviewHash,
+      }],
+    }), context, reviews, policy);
+    expect(result.reviewGateSatisfied).toBe(false);
+    expect(result.blockers.join(" ")).toMatch(/current exact-head provider PR-review witness/);
   });
 
   it("requires deterministic Python evidence at the exact head", async () => {
@@ -187,12 +230,24 @@ describe("independent review receipt gate", () => {
       receipt(TRUSTED_SEMANTIC, "semantic"),
       receipt("python-static-review-v1", "deterministic"),
     ];
-    const provider = providerFor(reviews, {
+    const result = await evaluateIndependentReviewGate(providerFor(reviews, {
       mutateVerification: (signal) => ({ ...signal, commitSha: "c".repeat(40) }),
-    });
-    const result = await evaluateIndependentReviewGate(provider, context, reviews, policy);
+    }), context, reviews, policy);
     expect(result.reviewGateSatisfied).toBe(false);
     expect(result.blockers.join(" ")).toMatch(/Missing passed exact-head deterministic witness/);
+  });
+
+  it("requires witness signals to come from the repository provider being queried", async () => {
+    const reviews = [
+      receipt(TRUSTED_SEMANTIC, "semantic"),
+      receipt("python-static-review-v1", "deterministic"),
+    ];
+    const result = await evaluateIndependentReviewGate(providerFor(reviews, {
+      mutateReview: (signal) => ({ ...signal, provider: "other-provider" }),
+      mutateVerification: (signal) => ({ ...signal, provider: "other-provider" }),
+    }), context, reviews, policy);
+    expect(result.reviewGateSatisfied).toBe(false);
+    expect(result.blockers.join(" ")).toMatch(/witness/);
   });
 
   it("blocks any witnessed P1 finding", async () => {
@@ -253,5 +308,20 @@ describe("independent review receipt gate", () => {
     await expect(evaluateIndependentReviewGate(providerFor(reviews), context, reviews, policy)).resolves.toMatchObject({
       reviewGateSatisfied: false,
     });
+  });
+
+  it("rejects malformed finding path/recommendation fields even with a recomputed receipt hash", async () => {
+    const clean = receipt(TRUSTED_SEMANTIC, "semantic", "P1");
+    const malformedDraft = {
+      ...clean,
+      findings: [{ ...clean.findings[0], path: null, recommendation: 123 }],
+      reviewHash: "",
+    } as unknown as IndependentReviewReceipt;
+    const malformed = { ...malformedDraft, reviewHash: independentReviewHash(malformedDraft) };
+    const reviews = [malformed, receipt("python-static-review-v1", "deterministic")];
+    const result = await evaluateIndependentReviewGate(providerFor(reviews), context, reviews, policy);
+    expect(result.reviewGateSatisfied).toBe(false);
+    expect(result.blockers.join(" ")).toMatch(/path must be a string/);
+    expect(result.blockers.join(" ")).toMatch(/recommendation must be a string/);
   });
 });
