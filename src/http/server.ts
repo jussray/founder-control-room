@@ -25,6 +25,7 @@ import { goalfixRouter } from './routes/goalfix.js';
 import { founderOsSkillsRouter } from './routes/founderOsSkills.js';
 import { mirrorRouter } from './routes/mirror.js';
 import { n8nConveyorRouter } from './routes/n8nConveyor.js';
+import { switchboardRouter } from './routes/switchboard.js';
 import { handleFounderSignalEngineMcp } from './routes/founderSignalEngineMcp.js';
 import { handleFounderSignalReviewContextIngest } from './routes/founderSignalReviewContexts.js';
 import { handleFounderSignalReviewEmailIngest } from './routes/founderSignalReviewEmailIngress.js';
@@ -57,6 +58,7 @@ import { requireSameOriginBrowserMutation } from './middleware/csrf.js';
 import { jsonParseErrorHandler } from './middleware/jsonParseError.js';
 import { requireProjectReadAudit } from './middleware/projectReadAudit.js';
 import { requireFounder } from './middleware/requireFounder.js';
+import { requirePortfolioSwitchOn } from './middleware/requirePortfolioSwitchOn.js';
 import { requireV10PrivilegedApprovalBinding } from './middleware/v10PrivilegedApprovalBinding.js';
 import { requireFounderSignalEngineMcpToken } from './middleware/founderSignalEngineMcpAuth.js';
 import { requireFounderSignalEngineReviewOnly } from './middleware/founderSignalEngineWriteGate.js';
@@ -237,14 +239,17 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/auth', authRouter);
   app.use('/onboarding', founderOnboardingRouter);
   app.use('/portfolio', portfolioVerificationRouter);
+  app.use('/switchboard', switchboardRouter);
   app.use('/projects', repositoryVerificationRouter);
   app.use('/projects', requireProjectReadAudit, projectsRouter);
   // Privileged mission execution still uses the existing approvals router, but
-  // it must now pass founder authentication + V10 plan/registry/exact-head
-  // binding before the route may reserve an approval_executions row.
+  // it must now pass founder authentication + founder master switch + V10
+  // plan/registry/exact-head binding before the route may reserve an
+  // approval_executions row.
   app.post(
     '/approvals/:missionId/execute',
     requireFounder,
+    requirePortfolioSwitchOn('fcr-privileged-execution-master'),
     requireV10PrivilegedApprovalBinding,
   );
   app.use('/approvals', approvalsRouter);

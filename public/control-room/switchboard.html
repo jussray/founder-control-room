@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Founder Switchboard · Founder Control Room</title>
+  <link rel="stylesheet" href="/control-room/switchboard.css" />
+</head>
+<body>
+  <main id="switchboard-root">
+    <p class="boot">Loading Founder Switchboard…</p>
+  </main>
+
+  <dialog id="switch-confirm" class="confirm-dialog" aria-labelledby="confirm-title">
+    <form method="dialog" id="confirm-form">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">FOUNDER STATE CHANGE</p>
+          <h2 id="confirm-title">Confirm switch change</h2>
+        </div>
+        <button class="icon-button" value="cancel" aria-label="Cancel switch change">×</button>
+      </div>
+      <p id="confirm-summary" class="dialog-summary"></p>
+      <div id="confirm-boundary" class="boundary-note"></div>
+      <label for="switch-reason">Reason <span class="muted">optional, retained with the receipt</span></label>
+      <textarea id="switch-reason" maxlength="500" rows="3" placeholder="Why are you changing this capability now?"></textarea>
+      <div class="dialog-actions">
+        <button class="secondary-button" value="cancel">Cancel</button>
+        <button id="confirm-submit" class="danger-button" value="default">Turn OFF</button>
+      </div>
+      <p id="confirm-status" class="status-copy" role="status" aria-live="polite"></p>
+    </form>
+  </dialog>
+
+  <script type="module" src="/control-room/switchboard.js"></script>
+</body>
+</html>
