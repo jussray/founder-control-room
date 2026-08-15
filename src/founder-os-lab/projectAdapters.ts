@@ -16,6 +16,7 @@ interface FounderOsLabProjectAdapterDescriptor {
   name: string;
   repository: string;
   auditedSourceHead: string;
+  auditedContractBlobs: Readonly<Record<string, string>>;
   authorityOwner: 'founder-control-room';
   mode: 'preview';
   executionAllowed: false;
@@ -45,7 +46,16 @@ interface NormalizedContractUrls {
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SEKRET_BIP_REPOSITORY = 'jussray/Sekret-Bip';
-const SEKRET_BIP_AUDITED_HEAD = '1dba83386eb0a0865d051f2c74ae9046dafb5eeb';
+const SEKRET_BIP_AUDITED_HEAD = '91206da6530369ba3fac97828d33e41e08e704ee';
+const SEKRET_BIP_AUDITED_CONTRACT_BLOBS = {
+  'app/index.tsx': '46e73c816a392f289c377d5610243d8ef8189f7c',
+  'screens/WebWelcomeScreen.tsx': '2520c10810593ebcab93e2d3be2a14cff6bd32ce',
+  'constants/frontDoorTheme.ts': '0c331d30058ad21ea3cbb51e0788165008992d2f',
+  'docs/COMPANION_NAME_CANON.md': 'fec910ecd3c99b08f1305225cfe3d1b1e82aa171',
+  'docs/FRONT_DOOR_VARIANTS.md': '171db3a64822a46d052b290b55ebc890dc7a8d76',
+  'implementation-ledger.extensions/human-ai-identity-contract.json': '2266fb7f8bf51506011d976f5907e9656da5a67b',
+  'test/dual-front-door-contract.test.mjs': '6f4a3743a6accf9064877d3759ecb006f35a1b98',
+} as const;
 const PROJECT_AUDIENCES: ReadonlySet<FounderOsLabProjectAudience> = new Set(['teen', 'bip-jr']);
 
 export const FOUNDER_OS_LAB_PROJECT_ADAPTERS: readonly FounderOsLabProjectAdapterDescriptor[] = [
@@ -54,19 +64,13 @@ export const FOUNDER_OS_LAB_PROJECT_ADAPTERS: readonly FounderOsLabProjectAdapte
     name: 'Se’kret Bip',
     repository: SEKRET_BIP_REPOSITORY,
     auditedSourceHead: SEKRET_BIP_AUDITED_HEAD,
+    auditedContractBlobs: SEKRET_BIP_AUDITED_CONTRACT_BLOBS,
     authorityOwner: 'founder-control-room',
     mode: 'preview',
     executionAllowed: false,
     allowedActions: ['inspect', 'plan'],
     allowedProviders: ['chatgpt', 'claude', 'codex', 'github', 'figma'],
-    requiredContractPaths: [
-      'app/index.tsx',
-      'constants/frontDoorTheme.ts',
-      'docs/COMPANION_NAME_CANON.md',
-      'docs/FRONT_DOOR_VARIANTS.md',
-      'implementation-ledger.extensions/human-ai-identity-contract.json',
-      'test/dual-front-door-contract.test.mjs',
-    ],
+    requiredContractPaths: Object.keys(SEKRET_BIP_AUDITED_CONTRACT_BLOBS),
     canonicalDisplayNames: ['Night', 'Suhana', 'Sy', 'Cloud'],
     forbiddenDisplayNames: ['Suhanna'],
     legacyInternalIdsPreserved: true,

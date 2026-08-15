@@ -27,7 +27,7 @@ describe('Se’kret Bip Founder OS project adapter', () => {
       id: 'sekret-bip',
       name: 'Se’kret Bip',
       repository: 'jussray/Sekret-Bip',
-      auditedSourceHead: '1dba83386eb0a0865d051f2c74ae9046dafb5eeb',
+      auditedSourceHead: '91206da6530369ba3fac97828d33e41e08e704ee',
       authorityOwner: 'founder-control-room',
       mode: 'preview',
       executionAllowed: false,
@@ -41,12 +41,18 @@ describe('Se’kret Bip Founder OS project adapter', () => {
     expect(ADAPTER.forbiddenDisplayNames).toEqual(['Suhanna']);
     expect(ADAPTER.requiredContractPaths).toEqual([
       'app/index.tsx',
+      'screens/WebWelcomeScreen.tsx',
       'constants/frontDoorTheme.ts',
       'docs/COMPANION_NAME_CANON.md',
       'docs/FRONT_DOOR_VARIANTS.md',
       'implementation-ledger.extensions/human-ai-identity-contract.json',
       'test/dual-front-door-contract.test.mjs',
     ]);
+    expect(ADAPTER.auditedContractBlobs).toMatchObject({
+      'app/index.tsx': '46e73c816a392f289c377d5610243d8ef8189f7c',
+      'screens/WebWelcomeScreen.tsx': '2520c10810593ebcab93e2d3be2a14cff6bd32ce',
+      'test/dual-front-door-contract.test.mjs': '6f4a3743a6accf9064877d3759ecb006f35a1b98',
+    });
   });
 
   it('produces a source-bound read-only repository inspection preview', () => {
