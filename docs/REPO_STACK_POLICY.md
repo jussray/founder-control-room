@@ -67,7 +67,7 @@ Add a server only when its evidence value exceeds its authority and data-exposur
 - `jussray/jbh-private`: private admin stack; GitHub, Context7, isolated Playwright; no standing deployment, database, or Figma MCP.
 - `jussray/founder-control-room`: governance/control-plane stack; GitHub, Context7, its own read-only Supabase project, official Figma bound to `docs/FIGMA_SOURCE_OF_TRUTH.md` and repo-specific builder/implementation skills, narrow Cloudflare evidence.
 - `jussray/chief-ai-machine`: public prototype-SPA stack; GitHub, Context7, isolated Playwright. Its Figma operating guide exists, but standing design-write authority requires executable builder/implementation skill routing.
-- `jussray/l99-StoryEngine`: public runtime/framework stack; GitHub, Context7, isolated Playwright for synthetic dashboard verification; Figma remains deferred until a verified design authority exists; add Netdata only after persistent monitored hosts exist.
+- `jussray/StoryEngine`: private runtime/framework stack; GitHub, Context7, isolated Playwright for synthetic dashboard verification; Figma remains deferred until a verified design authority exists; add Netdata only after persistent monitored hosts exist.
 - `jussray/untold-stories-storefront`: private Shopify Hydrogen storefront stack; GitHub, Context7, isolated Playwright; add Figma or hosting-specific operational tools only after a canonical design source or Oxygen/Cloudflare deployment is selected and governed.
 
 ### Do not automatically modify

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   L99_PROJECT_SLUG,
@@ -6,6 +7,14 @@ import {
   buildL99RepositoryFields,
   needsL99RepositoryReconciliation,
 } from "./l99Repository.js";
+
+const STALE_REPOSITORY_IDENTIFIER = "jussray/" + "l99-StoryEngine";
+const ACTIVE_ROUTING_FILES = [
+  "../../AGENTS.md",
+  "../../docs/REPO_STACK_POLICY.md",
+  "../../docs/FIGMA_PORTFOLIO_CONTRACT.md",
+  "../../docs/REPOSITORY_PRIVACY_PROGRAM.md",
+] as const;
 
 describe("L99 repository identity", () => {
   it("keeps the stable project slug separate from the repository locator", () => {
@@ -33,6 +42,14 @@ describe("L99 repository identity", () => {
           repo_identifier,
         }),
       ).toBe(true);
+    }
+  });
+
+  it("keeps active portfolio routing on the authoritative StoryEngine repository", () => {
+    for (const relativePath of ACTIVE_ROUTING_FILES) {
+      const content = readFileSync(new URL(relativePath, import.meta.url), "utf8");
+      expect(content).toContain(L99_REPOSITORY_IDENTIFIER);
+      expect(content).not.toContain(STALE_REPOSITORY_IDENTIFIER);
     }
   });
 

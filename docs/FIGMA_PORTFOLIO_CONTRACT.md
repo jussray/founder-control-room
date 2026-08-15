@@ -12,7 +12,7 @@ Every active repository owns a local `.agents/skills/figma-build-implement/SKILL
 |---|---|---|
 | `jussray/Sekret-Bip` | Mobile and responsive Expo product design | Expo Router, React Native, TypeScript; synthetic teen/family content only |
 | `jussray/founder-control-room` | Founder dashboard and economic-intelligence control surfaces | Current TypeScript/Express/web contracts; no invented authority or false-green state |
-| `jussray/l99-StoryEngine` | Creator studio, artifact review, video/shot planning | Current studio/runtime boundaries; Figma is not canon, renderer, event bus, or promotion proof |
+| `jussray/StoryEngine` | Creator studio, artifact review, video/shot planning | Current studio/runtime boundaries; Figma is not canon, renderer, event bus, or promotion proof |
 | `jussray/chief-ai-machine` | Prompt-builder prototype and design governance | Current vanilla JavaScript SPA unless a separate architecture change is approved |
 | `jussray/jussbeautifulhair-site` | Public responsive commerce | React/Vite public storefront and minimal Cloudflare checkout handoff only |
 | `jussray/untold-stories-storefront` | Story-first responsive commerce | Shopify Hydrogen routes/components/fragments; Shopify remains product and checkout authority |
