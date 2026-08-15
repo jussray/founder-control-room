@@ -84,9 +84,13 @@ begin
     raise exception 'switch reason exceeds 500 characters';
   end if;
 
-  -- If an override already exists, bind the mutation to the state the caller
-  -- actually observed. This prevents two founder sessions from silently
-  -- overwriting each other's switch decision with a stale confirmation.
+  -- Serialize writers per switch, including the first override where no row
+  -- exists yet. The row lock below cannot protect a missing row by itself.
+  perform pg_advisory_xact_lock(hashtextextended(p_switch_id, 0));
+
+  -- Bind the mutation to the state the caller actually observed. This makes a
+  -- stale confirmation fail instead of silently overwriting a newer founder
+  -- decision from another session.
   select fso.desired_state
     into v_existing_state
     from public.founder_switch_overrides as fso
