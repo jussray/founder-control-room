@@ -7,7 +7,7 @@ import {
   type CapabilityRequestV1,
 } from './capabilityExecutionContracts.js';
 
-export const FCR_EVIDENCE_SCALE_GATE_CONTRACT = 'juss/fcr-evidence-scale-gate@v2' as const;
+export const FCR_EVIDENCE_SCALE_GATE_CONTRACT = 'juss/fcr-evidence-scale-gate@v3' as const;
 export const FCR_EVALUATION_TIME_AUTHORITY_CONTRACT = 'juss/fcr-evaluation-time-authority@v1' as const;
 
 export type FcrEvidenceKind =
@@ -58,6 +58,13 @@ export interface FcrEvidenceScalePolicy {
   maxRetryRate?: number;
 }
 
+/**
+ * Deterministic evaluation-window claim supplied by an outer runtime adapter.
+ *
+ * The isolated lab validates its shape and bindings only. It does NOT
+ * authenticate this object. A future runtime authority adapter must resolve
+ * this claim from durable/authenticated state before scale review can open.
+ */
 export interface FcrEvaluationTimeAuthority {
   contract: typeof FCR_EVALUATION_TIME_AUTHORITY_CONTRACT;
   authorityId: 'control-room-runtime';
@@ -83,6 +90,7 @@ export interface FcrEvidenceScaleMetrics {
   currentHeadEntries: number;
   freshCurrentEntries: number;
   staleCurrentEntries: number;
+  distinctCurrentExecutions: number;
   distinctFreshExecutions: number;
   freshExactHeadPasses: number;
   passRate: number | null;
@@ -109,15 +117,22 @@ export interface FcrEvidenceScaleDecision {
   expectedHeadSha: string;
   evaluatedAt: string;
   expiresAt: string;
-  clockSource: 'authority-receipt';
+  clockSource: 'declared-unverified';
   timeAuthority: FcrEvaluationTimeAuthority;
+  authority: {
+    status: 'unverified';
+    scaleReviewAllowed: false;
+    blockers: string[];
+  };
   policy: {
     policyId: string;
     policyVersion: string;
     digest: string;
+    source: 'unverified-input';
     thresholds: FcrEvidenceScalePolicy;
   };
   ledger: {
+    authenticity: 'unverified-input';
     evidenceIds: string[];
     executionIds: string[];
     provenanceIds: string[];
@@ -125,16 +140,17 @@ export interface FcrEvidenceScaleDecision {
   };
   metrics: FcrEvidenceScaleMetrics;
   evaluation: {
-    status: 'blocked' | 'meets_proof_floor';
+    status: 'blocked' | 'meets_untrusted_proof_floor';
     blockers: string[];
   };
   optimization: {
-    status: 'blocked_by_proof' | 'recommended' | 'none';
+    status: 'blocked_by_proof' | 'candidate' | 'none';
     recommendations: FcrOptimizationRecommendation[];
     executionAllowed: false;
   };
   scaleGate: {
-    status: 'blocked' | 'optimize_first' | 'ready_for_founder_scale_review';
+    status: 'blocked';
+    candidate: 'none' | 'optimize_candidate' | 'evidence_candidate';
     scaleAuthorized: false;
     executionAllowed: false;
     nextGate: string;
@@ -150,9 +166,11 @@ export interface NormalizeCapabilityReceiptEvidenceInput {
 export interface NormalizeCapabilityReceiptEvidenceResult {
   evidence: FcrEvidenceLedgerEntry[];
   integrityFailures: string[];
+  authenticity: 'checksum-only-unverified';
 }
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
+const MAX_EVIDENCE_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const EVIDENCE_KINDS = new Set<FcrEvidenceKind>([
   'test',
   'log',
@@ -276,6 +294,8 @@ function normalizePolicy(raw: unknown): { policy: FcrEvidenceScalePolicy; failur
   }
   if (!Number.isInteger(policy.maxEvidenceAgeMs) || policy.maxEvidenceAgeMs <= 0) {
     failures.push('policy maxEvidenceAgeMs must be a positive integer');
+  } else if (policy.maxEvidenceAgeMs > MAX_EVIDENCE_AGE_MS) {
+    failures.push(`policy maxEvidenceAgeMs must not exceed ${MAX_EVIDENCE_AGE_MS}`);
   }
   if (!Number.isInteger(policy.minFreshExactHeadPasses) || policy.minFreshExactHeadPasses <= 0) {
     failures.push('policy minFreshExactHeadPasses must be a positive integer');
@@ -321,15 +341,9 @@ function normalizeTimeAuthority(
   const validUntil = asString(record.validUntil) ?? '';
   const provenanceId = asString(record.provenanceId) ?? '';
 
-  if (contract !== FCR_EVALUATION_TIME_AUTHORITY_CONTRACT) {
-    failures.push('timeAuthority contract is unsupported');
-  }
-  if (authorityId !== 'control-room-runtime') {
-    failures.push('timeAuthority authorityId must be control-room-runtime');
-  }
-  if (receiptProject !== projectSlug) {
-    failures.push('timeAuthority projectSlug does not match evaluated project');
-  }
+  if (contract !== FCR_EVALUATION_TIME_AUTHORITY_CONTRACT) failures.push('timeAuthority contract is unsupported');
+  if (authorityId !== 'control-room-runtime') failures.push('timeAuthority authorityId must be control-room-runtime');
+  if (receiptProject !== projectSlug) failures.push('timeAuthority projectSlug does not match evaluated project');
   if (receiptHead.toLowerCase() !== expectedHeadSha.toLowerCase()) {
     failures.push('timeAuthority expectedHeadSha does not match evaluated head');
   }
@@ -342,12 +356,8 @@ function normalizeTimeAuthority(
 
   const evaluatedAtMs = Date.parse(evaluatedAt);
   const validUntilMs = Date.parse(validUntil);
-  if (!evaluatedAt || Number.isNaN(evaluatedAtMs)) {
-    failures.push('timeAuthority evaluatedAt must be an ISO-compatible timestamp');
-  }
-  if (!validUntil || Number.isNaN(validUntilMs)) {
-    failures.push('timeAuthority validUntil must be an ISO-compatible timestamp');
-  }
+  if (!evaluatedAt || Number.isNaN(evaluatedAtMs)) failures.push('timeAuthority evaluatedAt must be an ISO-compatible timestamp');
+  if (!validUntil || Number.isNaN(validUntilMs)) failures.push('timeAuthority validUntil must be an ISO-compatible timestamp');
   if (!Number.isNaN(evaluatedAtMs) && !Number.isNaN(validUntilMs) && validUntilMs < evaluatedAtMs) {
     failures.push('timeAuthority validUntil must not precede evaluatedAt');
   }
@@ -453,9 +463,7 @@ function normalizeEvidenceEntry(raw: unknown, index: number): {
   if (observedHeadSha !== null && !FULL_SHA.test(observedHeadSha)) {
     failures.push(`evidence ${evidenceId || `<index:${index}>`} observedHeadSha is invalid`);
   }
-  if (!observedAt || Number.isNaN(Date.parse(observedAt))) {
-    failures.push(`evidence ${evidenceId || `<index:${index}>`} observedAt is invalid`);
-  }
+  if (!observedAt || Number.isNaN(Date.parse(observedAt))) failures.push(`evidence ${evidenceId || `<index:${index}>`} observedAt is invalid`);
 
   return {
     entry: {
@@ -477,26 +485,6 @@ function normalizeEvidenceEntry(raw: unknown, index: number): {
   };
 }
 
-function executionMetric(
-  entries: FcrEvidenceLedgerEntry[],
-  field: 'latencyMs' | 'costUsd' | 'attempts',
-  failures: string[],
-): number | null {
-  const values = unique(
-    entries
-      .map((entry) => entry[field])
-      .filter((value): value is number => typeof value === 'number')
-      .map((value) => String(value)),
-  ).map(Number);
-
-  if (values.length === 0) return null;
-  if (values.length > 1) {
-    failures.push(`execution ${entries[0].executionId} has conflicting ${field} telemetry`);
-    return null;
-  }
-  return values[0];
-}
-
 function groupByExecution(entries: FcrEvidenceLedgerEntry[]): Map<string, FcrEvidenceLedgerEntry[]> {
   const groups = new Map<string, FcrEvidenceLedgerEntry[]>();
   for (const entry of entries) {
@@ -513,51 +501,88 @@ function executionVerdict(entries: FcrEvidenceLedgerEntry[]): FcrEvidenceVerdict
   return 'PASS';
 }
 
+function executionMetric(
+  entries: FcrEvidenceLedgerEntry[],
+  field: 'latencyMs' | 'costUsd' | 'attempts',
+  failures: string[],
+): number | null {
+  const values = unique(
+    entries
+      .map((entry) => entry[field])
+      .filter((value): value is number => typeof value === 'number')
+      .map(String),
+  ).map(Number);
+
+  if (values.length === 0) return null;
+  if (values.length > 1) {
+    failures.push(`execution ${entries[0].executionId} has conflicting ${field} telemetry`);
+    return null;
+  }
+  return values[0];
+}
+
+function executionIsFresh(
+  entries: FcrEvidenceLedgerEntry[],
+  evaluatedAtMs: number,
+  maxEvidenceAgeMs: number,
+): boolean {
+  if (Number.isNaN(evaluatedAtMs)) return false;
+  return entries.every((entry) => {
+    const observedAtMs = Date.parse(entry.observedAt);
+    return !Number.isNaN(observedAtMs)
+      && observedAtMs <= evaluatedAtMs
+      && evaluatedAtMs - observedAtMs <= maxEvidenceAgeMs;
+  });
+}
+
 export function normalizeCapabilityReceiptEvidence(
   input: NormalizeCapabilityReceiptEvidenceInput,
 ): NormalizeCapabilityReceiptEvidenceResult {
   const integrityFailures: string[] = [];
+  const empty = (): NormalizeCapabilityReceiptEvidenceResult => ({
+    evidence: [],
+    integrityFailures: unique(integrityFailures),
+    authenticity: 'checksum-only-unverified',
+  });
+
   if (!isRecord(input)) {
-    return { evidence: [], integrityFailures: ['capability receipt normalization input must be an object'] };
+    integrityFailures.push('capability receipt normalization input must be an object');
+    return empty();
   }
 
-  const projectSlug = asString((input as unknown as Record<string, unknown>).projectSlug) ?? '';
+  const raw = input as unknown as Record<string, unknown>;
+  const projectSlug = asString(raw.projectSlug) ?? '';
+  const request = raw.request;
+  const receipt = raw.receipt;
   if (!projectSlug.trim()) integrityFailures.push('projectSlug is required for capability receipt normalization');
-
-  const request = (input as unknown as Record<string, unknown>).request;
-  const receipt = (input as unknown as Record<string, unknown>).receipt;
   if (!isRecord(request)) integrityFailures.push('capability request must be an object');
   if (!isRecord(receipt)) integrityFailures.push('capability receipt must be an object');
+  if (integrityFailures.length > 0) return empty();
 
-  if (integrityFailures.length > 0) return { evidence: [], integrityFailures };
-
+  const typedRequest = request as unknown as CapabilityRequestV1;
+  const typedReceipt = receipt as unknown as CapabilityReceiptV1;
   try {
-    integrityFailures.push(...validateCapabilityRequest(request as unknown as CapabilityRequestV1));
-    integrityFailures.push(
-      ...validateCapabilityReceipt(
-        request as unknown as CapabilityRequestV1,
-        receipt as unknown as CapabilityReceiptV1,
-      ),
-    );
+    integrityFailures.push(...validateCapabilityRequest(typedRequest));
+    integrityFailures.push(...validateCapabilityReceipt(typedRequest, typedReceipt));
   } catch {
     integrityFailures.push('capability receipt validation failed at the runtime boundary');
   }
 
+  const requestProject = isRecord(typedRequest.args) ? asString(typedRequest.args.projectSlug) ?? '' : '';
+  if (!requestProject) integrityFailures.push('capability request does not carry a project binding');
+  else if (requestProject !== projectSlug) integrityFailures.push('capability request project does not match normalization project');
+
   if ((receipt as Record<string, unknown>).execution !== 'COMPLETED') {
     integrityFailures.push('capability receipt execution must be COMPLETED before evidence normalization');
   }
+  if (integrityFailures.length > 0) return empty();
 
-  if (integrityFailures.length > 0) {
-    return { evidence: [], integrityFailures: unique(integrityFailures) };
-  }
-
-  const typedReceipt = receipt as unknown as CapabilityReceiptV1;
   return {
     evidence: typedReceipt.evidence.map((entry) => ({
       evidenceId: entry.evidenceId,
-      projectSlug,
+      projectSlug: requestProject,
       executionId: `${typedReceipt.runId}:${typedReceipt.attemptId}`,
-      provenanceId: `${typedReceipt.receiptDigest}:${entry.digest}`,
+      provenanceId: `checksum-only:${typedReceipt.receiptDigest}:${entry.digest}`,
       kind: entry.kind,
       verdict: entry.verdict,
       source: 'capability-receipt',
@@ -566,12 +591,14 @@ export function normalizeCapabilityReceiptEvidence(
       observedAt: entry.observedAt,
     })),
     integrityFailures: [],
+    authenticity: 'checksum-only-unverified',
   };
 }
 
 export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvidenceScaleDecision {
   const rawInput = isRecord(input) ? input as unknown as Record<string, unknown> : {};
   const blockers: string[] = [];
+  const integrityFailures: string[] = [];
   if (!isRecord(input)) blockers.push('evidence scale input must be an object');
 
   const projectSlug = asString(rawInput.projectSlug) ?? '';
@@ -594,7 +621,6 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
   if (!Array.isArray(rawInput.evidence)) blockers.push('evidence must be an array');
 
   const evidence: FcrEvidenceLedgerEntry[] = [];
-  const integrityFailures: string[] = [];
   for (const [index, rawEntry] of evidenceRaw.entries()) {
     const normalized = normalizeEvidenceEntry(rawEntry, index);
     evidence.push(normalized.entry);
@@ -606,19 +632,12 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
   for (const entry of evidence) {
     if (evidenceIds.has(entry.evidenceId)) integrityFailures.push(`duplicate evidenceId: ${entry.evidenceId}`);
     else evidenceIds.add(entry.evidenceId);
-
-    if (provenanceIds.has(entry.provenanceId)) {
-      integrityFailures.push(`duplicate provenanceId: ${entry.provenanceId}`);
-    } else {
-      provenanceIds.add(entry.provenanceId);
-    }
+    if (provenanceIds.has(entry.provenanceId)) integrityFailures.push(`duplicate provenanceId: ${entry.provenanceId}`);
+    else provenanceIds.add(entry.provenanceId);
 
     if (entry.projectSlug !== projectSlug) {
-      integrityFailures.push(
-        `evidence ${entry.evidenceId || '<missing>'} projectSlug ${entry.projectSlug || '<missing>'} does not match evaluated project ${projectSlug || '<missing>'}`,
-      );
+      integrityFailures.push(`evidence ${entry.evidenceId || '<missing>'} projectSlug does not match evaluated project`);
     }
-
     if (
       entry.verdict === 'PASS'
       && entry.requestedHeadSha.toLowerCase() === expectedHeadSha.toLowerCase()
@@ -628,59 +647,47 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
     }
   }
 
-  blockers.push(...integrityFailures);
-
   const evaluatedAtMs = Date.parse(timeAuthority.evaluatedAt);
   const validUntilMs = Date.parse(timeAuthority.validUntil);
-  const evaluatedAt = timeAuthority.evaluatedAt;
-  const expectedHead = expectedHeadSha.toLowerCase();
-
-  const currentHeadEntries = evidence.filter(
-    (entry) => entry.requestedHeadSha.toLowerCase() === expectedHead,
-  );
-  const historicalEntries = evidence.length - currentHeadEntries.length;
-
-  const freshCurrentEntries = Number.isNaN(evaluatedAtMs)
-    ? []
-    : currentHeadEntries.filter((entry) => {
-      const observedAtMs = Date.parse(entry.observedAt);
-      return !Number.isNaN(observedAtMs)
-        && observedAtMs <= evaluatedAtMs
-        && evaluatedAtMs - observedAtMs <= policy.maxEvidenceAgeMs;
-    });
-  const staleCurrentEntries = currentHeadEntries.length - freshCurrentEntries.length;
-
-  if (!Number.isNaN(validUntilMs)) {
-    for (const entry of freshCurrentEntries) {
-      const evidenceDeadlineMs = Date.parse(entry.observedAt) + policy.maxEvidenceAgeMs;
-      if (validUntilMs > evidenceDeadlineMs) {
-        blockers.push(`timeAuthority validity exceeds evidence freshness window for ${entry.evidenceId}`);
-      }
+  for (const entry of evidence) {
+    const observedAtMs = Date.parse(entry.observedAt);
+    if (!Number.isNaN(evaluatedAtMs) && !Number.isNaN(observedAtMs) && observedAtMs > evaluatedAtMs) {
+      integrityFailures.push(`evidence ${entry.evidenceId || '<missing>'} is dated after the evaluation window`);
     }
   }
+  blockers.push(...integrityFailures);
 
-  const freshExactHeadPassEvidence = freshCurrentEntries.filter(
-    (entry) => entry.verdict === 'PASS' && entry.observedHeadSha?.toLowerCase() === expectedHead,
+  const expectedHead = expectedHeadSha.toLowerCase();
+  const currentHeadEntries = evidence.filter((entry) => entry.requestedHeadSha.toLowerCase() === expectedHead);
+  const historicalEntries = evidence.length - currentHeadEntries.length;
+  const currentExecutionGroups = [...groupByExecution(currentHeadEntries).values()];
+  const freshExecutionGroups = currentExecutionGroups.filter((entries) => executionIsFresh(entries, evaluatedAtMs, policy.maxEvidenceAgeMs));
+  const freshCurrentEntries = freshExecutionGroups.flat();
+  const staleCurrentEntries = currentHeadEntries.length - freshCurrentEntries.length;
+
+  if (!Number.isNaN(validUntilMs) && !Number.isNaN(evaluatedAtMs)) {
+    const allowedValidityEnd = evaluatedAtMs + Math.min(policy.maxEvidenceAgeMs, MAX_EVIDENCE_AGE_MS);
+    if (validUntilMs > allowedValidityEnd) blockers.push('timeAuthority validity exceeds the maximum evidence freshness window');
+  }
+
+  const successfulExecutionGroups = freshExecutionGroups.filter((entries) =>
+    executionVerdict(entries) === 'PASS'
+    && entries.every((entry) => entry.observedHeadSha?.toLowerCase() === expectedHead),
   );
-  const satisfiedKinds = new Set(freshExactHeadPassEvidence.map((entry) => entry.kind));
+  const satisfiedKinds = new Set(successfulExecutionGroups.flat().map((entry) => entry.kind));
   const missingKinds = policy.requiredEvidenceKinds.filter((kind) => !satisfiedKinds.has(kind));
   const proofCoverage = policy.requiredEvidenceKinds.length === 0
     ? 0
     : (policy.requiredEvidenceKinds.length - missingKinds.length) / policy.requiredEvidenceKinds.length;
 
-  const executionGroups = groupByExecution(freshCurrentEntries);
-  const executions = [...executionGroups.values()];
-  const executionVerdicts = executions.map(executionVerdict);
-  const freshExactHeadPasses = executions.filter(
-    (entries) => executionVerdict(entries) === 'PASS'
-      && entries.every((entry) => entry.observedHeadSha?.toLowerCase() === expectedHead),
-  ).length;
-  const failures = executionVerdicts.filter((verdict) => verdict === 'FAIL').length;
-  const passRate = ratio(freshExactHeadPasses, executions.length);
-  const failureRate = ratio(failures, executions.length);
+  const executionVerdicts = freshExecutionGroups.map(executionVerdict);
+  const freshExactHeadPasses = successfulExecutionGroups.length;
+  const freshFailures = executionVerdicts.filter((verdict) => verdict === 'FAIL').length;
+  const passRate = ratio(freshExactHeadPasses, freshExecutionGroups.length);
+  const failureRate = ratio(freshFailures, freshExecutionGroups.length);
 
   if (evidence.length === 0) blockers.push('no evidence supplied');
-  for (const kind of missingKinds) blockers.push(`missing fresh exact-head PASS evidence for required kind: ${kind}`);
+  for (const kind of missingKinds) blockers.push(`missing fresh exact-head PASS execution for required kind: ${kind}`);
   if (freshExactHeadPasses < policy.minFreshExactHeadPasses) {
     blockers.push(`fresh exact-head PASS executions ${freshExactHeadPasses} are below required ${policy.minFreshExactHeadPasses}`);
   }
@@ -692,30 +699,25 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
   }
 
   const telemetryFailures: string[] = [];
-  const latencySamples = executions
+  const latencySamples = freshExecutionGroups
     .map((entries) => executionMetric(entries, 'latencyMs', telemetryFailures))
     .filter((value): value is number => value !== null);
-  const costSamples = executions
+  const costSamples = freshExecutionGroups
     .map((entries) => executionMetric(entries, 'costUsd', telemetryFailures))
     .filter((value): value is number => value !== null);
-  const attemptSamples = executions
+  const attemptSamples = freshExecutionGroups
     .map((entries) => executionMetric(entries, 'attempts', telemetryFailures))
     .filter((value): value is number => value !== null);
-
   blockers.push(...telemetryFailures);
   integrityFailures.push(...telemetryFailures);
 
   const p95LatencyMs = p95(latencySamples);
-  const latencyCoverage = ratio(latencySamples.length, executions.length);
+  const latencyCoverage = ratio(latencySamples.length, freshExecutionGroups.length);
   const totalCostUsd = costSamples.reduce((sum, value) => sum + value, 0);
-  const costPerPassUsd = costSamples.length === 0 || freshExactHeadPasses === 0
-    ? null
-    : totalCostUsd / freshExactHeadPasses;
-  const costCoverage = ratio(costSamples.length, executions.length);
-  const retryRate = attemptSamples.length === 0
-    ? null
-    : attemptSamples.filter((value) => value > 1).length / attemptSamples.length;
-  const retryCoverage = ratio(attemptSamples.length, executions.length);
+  const costPerPassUsd = costSamples.length === 0 || freshExactHeadPasses === 0 ? null : totalCostUsd / freshExactHeadPasses;
+  const costCoverage = ratio(costSamples.length, freshExecutionGroups.length);
+  const retryRate = attemptSamples.length === 0 ? null : attemptSamples.filter((value) => value > 1).length / attemptSamples.length;
+  const retryCoverage = ratio(attemptSamples.length, freshExecutionGroups.length);
 
   if (policy.maxP95LatencyMs !== undefined && latencyCoverage !== 1) {
     blockers.push(`latency telemetry coverage ${latencyCoverage === null ? 'unavailable' : latencyCoverage.toFixed(4)} is below required 1`);
@@ -728,71 +730,47 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
   }
 
   const recommendations: FcrOptimizationRecommendation[] = [];
-  if (
-    policy.maxP95LatencyMs !== undefined
-    && latencyCoverage === 1
-    && p95LatencyMs !== null
-    && p95LatencyMs > policy.maxP95LatencyMs
-  ) {
-    recommendations.push({
-      code: 'reduce_latency',
-      reason: 'Fresh current-head latency exceeds the explicit policy budget.',
-      observed: p95LatencyMs,
-      threshold: policy.maxP95LatencyMs,
-    });
+  if (policy.maxP95LatencyMs !== undefined && latencyCoverage === 1 && p95LatencyMs !== null && p95LatencyMs > policy.maxP95LatencyMs) {
+    recommendations.push({ code: 'reduce_latency', reason: 'Observed latency exceeds the declared policy budget.', observed: p95LatencyMs, threshold: policy.maxP95LatencyMs });
   }
-  if (
-    policy.maxCostPerPassUsd !== undefined
-    && costCoverage === 1
-    && costPerPassUsd !== null
-    && costPerPassUsd > policy.maxCostPerPassUsd
-  ) {
-    recommendations.push({
-      code: 'reduce_cost',
-      reason: 'Fresh current-head cost per exact-head PASS exceeds the explicit policy budget.',
-      observed: costPerPassUsd,
-      threshold: policy.maxCostPerPassUsd,
-    });
+  if (policy.maxCostPerPassUsd !== undefined && costCoverage === 1 && costPerPassUsd !== null && costPerPassUsd > policy.maxCostPerPassUsd) {
+    recommendations.push({ code: 'reduce_cost', reason: 'Observed cost per PASS exceeds the declared policy budget.', observed: costPerPassUsd, threshold: policy.maxCostPerPassUsd });
   }
-  if (
-    policy.maxRetryRate !== undefined
-    && retryCoverage === 1
-    && retryRate !== null
-    && retryRate > policy.maxRetryRate
-  ) {
-    recommendations.push({
-      code: 'reduce_retries',
-      reason: 'Fresh current-head retry rate exceeds the explicit policy budget.',
-      observed: retryRate,
-      threshold: policy.maxRetryRate,
-    });
+  if (policy.maxRetryRate !== undefined && retryCoverage === 1 && retryRate !== null && retryRate > policy.maxRetryRate) {
+    recommendations.push({ code: 'reduce_retries', reason: 'Observed retry rate exceeds the declared policy budget.', observed: retryRate, threshold: policy.maxRetryRate });
   }
 
   const uniqueBlockers = unique(blockers);
   const proofBlocked = uniqueBlockers.length > 0;
-  const scaleStatus = proofBlocked
-    ? 'blocked'
-    : recommendations.length > 0
-      ? 'optimize_first'
-      : 'ready_for_founder_scale_review';
-
-  const policySnapshot = stablePolicySnapshot(policy);
+  const candidate = proofBlocked ? 'none' : recommendations.length > 0 ? 'optimize_candidate' : 'evidence_candidate';
+  const authorityBlockers = [
+    'evidence provenance is not authenticated by the isolated kernel',
+    'scale policy is caller-supplied and not resolved from an approved authority record',
+    'evaluation time is a declared claim and not authenticated by the isolated kernel',
+  ];
 
   return {
     contract: FCR_EVIDENCE_SCALE_GATE_CONTRACT,
     projectSlug: projectSlug.trim(),
     expectedHeadSha,
-    evaluatedAt,
+    evaluatedAt: timeAuthority.evaluatedAt,
     expiresAt: timeAuthority.validUntil,
-    clockSource: 'authority-receipt',
+    clockSource: 'declared-unverified',
     timeAuthority,
+    authority: {
+      status: 'unverified',
+      scaleReviewAllowed: false,
+      blockers: authorityBlockers,
+    },
     policy: {
       policyId: policy.policyId,
       policyVersion: policy.policyVersion,
       digest: evaluatedPolicyDigest,
-      thresholds: policySnapshot,
+      source: 'unverified-input',
+      thresholds: stablePolicySnapshot(policy),
     },
     ledger: {
+      authenticity: 'unverified-input',
       evidenceIds: evidence.map((entry) => entry.evidenceId),
       executionIds: unique(evidence.map((entry) => entry.executionId)),
       provenanceIds: evidence.map((entry) => entry.provenanceId),
@@ -804,7 +782,8 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
       currentHeadEntries: currentHeadEntries.length,
       freshCurrentEntries: freshCurrentEntries.length,
       staleCurrentEntries,
-      distinctFreshExecutions: executions.length,
+      distinctCurrentExecutions: currentExecutionGroups.length,
+      distinctFreshExecutions: freshExecutionGroups.length,
       freshExactHeadPasses,
       passRate,
       failureRate,
@@ -817,23 +796,22 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
       retryCoverage,
     },
     evaluation: {
-      status: proofBlocked ? 'blocked' : 'meets_proof_floor',
+      status: proofBlocked ? 'blocked' : 'meets_untrusted_proof_floor',
       blockers: uniqueBlockers,
     },
     optimization: {
-      status: proofBlocked ? 'blocked_by_proof' : recommendations.length > 0 ? 'recommended' : 'none',
+      status: proofBlocked ? 'blocked_by_proof' : recommendations.length > 0 ? 'candidate' : 'none',
       recommendations,
       executionAllowed: false,
     },
     scaleGate: {
-      status: scaleStatus,
+      status: 'blocked',
+      candidate,
       scaleAuthorized: false,
       executionAllowed: false,
       nextGate: proofBlocked
-        ? 'Repair or refresh the failed evidence contract before optimization or scale review.'
-        : recommendations.length > 0
-          ? 'Obtain explicit founder or operation-owner approval for one bounded optimization before any change; then collect fresh exact-head evidence and reevaluate.'
-          : 'Founder reviews the evidence-backed scale candidate; scaling still requires separate explicit authority and execution proof.',
+        ? 'Repair or refresh the evidence contract, then resolve evidence and policy through an authenticated runtime authority adapter.'
+        : 'Resolve evidence, policy, project, execution provenance, and evaluation time through an authenticated runtime authority adapter before founder scale review can open.',
     },
   };
 }
