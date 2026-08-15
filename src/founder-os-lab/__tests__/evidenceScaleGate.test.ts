@@ -1,10 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
+  computeEvidenceScalePolicyDigest,
   evaluateEvidenceScaleGate,
+  FCR_EVALUATION_TIME_AUTHORITY_CONTRACT,
   FCR_EVIDENCE_SCALE_GATE_CONTRACT,
   normalizeCapabilityReceiptEvidence,
   type FcrEvidenceLedgerEntry,
+  type FcrEvaluationTimeAuthority,
   type FcrEvidenceScaleInput,
   type FcrEvidenceScalePolicy,
 } from '../evidenceScaleGate.js';
@@ -17,6 +20,7 @@ import {
 const HEAD = 'a'.repeat(40);
 const OTHER_HEAD = 'b'.repeat(40);
 const NOW = '2026-08-14T22:00:00.000Z';
+const VALID_UNTIL = '2026-08-14T22:30:00.000Z';
 const FRESH = '2026-08-14T21:55:00.000Z';
 const STALE = '2026-08-13T20:00:00.000Z';
 
@@ -64,12 +68,31 @@ function completeEvidence(): FcrEvidenceLedgerEntry[] {
   ];
 }
 
+function timeAuthority(
+  effectivePolicy: FcrEvidenceScalePolicy,
+  overrides: Partial<FcrEvaluationTimeAuthority> = {},
+): FcrEvaluationTimeAuthority {
+  return {
+    contract: FCR_EVALUATION_TIME_AUTHORITY_CONTRACT,
+    authorityId: 'control-room-runtime',
+    projectSlug: 'founder-control-room',
+    expectedHeadSha: HEAD,
+    policyDigest: computeEvidenceScalePolicyDigest(effectivePolicy),
+    evaluatedAt: NOW,
+    validUntil: VALID_UNTIL,
+    provenanceId: `fcr-time:${'4'.repeat(64)}`,
+    ...overrides,
+  };
+}
+
 function evaluate(entries: FcrEvidenceLedgerEntry[], overrides: Partial<FcrEvidenceScalePolicy> = {}) {
+  const effectivePolicy = { ...policy, ...overrides };
   return evaluateEvidenceScaleGate({
     projectSlug: 'founder-control-room',
     expectedHeadSha: HEAD,
     evidence: entries,
-    policy: { ...policy, ...overrides },
+    policy: effectivePolicy,
+    timeAuthority: timeAuthority(effectivePolicy),
   });
 }
 
@@ -126,22 +149,13 @@ function capabilityReceipt(request: CapabilityRequestV1): CapabilityReceiptV1 {
 }
 
 describe('FCR evidence-to-scale decision kernel', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date(NOW));
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   it('fails closed when no evidence exists', () => {
     const decision = evaluate([]);
 
     expect(decision.contract).toBe(FCR_EVIDENCE_SCALE_GATE_CONTRACT);
-    expect(decision.clockSource).toBe('system');
+    expect(decision.clockSource).toBe('authority-receipt');
     expect(decision.evaluatedAt).toBe(NOW);
-    expect(decision.expiresAt).toBe(NOW);
+    expect(decision.expiresAt).toBe(VALID_UNTIL);
     expect(decision.evaluation.status).toBe('blocked');
     expect(decision.evaluation.blockers).toContain('no evidence supplied');
     expect(decision.metrics.passRate).toBeNull();
@@ -180,7 +194,7 @@ describe('FCR evidence-to-scale decision kernel', () => {
     expect(decision.scaleGate.nextGate).toMatch(/separate explicit authority/i);
   });
 
-  it('does not allow stale evidence or a caller-supplied historical evaluation time to satisfy proof', () => {
+  it('does not allow stale evidence or an ignored top-level historical timestamp to satisfy proof', () => {
     const entries = completeEvidence();
     entries[1] = evidence('browser-stale', 'playwright', { observedAt: STALE });
 
@@ -189,16 +203,36 @@ describe('FCR evidence-to-scale decision kernel', () => {
       expectedHeadSha: HEAD,
       evidence: entries,
       policy,
+      timeAuthority: timeAuthority(policy),
       evaluatedAt: '2026-08-13T20:01:00.000Z',
     } as FcrEvidenceScaleInput & { evaluatedAt: string });
 
-    expect(decision.clockSource).toBe('system');
+    expect(decision.clockSource).toBe('authority-receipt');
     expect(decision.evaluatedAt).toBe(NOW);
     expect(decision.metrics.staleCurrentEntries).toBe(1);
     expect(decision.metrics.proofCoverage).toBeCloseTo(2 / 3);
     expect(decision.evaluation.blockers).toContain(
       'missing fresh exact-head PASS evidence for required kind: playwright',
     );
+    expect(decision.scaleGate.status).toBe('blocked');
+  });
+
+  it('requires the evaluation-time authority receipt to bind project, head, policy, and freshness window', () => {
+    const decision = evaluateEvidenceScaleGate({
+      projectSlug: 'founder-control-room',
+      expectedHeadSha: HEAD,
+      evidence: completeEvidence(),
+      policy,
+      timeAuthority: timeAuthority(policy, {
+        policyDigest: '0'.repeat(64),
+        validUntil: '2026-08-14T23:30:00.000Z',
+      }),
+    });
+
+    expect(decision.evaluation.blockers).toEqual(expect.arrayContaining([
+      'timeAuthority policyDigest does not match evaluated policy',
+      'timeAuthority validity exceeds evidence freshness window for test-green',
+    ]));
     expect(decision.scaleGate.status).toBe('blocked');
   });
 
@@ -458,14 +492,16 @@ describe('FCR evidence-to-scale decision kernel', () => {
   });
 
   it('rejects malformed optional policy thresholds instead of silently dropping them', () => {
+    const malformedPolicy = {
+      ...policy,
+      maxRetryRate: 'fast',
+    };
     const decision = evaluateEvidenceScaleGate({
       projectSlug: 'founder-control-room',
       expectedHeadSha: HEAD,
       evidence: completeEvidence(),
-      policy: {
-        ...policy,
-        maxRetryRate: 'fast',
-      },
+      policy: malformedPolicy,
+      timeAuthority: timeAuthority(policy),
     } as unknown as FcrEvidenceScaleInput);
 
     expect(decision.evaluation.blockers.join(' ')).toMatch(/maxRetryRate must be a finite number/);
