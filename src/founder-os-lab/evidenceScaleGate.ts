@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { hash } from 'node:crypto';
 
 import {
   validateCapabilityReceipt,
@@ -215,9 +215,7 @@ function stablePolicySnapshot(policy: FcrEvidenceScalePolicy): FcrEvidenceScaleP
 }
 
 export function computeEvidenceScalePolicyDigest(policy: FcrEvidenceScalePolicy): string {
-  return createHash('sha256')
-    .update(JSON.stringify(stablePolicySnapshot(policy)), 'utf8')
-    .digest('hex');
+  return hash('sha256', JSON.stringify(stablePolicySnapshot(policy)), 'hex');
 }
 
 function normalizePolicy(raw: unknown): { policy: FcrEvidenceScalePolicy; failures: string[] } {
