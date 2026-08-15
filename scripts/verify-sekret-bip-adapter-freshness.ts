@@ -38,6 +38,16 @@ function encodedRepoPath(path: string): string {
   return path.split('/').map((segment) => encodeURIComponent(segment)).join('/');
 }
 
+async function readMainHead(owner: string, repo: string): Promise<string> {
+  const payload = await githubJson(
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits/main`,
+  );
+  if (!isRecord(payload) || typeof payload.sha !== 'string') {
+    throw new Error('github_current_head_payload_invalid');
+  }
+  return payload.sha.toLowerCase();
+}
+
 async function writeReceipt(receipt: Record<string, unknown>): Promise<void> {
   await mkdir(dirname(RECEIPT_PATH), { recursive: true });
   await writeFile(RECEIPT_PATH, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
@@ -49,11 +59,7 @@ async function main(): Promise<void> {
 
   const checkedAt = new Date().toISOString();
   try {
-    const commitPayload = await githubJson(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits/main`);
-    if (!isRecord(commitPayload) || typeof commitPayload.sha !== 'string') {
-      throw new Error('github_current_head_payload_invalid');
-    }
-    const currentHead = commitPayload.sha.toLowerCase();
+    const currentHead = await readMainHead(owner, repo);
     const observedContractBlobs: Record<string, string> = {};
 
     for (const path of adapter.requiredContractPaths) {
@@ -64,6 +70,11 @@ async function main(): Promise<void> {
         throw new Error(`github_contract_blob_payload_invalid:${path}`);
       }
       observedContractBlobs[path] = payload.sha.toLowerCase();
+    }
+
+    const confirmedHead = await readMainHead(owner, repo);
+    if (confirmedHead !== currentHead) {
+      throw new Error(`github_main_moved_during_verification:${currentHead}:${confirmedHead}`);
     }
 
     const assessment = assessProjectAdapterFreshness({
@@ -82,6 +93,7 @@ async function main(): Promise<void> {
       repository: adapter.repository,
       auditedHead: adapter.auditedSourceHead,
       currentHead,
+      mainHeadConfirmedAfterBlobRead: true,
       auditedContractBlobs: adapter.auditedContractBlobs,
       observedContractBlobs,
       assessment,
@@ -105,12 +117,13 @@ async function main(): Promise<void> {
       repository: adapter.repository,
       auditedHead: adapter.auditedSourceHead,
       currentHead: null,
+      mainHeadConfirmedAfterBlobRead: false,
       assessment: {
         state: 'unknown',
         freshness: 'missing',
         recommendation: 'hold',
-        blocker: 'Authoritative Se’kret Bip source truth could not be read.',
-        nextAction: 'Restore read authority or GitHub availability, then rerun the freshness verifier.',
+        blocker: 'Authoritative Se’kret Bip source truth could not be proven stable.',
+        nextAction: 'Restore read authority or wait for repository head stability, then rerun the freshness verifier.',
         reasons: [detail],
         founderReviewRequired: true,
         promotionAllowed: false,
