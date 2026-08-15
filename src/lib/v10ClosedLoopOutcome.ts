@@ -9,9 +9,15 @@ import {
 } from './founderConveyorReceipt.js';
 import type { RepositoryTruthAssessment } from './repositoryTruthAssessment.js';
 
+export interface V10ClosedLoopTruthIdentity {
+  projectSlug: string;
+  headSha: string;
+}
+
 export interface V10ClosedLoopOutcomeInput {
   receiptIdentity: FounderConveyorReceiptIdentity;
   executionReceiptId: string;
+  truthIdentity: V10ClosedLoopTruthIdentity;
   truth: RepositoryTruthAssessment;
   observedAt: string;
   goalSucceeded: boolean | null;
@@ -37,10 +43,10 @@ function uniqueEvidenceUrls(
 /**
  * Seal one bounded execution into the canonical V10 outcome contract.
  *
- * The caller does not get to assert execution identity: FCR re-derives the
- * conveyor receipt from the exact project/head/plan/registry/stage/evidence
- * identity and rejects a mismatched receipt. Repository truth may mark the
- * observation verified only while it is both verified and fresh.
+ * FCR re-derives the conveyor receipt from the exact execution identity and
+ * also binds the verified truth context to the same project and expected head.
+ * This prevents a valid receipt from being paired with fresh truth belonging
+ * to another repository or commit.
  *
  * This function never promotes a capability or authorizes another mutation.
  * It only creates evidence that Chief AI may assess for the next decision.
@@ -51,6 +57,12 @@ export function createV10ClosedLoopOutcome(
   const expectedReceiptId = founderConveyorReceiptId(input.receiptIdentity);
   if (!same(input.executionReceiptId, expectedReceiptId)) {
     throw new Error('executionReceiptId does not match the bound conveyor receipt identity');
+  }
+  if (!same(input.truthIdentity.projectSlug, input.receiptIdentity.projectSlug)) {
+    throw new Error('truth project does not match the bound conveyor project');
+  }
+  if (!same(input.truthIdentity.headSha, input.receiptIdentity.expectedHeadSha)) {
+    throw new Error('truth head does not match the bound conveyor expected head');
   }
 
   const verified = input.truth.state === 'verified' && input.truth.freshness === 'fresh';
