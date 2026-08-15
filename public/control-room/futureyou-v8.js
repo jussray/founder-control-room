@@ -78,9 +78,12 @@ function authorityAtLeast(connection, minimum) {
     && AUTHORITY_RANK[connection.authorityLevel] >= AUTHORITY_RANK[minimum];
 }
 
-function connectionSupports(connection, minimum) {
+function connectionSupports(connection, { minimum, type = null, capability = null }) {
   if (!authorityAtLeast(connection, minimum)) return false;
   if (AUTHORITY_RANK[minimum] >= AUTHORITY_RANK.L4 && !connection.secretRef) return false;
+  if (type && connection.type !== type) return false;
+  const capabilities = Array.isArray(connection.capabilities) ? connection.capabilities : [];
+  if (capability && !capabilities.includes(capability)) return false;
   return true;
 }
 
@@ -102,19 +105,24 @@ function buildAutonomyReadiness(pluginCenter) {
 
   const lanes = [...projects.values()].map((project) => {
     const active = project.connections.filter((connection) => connection.status === 'active');
-    const github = active.filter((connection) => connection.type === 'github');
-    const buildReady = github.some((connection) => connectionSupports(connection, 'L4'));
-    const integrationReady = github.some((connection) => connectionSupports(connection, 'L5'));
-    const providerReady = active.some((connection) => connectionSupports(connection, 'L6'));
+    const buildReady = active.some((connection) => connectionSupports(connection, {
+      minimum: 'L4', type: 'github', capability: 'create_branch',
+    }));
+    const integrationReady = active.some((connection) => connectionSupports(connection, {
+      minimum: 'L5', type: 'github', capability: 'integrate_main',
+    }));
+    const providerReady = active.some((connection) => connectionSupports(connection, {
+      minimum: 'L6', capability: 'deploy',
+    }));
     const authorityUnknown = project.connections.some((connection) => !connection.authorityLevel);
     const missingSecretRef = active.some((connection) => {
       const rank = AUTHORITY_RANK[connection.authorityLevel] ?? -1;
       return rank >= AUTHORITY_RANK.L4 && !connection.secretRef;
     });
     const blockers = [];
-    if (!buildReady) blockers.push('No active GitHub L4+ connection with a credential reference for branch/build work.');
-    if (!integrationReady) blockers.push('GitHub integration authority is below L5 or not credential-backed.');
-    if (!providerReady) blockers.push('No active L6 provider connection is credential-backed for production/provider work.');
+    if (!buildReady) blockers.push('No active GitHub connection declares L4+, create_branch, and a credential reference.');
+    if (!integrationReady) blockers.push('No active GitHub connection declares L5+, integrate_main, and a credential reference.');
+    if (!providerReady) blockers.push('No active L6 connection declares deploy and a credential reference for provider/production work.');
     if (authorityUnknown) blockers.push('At least one connection has no declared authority level.');
     if (missingSecretRef) blockers.push('At least one active L4+ connection is missing a secret reference.');
 
@@ -181,7 +189,7 @@ function renderAutonomy(autonomy) {
   return `
     <section class="section-heading">
       <div><p class="eyebrow">Standing founder policy</p><h2>Declared autonomy readiness</h2></div>
-      <p>Readiness means project-scoped authority is declared and credential-referenced. It does not bypass proof, rollback, or provider gates.</p>
+      <p>Readiness requires matching project-scoped authority, provider capability, and credential reference. It does not bypass proof, rollback, or provider gates.</p>
     </section>
     <section class="metrics" aria-label="Autonomy readiness summary">
       ${metric('Build-ready projects', autonomy.buildReadyProjects)}
