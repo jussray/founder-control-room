@@ -271,6 +271,8 @@ async function proveViewport(browser, { name, width, height, isMobile = false })
 
   await mkdir(outputDir, { recursive: true });
   const screenshot = resolve(outputDir, `${name}.png`);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(50);
   await page.screenshot({ path: screenshot, fullPage: true });
   await context.close();
 
