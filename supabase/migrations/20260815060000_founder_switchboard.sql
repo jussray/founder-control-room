@@ -126,7 +126,7 @@ begin
     btrim(p_actor_email),
     v_updated_at
   )
-  on conflict (switch_id) do update
+  on conflict on constraint founder_switch_overrides_pkey do update
     set desired_state = excluded.desired_state,
         reason = excluded.reason,
         updated_by = excluded.updated_by,
