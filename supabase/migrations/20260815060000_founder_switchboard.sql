@@ -10,7 +10,8 @@ create table if not exists public.founder_switch_overrides (
     check (desired_state in ('on', 'off')),
   reason text
     check (reason is null or char_length(reason) <= 500),
-  updated_by text,
+  updated_by text
+    check (updated_by is null or char_length(updated_by) <= 320),
   updated_at timestamptz not null default now()
 );
 
@@ -27,7 +28,8 @@ create table if not exists public.founder_switch_events (
     check (desired_state in ('on', 'off')),
   reason text
     check (reason is null or char_length(reason) <= 500),
-  actor_email text,
+  actor_email text
+    check (actor_email is null or char_length(actor_email) <= 320),
   created_at timestamptz not null default now()
 );
 
@@ -43,8 +45,14 @@ alter table public.founder_switch_events enable row level security;
 revoke all on table public.founder_switch_overrides from public, anon, authenticated;
 revoke all on table public.founder_switch_events from public, anon, authenticated;
 
-grant select, insert, update on table public.founder_switch_overrides to service_role;
-grant select, insert on table public.founder_switch_events to service_role;
+-- The application service role may read state/history but cannot directly
+-- mutate either table. All writes must pass through the atomic function below.
+revoke insert, update, delete, truncate, references, trigger
+  on table public.founder_switch_overrides from service_role;
+revoke insert, update, delete, truncate, references, trigger
+  on table public.founder_switch_events from service_role;
+grant select on table public.founder_switch_overrides to service_role;
+grant select on table public.founder_switch_events to service_role;
 
 create or replace function public.set_founder_switch_state(
   p_switch_id text,
@@ -84,6 +92,10 @@ begin
     raise exception 'switch reason exceeds 500 characters';
   end if;
 
+  if p_actor_email is null or char_length(btrim(p_actor_email)) not between 3 and 320 then
+    raise exception 'invalid switch actor';
+  end if;
+
   -- Serialize writers per switch, including the first override where no row
   -- exists yet. The row lock below cannot protect a missing row by itself.
   perform pg_advisory_xact_lock(hashtextextended(p_switch_id, 0));
@@ -111,7 +123,7 @@ begin
     p_switch_id,
     p_desired_state,
     nullif(btrim(p_reason), ''),
-    nullif(btrim(p_actor_email), ''),
+    btrim(p_actor_email),
     v_updated_at
   )
   on conflict (switch_id) do update
@@ -132,7 +144,7 @@ begin
     p_previous_state,
     p_desired_state,
     nullif(btrim(p_reason), ''),
-    nullif(btrim(p_actor_email), ''),
+    btrim(p_actor_email),
     v_updated_at
   );
 
