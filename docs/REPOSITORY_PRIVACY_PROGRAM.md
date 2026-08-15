@@ -35,7 +35,7 @@ Do not create public mirrors by copying the canonical Git history. Public releas
 
 - `jussray/Sekret-Bip`
 - `jussray/chief-ai-machine`
-- `jussray/l99-StoryEngine`
+- `jussray/StoryEngine`
 - `jussray/founder-control-room`
 - `jussray/promptos`
 - `jussray/jbh-private`

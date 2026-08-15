@@ -198,7 +198,7 @@ Cloudflare build/deploy evidence is release truth, but it is separate from GitHu
 
 Only `jussray/Sekret-Bip` is the active Se'kret Bip working repository. Other Bip-named repositories are historical or investigate-only unless Founder Control Room explicitly names one for provenance capture.
 
-Active work may proceed in Founder Control Room, `jussray/Sekret-Bip`, `jussray/l99-StoryEngine`, Chief/PromptOS, Juss Beautiful Hair repos, and clothing/storefront repos when each repo's local gates are satisfied.
+Active work may proceed in Founder Control Room, `jussray/Sekret-Bip`, `jussray/StoryEngine`, Chief/PromptOS, Juss Beautiful Hair repos, and clothing/storefront repos when each repo's local gates are satisfied.
 
 ## GitHub Actions Secrets
 
@@ -208,7 +208,7 @@ Before triggering a deploy, verify the full checklist in that file. Key secrets 
 
 | Secret | Used by | Purpose |
 |---|---|---|
-| `RECONCILE_SHARED_SECRET` | `deploy.yml / reconcile`, `POST /api/reconcile` | Authenticates inbound DriftReports. Minimum 32 random hex chars. Must be set in GitHub Secrets AND in Sekret-Bip and l99-StoryEngine for cross-service reconciliation. Generate with `openssl rand -hex 32`. |
+| `RECONCILE_SHARED_SECRET` | `deploy.yml / reconcile`, `POST /api/reconcile` | Authenticates inbound DriftReports. Minimum 32 random hex chars. Must be set in GitHub Secrets AND in Sekret-Bip and StoryEngine for cross-service reconciliation. Generate with `openssl rand -hex 32`. |
 
 > Never commit, log, or expose `RECONCILE_SHARED_SECRET`. Never put it in a `NEXT_PUBLIC_*` var.
 
