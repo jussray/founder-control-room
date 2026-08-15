@@ -12,7 +12,7 @@ const LOGIN_HTML = `<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Founder Control Room — Sign in</title>
+  <title>Founder Control Room - Sign in</title>
   <link rel="stylesheet" href="/control-room/styles.css">
 </head>
 <body class="login-page">
@@ -42,18 +42,18 @@ const DASHBOARD_HTML = `<!doctype html>
 <body>
   <header class="topbar">
     <div>
-      <p class="eyebrow">PORTFOLIO REPOSITORY TRUTH</p>
+      <p class="eyebrow">PORTFOLIO TRUTH RECEIPTS</p>
       <h1>Founder Control Room</h1>
     </div>
     <div class="topbar-actions">
-      <span id="sync-status" class="sync-status">Loading…</span>
+      <span id="sync-status" class="sync-status">Loading...</span>
       <button id="refresh-button" class="secondary" type="button">Refresh</button>
       <button id="logout-button" class="secondary" type="button">Sign out</button>
     </div>
   </header>
 
   <main class="dashboard-shell">
-    <section id="summary" class="summary-grid" aria-label="Portfolio summary"></section>
+    <section id="summary" class="summary-grid" aria-label="Portfolio truth summary"></section>
 
     <section class="workspace">
       <div class="panel repository-panel">
@@ -69,16 +69,16 @@ const DASHBOARD_HTML = `<!doctype html>
 
       <aside class="panel detail-panel" aria-live="polite">
         <div id="repository-detail" class="empty-state">
-          <p class="eyebrow">REPOSITORY EVIDENCE</p>
+          <p class="eyebrow">REPOSITORY TRUTH</p>
           <h2>Select a repository</h2>
-          <p class="muted">Inspect the exact commit, required checks, capability evidence, drift findings, and approval-gated repair missions.</p>
+          <p class="muted">See the current truth state, evidence freshness, confidence, next founder gate, exact commit, checks, capability drift, and repair missions.</p>
         </div>
       </aside>
     </section>
   </main>
 
   <footer>
-    Verification can prepare a repair mission. It never authorizes branch creation, merge, deployment, rollback, secret access, or destructive work.
+    A truth receipt can recommend verification or a repair mission. It never authorizes branch creation, merge, deployment, rollback, secret access, or destructive work.
   </footer>
   <script src="/control-room/app.js" defer></script>
 </body>
@@ -92,7 +92,7 @@ const LOGIN_JS = `(() => {
     const button = form.querySelector('button');
     const email = new FormData(form).get('email');
     button.disabled = true;
-    message.textContent = 'Requesting a secure link…';
+    message.textContent = 'Requesting a secure link...';
     try {
       const response = await fetch('/auth/magic-link', {
         method: 'POST',
@@ -149,22 +149,36 @@ const DASHBOARD_JS = `(() => {
   }
 
   function statusOf(repository) {
-    return repository.latestRun?.overall_status || 'unverified';
+    return repository.truth?.state || 'unknown';
   }
 
   function statusLabel(status) {
-    return status === 'passed' ? 'Verified' : status === 'warning' ? 'Warning' : status === 'failed' ? 'Failed' : 'Unverified';
+    return status === 'verified'
+      ? 'Verified'
+      : status === 'attention'
+        ? 'Attention'
+        : status === 'stale'
+          ? 'Stale'
+          : 'Unknown';
+  }
+
+  function freshnessLabel(truth) {
+    if (!truth) return 'No receipt';
+    if (truth.freshness === 'fresh') return truth.ageMinutes === 0 ? 'Fresh now' : truth.ageMinutes + 'm old';
+    if (truth.freshness === 'stale') return truth.ageMinutes + 'm old';
+    if (truth.freshness === 'invalid') return 'Invalid time';
+    return 'No receipt';
   }
 
   function renderSummary() {
-    const totals = { passed: 0, warning: 0, failed: 0, unverified: 0 };
+    const totals = { verified: 0, attention: 0, stale: 0, unknown: 0 };
     state.repositories.forEach(repository => { totals[statusOf(repository)] += 1; });
     const cards = [
       ['Repositories', state.repositories.length, 'total'],
-      ['Verified', totals.passed, 'passed'],
-      ['Warnings', totals.warning, 'warning'],
-      ['Failed', totals.failed, 'failed'],
-      ['Unverified', totals.unverified, 'unverified']
+      ['Verified', totals.verified, 'verified'],
+      ['Attention', totals.attention, 'attention'],
+      ['Stale', totals.stale, 'stale'],
+      ['Unknown', totals.unknown, 'unknown']
     ];
     summary.replaceChildren(...cards.map(([label, value, status]) => {
       const card = el('article', 'summary-card');
@@ -195,8 +209,9 @@ const DASHBOARD_JS = `(() => {
       const metrics = el('div', 'repository-metrics');
       metrics.append(
         el('span', '', 'Commit ' + commit),
-        el('span', '', repository.findings.total + ' findings'),
-        el('span', '', repository.capabilities.verified + '/' + repository.capabilities.total + ' capabilities')
+        el('span', '', freshnessLabel(repository.truth)),
+        el('span', '', 'Confidence ' + (repository.truth?.confidence ?? 0) + '%'),
+        el('span', '', repository.findings.total + ' findings')
       );
       button.append(heading, metrics);
       button.addEventListener('click', () => selectRepository(repository.slug));
@@ -208,6 +223,30 @@ const DASHBOARD_JS = `(() => {
     const row = el('div', 'definition-row');
     row.append(el('dt', '', label), el('dd', '', value));
     return row;
+  }
+
+  function renderTruthReceipt(truth) {
+    const receipt = el('section', 'truth-receipt');
+    const stateValue = truth?.state || 'unknown';
+    receipt.dataset.status = stateValue;
+
+    const heading = el('div', 'truth-receipt-heading');
+    const copy = el('div');
+    copy.append(el('p', 'eyebrow', 'TRUTH RECEIPT'), el('h3', '', statusLabel(stateValue)));
+    heading.append(copy, el('span', 'status-badge', statusLabel(stateValue)));
+
+    const grid = el('div', 'truth-grid');
+    grid.append(
+      definitionRow('Confidence', String(truth?.confidence ?? 0) + '%'),
+      definitionRow('Freshness', freshnessLabel(truth)),
+      definitionRow('Evidence', String(truth?.evidenceCompleteness ?? 0) + '% complete'),
+      definitionRow('Recommendation', truth?.recommendation || 'hold')
+    );
+
+    const blocker = el('p', truth?.blocker ? 'truth-blocker' : 'truth-clear', truth?.blocker || 'No current evidence blocker.');
+    const next = el('p', 'truth-next', 'Next gate: ' + (truth?.nextAction || 'Verify now before making a current-state claim.'));
+    receipt.append(heading, grid, blocker, next);
+    return receipt;
   }
 
   function renderChecks(run) {
@@ -271,16 +310,18 @@ const DASHBOARD_JS = `(() => {
   async function selectRepository(slug) {
     state.selectedSlug = slug;
     renderRepositories();
-    detail.replaceChildren(el('p', 'muted', 'Loading exact repository evidence…'));
+    detail.replaceChildren(el('p', 'muted', 'Loading exact repository evidence...'));
     try {
       const payload = await api('/projects/' + encodeURIComponent(slug) + '/verification');
       const repository = payload.project;
       const run = payload.latestRun;
-      const status = run?.overall_status || 'unverified';
+      const portfolioRepository = state.repositories.find(candidate => candidate.slug === slug);
+      const truth = portfolioRepository?.truth || null;
+      const status = truth?.state || 'unknown';
 
       const heading = el('div', 'detail-heading');
       const title = el('div');
-      title.append(el('p', 'eyebrow', 'REPOSITORY EVIDENCE'), el('h2', '', repository.name));
+      title.append(el('p', 'eyebrow', 'REPOSITORY TRUTH'), el('h2', '', repository.name));
       heading.append(title, el('span', 'status-badge', statusLabel(status)));
 
       const facts = el('dl', 'definition-list');
@@ -289,7 +330,8 @@ const DASHBOARD_JS = `(() => {
         definitionRow('Commit', run?.commit_sha || 'Not scanned'),
         definitionRow('Branch', run?.branch || 'Unknown'),
         definitionRow('Source', run?.source || 'No evidence'),
-        definitionRow('Observed', run?.received_at ? new Date(run.received_at).toLocaleString() : 'Never')
+        definitionRow('Observed', run?.received_at ? new Date(run.received_at).toLocaleString() : 'Never'),
+        definitionRow('Fresh until', truth?.freshUntil ? new Date(truth.freshUntil).toLocaleString() : 'No current window')
       );
 
       const actions = el('div', 'detail-actions');
@@ -297,7 +339,7 @@ const DASHBOARD_JS = `(() => {
       verify.type = 'button';
       verify.addEventListener('click', async () => {
         verify.disabled = true;
-        verify.textContent = 'Verifying…';
+        verify.textContent = 'Verifying...';
         try {
           await api('/projects/' + encodeURIComponent(slug) + '/verification/scan', { method: 'POST', body: '{}' });
           await loadPortfolio();
@@ -317,7 +359,7 @@ const DASHBOARD_JS = `(() => {
         mission.type = 'button';
         mission.addEventListener('click', async () => {
           mission.disabled = true;
-          mission.textContent = 'Preparing…';
+          mission.textContent = 'Preparing...';
           try {
             await api('/projects/' + encodeURIComponent(slug) + '/verification/propose-mission', {
               method: 'POST',
@@ -337,6 +379,7 @@ const DASHBOARD_JS = `(() => {
 
       detail.replaceChildren(
         heading,
+        renderTruthReceipt(truth),
         facts,
         actions,
         renderChecks(run),
@@ -349,12 +392,12 @@ const DASHBOARD_JS = `(() => {
   }
 
   async function loadPortfolio() {
-    syncStatus.textContent = 'Refreshing…';
+    syncStatus.textContent = 'Refreshing...';
     try {
       const payload = await api('/portfolio/repositories');
       state.repositories = payload.repositories || [];
       generatedAt.textContent = 'Updated ' + new Date(payload.generatedAt).toLocaleTimeString();
-      syncStatus.textContent = 'Portfolio current';
+      syncStatus.textContent = 'Portfolio truth loaded';
       renderSummary();
       renderRepositories();
     } catch (error) {
@@ -385,6 +428,7 @@ const STYLES = `:root {
   --passed: #70d6a3;
   --warning: #f0c36c;
   --failed: #ff7e8d;
+  --unknown: #9ba2b4;
 }
 * { box-sizing: border-box; }
 body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 10% 0%, #211a3d 0, transparent 32rem), #090b12; }
@@ -408,25 +452,40 @@ h3 { font-size: 1rem; }
 .dashboard-shell { padding: 1.25rem clamp(1rem, 4vw, 3rem) 2rem; }
 .summary-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .8rem; margin-bottom: 1rem; }
 .summary-card { background: rgba(18, 21, 33, .92); border: 1px solid var(--border); border-radius: 1rem; padding: 1rem; }
-.summary-card[data-status="passed"] { border-color: color-mix(in srgb, var(--passed) 45%, var(--border)); }
-.summary-card[data-status="warning"] { border-color: color-mix(in srgb, var(--warning) 45%, var(--border)); }
-.summary-card[data-status="failed"] { border-color: color-mix(in srgb, var(--failed) 45%, var(--border)); }
+.summary-card[data-status="verified"] { border-color: color-mix(in srgb, var(--passed) 45%, var(--border)); }
+.summary-card[data-status="attention"] { border-color: color-mix(in srgb, var(--failed) 45%, var(--border)); }
+.summary-card[data-status="stale"] { border-color: color-mix(in srgb, var(--warning) 45%, var(--border)); }
+.summary-card[data-status="unknown"] { border-color: color-mix(in srgb, var(--unknown) 45%, var(--border)); }
 .summary-label { display: block; color: var(--muted); font-size: .78rem; }
 .summary-value { display: block; margin-top: .2rem; font-size: 1.75rem; }
 .workspace { display: grid; grid-template-columns: minmax(18rem, .85fr) minmax(24rem, 1.5fr); gap: 1rem; align-items: start; }
 .panel { background: rgba(18, 21, 33, .94); border: 1px solid var(--border); border-radius: 1.1rem; padding: 1rem; min-width: 0; }
 .detail-panel { position: sticky; top: 7.25rem; max-height: calc(100vh - 8.5rem); overflow: auto; }
-.panel-heading, .detail-heading, .repository-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.panel-heading, .detail-heading, .repository-card-heading, .truth-receipt-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .repository-list, .evidence-list, .finding-list { display: grid; gap: .7rem; margin-top: 1rem; }
 .repository-card { width: 100%; text-align: left; padding: .9rem; background: var(--surface-2); color: inherit; border: 1px solid var(--border); }
 .repository-card[data-selected="true"] { outline: 2px solid var(--accent); }
+.repository-card[data-status="verified"] { border-left: 3px solid var(--passed); }
+.repository-card[data-status="attention"] { border-left: 3px solid var(--failed); }
+.repository-card[data-status="stale"] { border-left: 3px solid var(--warning); }
+.repository-card[data-status="unknown"] { border-left: 3px solid var(--unknown); }
 .repository-card strong, .repository-card .repo-id { display: block; }
 .repo-id { color: var(--muted); font-size: .75rem; margin-top: .2rem; }
 .repository-metrics { display: flex; flex-wrap: wrap; gap: .65rem; color: var(--muted); font-size: .72rem; margin-top: .8rem; }
 .status-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: .28rem .55rem; font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; background: #282d3e; color: #dddfea; white-space: nowrap; }
 [data-status="passed"] > .status-badge, [data-status="verified"] > .status-badge { background: color-mix(in srgb, var(--passed) 20%, #15251e); color: var(--passed); }
-[data-status="warning"] > .status-badge, [data-status="unverified"] > .status-badge, [data-status="pending"] > .status-badge { background: color-mix(in srgb, var(--warning) 18%, #2b2416); color: var(--warning); }
-[data-status="failed"] > .status-badge, [data-status="drifted"] > .status-badge, [data-status="missing"] > .status-badge { background: color-mix(in srgb, var(--failed) 18%, #2b171b); color: var(--failed); }
+[data-status="warning"] > .status-badge, [data-status="pending"] > .status-badge, [data-status="stale"] > .status-badge { background: color-mix(in srgb, var(--warning) 18%, #2b2416); color: var(--warning); }
+[data-status="failed"] > .status-badge, [data-status="drifted"] > .status-badge, [data-status="missing"] > .status-badge, [data-status="attention"] > .status-badge { background: color-mix(in srgb, var(--failed) 18%, #2b171b); color: var(--failed); }
+[data-status="unknown"] > .status-badge, [data-status="unverified"] > .status-badge { background: color-mix(in srgb, var(--unknown) 18%, #1d212b); color: #c7cbd5; }
+.truth-receipt { margin-top: 1rem; border: 1px solid var(--border); border-radius: 1rem; padding: 1rem; background: linear-gradient(145deg, rgba(165, 139, 255, .08), rgba(14, 17, 27, .96)); }
+.truth-receipt[data-status="verified"] { border-color: color-mix(in srgb, var(--passed) 45%, var(--border)); }
+.truth-receipt[data-status="attention"] { border-color: color-mix(in srgb, var(--failed) 45%, var(--border)); }
+.truth-receipt[data-status="stale"] { border-color: color-mix(in srgb, var(--warning) 45%, var(--border)); }
+.truth-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 .9rem; margin-top: .6rem; }
+.truth-blocker, .truth-clear, .truth-next { margin: .75rem 0 0; padding: .65rem .75rem; border-radius: .7rem; font-size: .82rem; }
+.truth-blocker { background: rgba(255, 126, 141, .08); color: #ffb3bc; border: 1px solid rgba(255, 126, 141, .2); }
+.truth-clear { background: rgba(112, 214, 163, .08); color: #a8e8c7; border: 1px solid rgba(112, 214, 163, .2); }
+.truth-next { background: rgba(165, 139, 255, .08); color: #d7cdff; border: 1px solid rgba(165, 139, 255, .2); }
 .definition-list { display: grid; gap: .1rem; margin: 1rem 0; }
 .definition-row { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: .8rem; padding: .55rem 0; border-bottom: 1px solid #23283a; }
 dt { color: var(--muted); }
@@ -453,6 +512,7 @@ footer { padding: 1rem clamp(1rem, 4vw, 3rem) 2rem; color: var(--muted); font-si
   .topbar { align-items: flex-start; flex-direction: column; }
   .topbar-actions { justify-content: flex-start; }
   .summary-grid { grid-template-columns: 1fr 1fr; }
+  .truth-grid { grid-template-columns: 1fr; }
   .definition-row { grid-template-columns: 1fr; gap: .25rem; }
 }`;
 
