@@ -7,6 +7,8 @@ on:
       - 'src/http/routes/futureYou.ts'
       - 'src/http/routes/__tests__/futureYou.integration.test.ts'
       - 'src/http/server.ts'
+      - 'src/lib/standingFounderPolicy.ts'
+      - 'src/lib/__tests__/standingFounderPolicy.test.ts'
       - 'public/control-room/futureyou-v8.*'
       - 'public/control-room/index.html'
       - 'e2e/futureyou-v8.mjs'
@@ -37,6 +39,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Verify static, unit, and route contracts
         run: npm run verify:futureyou-v8
+      - name: Verify standing founder policy
+        run: npx vitest run src/lib/__tests__/standingFounderPolicy.test.ts
       - name: Render cockpit proof
         run: node e2e/futureyou-v8.mjs
       - name: Upload rendered evidence
@@ -44,6 +48,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: futureyou-v8-cockpit-${{ github.sha }}
-          path: artifacts/futureyou-v8-cockpit.png
-          if-no-files-found: warn
+          path: |
+            artifacts/futureyou-v8-cockpit-desktop.png
+            artifacts/futureyou-v8-cockpit-mobile.png
+            artifacts/futureyou-v8-autonomy-receipt.json
+          if-no-files-found: error
           retention-days: 14
