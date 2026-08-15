@@ -1,4 +1,5 @@
 name = "founder-control-room"
+account_id = "9b59861bd1747cf7525571b4c51d2aa0"
 main = "src/worker/cf-entry.ts"
 compatibility_date = "2026-07-20"
 compatibility_flags = [
@@ -13,6 +14,8 @@ preview_urls = true
 # This single surviving Worker owns backend, auth, MCP, and reconciliation
 # traffic at api.foundercontrolroom.org. The deleted founder-control-room2
 # identity must never be recreated or targeted by deployment automation.
+# The account ID is a public provider identifier and is kept here as
+# declarative Worker authority; deployment credentials remain GitHub secrets.
 
 [observability]
 enabled = true
