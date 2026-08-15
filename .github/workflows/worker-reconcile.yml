@@ -73,29 +73,23 @@ jobs:
       - name: Validate Worker-only production configuration
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail
 
-          required=(
-            CLOUDFLARE_API_TOKEN
-            CLOUDFLARE_ACCOUNT_ID
-          )
-          missing=()
-
-          for name in "${required[@]}"; do
-            if [[ -z "${!name:-}" ]]; then
-              missing+=("$name")
-            fi
-          done
-
-          if (( ${#missing[@]} > 0 )); then
-            printf '::error title=Missing Worker reconcile configuration::Set these GitHub production environment secrets before reconciliation: %s\n' "${missing[*]}"
+          if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
+            echo '::error title=Missing Worker reconcile credential::Set CLOUDFLARE_API_TOKEN in the GitHub production environment before reconciliation.'
             exit 1
           fi
 
-          echo "Cloudflare Worker reconciliation credentials are present."
+          ACCOUNT_ID="$(sed -nE 's/^account_id[[:space:]]*=[[:space:]]*"([0-9a-f]+)"[[:space:]]*$/\1/p' wrangler.worker.toml | head -n 1)"
+          if [[ ! "$ACCOUNT_ID" =~ ^[0-9a-f]{32}$ ]]; then
+            echo '::error title=Invalid Worker account authority::wrangler.worker.toml must declare a 32-character lowercase Cloudflare account_id.'
+            exit 1
+          fi
+
+          echo "Cloudflare Worker deploy token is present."
+          echo "Cloudflare account authority is declared in wrangler.worker.toml."
 
       - name: Record bounded authority receipt
         shell: bash
@@ -107,6 +101,7 @@ jobs:
             echo "- Approval reference: \`$DEPLOYMENT_APPROVAL_ID\`"
             echo "- Reason: ${DEPLOYMENT_REASON:-not supplied}"
             echo "- Mutation scope: Cloudflare Worker \`founder-control-room\` via \`wrangler.worker.toml\`"
+            echo "- Cloudflare account authority: declarative \`wrangler.worker.toml account_id\`"
             echo "- Existing Worker runtime secrets: preserved; not rewritten by this workflow"
             echo "- Supabase database mutation: skipped by workflow design"
             echo "- Publication scheduling: absent by workflow design"
@@ -137,14 +132,12 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: '4.110.0'
           command: deploy --config wrangler.worker.toml --var GIT_SHA:${{ inputs.expected_head_sha }}
           secrets: |
             FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
         env:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           # Reconciliation never activates external publication. This is a
           # literal disabled policy, not a copied GitHub production secret.
           FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON: >-
