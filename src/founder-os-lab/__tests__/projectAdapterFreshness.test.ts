@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { FOUNDER_OS_LAB_PROJECT_ADAPTERS } from '../projectAdapters.js';
 import { assessProjectAdapterFreshness } from '../projectAdapterFreshness.js';
 
-const ADAPTER = FOUNDER_OS_LAB_PROJECT_ADAPTERS.find((candidate) => candidate.id === 'sekret-bip');
-if (!ADAPTER) throw new Error('sekret-bip adapter missing');
+const foundAdapter = FOUNDER_OS_LAB_PROJECT_ADAPTERS.find(
+  (candidate) => candidate.id === 'sekret-bip',
+);
+if (!foundAdapter) throw new Error('sekret-bip adapter missing');
+const ADAPTER = foundAdapter;
 
 function assess(overrides: Partial<Parameters<typeof assessProjectAdapterFreshness>[0]> = {}) {
   return assessProjectAdapterFreshness({
