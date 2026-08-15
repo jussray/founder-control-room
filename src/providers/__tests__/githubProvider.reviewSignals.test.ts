@@ -17,6 +17,7 @@ const { GitHubProvider } = await import("../GitHubProvider.js");
 const PROJECT_ID = "founder-control-room";
 const HEAD = "b".repeat(40);
 const RECEIPT = "1".repeat(64);
+const OTHER_RECEIPT = "2".repeat(64);
 
 function buildProvider() {
   return new GitHubProvider({
@@ -47,10 +48,19 @@ describe("GitHubProvider.listReviewSignals", () => {
         user: { login: "semantic-reviewer-2" },
         _links: { html: { href: "https://github.com/jussray/founder-control-room/pull/364#pullrequestreview-102" } },
       },
+      {
+        id: 103,
+        state: "APPROVED",
+        body: `Review-Receipt: ${RECEIPT}\nReview-Receipt: ${OTHER_RECEIPT}`,
+        commit_id: HEAD,
+        submitted_at: "2026-08-15T02:32:00Z",
+        user: { login: "semantic-reviewer-3" },
+        _links: { html: { href: "https://github.com/jussray/founder-control-room/pull/364#pullrequestreview-103" } },
+      },
     ]);
   });
 
-  it("maps provider-recorded reviewer identity, exact commit, state, and receipt hash", async () => {
+  it("maps provider-recorded reviewer identity, exact commit, state, and one receipt hash", async () => {
     const provider = buildProvider();
     const signals = await provider.listReviewSignals(PROJECT_ID, 364);
 
@@ -76,6 +86,16 @@ describe("GitHubProvider.listReviewSignals", () => {
     expect(signals[1]).toMatchObject({
       reviewerId: "semantic-reviewer-2",
       state: "changes_requested",
+      receiptHash: undefined,
+    });
+  });
+
+  it("fails closed when a provider review body carries multiple receipt markers", async () => {
+    const provider = buildProvider();
+    const signals = await provider.listReviewSignals(PROJECT_ID, 364);
+    expect(signals[2]).toMatchObject({
+      reviewerId: "semantic-reviewer-3",
+      state: "approved",
       receiptHash: undefined,
     });
   });
