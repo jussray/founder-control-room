@@ -48,10 +48,6 @@ function uniqueEvidenceUrls(
 export function createV10ClosedLoopOutcome(
   input: V10ClosedLoopOutcomeInput,
 ): V10OutcomeObservation {
-  if (!same(input.receiptIdentity.capabilityPlanHash, input.receiptIdentity.capabilityPlanHash.toLowerCase())) {
-    throw new Error('capabilityPlanHash must be normalized before outcome sealing');
-  }
-
   const expectedReceiptId = founderConveyorReceiptId(input.receiptIdentity);
   if (!same(input.executionReceiptId, expectedReceiptId)) {
     throw new Error('executionReceiptId does not match the bound conveyor receipt identity');
