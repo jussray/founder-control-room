@@ -9,10 +9,7 @@ vi.mock('../../lib/supabaseClient.js', () => ({
   supabase: { from, rpc },
 }));
 
-import {
-  setFounderDesiredState,
-  SwitchboardError,
-} from '../store.js';
+import { setFounderDesiredState } from '../store.js';
 
 function overrideRead(data = null) {
   from.mockReturnValue({
@@ -73,8 +70,6 @@ describe('switchboard store', () => {
       switchId: 'fcr-privileged-execution-master',
       desiredState: 'off',
       actorEmail: 'founder@example.com',
-    })).rejects.toEqual(expect.objectContaining<Partial<SwitchboardError>>({
-      code: 'write_failed',
-    }));
+    })).rejects.toEqual(expect.objectContaining({ code: 'write_failed' }));
   });
 });
