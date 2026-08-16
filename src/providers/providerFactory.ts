@@ -87,19 +87,38 @@ class LazyRepositoryProvider implements RepositoryProvider {
   }
 }
 
+export function providerConfigurationError(
+  project: ProviderProjectConfig,
+  env: NodeJS.ProcessEnv = process.env,
+): string | null {
+  if (project.repo_provider === "github") {
+    const fallbackToken = env.GITHUB_TOKEN?.trim();
+    const appId = env.GITHUB_APP_ID?.trim();
+    const privateKey = env.GITHUB_PRIVATE_KEY?.trim();
+    return fallbackToken || (appId && privateKey)
+      ? null
+      : "GitHub authentication is not configured; set GITHUB_APP_ID and GITHUB_PRIVATE_KEY or a local GITHUB_TOKEN fallback";
+  }
+
+  if (project.repo_provider === "gitlab") {
+    return env.GITLAB_TOKEN?.trim()
+      ? null
+      : "GitLab authentication is not configured; set GITLAB_TOKEN";
+  }
+
+  return `No RepositoryProvider implementation for "${project.repo_provider}" yet`;
+}
+
 async function githubProvider(project: ProviderProjectConfig): Promise<RepositoryProvider> {
+  const configError = providerConfigurationError(project);
+  if (configError) throw new Error(configError);
+
   const fallbackToken = process.env.GITHUB_TOKEN?.trim();
   const appId = process.env.GITHUB_APP_ID?.trim();
   const privateKey = process.env.GITHUB_PRIVATE_KEY?.trim();
-
   const token = appId && privateKey
     ? await getGitHubInstallationToken(appId, privateKey, project.repo_identifier)
-    : fallbackToken;
-  if (!token) {
-    throw new Error(
-      "GitHub authentication is not configured; set GITHUB_APP_ID and GITHUB_PRIVATE_KEY or a local GITHUB_TOKEN fallback",
-    );
-  }
+    : fallbackToken!;
 
   return new GitHubProvider({
     token,
@@ -109,13 +128,11 @@ async function githubProvider(project: ProviderProjectConfig): Promise<Repositor
 }
 
 async function gitlabProvider(project: ProviderProjectConfig): Promise<RepositoryProvider> {
-  const token = process.env.GITLAB_TOKEN?.trim();
-  if (!token) {
-    throw new Error("GitLab authentication is not configured; set GITLAB_TOKEN");
-  }
+  const configError = providerConfigurationError(project);
+  if (configError) throw new Error(configError);
 
   return new GitLabProvider({
-    token,
+    token: process.env.GITLAB_TOKEN!.trim(),
     projectMap: { [project.slug]: project.repo_identifier },
     baseUrl: process.env.GITLAB_BASE_URL,
   });
