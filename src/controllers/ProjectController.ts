@@ -38,7 +38,10 @@ export class ProjectController extends BaseController {
       return this.done("converged", `Project ${project.slug} is ${project.status}`);
     }
     if (!project.repo_identifier) {
-      return this.done("blocked", `Project ${project.slug} has no repository identifier`);
+      return this.done(
+        "converged",
+        `Project ${project.slug} is active without a repository connection`,
+      );
     }
 
     try {
