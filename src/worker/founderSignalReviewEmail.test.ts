@@ -51,7 +51,9 @@ function withApiBinding(fetchMock: ReturnType<typeof vi.fn>) {
   return {
     ...env,
     FOUNDER_CONTROL_ROOM_API: {
-      fetch: fetchMock,
+      fetch: async (request: Request): Promise<Response> => {
+        return await fetchMock(request) as Response;
+      },
     },
   };
 }
