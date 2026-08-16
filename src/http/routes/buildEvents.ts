@@ -3,9 +3,11 @@ import { buildCurrentTruthProjection } from '../../buildEvents/currentTruth.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { loadBuildEvents } from '../../services/buildEventStore.js';
 import { requireFounder } from '../middleware/requireFounder.js';
+import { requireProjectReadAudit } from '../middleware/projectReadAudit.js';
 
 export const buildEventsRouter = Router();
 buildEventsRouter.use(requireFounder);
+buildEventsRouter.use(requireProjectReadAudit);
 
 function noStore(res: Response) {
   res.set({
