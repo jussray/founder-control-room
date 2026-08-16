@@ -16,6 +16,7 @@ function base(overrides: Partial<BuildEventInput> = {}): BuildEventInput {
     repository: {
       name: 'jussray/founder-control-room',
       branch: 'main',
+      refKind: 'branch-head',
       commitSha: SHA,
     },
     evidenceRefs: ['github-delivery:delivery-123'],
@@ -83,12 +84,27 @@ describe('BuildEvent contract', () => {
     expect(errors).toContain('runtime payload requires category=runtime');
   });
 
+  it('requires source ref provenance for branch-head claims', () => {
+    expect(validateBuildEvent(base({
+      repository: {
+        name: 'jussray/founder-control-room',
+        refKind: 'branch-head',
+        commitSha: SHA,
+      },
+    }))).toContain('branch-head repository refs require a branch');
+  });
+
   it('requires evidence for verified claims and exact SHA shape', () => {
     expect(validateBuildEvent(base({ evidenceRefs: [], evidenceUrls: [] }))).toContain(
       'verified events require at least one evidence URL or evidence reference',
     );
     expect(validateBuildEvent(base({
-      repository: { name: 'jussray/founder-control-room', branch: 'main', commitSha: 'abc' },
+      repository: {
+        name: 'jussray/founder-control-room',
+        branch: 'main',
+        refKind: 'branch-head',
+        commitSha: 'abc',
+      },
     }))).toContain('repository.commitSha must be an exact 40-character SHA');
   });
 });
