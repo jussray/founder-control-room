@@ -133,7 +133,7 @@ async function approvalForProject(
   }
 }
 
-export async function validateEvidenceReferences(
+async function resolveEvidenceProject(
   projectId: string,
   missionId?: string,
   approvalId?: string,
@@ -165,6 +165,15 @@ export async function validateEvidenceReferences(
         ? project.repo_identifier.trim()
         : undefined,
   };
+}
+
+export async function validateEvidenceReferences(
+  projectId: string,
+  missionId?: string,
+  approvalId?: string,
+): Promise<string> {
+  const project = await resolveEvidenceProject(projectId, missionId, approvalId);
+  return project.id;
 }
 
 async function writeEvidence(
@@ -252,7 +261,7 @@ export class McpHub {
     evidenceId: string;
   }> {
     assertNoSecretArguments(request.arguments);
-    const evidenceProject = await validateEvidenceReferences(
+    const evidenceProject = await resolveEvidenceProject(
       request.projectId,
       request.missionId,
       request.approvalId,
@@ -293,7 +302,7 @@ export class McpHub {
 
   async invoke(request: McpInvocationRequest): Promise<McpInvocationResult> {
     assertNoSecretArguments(request.arguments);
-    const evidenceProject = await validateEvidenceReferences(
+    const evidenceProject = await resolveEvidenceProject(
       request.projectId,
       request.missionId,
       request.approvalId,
