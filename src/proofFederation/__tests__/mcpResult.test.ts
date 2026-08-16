@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FederatedProofContractError } from '../contract.js';
 import {
+  assertFederatedProofReceiptMatchesInvocation,
   federatedProofReceiptFromMcpResult,
   summarizeFederatedProofReceipt,
 } from '../mcpResult.js';
@@ -46,11 +47,21 @@ function result(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function admittedPolicy(argumentsValue: Record<string, unknown> = { owner: 'jussray', repo: 'chief-ai-machine' }) {
+  return {
+    serverId: 'proofmode',
+    provider: 'github',
+    allowedScopes: ['repository'],
+    arguments: argumentsValue,
+  };
+}
+
 describe('federated MCP result recognition', () => {
-  it('accepts a valid ProofMode receipt and reduces it to safe hub metadata', () => {
+  it('accepts a valid ProofMode receipt, binds it to the request, and reduces it to safe hub metadata', () => {
     const receipt = federatedProofReceiptFromMcpResult(result());
     expect(receipt?.exactTarget.sha).toBe(SHA);
     expect(receipt?.state).toBe('inferred');
+    expect(() => assertFederatedProofReceiptMatchesInvocation(receipt!, admittedPolicy())).not.toThrow();
 
     expect(summarizeFederatedProofReceipt(receipt!)).toEqual({
       schema: 'juss-proof/v1',
@@ -89,5 +100,40 @@ describe('federated MCP result recognition', () => {
     expect(() => federatedProofReceiptFromMcpResult(failed)).toThrowError(
       new FederatedProofContractError('error_result_cannot_emit_receipt'),
     );
+  });
+
+  it('rejects receipts from MCPs that were not admitted as proof authorities', () => {
+    const receipt = federatedProofReceiptFromMcpResult(result())!;
+    expect(() =>
+      assertFederatedProofReceiptMatchesInvocation(receipt, {
+        serverId: 'github',
+        arguments: { owner: 'jussray', repo: 'chief-ai-machine' },
+      }),
+    ).toThrowError(new FederatedProofContractError('untrusted_federated_receipt_source'));
+  });
+
+  it('rejects provider, scope, and repository target substitution', () => {
+    const receipt = federatedProofReceiptFromMcpResult(result())!;
+
+    expect(() =>
+      assertFederatedProofReceiptMatchesInvocation(receipt, {
+        ...admittedPolicy(),
+        provider: 'cloudflare',
+      }),
+    ).toThrowError(new FederatedProofContractError('receipt_provider_mismatch'));
+
+    expect(() =>
+      assertFederatedProofReceiptMatchesInvocation(receipt, {
+        ...admittedPolicy(),
+        allowedScopes: ['deployment'],
+      }),
+    ).toThrowError(new FederatedProofContractError('receipt_scope_not_allowed'));
+
+    expect(() =>
+      assertFederatedProofReceiptMatchesInvocation(
+        receipt,
+        admittedPolicy({ repository: 'jussray/StoryEngine' }),
+      ),
+    ).toThrowError(new FederatedProofContractError('repository_receipt_target_mismatch'));
   });
 });
