@@ -161,7 +161,8 @@ export function buildCurrentTruthProjection(
 
   const currentMainSha = newestVerifiedMapped(events, (event) => (
     event.category === 'source'
-      && event.repository?.branch === 'main'
+      && event.repository?.refKind === 'branch-head'
+      && event.repository.branch === 'main'
       && event.repository.commitSha
       ? event.repository.commitSha
       : null
@@ -182,10 +183,10 @@ export function buildCurrentTruthProjection(
 
   const providers = latestByKey(
     events,
-    (event) => event.provider
+    (event) => event.category === 'provider' && event.provider
       ? `${event.provider.name}:${event.provider.resource ?? 'default'}`
       : null,
-    (event) => event.provider ?? null,
+    (event) => event.category === 'provider' ? event.provider ?? null : null,
   );
 
   const runtimes = latestByKey(
