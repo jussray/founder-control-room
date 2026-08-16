@@ -20,6 +20,7 @@ const ENV_PREFIX: Record<VaultEnvironment, string> = {
 };
 
 const SCOPE_PATTERN = /^[a-z][a-z0-9:_-]{1,79}$/;
+const SECRET_REFERENCE_PATTERN = /^[a-z][a-z0-9+.-]*:\/\/\S{3,1024}$/i;
 const MAX_SCOPES = 20;
 
 export interface IssuedFcrApiToken {
@@ -33,6 +34,14 @@ export function parseVaultEnvironment(value: unknown): VaultEnvironment {
     throw new Error(`environment must be one of: ${VAULT_ENVIRONMENTS.join(', ')}`);
   }
   return value as VaultEnvironment;
+}
+
+export function normalizeSecretReference(value: unknown): string {
+  const reference = typeof value === 'string' ? value.trim() : '';
+  if (!SECRET_REFERENCE_PATTERN.test(reference)) {
+    throw new Error('secretRef must be an opaque URI reference such as cloudflare-secrets-store://store/secret-name');
+  }
+  return reference;
 }
 
 export function normalizeTokenScopes(value: unknown): string[] {
