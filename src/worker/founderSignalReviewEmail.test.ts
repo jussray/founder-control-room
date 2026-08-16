@@ -15,6 +15,8 @@ const env = {
     'https://api.foundercontrolroom.org/ingest/founder-review-email',
 };
 
+type ApiFetch = (request: Request) => Promise<Response>;
+
 function rawMessage(command = 'cancel all') {
   return new TextEncoder().encode([
     'From: Juss Ray <juss@example.com>',
@@ -47,13 +49,15 @@ function fakeMessage(overrides: Partial<{ from: string; to: string; rawSize: num
   };
 }
 
-function withApiBinding(fetchMock: ReturnType<typeof vi.fn>) {
+function apiFetchMock() {
+  return vi.fn<ApiFetch>();
+}
+
+function withApiBinding(fetchMock: ApiFetch) {
   return {
     ...env,
     FOUNDER_CONTROL_ROOM_API: {
-      fetch: async (request: Request): Promise<Response> => {
-        return await fetchMock(request) as Response;
-      },
+      fetch: fetchMock,
     },
   };
 }
@@ -66,7 +70,7 @@ describe('Founder Signal review email Worker', () => {
 
   it('posts one signed sanitized unresolved receipt through the private API service binding', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(1_775_165_100_000);
-    const bindingFetch = vi.fn().mockResolvedValue(new Response('{}', { status: 201 }));
+    const bindingFetch = apiFetchMock().mockResolvedValue(new Response('{}', { status: 201 }));
     const publicFetch = vi.fn();
     vi.stubGlobal('fetch', publicFetch);
     const message = fakeMessage();
@@ -77,7 +81,7 @@ describe('Founder Signal review email Worker', () => {
     expect(bindingFetch).toHaveBeenCalledOnce();
     expect(publicFetch).not.toHaveBeenCalled();
 
-    const [request] = bindingFetch.mock.calls[0] as [Request];
+    const [request] = bindingFetch.mock.calls[0];
     expect(request.url).toBe(env.FOUNDER_REVIEW_INGEST_URL);
     expect(request.method).toBe('POST');
     expect(request.redirect).toBe('error');
@@ -115,7 +119,7 @@ describe('Founder Signal review email Worker', () => {
   });
 
   it('rejects unauthorized or malformed mail without calling the backend', async () => {
-    const bindingFetch = vi.fn();
+    const bindingFetch = apiFetchMock();
     const message = fakeMessage({ from: 'attacker@example.com' });
 
     await handleFounderSignalReviewEmail(message, withApiBinding(bindingFetch));
@@ -125,7 +129,7 @@ describe('Founder Signal review email Worker', () => {
   });
 
   it('rejects declared-size mismatches before MIME parsing', async () => {
-    const bindingFetch = vi.fn();
+    const bindingFetch = apiFetchMock();
     const message = fakeMessage({ rawSize: 1 });
 
     await handleFounderSignalReviewEmail(message, withApiBinding(bindingFetch));
@@ -138,7 +142,7 @@ describe('Founder Signal review email Worker', () => {
     const message = fakeMessage();
 
     await expect(handleFounderSignalReviewEmail(message, {
-      ...withApiBinding(vi.fn()),
+      ...withApiBinding(apiFetchMock()),
       FOUNDER_REVIEW_EMAIL_INGRESS_SECRET: 'too-short',
     })).rejects.toThrow('weak_founder_review_email_ingress_secret');
   });
@@ -155,7 +159,7 @@ describe('Founder Signal review email Worker', () => {
   });
 
   it('throws on backend failure so valid founder mail is not silently lost', async () => {
-    const bindingFetch = vi.fn().mockResolvedValue(new Response('{}', { status: 503 }));
+    const bindingFetch = apiFetchMock().mockResolvedValue(new Response('{}', { status: 503 }));
     const message = fakeMessage();
 
     await expect(handleFounderSignalReviewEmail(
@@ -166,7 +170,7 @@ describe('Founder Signal review email Worker', () => {
   });
 
   it('refuses an alternate ingest destination', async () => {
-    const bindingFetch = vi.fn();
+    const bindingFetch = apiFetchMock();
     const message = fakeMessage();
 
     await expect(handleFounderSignalReviewEmail(message, {
