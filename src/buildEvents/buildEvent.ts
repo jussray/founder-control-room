@@ -49,10 +49,15 @@ export type BuildRuntimeEnvironment =
   | 'staging'
   | 'development'
   | 'unknown';
+export type BuildEventRepositoryRefKind =
+  | 'branch-head'
+  | 'proposal-head'
+  | 'detached';
 
 export interface BuildEventRepositoryRef {
   name: string;
   branch?: string;
+  refKind?: BuildEventRepositoryRefKind;
   commitSha?: string;
   auditedCommitSha?: string;
 }
@@ -128,6 +133,9 @@ const TRUTHS: readonly BuildEventTruth[] = ['verified', 'inferred', 'unknown'];
 const AUTHORITIES: readonly BuildEventAuthority[] = ['observed', 'authorized', 'not-authorized'];
 const STATUSES: readonly BuildEventStatus[] = [
   'pending', 'running', 'passed', 'failed', 'blocked', 'completed', 'unknown',
+];
+const REPOSITORY_REF_KINDS: readonly BuildEventRepositoryRefKind[] = [
+  'branch-head', 'proposal-head', 'detached',
 ];
 
 function boundedText(value: unknown, maximumLength: number): string {
@@ -206,6 +214,15 @@ export function validateBuildEvent(input: BuildEventInput): string[] {
     if (!REPOSITORY.test(name)) errors.push('repository.name must be owner/repository');
     if (input.repository.branch !== undefined && !boundedText(input.repository.branch, 255)) {
       errors.push('repository.branch is invalid');
+    }
+    if (input.repository.refKind !== undefined && !REPOSITORY_REF_KINDS.includes(input.repository.refKind)) {
+      errors.push('repository.refKind is invalid');
+    }
+    if (input.repository.refKind === 'branch-head' && !boundedText(input.repository.branch, 255)) {
+      errors.push('branch-head repository refs require a branch');
+    }
+    if (input.repository.refKind === 'proposal-head' && !boundedText(input.repository.branch, 255)) {
+      errors.push('proposal-head repository refs require a branch');
     }
     if (input.repository.commitSha !== undefined && !normalizedSha(input.repository.commitSha)) {
       errors.push('repository.commitSha must be an exact 40-character SHA');
@@ -302,6 +319,9 @@ export function createBuildEvent(input: BuildEventInput): BuildEvent {
         name: boundedText(input.repository.name, 200),
         ...(input.repository.branch !== undefined
           ? { branch: boundedText(input.repository.branch, 255) }
+          : {}),
+        ...(input.repository.refKind !== undefined
+          ? { refKind: input.repository.refKind }
           : {}),
         ...(input.repository.commitSha !== undefined
           ? { commitSha: normalizedSha(input.repository.commitSha)! }
