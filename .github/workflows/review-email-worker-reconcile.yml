@@ -1,0 +1,208 @@
+name: FCR Review Email Worker Reconcile
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_head_sha:
+        description: Exact current main commit approved for review-email Worker reconciliation
+        required: true
+        type: string
+      deployment_approval_id:
+        description: Auditable founder approval reference
+        required: true
+        type: string
+      deployment_reason:
+        description: Short reason for this review-email Worker reconciliation
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fcr-review-email-worker-reconcile-production
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  authority-gate:
+    name: Review Email Worker Authority and Exact-Head Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    env:
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+      DEPLOYMENT_APPROVAL_ID: ${{ inputs.deployment_approval_id }}
+      DEPLOYMENT_REASON: ${{ inputs.deployment_reason }}
+    steps:
+      - name: Checkout exact approved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify production authority and current main
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=Invalid exact head::expected_head_sha must be a lowercase 40-character commit SHA."
+            exit 1
+          fi
+          if [[ ! "$DEPLOYMENT_APPROVAL_ID" =~ ^[A-Za-z0-9._:-]{8,200}$ ]]; then
+            echo "::error title=Invalid production approval reference::deployment_approval_id must be an auditable 8-200 character reference."
+            exit 1
+          fi
+
+          ACTUAL_HEAD_SHA="$(git rev-parse HEAD)"
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          CURRENT_MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
+
+          echo "Expected approved SHA: $EXPECTED_HEAD_SHA"
+          echo "Checked-out SHA:       $ACTUAL_HEAD_SHA"
+          echo "Current main SHA:       $CURRENT_MAIN_SHA"
+          echo "Approval reference:     $DEPLOYMENT_APPROVAL_ID"
+
+          test "$ACTUAL_HEAD_SHA" = "$EXPECTED_HEAD_SHA"
+          test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"
+
+      - name: Validate bounded review-email Worker authority
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
+            echo '::error title=Missing Worker credential::Set CLOUDFLARE_API_TOKEN in the GitHub production environment before reconciliation.'
+            exit 1
+          fi
+
+          ACCOUNT_ID="$(sed -nE 's/^account_id[[:space:]]*=[[:space:]]*"([0-9a-f]+)"[[:space:]]*$/\1/p' wrangler.email.toml | head -n 1)"
+          if [[ ! "$ACCOUNT_ID" =~ ^[0-9a-f]{32}$ ]]; then
+            echo '::error title=Invalid review-email Worker account authority::wrangler.email.toml must declare a 32-character lowercase Cloudflare account_id.'
+            exit 1
+          fi
+
+          grep -Eq '^name = "founder-control-room-review-email"$' wrangler.email.toml
+          grep -Eq '^binding = "FOUNDER_CONTROL_ROOM_API"$' wrangler.email.toml
+          grep -Eq '^service = "founder-control-room"$' wrangler.email.toml
+
+          echo 'Review-email Worker identity, account authority, and private API binding are declared.'
+
+      - name: Record bounded authority receipt
+        shell: bash
+        run: |
+          {
+            echo "## Review-email Worker reconciliation authority"
+            echo
+            echo "- Exact approved head: \`$EXPECTED_HEAD_SHA\`"
+            echo "- Approval reference: \`$DEPLOYMENT_APPROVAL_ID\`"
+            echo "- Reason: ${DEPLOYMENT_REASON:-not supplied}"
+            echo "- Mutation scope: Cloudflare Worker \`founder-control-room-review-email\` via \`wrangler.email.toml\`"
+            echo "- Intended private binding: \`FOUNDER_CONTROL_ROOM_API -> founder-control-room\`"
+            echo "- Existing Worker secrets: preserved and validated by name before deploy"
+            echo "- Supabase database mutation: absent by workflow design"
+            echo "- Cloudflare Access mutation: absent by workflow design"
+            echo "- Publication scheduling: absent by workflow design"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  reconcile:
+    name: Reconcile Review Email Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    needs: authority-gate
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_head_sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Re-prove review-email Worker repository contract
+        run: npm run verify:founder-review-email
+
+      - name: Verify existing review-email Worker secret names
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          secret_receipt="$RUNNER_TEMP/review-email-secret-names.json"
+          ./node_modules/.bin/wrangler secret list \
+            --config wrangler.email.toml \
+            --format json > "$secret_receipt"
+
+          for required in FOUNDER_REVIEW_FOUNDER_EMAIL FOUNDER_REVIEW_EMAIL_INGRESS_SECRET; do
+            if ! jq -e --arg required "$required" 'any(.[]; .name == $required)' "$secret_receipt" >/dev/null; then
+              echo "::error title=Missing review-email Worker secret::$required is not installed on founder-control-room-review-email."
+              exit 1
+            fi
+          done
+
+          echo 'Required review-email Worker secret names are present. Values were not read.'
+
+      - name: Deploy only the review-email Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-results
+          deploy_log="$RUNNER_TEMP/review-email-worker-deploy.log"
+
+          set +e
+          ./node_modules/.bin/wrangler deploy --config wrangler.email.toml 2>&1 | tee "$deploy_log"
+          deploy_status=${PIPESTATUS[0]}
+          set -e
+          if (( deploy_status != 0 )); then
+            echo "::error title=Review-email Worker deployment failed::Wrangler exited with status $deploy_status."
+            exit "$deploy_status"
+          fi
+
+          grep -F 'FOUNDER_CONTROL_ROOM_API (founder-control-room)' "$deploy_log" >/dev/null || {
+            echo '::error title=Service Binding proof missing::Wrangler deployment output did not prove FOUNDER_CONTROL_ROOM_API -> founder-control-room.'
+            exit 1
+          }
+
+          jq -n \
+            --arg scope 'review_email_worker_reconcile' \
+            --arg expected_sha "$EXPECTED_HEAD_SHA" \
+            --arg worker 'founder-control-room-review-email' \
+            --arg binding 'FOUNDER_CONTROL_ROOM_API' \
+            --arg service 'founder-control-room' \
+            '{
+              scope: $scope,
+              expected_sha: $expected_sha,
+              worker: $worker,
+              service_binding: {binding: $binding, service: $service},
+              provider_deploy_succeeded: true,
+              required_secret_names_verified: true,
+              supabase_db_mutation: false,
+              access_policy_mutation: false,
+              runtime_email_invocation_proven: false
+            }' > test-results/fcr-review-email-worker-reconcile.json
+
+          cat test-results/fcr-review-email-worker-reconcile.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload redacted reconciliation receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fcr-review-email-worker-reconcile-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/fcr-review-email-worker-reconcile.json
+          if-no-files-found: warn
+          retention-days: 30
