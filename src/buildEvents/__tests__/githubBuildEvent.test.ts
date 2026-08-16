@@ -4,7 +4,7 @@ import { githubWebhookToBuildEvent } from '../githubBuildEvent.js';
 const SHA = 'a'.repeat(40);
 
 describe('GitHub build-event projection', () => {
-  it('turns a main push into verified source truth', () => {
+  it('turns a main push into verified branch-head truth', () => {
     const event = githubWebhookToBuildEvent('push', 'delivery-push', {
       repository: { full_name: 'jussray/founder-control-room' },
       ref: 'refs/heads/main',
@@ -18,11 +18,32 @@ describe('GitHub build-event projection', () => {
     expect(event?.repository).toEqual({
       name: 'jussray/founder-control-room',
       branch: 'main',
+      refKind: 'branch-head',
       commitSha: SHA,
     });
   });
 
-  it('turns a workflow run into exact-head verification truth', () => {
+  it('marks pull-request heads separately even when their branch is named main', () => {
+    const event = githubWebhookToBuildEvent('pull_request', 'delivery-pr', {
+      repository: { full_name: 'jussray/founder-control-room' },
+      pull_request: {
+        number: 55,
+        state: 'open',
+        merged: false,
+        html_url: 'https://github.com/jussray/founder-control-room/pull/55',
+        head: { sha: SHA, ref: 'main' },
+      },
+    }, '2026-08-16T03:00:30Z');
+
+    expect(event?.repository).toEqual({
+      name: 'jussray/founder-control-room',
+      branch: 'main',
+      refKind: 'proposal-head',
+      commitSha: SHA,
+    });
+  });
+
+  it('turns a workflow run into exact-head verification truth without claiming branch ownership', () => {
     const event = githubWebhookToBuildEvent('workflow_run', 'delivery-workflow', {
       repository: { full_name: 'jussray/founder-control-room' },
       workflow_run: {
@@ -42,6 +63,7 @@ describe('GitHub build-event projection', () => {
       exactCommitSha: SHA,
     });
     expect(event?.repository?.branch).toBe('main');
+    expect(event?.repository?.refKind).toBe('detached');
   });
 
   it('keeps deployment success as provider observation instead of runtime proof', () => {
@@ -68,8 +90,8 @@ describe('GitHub build-event projection', () => {
     expect(event?.runtime).toBeUndefined();
   });
 
-  it('returns null when exact commit evidence is missing', () => {
-    const event = githubWebhookToBuildEvent('workflow_run', 'delivery-missing', {
+  it('returns null when exact commit evidence is missing or a branch deletion reports the zero SHA', () => {
+    const missing = githubWebhookToBuildEvent('workflow_run', 'delivery-missing', {
       repository: { full_name: 'jussray/founder-control-room' },
       workflow_run: {
         name: 'CI',
@@ -78,6 +100,13 @@ describe('GitHub build-event projection', () => {
       },
     }, '2026-08-16T03:03:00Z');
 
-    expect(event).toBeNull();
+    const deleted = githubWebhookToBuildEvent('push', 'delivery-delete', {
+      repository: { full_name: 'jussray/founder-control-room' },
+      ref: 'refs/heads/main',
+      after: '0'.repeat(40),
+    }, '2026-08-16T03:04:00Z');
+
+    expect(missing).toBeNull();
+    expect(deleted).toBeNull();
   });
 });
