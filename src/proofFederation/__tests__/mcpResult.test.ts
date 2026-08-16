@@ -52,12 +52,13 @@ function admittedPolicy(argumentsValue: Record<string, unknown> = { owner: 'juss
     serverId: 'proofmode',
     provider: 'github',
     allowedScopes: ['repository'],
+    expectedRepository: 'jussray/chief-ai-machine',
     arguments: argumentsValue,
   };
 }
 
 describe('federated MCP result recognition', () => {
-  it('accepts a valid ProofMode receipt, binds it to the request, and reduces it to safe hub metadata', () => {
+  it('accepts a valid ProofMode receipt, binds it to FCR project authority, and reduces it to safe hub metadata', () => {
     const receipt = federatedProofReceiptFromMcpResult(result());
     expect(receipt?.exactTarget.sha).toBe(SHA);
     expect(receipt?.state).toBe('inferred');
@@ -112,7 +113,7 @@ describe('federated MCP result recognition', () => {
     ).toThrowError(new FederatedProofContractError('untrusted_federated_receipt_source'));
   });
 
-  it('rejects provider, scope, and repository target substitution', () => {
+  it('rejects provider, scope, project, and repository target substitution', () => {
     const receipt = federatedProofReceiptFromMcpResult(result())!;
 
     expect(() =>
@@ -130,10 +131,25 @@ describe('federated MCP result recognition', () => {
     ).toThrowError(new FederatedProofContractError('receipt_scope_not_allowed'));
 
     expect(() =>
+      assertFederatedProofReceiptMatchesInvocation(receipt, {
+        ...admittedPolicy(),
+        expectedRepository: undefined,
+      }),
+    ).toThrowError(new FederatedProofContractError('project_repository_unbound'));
+
+    expect(() =>
       assertFederatedProofReceiptMatchesInvocation(
         receipt,
         admittedPolicy({ repository: 'jussray/StoryEngine' }),
       ),
+    ).toThrowError(new FederatedProofContractError('requested_repository_project_mismatch'));
+
+    expect(() =>
+      assertFederatedProofReceiptMatchesInvocation(receipt, {
+        ...admittedPolicy(),
+        expectedRepository: 'jussray/StoryEngine',
+        arguments: { repository: 'jussray/StoryEngine' },
+      }),
     ).toThrowError(new FederatedProofContractError('repository_receipt_target_mismatch'));
   });
 });
