@@ -19,6 +19,9 @@ const requiredAssets = [
   'control-room/capabilities.html',
   'control-room/capabilities.js',
   'control-room/capabilities.css',
+  'control-room/security.html',
+  'control-room/security.js',
+  'control-room/security.css',
   'portable-founder-console/index.html',
 ];
 

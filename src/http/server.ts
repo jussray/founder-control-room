@@ -26,6 +26,7 @@ import { founderOsSkillsRouter } from './routes/founderOsSkills.js';
 import { mirrorRouter } from './routes/mirror.js';
 import { n8nConveyorRouter } from './routes/n8nConveyor.js';
 import { switchboardRouter } from './routes/switchboard.js';
+import { securityPostureRouter } from './routes/securityPosture.js';
 import { handleFounderSignalEngineMcp } from './routes/founderSignalEngineMcp.js';
 import { handleFounderSignalReviewContextIngest } from './routes/founderSignalReviewContexts.js';
 import { handleFounderSignalReviewEmailIngest } from './routes/founderSignalReviewEmailIngress.js';
@@ -240,6 +241,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/onboarding', founderOnboardingRouter);
   app.use('/portfolio', portfolioVerificationRouter);
   app.use('/switchboard', switchboardRouter);
+  app.use('/security-posture', securityPostureRouter);
   app.use('/projects', repositoryVerificationRouter);
   app.use('/projects', requireProjectReadAudit, projectsRouter);
   // Privileged mission execution still uses the existing approvals router, but
