@@ -65,6 +65,10 @@ function readSurface(pathname: string): ReadSurface | null {
       eventType: 'project_file_read',
       routeTemplate: 'GET /projects/:slug/file',
     },
+    'current-truth': {
+      eventType: 'project_current_truth_read',
+      routeTemplate: 'GET /projects/:slug/current-truth',
+    },
   };
 
   const surface = suffix ? surfaces[suffix] : undefined;
@@ -72,11 +76,11 @@ function readSurface(pathname: string): ReadSurface | null {
 }
 
 function projectIdsFromRegistryBody(body: unknown): string[] | null {
-  const projects = asRecord(body)?.['projects'];
+  const projects = asRecord(body)?.projects;
   if (!Array.isArray(projects)) return null;
 
   const ids = projects
-    .map(project => asRecord(project)?.['id'])
+    .map(project => asRecord(project)?.id)
     .filter((id): id is string => typeof id === 'string' && id.length > 0);
 
   if (projects.length > 0 && ids.length !== projects.length) {
@@ -89,7 +93,7 @@ function projectIdsFromRegistryBody(body: unknown): string[] | null {
 }
 
 function projectIdFromBody(body: unknown): string | null {
-  const id = asRecord(asRecord(body)?.['project'])?.['id'];
+  const id = asRecord(asRecord(body)?.project)?.id;
   return typeof id === 'string' && id.length > 0 ? id : null;
 }
 
@@ -159,10 +163,10 @@ async function persistReadAudit(
 }
 
 /**
- * Delays successful JSON responses from the Project Registry until a sanitized
+ * Delays successful JSON responses from project read surfaces until a sanitized
  * access event has persisted. Error responses and non-GET methods are not
- * rewritten. This is mounted around `projectsRouter` only, after unrelated
- * repository-verification routes.
+ * rewritten. Every recognized project-specific read fails closed when its
+ * audit receipt cannot be written.
  */
 export function requireProjectReadAudit(
   req: FounderRequest,
