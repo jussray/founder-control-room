@@ -44,6 +44,28 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).not.toContain('wrangler secret bulk');
   });
 
+  it('rejects malformed Cloudflare token values without printing them', () => {
+    expect(workflow).toContain('Validate Cloudflare API token header safety');
+    expect(workflow).toContain("token.encode('ascii')");
+    expect(workflow).toContain('contains non-ASCII characters and cannot be used as an HTTP Authorization value');
+    expect(workflow).toContain('contains whitespace or non-printable characters');
+    expect(workflow).toContain('The token value was not printed.');
+    expect(workflow).not.toContain('echo "$CLOUDFLARE_API_TOKEN"');
+    expect(workflow).not.toContain("print(token)");
+  });
+
+  it('initializes a redacted receipt before provider credential and secret-name checks', () => {
+    expect(workflow).toContain('Initialize redacted reconciliation receipt');
+    expect(workflow).toContain('credential_header_safe: false');
+    expect(workflow).toContain('required_secret_names_verified: false');
+    expect(workflow).toContain('provider_deploy_succeeded: false');
+    expect(workflow).toContain('blocked_stage: "credential_header_safety"');
+    expect(workflow).toContain('.credential_header_safe = true | .blocked_stage = "secret_names"');
+    expect(workflow).toContain('.required_secret_names_verified = true | .blocked_stage = "provider_deploy"');
+    expect(workflow).toContain('.provider_deploy_succeeded = true | .blocked_stage = null');
+    expect(workflow).toContain('if-no-files-found: error');
+  });
+
   it('does not smuggle database, Access, publication, or broad Worker mutations into the lane', () => {
     expect(workflow).not.toContain('supabase db push');
     expect(workflow).not.toContain('SUPABASE_DB_URL');
@@ -56,8 +78,10 @@ describe('review-email Worker reconciliation authority contract', () => {
   });
 
   it('keeps provider deployment proof separate from unproven runtime email invocation', () => {
-    expect(workflow).toContain('provider_deploy_succeeded: true');
-    expect(workflow).toContain('required_secret_names_verified: true');
+    expect(workflow).toContain('provider_deploy_succeeded: false');
+    expect(workflow).toContain('.provider_deploy_succeeded = true');
+    expect(workflow).toContain('required_secret_names_verified: false');
+    expect(workflow).toContain('.required_secret_names_verified = true');
     expect(workflow).toContain('runtime_email_invocation_proven: false');
     expect(workflow).toContain('fcr-review-email-worker-reconcile-${{ github.run_id }}-${{ github.run_attempt }}');
   });
