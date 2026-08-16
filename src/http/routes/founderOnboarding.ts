@@ -142,8 +142,8 @@ founderOnboardingRouter.post('/bootstrap', async (req: FounderRequest, res) => {
 
   const slug = stringValue(projectInput.slug);
   const name = stringValue(projectInput.name);
-  const repoProvider = optionalString(projectInput.repoProvider) ?? 'github';
   const repoIdentifier = optionalString(projectInput.repoIdentifier);
+  const repoProvider = optionalString(projectInput.repoProvider) ?? (repoIdentifier ? 'github' : 'none');
   const stack = optionalString(projectInput.stack);
   const riskLevel = optionalString(projectInput.riskLevel) ?? 'medium';
   const requestedProviders = [...new Set(stringArray(body.providers))];

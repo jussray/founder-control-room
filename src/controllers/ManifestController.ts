@@ -40,7 +40,10 @@ export class ManifestController extends BaseController {
       return this.done("converged", `Repository verification is disabled for ${project.slug}`);
     }
     if (!project.repo_identifier) {
-      return this.done("blocked", `Project ${project.slug} has no repository identifier`);
+      return this.done(
+        "converged",
+        `Repository verification is not applicable for ${project.slug}; no repository is connected`,
+      );
     }
 
     try {
