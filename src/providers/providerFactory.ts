@@ -1,5 +1,6 @@
 import { getGitHubInstallationToken } from "./githubAppAuth.js";
 import { GitHubProvider } from "./GitHubProvider.js";
+import { GitLabProvider } from "./GitLabProvider.js";
 import type {
   Diff,
   FileEntry,
@@ -107,17 +108,34 @@ async function githubProvider(project: ProviderProjectConfig): Promise<Repositor
   });
 }
 
+async function gitlabProvider(project: ProviderProjectConfig): Promise<RepositoryProvider> {
+  const token = process.env.GITLAB_TOKEN?.trim();
+  if (!token) {
+    throw new Error("GitLab authentication is not configured; set GITLAB_TOKEN");
+  }
+
+  return new GitLabProvider({
+    token,
+    projectMap: { [project.slug]: project.repo_identifier },
+    baseUrl: process.env.GITLAB_BASE_URL,
+  });
+}
+
 /**
  * Provider construction belongs in one place so routes, reconcilers, and
- * mission runners do not grow direct GitHub dependencies.
+ * mission runners do not grow direct host dependencies.
  *
- * Production prefers a repository-scoped GitHub App installation token.
- * GITHUB_TOKEN remains a local/development fallback only. Authentication is
- * demand-driven and cached so callers retain the synchronous factory contract.
+ * GitHub prefers a repository-scoped App installation token, while GitLab
+ * consumes its own provider token and optional self-managed instance URL.
+ * Authentication is demand-driven and cached so callers retain the synchronous
+ * factory contract without coupling project existence to either provider.
  */
 export function providerForProject(project: ProviderProjectConfig): RepositoryProvider {
   if (project.repo_provider === "github") {
     return new LazyRepositoryProvider("github", () => githubProvider(project));
+  }
+  if (project.repo_provider === "gitlab") {
+    return new LazyRepositoryProvider("gitlab", () => gitlabProvider(project));
   }
   throw new Error(`No RepositoryProvider implementation for "${project.repo_provider}" yet`);
 }
