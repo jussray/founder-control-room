@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   hashFcrApiToken,
   issueFcrApiToken,
+  normalizeSecretReference,
   normalizeTokenScopes,
   parseVaultEnvironment,
   tokenHashMatches,
@@ -20,6 +21,15 @@ describe('FCR connection-vault API tokens', () => {
     expect(first.tokenPrefix).toBe(first.token.slice(0, 20));
     expect(tokenHashMatches(first.token, first.tokenHash)).toBe(true);
     expect(tokenHashMatches(second.token, first.tokenHash)).toBe(false);
+  });
+
+  it('accepts only URI-shaped opaque secret references', () => {
+    expect(normalizeSecretReference('cloudflare-secrets-store://store/github-token'))
+      .toBe('cloudflare-secrets-store://store/github-token');
+    expect(normalizeSecretReference('env://MCP_GITHUB_TOKEN')).toBe('env://MCP_GITHUB_TOKEN');
+    expect(() => normalizeSecretReference('github_pat_this_is_not_a_reference'))
+      .toThrow(/opaque URI reference/);
+    expect(() => normalizeSecretReference('plain secret text')).toThrow(/opaque URI reference/);
   });
 
   it('normalizes and validates scopes', () => {
