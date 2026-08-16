@@ -1,0 +1,55 @@
+name: Connection Vault Playwright
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/connectionVault/**'
+      - 'src/http/routes/connectionVault.ts'
+      - 'src/http/routes/mcp.ts'
+      - 'supabase/migrations/*connection_vault*'
+      - 'e2e/connection-vault-*'
+      - '.github/workflows/connection-vault-playwright.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/connectionVault/**'
+      - 'src/http/routes/connectionVault.ts'
+      - 'src/http/routes/mcp.ts'
+      - 'supabase/migrations/*connection_vault*'
+      - 'e2e/connection-vault-*'
+      - '.github/workflows/connection-vault-playwright.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  api-runtime-proof:
+    name: Verify Connection Vault API with Playwright
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact target
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Verify exact head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Run real route through Playwright request client
+        env:
+          NODE_OPTIONS: --import=./e2e/register-connection-vault-loader.mjs
+        run: npx playwright test e2e/connection-vault-api.pw.mjs --reporter=line
