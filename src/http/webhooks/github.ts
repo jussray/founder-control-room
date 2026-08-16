@@ -2,10 +2,10 @@
  * GitHub webhook endpoint.
  *
  * Validates HMAC-SHA256 signature → parses the verified raw body → persists to
- * inbox → enqueues targeted reconciliation for every controller the event
- * routes to. Responds 200 immediately; all reconciliation processing is
- * async. Product code is never included in Founder Control Room state; only
- * the sanitized provider event envelope is retained.
+ * inbox → projects a curated build-memory receipt → enqueues targeted
+ * reconciliation for every controller the event routes to. Product code is
+ * never included in Founder Control Room state; only bounded operational
+ * envelopes are retained.
  *
  * Supported events:
  *   check_run, pull_request, push, workflow_run, deployment, deployment_status
@@ -13,19 +13,21 @@
 
 import { createHmac, timingSafeEqual } from 'crypto';
 import type { Request, Response } from 'express';
+import { githubWebhookToBuildEvent } from '../../buildEvents/githubBuildEvent.js';
 import { persistProviderEvent } from '../../events/inbox.js';
 import { enqueueReconcile } from '../../events/outbox.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import type { ProviderKind } from '../../reconciliation/types.js';
+import { storeBuildEvent, type BuildEventStoreDisposition } from '../../services/buildEventStore.js';
 import { sanitizeWebhookPayload } from './sanitize.js';
 
 const SUPPORTED_EVENTS = new Set([
-  "check_run",
-  "pull_request",
-  "push",
-  "workflow_run",
-  "deployment",
-  "deployment_status",
+  'check_run',
+  'pull_request',
+  'push',
+  'workflow_run',
+  'deployment',
+  'deployment_status',
 ]);
 
 interface ControllerRoute {
@@ -34,7 +36,7 @@ interface ControllerRoute {
 }
 
 function verifySignature(secret: string, body: Buffer, signature: string): boolean {
-  const expected = `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`;
+  const expected = `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
   try {
     return timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
   } catch {
@@ -62,19 +64,19 @@ function parseVerifiedPayload(body: Buffer): Record<string, unknown> | null {
  * installation as trusted.
  */
 function matchesAllOwnedRepositoryScope(config: unknown, repoFullName: string): boolean {
-  const [owner, repo, extra] = repoFullName.split("/");
+  const [owner, repo, extra] = repoFullName.split('/');
   if (!owner || !repo || extra) return false;
 
-  const configRecord = config && typeof config === "object"
+  const configRecord = config && typeof config === 'object'
     ? config as Record<string, unknown>
     : null;
-  const scope = configRecord?.["repositoryScope"];
-  if (!scope || typeof scope !== "object") return false;
+  const scope = configRecord?.repositoryScope;
+  if (!scope || typeof scope !== 'object') return false;
 
   const scopeRecord = scope as Record<string, unknown>;
-  return scopeRecord["mode"] === "all_owned" &&
-    typeof scopeRecord["owner"] === "string" &&
-    scopeRecord["owner"].toLowerCase() === owner.toLowerCase();
+  return scopeRecord.mode === 'all_owned'
+    && typeof scopeRecord.owner === 'string'
+    && scopeRecord.owner.toLowerCase() === owner.toLowerCase();
 }
 
 async function resolveProject(repoFullName: string): Promise<string | null> {
@@ -88,7 +90,7 @@ async function resolveProject(repoFullName: string): Promise<string | null> {
     .maybeSingle();
 
   if (directError) {
-    throw new Error("webhook_project_lookup_failed:" + directError.message);
+    throw new Error(`webhook_project_lookup_failed:${directError.message}`);
   }
   if (directConnection?.project_id) {
     return directConnection.project_id;
@@ -101,7 +103,7 @@ async function resolveProject(repoFullName: string): Promise<string | null> {
     .eq('status', 'active');
 
   if (scopedError) {
-    throw new Error("webhook_portfolio_scope_lookup_failed:" + scopedError.message);
+    throw new Error(`webhook_portfolio_scope_lookup_failed:${scopedError.message}`);
   }
 
   return (scopedConnections ?? [])
@@ -115,31 +117,31 @@ function routeToControllers(
   repoFullName: string,
 ): ControllerRoute[] {
   switch (eventType) {
-    case "check_run": {
+    case 'check_run': {
       const checkRun = payload.check_run as Record<string, unknown> | undefined;
       return [{
-        controller: "CheckRunController",
+        controller: 'CheckRunController',
         resourceId: String(checkRun?.id ?? repoFullName),
       }];
     }
-    case "pull_request": {
+    case 'pull_request': {
       const pullRequest = payload.pull_request as Record<string, unknown> | undefined;
       return [{
-        controller: "ChangeProposalController",
+        controller: 'ChangeProposalController',
         resourceId: String(pullRequest?.number ?? repoFullName),
       }];
     }
-    case "push":
-    case "workflow_run":
+    case 'push':
+    case 'workflow_run':
       return [
-        { controller: "ProjectController", resourceId: repoFullName },
-        { controller: "ManifestController", resourceId: repoFullName },
+        { controller: 'ProjectController', resourceId: repoFullName },
+        { controller: 'ManifestController', resourceId: repoFullName },
       ];
-    case "deployment":
-    case "deployment_status": {
+    case 'deployment':
+    case 'deployment_status': {
       const deployment = (payload.deployment ?? payload.deployment_status) as Record<string, unknown> | undefined;
       return [{
-        controller: "ReleaseController",
+        controller: 'ReleaseController',
         resourceId: String(deployment?.id ?? repoFullName),
       }];
     }
@@ -148,10 +150,32 @@ function routeToControllers(
   }
 }
 
+async function projectBuildMemory(
+  projectId: string,
+  eventType: string,
+  deliveryId: string,
+  sanitizedPayload: Record<string, unknown>,
+): Promise<BuildEventStoreDisposition | 'not-projectable' | 'error'> {
+  try {
+    const event = githubWebhookToBuildEvent(
+      eventType,
+      deliveryId,
+      sanitizedPayload,
+    );
+    if (!event) return 'not-projectable';
+    return await storeBuildEvent(projectId, event);
+  } catch {
+    // The durable provider inbox remains the source receipt and can be replayed.
+    // Build-memory projection must never turn an accepted GitHub delivery into
+    // a provider retry storm or hide that the source event was safely retained.
+    return 'error';
+  }
+}
+
 export async function handleGitHubWebhook(req: Request, res: Response): Promise<void> {
   const secret = process.env.GITHUB_WEBHOOK_SECRET;
   if (!secret) {
-    res.status(500).json({ error: "Webhook secret not configured" });
+    res.status(500).json({ error: 'Webhook secret not configured' });
     return;
   }
 
@@ -182,14 +206,14 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
   }
 
   if (!SUPPORTED_EVENTS.has(eventType)) {
-    res.status(200).json({ accepted: false, reason: "unsupported event type" });
+    res.status(200).json({ accepted: false, reason: 'unsupported event type' });
     return;
   }
 
   const repository = payload.repository as Record<string, unknown> | undefined;
-  const repoFullName = typeof repository?.full_name === "string" ? repository.full_name : null;
+  const repoFullName = typeof repository?.full_name === 'string' ? repository.full_name : null;
   if (!repoFullName) {
-    res.status(200).json({ accepted: false, reason: "no repository in payload" });
+    res.status(200).json({ accepted: false, reason: 'no repository in payload' });
     return;
   }
 
@@ -197,8 +221,8 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
   try {
     projectId = await resolveProject(repoFullName);
   } catch (error) {
-    console.error("Project resolution failed", error);
-    res.status(500).json({ error: "Failed to resolve project" });
+    console.error('Project resolution failed', error);
+    res.status(500).json({ error: 'Failed to resolve project' });
     return;
   }
   if (!projectId) {
@@ -209,35 +233,60 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
 
   const routes = routeToControllers(eventType, payload, repoFullName);
   if (routes.length === 0) {
-    res.status(200).json({ accepted: false, reason: "no controller for event" });
+    res.status(200).json({ accepted: false, reason: 'no controller for event' });
     return;
   }
+
+  const sanitizedPayload = sanitizeWebhookPayload(eventType, payload);
 
   // 1. Persist to inbox (dedup on provider + deliveryId). Only the
   // allowlisted envelope is stored — never the raw provider payload.
   let inboxResult;
   try {
     inboxResult = await persistProviderEvent({
-      provider: "github" as ProviderKind,
+      provider: 'github' as ProviderKind,
       projectId,
       providerEventId: deliveryId,
       eventType,
       resourceType: eventType,
       resourceId: routes[0]?.resourceId ?? repoFullName,
-      payload: sanitizeWebhookPayload(eventType, payload),
+      payload: sanitizedPayload,
     });
   } catch (error) {
-    console.error("Inbox persist failed", error);
-    res.status(500).json({ error: "Failed to persist event" });
+    console.error('Inbox persist failed', error);
+    res.status(500).json({ error: 'Failed to persist event' });
     return;
+  }
+
+  // 2. Project the same sanitized receipt into founder-readable build memory.
+  // This is intentionally retried for duplicate GitHub deliveries because the
+  // provider inbox may have succeeded while a previous projection failed.
+  const buildMemory = await projectBuildMemory(
+    projectId,
+    eventType,
+    deliveryId,
+    sanitizedPayload,
+  );
+
+  if (buildMemory === 'error' || buildMemory === 'conflict') {
+    console.error('Ambient build-memory projection failed', {
+      projectId,
+      eventType,
+      deliveryId,
+      disposition: buildMemory,
+    });
   }
 
   if (inboxResult.isDuplicate) {
-    res.status(200).json({ accepted: true, duplicate: true });
+    res.status(200).json({
+      accepted: true,
+      duplicate: true,
+      buildMemory,
+    });
     return;
   }
 
-  // 2. Enqueue targeted reconciliation for every controller this event
+  // 3. Enqueue targeted reconciliation for every controller this event
   // routes to (with 500ms debounce for burst events).
   const availableAt = new Date(Date.now() + 500).toISOString();
   const results = await Promise.allSettled(
@@ -246,7 +295,7 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
         projectId,
         controller: route.controller,
         resourceId: route.resourceId,
-        reason: "provider_event",
+        reason: 'provider_event',
         sourceEventId: inboxResult.id,
       },
       { availableAt },
@@ -254,12 +303,12 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
   );
   const failedRoutes = results
     .map((result, index) => ({ result, route: routes[index] }))
-    .filter((entry) => entry.result.status === "rejected")
+    .filter((entry) => entry.result.status === 'rejected')
     .map((entry) => entry.route?.controller)
     .filter(Boolean);
 
   if (failedRoutes.length > 0) {
-    console.error("Outbox enqueue failed", { projectId, failedRoutes });
+    console.error('Outbox enqueue failed', { projectId, failedRoutes });
     // Event remains safely in the inbox and can be replayed.
   }
 
@@ -268,5 +317,6 @@ export async function handleGitHubWebhook(req: Request, res: Response): Promise<
     eventId: inboxResult.id,
     controllers: routes.map((route) => route.controller),
     enqueueFailures: failedRoutes,
+    buildMemory,
   });
 }

@@ -48,6 +48,10 @@ function createProbeApp() {
     res.json({ releases: [{ id: 'release-1' }] });
   });
 
+  app.get('/projects/:slug/current-truth', (_req, res) => {
+    res.json({ snapshot: { contract: 'fcr/current-truth@v1' } });
+  });
+
   app.get('/projects/:slug/connections', (_req, res) => {
     res.status(404).json({ error: 'Not found' });
   });
@@ -133,6 +137,23 @@ describe('requireProjectReadAudit', () => {
         event_type: 'project_releases_read',
         metadata: expect.objectContaining({
           route: 'GET /projects/:slug/releases',
+        }),
+      }),
+    ]);
+  });
+
+  it('audits the ambient current-truth read before releasing it', async () => {
+    const response = await request(createProbeApp()).get('/projects/one/current-truth');
+
+    expect(response.status).toBe(200);
+    expect(response.body.snapshot.contract).toBe('fcr/current-truth@v1');
+    expect(mockInsert).toHaveBeenCalledWith([
+      expect.objectContaining({
+        project_id: 'project-lookup',
+        event_type: 'project_current_truth_read',
+        metadata: expect.objectContaining({
+          route: 'GET /projects/:slug/current-truth',
+          actor: 'founder',
         }),
       }),
     ]);

@@ -124,9 +124,28 @@ function sanitizeCheckRun(value: unknown): JsonRecord | undefined {
 
   const sanitized: JsonRecord = {};
   setIfDefined(sanitized, 'name', boundedString(checkRun['name'], 255));
+  setIfDefined(sanitized, 'status', boundedString(checkRun['status'], 64));
   setIfDefined(sanitized, 'conclusion', boundedString(checkRun['conclusion'], 64));
   setIfDefined(sanitized, 'head_sha', shaValue(checkRun['head_sha']));
   setIfDefined(sanitized, 'details_url', safeUrlValue(checkRun['details_url']));
+  return sanitized;
+}
+
+function sanitizeWorkflowRun(value: unknown): JsonRecord | undefined {
+  const workflowRun = asRecord(value);
+  if (!workflowRun) return undefined;
+
+  const sanitized: JsonRecord = {};
+  setIfDefined(sanitized, 'id', positiveInteger(workflowRun['id']));
+  setIfDefined(sanitized, 'name', boundedString(workflowRun['name'], 255));
+  setIfDefined(sanitized, 'event', boundedString(workflowRun['event'], 64));
+  setIfDefined(sanitized, 'status', boundedString(workflowRun['status'], 64));
+  setIfDefined(sanitized, 'conclusion', boundedString(workflowRun['conclusion'], 64));
+  setIfDefined(sanitized, 'head_sha', shaValue(workflowRun['head_sha']));
+  setIfDefined(sanitized, 'head_branch', boundedString(workflowRun['head_branch'], 255));
+  setIfDefined(sanitized, 'html_url', safeUrlValue(workflowRun['html_url']));
+  setIfDefined(sanitized, 'run_started_at', timestampValue(workflowRun['run_started_at']));
+  setIfDefined(sanitized, 'updated_at', timestampValue(workflowRun['updated_at']));
   return sanitized;
 }
 
@@ -173,6 +192,14 @@ export function sanitizeWebhookPayload(
   const action = boundedString(payload['action'], 64);
   if (action) sanitized['action'] = action;
 
+  if (eventType === 'push') {
+    setIfDefined(sanitized, 'ref', boundedString(payload['ref'], 300));
+    setIfDefined(sanitized, 'before', shaValue(payload['before']));
+    setIfDefined(sanitized, 'after', shaValue(payload['after']));
+    setIfDefined(sanitized, 'forced', booleanValue(payload['forced']));
+    setIfDefined(sanitized, 'compare', safeUrlValue(payload['compare']));
+  }
+
   if (eventType === 'pull_request') {
     const pullRequest = sanitizePullRequest(payload['pull_request']);
     if (pullRequest) sanitized['pull_request'] = pullRequest;
@@ -181,6 +208,11 @@ export function sanitizeWebhookPayload(
   if (eventType === 'check_run') {
     const checkRun = sanitizeCheckRun(payload['check_run']);
     if (checkRun) sanitized['check_run'] = checkRun;
+  }
+
+  if (eventType === 'workflow_run') {
+    const workflowRun = sanitizeWorkflowRun(payload['workflow_run']);
+    if (workflowRun) sanitized['workflow_run'] = workflowRun;
   }
 
   if (eventType === 'deployment') {
@@ -196,7 +228,5 @@ export function sanitizeWebhookPayload(
     if (deployment) sanitized['deployment'] = deployment;
   }
 
-  // push / workflow_run carry no controller-read subfields today beyond
-  // action/repository, already handled above.
   return sanitized;
 }

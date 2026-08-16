@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   mockPersistProviderEvent,
   mockEnqueueReconcile,
+  mockStoreBuildEvent,
   mockFrom,
   mockSelect,
   mockEq,
@@ -14,6 +15,7 @@ const {
 } = vi.hoisted(() => ({
   mockPersistProviderEvent: vi.fn(),
   mockEnqueueReconcile: vi.fn(),
+  mockStoreBuildEvent: vi.fn(),
   mockFrom: vi.fn(),
   mockSelect: vi.fn(),
   mockEq: vi.fn(),
@@ -28,6 +30,10 @@ vi.mock('../../../events/inbox.js', () => ({
 
 vi.mock('../../../events/outbox.js', () => ({
   enqueueReconcile: mockEnqueueReconcile,
+}));
+
+vi.mock('../../../services/buildEventStore.js', () => ({
+  storeBuildEvent: mockStoreBuildEvent,
 }));
 
 vi.mock('../../../lib/supabaseClient.js', () => ({
@@ -86,6 +92,7 @@ beforeEach(() => {
     id: 'event-123',
     isDuplicate: false,
   });
+  mockStoreBuildEvent.mockResolvedValue('stored');
   mockEnqueueReconcile.mockResolvedValue(undefined);
 });
 
@@ -143,6 +150,7 @@ describe('GitHub webhook ingestion', () => {
       eventId: 'event-123',
       controllers: ['ChangeProposalController'],
       enqueueFailures: [],
+      buildMemory: 'not-projectable',
     });
   });
 
@@ -247,6 +255,46 @@ describe('GitHub webhook ingestion', () => {
     expect(storedPayload.pull_request.body).toBeUndefined();
     expect(storedPayload.pull_request.user.avatar_url).toBeUndefined();
     expect(storedPayload.pull_request.requested_reviewers).toBeUndefined();
+    expect(mockStoreBuildEvent).toHaveBeenCalledWith(
+      'project-123',
+      expect.objectContaining({
+        source: 'github',
+        category: 'source',
+        truth: 'verified',
+        repository: expect.objectContaining({
+          name: 'jussray/Sekret-Bip',
+          branch: 'feature/x',
+          commitSha: 'a'.repeat(40),
+        }),
+      }),
+    );
+  });
+
+  it('retries build-memory projection on a duplicate provider delivery without re-enqueueing work', async () => {
+    mockPersistProviderEvent.mockResolvedValue({
+      id: 'event-123',
+      isDuplicate: true,
+    });
+    mockStoreBuildEvent.mockResolvedValue('duplicate');
+
+    const payload = {
+      repository: { full_name: 'jussray/founder-control-room' },
+      ref: 'refs/heads/main',
+      after: 'b'.repeat(40),
+      compare: `https://github.com/jussray/founder-control-room/compare/${'a'.repeat(40)}...${'b'.repeat(40)}`,
+    };
+    const req = signedRequest(payload, 'push');
+    const res = makeResponse();
+
+    await handleGitHubWebhook(req, res as unknown as Response);
+
+    expect(mockStoreBuildEvent).toHaveBeenCalledTimes(1);
+    expect(mockEnqueueReconcile).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({
+      accepted: true,
+      duplicate: true,
+      buildMemory: 'duplicate',
+    });
   });
 
   it('rejects invalid JSON only after the raw-body signature passes', async () => {
@@ -270,6 +318,7 @@ describe('GitHub webhook ingestion', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'Invalid JSON payload' });
     expect(mockFrom).not.toHaveBeenCalled();
     expect(mockPersistProviderEvent).not.toHaveBeenCalled();
+    expect(mockStoreBuildEvent).not.toHaveBeenCalled();
     expect(mockEnqueueReconcile).not.toHaveBeenCalled();
   });
 });
