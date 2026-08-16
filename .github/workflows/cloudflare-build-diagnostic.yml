@@ -24,7 +24,9 @@ jobs:
       EXPECTED_HEAD_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_head_sha || github.sha }}
       CF_WORKER_NAME: founder-control-room
       CF_API_HOSTNAME: api.foundercontrolroom.org
-      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Cloudflare account IDs are public provider identifiers. Keep this aligned
+      # with wrangler.worker.toml instead of depending on an unnecessary secret.
+      CF_ACCOUNT_ID: 9b59861bd1747cf7525571b4c51d2aa0
       CF_API_TOKEN: ${{ secrets.CLOUDFLARE_BUILDS_API_TOKEN }}
 
     steps:
