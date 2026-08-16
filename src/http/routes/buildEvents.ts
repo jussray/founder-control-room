@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import { buildCurrentTruthProjection } from '../../buildEvents/currentTruth.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { loadBuildEvents } from '../../services/buildEventStore.js';
@@ -7,7 +7,7 @@ import { requireFounder } from '../middleware/requireFounder.js';
 export const buildEventsRouter = Router();
 buildEventsRouter.use(requireFounder);
 
-function noStore(res: Parameters<Parameters<typeof buildEventsRouter.get>[1]>[1]) {
+function noStore(res: Response) {
   res.set({
     'Cache-Control': 'no-store',
     'Content-Type': 'application/json; charset=utf-8',
