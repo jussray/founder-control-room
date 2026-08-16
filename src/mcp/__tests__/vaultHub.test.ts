@@ -162,7 +162,7 @@ describe("Connection Vault-backed MCP runtime", () => {
   });
 
   it("carries a ProofMode receipt through Vault resolution into FCR evidence without process-env fallback", async () => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = vi.fn(async (_input: unknown, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body ?? "{}")) as {
         id?: string;
         method?: string;
