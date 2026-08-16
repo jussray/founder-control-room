@@ -27,6 +27,8 @@ describe('Founder Control Room completion claim UI contract', () => {
     expect(source).toContain("'Merge executed.'");
     expect(source).toContain("'Branch created.'");
     expect(source).toContain("applyEvidenceBackedCompletionClaim");
-    expect(source).toContain("data-completion-claim");
+    expect(source).toContain("notice.dataset.completionClaim");
+    expect(source).toContain("'evidence-backed'");
+    expect(source).toContain("'unverified'");
   });
 });
