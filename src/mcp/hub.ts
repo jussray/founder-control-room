@@ -21,6 +21,11 @@ import type {
 
 const CAPABILITY_CACHE_MS = 5 * 60_000;
 
+interface McpEvidenceProject {
+  id: string;
+  repoIdentifier?: string;
+}
+
 function summarizeRequest(request: McpInvocationRequest): Record<string, unknown> {
   const serialized = JSON.stringify(request.arguments);
   return {
@@ -132,10 +137,10 @@ export async function validateEvidenceReferences(
   projectId: string,
   missionId?: string,
   approvalId?: string,
-): Promise<string> {
+): Promise<McpEvidenceProject> {
   const { data: project, error: projectError } = await supabase
     .from("projects")
-    .select("id")
+    .select("id,repo_identifier")
     .eq("slug", projectId)
     .maybeSingle();
 
@@ -153,7 +158,13 @@ export async function validateEvidenceReferences(
     await approvalForProject(approvalId, project.id, missionId);
   }
 
-  return project.id;
+  return {
+    id: project.id,
+    repoIdentifier:
+      typeof project.repo_identifier === "string" && project.repo_identifier.trim()
+        ? project.repo_identifier.trim()
+        : undefined,
+  };
 }
 
 async function writeEvidence(
@@ -241,7 +252,7 @@ export class McpHub {
     evidenceId: string;
   }> {
     assertNoSecretArguments(request.arguments);
-    const projectUuid = await validateEvidenceReferences(
+    const evidenceProject = await validateEvidenceReferences(
       request.projectId,
       request.missionId,
       request.approvalId,
@@ -271,7 +282,7 @@ export class McpHub {
       requestHash: hash,
       requestSummary: summarizeRequest(request),
       estimatedCostUsd: 0,
-    }, projectUuid);
+    }, evidenceProject.id);
 
     return {
       policy,
@@ -282,7 +293,7 @@ export class McpHub {
 
   async invoke(request: McpInvocationRequest): Promise<McpInvocationResult> {
     assertNoSecretArguments(request.arguments);
-    const projectUuid = await validateEvidenceReferences(
+    const evidenceProject = await validateEvidenceReferences(
       request.projectId,
       request.missionId,
       request.approvalId,
@@ -314,7 +325,7 @@ export class McpHub {
         requestHash: hash,
         requestSummary: summarizeRequest(request),
         estimatedCostUsd: 0,
-      }, projectUuid);
+      }, evidenceProject.id);
       throw new Error(`MCP invocation blocked (${evidenceId}): ${policy.reason}`);
     }
 
@@ -341,6 +352,7 @@ export class McpHub {
           serverId: server.id,
           provider: server.federatedProof?.provider,
           allowedScopes: server.federatedProof?.allowedScopes,
+          expectedRepository: evidenceProject.repoIdentifier,
           arguments: request.arguments,
         });
       }
@@ -362,7 +374,7 @@ export class McpHub {
         responseSummary: summarizeResponse(result, federatedProof),
         durationMs,
         estimatedCostUsd: 0,
-      }, projectUuid);
+      }, evidenceProject.id);
 
       return {
         serverId: request.serverId,
@@ -393,7 +405,7 @@ export class McpHub {
         durationMs,
         estimatedCostUsd: 0,
         errorCode: requestHash(message).slice(0, 16),
-      }, projectUuid);
+      }, evidenceProject.id);
       throw error;
     }
   }
