@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { supabase } from "../lib/supabaseClient.js";
 import {
+  assertFederatedProofReceiptMatchesInvocation,
   federatedProofReceiptFromMcpResult,
   summarizeFederatedProofReceipt,
   type FederatedMcpReceiptSummary,
@@ -335,6 +336,14 @@ export class McpHub {
       const client = new McpHttpClient(server, this.env);
       const result = await client.callTool(request.toolName, request.arguments);
       const federatedReceipt = federatedProofReceiptFromMcpResult(result);
+      if (federatedReceipt) {
+        assertFederatedProofReceiptMatchesInvocation(federatedReceipt, {
+          serverId: server.id,
+          provider: server.federatedProof?.provider,
+          allowedScopes: server.federatedProof?.allowedScopes,
+          arguments: request.arguments,
+        });
+      }
       const federatedProof = federatedReceipt
         ? summarizeFederatedProofReceipt(federatedReceipt)
         : undefined;
