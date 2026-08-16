@@ -15,13 +15,17 @@ import { randomUUID } from 'node:crypto';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { executionScopeMatches } from '../../lib/idempotencyScope.js';
-import { GitHubProvider } from '../../providers/GitHubProvider.js';
+import {
+  providerConfigurationError,
+  providerForProject,
+  type ProviderProjectConfig,
+} from '../../providers/providerFactory.js';
 import { enqueueReconcile } from '../../events/outbox.js';
 import { ProofGateController } from '../../controllers/ProofGateController.js';
 import type { ProofEvidence } from '../../proof-gate/index.js';
 import type { EvidenceKind } from '../../reconciliation/types.js';
 import { WEBHOOK_ONLY_EVIDENCE_KINDS } from '../../reconciliation/types.js';
-import type { PatchFileChange } from '../../providers/RepositoryProvider.js';
+import type { PatchFileChange, RepositoryProvider } from '../../providers/RepositoryProvider.js';
 
 /** Mission states in which the branch is still under active work — safe to patch. */
 const PATCHABLE_MISSION_STATUSES = new Set(['sandboxed', 'in_review']);
@@ -45,8 +49,36 @@ interface ExecutionRecord {
   success: boolean | null;
 }
 
+interface RepositoryProjectRow {
+  slug: string;
+  repo_provider: string;
+  repo_identifier: string | null;
+}
+
 export const approvalsRouter = Router();
 approvalsRouter.use(requireFounder);
+
+function configuredRepositoryProvider(
+  project: RepositoryProjectRow,
+): { provider: RepositoryProvider; config: ProviderProjectConfig } | { error: string } {
+  if (!project.repo_identifier) {
+    return { error: `Repository identifier is missing for project "${project.slug}"` };
+  }
+
+  const config: ProviderProjectConfig = {
+    repo_provider: project.repo_provider,
+    slug: project.slug,
+    repo_identifier: project.repo_identifier,
+  };
+  const configError = providerConfigurationError(config);
+  if (configError) return { error: configError };
+
+  try {
+    return { provider: providerForProject(config), config };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+}
 
 function validateEvidence(body: unknown): { ok: true; evidence: ProofEvidence } | { ok: false; error: string } {
   if (!body || typeof body !== 'object') {
@@ -221,15 +253,17 @@ approvalsRouter.post(
           .eq('id', mission.project_id as string)
           .maybeSingle();
 
-        const token = process.env['GITHUB_TOKEN'];
-        if (project?.repo_identifier && token && project.repo_provider === 'github') {
-          const provider = new GitHubProvider({
-            token,
-            projectMap: { [project.slug]: project.repo_identifier },
-            baseUrl: process.env['GITHUB_API_BASE_URL'],
-          });
+        if (project?.repo_identifier) {
+          const configured = configuredRepositoryProvider(project as RepositoryProjectRow);
+          if ('error' in configured) {
+            return res.status(502).json({
+              ok: false,
+              error: 'Proof passed but the repository provider is unavailable — approval not persisted.',
+              detail: configured.error,
+            });
+          }
           try {
-            expectedHeadSha = await provider.resolveRef(project.slug, mission.branch_ref);
+            expectedHeadSha = await configured.provider.resolveRef(project.slug, mission.branch_ref);
           } catch (err) {
             return res.status(502).json({
               ok: false,
@@ -369,21 +403,15 @@ approvalsRouter.post(
       return res.status(500).json({ error: 'Project repository configuration not found.' });
     }
 
-    const token = process.env['GITHUB_TOKEN'];
-    const provider = token && project.repo_provider === 'github' && project.repo_identifier
-      ? new GitHubProvider({
-          token,
-          projectMap: { [project.slug]: project.repo_identifier },
-          baseUrl: process.env['GITHUB_API_BASE_URL'],
-        })
-      : null;
-
-    if (!provider) {
+    const configured = configuredRepositoryProvider(project as RepositoryProjectRow);
+    if ('error' in configured) {
       return res.status(503).json({
         error: 'Repository provider is not configured.',
         code: 'REPOSITORY_PROVIDER_UNAVAILABLE',
+        detail: configured.error,
       });
     }
+    const provider = configured.provider;
 
     // Reserve before external mutation. The unique idempotency key is the final
     // race barrier if two requests pass the preceding lookup concurrently.
@@ -647,21 +675,15 @@ approvalsRouter.post(
       return res.status(500).json({ error: 'Project repository configuration not found.' });
     }
 
-    const token = process.env['GITHUB_TOKEN'];
-    const provider = token && project.repo_provider === 'github' && project.repo_identifier
-      ? new GitHubProvider({
-          token,
-          projectMap: { [project.slug]: project.repo_identifier },
-          baseUrl: process.env['GITHUB_API_BASE_URL'],
-        })
-      : null;
-
-    if (!provider) {
+    const configured = configuredRepositoryProvider(project as RepositoryProjectRow);
+    if ('error' in configured) {
       return res.status(503).json({
         error: 'Repository provider is not configured.',
         code: 'REPOSITORY_PROVIDER_UNAVAILABLE',
+        detail: configured.error,
       });
     }
+    const provider = configured.provider;
 
     let commitSha: string;
     try {
