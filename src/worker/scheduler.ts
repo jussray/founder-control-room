@@ -23,6 +23,34 @@ const NORMAL_RESYNC_INTERVAL_MS = 15 * 60 * 1_000;  // 15 minutes
 const DEEP_AUDIT_INTERVAL_MS = 24 * 60 * 60 * 1_000; // 24 hours
 const RECONCILER_POLL_MS = 2_000; // outbox poll every 2s
 
+async function enqueueStripeSyncWitness(): Promise<void> {
+  const { data: project, error } = await supabase
+    .from('projects')
+    .select('id')
+    .eq('slug', 'founder-control-room')
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (error) {
+    console.error(JSON.stringify({
+      ts: new Date().toISOString(),
+      scheduler: 'stripe_sync_witness',
+      level: 'error',
+      message: error.message,
+    }));
+    return;
+  }
+
+  if (!project) return;
+
+  await enqueueReconcile({
+    projectId: project.id,
+    controller: 'StripeSyncWitnessController',
+    resourceId: 'latest_full_sync_run',
+    reason: 'periodic_resync',
+  });
+}
+
 async function enqueueActiveMissionResync(): Promise<void> {
   const { data: projects } = await supabase
     .from('projects')
@@ -84,6 +112,8 @@ async function enqueueDeepAudit(): Promise<void> {
     });
   }
 
+  await enqueueStripeSyncWitness();
+
   console.log(JSON.stringify({
     ts: new Date().toISOString(),
     scheduler: 'deep_audit',
@@ -101,6 +131,7 @@ export async function triggerImmediateResync(projectId?: string): Promise<void> 
     });
   } else {
     await enqueueNormalProjectResync();
+    await enqueueStripeSyncWitness();
   }
 }
 
