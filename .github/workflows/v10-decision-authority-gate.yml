@@ -5,12 +5,16 @@ on:
     paths:
       - "src/lib/v10DecisionAuthorityGate.ts"
       - "src/lib/__tests__/v10DecisionAuthorityGate.test.ts"
+      - "src/lib/__tests__/v10DecisionAuthorityGate.conformance.test.ts"
+      - "testdata/v10-decision-cycle-conformance.json"
       - ".github/workflows/v10-decision-authority-gate.yml"
   push:
     branches: [main]
     paths:
       - "src/lib/v10DecisionAuthorityGate.ts"
       - "src/lib/__tests__/v10DecisionAuthorityGate.test.ts"
+      - "src/lib/__tests__/v10DecisionAuthorityGate.conformance.test.ts"
+      - "testdata/v10-decision-cycle-conformance.json"
       - ".github/workflows/v10-decision-authority-gate.yml"
   workflow_dispatch:
 
@@ -49,5 +53,5 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Verify decision authority gate
-        run: npx vitest run src/lib/__tests__/v10DecisionAuthorityGate.test.ts
+      - name: Verify decision authority gate and cross-repo identity
+        run: npx vitest run src/lib/__tests__/v10DecisionAuthorityGate.test.ts src/lib/__tests__/v10DecisionAuthorityGate.conformance.test.ts
