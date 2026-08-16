@@ -44,11 +44,14 @@ Secrets marked required cause the named workflow job to fail if absent.
 
 | Secret | Required by | Description |
 |---|---|---|
-| `CLOUDFLARE_API_TOKEN` | `deploy.yml / worker-deploy` | Wrangler deploy token with `Workers Scripts:Edit` on the target account. |
+| `CLOUDFLARE_API_TOKEN` | canonical `founder-control-room` deploy and reconcile workflows | Canonical Worker mutation credential with only the permissions required for the `founder-control-room` Worker. Do not reuse it for the review-email Worker or read-only Builds inspection. |
+| `CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN` | `review-email-worker-reconcile.yml` | Dedicated mutation credential for `founder-control-room-review-email`. Keep separate from the canonical Worker deploy token. |
 | `CLOUDFLARE_BUILDS_API_TOKEN` | manual build diagnostics | User-scoped read credential for Cloudflare Builds diagnostics. Keep separate from deploy tokens. |
 | `CLOUDFLARE_ACCOUNT_ID` | deploy and diagnostic workflows | Cloudflare account ID. |
 | `CF_SESSIONS_KV_NAMESPACE_ID` | Worker deployment where enabled | KV namespace identifier for sessions. |
 | `CF_FEATURE_FLAGS_KV_NAMESPACE_ID` | Worker deployment where enabled | KV namespace identifier for feature flags. |
+
+The authority boundary is **provider + environment + operation class**, not one token per script. Canonical Worker deploy and canonical Worker reconciliation may share the same production mutation credential because they operate on the same authority surface. The review-email Worker and read-only Builds observer use separate credentials.
 
 ---
 
@@ -150,7 +153,9 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] GITHUB_WEBHOOK_SECRET
 [ ] GITHUB_APP_ID
 [ ] GITHUB_PRIVATE_KEY
-[ ] CLOUDFLARE_API_TOKEN
+[ ] CLOUDFLARE_API_TOKEN for canonical founder-control-room mutation only
+[ ] CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN for founder-control-room-review-email only
+[ ] CLOUDFLARE_BUILDS_API_TOKEN for read-only Builds inspection
 [ ] CLOUDFLARE_ACCOUNT_ID
 [ ] DEPLOY_URL=https://api.foundercontrolroom.org
 [ ] FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
