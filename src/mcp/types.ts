@@ -5,6 +5,7 @@ export type McpRisk =
   | "external_side_effect";
 
 export type McpPolicyDecision = "allow" | "deny" | "requires_approval";
+export type McpEndpointAuthority = "environment" | "connection-vault";
 
 export interface McpFederatedProofPolicy {
   provider: string;
@@ -16,6 +17,7 @@ export interface McpServerDefinition {
   label: string;
   role: string;
   endpointEnv: string;
+  endpointAuthority?: McpEndpointAuthority;
   authTokenEnv?: string;
   enabledProjects: readonly string[];
   allowedToolPatterns: readonly string[];

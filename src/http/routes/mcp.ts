@@ -2,10 +2,11 @@ import { Router } from "express";
 import { requireFounder, type FounderRequest } from "../middleware/requireFounder.js";
 import { McpHub, advertisedToolNames } from "../../mcp/hub.js";
 import type { McpInvocationRequest } from "../../mcp/types.js";
+import { hubForMcpProject } from "../../mcp/vaultHub.js";
 import { connectionVaultRouter } from "./connectionVault.js";
 
 export const mcpRouter = Router();
-const hub = new McpHub();
+const registryHub = new McpHub();
 
 function projectIdFrom(value: unknown): string {
   if (typeof value !== "string" || !value.trim()) {
@@ -41,7 +42,7 @@ function invocationFromRequest(
 mcpRouter.use("/vault", connectionVaultRouter);
 
 mcpRouter.get("/servers", requireFounder, (_req, res) => {
-  return res.json({ servers: hub.listServers() });
+  return res.json({ servers: registryHub.listServers() });
 });
 
 mcpRouter.get(
@@ -50,6 +51,7 @@ mcpRouter.get(
   async (req: FounderRequest, res) => {
     try {
       const projectId = projectIdFrom(req.query.projectId);
+      const hub = await hubForMcpProject(req.params.serverId, projectId);
       const snapshot = await hub.discoverCapabilities(req.params.serverId, projectId);
       return res.json({
         serverId: snapshot.serverId,
@@ -75,6 +77,7 @@ mcpRouter.post(
         req.params.serverId,
         req.params.toolName,
       );
+      const hub = await hubForMcpProject(request.serverId, request.projectId);
       return res.json(await hub.preview(request));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -93,6 +96,7 @@ mcpRouter.post(
         req.params.serverId,
         req.params.toolName,
       );
+      const hub = await hubForMcpProject(request.serverId, request.projectId);
       return res.json(await hub.invoke(request));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

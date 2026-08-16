@@ -5,8 +5,8 @@ const ALL_ACTIVE_PROJECTS = [...ACTIVE_PROJECT_SLUGS];
 
 /**
  * Phase 1 is deliberately read-only. A server is unavailable until its URL is
- * supplied locally through the declared environment variable. Tokens are never
- * stored in this registry or returned by the API.
+ * supplied through its declared authority boundary. Tokens are never stored in
+ * this registry or returned by the API.
  */
 export const DEFAULT_MCP_SERVERS: readonly McpServerDefinition[] = [
   {
@@ -59,6 +59,7 @@ export const DEFAULT_MCP_SERVERS: readonly McpServerDefinition[] = [
     label: "ProofMode MCP",
     role: "federated-repository-evidence",
     endpointEnv: "MCP_PROOFMODE_URL",
+    endpointAuthority: "connection-vault",
     enabledProjects: ALL_ACTIVE_PROJECTS,
     allowedToolPatterns: ["audit_repository"],
     deniedToolPatterns: [
