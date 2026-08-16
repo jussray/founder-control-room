@@ -42,7 +42,7 @@ function buildReceipt(overrides: Partial<V10DecisionReceipt> = {}): V10DecisionR
         : [],
     })),
     dissent: ['Redteam requires proof before authority resolution.'],
-    candidateOptions: ['Keep handoffs informal.', 'Bind the decision with one portable hash.'],
+    candidateOptions: ['Bind the decision with one portable hash.', 'Keep handoffs informal.'],
     recommendation: 'Use one proposal-only decision receipt across the three peer systems.',
     authorityCeiling: 'reason',
     proofRequirements: ['exact-head CI', 'independent FCR read-back'],
