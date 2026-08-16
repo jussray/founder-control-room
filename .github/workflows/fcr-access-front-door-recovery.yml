@@ -1,46 +1,43 @@
 name: FCR Access Front Door Recovery
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'scripts/reconcile-cloudflare-access-public-zone.mjs'
-      - 'scripts/reconcile-cloudflare-access-public-zone.node-test.mjs'
-      - '.github/workflows/fcr-access-front-door-recovery.yml'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Apply the bounded foundercontrolroom.org Access exemption after inspection'
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+  EXPECTED_HEAD_SHA: ${{ github.sha }}
   CLOUDFLARE_ACCOUNT_ID: '9b59861bd1747cf7525571b4c51d2aa0'
 
 jobs:
   recover:
-    name: Restore FCR application-owned auth front door
-    if: >-
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.head.ref == 'fix/domain-runtime-authority' &&
-      github.event.pull_request.user.login == 'jussray'
+    name: Inspect or restore FCR application-owned auth front door
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
-      - name: Check out exact repair head
+      - name: Check out exact selected revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           persist-credentials: false
           fetch-depth: 1
 
-      - name: Verify exact repair head
+      - name: Verify exact selected revision
         shell: bash
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
           test "$actual" = "$EXPECTED_HEAD_SHA"
-          printf 'Verified FCR Access recovery head: %s\n' "$actual"
+          printf 'Verified FCR Access recovery revision: %s\n' "$actual"
 
       - name: Set up Node 24
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -62,20 +59,23 @@ jobs:
         run: node scripts/reconcile-cloudflare-access-public-zone.mjs
 
       - name: Apply one-zone Access exemption
+        if: inputs.apply == true
         env:
           CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: node scripts/reconcile-cloudflare-access-public-zone.mjs --apply
 
-      - name: Install Chromium
+      - name: Install Chromium for post-apply proof
+        if: inputs.apply == true
         run: npx playwright install --with-deps chromium
 
       - name: Verify recovered front door with Playwright
+        if: inputs.apply == true
         run: npx playwright test -c playwright.domain.config.ts
 
       - name: Upload recovery browser artifacts
-        if: always()
+        if: always() && inputs.apply == true
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: fcr-access-front-door-recovery-${{ env.EXPECTED_HEAD_SHA }}
