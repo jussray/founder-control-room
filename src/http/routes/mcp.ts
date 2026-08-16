@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireFounder, type FounderRequest } from "../middleware/requireFounder.js";
 import { McpHub, advertisedToolNames } from "../../mcp/hub.js";
 import type { McpInvocationRequest } from "../../mcp/types.js";
+import { connectionVaultRouter } from "./connectionVault.js";
 
 export const mcpRouter = Router();
 const hub = new McpHub();
@@ -33,6 +34,11 @@ function invocationFromRequest(
     approvalId: typeof body.approvalId === "string" ? body.approvalId : undefined,
   };
 }
+
+// Connection Vault is part of the MCP/connection authority surface. Its
+// workflow-facing resolver uses short-lived hashed FCR bearer tokens; founder
+// administration routes remain protected by requireFounder inside the router.
+mcpRouter.use("/vault", connectionVaultRouter);
 
 mcpRouter.get("/servers", requireFounder, (_req, res) => {
   return res.json({ servers: hub.listServers() });
