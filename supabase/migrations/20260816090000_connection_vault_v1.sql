@@ -25,7 +25,8 @@ create table if not exists connection_vault_bindings (
     (
       kind = 'secret'
       and secret_ref is not null
-      and secret_ref ~ '^[A-Za-z][A-Za-z0-9+.-]*://[^[:space:]]{3,1024}$'
+      and length(secret_ref) between 6 and 2048
+      and secret_ref ~ '^[A-Za-z][A-Za-z0-9+.-]*://[^[:space:]]+$'
       and variable_value is null
     )
     or
