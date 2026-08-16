@@ -83,6 +83,10 @@ export const DEFAULT_MCP_SERVERS: readonly McpServerDefinition[] = [
     ],
     defaultRisk: "read",
     monthlyBudgetUsd: 0,
+    federatedProof: {
+      provider: "github",
+      allowedScopes: ["repository"],
+    },
   },
   {
     id: "exa",
