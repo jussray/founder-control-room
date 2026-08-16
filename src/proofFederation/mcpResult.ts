@@ -28,6 +28,7 @@ export interface FederatedReceiptInvocationPolicy {
   serverId: string;
   provider?: string;
   allowedScopes?: readonly string[];
+  expectedRepository?: string;
   arguments: Record<string, unknown>;
 }
 
@@ -91,12 +92,20 @@ export function assertFederatedProofReceiptMatchesInvocation(
     if (!requested) {
       throw new FederatedProofContractError('repository_receipt_target_unbound');
     }
+    if (!policy.expectedRepository?.trim()) {
+      throw new FederatedProofContractError('project_repository_unbound');
+    }
+    const expected = canonicalRepository(policy.expectedRepository);
+    if (requested !== expected) {
+      throw new FederatedProofContractError('requested_repository_project_mismatch');
+    }
+
     const declaredRepository = receipt.exactTarget.repository;
     if (!declaredRepository) {
       throw new FederatedProofContractError('repository_receipt_target_missing');
     }
     const targets = [receipt.project, receipt.authority.target, declaredRepository].map(canonicalRepository);
-    if (targets.some((target) => target !== requested)) {
+    if (targets.some((target) => target !== expected)) {
       throw new FederatedProofContractError('repository_receipt_target_mismatch');
     }
   }
