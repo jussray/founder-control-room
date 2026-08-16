@@ -9,6 +9,10 @@ const reconcileWorkflow = readFileSync(
   new URL('../../../.github/workflows/worker-reconcile.yml', import.meta.url),
   'utf8',
 );
+const reviewEmailReconcileWorkflow = readFileSync(
+  new URL('../../../.github/workflows/review-email-worker-reconcile.yml', import.meta.url),
+  'utf8',
+);
 const workerConfig = readFileSync(
   new URL('../../../wrangler.worker.toml', import.meta.url),
   'utf8',
@@ -35,7 +39,7 @@ describe('Founder deploy command authority contract', () => {
     expect(commandWorkflow).toContain('test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"');
   });
 
-  it('delegates only to the bounded Worker reconciliation workflow', () => {
+  it('delegates the canonical command only to the bounded Worker reconciliation workflow', () => {
     expect(commandWorkflow).toContain('actions: write');
     expect(commandWorkflow).toContain('/actions/workflows/worker-reconcile.yml/dispatches');
     expect(commandWorkflow).toContain('expected_head_sha: $sha');
@@ -47,6 +51,38 @@ describe('Founder deploy command authority contract', () => {
     expect(commandWorkflow).not.toContain('CLOUDFLARE_API_TOKEN');
     expect(commandWorkflow).not.toContain('CLOUDFLARE_ACCOUNT_ID');
     expect(commandWorkflow).not.toContain('secrets.');
+  });
+
+  it('accepts a separate founder-only review-email command only on issue 395', () => {
+    expect(commandWorkflow).toContain("github.event.issue.number == 395");
+    expect(commandWorkflow).toContain("github.event.comment.user.login == 'jussray'");
+    expect(commandWorkflow).toContain("startsWith(github.event.comment.body, '/deploy-fcr-review-email ')");
+    expect(commandWorkflow).toContain(
+      'Expected exactly: /deploy-fcr-review-email <40-char-main-sha> <approval-reference>',
+    );
+    expect(commandWorkflow).toContain('/actions/workflows/review-email-worker-reconcile.yml/dispatches');
+    expect(commandWorkflow).toContain(
+      'Deploy privately bound founder-control-room-review-email Worker for issue #395',
+    );
+  });
+
+  it('keeps the review-email dispatch bridge provider-blind and targets only its bounded reconcile', () => {
+    expect(commandWorkflow).not.toContain('wrangler deploy');
+    expect(commandWorkflow).not.toContain('supabase db push');
+    expect(commandWorkflow).not.toContain('CLOUDFLARE_API_TOKEN');
+    expect(commandWorkflow).not.toContain('CLOUDFLARE_ACCOUNT_ID');
+    expect(commandWorkflow).not.toContain('secrets.');
+
+    expect(reviewEmailReconcileWorkflow).toContain('workflow_dispatch:');
+    expect(reviewEmailReconcileWorkflow).toContain('environment: production');
+    expect(reviewEmailReconcileWorkflow).toContain('test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"');
+    expect(reviewEmailReconcileWorkflow).toContain('wrangler deploy --config wrangler.email.toml');
+    expect(reviewEmailReconcileWorkflow).toContain("'FOUNDER_CONTROL_ROOM_API (founder-control-room)'");
+    expect(reviewEmailReconcileWorkflow).not.toContain('wrangler deploy --config wrangler.worker.toml');
+    expect(reviewEmailReconcileWorkflow).not.toContain('wrangler deploy --config wrangler.deletion-queue.toml');
+    expect(reviewEmailReconcileWorkflow).not.toContain('supabase db push');
+    expect(reviewEmailReconcileWorkflow).not.toContain('/access/apps');
+    expect(reviewEmailReconcileWorkflow).toContain('runtime_email_invocation_proven: false');
   });
 
   it('keeps the reconciliation target exact-head, Worker-only, and non-publishing', () => {
