@@ -5,6 +5,7 @@ import { authRouter } from './routes/auth.js';
 import { onboardingRouter } from './routes/onboarding.js';
 import { founderOnboardingRouter } from './routes/founderOnboarding.js';
 import { projectsRouter } from './routes/projects.js';
+import { buildEventsRouter } from './routes/buildEvents.js';
 import { approvalsRouter } from './routes/approvals.js';
 import { l99Router } from './routes/l99.js';
 import { terminalRouter } from './routes/terminal.js';
@@ -241,6 +242,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/portfolio', portfolioVerificationRouter);
   app.use('/switchboard', switchboardRouter);
   app.use('/projects', repositoryVerificationRouter);
+  app.use('/projects', buildEventsRouter);
   app.use('/projects', requireProjectReadAudit, projectsRouter);
   // Privileged mission execution still uses the existing approvals router, but
   // it must now pass founder authentication + founder master switch + V10
