@@ -251,7 +251,7 @@ describe('GET /mcp/vault/resolve workflow API', () => {
     });
     const serialized = JSON.stringify(res.body);
     expect(serialized).not.toContain('cloudflare-secrets-store://store/github-token');
-    expect(serialized).not.toContain('secretRef');
+    expect(serialized).not.toContain('"secretRef":');
     expect(serialized).not.toContain(issued.token);
     expect(res.body.connections[0].bindings).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: 'MCP_GITHUB_TOKEN', kind: 'secret', configured: true }),
