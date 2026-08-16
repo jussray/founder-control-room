@@ -3,6 +3,7 @@ import {
   CONNECTION_VAULT_CONTRACT,
   hashFcrApiToken,
   issueFcrApiToken,
+  normalizeSecretReference,
   normalizeTokenScopes,
   parseVaultEnvironment,
 } from '../../connectionVault/tokens.js';
@@ -139,9 +140,10 @@ function scopeAllows(scopes: string[], required: string): boolean {
   return scopes.includes(`${namespace}:*`);
 }
 
-// Workflow-facing API. This endpoint intentionally returns only connection
-// metadata, non-secret variables, and "configured" status for secrets. Raw
-// provider credentials and secret references never cross this boundary.
+// Workflow-facing API. This endpoint intentionally returns only allowlisted
+// connection metadata, non-secret variables, and configured-state for secrets.
+// Raw provider credentials, secret references, and provider config never cross
+// this boundary.
 connectionVaultRouter.get('/resolve', async (req, res) => {
   try {
     const token = await activeToken(req);
@@ -171,7 +173,7 @@ connectionVaultRouter.get('/resolve', async (req, res) => {
 
     const { data: connectionRows, error: connectionError } = await supabase
       .from('project_connections')
-      .select('id, connection_type, label, status, authority_level, capabilities, data_boundary, required_approval, config')
+      .select('id, connection_type, label, status, authority_level, capabilities, data_boundary, required_approval')
       .eq('project_id', projectId)
       .eq('status', 'active')
       .contains('capabilities', [capability]);
@@ -201,7 +203,6 @@ connectionVaultRouter.get('/resolve', async (req, res) => {
       capabilities: textArray(connection.capabilities),
       dataBoundary: text(connection.data_boundary),
       requiredApproval: text(connection.required_approval),
-      config: record(connection.config) ?? {},
       bindings: publicBindings.filter((binding) => binding.connectionId === text(connection.id)),
     }));
 
@@ -224,6 +225,7 @@ connectionVaultRouter.get('/resolve', async (req, res) => {
       credentialBoundary: {
         rawCredentialsReturned: false,
         secretReferencesReturned: false,
+        providerConfigReturned: false,
         secretResolution: 'fcr-internal-only',
       },
       connections: resolved,
@@ -272,7 +274,7 @@ connectionVaultRouter.post('/bindings', async (req: FounderRequest, res) => {
     const name = text(body.name);
     const kind = text(body.kind);
     const storageProvider = text(body.storageProvider);
-    const secretRef = text(body.secretRef);
+    const secretRefInput = text(body.secretRef);
     const variableValue = typeof body.variableValue === 'string' ? body.variableValue : null;
     if (!projectSlug || !connectionId || !name || !kind || !storageProvider) {
       return res.status(400).json({ error: 'projectSlug, connectionId, name, kind, and storageProvider are required' });
@@ -280,15 +282,16 @@ connectionVaultRouter.post('/bindings', async (req: FounderRequest, res) => {
     if (!ENV_NAME.test(name)) return res.status(400).json({ error: 'name must use ENV_VARIABLE_STYLE' });
     const environment = parseVaultEnvironment(body.environment);
     if (kind !== 'secret' && kind !== 'variable') return res.status(400).json({ error: 'kind must be secret or variable' });
-    if (kind === 'secret' && (!secretRef || variableValue !== null)) {
+    if (kind === 'secret' && (!secretRefInput || variableValue !== null)) {
       return res.status(400).json({ error: 'secret bindings require secretRef and never accept variableValue' });
     }
-    if (kind === 'variable' && (variableValue === null || secretRef)) {
+    if (kind === 'variable' && (variableValue === null || secretRefInput)) {
       return res.status(400).json({ error: 'variable bindings require variableValue and must not include secretRef' });
     }
     if (/(TOKEN|SECRET|PASSWORD|PRIVATE_KEY|SERVICE_ROLE|API_KEY)/i.test(name) && kind !== 'secret') {
       return res.status(400).json({ error: 'secret-like environment names must use kind=secret' });
     }
+    const secretRef = kind === 'secret' ? normalizeSecretReference(secretRefInput) : null;
 
     const project = await projectBySlug(projectSlug);
     if (!project) return res.status(404).json({ error: 'project_not_registered' });
@@ -305,7 +308,7 @@ connectionVaultRouter.post('/bindings', async (req: FounderRequest, res) => {
         name,
         kind,
         storage_provider: storageProvider,
-        secret_ref: kind === 'secret' ? secretRef : null,
+        secret_ref: secretRef,
         variable_value: kind === 'variable' ? variableValue : null,
         status: 'active',
         created_by: req.founder?.email ?? 'founder',
