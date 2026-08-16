@@ -5,7 +5,12 @@ const MAX_RAW_BYTES = 128 * 1024;
 const MIN_INGRESS_SECRET_LENGTH = 32;
 const APPROVED_INGEST_URL = 'https://api.foundercontrolroom.org/ingest/founder-review-email';
 
+interface FounderControlRoomApiBinding {
+  fetch(request: Request): Promise<Response>;
+}
+
 interface FounderSignalReviewEmailEnv {
+  FOUNDER_CONTROL_ROOM_API?: FounderControlRoomApiBinding;
   FOUNDER_REVIEW_FOUNDER_EMAIL?: string;
   FOUNDER_REVIEW_EMAIL_DOMAIN?: string;
   FOUNDER_REVIEW_EMAIL_INGRESS_SECRET?: string;
@@ -36,6 +41,15 @@ function requireStrongSecret(value: string | undefined, name: string): string {
     throw new Error(`weak_${name.toLowerCase()}`);
   }
   return secret;
+}
+
+function requireApiBinding(
+  binding: FounderControlRoomApiBinding | undefined,
+): FounderControlRoomApiBinding {
+  if (!binding || typeof binding.fetch !== 'function') {
+    throw new Error('missing_founder_control_room_api_service_binding');
+  }
+  return binding;
 }
 
 function signEnvelope(timestamp: string, body: string, secret: string): string {
@@ -107,6 +121,7 @@ export async function handleFounderSignalReviewEmail(
     env.FOUNDER_REVIEW_INGEST_URL,
     'FOUNDER_REVIEW_INGEST_URL',
   );
+  const apiBinding = requireApiBinding(env.FOUNDER_CONTROL_ROOM_API);
 
   if (ingestUrl !== APPROVED_INGEST_URL) {
     throw new Error('unapproved_review_ingest_url');
@@ -127,7 +142,7 @@ export async function handleFounderSignalReviewEmail(
   const body = JSON.stringify(receipt);
   const timestamp = String(Date.now());
   const signature = signEnvelope(timestamp, body, secret);
-  const response = await fetch(ingestUrl, {
+  const response = await apiBinding.fetch(new Request(ingestUrl, {
     method: 'POST',
     redirect: 'error',
     headers: {
@@ -137,7 +152,7 @@ export async function handleFounderSignalReviewEmail(
       'x-founder-review-signature': signature,
     },
     body,
-  });
+  }));
 
   if (!response.ok) {
     throw new Error(`review_ingest_failed_${response.status}`);

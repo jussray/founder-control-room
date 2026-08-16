@@ -15,6 +15,8 @@ const env = {
     'https://api.foundercontrolroom.org/ingest/founder-review-email',
 };
 
+type ApiFetch = (request: Request) => Promise<Response>;
+
 function rawMessage(command = 'cancel all') {
   return new TextEncoder().encode([
     'From: Juss Ray <juss@example.com>',
@@ -47,28 +49,44 @@ function fakeMessage(overrides: Partial<{ from: string; to: string; rawSize: num
   };
 }
 
+function apiFetchMock() {
+  return vi.fn<ApiFetch>();
+}
+
+function withApiBinding(fetchMock: ApiFetch) {
+  return {
+    ...env,
+    FOUNDER_CONTROL_ROOM_API: {
+      fetch: fetchMock,
+    },
+  };
+}
+
 describe('Founder Signal review email Worker', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
-  it('posts one signed sanitized unresolved receipt with hashed review capability', async () => {
+  it('posts one signed sanitized unresolved receipt through the private API service binding', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(1_775_165_100_000);
-    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 201 }));
-    vi.stubGlobal('fetch', fetchMock);
+    const bindingFetch = apiFetchMock().mockResolvedValue(new Response('{}', { status: 201 }));
+    const publicFetch = vi.fn();
+    vi.stubGlobal('fetch', publicFetch);
     const message = fakeMessage();
 
-    await handleFounderSignalReviewEmail(message, env);
+    await handleFounderSignalReviewEmail(message, withApiBinding(bindingFetch));
 
     expect(message.setReject).not.toHaveBeenCalled();
-    expect(fetchMock).toHaveBeenCalledOnce();
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe(env.FOUNDER_REVIEW_INGEST_URL);
-    expect(init.method).toBe('POST');
-    expect(init.redirect).toBe('error');
+    expect(bindingFetch).toHaveBeenCalledOnce();
+    expect(publicFetch).not.toHaveBeenCalled();
 
-    const body = String(init.body);
+    const [request] = bindingFetch.mock.calls[0];
+    expect(request.url).toBe(env.FOUNDER_REVIEW_INGEST_URL);
+    expect(request.method).toBe('POST');
+    expect(request.redirect).toBe('error');
+
+    const body = await request.clone().text();
     const parsed = JSON.parse(body) as Record<string, unknown>;
     expect(parsed).toMatchObject({
       replyContextId: contextId,
@@ -87,69 +105,78 @@ describe('Founder Signal review email Worker', () => {
     expect(body).not.toContain(replyAddress);
     expect(body).not.toContain(reviewToken);
 
-    const headers = init.headers as Record<string, string>;
-    const timestamp = headers['x-founder-review-timestamp'];
+    const timestamp = request.headers.get('x-founder-review-timestamp');
+    expect(timestamp).not.toBeNull();
     const expectedSignature = createHmac(
       'sha256',
       env.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET,
     )
-      .update(timestamp, 'utf8')
+      .update(timestamp!, 'utf8')
       .update('.', 'utf8')
       .update(body, 'utf8')
       .digest('hex');
-    expect(headers['x-founder-review-signature']).toBe(expectedSignature);
+    expect(request.headers.get('x-founder-review-signature')).toBe(expectedSignature);
   });
 
   it('rejects unauthorized or malformed mail without calling the backend', async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
+    const bindingFetch = apiFetchMock();
     const message = fakeMessage({ from: 'attacker@example.com' });
 
-    await handleFounderSignalReviewEmail(message, env);
+    await handleFounderSignalReviewEmail(message, withApiBinding(bindingFetch));
 
     expect(message.setReject).toHaveBeenCalledWith('Review command rejected');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(bindingFetch).not.toHaveBeenCalled();
   });
 
   it('rejects declared-size mismatches before MIME parsing', async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
+    const bindingFetch = apiFetchMock();
     const message = fakeMessage({ rawSize: 1 });
 
-    await handleFounderSignalReviewEmail(message, env);
+    await handleFounderSignalReviewEmail(message, withApiBinding(bindingFetch));
 
     expect(message.setReject).toHaveBeenCalledWith('Review command rejected');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(bindingFetch).not.toHaveBeenCalled();
   });
 
   it('rejects a weak shared ingress secret before reading mail', async () => {
-    vi.stubGlobal('fetch', vi.fn());
     const message = fakeMessage();
 
     await expect(handleFounderSignalReviewEmail(message, {
-      ...env,
+      ...withApiBinding(apiFetchMock()),
       FOUNDER_REVIEW_EMAIL_INGRESS_SECRET: 'too-short',
     })).rejects.toThrow('weak_founder_review_email_ingress_secret');
   });
 
-  it('throws on backend failure so valid founder mail is not silently lost', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 503 }));
-    vi.stubGlobal('fetch', fetchMock);
+  it('fails closed when the private API service binding is missing', async () => {
+    const publicFetch = vi.fn();
+    vi.stubGlobal('fetch', publicFetch);
     const message = fakeMessage();
 
     await expect(handleFounderSignalReviewEmail(message, env)).rejects.toThrow(
-      'review_ingest_failed_503',
+      'missing_founder_control_room_api_service_binding',
     );
+    expect(publicFetch).not.toHaveBeenCalled();
+  });
+
+  it('throws on backend failure so valid founder mail is not silently lost', async () => {
+    const bindingFetch = apiFetchMock().mockResolvedValue(new Response('{}', { status: 503 }));
+    const message = fakeMessage();
+
+    await expect(handleFounderSignalReviewEmail(
+      message,
+      withApiBinding(bindingFetch),
+    )).rejects.toThrow('review_ingest_failed_503');
     expect(message.setReject).not.toHaveBeenCalled();
   });
 
   it('refuses an alternate ingest destination', async () => {
-    vi.stubGlobal('fetch', vi.fn());
+    const bindingFetch = apiFetchMock();
     const message = fakeMessage();
 
     await expect(handleFounderSignalReviewEmail(message, {
-      ...env,
+      ...withApiBinding(bindingFetch),
       FOUNDER_REVIEW_INGEST_URL: 'https://example.com/ingest',
     })).rejects.toThrow('unapproved_review_ingest_url');
+    expect(bindingFetch).not.toHaveBeenCalled();
   });
 });
