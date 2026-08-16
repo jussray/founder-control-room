@@ -1,0 +1,66 @@
+name: Domain Authority Playwright
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'config/domain-authority.json'
+      - 'domain-e2e/**'
+      - 'playwright.domain.config.ts'
+      - '.github/workflows/domain-authority-playwright.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  verify-public-domains:
+    name: Verify public domain authority
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify exact candidate head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          printf 'Verified domain-authority candidate: %s\n' "$actual"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify live production domains with Playwright
+        run: npx playwright test -c playwright.domain.config.ts
+
+      - name: Upload domain proof artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: domain-authority-playwright-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            test-results/domain-authority/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
