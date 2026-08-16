@@ -1,0 +1,79 @@
+name: Founder Reasoning Receipt Exact-Head
+
+on:
+  pull_request:
+    paths:
+      - 'src/reasoningRuns/**'
+      - 'src/services/reasoningRunStore.ts'
+      - 'src/services/__tests__/reasoningRunStore.test.ts'
+      - 'src/http/routes/reasoningRuns.ts'
+      - 'src/http/routes/__tests__/reasoningRuns.integration.test.ts'
+      - 'src/http/server.ts'
+      - 'scripts/emit-founder-reasoning-artifact.mjs'
+      - '.security/cookies.json'
+      - '.github/workflows/founder-reasoning-receipt-exact-head.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/reasoningRuns/**'
+      - 'src/services/reasoningRunStore.ts'
+      - 'src/services/__tests__/reasoningRunStore.test.ts'
+      - 'src/http/routes/reasoningRuns.ts'
+      - 'src/http/routes/__tests__/reasoningRuns.integration.test.ts'
+      - 'src/http/server.ts'
+      - 'scripts/emit-founder-reasoning-artifact.mjs'
+      - '.security/cookies.json'
+      - '.github/workflows/founder-reasoning-receipt-exact-head.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Verify exact head
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify reasoning receipt, persistence continuity, and founder ingest boundary
+        run: >-
+          npx vitest run
+          src/reasoningRuns/__tests__/reasoningRun.test.ts
+          src/services/__tests__/reasoningRunStore.test.ts
+          src/http/routes/__tests__/reasoningRuns.integration.test.ts
+
+      - name: Verify strict TypeScript
+        run: npm run typecheck
+
+      - name: Verify founder cookie contract
+        run: npm run verify:cookies
+
+      - name: Emit sanitized reasoning implementation artifact
+        run: node scripts/emit-founder-reasoning-artifact.mjs
+
+      - name: Upload exact-head reasoning artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: founder-reasoning-receipt-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/reasoning-runs/founder-reasoning-implementation-proof.json
+          if-no-files-found: error
+          retention-days: 30
