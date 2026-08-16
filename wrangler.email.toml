@@ -1,4 +1,5 @@
 name = "founder-control-room-review-email"
+account_id = "9b59861bd1747cf7525571b4c51d2aa0"
 main = "src/worker/founderSignalReviewEmail.ts"
 compatibility_date = "2025-06-01"
 compatibility_flags = ["nodejs_compat"]
@@ -7,6 +8,13 @@ preview_urls = false
 
 [observability]
 enabled = true
+
+# Keep founder review-email ingestion on Cloudflare's private Worker fabric.
+# The request URL remains the canonical API route for downstream routing, but
+# the transport uses this Service Binding instead of the public Internet.
+[[services]]
+binding = "FOUNDER_CONTROL_ROOM_API"
+service = "founder-control-room"
 
 # Non-secret values only. This Worker receives mail only after a separately
 # approved Cloudflare Email Routing rule is created. This file creates no DNS,
