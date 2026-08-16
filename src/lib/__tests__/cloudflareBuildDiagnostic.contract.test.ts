@@ -27,10 +27,38 @@ describe("Cloudflare build diagnostic authority", () => {
     expect(workflow).not.toContain("secrets.CLOUDFLARE_ACCOUNT_ID");
   });
 
-  it("keeps collecting provider evidence when the public runtime identity is wrong", () => {
+  it("classifies the raw observer token before any provider read", () => {
+    expect(inspector).toContain('const apiToken = process.env.CF_API_TOKEN ?? "";');
+    expect(inspector).toContain("classifyTokenShape(apiToken)");
+    expect(inspector).toContain("tokenPreflightFailure(receipt.providerCredentials.tokenShape)");
+    expect(inspector).toContain('classification: "provider-token-header-unsafe"');
+    expect(inspector).toContain('classification: "provider-token-account-id"');
+    expect(inspector).toContain('classification: "provider-token-type-unsupported"');
+    expect(inspector).toContain('shape.credentialType === "account-token"');
+    expect(inspector).toContain('shape.credentialType === "global-key"');
+    expect(inspector).toContain("hasNonAscii");
+    expect(inspector).toContain("hasLeadingOrTrailingWhitespace");
+    expect(inspector).toContain("matchesAccountId");
+  });
+
+  it("requires active user-token verification before account or build reads", () => {
+    expect(inspector).toContain('verifyToken("/user/tokens/verify")');
+    expect(inspector).toContain('`/accounts/${accountId}/tokens/verify`');
+    expect(inspector).toContain('classification = "user-token-active"');
+    expect(inspector).toContain('classification = "provider-token-invalid"');
+    expect(inspector).toContain("Workers Builds inspection requires a user-scoped token");
+  });
+
+  it("keeps collecting public-runtime evidence independently of provider auth", () => {
     expect(inspector).toContain("const failures = [];");
+    expect(inspector).toContain("PUBLIC_ORIGIN_TRANSPORT_FAILURE");
     expect(inspector).toContain("WRONG_SERVICE_ORIGIN");
     expect(inspector).not.toMatch(/throw new Error\(\s*`WRONG_SERVICE_ORIGIN/);
+  });
+
+  it("only reaches domain, script, build, and log reads after credential verification", () => {
+    expect(inspector).toContain("/workers/domains?hostname=");
+    expect(inspector).toContain("/workers/scripts");
     expect(inspector).toContain("/builds/workers/${worker.tag}/builds");
     expect(inspector).toContain("/builds/builds/${build.build_uuid}/logs");
   });
