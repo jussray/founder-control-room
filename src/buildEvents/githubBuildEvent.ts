@@ -19,7 +19,9 @@ function text(value: unknown): string | undefined {
 
 function sha(value: unknown): string | undefined {
   const candidate = text(value);
-  return candidate && /^[0-9a-f]{40}$/i.test(candidate)
+  return candidate
+    && /^[0-9a-f]{40}$/i.test(candidate)
+    && !/^0{40}$/.test(candidate)
     ? candidate.toLowerCase()
     : undefined;
 }
@@ -110,7 +112,12 @@ export function githubWebhookToBuildEvent(
       category: 'source',
       phase: 'build',
       status: 'completed',
-      repository: { name: repository, branch, commitSha },
+      repository: {
+        name: repository,
+        branch,
+        refKind: 'branch-head',
+        commitSha,
+      },
       evidenceUrls: text(payload.compare) ? [text(payload.compare)!] : [],
     });
   }
@@ -128,7 +135,12 @@ export function githubWebhookToBuildEvent(
       category: 'source',
       phase: 'build',
       status: merged || state === 'closed' ? 'completed' : 'running',
-      repository: { name: repository, branch: headBranch, commitSha: headSha },
+      repository: {
+        name: repository,
+        branch: headBranch,
+        refKind: 'proposal-head',
+        commitSha: headSha,
+      },
       evidenceUrls: text(pullRequest.html_url) ? [text(pullRequest.html_url)!] : [],
     });
   }
@@ -144,7 +156,7 @@ export function githubWebhookToBuildEvent(
       category: 'verification',
       phase: 'verify',
       status,
-      repository: { name: repository, commitSha: headSha },
+      repository: { name: repository, refKind: 'detached', commitSha: headSha },
       verification: { kind: name, status, exactCommitSha: headSha },
       evidenceUrls: text(checkRun.details_url) ? [text(checkRun.details_url)!] : [],
     });
@@ -164,6 +176,7 @@ export function githubWebhookToBuildEvent(
       repository: {
         name: repository,
         ...(text(workflowRun.head_branch) ? { branch: text(workflowRun.head_branch)! } : {}),
+        refKind: 'detached',
         commitSha: headSha,
       },
       verification: { kind: name, status, exactCommitSha: headSha },
@@ -174,14 +187,15 @@ export function githubWebhookToBuildEvent(
   if (eventType === 'deployment') {
     const deployment = asRecord(payload.deployment);
     const commitSha = sha(deployment?.sha);
-    const id = text(deployment?.id) ?? (typeof deployment?.id === 'number' ? String(deployment.id) : undefined);
+    const id = text(deployment?.id)
+      ?? (typeof deployment?.id === 'number' ? String(deployment?.id) : undefined);
     if (!deployment || !commitSha || !id) return null;
 
     return build(deliveryId, occurredAt, {
       category: 'provider',
       phase: 'deploy',
       status: 'completed',
-      repository: { name: repository, commitSha },
+      repository: { name: repository, refKind: 'detached', commitSha },
       provider: {
         name: 'github',
         resource: `deployment:${id}`,
@@ -194,7 +208,8 @@ export function githubWebhookToBuildEvent(
     const deployment = asRecord(payload.deployment);
     const deploymentStatusValue = asRecord(payload.deployment_status);
     const commitSha = sha(deployment?.sha);
-    const id = text(deployment?.id) ?? (typeof deployment?.id === 'number' ? String(deployment.id) : undefined);
+    const id = text(deployment?.id)
+      ?? (typeof deployment?.id === 'number' ? String(deployment?.id) : undefined);
     if (!deployment || !deploymentStatusValue || !commitSha || !id) return null;
     const status = deploymentStatus(deploymentStatusValue.state);
 
@@ -202,7 +217,7 @@ export function githubWebhookToBuildEvent(
       category: 'provider',
       phase: 'deploy',
       status,
-      repository: { name: repository, commitSha },
+      repository: { name: repository, refKind: 'detached', commitSha },
       provider: {
         name: 'github',
         resource: `deployment:${id}`,
