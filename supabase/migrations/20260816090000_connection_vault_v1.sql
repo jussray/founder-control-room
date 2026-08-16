@@ -22,7 +22,12 @@ create table if not exists connection_vault_bindings (
   updated_at timestamptz not null default now(),
   unique (connection_id, environment, name),
   constraint connection_vault_binding_value_shape check (
-    (kind = 'secret' and secret_ref is not null and length(trim(secret_ref)) > 0 and variable_value is null)
+    (
+      kind = 'secret'
+      and secret_ref is not null
+      and secret_ref ~ '^[A-Za-z][A-Za-z0-9+.-]*://[^[:space:]]{3,1024}$'
+      and variable_value is null
+    )
     or
     (kind = 'variable' and variable_value is not null and secret_ref is null)
   )
@@ -31,7 +36,7 @@ create table if not exists connection_vault_bindings (
 comment on table connection_vault_bindings is
   'FCR-owned environment binding metadata. Secret values are never stored here; secret_ref points to provider-held encrypted material.';
 comment on column connection_vault_bindings.secret_ref is
-  'Opaque reference to an external secret-manager entry. Never the secret value itself.';
+  'Opaque URI reference to an external secret-manager entry. Never the secret value itself.';
 comment on column connection_vault_bindings.variable_value is
   'Non-secret environment value. Secret-like values belong in the external secret manager and must use kind=secret.';
 
