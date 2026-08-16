@@ -6,6 +6,7 @@ const OLD_SHA = 'a'.repeat(40);
 const AUDITED_SHA = 'b'.repeat(40);
 const MAIN_SHA = 'c'.repeat(40);
 const INFERRED_SHA = 'd'.repeat(40);
+const PROPOSAL_SHA = 'e'.repeat(40);
 
 function evidence(id: string) {
   return [`test-evidence:${id}`];
@@ -23,7 +24,12 @@ describe('current truth projection', () => {
         truth: 'verified',
         authority: 'observed',
         status: 'completed',
-        repository: { name: 'jussray/Sekret-Bip', branch: 'main', commitSha: OLD_SHA },
+        repository: {
+          name: 'jussray/Sekret-Bip',
+          branch: 'main',
+          refKind: 'branch-head',
+          commitSha: OLD_SHA,
+        },
         evidenceRefs: evidence('old-main'),
       }),
       createBuildEvent({
@@ -47,7 +53,12 @@ describe('current truth projection', () => {
         truth: 'verified',
         authority: 'observed',
         status: 'completed',
-        repository: { name: 'jussray/Sekret-Bip', branch: 'main', commitSha: MAIN_SHA },
+        repository: {
+          name: 'jussray/Sekret-Bip',
+          branch: 'main',
+          refKind: 'branch-head',
+          commitSha: MAIN_SHA,
+        },
         evidenceRefs: evidence('new-main'),
       }),
       createBuildEvent({
@@ -59,7 +70,7 @@ describe('current truth projection', () => {
         truth: 'verified',
         authority: 'observed',
         status: 'passed',
-        repository: { name: 'jussray/Sekret-Bip', commitSha: OLD_SHA },
+        repository: { name: 'jussray/Sekret-Bip', refKind: 'detached', commitSha: OLD_SHA },
         runtime: {
           service: 'sekret-backend',
           environment: 'production',
@@ -77,7 +88,12 @@ describe('current truth projection', () => {
         truth: 'verified',
         authority: 'observed',
         status: 'passed',
-        repository: { name: 'jussray/Sekret-Bip', branch: 'main', commitSha: MAIN_SHA },
+        repository: {
+          name: 'jussray/Sekret-Bip',
+          branch: 'main',
+          refKind: 'detached',
+          commitSha: MAIN_SHA,
+        },
         verification: { kind: 'CI', status: 'passed', exactCommitSha: MAIN_SHA },
         evidenceRefs: evidence('ci'),
       }),
@@ -90,7 +106,29 @@ describe('current truth projection', () => {
         truth: 'inferred',
         authority: 'observed',
         status: 'completed',
-        repository: { name: 'jussray/Sekret-Bip', branch: 'main', commitSha: INFERRED_SHA },
+        repository: {
+          name: 'jussray/Sekret-Bip',
+          branch: 'main',
+          refKind: 'branch-head',
+          commitSha: INFERRED_SHA,
+        },
+      }),
+      createBuildEvent({
+        eventId: 'github:proposal-main',
+        occurredAt: '2026-08-16T01:15:00Z',
+        source: 'github',
+        category: 'source',
+        phase: 'build',
+        truth: 'verified',
+        authority: 'observed',
+        status: 'running',
+        repository: {
+          name: 'jussray/Sekret-Bip',
+          branch: 'main',
+          refKind: 'proposal-head',
+          commitSha: PROPOSAL_SHA,
+        },
+        evidenceRefs: evidence('proposal'),
       }),
     ];
 
@@ -101,7 +139,7 @@ describe('current truth projection', () => {
     expect(snapshot.runtimes['sekret-backend:production']?.value.releaseSha).toBe(OLD_SHA);
     expect(snapshot.verifications.CI?.value.exactCommitSha).toBe(MAIN_SHA);
     expect(snapshot.quality.staleCurrentFacts).toBe(1);
-    expect(snapshot.quality.verifiedEvents).toBe(5);
+    expect(snapshot.quality.verifiedEvents).toBe(6);
     expect(snapshot.quality.inferredEvents).toBe(1);
   });
 
@@ -116,7 +154,12 @@ describe('current truth projection', () => {
         truth: 'verified',
         authority: 'observed',
         status: 'completed',
-        repository: { name: 'jussray/Sekret-Bip', branch: 'main', commitSha: MAIN_SHA },
+        repository: {
+          name: 'jussray/Sekret-Bip',
+          branch: 'main',
+          refKind: 'branch-head',
+          commitSha: MAIN_SHA,
+        },
         evidenceRefs: evidence('main'),
       }),
       createBuildEvent({
@@ -128,7 +171,7 @@ describe('current truth projection', () => {
         truth: 'verified',
         authority: 'observed',
         status: 'passed',
-        repository: { name: 'jussray/Sekret-Bip', commitSha: MAIN_SHA },
+        repository: { name: 'jussray/Sekret-Bip', refKind: 'detached', commitSha: MAIN_SHA },
         provider: { name: 'github', resource: 'deployment:1', environment: 'production' },
         evidenceRefs: evidence('deployment'),
       }),
