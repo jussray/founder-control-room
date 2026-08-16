@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { supabase } from "../lib/supabaseClient.js";
+import {
+  federatedProofReceiptFromMcpResult,
+  summarizeFederatedProofReceipt,
+  type FederatedMcpReceiptSummary,
+} from "../proofFederation/mcpResult.js";
 import { McpHttpClient } from "./client.js";
 import { evaluateMcpPolicy } from "./policy.js";
 import { McpRegistry } from "./registry.js";
@@ -25,11 +30,15 @@ function summarizeRequest(request: McpInvocationRequest): Record<string, unknown
   };
 }
 
-function summarizeResponse(result: unknown): Record<string, unknown> {
+function summarizeResponse(
+  result: unknown,
+  federatedProof?: FederatedMcpReceiptSummary,
+): Record<string, unknown> {
   const serialized = JSON.stringify(result);
   return {
     type: Array.isArray(result) ? "array" : typeof result,
     bytes: Buffer.byteLength(serialized ?? "", "utf8"),
+    ...(federatedProof ? { federatedProof } : {}),
   };
 }
 
@@ -325,6 +334,10 @@ export class McpHub {
 
       const client = new McpHttpClient(server, this.env);
       const result = await client.callTool(request.toolName, request.arguments);
+      const federatedReceipt = federatedProofReceiptFromMcpResult(result);
+      const federatedProof = federatedReceipt
+        ? summarizeFederatedProofReceipt(federatedReceipt)
+        : undefined;
       const durationMs = Date.now() - started;
       const evidenceId = await writeEvidence({
         projectId: request.projectId,
@@ -337,7 +350,7 @@ export class McpHub {
         status: "passed",
         requestHash: hash,
         requestSummary: summarizeRequest(request),
-        responseSummary: summarizeResponse(result),
+        responseSummary: summarizeResponse(result, federatedProof),
         durationMs,
         estimatedCostUsd: 0,
       }, projectUuid);
