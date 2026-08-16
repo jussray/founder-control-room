@@ -38,6 +38,7 @@ buildEventsRouter.get('/:slug/current-truth', async (req, res) => {
 
     return res.status(200).json({
       project: {
+        id: project.id,
         slug: project.slug,
         name: project.name,
         repository: project.repo_identifier ?? null,
