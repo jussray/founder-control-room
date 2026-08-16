@@ -114,6 +114,21 @@ const EXACT_SHA = /^[0-9a-f]{40}$/i;
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const EVENT_ID = /^[A-Za-z0-9._:@/-]{1,200}$/;
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/g;
+const SOURCES: readonly BuildEventSource[] = [
+  'founder', 'chatgpt', 'github', 'supabase', 'cloudflare', 'product-design',
+  'data-analytics', 'playwright', 'system', 'other',
+];
+const CATEGORIES: readonly BuildEventCategory[] = [
+  'intent', 'decision', 'source', 'provider', 'runtime', 'verification', 'analytics', 'artifact',
+];
+const PHASES: readonly BuildEventPhase[] = [
+  'idea', 'brief', 'design', 'build', 'verify', 'deploy', 'observe', 'learn',
+];
+const TRUTHS: readonly BuildEventTruth[] = ['verified', 'inferred', 'unknown'];
+const AUTHORITIES: readonly BuildEventAuthority[] = ['observed', 'authorized', 'not-authorized'];
+const STATUSES: readonly BuildEventStatus[] = [
+  'pending', 'running', 'passed', 'failed', 'blocked', 'completed', 'unknown',
+];
 
 function boundedText(value: unknown, maximumLength: number): string {
   if (typeof value !== 'string') return '';
@@ -162,15 +177,7 @@ function validTimestamp(value: unknown): boolean {
 }
 
 function validStatus(value: unknown): value is BuildEventStatus {
-  return [
-    'pending',
-    'running',
-    'passed',
-    'failed',
-    'blocked',
-    'completed',
-    'unknown',
-  ].includes(String(value));
+  return STATUSES.includes(value as BuildEventStatus);
 }
 
 export function validateBuildEvent(input: BuildEventInput): string[] {
@@ -181,10 +188,15 @@ export function validateBuildEvent(input: BuildEventInput): string[] {
 
   if (!EVENT_ID.test(eventId)) errors.push('eventId must be a bounded operational identifier');
   if (!validTimestamp(input.occurredAt)) errors.push('occurredAt must be an ISO-compatible timestamp');
+  if (!SOURCES.includes(input.source)) errors.push('source is invalid');
+  if (!CATEGORIES.includes(input.category)) errors.push('category is invalid');
+  if (!PHASES.includes(input.phase)) errors.push('phase is invalid');
+  if (!TRUTHS.includes(input.truth)) errors.push('truth is invalid');
+  if (!AUTHORITIES.includes(input.authority)) errors.push('authority is invalid');
+  if (!validStatus(input.status)) errors.push('status is invalid');
   if (input.privacy !== undefined && input.privacy !== 'operational-only') {
     errors.push('privacy must be operational-only');
   }
-  if (!validStatus(input.status)) errors.push('status is invalid');
 
   if (input.goal !== undefined && !boundedText(input.goal, 300)) errors.push('goal is invalid');
   if (input.nextGate !== undefined && !boundedText(input.nextGate, 300)) errors.push('nextGate is invalid');
@@ -217,6 +229,7 @@ export function validateBuildEvent(input: BuildEventInput): string[] {
   }
 
   if (input.runtime) {
+    if (input.category !== 'runtime') errors.push('runtime payload requires category=runtime');
     if (!boundedText(input.runtime.service, 160)) errors.push('runtime.service is invalid');
     if (!['production', 'preview', 'staging', 'development', 'unknown'].includes(input.runtime.environment)) {
       errors.push('runtime.environment is invalid');
@@ -230,6 +243,7 @@ export function validateBuildEvent(input: BuildEventInput): string[] {
   }
 
   if (input.verification) {
+    if (input.category !== 'verification') errors.push('verification payload requires category=verification');
     if (!boundedText(input.verification.kind, 200)) errors.push('verification.kind is invalid');
     if (!validStatus(input.verification.status)) errors.push('verification.status is invalid');
     if (input.verification.exactCommitSha !== undefined && !normalizedSha(input.verification.exactCommitSha)) {
