@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 
 const accountId = process.env.CF_ACCOUNT_ID?.trim();
-const apiToken = process.env.CF_API_TOKEN?.trim();
+const apiToken = process.env.CF_API_TOKEN ?? "";
 const expectedHeadSha =
   process.env.EXPECTED_HEAD_SHA?.trim() || process.env.GITHUB_SHA?.trim();
 const workerName = process.env.CF_WORKER_NAME?.trim() || "founder-control-room";
@@ -27,18 +27,134 @@ function redact(value) {
     .slice(0, 4000);
 }
 
+function providerMessages(body) {
+  return [
+    ...(body?.errors ?? []).map((entry) =>
+      typeof entry === "string" ? entry : entry?.message,
+    ),
+    ...(body?.messages ?? []).map((entry) =>
+      typeof entry === "string" ? entry : entry?.message,
+    ),
+  ].filter(Boolean);
+}
+
+function classifyTokenShape(token) {
+  if (!token) {
+    return {
+      credentialType: "missing",
+      matchesAccountId: false,
+      hasBearerPrefix: false,
+      hasWhitespace: false,
+      hasLeadingOrTrailingWhitespace: false,
+      hasNonAscii: false,
+      hasWrappingQuote: false,
+      looksLikeAssignment: false,
+      headerSafe: false,
+    };
+  }
+
+  const shape = {
+    credentialType: token.startsWith("cfut_")
+      ? "user-token"
+      : token.startsWith("cfat_")
+        ? "account-token"
+        : token.startsWith("cfk_")
+          ? "global-key"
+          : "legacy-or-unknown",
+    matchesAccountId: Boolean(accountId && token === accountId),
+    hasBearerPrefix: /^Bearer\s+/i.test(token),
+    hasWhitespace: /\s/.test(token),
+    hasLeadingOrTrailingWhitespace: token !== token.trim(),
+    hasNonAscii: /[^\x20-\x7E]/.test(token),
+    hasWrappingQuote: /^(?:".*"|'.*')$/.test(token),
+    looksLikeAssignment: /^[A-Za-z_][A-Za-z0-9_]*=/.test(token),
+  };
+
+  return {
+    ...shape,
+    headerSafe: !shape.matchesAccountId
+      && !shape.hasBearerPrefix
+      && !shape.hasWhitespace
+      && !shape.hasNonAscii
+      && !shape.hasWrappingQuote
+      && !shape.looksLikeAssignment,
+  };
+}
+
+function tokenPreflightFailure(shape) {
+  if (shape.matchesAccountId) {
+    return {
+      classification: "provider-token-account-id",
+      message: "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: configured token equals the Cloudflare account ID.",
+    };
+  }
+  if (shape.hasNonAscii) {
+    return {
+      classification: "provider-token-header-unsafe",
+      message: "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: configured token contains non-ASCII characters and cannot be used as an HTTP Authorization value.",
+    };
+  }
+  if (shape.hasBearerPrefix) {
+    return {
+      classification: "provider-token-header-unsafe",
+      message: "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: configured token includes a Bearer prefix; store only the token value.",
+    };
+  }
+  if (shape.hasWhitespace) {
+    return {
+      classification: "provider-token-header-unsafe",
+      message: "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: configured token contains whitespace.",
+    };
+  }
+  if (shape.hasWrappingQuote) {
+    return {
+      classification: "provider-token-header-unsafe",
+      message: "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: configured token is wrapped in quotes.",
+    };
+  }
+  if (shape.looksLikeAssignment) {
+    return {
+      classification: "provider-token-header-unsafe",
+      message: "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: configured token looks like a variable assignment rather than a token value.",
+    };
+  }
+  if (shape.credentialType === "account-token") {
+    return {
+      classification: "provider-token-type-unsupported",
+      message: "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: Workers Builds inspection requires a user-scoped Cloudflare API token; account-scoped tokens are unsupported.",
+    };
+  }
+  if (shape.credentialType === "global-key") {
+    return {
+      classification: "provider-token-type-unsupported",
+      message: "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: Workers Builds inspection requires a user-scoped Cloudflare API token; a global API key is unsupported.",
+    };
+  }
+  return null;
+}
+
+async function verifyToken(path) {
+  const response = await fetch(`${apiBase}${path}`, {
+    headers: { Authorization: `Bearer ${apiToken}` },
+  });
+  const body = await response.json().catch(() => null);
+  const status = typeof body?.result?.status === "string" ? body.result.status : null;
+  return {
+    httpStatus: response.status,
+    success: body?.success === true,
+    status,
+    error: redact(providerMessages(body).join("; ") || "") || null,
+  };
+}
+
 async function cloudflare(path) {
   const response = await fetch(`${apiBase}${path}`, {
     headers: { Authorization: `Bearer ${apiToken}` },
   });
   const body = await response.json().catch(() => null);
   if (!response.ok || body?.success === false) {
-    const messages = [
-      ...(body?.errors ?? []).map((entry) => entry?.message),
-      ...(body?.messages ?? []),
-    ].filter(Boolean);
     throw new Error(
-      `Cloudflare API ${response.status}: ${redact(messages.join("; ") || "request failed")}`,
+      `Cloudflare API ${response.status}: ${redact(providerMessages(body).join("; ") || "request failed")}`,
     );
   }
   return body?.result;
@@ -84,6 +200,14 @@ const receipt = {
   apiHostname,
   expectedHeadSha: expectedHeadSha || null,
   inspectedAt: new Date().toISOString(),
+  providerCredentials: {
+    accountIdPresent: Boolean(accountId),
+    apiTokenPresent: Boolean(apiToken),
+    tokenShape: classifyTokenShape(apiToken),
+    userTokenVerification: null,
+    accountTokenVerification: null,
+    classification: null,
+  },
   origin: null,
   domain: null,
   build: null,
@@ -157,86 +281,123 @@ try {
   }
 
   if (!accountId || !apiToken) {
+    receipt.providerCredentials.classification = "provider-credentials-unavailable";
     fail(
       "PROVIDER_CREDENTIALS_UNAVAILABLE: CF_ACCOUNT_ID and the dedicated CLOUDFLARE_BUILDS_API_TOKEN-derived CF_API_TOKEN are required for read-only Cloudflare build inspection.",
     );
   } else {
-    try {
-      const domains = normalizeDomains(
-        await cloudflare(
-          `/accounts/${accountId}/workers/domains?hostname=${encodeURIComponent(apiHostname)}`,
-        ),
-      );
-      const matchingDomains = domains.filter(
-        (entry) => String(entry?.hostname ?? "").toLowerCase() === apiHostname.toLowerCase(),
-      );
+    const preflight = tokenPreflightFailure(receipt.providerCredentials.tokenShape);
+    if (preflight) {
+      receipt.providerCredentials.classification = preflight.classification;
+      fail(preflight.message);
+    } else {
+      const userVerification = await verifyToken("/user/tokens/verify");
+      receipt.providerCredentials.userTokenVerification = userVerification;
 
-      if (matchingDomains.length !== 1) {
-        fail(
-          `Expected exactly one Cloudflare Worker domain for ${apiHostname}; found ${matchingDomains.length}.`,
-        );
-      } else {
-        const domain = matchingDomains[0];
-        receipt.domain = {
-          hostname: domain?.hostname ?? null,
-          service: domain?.service ?? null,
-          environment: domain?.environment ?? null,
-          zoneName: domain?.zone_name ?? null,
-        };
-
-        if (domain?.service !== workerName) {
+      if (!(userVerification.success && userVerification.status === "active")) {
+        if (receipt.providerCredentials.tokenShape.credentialType === "legacy-or-unknown") {
+          const accountVerification = await verifyToken(
+            `/accounts/${accountId}/tokens/verify`,
+          );
+          receipt.providerCredentials.accountTokenVerification = accountVerification;
+          if (accountVerification.success && accountVerification.status === "active") {
+            receipt.providerCredentials.classification = "provider-token-type-unsupported";
+            fail(
+              "CLOUDFLARE_BUILDS_TOKEN_VERIFICATION_FAILED: credential verifies as an account token, but Workers Builds inspection requires a user-scoped token.",
+            );
+          } else {
+            receipt.providerCredentials.classification = "provider-token-invalid";
+            fail(
+              `CLOUDFLARE_BUILDS_TOKEN_VERIFICATION_FAILED: user token verification HTTP ${userVerification.httpStatus}; status ${userVerification.status || "unknown"}.`,
+            );
+          }
+        } else {
+          receipt.providerCredentials.classification = "provider-token-invalid";
           fail(
-            `Custom domain ${apiHostname} is attached to Worker ${domain?.service || "unknown"}; expected ${workerName}.`,
+            `CLOUDFLARE_BUILDS_TOKEN_VERIFICATION_FAILED: user token verification HTTP ${userVerification.httpStatus}; status ${userVerification.status || "unknown"}.`,
           );
         }
-      }
-
-      const scripts = await cloudflare(`/accounts/${accountId}/workers/scripts`);
-      const worker = (Array.isArray(scripts) ? scripts : []).find(
-        (entry) => entry?.id === workerName,
-      );
-      if (!worker?.tag) {
-        fail(`Worker ${workerName} was not found or has no immutable tag.`);
       } else {
-        const buildResult = await cloudflare(
-          `/accounts/${accountId}/builds/workers/${worker.tag}/builds`,
-        );
-        const builds = normalizeBuilds(buildResult);
-        const build = builds.find(
-          (entry) => entry?.build_trigger_metadata?.commit_hash === expectedHeadSha,
-        );
-        if (!build?.build_uuid) {
-          fail(`No Cloudflare build matched exact head ${expectedHeadSha}.`);
-        } else {
-          const logs = await cloudflare(
-            `/accounts/${accountId}/builds/builds/${build.build_uuid}/logs`,
-          );
-          const lines = (logs?.lines ?? []).map(normalizeLogLine).map(redact);
-          const relevant = lines.filter((line) =>
-            /error|fail|fatal|exception|permission|unauthor|route|domain|zone|wrangler|deploy|node|limit|quota/i.test(
-              line,
+        receipt.providerCredentials.classification = "user-token-active";
+
+        try {
+          const domains = normalizeDomains(
+            await cloudflare(
+              `/accounts/${accountId}/workers/domains?hostname=${encodeURIComponent(apiHostname)}`,
             ),
           );
-
-          receipt.build = {
-            buildUuid: build.build_uuid,
-            outcome: build.build_outcome ?? null,
-            createdOn: build.created_on ?? null,
-            stoppedOn: build.stopped_on ?? null,
-            branch: build.build_trigger_metadata?.branch ?? null,
-            commitHash: build.build_trigger_metadata?.commit_hash ?? null,
-            buildCommand: build.build_trigger_metadata?.build_command ?? null,
-            deployCommand: build.build_trigger_metadata?.deploy_command ?? null,
-            rootDirectory: build.build_trigger_metadata?.root_directory ?? null,
-            triggerSource: build.build_trigger_metadata?.build_trigger_source ?? null,
-          };
-          receipt.relevantLogLines = (relevant.length > 0 ? relevant : lines.slice(-40)).slice(
-            -120,
+          const matchingDomains = domains.filter(
+            (entry) => String(entry?.hostname ?? "").toLowerCase() === apiHostname.toLowerCase(),
           );
+
+          if (matchingDomains.length !== 1) {
+            fail(
+              `Expected exactly one Cloudflare Worker domain for ${apiHostname}; found ${matchingDomains.length}.`,
+            );
+          } else {
+            const domain = matchingDomains[0];
+            receipt.domain = {
+              hostname: domain?.hostname ?? null,
+              service: domain?.service ?? null,
+              environment: domain?.environment ?? null,
+              zoneName: domain?.zone_name ?? null,
+            };
+
+            if (domain?.service !== workerName) {
+              fail(
+                `Custom domain ${apiHostname} is attached to Worker ${domain?.service || "unknown"}; expected ${workerName}.`,
+              );
+            }
+          }
+
+          const scripts = await cloudflare(`/accounts/${accountId}/workers/scripts`);
+          const worker = (Array.isArray(scripts) ? scripts : []).find(
+            (entry) => entry?.id === workerName,
+          );
+          if (!worker?.tag) {
+            fail(`Worker ${workerName} was not found or has no immutable tag.`);
+          } else {
+            const buildResult = await cloudflare(
+              `/accounts/${accountId}/builds/workers/${worker.tag}/builds`,
+            );
+            const builds = normalizeBuilds(buildResult);
+            const build = builds.find(
+              (entry) => entry?.build_trigger_metadata?.commit_hash === expectedHeadSha,
+            );
+            if (!build?.build_uuid) {
+              fail(`No Cloudflare build matched exact head ${expectedHeadSha}.`);
+            } else {
+              const logs = await cloudflare(
+                `/accounts/${accountId}/builds/builds/${build.build_uuid}/logs`,
+              );
+              const lines = (logs?.lines ?? []).map(normalizeLogLine).map(redact);
+              const relevant = lines.filter((line) =>
+                /error|fail|fatal|exception|permission|unauthor|route|domain|zone|wrangler|deploy|node|limit|quota/i.test(
+                  line,
+                ),
+              );
+
+              receipt.build = {
+                buildUuid: build.build_uuid,
+                outcome: build.build_outcome ?? null,
+                createdOn: build.created_on ?? null,
+                stoppedOn: build.stopped_on ?? null,
+                branch: build.build_trigger_metadata?.branch ?? null,
+                commitHash: build.build_trigger_metadata?.commit_hash ?? null,
+                buildCommand: build.build_trigger_metadata?.build_command ?? null,
+                deployCommand: build.build_trigger_metadata?.deploy_command ?? null,
+                rootDirectory: build.build_trigger_metadata?.root_directory ?? null,
+                triggerSource: build.build_trigger_metadata?.build_trigger_source ?? null,
+              };
+              receipt.relevantLogLines = (relevant.length > 0 ? relevant : lines.slice(-40)).slice(
+                -120,
+              );
+            }
+          }
+        } catch (error) {
+          fail(error instanceof Error ? error.message : error);
         }
       }
-    } catch (error) {
-      fail(error instanceof Error ? error.message : error);
     }
   }
 
