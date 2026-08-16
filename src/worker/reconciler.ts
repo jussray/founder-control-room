@@ -25,6 +25,7 @@ import { MissionController } from '../controllers/MissionController.js';
 import { ProjectController } from '../controllers/ProjectController.js';
 import { ReleaseController } from '../controllers/ReleaseController.js';
 import { ProofGateController } from '../controllers/ProofGateController.js';
+import { StripeSyncWitnessController } from '../controllers/StripeSyncWitnessController.js';
 import type { ReconcileReason, ReconcileResult } from '../reconciliation/types.js';
 
 const CONTROLLERS = new Map<string, BaseController>([
@@ -35,6 +36,7 @@ const CONTROLLERS = new Map<string, BaseController>([
   ["ProjectController", new ProjectController()],
   ["ReleaseController", new ReleaseController()],
   ["ProofGateController", new ProofGateController()],
+  ["StripeSyncWitnessController", new StripeSyncWitnessController()],
 ]);
 
 const MAX_ATTEMPTS = 5;
