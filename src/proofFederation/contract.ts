@@ -150,6 +150,9 @@ function normalizeExactTarget(value: unknown, authority: FederatedProofAuthority
   if (!repository && !environment && !sha) {
     throw new FederatedProofContractError('empty_exact_target');
   }
+  if (authority.scope === 'repository' && !repository) {
+    throw new FederatedProofContractError('repository_target_required');
+  }
   if ((authority.scope === 'repository' || authority.scope === 'deployment') && !sha) {
     throw new FederatedProofContractError('exact_sha_required');
   }
