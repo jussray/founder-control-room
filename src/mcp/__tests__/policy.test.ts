@@ -36,6 +36,35 @@ describe("MCP Phase 1 policy", () => {
     ).toMatchObject({ decision: "allow", risk: "read" });
   });
 
+  it("keeps ProofMode as a second read-only MCP instead of replacing GitHub", () => {
+    const proofmode = DEFAULT_MCP_SERVERS.find((server) => server.id === "proofmode");
+    if (!proofmode) throw new Error("ProofMode MCP definition missing");
+
+    expect(github.id).toBe("github");
+    expect(
+      evaluateMcpPolicy({
+        server: proofmode,
+        projectId: "founder-control-room",
+        toolName: "audit_repository",
+        env: {
+          NODE_ENV: "development",
+          MCP_PROOFMODE_URL: "https://proofmode.example.test/mcp",
+        },
+      }),
+    ).toMatchObject({ decision: "allow", risk: "read" });
+    expect(
+      evaluateMcpPolicy({
+        server: proofmode,
+        projectId: "founder-control-room",
+        toolName: "create_issue",
+        env: {
+          NODE_ENV: "development",
+          MCP_PROOFMODE_URL: "https://proofmode.example.test/mcp",
+        },
+      }),
+    ).toMatchObject({ decision: "deny" });
+  });
+
   it("denies write tools even when the provider is configured", () => {
     expect(
       evaluateMcpPolicy({
