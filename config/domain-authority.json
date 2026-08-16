@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "project": "founder-control-room",
+  "mode": "production",
+  "surfaces": [
+    {
+      "name": "web",
+      "kind": "browser",
+      "origin": "https://foundercontrolroom.org",
+      "allowedFinalOrigins": ["https://foundercontrolroom.org"],
+      "required": true
+    },
+    {
+      "name": "api-version",
+      "kind": "version",
+      "origin": "https://api.foundercontrolroom.org",
+      "path": "/version",
+      "required": true
+    }
+  ]
+}
