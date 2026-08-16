@@ -225,7 +225,6 @@ connectionVaultRouter.get('/resolve', async (req, res) => {
       credentialBoundary: {
         rawCredentialsReturned: false,
         secretReferencesReturned: false,
-        providerConfigReturned: false,
         secretResolution: 'fcr-internal-only',
       },
       connections: resolved,
