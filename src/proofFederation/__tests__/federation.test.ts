@@ -60,6 +60,12 @@ describe('federated proof contract', () => {
     expect(() => validateFederatedProofReceipt({ ...receipt(), token: 'secret' })).toThrowError(
       new FederatedProofContractError('unknown_or_private_field'),
     );
+    expect(() =>
+      validateFederatedProofReceipt({
+        ...receipt(),
+        exactTarget: { sha: SHA },
+      }),
+    ).toThrowError(new FederatedProofContractError('repository_target_required'));
   });
 
   it('requires acknowledged receipts to describe the same project and exact SHA', () => {
@@ -144,6 +150,32 @@ describe('federated proof contract', () => {
     });
     expect(() => buildFederatedProofView([upstream, wrongAuthoritySupersession])).toThrowError(
       new FederatedProofContractError('supersession_authority_mismatch'),
+    );
+  });
+
+  it('rejects future-bound references and circular proof chains', () => {
+    const upstream = receipt();
+    const beforeUpstream = receipt({
+      receiptId: RECEIPT_B,
+      acknowledges: [RECEIPT_A],
+      issuedAt: '2026-08-16T08:44:00.000Z',
+    });
+    expect(() => buildFederatedProofView([upstream, beforeUpstream])).toThrowError(
+      new FederatedProofContractError('reference_time_reversal'),
+    );
+
+    const cycleA = receipt({
+      receiptId: RECEIPT_A,
+      dependsOn: [RECEIPT_B],
+      issuedAt: NOW,
+    });
+    const cycleB = receipt({
+      receiptId: RECEIPT_B,
+      dependsOn: [RECEIPT_A],
+      issuedAt: NOW,
+    });
+    expect(() => buildFederatedProofView([cycleA, cycleB])).toThrowError(
+      new FederatedProofContractError('receipt_lineage_cycle'),
     );
   });
 
