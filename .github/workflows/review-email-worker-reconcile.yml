@@ -134,6 +134,66 @@ jobs:
       - name: Re-prove review-email Worker repository contract
         run: npm run verify:founder-review-email
 
+      - name: Initialize redacted reconciliation receipt
+        env:
+          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-results
+          jq -n \
+            --arg scope 'review_email_worker_reconcile' \
+            --arg expected_sha "$EXPECTED_HEAD_SHA" \
+            --arg worker 'founder-control-room-review-email' \
+            --arg binding 'FOUNDER_CONTROL_ROOM_API' \
+            --arg service 'founder-control-room' \
+            '{
+              scope: $scope,
+              expected_sha: $expected_sha,
+              worker: $worker,
+              service_binding: {binding: $binding, service: $service},
+              credential_header_safe: false,
+              required_secret_names_verified: false,
+              provider_deploy_succeeded: false,
+              blocked_stage: "credential_header_safety",
+              supabase_db_mutation: false,
+              access_policy_mutation: false,
+              runtime_email_invocation_proven: false
+            }' > test-results/fcr-review-email-worker-reconcile.json
+
+      - name: Validate Cloudflare API token header safety
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import sys
+
+          token = os.environ.get('CLOUDFLARE_API_TOKEN', '')
+          if not token:
+              print('::error title=Missing Worker credential::CLOUDFLARE_API_TOKEN is empty.')
+              sys.exit(1)
+
+          try:
+              token.encode('ascii')
+          except UnicodeEncodeError:
+              print('::error title=Malformed Worker credential::CLOUDFLARE_API_TOKEN contains non-ASCII characters and cannot be used as an HTTP Authorization value. Re-copy the exact Cloudflare-issued token.')
+              sys.exit(1)
+
+          if any(ord(char) < 33 or ord(char) > 126 or char.isspace() for char in token):
+              print('::error title=Malformed Worker credential::CLOUDFLARE_API_TOKEN contains whitespace or non-printable characters. Re-copy the exact Cloudflare-issued token.')
+              sys.exit(1)
+
+          print('Cloudflare API token is header-safe. The token value was not printed.')
+          PY
+
+          receipt='test-results/fcr-review-email-worker-reconcile.json'
+          tmp="${receipt}.tmp"
+          jq '.credential_header_safe = true | .blocked_stage = "secret_names"' "$receipt" > "$tmp"
+          mv "$tmp" "$receipt"
+
       - name: Verify existing review-email Worker secret names
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -152,6 +212,10 @@ jobs:
             fi
           done
 
+          receipt='test-results/fcr-review-email-worker-reconcile.json'
+          tmp="${receipt}.tmp"
+          jq '.required_secret_names_verified = true | .blocked_stage = "provider_deploy"' "$receipt" > "$tmp"
+          mv "$tmp" "$receipt"
           echo 'Required review-email Worker secret names are present. Values were not read.'
 
       - name: Deploy only the review-email Worker
@@ -161,7 +225,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p test-results
           deploy_log="$RUNNER_TEMP/review-email-worker-deploy.log"
 
           set +e
@@ -178,25 +241,11 @@ jobs:
             exit 1
           }
 
-          jq -n \
-            --arg scope 'review_email_worker_reconcile' \
-            --arg expected_sha "$EXPECTED_HEAD_SHA" \
-            --arg worker 'founder-control-room-review-email' \
-            --arg binding 'FOUNDER_CONTROL_ROOM_API' \
-            --arg service 'founder-control-room' \
-            '{
-              scope: $scope,
-              expected_sha: $expected_sha,
-              worker: $worker,
-              service_binding: {binding: $binding, service: $service},
-              provider_deploy_succeeded: true,
-              required_secret_names_verified: true,
-              supabase_db_mutation: false,
-              access_policy_mutation: false,
-              runtime_email_invocation_proven: false
-            }' > test-results/fcr-review-email-worker-reconcile.json
-
-          cat test-results/fcr-review-email-worker-reconcile.json >> "$GITHUB_STEP_SUMMARY"
+          receipt='test-results/fcr-review-email-worker-reconcile.json'
+          tmp="${receipt}.tmp"
+          jq '.provider_deploy_succeeded = true | .blocked_stage = null' "$receipt" > "$tmp"
+          mv "$tmp" "$receipt"
+          cat "$receipt" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload redacted reconciliation receipt
         if: always()
@@ -204,5 +253,5 @@ jobs:
         with:
           name: fcr-review-email-worker-reconcile-${{ github.run_id }}-${{ github.run_attempt }}
           path: test-results/fcr-review-email-worker-reconcile.json
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
