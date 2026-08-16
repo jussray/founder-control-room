@@ -6,6 +6,11 @@ export type McpRisk =
 
 export type McpPolicyDecision = "allow" | "deny" | "requires_approval";
 
+export interface McpFederatedProofPolicy {
+  provider: string;
+  allowedScopes: readonly string[];
+}
+
 export interface McpServerDefinition {
   id: string;
   label: string;
@@ -18,6 +23,7 @@ export interface McpServerDefinition {
   defaultRisk: McpRisk;
   developmentOnly?: boolean;
   monthlyBudgetUsd: number;
+  federatedProof?: McpFederatedProofPolicy;
 }
 
 export interface McpToolDefinition {

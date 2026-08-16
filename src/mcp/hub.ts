@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { supabase } from "../lib/supabaseClient.js";
+import {
+  assertFederatedProofReceiptMatchesInvocation,
+  federatedProofReceiptFromMcpResult,
+  summarizeFederatedProofReceipt,
+  type FederatedMcpReceiptSummary,
+} from "../proofFederation/mcpResult.js";
 import { McpHttpClient } from "./client.js";
 import { evaluateMcpPolicy } from "./policy.js";
 import { McpRegistry } from "./registry.js";
@@ -15,6 +21,11 @@ import type {
 
 const CAPABILITY_CACHE_MS = 5 * 60_000;
 
+interface McpEvidenceProject {
+  id: string;
+  repoIdentifier?: string;
+}
+
 function summarizeRequest(request: McpInvocationRequest): Record<string, unknown> {
   const serialized = JSON.stringify(request.arguments);
   return {
@@ -25,11 +36,15 @@ function summarizeRequest(request: McpInvocationRequest): Record<string, unknown
   };
 }
 
-function summarizeResponse(result: unknown): Record<string, unknown> {
+function summarizeResponse(
+  result: unknown,
+  federatedProof?: FederatedMcpReceiptSummary,
+): Record<string, unknown> {
   const serialized = JSON.stringify(result);
   return {
     type: Array.isArray(result) ? "array" : typeof result,
     bytes: Buffer.byteLength(serialized ?? "", "utf8"),
+    ...(federatedProof ? { federatedProof } : {}),
   };
 }
 
@@ -118,14 +133,14 @@ async function approvalForProject(
   }
 }
 
-export async function validateEvidenceReferences(
+async function resolveEvidenceProject(
   projectId: string,
   missionId?: string,
   approvalId?: string,
-): Promise<string> {
+): Promise<McpEvidenceProject> {
   const { data: project, error: projectError } = await supabase
     .from("projects")
-    .select("id")
+    .select("id,repo_identifier")
     .eq("slug", projectId)
     .maybeSingle();
 
@@ -143,6 +158,21 @@ export async function validateEvidenceReferences(
     await approvalForProject(approvalId, project.id, missionId);
   }
 
+  return {
+    id: project.id,
+    repoIdentifier:
+      typeof project.repo_identifier === "string" && project.repo_identifier.trim()
+        ? project.repo_identifier.trim()
+        : undefined,
+  };
+}
+
+export async function validateEvidenceReferences(
+  projectId: string,
+  missionId?: string,
+  approvalId?: string,
+): Promise<string> {
+  const project = await resolveEvidenceProject(projectId, missionId, approvalId);
   return project.id;
 }
 
@@ -231,7 +261,7 @@ export class McpHub {
     evidenceId: string;
   }> {
     assertNoSecretArguments(request.arguments);
-    const projectUuid = await validateEvidenceReferences(
+    const evidenceProject = await resolveEvidenceProject(
       request.projectId,
       request.missionId,
       request.approvalId,
@@ -261,7 +291,7 @@ export class McpHub {
       requestHash: hash,
       requestSummary: summarizeRequest(request),
       estimatedCostUsd: 0,
-    }, projectUuid);
+    }, evidenceProject.id);
 
     return {
       policy,
@@ -272,7 +302,7 @@ export class McpHub {
 
   async invoke(request: McpInvocationRequest): Promise<McpInvocationResult> {
     assertNoSecretArguments(request.arguments);
-    const projectUuid = await validateEvidenceReferences(
+    const evidenceProject = await resolveEvidenceProject(
       request.projectId,
       request.missionId,
       request.approvalId,
@@ -304,7 +334,7 @@ export class McpHub {
         requestHash: hash,
         requestSummary: summarizeRequest(request),
         estimatedCostUsd: 0,
-      }, projectUuid);
+      }, evidenceProject.id);
       throw new Error(`MCP invocation blocked (${evidenceId}): ${policy.reason}`);
     }
 
@@ -325,6 +355,19 @@ export class McpHub {
 
       const client = new McpHttpClient(server, this.env);
       const result = await client.callTool(request.toolName, request.arguments);
+      const federatedReceipt = federatedProofReceiptFromMcpResult(result);
+      if (federatedReceipt) {
+        assertFederatedProofReceiptMatchesInvocation(federatedReceipt, {
+          serverId: server.id,
+          provider: server.federatedProof?.provider,
+          allowedScopes: server.federatedProof?.allowedScopes,
+          expectedRepository: evidenceProject.repoIdentifier,
+          arguments: request.arguments,
+        });
+      }
+      const federatedProof = federatedReceipt
+        ? summarizeFederatedProofReceipt(federatedReceipt)
+        : undefined;
       const durationMs = Date.now() - started;
       const evidenceId = await writeEvidence({
         projectId: request.projectId,
@@ -337,10 +380,10 @@ export class McpHub {
         status: "passed",
         requestHash: hash,
         requestSummary: summarizeRequest(request),
-        responseSummary: summarizeResponse(result),
+        responseSummary: summarizeResponse(result, federatedProof),
         durationMs,
         estimatedCostUsd: 0,
-      }, projectUuid);
+      }, evidenceProject.id);
 
       return {
         serverId: request.serverId,
@@ -371,7 +414,7 @@ export class McpHub {
         durationMs,
         estimatedCostUsd: 0,
         errorCode: requestHash(message).slice(0, 16),
-      }, projectUuid);
+      }, evidenceProject.id);
       throw error;
     }
   }
