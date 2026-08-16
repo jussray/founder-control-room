@@ -20,6 +20,13 @@ preview_urls = true
 [observability]
 enabled = true
 
+# Outbound transactional email capability. This binding alone sends nothing;
+# application code must explicitly invoke it. Restrict the provider boundary
+# to the approved sender identity from the start.
+[[send_email]]
+name = "FCR_EMAIL"
+allowed_sender_addresses = ["welcome@api.foundercontrolroom.org"]
+
 [[routes]]
 pattern = "api.foundercontrolroom.org"
 custom_domain = true
