@@ -27,7 +27,7 @@ describe('Se’kret Bip Founder OS project adapter', () => {
       id: 'sekret-bip',
       name: 'Se’kret Bip',
       repository: 'jussray/Sekret-Bip',
-      auditedSourceHead: '91206da6530369ba3fac97828d33e41e08e704ee',
+      auditedSourceHead: '90d350a22cbdde1f1d5aa2ced1453a62fa298193',
       authorityOwner: 'founder-control-room',
       mode: 'preview',
       executionAllowed: false,
