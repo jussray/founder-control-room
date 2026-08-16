@@ -43,13 +43,35 @@ function assertDependency(receipt: FederatedProofReceipt, upstream: FederatedPro
   }
 }
 
+function assertReferenceTime(receipt: FederatedProofReceipt, target: FederatedProofReceipt): void {
+  if (Date.parse(target.issuedAt) > Date.parse(receipt.issuedAt)) {
+    throw new FederatedProofContractError('reference_time_reversal');
+  }
+}
+
 function assertSupersession(receipt: FederatedProofReceipt, superseded: FederatedProofReceipt): void {
   if (authorityKey(receipt) !== authorityKey(superseded)) {
     throw new FederatedProofContractError('supersession_authority_mismatch');
   }
-  if (Date.parse(receipt.issuedAt) < Date.parse(superseded.issuedAt)) {
-    throw new FederatedProofContractError('supersession_time_reversal');
-  }
+  assertReferenceTime(receipt, superseded);
+}
+
+function assertAcyclicLineage(edges: Map<string, Set<string>>): void {
+  const state = new Map<string, 'visiting' | 'visited'>();
+
+  const visit = (receiptId: string): void => {
+    const current = state.get(receiptId);
+    if (current === 'visiting') {
+      throw new FederatedProofContractError('receipt_lineage_cycle');
+    }
+    if (current === 'visited') return;
+
+    state.set(receiptId, 'visiting');
+    for (const target of edges.get(receiptId) ?? []) visit(target);
+    state.set(receiptId, 'visited');
+  };
+
+  for (const receiptId of edges.keys()) visit(receiptId);
 }
 
 export function buildFederatedProofView(inputs: unknown[]): FederatedProofView {
@@ -71,8 +93,10 @@ export function buildFederatedProofView(inputs: unknown[]): FederatedProofView {
   const superseded = new Set<string>();
   const danglingReferences: FederatedDanglingReference[] = [];
   const acknowledgedBy: Record<string, string[]> = {};
+  const lineageEdges = new Map<string, Set<string>>();
 
   for (const receipt of receipts) {
+    lineageEdges.set(receipt.receiptId, new Set());
     const relations: Array<['acknowledges' | 'dependsOn' | 'supersedes', string[]]> = [
       ['acknowledges', receipt.acknowledges],
       ['dependsOn', receipt.dependsOn],
@@ -86,6 +110,9 @@ export function buildFederatedProofView(inputs: unknown[]): FederatedProofView {
           danglingReferences.push({ receiptId: receipt.receiptId, relation, targetReceiptId });
           continue;
         }
+
+        assertReferenceTime(receipt, target);
+        lineageEdges.get(receipt.receiptId)?.add(targetReceiptId);
 
         if (relation === 'acknowledges') {
           assertFederatedReceiptAcknowledgement(receipt, target);
@@ -103,6 +130,8 @@ export function buildFederatedProofView(inputs: unknown[]): FederatedProofView {
       }
     }
   }
+
+  assertAcyclicLineage(lineageEdges);
 
   const activeReceipts = receipts.filter((receipt) => !superseded.has(receipt.receiptId));
   const latestByAuthority: Record<string, FederatedProofReceipt> = {};
