@@ -38,11 +38,11 @@ describe('BuildEvent contract', () => {
   });
 
   it('rejects malformed runtime dimensions even when input bypasses TypeScript', () => {
-    const input = base() as BuildEventInput & { source: string; truth: string };
+    const input = base() as unknown as Record<string, unknown>;
     input.source = 'made-up-provider';
     input.truth = 'probably';
 
-    const errors = validateBuildEvent(input as BuildEventInput);
+    const errors = validateBuildEvent(input as unknown as BuildEventInput);
     expect(errors).toContain('source is invalid');
     expect(errors).toContain('truth is invalid');
   });
