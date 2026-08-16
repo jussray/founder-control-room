@@ -24,6 +24,13 @@ export interface FederatedMcpReceiptSummary {
   evidenceCount: number;
 }
 
+export interface FederatedReceiptInvocationPolicy {
+  serverId: string;
+  provider?: string;
+  allowedScopes?: readonly string[];
+  arguments: Record<string, unknown>;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -38,12 +45,61 @@ function candidateFromMcpResult(result: unknown): unknown {
   return structured.proofReceipt;
 }
 
+function canonicalRepository(value: string): string {
+  return value.trim().replace(/^https:\/\/github\.com\//i, '').replace(/\.git$/i, '').toLowerCase();
+}
+
+function requestedRepository(args: Record<string, unknown>): string | undefined {
+  if (typeof args.repository === 'string' && args.repository.trim()) {
+    return canonicalRepository(args.repository);
+  }
+  if (
+    typeof args.owner === 'string' &&
+    args.owner.trim() &&
+    typeof args.repo === 'string' &&
+    args.repo.trim()
+  ) {
+    return canonicalRepository(`${args.owner}/${args.repo}`);
+  }
+  return undefined;
+}
+
 export function federatedProofReceiptFromMcpResult(
   result: unknown,
 ): FederatedProofReceipt | undefined {
   const candidate = candidateFromMcpResult(result);
   if (candidate === undefined) return undefined;
   return validateFederatedProofReceipt(candidate);
+}
+
+export function assertFederatedProofReceiptMatchesInvocation(
+  receipt: FederatedProofReceipt,
+  policy: FederatedReceiptInvocationPolicy,
+): void {
+  if (!policy.provider || !policy.allowedScopes?.length) {
+    throw new FederatedProofContractError('untrusted_federated_receipt_source');
+  }
+  if (receipt.authority.provider !== policy.provider) {
+    throw new FederatedProofContractError('receipt_provider_mismatch');
+  }
+  if (!policy.allowedScopes.includes(receipt.authority.scope)) {
+    throw new FederatedProofContractError('receipt_scope_not_allowed');
+  }
+
+  if (receipt.authority.scope === 'repository') {
+    const requested = requestedRepository(policy.arguments);
+    if (!requested) {
+      throw new FederatedProofContractError('repository_receipt_target_unbound');
+    }
+    const declaredRepository = receipt.exactTarget.repository;
+    if (!declaredRepository) {
+      throw new FederatedProofContractError('repository_receipt_target_missing');
+    }
+    const targets = [receipt.project, receipt.authority.target, declaredRepository].map(canonicalRepository);
+    if (targets.some((target) => target !== requested)) {
+      throw new FederatedProofContractError('repository_receipt_target_mismatch');
+    }
+  }
 }
 
 export function summarizeFederatedProofReceipt(
