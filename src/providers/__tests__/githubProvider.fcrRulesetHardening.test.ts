@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockGetRepoRulesets, mockCreateRepoRuleset, mockUpdateRepoRuleset } = vi.hoisted(() => ({
+const {
+  mockGetRepoRulesets,
+  mockGetRepoRuleset,
+  mockCreateRepoRuleset,
+  mockUpdateRepoRuleset,
+} = vi.hoisted(() => ({
   mockGetRepoRulesets: vi.fn(),
+  mockGetRepoRuleset: vi.fn(),
   mockCreateRepoRuleset: vi.fn(),
   mockUpdateRepoRuleset: vi.fn(),
 }));
@@ -10,6 +16,7 @@ vi.mock("@octokit/rest", () => ({
   Octokit: class MockOctokit {
     repos = {
       getRepoRulesets: mockGetRepoRulesets,
+      getRepoRuleset: mockGetRepoRuleset,
       createRepoRuleset: mockCreateRepoRuleset,
       updateRepoRuleset: mockUpdateRepoRuleset,
     };
@@ -28,6 +35,37 @@ const config = {
   blockForcePushes: true,
   blockDeletion: true,
 };
+
+function strongReadback() {
+  return {
+    id: 1,
+    name: config.name,
+    enforcement: "active",
+    rules: [
+      {
+        type: "pull_request",
+        parameters: {
+          required_approving_review_count: 1,
+          dismiss_stale_reviews_on_push: true,
+          require_last_push_approval: true,
+          required_review_thread_resolution: true,
+        },
+      },
+      {
+        type: "required_status_checks",
+        parameters: {
+          strict_required_status_checks_policy: true,
+          required_status_checks: [
+            { context: "Required Gate" },
+            { context: "Verify test-ledger contract" },
+          ],
+        },
+      },
+      { type: "non_fast_forward" },
+      { type: "deletion" },
+    ],
+  };
+}
 
 function buildProvider() {
   return new GitHubProvider({
@@ -53,6 +91,7 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetRepoRulesets.mockResolvedValue({ data: [] });
+    mockGetRepoRuleset.mockResolvedValue({ data: strongReadback() });
     mockCreateRepoRuleset.mockResolvedValue({
       data: { id: 1, name: config.name, enforcement: "active" },
     });
@@ -79,6 +118,54 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
       { context: "Required Gate" },
       { context: "Verify test-ledger contract" },
     ]);
+    expect(mockGetRepoRuleset).toHaveBeenCalledWith({
+      owner: "jussray",
+      repo: "founder-control-room",
+      ruleset_id: 1,
+    });
+  });
+
+  it("rejects a weak FCR main policy before provider mutation", async () => {
+    const provider = buildProvider();
+
+    await expect(provider.applyBranchRuleset("founder-control-room", {
+      ...config,
+      requiredApprovingReviewCount: 0,
+    })).rejects.toThrow("at least one approving review is required");
+
+    expect(mockCreateRepoRuleset).not.toHaveBeenCalled();
+    expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
+    expect(mockGetRepoRuleset).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when provider read-back does not match the hardened FCR policy", async () => {
+    mockGetRepoRuleset.mockResolvedValue({
+      data: {
+        ...strongReadback(),
+        rules: [
+          {
+            type: "pull_request",
+            parameters: {
+              required_approving_review_count: 0,
+              dismiss_stale_reviews_on_push: false,
+              require_last_push_approval: false,
+              required_review_thread_resolution: false,
+            },
+          },
+          {
+            type: "required_status_checks",
+            parameters: {
+              strict_required_status_checks_policy: false,
+              required_status_checks: [{ context: "Required Gate" }],
+            },
+          },
+        ],
+      },
+    });
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", config))
+      .rejects.toThrow("FCR main ruleset read-back mismatch");
   });
 
   it("does not impose FCR-specific stale-review semantics on another project", async () => {
@@ -89,5 +176,6 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     expect(pullRequestRule.parameters.dismiss_stale_reviews_on_push).toBe(false);
     expect(pullRequestRule.parameters.require_last_push_approval).toBe(false);
     expect(pullRequestRule.parameters.required_review_thread_resolution).toBe(true);
+    expect(mockGetRepoRuleset).not.toHaveBeenCalled();
   });
 });
