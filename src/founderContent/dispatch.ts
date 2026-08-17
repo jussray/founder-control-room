@@ -89,6 +89,7 @@ function validateDistributionInput(
   if (!/^[a-z0-9][a-z0-9_-]{0,99}$/.test(input.contentField)) {
     throw new FounderContentDispatchError('INVALID_CONTENT_FIELD', 400, 'contentField is invalid');
   }
+
   const expectedPlatform = input.channel === 'juss_rayy_linkedin'
     ? 'linkedin'
     : input.channel.endsWith('_facebook')
@@ -102,7 +103,11 @@ function validateDistributionInput(
     );
   }
   if (!authorization.channels.includes(authorization.content.platform)) {
-    throw new FounderContentDispatchError('CHANNEL_NOT_AUTHORIZED', 403, 'Platform is not included in Current You approval');
+    throw new FounderContentDispatchError(
+      'CHANNEL_NOT_AUTHORIZED',
+      403,
+      'Platform is not included in Current You approval',
+    );
   }
 
   if (authorization.content.platform === 'linkedin') {
@@ -115,7 +120,11 @@ function validateDistributionInput(
     }
     const strategy = input.linkedinStrategy;
     if (!strategy) {
-      throw new FounderContentDispatchError('LINKEDIN_STRATEGY_REQUIRED', 422, 'Verified LinkedIn strategy context is required');
+      throw new FounderContentDispatchError(
+        'LINKEDIN_STRATEGY_REQUIRED',
+        422,
+        'LinkedIn strategy context is required',
+      );
     }
     const fields = [
       strategy.baselineRef,
@@ -125,7 +134,11 @@ function validateDistributionInput(
       strategy.nextMutation,
     ];
     if (fields.some(value => typeof value !== 'string' || value.trim().length < 20)) {
-      throw new FounderContentDispatchError('LINKEDIN_STRATEGY_INCOMPLETE', 422, 'LinkedIn rising-floor strategy is incomplete');
+      throw new FounderContentDispatchError(
+        'LINKEDIN_STRATEGY_INCOMPLETE',
+        422,
+        'LinkedIn rising-floor strategy is incomplete',
+      );
     }
   }
 }
@@ -153,7 +166,11 @@ async function sourceProject(sourceRepo: string): Promise<SourceProject> {
     .eq('repo_identifier', sourceRepo)
     .maybeSingle();
   if (error) {
-    throw new FounderContentDispatchError('PROJECT_LOOKUP_FAILED', 500, 'Unable to resolve source project');
+    throw new FounderContentDispatchError(
+      'PROJECT_LOOKUP_FAILED',
+      500,
+      'Unable to resolve source project',
+    );
   }
   if (!data) {
     throw new FounderContentDispatchError(
@@ -253,10 +270,60 @@ export async function reserveAndDispatchFounderContent(
   const reviewDeadline = scheduledAt;
   const founderApprovalId = `current-you:${authorization.authorization_hash}`;
   const strategy = input.linkedinStrategy;
+
+  // Reserve before constructing the final provider packet. The provider packet
+  // is then bound to this exact durable FCR execution UUID and its SHA-256 hash
+  // is persisted before any external request is attempted.
+  const { data: reservation, error: reservationError } = await supabase
+    .from('approval_executions')
+    .insert({
+      mission_id: null,
+      project_id: project.id,
+      action_type: ACTION_TYPE,
+      idempotency_key: idempotencyKey,
+      executed_by: options.executedBy,
+      status: 'pending',
+      request: {
+        authorization_hash: authorization.authorization_hash,
+        proposal_hash: authorization.proposal_hash,
+        public_payload_hash: authorization.public_payload_hash,
+        source_repo: authorization.source.repo,
+        source_commit_sha: authorization.source.commit_sha,
+        platform: authorization.content.platform,
+        channel: input.channel,
+        content_field: input.contentField,
+        provider_request_hash: null,
+      },
+      result: {},
+      success: null,
+      started_at: iso(nowMs),
+    })
+    .select('id')
+    .single();
+
+  if (reservationError || !reservation) {
+    const raced = await findExecution(idempotencyKey);
+    if (raced && executionScopeMatches(raced, expectedScope)) {
+      if (raced.status === 'succeeded') return successfulReplay(raced, authorization);
+      throw new FounderContentDispatchError(
+        'FOUNDER_CONTENT_ALREADY_RESERVED',
+        409,
+        'Another request reserved this exact founder-content authorization',
+      );
+    }
+    throw new FounderContentDispatchError(
+      'FOUNDER_CONTENT_RESERVATION_FAILED',
+      500,
+      'Unable to reserve founder-content publication; no provider dispatch was attempted',
+    );
+  }
+
+  const executionId = String(reservation.id);
   const payload = {
     version: 1,
     event_type: 'first_party_founder_content_schedule',
     idempotency_key: idempotencyKey,
+    founder_content_execution_id: executionId,
     execution_authorization_hash: authorization.authorization_hash,
     proposal_hash: authorization.proposal_hash,
     public_payload_hash: authorization.public_payload_hash,
@@ -302,15 +369,9 @@ export async function reserveAndDispatchFounderContent(
   const body = JSON.stringify(payload);
   const requestHash = sha256(body);
 
-  const { data: reservation, error: reservationError } = await supabase
+  const { error: bindError } = await supabase
     .from('approval_executions')
-    .insert({
-      mission_id: null,
-      project_id: project.id,
-      action_type: ACTION_TYPE,
-      idempotency_key: idempotencyKey,
-      executed_by: options.executedBy,
-      status: 'pending',
+    .update({
       request: {
         authorization_hash: authorization.authorization_hash,
         proposal_hash: authorization.proposal_hash,
@@ -320,34 +381,24 @@ export async function reserveAndDispatchFounderContent(
         platform: authorization.content.platform,
         channel: input.channel,
         content_field: input.contentField,
+        founder_content_execution_id: executionId,
         provider_request_hash: requestHash,
       },
-      result: {},
-      success: null,
-      started_at: iso(nowMs),
     })
-    .select('id')
-    .single();
+    .eq('id', executionId)
+    .eq('status', 'pending');
 
-  if (reservationError || !reservation) {
-    const raced = await findExecution(idempotencyKey);
-    if (raced && executionScopeMatches(raced, expectedScope)) {
-      if (raced.status === 'succeeded') return successfulReplay(raced, authorization);
-      throw new FounderContentDispatchError(
-        'FOUNDER_CONTENT_ALREADY_RESERVED',
-        409,
-        'Another request reserved this exact founder-content authorization',
-      );
-    }
+  if (bindError) {
     throw new FounderContentDispatchError(
-      'FOUNDER_CONTENT_RESERVATION_FAILED',
+      'FOUNDER_CONTENT_REQUEST_BINDING_FAILED',
       500,
-      'Unable to reserve founder-content publication; no provider dispatch was attempted',
+      'Unable to bind the reserved FCR execution to the provider request; no provider dispatch was attempted',
     );
   }
 
-  const executionId = String(reservation.id);
-  const hookUrl = options.hookUrl ?? process.env.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL?.trim() ?? '';
+  const hookUrl = options.hookUrl
+    ?? process.env.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL?.trim()
+    ?? '';
   if (!HTTPS_URL.test(hookUrl)) {
     await supabase.from('approval_executions').update({
       status: 'failed',
@@ -400,7 +451,9 @@ export async function reserveAndDispatchFounderContent(
       status: 'failed',
       success: false,
       result: {
-        code: error instanceof FounderContentDispatchError ? error.code : 'PROVIDER_DISPATCH_AMBIGUOUS',
+        code: error instanceof FounderContentDispatchError
+          ? error.code
+          : 'PROVIDER_DISPATCH_AMBIGUOUS',
         provider_http_status: status,
         provider_response_hash: responseHash,
         provider_execution_proven: false,
