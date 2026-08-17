@@ -1,7 +1,10 @@
 'use strict';
 
 const { createHash } = require('node:crypto');
-const { authorizeFounderContentPublication } = require('./founder-content-authorization-contract.cjs');
+const {
+  authorizeFounderContentPublication,
+  canonicalChiefIdentity,
+} = require('./founder-content-authorization-contract.cjs');
 
 const HASH = /^[0-9a-f]{64}$/i;
 const HTTPS_URL = /^https:\/\//i;
@@ -29,6 +32,20 @@ function parseTime(value, label) {
   const ms = Date.parse(raw);
   if (!raw || Number.isNaN(ms)) reject([`${label} must be an RFC3339 timestamp`]);
   return { raw: new Date(ms).toISOString(), ms };
+}
+
+function freezePublicPayload(payload = {}) {
+  const claims = Array.isArray(payload.public_claims)
+    ? payload.public_claims.map((claim) => Object.freeze({ ...claim }))
+    : [];
+  return Object.freeze({
+    platform: asString(payload.platform, 80).toLowerCase(),
+    story_type: asString(payload.story_type, 80).toLowerCase(),
+    draft_text: asString(payload.draft_text, 3000),
+    public_claims: Object.freeze(claims),
+    proof_link: asString(payload.proof_link, 1000) || null,
+    proof_link_policy: asString(payload.proof_link_policy, 80),
+  });
 }
 
 function validateCanonicalAuthorization(authorization = {}, nowMs) {
@@ -110,11 +127,15 @@ function authorizeFounderContentPublishNow({ proposal, approval, confirmation = 
   const canonicalAuthorization = authorizeFounderContentPublication({ proposal, approval, now: nowTime.raw });
   const source = validateCanonicalAuthorization(canonicalAuthorization, nowTime.ms);
   const current = validateCurrentYou(currentYou, source, nowTime.ms);
+  const canonicalProposal = canonicalChiefIdentity(proposal);
+  const publicPayload = freezePublicPayload(canonicalProposal.public_payload);
   const providerName = asString(provider, 80).toLowerCase();
   const accountId = asString(providerAccountId, 240);
   const targetChannel = asString(channel, 80).toLowerCase();
   const errors = [];
 
+  if (hash(publicPayload) !== source.publicPayloadHash) errors.push('canonical public payload no longer matches approved public_payload_hash');
+  if (publicPayload.platform !== source.platform || publicPayload.draft_text !== source.text) errors.push('canonical public payload no longer matches approved content');
   if (confirmation.confirm_publication !== true) errors.push('confirm_publication must be true');
   if (asString(confirmation.authorization_hash, 64).toLowerCase() !== source.authorizationHash) errors.push('confirmation authorization_hash must match the exact canonical approval packet');
   if (asString(confirmation.public_payload_hash, 64).toLowerCase() !== source.publicPayloadHash) errors.push('confirmation public_payload_hash must match the exact approved copy');
@@ -157,6 +178,7 @@ function authorizeFounderContentPublishNow({ proposal, approval, confirmation = 
     source_authorization_hash: source.authorizationHash,
     proposal_hash: source.proposalHash,
     public_payload_hash: source.publicPayloadHash,
+    public_payload: publicPayload,
     content: Object.freeze({ platform: source.platform, text: source.text }),
     destination: Object.freeze({ provider: providerName, provider_account_id: accountId, channel: targetChannel }),
     current_you: Object.freeze({ authenticated: true, source: 'current_authenticated_founder', intent_id: current.intentId, intent_version: current.intentVersion, observed_at: current.observed.raw }),
@@ -202,6 +224,7 @@ function buildFounderContentProviderWriteEnvelope({ publish_authorization: autho
   const expires = parseTime(authorization.expires_at, 'publish_authorization.expires_at');
   const key = asString(authorization.idempotency_key, 64).toLowerCase();
   const authorizationHash = asString(authorization.publish_authorization_hash, 64).toLowerCase();
+  const publicPayload = freezePublicPayload(authorization.public_payload);
 
   if (authorization.kind !== 'fcr/founder-content-publish-now-authorization') errors.push('publish authorization kind is invalid');
   if (authorization.state !== 'authorized-for-publish') errors.push('publish authorization state must be authorized-for-publish');
@@ -211,14 +234,15 @@ function buildFounderContentProviderWriteEnvelope({ publish_authorization: autho
   if (authorization.authority?.one_shot !== true) errors.push('publish authorization must be one_shot');
   if (!HASH.test(authorizationHash)) errors.push('publish_authorization_hash must be sha256');
   if (HASH.test(authorizationHash) && hash(publishAuthorizationIdentity(authorization)) !== authorizationHash) errors.push('publish authorization identity has been mutated');
+  if (!HASH.test(asString(authorization.public_payload_hash, 64)) || hash(publicPayload) !== asString(authorization.public_payload_hash, 64).toLowerCase()) errors.push('authorized public payload has been mutated');
+  if (publicPayload.platform !== asString(authorization.content?.platform, 80).toLowerCase() || publicPayload.draft_text !== asString(authorization.content?.text, 3000)) errors.push('authorized public copy has been mutated');
   if (!HASH.test(key)) errors.push('idempotency_key must be sha256');
   if (HASH.test(key) && expectedIdempotencyKey(authorization) !== key) errors.push('idempotency_key does not match exact provider/account/copy authorization');
   if (nowTime.ms >= expires.ms) errors.push('publish authorization is expired');
   if (Array.isArray(consumedKeys) && consumedKeys.includes(key)) errors.push('publish authorization replay is blocked');
   if (!asString(authorization.destination?.provider, 80)) errors.push('provider destination is required');
   if (!asString(authorization.destination?.provider_account_id, 240)) errors.push('provider account destination is required');
-  if (!asString(authorization.content?.text, 3000)) errors.push('authorized public text is required');
-  if (asString(authorization.destination?.channel, 80).toLowerCase() !== asString(authorization.content?.platform, 80).toLowerCase()) errors.push('destination channel no longer matches authorized platform');
+  if (asString(authorization.destination?.channel, 80).toLowerCase() !== publicPayload.platform) errors.push('destination channel no longer matches authorized platform');
 
   if (errors.length > 0) reject(errors);
 
@@ -230,7 +254,7 @@ function buildFounderContentProviderWriteEnvelope({ publish_authorization: autho
     publish_authorization_hash: authorizationHash,
     public_payload_hash: authorization.public_payload_hash,
     destination: Object.freeze({ ...authorization.destination }),
-    public_payload: Object.freeze({ platform: authorization.content.platform, text: authorization.content.text }),
+    public_payload: Object.freeze({ platform: publicPayload.platform, text: publicPayload.draft_text }),
     expires_at: authorization.expires_at,
   };
   const envelopeHash = hash(writeEnvelopeIdentity(envelope));
