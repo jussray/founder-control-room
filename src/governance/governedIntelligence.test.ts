@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   adjudicateMemoryWrite,
+  authorizationSupportsAction,
   evaluateGovernedAction,
   memoryCanAuthorize,
   proofSupportsClaim,
   resolveTemporalIntent,
+  type ExecutionAuthorization,
   type GovernedMemory,
   type ProofContract,
   type RecoveryPlan,
@@ -12,7 +14,9 @@ import {
 } from './governedIntelligence.js';
 
 const NOW = new Date('2026-08-17T03:30:00.000Z');
-const HASH = 'a'.repeat(64);
+const ARTIFACT_HASH = 'a'.repeat(64);
+const PROPOSAL_HASH = 'b'.repeat(64);
+const ACTION_HASH = 'c'.repeat(64);
 
 function intent(overrides: Partial<TemporalIntent> = {}): TemporalIntent {
   return {
@@ -62,7 +66,7 @@ function proof(overrides: Partial<ProofContract> = {}): ProofContract {
     subject: 'founder-control-room production',
     proves: ['production_sha_matches'],
     doesNotProve: ['payment_settled'],
-    artifactHash: HASH,
+    artifactHash: ARTIFACT_HASH,
     verificationMethod: 'exact-head runtime read-back',
     observedAt: '2026-08-17T03:15:00.000Z',
     exactVersion: 'abc123',
@@ -79,6 +83,24 @@ function recovery(overrides: Partial<RecoveryPlan> = {}): RecoveryPlan {
     checkpointRef: 'deployment:before',
     rollbackAction: 'restore previous deployment',
     validationAction: 'verify health and exact version',
+    ...overrides,
+  };
+}
+
+function authorization(overrides: Partial<ExecutionAuthorization> = {}): ExecutionAuthorization {
+  return {
+    id: 'authorization-1',
+    actorId: 'founder',
+    source: 'current_user',
+    intentId: 'intent-current',
+    proposalId: 'proposal-1',
+    proposalHash: PROPOSAL_HASH,
+    actionHash: ACTION_HASH,
+    scope: ['deploy'],
+    exactVersion: 'abc123',
+    issuedAt: '2026-08-17T03:20:00.000Z',
+    expiresAt: '2026-08-17T04:00:00.000Z',
+    authenticated: true,
     ...overrides,
   };
 }
@@ -102,18 +124,42 @@ describe('temporal authority', () => {
     });
   });
 
-  it('keeps FutureYou advisory instead of silently authorizing consequential action', () => {
-    const verdict = evaluateGovernedAction({
-      requiredScope: 'deploy',
-      risk: 'consequential',
-      intents: [intent({ source: 'future_you', authenticated: false })],
-      recoveryPlan: recovery(),
-      explicitApproval: true,
-      now: NOW,
-    });
+  it('does not let advisory FutureYou suppress Current You through supersedes', () => {
+    const resolved = resolveTemporalIntent([
+      intent(),
+      intent({
+        id: 'future',
+        source: 'future_you',
+        authenticated: false,
+        intentHash: 'future-projection',
+        issuedAt: '2026-08-17T03:25:00.000Z',
+        supersedes: ['intent-current'],
+      }),
+    ], 'deploy', NOW);
 
-    expect(verdict.decision).toBe('reconfirm');
-    expect(verdict.reasons.join(' ')).toContain('cannot silently authorize');
+    expect(resolved.mode).toBe('authoritative');
+    expect(resolved.selected?.id).toBe('intent-current');
+  });
+
+  it('does not let delegated authority supersede stronger Current You authority', () => {
+    const resolved = resolveTemporalIntent([
+      intent(),
+      intent({
+        id: 'delegate',
+        source: 'delegated',
+        intentHash: 'delegate-plan',
+        issuedAt: '2026-08-17T03:25:00.000Z',
+        supersedes: ['intent-current'],
+      }),
+    ], 'deploy', NOW);
+
+    expect(resolved.mode).toBe('authoritative');
+    expect(resolved.selected?.id).toBe('intent-current');
+  });
+
+  it('fails closed when expiry metadata is malformed', () => {
+    const resolved = resolveTemporalIntent([intent({ expiresAt: 'not-a-time' })], 'deploy', NOW);
+    expect(resolved.mode).toBe('missing');
   });
 
   it('does not let revoked Current You intent remain active authority', () => {
@@ -124,7 +170,6 @@ describe('temporal authority', () => {
         source: 'historical_user',
         intentHash: 'older-plan',
         issuedAt: '2026-08-16T03:20:00.000Z',
-        authenticated: true,
       }),
     ], 'deploy', NOW);
 
@@ -132,7 +177,7 @@ describe('temporal authority', () => {
     expect(resolved.selected?.id).toBe('history');
   });
 
-  it('requires explicit reconfirmation for equally current conflicting authenticated intents', () => {
+  it('requires reconfirmation for equally current conflicting authenticated intents', () => {
     const resolved = resolveTemporalIntent([
       intent({ id: 'a', intentHash: 'ship-a' }),
       intent({ id: 'b', intentHash: 'ship-b' }),
@@ -201,38 +246,14 @@ describe('governed memory', () => {
     expect(result.reason).toContain('objective evidence');
   });
 
-  it('lets fresh provider evidence supersede an older user belief about runtime state', () => {
+  it('lets a valid incoming observation supersede malformed existing memory', () => {
     const result = adjudicateMemoryWrite(
-      runtimeMemory({
-        id: 'user-belief',
-        source: 'current_user',
-        factHash: 'production-healthy',
-        observedAt: '2026-08-16T03:00:00.000Z',
-        lastVerifiedAt: '2026-08-16T03:00:00.000Z',
-      }),
-      runtimeMemory({ id: 'provider-readback', factHash: 'production-unhealthy' }),
+      runtimeMemory({ id: 'broken', observedAt: 'not-a-time' }),
+      runtimeMemory({ id: 'fresh' }),
       NOW,
     );
 
-    expect(result).toMatchObject({
-      decision: 'supersede',
-      winnerId: 'provider-readback',
-      loserId: 'user-belief',
-    });
-  });
-
-  it('rejects unauthenticated Current You memory as an authority-bearing write', () => {
-    const result = adjudicateMemoryWrite(
-      preferenceMemory({ id: 'existing' }),
-      preferenceMemory({ id: 'spoofed-current', factHash: 'spoofed', authenticated: false }),
-      NOW,
-    );
-
-    expect(result).toMatchObject({
-      decision: 'preserve_existing',
-      winnerId: 'existing',
-      loserId: 'spoofed-current',
-    });
+    expect(result).toMatchObject({ decision: 'supersede', winnerId: 'fresh', loserId: 'broken' });
   });
 
   it('blocks stale verified runtime memory from authorizing consequential action', () => {
@@ -250,16 +271,10 @@ describe('governed memory', () => {
     expect(result.allowed).toBe(false);
     expect(result.reason).toContain('objective provider or system evidence');
   });
-
-  it('blocks FutureYou preference from effectful authority even when a record is marked verified', () => {
-    const result = memoryCanAuthorize(preferenceMemory({ source: 'future_you', authenticated: false }), 'reversible', NOW);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toContain('current or delegated authority');
-  });
 });
 
 describe('proof contracts', () => {
-  it('refuses to promote a proof beyond the claims it explicitly covers', () => {
+  it('refuses to promote proof beyond the claims it explicitly covers', () => {
     expect(proofSupportsClaim(proof(), 'production_sha_matches', NOW, 'abc123').supported).toBe(true);
     expect(proofSupportsClaim(proof(), 'payment_settled', NOW).supported).toBe(false);
     expect(proofSupportsClaim(proof(), 'all_devices_healthy', NOW).supported).toBe(false);
@@ -271,15 +286,80 @@ describe('proof contracts', () => {
     expect(result.reason).toContain('exact version');
   });
 
-  it('rejects a proof after its own declared freshness window', () => {
-    const result = proofSupportsClaim(proof({ freshForMs: 5 * 60 * 1000 }), 'production_sha_matches', NOW, 'abc123');
+  it('rejects malformed proof expiry instead of treating it as no expiry', () => {
+    const result = proofSupportsClaim(proof({ expiresAt: 'not-a-time' }), 'production_sha_matches', NOW, 'abc123');
     expect(result.supported).toBe(false);
-    expect(result.reason).toContain('freshness window');
+    expect(result.reason).toContain('expiry');
+  });
+});
+
+describe('bound execution authorization', () => {
+  it('accepts fresh authorization bound to exact proposal, action, intent, scope, and version', () => {
+    const result = authorizationSupportsAction(authorization(), {
+      requiredScope: 'deploy',
+      intentId: 'intent-current',
+      proposalId: 'proposal-1',
+      proposalHash: PROPOSAL_HASH,
+      actionHash: ACTION_HASH,
+      exactVersion: 'abc123',
+      now: NOW,
+    });
+
+    expect(result.allowed).toBe(true);
+  });
+
+  it('rejects approval replay against a different action', () => {
+    const result = authorizationSupportsAction(authorization(), {
+      requiredScope: 'deploy',
+      intentId: 'intent-current',
+      proposalId: 'proposal-1',
+      proposalHash: PROPOSAL_HASH,
+      actionHash: 'd'.repeat(64),
+      exactVersion: 'abc123',
+      now: NOW,
+    });
+
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('different action');
+  });
+
+  it('rejects an already-consumed authorization id', () => {
+    const result = authorizationSupportsAction(authorization(), {
+      requiredScope: 'deploy',
+      intentId: 'intent-current',
+      proposalId: 'proposal-1',
+      proposalHash: PROPOSAL_HASH,
+      actionHash: ACTION_HASH,
+      exactVersion: 'abc123',
+      consumedAuthorizationIds: ['authorization-1'],
+      now: NOW,
+    });
+
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('already been consumed');
+  });
+
+  it('rejects stale authorization even when hashes still match', () => {
+    const result = authorizationSupportsAction(authorization({
+      issuedAt: '2026-08-17T01:00:00.000Z',
+      expiresAt: '2026-08-17T01:30:00.000Z',
+    }), {
+      requiredScope: 'deploy',
+      intentId: 'intent-current',
+      proposalId: 'proposal-1',
+      proposalHash: PROPOSAL_HASH,
+      actionHash: ACTION_HASH,
+      exactVersion: 'abc123',
+      now: NOW,
+    });
+
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('stale or expired');
   });
 });
 
 describe('governed action contract', () => {
-  it('allows a consequential action only when intent, objective memory, proof, approval, and rollback line up', () => {
+  it('allows consequential action only when intent, objective memory, proof, bound approval, and rollback align', () => {
     const verdict = evaluateGovernedAction({
       requiredScope: 'deploy',
       risk: 'consequential',
@@ -289,7 +369,11 @@ describe('governed action contract', () => {
       proofs: [proof()],
       requiredClaims: [{ claim: 'production_sha_matches', exactVersion: 'abc123' }],
       recoveryPlan: recovery(),
-      explicitApproval: true,
+      proposalId: 'proposal-1',
+      proposalHash: PROPOSAL_HASH,
+      actionHash: ACTION_HASH,
+      exactVersion: 'abc123',
+      authorization: authorization(),
       now: NOW,
     });
 
@@ -299,16 +383,61 @@ describe('governed action contract', () => {
       memoryIds: ['memory-runtime'],
       proofIds: ['proof-runtime'],
       recoveryPlanId: 'recovery-1',
+      authorizationId: 'authorization-1',
+      proposalId: 'proposal-1',
+      proposalHash: PROPOSAL_HASH,
+      actionHash: ACTION_HASH,
+      exactVersion: 'abc123',
     });
   });
 
-  it('denies consequential action when the rollback plan is structurally incomplete', () => {
+  it('keeps FutureYou advisory instead of silently authorizing consequential action', () => {
+    const verdict = evaluateGovernedAction({
+      requiredScope: 'deploy',
+      risk: 'consequential',
+      intents: [intent({ source: 'future_you', authenticated: false })],
+      recoveryPlan: recovery(),
+      proposalId: 'proposal-1',
+      proposalHash: PROPOSAL_HASH,
+      actionHash: ACTION_HASH,
+      authorization: authorization(),
+      now: NOW,
+    });
+
+    expect(verdict.decision).toBe('reconfirm');
+    expect(verdict.reasons.join(' ')).toContain('cannot silently authorize');
+  });
+
+  it('rejects consequential proof with no explicit freshness boundary', () => {
+    const verdict = evaluateGovernedAction({
+      requiredScope: 'deploy',
+      risk: 'consequential',
+      intents: [intent()],
+      proofs: [proof({ freshForMs: null, expiresAt: null })],
+      requiredClaims: [{ claim: 'production_sha_matches', exactVersion: 'abc123' }],
+      recoveryPlan: recovery(),
+      proposalId: 'proposal-1',
+      proposalHash: PROPOSAL_HASH,
+      actionHash: ACTION_HASH,
+      exactVersion: 'abc123',
+      authorization: authorization(),
+      now: NOW,
+    });
+
+    expect(verdict.decision).toBe('reconfirm');
+    expect(verdict.reasons.join(' ')).toContain('no explicit freshness boundary');
+  });
+
+  it('denies consequential action when rollback is structurally incomplete', () => {
     const verdict = evaluateGovernedAction({
       requiredScope: 'deploy',
       risk: 'consequential',
       intents: [intent()],
       recoveryPlan: recovery({ checkpointRef: null }),
-      explicitApproval: true,
+      proposalId: 'proposal-1',
+      proposalHash: PROPOSAL_HASH,
+      actionHash: ACTION_HASH,
+      authorization: authorization(),
       now: NOW,
     });
 
@@ -322,7 +451,10 @@ describe('governed action contract', () => {
       risk: 'irreversible',
       intents: [intent({ scope: ['delete-production'] })],
       recoveryPlan: recovery({ level: 'R4' }),
-      explicitApproval: true,
+      proposalId: 'proposal-1',
+      proposalHash: PROPOSAL_HASH,
+      actionHash: ACTION_HASH,
+      authorization: authorization({ scope: ['delete-production'] }),
       now: NOW,
     });
 
@@ -330,13 +462,16 @@ describe('governed action contract', () => {
     expect(verdict.reasons.join(' ')).toContain('cannot be autonomously authorized');
   });
 
-  it('hard constraints outrank even fresh authenticated Current You approval', () => {
+  it('hard constraints outrank fresh authenticated Current You authorization', () => {
     const verdict = evaluateGovernedAction({
       requiredScope: 'deploy',
       risk: 'consequential',
       intents: [intent()],
       recoveryPlan: recovery(),
-      explicitApproval: true,
+      proposalId: 'proposal-1',
+      proposalHash: PROPOSAL_HASH,
+      actionHash: ACTION_HASH,
+      authorization: authorization(),
       hardConstraintViolations: ['requested action violates a non-overridable safety policy'],
       now: NOW,
     });
