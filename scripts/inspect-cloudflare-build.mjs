@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 
 const accountId = process.env.CF_ACCOUNT_ID?.trim();
 const apiToken = process.env.CF_API_TOKEN ?? "";
@@ -9,9 +9,9 @@ const expectedHeadSha =
 const workerName = process.env.CF_WORKER_NAME?.trim() || "founder-control-room";
 const apiHostname =
   process.env.CF_API_HOSTNAME?.trim() || "api.foundercontrolroom.org";
-const expectedWorkerGitMode =
-  process.env.CF_EXPECT_WORKER_GIT_MODE?.trim() ||
-  "disconnected-or-non-promoting";
+const authorityPolicyPath =
+  process.env.CF_WORKER_GIT_AUTHORITY_POLICY?.trim() ||
+  "config/cloudflare-worker-git-authority-policy.json";
 const receiptPath = "test-results/cloudflare-build-diagnostic.json";
 const apiBase = "https://api.cloudflare.com/client/v4";
 
@@ -44,6 +44,73 @@ function providerMessages(body) {
       typeof entry === "string" ? entry : entry?.message,
     ),
   ].filter(Boolean);
+}
+
+function isNonPromotingDeployCommand(command) {
+  return /\bwrangler\s+versions\s+upload\b/i.test(String(command ?? ""));
+}
+
+async function loadAuthorityPolicy(path) {
+  const raw = await readFile(path, "utf8");
+  const policy = JSON.parse(raw);
+  const allowedSafeStates = Array.isArray(policy?.allowedSafeStates)
+    ? policy.allowedSafeStates
+    : [];
+  const historicalDisconnect = Array.isArray(policy?.historicalDecisions)
+    ? policy.historicalDecisions.find((entry) => entry?.decision === "disconnect")
+    : null;
+
+  const errors = [];
+  if (policy?.kind !== "fcr/cloudflare-worker-git-authority-policy@v1") {
+    errors.push("policy kind must be fcr/cloudflare-worker-git-authority-policy@v1");
+  }
+  if (policy?.policyVersion !== 1) errors.push("policyVersion must be 1");
+  if (policy?.workerName !== workerName) errors.push("policy workerName mismatch");
+  if (policy?.apiHostname !== apiHostname) errors.push("policy apiHostname mismatch");
+  if (policy?.canonicalProductionAuthority !== "github-manual-deploy-workflow") {
+    errors.push("canonical production authority must remain the GitHub manual deploy workflow");
+  }
+  if (policy?.safetyInvariant !== "native-worker-git-must-not-promote-production") {
+    errors.push("policy safety invariant is unsupported");
+  }
+  if (!allowedSafeStates.includes("disconnected") || !allowedSafeStates.includes("non-promoting")) {
+    errors.push("allowedSafeStates must preserve disconnected and non-promoting safety states");
+  }
+  if (allowedSafeStates.includes("automatic-production-deploy-conflict")) {
+    errors.push("promoting Worker Git may not be an allowed safe state");
+  }
+  if (policy?.currentDesiredState !== "non-promoting") {
+    errors.push("current desired Worker Git state must be non-promoting");
+  }
+  if (!isNonPromotingDeployCommand(policy?.currentDesiredDeployCommand)) {
+    errors.push("current desired deploy command must use wrangler versions upload");
+  }
+  if (policy?.policyRole !== "desired-state-only" || policy?.canAuthorizeProviderMutation !== false) {
+    errors.push("desired-state policy may not authorize provider mutation");
+  }
+  if (
+    policy?.currentFounderIntent?.source !== "current_authenticated_founder" ||
+    policy?.currentFounderIntent?.status !== "current" ||
+    policy?.currentFounderIntent?.persistsUntilSuperseded !== true ||
+    policy?.currentFounderIntent?.freshApprovalRequiredForConsequentialMutation !== true ||
+    policy?.currentFounderIntent?.historicalDecisionsCanAuthorize !== false
+  ) {
+    errors.push("current founder intent policy must remain current-until-superseded and non-executing");
+  }
+  if (
+    historicalDisconnect?.status !== "superseded-safe-fallback" ||
+    historicalDisconnect?.maySatisfySafetyInvariant !== true ||
+    historicalDisconnect?.isCurrentPreference !== false ||
+    historicalDisconnect?.canAuthorizeProviderMutation !== false
+  ) {
+    errors.push("historical disconnect decision must remain a non-authorizing safe fallback");
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`WORKER_GIT_AUTHORITY_POLICY_INVALID: ${errors.join("; ")}`);
+  }
+
+  return policy;
 }
 
 function classifyTokenShape(token) {
@@ -192,10 +259,6 @@ function normalizeTriggers(result) {
   return [];
 }
 
-function isNonPromotingDeployCommand(command) {
-  return /\bwrangler\s+versions\s+upload\b/i.test(String(command ?? ""));
-}
-
 function canTargetProductionBranch(trigger) {
   const includes = Array.isArray(trigger?.branch_includes)
     ? trigger.branch_includes.map((value) => String(value).trim())
@@ -237,15 +300,25 @@ function fail(message) {
   console.error(safe);
 }
 
+let authorityPolicy = null;
+let policyLoadError = null;
+try {
+  authorityPolicy = await loadAuthorityPolicy(authorityPolicyPath);
+} catch (error) {
+  policyLoadError = error instanceof Error ? error.message : String(error);
+}
+
+const inspectedAt = new Date().toISOString();
 const receipt = {
   ok: false,
   scope: "cloudflare-worker-git-authority",
   workerName,
   apiHostname,
   expectedHeadSha: expectedHeadSha || null,
-  expectedWorkerGitMode,
-  canonicalProductionAuthority: "github-manual-deploy-workflow",
-  inspectedAt: new Date().toISOString(),
+  authorityPolicyPath,
+  canonicalProductionAuthority:
+    authorityPolicy?.canonicalProductionAuthority || "github-manual-deploy-workflow",
+  inspectedAt,
   providerCredentials: {
     accountIdPresent: Boolean(accountId),
     apiTokenPresent: Boolean(apiToken),
@@ -261,8 +334,75 @@ const receipt = {
     promotingTriggerCount: null,
     triggers: [],
   },
+  truthLanes: {
+    observed: {
+      source: "cloudflare-provider-readback",
+      state: "unknown",
+      observedAt: inspectedAt,
+    },
+    safety: {
+      invariant:
+        authorityPolicy?.safetyInvariant ||
+        "native-worker-git-must-not-promote-production",
+      satisfied: null,
+    },
+    allowed: {
+      safeStates: authorityPolicy?.allowedSafeStates || [],
+    },
+    desired: {
+      state: authorityPolicy?.currentDesiredState || null,
+      deployCommand: authorityPolicy?.currentDesiredDeployCommand || null,
+      source: "current-founder-intent-policy",
+      status: authorityPolicy?.currentFounderIntent?.status || null,
+      persistsUntilSuperseded:
+        authorityPolicy?.currentFounderIntent?.persistsUntilSuperseded ?? null,
+      canAuthorizeProviderMutation: false,
+    },
+    authority: {
+      production: authorityPolicy?.canonicalProductionAuthority || "github-manual-deploy-workflow",
+      freshApprovalRequiredForConsequentialMutation:
+        authorityPolicy?.currentFounderIntent
+          ?.freshApprovalRequiredForConsequentialMutation ?? true,
+    },
+    drift: {
+      class: "unknown",
+      currentPreferenceMatched: null,
+    },
+  },
+  analytics: {
+    observationOnly: true,
+    observedMode: "unknown",
+    safetySatisfied: null,
+    desiredMatched: null,
+    driftClass: "unknown",
+    observedAt: inspectedAt,
+    canAuthorizeProviderMutation: false,
+  },
   error: null,
 };
+
+function applyAuthorityPolicy(observedState) {
+  receipt.truthLanes.observed.state = observedState;
+  receipt.analytics.observedMode = observedState;
+
+  if (!authorityPolicy) return;
+
+  const safetySatisfied = authorityPolicy.allowedSafeStates.includes(observedState);
+  const currentPreferenceMatched =
+    safetySatisfied && observedState === authorityPolicy.currentDesiredState;
+  const driftClass = !safetySatisfied
+    ? "unsafe"
+    : currentPreferenceMatched
+      ? "none"
+      : "safe-but-not-current";
+
+  receipt.truthLanes.safety.satisfied = safetySatisfied;
+  receipt.truthLanes.drift.class = driftClass;
+  receipt.truthLanes.drift.currentPreferenceMatched = currentPreferenceMatched;
+  receipt.analytics.safetySatisfied = safetySatisfied;
+  receipt.analytics.desiredMatched = currentPreferenceMatched;
+  receipt.analytics.driftClass = driftClass;
+}
 
 try {
   if (!expectedHeadSha || !/^[0-9a-f]{40}$/.test(expectedHeadSha)) {
@@ -271,10 +411,8 @@ try {
     );
   }
 
-  if (expectedWorkerGitMode !== "disconnected-or-non-promoting") {
-    throw new Error(
-      `Unsupported CF_EXPECT_WORKER_GIT_MODE: ${expectedWorkerGitMode}.`,
-    );
+  if (policyLoadError) {
+    throw new Error(policyLoadError);
   }
 
   if (!accountId || !apiToken) {
@@ -397,13 +535,19 @@ try {
 
             if (sanitizedTriggers.length === 0) {
               receipt.workerGitAuthority.state = "disconnected";
+              applyAuthorityPolicy("disconnected");
+              fail(
+                `WORKER_GIT_CURRENT_TOPOLOGY_DRIFT: observed disconnected is safe but not the current desired state ${authorityPolicy.currentDesiredState}. Historical safe fallbacks do not override current founder intent.`,
+              );
             } else if (promotingTriggers.length === 0) {
               receipt.workerGitAuthority.state = "non-promoting";
+              applyAuthorityPolicy("non-promoting");
             } else {
               receipt.workerGitAuthority.state =
                 "automatic-production-deploy-conflict";
+              applyAuthorityPolicy("automatic-production-deploy-conflict");
               fail(
-                `WORKER_GIT_AUTO_DEPLOY_AUTHORITY_CONFLICT: found ${promotingTriggers.length} active Worker Git trigger(s) that can promote production. Disconnect Worker Builds or use a non-promoting "wrangler versions upload" deploy command.`,
+                `WORKER_GIT_AUTO_DEPLOY_AUTHORITY_CONFLICT: found ${promotingTriggers.length} active Worker Git trigger(s) that can promote production. Current desired topology keeps Worker Git connected but non-promoting with "wrangler versions upload"; production promotion remains a separately approved GitHub manual deploy.`,
               );
             }
           }

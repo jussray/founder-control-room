@@ -29,6 +29,28 @@ A Cloudflare incident can present several facts that look contradictory:
 
 The engine separates those states rather than compressing them into “Cloudflare is broken.” That sentence is emotionally satisfying and operationally useless.
 
+## Temporal truth and intent drift
+
+A statement can be accurate when recorded and wrong when reused later. The Control Room must therefore distinguish five lanes instead of flattening them into one memory value:
+
+1. **Observed** — what repository, provider, runtime, or human-outcome evidence says now. Provider/runtime facts require fresh at-use evidence under the Truth Lease contract.
+2. **Safety invariant** — what must remain true regardless of current preference. For the FCR Worker, native Worker Git may not promote production outside the governed deploy authority.
+3. **Allowed safe states** — states that satisfy the invariant. `disconnected` and `non-promoting` are both safe with respect to duplicate production promotion.
+4. **Current desired state** — the founder's current product/architecture preference. The current Worker Git preference is connected but non-promoting, with `npx wrangler versions upload` as the deploy command.
+5. **Historical decision** — what was once recommended or preferred. A historical disconnect recommendation remains useful provenance and may still describe a safe fallback, but it is not current intent and cannot authorize a provider change.
+
+This separation fixes the failure mode where “disconnect Worker Git Builds” was once a defensible safe recommendation and later got repeated as though it were the current architecture plan. The problem was not that the old statement had never been true. The problem was that **allowed safe state**, **current preference**, and **execution authority** had been collapsed.
+
+The machine-readable source for this specific topology is `config/cloudflare-worker-git-authority-policy.json`. It is a desired-state policy only. It cannot authorize a Cloudflare mutation. Founder preference may persist until explicitly superseded so the product can remember what the founder wants, while any consequential provider mutation still requires a fresh Current You approval. Conversely, provider/runtime facts do not persist merely because the founder remembers them; they must be re-observed at the boundary where they are used.
+
+The Worker Git authority receipt exposes the same Product Design hierarchy explicitly:
+
+```text
+OBSERVED → SAFETY → ALLOWED → DESIRED → AUTHORITY → DRIFT
+```
+
+Analytics may count the resulting state and drift classification, but analytics is observation-only. It cannot infer a new desired state, authorize a mutation, or turn historical frequency into founder intent.
+
 ## Input contract
 
 The reasoner accepts sanitized, timestamped observations such as:
@@ -121,18 +143,20 @@ It writes one sanitized `cloudflare_reasoning_completed` event. If that audit wr
 
 ## Recovery example
 
-When native Git deployment succeeds while an old token-upload workflow reports Cloudflare code `9109`, the reasoner should not immediately demand another token. It should first detect two deployment authorities and propose reducing the system to one authority through a separately approved repository change.
+When native Git deployment succeeds while an old token-upload workflow reports Cloudflare code `9109`, the reasoner should not immediately demand another token. It should first detect two deployment authorities and propose reducing the system to one production authority through a separately approved repository or provider change.
+
+For Founder Control Room specifically, a native Worker Git trigger may remain connected when it is non-promoting. A provider read-back showing `wrangler versions upload` satisfies the current desired topology; a disconnected trigger satisfies the safety invariant but is reported as `safe-but-not-current`; a production-capable `wrangler deploy` trigger is an authority conflict.
 
 The complete reasoning path becomes:
 
 ```text
 Observe the contradiction
-→ attack the assumption that the token path is required
+→ separate provider fact from remembered architecture preference
+→ attack the assumption that every safe fallback is current intent
 → inspect authority and provenance
 → identify the bottleneck and leverage point
-→ question why two authorities exist
-→ delete the obsolete path before optimizing credentials
-→ simplify to one authority and one evidence contract
+→ preserve one production promotion authority
+→ keep useful non-promoting evidence paths when they match current intent
 → verify the exact deployed commit and runtime health
 → retain rollback and approval boundaries
 → automate only repeated read-only evidence refresh
