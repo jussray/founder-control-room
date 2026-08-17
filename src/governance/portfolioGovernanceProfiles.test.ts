@@ -35,10 +35,12 @@ function authorization(scope: string): ExecutionAuthorization {
     actorId: 'founder',
     source: 'current_user',
     intentId: `intent-${scope}`,
+    intentHash: `intent-hash-${scope}`,
     proposalId: `proposal-${scope}`,
     proposalHash: PROPOSAL_HASH,
     actionHash: ACTION_HASH,
     scope: [scope],
+    risk: 'consequential',
     issuedAt: '2026-08-17T03:40:00.000Z',
     expiresAt: '2026-08-17T04:00:00.000Z',
     authenticated: true,
@@ -78,6 +80,7 @@ function request(scope: string, overrides: Partial<GovernedActionRequest> = {}):
     proposalHash: PROPOSAL_HASH,
     actionHash: ACTION_HASH,
     authorization: authorization(scope),
+    authorizationReplayState: 'unused',
     now: NOW,
     ...overrides,
   };
@@ -94,18 +97,9 @@ describe('active portfolio governance registry', () => {
   it('covers every currently governed canonical active repository without double-counting retired demos', () => {
     const repositories = PORTFOLIO_GOVERNANCE_PROFILES.flatMap((profile) => profile.repositories);
     expect(repositories).toEqual(expect.arrayContaining([
-      'jussray/founder-control-room',
-      'jussray/chief-ai-machine',
-      'jussray/promptos',
-      'jussray/Sekret-Bip',
-      'jussray/Se-kretBip',
-      'jussray/jussbeautifulhair-site',
-      'jussray/jbh-private',
-      'jussray/StoryEngine',
-      'jussray/solcontinuity',
-      'jussray/SleepWealth-Agent',
-      'jussray/untold-stories-storefront',
-      'jussray/Sweats',
+      'jussray/founder-control-room', 'jussray/chief-ai-machine', 'jussray/promptos', 'jussray/Sekret-Bip', 'jussray/Se-kretBip',
+      'jussray/jussbeautifulhair-site', 'jussray/jbh-private', 'jussray/StoryEngine', 'jussray/solcontinuity', 'jussray/SleepWealth-Agent',
+      'jussray/untold-stories-storefront', 'jussray/Sweats',
     ]));
     expect(repositories).not.toContain('jussray/jussbeautifulhair1');
     expect(repositories).not.toContain('jussray/sekret-bip-demo');
@@ -119,54 +113,32 @@ describe('active portfolio governance registry', () => {
 
 describe('hard portfolio boundaries', () => {
   it('keeps SleepWealth paper-only by rejecting a live trade request before any proof can authorize it', () => {
-    const verdict = evaluatePortfolioGovernedAction(
-      'jussray/SleepWealth-Agent',
-      'live-trade',
-      request('live-trade'),
-    );
+    const verdict = evaluatePortfolioGovernedAction('jussray/SleepWealth-Agent', 'live-trade', request('live-trade'));
     expect(verdict.decision).toBe('deny');
     expect(verdict.reasons.join(' ')).toContain('explicitly blocks action: live-trade');
   });
 
   it('keeps Bip Jr public social and permission escalation blocked', () => {
-    expect(portfolioHardConstraintViolations('jussray/Se-kretBip', 'enable-public-social')).toContain(
-      'project profile explicitly blocks action: enable-public-social',
-    );
-    expect(portfolioHardConstraintViolations('jussray/Se-kretBip', 'expand-child-permissions-without-adult')).toContain(
-      'project profile explicitly blocks action: expand-child-permissions-without-adult',
-    );
+    expect(portfolioHardConstraintViolations('jussray/Se-kretBip', 'enable-public-social')).toContain('project profile explicitly blocks action: enable-public-social');
+    expect(portfolioHardConstraintViolations('jussray/Se-kretBip', 'expand-child-permissions-without-adult')).toContain('project profile explicitly blocks action: expand-child-permissions-without-adult');
   });
 
   it('keeps StoryEngine source analysis from auto-promoting canon', () => {
-    const verdict = evaluatePortfolioGovernedAction(
-      'jussray/StoryEngine',
-      'auto-promote-canon',
-      request('auto-promote-canon'),
-    );
-    expect(verdict.decision).toBe('deny');
+    expect(evaluatePortfolioGovernedAction('jussray/StoryEngine', 'auto-promote-canon', request('auto-promote-canon')).decision).toBe('deny');
   });
 
   it('keeps SWEATS honest while its runtime remains unimplemented', () => {
-    const verdict = evaluatePortfolioGovernedAction(
-      'jussray/Sweats',
-      'production-claim',
-      request('production-claim'),
-    );
+    const verdict = evaluatePortfolioGovernedAction('jussray/Sweats', 'production-claim', request('production-claim'));
     expect(verdict.decision).toBe('deny');
     expect(verdict.reasons.join(' ')).toContain('no implemented runtime authority');
   });
 
   it('does not let a caller downgrade FCR deploy from consequential to reversible to skip authorization', () => {
-    const verdict = evaluatePortfolioGovernedAction(
-      'jussray/founder-control-room',
-      'deploy',
-      request('deploy', {
-        risk: 'reversible',
-        proofs: [proof('repository_head_matches_plan'), proof('production_authority_is_singular')],
-        authorization: null,
-      }),
-    );
-
+    const verdict = evaluatePortfolioGovernedAction('jussray/founder-control-room', 'deploy', request('deploy', {
+      risk: 'reversible',
+      proofs: [proof('repository_head_matches_plan'), proof('production_authority_is_singular')],
+      authorization: null,
+    }));
     expect(verdict.decision).toBe('reconfirm');
     expect(verdict.reasons.join(' ')).toContain('bound execution authorization');
   });
@@ -174,71 +146,52 @@ describe('hard portfolio boundaries', () => {
 
 describe('project-specific proof contracts', () => {
   it('requires both exact runtime and commerce-path proof before Untold can make a production claim', () => {
-    const first = evaluatePortfolioGovernedAction(
-      'jussray/untold-stories-storefront',
-      'production_claim',
-      request('production_claim', {
-        proofs: [proof('exact_production_version_verified')],
-      }),
-    );
+    const first = evaluatePortfolioGovernedAction('jussray/untold-stories-storefront', 'production_claim', request('production_claim', {
+      proofs: [proof('exact_production_version_verified')],
+    }));
     expect(first.decision).toBe('reconfirm');
     expect(first.reasons.join(' ')).toContain('commerce_path_verified');
 
-    const complete = evaluatePortfolioGovernedAction(
-      'jussray/untold-stories-storefront',
-      'production_claim',
-      request('production_claim', {
-        proofs: [
-          proof('exact_production_version_verified'),
-          proof('commerce_path_verified'),
-        ],
-      }),
-    );
+    const complete = evaluatePortfolioGovernedAction('jussray/untold-stories-storefront', 'production_claim', request('production_claim', {
+      proofs: [proof('exact_production_version_verified'), proof('commerce_path_verified')],
+    }));
     expect(complete.decision).toBe('allow');
   });
 
   it('requires provider-backed commerce receipt before JBH completion can be claimed', () => {
-    const missing = evaluatePortfolioGovernedAction(
-      'jussray/jussbeautifulhair-site',
-      'commerce_completion',
-      request('commerce_completion'),
-    );
+    const missing = evaluatePortfolioGovernedAction('jussray/jussbeautifulhair-site', 'commerce_completion', request('commerce_completion'));
     expect(missing.decision).toBe('reconfirm');
     expect(missing.reasons.join(' ')).toContain('commerce_provider_receipt_verified');
 
-    const complete = evaluatePortfolioGovernedAction(
-      'jussray/jussbeautifulhair-site',
-      'commerce_completion',
-      request('commerce_completion', {
-        proofs: [proof('commerce_provider_receipt_verified')],
-      }),
-    );
+    const complete = evaluatePortfolioGovernedAction('jussray/jussbeautifulhair-site', 'commerce_completion', request('commerce_completion', {
+      proofs: [proof('commerce_provider_receipt_verified')],
+    }));
     expect(complete.decision).toBe('allow');
   });
 
   it('requires creator approval and source lineage for StoryEngine canonization', () => {
-    const verdict = evaluatePortfolioGovernedAction(
-      'jussray/StoryEngine',
-      'canonize',
-      request('canonize', {
-        proofs: [proof('creator_approval_verified')],
-      }),
-    );
+    const verdict = evaluatePortfolioGovernedAction('jussray/StoryEngine', 'canonize', request('canonize', {
+      proofs: [proof('creator_approval_verified')],
+    }));
     expect(verdict.decision).toBe('reconfirm');
     expect(verdict.reasons.join(' ')).toContain('source_lineage_verified');
   });
 
   it('rejects an authorization copied from a different portfolio action', () => {
-    const verdict = evaluatePortfolioGovernedAction(
-      'jussray/jussbeautifulhair-site',
-      'commerce_completion',
-      request('commerce_completion', {
-        proofs: [proof('commerce_provider_receipt_verified')],
-        authorization: authorization('production_claim'),
-      }),
-    );
-
+    const verdict = evaluatePortfolioGovernedAction('jussray/jussbeautifulhair-site', 'commerce_completion', request('commerce_completion', {
+      proofs: [proof('commerce_provider_receipt_verified')],
+      authorization: authorization('production_claim'),
+    }));
     expect(verdict.decision).toBe('reconfirm');
     expect(verdict.reasons.join(' ')).toContain('different intent');
+  });
+
+  it('fails closed when a consequential portfolio action cannot prove authorization replay state', () => {
+    const verdict = evaluatePortfolioGovernedAction('jussray/StoryEngine', 'canonize', request('canonize', {
+      proofs: [proof('creator_approval_verified'), proof('source_lineage_verified')],
+      authorizationReplayState: 'unknown',
+    }));
+    expect(verdict.decision).toBe('reconfirm');
+    expect(verdict.reasons.join(' ')).toContain('unused status must be proven');
   });
 });
