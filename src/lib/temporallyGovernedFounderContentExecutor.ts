@@ -5,11 +5,13 @@ import {
   type FirstPartyFounderPublishResult,
 } from './firstPartyFounderContentExecutor.js';
 import {
-  TEMPORAL_CLAIM_TRUTH_CONTRACT,
+  TEMPORAL_CLAIM_CLASSES,
+  buildTemporalClaimTruthContextFromCanonical,
   revalidateTemporalPublicClaims,
   temporalTruthAnalytics,
+  type CanonicalPublicClaim,
   type RepositoryTruthResolver,
-  type TemporalClaimTruthContext,
+  type TemporalClaimClass,
   type TemporalClaimTruthReceipt,
 } from '../governance/temporalClaimTruth.js';
 // @ts-expect-error -- canonical founder-content authority intentionally remains the CommonJS firewall contract.
@@ -29,7 +31,6 @@ interface CanonicalFounderContentContract {
 const canonicalFounderContent = founderContentAuthorizationContract as CanonicalFounderContentContract;
 
 export interface TemporallyGovernedFounderPublishInput extends FirstPartyFounderPublishInput {
-  truth_context?: TemporalClaimTruthContext;
   confirmation: FirstPartyFounderPublishInput['confirmation'] & { truth_context_hash?: string };
 }
 
@@ -48,6 +49,11 @@ function text(value: unknown): string {
 
 function record(value: unknown): JsonRecord {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonRecord : {};
+}
+
+function temporalClass(value: unknown): TemporalClaimClass | null {
+  const candidate = text(value).toLowerCase() as TemporalClaimClass;
+  return TEMPORAL_CLAIM_CLASSES.includes(candidate) ? candidate : null;
 }
 
 async function defaultTruthResolver(): Promise<RepositoryTruthResolver> {
@@ -114,12 +120,6 @@ export async function dispatchTemporallyGovernedFounderContentPublishNow(
     reasons: [],
   };
 
-  if (!input.truth_context || input.truth_context.contract !== TEMPORAL_CLAIM_TRUTH_CONTRACT) {
-    return blocked(emptyBase, null, [
-      'every direct publication requires an explicit temporal truth context; verified-without-time is not publish authority',
-    ]);
-  }
-
   let authorization: JsonRecord;
   let identity: JsonRecord;
   try {
@@ -138,18 +138,48 @@ export async function dispatchTemporallyGovernedFounderContentPublishNow(
   const source = record(authorization.source);
   const payload = record(identity.public_payload);
   const claimsRaw = Array.isArray(payload.public_claims) ? payload.public_claims : [];
-  const canonicalClaims = claimsRaw.map((claim) => {
+  const canonicalClaims: CanonicalPublicClaim[] = [];
+  const classificationErrors: string[] = [];
+
+  for (const claim of claimsRaw) {
     const value = record(claim);
-    return {
-      claimId: text(value.claim_id),
+    const claimId = text(value.claim_id).toLowerCase();
+    const claimTemporalClass = temporalClass(value.temporal_class);
+    const temporalVersion = text(value.temporal_version).toLowerCase() || null;
+    if (!claimTemporalClass) {
+      classificationErrors.push(`${claimId || '<missing>'}: canonical temporal_class is required for direct publication`);
+      continue;
+    }
+    canonicalClaims.push({
+      claimId,
+      text: text(value.text),
       evidenceRef: text(value.evidence_ref),
       evidenceScope: text(value.evidence_scope),
-    };
+      temporalClass: claimTemporalClass,
+      temporalVersion,
+    });
+  }
+
+  if (classificationErrors.length > 0 || canonicalClaims.length !== claimsRaw.length || canonicalClaims.length === 0) {
+    return blocked(emptyBase, null, [
+      'direct publication is fail-closed until every approved public claim has proposal-bound temporal semantics',
+      ...classificationErrors,
+    ]);
+  }
+
+  const temporalContext = buildTemporalClaimTruthContextFromCanonical({
+    proposalHash: text(authorization.proposal_hash),
+    publicPayloadHash: text(authorization.public_payload_hash),
+    claims: canonicalClaims,
   });
 
-  const resolver = options.truthResolver ?? await defaultTruthResolver();
+  const needsRepoRead = canonicalClaims.some((claim) => claim.temporalClass === 'current_repo_state');
+  const resolver = options.truthResolver ?? (needsRepoRead
+    ? await defaultTruthResolver()
+    : { currentVersion: async () => { throw new Error('repository read is not required for this claim set'); } });
+
   const temporalTruth = await revalidateTemporalPublicClaims({
-    context: input.truth_context,
+    context: temporalContext,
     canonicalClaims,
     sourceRepo: text(source.repo),
     sourceCommitSha: text(source.commit_sha),
@@ -165,7 +195,7 @@ export async function dispatchTemporallyGovernedFounderContentPublishNow(
       .filter((claim) => !claim.publishSafe)
       .map((claim) => `${claim.claimId}: ${claim.displayLabel}`);
     return blocked(emptyBase, temporalTruth, [
-      'publication stopped because one or more once-true claims are not proven current for their declared temporal class',
+      'publication stopped because one or more approved claims are not proven valid for their proposal-bound temporal class',
       ...reasons,
     ]);
   }
