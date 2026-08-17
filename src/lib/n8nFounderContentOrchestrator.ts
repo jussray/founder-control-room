@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import { executionScopeMatches } from './idempotencyScope.js';
-import { supabase } from './supabaseClient.js';
 // @ts-expect-error -- the canonical #428 social-distribution contract is CommonJS and intentionally remains the single authority implementation.
 import socialDistributionContract from '../../tools/zapier/social-distribution-contract.cjs';
 
@@ -196,6 +195,11 @@ function validTimestamp(value: string): boolean {
   return Boolean(value) && Number.isFinite(Date.parse(value));
 }
 
+async function founderContentDb() {
+  const { supabase } = await import('./supabaseClient.js');
+  return supabase;
+}
+
 export function readN8nFounderContentConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): N8nFounderContentConfig {
@@ -362,6 +366,7 @@ export function verifyN8nFounderContentReceipt(
 async function findFounderContentExecution(
   idempotencyKey: string,
 ): Promise<{ data: FounderContentExecutionRecord | null; error: { message: string } | null }> {
+  const supabase = await founderContentDb();
   const { data, error } = await supabase
     .from('approval_executions')
     .select('id, mission_id, project_id, action_type, status')
@@ -383,6 +388,7 @@ export async function reserveN8nFounderContentExecution(
     };
   }
 
+  const supabase = await founderContentDb();
   const { data: projectRows, error: projectError } = await supabase
     .from('projects')
     .select('id, repo_identifier')
@@ -489,6 +495,7 @@ export async function finalizeN8nFounderContentExecution(
   executionId: string,
   receipt: VerifiedN8nFounderContentReceipt,
 ): Promise<boolean> {
+  const supabase = await founderContentDb();
   const { data, error } = await supabase
     .from('approval_executions')
     .update({
@@ -555,9 +562,7 @@ export async function dispatchN8nFounderContent(
 
   const reservation = await reserveN8nFounderContentExecution(request, executedBy);
   if (!reservation.ok) {
-    const status = reservation.code === 'SOURCE_PROJECT_UNRESOLVED' ? 409
-      : reservation.code === 'ACTION_RESERVATION_FAILED' ? 503
-        : 409;
+    const status = reservation.code === 'ACTION_RESERVATION_FAILED' ? 503 : 409;
     return {
       ok: false,
       code: reservation.code,

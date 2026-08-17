@@ -77,7 +77,7 @@ interface DbOptions {
 
 function installDb(options: DbOptions = {}) {
   const events: string[] = [];
-  const insertMock = vi.fn((payload: Record<string, unknown>) => ({
+  const insertMock = vi.fn((_payload: Record<string, unknown>) => ({
     select: () => ({
       single: async () => {
         events.push('reserve');
