@@ -21,8 +21,16 @@ const page = await browser.newPage({
 try {
   await page.goto(pathToFileURL(pagePath).href, { waitUntil: 'domcontentloaded' });
 
-  const title = await page.locator('h1').innerText();
-  assert.equal(title, 'Post from your own product.');
+  assert.equal(await page.locator('h1').innerText(), 'Post from your own product.');
+  assert.equal(await page.locator('main').getAttribute('data-content-authority-state'), 'awaiting-draft');
+  assert.equal(await page.locator('[data-first-party-draft-preview]').getAttribute('data-draft-state'), 'empty');
+  assert.match(await page.locator('[data-first-party-draft-preview]').innerText(), /No canonical draft loaded/i);
+  assert.equal(await page.locator('[data-internal-evidence-state]').getAttribute('data-internal-evidence-state'), 'unknown');
+  assert.equal(await page.locator('[data-sauce-state]').getAttribute('data-sauce-state'), 'unknown');
+  assert.equal(await page.locator('[data-public-proof-state]').getAttribute('data-public-proof-state'), 'optional-off');
+  assert.equal(await page.locator('[data-current-you-state]').getAttribute('data-current-you-state'), 'not-requested');
+  assert.equal(await page.locator('[data-provider-state]').getAttribute('data-provider-state'), 'not-handed-off');
+  assert.equal(await page.locator('[data-public-proof-link-toggle]').count(), 0, 'empty state must not expose a fake proof-link control');
 
   const stageNames = await page.locator('[data-content-stage] h2').allTextContents();
   assert.deepEqual(stageNames, [
@@ -30,38 +38,32 @@ try {
     'Chief story',
     'Sauce guard',
     'FCR draft',
-    'Current You approval',
+    'Current You',
     'Provider handoff',
     'Outcome learning',
   ]);
 
-  const proofToggle = page.locator('[data-public-proof-link-toggle]');
-  assert.equal(await proofToggle.isChecked(), false, 'public proof link must default off');
-  await proofToggle.check();
-  assert.equal(await proofToggle.isChecked(), true, 'founder can editorially include a public proof link');
-  await proofToggle.uncheck();
-  assert.equal(await proofToggle.isChecked(), false, 'founder can keep the public post link-free');
-
-  const statusText = await page.locator('.status-row').first().innerText();
-  assert.match(statusText, /Internal evidence required/i);
-  assert.match(statusText, /Sauce protected/i);
-  assert.match(statusText, /Public proof link optional/i);
-  assert.match(statusText, /Current You approves/i);
+  const topStatus = await page.locator('.status-row').first().innerText();
+  assert.match(topStatus, /Internal evidence required/i);
+  assert.match(topStatus, /Sauce guard required/i);
+  assert.match(topStatus, /Public proof link optional/i);
+  assert.match(topStatus, /Current You approves/i);
+  assert.doesNotMatch(topStatus, /Verified/i);
 
   const authorityText = await page.locator('.authority').innerText();
   assert.match(authorityText, /Chief AI owns/i);
   assert.match(authorityText, /Founder Control Room owns/i);
   assert.match(authorityText, /Providers own/i);
-  assert.match(authorityText, /Never the canonical copy or founder authority/i);
+  assert.match(authorityText, /Actual publication state/i);
 
-  const actions = await page.locator('.action').allTextContents();
-  assert(actions.includes('Open proof ledger'));
-  assert(actions.includes('Open activity receipts'));
-
-  const policyText = await page.locator('.blocker').innerText();
+  const policyText = await page.locator('.boundary').innerText();
   assert.match(policyText, /does not mean a provider write already happened/i);
-  assert.match(policyText, /OAuth\/API authorization remains a separate provider capability/i);
+  assert.match(policyText, /provider receipt must still be read back/i);
   assert.match(policyText, /published/i);
+
+  const learningText = await page.locator('[data-content-stage="learning"]').innerText();
+  assert.match(learningText, /Missing metrics stay UNKNOWN/i);
+  assert.match(learningText, /analytics can never increase authority/i);
 
   const dimensions = await page.evaluate(() => ({
     viewportWidth: document.documentElement.clientWidth,
@@ -69,7 +71,6 @@ try {
     flowWidth: document.querySelector('.flow')?.clientWidth ?? 0,
     flowScrollWidth: document.querySelector('.flow')?.scrollWidth ?? 0,
   }));
-
   assert.equal(dimensions.pageWidth, dimensions.viewportWidth, 'page must not overflow the mobile viewport');
   assert(dimensions.flowScrollWidth > dimensions.flowWidth, 'workflow must remain horizontally explorable on mobile');
 
@@ -85,8 +86,13 @@ try {
     ok: true,
     route: '/control-room/content-manager.html',
     viewport: '390x844',
+    authorityState: 'awaiting-draft',
+    evidenceState: 'unknown',
+    sauceState: 'unknown',
+    publicProofLinkState: 'optional-off',
+    currentYouState: 'not-requested',
+    providerState: 'not-handed-off',
     stages: stageNames,
-    publicProofLinkDefault: 'off',
     screenshot: 'test-results/content-manager-mobile.png',
     overflow: dimensions,
   }, null, 2));
