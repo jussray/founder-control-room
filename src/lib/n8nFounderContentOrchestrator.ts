@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { executionScopeMatches } from './idempotencyScope.js';
+import { supabase } from './supabaseClient.js';
 // @ts-expect-error -- the canonical #428 social-distribution contract is CommonJS and intentionally remains the single authority implementation.
 import socialDistributionContract from '../../tools/zapier/social-distribution-contract.cjs';
 
@@ -10,6 +12,7 @@ const HASH = /^[0-9a-f]{64}$/i;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const OWNED_REPO = /^jussray\/[A-Za-z0-9._-]+$/;
 const MAX_TEXT = 5000;
+const FOUNDER_CONTENT_ACTION = 'schedule_founder_content';
 
 export type FirstPartyFounderDistributionInput = Record<string, unknown>;
 
@@ -132,6 +135,12 @@ export interface N8nFounderContentDispatchResult {
     | 'ORCHESTRATION_DISABLED'
     | 'ORCHESTRATION_NOT_CONFIGURED'
     | 'INVALID_ENVELOPE'
+    | 'EXECUTION_CONTEXT_REQUIRED'
+    | 'SOURCE_PROJECT_UNRESOLVED'
+    | 'IDEMPOTENCY_SCOPE_MISMATCH'
+    | 'ACTION_ALREADY_RESERVED'
+    | 'ACTION_RESERVATION_FAILED'
+    | 'ACTION_AUDIT_INCOMPLETE'
     | 'UPSTREAM_REJECTED'
     | 'UPSTREAM_RECEIPT_INVALID'
     | 'UPSTREAM_UNREACHABLE';
@@ -144,7 +153,28 @@ export interface N8nFounderContentDispatchResult {
 interface DispatchOptions {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
+  executedBy?: string;
 }
+
+interface FounderContentExecutionRecord {
+  id: string;
+  mission_id: string | null;
+  project_id: string;
+  action_type: string;
+  status: 'pending' | 'succeeded' | 'failed';
+}
+
+export type FounderContentReservationResult =
+  | { ok: true; executionId: string; projectId: string }
+  | {
+      ok: false;
+      code:
+        | 'SOURCE_PROJECT_UNRESOLVED'
+        | 'IDEMPOTENCY_SCOPE_MISMATCH'
+        | 'ACTION_ALREADY_RESERVED'
+        | 'ACTION_RESERVATION_FAILED';
+      reason: string;
+    };
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -329,6 +359,161 @@ export function verifyN8nFounderContentReceipt(
   };
 }
 
+async function findFounderContentExecution(
+  idempotencyKey: string,
+): Promise<{ data: FounderContentExecutionRecord | null; error: { message: string } | null }> {
+  const { data, error } = await supabase
+    .from('approval_executions')
+    .select('id, mission_id, project_id, action_type, status')
+    .eq('idempotency_key', idempotencyKey)
+    .maybeSingle();
+  return { data: data as FounderContentExecutionRecord | null, error };
+}
+
+export async function reserveN8nFounderContentExecution(
+  request: N8nFounderContentRequest,
+  executedBy: string,
+): Promise<FounderContentReservationResult> {
+  const actor = text(executedBy).toLowerCase();
+  if (!actor) {
+    return {
+      ok: false,
+      code: 'ACTION_RESERVATION_FAILED',
+      reason: 'trusted founder execution identity is required',
+    };
+  }
+
+  const { data: projectRows, error: projectError } = await supabase
+    .from('projects')
+    .select('id, repo_identifier')
+    .eq('repo_identifier', request.source.repo)
+    .limit(2);
+
+  if (projectError || !projectRows || projectRows.length !== 1) {
+    return {
+      ok: false,
+      code: 'SOURCE_PROJECT_UNRESOLVED',
+      reason: projectError
+        ? `source project lookup failed: ${projectError.message}`
+        : `source repository ${request.source.repo} must resolve to exactly one FCR project`,
+    };
+  }
+
+  const projectId = String(projectRows[0].id);
+  const expectedScope = {
+    missionId: null,
+    projectId,
+    actionType: FOUNDER_CONTENT_ACTION,
+  };
+  const existing = await findFounderContentExecution(request.orchestrationId);
+  if (existing.error) {
+    return {
+      ok: false,
+      code: 'ACTION_RESERVATION_FAILED',
+      reason: `founder-content reservation lookup failed: ${existing.error.message}`,
+    };
+  }
+  if (existing.data) {
+    if (!executionScopeMatches(existing.data, expectedScope)) {
+      return {
+        ok: false,
+        code: 'IDEMPOTENCY_SCOPE_MISMATCH',
+        reason: 'founder-content idempotency key already exists under a different execution scope',
+      };
+    }
+    return {
+      ok: false,
+      code: 'ACTION_ALREADY_RESERVED',
+      reason: `founder-content authorization is already ${existing.data.status}; exact approval will not be dispatched again`,
+    };
+  }
+
+  const { data: reservation, error: reservationError } = await supabase
+    .from('approval_executions')
+    .insert({
+      mission_id: null,
+      project_id: projectId,
+      action_type: FOUNDER_CONTENT_ACTION,
+      idempotency_key: request.orchestrationId,
+      executed_by: actor,
+      status: 'pending',
+      request: {
+        contract: request.contract,
+        orchestrationId: request.orchestrationId,
+        contentId: request.contentId,
+        platform: request.platform,
+        channel: request.channel,
+        source: request.source,
+        authorizationHash: request.fcrAuthorization.authorizationHash,
+        proposalHash: request.fcrAuthorization.proposalHash,
+        publicPayloadHash: request.fcrAuthorization.publicPayloadHash,
+        currentYouIntentId: request.fcrAuthorization.currentYouIntentId,
+        currentYouIntentVersion: request.fcrAuthorization.currentYouIntentVersion,
+        provider: request.providerRequest.provider,
+        scheduleAt: request.providerRequest.scheduleAt,
+      },
+      result: {},
+      success: null,
+      started_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
+
+  if (reservationError || !reservation?.id) {
+    const raced = await findFounderContentExecution(request.orchestrationId);
+    if (!raced.error && raced.data) {
+      if (!executionScopeMatches(raced.data, expectedScope)) {
+        return {
+          ok: false,
+          code: 'IDEMPOTENCY_SCOPE_MISMATCH',
+          reason: 'founder-content idempotency reservation raced with a different execution scope',
+        };
+      }
+      return {
+        ok: false,
+        code: 'ACTION_ALREADY_RESERVED',
+        reason: `founder-content authorization is already ${raced.data.status}; exact approval will not be dispatched again`,
+      };
+    }
+    return {
+      ok: false,
+      code: 'ACTION_RESERVATION_FAILED',
+      reason: reservationError?.message ?? 'founder-content reservation was not persisted',
+    };
+  }
+
+  return { ok: true, executionId: String(reservation.id), projectId };
+}
+
+export async function finalizeN8nFounderContentExecution(
+  executionId: string,
+  receipt: VerifiedN8nFounderContentReceipt,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('approval_executions')
+    .update({
+      status: 'succeeded',
+      result: {
+        orchestrationId: receipt.orchestrationId,
+        provider: receipt.provider,
+        state: receipt.state,
+        providerItemId: receipt.providerItemId,
+        providerRequestId: receipt.providerRequestId,
+        truthState: receipt.truthState,
+        published: false,
+        requiresProviderReadback: true,
+      },
+      success: true,
+      executed_at: new Date().toISOString(),
+    })
+    .eq('id', executionId)
+    .eq('status', 'pending')
+    .select('id')
+    .maybeSingle();
+
+  return !error && String(data?.id ?? '') === executionId;
+}
+
 export async function dispatchN8nFounderContent(
   input: FirstPartyFounderDistributionInput,
   options: DispatchOptions = {},
@@ -356,6 +541,33 @@ export async function dispatchN8nFounderContent(
     return { ok: false, code: 'ORCHESTRATION_NOT_CONFIGURED', status: 503, request, receipt: null, reasons: ['n8n founder-content webhook and bearer token must be configured'] };
   }
 
+  const executedBy = text(options.executedBy).toLowerCase();
+  if (!executedBy) {
+    return {
+      ok: false,
+      code: 'EXECUTION_CONTEXT_REQUIRED',
+      status: 500,
+      request,
+      receipt: null,
+      reasons: ['server-authenticated founder identity is required before external orchestration'],
+    };
+  }
+
+  const reservation = await reserveN8nFounderContentExecution(request, executedBy);
+  if (!reservation.ok) {
+    const status = reservation.code === 'SOURCE_PROJECT_UNRESOLVED' ? 409
+      : reservation.code === 'ACTION_RESERVATION_FAILED' ? 503
+        : 409;
+    return {
+      ok: false,
+      code: reservation.code,
+      status,
+      request,
+      receipt: null,
+      reasons: [reservation.reason],
+    };
+  }
+
   try {
     const response = await (options.fetchImpl ?? fetch)(config.webhookUrl, {
       method: 'POST',
@@ -377,16 +589,60 @@ export async function dispatchN8nFounderContent(
     }
 
     if (!response.ok) {
-      return { ok: false, code: 'UPSTREAM_REJECTED', status: 502, request, receipt: null, reasons: [`n8n rejected founder-content orchestration with HTTP ${response.status}`] };
+      return {
+        ok: false,
+        code: 'UPSTREAM_REJECTED',
+        status: 502,
+        request,
+        receipt: null,
+        reasons: [
+          `n8n rejected founder-content orchestration with HTTP ${response.status}`,
+          'FCR reservation remains pending; do not retry this exact approval automatically',
+        ],
+      };
     }
 
     try {
       const receipt = verifyN8nFounderContentReceipt(request, body);
+      const finalized = await finalizeN8nFounderContentExecution(reservation.executionId, receipt);
+      if (!finalized) {
+        return {
+          ok: false,
+          code: 'ACTION_AUDIT_INCOMPLETE',
+          status: 502,
+          request,
+          receipt,
+          reasons: [
+            'n8n accepted the request but FCR could not prove the pending reservation transitioned to succeeded',
+            'do not retry this exact approval automatically; reconcile the execution ledger first',
+          ],
+        };
+      }
       return { ok: true, code: 'DISPATCHED', status: 202, request, receipt, reasons: [] };
     } catch (error) {
-      return { ok: false, code: 'UPSTREAM_RECEIPT_INVALID', status: 502, request, receipt: null, reasons: [error instanceof Error ? error.message : 'invalid n8n founder-content receipt'] };
+      return {
+        ok: false,
+        code: 'UPSTREAM_RECEIPT_INVALID',
+        status: 502,
+        request,
+        receipt: null,
+        reasons: [
+          error instanceof Error ? error.message : 'invalid n8n founder-content receipt',
+          'FCR reservation remains pending; do not retry this exact approval automatically',
+        ],
+      };
     }
   } catch {
-    return { ok: false, code: 'UPSTREAM_UNREACHABLE', status: 502, request, receipt: null, reasons: ['n8n founder-content webhook was unreachable'] };
+    return {
+      ok: false,
+      code: 'UPSTREAM_UNREACHABLE',
+      status: 502,
+      request,
+      receipt: null,
+      reasons: [
+        'n8n founder-content webhook outcome is unknown',
+        'FCR reservation remains pending; do not retry this exact approval automatically',
+      ],
+    };
   }
 }

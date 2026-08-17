@@ -108,7 +108,9 @@ n8nConveyorRouter.post('/advance', async (req: FounderRequest, res) => {
 
 n8nConveyorRouter.post('/founder-content', async (req: FounderRequest, res) => {
   const input = (req.body ?? {}) as JsonRecord;
-  const result = await dispatchN8nFounderContent(input);
+  const result = await dispatchN8nFounderContent(input, {
+    executedBy: req.founder!.email,
+  });
 
   return res.status(result.status).json({
     ...result,
