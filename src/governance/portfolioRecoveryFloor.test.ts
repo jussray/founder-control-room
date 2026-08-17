@@ -1,55 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { evaluatePortfolioGovernedAction } from './portfolioGovernanceProfiles.js';
-
-const NOW = new Date('2026-08-17T03:45:00.000Z');
+import { portfolioHardConstraintViolations } from './portfolioGovernanceProfiles.js';
 
 describe('portfolio recovery floors', () => {
-  it('rejects reversible Se’kret work when only an R1 rollback is supplied', () => {
-    const verdict = evaluatePortfolioGovernedAction('jussray/Sekret-Bip', 'reversible-change', {
-      requiredScope: 'reversible-change',
-      risk: 'reversible',
-      intents: [{
-        id: 'current',
-        source: 'current_user',
-        scope: ['reversible-change'],
-        intentHash: 'current-change',
-        issuedAt: '2026-08-17T03:40:00.000Z',
-        authenticated: true,
-      }],
-      recoveryPlan: {
-        id: 'r1',
-        level: 'R1',
-        rollbackAction: 'revert change',
-      },
-      now: NOW,
-    });
+  it('rejects effectful JBH work when only R1 is supplied against the R2 project floor', () => {
+    const violations = portfolioHardConstraintViolations(
+      'jussray/jussbeautifulhair-site',
+      'production_claim',
+      'R1',
+      'reversible',
+    );
 
-    expect(verdict.decision).toBe('deny');
-    expect(verdict.reasons.join(' ')).toContain('requires recovery R2 or stronger');
+    expect(violations).toContain('project requires recovery R2 or stronger; received R1');
   });
 
-  it('accepts the same bounded change when its project recovery floor is met', () => {
-    const verdict = evaluatePortfolioGovernedAction('jussray/Sekret-Bip', 'reversible-change', {
-      requiredScope: 'reversible-change',
-      risk: 'reversible',
-      intents: [{
-        id: 'current',
-        source: 'current_user',
-        scope: ['reversible-change'],
-        intentHash: 'current-change',
-        issuedAt: '2026-08-17T03:40:00.000Z',
-        authenticated: true,
-      }],
-      recoveryPlan: {
-        id: 'r2',
-        level: 'R2',
-        checkpointRef: 'before',
-        rollbackAction: 'revert change',
-        validationAction: 'verify restored state',
-      },
-      now: NOW,
-    });
+  it('clears the recovery-floor violation when R2 is supplied for the same registered action', () => {
+    const violations = portfolioHardConstraintViolations(
+      'jussray/jussbeautifulhair-site',
+      'production_claim',
+      'R2',
+      'reversible',
+    );
 
-    expect(verdict.decision).toBe('allow');
+    expect(violations).toEqual([]);
   });
 });
