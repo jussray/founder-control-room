@@ -60,7 +60,7 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(stackRouter).toContain('new MutationObserver');
   });
 
-  it('routes Workflows through a review-first Cambiante content lifecycle', () => {
+  it('routes Workflows through the current proof-bound founder content lifecycle', () => {
     const app = read('public/control-room/index.html');
     const contentManager = read('public/control-room/content-manager.html');
     const playwrightProof = read('e2e/content-manager-proof.mjs');
@@ -70,13 +70,17 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(contentManager).toContain('Workflow content lifecycle');
     expect(contentManager).not.toContain('Cowork');
     expect(contentManager).toContain('Proof → draft → review → approval → schedule → publish → metrics');
-    expect(contentManager).toContain('create_linkedin_post');
-    expect(contentManager).toContain('add_post_comment');
-    expect(contentManager).toContain('approve_post');
-    expect(contentManager).toContain('reschedule_post / bulk_schedule_posts');
-    expect(contentManager).toContain('publish_now(confirmPublication: true)');
-    expect(contentManager).toContain('get_post_status / sync_post_metrics');
-    expect(contentManager).toContain('A provider limit, authorization error, or failed write is BLOCKED.');
+    expect(contentManager).toContain('First-party LinkedIn publish capability implemented');
+    expect(contentManager).toContain('Temporal truth UNKNOWN until execution');
+    expect(contentManager).toContain('Capability is not publication proof.');
+    expect(contentManager).toContain('chief-ai/founder-content-proposal');
+    expect(contentManager).toContain('exact Current You authorization');
+    expect(contentManager).toContain('publish_founder_content');
+    expect(contentManager).toContain('provider readback + outcome receipt');
+    expect(contentManager).toContain('Publication requires terminal provider readback bound to the authorized execution.');
+    expect(contentManager).not.toContain('create_linkedin_post');
+    expect(contentManager).not.toContain('publish_now(confirmPublication: true)');
+    expect(contentManager).not.toContain('remains review-window only');
 
     const approval = contentManager.indexOf('data-content-stage="approval"');
     const publish = contentManager.indexOf('data-content-stage="publish"');
@@ -86,6 +90,7 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(playwrightProof).toContain("viewport: { width: 390, height: 844 }");
     expect(playwrightProof).toContain("'content-manager-mobile.png'");
     expect(playwrightProof).toContain('page must not overflow the mobile viewport');
+    expect(playwrightProof).toContain('capability must not be presented as an already-authorized publish control');
   });
 
   it('keeps browser API calls same-origin and rejects an unverified upstream', () => {
