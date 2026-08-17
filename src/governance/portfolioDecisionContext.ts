@@ -35,11 +35,23 @@ export type ContextBoundGovernedActionRequest = Omit<GovernedActionRequest, 'aut
 
 function normalizeSnapshot(snapshot: DecisionContextSnapshot): DecisionContextSnapshot {
   return {
-    intent: snapshot.intent,
-    memories: [...snapshot.memories].sort((a, b) => a.id.localeCompare(b.id)),
-    proofs: [...snapshot.proofs].sort((a, b) => a.id.localeCompare(b.id)),
+    intent: {
+      id: snapshot.intent.id,
+      hash: snapshot.intent.hash,
+      source: snapshot.intent.source,
+    },
+    memories: snapshot.memories
+      .map((memory) => ({ id: memory.id, factHash: memory.factHash, source: memory.source }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+    proofs: snapshot.proofs
+      .map((proof) => ({ id: proof.id, artifactHash: proof.artifactHash, exactVersion: proof.exactVersion }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
     exactVersion: snapshot.exactVersion,
   };
+}
+
+function reasonsBeforeContextGate(verdict: GovernedActionVerdict): string[] {
+  return verdict.reasons.filter((reason) => reason !== 'Governed action contract satisfied.');
 }
 
 export function decisionContextFromVerdict(
@@ -93,13 +105,14 @@ export function enforceConsequentialDecisionContext(
 
   const approved = request.authorization?.decisionContext ?? null;
   const current = decisionContextFromVerdict(request, verdict);
+  const baseReasons = reasonsBeforeContextGate(verdict);
 
   if (!approved || !current) {
     return {
       ...verdict,
       decision: 'reconfirm',
       reasons: [
-        ...verdict.reasons,
+        ...baseReasons,
         'Consequential portfolio action requires execution authorization bound to the exact decision context.',
       ],
       reasonCodes: ['execution_authorization_binding'],
@@ -111,7 +124,7 @@ export function enforceConsequentialDecisionContext(
       ...verdict,
       decision: 'reconfirm',
       reasons: [
-        ...verdict.reasons,
+        ...baseReasons,
         'Execution authorization decision context no longer matches current intent, memory, proof, or exact version; regenerate the proposal or re-confirm it against current state.',
       ],
       reasonCodes: ['execution_authorization_binding'],
