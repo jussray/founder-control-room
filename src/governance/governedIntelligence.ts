@@ -62,6 +62,22 @@ export interface RecoveryPlan {
   rehearsedAt?: string | null;
 }
 
+export interface ExecutionAuthorization {
+  id: string;
+  actorId: string;
+  source: 'current_user' | 'delegated';
+  intentId: string;
+  proposalId: string;
+  proposalHash: string;
+  actionHash: string;
+  scope: string[];
+  exactVersion?: string | null;
+  issuedAt: string;
+  expiresAt: string;
+  revokedAt?: string | null;
+  authenticated: boolean;
+}
+
 export interface GovernedActionRequest {
   requiredScope: string;
   risk: ActionRisk;
@@ -69,9 +85,18 @@ export interface GovernedActionRequest {
   memories?: GovernedMemory[];
   requiredMemoryIds?: string[];
   proofs?: ProofContract[];
-  requiredClaims?: Array<{ claim: string; exactVersion?: string | null }>;
+  requiredClaims?: Array<{
+    claim: string;
+    exactVersion?: string | null;
+    maxAgeMs?: number | null;
+  }>;
   recoveryPlan?: RecoveryPlan | null;
-  explicitApproval?: boolean;
+  proposalId?: string | null;
+  proposalHash?: string | null;
+  actionHash?: string | null;
+  exactVersion?: string | null;
+  authorization?: ExecutionAuthorization | null;
+  consumedAuthorizationIds?: string[];
   hardConstraintViolations?: string[];
   now?: Date;
 }
@@ -82,6 +107,11 @@ export interface DecisionLineage {
   memoryIds: string[];
   proofIds: string[];
   recoveryPlanId: string | null;
+  authorizationId: string | null;
+  proposalId: string | null;
+  proposalHash: string | null;
+  actionHash: string | null;
+  exactVersion: string | null;
 }
 
 export interface GovernedActionVerdict {
@@ -99,6 +129,7 @@ export interface MemoryAdjudication {
 }
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
+const ONE_HOUR_MS = 60 * 60 * 1000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const SEVEN_DAYS_MS = 7 * ONE_DAY_MS;
 const SHA256 = /^[a-f0-9]{64}$/i;
@@ -125,6 +156,10 @@ function parseTime(value?: string | null): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function optionalTimeIsMalformed(value?: string | null): boolean {
+  return value !== undefined && value !== null && parseTime(value) === null;
+}
+
 function isFutureBeyondSkew(value: string, now: Date): boolean {
   const parsed = parseTime(value);
   return parsed !== null && parsed > now.getTime() + FIVE_MINUTES_MS;
@@ -139,6 +174,10 @@ function sourceRequiresAuthentication(source: MemorySource): boolean {
     || source === 'delegated'
     || source === 'system_observation'
     || source === 'provider_evidence';
+}
+
+function isAuthorityBearingIntent(intent: TemporalIntent): boolean {
+  return (intent.source === 'current_user' || intent.source === 'delegated') && intent.authenticated;
 }
 
 function memorySourceRank(memory: GovernedMemory): number {
@@ -171,6 +210,8 @@ function activeIntent(intent: TemporalIntent, now: Date, requiredScope: string):
   const issuedAt = parseTime(intent.issuedAt);
   if (issuedAt === null || isFutureBeyondSkew(intent.issuedAt, now)) return false;
   if (!scopeMatches(intent.scope, requiredScope)) return false;
+  if (optionalTimeIsMalformed(intent.revokedAt) || optionalTimeIsMalformed(intent.expiresAt)) return false;
+
   const revokedAt = parseTime(intent.revokedAt);
   if (revokedAt !== null && revokedAt <= now.getTime()) return false;
   const expiresAt = parseTime(intent.expiresAt);
@@ -179,15 +220,28 @@ function activeIntent(intent: TemporalIntent, now: Date, requiredScope: string):
   return true;
 }
 
+function canSupersedeIntent(superseder: TemporalIntent, target: TemporalIntent): boolean {
+  if (!isAuthorityBearingIntent(superseder)) return false;
+  return INTENT_RANK[superseder.source] >= INTENT_RANK[target.source];
+}
+
 export function resolveTemporalIntent(
   intents: TemporalIntent[],
   requiredScope: string,
   now: Date = new Date(),
 ): { selected: TemporalIntent | null; mode: 'authoritative' | 'advisory' | 'missing' | 'conflict'; reasons: string[] } {
   const active = intents.filter((intent) => activeIntent(intent, now, requiredScope));
-  const superseded = new Set(active.flatMap((intent) => intent.supersedes ?? []));
-  const effective = active.filter((intent) => !superseded.has(intent.id));
+  const byId = new Map(active.map((intent) => [intent.id, intent]));
+  const superseded = new Set<string>();
 
+  for (const superseder of active) {
+    for (const targetId of superseder.supersedes ?? []) {
+      const target = byId.get(targetId);
+      if (target && canSupersedeIntent(superseder, target)) superseded.add(targetId);
+    }
+  }
+
+  const effective = active.filter((intent) => !superseded.has(intent.id));
   if (effective.length === 0) {
     return { selected: null, mode: 'missing', reasons: ['No active intent covers the requested scope.'] };
   }
@@ -199,9 +253,11 @@ export function resolveTemporalIntent(
   });
 
   const selected = sorted[0];
-  const sameRank = sorted.filter((intent) => INTENT_RANK[intent.source] === INTENT_RANK[selected.source]);
   const newestTime = parseTime(selected.issuedAt) ?? 0;
-  const equallyCurrent = sameRank.filter((intent) => (parseTime(intent.issuedAt) ?? 0) === newestTime);
+  const equallyCurrent = sorted.filter((intent) =>
+    INTENT_RANK[intent.source] === INTENT_RANK[selected.source]
+    && (parseTime(intent.issuedAt) ?? 0) === newestTime);
+
   if (new Set(equallyCurrent.map((intent) => intent.intentHash)).size > 1) {
     return {
       selected: null,
@@ -210,11 +266,11 @@ export function resolveTemporalIntent(
     };
   }
 
-  if (selected.source === 'current_user' || selected.source === 'delegated') {
+  if (isAuthorityBearingIntent(selected)) {
     return {
       selected,
       mode: 'authoritative',
-      reasons: [`${selected.source} intent is active, authenticated, scoped, and not superseded.`],
+      reasons: [`${selected.source} intent is active, authenticated, scoped, and not legitimately superseded.`],
     };
   }
 
@@ -225,26 +281,25 @@ export function resolveTemporalIntent(
   };
 }
 
+function memoryObservationIsValid(memory: GovernedMemory, now: Date): boolean {
+  const observedAt = parseTime(memory.observedAt);
+  if (observedAt === null || isFutureBeyondSkew(memory.observedAt, now)) return false;
+  if (optionalTimeIsMalformed(memory.lastVerifiedAt) || optionalTimeIsMalformed(memory.expiresAt)) return false;
+  if (sourceRequiresAuthentication(memory.source) && !memory.authenticated) return false;
+  return true;
+}
+
 export function adjudicateMemoryWrite(
   existing: GovernedMemory | null,
   incoming: GovernedMemory,
   now: Date = new Date(),
 ): MemoryAdjudication {
-  const incomingTime = parseTime(incoming.observedAt);
-  if (incomingTime === null || isFutureBeyondSkew(incoming.observedAt, now)) {
+  if (!memoryObservationIsValid(incoming, now)) {
     return {
       decision: existing ? 'preserve_existing' : 'dispute',
       winnerId: existing?.id ?? null,
       loserId: existing ? incoming.id : null,
-      reason: 'Malformed or future-dated memory cannot become current truth.',
-    };
-  }
-  if (sourceRequiresAuthentication(incoming.source) && !incoming.authenticated) {
-    return {
-      decision: existing ? 'preserve_existing' : 'dispute',
-      winnerId: existing?.id ?? null,
-      loserId: existing ? incoming.id : null,
-      reason: 'Unauthenticated authority-bearing memory cannot become current truth.',
+      reason: 'Malformed, future-dated, or unauthenticated authority-bearing memory cannot become current truth.',
     };
   }
   if (!existing) {
@@ -258,7 +313,16 @@ export function adjudicateMemoryWrite(
       reason: 'Conflicting memory kinds cannot overwrite one another automatically.',
     };
   }
+  if (!memoryObservationIsValid(existing, now)) {
+    return {
+      decision: 'supersede',
+      winnerId: incoming.id,
+      loserId: existing.id,
+      reason: 'A valid incoming memory supersedes an invalid existing observation while preserving lineage.',
+    };
+  }
 
+  const incomingTime = parseTime(incoming.observedAt) ?? 0;
   const existingTime = parseTime(existing.observedAt) ?? 0;
   const incomingRank = memorySourceRank(incoming);
   const existingRank = memorySourceRank(existing);
@@ -324,17 +388,11 @@ export function memoryCanAuthorize(
   risk: ActionRisk,
   now: Date = new Date(),
 ): { allowed: boolean; reason: string } {
-  const observedAt = parseTime(memory.observedAt);
-  if (observedAt === null || isFutureBeyondSkew(memory.observedAt, now)) {
-    return { allowed: false, reason: 'Memory observation time is invalid or future-dated.' };
-  }
-  if (sourceRequiresAuthentication(memory.source) && !memory.authenticated) {
-    return { allowed: false, reason: 'Memory source is not authenticated.' };
+  if (!memoryObservationIsValid(memory, now)) {
+    return { allowed: false, reason: 'Memory observation or verification metadata is invalid.' };
   }
   const expiresAt = parseTime(memory.expiresAt);
-  if (expiresAt !== null && expiresAt <= now.getTime()) {
-    return { allowed: false, reason: 'Memory has expired.' };
-  }
+  if (expiresAt !== null && expiresAt <= now.getTime()) return { allowed: false, reason: 'Memory has expired.' };
   if (['candidate', 'stale', 'disputed', 'superseded', 'forgotten'].includes(memory.status)) {
     return { allowed: false, reason: `Memory status ${memory.status} cannot authorize action.` };
   }
@@ -371,30 +429,26 @@ export function proofSupportsClaim(
   claim: string,
   now: Date = new Date(),
   exactVersion?: string | null,
+  maxAgeMs?: number | null,
 ): { supported: boolean; reason: string } {
-  if (proof.doesNotProve.includes(claim)) {
-    return { supported: false, reason: 'Proof contract explicitly excludes this claim.' };
-  }
-  if (!proof.proves.includes(claim)) {
-    return { supported: false, reason: 'Proof contract does not declare support for this claim.' };
-  }
-  if (!SHA256.test(proof.artifactHash)) {
-    return { supported: false, reason: 'Proof artifact hash is missing or malformed.' };
-  }
+  if (proof.doesNotProve.includes(claim)) return { supported: false, reason: 'Proof contract explicitly excludes this claim.' };
+  if (!proof.proves.includes(claim)) return { supported: false, reason: 'Proof contract does not declare support for this claim.' };
+  if (!SHA256.test(proof.artifactHash)) return { supported: false, reason: 'Proof artifact hash is missing or malformed.' };
 
   const observedAt = parseTime(proof.observedAt);
   if (observedAt === null || observedAt > now.getTime() + FIVE_MINUTES_MS) {
     return { supported: false, reason: 'Proof observation time is invalid or future-dated.' };
   }
+  if (optionalTimeIsMalformed(proof.expiresAt)) return { supported: false, reason: 'Proof expiry metadata is malformed.' };
   const expiresAt = parseTime(proof.expiresAt);
-  if (expiresAt !== null && expiresAt <= now.getTime()) {
-    return { supported: false, reason: 'Proof contract has expired.' };
-  }
-  if (proof.freshForMs !== undefined && proof.freshForMs !== null) {
-    if (!Number.isFinite(proof.freshForMs) || proof.freshForMs <= 0) {
+  if (expiresAt !== null && expiresAt <= now.getTime()) return { supported: false, reason: 'Proof contract has expired.' };
+
+  const freshnessWindow = maxAgeMs ?? proof.freshForMs;
+  if (freshnessWindow !== undefined && freshnessWindow !== null) {
+    if (!Number.isFinite(freshnessWindow) || freshnessWindow <= 0) {
       return { supported: false, reason: 'Proof freshness window is invalid.' };
     }
-    if (now.getTime() - observedAt > proof.freshForMs) {
+    if (now.getTime() - observedAt > freshnessWindow) {
       return { supported: false, reason: 'Proof contract is outside its declared freshness window.' };
     }
   }
@@ -402,7 +456,7 @@ export function proofSupportsClaim(
     return { supported: false, reason: 'Proof exact version does not match the requested version.' };
   }
 
-  return { supported: true, reason: 'Proof contract is claim-scoped, fresh, and version-compatible.' };
+  return { supported: true, reason: 'Proof contract is claim-scoped, time-valid, and version-compatible.' };
 }
 
 export function recoverySatisfiesRisk(
@@ -423,8 +477,58 @@ export function recoverySatisfiesRisk(
   if ((risk === 'consequential' || risk === 'irreversible') && !plan.validationAction) {
     return { allowed: false, reason: 'Consequential action requires post-rollback validation.' };
   }
-
   return { allowed: true, reason: 'Recovery plan is sufficient for this risk level.' };
+}
+
+export function authorizationSupportsAction(
+  authorization: ExecutionAuthorization,
+  request: {
+    requiredScope: string;
+    intentId: string;
+    proposalId: string;
+    proposalHash: string;
+    actionHash: string;
+    exactVersion?: string | null;
+    consumedAuthorizationIds?: string[];
+    now?: Date;
+  },
+): { allowed: boolean; reason: string } {
+  const now = request.now ?? new Date();
+  if (!authorization.authenticated) return { allowed: false, reason: 'Execution authorization is not authenticated.' };
+  if (!scopeMatches(authorization.scope, request.requiredScope)) return { allowed: false, reason: 'Execution authorization scope does not cover this action.' };
+  if (authorization.intentId !== request.intentId) return { allowed: false, reason: 'Execution authorization is bound to a different intent.' };
+  if (authorization.proposalId !== request.proposalId || authorization.proposalHash !== request.proposalHash) {
+    return { allowed: false, reason: 'Execution authorization is bound to a different proposal.' };
+  }
+  if (authorization.actionHash !== request.actionHash) return { allowed: false, reason: 'Execution authorization is bound to a different action.' };
+  if (!SHA256.test(authorization.proposalHash) || !SHA256.test(authorization.actionHash)) {
+    return { allowed: false, reason: 'Execution authorization requires SHA-256 proposal and action bindings.' };
+  }
+  if (request.exactVersion && authorization.exactVersion !== request.exactVersion) {
+    return { allowed: false, reason: 'Execution authorization is bound to a different exact version.' };
+  }
+  if (authorization.exactVersion && request.exactVersion !== authorization.exactVersion) {
+    return { allowed: false, reason: 'Execution request omitted or changed the version bound by the authorization.' };
+  }
+  if (request.consumedAuthorizationIds?.includes(authorization.id)) {
+    return { allowed: false, reason: 'Execution authorization has already been consumed.' };
+  }
+  if (optionalTimeIsMalformed(authorization.revokedAt)) return { allowed: false, reason: 'Execution authorization revocation metadata is malformed.' };
+
+  const issuedAt = parseTime(authorization.issuedAt);
+  const expiresAt = parseTime(authorization.expiresAt);
+  if (issuedAt === null || expiresAt === null) return { allowed: false, reason: 'Execution authorization requires valid issue and expiry timestamps.' };
+  if (issuedAt > now.getTime() + FIVE_MINUTES_MS) return { allowed: false, reason: 'Execution authorization is future-dated.' };
+  if (expiresAt <= issuedAt || expiresAt - issuedAt > ONE_HOUR_MS) {
+    return { allowed: false, reason: 'Execution authorization validity window must be positive and no longer than one hour.' };
+  }
+  if (expiresAt <= now.getTime() || now.getTime() - issuedAt > ONE_HOUR_MS) {
+    return { allowed: false, reason: 'Execution authorization is stale or expired.' };
+  }
+  const revokedAt = parseTime(authorization.revokedAt);
+  if (revokedAt !== null && revokedAt <= now.getTime()) return { allowed: false, reason: 'Execution authorization has been revoked.' };
+
+  return { allowed: true, reason: 'Execution authorization is fresh and bound to the exact intent, proposal, action, scope, and version.' };
 }
 
 export function evaluateGovernedAction(request: GovernedActionRequest): GovernedActionVerdict {
@@ -442,6 +546,11 @@ export function evaluateGovernedAction(request: GovernedActionRequest): Governed
     memoryIds: [],
     proofIds: [],
     recoveryPlanId: request.recoveryPlan?.id ?? null,
+    authorizationId: request.authorization?.id ?? null,
+    proposalId: request.proposalId ?? null,
+    proposalHash: request.proposalHash ?? null,
+    actionHash: request.actionHash ?? null,
+    exactVersion: request.exactVersion ?? null,
   };
 
   if (hardConstraintViolations.length > 0) {
@@ -485,9 +594,16 @@ export function evaluateGovernedAction(request: GovernedActionRequest): Governed
 
   for (const requirement of requiredClaims) {
     const supporting = proofs.find((candidate) =>
-      proofSupportsClaim(candidate, requirement.claim, now, requirement.exactVersion).supported);
+      proofSupportsClaim(candidate, requirement.claim, now, requirement.exactVersion, requirement.maxAgeMs).supported);
     if (!supporting) {
       reasons.push(`No valid proof contract supports required claim: ${requirement.claim}.`);
+      return { decision: 'reconfirm', reasons, selectedIntent: intent.selected, lineage };
+    }
+    if (request.risk === 'consequential'
+      && requirement.maxAgeMs == null
+      && supporting.freshForMs == null
+      && supporting.expiresAt == null) {
+      reasons.push(`Consequential claim ${requirement.claim} has no explicit freshness boundary.`);
       return { decision: 'reconfirm', reasons, selectedIntent: intent.selected, lineage };
     }
     lineage.proofIds.push(supporting.id);
@@ -500,9 +616,26 @@ export function evaluateGovernedAction(request: GovernedActionRequest): Governed
   }
   reasons.push(recovery.reason);
 
-  if (request.risk === 'consequential' && request.explicitApproval !== true) {
-    reasons.push('Consequential action requires explicit current approval at execution time.');
-    return { decision: 'reconfirm', reasons, selectedIntent: intent.selected, lineage };
+  if (request.risk === 'consequential') {
+    if (!request.authorization || !request.proposalId || !request.proposalHash || !request.actionHash || !intent.selected) {
+      reasons.push('Consequential action requires a bound execution authorization plus proposal and action hashes.');
+      return { decision: 'reconfirm', reasons, selectedIntent: intent.selected, lineage };
+    }
+    const authorization = authorizationSupportsAction(request.authorization, {
+      requiredScope: request.requiredScope,
+      intentId: intent.selected.id,
+      proposalId: request.proposalId,
+      proposalHash: request.proposalHash,
+      actionHash: request.actionHash,
+      exactVersion: request.exactVersion,
+      consumedAuthorizationIds: request.consumedAuthorizationIds,
+      now,
+    });
+    if (!authorization.allowed) {
+      reasons.push(authorization.reason);
+      return { decision: 'reconfirm', reasons, selectedIntent: intent.selected, lineage };
+    }
+    reasons.push(authorization.reason);
   }
 
   reasons.push('Governed action contract satisfied.');
