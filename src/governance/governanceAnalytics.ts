@@ -2,26 +2,12 @@ import type {
   ActionRisk,
   GovernedActionVerdict,
   GovernedDecision,
+  GovernanceReasonCode,
   IntentSource,
   RecoveryLevel,
 } from './governedIntelligence.js';
 
-export type GovernanceBlockCategory =
-  | 'hard_constraint'
-  | 'intent_missing'
-  | 'intent_conflict'
-  | 'intent_advisory_only'
-  | 'memory_missing'
-  | 'memory_stale_or_invalid'
-  | 'memory_authority'
-  | 'proof_missing_or_invalid'
-  | 'recovery_insufficient'
-  | 'execution_authorization_missing'
-  | 'execution_authorization_binding'
-  | 'execution_authorization_replay'
-  | 'execution_authorization_stale_or_revoked'
-  | 'irreversible_action'
-  | 'other';
+export type GovernanceBlockCategory = Exclude<GovernanceReasonCode, 'allow'>;
 
 export interface GovernanceObservation {
   projectId: string;
@@ -59,30 +45,10 @@ const BLOCK_CATEGORIES: GovernanceBlockCategory[] = [
   'execution_authorization_replay',
   'execution_authorization_stale_or_revoked',
   'irreversible_action',
-  'other',
 ];
 
 function boundedCount(value: number): number {
   return Number.isInteger(value) && value >= 0 ? Math.min(value, 10_000) : 0;
-}
-
-function classifyReason(reason: string): GovernanceBlockCategory | null {
-  const value = reason.toLowerCase();
-  if (value.includes('hard constraint')) return 'hard_constraint';
-  if (value.includes('no active intent') || value.includes('intent covers')) return 'intent_missing';
-  if (value.includes('conflicting equally current intents')) return 'intent_conflict';
-  if (value.includes('cannot silently authorize') || value.includes('effectful action requires fresh authenticated current you')) return 'intent_advisory_only';
-  if (value.includes('required memory') && value.includes('missing')) return 'memory_missing';
-  if (value.includes('memory') && (value.includes('stale') || value.includes('expired') || value.includes('future-dated') || value.includes('re-verification') || value.includes('metadata is invalid'))) return 'memory_stale_or_invalid';
-  if (value.includes('memory') && (value.includes('authority') || value.includes('objective provider') || value.includes('source is not authenticated'))) return 'memory_authority';
-  if (value.includes('no valid proof contract') || value.includes('proof contract') || value.includes('proof freshness') || value.includes('proof expiry')) return 'proof_missing_or_invalid';
-  if (value.includes('recovery') || value.includes('checkpoint') || value.includes('rollback')) return 'recovery_insufficient';
-  if (value.includes('already been consumed')) return 'execution_authorization_replay';
-  if (value.includes('execution authorization') && (value.includes('stale') || value.includes('expired') || value.includes('revoked') || value.includes('future-dated') || value.includes('validity window') || value.includes('revocation metadata'))) return 'execution_authorization_stale_or_revoked';
-  if (value.includes('execution authorization') && (value.includes('different intent') || value.includes('different proposal') || value.includes('different action') || value.includes('scope does not cover') || value.includes('different exact version') || value.includes('omitted or changed') || value.includes('sha-256') || value.includes('not authenticated'))) return 'execution_authorization_binding';
-  if (value.includes('bound execution authorization') || value.includes('execution authorization plus proposal and action hashes')) return 'execution_authorization_missing';
-  if (value.includes('irreversible action')) return 'irreversible_action';
-  return null;
 }
 
 export function governanceObservationFromVerdict(input: {
@@ -91,8 +57,7 @@ export function governanceObservationFromVerdict(input: {
   verdict: GovernedActionVerdict;
   recoveryLevel?: RecoveryLevel | null;
 }): GovernanceObservation {
-  const categories = [...new Set(input.verdict.reasons.map(classifyReason).filter((value): value is GovernanceBlockCategory => value !== null))];
-  if (input.verdict.decision !== 'allow' && categories.length === 0) categories.push('other');
+  const categories = [...new Set(input.verdict.reasonCodes.filter((code): code is GovernanceBlockCategory => code !== 'allow'))];
 
   return {
     projectId: input.projectId.trim().slice(0, 160) || 'unknown',
