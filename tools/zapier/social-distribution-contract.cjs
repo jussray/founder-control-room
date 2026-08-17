@@ -1,27 +1,23 @@
 'use strict';
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
+const SHA256 = /^[0-9a-f]{64}$/i;
 const HTTPS_URL = /^https:\/\//i;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const OWNED_REPO = /^jussray\/[A-Za-z0-9._-]+$/;
 const CAMPAIGN_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const BUFFER_SCHEDULE_POLICY_ID = 'buffer-20-minute-review-v1';
+const PUBLIC_SIGNAL_POLICY_VERSION = 'public-progress-v1';
 
 const KNOWN_CHANNEL_PLATFORMS = Object.freeze({
   juss_rayy_linkedin: 'linkedin',
   juss_and_co_facebook: 'facebook',
   juss_beautiful_hair_facebook: 'facebook',
 });
-
 const HUBSPOT_CONTACT_ATTRIBUTION_FIELDS = Object.freeze([
-  'hs_analytics_source',
-  'hs_analytics_source_data_1',
-  'hs_analytics_source_data_2',
-  'hs_latest_source',
-  'hs_latest_source_data_1',
-  'hs_latest_source_data_2',
+  'hs_analytics_source', 'hs_analytics_source_data_1', 'hs_analytics_source_data_2',
+  'hs_latest_source', 'hs_latest_source_data_1', 'hs_latest_source_data_2',
 ]);
-
 const SOCIAL_KPI_CONTRACT = Object.freeze({
   objective: 'verified_social_to_qualified_pipeline',
   outcomes: Object.freeze([
@@ -41,48 +37,36 @@ const SOCIAL_KPI_CONTRACT = Object.freeze({
   ]),
 });
 
-function asTrimmedString(value) {
-  return typeof value === 'string' ? value.trim() : '';
+function asTrimmedString(value) { return typeof value === 'string' ? value.trim() : ''; }
+function asInteger(value) {
+  const parsed = typeof value === 'number' ? value : Number.parseInt(String(value ?? ''), 10);
+  return Number.isInteger(parsed) ? parsed : null;
 }
-
 function reject(errors) {
   const error = new Error(`SOCIAL_DISTRIBUTION_REJECTED: ${errors.join('; ')}`);
   error.code = 'SOCIAL_DISTRIBUTION_REJECTED';
   error.details = errors;
   throw error;
 }
-
 function validateCommon(input = {}) {
   const contentId = asTrimmedString(input.content_id);
   const sourceRepo = asTrimmedString(input.source_repo);
-  const sourceCommitSha = asTrimmedString(input.source_commit_sha);
+  const sourceCommitSha = asTrimmedString(input.source_commit_sha).toLowerCase();
   const proofUrl = asTrimmedString(input.proof_url);
   const campaignSlug = asTrimmedString(input.campaign_slug).toLowerCase();
   const platform = asTrimmedString(input.platform).toLowerCase();
   const destinationUrl = asTrimmedString(input.destination_url);
   const errors = [];
-
   if (!UUID.test(contentId)) errors.push('content_id must be a UUID');
   if (!OWNED_REPO.test(sourceRepo)) errors.push('source_repo must be an owned jussray repository');
   if (!EXACT_COMMIT_SHA.test(sourceCommitSha)) errors.push('source_commit_sha must be an exact 40-character commit SHA');
-  if (!HTTPS_URL.test(proofUrl)) errors.push('proof_url must be an HTTPS URL');
+  if (proofUrl && !HTTPS_URL.test(proofUrl)) errors.push('proof_url must be empty or an HTTPS URL');
   if (!CAMPAIGN_SLUG.test(campaignSlug)) errors.push('campaign_slug must be lowercase kebab-case');
   if (!platform) errors.push('platform is required');
   if (!HTTPS_URL.test(destinationUrl)) errors.push('destination_url must be an HTTPS URL');
-
-  if (errors.length > 0) reject(errors);
-
-  return {
-    contentId,
-    sourceRepo,
-    sourceCommitSha,
-    proofUrl,
-    campaignSlug,
-    platform,
-    destinationUrl,
-  };
+  if (errors.length) reject(errors);
+  return { contentId, sourceRepo, sourceCommitSha, proofUrl, campaignSlug, platform, destinationUrl };
 }
-
 function buildTrackedUrl(destinationUrl, { platform, campaignSlug, contentId }) {
   const url = new URL(destinationUrl);
   url.searchParams.set('utm_source', platform);
@@ -91,7 +75,6 @@ function buildTrackedUrl(destinationUrl, { platform, campaignSlug, contentId }) 
   url.searchParams.set('utm_content', contentId);
   return url.toString();
 }
-
 function buildAttribution(common) {
   return {
     version: 1,
@@ -101,32 +84,33 @@ function buildAttribution(common) {
     utm_content: common.contentId,
     destination_url: common.destinationUrl,
     tracked_url: buildTrackedUrl(common.destinationUrl, common),
-    hubspot: {
-      mode: 'automatic_tracking_only',
-      contact_source_fields: [...HUBSPOT_CONTACT_ATTRIBUTION_FIELDS],
-      campaign_object_required: false,
-    },
+    hubspot: { mode: 'automatic_tracking_only', contact_source_fields: [...HUBSPOT_CONTACT_ATTRIBUTION_FIELDS], campaign_object_required: false },
   };
 }
-
+function evidenceLineageFrom(input = {}) {
+  const evidenceHash = asTrimmedString(input.evidence_hash).toLowerCase();
+  const evidenceCount = asInteger(input.evidence_count);
+  const errors = [];
+  if (!SHA256.test(evidenceHash)) errors.push('evidence_hash must be a SHA-256 hash of private evidence lineage');
+  if (evidenceCount === null || evidenceCount < 1) errors.push('evidence_count must be a positive integer');
+  if (errors.length) reject(errors);
+  return { hash: evidenceHash, count: evidenceCount, raw_evidence_included: false };
+}
 function buildEditorialDraftEnvelope(input = {}) {
   const common = validateCommon(input);
   const text = asTrimmedString(input.text);
   if (!text) reject(['text is required for an editorial draft']);
-
+  const evidenceLineage = evidenceLineageFrom(input);
   return {
-    version: 1,
+    version: 2,
     lane: 'editorial_draft',
     provider: 'buffer',
     state: 'draft',
     content_id: common.contentId,
     platform: common.platform,
     text,
-    source: {
-      repo: common.sourceRepo,
-      commit_sha: common.sourceCommitSha,
-      proof_url: common.proofUrl,
-    },
+    source: { repo: common.sourceRepo, commit_sha: common.sourceCommitSha, proof_url: common.proofUrl || null },
+    evidence_lineage: evidenceLineage,
     attribution: buildAttribution(common),
     authority: {
       publish_allowed: false,
@@ -134,21 +118,12 @@ function buildEditorialDraftEnvelope(input = {}) {
       explicit_founder_approval_required: true,
       standing_policy_applied: false,
     },
-    provider_request: {
-      method: 'draft',
-      save_to_draft: true,
-      schedule_at: null,
-      share_now_allowed: false,
-      external_write_included: false,
-    },
+    provider_request: { method: 'draft', save_to_draft: true, schedule_at: null, share_now_allowed: false, external_write_included: false },
     kpi_contract: SOCIAL_KPI_CONTRACT,
   };
 }
-
 function buildGovernedScheduleEnvelope(input = {}) {
-  const firewallOutput = input.firewall_output && typeof input.firewall_output === 'object'
-    ? input.firewall_output
-    : {};
+  const firewallOutput = input.firewall_output && typeof input.firewall_output === 'object' ? input.firewall_output : {};
   const common = validateCommon({
     ...input,
     source_commit_sha: asTrimmedString(firewallOutput.source_commit_sha) || input.source_commit_sha,
@@ -157,39 +132,35 @@ function buildGovernedScheduleEnvelope(input = {}) {
   const errors = [];
   const channel = asTrimmedString(firewallOutput.channel);
   const knownPlatform = KNOWN_CHANNEL_PLATFORMS[channel];
+  const evidenceHash = asTrimmedString(firewallOutput.evidence_hash).toLowerCase();
+  const evidenceCount = asInteger(firewallOutput.evidence_count);
+  const publicSignalHash = asTrimmedString(firewallOutput.public_signal_hash).toLowerCase();
+  const currentIntentHash = asTrimmedString(firewallOutput.current_intent_hash).toLowerCase();
+  const sourceContextHash = asTrimmedString(firewallOutput.source_context_hash).toLowerCase();
+  const policyVersion = asTrimmedString(firewallOutput.policy_version);
 
   if (firewallOutput.content_validated !== true) errors.push('firewall_output.content_validated must be true');
   if (firewallOutput.publish_allowed !== true) errors.push('firewall_output.publish_allowed must be true');
-  if (firewallOutput.authorization_receipt_verified !== true) {
-    errors.push('firewall_output.authorization_receipt_verified must be true');
-  }
+  if (firewallOutput.standing_policy_correlation_verified !== true) errors.push('firewall_output.standing_policy_correlation_verified must be true');
+  if (firewallOutput.authorization_receipt_verified === true) errors.push('firewall_output must not overclaim standing-policy correlation as authenticated authorization');
   if (firewallOutput.buffer_method !== 'schedule') errors.push('firewall_output.buffer_method must be schedule');
   if (firewallOutput.buffer_save_to_draft !== false) errors.push('firewall_output.buffer_save_to_draft must be false');
   if (firewallOutput.share_now_allowed !== false) errors.push('firewall_output.share_now_allowed must be false');
-  if (firewallOutput.schedule_policy_id !== BUFFER_SCHEDULE_POLICY_ID) {
-    errors.push('firewall_output.schedule_policy_id must match the checked-in Buffer review policy');
-  }
-  if (!asTrimmedString(firewallOutput.validated_post_text)) {
-    errors.push('firewall_output.validated_post_text is required');
-  }
+  if (firewallOutput.schedule_policy_id !== BUFFER_SCHEDULE_POLICY_ID) errors.push('firewall_output.schedule_policy_id must match the checked-in Buffer review policy');
+  if (!asTrimmedString(firewallOutput.validated_post_text)) errors.push('firewall_output.validated_post_text is required');
   if (!asTrimmedString(firewallOutput.scheduled_at)) errors.push('firewall_output.scheduled_at is required');
-  if (knownPlatform && knownPlatform !== common.platform) {
-    errors.push(`platform ${common.platform} does not match channel ${channel}`);
-  }
-  if (
-    asTrimmedString(input.source_commit_sha) &&
-    asTrimmedString(input.source_commit_sha) !== asTrimmedString(firewallOutput.source_commit_sha)
-  ) {
-    errors.push('source_commit_sha must match the validated firewall source commit');
-  }
-  if (asTrimmedString(input.proof_url) && asTrimmedString(input.proof_url) !== asTrimmedString(firewallOutput.proof_url)) {
-    errors.push('proof_url must match the validated firewall proof URL');
-  }
-
-  if (errors.length > 0) reject(errors);
+  if (knownPlatform && knownPlatform !== common.platform) errors.push(`platform ${common.platform} does not match channel ${channel}`);
+  if (asTrimmedString(input.source_commit_sha) && asTrimmedString(input.source_commit_sha).toLowerCase() !== asTrimmedString(firewallOutput.source_commit_sha).toLowerCase()) errors.push('source_commit_sha must match the validated firewall source commit');
+  if (asTrimmedString(input.proof_url) && asTrimmedString(input.proof_url) !== asTrimmedString(firewallOutput.proof_url)) errors.push('proof_url must match the validated firewall proof URL');
+  if (!SHA256.test(evidenceHash) || evidenceCount === null || evidenceCount < 1) errors.push('firewall_output must bind private evidence lineage by hash and count');
+  if (!SHA256.test(publicSignalHash)) errors.push('firewall_output.public_signal_hash must be a SHA-256 hash');
+  if (!SHA256.test(currentIntentHash)) errors.push('firewall_output.current_intent_hash must be a SHA-256 hash');
+  if (!SHA256.test(sourceContextHash)) errors.push('firewall_output.source_context_hash must be a SHA-256 hash');
+  if (policyVersion !== PUBLIC_SIGNAL_POLICY_VERSION) errors.push('firewall_output.policy_version must match the checked-in public signal policy');
+  if (errors.length) reject(errors);
 
   return {
-    version: 1,
+    version: 2,
     lane: 'governed_schedule',
     provider: 'buffer',
     state: 'scheduled_review_window',
@@ -197,10 +168,13 @@ function buildGovernedScheduleEnvelope(input = {}) {
     platform: common.platform,
     channel,
     text: firewallOutput.validated_post_text,
-    source: {
-      repo: common.sourceRepo,
-      commit_sha: common.sourceCommitSha,
-      proof_url: common.proofUrl,
+    source: { repo: common.sourceRepo, commit_sha: common.sourceCommitSha, proof_url: common.proofUrl || null },
+    evidence_lineage: { hash: evidenceHash, count: evidenceCount, raw_evidence_included: false },
+    decision_context: {
+      public_signal_hash: publicSignalHash,
+      current_intent_hash: currentIntentHash,
+      source_context_hash: sourceContextHash,
+      policy_version: policyVersion,
     },
     attribution: buildAttribution(common),
     authority: {
@@ -209,27 +183,21 @@ function buildGovernedScheduleEnvelope(input = {}) {
       explicit_founder_approval_required: false,
       standing_policy_applied: true,
       authorization_mode: firewallOutput.authorization_mode,
-      authorization_receipt_verified: true,
+      authorization_receipt_verified: false,
+      standing_policy_correlation_verified: true,
+      standing_policy_correlation_id: firewallOutput.founder_approval_id,
       schedule_policy_id: firewallOutput.schedule_policy_id,
     },
     provider_request: {
-      method: 'schedule',
-      save_to_draft: false,
-      schedule_at: firewallOutput.scheduled_at,
-      review_deadline: firewallOutput.review_deadline,
-      review_window_minutes: firewallOutput.review_window_minutes,
-      share_now_allowed: false,
-      external_write_included: false,
+      method: 'schedule', save_to_draft: false, schedule_at: firewallOutput.scheduled_at,
+      review_deadline: firewallOutput.review_deadline, review_window_minutes: firewallOutput.review_window_minutes,
+      share_now_allowed: false, external_write_included: false,
     },
     kpi_contract: SOCIAL_KPI_CONTRACT,
   };
 }
 
 module.exports = {
-  buildEditorialDraftEnvelope,
-  buildGovernedScheduleEnvelope,
-  buildTrackedUrl,
-  HUBSPOT_CONTACT_ATTRIBUTION_FIELDS,
-  KNOWN_CHANNEL_PLATFORMS,
-  SOCIAL_KPI_CONTRACT,
+  buildEditorialDraftEnvelope, buildGovernedScheduleEnvelope, buildTrackedUrl,
+  HUBSPOT_CONTACT_ATTRIBUTION_FIELDS, KNOWN_CHANNEL_PLATFORMS, SOCIAL_KPI_CONTRACT,
 };
