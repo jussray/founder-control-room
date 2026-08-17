@@ -19,21 +19,11 @@ function rawSecret(env, name) {
 }
 
 function tokenCandidates(env, { apply = false } = {}) {
-  const names = apply
-    ? ['CLOUDFLARE_ACCESS_ADMIN_API_TOKEN']
-    : [
-        'CLOUDFLARE_ACCESS_API_TOKEN',
-        'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN',
-        'CLOUDFLARE_API_TOKEN',
-      ];
-
-  const values = names
-    .map((name) => [name, rawSecret(env, name)])
-    .filter(([, value]) => value.length > 0);
-
-  return values.filter(
-    ([, value], index) => values.findIndex(([, other]) => other === value) === index,
-  );
+  const name = apply
+    ? 'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN'
+    : 'CLOUDFLARE_ACCESS_API_TOKEN';
+  const value = rawSecret(env, name);
+  return value.length > 0 ? [[name, value]] : [];
 }
 
 function normalizedHost(value) {
@@ -108,16 +98,23 @@ async function cloudflareJson({ token, fetchImpl }, method, path, body) {
 async function selectCredential({ env, accountId, fetchImpl, apply }) {
   const failures = [];
   const candidates = tokenCandidates(env, { apply });
+  const requiredName = apply
+    ? 'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN'
+    : 'CLOUDFLARE_ACCESS_API_TOKEN';
 
-  if (apply && candidates.length === 0) {
+  if (candidates.length === 0) {
     const error = new Error(
-      'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN is required for Access mutation; read-only or general-purpose credentials are not mutation authority.',
+      apply
+        ? 'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN is required for Access mutation; read-only or general-purpose credentials are not mutation authority.'
+        : 'CLOUDFLARE_ACCESS_API_TOKEN is required for Access inspection; admin or general-purpose credentials are not read-authority fallbacks.',
     );
-    error.classification = 'dedicated-admin-credential-required';
+    error.classification = apply
+      ? 'dedicated-admin-credential-required'
+      : 'dedicated-read-credential-required';
     error.credentialFailures = [{
-      source: 'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN',
+      source: requiredName,
       reason: 'missing',
-      nextAction: nextCredentialAction('CLOUDFLARE_ACCESS_ADMIN_API_TOKEN', 'missing'),
+      nextAction: nextCredentialAction(requiredName, 'missing'),
     }];
     throw error;
   }
@@ -153,7 +150,7 @@ async function selectCredential({ env, accountId, fetchImpl, apply }) {
   const error = new Error(
     apply
       ? 'The dedicated Cloudflare Access admin credential could not read the Zero Trust organization; mutation is blocked.'
-      : 'No configured Cloudflare Access credential can read the Zero Trust organization.',
+      : 'The dedicated Cloudflare Access read credential could not read the Zero Trust organization.',
   );
   error.classification = failures.some((failure) => failure.reason === 'provider-read-failed')
     ? 'provider-read-failed'
@@ -161,11 +158,9 @@ async function selectCredential({ env, accountId, fetchImpl, apply }) {
   error.credentialFailures = failures.length > 0
     ? failures
     : [{
-        source: apply ? 'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN' : 'CLOUDFLARE_ACCESS_API_TOKEN',
+        source: requiredName,
         reason: 'missing',
-        nextAction: apply
-          ? nextCredentialAction('CLOUDFLARE_ACCESS_ADMIN_API_TOKEN', 'missing')
-          : 'configure a read-only Cloudflare Access token for inspection',
+        nextAction: nextCredentialAction(requiredName, 'missing'),
       }];
   throw error;
 }
