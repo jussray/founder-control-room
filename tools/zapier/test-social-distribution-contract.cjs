@@ -1,5 +1,7 @@
 'use strict';
 
+require('./test-founder-content-authorization-contract.cjs');
+
 const assert = require('node:assert/strict');
 const {
   buildEditorialDraftEnvelope,
