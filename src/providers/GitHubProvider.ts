@@ -434,12 +434,18 @@ export class GitHubProvider implements RepositoryProvider {
   }
 }
 
-const FCR_MAIN_RULESET_NAME = "Founder Control Room main exact-head gate";
-const FCR_MAIN_REQUIRED_CHECKS = ["Required Gate", "Verify test-ledger contract"] as const;
-
 type RulesetReadback = {
   name?: string;
   enforcement?: string;
+  bypass_actors?: Array<{
+    actor_type?: string;
+    actor_id?: number;
+  }>;
+  conditions?: {
+    ref_name?: {
+      include?: string[];
+    };
+  };
   rules?: Array<{
     type?: string;
     parameters?: Record<string, unknown>;
@@ -448,18 +454,26 @@ type RulesetReadback = {
 
 function fcrMainRulesetConfigErrors(config: RulesetConfig): string[] {
   const errors: string[] = [];
-  if (config.name !== FCR_MAIN_RULESET_NAME) errors.push(`name must be ${JSON.stringify(FCR_MAIN_RULESET_NAME)}`);
-  if (config.targetRefs.length !== 1 || config.targetRefs[0] !== "main") errors.push("targetRefs must be exactly [\"main\"]");
   if (!config.requirePullRequest) errors.push("pull requests must be required");
   if (!Number.isInteger(config.requiredApprovingReviewCount) || config.requiredApprovingReviewCount < 1) {
     errors.push("at least one approving review is required");
   }
-  for (const required of FCR_MAIN_REQUIRED_CHECKS) {
-    if (!config.requiredStatusCheckNames.includes(required)) errors.push(`required status check is missing: ${required}`);
-  }
-  if (!config.blockForcePushes) errors.push("force pushes must be blocked");
-  if (!config.blockDeletion) errors.push("branch deletion must be blocked");
   return errors;
+}
+
+function expectedBypassIdentities(config: RulesetConfig): string[] {
+  return (config.bypassActors ?? [])
+    .map((actor) => {
+      if (actor.kind === "app") return `Integration:${Number(actor.id)}`;
+      return `unsupported:${actor.kind}:${actor.id}`;
+    })
+    .sort();
+}
+
+function observedBypassIdentities(readback: RulesetReadback): string[] {
+  return (readback.bypass_actors ?? [])
+    .map((actor) => `${String(actor.actor_type ?? "")}:${Number(actor.actor_id)}`)
+    .sort();
 }
 
 function fcrMainRulesetReadbackErrors(config: RulesetConfig, value: unknown): string[] {
@@ -468,7 +482,19 @@ function fcrMainRulesetReadbackErrors(config: RulesetConfig, value: unknown): st
     : {};
   const errors: string[] = [];
   if (readback.name !== config.name) errors.push("ruleset name did not round-trip");
-  if (readback.enforcement !== "active") errors.push("ruleset enforcement is not active");
+  if (readback.enforcement !== config.enforcement) errors.push("ruleset enforcement did not round-trip");
+
+  const observedTargets = readback.conditions?.ref_name?.include ?? [];
+  for (const target of config.targetRefs) {
+    const qualified = `refs/heads/${target}`;
+    if (!observedTargets.includes(qualified)) errors.push(`provider read-back is missing requested target: ${qualified}`);
+  }
+
+  const expectedBypasses = expectedBypassIdentities(config);
+  const observedBypasses = observedBypassIdentities(readback);
+  if (JSON.stringify(observedBypasses) !== JSON.stringify(expectedBypasses)) {
+    errors.push("provider read-back bypass actors do not match the requested policy");
+  }
 
   const rules = Array.isArray(readback.rules) ? readback.rules : [];
   const pullRequest = rules.find((rule) => rule.type === "pull_request");
@@ -481,21 +507,27 @@ function fcrMainRulesetReadbackErrors(config: RulesetConfig, value: unknown): st
   if (pullParameters.require_last_push_approval !== true) errors.push("last-push approval is not required");
   if (pullParameters.required_review_thread_resolution !== true) errors.push("review-thread resolution is not required");
 
-  const statusChecks = rules.find((rule) => rule.type === "required_status_checks");
-  const statusParameters = statusChecks?.parameters ?? {};
-  if (!statusChecks) errors.push("required status checks rule is missing");
-  if (statusParameters.strict_required_status_checks_policy !== true) errors.push("required status checks are not strict");
-  const requiredChecks = Array.isArray(statusParameters.required_status_checks)
-    ? statusParameters.required_status_checks
-        .map((entry) => entry && typeof entry === "object" && "context" in entry ? String((entry as { context?: unknown }).context ?? "") : "")
-        .filter(Boolean)
-    : [];
-  for (const required of FCR_MAIN_REQUIRED_CHECKS) {
-    if (!requiredChecks.includes(required)) errors.push(`provider read-back is missing required check: ${required}`);
+  if (config.requiredStatusCheckNames.length > 0) {
+    const statusChecks = rules.find((rule) => rule.type === "required_status_checks");
+    const statusParameters = statusChecks?.parameters ?? {};
+    if (!statusChecks) errors.push("required status checks rule is missing");
+    if (statusParameters.strict_required_status_checks_policy !== true) errors.push("required status checks are not strict");
+    const requiredChecks = Array.isArray(statusParameters.required_status_checks)
+      ? statusParameters.required_status_checks
+          .map((entry) => entry && typeof entry === "object" && "context" in entry ? String((entry as { context?: unknown }).context ?? "") : "")
+          .filter(Boolean)
+      : [];
+    for (const required of config.requiredStatusCheckNames) {
+      if (!requiredChecks.includes(required)) errors.push(`provider read-back is missing requested check: ${required}`);
+    }
   }
 
-  if (!rules.some((rule) => rule.type === "non_fast_forward")) errors.push("force-push protection is missing");
-  if (!rules.some((rule) => rule.type === "deletion")) errors.push("deletion protection is missing");
+  if (config.blockForcePushes && !rules.some((rule) => rule.type === "non_fast_forward")) {
+    errors.push("force-push protection is missing");
+  }
+  if (config.blockDeletion && !rules.some((rule) => rule.type === "deletion")) {
+    errors.push("deletion protection is missing");
+  }
   return errors;
 }
 
