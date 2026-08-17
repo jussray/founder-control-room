@@ -75,11 +75,11 @@
     const warnings = Array.isArray(result.warnings) ? result.warnings.filter(Boolean) : [];
 
     if (!receipt) {
-      return `${label} accepted, but completion is not claimed: execution receipt unavailable.`;
+      return { text: `${label} accepted, but completion is not claimed: execution receipt unavailable.`, status: 'unverified', evidenceKinds: [], warningCount: 0 };
     }
 
     if (warnings.length > 0) {
-      return `${label} executed; completion is not claimed. Evidence: execution ${receipt}. Warning: ${warnings.join(' | ')}`;
+      return { text: `${label} executed; completion is not claimed. Evidence: execution ${receipt}. Warning: ${warnings.join(' | ')}`, status: 'incomplete', evidenceKinds: ['execution'], warningCount: warnings.length };
     }
 
     if (actionType === 'merge') {
@@ -87,16 +87,28 @@
         ? Object.entries(result.evidence)
         : [];
       if (!result.mergeCommitSha || !result.expectedHeadSha || checks.length === 0) {
-        return `Merge executed; completion is not claimed. Evidence: execution ${receipt}; exact completion evidence is incomplete.`;
+        return { text: `Merge executed; completion is not claimed. Evidence: execution ${receipt}; exact completion evidence is incomplete.`, status: 'incomplete', evidenceKinds: ['execution'], warningCount: 0 };
       }
-      return `Merge witnessed. Evidence: execution ${receipt}; merge ${shortSha(result.mergeCommitSha)}; exact head ${shortSha(result.expectedHeadSha)}; checks ${checks.map(([kind, value]) => `${kind}=${value}`).join(', ')}.`;
+      return { text: `Merge witnessed. Evidence: execution ${receipt}; merge ${shortSha(result.mergeCommitSha)}; exact head ${shortSha(result.expectedHeadSha)}; checks ${checks.map(([kind, value]) => `${kind}=${value}`).join(', ')}.`, status: 'witnessed', evidenceKinds: ['execution', 'merge_commit', 'exact_head', 'checks'], warningCount: 0 };
     }
 
     if (!result.branchName || !result.expectedHeadSha) {
-      return `Branch executed; completion is not claimed. Evidence: execution ${receipt}; exact-head evidence is incomplete.`;
+      return { text: `Branch executed; completion is not claimed. Evidence: execution ${receipt}; exact-head evidence is incomplete.`, status: 'incomplete', evidenceKinds: ['execution'], warningCount: 0 };
     }
 
-    return `Branch witnessed. Evidence: execution ${receipt}; branch ${result.branchName}; exact head ${shortSha(result.expectedHeadSha)}.`;
+    return { text: `Branch witnessed. Evidence: execution ${receipt}; branch ${result.branchName}; exact head ${shortSha(result.expectedHeadSha)}.`, status: 'witnessed', evidenceKinds: ['execution', 'branch', 'exact_head'], warningCount: 0 };
+  }
+
+  function emitCompletionObservation(actionType, claim) {
+    window.dispatchEvent(new CustomEvent('fcr:completion-claim', {
+      detail: {
+        actionType,
+        claimStatus: claim.status,
+        evidenceKinds: claim.evidenceKinds,
+        evidenceCount: claim.evidenceKinds.length,
+        warningCount: claim.warningCount,
+      },
+    }));
   }
 
   function applyEvidenceBackedCompletionClaim() {
@@ -108,8 +120,12 @@
       .find((node) => node.textContent?.trim() === expectedText);
     if (!notice) return;
 
-    notice.textContent = completionClaim(evidence.actionType, evidence.payload);
-    notice.dataset.completionClaim = evidence.payload?.executionId ? 'evidence-backed' : 'unverified';
+    const claim = completionClaim(evidence.actionType, evidence.payload);
+    notice.textContent = claim.text;
+    notice.dataset.completionClaim = claim.status === 'witnessed' ? 'evidence-backed' : 'unverified';
+    notice.dataset.claimStatus = claim.status;
+    notice.dataset.evidenceCount = String(claim.evidenceKinds.length);
+    emitCompletionObservation(evidence.actionType, claim);
     lastExecutionEvidence = null;
   }
 

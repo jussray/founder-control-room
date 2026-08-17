@@ -10,9 +10,15 @@ const inspector = readFileSync(
   resolve(process.cwd(), "scripts/inspect-cloudflare-build.mjs"),
   "utf8",
 );
+const policy = JSON.parse(
+  readFileSync(
+    resolve(process.cwd(), "config/cloudflare-worker-git-authority-policy.json"),
+    "utf8",
+  ),
+);
 
-describe("Cloudflare build diagnostic authority", () => {
-  it("uses only the dedicated read-only Builds API token contract", () => {
+describe("Cloudflare Worker Git authority audit", () => {
+  it("uses only the dedicated read-only Workers Builds token contract", () => {
     expect(workflow).toContain(
       "CF_API_TOKEN: ${{ secrets.FCR_CLOUDFLARE_BUILDS_USER_TOKEN }}",
     );
@@ -28,15 +34,36 @@ describe("Cloudflare build diagnostic authority", () => {
     expect(workflow).not.toContain("secrets.CLOUDFLARE_ACCOUNT_ID");
   });
 
-  it("fails explicitly when the dedicated Builds observer token is unavailable", () => {
-    expect(workflow).toContain("Verify dedicated Builds user token is available");
-    expect(workflow).toContain("FCR_CLOUDFLARE_BUILDS_USER_TOKEN is not available to this workflow.");
+  it("is manual-only and binds provider inspection to exact current main", () => {
+    expect(workflow).toMatch(/^on:\n  workflow_dispatch:/m);
+    expect(workflow).not.toMatch(/^  push:/m);
+    expect(workflow).toContain(
+      "CF_WORKER_GIT_AUTHORITY_POLICY: config/cloudflare-worker-git-authority-policy.json",
+    );
+    expect(workflow).not.toContain("CF_EXPECT_WORKER_GIT_MODE");
+    expect(workflow).toContain(
+      'test "$ACTUAL_HEAD_SHA" = "$EXPECTED_HEAD_SHA"',
+    );
+    expect(workflow).toContain(
+      'test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"',
+    );
+  });
+
+  it("fails explicitly when the dedicated observer token is unavailable", () => {
+    expect(workflow).toContain(
+      "Verify dedicated read-only Workers Builds token is available",
+    );
+    expect(workflow).toContain(
+      "FCR_CLOUDFLARE_BUILDS_USER_TOKEN is not available to this workflow.",
+    );
   });
 
   it("classifies the raw observer token before any provider read", () => {
     expect(inspector).toContain('const apiToken = process.env.CF_API_TOKEN ?? "";');
     expect(inspector).toContain("classifyTokenShape(apiToken)");
-    expect(inspector).toContain("tokenPreflightFailure(receipt.providerCredentials.tokenShape)");
+    expect(inspector).toMatch(
+      /tokenPreflightFailure\(\s*receipt\.providerCredentials\.tokenShape,?\s*\)/,
+    );
     expect(inspector).toContain('classification: "provider-token-header-unsafe"');
     expect(inspector).toContain('classification: "provider-token-account-id"');
     expect(inspector).toContain('classification: "provider-token-type-unsupported"');
@@ -47,32 +74,56 @@ describe("Cloudflare build diagnostic authority", () => {
     expect(inspector).toContain("matchesAccountId");
   });
 
-  it("requires active user-token verification before account or build reads", () => {
+  it("requires active user-token verification before provider authority reads", () => {
     expect(inspector).toContain('verifyToken("/user/tokens/verify")');
     expect(inspector).toContain('`/accounts/${accountId}/tokens/verify`');
     expect(inspector).toContain('classification = "user-token-active"');
     expect(inspector).toContain('classification = "provider-token-invalid"');
-    expect(inspector).toContain("Workers Builds inspection requires a user-scoped token");
+    expect(inspector).toContain(
+      "Workers Builds inspection requires a user-scoped token",
+    );
   });
 
-  it("keeps collecting public-runtime evidence independently of provider auth", () => {
-    expect(inspector).toContain("const failures = [];");
-    expect(inspector).toContain("PUBLIC_ORIGIN_TRANSPORT_FAILURE");
-    expect(inspector).toContain("WRONG_SERVICE_ORIGIN");
-    expect(inspector).not.toMatch(/throw new Error\(\s*`WRONG_SERVICE_ORIGIN/);
-  });
-
-  it("only reaches domain, script, build, and log reads after credential verification", () => {
+  it("reads domain, Worker identity, and Git triggers rather than requiring an exact native build", () => {
     expect(inspector).toContain("/workers/domains?hostname=");
     expect(inspector).toContain("/workers/scripts");
-    expect(inspector).toContain("/builds/workers/${worker.tag}/builds");
-    expect(inspector).toContain("/builds/builds/${build.build_uuid}/logs");
+    expect(inspector).toContain("/builds/workers/${worker.tag}/triggers");
+    expect(inspector).toContain('receipt.workerGitAuthority.state = "disconnected"');
+    expect(inspector).toContain('receipt.workerGitAuthority.state = "non-promoting"');
+    expect(inspector).toContain("WORKER_GIT_AUTO_DEPLOY_AUTHORITY_CONFLICT");
+    expect(inspector).not.toContain("/builds/workers/${worker.tag}/builds");
+    expect(inspector).not.toContain("/builds/builds/${build.build_uuid}/logs");
+    expect(inspector).not.toContain("PUBLIC_ORIGIN_TRANSPORT_FAILURE");
   });
 
-  it("still fails closed after retaining the diagnostic receipt", () => {
+  it("distinguishes safe fallback from the current desired topology", () => {
+    expect(policy.allowedSafeStates).toEqual(["disconnected", "non-promoting"]);
+    expect(policy.currentDesiredState).toBe("non-promoting");
+    expect(policy.currentDesiredDeployCommand).toBe("npx wrangler versions upload");
+    expect(policy.canAuthorizeProviderMutation).toBe(false);
+    expect(inspector).toContain("WORKER_GIT_CURRENT_TOPOLOGY_DRIFT");
+    expect(inspector).toContain('driftClass = !safetySatisfied');
+    expect(inspector).toContain('"safe-but-not-current"');
+  });
+
+  it("keeps historical intent and analytics non-authoritative", () => {
+    expect(policy.currentFounderIntent.historicalDecisionsCanAuthorize).toBe(false);
+    expect(policy.currentFounderIntent.freshApprovalRequiredForConsequentialMutation).toBe(true);
+    expect(policy.historicalDecisions[0]).toMatchObject({
+      decision: "disconnect",
+      status: "superseded-safe-fallback",
+      isCurrentPreference: false,
+      canAuthorizeProviderMutation: false,
+    });
+    expect(inspector).toContain("observationOnly: true");
+    expect(inspector).toContain("canAuthorizeProviderMutation: false");
+  });
+
+  it("still fails closed and retains a redacted authority receipt", () => {
     expect(inspector).toContain("receipt.ok = failures.length === 0;");
     expect(inspector).toContain('receipt.error = failures.join(" | ");');
     expect(inspector).toContain("process.exitCode = 1;");
     expect(inspector).toContain("cloudflare-build-diagnostic.json");
+    expect(inspector).toContain("github-manual-deploy-workflow");
   });
 });
