@@ -132,6 +132,36 @@ describe('temporal public-claim truth', () => {
     }
   });
 
+  it('rejects runtime truth mislabeled as current repository truth', async () => {
+    for (const claimText of [
+      'Production is live and reachable.',
+      'The API service is healthy and available.',
+      'The app is serving production traffic.',
+    ]) {
+      const receipt = await verify('current_repo_state', SOURCE, claimText);
+      expect(receipt.publishSafe).toBe(false);
+      expect(receipt.claims[0].state).toBe('INVALID');
+      expect(receipt.claims[0].displayLabel).toContain('requires current_runtime evidence');
+    }
+  });
+
+  it('rejects present-tense metrics mislabeled as repository truth but preserves explicit historical metrics', async () => {
+    for (const claimText of [
+      'We now have 54 followers.',
+      'The product has 120 users.',
+      'Conversion is 12.5%.',
+    ]) {
+      const receipt = await verify('current_repo_state', SOURCE, claimText);
+      expect(receipt.publishSafe).toBe(false);
+      expect(receipt.claims[0].state).toBe('INVALID');
+      expect(receipt.claims[0].displayLabel).toContain('requires metric evidence');
+    }
+
+    const historical = await verify('historical_version', NEWER, 'Reached 54 followers during this build period.');
+    expect(historical.publishSafe).toBe(true);
+    expect(historical.claims[0].state).toBe('HISTORICAL_VERIFIED');
+  });
+
   it('rejects changed evidence binding, missing classifications, and forged truth hash', async () => {
     const { truth, canonicalClaims } = context('historical_version');
     const cases: TemporalClaimTruthContext[] = [
