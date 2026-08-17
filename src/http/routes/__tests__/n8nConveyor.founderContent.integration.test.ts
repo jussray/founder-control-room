@@ -88,7 +88,7 @@ describe('n8n founder-content route', () => {
     }));
   });
 
-  it('dispatches through FCR and never upgrades n8n acknowledgement to published truth', async () => {
+  it('binds execution identity to the authenticated founder and never trusts body identity', async () => {
     mockDispatchFounderContent.mockResolvedValue({
       ok: true,
       code: 'DISPATCHED',
@@ -110,6 +110,7 @@ describe('n8n founder-content route', () => {
     const envelope = {
       lane: 'first_party_founder_governed_schedule',
       authority: { authorization_mode: 'exact-current-you' },
+      executedBy: 'attacker@example.com',
     };
 
     const res = await request(buildApp())
@@ -118,7 +119,9 @@ describe('n8n founder-content route', () => {
       .send(envelope);
 
     expect(res.status).toBe(202);
-    expect(mockDispatchFounderContent).toHaveBeenCalledWith(envelope);
+    expect(mockDispatchFounderContent).toHaveBeenCalledWith(envelope, {
+      executedBy: FOUNDER_EMAIL,
+    });
     expect(res.body.contract).toBe(N8N_FOUNDER_CONTENT_CONTRACT);
     expect(res.body.founder).toEqual({ userId: 'founder-user-1' });
     expect(res.body.receipt.published).toBe(false);
