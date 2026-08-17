@@ -9,7 +9,7 @@ const {
 
 const SOURCE_SHA = 'b'.repeat(40);
 const EVIDENCE_REF = `github:chief-ai-machine@${SOURCE_SHA}#quality-gate`;
-const KNOWN_CHIEF_V1_HASH = '5dac904c02b00e5b5d79c11d6fd819a431df38094363b25bfcda64e52a1d66ce';
+const KNOWN_CHIEF_V1_HASH = 'e02fb57c56ab9306f368920debafd4bb78c35fc020704bc4a360f6d3dd238040';
 
 const sauceGuard = {
   scanner_version: 'sauce-guard-v1',
@@ -39,6 +39,8 @@ function proposal(overrides = {}) {
         public_safe: true,
         evidence_ref: EVIDENCE_REF,
         evidence_scope: 'founder-content-contract',
+        temporal_class: 'current_repo_state',
+        temporal_version: SOURCE_SHA,
       },
     ],
     proof_link: null,
@@ -320,4 +322,4 @@ function approval(proposed, overrides = {}) {
   );
 }
 
-console.log('founder content authorization contract: exact Chief v1 receipt, Current You supersession, proof/copy binding, replay defense, and schedule-review-only authority verified.');
+console.log('founder content authorization contract: exact Chief v1 receipt, temporal claim binding, Current You supersession, proof/copy binding, replay defense, and schedule-review-only authority verified.');
