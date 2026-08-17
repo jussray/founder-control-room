@@ -1,6 +1,7 @@
 'use strict';
 
 const { createHash } = require('node:crypto');
+const { authorizeFounderContentPublication } = require('./founder-content-authorization-contract.cjs');
 
 const HASH = /^[0-9a-f]{64}$/i;
 const HTTPS_URL = /^https:\/\//i;
@@ -30,7 +31,7 @@ function parseTime(value, label) {
   return { raw: new Date(ms).toISOString(), ms };
 }
 
-function validateScheduledAuthorization(authorization = {}, nowMs) {
+function validateCanonicalAuthorization(authorization = {}, nowMs) {
   const errors = [];
   const authorizationHash = asString(authorization.authorization_hash, 64).toLowerCase();
   const publicPayloadHash = asString(authorization.public_payload_hash, 64).toLowerCase();
@@ -39,26 +40,21 @@ function validateScheduledAuthorization(authorization = {}, nowMs) {
   const text = asString(authorization.content?.text, 3000);
   const intentId = asString(authorization.current_you?.intent_id, 200);
   const intentVersion = authorization.current_you?.intent_version;
+  const currentObserved = parseTime(authorization.current_you?.observed_at, 'authorization.current_you.observed_at');
   const expires = parseTime(authorization.expires_at, 'authorization.expires_at');
 
-  if (authorization.kind !== 'fcr/founder-content-publication-authorization') {
-    errors.push('authorization kind is invalid');
-  }
-  if (authorization.state !== 'authorized-for-scheduled-review') {
-    errors.push('publish_now must derive from an authorized scheduled-review packet');
-  }
-  if (authorization.authority?.execution_mode !== 'schedule_review_window') {
-    errors.push('source authorization execution_mode must be schedule_review_window');
-  }
-  if (authorization.authority?.one_shot !== true) errors.push('source authorization must be one_shot');
-  if (authorization.authority?.share_now_allowed !== false) errors.push('source authorization must not already allow share_now');
+  if (authorization.kind !== 'fcr/founder-content-publication-authorization') errors.push('canonical authorization kind is invalid');
+  if (authorization.state !== 'authorized-for-scheduled-review') errors.push('canonical authorization state is invalid');
+  if (authorization.authority?.execution_mode !== 'schedule_review_window') errors.push('canonical authorization must begin in schedule_review_window mode');
+  if (authorization.authority?.one_shot !== true) errors.push('canonical authorization must be one_shot');
+  if (authorization.authority?.share_now_allowed !== false) errors.push('canonical authorization must not pre-authorize share_now');
   if (!HASH.test(authorizationHash)) errors.push('authorization_hash must be sha256');
   if (!HASH.test(publicPayloadHash)) errors.push('public_payload_hash must be sha256');
   if (!HASH.test(proposalHash)) errors.push('proposal_hash must be sha256');
   if (!platform || !text) errors.push('authorized public platform and text are required');
   if (!intentId) errors.push('authorized Current You intent id is required');
   if (!Number.isInteger(intentVersion) || intentVersion < 1) errors.push('authorized Current You intent version is invalid');
-  if (nowMs >= expires.ms) errors.push('source publication authorization is expired');
+  if (nowMs >= expires.ms) errors.push('canonical publication authorization is expired');
 
   if (errors.length > 0) reject(errors);
   return {
@@ -69,6 +65,7 @@ function validateScheduledAuthorization(authorization = {}, nowMs) {
     text,
     intentId,
     intentVersion,
+    currentObserved,
     expires,
   };
 }
@@ -83,6 +80,7 @@ function validateCurrentYou(currentYou = {}, source, nowMs) {
   if (currentYou.source !== 'current_authenticated_founder') errors.push('current_you.source must be current_authenticated_founder');
   if (intentId !== source.intentId) errors.push('Current You intent id no longer matches the approved content');
   if (intentVersion !== source.intentVersion) errors.push('Current You intent version no longer matches the approved content');
+  if (observed.ms < source.currentObserved.ms) errors.push('Current You must be re-read at or after the canonical approval observation');
   if (observed.ms > nowMs + MAX_CLOCK_SKEW_MS) errors.push('Current You observation is future-dated');
   if (nowMs - observed.ms > MAX_CURRENT_YOU_AGE_MS) errors.push('Current You observation is stale');
 
@@ -91,7 +89,8 @@ function validateCurrentYou(currentYou = {}, source, nowMs) {
 }
 
 function authorizeFounderContentPublishNow({
-  scheduled_authorization: authorization,
+  proposal,
+  approval,
   confirmation = {},
   provider,
   provider_account_id: providerAccountId,
@@ -100,7 +99,8 @@ function authorizeFounderContentPublishNow({
   now,
 } = {}) {
   const nowTime = parseTime(now, 'now');
-  const source = validateScheduledAuthorization(authorization, nowTime.ms);
+  const canonicalAuthorization = authorizeFounderContentPublication({ proposal, approval, now: nowTime.raw });
+  const source = validateCanonicalAuthorization(canonicalAuthorization, nowTime.ms);
   const current = validateCurrentYou(currentYou, source, nowTime.ms);
   const providerName = asString(provider, 80).toLowerCase();
   const accountId = asString(providerAccountId, 240);
@@ -109,7 +109,7 @@ function authorizeFounderContentPublishNow({
 
   if (confirmation.confirm_publication !== true) errors.push('confirm_publication must be true');
   if (asString(confirmation.authorization_hash, 64).toLowerCase() !== source.authorizationHash) {
-    errors.push('confirmation authorization_hash must match the exact approved packet');
+    errors.push('confirmation authorization_hash must match the exact canonical approval packet');
   }
   if (asString(confirmation.public_payload_hash, 64).toLowerCase() !== source.publicPayloadHash) {
     errors.push('confirmation public_payload_hash must match the exact approved copy');
@@ -117,8 +117,8 @@ function authorizeFounderContentPublishNow({
   if (!IDENTIFIER.test(providerName)) errors.push('provider is required and must be a stable identifier');
   if (!accountId) errors.push('provider_account_id is required');
   if (targetChannel !== source.platform) errors.push('channel must match the exact authorized platform');
-  if (!Array.isArray(authorization.channels) || !authorization.channels.includes(targetChannel)) {
-    errors.push('channel is not present in the source authorization');
+  if (!Array.isArray(canonicalAuthorization.channels) || !canonicalAuthorization.channels.includes(targetChannel)) {
+    errors.push('channel is not present in the canonical authorization');
   }
   if (confirmation.revoked === true) errors.push('publish_now confirmation is revoked');
   if (confirmation.used === true) errors.push('publish_now confirmation has already been used');
@@ -216,10 +216,7 @@ function buildFounderContentProviderWriteEnvelope({
     publish_authorization_hash: authorization.publish_authorization_hash,
     public_payload_hash: authorization.public_payload_hash,
     destination: Object.freeze({ ...authorization.destination }),
-    public_payload: Object.freeze({
-      platform: authorization.content.platform,
-      text: authorization.content.text,
-    }),
+    public_payload: Object.freeze({ platform: authorization.content.platform, text: authorization.content.text }),
     authority: Object.freeze({
       external_write_authorized: true,
       one_shot: true,
