@@ -4,6 +4,7 @@
   const nativeFetch = window.fetch.bind(window);
   const privilegedActions = new Set(['create_branch', 'merge']);
   const executePath = /^\/approvals\/[^/]+\/execute$/;
+  let lastExecutionEvidence = null;
 
   function formForAction(actionType) {
     return actionType === 'merge'
@@ -63,9 +64,59 @@
     form.insertBefore(wrapper, submitRow);
   }
 
+  function shortSha(value) {
+    return typeof value === 'string' && value.length >= 12 ? value.slice(0, 12) : value;
+  }
+
+  function completionClaim(actionType, payload) {
+    const label = actionType === 'merge' ? 'Merge' : 'Branch';
+    const receipt = payload?.executionId;
+    const result = payload?.result && typeof payload.result === 'object' ? payload.result : {};
+    const warnings = Array.isArray(result.warnings) ? result.warnings.filter(Boolean) : [];
+
+    if (!receipt) {
+      return `${label} accepted, but completion is not claimed: execution receipt unavailable.`;
+    }
+
+    if (warnings.length > 0) {
+      return `${label} executed; completion is not claimed. Evidence: execution ${receipt}. Warning: ${warnings.join(' | ')}`;
+    }
+
+    if (actionType === 'merge') {
+      const checks = result.evidence && typeof result.evidence === 'object'
+        ? Object.entries(result.evidence)
+        : [];
+      if (!result.mergeCommitSha || !result.expectedHeadSha || checks.length === 0) {
+        return `Merge executed; completion is not claimed. Evidence: execution ${receipt}; exact completion evidence is incomplete.`;
+      }
+      return `Merge witnessed. Evidence: execution ${receipt}; merge ${shortSha(result.mergeCommitSha)}; exact head ${shortSha(result.expectedHeadSha)}; checks ${checks.map(([kind, value]) => `${kind}=${value}`).join(', ')}.`;
+    }
+
+    if (!result.branchName || !result.expectedHeadSha) {
+      return `Branch executed; completion is not claimed. Evidence: execution ${receipt}; exact-head evidence is incomplete.`;
+    }
+
+    return `Branch witnessed. Evidence: execution ${receipt}; branch ${result.branchName}; exact head ${shortSha(result.expectedHeadSha)}.`;
+  }
+
+  function applyEvidenceBackedCompletionClaim() {
+    const evidence = lastExecutionEvidence;
+    if (!evidence) return;
+
+    const expectedText = evidence.actionType === 'merge' ? 'Merge executed.' : 'Branch created.';
+    const notice = [...document.querySelectorAll('#root .notice')]
+      .find((node) => node.textContent?.trim() === expectedText);
+    if (!notice) return;
+
+    notice.textContent = completionClaim(evidence.actionType, evidence.payload);
+    notice.dataset.completionClaim = evidence.payload?.executionId ? 'evidence-backed' : 'unverified';
+    lastExecutionEvidence = null;
+  }
+
   function augmentPrivilegedForms() {
     addPlanField(document.querySelector('#create-branch-form'), 'create_branch');
     addPlanField(document.querySelector('#execute-merge-form'), 'merge');
+    applyEvidenceBackedCompletionClaim();
   }
 
   const observer = new MutationObserver(augmentPrivilegedForms);
@@ -90,18 +141,29 @@
       return nativeFetch(input, init);
     }
 
-    if (!body || !privilegedActions.has(body.actionType) || body.capabilityPlan !== undefined) {
+    if (!body || !privilegedActions.has(body.actionType)) {
       return nativeFetch(input, init);
     }
 
-    const nextInit = {
-      ...init,
-      body: JSON.stringify({
-        ...body,
-        capabilityPlan: readCapabilityPlan(body.actionType),
-      }),
-    };
+    const nextInit = body.capabilityPlan !== undefined
+      ? init
+      : {
+          ...init,
+          body: JSON.stringify({
+            ...body,
+            capabilityPlan: readCapabilityPlan(body.actionType),
+          }),
+        };
 
-    return nativeFetch(input, nextInit);
+    const response = await nativeFetch(input, nextInit);
+    try {
+      const payload = await response.clone().json();
+      lastExecutionEvidence = response.ok && payload?.ok === true
+        ? { actionType: body.actionType, payload }
+        : null;
+    } catch {
+      lastExecutionEvidence = null;
+    }
+    return response;
   };
 })();
