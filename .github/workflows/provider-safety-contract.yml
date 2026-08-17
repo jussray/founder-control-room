@@ -8,6 +8,7 @@ on:
     paths:
       - 'scripts/provider-credential-contract.mjs'
       - 'scripts/provider-credential-contract.node-test.mjs'
+      - 'scripts/provider-workflow-contract.node-test.mjs'
       - 'scripts/reconcile-cloudflare-access-public-zone.mjs'
       - 'scripts/reconcile-cloudflare-access-public-zone.node-test.mjs'
       - '.github/workflows/provider-safety-contract.yml'
@@ -55,6 +56,9 @@ jobs:
       - name: Prove bounded Access recovery contract
         run: node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
 
+      - name: Prove workflow authority membranes
+        run: node --test scripts/provider-workflow-contract.node-test.mjs
+
       - name: Record prevention receipt
         shell: bash
         run: |
@@ -70,6 +74,7 @@ jobs:
               rawCredentialShapeContract: "passed",
               leastPrivilegeInspectionContract: "passed",
               dedicatedMutationAuthorityContract: "passed",
+              workflowAuthorityMembraneContract: "passed",
               exactHeadBound: true,
               providerMutationPerformed: false
             }' > test-results/provider-safety-contract.json
