@@ -296,11 +296,14 @@ export function adjudicateMemoryWrite(existing: GovernedMemory | null, incoming:
   const existingTime = parseTime(existing.observedAt) ?? 0;
   const incomingRank = memorySourceRank(incoming);
   const existingRank = memorySourceRank(existing);
+  const incomingCurrentHumanIntent = (incoming.kind === 'preference' || incoming.kind === 'goal')
+    && incoming.source === 'current_user'
+    && incoming.authenticated;
   if (existing.factHash === incoming.factHash) {
     const incomingWins = incomingRank > existingRank || (incomingRank === existingRank && incomingTime >= existingTime);
     return { decision: incomingWins ? 'supersede' : 'preserve_existing', winnerId: incomingWins ? incoming.id : existing.id, loserId: incomingWins ? existing.id : incoming.id, reason: 'Equivalent memories preserve lineage while the stronger or newer observation becomes current.' };
   }
-  if (incomingRank > existingRank && incomingTime >= existingTime) {
+  if (incomingRank > existingRank && (incomingCurrentHumanIntent || incomingTime >= existingTime)) {
     return {
       decision: 'supersede', winnerId: incoming.id, loserId: existing.id,
       reason: incoming.kind === 'preference' || incoming.kind === 'goal'
