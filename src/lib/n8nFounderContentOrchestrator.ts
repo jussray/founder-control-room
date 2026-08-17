@@ -1,4 +1,8 @@
 import { createHash } from 'node:crypto';
+import {
+  applyFounderContentCadenceSchedule,
+  reserveFounderContentCadence,
+} from './founderContentCadence.js';
 import { executionScopeMatches } from './idempotencyScope.js';
 // @ts-expect-error -- the canonical #428 social-distribution contract is CommonJS and intentionally remains the single authority implementation.
 import socialDistributionContract from '../../tools/zapier/social-distribution-contract.cjs';
@@ -135,6 +139,7 @@ export interface N8nFounderContentDispatchResult {
     | 'ORCHESTRATION_NOT_CONFIGURED'
     | 'INVALID_ENVELOPE'
     | 'EXECUTION_CONTEXT_REQUIRED'
+    | 'CADENCE_RESERVATION_FAILED'
     | 'SOURCE_PROJECT_UNRESOLVED'
     | 'IDEMPOTENCY_SCOPE_MISMATCH'
     | 'ACTION_ALREADY_RESERVED'
@@ -525,9 +530,10 @@ export async function dispatchN8nFounderContent(
   input: FirstPartyFounderDistributionInput,
   options: DispatchOptions = {},
 ): Promise<N8nFounderContentDispatchResult> {
+  let envelope: FirstPartyFounderScheduleEnvelope;
   let request: N8nFounderContentRequest;
   try {
-    const envelope = buildCanonicalFirstPartyFounderScheduleEnvelope(input);
+    envelope = buildCanonicalFirstPartyFounderScheduleEnvelope(input);
     request = buildN8nFounderContentRequest(envelope);
   } catch (error) {
     return {
@@ -557,6 +563,29 @@ export async function dispatchN8nFounderContent(
       request,
       receipt: null,
       reasons: ['server-authenticated founder identity is required before external orchestration'],
+    };
+  }
+
+  try {
+    const cadence = await reserveFounderContentCadence({
+      provider: envelope.provider,
+      channel: envelope.channel,
+      contentId: envelope.content_id,
+      requestedScheduleAt: envelope.provider_request.schedule_at,
+    });
+    envelope = applyFounderContentCadenceSchedule(envelope, cadence);
+    request = buildN8nFounderContentRequest(envelope);
+  } catch (error) {
+    return {
+      ok: false,
+      code: 'CADENCE_RESERVATION_FAILED',
+      status: 503,
+      request,
+      receipt: null,
+      reasons: [
+        error instanceof Error ? error.message : 'founder-content cadence reservation failed',
+        'no external founder-content orchestration was attempted',
+      ],
     };
   }
 
