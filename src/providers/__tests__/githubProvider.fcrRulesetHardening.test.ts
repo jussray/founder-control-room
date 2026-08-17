@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
   mockGetRepoRulesets,
   mockGetRepoRuleset,
+  mockListCollaborators,
   mockCreateRepoRuleset,
   mockUpdateRepoRuleset,
 } = vi.hoisted(() => ({
   mockGetRepoRulesets: vi.fn(),
   mockGetRepoRuleset: vi.fn(),
+  mockListCollaborators: vi.fn(),
   mockCreateRepoRuleset: vi.fn(),
   mockUpdateRepoRuleset: vi.fn(),
 }));
@@ -17,6 +19,7 @@ vi.mock("@octokit/rest", () => ({
     repos = {
       getRepoRulesets: mockGetRepoRulesets,
       getRepoRuleset: mockGetRepoRuleset,
+      listCollaborators: mockListCollaborators,
       createRepoRuleset: mockCreateRepoRuleset,
       updateRepoRuleset: mockUpdateRepoRuleset,
     };
@@ -109,6 +112,12 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     vi.clearAllMocks();
     mockGetRepoRulesets.mockResolvedValue({ data: [] });
     mockGetRepoRuleset.mockResolvedValue({ data: strongReadback() });
+    mockListCollaborators.mockResolvedValue({
+      data: [
+        { login: "jussray", permissions: { push: true } },
+        { login: "independent-reviewer", permissions: { push: true } },
+      ],
+    });
     mockCreateRepoRuleset.mockResolvedValue({
       data: { id: 1, name: config.name, enforcement: "active" },
     });
@@ -120,6 +129,13 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
   it("maps active FCR main review policy to stale-review and last-push protections", async () => {
     const provider = buildProvider();
     await provider.applyBranchRuleset("founder-control-room", config);
+
+    expect(mockListCollaborators).toHaveBeenCalledWith({
+      owner: "jussray",
+      repo: "founder-control-room",
+      affiliation: "all",
+      per_page: 100,
+    });
 
     const pullRequestRule = pullRequestRuleFromLastCreate();
     expect(pullRequestRule.parameters).toMatchObject({
@@ -150,9 +166,37 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
       requiredApprovingReviewCount: 0,
     })).rejects.toThrow("at least one approving review is required");
 
+    expect(mockListCollaborators).not.toHaveBeenCalled();
     expect(mockCreateRepoRuleset).not.toHaveBeenCalled();
     expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
     expect(mockGetRepoRuleset).not.toHaveBeenCalled();
+  });
+
+  it("rejects an independent-review policy when no non-owner writer can satisfy it", async () => {
+    mockListCollaborators.mockResolvedValue({
+      data: [{ login: "jussray", permissions: { push: true } }],
+    });
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", config))
+      .rejects.toThrow("non-owner collaborator with write authority");
+
+    expect(mockCreateRepoRuleset).not.toHaveBeenCalled();
+    expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
+    expect(mockGetRepoRuleset).not.toHaveBeenCalled();
+  });
+
+  it("does not count a non-owner read-only collaborator as independent-review capability", async () => {
+    mockListCollaborators.mockResolvedValue({
+      data: [
+        { login: "jussray", permissions: { push: true } },
+        { login: "reader", permissions: { push: false } },
+      ],
+    });
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", config))
+      .rejects.toThrow("non-owner collaborator with write authority");
   });
 
   it("accepts renamed policy and additional protected refs when semantics round-trip", async () => {
@@ -222,6 +266,7 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     expect(pullRequestRule.parameters.dismiss_stale_reviews_on_push).toBe(false);
     expect(pullRequestRule.parameters.require_last_push_approval).toBe(false);
     expect(pullRequestRule.parameters.required_review_thread_resolution).toBe(true);
+    expect(mockListCollaborators).not.toHaveBeenCalled();
     expect(mockGetRepoRuleset).not.toHaveBeenCalled();
   });
 });
