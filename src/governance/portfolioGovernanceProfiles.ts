@@ -30,6 +30,12 @@ function maxRisk(requested: ActionRisk, floor?: ActionRisk): ActionRisk {
   return ACTION_RISK_RANK[requested] >= ACTION_RISK_RANK[floor] ? requested : floor;
 }
 
+function portfolioActionRegistered(profile: PortfolioGovernanceProfile, action: string): boolean {
+  return profile.blockedActions.includes(action)
+    || Object.prototype.hasOwnProperty.call(profile.requiredClaims, action)
+    || Object.prototype.hasOwnProperty.call(profile.actionRiskFloors, action);
+}
+
 export const PORTFOLIO_GOVERNANCE_PROFILES: readonly PortfolioGovernanceProfile[] = [
   {
     id: 'founder-control-room', repositories: ['jussray/founder-control-room'], implementationState: 'active',
@@ -124,6 +130,7 @@ export function portfolioHardConstraintViolations(
   repository: string,
   action: string,
   recoveryLevel?: RecoveryLevel | null,
+  effectiveRisk?: ActionRisk,
 ): string[] {
   const profile = portfolioGovernanceProfile(repository);
   if (!profile) return ['repository has no governed portfolio profile'];
@@ -132,6 +139,9 @@ export function portfolioHardConstraintViolations(
     reasons.push('project has no implemented runtime authority');
   }
   if (profile.blockedActions.includes(action)) reasons.push(`project profile explicitly blocks action: ${action}`);
+  if (effectiveRisk === 'consequential' && !portfolioActionRegistered(profile, action)) {
+    reasons.push(`consequential action must be explicitly registered in project profile: ${action}`);
+  }
   if (recoveryLevel && RECOVERY_RANK[recoveryLevel] < RECOVERY_RANK[profile.minimumRecoveryLevel]) {
     reasons.push(`project requires recovery ${profile.minimumRecoveryLevel} or stronger; received ${recoveryLevel}`);
   }
@@ -160,7 +170,12 @@ export function evaluatePortfolioGovernedAction(
     requiredClaims: mergedClaims,
     hardConstraintViolations: [
       ...(request.hardConstraintViolations ?? []),
-      ...portfolioHardConstraintViolations(repository, action, request.recoveryPlan?.level),
+      ...portfolioHardConstraintViolations(
+        repository,
+        action,
+        request.recoveryPlan?.level,
+        effectiveRisk,
+      ),
     ],
   });
 }
