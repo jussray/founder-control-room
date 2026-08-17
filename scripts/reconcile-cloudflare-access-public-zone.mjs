@@ -1,6 +1,12 @@
+import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import {
+  classifyProviderToken,
+  nextCredentialAction,
+} from './provider-credential-contract.mjs';
 
 const API_BASE = 'https://api.cloudflare.com/client/v4';
+const RECEIPT_PATH = 'test-results/fcr-access-front-door-recovery.json';
 export const FCR_CLOUDFLARE_ACCOUNT_ID = '9b59861bd1747cf7525571b4c51d2aa0';
 export const FCR_PUBLIC_ZONE = 'foundercontrolroom.org';
 
@@ -8,24 +14,26 @@ function clean(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function tokenCandidates(env) {
-  const values = [
-    ['CLOUDFLARE_ACCESS_ADMIN_API_TOKEN', clean(env.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN)],
-    ['CLOUDFLARE_ACCESS_API_TOKEN', clean(env.CLOUDFLARE_ACCESS_API_TOKEN)],
-    ['CLOUDFLARE_API_TOKEN', clean(env.CLOUDFLARE_API_TOKEN)],
-  ].filter(([, value]) => value);
+function rawSecret(env, name) {
+  return typeof env?.[name] === 'string' ? env[name] : '';
+}
+
+function tokenCandidates(env, { apply = false } = {}) {
+  const names = apply
+    ? ['CLOUDFLARE_ACCESS_ADMIN_API_TOKEN']
+    : [
+        'CLOUDFLARE_ACCESS_API_TOKEN',
+        'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN',
+        'CLOUDFLARE_API_TOKEN',
+      ];
+
+  const values = names
+    .map((name) => [name, rawSecret(env, name)])
+    .filter(([, value]) => value.length > 0);
 
   return values.filter(
     ([, value], index) => values.findIndex(([, other]) => other === value) === index,
   );
-}
-
-function validBearerToken(token) {
-  return Boolean(token)
-    && /^[\x21-\x7E]+$/.test(token)
-    && !/\s/.test(token)
-    && !/^Bearer\s/i.test(token)
-    && !/^['"]|['"]$/.test(token);
 }
 
 function normalizedHost(value) {
@@ -74,7 +82,7 @@ export function matchingAccessReasons(application, zone = FCR_PUBLIC_ZONE) {
   return [...new Set(reasons)];
 }
 
-async function cloudflareJson({ accountId, token, fetchImpl }, method, path, body) {
+async function cloudflareJson({ token, fetchImpl }, method, path, body) {
   const response = await fetchImpl(`${API_BASE}${path}`, {
     method,
     headers: {
@@ -97,16 +105,36 @@ async function cloudflareJson({ accountId, token, fetchImpl }, method, path, bod
   return payload?.result ?? null;
 }
 
-async function selectCredential({ env, accountId, fetchImpl }) {
+async function selectCredential({ env, accountId, fetchImpl, apply }) {
   const failures = [];
-  for (const [source, token] of tokenCandidates(env)) {
-    if (!validBearerToken(token)) {
-      failures.push({ source, reason: 'invalid-token-format' });
+  const candidates = tokenCandidates(env, { apply });
+
+  if (apply && candidates.length === 0) {
+    const error = new Error(
+      'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN is required for Access mutation; read-only or general-purpose credentials are not mutation authority.',
+    );
+    error.classification = 'dedicated-admin-credential-required';
+    error.credentialFailures = [{
+      source: 'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN',
+      reason: 'missing',
+      nextAction: nextCredentialAction('CLOUDFLARE_ACCESS_ADMIN_API_TOKEN', 'missing'),
+    }];
+    throw error;
+  }
+
+  for (const [source, token] of candidates) {
+    const shape = classifyProviderToken(token, { accountId });
+    if (!shape.headerSafe) {
+      failures.push({
+        source,
+        reason: shape.classification,
+        nextAction: nextCredentialAction(source, shape.classification),
+      });
       continue;
     }
     try {
       const organization = await cloudflareJson(
-        { accountId, token, fetchImpl },
+        { token, fetchImpl },
         'GET',
         `/accounts/${accountId}/access/organizations`,
       );
@@ -117,12 +145,53 @@ async function selectCredential({ env, accountId, fetchImpl }) {
         reason: 'provider-read-failed',
         status: Number.isInteger(error?.providerStatus) ? error.providerStatus : null,
         providerCodes: Array.isArray(error?.providerCodes) ? error.providerCodes : [],
+        nextAction: 'verify token scope and Cloudflare Access permissions for this account',
       });
     }
   }
-  const error = new Error('No configured Cloudflare Access credential can read the Zero Trust organization.');
-  error.credentialFailures = failures;
+
+  const error = new Error(
+    apply
+      ? 'The dedicated Cloudflare Access admin credential could not read the Zero Trust organization; mutation is blocked.'
+      : 'No configured Cloudflare Access credential can read the Zero Trust organization.',
+  );
+  error.classification = failures.some((failure) => failure.reason === 'provider-read-failed')
+    ? 'provider-read-failed'
+    : 'provider-credential-invalid';
+  error.credentialFailures = failures.length > 0
+    ? failures
+    : [{
+        source: apply ? 'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN' : 'CLOUDFLARE_ACCESS_API_TOKEN',
+        reason: 'missing',
+        nextAction: apply
+          ? nextCredentialAction('CLOUDFLARE_ACCESS_ADMIN_API_TOKEN', 'missing')
+          : 'configure a read-only Cloudflare Access token for inspection',
+      }];
   throw error;
+}
+
+function receiptBase({ apply, accountId, zone }) {
+  return {
+    schemaVersion: 2,
+    scope: 'fcr-access-front-door-recovery',
+    observedAt: new Date().toISOString(),
+    workflowRunId: process.env.GITHUB_RUN_ID || null,
+    workflowRunAttempt: process.env.GITHUB_RUN_ATTEMPT || null,
+    expectedHeadSha: process.env.EXPECTED_HEAD_SHA || process.env.GITHUB_SHA || null,
+    state: 'unknown',
+    applyRequested: apply,
+    mutationPerformed: false,
+    accountId,
+    zone,
+    credentialSource: null,
+    credentialFailures: [],
+    denyUnmatchedRequests: null,
+    alreadyExempt: null,
+    matchingApplicationCount: null,
+    action: 'none',
+    blocker: null,
+    nextAction: null,
+  };
 }
 
 export async function reconcileFcrPublicAccessZone({
@@ -132,9 +201,9 @@ export async function reconcileFcrPublicAccessZone({
   accountId = clean(env.CLOUDFLARE_ACCOUNT_ID) || FCR_CLOUDFLARE_ACCOUNT_ID,
   zone = FCR_PUBLIC_ZONE,
 } = {}) {
-  const credential = await selectCredential({ env, accountId, fetchImpl });
+  const credential = await selectCredential({ env, accountId, fetchImpl, apply });
   const applications = await cloudflareJson(
-    { accountId, token: credential.token, fetchImpl },
+    { token: credential.token, fetchImpl },
     'GET',
     `/accounts/${accountId}/access/apps?per_page=1000`,
   );
@@ -150,7 +219,10 @@ export async function reconcileFcrPublicAccessZone({
     const error = new Error(
       'Explicit Cloudflare Access application coverage matches Founder Control Room; refusing zone exemption until that application is reviewed.',
     );
+    error.classification = 'explicit-access-application-match';
     error.matchingApplications = matchingApplications;
+    error.credentialSource = credential.source;
+    error.credentialFailures = credential.failures;
     throw error;
   }
 
@@ -159,36 +231,54 @@ export async function reconcileFcrPublicAccessZone({
     : {};
   const denyUnmatchedRequests = organization.deny_unmatched_requests === true;
   const existingExemptions = Array.isArray(organization.deny_unmatched_requests_exempted_zone_names)
-    ? organization.deny_unmatched_requests_exempted_zone_names.map((item) => clean(item).toLowerCase()).filter(Boolean)
+    ? organization.deny_unmatched_requests_exempted_zone_names
+        .map((item) => clean(item).toLowerCase())
+        .filter(Boolean)
     : [];
   const alreadyExempt = existingExemptions.includes(zone.toLowerCase());
 
   const receipt = {
-    version: 1,
-    mutationPerformed: false,
-    accountId,
-    zone,
+    ...receiptBase({ apply, accountId, zone }),
     credentialSource: credential.source,
     credentialFailures: credential.failures,
     denyUnmatchedRequests,
     alreadyExempt,
     matchingApplicationCount: matchingApplications.length,
-    action: 'none',
   };
 
   if (!denyUnmatchedRequests) {
-    return { ...receipt, action: 'deny-unmatched-disabled' };
+    return {
+      ...receipt,
+      state: 'clear',
+      action: 'deny-unmatched-disabled',
+      nextAction: 'run domain authority Playwright and verify the public front door',
+    };
   }
   if (alreadyExempt) {
-    return { ...receipt, action: 'already-exempt' };
+    return {
+      ...receipt,
+      state: 'clear',
+      action: 'already-exempt',
+      nextAction: 'run domain authority Playwright and verify the public front door',
+    };
   }
   if (!apply) {
-    return { ...receipt, action: 'would-add-zone-exemption' };
+    return {
+      ...receipt,
+      state: 'attention',
+      action: 'would-add-zone-exemption',
+      blocker: 'deny-unmatched Access protection currently covers the public FCR zone without a matching explicit app',
+      nextAction: 'founder-approved run may add only foundercontrolroom.org to the existing exemption list',
+    };
+  }
+
+  if (credential.source !== 'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN') {
+    throw new Error('Mutation authority must come from CLOUDFLARE_ACCESS_ADMIN_API_TOKEN.');
   }
 
   const nextExemptions = [...new Set([...existingExemptions, zone.toLowerCase()])].sort();
   const updated = await cloudflareJson(
-    { accountId, token: credential.token, fetchImpl },
+    { token: credential.token, fetchImpl },
     'PUT',
     `/accounts/${accountId}/access/organizations`,
     { deny_unmatched_requests_exempted_zone_names: nextExemptions },
@@ -197,15 +287,24 @@ export async function reconcileFcrPublicAccessZone({
     ? updated.deny_unmatched_requests_exempted_zone_names.map((item) => clean(item).toLowerCase())
     : [];
   if (!verifiedExemptions.includes(zone.toLowerCase())) {
-    throw new Error('Cloudflare accepted the update but did not return the Founder Control Room zone exemption.');
+    throw new Error(
+      'Cloudflare accepted the update but did not return the Founder Control Room zone exemption.',
+    );
   }
 
   return {
     ...receipt,
+    state: 'mutated-needs-browser-proof',
     mutationPerformed: true,
     alreadyExempt: true,
     action: 'added-zone-exemption',
+    nextAction: 'run exact-head domain authority Playwright before declaring the front door recovered',
   };
+}
+
+async function writeReceipt(receipt) {
+  await mkdir('test-results', { recursive: true });
+  await writeFile(RECEIPT_PATH, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
 }
 
 function printReceipt(receipt) {
@@ -215,16 +314,36 @@ function printReceipt(receipt) {
 const invokedDirectly = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
 if (invokedDirectly) {
   const apply = process.argv.includes('--apply');
+  const accountId = clean(process.env.CLOUDFLARE_ACCOUNT_ID) || FCR_CLOUDFLARE_ACCOUNT_ID;
+  const base = receiptBase({ apply, accountId, zone: FCR_PUBLIC_ZONE });
+
   reconcileFcrPublicAccessZone({ apply })
-    .then(printReceipt)
-    .catch((error) => {
-      console.error(error instanceof Error ? error.message : String(error));
-      if (Array.isArray(error?.credentialFailures)) {
-        console.error(JSON.stringify({ credentialFailures: error.credentialFailures }, null, 2));
-      }
-      if (Array.isArray(error?.matchingApplications)) {
-        console.error(JSON.stringify({ matchingApplications: error.matchingApplications }, null, 2));
-      }
+    .then(async (receipt) => {
+      await writeReceipt(receipt);
+      printReceipt(receipt);
+    })
+    .catch(async (error) => {
+      const receipt = {
+        ...base,
+        state: 'blocked',
+        credentialSource: error?.credentialSource ?? null,
+        credentialFailures: Array.isArray(error?.credentialFailures)
+          ? error.credentialFailures
+          : [],
+        matchingApplications: Array.isArray(error?.matchingApplications)
+          ? error.matchingApplications
+          : [],
+        matchingApplicationCount: Array.isArray(error?.matchingApplications)
+          ? error.matchingApplications.length
+          : null,
+        blocker: error instanceof Error ? error.message : String(error),
+        classification: error?.classification || 'provider-recovery-failed',
+        nextAction: Array.isArray(error?.credentialFailures) && error.credentialFailures[0]?.nextAction
+          ? error.credentialFailures[0].nextAction
+          : 'review the structured receipt and correct the bounded provider authority before retrying',
+      };
+      await writeReceipt(receipt);
+      printReceipt(receipt);
       process.exitCode = 1;
     });
 }
