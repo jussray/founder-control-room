@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildCanonicalFirstPartyFounderScheduleEnvelope,
   buildN8nFounderContentRequest,
   readN8nFounderContentConfig,
   validateN8nFounderContentEnvelope,
@@ -77,6 +78,12 @@ describe('n8n founder-content orchestration', () => {
       'authorization_mode must be exact-current-you',
       'standing policy may not authorize founder-progress publication',
     ]));
+  });
+
+  it('does not accept a caller-shaped authorized envelope as canonical FCR authority', () => {
+    expect(() => buildCanonicalFirstPartyFounderScheduleEnvelope(
+      envelope() as unknown as Record<string, unknown>,
+    )).toThrow(/FOUNDER_CONTENT_AUTHORIZATION_REJECTED|SOCIAL_DISTRIBUTION_REJECTED/);
   });
 
   it('projects only provider-safe data and never sends private proof references', () => {
