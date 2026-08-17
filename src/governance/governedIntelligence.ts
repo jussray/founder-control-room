@@ -5,6 +5,8 @@ export type IntentSource =
   | 'future_you'
   | 'inferred';
 
+export type MemorySource = IntentSource | 'system_observation' | 'provider_evidence';
+export type MemoryKind = 'preference' | 'goal' | 'fact' | 'runtime_state';
 export type ActionRisk = 'observe' | 'reversible' | 'consequential' | 'irreversible';
 export type MemoryStatus = 'candidate' | 'trusted' | 'verified' | 'stale' | 'disputed' | 'superseded' | 'forgotten';
 export type RecoveryLevel = 'R0' | 'R1' | 'R2' | 'R3' | 'R4';
@@ -24,9 +26,10 @@ export interface TemporalIntent {
 
 export interface GovernedMemory {
   id: string;
+  kind: MemoryKind;
   factHash: string;
   ownerId: string;
-  source: IntentSource;
+  source: MemorySource;
   status: MemoryStatus;
   observedAt: string;
   authenticated: boolean;
@@ -47,6 +50,7 @@ export interface ProofContract {
   environment?: string | null;
   exactVersion?: string | null;
   expiresAt?: string | null;
+  freshForMs?: number | null;
 }
 
 export interface RecoveryPlan {
@@ -107,14 +111,6 @@ const INTENT_RANK: Record<IntentSource, number> = {
   inferred: 1,
 };
 
-const MEMORY_SOURCE_RANK: Record<IntentSource, number> = {
-  current_user: 5,
-  delegated: 4,
-  historical_user: 3,
-  future_you: 2,
-  inferred: 1,
-};
-
 const RECOVERY_RANK: Record<RecoveryLevel, number> = {
   R0: 0,
   R1: 1,
@@ -138,12 +134,47 @@ function scopeMatches(scope: string[], requiredScope: string): boolean {
   return scope.includes('*') || scope.includes(requiredScope);
 }
 
+function sourceRequiresAuthentication(source: MemorySource): boolean {
+  return source === 'current_user'
+    || source === 'delegated'
+    || source === 'system_observation'
+    || source === 'provider_evidence';
+}
+
+function memorySourceRank(memory: GovernedMemory): number {
+  if (sourceRequiresAuthentication(memory.source) && !memory.authenticated) return 0;
+
+  if (memory.kind === 'preference' || memory.kind === 'goal') {
+    switch (memory.source) {
+      case 'current_user': return 60;
+      case 'delegated': return 50;
+      case 'historical_user': return 35;
+      case 'future_you': return 20;
+      case 'inferred': return 10;
+      case 'system_observation': return 5;
+      case 'provider_evidence': return 5;
+    }
+  }
+
+  switch (memory.source) {
+    case 'provider_evidence': return 60;
+    case 'system_observation': return 55;
+    case 'current_user': return 40;
+    case 'delegated': return 35;
+    case 'historical_user': return 25;
+    case 'future_you': return 15;
+    case 'inferred': return 10;
+  }
+}
+
 function activeIntent(intent: TemporalIntent, now: Date, requiredScope: string): boolean {
   const issuedAt = parseTime(intent.issuedAt);
   if (issuedAt === null || isFutureBeyondSkew(intent.issuedAt, now)) return false;
   if (!scopeMatches(intent.scope, requiredScope)) return false;
-  if (intent.revokedAt && parseTime(intent.revokedAt) !== null && parseTime(intent.revokedAt)! <= now.getTime()) return false;
-  if (intent.expiresAt && parseTime(intent.expiresAt) !== null && parseTime(intent.expiresAt)! <= now.getTime()) return false;
+  const revokedAt = parseTime(intent.revokedAt);
+  if (revokedAt !== null && revokedAt <= now.getTime()) return false;
+  const expiresAt = parseTime(intent.expiresAt);
+  if (expiresAt !== null && expiresAt <= now.getTime()) return false;
   if ((intent.source === 'current_user' || intent.source === 'delegated') && !intent.authenticated) return false;
   return true;
 }
@@ -199,61 +230,84 @@ export function adjudicateMemoryWrite(
   incoming: GovernedMemory,
   now: Date = new Date(),
 ): MemoryAdjudication {
+  const incomingTime = parseTime(incoming.observedAt);
+  if (incomingTime === null || isFutureBeyondSkew(incoming.observedAt, now)) {
+    return {
+      decision: existing ? 'preserve_existing' : 'dispute',
+      winnerId: existing?.id ?? null,
+      loserId: existing ? incoming.id : null,
+      reason: 'Malformed or future-dated memory cannot become current truth.',
+    };
+  }
+  if (sourceRequiresAuthentication(incoming.source) && !incoming.authenticated) {
+    return {
+      decision: existing ? 'preserve_existing' : 'dispute',
+      winnerId: existing?.id ?? null,
+      loserId: existing ? incoming.id : null,
+      reason: 'Unauthenticated authority-bearing memory cannot become current truth.',
+    };
+  }
   if (!existing) {
     return { decision: 'accept', winnerId: incoming.id, loserId: null, reason: 'No existing memory competes with this write.' };
   }
+  if (existing.kind !== incoming.kind) {
+    return {
+      decision: 'dispute',
+      winnerId: null,
+      loserId: null,
+      reason: 'Conflicting memory kinds cannot overwrite one another automatically.',
+    };
+  }
+
+  const existingTime = parseTime(existing.observedAt) ?? 0;
+  const incomingRank = memorySourceRank(incoming);
+  const existingRank = memorySourceRank(existing);
 
   if (existing.factHash === incoming.factHash) {
-    const newer = (parseTime(incoming.observedAt) ?? 0) >= (parseTime(existing.observedAt) ?? 0);
+    const incomingWins = incomingRank > existingRank
+      || (incomingRank === existingRank && incomingTime >= existingTime);
     return {
-      decision: newer ? 'supersede' : 'preserve_existing',
-      winnerId: newer ? incoming.id : existing.id,
-      loserId: newer ? existing.id : incoming.id,
-      reason: 'Equivalent facts preserve lineage while the newer observation becomes current.',
+      decision: incomingWins ? 'supersede' : 'preserve_existing',
+      winnerId: incomingWins ? incoming.id : existing.id,
+      loserId: incomingWins ? existing.id : incoming.id,
+      reason: 'Equivalent memories preserve lineage while the stronger or newer observation becomes current.',
     };
   }
 
-  const incomingTime = parseTime(incoming.observedAt);
-  const existingTime = parseTime(existing.observedAt);
-  const incomingValid = incomingTime !== null && !isFutureBeyondSkew(incoming.observedAt, now);
-  if (!incomingValid) {
-    return {
-      decision: 'preserve_existing',
-      winnerId: existing.id,
-      loserId: incoming.id,
-      reason: 'Malformed or future-dated memory cannot displace existing state.',
-    };
-  }
-
-  const incomingAuthoritative = incoming.authenticated && incoming.source === 'current_user';
-  const existingAuthoritative = existing.authenticated && existing.source === 'current_user';
-
-  if (incomingAuthoritative && (!existingAuthoritative || (incomingTime ?? 0) > (existingTime ?? 0))) {
+  if (incomingRank > existingRank && incomingTime >= existingTime) {
     return {
       decision: 'supersede',
       winnerId: incoming.id,
       loserId: existing.id,
-      reason: 'A newer authenticated Current You correction supersedes lower-authority or older memory while preserving the prior record for audit.',
+      reason: incoming.kind === 'preference' || incoming.kind === 'goal'
+        ? 'Higher-authority current intent supersedes lower-authority historical or projected memory.'
+        : 'Higher-authority objective evidence supersedes lower-authority belief while preserving prior lineage.',
     };
   }
 
-  if (existingAuthoritative && ['future_you', 'historical_user', 'inferred'].includes(incoming.source)) {
+  if (existingRank > incomingRank) {
+    if ((existing.kind === 'preference' || existing.kind === 'goal') && existing.source === 'current_user') {
+      return {
+        decision: 'preserve_existing',
+        winnerId: existing.id,
+        loserId: incoming.id,
+        reason: 'Future, historical, inferred, or lower delegation context cannot overwrite authenticated Current You preference or goal.',
+      };
+    }
+    if ((existing.kind === 'fact' || existing.kind === 'runtime_state')
+      && (existing.source === 'provider_evidence' || existing.source === 'system_observation')) {
+      return {
+        decision: 'dispute',
+        winnerId: existing.id,
+        loserId: null,
+        reason: 'A lower-authority conflicting assertion cannot overwrite objective evidence; the conflict requires fresh re-verification.',
+      };
+    }
     return {
       decision: 'preserve_existing',
       winnerId: existing.id,
       loserId: incoming.id,
-      reason: 'FutureYou, historical, or inferred context cannot overwrite an authenticated Current You fact.',
-    };
-  }
-
-  const incomingRank = MEMORY_SOURCE_RANK[incoming.source];
-  const existingRank = MEMORY_SOURCE_RANK[existing.source];
-  if (incomingRank > existingRank && (incomingTime ?? 0) >= (existingTime ?? 0)) {
-    return {
-      decision: 'supersede',
-      winnerId: incoming.id,
-      loserId: existing.id,
-      reason: 'Higher-authority newer evidence supersedes the prior memory and preserves it as lineage.',
+      reason: 'Lower-authority conflicting memory cannot silently replace stronger current state.',
     };
   }
 
@@ -274,11 +328,26 @@ export function memoryCanAuthorize(
   if (observedAt === null || isFutureBeyondSkew(memory.observedAt, now)) {
     return { allowed: false, reason: 'Memory observation time is invalid or future-dated.' };
   }
-  if (memory.expiresAt && parseTime(memory.expiresAt) !== null && parseTime(memory.expiresAt)! <= now.getTime()) {
+  if (sourceRequiresAuthentication(memory.source) && !memory.authenticated) {
+    return { allowed: false, reason: 'Memory source is not authenticated.' };
+  }
+  const expiresAt = parseTime(memory.expiresAt);
+  if (expiresAt !== null && expiresAt <= now.getTime()) {
     return { allowed: false, reason: 'Memory has expired.' };
   }
   if (['candidate', 'stale', 'disputed', 'superseded', 'forgotten'].includes(memory.status)) {
     return { allowed: false, reason: `Memory status ${memory.status} cannot authorize action.` };
+  }
+
+  if (risk !== 'observe') {
+    if ((memory.kind === 'preference' || memory.kind === 'goal')
+      && !['current_user', 'delegated'].includes(memory.source)) {
+      return { allowed: false, reason: 'Effectful action requires current or delegated authority for preferences and goals.' };
+    }
+    if ((memory.kind === 'fact' || memory.kind === 'runtime_state')
+      && !['provider_evidence', 'system_observation'].includes(memory.source)) {
+      return { allowed: false, reason: 'Effectful action requires objective provider or system evidence for facts and runtime state.' };
+    }
   }
 
   const verifiedAt = parseTime(memory.lastVerifiedAt ?? memory.observedAt);
@@ -294,7 +363,7 @@ export function memoryCanAuthorize(
     return { allowed: false, reason: 'Reversible action requires memory re-verification within 7 days.' };
   }
 
-  return { allowed: true, reason: 'Memory is sufficiently verified and fresh for this risk level.' };
+  return { allowed: true, reason: 'Memory is sufficiently authoritative, verified, and fresh for this risk level.' };
 }
 
 export function proofSupportsClaim(
@@ -317,14 +386,23 @@ export function proofSupportsClaim(
   if (observedAt === null || observedAt > now.getTime() + FIVE_MINUTES_MS) {
     return { supported: false, reason: 'Proof observation time is invalid or future-dated.' };
   }
-  if (proof.expiresAt && parseTime(proof.expiresAt) !== null && parseTime(proof.expiresAt)! <= now.getTime()) {
+  const expiresAt = parseTime(proof.expiresAt);
+  if (expiresAt !== null && expiresAt <= now.getTime()) {
     return { supported: false, reason: 'Proof contract has expired.' };
+  }
+  if (proof.freshForMs !== undefined && proof.freshForMs !== null) {
+    if (!Number.isFinite(proof.freshForMs) || proof.freshForMs <= 0) {
+      return { supported: false, reason: 'Proof freshness window is invalid.' };
+    }
+    if (now.getTime() - observedAt > proof.freshForMs) {
+      return { supported: false, reason: 'Proof contract is outside its declared freshness window.' };
+    }
   }
   if (exactVersion && proof.exactVersion !== exactVersion) {
     return { supported: false, reason: 'Proof exact version does not match the requested version.' };
   }
 
-  return { supported: true, reason: 'Proof contract is scoped, fresh, and version-compatible.' };
+  return { supported: true, reason: 'Proof contract is claim-scoped, fresh, and version-compatible.' };
 }
 
 export function recoverySatisfiesRisk(
@@ -382,12 +460,10 @@ export function evaluateGovernedAction(request: GovernedActionRequest): Governed
   if (intent.mode === 'missing' || intent.mode === 'conflict') {
     return { decision: 'reconfirm', reasons, selectedIntent: intent.selected, lineage };
   }
-
   if (request.risk !== 'observe' && intent.mode !== 'authoritative') {
     reasons.push('Effectful action requires fresh authenticated Current You or active delegated authority.');
     return { decision: 'reconfirm', reasons, selectedIntent: intent.selected, lineage };
   }
-
   if (request.risk === 'irreversible') {
     reasons.push('Irreversible action cannot be autonomously authorized by this contract.');
     return { decision: 'deny', reasons, selectedIntent: intent.selected, lineage };
@@ -408,7 +484,8 @@ export function evaluateGovernedAction(request: GovernedActionRequest): Governed
   }
 
   for (const requirement of requiredClaims) {
-    const supporting = proofs.find((proof) => proofSupportsClaim(proof, requirement.claim, now, requirement.exactVersion).supported);
+    const supporting = proofs.find((candidate) =>
+      proofSupportsClaim(candidate, requirement.claim, now, requirement.exactVersion).supported);
     if (!supporting) {
       reasons.push(`No valid proof contract supports required claim: ${requirement.claim}.`);
       return { decision: 'reconfirm', reasons, selectedIntent: intent.selected, lineage };
