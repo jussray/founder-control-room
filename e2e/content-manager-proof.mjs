@@ -43,15 +43,15 @@ try {
   assert.equal(await proofToggle.isChecked(), false, 'founder can keep the public post link-free');
 
   const statusText = await page.locator('.status-row').first().innerText();
-  assert.match(statusText, /Internal evidence required/);
-  assert.match(statusText, /Sauce protected/);
-  assert.match(statusText, /Public proof link optional/);
-  assert.match(statusText, /Current You approves/);
+  assert.match(statusText, /Internal evidence required/i);
+  assert.match(statusText, /Sauce protected/i);
+  assert.match(statusText, /Public proof link optional/i);
+  assert.match(statusText, /Current You approves/i);
 
   const authorityText = await page.locator('.authority').innerText();
-  assert.match(authorityText, /Chief AI owns/);
-  assert.match(authorityText, /Founder Control Room owns/);
-  assert.match(authorityText, /Providers own/);
+  assert.match(authorityText, /Chief AI owns/i);
+  assert.match(authorityText, /Founder Control Room owns/i);
+  assert.match(authorityText, /Providers own/i);
   assert.match(authorityText, /Never the canonical copy or founder authority/i);
 
   const actions = await page.locator('.action').allTextContents();
