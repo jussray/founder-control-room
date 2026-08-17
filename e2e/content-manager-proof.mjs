@@ -35,7 +35,9 @@ try {
   const founderLane = page.locator('[data-founder-progress-lane]');
   await founderLane.waitFor({ state: 'visible' });
   assert.equal(await founderLane.getAttribute('data-founder-authority'), 'current-you');
-  assert.equal(await founderLane.getAttribute('data-provider-write-state'), 'separate-gate');
+  assert.equal(await founderLane.getAttribute('data-provider-write-state'), 'capability-implemented');
+  assert.equal(await founderLane.getAttribute('data-first-party-linkedin-capability'), 'implemented');
+  assert.equal(await founderLane.getAttribute('data-temporal-truth-state'), 'unknown');
   assert.equal(await founderLane.getAttribute('data-analytics-authority'), 'observation-only');
   assert.equal(await founderLane.getAttribute('data-public-proof-state'), 'optional-off');
   assert.equal(await founderLane.getAttribute('data-review-window-state'), 'not-handed-off');
@@ -49,37 +51,62 @@ try {
   assert.match(founderLaneText, /FutureYou is advisory only/i);
   assert.match(founderLaneText, /Missing metrics stay UNKNOWN/i);
   assert.match(founderLaneText, /analytics can improve later drafts, never authorize them/i);
-  assert.match(founderLaneText, /Share-now is forbidden for this lane/i);
-  assert.match(founderLaneText, /Live provider writes remain a separate server-side authorization and credential gate/i);
+  assert.match(founderLaneText, /Exact-copy \+ temporal approval required/i);
+  assert.match(founderLaneText, /first-party LinkedIn execution capability is implemented/i);
+  assert.match(founderLaneText, /capability is not publication proof/i);
+  assert.match(founderLaneText, /canonical temporal revalidation/i);
+  assert.match(founderLaneText, /durable one-shot reservation/i);
+  assert.match(founderLaneText, /provider readback/i);
+  assert.match(founderLaneText, /provider and publication state remain UNKNOWN/i);
+  assert.doesNotMatch(founderLaneText, /Share-now is forbidden for this lane/i);
+  assert.doesNotMatch(founderLaneText, /Live provider writes remain a separate server-side authorization and credential gate/i);
 
   const founderCards = await founderLane.locator('[data-founder-lane-card]').count();
   assert.equal(founderCards, 3, 'founder progress lane must keep public, private, and authority boundaries visible');
-  assert.equal(await founderLane.locator('button, .action').count(), 0, 'founder progress lane must not present a fake provider-write control');
+  assert.equal(await founderLane.locator('button, .action').count(), 0, 'capability must not be presented as an already-authorized publish control');
 
   const status = page.locator('[aria-label="Content authority status"]');
   assert.equal(await status.locator('[data-founder-engine-state]').getAttribute('data-founder-engine-state'), 'contract-ready');
+  assert.equal(await status.locator('[data-first-party-linkedin-capability]').getAttribute('data-first-party-linkedin-capability'), 'implemented');
   assert.equal(await status.locator('[data-founder-evidence-state]').getAttribute('data-founder-evidence-state'), 'unknown');
   assert.equal(await status.locator('[data-founder-sauce-state]').getAttribute('data-founder-sauce-state'), 'unknown');
+  assert.equal(await status.locator('[data-temporal-truth-state]').getAttribute('data-temporal-truth-state'), 'unknown');
   assert.equal(await status.locator('[data-current-you-state]').getAttribute('data-current-you-state'), 'not-requested');
   assert.equal(await status.locator('[data-provider-state]').getAttribute('data-provider-state'), 'unknown');
+  assert.equal(await status.locator('[data-outcome-state]').getAttribute('data-outcome-state'), 'unknown');
   const statusText = await status.innerText();
   assert.match(statusText, /Founder progress contract ready/i);
+  assert.match(statusText, /First-party LinkedIn publish capability implemented/i);
   assert.match(statusText, /Evidence UNKNOWN until proposal/i);
   assert.match(statusText, /Sauce receipt UNKNOWN until proposal/i);
+  assert.match(statusText, /Temporal truth UNKNOWN until execution/i);
   assert.match(statusText, /Current You not requested/i);
   assert.match(statusText, /Provider state UNKNOWN/i);
-  assert.doesNotMatch(statusText, /Founder progress engine ready/i);
-  assert.doesNotMatch(statusText, /Sauce-safe by contract/i);
+  assert.match(statusText, /Outcome UNKNOWN/i);
+
+  const publishStage = page.locator('[data-content-stage="publish"]');
+  const publishText = await publishStage.innerText();
+  assert.match(publishText, /First-party founder content can dispatch to LinkedIn/i);
+  assert.match(publishText, /exact Current You confirmation/i);
+  assert.match(publishText, /temporal truth revalidation/i);
+  assert.match(publishText, /provider readback/i);
+  assert.match(publishText, /publish_founder_content/i);
+  assert.doesNotMatch(publishText, /remains review-window only/i);
 
   const actions = await page.locator('.action').allTextContents();
   assert(actions.includes('Open proof ledger'));
   assert(actions.includes('Open activity receipts'));
 
   const policyText = await page.locator('.blocker').innerText();
-  assert.match(policyText, /402/);
-  assert.match(policyText, /must never translate/i);
-  assert.match(policyText, /missing provider receipt/i);
-  assert.match(policyText, /published/i);
+  assert.match(policyText, /missing truth gate/i);
+  assert.match(policyText, /rejected or ambiguous write/i);
+  assert.match(policyText, /absent readback/i);
+  assert.match(policyText, /must never translate capability, approval, dispatch/i);
+  assert.match(policyText, /Publication requires terminal provider readback/i);
+
+  const pageText = await page.locator('main').innerText();
+  assert.doesNotMatch(pageText, /Cambiante, Buffer, or another approved actuator owns/i);
+  assert.match(pageText, /Capability, authorization, dispatch, and publication remain separate truths\./i);
 
   const dimensions = await page.evaluate(() => ({
     viewportWidth: document.documentElement.clientWidth,
@@ -108,8 +135,10 @@ try {
     stages: stageNames,
     founderProgress: {
       engineState: 'contract-ready',
+      firstPartyLinkedInCapability: 'implemented',
       evidenceState: 'unknown',
       sauceState: 'unknown',
+      temporalTruthState: 'unknown',
       currentYouState: 'not-requested',
       publicProofState: 'optional-off',
       reviewWindowState: 'not-handed-off',
