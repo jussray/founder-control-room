@@ -71,7 +71,7 @@ describe('FutureYou V8 mission control', () => {
     );
   });
 
-  it('reports evidence coverage and missing project labels honestly', () => {
+  it('keeps structural evidence separate from observation trust', () => {
     const brief = buildMissionControlBrief({
       now: NOW,
       missions: [mission({ project: null })],
@@ -79,7 +79,126 @@ describe('FutureYou V8 mission control', () => {
     });
 
     expect(brief.summary.evidenceCoveragePercent).toBe(100);
+    expect(brief.summary.trustedObservationPercent).toBe(100);
     expect(brief.blindSpots).toContain('Some records are missing project labels, lowering prioritization confidence.');
     expect(brief.priorities[0].confidence).toBe('medium');
+    expect(brief.priorities[0].observationState).toBe('fresh');
+  });
+
+  it('forces malformed observation times to low confidence instead of treating them as fresh', () => {
+    const brief = buildMissionControlBrief({
+      now: NOW,
+      missions: [mission({ updated_at: 'not-a-timestamp' })],
+      activity: [],
+    });
+
+    expect(brief.summary.evidenceCoveragePercent).toBe(100);
+    expect(brief.summary.trustedObservationPercent).toBe(0);
+    expect(brief.summary.invalidObservationTimes).toBe(1);
+    expect(brief.priorities[0]).toMatchObject({
+      observationState: 'invalid',
+      confidence: 'low',
+    });
+    expect(brief.priorities[0].reason).toContain('invalid observation time');
+    expect(brief.blindSpots.some((item) => item.includes('invalid observation time'))).toBe(true);
+  });
+
+  it('rejects future-dated observations as trusted evidence beyond bounded clock skew', () => {
+    const brief = buildMissionControlBrief({
+      now: NOW,
+      missions: [mission({ updated_at: '2026-07-25T20:00:00.000Z' })],
+      activity: [],
+    });
+
+    expect(brief.summary.trustedObservationPercent).toBe(0);
+    expect(brief.summary.futureObservationTimes).toBe(1);
+    expect(brief.priorities[0]).toMatchObject({
+      observationState: 'future',
+      confidence: 'low',
+    });
+    expect(brief.priorities[0].reason).toContain('future-dated observation');
+  });
+
+  it('does not count malformed or future timestamps as recent completions', () => {
+    const brief = buildMissionControlBrief({
+      now: NOW,
+      missions: [
+        mission({ id: 'invalid-completion', status: 'deployed', updated_at: 'broken' }),
+        mission({ id: 'future-completion', status: 'integrated', updated_at: '2026-07-25T20:00:00.000Z' }),
+        mission({ id: 'real-completion', status: 'deployed', updated_at: '2026-07-24T19:00:00.000Z' }),
+      ],
+      activity: [],
+    });
+
+    expect(brief.summary.recentCompletions).toBe(1);
+    expect(brief.summary.invalidObservationTimes).toBe(1);
+    expect(brief.summary.futureObservationTimes).toBe(1);
+    expect(brief.summary.trustedObservationPercent).toBe(33);
+  });
+
+  it('marks three-day-old observations stale and exposes the analytical gap', () => {
+    const brief = buildMissionControlBrief({
+      now: NOW,
+      missions: [mission({ updated_at: '2026-07-20T20:00:00.000Z' })],
+      activity: [],
+    });
+
+    expect(brief.summary.staleObservations).toBe(1);
+    expect(brief.summary.trustedObservationPercent).toBe(0);
+    expect(brief.priorities[0]).toMatchObject({
+      observationState: 'stale',
+      confidence: 'medium',
+    });
+    expect(brief.blindSpots.some((item) => item.includes('cannot count as fresh decision evidence'))).toBe(true);
+  });
+
+  it('does not let a harmless event become actionable solely because its timestamp is malformed or future-dated', () => {
+    const activity = [
+      {
+        id: 'invalid-info',
+        project_id: 'project-1',
+        event_type: 'heartbeat_observed',
+        severity: 'info',
+        created_at: 'not-a-timestamp',
+        project,
+      },
+      {
+        id: 'future-info',
+        project_id: 'project-1',
+        event_type: 'heartbeat_observed',
+        severity: 'info',
+        created_at: '2026-07-25T20:00:00.000Z',
+        project,
+      },
+    ];
+
+    const brief = buildMissionControlBrief({ now: NOW, missions: [], activity });
+
+    expect(brief.priorities).toHaveLength(0);
+    expect(brief.summary.invalidObservationTimes).toBe(1);
+    expect(brief.summary.futureObservationTimes).toBe(1);
+  });
+
+  it('keeps a truly critical event actionable even when its clock is invalid, but marks trust low', () => {
+    const brief = buildMissionControlBrief({
+      now: NOW,
+      missions: [],
+      activity: [{
+        id: 'critical-invalid',
+        project_id: 'project-1',
+        event_type: 'payment_delivery_failed',
+        severity: 'critical',
+        created_at: 'broken-clock',
+        project,
+      }],
+    });
+
+    expect(brief.priorities).toHaveLength(1);
+    expect(brief.priorities[0]).toMatchObject({
+      source: 'event',
+      observationState: 'invalid',
+      confidence: 'low',
+    });
+    expect(brief.summary.invalidObservationTimes).toBe(1);
   });
 });

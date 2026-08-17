@@ -28,6 +28,7 @@ export interface MissionControlEventInput {
 }
 
 export type MissionControlDomain = 'sell' | 'ship' | 'grow' | 'verify' | 'risk';
+export type MissionControlObservationState = 'fresh' | 'stale' | 'invalid' | 'future';
 
 export interface MissionControlAuthority {
   level: 'L1' | 'L2' | 'L3' | 'L4';
@@ -44,6 +45,7 @@ export interface MissionControlPriority {
   domain: MissionControlDomain;
   score: number;
   confidence: 'low' | 'medium' | 'high';
+  observationState: MissionControlObservationState;
   reason: string;
   nextAction: string;
   evidence: string[];
@@ -68,12 +70,18 @@ export interface MissionControlBrief {
     highRisk: number;
     recentCompletions: number;
     evidenceCoveragePercent: number;
+    trustedObservationPercent: number;
+    staleObservations: number;
+    invalidObservationTimes: number;
+    futureObservationTimes: number;
   };
   priorities: MissionControlPriority[];
   blindSpots: string[];
 }
 
 const TERMINAL_STATUSES = new Set(['deployed', 'rejected', 'rolled_back']);
+const FUTURE_CLOCK_SKEW_MS = 5 * 60 * 1000;
+const FRESH_OBSERVATION_DAYS = 3;
 
 const STATUS_SCORE: Record<string, number> = {
   rolled_back: 88,
@@ -98,10 +106,24 @@ function safeTime(value: string): number {
   return Number.isFinite(time) ? time : 0;
 }
 
-function ageDays(value: string, now: Date): number {
+type Observation = {
+  state: MissionControlObservationState;
+  time: number | null;
+  ageDays: number | null;
+};
+
+function observeTime(value: string, now: Date): Observation {
   const time = safeTime(value);
-  if (!time) return 0;
-  return Math.max(0, (now.getTime() - time) / 86_400_000);
+  if (!time) return { state: 'invalid', time: null, ageDays: null };
+  if (time > now.getTime() + FUTURE_CLOCK_SKEW_MS) {
+    return { state: 'future', time, ageDays: null };
+  }
+  const ageDays = Math.max(0, (now.getTime() - time) / 86_400_000);
+  return {
+    state: ageDays >= FRESH_OBSERVATION_DAYS ? 'stale' : 'fresh',
+    time,
+    ageDays,
+  };
 }
 
 function riskScore(risk: MissionRisk): number {
@@ -123,6 +145,21 @@ function classifyDomain(text: string, risk: MissionRisk): MissionControlDomain {
     if (pattern.test(text)) return domain;
   }
   return 'ship';
+}
+
+function confidenceFor(project: MissionControlProjectLabel | null | undefined, observation: Observation): 'low' | 'medium' | 'high' {
+  if (observation.state === 'invalid' || observation.state === 'future') return 'low';
+  if (!project || observation.state === 'stale') return 'medium';
+  return 'high';
+}
+
+function observationReason(observation: Observation): string | null {
+  if (observation.state === 'invalid') return 'invalid observation time';
+  if (observation.state === 'future') return 'future-dated observation';
+  if (observation.state === 'stale' && observation.ageDays !== null) {
+    return `unchanged for ${Math.floor(observation.ageDays)} days`;
+  }
+  return null;
 }
 
 function missionAuthority(status: string): MissionControlAuthority {
@@ -181,22 +218,25 @@ function missionNextAction(status: string): string {
   }
 }
 
-function missionReason(mission: MissionControlMissionInput, days: number): string {
+function missionReason(mission: MissionControlMissionInput, observation: Observation): string {
   const parts = [`${mission.status.replaceAll('_', ' ')} mission`];
   if (mission.risk_level === 'high') parts.push('high risk');
-  if (days >= 3) parts.push(`unchanged for ${Math.floor(days)} days`);
+  const timeReason = observationReason(observation);
+  if (timeReason) parts.push(timeReason);
   return parts.join(' · ');
 }
 
 function missionPriority(mission: MissionControlMissionInput, now: Date): MissionControlPriority {
-  const days = ageDays(mission.updated_at, now);
+  const observation = observeTime(mission.updated_at, now);
   const text = `${mission.title} ${mission.description ?? ''}`;
   const domain = classifyDomain(text, mission.risk_level);
-  const score = Math.min(100, (STATUS_SCORE[mission.status] ?? 40) + riskScore(mission.risk_level) + staleScore(days));
+  const agePenalty = observation.state === 'stale' && observation.ageDays !== null ? staleScore(observation.ageDays) : 0;
+  const score = Math.min(100, (STATUS_SCORE[mission.status] ?? 40) + riskScore(mission.risk_level) + agePenalty);
   const evidence = [
     `mission status: ${mission.status}`,
     `risk level: ${mission.risk_level}`,
     `last updated: ${mission.updated_at}`,
+    `observation state: ${observation.state}`,
   ];
   if (mission.project) evidence.push(`project: ${mission.project.slug}`);
 
@@ -207,8 +247,9 @@ function missionPriority(mission: MissionControlMissionInput, now: Date): Missio
     title: mission.title,
     domain,
     score,
-    confidence: mission.project && safeTime(mission.updated_at) ? 'high' : 'medium',
-    reason: missionReason(mission, days),
+    confidence: confidenceFor(mission.project, observation),
+    observationState: observation.state,
+    reason: missionReason(mission, observation),
     nextAction: missionNextAction(mission.status),
     evidence,
     authority: missionAuthority(mission.status),
@@ -217,21 +258,25 @@ function missionPriority(mission: MissionControlMissionInput, now: Date): Missio
 }
 
 function eventIsActionable(event: MissionControlEventInput, now: Date): boolean {
-  if (ageDays(event.created_at, now) > 14) return false;
+  const observation = observeTime(event.created_at, now);
+  if (observation.state === 'stale' && (observation.ageDays ?? 0) > 14) return false;
   if (event.severity === 'critical' || event.severity === 'error') return true;
   return /fail|drift|block|risk|rollback|payment|delivery/i.test(event.event_type);
 }
 
-function eventPriority(event: MissionControlEventInput): MissionControlPriority {
+function eventPriority(event: MissionControlEventInput, now: Date): MissionControlPriority {
+  const observation = observeTime(event.created_at, now);
   const severityScore = event.severity === 'critical' ? 98 : event.severity === 'error' ? 88 : 68;
   const metadataKeys = Object.keys(event.metadata ?? {}).slice(0, 4);
   const evidence = [
     `event type: ${event.event_type}`,
     `severity: ${event.severity}`,
     `observed: ${event.created_at}`,
+    `observation state: ${observation.state}`,
   ];
   if (event.screen) evidence.push(`screen: ${event.screen}`);
   if (metadataKeys.length > 0) evidence.push(`metadata keys: ${metadataKeys.join(', ')}`);
+  const timeReason = observationReason(observation);
 
   return {
     id: `event:${event.id}`,
@@ -240,8 +285,11 @@ function eventPriority(event: MissionControlEventInput): MissionControlPriority 
     title: event.event_type.replaceAll('_', ' '),
     domain: 'risk',
     score: severityScore,
-    confidence: event.project && safeTime(event.created_at) ? 'high' : 'medium',
-    reason: `${event.severity} operational signal requires read-back`,
+    confidence: confidenceFor(event.project, observation),
+    observationState: observation.state,
+    reason: timeReason
+      ? `${event.severity} operational signal · ${timeReason}`
+      : `${event.severity} operational signal requires read-back`,
     nextAction: 'Inspect the source event, attach it to an existing mission or open a corrective mission, and do not mark resolved without provider read-back.',
     evidence,
     authority: {
@@ -263,25 +311,50 @@ export function buildMissionControlBrief(input: {
   const now = input.now ?? new Date();
   const limit = Math.max(1, Math.min(input.limit ?? 7, 12));
   const openMissions = input.missions.filter((mission) => !TERMINAL_STATUSES.has(mission.status));
-  const recentCompletions = input.missions.filter((mission) =>
-    (mission.status === 'deployed' || mission.status === 'integrated') && ageDays(mission.updated_at, now) <= 1,
-  ).length;
+  const recentCompletions = input.missions.filter((mission) => {
+    if (mission.status !== 'deployed' && mission.status !== 'integrated') return false;
+    const observation = observeTime(mission.updated_at, now);
+    return observation.state === 'fresh' && observation.ageDays !== null && observation.ageDays <= 1;
+  }).length;
 
   const missionPriorities = input.missions
-    .filter((mission) => mission.status !== 'rejected' || ageDays(mission.updated_at, now) <= 1)
+    .filter((mission) => {
+      if (mission.status !== 'rejected') return true;
+      const observation = observeTime(mission.updated_at, now);
+      return observation.state === 'fresh' && observation.ageDays !== null && observation.ageDays <= 1;
+    })
     .map((mission) => missionPriority(mission, now));
   const eventPriorities = input.activity
     .filter((event) => eventIsActionable(event, now))
-    .map(eventPriority);
+    .map((event) => eventPriority(event, now));
 
   const priorities = [...missionPriorities, ...eventPriorities]
     .sort((a, b) => b.score - a.score || safeTime(b.observedAt) - safeTime(a.observedAt))
     .slice(0, limit);
 
+  const allObservations = [
+    ...input.missions.map((mission) => observeTime(mission.updated_at, now)),
+    ...input.activity.map((event) => observeTime(event.created_at, now)),
+  ];
+  const freshObservations = allObservations.filter((observation) => observation.state === 'fresh').length;
+  const staleObservations = allObservations.filter((observation) => observation.state === 'stale').length;
+  const invalidObservationTimes = allObservations.filter((observation) => observation.state === 'invalid').length;
+  const futureObservationTimes = allObservations.filter((observation) => observation.state === 'future').length;
+  const trustedObservationPercent = allObservations.length === 0
+    ? 0
+    : Math.round((freshObservations / allObservations.length) * 100);
+
   const blindSpots: string[] = [];
   if (input.missions.length === 0) blindSpots.push('No missions were returned, so there is no governed work queue to prioritize.');
-  if (input.activity.every((event) => ageDays(event.created_at, now) > 1)) blindSpots.push('No sanitized operational event was observed in the last 24 hours.');
+  const hasRecentActivity = input.activity.some((event) => {
+    const observation = observeTime(event.created_at, now);
+    return observation.state === 'fresh' && observation.ageDays !== null && observation.ageDays <= 1;
+  });
+  if (!hasRecentActivity) blindSpots.push('No trusted sanitized operational event was observed in the last 24 hours.');
   if ([...input.missions, ...input.activity].some((item) => !item.project)) blindSpots.push('Some records are missing project labels, lowering prioritization confidence.');
+  if (staleObservations > 0) blindSpots.push(`${staleObservations} observation${staleObservations === 1 ? ' is' : 's are'} at least ${FRESH_OBSERVATION_DAYS} days old and cannot count as fresh decision evidence.`);
+  if (invalidObservationTimes > 0) blindSpots.push(`${invalidObservationTimes} record${invalidObservationTimes === 1 ? ' has' : 's have'} an invalid observation time; machine confidence is forced low.`);
+  if (futureObservationTimes > 0) blindSpots.push(`${futureObservationTimes} record${futureObservationTimes === 1 ? ' has' : 's have'} a future-dated observation beyond the clock-skew allowance; machine confidence is forced low.`);
   blindSpots.push('No verified revenue or expected-value feed is connected to this read model; rankings are operational, not financial forecasts.');
 
   const prioritiesWithEvidence = priorities.filter((priority) => priority.evidence.length >= 3).length;
@@ -293,9 +366,9 @@ export function buildMissionControlBrief(input: {
     northStar: 'Surface the highest-leverage verified next action without inventing certainty, revenue, or execution authority.',
     operatingContract: {
       futureYou: 'Still usable with dozens of products, repositories, providers, and active opportunities.',
-      redTeam: 'Expose blind spots and never present a draft, estimate, or stale record as completed reality.',
-      ooda: 'Observe signals, orient by risk and state, decide one next move, act through existing gates, then verify.',
-      lindyMode: 'Organize around durable founder decisions rather than whichever provider happens to be connected today.',
+      redTeam: 'Expose blind spots and never present a draft, estimate, malformed timestamp, future-dated signal, or stale record as fresh completed reality.',
+      ooda: 'Observe trustworthy signals, orient by risk and state, decide one next move, act through existing gates, then verify.',
+      lindyMode: 'Organize around durable founder decisions and explicit evidence freshness rather than whichever provider happens to be connected today.',
       l99: 'L99 requires every recommendation to declare its authority level and keep approval boundaries explicit.',
     },
     summary: {
@@ -305,6 +378,10 @@ export function buildMissionControlBrief(input: {
         + input.activity.filter((event) => event.severity === 'critical').length,
       recentCompletions,
       evidenceCoveragePercent,
+      trustedObservationPercent,
+      staleObservations,
+      invalidObservationTimes,
+      futureObservationTimes,
     },
     priorities,
     blindSpots,
