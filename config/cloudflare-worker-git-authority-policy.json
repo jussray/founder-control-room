@@ -1,0 +1,32 @@
+{
+  "kind": "fcr/cloudflare-worker-git-authority-policy@v1",
+  "policyVersion": 1,
+  "workerName": "founder-control-room",
+  "apiHostname": "api.foundercontrolroom.org",
+  "canonicalProductionAuthority": "github-manual-deploy-workflow",
+  "safetyInvariant": "native-worker-git-must-not-promote-production",
+  "allowedSafeStates": [
+    "disconnected",
+    "non-promoting"
+  ],
+  "currentDesiredState": "non-promoting",
+  "currentDesiredDeployCommand": "npx wrangler versions upload",
+  "policyRole": "desired-state-only",
+  "canAuthorizeProviderMutation": false,
+  "currentFounderIntent": {
+    "source": "current_authenticated_founder",
+    "status": "current",
+    "persistsUntilSuperseded": true,
+    "freshApprovalRequiredForConsequentialMutation": true,
+    "historicalDecisionsCanAuthorize": false
+  },
+  "historicalDecisions": [
+    {
+      "decision": "disconnect",
+      "status": "superseded-safe-fallback",
+      "maySatisfySafetyInvariant": true,
+      "isCurrentPreference": false,
+      "canAuthorizeProviderMutation": false
+    }
+  ]
+}

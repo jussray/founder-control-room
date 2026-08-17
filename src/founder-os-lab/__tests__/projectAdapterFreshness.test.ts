@@ -38,15 +38,39 @@ describe('project adapter freshness', () => {
     expect(result.contractPathsRequired).toEqual(Object.keys(ADAPTER.auditedContractBlobs));
   });
 
-  it('fails stale when authoritative main advances beyond the audited head', () => {
+  it('stays verified when authoritative main advances but required contract blobs are unchanged', () => {
     const result = assess({
       currentHead: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     });
 
-    expect(result.state).toBe('stale');
-    expect(result.freshness).toBe('stale');
+    expect(result.state).toBe('verified');
+    expect(result.freshness).toBe('fresh');
     expect(result.sourceHeadMatchesAudited).toBe(false);
-    expect(result.blocker).toContain('no longer matches audited adapter head');
+    expect(result.contractPathsMissing).toEqual([]);
+    expect(result.contractPathsDrifted).toEqual([]);
+    expect(result.blocker).toBeNull();
+    expect(result.reasons).toContain(
+      'Repository main advanced, but every required canon blob still matches the audited adapter snapshot.',
+    );
+  });
+
+  it('requires review when authoritative main advances and a required contract blob drifts', () => {
+    const observed = {
+      ...ADAPTER.auditedContractBlobs,
+      'app/index.tsx': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    };
+    const result = assess({
+      currentHead: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      observedContractBlobs: observed,
+    });
+
+    expect(result.state).toBe('attention');
+    expect(result.freshness).toBe('stale');
+    expect(result.recommendation).toBe('review');
+    expect(result.sourceHeadMatchesAudited).toBe(false);
+    expect(result.contractPathsDrifted).toEqual(['app/index.tsx']);
+    expect(result.blocker).toContain('Repository main advanced and required canon contract blobs drifted');
+    expect(result.mutationAuthorized).toBe(false);
   });
 
   it('requires every audited contract blob from the exact head', () => {
