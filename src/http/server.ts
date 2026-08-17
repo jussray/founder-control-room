@@ -25,6 +25,7 @@ import { externalUseRouter } from './routes/externalUse.js';
 import { futureYouRouter } from './routes/futureYou.js';
 import { goalfixRouter } from './routes/goalfix.js';
 import { founderOsSkillsRouter } from './routes/founderOsSkills.js';
+import { founderContentRouter } from './routes/founderContent.js';
 import { mirrorRouter } from './routes/mirror.js';
 import { n8nConveyorRouter } from './routes/n8nConveyor.js';
 import { switchboardRouter } from './routes/switchboard.js';
@@ -265,6 +266,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/futureyou', futureYouRouter);
   app.use('/goalfix', goalfixRouter);
   app.use('/founder-os', founderOsSkillsRouter);
+  app.use('/founder-content', founderContentRouter);
   app.use('/mirror', mirrorRouter);
   app.use('/missions', missionsRouter);
   app.use('/promptos', promptosRouter);
