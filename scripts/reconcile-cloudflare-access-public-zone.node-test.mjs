@@ -7,7 +7,8 @@ import {
   reconcileFcrPublicAccessZone,
 } from './reconcile-cloudflare-access-public-zone.mjs';
 
-const TOKEN = 'cf-test-token-123';
+const READ_TOKEN = 'cf-read-token-123';
+const ADMIN_TOKEN = 'cf-admin-token-456';
 
 function response(result, status = 200) {
   return {
@@ -21,9 +22,10 @@ function response(result, status = 200) {
   };
 }
 
-function fakeFetch({ organization, applications = [], onUpdate } = {}) {
+function fakeFetch({ organization, applications = [], onUpdate, onRequest } = {}) {
   return async (url, options = {}) => {
     const method = options.method ?? 'GET';
+    onRequest?.({ url, method, authorization: options.headers?.Authorization ?? null });
     if (url.endsWith('/access/organizations') && method === 'GET') {
       return response(organization);
     }
@@ -43,8 +45,14 @@ function fakeFetch({ organization, applications = [], onUpdate } = {}) {
   };
 }
 
-const env = {
-  CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: TOKEN,
+const readEnv = {
+  CLOUDFLARE_ACCESS_API_TOKEN: READ_TOKEN,
+  CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ADMIN_TOKEN,
+  CLOUDFLARE_ACCOUNT_ID: FCR_CLOUDFLARE_ACCOUNT_ID,
+};
+
+const adminEnv = {
+  CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ADMIN_TOKEN,
   CLOUDFLARE_ACCOUNT_ID: FCR_CLOUDFLARE_ACCOUNT_ID,
 };
 
@@ -55,9 +63,29 @@ test('detects all-workers Access coverage as unsafe for automatic exemption', ()
   );
 });
 
+test('read-only inspection prefers the least-privilege Access token', async () => {
+  const requests = [];
+  const receipt = await reconcileFcrPublicAccessZone({
+    env: readEnv,
+    apply: false,
+    fetchImpl: fakeFetch({
+      organization: {
+        deny_unmatched_requests: false,
+        deny_unmatched_requests_exempted_zone_names: [],
+      },
+      onRequest(request) {
+        requests.push(request);
+      },
+    }),
+  });
+
+  assert.equal(receipt.credentialSource, 'CLOUDFLARE_ACCESS_API_TOKEN');
+  assert.ok(requests.every((request) => request.authorization === `Bearer ${READ_TOKEN}`));
+});
+
 test('dry run proposes only the FCR zone exemption', async () => {
   const receipt = await reconcileFcrPublicAccessZone({
-    env,
+    env: readEnv,
     apply: false,
     fetchImpl: fakeFetch({
       organization: {
@@ -70,12 +98,33 @@ test('dry run proposes only the FCR zone exemption', async () => {
   assert.equal(receipt.zone, FCR_PUBLIC_ZONE);
   assert.equal(receipt.action, 'would-add-zone-exemption');
   assert.equal(receipt.mutationPerformed, false);
+  assert.equal(receipt.state, 'attention');
+});
+
+test('apply requires the dedicated admin token and never falls back to read-only authority', async () => {
+  await assert.rejects(
+    reconcileFcrPublicAccessZone({
+      env: {
+        CLOUDFLARE_ACCESS_API_TOKEN: READ_TOKEN,
+        CLOUDFLARE_ACCOUNT_ID: FCR_CLOUDFLARE_ACCOUNT_ID,
+      },
+      apply: true,
+      fetchImpl: fakeFetch({
+        organization: {
+          deny_unmatched_requests: true,
+          deny_unmatched_requests_exempted_zone_names: [],
+        },
+      }),
+    }),
+    /CLOUDFLARE_ACCESS_ADMIN_API_TOKEN is required for Access mutation/,
+  );
 });
 
 test('apply preserves existing exemptions and adds only Founder Control Room', async () => {
   let updateBody = null;
+  const requests = [];
   const receipt = await reconcileFcrPublicAccessZone({
-    env,
+    env: adminEnv,
     apply: true,
     fetchImpl: fakeFetch({
       organization: {
@@ -84,6 +133,9 @@ test('apply preserves existing exemptions and adds only Founder Control Room', a
       },
       onUpdate(body) {
         updateBody = body;
+      },
+      onRequest(request) {
+        requests.push(request);
       },
     }),
   });
@@ -96,12 +148,14 @@ test('apply preserves existing exemptions and adds only Founder Control Room', a
   });
   assert.equal(receipt.action, 'added-zone-exemption');
   assert.equal(receipt.mutationPerformed, true);
+  assert.equal(receipt.credentialSource, 'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN');
+  assert.ok(requests.every((request) => request.authorization === `Bearer ${ADMIN_TOKEN}`));
 });
 
 test('refuses mutation when an explicit matching Access app exists', async () => {
   await assert.rejects(
     reconcileFcrPublicAccessZone({
-      env,
+      env: adminEnv,
       apply: true,
       fetchImpl: fakeFetch({
         organization: {
@@ -124,7 +178,7 @@ test('refuses mutation when an explicit matching Access app exists', async () =>
 test('already exempt is idempotent and does not update provider state', async () => {
   let updateCount = 0;
   const receipt = await reconcileFcrPublicAccessZone({
-    env,
+    env: adminEnv,
     apply: true,
     fetchImpl: fakeFetch({
       organization: {
@@ -139,4 +193,23 @@ test('already exempt is idempotent and does not update provider state', async ()
 
   assert.equal(receipt.action, 'already-exempt');
   assert.equal(updateCount, 0);
+});
+
+test('raw leading or trailing whitespace is rejected instead of silently trimmed', async () => {
+  await assert.rejects(
+    reconcileFcrPublicAccessZone({
+      env: {
+        CLOUDFLARE_ACCESS_API_TOKEN: ` ${READ_TOKEN} `,
+        CLOUDFLARE_ACCOUNT_ID: FCR_CLOUDFLARE_ACCOUNT_ID,
+      },
+      apply: false,
+      fetchImpl: fakeFetch({
+        organization: {
+          deny_unmatched_requests: false,
+          deny_unmatched_requests_exempted_zone_names: [],
+        },
+      }),
+    }),
+    /No configured Cloudflare Access credential can read the Zero Trust organization/,
+  );
 });
