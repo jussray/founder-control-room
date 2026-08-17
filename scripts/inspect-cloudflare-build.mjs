@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 
 const accountId = process.env.CF_ACCOUNT_ID?.trim();
@@ -10,6 +9,9 @@ const expectedHeadSha =
 const workerName = process.env.CF_WORKER_NAME?.trim() || "founder-control-room";
 const apiHostname =
   process.env.CF_API_HOSTNAME?.trim() || "api.foundercontrolroom.org";
+const expectedWorkerGitMode =
+  process.env.CF_EXPECT_WORKER_GIT_MODE?.trim() ||
+  "disconnected-or-non-promoting";
 const receiptPath = "test-results/cloudflare-build-diagnostic.json";
 const apiBase = "https://api.cloudflare.com/client/v4";
 
@@ -21,8 +23,14 @@ function redact(value) {
 
   return text
     .replace(/Bearer\s+\S+/gi, "Bearer [REDACTED]")
-    .replace(/(token|secret|password|private[_ -]?key|api[_ -]?key)(\s*[:=]\s*)\S+/gi, "$1$2[REDACTED]")
-    .replace(/\b(?:sk|ghp|github_pat|xox[baprs])-[-A-Za-z0-9_]{12,}\b/g, "[REDACTED_TOKEN]")
+    .replace(
+      /(token|secret|password|private[_ -]?key|api[_ -]?key)(\s*[:=]\s*)\S+/gi,
+      "$1$2[REDACTED]",
+    )
+    .replace(
+      /\b(?:sk|ghp|github_pat|xox[baprs])-[-A-Za-z0-9_]{12,}\b/g,
+      "[REDACTED_TOKEN]",
+    )
     .replace(/\b[A-Fa-f0-9]{40,}\b/g, "[REDACTED_HEX]")
     .slice(0, 4000);
 }
@@ -66,18 +74,19 @@ function classifyTokenShape(token) {
     hasWhitespace: /\s/.test(token),
     hasLeadingOrTrailingWhitespace: token !== token.trim(),
     hasNonAscii: /[^\x20-\x7E]/.test(token),
-    hasWrappingQuote: /^(?:".*"|'.*')$/.test(token),
+    hasWrappingQuote: /^(?:"(?:.|\n)*"|'(?:.|\n)*')$/.test(token),
     looksLikeAssignment: /^[A-Za-z_][A-Za-z0-9_]*=/.test(token),
   };
 
   return {
     ...shape,
-    headerSafe: !shape.matchesAccountId
-      && !shape.hasBearerPrefix
-      && !shape.hasWhitespace
-      && !shape.hasNonAscii
-      && !shape.hasWrappingQuote
-      && !shape.looksLikeAssignment,
+    headerSafe:
+      !shape.matchesAccountId &&
+      !shape.hasBearerPrefix &&
+      !shape.hasWhitespace &&
+      !shape.hasNonAscii &&
+      !shape.hasWrappingQuote &&
+      !shape.looksLikeAssignment,
   };
 }
 
@@ -85,49 +94,57 @@ function tokenPreflightFailure(shape) {
   if (shape.matchesAccountId) {
     return {
       classification: "provider-token-account-id",
-      message: "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: configured token equals the Cloudflare account ID.",
+      message:
+        "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: configured token equals the Cloudflare account ID.",
     };
   }
   if (shape.hasNonAscii) {
     return {
       classification: "provider-token-header-unsafe",
-      message: "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: configured token contains non-ASCII characters and cannot be used as an HTTP Authorization value.",
+      message:
+        "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: configured token contains non-ASCII characters and cannot be used as an HTTP Authorization value.",
     };
   }
   if (shape.hasBearerPrefix) {
     return {
       classification: "provider-token-header-unsafe",
-      message: "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: configured token includes a Bearer prefix; store only the token value.",
+      message:
+        "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: configured token includes a Bearer prefix; store only the token value.",
     };
   }
   if (shape.hasWhitespace) {
     return {
       classification: "provider-token-header-unsafe",
-      message: "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: configured token contains whitespace.",
+      message:
+        "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: configured token contains whitespace.",
     };
   }
   if (shape.hasWrappingQuote) {
     return {
       classification: "provider-token-header-unsafe",
-      message: "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: configured token is wrapped in quotes.",
+      message:
+        "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: configured token is wrapped in quotes.",
     };
   }
   if (shape.looksLikeAssignment) {
     return {
       classification: "provider-token-header-unsafe",
-      message: "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: configured token looks like a variable assignment rather than a token value.",
+      message:
+        "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: configured token looks like a variable assignment rather than a token value.",
     };
   }
   if (shape.credentialType === "account-token") {
     return {
       classification: "provider-token-type-unsupported",
-      message: "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: Workers Builds inspection requires a user-scoped Cloudflare API token; account-scoped tokens are unsupported.",
+      message:
+        "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: Workers Builds inspection requires a user-scoped Cloudflare API token; account-scoped tokens are unsupported.",
     };
   }
   if (shape.credentialType === "global-key") {
     return {
       classification: "provider-token-type-unsupported",
-      message: "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: Workers Builds inspection requires a user-scoped Cloudflare API token; a global API key is unsupported.",
+      message:
+        "CLOUDFLARE_BUILDS_TOKEN_PREFLIGHT_FAILED: Workers Builds inspection requires a user-scoped Cloudflare API token; a global API key is unsupported.",
     };
   }
   return null;
@@ -138,7 +155,8 @@ async function verifyToken(path) {
     headers: { Authorization: `Bearer ${apiToken}` },
   });
   const body = await response.json().catch(() => null);
-  const status = typeof body?.result?.status === "string" ? body.result.status : null;
+  const status =
+    typeof body?.result?.status === "string" ? body.result.status : null;
   return {
     httpStatus: response.status,
     success: body?.success === true,
@@ -154,22 +172,12 @@ async function cloudflare(path) {
   const body = await response.json().catch(() => null);
   if (!response.ok || body?.success === false) {
     throw new Error(
-      `Cloudflare API ${response.status}: ${redact(providerMessages(body).join("; ") || "request failed")}`,
+      `Cloudflare API ${response.status}: ${redact(
+        providerMessages(body).join("; ") || "request failed",
+      )}`,
     );
   }
   return body?.result;
-}
-
-function normalizeBuilds(result) {
-  if (Array.isArray(result)) return result;
-  if (Array.isArray(result?.builds)) return result.builds;
-  if (result?.builds && typeof result.builds === "object") {
-    return Object.values(result.builds);
-  }
-  if (result && typeof result === "object") {
-    return Object.values(result).filter((value) => value?.build_uuid);
-  }
-  return [];
 }
 
 function normalizeDomains(result) {
@@ -178,13 +186,48 @@ function normalizeDomains(result) {
   return [];
 }
 
-function normalizeLogLine(line) {
-  if (Array.isArray(line)) return line.map((part) => String(part)).join(" ");
-  return String(line ?? "");
+function normalizeTriggers(result) {
+  if (Array.isArray(result)) return result;
+  if (Array.isArray(result?.triggers)) return result.triggers;
+  return [];
 }
 
-function sha256(value) {
-  return createHash("sha256").update(value).digest("hex");
+function isNonPromotingDeployCommand(command) {
+  return /\bwrangler\s+versions\s+upload\b/i.test(String(command ?? ""));
+}
+
+function canTargetProductionBranch(trigger) {
+  const includes = Array.isArray(trigger?.branch_includes)
+    ? trigger.branch_includes.map((value) => String(value).trim())
+    : [];
+
+  if (includes.length === 0) return true;
+
+  return includes.some((branch) => branch === "main" || branch === "*");
+}
+
+function sanitizeTrigger(trigger) {
+  const deployCommand = redact(trigger?.deploy_command ?? "");
+  const branchIncludes = Array.isArray(trigger?.branch_includes)
+    ? trigger.branch_includes.map((value) => redact(value))
+    : [];
+  const branchExcludes = Array.isArray(trigger?.branch_excludes)
+    ? trigger.branch_excludes.map((value) => redact(value))
+    : [];
+
+  return {
+    triggerUuid: trigger?.trigger_uuid ?? null,
+    triggerName: redact(trigger?.trigger_name ?? "") || null,
+    repoName: redact(trigger?.repo_connection?.repo_name ?? "") || null,
+    providerType: trigger?.repo_connection?.provider_type ?? null,
+    rootDirectory: redact(trigger?.root_directory ?? "") || null,
+    branchIncludes,
+    branchExcludes,
+    buildCommand: redact(trigger?.build_command ?? "") || null,
+    deployCommand: deployCommand || null,
+    nonPromotingDeployCommand: isNonPromotingDeployCommand(deployCommand),
+    canTargetProductionBranch: canTargetProductionBranch(trigger),
+  };
 }
 
 const failures = [];
@@ -196,9 +239,12 @@ function fail(message) {
 
 const receipt = {
   ok: false,
+  scope: "cloudflare-worker-git-authority",
   workerName,
   apiHostname,
   expectedHeadSha: expectedHeadSha || null,
+  expectedWorkerGitMode,
+  canonicalProductionAuthority: "github-manual-deploy-workflow",
   inspectedAt: new Date().toISOString(),
   providerCredentials: {
     accountIdPresent: Boolean(accountId),
@@ -208,85 +254,39 @@ const receipt = {
     accountTokenVerification: null,
     classification: null,
   },
-  origin: null,
   domain: null,
-  build: null,
-  relevantLogLines: [],
+  workerGitAuthority: {
+    state: "unknown",
+    activeTriggerCount: null,
+    promotingTriggerCount: null,
+    triggers: [],
+  },
   error: null,
 };
 
 try {
-  if (!expectedHeadSha) {
-    throw new Error("EXPECTED_HEAD_SHA or GITHUB_SHA is required.");
-  }
-
-  let originResponse = null;
-  try {
-    originResponse = await fetch(`https://${apiHostname}/version`, {
-      headers: { Accept: "application/json" },
-      redirect: "error",
-    });
-  } catch (error) {
-    fail(
-      `PUBLIC_ORIGIN_TRANSPORT_FAILURE: ${error instanceof Error ? error.message : error}`,
+  if (!expectedHeadSha || !/^[0-9a-f]{40}$/.test(expectedHeadSha)) {
+    throw new Error(
+      "EXPECTED_HEAD_SHA or GITHUB_SHA must be an exact 40-character lowercase commit SHA.",
     );
   }
 
-  if (originResponse) {
-    const originBody = Buffer.from(await originResponse.arrayBuffer());
-    const originText = originBody.toString("utf8");
-    const originContentType = originResponse.headers.get("content-type");
-    const originServiceIdentity = originResponse.headers.get(
-      "x-founder-control-room-service",
+  if (expectedWorkerGitMode !== "disconnected-or-non-promoting") {
+    throw new Error(
+      `Unsupported CF_EXPECT_WORKER_GIT_MODE: ${expectedWorkerGitMode}.`,
     );
-    let originJson = null;
-    try {
-      originJson = JSON.parse(originText);
-    } catch {
-      originJson = null;
-    }
-
-    const liveSha =
-      originJson && typeof originJson.gitSha === "string" ? originJson.gitSha : null;
-    receipt.origin = {
-      httpStatus: originResponse.status,
-      contentType: originContentType,
-      serviceIdentity: originServiceIdentity,
-      responseBytes: originBody.byteLength,
-      responseSha256: sha256(originBody),
-      liveSha,
-    };
-
-    if (!originResponse.ok) {
-      fail(
-        `PUBLIC_ORIGIN_HTTP_FAILURE: ${apiHostname}/version returned HTTP ${originResponse.status}.`,
-      );
-    }
-
-    if (originServiceIdentity !== workerName || originJson?.service !== workerName) {
-      fail(
-        `WRONG_SERVICE_ORIGIN: ${apiHostname} is not reaching the canonical ${workerName} Worker.`,
-      );
-    }
-
-    if (!/^[0-9a-f]{40}$/.test(liveSha ?? "")) {
-      fail(
-        `INVALID_VERSION_DOCUMENT: ${apiHostname}/version did not return a valid exact gitSha.`,
-      );
-    } else if (liveSha !== expectedHeadSha) {
-      fail(
-        `STALE_LIVE_DEPLOYMENT: live Worker SHA ${liveSha} does not match expected head ${expectedHeadSha}.`,
-      );
-    }
   }
 
   if (!accountId || !apiToken) {
-    receipt.providerCredentials.classification = "provider-credentials-unavailable";
+    receipt.providerCredentials.classification =
+      "provider-credentials-unavailable";
     fail(
-      "PROVIDER_CREDENTIALS_UNAVAILABLE: CF_ACCOUNT_ID and the dedicated CLOUDFLARE_BUILDS_API_TOKEN-derived CF_API_TOKEN are required for read-only Cloudflare build inspection.",
+      "PROVIDER_CREDENTIALS_UNAVAILABLE: CF_ACCOUNT_ID and the dedicated FCR_CLOUDFLARE_BUILDS_USER_TOKEN-derived CF_API_TOKEN are required for read-only Worker Git authority inspection.",
     );
   } else {
-    const preflight = tokenPreflightFailure(receipt.providerCredentials.tokenShape);
+    const preflight = tokenPreflightFailure(
+      receipt.providerCredentials.tokenShape,
+    );
     if (preflight) {
       receipt.providerCredentials.classification = preflight.classification;
       fail(preflight.message);
@@ -295,18 +295,27 @@ try {
       receipt.providerCredentials.userTokenVerification = userVerification;
 
       if (!(userVerification.success && userVerification.status === "active")) {
-        if (receipt.providerCredentials.tokenShape.credentialType === "legacy-or-unknown") {
+        if (
+          receipt.providerCredentials.tokenShape.credentialType ===
+          "legacy-or-unknown"
+        ) {
           const accountVerification = await verifyToken(
             `/accounts/${accountId}/tokens/verify`,
           );
-          receipt.providerCredentials.accountTokenVerification = accountVerification;
-          if (accountVerification.success && accountVerification.status === "active") {
-            receipt.providerCredentials.classification = "provider-token-type-unsupported";
+          receipt.providerCredentials.accountTokenVerification =
+            accountVerification;
+          if (
+            accountVerification.success &&
+            accountVerification.status === "active"
+          ) {
+            receipt.providerCredentials.classification =
+              "provider-token-type-unsupported";
             fail(
               "CLOUDFLARE_BUILDS_TOKEN_VERIFICATION_FAILED: credential verifies as an account token, but Workers Builds inspection requires a user-scoped token.",
             );
           } else {
-            receipt.providerCredentials.classification = "provider-token-invalid";
+            receipt.providerCredentials.classification =
+              "provider-token-invalid";
             fail(
               `CLOUDFLARE_BUILDS_TOKEN_VERIFICATION_FAILED: user token verification HTTP ${userVerification.httpStatus}; status ${userVerification.status || "unknown"}.`,
             );
@@ -323,11 +332,15 @@ try {
         try {
           const domains = normalizeDomains(
             await cloudflare(
-              `/accounts/${accountId}/workers/domains?hostname=${encodeURIComponent(apiHostname)}`,
+              `/accounts/${accountId}/workers/domains?hostname=${encodeURIComponent(
+                apiHostname,
+              )}`,
             ),
           );
           const matchingDomains = domains.filter(
-            (entry) => String(entry?.hostname ?? "").toLowerCase() === apiHostname.toLowerCase(),
+            (entry) =>
+              String(entry?.hostname ?? "").toLowerCase() ===
+              apiHostname.toLowerCase(),
           );
 
           if (matchingDomains.length !== 1) {
@@ -345,52 +358,52 @@ try {
 
             if (domain?.service !== workerName) {
               fail(
-                `Custom domain ${apiHostname} is attached to Worker ${domain?.service || "unknown"}; expected ${workerName}.`,
+                `Custom domain ${apiHostname} is attached to Worker ${
+                  domain?.service || "unknown"
+                }; expected ${workerName}.`,
               );
             }
           }
 
-          const scripts = await cloudflare(`/accounts/${accountId}/workers/scripts`);
+          const scripts = await cloudflare(
+            `/accounts/${accountId}/workers/scripts`,
+          );
           const worker = (Array.isArray(scripts) ? scripts : []).find(
             (entry) => entry?.id === workerName,
           );
+
           if (!worker?.tag) {
             fail(`Worker ${workerName} was not found or has no immutable tag.`);
           } else {
-            const buildResult = await cloudflare(
-              `/accounts/${accountId}/builds/workers/${worker.tag}/builds`,
+            const triggerResult = await cloudflare(
+              `/accounts/${accountId}/builds/workers/${worker.tag}/triggers`,
             );
-            const builds = normalizeBuilds(buildResult);
-            const build = builds.find(
-              (entry) => entry?.build_trigger_metadata?.commit_hash === expectedHeadSha,
+            const activeTriggers = normalizeTriggers(triggerResult).filter(
+              (trigger) =>
+                !trigger?.deleted_on && !trigger?.repo_connection?.deleted_on,
             );
-            if (!build?.build_uuid) {
-              fail(`No Cloudflare build matched exact head ${expectedHeadSha}.`);
-            } else {
-              const logs = await cloudflare(
-                `/accounts/${accountId}/builds/builds/${build.build_uuid}/logs`,
-              );
-              const lines = (logs?.lines ?? []).map(normalizeLogLine).map(redact);
-              const relevant = lines.filter((line) =>
-                /error|fail|fatal|exception|permission|unauthor|route|domain|zone|wrangler|deploy|node|limit|quota/i.test(
-                  line,
-                ),
-              );
+            const sanitizedTriggers = activeTriggers.map(sanitizeTrigger);
+            const promotingTriggers = sanitizedTriggers.filter(
+              (trigger) =>
+                trigger.canTargetProductionBranch &&
+                !trigger.nonPromotingDeployCommand,
+            );
 
-              receipt.build = {
-                buildUuid: build.build_uuid,
-                outcome: build.build_outcome ?? null,
-                createdOn: build.created_on ?? null,
-                stoppedOn: build.stopped_on ?? null,
-                branch: build.build_trigger_metadata?.branch ?? null,
-                commitHash: build.build_trigger_metadata?.commit_hash ?? null,
-                buildCommand: build.build_trigger_metadata?.build_command ?? null,
-                deployCommand: build.build_trigger_metadata?.deploy_command ?? null,
-                rootDirectory: build.build_trigger_metadata?.root_directory ?? null,
-                triggerSource: build.build_trigger_metadata?.build_trigger_source ?? null,
-              };
-              receipt.relevantLogLines = (relevant.length > 0 ? relevant : lines.slice(-40)).slice(
-                -120,
+            receipt.workerGitAuthority.activeTriggerCount =
+              sanitizedTriggers.length;
+            receipt.workerGitAuthority.promotingTriggerCount =
+              promotingTriggers.length;
+            receipt.workerGitAuthority.triggers = sanitizedTriggers;
+
+            if (sanitizedTriggers.length === 0) {
+              receipt.workerGitAuthority.state = "disconnected";
+            } else if (promotingTriggers.length === 0) {
+              receipt.workerGitAuthority.state = "non-promoting";
+            } else {
+              receipt.workerGitAuthority.state =
+                "automatic-production-deploy-conflict";
+              fail(
+                `WORKER_GIT_AUTO_DEPLOY_AUTHORITY_CONFLICT: found ${promotingTriggers.length} active Worker Git trigger(s) that can promote production. Disconnect Worker Builds or use a non-promoting "wrangler versions upload" deploy command.`,
               );
             }
           }
@@ -414,4 +427,4 @@ try {
 
 await mkdir("test-results", { recursive: true });
 await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, "utf8");
-console.log(`Cloudflare diagnostic receipt: ${receiptPath}`);
+console.log(`Cloudflare Worker Git authority receipt: ${receiptPath}`);
