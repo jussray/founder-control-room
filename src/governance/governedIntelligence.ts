@@ -11,6 +11,7 @@ export type ActionRisk = 'observe' | 'reversible' | 'consequential' | 'irreversi
 export type MemoryStatus = 'candidate' | 'trusted' | 'verified' | 'stale' | 'disputed' | 'superseded' | 'forgotten';
 export type RecoveryLevel = 'R0' | 'R1' | 'R2' | 'R3' | 'R4';
 export type GovernedDecision = 'allow' | 'reconfirm' | 'deny';
+export type AuthorizationReplayState = 'unused' | 'consumed' | 'unknown';
 
 export interface TemporalIntent {
   id: string;
@@ -67,10 +68,12 @@ export interface ExecutionAuthorization {
   actorId: string;
   source: 'current_user' | 'delegated';
   intentId: string;
+  intentHash: string;
   proposalId: string;
   proposalHash: string;
   actionHash: string;
   scope: string[];
+  risk: ActionRisk;
   exactVersion?: string | null;
   issuedAt: string;
   expiresAt: string;
@@ -96,7 +99,7 @@ export interface GovernedActionRequest {
   actionHash?: string | null;
   exactVersion?: string | null;
   authorization?: ExecutionAuthorization | null;
-  consumedAuthorizationIds?: string[];
+  authorizationReplayState?: AuthorizationReplayState;
   hardConstraintViolations?: string[];
   now?: Date;
 }
@@ -484,19 +487,27 @@ export function authorizationSupportsAction(
   authorization: ExecutionAuthorization,
   request: {
     requiredScope: string;
+    risk: ActionRisk;
     intentId: string;
+    intentHash: string;
+    intentSource: IntentSource;
     proposalId: string;
     proposalHash: string;
     actionHash: string;
     exactVersion?: string | null;
-    consumedAuthorizationIds?: string[];
+    replayState?: AuthorizationReplayState;
     now?: Date;
   },
 ): { allowed: boolean; reason: string } {
   const now = request.now ?? new Date();
   if (!authorization.authenticated) return { allowed: false, reason: 'Execution authorization is not authenticated.' };
+  if (!authorization.actorId.trim()) return { allowed: false, reason: 'Execution authorization actor identity is missing.' };
+  if (authorization.source !== request.intentSource) return { allowed: false, reason: 'Execution authorization source does not match the selected intent authority.' };
   if (!scopeMatches(authorization.scope, request.requiredScope)) return { allowed: false, reason: 'Execution authorization scope does not cover this action.' };
-  if (authorization.intentId !== request.intentId) return { allowed: false, reason: 'Execution authorization is bound to a different intent.' };
+  if (authorization.risk !== request.risk) return { allowed: false, reason: 'Execution authorization is bound to a different action risk.' };
+  if (authorization.intentId !== request.intentId || authorization.intentHash !== request.intentHash) {
+    return { allowed: false, reason: 'Execution authorization is bound to a different intent identity or meaning.' };
+  }
   if (authorization.proposalId !== request.proposalId || authorization.proposalHash !== request.proposalHash) {
     return { allowed: false, reason: 'Execution authorization is bound to a different proposal.' };
   }
@@ -510,9 +521,8 @@ export function authorizationSupportsAction(
   if (authorization.exactVersion && request.exactVersion !== authorization.exactVersion) {
     return { allowed: false, reason: 'Execution request omitted or changed the version bound by the authorization.' };
   }
-  if (request.consumedAuthorizationIds?.includes(authorization.id)) {
-    return { allowed: false, reason: 'Execution authorization has already been consumed.' };
-  }
+  if (request.replayState === 'consumed') return { allowed: false, reason: 'Execution authorization has already been consumed.' };
+  if (request.replayState !== 'unused') return { allowed: false, reason: 'Execution authorization replay state is unknown; unused status must be proven before execution.' };
   if (optionalTimeIsMalformed(authorization.revokedAt)) return { allowed: false, reason: 'Execution authorization revocation metadata is malformed.' };
 
   const issuedAt = parseTime(authorization.issuedAt);
@@ -528,7 +538,7 @@ export function authorizationSupportsAction(
   const revokedAt = parseTime(authorization.revokedAt);
   if (revokedAt !== null && revokedAt <= now.getTime()) return { allowed: false, reason: 'Execution authorization has been revoked.' };
 
-  return { allowed: true, reason: 'Execution authorization is fresh and bound to the exact intent, proposal, action, scope, and version.' };
+  return { allowed: true, reason: 'Execution authorization is fresh, unused, and bound to the exact intent meaning, proposal, action, scope, risk, and version.' };
 }
 
 export function evaluateGovernedAction(request: GovernedActionRequest): GovernedActionVerdict {
@@ -623,12 +633,15 @@ export function evaluateGovernedAction(request: GovernedActionRequest): Governed
     }
     const authorization = authorizationSupportsAction(request.authorization, {
       requiredScope: request.requiredScope,
+      risk: request.risk,
       intentId: intent.selected.id,
+      intentHash: intent.selected.intentHash,
+      intentSource: intent.selected.source,
       proposalId: request.proposalId,
       proposalHash: request.proposalHash,
       actionHash: request.actionHash,
       exactVersion: request.exactVersion,
-      consumedAuthorizationIds: request.consumedAuthorizationIds,
+      replayState: request.authorizationReplayState,
       now,
     });
     if (!authorization.allowed) {
