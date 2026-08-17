@@ -259,8 +259,7 @@ function missionPriority(mission: MissionControlMissionInput, now: Date): Missio
 
 function eventIsActionable(event: MissionControlEventInput, now: Date): boolean {
   const observation = observeTime(event.created_at, now);
-  if (observation.state === 'invalid' || observation.state === 'future') return true;
-  if ((observation.ageDays ?? 0) > 14) return false;
+  if (observation.state === 'stale' && (observation.ageDays ?? 0) > 14) return false;
   if (event.severity === 'critical' || event.severity === 'error') return true;
   return /fail|drift|block|risk|rollback|payment|delivery/i.test(event.event_type);
 }
