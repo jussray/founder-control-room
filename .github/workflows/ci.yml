@@ -119,6 +119,26 @@ jobs:
           NODE_ENV: test
           PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
 
+  python-tests:
+    name: Python tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run Python unit tests
+        run: python3 -m unittest scripts.test_whoami scripts.test_capability_receipt -v
+
   rls-contract:
     name: RLS migration contract
     runs-on: ubuntu-latest
@@ -170,6 +190,7 @@ jobs:
       - lint
       - test
       - e2e
+      - python-tests
       - rls-contract
     runs-on: ubuntu-latest
     steps:
@@ -180,14 +201,16 @@ jobs:
           LINT_RESULT: ${{ needs.lint.result }}
           TEST_RESULT: ${{ needs.test.result }}
           E2E_RESULT: ${{ needs.e2e.result }}
+          PYTHON_RESULT: ${{ needs.python-tests.result }}
           RLS_RESULT: ${{ needs.rls-contract.result }}
         run: |
           set -euo pipefail
-          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\nrls=%s\n' \
+          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\npython=%s\nrls=%s\n' \
             "$TYPECHECK_RESULT" \
             "$LINT_RESULT" \
             "$TEST_RESULT" \
             "$E2E_RESULT" \
+            "$PYTHON_RESULT" \
             "$RLS_RESULT"
 
           for result in \
@@ -195,6 +218,7 @@ jobs:
             "$LINT_RESULT" \
             "$TEST_RESULT" \
             "$E2E_RESULT" \
+            "$PYTHON_RESULT" \
             "$RLS_RESULT"; do
             if [ "$result" != "success" ]; then
               echo "Required Gate blocked: at least one load-bearing CI job is not successful."
