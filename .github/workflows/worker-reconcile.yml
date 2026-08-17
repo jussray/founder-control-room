@@ -36,6 +36,7 @@ jobs:
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
       DEPLOYMENT_APPROVAL_ID: ${{ inputs.deployment_approval_id }}
       DEPLOYMENT_REASON: ${{ inputs.deployment_reason }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     steps:
       - name: Checkout exact approved commit
         uses: actions/checkout@v4
@@ -70,60 +71,21 @@ jobs:
           test "$ACTUAL_HEAD_SHA" = "$EXPECTED_HEAD_SHA"
           test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"
 
-      - name: Validate Worker-only production configuration
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Preflight canonical Worker token with shared contract
         shell: bash
         run: |
           set -euo pipefail
-
-          if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
-            echo '::error title=Missing Worker reconcile credential::Set CLOUDFLARE_API_TOKEN in the GitHub production environment before reconciliation.'
-            exit 1
-          fi
-
-          python3 - <<'PY'
-          import os
-          import sys
-
-          token = os.environ.get('CLOUDFLARE_API_TOKEN', '')
-          if not token:
-              print('::error title=Missing Worker reconcile credential::CLOUDFLARE_API_TOKEN is empty.')
-              sys.exit(1)
-
-          try:
-              token.encode('ascii')
-          except UnicodeEncodeError:
-              print('::error title=Malformed Worker deploy credential::CLOUDFLARE_API_TOKEN contains non-ASCII characters and cannot be used as an HTTP Authorization value. Re-copy the exact Cloudflare-issued token.')
-              sys.exit(1)
-
-          if any(ord(char) < 33 or ord(char) > 126 or char.isspace() for char in token):
-              print('::error title=Malformed Worker deploy credential::CLOUDFLARE_API_TOKEN contains whitespace or non-printable characters. Re-copy the exact Cloudflare-issued token.')
-              sys.exit(1)
-
-          if token.lower().startswith('bearer '):
-              print('::error title=Malformed Worker deploy credential::Store only the raw Cloudflare API token, without a Bearer prefix.')
-              sys.exit(1)
-
-          if token.startswith('CLOUDFLARE_API_TOKEN='):
-              print('::error title=Malformed Worker deploy credential::Store only the raw Cloudflare API token, without a NAME=value wrapper.')
-              sys.exit(1)
-
-          if len(token) >= 2 and token[0] == token[-1] and token[0] in {'"', "'"}:
-              print('::error title=Malformed Worker deploy credential::Store only the raw Cloudflare API token, without wrapping quotes.')
-              sys.exit(1)
-
-          print('Canonical Cloudflare Worker deploy token is header-safe. The token value was not printed.')
-          PY
-
           ACCOUNT_ID="$(sed -nE 's/^account_id[[:space:]]*=[[:space:]]*"([0-9a-f]+)"[[:space:]]*$/\1/p' wrangler.worker.toml | head -n 1)"
           if [[ ! "$ACCOUNT_ID" =~ ^[0-9a-f]{32}$ ]]; then
             echo '::error title=Invalid Worker account authority::wrangler.worker.toml must declare a 32-character lowercase Cloudflare account_id.'
             exit 1
           fi
 
-          echo "Cloudflare Worker deploy token is present and header-safe."
-          echo "Cloudflare account authority is declared in wrangler.worker.toml."
+          node scripts/provider-credential-contract.mjs \
+            --env CLOUDFLARE_API_TOKEN \
+            --account-id "$ACCOUNT_ID" \
+            --purpose canonical-worker-deploy \
+            --output test-results/provider-credentials/worker-reconcile.json
 
       - name: Record bounded authority receipt
         shell: bash
@@ -135,12 +97,21 @@ jobs:
             echo "- Approval reference: \`$DEPLOYMENT_APPROVAL_ID\`"
             echo "- Reason: ${DEPLOYMENT_REASON:-not supplied}"
             echo "- Mutation scope: Cloudflare Worker \`founder-control-room\` via \`wrangler.worker.toml\`"
-            echo "- Credential preflight: canonical deploy token present and HTTP-header-safe; value never printed"
+            echo "- Credential preflight: shared raw-byte provider contract passed; value never printed"
             echo "- Cloudflare account authority: declarative \`wrangler.worker.toml account_id\`"
             echo "- Existing Worker runtime secrets: preserved except \`FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON\`, which this workflow forces disabled"
             echo "- Supabase database mutation: skipped by workflow design"
             echo "- Publication scheduling: absent by workflow design"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload authority and credential receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fcr-worker-authority-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/provider-credentials/worker-reconcile.json
+          if-no-files-found: warn
+          retention-days: 30
 
   worker-deploy:
     name: Reconcile Canonical Worker
@@ -240,12 +211,14 @@ jobs:
             --arg live_sha "$(jq -r '.gitSha' <<<"$version_body")" \
             --argjson health "$health_body" \
             '{
+              schemaVersion: 2,
               scope: $scope,
               api_origin: $api_origin,
               expected_sha: $expected_sha,
               service: $service,
               live_sha: $live_sha,
               health: $health,
+              exactHeadVerified: ($live_sha == $expected_sha),
               supabase_db_mutation: false,
               proof_of_ship: false
             }' > test-results/fcr-worker-reconcile.json
