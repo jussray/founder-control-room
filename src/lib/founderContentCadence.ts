@@ -50,9 +50,7 @@ export interface CadenceSchedulableEnvelope {
   content_id: string;
   provider_request: {
     schedule_at: string;
-    [key: string]: unknown;
   };
-  [key: string]: unknown;
 }
 
 function clean(value: unknown, max = 240): string {
@@ -161,7 +159,7 @@ export function applyFounderContentCadenceSchedule<T extends CadenceSchedulableE
       ...envelope.provider_request,
       schedule_at: reservation.reservedScheduleAt,
     },
-  };
+  } as T;
 }
 
 export function buildFounderContentCadenceTelemetry(
