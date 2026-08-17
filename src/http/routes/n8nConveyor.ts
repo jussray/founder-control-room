@@ -13,6 +13,11 @@ import {
   N8N_FOUNDER_CONTENT_CONTRACT,
   dispatchN8nFounderContent,
 } from '../../lib/n8nFounderContentOrchestrator.js';
+import {
+  FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
+  dispatchFirstPartyFounderContentPublishNow,
+  type FirstPartyFounderPublishInput,
+} from '../../lib/firstPartyFounderContentExecutor.js';
 import { founderConveyorReadiness } from '../../lib/n8nConveyorReadiness.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../../lib/founderConveyorReceipt.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
@@ -68,6 +73,16 @@ n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
         readPrivateEvidence: false,
       },
       finalPublishedTruth: 'fcr-provider-readback-only',
+      directPublish: {
+        contract: FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
+        route: '/founder-content/publish-now',
+        provider: 'linkedin',
+        exactCurrentYouApprovalRequired: true,
+        durableOneShotReservationRequired: true,
+        providerReadbackRequired: true,
+        copyMutationAllowed: false,
+        blindRetryAllowed: false,
+      },
     },
   });
 });
@@ -103,6 +118,19 @@ n8nConveyorRouter.post('/advance', async (req: FounderRequest, res) => {
   return res.status(result.status).json({
     ...result,
     contract: FOUNDER_CONVEYOR_CONTRACT,
+  });
+});
+
+n8nConveyorRouter.post('/founder-content/publish-now', async (req: FounderRequest, res) => {
+  const input = (req.body ?? {}) as unknown as FirstPartyFounderPublishInput;
+  const result = await dispatchFirstPartyFounderContentPublishNow(input, {
+    executedBy: req.founder!.email,
+  });
+
+  return res.status(result.status).json({
+    ...result,
+    founder: req.founder ? { userId: req.founder.userId } : null,
+    finalPublishedTruth: 'fcr-provider-readback-only',
   });
 });
 
