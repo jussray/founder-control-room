@@ -21,14 +21,27 @@ describe('Founder Control Room completion claim UI contract', () => {
   it('downgrades provider success when downstream state reports warnings', () => {
     expect(source).toContain("Array.isArray(result.warnings)");
     expect(source).toContain("completion is not claimed. Evidence: execution ${receipt}. Warning:");
+    expect(source).toContain("status: 'incomplete'");
   });
 
-  it('replaces the legacy optimistic UI claims only after inspecting the execution payload', () => {
+  it('replaces legacy optimistic claims with an explicit claim status', () => {
     expect(source).toContain("'Merge executed.'");
     expect(source).toContain("'Branch created.'");
     expect(source).toContain("applyEvidenceBackedCompletionClaim");
     expect(source).toContain("notice.dataset.completionClaim");
-    expect(source).toContain("'evidence-backed'");
+    expect(source).toContain("notice.dataset.claimStatus");
+    expect(source).toContain("notice.dataset.evidenceCount");
+    expect(source).toContain("'witnessed'");
+    expect(source).toContain("'incomplete'");
     expect(source).toContain("'unverified'");
+  });
+
+  it('emits sanitized analytics for claim quality without leaking execution payloads', () => {
+    expect(source).toContain("new CustomEvent('fcr:completion-claim'");
+    expect(source).toContain('claimStatus: claim.status');
+    expect(source).toContain('evidenceKinds: claim.evidenceKinds');
+    expect(source).toContain('evidenceCount: claim.evidenceKinds.length');
+    expect(source).toContain('warningCount: claim.warningCount');
+    expect(source).not.toContain('detail: evidence.payload');
   });
 });
