@@ -26,6 +26,22 @@ function tokenCandidates(env, { apply = false } = {}) {
   return value.length > 0 ? [[name, value]] : [];
 }
 
+function assertCanonicalAccountAuthority(accountId) {
+  const effectiveAccountId = clean(accountId);
+  if (effectiveAccountId === FCR_CLOUDFLARE_ACCOUNT_ID) {
+    return FCR_CLOUDFLARE_ACCOUNT_ID;
+  }
+
+  const error = new Error(
+    'Cloudflare account authority mismatch: Founder Control Room Access recovery is pinned to its canonical provider account.',
+  );
+  error.classification = 'account-authority-mismatch';
+  error.expectedAccountId = FCR_CLOUDFLARE_ACCOUNT_ID;
+  error.suppliedAccountIdPresent = Boolean(effectiveAccountId);
+  error.nextAction = 'remove or correct CLOUDFLARE_ACCOUNT_ID; FCR recovery cannot target another Cloudflare account';
+  throw error;
+}
+
 function normalizedHost(value) {
   const raw = clean(value).toLowerCase();
   if (!raw) return '';
@@ -196,11 +212,17 @@ export async function reconcileFcrPublicAccessZone({
   accountId = clean(env.CLOUDFLARE_ACCOUNT_ID) || FCR_CLOUDFLARE_ACCOUNT_ID,
   zone = FCR_PUBLIC_ZONE,
 } = {}) {
-  const credential = await selectCredential({ env, accountId, fetchImpl, apply });
+  const canonicalAccountId = assertCanonicalAccountAuthority(accountId);
+  const credential = await selectCredential({
+    env,
+    accountId: canonicalAccountId,
+    fetchImpl,
+    apply,
+  });
   const applications = await cloudflareJson(
     { token: credential.token, fetchImpl },
     'GET',
-    `/accounts/${accountId}/access/apps?per_page=1000`,
+    `/accounts/${canonicalAccountId}/access/apps?per_page=1000`,
   );
   const matchingApplications = (Array.isArray(applications) ? applications : [])
     .map((application) => ({
@@ -233,7 +255,7 @@ export async function reconcileFcrPublicAccessZone({
   const alreadyExempt = existingExemptions.includes(zone.toLowerCase());
 
   const receipt = {
-    ...receiptBase({ apply, accountId, zone }),
+    ...receiptBase({ apply, accountId: canonicalAccountId, zone }),
     credentialSource: credential.source,
     credentialFailures: credential.failures,
     denyUnmatchedRequests,
@@ -275,7 +297,7 @@ export async function reconcileFcrPublicAccessZone({
   const updated = await cloudflareJson(
     { token: credential.token, fetchImpl },
     'PUT',
-    `/accounts/${accountId}/access/organizations`,
+    `/accounts/${canonicalAccountId}/access/organizations`,
     { deny_unmatched_requests_exempted_zone_names: nextExemptions },
   );
   const verifiedExemptions = Array.isArray(updated?.deny_unmatched_requests_exempted_zone_names)
@@ -309,8 +331,12 @@ function printReceipt(receipt) {
 const invokedDirectly = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
 if (invokedDirectly) {
   const apply = process.argv.includes('--apply');
-  const accountId = clean(process.env.CLOUDFLARE_ACCOUNT_ID) || FCR_CLOUDFLARE_ACCOUNT_ID;
-  const base = receiptBase({ apply, accountId, zone: FCR_PUBLIC_ZONE });
+  const suppliedAccountId = clean(process.env.CLOUDFLARE_ACCOUNT_ID);
+  const base = receiptBase({
+    apply,
+    accountId: FCR_CLOUDFLARE_ACCOUNT_ID,
+    zone: FCR_PUBLIC_ZONE,
+  });
 
   reconcileFcrPublicAccessZone({ apply })
     .then(async (receipt) => {
@@ -321,6 +347,11 @@ if (invokedDirectly) {
       const receipt = {
         ...base,
         state: 'blocked',
+        accountAuthority: {
+          canonicalAccountId: FCR_CLOUDFLARE_ACCOUNT_ID,
+          suppliedAccountIdPresent: Boolean(suppliedAccountId),
+          matchesCanonical: !suppliedAccountId || suppliedAccountId === FCR_CLOUDFLARE_ACCOUNT_ID,
+        },
         credentialSource: error?.credentialSource ?? null,
         credentialFailures: Array.isArray(error?.credentialFailures)
           ? error.credentialFailures
@@ -333,9 +364,10 @@ if (invokedDirectly) {
           : null,
         blocker: error instanceof Error ? error.message : String(error),
         classification: error?.classification || 'provider-recovery-failed',
-        nextAction: Array.isArray(error?.credentialFailures) && error.credentialFailures[0]?.nextAction
-          ? error.credentialFailures[0].nextAction
-          : 'review the structured receipt and correct the bounded provider authority before retrying',
+        nextAction: error?.nextAction
+          || (Array.isArray(error?.credentialFailures) && error.credentialFailures[0]?.nextAction
+            ? error.credentialFailures[0].nextAction
+            : 'review the structured receipt and correct the bounded provider authority before retrying'),
       };
       await writeReceipt(receipt);
       printReceipt(receipt);
