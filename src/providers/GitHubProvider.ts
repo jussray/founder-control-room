@@ -350,6 +350,13 @@ export class GitHubProvider implements RepositoryProvider {
       && config.enforcement === "active"
       && config.targetRefs.includes("main");
 
+    if (hardenFounderControlRoomMainReview) {
+      const errors = fcrMainRulesetConfigErrors(config);
+      if (errors.length > 0) {
+        throw new Error(`GitHubProvider: FCR main ruleset config rejected: ${errors.join("; ")}`);
+      }
+    }
+
     type RepoRule = NonNullable<
       RestEndpointMethodTypes["repos"]["createRepoRuleset"]["parameters"]
     >["rules"] extends (infer R)[] | undefined
@@ -411,8 +418,85 @@ export class GitHubProvider implements RepositoryProvider {
       ? await this.octokit.repos.updateRepoRuleset({ ...payload, ruleset_id: match.id })
       : await this.octokit.repos.createRepoRuleset(payload);
 
+    if (hardenFounderControlRoomMainReview) {
+      const { data: readback } = await this.octokit.repos.getRepoRuleset({
+        owner,
+        repo,
+        ruleset_id: data.id,
+      });
+      const errors = fcrMainRulesetReadbackErrors(config, readback);
+      if (errors.length > 0) {
+        throw new Error(`GitHubProvider: FCR main ruleset read-back mismatch: ${errors.join("; ")}`);
+      }
+    }
+
     return { id: String(data.id), name: data.name, enforcement: data.enforcement };
   }
+}
+
+const FCR_MAIN_RULESET_NAME = "Founder Control Room main exact-head gate";
+const FCR_MAIN_REQUIRED_CHECKS = ["Required Gate", "Verify test-ledger contract"] as const;
+
+type RulesetReadback = {
+  name?: string;
+  enforcement?: string;
+  rules?: Array<{
+    type?: string;
+    parameters?: Record<string, unknown>;
+  }>;
+};
+
+function fcrMainRulesetConfigErrors(config: RulesetConfig): string[] {
+  const errors: string[] = [];
+  if (config.name !== FCR_MAIN_RULESET_NAME) errors.push(`name must be ${JSON.stringify(FCR_MAIN_RULESET_NAME)}`);
+  if (config.targetRefs.length !== 1 || config.targetRefs[0] !== "main") errors.push("targetRefs must be exactly [\"main\"]");
+  if (!config.requirePullRequest) errors.push("pull requests must be required");
+  if (!Number.isInteger(config.requiredApprovingReviewCount) || config.requiredApprovingReviewCount < 1) {
+    errors.push("at least one approving review is required");
+  }
+  for (const required of FCR_MAIN_REQUIRED_CHECKS) {
+    if (!config.requiredStatusCheckNames.includes(required)) errors.push(`required status check is missing: ${required}`);
+  }
+  if (!config.blockForcePushes) errors.push("force pushes must be blocked");
+  if (!config.blockDeletion) errors.push("branch deletion must be blocked");
+  return errors;
+}
+
+function fcrMainRulesetReadbackErrors(config: RulesetConfig, value: unknown): string[] {
+  const readback = (value && typeof value === "object" && !Array.isArray(value))
+    ? value as RulesetReadback
+    : {};
+  const errors: string[] = [];
+  if (readback.name !== config.name) errors.push("ruleset name did not round-trip");
+  if (readback.enforcement !== "active") errors.push("ruleset enforcement is not active");
+
+  const rules = Array.isArray(readback.rules) ? readback.rules : [];
+  const pullRequest = rules.find((rule) => rule.type === "pull_request");
+  const pullParameters = pullRequest?.parameters ?? {};
+  if (!pullRequest) errors.push("pull request rule is missing");
+  if (pullParameters.required_approving_review_count !== config.requiredApprovingReviewCount) {
+    errors.push("approving review count does not match requested policy");
+  }
+  if (pullParameters.dismiss_stale_reviews_on_push !== true) errors.push("stale approvals are not dismissed on push");
+  if (pullParameters.require_last_push_approval !== true) errors.push("last-push approval is not required");
+  if (pullParameters.required_review_thread_resolution !== true) errors.push("review-thread resolution is not required");
+
+  const statusChecks = rules.find((rule) => rule.type === "required_status_checks");
+  const statusParameters = statusChecks?.parameters ?? {};
+  if (!statusChecks) errors.push("required status checks rule is missing");
+  if (statusParameters.strict_required_status_checks_policy !== true) errors.push("required status checks are not strict");
+  const requiredChecks = Array.isArray(statusParameters.required_status_checks)
+    ? statusParameters.required_status_checks
+        .map((entry) => entry && typeof entry === "object" && "context" in entry ? String((entry as { context?: unknown }).context ?? "") : "")
+        .filter(Boolean)
+    : [];
+  for (const required of FCR_MAIN_REQUIRED_CHECKS) {
+    if (!requiredChecks.includes(required)) errors.push(`provider read-back is missing required check: ${required}`);
+  }
+
+  if (!rules.some((rule) => rule.type === "non_fast_forward")) errors.push("force-push protection is missing");
+  if (!rules.some((rule) => rule.type === "deletion")) errors.push("deletion protection is missing");
+  return errors;
 }
 
 function extractSingleReviewReceiptHash(body: string | null | undefined): string | undefined {
