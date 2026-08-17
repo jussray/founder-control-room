@@ -1,0 +1,83 @@
+name: Provider Safety Contract
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/provider-credential-contract.mjs'
+      - 'scripts/provider-credential-contract.node-test.mjs'
+      - 'scripts/reconcile-cloudflare-access-public-zone.mjs'
+      - 'scripts/reconcile-cloudflare-access-public-zone.node-test.mjs'
+      - '.github/workflows/provider-safety-contract.yml'
+      - '.github/workflows/fcr-access-front-door-recovery.yml'
+      - '.github/workflows/worker-reconcile.yml'
+      - '.github/workflows/cloudflare-build-diagnostic.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  provider-safety:
+    name: Exact-head provider safety
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          printf 'Provider safety candidate: %s\n' "$actual"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Prove raw credential fail-closed contract
+        run: node --test scripts/provider-credential-contract.node-test.mjs
+
+      - name: Prove bounded Access recovery contract
+        run: node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
+
+      - name: Record prevention receipt
+        shell: bash
+        run: |
+          mkdir -p test-results
+          jq -n \
+            --arg expected_head_sha "$EXPECTED_HEAD_SHA" \
+            --arg observed_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{
+              schemaVersion: 1,
+              scope: "provider-safety-contract",
+              expectedHeadSha: $expected_head_sha,
+              observedAt: $observed_at,
+              rawCredentialShapeContract: "passed",
+              leastPrivilegeInspectionContract: "passed",
+              dedicatedMutationAuthorityContract: "passed",
+              exactHeadBound: true,
+              providerMutationPerformed: false
+            }' > test-results/provider-safety-contract.json
+
+      - name: Upload prevention receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: provider-safety-contract-${{ env.EXPECTED_HEAD_SHA }}
+          path: test-results/provider-safety-contract.json
+          if-no-files-found: error
+          retention-days: 30
