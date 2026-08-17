@@ -12,7 +12,6 @@ import {
 import {
   N8N_FOUNDER_CONTENT_CONTRACT,
   dispatchN8nFounderContent,
-  type FirstPartyFounderScheduleEnvelope,
 } from '../../lib/n8nFounderContentOrchestrator.js';
 import { founderConveyorReadiness } from '../../lib/n8nConveyorReadiness.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../../lib/founderConveyorReceipt.js';
@@ -59,6 +58,7 @@ n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
     founderContent: {
       contract: N8N_FOUNDER_CONTENT_CONTRACT,
       route: '/founder-content',
+      inputAuthority: 'canonical-fcr-proposal-approval-firewall-input',
       authority: {
         orchestrate: true,
         requestProviderWrite: true,
@@ -107,8 +107,8 @@ n8nConveyorRouter.post('/advance', async (req: FounderRequest, res) => {
 });
 
 n8nConveyorRouter.post('/founder-content', async (req: FounderRequest, res) => {
-  const envelope = (req.body ?? {}) as FirstPartyFounderScheduleEnvelope;
-  const result = await dispatchN8nFounderContent(envelope);
+  const input = (req.body ?? {}) as JsonRecord;
+  const result = await dispatchN8nFounderContent(input);
 
   return res.status(result.status).json({
     ...result,
