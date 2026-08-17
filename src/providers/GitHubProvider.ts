@@ -345,6 +345,10 @@ export class GitHubProvider implements RepositoryProvider {
     config: RulesetConfig,
   ): Promise<RulesetResult> {
     const { owner, repo } = this.locate(projectId);
+    const hardenFounderControlRoomMainReview =
+      projectId === "founder-control-room"
+      && config.enforcement === "active"
+      && config.targetRefs.includes("main");
 
     type RepoRule = NonNullable<
       RestEndpointMethodTypes["repos"]["createRepoRuleset"]["parameters"]
@@ -356,9 +360,9 @@ export class GitHubProvider implements RepositoryProvider {
       rules.push({
         type: "pull_request",
         parameters: {
-          dismiss_stale_reviews_on_push: false,
+          dismiss_stale_reviews_on_push: hardenFounderControlRoomMainReview,
           require_code_owner_review: false,
-          require_last_push_approval: false,
+          require_last_push_approval: hardenFounderControlRoomMainReview,
           required_approving_review_count: config.requiredApprovingReviewCount,
           required_review_thread_resolution: true,
         },
