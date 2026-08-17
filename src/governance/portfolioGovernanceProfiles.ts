@@ -1,0 +1,256 @@
+import {
+  evaluateGovernedAction,
+  type GovernedActionRequest,
+  type GovernedActionVerdict,
+  type RecoveryLevel,
+} from './governedIntelligence.js';
+
+export type PortfolioImplementationState = 'active' | 'bounded' | 'foundation' | 'not_implemented';
+
+export interface PortfolioGovernanceProfile {
+  id: string;
+  repositories: string[];
+  implementationState: PortfolioImplementationState;
+  humanAuthority: string;
+  objectiveTruthSources: Array<'provider_evidence' | 'system_observation'>;
+  minimumRecoveryLevel: RecoveryLevel;
+  hardConstraints: string[];
+  blockedActions: string[];
+  requiredClaims: Record<string, string[]>;
+}
+
+const DAY = 24 * 60 * 60 * 1000;
+
+export const PORTFOLIO_GOVERNANCE_PROFILES: readonly PortfolioGovernanceProfile[] = [
+  {
+    id: 'founder-control-room',
+    repositories: ['jussray/founder-control-room'],
+    implementationState: 'active',
+    humanAuthority: 'founder',
+    objectiveTruthSources: ['provider_evidence', 'system_observation'],
+    minimumRecoveryLevel: 'R2',
+    hardConstraints: [
+      'privileged repository actions remain exact-head and founder-approval bound',
+      'provider truth cannot be replaced by repository or memory claims',
+      'unresolved deployment-authority conflicts block production promotion',
+    ],
+    blockedActions: [],
+    requiredClaims: {
+      merge: ['repository_head_matches_plan', 'approved_capability_registry_matches'],
+      deploy: ['repository_head_matches_plan', 'production_authority_is_singular'],
+    },
+  },
+  {
+    id: 'chief-ai-machine',
+    repositories: ['jussray/chief-ai-machine'],
+    implementationState: 'active',
+    humanAuthority: 'founder',
+    objectiveTruthSources: ['provider_evidence', 'system_observation'],
+    minimumRecoveryLevel: 'R1',
+    hardConstraints: [
+      'company intelligence must preserve source and confidence boundaries',
+      'saved intelligence cannot self-promote into execution authority',
+    ],
+    blockedActions: [],
+    requiredClaims: {
+      production_claim: ['exact_production_version_verified'],
+    },
+  },
+  {
+    id: 'promptos',
+    repositories: ['jussray/promptos'],
+    implementationState: 'active',
+    humanAuthority: 'founder',
+    objectiveTruthSources: ['provider_evidence', 'system_observation'],
+    minimumRecoveryLevel: 'R1',
+    hardConstraints: [
+      'compiled intent remains below deployment or provider authority',
+      'submitted decision receipts remain unverified until independently proven',
+    ],
+    blockedActions: [],
+    requiredClaims: {
+      execute: ['current_intent_verified', 'execution_authority_verified'],
+    },
+  },
+  {
+    id: 'sekret-bip',
+    repositories: ['jussray/Sekret-Bip'],
+    implementationState: 'active',
+    humanAuthority: 'account actor within server-enforced teen/parent scope',
+    objectiveTruthSources: ['provider_evidence', 'system_observation'],
+    minimumRecoveryLevel: 'R2',
+    hardConstraints: [
+      'privacy and safety constraints outrank remembered preferences',
+      'rendered or launch claims require exact runtime and device evidence',
+      'a FutureYou projection cannot override current authenticated user choice',
+    ],
+    blockedActions: [],
+    requiredClaims: {
+      production_claim: ['exact_production_version_verified'],
+      account_authority_change: ['server_authority_verified'],
+    },
+  },
+  {
+    id: 'sekret-bip-jr',
+    repositories: ['jussray/Se-kretBip'],
+    implementationState: 'bounded',
+    humanAuthority: 'adult authority with child input inside age-banded scope',
+    objectiveTruthSources: ['provider_evidence', 'system_observation'],
+    minimumRecoveryLevel: 'R2',
+    hardConstraints: [
+      'adult setup and server-enforced authority remain mandatory',
+      'child input cannot expand adult-granted permissions',
+      'public social feed, peer search, followers, DMs, peer voice/video, and child-created groups remain prohibited',
+    ],
+    blockedActions: ['enable-public-social', 'enable-child-dm', 'expand-child-permissions-without-adult'],
+    requiredClaims: {
+      authority_change: ['adult_authority_verified', 'server_authority_verified'],
+    },
+  },
+  {
+    id: 'jussbeautifulhair',
+    repositories: ['jussray/jussbeautifulhair-site', 'jussray/jbh-private'],
+    implementationState: 'active',
+    humanAuthority: 'founder for operations; customer intent for customer choices',
+    objectiveTruthSources: ['provider_evidence', 'system_observation'],
+    minimumRecoveryLevel: 'R2',
+    hardConstraints: [
+      'private admin, vendor, customer, and order authority remains separated from the public storefront',
+      'commerce completion requires provider-backed order or checkout evidence rather than UI success alone',
+    ],
+    blockedActions: [],
+    requiredClaims: {
+      commerce_completion: ['commerce_provider_receipt_verified'],
+      production_claim: ['exact_production_version_verified'],
+    },
+  },
+  {
+    id: 'storyengine',
+    repositories: ['jussray/StoryEngine'],
+    implementationState: 'bounded',
+    humanAuthority: 'creator',
+    objectiveTruthSources: ['provider_evidence', 'system_observation'],
+    minimumRecoveryLevel: 'R2',
+    hardConstraints: [
+      'source analysis may propose canon but cannot promote canon without explicit creator approval',
+      'semantic similarity is not authorization',
+      'revocation beats cache TTL',
+    ],
+    blockedActions: ['auto-promote-canon'],
+    requiredClaims: {
+      canonize: ['creator_approval_verified', 'source_lineage_verified'],
+    },
+  },
+  {
+    id: 'solcontinuity',
+    repositories: ['jussray/solcontinuity'],
+    implementationState: 'active',
+    humanAuthority: 'founder',
+    objectiveTruthSources: ['provider_evidence', 'system_observation'],
+    minimumRecoveryLevel: 'R2',
+    hardConstraints: [
+      'application-layer evidence must not be promoted into a claim about Solana consensus or universal inclusion',
+      'private keys must not become runtime inputs to the governed broadcast examples',
+      'registry publication, deployment, spending, grants, live transaction tests, and merge remain explicit founder decisions',
+    ],
+    blockedActions: ['load-private-key'],
+    requiredClaims: {
+      broadcast_claim: ['signed_transaction_supplied', 'independent_confirmation_observed'],
+    },
+  },
+  {
+    id: 'sleepwealth-agent',
+    repositories: ['jussray/SleepWealth-Agent'],
+    implementationState: 'bounded',
+    humanAuthority: 'human approval inside simulation only',
+    objectiveTruthSources: ['provider_evidence', 'system_observation'],
+    minimumRecoveryLevel: 'R2',
+    hardConstraints: [
+      'live execution is disabled',
+      'paper or mock results are not investment-performance claims',
+      'the project does not claim trading alpha',
+    ],
+    blockedActions: ['live-trade', 'enable-live-broker', 'auto-increase-ceiling'],
+    requiredClaims: {
+      paper_execution: ['approval_verified', 'risk_gate_verified', 'mock_execution_receipt_verified'],
+    },
+  },
+  {
+    id: 'untold-stories-storefront',
+    repositories: ['jussray/untold-stories-storefront'],
+    implementationState: 'foundation',
+    humanAuthority: 'founder for release; customer for checkout intent',
+    objectiveTruthSources: ['provider_evidence', 'system_observation'],
+    minimumRecoveryLevel: 'R2',
+    hardConstraints: [
+      'repository proof is not production storefront proof',
+      'production release claims require exact deployed SHA plus real catalog/cart/checkout validation',
+    ],
+    blockedActions: [],
+    requiredClaims: {
+      production_claim: ['exact_production_version_verified', 'commerce_path_verified'],
+    },
+  },
+  {
+    id: 'sweats',
+    repositories: ['jussray/Sweats'],
+    implementationState: 'not_implemented',
+    humanAuthority: 'founder',
+    objectiveTruthSources: ['provider_evidence', 'system_observation'],
+    minimumRecoveryLevel: 'R0',
+    hardConstraints: [
+      'do not promote a brand concept or initial repository into an implemented runtime claim',
+    ],
+    blockedActions: ['runtime-claim', 'production-claim', 'autonomous-action'],
+    requiredClaims: {},
+  },
+] as const;
+
+export function portfolioGovernanceProfile(repository: string): PortfolioGovernanceProfile | null {
+  const normalized = repository.trim().toLowerCase();
+  return PORTFOLIO_GOVERNANCE_PROFILES.find((profile) =>
+    profile.repositories.some((candidate) => candidate.toLowerCase() === normalized)) ?? null;
+}
+
+export function portfolioHardConstraintViolations(
+  repository: string,
+  action: string,
+): string[] {
+  const profile = portfolioGovernanceProfile(repository);
+  if (!profile) return ['repository has no governed portfolio profile'];
+  const reasons: string[] = [];
+  if (profile.implementationState === 'not_implemented' && action !== 'observe') {
+    reasons.push('project has no implemented runtime authority');
+  }
+  if (profile.blockedActions.includes(action)) {
+    reasons.push(`project profile explicitly blocks action: ${action}`);
+  }
+  return reasons;
+}
+
+export function evaluatePortfolioGovernedAction(
+  repository: string,
+  action: string,
+  request: GovernedActionRequest,
+): GovernedActionVerdict {
+  const profile = portfolioGovernanceProfile(repository);
+  const requiredClaims = profile?.requiredClaims[action] ?? [];
+  const explicitClaims = request.requiredClaims ?? [];
+  const mergedClaims = [
+    ...explicitClaims,
+    ...requiredClaims
+      .filter((claim) => !explicitClaims.some((candidate) => candidate.claim === claim))
+      .map((claim) => ({ claim })),
+  ];
+
+  return evaluateGovernedAction({
+    ...request,
+    requiredClaims: mergedClaims,
+    hardConstraintViolations: [
+      ...(request.hardConstraintViolations ?? []),
+      ...portfolioHardConstraintViolations(repository, action),
+    ],
+  });
+}
+
+export const PORTFOLIO_CONSEQUENTIAL_MEMORY_MAX_AGE_MS = DAY;
