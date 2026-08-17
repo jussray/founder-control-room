@@ -126,6 +126,8 @@ const founderProposal = {
         public_safe: true,
         evidence_ref: founderEvidenceRef,
         evidence_scope: 'founder-content-contract',
+        temporal_class: 'current_repo_state',
+        temporal_version: founderSourceSha,
       },
     ],
     proof_link: null,
@@ -170,7 +172,7 @@ const founderProposal = {
     analytics_can_authorize_publish: false,
     external_feedback_trusted_for_authority: false,
   },
-  proposal_hash: '5dac904c02b00e5b5d79c11d6fd819a431df38094363b25bfcda64e52a1d66ce',
+  proposal_hash: 'e02fb57c56ab9306f368920debafd4bb78c35fc020704bc4a360f6d3dd238040',
 };
 const founderApproval = {
   approval_id: 'approval-2026-08-17-current',
@@ -302,4 +304,4 @@ assert.throws(
   /destination_url must be an HTTPS URL/,
 );
 
-console.log('Social distribution contract verified: first-party founder content must carry the exact Chief proposal and fresh Current You authorization into the existing Buffer review window; generic campaigns remain intact; exact-SHA proof, UTM attribution, HubSpot observation-only analytics, and share-now denial remain enforced.');
+console.log('Social distribution contract verified: first-party founder content carries the exact temporal-bound Chief proposal and fresh Current You authorization into the existing Buffer review window; generic campaigns remain intact; exact-SHA proof, UTM attribution, HubSpot observation-only analytics, and share-now denial remain enforced.');

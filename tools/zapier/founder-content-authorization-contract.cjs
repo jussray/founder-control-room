@@ -5,6 +5,12 @@ const { createHash } = require('node:crypto');
 const HASH = /^[0-9a-f]{64}$/i;
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const IDENTIFIER = /^[a-z0-9][a-z0-9._:-]{0,119}$/;
+const TEMPORAL_CLAIM_CLASSES = new Set([
+  'historical_version',
+  'current_repo_state',
+  'current_runtime',
+  'metric',
+]);
 const MAX_APPROVAL_TTL_MS = 60 * 60 * 1000;
 const MAX_CURRENT_YOU_AGE_MS = 24 * 60 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
@@ -56,6 +62,8 @@ function canonicalChiefIdentity(proposal = {}) {
         public_safe: claim?.public_safe === true,
         evidence_ref: asString(claim?.evidence_ref, 1000),
         evidence_scope: asString(claim?.evidence_scope, 200),
+        temporal_class: asString(claim?.temporal_class, 40).toLowerCase() || null,
+        temporal_version: asString(claim?.temporal_version, 40).toLowerCase() || null,
       }))
     : [];
 
@@ -176,6 +184,24 @@ function validateProposal(proposal = {}) {
     }
     if (!claim.evidence_scope || !evidence.proves.includes(claim.evidence_scope)) {
       errors.push('every public claim evidence_scope must be explicitly covered by internal evidence');
+      break;
+    }
+    if (claim.temporal_class && !TEMPORAL_CLAIM_CLASSES.has(claim.temporal_class)) {
+      errors.push('public claim temporal_class is invalid');
+      break;
+    }
+    if (
+      (claim.temporal_class === 'historical_version' || claim.temporal_class === 'current_repo_state') &&
+      claim.temporal_version !== sourceCommitSha
+    ) {
+      errors.push('version-bound public claim temporal_version must equal the exact source commit');
+      break;
+    }
+    if (
+      (claim.temporal_class === 'current_runtime' || claim.temporal_class === 'metric') &&
+      claim.temporal_version !== null
+    ) {
+      errors.push('runtime or metric public claims may not carry a repository temporal_version');
       break;
     }
   }
