@@ -6,6 +6,31 @@ const {
   hashPublicPayload,
 } = require('./founder-content-authorization-contract.cjs');
 
+const sauceGuard = {
+  private_implementation_removed: true,
+  secret_material_removed: true,
+  raw_diff_removed: true,
+  private_metrics_removed: true,
+  unreleased_roadmap_removed: true,
+  customer_private_data_removed: true,
+  security_sensitive_details_removed: true,
+  public_claims_only: true,
+};
+
+function chiefIdentity(proposed) {
+  return {
+    version: 1,
+    source_repo: proposed.source.repo,
+    source_commit_sha: proposed.source.commit_sha,
+    current_you_intent_id: proposed.authority.current_you_intent_id,
+    freshness: proposed.freshness,
+    internal_evidence: proposed.internal_evidence,
+    claim_evidence: proposed.claim_evidence,
+    public_payload: proposed.public_payload,
+    sauce_guard: proposed.sauce_guard,
+  };
+}
+
 function proposal(overrides = {}) {
   const publicPayload = overrides.public_payload || {
     platform: 'linkedin',
@@ -17,11 +42,9 @@ function proposal(overrides = {}) {
     proof_link: null,
     proof_link_policy: 'editorial_optional',
   };
-
-  return {
+  const built = {
     version: 1,
     kind: 'chief-ai/founder-content-proposal',
-    proposal_hash: 'a'.repeat(64),
     source: { repo: 'jussray/chief-ai-machine', commit_sha: 'b'.repeat(40) },
     freshness: {
       issued_at: '2026-08-17T07:45:00.000Z',
@@ -29,20 +52,33 @@ function proposal(overrides = {}) {
     },
     public_payload: publicPayload,
     internal_evidence: {
+      ref: 'github:chief-ai-machine@' + 'b'.repeat(40) + '#quality-gate',
+      digest: 'c'.repeat(64),
       verified: true,
       not_for_publication: true,
-      digest: 'c'.repeat(64),
     },
+    claim_evidence: [
+      { claim_id: 'proof-bound', evidence_refs: ['proof:quality-gate'] },
+    ],
+    sauce_guard: { ...sauceGuard },
     authority: {
       proposal_only: true,
       publish_authorized: false,
+      current_you_source: 'current_authenticated_founder',
+      current_you_intent_id: 'chief-content-intent-current',
       future_you_advisory_only: true,
+      historical_content_intent_authoritative: false,
+      analytics_feedback_authority: 'observation-only',
       analytics_can_authorize_publish: false,
       external_feedback_trusted_for_authority: false,
     },
     ...overrides,
     public_payload: publicPayload,
   };
+  if (!Object.prototype.hasOwnProperty.call(overrides, 'proposal_hash')) {
+    built.proposal_hash = hashPublicPayload(chiefIdentity(built));
+  }
+  return built;
 }
 
 function approval(proposed, overrides = {}) {
@@ -94,7 +130,21 @@ function approval(proposed, overrides = {}) {
 
   assert.throws(
     () => authorizeFounderContentPublication({ proposal: edited, approval: approved, now: '2026-08-17T08:05:00.000Z' }),
-    /public_payload_hash does not match exact public copy/,
+    /proposal_hash does not match canonical Chief proposal identity/,
+  );
+}
+
+{
+  const proposed = proposal();
+  const approved = approval(proposed);
+  const proofTampered = proposal({
+    proposal_hash: proposed.proposal_hash,
+    internal_evidence: { ...proposed.internal_evidence, digest: 'd'.repeat(64) },
+  });
+
+  assert.throws(
+    () => authorizeFounderContentPublication({ proposal: proofTampered, approval: approved, now: '2026-08-17T08:05:00.000Z' }),
+    /proposal_hash does not match canonical Chief proposal identity/,
   );
 }
 
@@ -175,7 +225,9 @@ function approval(proposed, overrides = {}) {
     authority: {
       proposal_only: true,
       publish_authorized: false,
+      current_you_intent_id: 'chief-content-intent-current',
       future_you_advisory_only: true,
+      historical_content_intent_authoritative: false,
       analytics_can_authorize_publish: true,
       external_feedback_trusted_for_authority: false,
     },
