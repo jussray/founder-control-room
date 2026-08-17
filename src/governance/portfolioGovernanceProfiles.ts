@@ -1,10 +1,13 @@
 import {
   evaluateGovernedAction,
   type ActionRisk,
-  type GovernedActionRequest,
   type GovernedActionVerdict,
   type RecoveryLevel,
 } from './governedIntelligence.js';
+import {
+  enforceConsequentialDecisionContext,
+  type ContextBoundGovernedActionRequest,
+} from './portfolioDecisionContext.js';
 
 export type PortfolioImplementationState = 'active' | 'bounded' | 'foundation' | 'not_implemented';
 
@@ -151,7 +154,7 @@ export function portfolioHardConstraintViolations(
 export function evaluatePortfolioGovernedAction(
   repository: string,
   action: string,
-  request: GovernedActionRequest,
+  request: ContextBoundGovernedActionRequest,
 ): GovernedActionVerdict {
   const profile = portfolioGovernanceProfile(repository);
   const requiredClaims = profile?.requiredClaims[action] ?? [];
@@ -163,8 +166,7 @@ export function evaluatePortfolioGovernedAction(
       .map((claim) => ({ claim })),
   ];
   const effectiveRisk = maxRisk(request.risk, profile?.actionRiskFloors[action]);
-
-  return evaluateGovernedAction({
+  const evaluatedRequest: ContextBoundGovernedActionRequest = {
     ...request,
     risk: effectiveRisk,
     requiredClaims: mergedClaims,
@@ -172,7 +174,10 @@ export function evaluatePortfolioGovernedAction(
       ...(request.hardConstraintViolations ?? []),
       ...portfolioHardConstraintViolations(repository, action, request.recoveryPlan?.level, effectiveRisk),
     ],
-  });
+  };
+
+  const verdict = evaluateGovernedAction(evaluatedRequest);
+  return enforceConsequentialDecisionContext(evaluatedRequest, verdict, effectiveRisk);
 }
 
 export const PORTFOLIO_CONSEQUENTIAL_MEMORY_MAX_AGE_MS = DAY;
