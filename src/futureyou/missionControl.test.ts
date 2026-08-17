@@ -151,4 +151,54 @@ describe('FutureYou V8 mission control', () => {
     });
     expect(brief.blindSpots.some((item) => item.includes('cannot count as fresh decision evidence'))).toBe(true);
   });
+
+  it('does not let a harmless event become actionable solely because its timestamp is malformed or future-dated', () => {
+    const activity = [
+      {
+        id: 'invalid-info',
+        project_id: 'project-1',
+        event_type: 'heartbeat_observed',
+        severity: 'info',
+        created_at: 'not-a-timestamp',
+        project,
+      },
+      {
+        id: 'future-info',
+        project_id: 'project-1',
+        event_type: 'heartbeat_observed',
+        severity: 'info',
+        created_at: '2026-07-25T20:00:00.000Z',
+        project,
+      },
+    ];
+
+    const brief = buildMissionControlBrief({ now: NOW, missions: [], activity });
+
+    expect(brief.priorities).toHaveLength(0);
+    expect(brief.summary.invalidObservationTimes).toBe(1);
+    expect(brief.summary.futureObservationTimes).toBe(1);
+  });
+
+  it('keeps a truly critical event actionable even when its clock is invalid, but marks trust low', () => {
+    const brief = buildMissionControlBrief({
+      now: NOW,
+      missions: [],
+      activity: [{
+        id: 'critical-invalid',
+        project_id: 'project-1',
+        event_type: 'payment_delivery_failed',
+        severity: 'critical',
+        created_at: 'broken-clock',
+        project,
+      }],
+    });
+
+    expect(brief.priorities).toHaveLength(1);
+    expect(brief.priorities[0]).toMatchObject({
+      source: 'event',
+      observationState: 'invalid',
+      confidence: 'low',
+    });
+    expect(brief.summary.invalidObservationTimes).toBe(1);
+  });
 });
