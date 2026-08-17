@@ -99,23 +99,11 @@ export function assessProjectAdapterFreshness(
     };
   }
 
-  if (input.currentHead.toLowerCase() !== input.auditedHead.toLowerCase()) {
-    return {
-      ...shared,
-      state: 'stale',
-      freshness: 'stale',
-      recommendation: 'hold',
-      sourceHeadMatchesAudited: false,
-      contractPathsMissing: [],
-      contractPathsDrifted: [],
-      blocker: `Authoritative main ${input.currentHead} no longer matches audited adapter head ${input.auditedHead}.`,
-      nextAction: 'Audit the new project main head and its required canon contracts before refreshing the adapter.',
-      reasons: ['Repository main advanced after the adapter snapshot was audited.'],
-    };
-  }
-
+  const sourceHeadMatchesAudited =
+    input.currentHead.toLowerCase() === input.auditedHead.toLowerCase();
   const missing: string[] = [];
   const drifted: string[] = [];
+
   for (const path of contractPathsRequired) {
     const expected = input.auditedContractBlobs[path];
     const observed = input.observedContractBlobs[path];
@@ -129,7 +117,7 @@ export function assessProjectAdapterFreshness(
         state: 'unknown',
         freshness: 'invalid',
         recommendation: 'hold',
-        sourceHeadMatchesAudited: true,
+        sourceHeadMatchesAudited,
         contractPathsMissing: [],
         contractPathsDrifted: [],
         blocker: `Contract blob evidence is invalid for ${path}.`,
@@ -146,7 +134,7 @@ export function assessProjectAdapterFreshness(
       state: 'unknown',
       freshness: 'missing',
       recommendation: 'hold',
-      sourceHeadMatchesAudited: true,
+      sourceHeadMatchesAudited,
       contractPathsMissing: missing,
       contractPathsDrifted: [],
       blocker: `Current-head canon evidence is missing for: ${missing.join(', ')}.`,
@@ -159,14 +147,35 @@ export function assessProjectAdapterFreshness(
     return {
       ...shared,
       state: 'attention',
-      freshness: 'fresh',
+      freshness: sourceHeadMatchesAudited ? 'fresh' : 'stale',
       recommendation: 'review',
-      sourceHeadMatchesAudited: true,
+      sourceHeadMatchesAudited,
       contractPathsMissing: [],
       contractPathsDrifted: drifted,
-      blocker: `Required canon contract blobs drifted at the audited head: ${drifted.join(', ')}.`,
+      blocker: sourceHeadMatchesAudited
+        ? `Required canon contract blobs drifted at the audited head: ${drifted.join(', ')}.`
+        : `Repository main advanced and required canon contract blobs drifted: ${drifted.join(', ')}.`,
       nextAction: 'Perform a semantic canon review before updating the checked-in adapter evidence.',
-      reasons: ['Exact-head identity alone is insufficient when a required canon blob differs from the audited manifest.'],
+      reasons: [
+        sourceHeadMatchesAudited
+          ? 'Exact-head identity alone is insufficient when a required canon blob differs from the audited manifest.'
+          : 'Repository main advanced and at least one required canon blob no longer matches the audited manifest.',
+      ],
+    };
+  }
+
+  if (!sourceHeadMatchesAudited) {
+    return {
+      ...shared,
+      state: 'verified',
+      freshness: 'fresh',
+      recommendation: 'hold',
+      sourceHeadMatchesAudited: false,
+      contractPathsMissing: [],
+      contractPathsDrifted: [],
+      blocker: null,
+      nextAction: 'Keep the adapter read-only and refresh the audited head only when intentionally updating the provenance snapshot.',
+      reasons: ['Repository main advanced, but every required canon blob still matches the audited adapter snapshot.'],
     };
   }
 
