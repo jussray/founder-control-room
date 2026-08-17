@@ -5,30 +5,40 @@ const source = readFileSync('public/control-room/content-manager.html', 'utf8');
 const playwrightWorkflow = readFileSync('.github/workflows/playwright.yml', 'utf8');
 
 describe('first-party founder content shop UI contract', () => {
-  it('makes Chief the story brain and FCR the canonical content shop', () => {
+  it('makes Chief the story brain, FCR the canonical shop, and providers replaceable delivery', () => {
     expect(source).toContain('Chief AI is the story brain.');
     expect(source).toContain('FCR is the canonical shop.');
-    expect(source).toContain('LinkedIn, Buffer, and Cambiante are replaceable delivery hands.');
+    expect(source).toContain('Providers own');
+    expect(source).toContain('Actual publication state.');
   });
 
-  it('separates internal evidence from optional public proof links', () => {
-    expect(source).toContain('Internal evidence required');
-    expect(source).toContain('Public proof link optional');
-    expect(source).toContain('data-public-proof-link-toggle');
-    expect(source).toContain('The post can be fully verified without showing a GitHub link.');
+  it('defaults to unknown rather than displaying false-green evidence or sauce status', () => {
+    expect(source).toContain('data-content-authority-state="awaiting-draft"');
+    expect(source).toContain('data-internal-evidence-state="unknown"');
+    expect(source).toContain('data-sauce-state="unknown"');
+    expect(source).toContain('No canonical draft loaded');
+    expect(source).toContain('Awaiting evidence');
+    expect(source).not.toContain('<span class="pill good">Verified</span>');
   });
 
-  it('makes sauce protection and Current-You approval visible', () => {
-    expect(source).toContain('Sauce protected');
-    expect(source).toContain('Private implementation removed');
-    expect(source).toContain('Current You approval');
-    expect(source).toContain('Any edit after approval changes the content hash');
+  it('keeps public proof editorially optional without presenting a fake active control', () => {
+    expect(source).toContain('data-public-proof-state="optional-off"');
+    expect(source).toContain('Optional · off');
+    expect(source).toContain('Internal proof can stay strict without turning every post into a repo receipt.');
+    expect(source).not.toContain('data-public-proof-link-toggle');
   });
 
-  it('keeps provider publication as a separate read-back boundary', () => {
-    expect(source).toContain('First-party authority does not mean a provider write already happened.');
-    expect(source).toContain('LinkedIn OAuth/API authorization remains a separate provider capability');
-    expect(source).toContain('Never the canonical copy or founder authority.');
+  it('shows the exact Current-You and provider truth boundaries', () => {
+    expect(source).toContain('data-current-you-state="not-requested"');
+    expect(source).toContain('data-provider-state="not-handed-off"');
+    expect(source).toContain('Any edit invalidates it.');
+    expect(source).toContain('A provider receipt must still be read back before “published” becomes true.');
+  });
+
+  it('communicates analytics unknown semantics and non-escalation', () => {
+    expect(source).toContain('Missing metrics stay UNKNOWN');
+    expect(source).toContain('UNKNOWN ≠ 0');
+    expect(source).toContain('analytics can never increase authority');
   });
 
   it('binds Product Design browser proof to the exact reviewed head', () => {
