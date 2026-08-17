@@ -3,18 +3,30 @@ name: FCR Access Front Door Recovery
 on:
   workflow_dispatch:
     inputs:
+      expected_head_sha:
+        description: 'Exact current main SHA approved for FCR front-door inspection or recovery'
+        required: true
+        type: string
       apply:
-        description: 'Apply the bounded foundercontrolroom.org Access exemption after inspection'
+        description: 'Apply only the bounded foundercontrolroom.org Access exemption after inspection'
         required: true
         type: boolean
         default: false
+      approval_reference:
+        description: 'Auditable founder approval reference; required when apply=true'
+        required: false
+        type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: fcr-access-front-door-recovery-production
+  cancel-in-progress: false
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  EXPECTED_HEAD_SHA: ${{ github.sha }}
+  EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
   CLOUDFLARE_ACCOUNT_ID: '9b59861bd1747cf7525571b4c51d2aa0'
 
 jobs:
@@ -22,22 +34,52 @@ jobs:
     name: Inspect or restore FCR application-owned auth front door
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment: production
 
     steps:
-      - name: Check out exact selected revision
+      - name: Check out exact approved revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           persist-credentials: false
-          fetch-depth: 1
+          fetch-depth: 0
 
-      - name: Verify exact selected revision
+      - name: Verify exact current main and mutation approval
+        env:
+          APPLY: ${{ inputs.apply }}
+          APPROVAL_REFERENCE: ${{ inputs.approval_reference }}
         shell: bash
         run: |
           set -euo pipefail
+          if [[ ! "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error title=Invalid exact head::expected_head_sha must be a lowercase 40-character commit SHA.'
+            exit 1
+          fi
+
           actual="$(git rev-parse HEAD)"
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          current_main="$(git rev-parse refs/remotes/origin/main)"
           test "$actual" = "$EXPECTED_HEAD_SHA"
-          printf 'Verified FCR Access recovery revision: %s\n' "$actual"
+          test "$current_main" = "$EXPECTED_HEAD_SHA"
+
+          if [[ "$APPLY" == 'true' ]]; then
+            if [[ ! "$APPROVAL_REFERENCE" =~ ^[A-Za-z0-9._:-]{8,200}$ ]]; then
+              echo '::error title=Missing mutation approval::apply=true requires an auditable 8-200 character approval_reference.'
+              exit 1
+            fi
+          fi
+
+          {
+            echo '## FCR front-door authority gate'
+            echo
+            echo "- Exact current main: \`$EXPECTED_HEAD_SHA\`"
+            echo "- Apply requested: \`$APPLY\`"
+            echo "- Approval reference: \`${APPROVAL_REFERENCE:-not-required-for-read-only}\`"
+            echo '- Mutation scope: Cloudflare Access organization exemption list only'
+            echo '- DNS mutation: none'
+            echo '- Worker route mutation: none'
+            echo '- Database mutation: none'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up Node 24
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -48,22 +90,23 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Prove shared provider credential contract
+        run: node --test scripts/provider-credential-contract.node-test.mjs
+
       - name: Prove bounded recovery behavior
         run: node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
 
       - name: Inspect provider state without mutation
         env:
-          CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
+          CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: node scripts/reconcile-cloudflare-access-public-zone.mjs
 
-      - name: Apply one-zone Access exemption
+      - name: Apply one-zone Access exemption with dedicated admin authority
         if: inputs.apply == true
         env:
           CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
-          CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: node scripts/reconcile-cloudflare-access-public-zone.mjs --apply
 
       - name: Install Chromium for post-apply proof
@@ -72,15 +115,32 @@ jobs:
 
       - name: Verify recovered front door with Playwright
         if: inputs.apply == true
+        env:
+          DOMAIN_EXPECTED_SHA: ${{ env.EXPECTED_HEAD_SHA }}
         run: npx playwright test -c playwright.domain.config.ts
 
-      - name: Upload recovery browser artifacts
-        if: always() && inputs.apply == true
+      - name: Publish structured provider recovery summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f test-results/fcr-access-front-door-recovery.json ]]; then
+            {
+              echo '## FCR Access front-door receipt'
+              echo
+              echo '```json'
+              cat test-results/fcr-access-front-door-recovery.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload recovery evidence
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: fcr-access-front-door-recovery-${{ env.EXPECTED_HEAD_SHA }}
+          name: fcr-access-front-door-recovery-${{ env.EXPECTED_HEAD_SHA }}-${{ github.run_attempt }}
           path: |
+            test-results/fcr-access-front-door-recovery.json
             test-results/domain-authority/
             playwright-report/
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 30
