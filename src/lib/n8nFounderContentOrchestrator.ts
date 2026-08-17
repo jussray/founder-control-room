@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+// @ts-expect-error -- the canonical #428 social-distribution contract is CommonJS and intentionally remains the single authority implementation.
+import socialDistributionContract from '../../tools/zapier/social-distribution-contract.cjs';
 
 export const N8N_FOUNDER_CONTENT_CONTRACT = 'fcr/n8n-founder-content-orchestration@v1' as const;
 export const N8N_FOUNDER_CONTENT_EVENT = 'founder-content.schedule.requested' as const;
@@ -8,6 +10,8 @@ const HASH = /^[0-9a-f]{64}$/i;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const OWNED_REPO = /^jussray\/[A-Za-z0-9._-]+$/;
 const MAX_TEXT = 5000;
+
+export type FirstPartyFounderDistributionInput = Record<string, unknown>;
 
 export interface FirstPartyFounderScheduleEnvelope {
   version: number;
@@ -47,6 +51,14 @@ export interface FirstPartyFounderScheduleEnvelope {
     external_write_included: boolean;
   };
 }
+
+interface CanonicalSocialDistributionContract {
+  buildFirstPartyFounderScheduleEnvelope(
+    input: FirstPartyFounderDistributionInput,
+  ): FirstPartyFounderScheduleEnvelope;
+}
+
+const canonicalSocialDistribution = socialDistributionContract as CanonicalSocialDistributionContract;
 
 export interface N8nFounderContentRequest {
   contract: typeof N8N_FOUNDER_CONTENT_CONTRACT;
@@ -217,6 +229,17 @@ export function validateN8nFounderContentEnvelope(
   return [...new Set(reasons)];
 }
 
+export function buildCanonicalFirstPartyFounderScheduleEnvelope(
+  input: FirstPartyFounderDistributionInput,
+): FirstPartyFounderScheduleEnvelope {
+  const envelope = canonicalSocialDistribution.buildFirstPartyFounderScheduleEnvelope(input);
+  const reasons = validateN8nFounderContentEnvelope(envelope);
+  if (reasons.length > 0) {
+    throw new Error(`N8N_FOUNDER_CONTENT_CANONICAL_ENVELOPE_REJECTED: ${reasons.join('; ')}`);
+  }
+  return envelope;
+}
+
 export function buildN8nFounderContentRequest(
   envelope: FirstPartyFounderScheduleEnvelope,
 ): N8nFounderContentRequest {
@@ -307,22 +330,30 @@ export function verifyN8nFounderContentReceipt(
 }
 
 export async function dispatchN8nFounderContent(
-  envelope: FirstPartyFounderScheduleEnvelope,
+  input: FirstPartyFounderDistributionInput,
   options: DispatchOptions = {},
 ): Promise<N8nFounderContentDispatchResult> {
-  const config = readN8nFounderContentConfig(options.env ?? process.env);
-  if (!config.enabled) {
-    return { ok: false, code: 'ORCHESTRATION_DISABLED', status: 503, request: null, receipt: null, reasons: ['n8n founder-content orchestration is disabled'] };
-  }
-  if (!config.configured || !config.webhookUrl || !config.bearerToken) {
-    return { ok: false, code: 'ORCHESTRATION_NOT_CONFIGURED', status: 503, request: null, receipt: null, reasons: ['n8n founder-content webhook and bearer token must be configured'] };
-  }
-
   let request: N8nFounderContentRequest;
   try {
+    const envelope = buildCanonicalFirstPartyFounderScheduleEnvelope(input);
     request = buildN8nFounderContentRequest(envelope);
   } catch (error) {
-    return { ok: false, code: 'INVALID_ENVELOPE', status: 400, request: null, receipt: null, reasons: [error instanceof Error ? error.message : 'invalid founder-content envelope'] };
+    return {
+      ok: false,
+      code: 'INVALID_ENVELOPE',
+      status: 400,
+      request: null,
+      receipt: null,
+      reasons: [error instanceof Error ? error.message : 'invalid canonical founder-content input'],
+    };
+  }
+
+  const config = readN8nFounderContentConfig(options.env ?? process.env);
+  if (!config.enabled) {
+    return { ok: false, code: 'ORCHESTRATION_DISABLED', status: 503, request, receipt: null, reasons: ['n8n founder-content orchestration is disabled'] };
+  }
+  if (!config.configured || !config.webhookUrl || !config.bearerToken) {
+    return { ok: false, code: 'ORCHESTRATION_NOT_CONFIGURED', status: 503, request, receipt: null, reasons: ['n8n founder-content webhook and bearer token must be configured'] };
   }
 
   try {
