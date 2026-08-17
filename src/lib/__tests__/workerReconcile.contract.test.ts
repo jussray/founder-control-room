@@ -5,6 +5,10 @@ const workflow = readFileSync(
   new URL('../../../.github/workflows/worker-reconcile.yml', import.meta.url),
   'utf8',
 );
+const credentialContract = readFileSync(
+  new URL('../../../scripts/provider-credential-contract.mjs', import.meta.url),
+  'utf8',
+);
 
 describe('canonical Worker reconcile credential preflight contract', () => {
   it('binds the production reconcile to the canonical Cloudflare deploy token', () => {
@@ -15,17 +19,27 @@ describe('canonical Worker reconcile credential preflight contract', () => {
     expect(workflow).toContain('apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}');
   });
 
-  it('fails closed on malformed token shape before Wrangler mutation without printing the token', () => {
-    expect(workflow).toContain("token = os.environ.get('CLOUDFLARE_API_TOKEN', '')");
-    expect(workflow).toContain("token.encode('ascii')");
-    expect(workflow).toContain('contains non-ASCII characters and cannot be used as an HTTP Authorization value');
-    expect(workflow).toContain('contains whitespace or non-printable characters');
-    expect(workflow).toContain('without a Bearer prefix');
-    expect(workflow).toContain('without a NAME=value wrapper');
-    expect(workflow).toContain('without wrapping quotes');
-    expect(workflow).toContain('The token value was not printed.');
+  it('fails closed through the shared raw credential contract before Wrangler mutation without printing the token', () => {
+    const preflightIndex = workflow.indexOf('Preflight canonical Worker token with shared contract');
+    const secretMutationIndex = workflow.indexOf('Force publication grant disabled on canonical Worker');
+    const deployIndex = workflow.indexOf('Deploy only the canonical Worker configuration');
+
+    expect(preflightIndex).toBeGreaterThan(-1);
+    expect(secretMutationIndex).toBeGreaterThan(preflightIndex);
+    expect(deployIndex).toBeGreaterThan(secretMutationIndex);
+    expect(workflow).toContain('node scripts/provider-credential-contract.mjs');
+    expect(workflow).toContain('--env CLOUDFLARE_API_TOKEN');
+    expect(workflow).toContain('--purpose canonical-worker-deploy');
+    expect(workflow).toContain('test-results/provider-credentials/worker-reconcile.json');
+
+    expect(credentialContract).toContain("classification = 'non-ascii'");
+    expect(credentialContract).toContain("classification = 'whitespace'");
+    expect(credentialContract).toContain("classification = 'bearer-prefix'");
+    expect(credentialContract).toContain("classification = 'assignment-wrapper'");
+    expect(credentialContract).toContain("classification = 'wrapping-quotes'");
+    expect(credentialContract).toContain("classification = 'account-id-substitution'");
+    expect(credentialContract).not.toContain('console.log(token)');
     expect(workflow).not.toContain('echo "$CLOUDFLARE_API_TOKEN"');
-    expect(workflow).not.toContain('print(token)');
   });
 
   it('preserves exact-head authority and the existing runtime proof boundary', () => {
@@ -35,5 +49,6 @@ describe('canonical Worker reconcile credential preflight contract', () => {
     expect(workflow).toContain('api.foundercontrolroom.org did not prove canonical service identity and exact deployed SHA');
     expect(workflow).toContain('.founderSignalAutomationGrant.configured == true');
     expect(workflow).toContain('.founderSignalAutomationGrant.enabled == false');
+    expect(workflow).toContain('exactHeadVerified: ($live_sha == $expected_sha)');
   });
 });
