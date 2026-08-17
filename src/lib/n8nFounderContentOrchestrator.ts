@@ -224,7 +224,6 @@ export function buildN8nFounderContentRequest(
   if (reasons.length > 0) throw new Error(`N8N_FOUNDER_CONTENT_REJECTED: ${reasons.join('; ')}`);
 
   const identity = {
-    contract: N8N_FOUNDER_CONTENT_CONTRACT,
     contentId: text(envelope.content_id),
     platform: text(envelope.platform).toLowerCase(),
     channel: text(envelope.channel),
@@ -255,10 +254,15 @@ export function buildN8nFounderContentRequest(
     },
   };
 
+  const orchestrationIdentity = {
+    contract: N8N_FOUNDER_CONTENT_CONTRACT,
+    ...identity,
+  };
+
   return {
     contract: N8N_FOUNDER_CONTENT_CONTRACT,
     event: N8N_FOUNDER_CONTENT_EVENT,
-    orchestrationId: `fcr-n8n-social-v1:${stableHash(identity)}`,
+    orchestrationId: `fcr-n8n-social-v1:${stableHash(orchestrationIdentity)}`,
     ...identity,
     authority: {
       orchestrate: true,
