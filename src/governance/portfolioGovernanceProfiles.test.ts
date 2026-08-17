@@ -155,6 +155,21 @@ describe('hard portfolio boundaries', () => {
     expect(verdict.decision).toBe('deny');
     expect(verdict.reasons.join(' ')).toContain('no implemented runtime authority');
   });
+
+  it('does not let a caller downgrade FCR deploy from consequential to reversible to skip authorization', () => {
+    const verdict = evaluatePortfolioGovernedAction(
+      'jussray/founder-control-room',
+      'deploy',
+      request('deploy', {
+        risk: 'reversible',
+        proofs: [proof('repository_head_matches_plan'), proof('production_authority_is_singular')],
+        authorization: null,
+      }),
+    );
+
+    expect(verdict.decision).toBe('reconfirm');
+    expect(verdict.reasons.join(' ')).toContain('bound execution authorization');
+  });
 });
 
 describe('project-specific proof contracts', () => {
