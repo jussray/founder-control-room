@@ -45,14 +45,13 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - name: Verify dedicated Builds user token is available
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -z "$CF_API_TOKEN" ]; then
-            echo "::error::FCR_CLOUDFLARE_BUILDS_USER_TOKEN is not available to this workflow."
-            exit 1
-          fi
+      - name: Preflight dedicated Builds credential with shared contract
+        run: >-
+          node scripts/provider-credential-contract.mjs
+          --env CF_API_TOKEN
+          --account-id "$CF_ACCOUNT_ID"
+          --purpose cloudflare-workers-builds-read
+          --output test-results/provider-credentials/cloudflare-builds.json
 
       - name: Inspect exact Cloudflare build and custom-domain ownership
         run: node scripts/inspect-cloudflare-build.mjs
@@ -70,12 +69,24 @@ jobs:
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           fi
+          if [ -f test-results/provider-credentials/cloudflare-builds.json ]; then
+            {
+              echo
+              echo '## Credential preflight receipt'
+              echo
+              echo '```json'
+              cat test-results/provider-credentials/cloudflare-builds.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload diagnostic receipt
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cloudflare-build-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
-          path: test-results/cloudflare-build-diagnostic.json
+          path: |
+            test-results/cloudflare-build-diagnostic.json
+            test-results/provider-credentials/cloudflare-builds.json
           if-no-files-found: warn
           retention-days: 30
