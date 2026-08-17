@@ -22,47 +22,49 @@
       <h1>Content Manager</h1>
       <p class="lede">Verified project proof becomes reviewable content, then moves through explicit founder gates before any external platform receives a publish command.</p>
       <div class="status-row" aria-label="Content authority status">
-        <span class="pill good">Founder progress engine ready</span>
-        <span class="pill good">Sauce-safe by contract</span>
-        <span class="pill warn">Current You approval required</span>
-        <span class="pill">Provider write stays separate</span>
+        <span class="pill" data-founder-engine-state="contract-ready">Founder progress contract ready</span>
+        <span class="pill warn" data-founder-evidence-state="unknown">Evidence UNKNOWN until proposal</span>
+        <span class="pill warn" data-founder-sauce-state="unknown">Sauce receipt UNKNOWN until proposal</span>
+        <span class="pill warn" data-current-you-state="not-requested">Current You not requested</span>
+        <span class="pill warn" data-temporal-truth-state="unknown">Temporal truth UNKNOWN until claim check</span>
+        <span class="pill" data-provider-state="unknown">Provider state UNKNOWN</span>
       </div>
     </article>
 
     <aside class="panel truth">
       <div class="truth-card">
         <strong>Chief proposes the story.</strong>
-        <p>It can turn verified project progress into public-safe copy, but it cannot approve, schedule, or publish the result.</p>
+        <p>It can turn verified project progress into public-safe copy and bind each claim to historical, current-repository, runtime, or metric truth. It cannot approve or publish the result.</p>
       </div>
       <div class="truth-card">
         <strong>FCR owns the authority.</strong>
-        <p>Fresh authenticated Current You must approve the exact proof, copy, and channel before the founder-progress lane can enter review scheduling.</p>
+        <p>Fresh authenticated Current You approves the exact proof, copy, channel, and proposal-bound temporal meaning. Current factual state is re-observed separately before a direct write.</p>
       </div>
       <div class="truth-card">
         <strong>Provider state stays external.</strong>
-        <p>Cambiante, Buffer, or another approved actuator owns external account authorization, write state, retries, and provider receipts.</p>
+        <p>FCR owns the first-party LinkedIn actuator and one-shot execution gate. LinkedIn still owns external OAuth validity, post state, and final readback truth; missing credentials or readback stay UNKNOWN.</p>
       </div>
     </aside>
   </section>
 
-  <section class="panel founder-lane" data-founder-progress-lane data-founder-authority="current-you" data-provider-write-state="separate-gate" data-analytics-authority="observation-only">
+  <section class="panel founder-lane" data-founder-progress-lane data-founder-authority="current-you" data-provider-write-state="separate-gate" data-analytics-authority="observation-only" data-public-proof-state="optional-off" data-review-window-state="not-handed-off" data-outcome-state="unknown" data-temporal-truth-state="unknown" data-direct-publish-state="credential-unknown">
     <div class="founder-lane-head">
       <div>
         <p class="eyebrow">First-party founder progress</p>
         <h2>Tell the progress. Keep the machinery private.</h2>
         <p>The product can prepare a proof-bound founder story about what changed and why it matters without exposing the implementation recipe underneath it.</p>
       </div>
-      <span class="pill good">Exact-copy approval</span>
+      <span class="pill warn">Exact-copy approval required</span>
     </div>
 
     <div class="founder-grid">
       <article class="founder-card" data-founder-lane-card="public">
         <h3>What can go public</h3>
-        <p>Only claims covered by verified evidence and marked public-safe.</p>
+        <p>Only claims covered by verified evidence, marked public-safe, and classified for when they are true.</p>
         <ul>
-          <li>What changed</li>
-          <li>What was learned</li>
-          <li>Why it matters</li>
+          <li>Historical progress stays labeled historical</li>
+          <li>Current repository claims are revalidated at execution</li>
+          <li>Runtime and metric claims require fresh live verifiers</li>
           <li>Optional public proof link</li>
         </ul>
       </article>
@@ -78,18 +80,18 @@
       </article>
       <article class="founder-card" data-founder-lane-card="authority">
         <h3>Who is allowed to decide</h3>
-        <p>Chief suggests. Analytics observes. Current You authorizes. FCR binds the exact packet to the review window.</p>
+        <p>Chief classifies and proposes. Analytics observes. Current You authorizes publication. Objective evidence decides whether a current-state claim is still true.</p>
         <ul>
           <li>FutureYou is advisory only</li>
-          <li>Analytics can improve later drafts, never authorize them</li>
-          <li>Edits after approval invalidate the authorization</li>
-          <li>Share-now is forbidden for this lane</li>
+          <li>Missing metrics stay UNKNOWN; analytics can improve later drafts, never authorize them</li>
+          <li>Edits or temporal relabeling after approval invalidate the authorization</li>
+          <li>Share-now is forbidden for this lane unless the separate publish-now gate is satisfied</li>
         </ul>
       </article>
     </div>
 
     <div class="gate-note" role="note">
-      <strong>Current execution boundary:</strong> the governed founder-progress packet and review-window bridge are implemented. Live provider writes remain a separate server-side authorization and credential gate, so this page does not pretend a post was scheduled or published.
+      <strong>Current execution boundary:</strong> FCR has a first-party LinkedIn actuator and direct publish executor, but live provider credentials and any specific post outcome remain UNKNOWN until the server-side gate runs and LinkedIn readback verifies the result. Capability is not publication proof.
     </div>
   </section>
 
@@ -101,7 +103,7 @@
     <p>A successful step never implies the next one succeeded. Each provider artifact must be read back before the conveyor advances.</p>
   </div>
 
-  <ol class="flow" aria-label="Cambiante review-first content workflow">
+  <ol class="flow" aria-label="Governed first-party content workflow">
     <li class="flow-step" data-content-stage="proof">
       <span class="step-number">1</span>
       <h2>Verified proof</h2>
@@ -112,37 +114,37 @@
       <span class="step-number">2</span>
       <h2>Create draft</h2>
       <p>Create reviewable copy and optional media. This step must not publish or silently approve the post.</p>
-      <code>create_linkedin_post</code>
+      <code>first-party draft</code>
     </li>
     <li class="flow-step" data-content-stage="review">
       <span class="step-number">3</span>
       <h2>Review</h2>
-      <p>Inspect final text, media count, target account, proof links, and any claim that could outrun the evidence.</p>
-      <code>add_post_comment</code>
+      <p>Inspect final text, target account, optional proof links, sauce boundaries, and whether each claim is historical, current, runtime, or metric truth.</p>
+      <code>temporal claim review</code>
     </li>
     <li class="flow-step" data-content-stage="approval">
       <span class="step-number">4</span>
       <h2>Founder approval</h2>
-      <p>Approval moves an unscheduled item to approved or a scheduled item to scheduled. It does not publish immediately.</p>
-      <code>approve_post</code>
+      <p>Current You approves the exact hashed proposal and copy. Approval never changes the objective truth state underneath a claim.</p>
+      <code>exact Current You approval</code>
     </li>
     <li class="flow-step" data-content-stage="schedule">
       <span class="step-number">5</span>
       <h2>Schedule</h2>
-      <p>Set or change an intentional date and time. Scheduling remains reversible before the provider publishes.</p>
-      <code>reschedule_post / bulk_schedule_posts</code>
+      <p>The review-window lane can schedule intentionally and remains reversible before a provider publishes.</p>
+      <code>review-window orchestration</code>
     </li>
     <li class="flow-step" data-content-stage="publish">
       <span class="step-number">6</span>
       <h2>Explicit publish</h2>
-      <p>Immediate publication belongs to the generic content lifecycle under its own explicit authority. The first-party founder-progress lane above remains review-window only.</p>
-      <code>publish_now(confirmPublication: true)</code>
+      <p>Direct LinkedIn publication requires a separate exact confirmation, proposal-bound temporal truth, a durable one-shot reservation, server-side credentials, and provider readback.</p>
+      <code>founder-content/publish-now</code>
     </li>
     <li class="flow-step" data-content-stage="metrics">
       <span class="step-number">7</span>
       <h2>Metrics receipt</h2>
-      <p>Read back external status, logs, and available engagement metrics, then retain the receipt in FCR without turning performance into publish authority.</p>
-      <code>get_post_status / sync_post_metrics</code>
+      <p>Read back external status and available engagement metrics, then retain sanitized observations without turning performance into publish authority.</p>
+      <code>provider readback / outcome receipt</code>
     </li>
   </ol>
 
@@ -152,17 +154,17 @@
       <h2>Authority and evidence</h2>
       <ul>
         <li>Exact source repository, branch, commit, and rendered proof.</li>
-        <li>Draft claim boundaries and review notes.</li>
-        <li>Current You approval and scheduling intent.</li>
+        <li>Proposal-bound temporal claim meaning and sauce-safe public copy.</li>
+        <li>Current You approval, scheduling intent, and one-shot execution reservation.</li>
         <li>Final provider receipt, rollback path, and next gate.</li>
       </ul>
     </article>
     <article class="panel">
-      <p class="eyebrow">Provider actuator owns</p>
-      <h2>External platform state</h2>
+      <p class="eyebrow">External provider owns</p>
+      <h2>External platform truth</h2>
       <ul>
-        <li>External OAuth and target account identity.</li>
-        <li>Post IDs, states, logs, retry queue, and platform errors.</li>
+        <li>OAuth validity and target account identity.</li>
+        <li>Post IDs, platform states, errors, and readback.</li>
         <li>Scheduled and published timestamps.</li>
         <li>Available platform engagement metrics.</li>
       </ul>
@@ -171,15 +173,15 @@
 
   <section class="panel blocker" role="note">
     <p class="eyebrow">Fail closed</p>
-    <strong>A provider limit, authorization error, or failed write is BLOCKED.</strong>
-    <p>FCR must never translate a 402, missing OAuth connection, failed schedule, absent post ID, or missing provider receipt into “approved,” “scheduled,” or “published.”</p>
+    <strong>A stale claim, provider limit, authorization error, ambiguous write, or missing readback is BLOCKED or UNKNOWN.</strong>
+    <p>FCR must never translate a superseded claim, 402, missing OAuth connection, failed write, absent post ID, or missing provider receipt into “current,” “approved,” “scheduled,” or “published.”</p>
     <div class="actions">
       <a class="action primary" href="/control-room/founder-signal-engine.html">Open proof ledger</a>
       <a class="action" href="/control-room/?tab=activity">Open activity receipts</a>
     </div>
   </section>
 
-  <p class="footer">Every output becomes the next gate. Publication remains a separate founder-authorized action.</p>
+  <p class="footer">Every output becomes the next gate. Historical truth stays historical; current truth must be re-observed.</p>
 </main>
 </body>
 </html>
