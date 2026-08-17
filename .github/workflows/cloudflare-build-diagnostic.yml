@@ -1,51 +1,66 @@
-name: Cloudflare Build Diagnostic
+name: Cloudflare Worker Git Authority Audit
 
 on:
   workflow_dispatch:
     inputs:
       expected_head_sha:
-        description: Exact 40-character commit SHA to inspect
+        description: Exact current main commit whose provider-authority audit code is approved to run
         required: true
         type: string
-  push:
-    branches:
-      - main
 
 permissions:
   contents: read
 
 jobs:
   inspect:
-    name: Redacted provider receipt
+    name: Read-only Worker Git authority receipt
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: production
     env:
-      EXPECTED_HEAD_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_head_sha || github.sha }}
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
       CF_WORKER_NAME: founder-control-room
       CF_API_HOSTNAME: api.foundercontrolroom.org
       CF_ACCOUNT_ID: 9b59861bd1747cf7525571b4c51d2aa0
+      CF_EXPECT_WORKER_GIT_MODE: disconnected-or-non-promoting
       CF_API_TOKEN: ${{ secrets.FCR_CLOUDFLARE_BUILDS_USER_TOKEN }}
 
     steps:
-      - name: Checkout exact head
+      - name: Checkout exact audit head
         uses: actions/checkout@v4
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify exact head
+      - name: Verify exact audit head is current main
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+          if [[ ! "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=Invalid exact head::expected_head_sha must be a lowercase 40-character commit SHA."
+            exit 1
+          fi
+
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+
+          ACTUAL_HEAD_SHA="$(git rev-parse HEAD)"
+          CURRENT_MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
+
+          echo "Expected audit SHA: $EXPECTED_HEAD_SHA"
+          echo "Checked-out SHA:    $ACTUAL_HEAD_SHA"
+          echo "Current main SHA:    $CURRENT_MAIN_SHA"
+
+          test "$ACTUAL_HEAD_SHA" = "$EXPECTED_HEAD_SHA"
+          test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
 
-      - name: Verify dedicated Builds user token is available
+      - name: Verify dedicated read-only Workers Builds token is available
         shell: bash
         run: |
           set -euo pipefail
@@ -54,16 +69,16 @@ jobs:
             exit 1
           fi
 
-      - name: Inspect exact Cloudflare build and custom-domain ownership
+      - name: Inspect Worker Git authority and custom-domain ownership
         run: node scripts/inspect-cloudflare-build.mjs
 
-      - name: Publish diagnostic summary
+      - name: Publish authority summary
         if: always()
         shell: bash
         run: |
           if [ -f test-results/cloudflare-build-diagnostic.json ]; then
             {
-              echo "## Cloudflare Build Diagnostic"
+              echo "## Cloudflare Worker Git Authority Audit"
               echo
               echo '```json'
               cat test-results/cloudflare-build-diagnostic.json
@@ -71,11 +86,11 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Upload diagnostic receipt
+      - name: Upload redacted authority receipt
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cloudflare-build-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          name: cloudflare-worker-git-authority-${{ github.run_id }}-${{ github.run_attempt }}
           path: test-results/cloudflare-build-diagnostic.json
           if-no-files-found: warn
           retention-days: 30
