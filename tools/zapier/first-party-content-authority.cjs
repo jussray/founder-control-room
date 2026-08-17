@@ -149,11 +149,15 @@ function approveFirstPartyDraft(draft = {}, approval = {}) {
   const approvalId = asTrimmedString(approval.approval_id);
   const approvedAt = asTrimmedString(approval.approved_at);
   const expiresAt = asTrimmedString(approval.expires_at);
+  const approvalIntentId = asTrimmedString(approval.current_you_intent_id);
 
   if (draft.kind !== 'fcr/first-party-founder-content') errors.push('draft kind is invalid');
   if (!HASH.test(asTrimmedString(draft.content_hash))) errors.push('draft content_hash is invalid');
   if (approval.authenticated_current_you !== true) errors.push('approval must come from authenticated Current You');
   if (asTrimmedString(approval.content_hash) !== draft.content_hash) errors.push('approval content_hash must match exact draft');
+  if (!approvalIntentId || approvalIntentId !== draft.authority?.current_you_intent_id) {
+    errors.push('approval current_you_intent_id must match the draft intent');
+  }
   if (!approvalId) errors.push('approval_id is required');
   if (!ISO_DATE.test(approvedAt)) errors.push('approved_at must be ISO UTC');
   if (!ISO_DATE.test(expiresAt)) errors.push('expires_at must be ISO UTC');
@@ -176,6 +180,7 @@ function approveFirstPartyDraft(draft = {}, approval = {}) {
       provider_write_authorized: false,
       approval_id: approvalId,
       approved_content_hash: draft.content_hash,
+      approved_current_you_intent_id: approvalIntentId,
       approved_at: approvedAt,
       expires_at: expiresAt,
     },
@@ -185,6 +190,7 @@ function approveFirstPartyDraft(draft = {}, approval = {}) {
 function buildProviderHandoff(approvedDraft = {}, input = {}) {
   const provider = asTrimmedString(input.provider).toLowerCase();
   const now = asTrimmedString(input.now);
+  const observedCurrentIntentId = asTrimmedString(input.current_you_intent_id);
   const errors = [];
 
   if (!PROVIDERS.has(provider)) errors.push('provider is not supported');
@@ -193,6 +199,11 @@ function buildProviderHandoff(approvedDraft = {}, input = {}) {
   if (approvedDraft.authority?.approved_content_hash !== approvedDraft.content_hash) {
     errors.push('approved content hash no longer matches draft');
   }
+  if (input.current_you_verified !== true) errors.push('Current You must be reverified at provider handoff');
+  if (!observedCurrentIntentId || observedCurrentIntentId !== approvedDraft.authority?.approved_current_you_intent_id) {
+    errors.push('approved content intent is stale relative to Current You');
+  }
+  if (input.approval_revoked === true) errors.push('founder approval has been revoked');
   if (!ISO_DATE.test(now)) errors.push('now must be ISO UTC');
   if (ISO_DATE.test(now) && ISO_DATE.test(approvedDraft.authority?.expires_at || '')) {
     if (Date.parse(now) >= Date.parse(approvedDraft.authority.expires_at)) errors.push('founder approval is expired');
@@ -209,6 +220,8 @@ function buildProviderHandoff(approvedDraft = {}, input = {}) {
     authority: {
       approval_id: approvedDraft.authority.approval_id,
       approved_content_hash: approvedDraft.content_hash,
+      current_you_intent_id: observedCurrentIntentId,
+      current_you_reverified: true,
       provider_handoff_allowed: true,
       provider_write_authorized: false,
       external_write_included: false,
