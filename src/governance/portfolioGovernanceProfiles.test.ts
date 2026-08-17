@@ -142,6 +142,30 @@ describe('hard portfolio boundaries', () => {
     expect(verdict.decision).toBe('reconfirm');
     expect(verdict.reasons.join(' ')).toContain('bound execution authorization');
   });
+
+  it('fails closed when a consequential portfolio action label is not explicitly registered', () => {
+    const verdict = evaluatePortfolioGovernedAction(
+      'jussray/founder-control-room',
+      'merge-pr',
+      request('merge-pr'),
+    );
+
+    expect(verdict.decision).toBe('deny');
+    expect(verdict.reasons.join(' ')).toContain(
+      'consequential action must be explicitly registered in project profile: merge-pr',
+    );
+  });
+
+  it('keeps registered FCR merge bound to its declared project-specific claims', () => {
+    const verdict = evaluatePortfolioGovernedAction(
+      'jussray/founder-control-room',
+      'merge',
+      request('merge'),
+    );
+
+    expect(verdict.decision).toBe('reconfirm');
+    expect(verdict.reasons.join(' ')).toContain('repository_head_matches_plan');
+  });
 });
 
 describe('project-specific proof contracts', () => {
