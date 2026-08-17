@@ -5,6 +5,18 @@ const workflow = readFileSync(
   new URL('../../../.github/workflows/review-email-worker-reconcile.yml', import.meta.url),
   'utf8',
 );
+const canonicalDeployWorkflow = readFileSync(
+  new URL('../../../.github/workflows/deploy.yml', import.meta.url),
+  'utf8',
+);
+const canonicalReconcileWorkflow = readFileSync(
+  new URL('../../../.github/workflows/worker-reconcile.yml', import.meta.url),
+  'utf8',
+);
+const buildDiagnosticWorkflow = readFileSync(
+  new URL('../../../.github/workflows/cloudflare-build-diagnostic.yml', import.meta.url),
+  'utf8',
+);
 const emailConfig = readFileSync(
   new URL('../../../wrangler.email.toml', import.meta.url),
   'utf8',
@@ -34,6 +46,27 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(emailConfig).toMatch(/^service = "founder-control-room"$/m);
   });
 
+  it('separates Cloudflare credential authority by operation class', () => {
+    const canonicalSecret = '${{ secrets.CLOUDFLARE_API_TOKEN }}';
+    const reviewEmailSecret = '${{ secrets.CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN }}';
+    const buildsSecret = '${{ secrets.FCR_CLOUDFLARE_BUILDS_USER_TOKEN }}';
+    const legacyBuildsSecret = '${{ secrets.CLOUDFLARE_BUILDS_API_TOKEN }}';
+
+    expect(canonicalDeployWorkflow).toContain(canonicalSecret);
+    expect(canonicalReconcileWorkflow).toContain(canonicalSecret);
+    expect(canonicalDeployWorkflow).not.toContain(reviewEmailSecret);
+    expect(canonicalReconcileWorkflow).not.toContain(reviewEmailSecret);
+
+    expect(workflow).toContain(reviewEmailSecret);
+    expect(workflow).not.toContain(canonicalSecret);
+    expect(workflow).not.toContain(buildsSecret);
+
+    expect(buildDiagnosticWorkflow).toContain(buildsSecret);
+    expect(buildDiagnosticWorkflow).not.toContain(legacyBuildsSecret);
+    expect(buildDiagnosticWorkflow).not.toContain(reviewEmailSecret);
+    expect(buildDiagnosticWorkflow).not.toContain(canonicalSecret);
+  });
+
   it('preserves existing secrets and verifies only their names before deploy', () => {
     expect(workflow).toContain('wrangler secret list');
     expect(workflow).toContain('--format json');
@@ -44,13 +77,14 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).not.toContain('wrangler secret bulk');
   });
 
-  it('rejects malformed Cloudflare token values without printing them', () => {
-    expect(workflow).toContain('Validate Cloudflare API token header safety');
+  it('rejects malformed dedicated review-email Cloudflare token values without printing them', () => {
+    expect(workflow).toContain('Validate dedicated review-email Cloudflare token header safety');
+    expect(workflow).toContain("token = os.environ.get('CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN', '')");
     expect(workflow).toContain("token.encode('ascii')");
     expect(workflow).toContain('contains non-ASCII characters and cannot be used as an HTTP Authorization value');
     expect(workflow).toContain('contains whitespace or non-printable characters');
     expect(workflow).toContain('The token value was not printed.');
-    expect(workflow).not.toContain('echo "$CLOUDFLARE_API_TOKEN"');
+    expect(workflow).not.toContain('echo "$CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN"');
     expect(workflow).not.toContain("print(token)");
   });
 

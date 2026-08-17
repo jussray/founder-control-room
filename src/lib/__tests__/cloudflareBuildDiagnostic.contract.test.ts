@@ -14,8 +14,9 @@ const inspector = readFileSync(
 describe("Cloudflare build diagnostic authority", () => {
   it("uses only the dedicated read-only Builds API token contract", () => {
     expect(workflow).toContain(
-      "CF_API_TOKEN: ${{ secrets.CLOUDFLARE_BUILDS_API_TOKEN }}",
+      "CF_API_TOKEN: ${{ secrets.FCR_CLOUDFLARE_BUILDS_USER_TOKEN }}",
     );
+    expect(workflow).not.toContain("secrets.CLOUDFLARE_BUILDS_API_TOKEN");
     expect(workflow).not.toContain("secrets.CLOUDFLARE_API_TOKEN");
     expect(workflow).toContain("permissions:\n  contents: read");
   });
@@ -25,6 +26,11 @@ describe("Cloudflare build diagnostic authority", () => {
       "CF_ACCOUNT_ID: 9b59861bd1747cf7525571b4c51d2aa0",
     );
     expect(workflow).not.toContain("secrets.CLOUDFLARE_ACCOUNT_ID");
+  });
+
+  it("fails explicitly when the dedicated Builds observer token is unavailable", () => {
+    expect(workflow).toContain("Verify dedicated Builds user token is available");
+    expect(workflow).toContain("FCR_CLOUDFLARE_BUILDS_USER_TOKEN is not available to this workflow.");
   });
 
   it("classifies the raw observer token before any provider read", () => {
