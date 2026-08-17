@@ -9,6 +9,11 @@ import {
   type FounderConveyorAdvanceInput,
   type FounderConveyorStage,
 } from '../../lib/n8nConveyor.js';
+import {
+  N8N_FOUNDER_CONTENT_CONTRACT,
+  dispatchN8nFounderContent,
+  type FirstPartyFounderScheduleEnvelope,
+} from '../../lib/n8nFounderContentOrchestrator.js';
 import { founderConveyorReadiness } from '../../lib/n8nConveyorReadiness.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../../lib/founderConveyorReceipt.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
@@ -51,6 +56,19 @@ n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
       publish: false,
       sendExternal: false,
     },
+    founderContent: {
+      contract: N8N_FOUNDER_CONTENT_CONTRACT,
+      route: '/founder-content',
+      authority: {
+        orchestrate: true,
+        requestProviderWrite: true,
+        authorizePublication: false,
+        changeCopy: false,
+        markPublished: false,
+        readPrivateEvidence: false,
+      },
+      finalPublishedTruth: 'fcr-provider-readback-only',
+    },
   });
 });
 
@@ -85,5 +103,17 @@ n8nConveyorRouter.post('/advance', async (req: FounderRequest, res) => {
   return res.status(result.status).json({
     ...result,
     contract: FOUNDER_CONVEYOR_CONTRACT,
+  });
+});
+
+n8nConveyorRouter.post('/founder-content', async (req: FounderRequest, res) => {
+  const envelope = (req.body ?? {}) as FirstPartyFounderScheduleEnvelope;
+  const result = await dispatchN8nFounderContent(envelope);
+
+  return res.status(result.status).json({
+    ...result,
+    contract: N8N_FOUNDER_CONTENT_CONTRACT,
+    founder: req.founder ? { userId: req.founder.userId } : null,
+    finalPublishedTruth: 'fcr-provider-readback-only',
   });
 });
