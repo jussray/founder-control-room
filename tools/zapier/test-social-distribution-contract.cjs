@@ -152,3 +152,7 @@ assert.throws(
 );
 
 console.log('Social distribution contract verified: editorial work fails into Buffer draft-only authority, governed schedules inherit the existing firewall receipt and review policy, exact-SHA proof cannot drift, UTM attribution is deterministic, HubSpot source fields stay read-only, and share-now remains forbidden.');
+
+// The first-party content shop is now part of this required social contract.
+// Buffer/Cambiante remain downstream adapters rather than canonical content authority.
+require('./test-first-party-content-authority.cjs');
