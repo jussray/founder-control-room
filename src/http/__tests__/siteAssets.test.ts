@@ -71,11 +71,16 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(contentManager).toContain('Post from your own product.');
     expect(contentManager).toContain('Chief AI is the story brain.');
     expect(contentManager).toContain('FCR is the canonical shop.');
-    expect(contentManager).toContain('LinkedIn, Buffer, and Cambiante are replaceable delivery hands.');
+    expect(contentManager).toContain('replaceable provider');
+    expect(contentManager).toContain('Providers own');
+    expect(contentManager).toContain('Actual publication state.');
     expect(contentManager).toContain('Internal evidence required');
+    expect(contentManager).toContain('Sauce guard required');
     expect(contentManager).toContain('Public proof link optional');
-    expect(contentManager).toContain('data-public-proof-link-toggle');
-    expect(contentManager).toContain('Sauce protected');
+    expect(contentManager).toContain('data-public-proof-state="optional-off"');
+    expect(contentManager).not.toContain('data-public-proof-link-toggle');
+    expect(contentManager).toContain('data-internal-evidence-state="unknown"');
+    expect(contentManager).toContain('data-sauce-state="unknown"');
     expect(contentManager).toContain('Current You approval');
     expect(contentManager).toContain('First-party authority does not mean a provider write already happened.');
     expect(contentManager).not.toContain('Cambiante is the actuator');
@@ -93,7 +98,12 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(playwrightProof).toContain("viewport: { width: 390, height: 844 }");
     expect(playwrightProof).toContain("'content-manager-mobile.png'");
     expect(playwrightProof).toContain('page must not overflow the mobile viewport');
-    expect(playwrightProof).toContain('data-public-proof-link-toggle');
+    expect(playwrightProof).toContain("data-content-authority-state");
+    expect(playwrightProof).toContain("data-public-proof-state");
+    expect(playwrightProof).toContain("data-current-you-state");
+    expect(playwrightProof).toContain("data-provider-state");
+    expect(playwrightProof).toContain("data-public-proof-link-toggle");
+    expect(playwrightProof).toContain("count(), 0");
   });
 
   it('keeps browser API calls same-origin and rejects an unverified upstream', () => {
