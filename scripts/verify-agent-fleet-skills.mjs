@@ -14,11 +14,13 @@ const failures = [];
 const requireText = (label, source, expected) => {
   if (!source.includes(expected)) failures.push(`${label}: missing ${JSON.stringify(expected)}`);
 };
+const semanticVersion = /^version:\s*\d+\.\d+\.\d+\s*$/m;
 
 for (const [label, source] of Object.entries(skills)) {
-  for (const field of ['description:', 'version: 1.0.0', 'status: active', 'scope: founder-control-room', 'owner: Juss']) {
+  for (const field of ['description:', 'status: active', 'scope: founder-control-room', 'owner: Juss']) {
     requireText(`${label} metadata`, source, field);
   }
+  if (!semanticVersion.test(source)) failures.push(`${label} metadata: version must be semantic x.y.z`);
   requireText(`${label} done contract`, source, 'Definition of done');
 }
 
@@ -44,7 +46,11 @@ for (const phrase of [
   'Evidence ladder',
   'Claim ceiling',
   'exact 40-character commit SHA',
+  'Consumer-bound dependency proof',
+  'Blocker fingerprint:',
+  'Retry trigger:',
   'Do not call work done while required proof remains queued or in progress',
+  'reacquire authority before continuing',
 ]) requireText('proof invariant', skills.proof, phrase);
 
 for (const phrase of [
@@ -60,7 +66,11 @@ for (const phrase of [
   'Handoff packet',
   'A handoff transfers context, not authority',
   'EXACT HEAD SHA',
+  'BASE / MAIN SHA',
+  'BLOCKER FINGERPRINT',
+  'RETRY TRIGGER',
   'ONE NEXT ACTION',
+  'consumer',
 ]) requireText('handoff invariant', skills.handoff, phrase);
 
 for (const phrase of [
@@ -68,6 +78,9 @@ for (const phrase of [
   'Search narrowly before opening large files',
   'Do not optimize token use by skipping tests',
   'FutureYou leverage pass',
+  '`/loop` stop protocol',
+  'blocker fingerprint',
+  'reacquire authority before any new edit, review, or merge decision',
 ]) requireText('token invariant', skills.tokens, phrase);
 
 for (const phrase of [
@@ -77,6 +90,9 @@ for (const phrase of [
   '/futureyou',
   'authority class',
   'what it compounds',
+  'Founder-touch reduction',
+  'avoidable-system-friction',
+  'external-authority-boundary',
   'does not portray uncertain economics as fact',
 ]) requireText('futureyou invariant', skills.futureyou, phrase);
 
