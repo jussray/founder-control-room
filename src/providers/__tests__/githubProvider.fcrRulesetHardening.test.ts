@@ -36,34 +36,51 @@ const config = {
   blockDeletion: true,
 };
 
-function strongReadback() {
+type TestConfig = typeof config & {
+  bypassActors?: Array<{ kind: "app"; id: string }>;
+};
+
+function strongReadback(request: TestConfig = config) {
+  const rules: Array<{ type: string; parameters?: Record<string, unknown> }> = [
+    {
+      type: "pull_request",
+      parameters: {
+        required_approving_review_count: request.requiredApprovingReviewCount,
+        dismiss_stale_reviews_on_push: true,
+        require_last_push_approval: true,
+        required_review_thread_resolution: true,
+      },
+    },
+  ];
+
+  if (request.requiredStatusCheckNames.length > 0) {
+    rules.push({
+      type: "required_status_checks",
+      parameters: {
+        strict_required_status_checks_policy: true,
+        required_status_checks: request.requiredStatusCheckNames.map((context) => ({ context })),
+      },
+    });
+  }
+  if (request.blockForcePushes) rules.push({ type: "non_fast_forward" });
+  if (request.blockDeletion) rules.push({ type: "deletion" });
+
   return {
     id: 1,
-    name: config.name,
-    enforcement: "active",
-    rules: [
-      {
-        type: "pull_request",
-        parameters: {
-          required_approving_review_count: 1,
-          dismiss_stale_reviews_on_push: true,
-          require_last_push_approval: true,
-          required_review_thread_resolution: true,
-        },
+    name: request.name,
+    enforcement: request.enforcement,
+    bypass_actors: (request.bypassActors ?? []).map((actor) => ({
+      actor_type: "Integration",
+      actor_id: Number(actor.id),
+      bypass_mode: "always",
+    })),
+    conditions: {
+      ref_name: {
+        include: request.targetRefs.map((ref) => `refs/heads/${ref}`),
+        exclude: [],
       },
-      {
-        type: "required_status_checks",
-        parameters: {
-          strict_required_status_checks_policy: true,
-          required_status_checks: [
-            { context: "Required Gate" },
-            { context: "Verify test-ledger contract" },
-          ],
-        },
-      },
-      { type: "non_fast_forward" },
-      { type: "deletion" },
-    ],
+    },
+    rules,
   };
 }
 
@@ -138,34 +155,63 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     expect(mockGetRepoRuleset).not.toHaveBeenCalled();
   });
 
-  it("fails closed when provider read-back does not match the hardened FCR policy", async () => {
-    mockGetRepoRuleset.mockResolvedValue({
-      data: {
-        ...strongReadback(),
-        rules: [
-          {
-            type: "pull_request",
-            parameters: {
-              required_approving_review_count: 0,
-              dismiss_stale_reviews_on_push: false,
-              require_last_push_approval: false,
-              required_review_thread_resolution: false,
-            },
-          },
-          {
-            type: "required_status_checks",
-            parameters: {
-              strict_required_status_checks_policy: false,
-              required_status_checks: [{ context: "Required Gate" }],
-            },
-          },
-        ],
-      },
+  it("accepts renamed policy and additional protected refs when semantics round-trip", async () => {
+    const flexible = {
+      ...config,
+      name: "FCR main governance v2",
+      targetRefs: ["main", "release"],
+    };
+    mockCreateRepoRuleset.mockResolvedValue({
+      data: { id: 1, name: flexible.name, enforcement: "active" },
     });
+    mockGetRepoRuleset.mockResolvedValue({ data: strongReadback(flexible) });
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", flexible)).resolves.toMatchObject({
+      name: flexible.name,
+      enforcement: "active",
+    });
+  });
+
+  it("fails closed when provider read-back does not match the hardened FCR policy", async () => {
+    const weak = strongReadback();
+    weak.rules = [
+      {
+        type: "pull_request",
+        parameters: {
+          required_approving_review_count: 0,
+          dismiss_stale_reviews_on_push: false,
+          require_last_push_approval: false,
+          required_review_thread_resolution: false,
+        },
+      },
+      {
+        type: "required_status_checks",
+        parameters: {
+          strict_required_status_checks_policy: false,
+          required_status_checks: [{ context: "Required Gate" }],
+        },
+      },
+    ];
+    mockGetRepoRuleset.mockResolvedValue({ data: weak });
 
     const provider = buildProvider();
     await expect(provider.applyBranchRuleset("founder-control-room", config))
       .rejects.toThrow("FCR main ruleset read-back mismatch");
+  });
+
+  it("fails closed when provider read-back widens bypass authority", async () => {
+    const widened = strongReadback();
+    widened.bypass_actors = [{
+      actor_type: "Integration",
+      actor_id: 999,
+      bypass_mode: "always",
+    }];
+    mockGetRepoRuleset.mockResolvedValue({ data: widened });
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", config))
+      .rejects.toThrow("bypass actors do not match the requested policy");
   });
 
   it("does not impose FCR-specific stale-review semantics on another project", async () => {
