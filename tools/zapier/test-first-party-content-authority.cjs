@@ -63,6 +63,7 @@ assert.equal(FIRST_PARTY_CONTENT_KPI_CONTRACT.guardrails.find((item) => item.id 
 
 const approved = approveFirstPartyDraft(draft, {
   authenticated_current_you: true,
+  current_you_intent_id: 'content-intent-current',
   content_hash: draft.content_hash,
   approval_id: 'approval-current-you-1',
   approved_at: '2026-08-17T07:30:00.000Z',
@@ -73,15 +74,19 @@ assert.equal(approved.authority.founder_approved, true);
 assert.equal(approved.authority.provider_handoff_allowed, true);
 assert.equal(approved.authority.provider_write_authorized, false);
 assert.equal(approved.authority.approved_content_hash, draft.content_hash);
+assert.equal(approved.authority.approved_current_you_intent_id, 'content-intent-current');
 
 const direct = buildProviderHandoff(approved, {
   provider: 'linkedin-direct',
   now: '2026-08-17T08:00:00.000Z',
+  current_you_verified: true,
+  current_you_intent_id: 'content-intent-current',
 });
 assert.equal(direct.provider, 'linkedin-direct');
 assert.equal(direct.public_payload.draft_text, draft.public_payload.draft_text);
 assert.equal(direct.public_payload.proof_link, null);
 assert.equal(direct.authority.external_write_included, false);
+assert.equal(direct.authority.current_you_reverified, true);
 assert.equal(direct.privacy.includes_private_lineage, false);
 assert.equal(direct.privacy.includes_internal_evidence_ref, false);
 assert.equal(Object.prototype.hasOwnProperty.call(direct, 'private_lineage'), false);
@@ -89,6 +94,8 @@ assert.equal(Object.prototype.hasOwnProperty.call(direct, 'private_lineage'), fa
 const viaBuffer = buildProviderHandoff(approved, {
   provider: 'buffer',
   now: '2026-08-17T08:00:00.000Z',
+  current_you_verified: true,
+  current_you_intent_id: 'content-intent-current',
 });
 assert.equal(viaBuffer.content_hash, direct.content_hash);
 assert.deepEqual(viaBuffer.public_payload, direct.public_payload);
@@ -96,6 +103,7 @@ assert.deepEqual(viaBuffer.public_payload, direct.public_payload);
 assert.throws(
   () => approveFirstPartyDraft(draft, {
     authenticated_current_you: true,
+    current_you_intent_id: 'content-intent-current',
     content_hash: 'f'.repeat(64),
     approval_id: 'stale-approval',
     approved_at: '2026-08-17T07:30:00.000Z',
@@ -107,6 +115,7 @@ assert.throws(
 assert.throws(
   () => approveFirstPartyDraft(draft, {
     authenticated_current_you: false,
+    current_you_intent_id: 'content-intent-current',
     content_hash: draft.content_hash,
     approval_id: 'future-you-approval',
     approved_at: '2026-08-17T07:30:00.000Z',
@@ -116,14 +125,49 @@ assert.throws(
 );
 
 assert.throws(
+  () => approveFirstPartyDraft(draft, {
+    authenticated_current_you: true,
+    current_you_intent_id: 'older-content-intent',
+    content_hash: draft.content_hash,
+    approval_id: 'stale-intent-approval',
+    approved_at: '2026-08-17T07:30:00.000Z',
+    expires_at: '2026-08-17T08:30:00.000Z',
+  }),
+  /must match the draft intent/,
+);
+
+assert.throws(
   () => buildProviderHandoff({
     ...approved,
     content_hash: 'e'.repeat(64),
   }, {
     provider: 'linkedin-direct',
     now: '2026-08-17T08:00:00.000Z',
+    current_you_verified: true,
+    current_you_intent_id: 'content-intent-current',
   }),
   /approved content hash no longer matches draft/,
+);
+
+assert.throws(
+  () => buildProviderHandoff(approved, {
+    provider: 'linkedin-direct',
+    now: '2026-08-17T08:00:00.000Z',
+    current_you_verified: true,
+    current_you_intent_id: 'new-current-intent',
+  }),
+  /approved content intent is stale relative to Current You/,
+);
+
+assert.throws(
+  () => buildProviderHandoff(approved, {
+    provider: 'linkedin-direct',
+    now: '2026-08-17T08:00:00.000Z',
+    current_you_verified: true,
+    current_you_intent_id: 'content-intent-current',
+    approval_revoked: true,
+  }),
+  /founder approval has been revoked/,
 );
 
 assert.throws(
@@ -161,4 +205,4 @@ assert.throws(
   /raw_post_text is forbidden/,
 );
 
-console.log('First-party content authority verified: Chief proposes, FCR is canonical, Current You binds exact-content approval, proof links are optional publicly while internal evidence remains required, provider adapters receive public payload only, edits invalidate approval, and analytics remain sanitized.');
+console.log('First-party content authority verified: Chief proposes, FCR is canonical, Current You binds exact-content approval and is re-read at provider handoff, public proof links are optional while internal evidence remains required, provider adapters receive public payload only, edits invalidate approval, and analytics remain sanitized.');
