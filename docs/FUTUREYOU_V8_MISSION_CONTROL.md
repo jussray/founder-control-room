@@ -22,7 +22,7 @@ The surface must remain legible when the founder manages dozens of products, rep
 
 ### Red Team
 
-The brief exposes missing project labels, stale observations, absent revenue evidence, and missing activity. It never converts an estimate or draft into completed reality.
+The brief exposes missing project labels, stale observations, absent revenue evidence, and missing activity. It never converts an estimate or draft into completed reality. A malformed or future-dated clock is treated as an anomaly to expose, never as a fresh, trustworthy signal — see Observation trust below.
 
 ### OODA
 
@@ -71,6 +71,26 @@ Actionable event scoring uses:
 - observation recency.
 
 The score is intentionally bounded to 0–100 and is only used to order founder attention.
+
+## Observation trust
+
+Structural evidence and observational trust are different questions. A record can have every evidence string present (`evidenceCoveragePercent: 100`) while its timestamp is unusable — that combination must stay visible, not collapse into a single confidence number.
+
+Every mission or event observation is classified into one `observationState`:
+
+- **fresh** — parses to a valid time, at most 3 days old (`FRESH_OBSERVATION_DAYS`).
+- **stale** — valid time, 3 or more days old. Still shown, never counted as fresh decision evidence.
+- **invalid** — the timestamp does not parse at all.
+- **future** — parses, but is more than a 5-minute clock-skew allowance (`FUTURE_CLOCK_SKEW_MS`) ahead of `now`.
+
+Rules that follow from that classification:
+
+- `invalid` and `future` observations always force machine `confidence` to `low`. They never inherit `high`/`medium` confidence and never count toward `recentCompletions`.
+- `stale` observations remain visible and can still raise operational urgency (a stale blocker is still a blocker), but they are excluded from `trustedObservationPercent` and from `recentCompletions`.
+- A non-critical/error event with an `invalid` or `future` timestamp is not made actionable by that alone — severity and the existing risk-keyword match still gate whether it surfaces. A genuinely critical/error event stays actionable even with a broken clock, but with confidence forced low.
+- `evidenceCoveragePercent` (legacy, structural — does a record have evidence strings) is preserved unchanged alongside the new `trustedObservationPercent` (does the record's own observation time hold up). Neither metric implies the other.
+
+`MissionControlBrief.summary` additionally reports `trustedObservationPercent`, `staleObservations`, `invalidObservationTimes`, and `futureObservationTimes`. The cockpit (`public/control-room/futureyou-v8.html`) renders an observation-trust pill next to the confidence pill on every priority card, and summary tiles for Trusted observations / Stale observations / Time integrity gaps alongside the legacy Structural evidence tile. None of this changes authority: FutureYou remains read-only and cannot merge, deploy, publish, send, spend, or self-promote regardless of observation state.
 
 ## Proof required before merge
 

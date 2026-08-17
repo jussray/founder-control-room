@@ -15,9 +15,9 @@ const brief = {
   northStar: 'Surface the highest-leverage verified next action without inventing certainty, revenue, or execution authority.',
   operatingContract: {
     futureYou: 'Still usable with dozens of products, repositories, providers, and active opportunities.',
-    redTeam: 'Expose blind spots and never present a draft, estimate, or stale record as completed reality.',
-    ooda: 'Observe signals, orient by risk and state, decide one next move, act through existing gates, then verify.',
-    lindyMode: 'Organize around durable founder decisions rather than whichever provider happens to be connected today.',
+    redTeam: 'Expose blind spots and never present a draft, estimate, malformed timestamp, future-dated signal, or stale record as fresh completed reality.',
+    ooda: 'Observe trustworthy signals, orient by risk and state, decide one next move, act through existing gates, then verify.',
+    lindyMode: 'Organize around durable founder decisions and explicit evidence freshness rather than whichever provider happens to be connected today.',
     l99: 'Every recommendation declares its authority level and keeps approval boundaries explicit.',
   },
   summary: {
@@ -26,6 +26,10 @@ const brief = {
     highRisk: 1,
     recentCompletions: 1,
     evidenceCoveragePercent: 100,
+    trustedObservationPercent: 75,
+    staleObservations: 1,
+    invalidObservationTimes: 1,
+    futureObservationTimes: 0,
   },
   priorities: [
     {
@@ -36,12 +40,14 @@ const brief = {
       domain: 'risk',
       score: 100,
       confidence: 'high',
+      observationState: 'fresh',
       reason: 'in review mission · high risk',
       nextAction: 'Decide: inspect the diff, unresolved risks, and proof gate before approving or requesting changes.',
       evidence: [
         'mission status: in_review',
         'risk level: high',
         'last updated: 2026-07-24T18:00:00.000Z',
+        'observation state: fresh',
         'project: founder-control-room',
       ],
       authority: {
@@ -54,6 +60,8 @@ const brief = {
     },
   ],
   blindSpots: [
+    '1 observation is at least 3 days old and cannot count as fresh decision evidence.',
+    '1 record has an invalid observation time; machine confidence is forced low.',
     'No verified revenue or expected-value feed is connected to this read model; rankings are operational, not financial forecasts.',
   ],
 };
@@ -183,10 +191,20 @@ try {
     await page.locator('h1', { hasText: 'What matters now.' }).waitFor();
     assert(await page.locator('.priority-card').count() === 1, `${viewport.name}: one governed priority renders`);
     assert(await page.locator('text=L3 · decide').count() === 1, `${viewport.name}: decision authority is visible`);
+    assert(await page.locator('text=high confidence').count() === 1, `${viewport.name}: machine confidence is visible`);
+    assert(await page.locator('text=fresh evidence').count() === 1, `${viewport.name}: observation trust is visible`);
     assert(await page.locator('text=no merge, send, publish, deploy, or spend action is implied').count() === 1, `${viewport.name}: execution boundary is visible`);
     assert(await page.locator('text=It is not a revenue forecast').count() === 1, `${viewport.name}: financial truth boundary is visible`);
     assert(await page.locator('text=No verified revenue or expected-value feed').count() === 1, `${viewport.name}: missing revenue evidence is exposed`);
+    assert(await page.locator('text=invalid observation time').count() === 1, `${viewport.name}: time-integrity blind spot is exposed`);
     assert(await page.locator('text=Declared autonomy readiness').count() === 1, `${viewport.name}: autonomy readiness section renders`);
+
+    const trustedMetric = page.locator('.metric', { hasText: 'Trusted observations' });
+    const staleMetric = page.locator('.metric', { hasText: 'Stale observations' });
+    const timeGapMetric = page.locator('.metric', { hasText: 'Time integrity gaps' });
+    assert((await trustedMetric.locator('strong').textContent())?.trim() === '75%', `${viewport.name}: trusted observation percentage is visible`);
+    assert((await staleMetric.locator('strong').textContent())?.trim() === '1', `${viewport.name}: stale observation count is visible`);
+    assert((await timeGapMetric.locator('strong').textContent())?.trim() === '1', `${viewport.name}: time integrity gaps are visible`);
 
     const buildMetric = page.locator('.metric', { hasText: 'Build-ready projects' });
     const integrationMetric = page.locator('.metric', { hasText: 'Integration-ready' });
@@ -216,6 +234,9 @@ try {
     receipts.push({
       viewport,
       screenshot,
+      trustedObservationPercent: 75,
+      staleObservations: 1,
+      timeIntegrityGaps: 1,
       buildReadyProjects: 2,
       integrationReadyProjects: 1,
       providerReadyProjects: 2,
@@ -227,10 +248,10 @@ try {
 
   await writeFile(
     join(ARTIFACT_DIR, 'futureyou-v8-autonomy-receipt.json'),
-    `${JSON.stringify({ schemaVersion: 1, result: 'passed', viewports: receipts }, null, 2)}\n`,
+    `${JSON.stringify({ schemaVersion: 2, result: 'passed', viewports: receipts }, null, 2)}\n`,
     'utf8',
   );
-  console.log('FutureYou V8 autonomy readiness rendered proof passed.');
+  console.log('FutureYou V8 observation-trust and autonomy readiness rendered proof passed.');
 } finally {
   await browser.close();
   await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
