@@ -63,6 +63,34 @@ test('detects all-workers Access coverage as unsafe for automatic exemption', ()
   );
 });
 
+test('rejects noncanonical FCR account authority before any provider request', async () => {
+  let requestCount = 0;
+  const wrongAccountId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
+  await assert.rejects(
+    reconcileFcrPublicAccessZone({
+      env: {
+        CLOUDFLARE_ACCESS_API_TOKEN: READ_TOKEN,
+        CLOUDFLARE_ACCOUNT_ID: wrongAccountId,
+      },
+      apply: false,
+      fetchImpl: async () => {
+        requestCount += 1;
+        throw new Error('provider fetch must not run on account mismatch');
+      },
+    }),
+    (error) => {
+      assert.equal(error?.classification, 'account-authority-mismatch');
+      assert.equal(error?.expectedAccountId, FCR_CLOUDFLARE_ACCOUNT_ID);
+      assert.equal(error?.suppliedAccountIdPresent, true);
+      assert.match(String(error?.message), /account authority mismatch/i);
+      return true;
+    },
+  );
+
+  assert.equal(requestCount, 0);
+});
+
 test('read-only inspection uses only the dedicated least-privilege Access token', async () => {
   const requests = [];
   const receipt = await reconcileFcrPublicAccessZone({
