@@ -150,6 +150,31 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  provider-safety:
+    name: Provider safety
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Prove raw credential fail-closed contract
+        run: node --test scripts/provider-credential-contract.node-test.mjs
+      - name: Prove bounded Access recovery contract
+        run: node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
+      - name: Prove workflow authority membranes
+        run: node --test scripts/provider-workflow-contract.node-test.mjs
+
   migration-lint:
     name: Migration lint
     runs-on: ubuntu-latest
@@ -171,6 +196,7 @@ jobs:
       - test
       - e2e
       - rls-contract
+      - provider-safety
     runs-on: ubuntu-latest
     steps:
       - name: Enforce load-bearing CI results
@@ -181,21 +207,24 @@ jobs:
           TEST_RESULT: ${{ needs.test.result }}
           E2E_RESULT: ${{ needs.e2e.result }}
           RLS_RESULT: ${{ needs.rls-contract.result }}
+          PROVIDER_SAFETY_RESULT: ${{ needs.provider-safety.result }}
         run: |
           set -euo pipefail
-          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\nrls=%s\n' \
+          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\nrls=%s\nprovider_safety=%s\n' \
             "$TYPECHECK_RESULT" \
             "$LINT_RESULT" \
             "$TEST_RESULT" \
             "$E2E_RESULT" \
-            "$RLS_RESULT"
+            "$RLS_RESULT" \
+            "$PROVIDER_SAFETY_RESULT"
 
           for result in \
             "$TYPECHECK_RESULT" \
             "$LINT_RESULT" \
             "$TEST_RESULT" \
             "$E2E_RESULT" \
-            "$RLS_RESULT"; do
+            "$RLS_RESULT" \
+            "$PROVIDER_SAFETY_RESULT"; do
             if [ "$result" != "success" ]; then
               echo "Required Gate blocked: at least one load-bearing CI job is not successful."
               exit 1
