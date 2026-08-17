@@ -1,11 +1,16 @@
 'use strict';
 
+const {
+  authorizeFounderContentPublication,
+} = require('./founder-content-authorization-contract.cjs');
+
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const HTTPS_URL = /^https:\/\//i;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const OWNED_REPO = /^jussray\/[A-Za-z0-9._-]+$/;
 const CAMPAIGN_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const BUFFER_SCHEDULE_POLICY_ID = 'buffer-20-minute-review-v1';
+const FIRST_PARTY_AUTHORIZATION_MODE = 'exact-current-you';
 
 const KNOWN_CHANNEL_PLATFORMS = Object.freeze({
   juss_rayy_linkedin: 'linkedin',
@@ -225,10 +230,69 @@ function buildGovernedScheduleEnvelope(input = {}) {
   };
 }
 
+function buildFirstPartyFounderScheduleEnvelope(input = {}) {
+  const authorization = authorizeFounderContentPublication({
+    proposal: input.proposal,
+    approval: input.approval,
+    now: input.now,
+  });
+  const firewallOutput = input.firewall_output && typeof input.firewall_output === 'object'
+    ? input.firewall_output
+    : {};
+  const errors = [];
+  const sourceRepo = asTrimmedString(input.source_repo);
+  const sourceCommitSha = asTrimmedString(input.source_commit_sha).toLowerCase();
+  const platform = asTrimmedString(input.platform).toLowerCase();
+  const validatedText = asTrimmedString(firewallOutput.validated_post_text);
+
+  if (firewallOutput.authorization_mode !== FIRST_PARTY_AUTHORIZATION_MODE) {
+    errors.push(`firewall_output.authorization_mode must be ${FIRST_PARTY_AUTHORIZATION_MODE} for first-party founder content`);
+  }
+  if (firewallOutput.authorization_receipt_verified !== true) {
+    errors.push('firewall_output.authorization_receipt_verified must be true');
+  }
+  if (authorization.state !== 'authorized-for-scheduled-review') {
+    errors.push('founder content authorization must be authorized-for-scheduled-review');
+  }
+  if (authorization.authority?.share_now_allowed !== false) {
+    errors.push('founder content authorization must forbid share-now');
+  }
+  if (authorization.source.repo !== sourceRepo || authorization.source.commit_sha !== sourceCommitSha) {
+    errors.push('distribution source must match exact authorized founder-content source');
+  }
+  if (authorization.content.platform !== platform || !authorization.channels.includes(platform)) {
+    errors.push('distribution platform must match exact authorized founder-content platform');
+  }
+  if (!validatedText || validatedText !== authorization.content.text) {
+    errors.push('firewall validated_post_text must match exact Current You authorized copy');
+  }
+  if (errors.length > 0) reject(errors);
+
+  const envelope = buildGovernedScheduleEnvelope(input);
+  return {
+    ...envelope,
+    lane: 'first_party_founder_governed_schedule',
+    authority: {
+      ...envelope.authority,
+      standing_policy_applied: false,
+      authorization_mode: FIRST_PARTY_AUTHORIZATION_MODE,
+      exact_current_you_approval_required: true,
+      first_party_founder_content: true,
+      founder_content_authorization_hash: authorization.authorization_hash,
+      founder_content_proposal_hash: authorization.proposal_hash,
+      public_payload_hash: authorization.public_payload_hash,
+      current_you_intent_id: authorization.current_you.intent_id,
+      current_you_intent_version: authorization.current_you.intent_version,
+    },
+  };
+}
+
 module.exports = {
   buildEditorialDraftEnvelope,
+  buildFirstPartyFounderScheduleEnvelope,
   buildGovernedScheduleEnvelope,
   buildTrackedUrl,
+  FIRST_PARTY_AUTHORIZATION_MODE,
   HUBSPOT_CONTACT_ATTRIBUTION_FIELDS,
   KNOWN_CHANNEL_PLATFORMS,
   SOCIAL_KPI_CONTRACT,
