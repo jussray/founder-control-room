@@ -15,9 +15,11 @@ import {
 } from '../../lib/n8nFounderContentOrchestrator.js';
 import {
   FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
-  dispatchFirstPartyFounderContentPublishNow,
-  type FirstPartyFounderPublishInput,
 } from '../../lib/firstPartyFounderContentExecutor.js';
+import {
+  dispatchTemporallyGovernedFounderContentPublishNow,
+  type TemporallyGovernedFounderPublishInput,
+} from '../../lib/temporallyGovernedFounderContentExecutor.js';
 import { founderConveyorReadiness } from '../../lib/n8nConveyorReadiness.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../../lib/founderConveyorReceipt.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
@@ -78,10 +80,20 @@ n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
         route: '/founder-content/publish-now',
         provider: 'linkedin',
         exactCurrentYouApprovalRequired: true,
+        temporalClaimTruthRequired: true,
+        historicalTruthPreserved: true,
+        currentRepoStateRevalidatedAtExecution: true,
+        runtimeAndMetricClaimsRequireDedicatedLiveVerifier: true,
         durableOneShotReservationRequired: true,
         providerReadbackRequired: true,
         copyMutationAllowed: false,
         blindRetryAllowed: false,
+        productTruthDisplay: {
+          current: 'Current · verified as of execution',
+          historical: 'Historical · verified at exact version',
+          superseded: 'Superseded · no longer current',
+          blocked: 'Fresh live evidence required',
+        },
       },
     },
   });
@@ -122,8 +134,8 @@ n8nConveyorRouter.post('/advance', async (req: FounderRequest, res) => {
 });
 
 n8nConveyorRouter.post('/founder-content/publish-now', async (req: FounderRequest, res) => {
-  const input = (req.body ?? {}) as unknown as FirstPartyFounderPublishInput;
-  const result = await dispatchFirstPartyFounderContentPublishNow(input, {
+  const input = (req.body ?? {}) as unknown as TemporallyGovernedFounderPublishInput;
+  const result = await dispatchTemporallyGovernedFounderContentPublishNow(input, {
     executedBy: req.founder!.email,
   });
 
@@ -131,6 +143,7 @@ n8nConveyorRouter.post('/founder-content/publish-now', async (req: FounderReques
     ...result,
     founder: req.founder ? { userId: req.founder.userId } : null,
     finalPublishedTruth: 'fcr-provider-readback-only',
+    currentTruthPolicy: 'historical-preserved-current-revalidated',
   });
 });
 
