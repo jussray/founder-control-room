@@ -1,0 +1,63 @@
+name: Production Origin Playwright
+
+on:
+  pull_request:
+    paths:
+      - "e2e/production-origin-proof.mjs"
+      - ".github/workflows/production-origin-playwright.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-origin-proof:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: custom-domain
+            origin: https://foundercontrolroom.org
+          - name: current-main-pages-preview
+            origin: https://c2a97e61.founder-control-room.pages.dev
+    env:
+      PUBLIC_ORIGIN: ${{ matrix.origin }}
+      PROBE_NAME: ${{ matrix.name }}
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Assert exact head
+        if: github.event_name == 'pull_request'
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Capture public-origin proof
+        run: node e2e/production-origin-proof.mjs
+
+      - name: Upload public-origin proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-origin-${{ matrix.name }}-${{ github.run_id }}
+          path: artifacts/production-origin/${{ matrix.name }}
+          if-no-files-found: warn
+          retention-days: 14
