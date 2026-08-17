@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  TEMPORAL_CLAIM_TRUTH_CONTRACT,
   buildTemporalClaimTruthContextFromCanonical,
   revalidateTemporalPublicClaims,
   temporalClaimTruthContextHash,
