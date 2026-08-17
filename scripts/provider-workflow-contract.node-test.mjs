@@ -17,6 +17,7 @@ function between(text, start, end) {
 const accessRecovery = read('.github/workflows/fcr-access-front-door-recovery.yml');
 const workerReconcile = read('.github/workflows/worker-reconcile.yml');
 const buildDiagnostic = read('.github/workflows/cloudflare-build-diagnostic.yml');
+const ci = read('.github/workflows/ci.yml');
 
 test('Access inspection receives only the dedicated read credential', () => {
   const block = between(
@@ -70,4 +71,17 @@ test('Build inspection is downstream of dedicated shared credential preflight', 
   assert.match(buildDiagnostic, /FCR_CLOUDFLARE_BUILDS_USER_TOKEN/);
   assert.match(buildDiagnostic, /--purpose cloudflare-workers-builds-read/);
   assert.doesNotMatch(buildDiagnostic, /secrets\.CLOUDFLARE_API_TOKEN/);
+});
+
+test('Required Gate makes provider safety load-bearing on every PR', () => {
+  const providerJob = between(ci, '  provider-safety:', '  migration-lint:');
+  const requiredGate = ci.slice(ci.indexOf('  required-gate:'));
+
+  assert.match(providerJob, /name: Provider safety/);
+  assert.match(providerJob, /provider-credential-contract\.node-test\.mjs/);
+  assert.match(providerJob, /reconcile-cloudflare-access-public-zone\.node-test\.mjs/);
+  assert.match(providerJob, /provider-workflow-contract\.node-test\.mjs/);
+  assert.match(requiredGate, /- provider-safety/);
+  assert.match(requiredGate, /PROVIDER_SAFETY_RESULT: \$\{\{ needs\.provider-safety\.result \}\}/);
+  assert.match(requiredGate, /"\$PROVIDER_SAFETY_RESULT"/);
 });
