@@ -22,10 +22,11 @@
       <h1>Content Manager</h1>
       <p class="lede">Verified project proof becomes reviewable content, then moves through explicit founder gates before any external platform receives a publish command.</p>
       <div class="status-row" aria-label="Content authority status">
-        <span class="pill good">Founder progress engine ready</span>
-        <span class="pill good">Sauce-safe by contract</span>
-        <span class="pill warn">Current You approval required</span>
-        <span class="pill">Provider write stays separate</span>
+        <span class="pill" data-founder-engine-state="contract-ready">Founder progress contract ready</span>
+        <span class="pill warn" data-founder-evidence-state="unknown">Evidence UNKNOWN until proposal</span>
+        <span class="pill warn" data-founder-sauce-state="unknown">Sauce receipt UNKNOWN until proposal</span>
+        <span class="pill warn" data-current-you-state="not-requested">Current You not requested</span>
+        <span class="pill" data-provider-state="unknown">Provider state UNKNOWN</span>
       </div>
     </article>
 
@@ -45,14 +46,14 @@
     </aside>
   </section>
 
-  <section class="panel founder-lane" data-founder-progress-lane data-founder-authority="current-you" data-provider-write-state="separate-gate" data-analytics-authority="observation-only">
+  <section class="panel founder-lane" data-founder-progress-lane data-founder-authority="current-you" data-provider-write-state="separate-gate" data-analytics-authority="observation-only" data-public-proof-state="optional-off" data-review-window-state="not-handed-off" data-outcome-state="unknown">
     <div class="founder-lane-head">
       <div>
         <p class="eyebrow">First-party founder progress</p>
         <h2>Tell the progress. Keep the machinery private.</h2>
         <p>The product can prepare a proof-bound founder story about what changed and why it matters without exposing the implementation recipe underneath it.</p>
       </div>
-      <span class="pill good">Exact-copy approval</span>
+      <span class="pill warn">Exact-copy approval required</span>
     </div>
 
     <div class="founder-grid">
@@ -81,7 +82,7 @@
         <p>Chief suggests. Analytics observes. Current You authorizes. FCR binds the exact packet to the review window.</p>
         <ul>
           <li>FutureYou is advisory only</li>
-          <li>Analytics can improve later drafts, never authorize them</li>
+          <li>Missing metrics stay UNKNOWN; analytics can improve later drafts, never authorize them</li>
           <li>Edits after approval invalidate the authorization</li>
           <li>Share-now is forbidden for this lane</li>
         </ul>
