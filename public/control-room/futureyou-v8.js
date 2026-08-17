@@ -42,6 +42,13 @@ function metric(label, value) {
   return `<article class="metric"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></article>`;
 }
 
+function observationLabel(state) {
+  if (state === 'invalid') return 'time invalid';
+  if (state === 'future') return 'future dated';
+  if (state === 'stale') return 'stale evidence';
+  return 'fresh evidence';
+}
+
 function renderPriority(priority, index) {
   const project = priority.project ? `${priority.project.name} · ${priority.project.slug}` : 'Project label unavailable';
   return `
@@ -61,6 +68,7 @@ function renderPriority(priority, index) {
         <span class="domain-pill domain-${escapeHtml(priority.domain)}">${escapeHtml(priority.domain)}</span>
         <span class="authority-pill">${escapeHtml(priority.authority.level)} · ${escapeHtml(priority.authority.mode)}</span>
         <span class="confidence-pill">${escapeHtml(priority.confidence)} confidence</span>
+        <span class="confidence-pill">${escapeHtml(observationLabel(priority.observationState))}</span>
       </div>
       <p class="reason">${escapeHtml(priority.reason)}</p>
       <div class="next-action"><strong>Next move:</strong> ${escapeHtml(priority.nextAction)}</div>
@@ -219,6 +227,8 @@ function renderBrief(brief, autonomy) {
     ['Lindy Mode', brief.operatingContract.lindyMode],
     ['L99', brief.operatingContract.l99],
   ];
+  const timeIntegrityGaps = Number(brief.summary.invalidObservationTimes ?? 0)
+    + Number(brief.summary.futureObservationTimes ?? 0);
 
   app.innerHTML = `
     <section class="hero">
@@ -235,14 +245,17 @@ function renderBrief(brief, autonomy) {
       ${metric('Waiting decision', brief.summary.waitingDecision)}
       ${metric('High risk', brief.summary.highRisk)}
       ${metric('24h completions', brief.summary.recentCompletions)}
-      ${metric('Evidence coverage', `${brief.summary.evidenceCoveragePercent}%`)}
+      ${metric('Trusted observations', `${brief.summary.trustedObservationPercent ?? 0}%`)}
+      ${metric('Stale observations', brief.summary.staleObservations ?? 0)}
+      ${metric('Time integrity gaps', timeIntegrityGaps)}
+      ${metric('Structural evidence', `${brief.summary.evidenceCoveragePercent}%`)}
     </section>
 
     ${renderAutonomy(autonomy)}
 
     <section class="section-heading">
       <div><p class="eyebrow">Today</p><h2>Ranked next actions</h2></div>
-      <p>Urgency reflects governed state, risk, staleness, and observed failures. It is not a revenue forecast.</p>
+      <p>Urgency reflects governed state, risk, staleness, and observed failures. Observation trust is separate from urgency. It is not a revenue forecast.</p>
     </section>
 
     <section class="priority-grid">
