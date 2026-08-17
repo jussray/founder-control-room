@@ -11,9 +11,7 @@ function read(path: string) {
 
 describe('Founder Control Room Cloudflare topology', () => {
   it('builds the browser frontend as a Cloudflare Pages artifact', () => {
-    const packageJson = JSON.parse(read('package.json')) as {
-      scripts?: Record<string, string>;
-    };
+    const packageJson = JSON.parse(read('package.json')) as { scripts?: Record<string, string> };
     const buildScript = read('scripts/build-pages.mjs');
 
     expect(packageJson.scripts?.['build:pages']).toBe('node scripts/build-pages.mjs');
@@ -60,32 +58,53 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(stackRouter).toContain('new MutationObserver');
   });
 
-  it('routes Workflows through a review-first Cambiante content lifecycle', () => {
+  it('routes founder content through Chief, exact Current You authorization, and provider truth', () => {
     const app = read('public/control-room/index.html');
     const contentManager = read('public/control-room/content-manager.html');
     const playwrightProof = read('e2e/content-manager-proof.mjs');
 
     expect(app).toContain('href="/control-room/content-manager.html"');
     expect(app).toContain('Content manager');
-    expect(contentManager).toContain('Workflow content lifecycle');
-    expect(contentManager).not.toContain('Cowork');
-    expect(contentManager).toContain('Proof → draft → review → approval → schedule → publish → metrics');
-    expect(contentManager).toContain('create_linkedin_post');
-    expect(contentManager).toContain('add_post_comment');
-    expect(contentManager).toContain('approve_post');
-    expect(contentManager).toContain('reschedule_post / bulk_schedule_posts');
-    expect(contentManager).toContain('publish_now(confirmPublication: true)');
-    expect(contentManager).toContain('get_post_status / sync_post_metrics');
-    expect(contentManager).toContain('A provider limit, authorization error, or failed write is BLOCKED.');
+    expect(contentManager).toContain('First-party content shop');
+    expect(contentManager).toContain('Post from your own product.');
+    expect(contentManager).toContain('Chief AI is the story brain.');
+    expect(contentManager).toContain('FCR is the authority boundary.');
+    expect(contentManager).toContain('Internal evidence required');
+    expect(contentManager).toContain('Sauce guard required');
+    expect(contentManager).toContain('Public proof link optional');
+    expect(contentManager).toContain('data-content-authority-state="awaiting-proposal"');
+    expect(contentManager).toContain('data-public-proof-state="optional-off"');
+    expect(contentManager).toContain('data-internal-evidence-state="unknown"');
+    expect(contentManager).toContain('data-sauce-state="unknown"');
+    expect(contentManager).toContain('data-provider-state="unknown"');
+    expect(contentManager).toContain('data-outcome-state="unknown"');
+    expect(contentManager).not.toContain('data-public-proof-link-toggle');
+    expect(contentManager).not.toContain('Cambiante is the actuator');
+    expect(contentManager).toContain('First-party authorization does not mean a provider write already happened.');
+    expect(contentManager).toContain('Missing metrics stay UNKNOWN');
+    expect(contentManager).toContain('analytics can never increase authority');
 
-    const approval = contentManager.indexOf('data-content-stage="approval"');
-    const publish = contentManager.indexOf('data-content-stage="publish"');
-    expect(approval).toBeGreaterThan(-1);
-    expect(publish).toBeGreaterThan(approval);
+    const story = contentManager.indexOf('data-content-stage="story"');
+    const verify = contentManager.indexOf('data-content-stage="verify"');
+    const currentYou = contentManager.indexOf('data-content-stage="current-you"');
+    const review = contentManager.indexOf('data-content-stage="review"');
+    const provider = contentManager.indexOf('data-content-stage="provider"');
+    const learning = contentManager.indexOf('data-content-stage="learning"');
+    expect(story).toBeGreaterThan(-1);
+    expect(verify).toBeGreaterThan(story);
+    expect(currentYou).toBeGreaterThan(verify);
+    expect(review).toBeGreaterThan(currentYou);
+    expect(provider).toBeGreaterThan(review);
+    expect(learning).toBeGreaterThan(provider);
 
     expect(playwrightProof).toContain("viewport: { width: 390, height: 844 }");
     expect(playwrightProof).toContain("'content-manager-mobile.png'");
     expect(playwrightProof).toContain('page must not overflow the mobile viewport');
+    expect(playwrightProof).toContain("data-content-authority-state");
+    expect(playwrightProof).toContain("data-current-you-state");
+    expect(playwrightProof).toContain("data-review-window-state");
+    expect(playwrightProof).toContain("data-provider-state");
+    expect(playwrightProof).toContain("data-outcome-state");
   });
 
   it('keeps browser API calls same-origin and rejects an unverified upstream', () => {
