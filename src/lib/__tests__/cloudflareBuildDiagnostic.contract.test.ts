@@ -10,6 +10,12 @@ const inspector = readFileSync(
   resolve(process.cwd(), "scripts/inspect-cloudflare-build.mjs"),
   "utf8",
 );
+const policy = JSON.parse(
+  readFileSync(
+    resolve(process.cwd(), "config/cloudflare-worker-git-authority-policy.json"),
+    "utf8",
+  ),
+);
 
 describe("Cloudflare Worker Git authority audit", () => {
   it("uses only the dedicated read-only Workers Builds token contract", () => {
@@ -32,8 +38,9 @@ describe("Cloudflare Worker Git authority audit", () => {
     expect(workflow).toMatch(/^on:\n  workflow_dispatch:/m);
     expect(workflow).not.toMatch(/^  push:/m);
     expect(workflow).toContain(
-      "CF_EXPECT_WORKER_GIT_MODE: disconnected-or-non-promoting",
+      "CF_WORKER_GIT_AUTHORITY_POLICY: config/cloudflare-worker-git-authority-policy.json",
     );
+    expect(workflow).not.toContain("CF_EXPECT_WORKER_GIT_MODE");
     expect(workflow).toContain(
       'test "$ACTUAL_HEAD_SHA" = "$EXPECTED_HEAD_SHA"',
     );
@@ -89,13 +96,34 @@ describe("Cloudflare Worker Git authority audit", () => {
     expect(inspector).not.toContain("PUBLIC_ORIGIN_TRANSPORT_FAILURE");
   });
 
+  it("distinguishes safe fallback from the current desired topology", () => {
+    expect(policy.allowedSafeStates).toEqual(["disconnected", "non-promoting"]);
+    expect(policy.currentDesiredState).toBe("non-promoting");
+    expect(policy.currentDesiredDeployCommand).toBe("npx wrangler versions upload");
+    expect(policy.canAuthorizeProviderMutation).toBe(false);
+    expect(inspector).toContain("WORKER_GIT_CURRENT_TOPOLOGY_DRIFT");
+    expect(inspector).toContain('driftClass = !safetySatisfied');
+    expect(inspector).toContain('"safe-but-not-current"');
+  });
+
+  it("keeps historical intent and analytics non-authoritative", () => {
+    expect(policy.currentFounderIntent.historicalDecisionsCanAuthorize).toBe(false);
+    expect(policy.currentFounderIntent.freshApprovalRequiredForConsequentialMutation).toBe(true);
+    expect(policy.historicalDecisions[0]).toMatchObject({
+      decision: "disconnect",
+      status: "superseded-safe-fallback",
+      isCurrentPreference: false,
+      canAuthorizeProviderMutation: false,
+    });
+    expect(inspector).toContain("observationOnly: true");
+    expect(inspector).toContain("canAuthorizeProviderMutation: false");
+  });
+
   it("still fails closed and retains a redacted authority receipt", () => {
     expect(inspector).toContain("receipt.ok = failures.length === 0;");
     expect(inspector).toContain('receipt.error = failures.join(" | ");');
     expect(inspector).toContain("process.exitCode = 1;");
     expect(inspector).toContain("cloudflare-build-diagnostic.json");
-    expect(inspector).toContain(
-      'canonicalProductionAuthority: "github-manual-deploy-workflow"',
-    );
+    expect(inspector).toContain("github-manual-deploy-workflow");
   });
 });
