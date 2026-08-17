@@ -355,6 +355,22 @@ export class GitHubProvider implements RepositoryProvider {
       if (errors.length > 0) {
         throw new Error(`GitHubProvider: FCR main ruleset config rejected: ${errors.join("; ")}`);
       }
+
+      const { data: collaborators } = await this.octokit.repos.listCollaborators({
+        owner,
+        repo,
+        affiliation: "all",
+        per_page: 100,
+      });
+      const ownerLogin = owner.toLowerCase();
+      const independentReviewerReady = collaborators.some((collaborator) =>
+        collaborator.login.toLowerCase() !== ownerLogin
+        && collaborator.permissions?.push === true);
+      if (!independentReviewerReady) {
+        throw new Error(
+          "GitHubProvider: FCR main independent-review policy cannot be activated until a non-owner collaborator with write authority is available",
+        );
+      }
     }
 
     type RepoRule = NonNullable<
