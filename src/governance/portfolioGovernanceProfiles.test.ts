@@ -19,69 +19,29 @@ const PROPOSAL_HASH = 'c'.repeat(64);
 const ACTION_HASH = 'd'.repeat(64);
 
 function intent(scope: string): TemporalIntent {
-  return {
-    id: `intent-${scope}`,
-    source: 'current_user',
-    scope: [scope],
-    intentHash: `intent-hash-${scope}`,
-    issuedAt: '2026-08-17T03:40:00.000Z',
-    authenticated: true,
-  };
+  return { id: `intent-${scope}`, source: 'current_user', scope: [scope], intentHash: `intent-hash-${scope}`, issuedAt: '2026-08-17T03:40:00.000Z', authenticated: true };
 }
 
 function authorization(scope: string): ExecutionAuthorization {
   return {
-    id: `authorization-${scope}`,
-    actorId: 'founder',
-    source: 'current_user',
-    intentId: `intent-${scope}`,
-    intentHash: `intent-hash-${scope}`,
-    proposalId: `proposal-${scope}`,
-    proposalHash: PROPOSAL_HASH,
-    actionHash: ACTION_HASH,
-    scope: [scope],
-    risk: 'consequential',
-    issuedAt: '2026-08-17T03:40:00.000Z',
-    expiresAt: '2026-08-17T04:00:00.000Z',
-    authenticated: true,
+    id: `authorization-${scope}`, actorId: 'founder', source: 'current_user', intentId: `intent-${scope}`, intentHash: `intent-hash-${scope}`,
+    proposalId: `proposal-${scope}`, proposalHash: PROPOSAL_HASH, actionHash: ACTION_HASH, scope: [scope], risk: 'consequential',
+    issuedAt: '2026-08-17T03:40:00.000Z', expiresAt: '2026-08-17T04:00:00.000Z', authenticated: true,
   };
 }
 
 function proof(claim: string): ProofContract {
-  return {
-    id: `proof-${claim}`,
-    subject: claim,
-    proves: [claim],
-    doesNotProve: [],
-    artifactHash: ARTIFACT_HASH,
-    verificationMethod: 'test fixture',
-    observedAt: '2026-08-17T03:41:00.000Z',
-    freshForMs: 60 * 60 * 1000,
-  };
+  return { id: `proof-${claim}`, subject: claim, proves: [claim], doesNotProve: [], artifactHash: ARTIFACT_HASH, verificationMethod: 'test fixture', observedAt: '2026-08-17T03:41:00.000Z', freshForMs: 60 * 60 * 1000 };
 }
 
 function recovery(level: RecoveryPlan['level'] = 'R2'): RecoveryPlan {
-  return {
-    id: `recovery-${level}`,
-    level,
-    checkpointRef: 'before',
-    rollbackAction: 'restore',
-    validationAction: 'verify restored state',
-  };
+  return { id: `recovery-${level}`, level, checkpointRef: 'before', rollbackAction: 'restore', validationAction: 'verify restored state' };
 }
 
 function request(scope: string, overrides: Partial<GovernedActionRequest> = {}): GovernedActionRequest {
   return {
-    requiredScope: scope,
-    risk: 'consequential',
-    intents: [intent(scope)],
-    recoveryPlan: recovery(),
-    proposalId: `proposal-${scope}`,
-    proposalHash: PROPOSAL_HASH,
-    actionHash: ACTION_HASH,
-    authorization: authorization(scope),
-    authorizationReplayState: 'unused',
-    now: NOW,
+    requiredScope: scope, risk: 'consequential', intents: [intent(scope)], recoveryPlan: recovery(), proposalId: `proposal-${scope}`,
+    proposalHash: PROPOSAL_HASH, actionHash: ACTION_HASH, authorization: authorization(scope), authorizationReplayState: 'unused', now: NOW,
     ...overrides,
   };
 }
@@ -135,34 +95,29 @@ describe('hard portfolio boundaries', () => {
 
   it('does not let a caller downgrade FCR deploy from consequential to reversible to skip authorization', () => {
     const verdict = evaluatePortfolioGovernedAction('jussray/founder-control-room', 'deploy', request('deploy', {
-      risk: 'reversible',
-      proofs: [proof('repository_head_matches_plan'), proof('production_authority_is_singular')],
-      authorization: null,
+      risk: 'reversible', proofs: [proof('repository_head_matches_plan'), proof('production_authority_is_singular')], authorization: null,
     }));
     expect(verdict.decision).toBe('reconfirm');
     expect(verdict.reasons.join(' ')).toContain('bound execution authorization');
   });
 
   it('fails closed when a consequential portfolio action label is not explicitly registered', () => {
-    const verdict = evaluatePortfolioGovernedAction(
-      'jussray/founder-control-room',
-      'merge-pr',
-      request('merge-pr'),
-    );
-
+    const verdict = evaluatePortfolioGovernedAction('jussray/founder-control-room', 'merge-pr', request('merge-pr'));
     expect(verdict.decision).toBe('deny');
-    expect(verdict.reasons.join(' ')).toContain(
-      'consequential action must be explicitly registered in project profile: merge-pr',
-    );
+    expect(verdict.reasons.join(' ')).toContain('effectful action must be explicitly registered in project profile: merge-pr');
+  });
+
+  it('also fails closed when an unknown effectful action is mislabeled reversible', () => {
+    const verdict = evaluatePortfolioGovernedAction('jussray/founder-control-room', 'mystery-change', request('mystery-change', {
+      risk: 'reversible',
+      authorization: null,
+    }));
+    expect(verdict.decision).toBe('deny');
+    expect(verdict.reasons.join(' ')).toContain('effectful action must be explicitly registered in project profile: mystery-change');
   });
 
   it('keeps registered FCR merge bound to its declared project-specific claims', () => {
-    const verdict = evaluatePortfolioGovernedAction(
-      'jussray/founder-control-room',
-      'merge',
-      request('merge'),
-    );
-
+    const verdict = evaluatePortfolioGovernedAction('jussray/founder-control-room', 'merge', request('merge'));
     expect(verdict.decision).toBe('reconfirm');
     expect(verdict.reasons.join(' ')).toContain('repository_head_matches_plan');
   });
@@ -170,15 +125,10 @@ describe('hard portfolio boundaries', () => {
 
 describe('project-specific proof contracts', () => {
   it('requires both exact runtime and commerce-path proof before Untold can make a production claim', () => {
-    const first = evaluatePortfolioGovernedAction('jussray/untold-stories-storefront', 'production_claim', request('production_claim', {
-      proofs: [proof('exact_production_version_verified')],
-    }));
+    const first = evaluatePortfolioGovernedAction('jussray/untold-stories-storefront', 'production_claim', request('production_claim', { proofs: [proof('exact_production_version_verified')] }));
     expect(first.decision).toBe('reconfirm');
     expect(first.reasons.join(' ')).toContain('commerce_path_verified');
-
-    const complete = evaluatePortfolioGovernedAction('jussray/untold-stories-storefront', 'production_claim', request('production_claim', {
-      proofs: [proof('exact_production_version_verified'), proof('commerce_path_verified')],
-    }));
+    const complete = evaluatePortfolioGovernedAction('jussray/untold-stories-storefront', 'production_claim', request('production_claim', { proofs: [proof('exact_production_version_verified'), proof('commerce_path_verified')] }));
     expect(complete.decision).toBe('allow');
   });
 
@@ -186,25 +136,19 @@ describe('project-specific proof contracts', () => {
     const missing = evaluatePortfolioGovernedAction('jussray/jussbeautifulhair-site', 'commerce_completion', request('commerce_completion'));
     expect(missing.decision).toBe('reconfirm');
     expect(missing.reasons.join(' ')).toContain('commerce_provider_receipt_verified');
-
-    const complete = evaluatePortfolioGovernedAction('jussray/jussbeautifulhair-site', 'commerce_completion', request('commerce_completion', {
-      proofs: [proof('commerce_provider_receipt_verified')],
-    }));
+    const complete = evaluatePortfolioGovernedAction('jussray/jussbeautifulhair-site', 'commerce_completion', request('commerce_completion', { proofs: [proof('commerce_provider_receipt_verified')] }));
     expect(complete.decision).toBe('allow');
   });
 
   it('requires creator approval and source lineage for StoryEngine canonization', () => {
-    const verdict = evaluatePortfolioGovernedAction('jussray/StoryEngine', 'canonize', request('canonize', {
-      proofs: [proof('creator_approval_verified')],
-    }));
+    const verdict = evaluatePortfolioGovernedAction('jussray/StoryEngine', 'canonize', request('canonize', { proofs: [proof('creator_approval_verified')] }));
     expect(verdict.decision).toBe('reconfirm');
     expect(verdict.reasons.join(' ')).toContain('source_lineage_verified');
   });
 
   it('rejects an authorization copied from a different portfolio action', () => {
     const verdict = evaluatePortfolioGovernedAction('jussray/jussbeautifulhair-site', 'commerce_completion', request('commerce_completion', {
-      proofs: [proof('commerce_provider_receipt_verified')],
-      authorization: authorization('production_claim'),
+      proofs: [proof('commerce_provider_receipt_verified')], authorization: authorization('production_claim'),
     }));
     expect(verdict.decision).toBe('reconfirm');
     expect(verdict.reasons.join(' ')).toContain('different intent');
@@ -212,8 +156,7 @@ describe('project-specific proof contracts', () => {
 
   it('fails closed when a consequential portfolio action cannot prove authorization replay state', () => {
     const verdict = evaluatePortfolioGovernedAction('jussray/StoryEngine', 'canonize', request('canonize', {
-      proofs: [proof('creator_approval_verified'), proof('source_lineage_verified')],
-      authorizationReplayState: 'unknown',
+      proofs: [proof('creator_approval_verified'), proof('source_lineage_verified')], authorizationReplayState: 'unknown',
     }));
     expect(verdict.decision).toBe('reconfirm');
     expect(verdict.reasons.join(' ')).toContain('unused status must be proven');
