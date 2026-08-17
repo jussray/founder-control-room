@@ -23,13 +23,18 @@ function verdict(overrides: Partial<GovernedActionVerdict> = {}): GovernedAction
       memoryIds: ['memory-1'],
       proofIds: [],
       recoveryPlanId: 'recovery-1',
+      authorizationId: null,
+      proposalId: null,
+      proposalHash: null,
+      actionHash: null,
+      exactVersion: null,
     },
     ...overrides,
   };
 }
 
 describe('sanitized governance analytics', () => {
-  it('emits category-level evidence without raw reason text, memory ids, proof ids, or payloads', () => {
+  it('emits category-level evidence without raw reason text, lineage ids, hashes, or payloads', () => {
     const observation = governanceObservationFromVerdict({
       projectId: 'sekret-bip',
       risk: 'consequential',
@@ -47,9 +52,10 @@ describe('sanitized governance analytics', () => {
       recoveryLevel: 'R2',
       blockCategories: ['proof_missing_or_invalid'],
     });
-    expect(JSON.stringify(observation)).not.toContain('exact_production_version_verified');
-    expect(JSON.stringify(observation)).not.toContain('memory-1');
-    expect(JSON.stringify(observation)).not.toContain('recovery-1');
+    const serialized = JSON.stringify(observation);
+    expect(serialized).not.toContain('exact_production_version_verified');
+    expect(serialized).not.toContain('memory-1');
+    expect(serialized).not.toContain('recovery-1');
   });
 
   it('separates stale-memory, intent-conflict, recovery, and hard-constraint failures', () => {
@@ -76,6 +82,29 @@ describe('sanitized governance analytics', () => {
     expect(summary.blockCategoryCounts.hard_constraint).toBe(1);
     expect(summary.reconfirmRate).toBe(0.5);
     expect(summary.denyRate).toBe(0.5);
+  });
+
+  it('distinguishes missing, misbound, replayed, and stale execution authorizations', () => {
+    const observations = [
+      governanceObservationFromVerdict({
+        projectId: 'missing', risk: 'consequential', verdict: verdict({ reasons: ['Consequential action requires a bound execution authorization plus proposal and action hashes.'] }),
+      }),
+      governanceObservationFromVerdict({
+        projectId: 'binding', risk: 'consequential', verdict: verdict({ reasons: ['Execution authorization is bound to a different action.'] }),
+      }),
+      governanceObservationFromVerdict({
+        projectId: 'replay', risk: 'consequential', verdict: verdict({ reasons: ['Execution authorization has already been consumed.'] }),
+      }),
+      governanceObservationFromVerdict({
+        projectId: 'stale', risk: 'consequential', verdict: verdict({ reasons: ['Execution authorization is stale or expired.'] }),
+      }),
+    ];
+
+    const summary = summarizeGovernanceObservations(observations);
+    expect(summary.blockCategoryCounts.execution_authorization_missing).toBe(1);
+    expect(summary.blockCategoryCounts.execution_authorization_binding).toBe(1);
+    expect(summary.blockCategoryCounts.execution_authorization_replay).toBe(1);
+    expect(summary.blockCategoryCounts.execution_authorization_stale_or_revoked).toBe(1);
   });
 
   it('reports allow/reconfirm/deny rates without inventing percentages on an empty sample', () => {
