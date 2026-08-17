@@ -37,6 +37,9 @@ try {
   assert.equal(await founderLane.getAttribute('data-founder-authority'), 'current-you');
   assert.equal(await founderLane.getAttribute('data-provider-write-state'), 'separate-gate');
   assert.equal(await founderLane.getAttribute('data-analytics-authority'), 'observation-only');
+  assert.equal(await founderLane.getAttribute('data-public-proof-state'), 'optional-off');
+  assert.equal(await founderLane.getAttribute('data-review-window-state'), 'not-handed-off');
+  assert.equal(await founderLane.getAttribute('data-outcome-state'), 'unknown');
 
   const founderLaneText = await founderLane.innerText();
   assert.match(founderLaneText, /Tell the progress\. Keep the machinery private\./);
@@ -44,7 +47,8 @@ try {
   assert.match(founderLaneText, /What stays behind the curtain/);
   assert.match(founderLaneText, /Current You authorizes/i);
   assert.match(founderLaneText, /FutureYou is advisory only/i);
-  assert.match(founderLaneText, /Analytics can improve later drafts, never authorize them/i);
+  assert.match(founderLaneText, /Missing metrics stay UNKNOWN/i);
+  assert.match(founderLaneText, /analytics can improve later drafts, never authorize them/i);
   assert.match(founderLaneText, /Share-now is forbidden for this lane/i);
   assert.match(founderLaneText, /Live provider writes remain a separate server-side authorization and credential gate/i);
 
@@ -52,11 +56,20 @@ try {
   assert.equal(founderCards, 3, 'founder progress lane must keep public, private, and authority boundaries visible');
   assert.equal(await founderLane.locator('button, .action').count(), 0, 'founder progress lane must not present a fake provider-write control');
 
-  const statusPills = await page.locator('[aria-label="Content authority status"] .pill').allTextContents();
-  assert(statusPills.includes('Founder progress engine ready'));
-  assert(statusPills.includes('Sauce-safe by contract'));
-  assert(statusPills.includes('Current You approval required'));
-  assert(statusPills.includes('Provider write stays separate'));
+  const status = page.locator('[aria-label="Content authority status"]');
+  assert.equal(await status.locator('[data-founder-engine-state]').getAttribute('data-founder-engine-state'), 'contract-ready');
+  assert.equal(await status.locator('[data-founder-evidence-state]').getAttribute('data-founder-evidence-state'), 'unknown');
+  assert.equal(await status.locator('[data-founder-sauce-state]').getAttribute('data-founder-sauce-state'), 'unknown');
+  assert.equal(await status.locator('[data-current-you-state]').getAttribute('data-current-you-state'), 'not-requested');
+  assert.equal(await status.locator('[data-provider-state]').getAttribute('data-provider-state'), 'unknown');
+  const statusText = await status.innerText();
+  assert.match(statusText, /Founder progress contract ready/i);
+  assert.match(statusText, /Evidence UNKNOWN until proposal/i);
+  assert.match(statusText, /Sauce receipt UNKNOWN until proposal/i);
+  assert.match(statusText, /Current You not requested/i);
+  assert.match(statusText, /Provider state UNKNOWN/i);
+  assert.doesNotMatch(statusText, /Founder progress engine ready/i);
+  assert.doesNotMatch(statusText, /Sauce-safe by contract/i);
 
   const actions = await page.locator('.action').allTextContents();
   assert(actions.includes('Open proof ledger'));
@@ -94,8 +107,14 @@ try {
     viewport: '390x844',
     stages: stageNames,
     founderProgress: {
-      authority: 'current-you',
-      providerWrite: 'separate-gate',
+      engineState: 'contract-ready',
+      evidenceState: 'unknown',
+      sauceState: 'unknown',
+      currentYouState: 'not-requested',
+      publicProofState: 'optional-off',
+      reviewWindowState: 'not-handed-off',
+      providerState: 'unknown',
+      outcomeState: 'unknown',
       analyticsAuthority: 'observation-only',
       fakeWriteControls: 0,
     },
