@@ -5,10 +5,18 @@ import {
   portfolioGovernanceProfile,
   portfolioHardConstraintViolations,
 } from './portfolioGovernanceProfiles.js';
-import type { GovernedActionRequest, ProofContract, RecoveryPlan, TemporalIntent } from './governedIntelligence.js';
+import type {
+  ExecutionAuthorization,
+  GovernedActionRequest,
+  ProofContract,
+  RecoveryPlan,
+  TemporalIntent,
+} from './governedIntelligence.js';
 
 const NOW = new Date('2026-08-17T03:45:00.000Z');
-const HASH = 'b'.repeat(64);
+const ARTIFACT_HASH = 'b'.repeat(64);
+const PROPOSAL_HASH = 'c'.repeat(64);
+const ACTION_HASH = 'd'.repeat(64);
 
 function intent(scope: string): TemporalIntent {
   return {
@@ -21,13 +29,29 @@ function intent(scope: string): TemporalIntent {
   };
 }
 
+function authorization(scope: string): ExecutionAuthorization {
+  return {
+    id: `authorization-${scope}`,
+    actorId: 'founder',
+    source: 'current_user',
+    intentId: `intent-${scope}`,
+    proposalId: `proposal-${scope}`,
+    proposalHash: PROPOSAL_HASH,
+    actionHash: ACTION_HASH,
+    scope: [scope],
+    issuedAt: '2026-08-17T03:40:00.000Z',
+    expiresAt: '2026-08-17T04:00:00.000Z',
+    authenticated: true,
+  };
+}
+
 function proof(claim: string): ProofContract {
   return {
     id: `proof-${claim}`,
     subject: claim,
     proves: [claim],
     doesNotProve: [],
-    artifactHash: HASH,
+    artifactHash: ARTIFACT_HASH,
     verificationMethod: 'test fixture',
     observedAt: '2026-08-17T03:41:00.000Z',
     freshForMs: 60 * 60 * 1000,
@@ -50,7 +74,10 @@ function request(scope: string, overrides: Partial<GovernedActionRequest> = {}):
     risk: 'consequential',
     intents: [intent(scope)],
     recoveryPlan: recovery(),
-    explicitApproval: true,
+    proposalId: `proposal-${scope}`,
+    proposalHash: PROPOSAL_HASH,
+    actionHash: ACTION_HASH,
+    authorization: authorization(scope),
     now: NOW,
     ...overrides,
   };
@@ -184,5 +211,19 @@ describe('project-specific proof contracts', () => {
     );
     expect(verdict.decision).toBe('reconfirm');
     expect(verdict.reasons.join(' ')).toContain('source_lineage_verified');
+  });
+
+  it('rejects an authorization copied from a different portfolio action', () => {
+    const verdict = evaluatePortfolioGovernedAction(
+      'jussray/jussbeautifulhair-site',
+      'commerce_completion',
+      request('commerce_completion', {
+        proofs: [proof('commerce_provider_receipt_verified')],
+        authorization: authorization('production_claim'),
+      }),
+    );
+
+    expect(verdict.decision).toBe('reconfirm');
+    expect(verdict.reasons.join(' ')).toContain('different intent');
   });
 });
