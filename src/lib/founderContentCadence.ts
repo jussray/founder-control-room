@@ -44,6 +44,17 @@ interface CadenceRpcClient {
   ): PromiseLike<{ data: unknown; error: RpcError | null }>;
 }
 
+export interface CadenceSchedulableEnvelope {
+  provider: string;
+  channel: string;
+  content_id: string;
+  provider_request: {
+    schedule_at: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
 function clean(value: unknown, max = 240): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
@@ -126,6 +137,31 @@ export async function reserveFounderContentCadence(
     deferredSeconds,
     deferred: deferredSeconds > 0,
   });
+}
+
+export function applyFounderContentCadenceSchedule<T extends CadenceSchedulableEnvelope>(
+  envelope: T,
+  reservation: FounderContentCadenceReservation,
+): T {
+  const provider = clean(envelope.provider, 80).toLowerCase();
+  const channel = clean(envelope.channel, 160).toLowerCase();
+  const contentId = clean(envelope.content_id, 80).toLowerCase();
+  const requestedScheduleAt = iso(envelope.provider_request?.schedule_at, 'envelope.provider_request.schedule_at');
+
+  if (provider !== reservation.provider || channel !== reservation.channel || contentId !== reservation.contentId) {
+    throw new Error('FOUNDER_CONTENT_CADENCE_APPLY_REJECTED: reservation destination identity mismatch');
+  }
+  if (requestedScheduleAt !== reservation.requestedScheduleAt) {
+    throw new Error('FOUNDER_CONTENT_CADENCE_APPLY_REJECTED: reservation requested schedule mismatch');
+  }
+
+  return {
+    ...envelope,
+    provider_request: {
+      ...envelope.provider_request,
+      schedule_at: reservation.reservedScheduleAt,
+    },
+  };
 }
 
 export function buildFounderContentCadenceTelemetry(
