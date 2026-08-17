@@ -16,7 +16,10 @@ export type GovernanceBlockCategory =
   | 'memory_authority'
   | 'proof_missing_or_invalid'
   | 'recovery_insufficient'
-  | 'explicit_approval_missing'
+  | 'execution_authorization_missing'
+  | 'execution_authorization_binding'
+  | 'execution_authorization_replay'
+  | 'execution_authorization_stale_or_revoked'
   | 'irreversible_action'
   | 'other';
 
@@ -51,7 +54,10 @@ const BLOCK_CATEGORIES: GovernanceBlockCategory[] = [
   'memory_authority',
   'proof_missing_or_invalid',
   'recovery_insufficient',
-  'explicit_approval_missing',
+  'execution_authorization_missing',
+  'execution_authorization_binding',
+  'execution_authorization_replay',
+  'execution_authorization_stale_or_revoked',
   'irreversible_action',
   'other',
 ];
@@ -67,11 +73,14 @@ function classifyReason(reason: string): GovernanceBlockCategory | null {
   if (value.includes('conflicting equally current intents')) return 'intent_conflict';
   if (value.includes('cannot silently authorize') || value.includes('effectful action requires fresh authenticated current you')) return 'intent_advisory_only';
   if (value.includes('required memory') && value.includes('missing')) return 'memory_missing';
-  if (value.includes('memory') && (value.includes('stale') || value.includes('expired') || value.includes('future-dated') || value.includes('re-verification'))) return 'memory_stale_or_invalid';
+  if (value.includes('memory') && (value.includes('stale') || value.includes('expired') || value.includes('future-dated') || value.includes('re-verification') || value.includes('metadata is invalid'))) return 'memory_stale_or_invalid';
   if (value.includes('memory') && (value.includes('authority') || value.includes('objective provider') || value.includes('source is not authenticated'))) return 'memory_authority';
-  if (value.includes('no valid proof contract') || value.includes('proof contract')) return 'proof_missing_or_invalid';
+  if (value.includes('no valid proof contract') || value.includes('proof contract') || value.includes('proof freshness') || value.includes('proof expiry')) return 'proof_missing_or_invalid';
   if (value.includes('recovery') || value.includes('checkpoint') || value.includes('rollback')) return 'recovery_insufficient';
-  if (value.includes('explicit current approval')) return 'explicit_approval_missing';
+  if (value.includes('already been consumed')) return 'execution_authorization_replay';
+  if (value.includes('execution authorization') && (value.includes('stale') || value.includes('expired') || value.includes('revoked') || value.includes('future-dated') || value.includes('validity window') || value.includes('revocation metadata'))) return 'execution_authorization_stale_or_revoked';
+  if (value.includes('execution authorization') && (value.includes('different intent') || value.includes('different proposal') || value.includes('different action') || value.includes('scope does not cover') || value.includes('different exact version') || value.includes('omitted or changed') || value.includes('sha-256') || value.includes('not authenticated'))) return 'execution_authorization_binding';
+  if (value.includes('bound execution authorization') || value.includes('execution authorization plus proposal and action hashes')) return 'execution_authorization_missing';
   if (value.includes('irreversible action')) return 'irreversible_action';
   return null;
 }
