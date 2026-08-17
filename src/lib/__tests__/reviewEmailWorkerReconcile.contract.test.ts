@@ -49,7 +49,8 @@ describe('review-email Worker reconciliation authority contract', () => {
   it('separates Cloudflare credential authority by operation class', () => {
     const canonicalSecret = '${{ secrets.CLOUDFLARE_API_TOKEN }}';
     const reviewEmailSecret = '${{ secrets.CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN }}';
-    const buildsSecret = '${{ secrets.CLOUDFLARE_BUILDS_API_TOKEN }}';
+    const buildsSecret = '${{ secrets.FCR_CLOUDFLARE_BUILDS_USER_TOKEN }}';
+    const legacyBuildsSecret = '${{ secrets.CLOUDFLARE_BUILDS_API_TOKEN }}';
 
     expect(canonicalDeployWorkflow).toContain(canonicalSecret);
     expect(canonicalReconcileWorkflow).toContain(canonicalSecret);
@@ -61,6 +62,7 @@ describe('review-email Worker reconciliation authority contract', () => {
     expect(workflow).not.toContain(buildsSecret);
 
     expect(buildDiagnosticWorkflow).toContain(buildsSecret);
+    expect(buildDiagnosticWorkflow).not.toContain(legacyBuildsSecret);
     expect(buildDiagnosticWorkflow).not.toContain(reviewEmailSecret);
     expect(buildDiagnosticWorkflow).not.toContain(canonicalSecret);
   });

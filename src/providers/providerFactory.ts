@@ -19,6 +19,32 @@ export interface ProviderProjectConfig {
   repo_identifier: string;
 }
 
+const FOUNDER_CONTROL_ROOM_PROJECT_ID = "founder-control-room";
+const FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH = "main";
+
+/**
+ * Founder Control Room's own merge policy must fail closed before a provider
+ * mutation is attempted. Other projects retain provider-neutral flexibility,
+ * including evaluate-only or zero-review rulesets when their own policy allows
+ * it; FCR main is the constitutional authority surface and cannot opt out of
+ * pull-request review through an omitted or zero review count.
+ */
+export function assertRulesetGovernancePolicy(projectId: string, config: RulesetConfig): void {
+  const protectsFounderControlRoomMain =
+    projectId === FOUNDER_CONTROL_ROOM_PROJECT_ID
+    && config.enforcement === "active"
+    && config.targetRefs.includes(FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH);
+
+  if (!protectsFounderControlRoomMain) return;
+
+  if (!config.requirePullRequest) {
+    throw new Error("Founder Control Room main governance requires pull-request enforcement");
+  }
+  if (!Number.isInteger(config.requiredApprovingReviewCount) || config.requiredApprovingReviewCount < 1) {
+    throw new Error("Founder Control Room main governance requires at least one approving review");
+  }
+}
+
 class LazyRepositoryProvider implements RepositoryProvider {
   readonly name: string;
   private readonly factory: () => Promise<RepositoryProvider>;
@@ -79,6 +105,7 @@ class LazyRepositoryProvider implements RepositoryProvider {
   }
 
   async applyBranchRuleset(projectId: string, config: RulesetConfig): Promise<RulesetResult> {
+    assertRulesetGovernancePolicy(projectId, config);
     const delegate = await this.delegate();
     if (!delegate.applyBranchRuleset) {
       throw new Error(`${delegate.name}: does not support applyBranchRuleset`);
