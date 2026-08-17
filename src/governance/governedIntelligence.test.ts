@@ -26,10 +26,26 @@ function intent(overrides: Partial<TemporalIntent> = {}): TemporalIntent {
   };
 }
 
-function memory(overrides: Partial<GovernedMemory> = {}): GovernedMemory {
+function runtimeMemory(overrides: Partial<GovernedMemory> = {}): GovernedMemory {
   return {
     id: 'memory-runtime',
-    factHash: 'fact-v1',
+    kind: 'runtime_state',
+    factHash: 'runtime-fact-v1',
+    ownerId: 'founder-control-room',
+    source: 'provider_evidence',
+    status: 'verified',
+    observedAt: '2026-08-17T03:10:00.000Z',
+    lastVerifiedAt: '2026-08-17T03:10:00.000Z',
+    authenticated: true,
+    ...overrides,
+  };
+}
+
+function preferenceMemory(overrides: Partial<GovernedMemory> = {}): GovernedMemory {
+  return {
+    id: 'memory-preference',
+    kind: 'preference',
+    factHash: 'preference-v1',
     ownerId: 'founder',
     source: 'current_user',
     status: 'verified',
@@ -51,6 +67,7 @@ function proof(overrides: Partial<ProofContract> = {}): ProofContract {
     observedAt: '2026-08-17T03:15:00.000Z',
     exactVersion: 'abc123',
     environment: 'production',
+    freshForMs: 60 * 60 * 1000,
     ...overrides,
   };
 }
@@ -66,7 +83,7 @@ function recovery(overrides: Partial<RecoveryPlan> = {}): RecoveryPlan {
   };
 }
 
-describe('governed intelligence temporal authority', () => {
+describe('temporal authority', () => {
   it('lets fresh authenticated Current You outrank a FutureYou projection', () => {
     const resolved = resolveTemporalIntent([
       intent({
@@ -127,33 +144,33 @@ describe('governed intelligence temporal authority', () => {
 });
 
 describe('governed memory', () => {
-  it('lets a newer authenticated Current You correction supersede FutureYou memory', () => {
+  it('lets authenticated Current You correct a FutureYou preference', () => {
     const result = adjudicateMemoryWrite(
-      memory({
-        id: 'future-memory',
+      preferenceMemory({
+        id: 'future-preference',
         source: 'future_you',
-        factHash: 'old-fact',
+        factHash: 'old-preference',
         authenticated: false,
         observedAt: '2026-08-16T03:10:00.000Z',
       }),
-      memory({ id: 'current-correction', factHash: 'new-fact' }),
+      preferenceMemory({ id: 'current-correction', factHash: 'new-preference' }),
       NOW,
     );
 
     expect(result).toMatchObject({
       decision: 'supersede',
       winnerId: 'current-correction',
-      loserId: 'future-memory',
+      loserId: 'future-preference',
     });
   });
 
-  it('does not let FutureYou overwrite authenticated Current You memory', () => {
+  it('does not let FutureYou overwrite authenticated Current You preference', () => {
     const result = adjudicateMemoryWrite(
-      memory({ id: 'current-memory', factHash: 'current-fact' }),
-      memory({
+      preferenceMemory({ id: 'current-preference', factHash: 'current-preference' }),
+      preferenceMemory({
         id: 'future-write',
         source: 'future_you',
-        factHash: 'projected-fact',
+        factHash: 'projected-preference',
         authenticated: false,
         observedAt: '2026-08-17T03:20:00.000Z',
       }),
@@ -162,19 +179,82 @@ describe('governed memory', () => {
 
     expect(result).toMatchObject({
       decision: 'preserve_existing',
-      winnerId: 'current-memory',
+      winnerId: 'current-preference',
       loserId: 'future-write',
     });
   });
 
-  it('blocks stale verified memory from authorizing consequential action', () => {
-    const result = memoryCanAuthorize(memory({
+  it('does not let a user assertion overwrite verified provider runtime evidence', () => {
+    const result = adjudicateMemoryWrite(
+      runtimeMemory({ id: 'provider-runtime', factHash: 'production-unhealthy' }),
+      runtimeMemory({
+        id: 'user-runtime-claim',
+        source: 'current_user',
+        factHash: 'production-healthy',
+        observedAt: '2026-08-17T03:20:00.000Z',
+      }),
+      NOW,
+    );
+
+    expect(result.decision).toBe('dispute');
+    expect(result.winnerId).toBe('provider-runtime');
+    expect(result.reason).toContain('objective evidence');
+  });
+
+  it('lets fresh provider evidence supersede an older user belief about runtime state', () => {
+    const result = adjudicateMemoryWrite(
+      runtimeMemory({
+        id: 'user-belief',
+        source: 'current_user',
+        factHash: 'production-healthy',
+        observedAt: '2026-08-16T03:00:00.000Z',
+        lastVerifiedAt: '2026-08-16T03:00:00.000Z',
+      }),
+      runtimeMemory({ id: 'provider-readback', factHash: 'production-unhealthy' }),
+      NOW,
+    );
+
+    expect(result).toMatchObject({
+      decision: 'supersede',
+      winnerId: 'provider-readback',
+      loserId: 'user-belief',
+    });
+  });
+
+  it('rejects unauthenticated Current You memory as an authority-bearing write', () => {
+    const result = adjudicateMemoryWrite(
+      preferenceMemory({ id: 'existing' }),
+      preferenceMemory({ id: 'spoofed-current', factHash: 'spoofed', authenticated: false }),
+      NOW,
+    );
+
+    expect(result).toMatchObject({
+      decision: 'preserve_existing',
+      winnerId: 'existing',
+      loserId: 'spoofed-current',
+    });
+  });
+
+  it('blocks stale verified runtime memory from authorizing consequential action', () => {
+    const result = memoryCanAuthorize(runtimeMemory({
       observedAt: '2026-08-14T03:10:00.000Z',
       lastVerifiedAt: '2026-08-14T03:10:00.000Z',
     }), 'consequential', NOW);
 
     expect(result.allowed).toBe(false);
     expect(result.reason).toContain('within 24 hours');
+  });
+
+  it('blocks user-authored runtime belief from authorizing effectful action even when marked verified', () => {
+    const result = memoryCanAuthorize(runtimeMemory({ source: 'current_user' }), 'reversible', NOW);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('objective provider or system evidence');
+  });
+
+  it('blocks FutureYou preference from effectful authority even when a record is marked verified', () => {
+    const result = memoryCanAuthorize(preferenceMemory({ source: 'future_you', authenticated: false }), 'reversible', NOW);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('current or delegated authority');
   });
 });
 
@@ -190,15 +270,21 @@ describe('proof contracts', () => {
     expect(result.supported).toBe(false);
     expect(result.reason).toContain('exact version');
   });
+
+  it('rejects a proof after its own declared freshness window', () => {
+    const result = proofSupportsClaim(proof({ freshForMs: 5 * 60 * 1000 }), 'production_sha_matches', NOW, 'abc123');
+    expect(result.supported).toBe(false);
+    expect(result.reason).toContain('freshness window');
+  });
 });
 
 describe('governed action contract', () => {
-  it('allows a consequential action only when intent, memory, proof, approval, and rollback all line up', () => {
+  it('allows a consequential action only when intent, objective memory, proof, approval, and rollback line up', () => {
     const verdict = evaluateGovernedAction({
       requiredScope: 'deploy',
       risk: 'consequential',
       intents: [intent()],
-      memories: [memory()],
+      memories: [runtimeMemory()],
       requiredMemoryIds: ['memory-runtime'],
       proofs: [proof()],
       requiredClaims: [{ claim: 'production_sha_matches', exactVersion: 'abc123' }],
