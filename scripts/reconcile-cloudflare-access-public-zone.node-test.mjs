@@ -63,7 +63,7 @@ test('detects all-workers Access coverage as unsafe for automatic exemption', ()
   );
 });
 
-test('read-only inspection prefers the least-privilege Access token', async () => {
+test('read-only inspection uses only the dedicated least-privilege Access token', async () => {
   const requests = [];
   const receipt = await reconcileFcrPublicAccessZone({
     env: readEnv,
@@ -81,6 +81,41 @@ test('read-only inspection prefers the least-privilege Access token', async () =
 
   assert.equal(receipt.credentialSource, 'CLOUDFLARE_ACCESS_API_TOKEN');
   assert.ok(requests.every((request) => request.authorization === `Bearer ${READ_TOKEN}`));
+});
+
+test('read-only inspection never falls back to the admin token', async () => {
+  await assert.rejects(
+    reconcileFcrPublicAccessZone({
+      env: adminEnv,
+      apply: false,
+      fetchImpl: fakeFetch({
+        organization: {
+          deny_unmatched_requests: false,
+          deny_unmatched_requests_exempted_zone_names: [],
+        },
+      }),
+    }),
+    /CLOUDFLARE_ACCESS_API_TOKEN is required for Access inspection/,
+  );
+});
+
+test('read-only inspection never falls back to a generic Cloudflare token', async () => {
+  await assert.rejects(
+    reconcileFcrPublicAccessZone({
+      env: {
+        CLOUDFLARE_API_TOKEN: 'cf-generic-token-789',
+        CLOUDFLARE_ACCOUNT_ID: FCR_CLOUDFLARE_ACCOUNT_ID,
+      },
+      apply: false,
+      fetchImpl: fakeFetch({
+        organization: {
+          deny_unmatched_requests: false,
+          deny_unmatched_requests_exempted_zone_names: [],
+        },
+      }),
+    }),
+    /CLOUDFLARE_ACCESS_API_TOKEN is required for Access inspection/,
+  );
 });
 
 test('dry run proposes only the FCR zone exemption', async () => {
@@ -210,6 +245,6 @@ test('raw leading or trailing whitespace is rejected instead of silently trimmed
         },
       }),
     }),
-    /No configured Cloudflare Access credential can read the Zero Trust organization/,
+    /dedicated Cloudflare Access read credential could not read/,
   );
 });
