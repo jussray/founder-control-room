@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "status": "implemented-awaiting-live-provider-and-ingress-proof",
   "provider": "buffer",
   "zapier": {
@@ -82,14 +82,23 @@
     "publishAllowed": true,
     "schedulePolicyId": "buffer-20-minute-review-v1",
     "requiredAuthorizationMode": "standing-policy",
-    "requiresRuntimeMintedReceipt": true,
-    "receiptFormat": "standing-policy:<grantId>:<invocationId>",
-    "receiptPurpose": "exact runtime correlation",
-    "securityBoundary": "authenticated Founder Control Room middleware plus private provider ingress",
+    "standingGrantId": "founder-approved-auto-distribution-v1",
+    "requiresRuntimeMintedCorrelation": true,
+    "correlationFormat": "standing-policy:<grantId>:<invocationId>:<publicSignalHashPrefix>",
+    "correlationPurpose": "context-bound standing-policy correlation only; not founder authentication",
+    "authenticatedAuthorizationReceiptVerifiedAtFirewall": false,
+    "securityBoundary": "this firewall validates exact content, source, evidence lineage, Current-You context, checked-in standing policy, and correlation; actor authentication, when required, must be enforced by trusted private ingress before this code runs",
+    "publicSignalContextVersion": "fcr/public-signal-context@v1",
+    "publicSignalPolicyVersion": "public-progress-v1",
+    "requiresCurrentIntentHash": true,
+    "requiresSourceContextHash": true,
+    "requiresPrivateEvidenceHash": true,
+    "requiresPositiveEvidenceCount": true,
     "maximumGrantIdLength": 100,
-    "maximumReceiptLength": 200,
+    "maximumReceiptLength": 240,
     "requiresExactSourceCommit": true,
-    "requiresHttpsProof": true,
+    "requiresHttpsProof": false,
+    "optionalPublicProofMustBeHttps": true,
     "liveProviderMutationIncluded": false
   },
   "activationGates": {
@@ -106,6 +115,7 @@
     "freeTwoStepZapAloneSufficient": false,
     "gmailPollingTriggerAcceptedForDeadlineCommands": false,
     "controlledSyntheticRunRequired": true,
-    "exactReceiptCorrelationRequired": true
+    "exactReceiptCorrelationRequired": true,
+    "privateIngressAuthenticationProofRequiredBeforeClaimingAuthenticatedFounderAuthority": true
   }
 }
