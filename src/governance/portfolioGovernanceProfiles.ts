@@ -139,8 +139,8 @@ export function portfolioHardConstraintViolations(
     reasons.push('project has no implemented runtime authority');
   }
   if (profile.blockedActions.includes(action)) reasons.push(`project profile explicitly blocks action: ${action}`);
-  if (effectiveRisk === 'consequential' && !portfolioActionRegistered(profile, action)) {
-    reasons.push(`consequential action must be explicitly registered in project profile: ${action}`);
+  if (effectiveRisk && effectiveRisk !== 'observe' && !portfolioActionRegistered(profile, action)) {
+    reasons.push(`effectful action must be explicitly registered in project profile: ${action}`);
   }
   if (recoveryLevel && RECOVERY_RANK[recoveryLevel] < RECOVERY_RANK[profile.minimumRecoveryLevel]) {
     reasons.push(`project requires recovery ${profile.minimumRecoveryLevel} or stronger; received ${recoveryLevel}`);
@@ -170,12 +170,7 @@ export function evaluatePortfolioGovernedAction(
     requiredClaims: mergedClaims,
     hardConstraintViolations: [
       ...(request.hardConstraintViolations ?? []),
-      ...portfolioHardConstraintViolations(
-        repository,
-        action,
-        request.recoveryPlan?.level,
-        effectiveRisk,
-      ),
+      ...portfolioHardConstraintViolations(repository, action, request.recoveryPlan?.level, effectiveRisk),
     ],
   });
 }
