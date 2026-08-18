@@ -71,6 +71,12 @@ FOUNDER_ALLOWED_ORIGINS: https://foundercontrolroom.org
 
 The canonical Worker owns the reconciliation cron because no duplicate HTTP Worker should exist.
 
+### Outbound email boundary
+
+The canonical Worker owns the FCR outbound Cloudflare Email Service capability through the project-scoped binding `FCR_EMAIL`. Repository source pins the only allowed FCR sender identity to `welcome@api.foundercontrolroom.org` in both `src/worker/projectEmail.ts` and `wrangler.worker.toml`; application callers may provide recipients/content but not a different `from` identity. A generic `EMAIL` binding or another project's sender must not be substituted into this Worker without a separate reviewed authority change.
+
+This checked-in binding and sender allowlist prove repository intent only. They do not prove the sender domain is onboarded at Cloudflare, the live Worker currently has the binding, or any message was accepted or delivered. Those remain provider/runtime evidence gates.
+
 ## Cloudflare Access recovery boundary
 
 Repository source contains a founder-gated Cloudflare Access inspection/recovery lane. Its existence does **not** prove current Access application state, exemption state, token permissions, or production front-door availability.
