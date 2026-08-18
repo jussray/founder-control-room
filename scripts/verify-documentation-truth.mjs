@@ -47,7 +47,7 @@ const truthSensitiveRules = [
   { domain: 'truth-governance', match: /^src\/governance\// },
   { domain: 'truth-governance', match: /^src\/lib\/(?:mergeAuthorityBoundary|truthLease)\.ts$/ },
   { domain: 'truth-governance', match: /^src\/futureyou\// },
-  { domain: 'repository-provider-authority', match: /^src\/providers\// },
+  { domain: 'repository-provider-authority', match: /^src\/providers\/(?!__tests__\/)/ },
   { domain: 'cloudflare-provider-authority', match: /^config\/cloudflare-worker-git-authority-policy\.json$/ },
   { domain: 'cloudflare-provider-authority', match: /^wrangler\.worker\.toml$/ },
   { domain: 'cloudflare-provider-authority', match: /^\.github\/workflows\/(?:deploy|cloudflare-build-diagnostic)\.yml$/ },
