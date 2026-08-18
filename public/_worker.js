@@ -186,8 +186,12 @@ export default {
       return env.ASSETS.fetch(request);
     }
 
+    if (!env?.FCR_API || typeof env.FCR_API.fetch !== 'function') {
+      return degradedResponse(request, 'API_SERVICE_BINDING_UNAVAILABLE');
+    }
+
     try {
-      const response = await fetch(createApiRequest(request));
+      const response = await env.FCR_API.fetch(createApiRequest(request));
       const failureCode = upstreamFailureCode(response);
       return failureCode ? degradedResponse(request, failureCode) : response;
     } catch {
