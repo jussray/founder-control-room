@@ -96,11 +96,35 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
     expect(mockIntegrate).not.toHaveBeenCalled();
   });
 
-  it("blocks base or head ref substitution after provider review context", async () => {
+  it("blocks attempts to integrate FCR into any base other than main", async () => {
     const provider = providerForProject(FCR_PROJECT);
     await provider.getPullRequestReviewContext!("founder-control-room", 474);
 
     await expect(provider.integrate("founder-control-room", "release", "mission/review-gate"))
+      .rejects.toThrow(/reviewed integration authority is pinned to main/);
+    expect(mockResolveRef).not.toHaveBeenCalled();
+    expect(mockIntegrate).not.toHaveBeenCalled();
+  });
+
+  it("blocks a PR that was retargeted away from main even if the reviewed SHA is unchanged", async () => {
+    mockGetPullRequestReviewContext.mockResolvedValue({
+      ...reviewContext,
+      baseRef: "release",
+    });
+    const provider = providerForProject(FCR_PROJECT);
+    await provider.getPullRequestReviewContext!("founder-control-room", 474);
+
+    await expect(provider.integrate("founder-control-room", "main", "mission/review-gate"))
+      .rejects.toThrow(/reviewed integration authority is pinned to main/);
+    expect(mockResolveRef).not.toHaveBeenCalled();
+    expect(mockIntegrate).not.toHaveBeenCalled();
+  });
+
+  it("blocks head ref substitution after provider review context", async () => {
+    const provider = providerForProject(FCR_PROJECT);
+    await provider.getPullRequestReviewContext!("founder-control-room", 474);
+
+    await expect(provider.integrate("founder-control-room", "main", "mission/other"))
       .rejects.toThrow(/integration refs changed after review context/);
     expect(mockResolveRef).not.toHaveBeenCalled();
     expect(mockIntegrate).not.toHaveBeenCalled();
