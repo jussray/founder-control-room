@@ -29,26 +29,32 @@ test('recovery workflow is production-gated and separates read from mutation aut
   assert.match(recoveryWorkflow, /verify-fcr-front-door-playwright\.mjs/);
 });
 
-test('recovery never echoes raw receipts into the public job summary', () => {
-  const summaryStep = recoveryWorkflow.match(
-    /- name: Publish sanitized recovery summary([\s\S]*?)- name: Upload recovery evidence/,
-  )?.[1] ?? '';
-
-  assert.match(summaryStep, /jq -e 'type == "object"' "\$receipt"/);
-  assert.match(summaryStep, /Raw recovery receipts are retained in the workflow artifact/);
-  assert.doesNotMatch(summaryStep, /cat "\$receipt"/);
-  assert.doesNotMatch(summaryStep, /```json/);
+test('raw recovery receipts remain ephemeral and are suppressed from workflow logs', () => {
+  assert.match(
+    recoveryWorkflow,
+    /node scripts\/reconcile-cloudflare-access-public-zone\.mjs >\/dev\/null 2>&1/,
+  );
+  assert.match(
+    recoveryWorkflow,
+    /node scripts\/reconcile-cloudflare-access-public-zone\.mjs --apply >\/dev\/null 2>&1/,
+  );
+  assert.match(
+    recoveryWorkflow,
+    /node scripts\/verify-fcr-front-door-playwright\.mjs >\/dev\/null 2>&1/,
+  );
 });
 
-test('recovery returns only bounded sanitized fields to the fixed founder control issue', () => {
+test('recovery returns only bounded sanitized fields to the fixed founder control issue and summary', () => {
   const returnStep = recoveryWorkflow.match(
-    /- name: Return sanitized recovery receipt to founder control issue([\s\S]*)$/,
+    /- name: Return sanitized recovery receipt to founder control issue([\s\S]*?)- name: Upload sanitized recovery evidence/,
   )?.[1] ?? '';
 
   assert.match(recoveryWorkflow, /issues:\s*write/);
   assert.match(returnStep, /RETURN_ISSUE:\s*'485'/);
   assert.match(returnStep, /WORKFLOW_RUN_URL/);
-  assert.match(returnStep, /gh issue comment "\$RETURN_ISSUE" --repo "\$GITHUB_REPOSITORY"/);
+  assert.match(returnStep, /public_receipt='test-results\/fcr-access-front-door-public-receipt\.md'/);
+  assert.match(returnStep, /gh issue comment "\$RETURN_ISSUE" --repo "\$GITHUB_REPOSITORY" --body-file "\$public_receipt"/);
+  assert.match(returnStep, /cat "\$public_receipt" >> "\$GITHUB_STEP_SUMMARY"/);
   assert.match(returnStep, /matchingApplicationCount/);
   assert.match(returnStep, /credentialFailures/);
   assert.match(returnStep, /apiVersionMatchesExpectedSha/);
@@ -58,8 +64,6 @@ test('recovery returns only bounded sanitized fields to the fixed founder contro
   assert.match(returnStep, /errorPresent/);
   assert.match(returnStep, /jq -e 'type == "object"' "\$access_receipt"/);
   assert.match(returnStep, /jq -e 'type == "object"' "\$browser_receipt"/);
-  assert.doesNotMatch(returnStep, /jq empty "\$access_receipt"/);
-  assert.doesNotMatch(returnStep, /jq empty "\$browser_receipt"/);
   assert.match(returnStep, /Access provider receipt: `malformed`/);
   assert.match(returnStep, /Browser proof receipt: `malformed`/);
   assert.match(returnStep, /Provider truth: `UNKNOWN`/);
@@ -71,6 +75,17 @@ test('recovery returns only bounded sanitized fields to the fixed founder contro
   assert.doesNotMatch(returnStep, /\n\s*nextAction\s*[,}]?/);
   assert.doesNotMatch(returnStep, /cat "\$access_receipt"/);
   assert.doesNotMatch(returnStep, /cat "\$browser_receipt"/);
+});
+
+test('artifact persistence contains only the sanitized public receipt', () => {
+  const artifactStep = recoveryWorkflow.match(
+    /- name: Upload sanitized recovery evidence([\s\S]*)$/,
+  )?.[1] ?? '';
+
+  assert.match(artifactStep, /fcr-access-front-door-public-receipt/);
+  assert.match(artifactStep, /path:\s*test-results\/fcr-access-front-door-public-receipt\.md/);
+  assert.doesNotMatch(artifactStep, /fcr-access-front-door-recovery\.json/);
+  assert.doesNotMatch(artifactStep, /fcr-access-front-door-browser-proof\.json/);
 });
 
 test('provider mutation is limited to the Access organization exemption update', () => {
