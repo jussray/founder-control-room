@@ -78,4 +78,13 @@ describe("independent review canonical hashes", () => {
     expect(() => independentReviewDiffHash(potentiallyTruncated))
       .toThrow(/diff completeness is unproven/);
   });
+
+  it("fails closed when provider comparison metadata omits file patch content", () => {
+    const missingPatch = diff([
+      { path: "assets/binary.dat", status: "modified", additions: 0, deletions: 0 },
+    ]);
+
+    expect(() => independentReviewDiffHash(missingPatch))
+      .toThrow(/diff content is incomplete/);
+  });
 });
