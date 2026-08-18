@@ -90,7 +90,10 @@ for (const required of requiredDocs) {
 const readme = read('README.md');
 const mergeAuthority = read('docs/FOUNDER_MERGE_AUTHORITY.md');
 const globalAi = read('GLOBAL_AI.md');
+const agents = read('AGENTS.md');
 const chatgpt = read('CHATGPT.md');
+const claude = read('CLAUDE.md');
+const perplexity = read('PERPLEXITY.md');
 const launchLoop = read('.ai/skills/juss-flow-launch-loop/SKILL.md');
 const publicTruth = read('docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md');
 const truthDecay = read('docs/TRUTH_DECAY_AUDIT.md');
@@ -109,9 +112,16 @@ const consistencyChecks = [
   [mergeAuthority.includes('Documentation truth'), 'merge authority must require documentation truth reconciliation'],
   [globalAi.includes('Truth Lease') && globalAi.includes('Documentation truth'), 'GLOBAL_AI must include truth-aging and documentation-truth rules'],
   [globalAi.includes('Product Design') && globalAi.includes('Data Analytics') && globalAi.includes('Hormozi'), 'GLOBAL_AI must include product, analytics, and value lenses'],
+  [globalAi.includes('/garyvee lindymode redteam l99 redteam ooda'), 'GLOBAL_AI must preserve the legacy founder-stack compatibility alias'],
   [launchLoop.includes('Parallel lenses, serialized authority'), 'launch loop must preserve parallel reasoning with serialized authority'],
   [launchLoop.includes('Truth Lease') && launchLoop.includes('Documentation truth gate'), 'launch loop must include truth aging and documentation reconciliation'],
+  [agents.includes('Historical Day 3 provenance') && !agents.includes('Current Day 3 source:'), 'AGENTS must preserve old Day 3 state as historical provenance, never current authority'],
+  [agents.includes('provider-neutral n8n') && agents.includes('Truth Lease') && agents.includes('Documentation Truth'), 'AGENTS must inherit the current provider-neutral truth-aging workflow'],
+  [!agents.includes('approved automated publishing class explicitly authorized'), 'AGENTS must not retain the superseded standing automated-publication shortcut'],
   [chatgpt.includes('post-merge') && chatgpt.includes('Documentation Truth') && chatgpt.includes('Truth Lease'), 'ChatGPT contract must re-observe truth after merges'],
+  [claude.includes('GLOBAL_AI.md') && claude.includes('provider-neutral n8n') && claude.includes('Truth Lease') && claude.includes('Documentation Truth'), 'Claude contract must inherit current provider-neutral truth-aging rules'],
+  [!claude.includes('Current provider truth:'), 'Claude contract must not freeze provider routing as durable current truth'],
+  [perplexity.includes('GLOBAL_AI.md') && perplexity.includes('provider-neutral n8n') && perplexity.includes('Truth Lease') && perplexity.includes('Documentation Truth'), 'Perplexity contract must inherit current provider-neutral truth-aging rules'],
   [publicTruth.includes('Temporal reuse and truth decay') && publicTruth.includes('Sauce boundary'), 'public communication contract must preserve temporal truth and sauce boundaries'],
   [truthDecay.includes('Documentation truth gate'), 'truth-decay audit must record the documentation drift control'],
   [truthDecay.includes('Analytics remains observation-only'), 'truth-decay audit must keep analytics observation-only'],
