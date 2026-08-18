@@ -280,6 +280,18 @@ describe("independent review receipt gate", () => {
     expect(result.blockers.join(" ")).toMatch(/not trusted by policy/);
   });
 
+  it("refuses GitHub App bot identities even when founder policy lists them as trusted", async () => {
+    const botReviewer = "semantic-reviewer[bot]";
+    const reviews = [
+      receipt(botReviewer, "semantic"),
+      receipt("python-static-review-v1", "deterministic"),
+    ];
+    const botPolicy = { ...policy, trustedSemanticReviewerIds: [botReviewer] };
+    const result = await evaluateIndependentReviewGate(providerFor(reviews), context, reviews, botPolicy);
+    expect(result.reviewGateSatisfied).toBe(false);
+    expect(result.blockers.join(" ")).toMatch(/bot cannot satisfy|cannot include GitHub App bot identities/i);
+  });
+
   it("fails closed when a receipt is altered after hashing", async () => {
     const clean = receipt(TRUSTED_SEMANTIC, "semantic");
     const tampered = { ...clean, summary: "Tampered after review." };
