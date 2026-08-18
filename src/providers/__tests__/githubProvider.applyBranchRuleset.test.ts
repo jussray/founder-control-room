@@ -18,7 +18,7 @@ vi.mock("@octokit/rest", () => ({
 
 const { GitHubProvider } = await import("../GitHubProvider.js");
 
-const PROJECT_ID = "founder-control-room";
+const PROJECT_ID = "generic-project";
 
 function buildProvider() {
   return new GitHubProvider({
