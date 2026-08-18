@@ -29,6 +29,19 @@ test('recovery workflow is production-gated and separates read from mutation aut
   assert.match(recoveryWorkflow, /verify-fcr-front-door-playwright\.mjs/);
 });
 
+test('authority gate never publishes a raw approval reference', () => {
+  const authorityStep = recoveryWorkflow.match(
+    /- name: Verify exact current main and mutation approval([\s\S]*?)- name: Set up Node 24/,
+  )?.[1] ?? '';
+
+  assert.match(authorityStep, /approval_reference_receipt='not-required-for-read-only'/);
+  assert.match(authorityStep, /sha256sum/);
+  assert.match(authorityStep, /approval_reference_receipt="sha256:/);
+  assert.match(authorityStep, /apply=false must not carry approval_reference/);
+  assert.match(authorityStep, /Approval reference receipt: \\`\$approval_reference_receipt\\`/);
+  assert.doesNotMatch(authorityStep, /Approval reference: \\`\$APPROVAL_REFERENCE\\`/);
+});
+
 test('raw recovery receipts remain ephemeral and are suppressed from workflow logs', () => {
   assert.match(
     recoveryWorkflow,
