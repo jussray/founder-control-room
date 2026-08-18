@@ -1,11 +1,12 @@
 import express from 'express';
 import request from 'supertest';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   createBuildEventReceiptIngestHandler,
   deriveBuildEventReceiptToken,
 } from '../buildEventReceipts.js';
 import type { BuildEvent } from '../../../buildEvents/buildEvent.js';
+import type { BuildEventStoreDisposition } from '../../../services/buildEventStore.js';
 
 const MCP_TOKEN = 'founder-signal-test-token';
 const PRODUCER = 'sekret-bip-release-observer';
@@ -38,8 +39,16 @@ function runtimeEvent(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function appWith(storeEvent = vi.fn(async () => 'stored' as const)) {
+function appWith(disposition: BuildEventStoreDisposition = 'stored') {
   const app = express();
+  const storedEvents: BuildEvent[] = [];
+  let storeCalls = 0;
+  const storeEvent = async (_projectId: string, event: BuildEvent): Promise<BuildEventStoreDisposition> => {
+    storeCalls += 1;
+    storedEvents.push(event);
+    return disposition;
+  };
+
   app.post(
     '/ingest/build-events/:slug',
     express.json(),
@@ -51,7 +60,11 @@ function appWith(storeEvent = vi.fn(async () => 'stored' as const)) {
       storeEvent,
     }),
   );
-  return { app, storeEvent };
+  return {
+    app,
+    storedEvents,
+    storeCalls: () => storeCalls,
+  };
 }
 
 function authorized(req: request.Test) {
@@ -62,9 +75,9 @@ function authorized(req: request.Test) {
 
 describe('build-event receipt ingress', () => {
   it('accepts an exact-SHA observed production receipt and preserves the existing build-event contract', async () => {
-    const { app, storeEvent } = appWith();
+    const harness = appWith();
     const response = await authorized(
-      request(app).post('/ingest/build-events/sekret-bip'),
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
     ).send(runtimeEvent());
 
     expect(response.status).toBe(201);
@@ -74,29 +87,30 @@ describe('build-event receipt ingress', () => {
       eventId: `sekret-release:${SHA}`,
       contract: 'fcr/build-event@v1',
     });
-    expect(storeEvent).toHaveBeenCalledTimes(1);
-    const stored = storeEvent.mock.calls[0]?.[1] as BuildEvent;
-    expect(stored.repository?.commitSha).toBe(SHA);
-    expect(stored.runtime?.releaseSha).toBe(SHA);
-    expect(stored.truth).toBe('verified');
-    expect(stored.authority).toBe('observed');
+    expect(harness.storeCalls()).toBe(1);
+    const stored = harness.storedEvents[0];
+    expect(stored).toBeDefined();
+    expect(stored?.repository?.commitSha).toBe(SHA);
+    expect(stored?.runtime?.releaseSha).toBe(SHA);
+    expect(stored?.truth).toBe('verified');
+    expect(stored?.authority).toBe('observed');
   });
 
   it('is idempotent when the store reports a duplicate', async () => {
-    const { app, storeEvent } = appWith(vi.fn(async () => 'duplicate' as const));
+    const harness = appWith('duplicate');
     const response = await authorized(
-      request(app).post('/ingest/build-events/sekret-bip'),
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
     ).send(runtimeEvent());
 
     expect(response.status).toBe(200);
     expect(response.body.duplicate).toBe(true);
-    expect(storeEvent).toHaveBeenCalledTimes(1);
+    expect(harness.storeCalls()).toBe(1);
   });
 
   it('fails closed on an event-id conflict', async () => {
-    const { app } = appWith(vi.fn(async () => 'conflict' as const));
+    const harness = appWith('conflict');
     const response = await authorized(
-      request(app).post('/ingest/build-events/sekret-bip'),
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
     ).send(runtimeEvent());
 
     expect(response.status).toBe(409);
@@ -104,11 +118,11 @@ describe('build-event receipt ingress', () => {
   });
 
   it('rejects missing or incorrect producer credentials', async () => {
-    const { app, storeEvent } = appWith();
-    const missing = await request(app)
+    const harness = appWith();
+    const missing = await request(harness.app)
       .post('/ingest/build-events/sekret-bip')
       .send(runtimeEvent());
-    const wrong = await request(app)
+    const wrong = await request(harness.app)
       .post('/ingest/build-events/sekret-bip')
       .set('x-build-event-producer', PRODUCER)
       .set('x-build-event-receipt-token', 'wrong')
@@ -116,13 +130,13 @@ describe('build-event receipt ingress', () => {
 
     expect(missing.status).toBe(401);
     expect(wrong.status).toBe(401);
-    expect(storeEvent).not.toHaveBeenCalled();
+    expect(harness.storeCalls()).toBe(0);
   });
 
   it('rejects repository mismatch even with valid credentials', async () => {
-    const { app, storeEvent } = appWith();
+    const harness = appWith();
     const response = await authorized(
-      request(app).post('/ingest/build-events/sekret-bip'),
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
     ).send(runtimeEvent({
       repository: {
         name: 'jussray/founder-control-room',
@@ -134,13 +148,13 @@ describe('build-event receipt ingress', () => {
 
     expect(response.status).toBe(403);
     expect(response.body.error).toBe('event_repository_mismatch');
-    expect(storeEvent).not.toHaveBeenCalled();
+    expect(harness.storeCalls()).toBe(0);
   });
 
   it('rejects external attempts to manufacture founder authorization', async () => {
-    const { app, storeEvent } = appWith();
+    const harness = appWith();
     const response = await authorized(
-      request(app).post('/ingest/build-events/sekret-bip'),
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
     ).send({
       ...runtimeEvent(),
       source: 'founder',
@@ -152,17 +166,17 @@ describe('build-event receipt ingress', () => {
 
     expect(response.status).toBe(403);
     expect(response.body.error).toMatch(/external_receipts_cannot_authorize|external_receipts_cannot_impersonate_founder/);
-    expect(storeEvent).not.toHaveBeenCalled();
+    expect(harness.storeCalls()).toBe(0);
   });
 
   it('rejects verified events without evidence before persistence', async () => {
-    const { app, storeEvent } = appWith();
+    const harness = appWith();
     const response = await authorized(
-      request(app).post('/ingest/build-events/sekret-bip'),
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
     ).send(runtimeEvent({ evidenceRefs: [] }));
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe('invalid_build_event');
-    expect(storeEvent).not.toHaveBeenCalled();
+    expect(harness.storeCalls()).toBe(0);
   });
 });
