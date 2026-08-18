@@ -13,7 +13,9 @@ import {
   N8N_FOUNDER_CONTENT_CONTRACT,
   N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
   dispatchProviderNeutralN8nFounderContent,
+  readN8nFounderContentProviderConfig,
 } from '../../lib/n8nProviderNeutralFounderContentOrchestrator.js';
+import { readN8nFounderContentConfig } from '../../lib/n8nFounderContentOrchestrator.js';
 import { FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT } from '../../lib/firstPartyFounderContentExecutor.js';
 import {
   dispatchTemporallyGovernedFounderContentPublishNow,
@@ -48,6 +50,8 @@ function capabilityPlan(value: unknown): V10CapabilityPlan | null {
 
 n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
   const readiness = founderConveyorReadiness();
+  const founderContentConfig = readN8nFounderContentConfig();
+  const providerConfig = readN8nFounderContentProviderConfig();
   return res.json({
     contract: FOUNDER_CONVEYOR_CONTRACT,
     capabilityPlanContract: 'juss-v10/capability-plan@v1',
@@ -71,6 +75,21 @@ n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
         env: 'N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS',
         defaultEnabled: ['buffer'],
         rule: 'contract-capable-does-not-imply-runtime-enabled',
+      },
+      providerRuntimeReadback: {
+        n8n: {
+          configured: founderContentConfig.configured,
+          enabled: founderContentConfig.enabled,
+        },
+        providerAllowlist: {
+          enabledProviders: providerConfig.enabledProviders,
+          invalidProviderCount: providerConfig.invalidProviders.length,
+          hasInvalidProviders: providerConfig.invalidProviders.length > 0,
+        },
+        adapterProof: 'not-observed',
+        liveProbeRequired: true,
+        providerOutcomeProofRequired: true,
+        secretsExposed: false,
       },
       authority: {
         orchestrate: true,
