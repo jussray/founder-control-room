@@ -1,0 +1,36 @@
+name: Apply production Playwright release witness patch
+
+on:
+  push:
+    branches:
+      - fix/production-playwright-release-witness
+    paths:
+      - '.github/patches/production-playwright-release-witness.patch'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out focused repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/production-playwright-release-witness
+          fetch-depth: 0
+
+      - name: Apply exact deploy workflow patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check .github/patches/production-playwright-release-witness.patch
+          git apply .github/patches/production-playwright-release-witness.patch
+          rm .github/patches/production-playwright-release-witness.patch
+          rm .github/workflows/apply-production-playwright-release-witness.yml
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/workflows/deploy.yml .github/patches/production-playwright-release-witness.patch .github/workflows/apply-production-playwright-release-witness.yml
+          git commit -m 'fix(release): gate proof-of-ship on production Playwright SHA witness'
+          git push origin HEAD:fix/production-playwright-release-witness
