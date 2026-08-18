@@ -1,6 +1,11 @@
 import type { ExportedHandler } from '@cloudflare/workers-types';
 import { V10_CAPABILITY_PLAN_CONTRACT } from '../founder-os-lab/capabilityKernel.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../lib/founderConveyorReceipt.js';
+import {
+  FCR_EMAIL_FROM,
+  isProjectEmailBinding,
+  type ProjectEmailBinding,
+} from './projectEmail.js';
 
 export interface ControlRoomWorkerEnv {
   SUPABASE_URL: string;
@@ -15,6 +20,8 @@ export interface ControlRoomWorkerEnv {
   GITHUB_TOKEN?: string;
   FOUNDER_ALLOWED_ORIGINS: string;
   FOUNDER_API_URL: string;
+  FCR_EMAIL: ProjectEmailBinding;
+  FCR_EMAIL_FROM: string;
   FCR_V10_CAPABILITY_PLAN_CONTRACT: string;
   FCR_V10_CONVEYOR_CONTRACT: string;
   FCR_V10_MAX_RUNTIME_AUTHORITY: string;
@@ -30,7 +37,7 @@ interface ReconcilerModule {
 
 type ReconcilerLoader = () => Promise<ReconcilerModule>;
 
-const REQUIRED_BINDINGS = [
+const REQUIRED_STRING_BINDINGS = [
   'SUPABASE_URL',
   'SUPABASE_PROJECT_REF',
   'SUPABASE_SERVICE_ROLE_KEY',
@@ -38,6 +45,7 @@ const REQUIRED_BINDINGS = [
   'GITHUB_WEBHOOK_SECRET',
   'FOUNDER_ALLOWED_ORIGINS',
   'FOUNDER_API_URL',
+  'FCR_EMAIL_FROM',
   'FCR_V10_CAPABILITY_PLAN_CONTRACT',
   'FCR_V10_CONVEYOR_CONTRACT',
   'FCR_V10_MAX_RUNTIME_AUTHORITY',
@@ -53,10 +61,14 @@ function hasNonEmptyString(value: unknown): value is string {
 export function validateWorkerEnv(
   env: Partial<Record<keyof ControlRoomWorkerEnv, unknown>>,
 ): asserts env is ControlRoomWorkerEnv {
-  const missing = REQUIRED_BINDINGS.filter((name) => !hasNonEmptyString(env[name]));
+  const missing = REQUIRED_STRING_BINDINGS.filter((name) => !hasNonEmptyString(env[name]));
 
   if (missing.length) {
     throw new Error(`Missing required Worker bindings: ${missing.join(', ')}`);
+  }
+
+  if (!isProjectEmailBinding(env.FCR_EMAIL)) {
+    throw new Error('Missing required Worker binding: FCR_EMAIL');
   }
 
   const hasGitHubToken = hasNonEmptyString(env.GITHUB_TOKEN);
@@ -77,6 +89,10 @@ export function validateWorkerEnv(
   // a non-empty string. TypeScript cannot derive that fact through the dynamic
   // key iteration, so narrow once at this boundary.
   const validated = env as ControlRoomWorkerEnv;
+
+  if (validated.FCR_EMAIL_FROM !== FCR_EMAIL_FROM) {
+    throw new Error('FCR_EMAIL_FROM must match the checked-in Founder Control Room sender identity');
+  }
 
   let supabaseUrl: URL;
   try {
