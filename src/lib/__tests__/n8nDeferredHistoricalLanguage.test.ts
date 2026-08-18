@@ -138,4 +138,11 @@ describe('deferred founder-content historical wording', () => {
       'The Facebook founder update supports verified repository evidence.',
     )).toThrow(/approved deferred copy uses current-state language/);
   });
+
+  it('rejects metric approved copy even when every attached claim is historically durable', () => {
+    expect(build(
+      'I shipped the Facebook founder update from verified repository evidence.',
+      'Reached 54 followers during this build period.',
+    )).toThrow(/metric language in approved deferred copy requires metric evidence/);
+  });
 });
