@@ -1,0 +1,52 @@
+name: Documentation Truth
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  DOC_TRUTH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+
+jobs:
+  documentation-truth:
+    name: Documentation truth gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact target with history
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact target
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\nbase=%s\n' "$EXPECTED_HEAD_SHA" "$actual" "$DOC_TRUTH_BASE_SHA"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Verify current documentation truth
+        run: node scripts/verify-documentation-truth.mjs
+
+      - name: Upload documentation truth receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-truth-${{ github.run_id }}
+          path: artifacts/documentation-truth-report.json
+          if-no-files-found: error
+          retention-days: 14
