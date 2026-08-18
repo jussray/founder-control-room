@@ -10,7 +10,10 @@ const socialPolicy = read('docs/founder-signal-engine/social-campaign-policy-v1.
 const readme = read('README.md');
 const mergeAuthority = read('docs/FOUNDER_MERGE_AUTHORITY.md');
 const globalAi = read('GLOBAL_AI.md');
+const agents = read('AGENTS.md');
 const chatgpt = read('CHATGPT.md');
+const claude = read('CLAUDE.md');
+const perplexity = read('PERPLEXITY.md');
 const launchLoop = read('.ai/skills/juss-flow-launch-loop/SKILL.md');
 const truthDecay = read('docs/TRUTH_DECAY_AUDIT.md');
 const cloudflareTargets = read('docs/deployment/CLOUDFLARE_WORKER_TARGETS.md');
@@ -78,6 +81,16 @@ describe('repository documentation truth control', () => {
     expect(globalAi).toContain('Data Analytics');
     expect(globalAi).toContain('Hormozi');
     expect(globalAi).toContain('Parallel thinking never grants parallel mutation authority');
+    expect(globalAi).toContain('/garyvee lindymode redteam l99 redteam ooda');
+  });
+
+  it('keeps AGENTS on historical Day 3 provenance and current provider-neutral truth', () => {
+    expect(agents).toContain('Historical Day 3 provenance');
+    expect(agents).not.toContain('Current Day 3 source:');
+    expect(agents).toContain('provider-neutral n8n');
+    expect(agents).toContain('Truth Lease');
+    expect(agents).toContain('Documentation Truth');
+    expect(agents).not.toContain('approved automated publishing class explicitly authorized');
   });
 
   it('keeps ChatGPT and the launch loop on post-merge re-observation', () => {
@@ -87,6 +100,22 @@ describe('repository documentation truth control', () => {
     expect(launchLoop).toContain('Parallel lenses, serialized authority');
     expect(launchLoop).toContain('Documentation truth gate');
     expect(launchLoop).toContain('Truth Lease');
+  });
+
+  it('keeps Claude on the same provider-neutral truth-aging constitution', () => {
+    expect(claude).toContain('GLOBAL_AI.md');
+    expect(claude).toContain('provider-neutral n8n');
+    expect(claude).toContain('Truth Lease');
+    expect(claude).toContain('Documentation Truth');
+    expect(claude).not.toContain('Current provider truth:');
+  });
+
+  it('keeps Perplexity research on current source freshness and Sauce Guard', () => {
+    expect(perplexity).toContain('GLOBAL_AI.md');
+    expect(perplexity).toContain('provider-neutral n8n');
+    expect(perplexity).toContain('Truth Lease');
+    expect(perplexity).toContain('Documentation Truth');
+    expect(perplexity).toContain('Sauce Guard');
   });
 
   it('keeps Cloudflare source binding requirements separate from live provider proof', () => {
