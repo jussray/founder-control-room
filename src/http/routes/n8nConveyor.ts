@@ -66,7 +66,12 @@ n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
       route: '/founder-content',
       inputAuthority: 'canonical-fcr-proposal-approval-firewall-input',
       providerSelection: 'founder-authenticated-bounded-platform-compatible',
-      providerRoutes: N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
+      providerContractRoutes: N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
+      providerRuntimeConfiguration: {
+        env: 'N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS',
+        defaultEnabled: ['buffer'],
+        rule: 'contract-capable-does-not-imply-runtime-enabled',
+      },
       authority: {
         orchestrate: true,
         requestProviderWrite: true,
