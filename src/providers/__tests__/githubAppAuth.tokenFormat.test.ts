@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockGetRepoInstallation, mockCreateInstallationAccessToken } = vi.hoisted(() => ({
@@ -23,6 +24,11 @@ function statelessInstallationToken(): string {
   return `ghs_${segment}.${segment}.${segment}`;
 }
 
+function privateKeyPem(): string {
+  const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  return privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+}
+
 describe("getGitHubInstallationToken token-format compatibility", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -40,7 +46,7 @@ describe("getGitHubInstallationToken token-format compatibility", () => {
 
     const resolved = await getGitHubInstallationToken(
       "12345",
-      "unused-by-mocked-octokit",
+      privateKeyPem(),
       REPOSITORY,
     );
 
