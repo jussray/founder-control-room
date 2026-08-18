@@ -97,7 +97,8 @@ describe('n8n founder-content route', () => {
         },
         providerAllowlist: {
           enabledProviders: ['buffer'],
-          invalidProviders: [],
+          invalidProviderCount: 0,
+          hasInvalidProviders: false,
         },
         adapterProof: 'not-observed',
         liveProbeRequired: true,
@@ -118,6 +119,7 @@ describe('n8n founder-content route', () => {
     const serialized = JSON.stringify(res.body);
     expect(serialized).not.toContain('webhookUrl');
     expect(serialized).not.toContain('bearerToken');
+    expect(serialized).not.toContain('invalidProviders');
     expect(serialized).not.toContain('configured-at-runtime');
   });
 
@@ -139,7 +141,8 @@ describe('n8n founder-content route', () => {
       },
       providerAllowlist: {
         enabledProviders: ['buffer', 'meta', 'tiktok'],
-        invalidProviders: [],
+        invalidProviderCount: 0,
+        hasInvalidProviders: false,
       },
       adapterProof: 'not-observed',
       liveProbeRequired: true,
@@ -152,8 +155,12 @@ describe('n8n founder-content route', () => {
     expect(serialized).not.toContain('configured-at-runtime');
   });
 
-  it('surfaces invalid provider allowlist values without leaking other environment data', async () => {
-    vi.stubEnv('N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS', 'meta,unknown-provider');
+  it('reports invalid provider presence without echoing credential-like values', async () => {
+    const credentialLikeInvalidValue = 'sk-proj-super-secret-credential-material';
+    vi.stubEnv(
+      'N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS',
+      `meta,${credentialLikeInvalidValue}`,
+    );
 
     const res = await request(buildApp())
       .get('/automation/conveyor')
@@ -162,9 +169,14 @@ describe('n8n founder-content route', () => {
     expect(res.status).toBe(200);
     expect(res.body.founderContent.providerRuntimeReadback.providerAllowlist).toEqual({
       enabledProviders: ['meta'],
-      invalidProviders: ['unknown-provider'],
+      invalidProviderCount: 1,
+      hasInvalidProviders: true,
     });
     expect(res.body.founderContent.providerRuntimeReadback.adapterProof).toBe('not-observed');
+
+    const serialized = JSON.stringify(res.body);
+    expect(serialized).not.toContain(credentialLikeInvalidValue);
+    expect(serialized).not.toContain('invalidProviders');
   });
 
   it('binds execution identity to the authenticated founder and never trusts body identity', async () => {
