@@ -65,4 +65,17 @@ describe("independent review canonical hashes", () => {
     expect(independentReviewDiffHash(changedPatch)).not.toBe(independentReviewDiffHash(original));
     expect(independentReviewDiffHash(staleBase)).not.toBe(independentReviewDiffHash(original));
   });
+
+  it("fails closed when a provider comparison returns GitHub's 300-file maximum", () => {
+    const potentiallyTruncated = diff(Array.from({ length: 300 }, (_, index) => ({
+      path: `src/generated/file-${String(index).padStart(3, "0")}.ts`,
+      status: "modified" as const,
+      additions: 1,
+      deletions: 1,
+      patch: `@@ file ${index} @@`,
+    })));
+
+    expect(() => independentReviewDiffHash(potentiallyTruncated))
+      .toThrow(/diff completeness is unproven/);
+  });
 });
