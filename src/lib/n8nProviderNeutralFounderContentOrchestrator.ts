@@ -20,6 +20,8 @@ import {
   type N8nFounderContentRequest,
   type VerifiedN8nFounderContentReceipt,
 } from './n8nFounderContentOrchestrator.js';
+// @ts-expect-error -- canonical founder-content authorization is CommonJS and remains the single Current You authority implementation.
+import founderContentAuthorizationContract from '../../tools/zapier/founder-content-authorization-contract.cjs';
 
 export const N8N_FOUNDER_CONTENT_PROVIDER_ROUTES = {
   buffer: ['linkedin', 'facebook'],
@@ -40,7 +42,40 @@ export interface N8nFounderContentProviderConfig {
   invalidProviders: string[];
 }
 
+interface FounderContentAuthorization {
+  state: string;
+  proposal_hash: string;
+  public_payload_hash: string;
+  source: { repo: string; commit_sha: string };
+  content: { platform: string; text: string };
+  current_you: {
+    intent_id: string;
+    intent_version: number;
+  };
+  authority: {
+    exact_current_you_approval_required: boolean;
+    share_now_allowed: boolean;
+    execution_mode: string;
+  };
+  channels: readonly string[];
+  expires_at: string;
+  approval_id: string;
+  authorization_hash: string;
+}
+
+interface FounderContentAuthorizationContract {
+  authorizeFounderContentPublication(input: {
+    proposal?: unknown;
+    approval?: unknown;
+    now?: unknown;
+  }): FounderContentAuthorization;
+}
+
+const canonicalFounderAuthorization = founderContentAuthorizationContract as FounderContentAuthorizationContract;
 const DEFAULT_PROVIDER: N8nFounderContentProvider = 'buffer';
+const NATIVE_REVIEW_WINDOW_MINUTES = 20;
+const NATIVE_REVIEW_WINDOW_MS = NATIVE_REVIEW_WINDOW_MINUTES * 60 * 1000;
+const PROVIDER_NEUTRAL_EXECUTION_IDENTITY = 'fcr/n8n-founder-content-execution-identity@v2' as const;
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -50,8 +85,78 @@ function stableHash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
+function deterministicUuid(value: unknown): string {
+  const hex = stableHash(value).slice(0, 32).split('');
+  hex[12] = '4';
+  hex[16] = '8';
+  const joined = hex.join('');
+  return `${joined.slice(0, 8)}-${joined.slice(8, 12)}-${joined.slice(12, 16)}-${joined.slice(16, 20)}-${joined.slice(20, 32)}`;
+}
+
 function requestedProvider(input: FirstPartyFounderDistributionInput): string {
   return text(input.n8n_provider).toLowerCase() || DEFAULT_PROVIDER;
+}
+
+function exactAuthorization(input: FirstPartyFounderDistributionInput): FounderContentAuthorization {
+  return canonicalFounderAuthorization.authorizeFounderContentPublication({
+    proposal: input.proposal,
+    approval: input.approval,
+    now: input.now,
+  });
+}
+
+function assertCallerDoesNotContradictAuthorization(
+  input: FirstPartyFounderDistributionInput,
+  authorization: FounderContentAuthorization,
+): void {
+  const conflicts: string[] = [];
+  const suppliedRepo = text(input.source_repo);
+  const suppliedSha = text(input.source_commit_sha).toLowerCase();
+  const suppliedPlatform = text(input.platform).toLowerCase();
+  const suppliedText = text(input.text);
+
+  if (suppliedRepo && suppliedRepo !== authorization.source.repo) {
+    conflicts.push('source_repo conflicts with exact founder authorization');
+  }
+  if (suppliedSha && suppliedSha !== authorization.source.commit_sha) {
+    conflicts.push('source_commit_sha conflicts with exact founder authorization');
+  }
+  if (suppliedPlatform && suppliedPlatform !== authorization.content.platform) {
+    conflicts.push('platform conflicts with exact founder authorization');
+  }
+  if (suppliedText && suppliedText !== authorization.content.text) {
+    conflicts.push('text conflicts with exact founder authorization');
+  }
+
+  if (conflicts.length > 0) {
+    throw new Error(`N8N_FOUNDER_CONTENT_AUTHORITY_CONFLICT: ${conflicts.join('; ')}`);
+  }
+}
+
+function nativeScheduleAt(input: FirstPartyFounderDistributionInput, authorization: FounderContentAuthorization): string {
+  const nowMs = Date.parse(text(input.now));
+  const expiresMs = Date.parse(authorization.expires_at);
+  if (!Number.isFinite(nowMs) || !Number.isFinite(expiresMs)) {
+    throw new Error('N8N_FOUNDER_CONTENT_NATIVE_SCHEDULE_REJECTED: authorization time boundary is invalid');
+  }
+  const scheduledMs = nowMs + NATIVE_REVIEW_WINDOW_MS;
+  if (scheduledMs >= expiresMs) {
+    throw new Error('N8N_FOUNDER_CONTENT_NATIVE_SCHEDULE_REJECTED: exact founder approval expires before the required 20-minute review window completes');
+  }
+  return new Date(scheduledMs).toISOString();
+}
+
+function providerNeutralExecutionId(request: N8nFounderContentRequest): string {
+  return `fcr-n8n-social-v2:${stableHash({
+    contract: PROVIDER_NEUTRAL_EXECUTION_IDENTITY,
+    platform: request.platform,
+    source: request.source,
+    authorizationHash: request.fcrAuthorization.authorizationHash,
+    proposalHash: request.fcrAuthorization.proposalHash,
+    publicPayloadHash: request.fcrAuthorization.publicPayloadHash,
+    currentYouIntentId: request.fcrAuthorization.currentYouIntentId,
+    currentYouIntentVersion: request.fcrAuthorization.currentYouIntentVersion,
+  })}`;
 }
 
 export function readN8nFounderContentProviderConfig(
@@ -115,12 +220,83 @@ export function validateProviderNeutralN8nFounderContentEnvelope(
 export function buildProviderNeutralN8nFounderContentEnvelope(
   input: FirstPartyFounderDistributionInput,
 ): FirstPartyFounderScheduleEnvelope {
-  const canonical = buildCanonicalFirstPartyFounderScheduleEnvelope(input);
-  const provider = resolveN8nFounderContentProvider(input, text(canonical.platform).toLowerCase());
-  const envelope = {
-    ...canonical,
+  const authorization = exactAuthorization(input);
+  assertCallerDoesNotContradictAuthorization(input, authorization);
+
+  const platform = text(authorization.content.platform).toLowerCase();
+  const provider = resolveN8nFounderContentProvider(input, platform);
+  const contentId = deterministicUuid({
+    authorizationHash: authorization.authorization_hash,
+    proposalHash: authorization.proposal_hash,
+    publicPayloadHash: authorization.public_payload_hash,
+    platform,
+  });
+
+  if (provider === DEFAULT_PROVIDER) {
+    const canonical = buildCanonicalFirstPartyFounderScheduleEnvelope(input);
+    const envelope = {
+      ...canonical,
+      content_id: contentId,
+    };
+    const reasons = validateProviderNeutralN8nFounderContentEnvelope(envelope);
+    if (reasons.length > 0) {
+      throw new Error(`N8N_FOUNDER_CONTENT_PROVIDER_ENVELOPE_REJECTED: ${reasons.join('; ')}`);
+    }
+    return envelope;
+  }
+
+  if (authorization.state !== 'authorized-for-scheduled-review') {
+    throw new Error('N8N_FOUNDER_CONTENT_NATIVE_SCHEDULE_REJECTED: exact founder authorization is not valid for scheduled review');
+  }
+  if (authorization.authority.exact_current_you_approval_required !== true) {
+    throw new Error('N8N_FOUNDER_CONTENT_NATIVE_SCHEDULE_REJECTED: exact Current You approval is required');
+  }
+  if (authorization.authority.share_now_allowed !== false || authorization.authority.execution_mode !== 'schedule_review_window') {
+    throw new Error('N8N_FOUNDER_CONTENT_NATIVE_SCHEDULE_REJECTED: native provider route must remain schedule-review-only');
+  }
+  if (!authorization.channels.includes(platform)) {
+    throw new Error('N8N_FOUNDER_CONTENT_NATIVE_SCHEDULE_REJECTED: exact founder approval does not include the authorized platform');
+  }
+
+  const scheduleAt = nativeScheduleAt(input, authorization);
+  const envelope: FirstPartyFounderScheduleEnvelope = {
+    version: 1,
+    lane: 'first_party_founder_governed_schedule',
     provider,
+    state: 'scheduled_review_window',
+    content_id: contentId,
+    platform,
+    channel: `fcr_${platform}`,
+    text: authorization.content.text,
+    source: {
+      repo: authorization.source.repo,
+      commit_sha: authorization.source.commit_sha,
+    },
+    authority: {
+      publish_allowed: true,
+      schedule_allowed: true,
+      standing_policy_applied: false,
+      authorization_mode: 'exact-current-you',
+      authorization_receipt_verified: true,
+      exact_current_you_approval_required: true,
+      first_party_founder_content: true,
+      founder_content_authorization_hash: authorization.authorization_hash,
+      founder_content_proposal_hash: authorization.proposal_hash,
+      public_payload_hash: authorization.public_payload_hash,
+      current_you_intent_id: authorization.current_you.intent_id,
+      current_you_intent_version: authorization.current_you.intent_version,
+    },
+    provider_request: {
+      method: 'schedule',
+      save_to_draft: false,
+      schedule_at: scheduleAt,
+      review_deadline: scheduleAt,
+      review_window_minutes: NATIVE_REVIEW_WINDOW_MINUTES,
+      share_now_allowed: false,
+      external_write_included: false,
+    },
   };
+
   const reasons = validateProviderNeutralN8nFounderContentEnvelope(envelope);
   if (reasons.length > 0) {
     throw new Error(`N8N_FOUNDER_CONTENT_PROVIDER_ENVELOPE_REJECTED: ${reasons.join('; ')}`);
@@ -140,27 +316,17 @@ export function buildProviderNeutralN8nFounderContentRequest(
     ...envelope,
     provider: DEFAULT_PROVIDER,
   });
-  const providerRequest = {
-    ...base.providerRequest,
-    provider: text(envelope.provider).toLowerCase(),
-  };
-  const identity = {
-    contentId: base.contentId,
-    platform: base.platform,
-    channel: base.channel,
-    text: base.text,
-    source: base.source,
-    fcrAuthorization: base.fcrAuthorization,
-    providerRequest,
+  const request: N8nFounderContentRequest = {
+    ...base,
+    providerRequest: {
+      ...base.providerRequest,
+      provider: text(envelope.provider).toLowerCase(),
+    },
   };
 
   return {
-    ...base,
-    orchestrationId: `fcr-n8n-social-v1:${stableHash({
-      contract: N8N_FOUNDER_CONTENT_CONTRACT,
-      ...identity,
-    })}`,
-    ...identity,
+    ...request,
+    orchestrationId: providerNeutralExecutionId(request),
   };
 }
 
@@ -278,8 +444,8 @@ export async function dispatchProviderNeutralN8nFounderContent(
 
   try {
     const cadence = await reserveFounderContentCadence({
-      provider: envelope.provider,
-      channel: envelope.channel,
+      provider: 'n8n',
+      channel: request.platform,
       contentId: envelope.content_id,
       requestedScheduleAt: envelope.provider_request.schedule_at,
     });
