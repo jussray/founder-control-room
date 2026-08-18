@@ -12,6 +12,7 @@ This contract applies before publishing, scheduling, sending, announcing, promot
 → Evidence check
 → Accounting-control check
 → Authorization check
+→ Temporal reuse check
 → Draft
 → Review or approved automation
 → Publish or hold
@@ -62,6 +63,21 @@ Still needing verification
 
 Corrections must be direct. Do not bury a mistake beneath promotional language or silently edit history when a public correction is warranted.
 
+## Temporal reuse and truth decay
+
+A claim that was true when verified is not automatically safe to reuse later. Preserve the original observation as history, but re-check any fact whose truth depends on current repository, provider, runtime, metric, or human-outcome state.
+
+Founder-content claims use these temporal classes:
+
+- `historical_version`: an explicitly historical statement bound to the exact source version. It remains eligible for deferred scheduling because a later main SHA does not rewrite what was built, merged, tested, or verified at that recorded version.
+- `current_repo_state`: a present-tense repository claim. It requires execution-time FCR revalidation against the then-current authoritative repository version.
+- `current_runtime`: a present-tense provider/runtime claim. It requires a fresh live verifier at use time.
+- `metric`: a current numerical/analytics claim. It requires a fresh authoritative metric read at use time.
+
+A deferred provider queue cannot freeze current truth. Scheduled n8n/provider routes therefore accept only exact-version `historical_version` claims with explicit historical wording. Current repository, runtime, and metric claims must use a path that revalidates truth at the execution boundary. Scheduler acceptance is not a truth lease.
+
+When a newer trustworthy observation contradicts an earlier current-state claim, preserve the earlier observation as historical evidence and classify its current use as superseded, stale, invalidated, or unknown. Never rewrite the historical fact merely because its current-use authority expired.
+
 ## Accounting-control principles for automated posting
 
 The founder authorizes automated publication only when the post and its workflow satisfy all of these controls:
@@ -79,11 +95,13 @@ The founder authorizes automated publication only when the post and its workflow
 
 This is an internal control framework inspired by sound accounting practice. It is not a representation that a post, workflow, or repository has received an external audit or formal GAAP opinion.
 
-## Standing founder authorization
+## Founder authorization
 
-The founder has approved automated posting as a class when, and only when, the workflow passes this contract and the accounting-control principles above.
+An approved automated publishing class defines the maximum class of communication that automation may handle. It does **not** weaken a more specific executable authority contract.
 
-This standing authorization removes the need for per-post founder approval for compliant posts inside the approved class. It does not authorize:
+Current first-party founder-content execution uses exact Current You authority: the exact public payload, proposal identity, channel, source version, and Current You approval must remain bound at execution. A standing class authorization must never be interpreted as permission to bypass that exact-proposal approval membrane when the active route requires it.
+
+This class boundary does not authorize:
 
 - invented, estimated, or unsupported financial results;
 - claims of revenue, profit, valuation, funding, customers, users, partnerships, endorsements, deployment, or impact without evidence;
@@ -92,8 +110,7 @@ This standing authorization removes the need for per-post founder approval for c
 - crisis communications, admissions of liability, political statements, or other high-consequence communications not explicitly approved as a separate class;
 - bypassing a hold condition because a scheduler or model is technically able to publish.
 
-Fresh approval is still required for any post outside these boundaries.
-Any post outside these boundaries requires fresh founder approval. Fresh approval is still required whenever the post is outside the approved automated publishing class or crosses a high-consequence boundary.
+Fresh approval is required whenever the active executable route requires exact Current You approval, whenever the proposal or approved copy changes, or whenever the post falls outside the approved class or crosses a high-consequence boundary.
 
 ## Posting requirements
 
@@ -102,10 +119,11 @@ Every material post must have:
 - a clear purpose and intended audience;
 - evidence supporting each execution or outcome claim;
 - honest status language;
+- a temporal classification that matches the wording and evidence lifetime;
 - disclosure of material uncertainty or limitation;
 - no invented metrics, testimonials, partnerships, users, revenue, deployment, or approval;
 - no implication of founder approval when only an agent drafted the content;
-- a reviewable draft or an approved automated publishing class;
+- a reviewable draft or an approved automated publishing class plus every stricter route-specific authority requirement;
 - a captured URL, observable platform artifact, message ID, or equivalent evidence after publication;
 - a correction path when the post becomes inaccurate.
 
@@ -122,15 +140,25 @@ Prefer precise language:
 - "live" only with runtime evidence at the public destination;
 - "used" or "helped" only with evidence of human use or outcome.
 
+For deferred founder-progress posts, prefer durable historical wording such as "I shipped," "I merged," "I tested," or "I found and fixed" when exact-version evidence supports it. Present-tense operational language belongs on an execution-time revalidated path.
+
+## Sauce boundary
+
+Public communication should explain the product change, user value, lesson, or verified progress without publishing the private recipe. Keep proprietary prompts, routing mechanics, raw diffs, credentials, private provider payloads, private metrics, unreleased roadmap details, customer data, internal evidence references, and security-sensitive implementation details out of the public payload.
+
+The public story and the private proof are separate objects. Internal evidence may prove the story without being attached to the post.
+
 ## Hold conditions
 
 Hold the post when:
 
 - a key claim cannot be traced to evidence;
 - the accounting-control check does not pass;
-- the post falls outside the approved automated publishing class;
+- temporal classification is missing, mismatched to the wording, or no longer valid at the use boundary;
+- a current-state claim is being sent through a deferred queue that cannot revalidate it at publication time;
+- the post falls outside the approved automated publishing class or a stricter exact Current You gate is unsatisfied;
 - the post depends on a workflow that failed before executing steps;
-- private, sensitive, or security-relevant information could be exposed;
+- private, sensitive, proprietary, or security-relevant information could be exposed;
 - urgency is being used to bypass truth or review;
 - the post would make a reasonable reader believe more was completed than the evidence proves.
 
@@ -138,4 +166,4 @@ Hold the post when:
 
 A posting workflow is not complete when a draft exists, a scheduler accepted it, or an automation was triggered.
 
-It is complete only when the intended publication artifact is observable, its claims remain accurate, the platform result is reconciled, and the evidence is recorded.
+It is complete only when the intended publication artifact is observable, its claims remain accurate for their declared temporal class, the platform result is reconciled, and the evidence is recorded.
