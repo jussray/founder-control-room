@@ -83,7 +83,8 @@ n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
         },
         providerAllowlist: {
           enabledProviders: providerConfig.enabledProviders,
-          invalidProviders: providerConfig.invalidProviders,
+          invalidProviderCount: providerConfig.invalidProviders.length,
+          hasInvalidProviders: providerConfig.invalidProviders.length > 0,
         },
         adapterProof: 'not-observed',
         liveProbeRequired: true,
