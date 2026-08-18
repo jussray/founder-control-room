@@ -1,35 +1,65 @@
 # FutureYou + ME Shared Analysis Contract
 
-Status: `LOCKED_SCOPE`
-
-Authoritative budget: [`config/zapier-task-budget.json`](../../config/zapier-task-budget.json)
+Status: `CURRENT_ANALYSIS_CONTRACT_WITH_HISTORICAL_EXECUTION_PROVENANCE`
 
 ## Goal
 
-Give Ray maximum decision and distribution coverage without multiplying Zapier thinking actions.
+Give Juss maximum decision and distribution coverage without multiplying thinking actions, inventing authority, or exposing the private implementation recipe.
 
-FutureYou, ME, Chief AI, 5W1H, evidence classification, the recommended next action, investor drafting, media direction, and every supported social-platform draft must be produced by the same structured AI action used by the Founder Signal Engine.
+FutureYou, ME, Chief AI, 5W1H, evidence classification, the recommended next action, investor drafting, media direction, and every supported social-platform draft should be produced from one coherent verified signal package whenever the implementation supports that efficiently.
 
-This contract adds fields, not separate AI tasks.
+This is an analysis/output contract. It does not grant publication, email, CRM, provider, or orchestration authority.
 
-## One signal, one thinking action
+## CURRENT EXECUTION UPDATE
+
+The earlier Zapier + Buffer budget model below is retained as **HISTORICAL ZAPIER BUDGET** provenance. It is no longer the complete current execution architecture.
+
+Current founder-content execution separates analysis from transport:
+
+```text
+verified source signal
+-> FCR truth + authority
+-> Chief / ME / FutureYou shared analysis package
+-> Sauce Guard + temporal truth
+-> exact Current You approval for executable publication
+-> channel router
+   -> first-party LinkedIn path where configured and proven
+   -> provider-neutral n8n orchestration for bounded social adapters
+   -> Zapier / Buffer only where they still add connector, scheduling, or fallback value
+-> provider readback
+-> FCR outcome receipt
+-> observation-only analytics
+```
+
+Current provider-neutral n8n capability must not be confused with runtime enablement. For each destination keep these states separate:
+
+```text
+contract-capable
+configured / allowlisted
+adapter-proven
+provider-outcome-proven
+```
+
+Facebook, Instagram, TikTok, Threads, X, YouTube Shorts, Pinterest, Bluesky, Mastodon, and Google Business drafts may exist before a live adapter is configured. Draft capability is not publication capability.
+
+## One signal, one coherent thinking package
+
+Preferred shape:
 
 ```text
 normalized source signal
--> free budget + idempotency gates
--> ONE structured AI action
-   -> evidence truth
+-> evidence + temporal classification
+-> one coherent structured reasoning package where practical
    -> ME decision lens
    -> FutureYou decision lens
    -> Chief AI routing decision
    -> platform-native social campaign package
    -> investor review draft when requested
--> free validation + Paths
--> ONE canonical HubSpot result note
--> optional founder-approved Buffer fan-out
+-> free deterministic validation
+-> bounded execution only after separate authority
 ```
 
-Do not create separate Zaps or separate AI calls for FutureYou, ME, LinkedIn, Facebook, Instagram, Threads, X, TikTok, YouTube Shorts, Pinterest, Bluesky, Mastodon, Google Business, investor outreach, or proof formatting.
+Do not create separate model calls merely because each destination has a different caption field. Platform-native formatting may branch after a shared verified claim set.
 
 ## ME lens
 
@@ -48,13 +78,14 @@ Rules:
 
 - State what is verified now without inflating progress.
 - Choose one smallest reversible next action.
-- Preserve Ray's founder voice rather than generating generic corporate copy.
-- Populate `me_profile_angle` only when the signal affects Ray's profile positioning, founder brand, Se'kret Bip narrative, or investor-facing proof.
-- Do not turn ME into a second AI action.
+- Preserve Juss's founder voice rather than generating generic corporate copy.
+- Populate `me_profile_angle` only when the signal affects Juss's profile positioning, founder brand, Se'kret Bip narrative, product launch, or investor-facing proof.
+- Do not turn ME into execution authority.
+- Re-observe facts that can decay before using them as present-tense truth.
 
 ## FutureYou lens
 
-FutureYou speaks as Ray five years after the goal succeeded.
+FutureYou speaks as Juss after the goal succeeded, but it is a decision-compression lens rather than evidence.
 
 Required fields:
 
@@ -65,32 +96,32 @@ future_you_what_did_not
 future_you_valid_fear
 ```
 
-Required voice:
-
-```text
-first person
-specific to the supplied evidence and decision
-what Ray needs to hear, not generic encouragement
-```
-
-Required opener:
-
-```text
-The thing you’re worried about most right now — I remember that. Here’s what actually happened…
-```
-
 FutureYou must identify:
 
-- what materially compounded;
-- what looked urgent but did not matter;
-- which current fear contained a real signal;
-- the action present-day Ray should take now.
+- what could materially compound;
+- what looks urgent but may not matter;
+- which current fear contains a real signal;
+- the action present-day Juss should consider now.
 
-Do not fabricate future facts, revenue, users, funding, partnerships, launch status, or outcomes. FutureYou is a decision-compression lens, not evidence.
+Do not fabricate future facts, revenue, users, funding, partnerships, launch status, or outcomes. FutureYou cannot approve an action, renew a Truth Lease, or turn a desired future into verified reality.
 
 ## Shared social campaign lens
 
-The same AI action must create one coherent campaign package, then tailor the copy to each platform instead of copying one generic caption everywhere.
+The same verified claim set may become channel-native copy for:
+
+```text
+LinkedIn
+Facebook
+Instagram
+Threads
+X
+TikTok
+YouTube Shorts
+Pinterest
+Bluesky
+Mastodon
+Google Business
+```
 
 Required campaign fields:
 
@@ -113,15 +144,31 @@ google_business_draft
 Rules:
 
 - Keep one verified campaign claim set across every platform.
-- Adapt hook, length, formatting, call to action, and media framing to the platform.
+- Adapt hook, length, formatting, CTA, and media framing to the destination.
 - Do not invent platform traction, views, followers, customers, partnerships, or launch proof.
-- Keep every draft review-only until an exact founder approval event exists.
-- The Buffer lane may distribute to three approved active channels in parallel, costing one Buffer action per channel.
-- Non-selected platform drafts remain available in HubSpot and Founder Control Room without another AI task.
+- Keep drafts non-executable until the current authority contract passes.
+- Never treat n8n acceptance, Buffer scheduling, Zapier success, or a provider request ID as final publication proof.
+- Require provider readback and a retained FCR outcome receipt before a channel becomes terminal green.
+- Keep private prompts, raw diffs, credentials, security-sensitive detail, customer data, unreleased roadmap, and private metrics behind Sauce Guard.
+
+## Founder-owned publishing outcome
+
+The product goal is not merely to generate social copy. Founder Control Room should be able to publish verified progress **about Juss's products from Juss's own product** while keeping the private machinery private.
+
+Public story may say:
+
+- what changed;
+- what problem was solved;
+- what was learned;
+- why the progress matters;
+- what public proof supports it;
+- what remains honestly unresolved.
+
+It should not expose the recipe merely to prove that progress happened.
 
 ## LinkedIn rising-floor lens
 
-LinkedIn is not optimized for one-off virality. The standing goal is a **steady or accelerating verified floor**: preserve the strongest mechanics from the last proven winner, improve one or more weak dimensions, measure the result, and use that result as the next baseline.
+LinkedIn is not optimized for one-off virality. The standing strategy goal is a steady or accelerating verified floor: preserve the strongest mechanics from the last proven winner, improve weak dimensions, measure the result, and use that verified result as the next baseline.
 
 Required fields:
 
@@ -141,32 +188,16 @@ Rules:
 
 - `linkedin_baseline_ref` must point to the latest verified LinkedIn analytics export, platform recap, or equally authoritative measurement source. Never invent a baseline from memory.
 - Never classify an incomplete day, partial export, or rolling-window replacement effect as a true decline without a like-for-like comparison.
-- The target is to beat the previous verified floor **without sacrificing engagement quality or business relevance**.
-- Every post must combine: verified build/operating proof, a founder-specific point of view, a clear business or investor consequence, and an honest unresolved truth or next gate.
-- When relevant warm comments, messages, invitations, or partnership threads require a response, treat them as conversion signals and surface the next conversation action before chasing extra distribution.
-- Use a visual only when it improves product comprehension or attention capture. Decorative media alone does not satisfy the strategy.
-- Measure at 24 hours and 48 hours. Compare impressions, engagement rate, quality comments, profile/follower conversion, and warm-conversation conversion where those metrics are available.
+- The target is to beat the previous verified floor without sacrificing engagement quality or business relevance.
+- Every post should combine verified build/operating proof, a founder-specific point of view, a clear business consequence, and an honest unresolved truth or next gate when relevant.
+- Relevant warm comments, messages, invitations, or partnership threads are conversion signals and should surface the next conversation action before chasing extra distribution.
+- Use a visual when it improves comprehension or attention. Decorative media alone does not satisfy the strategy.
+- Measure at 24 hours and 48 hours when those windows and metrics are actually available.
 - Classify weak results instead of hand-waving them: `distribution_failure`, `content_failure`, or `conversion_failure`.
-- `linkedin_next_mutation` must name what winning mechanism carries forward: hook structure, proof mechanic, format, visual, CTA, or conversion behavior.
-- `linkedin_rising_floor_ready=false` whenever the baseline is missing, the comparison is not like-for-like, or the post has no explicit growth hypothesis.
-- A LinkedIn post may remain review copy when the rising-floor gate is not ready, but it must not enter the scheduled Buffer lane as if the growth contract passed.
+- `linkedin_next_mutation` names which proven mechanism carries forward: hook structure, proof mechanic, format, visual, CTA, or conversion behavior.
+- `linkedin_rising_floor_ready=false` whenever the baseline is missing, stale, non-comparable, or the post has no explicit growth hypothesis.
 
-The system should therefore behave like:
-
-```text
-latest verified baseline
--> warm-conversation check
--> proof-backed post hypothesis
--> optional comprehension visual
--> founder review
--> schedule only when rising-floor-ready
--> 24h measurement
--> 48h measurement
--> classify result
--> carry winner mechanics into next post
-```
-
-Do not hard-code today's numeric thresholds into this contract. The floor must move upward as the account improves.
+Analytics is observation-only. It may improve the next proposal but never authorize publication.
 
 ## Shared truth boundary
 
@@ -176,16 +207,17 @@ The AI result must keep these categories separate:
 VERIFIED
 INFERRED
 UNKNOWN
+STALE / SUPERSEDED
 FUTUREYOU GUIDANCE
 ME DECISION
 SOCIAL REVIEW COPY
 ```
 
-FutureYou guidance, ME decisions, and social copy may reason from verified evidence, but they must never be written back as verified facts.
+FutureYou guidance, ME decisions, social copy, and analytics may reason from verified evidence, but they must never be written back as verified facts or authority.
 
 ## Shared output minimum
 
-The one AI action must return at least:
+The coherent analysis package should support at least:
 
 ```text
 signal_id
@@ -200,6 +232,7 @@ verified_evidence
 inferred_conclusions
 unknown_information
 missing_evidence
+truth_age_or_temporal_state
 first_failure_stage
 recommended_next_action
 me_reality_now
@@ -237,61 +270,29 @@ investor_outreach_draft
 publish_allowed
 ```
 
-`publish_allowed` remains `false` until an exact founder approval event reaches the separate approval lane.
+`publish_allowed` is an output describing current authorization state, not permission for a model to grant itself authority. Under the current executable direct/n8n publication path, exact Current You authorization is separately validated at execution.
 
-`linkedin_rising_floor_ready` is a second, LinkedIn-specific strategy gate. Founder approval does not override a missing verified LinkedIn baseline; the post must stay review-only until the strategy input is repaired.
+Investor outreach remains separate from social publication. A draft may be generated, but investor email must not auto-send without the applicable standing policy **and recipient-specific qualification**.
 
-## Zapier task effect
+## HISTORICAL ZAPIER BUDGET
 
-Adding FutureYou, ME, the wider social matrix, and the LinkedIn rising-floor fields changes the structured response schema only.
-
-```text
-Before: 1 AI action per signal
-After:  1 AI action per signal
-Added AI tasks: 0
-```
-
-Approved Buffer distribution remains separately and honestly budgeted:
+The following budget is retained as historical provenance for the earlier free-plan optimization. It must not be treated as the current distribution constitution:
 
 ```text
-3 selected channels
-x 1 Buffer action per channel
-= 3 Zapier tasks per approved campaign
-```
-
-The locked monthly plan is:
-
-```text
+one structured AI action per signal
+three selected Buffer channel actions per approved campaign
 88 planned tasks
 2 routine headroom
 10 emergency reserve
 100-task free-plan limit
 ```
 
-## Validation
+The earlier rule to avoid one separate Zap/AI action per FutureYou, ME, platform, or investor draft remains a useful efficiency principle. The exact task counts and Buffer-first routing are historical and may not override current first-party LinkedIn + provider-neutral n8n architecture.
 
-Run:
+Zapier remains a bounded integration plane where useful. n8n is the durable multistep orchestration plane where configured. FCR remains truth/authority. Providers remain terminal outcome authorities for their own external state.
 
-```bash
-npm run verify:zapier-budget
-```
+## Validation and documentation truth
 
-The verifier must fail when:
+Whenever the social execution architecture changes, update this document and `README.md` in the same bounded change and run the repository Documentation Truth gate.
 
-- FutureYou fields are removed;
-- ME fields are removed;
-- a required social-platform draft is removed;
-- LinkedIn rising-floor fields or guardrails are removed;
-- the LinkedIn baseline stops requiring verified analytics/platform evidence;
-- partial rolling windows can be labeled decline without like-for-like evidence;
-- the 24h/48h measurement windows drift;
-- winner mechanics stop compounding into the next post;
-- FutureYou, ME, social drafting, or LinkedIn strategy are split into separate AI actions;
-- the Buffer allocation does not equal the number of configured parallel channel slots;
-- platform-native copy is no longer required;
-- the planned task total exceeds the 90-task operating ceiling;
-- the 10-task emergency reserve is consumed by routine planning.
-
-## Rollback
-
-Revert this contract, the matching JSON fields, verifier assertions, and LinkedIn Buffer firewall gate together. Do not delete Zapier workflows, HubSpot evidence, Buffer drafts/posts, Zap History, analytics exports, or queue records.
+Historical budget or provider assumptions must be labeled as such rather than silently surviving as present-tense instructions.
