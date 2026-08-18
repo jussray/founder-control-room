@@ -162,6 +162,22 @@ Observe the contradiction
 → automate only repeated read-only evidence refresh
 ```
 
+## Public Access recovery evidence boundary
+
+The founder-gated `FCR Access Front Door Recovery` workflow is a separate inspection/recovery authority from the read-only reasoning engine. Its public evidence path is intentionally narrower than its private working files.
+
+The recovery workflow must:
+
+- independently reduce an unsafe or malformed requested head to literal `UNKNOWN` before any always-path publication;
+- treat both Access-provider and browser receipt files as untrusted streams;
+- parse each receipt stream with slurp semantics, require exactly one JSON document, then validate only `.[0]` against bounded field/type/enum allowlists;
+- make the public projection independently slurp and project only `.[0]`, so a multi-document stream cannot fan out after validation;
+- suppress raw producer stdout/stderr and never persist raw Access/browser receipt JSON as public evidence;
+- keep raw browser origin/error strings, Access application names/objects, free-form blocker/next-action text, tokens, provider payloads, and secret-bearing values out of public issue comments, job summaries, and retained public artifacts; and
+- persist one sanitized Markdown receipt for the founder control issue, Actions summary, and artifact. Apply-mode approval references are validated but represented in the recovery authority summary only by a SHA-256 receipt; read-only runs reject an approval reference.
+
+These controls prove a **repository evidence-sanitization contract**, not live Cloudflare state. A green workflow or sanitized receipt cannot by itself prove current Access configuration, credential permissions, front-door reachability, or runtime identity. Those remain provider/runtime observations with their own freshness requirements.
+
 ## Verification
 
 ```bash
