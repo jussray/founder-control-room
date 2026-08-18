@@ -170,9 +170,9 @@ jobs:
             if [[ ! -f "$access_receipt" ]]; then
               echo '- Access provider receipt: `missing`'
               echo '- Provider truth: `UNKNOWN` because the workflow ended before a structured Access receipt was produced.'
-            elif ! jq empty "$access_receipt" >/dev/null 2>&1; then
+            elif ! jq -e 'type == "object"' "$access_receipt" >/dev/null 2>&1; then
               echo '- Access provider receipt: `malformed`'
-              echo '- Provider truth: `UNKNOWN` because the structured Access receipt is not valid JSON.'
+              echo '- Provider truth: `UNKNOWN` because the structured Access receipt is not a valid JSON object.'
             else
               echo '- Access provider receipt: `present`'
               echo
@@ -205,10 +205,10 @@ jobs:
             if [[ ! -f "$browser_receipt" ]]; then
               echo
               echo '- Browser proof receipt: `missing`'
-            elif ! jq empty "$browser_receipt" >/dev/null 2>&1; then
+            elif ! jq -e 'type == "object"' "$browser_receipt" >/dev/null 2>&1; then
               echo
               echo '- Browser proof receipt: `malformed`'
-              echo '- Browser proof: `UNKNOWN` because the structured browser receipt is not valid JSON.'
+              echo '- Browser proof: `UNKNOWN` because the structured browser receipt is not a valid JSON object.'
             else
               echo
               echo '- Browser proof receipt: `present`'
