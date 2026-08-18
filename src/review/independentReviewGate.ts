@@ -85,6 +85,7 @@ const VERDICTS = new Set<ReviewVerdict>(["clear", "needs_review", "blocked"]);
 
 const text = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const lower = (value: unknown): string => text(value).toLowerCase();
+const isGitHubAppBotIdentity = (value: unknown): boolean => /\[bot\]$/i.test(text(value));
 
 export function independentReviewPolicyHash(policy: IndependentReviewPolicy): string {
   const trustedReviewerIds = Array.isArray(policy?.trustedSemanticReviewerIds)
@@ -189,6 +190,9 @@ function validateReceipt(review: IndependentReviewReceipt, context: IndependentR
   if (!REVIEWER_KINDS.has(review.reviewer?.kind)) errors.push("Unsupported reviewer kind");
   if (!text(review.reviewer?.provider) || !text(review.reviewer?.runtime)) errors.push("Reviewer provider/runtime are required");
   if (lower(review.reviewer?.id) === lower(context.authorIdentity)) errors.push("Patch author cannot satisfy independent review");
+  if (review.reviewer?.kind === "semantic" && isGitHubAppBotIdentity(review.reviewer?.id)) {
+    errors.push("GitHub App bot cannot satisfy independent semantic review");
+  }
 
   if (!Array.isArray(review.findings) || review.findings.length > 100) {
     errors.push("Review findings must contain at most 100 items");
@@ -290,6 +294,10 @@ export async function evaluateIndependentReviewGate(
   } else {
     const normalized = policy.trustedSemanticReviewerIds.map(lower).filter(Boolean);
     if (new Set(normalized).size !== normalized.length) blockers.push("Trusted semantic reviewer identities must be unique");
+    const botReviewers = normalized.filter(isGitHubAppBotIdentity);
+    if (botReviewers.length > 0) {
+      blockers.push(`Trusted semantic reviewer policy cannot include GitHub App bot identities: ${botReviewers.join(", ")}`);
+    }
     if (Number.isInteger(policy.requiredSemanticReviews) && normalized.length < policy.requiredSemanticReviews) {
       blockers.push("Policy has fewer trusted semantic reviewers than required semantic reviews");
     }
