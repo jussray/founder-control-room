@@ -32,14 +32,24 @@ describe("Cloudflare request trace witness", () => {
   it("keeps the trace witness read-only and non-authoritative", () => {
     expect(tracer).toContain('new Set(["GET", "HEAD"])');
     expect(tracer).toContain("REQUEST_TRACE_METHOD_UNSAFE");
+    expect(tracer).toContain("requestSimulation: true");
     expect(tracer).toContain("runtimeShaVerified: false");
     expect(tracer).toContain("canAuthorizeProviderMutation: false");
   });
 
-  it("redacts and summarizes trace output instead of persisting raw rule payloads", () => {
+  it("uses zone-response semantics rather than implying origin proof", () => {
+    expect(tracer).toContain("zoneResponseStatusCode");
+    expect(tracer).toContain("zone response status code");
+    expect(tracer).not.toContain("originStatusCode");
+    expect(tracer).not.toContain("origin status code");
+  });
+
+  it("redacts and minimizes trace output instead of persisting raw or free-form rule payloads", () => {
     expect(tracer).toContain("summarizeTrace(trace)");
     expect(tracer).not.toContain("action_parameters");
     expect(tracer).not.toContain("item.expression");
+    expect(tracer).not.toContain("item.name");
+    expect(tracer).not.toContain("item.description");
     expect(tracer).toContain("Bearer [REDACTED]");
   });
 

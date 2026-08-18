@@ -57,11 +57,9 @@ function summarizeTrace(trace) {
         step,
         type: redact(item.type ?? "") || null,
         stepName: redact(item.step_name ?? "") || null,
-        name: redact(item.name ?? "") || null,
         kind: redact(item.kind ?? "") || null,
         matched: typeof item.matched === "boolean" ? item.matched : null,
         action: redact(item.action ?? "") || null,
-        description: redact(item.description ?? "") || null,
       });
       visit(item.trace, step, depth + 1);
     }
@@ -93,7 +91,7 @@ const requestTrace = {
   method: traceMethod,
   observedAt,
   requestSimulation: true,
-  originStatusCode: null,
+  zoneResponseStatusCode: null,
   traceStepCount: null,
   matchedStepCount: null,
   steps: [],
@@ -157,21 +155,21 @@ try {
   }
 
   const trace = body?.result?.trace;
-  const originStatusCode = body?.result?.status_code;
+  const zoneResponseStatusCode = body?.result?.status_code;
   if (!Array.isArray(trace)) {
     throw new Error(
       "REQUEST_TRACE_RESULT_INVALID: Cloudflare returned no trace array.",
     );
   }
-  if (!Number.isInteger(originStatusCode)) {
+  if (!Number.isInteger(zoneResponseStatusCode)) {
     throw new Error(
-      "REQUEST_TRACE_RESULT_INVALID: Cloudflare returned no origin status code.",
+      "REQUEST_TRACE_RESULT_INVALID: Cloudflare returned no zone response status code.",
     );
   }
 
   const steps = summarizeTrace(trace);
   requestTrace.ok = true;
-  requestTrace.originStatusCode = originStatusCode;
+  requestTrace.zoneResponseStatusCode = zoneResponseStatusCode;
   requestTrace.traceStepCount = steps.length;
   requestTrace.matchedStepCount = steps.filter(
     (step) => step.matched === true,
