@@ -233,7 +233,7 @@ jobs:
               echo '- Access provider receipt: `present`'
               echo
               echo '```json'
-              jq '{
+              jq -s '.[0] | {
                 schemaVersion,
                 scope,
                 observedAt,
@@ -293,7 +293,7 @@ jobs:
               echo '- Browser proof receipt: `present`'
               echo
               echo '```json'
-              jq '{
+              jq -s '.[0] | {
                 schemaVersion,
                 scope,
                 observedAt,
