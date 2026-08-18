@@ -1,189 +1,146 @@
 name: PR Recovery Exact-Head Driver
 
 on:
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      expected_head_sha:
+        description: Exact 40-character commit SHA to diagnose
+        required: true
+        type: string
+      reason:
+        description: Why recovery diagnostics are needed
+        required: false
+        default: manual recovery
+        type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: pr-recovery-${{ github.repository }}-${{ inputs.expected_head_sha }}
+  cancel-in-progress: false
+
 env:
-  TARGET_SHA: ${{ github.event.pull_request.head.sha }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  TARGET_SHA: ${{ inputs.expected_head_sha }}
 
 jobs:
-  target-metadata:
-    name: Exact Target Metadata
-    runs-on: ubuntu-latest
+  recovery:
+    name: Recovery diagnostic packet
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Validate immutable target input
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "expected_head_sha must be a lowercase 40-character Git SHA."
+            exit 2
+          fi
+
+      - name: Check out immutable target
+        uses: actions/checkout@v4
         with:
           ref: ${{ env.TARGET_SHA }}
           fetch-depth: 1
+          persist-credentials: false
+
       - name: Assert immutable target
         shell: bash
         run: |
+          set -euo pipefail
           observed="$(git rev-parse HEAD)"
-          echo "target_sha=$TARGET_SHA"
-          echo "observed_sha=$observed"
+          printf 'target_sha=%s\nobserved_sha=%s\nreason=%s\n' \
+            "$TARGET_SHA" \
+            "$observed" \
+            "${{ inputs.reason }}"
           test "$observed" = "$TARGET_SHA"
 
-  typecheck:
-    name: Target Typecheck
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TARGET_SHA }}
-          fetch-depth: 1
-      - run: test "$(git rev-parse HEAD)" = "$TARGET_SHA"
-      - uses: actions/setup-node@v4
+      - name: Prepare recovery packet directory
+        run: mkdir -p recovery-logs
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
-      - run: npm ci
-      - name: Run typecheck with retained diagnostics
+
+      - name: Install locked dependencies once
         shell: bash
         run: |
           set -o pipefail
-          npm run typecheck 2>&1 | tee typecheck.log
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: pr35-recovery-typecheck-log
-          path: typecheck.log
-          if-no-files-found: error
-          retention-days: 7
+          npm ci 2>&1 | tee recovery-logs/npm-ci.log
 
-  lint:
-    name: Target Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TARGET_SHA }}
-          fetch-depth: 1
-      - run: test "$(git rev-parse HEAD)" = "$TARGET_SHA"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-      - run: npm ci
-      - name: Run lint with retained diagnostics
-        shell: bash
-        run: |
-          set -o pipefail
-          npm run lint 2>&1 | tee lint.log
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: pr35-recovery-lint-log
-          path: lint.log
-          if-no-files-found: error
-          retention-days: 7
-
-  unit-tests:
-    name: Target Unit Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TARGET_SHA }}
-          fetch-depth: 1
-      - run: test "$(git rev-parse HEAD)" = "$TARGET_SHA"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-      - run: npm ci
-      - name: Run unit tests with retained diagnostics
-        shell: bash
-        run: |
-          set -o pipefail
-          npm test -- --coverage --reporter=json --outputFile=driver-test-results.json 2>&1 | tee unit-tests.log
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: pr35-recovery-unit-test-diagnostics
-          path: |
-            unit-tests.log
-            driver-test-results.json
-          if-no-files-found: warn
-          retention-days: 7
-
-  terminal-contract:
-    name: Target Terminal and AI Contracts
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TARGET_SHA }}
-          fetch-depth: 1
-      - run: test "$(git rev-parse HEAD)" = "$TARGET_SHA"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-      - run: npm ci
-      - run: npm run verify:terminal-contract
-      - run: npm run verify:ai-skills
-
-  build:
-    name: Target Production Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TARGET_SHA }}
-          fetch-depth: 1
-      - run: test "$(git rev-parse HEAD)" = "$TARGET_SHA"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-      - run: npm ci
-      - name: Run production build with retained diagnostics
-        shell: bash
-        run: |
-          set -o pipefail
-          npm run build 2>&1 | tee build.log
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: pr35-recovery-build-log
-          path: build.log
-          if-no-files-found: error
-          retention-days: 7
-
-  migration-lint:
-    name: Target Migration Lint Evidence
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TARGET_SHA }}
-          fetch-depth: 1
-      - run: test "$(git rev-parse HEAD)" = "$TARGET_SHA"
-      - uses: supabase/setup-cli@v1
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
         with:
           version: 2.101.0
-      - name: Start local database and lint migrations
+
+      - name: Run complete recovery diagnostics
         shell: bash
         run: |
-          set -o pipefail
-          {
-            test -f supabase/config.toml || supabase init
-            supabase db start
-            supabase db lint --local --fail-on error
-          } 2>&1 | tee migration-lint.log
-      - uses: actions/upload-artifact@v4
+          set +e
+          : > recovery-logs/summary.txt
+          failed=0
+
+          run_check() {
+            name="$1"
+            shift
+            echo "::group::${name}"
+            "$@" 2>&1 | tee "recovery-logs/${name}.log"
+            status=${PIPESTATUS[0]}
+            printf '%s=%s\n' "$name" "$status" >> recovery-logs/summary.txt
+            if [ "$status" -ne 0 ]; then
+              failed=1
+            fi
+            echo "::endgroup::"
+          }
+
+          run_check typecheck npm run typecheck
+          run_check lint npm run lint
+          run_check unit-tests npm test -- --coverage --reporter=json --outputFile=recovery-logs/test-results.json
+          run_check terminal-contract npm run verify:terminal-contract
+          run_check ai-skills npm run verify:ai-skills
+          run_check production-build npm run build
+
+          echo "::group::migration-lint"
+          bash -o pipefail -c '
+            failed=0
+            if [ ! -f supabase/config.toml ]; then
+              supabase init || failed=1
+            fi
+            started=0
+            if supabase db start; then
+              started=1
+            else
+              failed=1
+            fi
+            if [ "$started" -eq 1 ]; then
+              supabase db lint --local --fail-on error || failed=1
+              supabase stop --no-backup || failed=1
+            else
+              echo "migration lint skipped because the local database did not start"
+            fi
+            exit "$failed"
+          ' 2>&1 | tee recovery-logs/migration-lint.log
+          migration_status=${PIPESTATUS[0]}
+          printf 'migration-lint=%s\n' "$migration_status" >> recovery-logs/summary.txt
+          if [ "$migration_status" -ne 0 ]; then
+            failed=1
+          fi
+          echo "::endgroup::"
+
+          printf 'overall=%s\n' "$failed" >> recovery-logs/summary.txt
+          cat recovery-logs/summary.txt
+          exit "$failed"
+
+      - name: Upload consolidated recovery packet
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: pr35-recovery-migration-lint-log
-          path: migration-lint.log
+          name: pr-recovery-${{ env.TARGET_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: recovery-logs/
           if-no-files-found: error
           retention-days: 7
-      - name: Stop local database
-        if: always()
-        run: supabase stop --no-backup
