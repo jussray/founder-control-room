@@ -78,7 +78,7 @@ const OWNED_REPO = /^jussray\/[A-Za-z0-9._-]+$/;
 const CURRENT_LANGUAGE = /\b(currently|right now|is live|are live|is green|are green|remains|still (?:is|are|has|have)|now (?:is|are|has|have))\b/i;
 const HISTORICAL_LANGUAGE = /\b(built|shipped|implemented|added|merged|completed|released|tested|verified|fixed|created|introduced|deployed|reached|grew|was|were|did)\b/i;
 const CURRENT_RUNTIME_LANGUAGE = /(?:\b(?:production|runtime|site|app|api|service|endpoint|deployment)\b.{0,80}\b(?:live|healthy|up|reachable|serving|available)\b)|(?:\b(?:live|healthy|up|reachable|serving|available)\b.{0,80}\b(?:production|runtime|site|app|api|service|endpoint|deployment)\b)/i;
-const METRIC_LANGUAGE = /(?:\b(?:have|has|currently|now)\b.{0,40}\b\d[\d,.]*\s*(?:followers?|impressions?|users?|downloads?|signups?|customers?|sales)\b)|(?:\b(?:revenue|mrr|arr|gmv|conversion|engagement rate)\b.{0,30}(?:\$\s?\d|\d[\d,.]*|\d+(?:\.\d+)?%))|(?:\d+(?:\.\d+)?%)/i;
+const METRIC_LANGUAGE = /(?:\b\d[\d,.]*\s*(?:followers?|impressions?|users?|downloads?|signups?|customers?|sales)\b)|(?:\b(?:revenue|mrr|arr|gmv|conversion|engagement rate)\b.{0,30}(?:\$\s?\d|\d[\d,.]*|\d+(?:\.\d+)?%))|(?:\d+(?:\.\d+)?%)/i;
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -168,7 +168,6 @@ function invalidReceipt(
 
 function semanticDomainErrors(claim: CanonicalPublicClaim): string[] {
   const errors: string[] = [];
-  const historical = HISTORICAL_LANGUAGE.test(claim.text) && !CURRENT_LANGUAGE.test(claim.text);
 
   if (claim.temporalClass === 'historical_version') {
     if (CURRENT_LANGUAGE.test(claim.text)) {
@@ -183,8 +182,8 @@ function semanticDomainErrors(claim: CanonicalPublicClaim): string[] {
     errors.push(`current repository claim ${claim.claimId} uses runtime-state language and requires current_runtime evidence`);
   }
 
-  if (claim.temporalClass !== 'metric' && METRIC_LANGUAGE.test(claim.text) && !historical) {
-    errors.push(`current metric language in claim ${claim.claimId} requires metric evidence`);
+  if (claim.temporalClass !== 'metric' && METRIC_LANGUAGE.test(claim.text)) {
+    errors.push(`metric language in claim ${claim.claimId} requires metric evidence; repository version proof cannot establish analytics truth`);
   }
 
   return errors;
