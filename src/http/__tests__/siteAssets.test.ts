@@ -93,7 +93,7 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(playwrightProof).toContain('capability must not be presented as an already-authorized publish control');
   });
 
-  it('keeps browser API calls same-origin and rejects an unverified upstream', () => {
+  it('keeps browser API calls same-origin and binds them directly to the API Worker', () => {
     const proxy = read('public/_worker.js');
 
     expect(proxy).toContain("const API_ORIGIN = 'https://api.foundercontrolroom.org'");
@@ -105,7 +105,9 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(proxy).toContain('return env.ASSETS.fetch(request)');
     expect(proxy).toContain("headers.set('x-forwarded-host', sourceUrl.host)");
     expect(proxy).toContain("redirect: 'manual'");
-    expect(proxy).toContain('const response = await fetch(createApiRequest(request))');
+    expect(proxy).toContain("typeof env.FCR_API.fetch !== 'function'");
+    expect(proxy).toContain("API_SERVICE_BINDING_UNAVAILABLE");
+    expect(proxy).toContain('const response = await env.FCR_API.fetch(createApiRequest(request))');
     expect(proxy).toContain('const failureCode = upstreamFailureCode(response)');
     expect(proxy).toContain('API_SERVICE_IDENTITY_MISMATCH');
     expect(proxy).toContain('return failureCode ? degradedResponse(request, failureCode) : response');
