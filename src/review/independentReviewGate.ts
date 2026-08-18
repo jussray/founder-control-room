@@ -109,6 +109,12 @@ export function independentReviewDiffHash(diff: Diff): string {
       `Independent review diff completeness is unproven for ${files.length} files; provider comparisons must contain at most ${MAX_COMPLETE_COMPARE_FILES} files`,
     );
   }
+  const filesWithoutPatch = files.filter((file) => typeof file.patch !== "string");
+  if (filesWithoutPatch.length > 0) {
+    throw new Error(
+      `Independent review diff content is incomplete for: ${filesWithoutPatch.map((file) => file.path).sort().join(", ")}`,
+    );
+  }
   files.sort((left, right) => left.path.localeCompare(right.path));
   return hash("sha256", JSON.stringify([
     lower(diff?.base),
@@ -120,7 +126,7 @@ export function independentReviewDiffHash(diff: Diff): string {
       file.status,
       file.additions,
       file.deletions,
-      file.patch ?? "",
+      file.patch,
     ]),
   ]), "hex");
 }
