@@ -78,6 +78,7 @@ export interface IndependentReviewGateResult {
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
+const MAX_COMPLETE_COMPARE_FILES = 299;
 const REVIEWER_KINDS = new Set<ReviewerKind>(["semantic", "deterministic"]);
 const SEVERITIES = new Set<ReviewSeverity>(["P0", "P1", "P2", "P3"]);
 const VERDICTS = new Set<ReviewVerdict>(["clear", "needs_review", "blocked"]);
@@ -99,6 +100,15 @@ export function independentReviewPolicyHash(policy: IndependentReviewPolicy): st
 
 export function independentReviewDiffHash(diff: Diff): string {
   const files = Array.isArray(diff?.files) ? [...diff.files] : [];
+  // GitHub's compare endpoint exposes at most 300 changed files. Seeing 300
+  // therefore cannot prove whether the comparison is complete. FCR prefers a
+  // false negative over reviewing a silently truncated file set; split the PR
+  // or use a future provider primitive that attests the full changed-file set.
+  if (files.length > MAX_COMPLETE_COMPARE_FILES) {
+    throw new Error(
+      `Independent review diff completeness is unproven for ${files.length} files; provider comparisons must contain at most ${MAX_COMPLETE_COMPARE_FILES} files`,
+    );
+  }
   files.sort((left, right) => left.path.localeCompare(right.path));
   return hash("sha256", JSON.stringify([
     lower(diff?.base),
