@@ -3,6 +3,7 @@ import {
   N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
   buildProviderNeutralN8nFounderContentRequest,
   providerSupportsFounderContentPlatform,
+  readN8nFounderContentProviderConfig,
   resolveN8nFounderContentProvider,
   validateProviderNeutralN8nFounderContentEnvelope,
   verifyProviderNeutralN8nFounderContentReceipt,
@@ -66,20 +67,9 @@ function envelope(
 }
 
 describe('provider-neutral n8n founder-content routing', () => {
-  it('covers the current platform-native campaign matrix while preserving Buffer fallback', () => {
-    expect(N8N_FOUNDER_CONTENT_PROVIDER_ROUTES.buffer).toEqual([
-      'linkedin',
-      'facebook',
-      'instagram',
-      'threads',
-      'x',
-      'tiktok',
-      'youtube_shorts',
-      'pinterest',
-      'bluesky',
-      'mastodon',
-      'google_business',
-    ]);
+  it('keeps Buffer limited to currently proven routes while defining bounded native provider contracts', () => {
+    expect(N8N_FOUNDER_CONTENT_PROVIDER_ROUTES.buffer).toEqual(['linkedin', 'facebook']);
+    expect(providerSupportsFounderContentPlatform('buffer', 'instagram')).toBe(false);
     expect(providerSupportsFounderContentPlatform('meta', 'facebook')).toBe(true);
     expect(providerSupportsFounderContentPlatform('meta', 'instagram')).toBe(true);
     expect(providerSupportsFounderContentPlatform('meta', 'threads')).toBe(true);
@@ -87,11 +77,32 @@ describe('provider-neutral n8n founder-content routing', () => {
     expect(providerSupportsFounderContentPlatform('youtube', 'youtube_shorts')).toBe(true);
   });
 
+  it('defaults runtime enablement to Buffer only and fails closed on invalid provider configuration', () => {
+    expect(readN8nFounderContentProviderConfig({})).toEqual({
+      enabledProviders: ['buffer'],
+      invalidProviders: [],
+    });
+    expect(readN8nFounderContentProviderConfig({
+      N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS: 'buffer,meta,tiktok',
+    })).toEqual({
+      enabledProviders: ['buffer', 'meta', 'tiktok'],
+      invalidProviders: [],
+    });
+    expect(readN8nFounderContentProviderConfig({
+      N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS: 'meta,unknown-provider',
+    })).toEqual({
+      enabledProviders: ['meta'],
+      invalidProviders: ['unknown-provider'],
+    });
+  });
+
   it('defaults to Buffer for backward compatibility but allows only bounded compatible providers', () => {
     expect(resolveN8nFounderContentProvider({}, 'facebook')).toBe('buffer');
     expect(resolveN8nFounderContentProvider({ n8n_provider: 'meta' }, 'facebook')).toBe('meta');
     expect(resolveN8nFounderContentProvider({ n8n_provider: 'tiktok' }, 'tiktok')).toBe('tiktok');
 
+    expect(() => resolveN8nFounderContentProvider({}, 'tiktok'))
+      .toThrow(/provider buffer does not support platform tiktok/);
     expect(() => resolveN8nFounderContentProvider({ n8n_provider: 'meta' }, 'tiktok'))
       .toThrow(/provider meta does not support platform tiktok/);
     expect(() => resolveN8nFounderContentProvider({ n8n_provider: 'unknown-provider' }, 'facebook'))
