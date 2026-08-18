@@ -101,13 +101,13 @@ jobs:
       - name: Inspect live Access state without mutation
         env:
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
-        run: node scripts/reconcile-cloudflare-access-public-zone.mjs
+        run: node scripts/reconcile-cloudflare-access-public-zone.mjs >/dev/null 2>&1
 
       - name: Apply bounded Access exemption with dedicated admin authority
         if: inputs.apply == true
         env:
           CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
-        run: node scripts/reconcile-cloudflare-access-public-zone.mjs --apply
+        run: node scripts/reconcile-cloudflare-access-public-zone.mjs --apply >/dev/null 2>&1
 
       - name: Install Chromium for post-apply proof
         if: inputs.apply == true
@@ -115,43 +115,7 @@ jobs:
 
       - name: Verify recovered front door and exact runtime SHA with Playwright
         if: inputs.apply == true
-        run: node scripts/verify-fcr-front-door-playwright.mjs
-
-      - name: Publish sanitized recovery summary
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          {
-            echo '## FCR Access front-door receipt availability'
-            echo
-            for receipt in \
-              test-results/fcr-access-front-door-recovery.json \
-              test-results/fcr-access-front-door-browser-proof.json; do
-              label="$(basename "$receipt")"
-              if [[ ! -f "$receipt" ]]; then
-                echo "- $label: \`missing\`"
-              elif ! jq -e 'type == "object"' "$receipt" >/dev/null 2>&1; then
-                echo "- $label: \`malformed\`"
-              else
-                state="$(jq -r 'if (.state | type) == "string" then .state else "unknown" end' "$receipt")"
-                echo "- $label: \`present\` (state: \`$state\`)"
-              fi
-            done
-            echo
-            echo '- Raw recovery receipts are retained in the workflow artifact and are not echoed into the job summary.'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload recovery evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: fcr-access-front-door-recovery-${{ env.EXPECTED_HEAD_SHA }}-${{ github.run_attempt }}
-          path: |
-            test-results/fcr-access-front-door-recovery.json
-            test-results/fcr-access-front-door-browser-proof.json
-          if-no-files-found: ignore
-          retention-days: 30
+        run: node scripts/verify-fcr-front-door-playwright.mjs >/dev/null 2>&1
 
       - name: Return sanitized recovery receipt to founder control issue
         if: always()
@@ -165,7 +129,8 @@ jobs:
           set -euo pipefail
           access_receipt='test-results/fcr-access-front-door-recovery.json'
           browser_receipt='test-results/fcr-access-front-door-browser-proof.json'
-          body="$(mktemp)"
+          public_receipt='test-results/fcr-access-front-door-public-receipt.md'
+          mkdir -p test-results
 
           {
             echo '## FCR Cloudflare Access receipt'
@@ -236,6 +201,16 @@ jobs:
               }' "$browser_receipt"
               echo '```'
             fi
-          } > "$body"
+          } > "$public_receipt"
 
-          gh issue comment "$RETURN_ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$body"
+          gh issue comment "$RETURN_ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$public_receipt"
+          cat "$public_receipt" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload sanitized recovery evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-access-front-door-public-receipt-${{ env.EXPECTED_HEAD_SHA }}-${{ github.run_attempt }}
+          path: test-results/fcr-access-front-door-public-receipt.md
+          if-no-files-found: ignore
+          retention-days: 30
