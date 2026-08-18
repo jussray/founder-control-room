@@ -12,7 +12,10 @@ const { canonicalChiefIdentity, hashPublicPayload } = founderContentAuthorizatio
   hashPublicPayload(value: unknown): string;
 };
 
-function proposalWithClaim(text: string): Record<string, unknown> {
+function proposalWithClaim(
+  claimText: string,
+  draftText: string = claimText,
+): Record<string, unknown> {
   const value: Record<string, unknown> = {
     version: 1,
     kind: 'chief-ai/founder-content-proposal',
@@ -24,10 +27,10 @@ function proposalWithClaim(text: string): Record<string, unknown> {
     public_payload: {
       platform: 'facebook',
       story_type: 'founder-progress',
-      draft_text: text,
+      draft_text: draftText,
       public_claims: [{
         claim_id: 'facebook-proof-bound',
-        text,
+        text: claimText,
         truth_state: 'verified',
         public_safe: true,
         evidence_ref: EVIDENCE_REF,
@@ -103,8 +106,8 @@ function approval(proposed: Record<string, unknown>) {
   };
 }
 
-function build(text: string) {
-  const proposed = proposalWithClaim(text);
+function build(claimText: string, draftText: string = claimText) {
+  const proposed = proposalWithClaim(claimText, draftText);
   return () => buildProviderNeutralN8nFounderContentEnvelope({
     n8n_provider: 'meta',
     proposal: proposed,
@@ -114,7 +117,7 @@ function build(text: string) {
 }
 
 describe('deferred founder-content historical wording', () => {
-  it('accepts a durable past-tense claim', () => {
+  it('accepts durable past-tense claim and approved copy', () => {
     expect(build('I shipped the Facebook founder update from verified repository evidence.')).not.toThrow();
   });
 
@@ -127,5 +130,12 @@ describe('deferred founder-content historical wording', () => {
     'The Facebook founder update has verified repository evidence.',
   ])('rejects present-state grammar even when the claim is labeled historical: %s', (claimText) => {
     expect(build(claimText)).toThrow(/uses current-state language/);
+  });
+
+  it('rejects current-state approved copy even when every attached claim is historically durable', () => {
+    expect(build(
+      'I shipped the Facebook founder update from verified repository evidence.',
+      'The Facebook founder update supports verified repository evidence.',
+    )).toThrow(/approved deferred copy uses current-state language/);
   });
 });
