@@ -5,6 +5,9 @@
  *   1. a fresh founder-approved proof_gate_results record; and
  *   2. complete machine evidence bound to the exact current head SHA.
  *
+ * Founder Control Room merges additionally pin provider-backed PR identity
+ * at approval time and re-verify independent review authority before merge.
+ *
  * Every external mutation is reserved in approval_executions BEFORE the
  * provider call. A pending reservation blocks replay if the provider succeeds
  * but the final audit update is interrupted.
@@ -26,7 +29,10 @@ import type { ProofEvidence } from '../../proof-gate/index.js';
 import type { EvidenceKind } from '../../reconciliation/types.js';
 import { WEBHOOK_ONLY_EVIDENCE_KINDS } from '../../reconciliation/types.js';
 import type { PatchFileChange, RepositoryProvider } from '../../providers/RepositoryProvider.js';
-import { enforceMergeReviewAuthority } from '../../review/mergeReviewAuthority.js';
+import {
+  enforceMergeReviewAuthority,
+  prepareMergeReviewAuthority,
+} from '../../review/mergeReviewAuthority.js';
 
 /** Mission states in which the branch is still under active work — safe to patch. */
 const PATCHABLE_MISSION_STATUSES = new Set(['sandboxed', 'in_review']);
@@ -63,7 +69,7 @@ function configuredRepositoryProvider(
   project: RepositoryProjectRow,
 ): { provider: RepositoryProvider; config: ProviderProjectConfig } | { error: string } {
   if (!project.repo_identifier) {
-    return { error: `Repository identifier is missing for project \"${project.slug}\"` };
+    return { error: `Repository identifier is missing for project "${project.slug}"` };
   }
 
   const config: ProviderProjectConfig = {
@@ -208,7 +214,7 @@ approvalsRouter.post(
 
     const { data: mission, error: missionError } = await supabase
       .from('missions')
-      .select('id, project_id, status, branch_ref, policy_snapshot')
+      .select('id, project_id, status, branch_ref, base_ref, policy_snapshot')
       .eq('id', missionId)
       .single();
 
@@ -238,15 +244,8 @@ approvalsRouter.post(
     }
 
     if (result.status === 'converged' && gateId === 'merge' && mission.status === 'in_review') {
-      // Nothing in this codebase ever wrote policy_snapshot.expectedHeadSha,
-      // which the merge-execution route (below) unconditionally requires to
-      // match before it will merge anything — meaning no mission could ever
-      // actually reach a completable merge, regardless of proof-gate result.
-      // This is the natural point to pin it: the founder is approving merge
-      // of the branch's CURRENT exact commit, resolved fresh right now, not
-      // whatever it drifts to later (the execute route separately re-checks
-      // this hasn't moved since).
       let expectedHeadSha: string | null = null;
+      let pinnedReviewAuthority: Record<string, unknown> | null = null;
       if (mission.branch_ref) {
         const { data: project } = await supabase
           .from('projects')
@@ -255,7 +254,8 @@ approvalsRouter.post(
           .maybeSingle();
 
         if (project?.repo_identifier) {
-          const configured = configuredRepositoryProvider(project as RepositoryProjectRow);
+          const projectRow = project as RepositoryProjectRow;
+          const configured = configuredRepositoryProvider(projectRow);
           if ('error' in configured) {
             return res.status(502).json({
               ok: false,
@@ -272,6 +272,25 @@ approvalsRouter.post(
               detail: err instanceof Error ? err.message : String(err),
             });
           }
+
+          try {
+            const prepared = await prepareMergeReviewAuthority({
+              provider: configured.provider,
+              projectId: project.slug,
+              repository: project.repo_identifier,
+              baseRef: typeof mission.base_ref === 'string' && mission.base_ref.trim() ? mission.base_ref : 'main',
+              headRef: mission.branch_ref,
+              headSha: expectedHeadSha,
+              request: body['independentReview'],
+            });
+            pinnedReviewAuthority = prepared as Record<string, unknown> | null;
+          } catch (err) {
+            return res.status(409).json({
+              ok: false,
+              code: 'INDEPENDENT_REVIEW_AUTHORITY_NOT_PINNED',
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
         }
       }
 
@@ -281,7 +300,13 @@ approvalsRouter.post(
           status: 'approved',
           updated_at: new Date().toISOString(),
           ...(expectedHeadSha
-            ? { policy_snapshot: { ...(mission.policy_snapshot as Record<string, unknown> ?? {}), expectedHeadSha } }
+            ? {
+                policy_snapshot: {
+                  ...(mission.policy_snapshot as Record<string, unknown> ?? {}),
+                  expectedHeadSha,
+                  ...(pinnedReviewAuthority ? { independentReview: pinnedReviewAuthority } : {}),
+                },
+              }
             : {}),
         })
         .eq('id', missionId)
@@ -356,7 +381,7 @@ approvalsRouter.post(
       return res.status(403).json({
         error: `Action '${actionType}' requires a passing proof gate result within the last 15 minutes.`,
         code: 'PROOF_GATE_REQUIRED',
-        hint: `Call POST /approvals/${missionId}/run-proof-gate with gateId: \"${actionType}\" first.`,
+        hint: `Call POST /approvals/${missionId}/run-proof-gate with gateId: "${actionType}" first.`,
       });
     }
 
@@ -473,14 +498,6 @@ approvalsRouter.post(
         const baseRef = (payload['baseRef'] as string) ?? 'main';
         await provider.createBranch(project.slug, baseRef, branchName);
 
-        // Pin the exact commit this mission's sandbox now stands on. Without
-        // this, policy_snapshot.expectedHeadSha never exists while the
-        // mission is sandboxed/in_review — MissionController's wrongHead
-        // check against it is permanently vacuous, and the guarded terminal
-        // (which hard-requires this pin at those exact statuses) can never
-        // run for any mission. A failure here doesn't roll back the branch,
-        // which already exists — it's reported as a warning, same as a
-        // failed mission-state update below.
         let expectedHeadSha: string | null = null;
         try {
           expectedHeadSha = await provider.resolveRef(project.slug, branchName);
@@ -550,9 +567,27 @@ approvalsRouter.post(
           projectId: project.slug,
           repository: project.repo_identifier as string,
           baseRef: base,
+          headRef: head,
           headSha: expectedHeadSha,
+          pinned: mission.policy_snapshot?.independentReview,
           payload,
         });
+
+        // Review/provider reads may take time. Re-read both mutable refs at the
+        // last possible moment before integration so neither reviewed side can
+        // drift silently between authority evaluation and the provider write.
+        const finalBaseSha = await provider.resolveRef(project.slug, base);
+        const finalHeadSha = await provider.resolveRef(project.slug, head);
+        if (finalHeadSha !== expectedHeadSha) {
+          throw new Error(
+            `Branch moved after independent review: current ${finalHeadSha}, approved ${expectedHeadSha}.`,
+          );
+        }
+        if (reviewAuthority.required && finalBaseSha.toLowerCase() !== reviewAuthority.baseSha?.toLowerCase()) {
+          throw new Error(
+            `Base moved after independent review: current ${finalBaseSha}, approved ${reviewAuthority.baseSha}.`,
+          );
+        }
 
         const mergeCommitSha = await provider.integrate(project.slug, base, head);
         executionResult = {
@@ -648,7 +683,7 @@ approvalsRouter.post(
       }
       if (change['delete'] !== true && typeof change['content'] !== 'string') {
         return res.status(400).json({
-          error: `changes for \"${change['path'] as string}\" must include string content unless delete is true`,
+          error: `changes for "${change['path'] as string}" must include string content unless delete is true`,
         });
       }
     }
@@ -671,7 +706,7 @@ approvalsRouter.post(
     }
     if (!mission.branch_ref) {
       return res.status(409).json({
-        error: 'Mission has no branch yet. Call POST /:missionId/execute with actionType \"create_branch\" first.',
+        error: 'Mission has no branch yet. Call POST /:missionId/execute with actionType "create_branch" first.',
         code: 'MISSION_HAS_NO_BRANCH',
       });
     }
@@ -725,13 +760,6 @@ approvalsRouter.post(
       },
     });
 
-    // Re-pin expectedHeadSha to this new commit. Without this, the pin set
-    // at create_branch goes stale the moment a founder edits the sandbox
-    // again — CheckRunController only attributes an incoming CI webhook's
-    // evidence to this mission when its head_sha matches the current pin, so
-    // a stale pin silently orphans every check run reported against the new
-    // commit (evidence gets persisted with mission_id: null and never
-    // reaches MissionController at all).
     let warning: string | undefined;
     const { error: pinUpdateError } = await supabase
       .from('missions')

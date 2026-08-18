@@ -6,8 +6,10 @@ import type {
   FileEntry,
   Patch,
   ProjectRepo,
+  PullRequestReviewContext,
   RepositoryProvider,
   RepositoryRef,
+  ReviewSignal,
   RulesetConfig,
   RulesetResult,
   VerificationSignal,
@@ -49,6 +51,7 @@ class LazyRepositoryProvider implements RepositoryProvider {
   readonly name: string;
   private readonly factory: () => Promise<RepositoryProvider>;
   private delegatePromise: Promise<RepositoryProvider> | null = null;
+  private readonly pullRequestContextByProject = new Map<string, PullRequestReviewContext>();
 
   constructor(name: string, factory: () => Promise<RepositoryProvider>) {
     this.name = name;
@@ -84,6 +87,29 @@ class LazyRepositoryProvider implements RepositoryProvider {
     return (await this.delegate()).listVerificationSignals(projectId, ref);
   }
 
+  async listReviewSignals(projectId: string, pullRequestNumber: number): Promise<ReviewSignal[]> {
+    const delegate = await this.delegate();
+    if (!delegate.listReviewSignals) {
+      throw new Error(`${delegate.name}: does not support provider-backed pull-request reviews`);
+    }
+    return delegate.listReviewSignals(projectId, pullRequestNumber);
+  }
+
+  async getPullRequestReviewContext(
+    projectId: string,
+    pullRequestNumber: number,
+  ): Promise<PullRequestReviewContext> {
+    const delegate = await this.delegate();
+    if (!delegate.getPullRequestReviewContext) {
+      throw new Error(`${delegate.name}: does not support provider-backed pull-request context`);
+    }
+    const context = await delegate.getPullRequestReviewContext(projectId, pullRequestNumber);
+    if (projectId === FOUNDER_CONTROL_ROOM_PROJECT_ID) {
+      this.pullRequestContextByProject.set(projectId, context);
+    }
+    return context;
+  }
+
   async createBranch(projectId: string, baseRef: string, name: string): Promise<string> {
     return (await this.delegate()).createBranch(projectId, baseRef, name);
   }
@@ -97,7 +123,46 @@ class LazyRepositoryProvider implements RepositoryProvider {
   }
 
   async integrate(projectId: string, base: string, head: string): Promise<string> {
-    return (await this.delegate()).integrate(projectId, base, head);
+    const delegate = await this.delegate();
+    if (projectId !== FOUNDER_CONTROL_ROOM_PROJECT_ID) {
+      return delegate.integrate(projectId, base, head);
+    }
+
+    const context = this.pullRequestContextByProject.get(projectId);
+    if (!context) {
+      throw new Error(
+        "Founder Control Room integration requires provider-backed pull-request context in the same execution",
+      );
+    }
+    if (base !== FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH || context.baseRef !== FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH) {
+      throw new Error(
+        `Founder Control Room reviewed integration authority is pinned to ${FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH}`,
+      );
+    }
+    if (base !== context.baseRef || head !== context.headRef) {
+      throw new Error(
+        `Founder Control Room integration refs changed after review context: expected ${context.baseRef}<-${context.headRef}, received ${base}<-${head}`,
+      );
+    }
+
+    // Last-mile TOCTOU membrane: re-read BOTH mutable refs immediately before
+    // handing control to the provider mutation. The semantic review is bound to
+    // context.baseSha/context.headSha; moving either ref invalidates that review.
+    const currentBaseSha = await delegate.resolveRef(projectId, base);
+    const currentHeadSha = await delegate.resolveRef(projectId, head);
+    if (currentBaseSha.toLowerCase() !== context.baseSha.toLowerCase()) {
+      throw new Error(
+        `Founder Control Room base moved after review context: current ${currentBaseSha}, reviewed ${context.baseSha}`,
+      );
+    }
+    if (currentHeadSha.toLowerCase() !== context.headSha.toLowerCase()) {
+      throw new Error(
+        `Founder Control Room head moved after review context: current ${currentHeadSha}, reviewed ${context.headSha}`,
+      );
+    }
+
+    this.pullRequestContextByProject.delete(projectId);
+    return delegate.integrate(projectId, base, head);
   }
 
   async deleteBranch(projectId: string, branch: string): Promise<void> {

@@ -1,5 +1,6 @@
 import { hash } from "node:crypto";
 import type {
+  Diff,
   RepositoryProvider,
   ReviewSignal,
   VerificationSignal,
@@ -77,12 +78,59 @@ export interface IndependentReviewGateResult {
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
+const MAX_COMPLETE_COMPARE_FILES = 299;
 const REVIEWER_KINDS = new Set<ReviewerKind>(["semantic", "deterministic"]);
 const SEVERITIES = new Set<ReviewSeverity>(["P0", "P1", "P2", "P3"]);
 const VERDICTS = new Set<ReviewVerdict>(["clear", "needs_review", "blocked"]);
 
 const text = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const lower = (value: unknown): string => text(value).toLowerCase();
+const isGitHubAppBotIdentity = (value: unknown): boolean => /\[bot\]$/i.test(text(value));
+
+export function independentReviewPolicyHash(policy: IndependentReviewPolicy): string {
+  const trustedReviewerIds = Array.isArray(policy?.trustedSemanticReviewerIds)
+    ? policy.trustedSemanticReviewerIds.map(lower).filter(Boolean).sort()
+    : [];
+  return hash("sha256", JSON.stringify([
+    policy?.requiredSemanticReviews,
+    policy?.requireDeterministicReview === true,
+    policy?.blockOnP2 === true,
+    trustedReviewerIds,
+  ]), "hex");
+}
+
+export function independentReviewDiffHash(diff: Diff): string {
+  const files = Array.isArray(diff?.files) ? [...diff.files] : [];
+  // GitHub's compare endpoint exposes at most 300 changed files. Seeing 300
+  // therefore cannot prove whether the comparison is complete. FCR prefers a
+  // false negative over reviewing a silently truncated file set; split the PR
+  // or use a future provider primitive that attests the full changed-file set.
+  if (files.length > MAX_COMPLETE_COMPARE_FILES) {
+    throw new Error(
+      `Independent review diff completeness is unproven for ${files.length} files; provider comparisons must contain at most ${MAX_COMPLETE_COMPARE_FILES} files`,
+    );
+  }
+  const filesWithoutPatch = files.filter((file) => typeof file.patch !== "string");
+  if (filesWithoutPatch.length > 0) {
+    throw new Error(
+      `Independent review diff content is incomplete for: ${filesWithoutPatch.map((file) => file.path).sort().join(", ")}`,
+    );
+  }
+  files.sort((left, right) => left.path.localeCompare(right.path));
+  return hash("sha256", JSON.stringify([
+    lower(diff?.base),
+    lower(diff?.head),
+    diff?.aheadBy,
+    diff?.behindBy,
+    files.map((file) => [
+      file.path,
+      file.status,
+      file.additions,
+      file.deletions,
+      file.patch,
+    ]),
+  ]), "hex");
+}
 
 function reviewSeed(review: IndependentReviewReceipt): string {
   const findings = Array.isArray(review?.findings) ? review.findings : [];
@@ -142,6 +190,9 @@ function validateReceipt(review: IndependentReviewReceipt, context: IndependentR
   if (!REVIEWER_KINDS.has(review.reviewer?.kind)) errors.push("Unsupported reviewer kind");
   if (!text(review.reviewer?.provider) || !text(review.reviewer?.runtime)) errors.push("Reviewer provider/runtime are required");
   if (lower(review.reviewer?.id) === lower(context.authorIdentity)) errors.push("Patch author cannot satisfy independent review");
+  if (review.reviewer?.kind === "semantic" && isGitHubAppBotIdentity(review.reviewer?.id)) {
+    errors.push("GitHub App bot cannot satisfy independent semantic review");
+  }
 
   if (!Array.isArray(review.findings) || review.findings.length > 100) {
     errors.push("Review findings must contain at most 100 items");
@@ -243,6 +294,10 @@ export async function evaluateIndependentReviewGate(
   } else {
     const normalized = policy.trustedSemanticReviewerIds.map(lower).filter(Boolean);
     if (new Set(normalized).size !== normalized.length) blockers.push("Trusted semantic reviewer identities must be unique");
+    const botReviewers = normalized.filter(isGitHubAppBotIdentity);
+    if (botReviewers.length > 0) {
+      blockers.push(`Trusted semantic reviewer policy cannot include GitHub App bot identities: ${botReviewers.join(", ")}`);
+    }
     if (Number.isInteger(policy.requiredSemanticReviews) && normalized.length < policy.requiredSemanticReviews) {
       blockers.push("Policy has fewer trusted semantic reviewers than required semantic reviews");
     }
