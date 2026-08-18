@@ -148,6 +148,8 @@ api.foundercontrolroom.org
 
 The retired `founder-control-room2` identity must not be recreated.
 
+The canonical Worker also owns FCR's outbound Cloudflare Email Service capability through the project-scoped `FCR_EMAIL` binding. Its sender identity is pinned in source/config to `welcome@api.foundercontrolroom.org`; callers cannot supply another project's `from` address, and other portfolio projects do not inherit this capability by default. Checked repository configuration is not proof that Cloudflare has onboarded the sender domain, that the deployed Worker exposes the binding, or that a message was delivered.
+
 Current Pages source fails closed when `FCR_API` is unavailable and verifies the bound service identity on dynamic responses. **Source dependence on that binding does not prove the live Pages project currently has the correct provider binding.** Provider configuration and exact runtime behavior require current Cloudflare readback and deployed-path proof.
 
 Native Cloudflare Worker/Pages build receipts are provider build/deploy evidence for the exact artifact they name. They do not prove the guarded production release path, database migration, auth behavior, browser behavior, fleet-wide runtime identity, or publication outcome.
