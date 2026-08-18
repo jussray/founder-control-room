@@ -12,9 +12,10 @@ const launchLoop = read('.ai/skills/juss-flow-launch-loop/SKILL.md');
 const globalAi = read('GLOBAL_AI.md');
 const verifier = read('scripts/verify-documentation-truth.mjs');
 const workflow = read('.github/workflows/documentation-truth.yml');
+const ci = read('.github/workflows/ci.yml');
 
 describe('documentation truth contract', () => {
-  it('makes post-merge documentation truth an executable gate', () => {
+  it('makes post-merge documentation truth an executable and load-bearing gate', () => {
     expect(readme).toContain('Documentation truth gate');
     expect(mergeAuthority).toContain('Documentation truth');
     expect(launchLoop).toContain('Documentation truth gate');
@@ -23,6 +24,10 @@ describe('documentation truth contract', () => {
     expect(workflow).toContain('Documentation truth gate');
     expect(workflow).toContain('scripts/verify-documentation-truth.mjs');
     expect(workflow).toContain('artifacts/documentation-truth-report.json');
+    expect(ci).toContain('documentation-truth:');
+    expect(ci).toContain('name: Documentation truth');
+    expect(ci).toMatch(/needs:[\s\S]*- documentation-truth/);
+    expect(ci).toContain('DOCUMENTATION_TRUTH_RESULT: ${{ needs.documentation-truth.result }}');
   });
 
   it('does not let old standing-automation prose override exact Current You publication authority', () => {
