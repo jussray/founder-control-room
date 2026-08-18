@@ -4,7 +4,7 @@
 
 Juss authorizes repository changes to be merged when the acting AI or operator determines that the merge is appropriate and the evidence supports that conclusion.
 
-This standing authority replaces blanket `do not merge` language in active operating instructions. It does not require another merge-only confirmation when all merge conditions below are satisfied.
+This standing authority replaces blanket `do not merge` language in active operating instructions. It does not require another merge-only confirmation when every applicable merge condition below is satisfied.
 
 ## Merge conditions
 
@@ -19,10 +19,55 @@ A merge is appropriate only when:
 - Playwright has passed for any changed user-facing web/runtime path, or is explicitly inapplicable;
 - Founder Control Room release-truth evidence has been checked when the change affects release, deployment, cross-repo coordination, or incident interpretation;
 - Cloudflare build/deploy evidence has been checked when Cloudflare is part of the release path, while keeping Cloudflare truth separate from GitHub Actions truth;
+- **Documentation truth** has been reconciled for truth-sensitive architecture, authority, provider, publishing, capability, workflow, or launch changes;
 - no unresolved critical review thread remains;
-- privacy, security, brand, IP, credential, and user-data boundaries remain intact;
+- privacy, security, brand, IP, credential, sauce, and user-data boundaries remain intact;
 - rollback or safe forward-fix is understood;
 - the merge itself does not silently execute a separately gated action.
+
+## Independent review for Founder Control Room merges
+
+The Founder Control Room in-app merge path has an additional load-bearing independent-review membrane before repository provider integration.
+
+For `jussray/founder-control-room` it requires, at minimum:
+
+- an exact open, non-draft pull request whose repository, base ref/SHA, head ref/SHA, and author identity match the founder-approved mission;
+- a canonical exact diff hash from the provider comparison;
+- a deterministic review witness on the exact head;
+- at least one trusted non-author semantic review on the exact head;
+- P2 findings to remain merge-blocking;
+- provider-backed review signals and receipt hashes to match the submitted review evidence;
+- the mutable head to be re-read immediately before provider integration; and
+- the review policy presented to the evaluator to match the **server-owned** reviewer trust configured through `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS`.
+
+The request may carry review metadata or a pinned policy representation for identity/hashing, but it cannot redefine the trusted semantic reviewer set. The evaluator fails closed when the policy hash differs from the server-owned FCR reviewer policy, when the server configuration is absent or invalid, when the reviewer is the author, when a GitHub App bot is offered as the semantic reviewer, or when the provider witness is stale or mismatched.
+
+### In-app FCR authority is not the live GitHub ruleset
+
+The source/runtime FCR merge membrane and the **live GitHub repository ruleset are a separate provider gate**.
+
+A correct in-app review engine does not prove that GitHub's web/API merge surface independently enforces the same approval count, stale-review dismissal, last-push approval, thread resolution, strict status freshness, bypass actors, or bypass modes. Those provider protections require their own current GitHub readback.
+
+Do not claim repository-wide GitHub governance is fixed merely because the FCR source gate is strong. Conversely, a GitHub merge that occurred outside the in-app FCR path does not prove the in-app independent-review contract was satisfied.
+
+## Documentation truth
+
+A merge is a truth transition. Documentation that describes current architecture, authority, provider topology, publication policy, capability state, launch state, or blockers must not remain current by inertia after the underlying state changes.
+
+For a truth-sensitive change:
+
+```text
+implementation / authority / provider truth changes
+-> update README + applicable current-state docs in the same bounded PR
+-> run Documentation Truth on the exact PR head
+-> merge only with the normal repository gates satisfied
+-> run Documentation Truth again on the merged main transition
+-> re-observe provider/runtime truth before reusing present-tense claims
+```
+
+Historical evidence stays useful. Mark older contradictory material `HISTORICAL`, `SUPERSEDED`, `REVALIDATION_REQUIRED`, or otherwise point it to the newer authority instead of deleting provenance or letting old present-tense guidance compete silently with current truth.
+
+A docs-only truth-sync merge closes an earlier drift cycle. Its post-merge Documentation Truth receipt closes that transition and does not create an infinite requirement to rewrite the docs again merely because the merge commit SHA changed.
 
 ## Infrastructure outage rule
 
@@ -30,7 +75,7 @@ A GitHub Actions infrastructure outage can gate merge and release truth without 
 
 When jobs have no executed steps or no logs, agents must not blame the diff. They must record the exact PR, head SHA, workflow, run, job evidence, classification, impact, Cloudflare/runtime evidence if available, and the next gate in Founder Control Room.
 
-If remaining evidence is sufficient for a docs-only, policy-only, or otherwise low-risk focused change, a merge may still be appropriate. If the change requires executed CI, Playwright, deployment proof, auth proof, migration proof, or runtime proof that is unavailable because of the outage, leave the PR open and state the exact blocker.
+If remaining evidence is sufficient for a docs-only, policy-only, or otherwise low-risk focused change, a merge may still be appropriate only when every other applicable authority gate is satisfied. If the change requires executed CI, independent review, Playwright, deployment proof, auth proof, migration proof, runtime proof, or Documentation Truth proof that is unavailable, leave the PR open and state the exact blocker.
 
 ## Canonical project routing
 
@@ -52,4 +97,6 @@ Those actions still require their own exact approval unless a later founder dire
 
 ## Operating rule
 
-Do not merge merely because a PR exists or because a badge looks green. Merge when it is the correct, evidence-backed integration step. When it is not appropriate, leave the PR open and state the exact blocker.
+Do not merge merely because a PR exists or because a badge looks green. Merge when it is the correct, evidence-backed integration step and the current authority membrane is satisfied.
+
+Immediately before merge, re-read current `main`, the exact PR head, required checks, review state, and applicable provider state. After merge, re-read the resulting `main`, Documentation Truth, and the next release/runtime gate. Old-head green remains historical evidence only.
