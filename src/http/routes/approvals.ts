@@ -5,6 +5,9 @@
  *   1. a fresh founder-approved proof_gate_results record; and
  *   2. complete machine evidence bound to the exact current head SHA.
  *
+ * Founder Control Room merges additionally require a provider-backed,
+ * exact-PR independent review gate before provider integration.
+ *
  * Every external mutation is reserved in approval_executions BEFORE the
  * provider call. A pending reservation blocks replay if the provider succeeds
  * but the final audit update is interrupted.
@@ -26,6 +29,13 @@ import type { ProofEvidence } from '../../proof-gate/index.js';
 import type { EvidenceKind } from '../../reconciliation/types.js';
 import { WEBHOOK_ONLY_EVIDENCE_KINDS } from '../../reconciliation/types.js';
 import type { PatchFileChange, RepositoryProvider } from '../../providers/RepositoryProvider.js';
+import {
+  evaluateIndependentReviewGate,
+  independentReviewDiffHash,
+  independentReviewPolicyHash,
+  type IndependentReviewPolicy,
+  type IndependentReviewReceipt,
+} from '../../review/independentReviewGate.js';
 
 /** Mission states in which the branch is still under active work — safe to patch. */
 const PATCHABLE_MISSION_STATUSES = new Set(['sandboxed', 'in_review']);
@@ -38,6 +48,9 @@ function isSafeRepoPath(path: string): boolean {
 
 const PROOF_GATED_ACTIONS = new Set(['merge', 'create_branch']);
 const PROOF_GATE_TTL_MS = 15 * 60 * 1_000;
+const FCR_REPOSITORY = 'jussray/founder-control-room';
+const FULL_SHA = /^[0-9a-f]{40}$/i;
+const SHA256 = /^[0-9a-f]{64}$/i;
 
 interface ExecutionRecord {
   id: string;
@@ -55,8 +68,120 @@ interface RepositoryProjectRow {
   repo_identifier: string | null;
 }
 
+interface FounderPinnedIndependentReview {
+  pullRequestNumber: number;
+  baseSha: string;
+  authorIdentity: string;
+  policy: IndependentReviewPolicy;
+  policyHash: string;
+}
+
 export const approvalsRouter = Router();
 approvalsRouter.use(requireFounder);
+
+function text(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function lower(value: unknown): string {
+  return text(value).toLowerCase();
+}
+
+function isFounderControlRoomRepository(project: RepositoryProjectRow): boolean {
+  return lower(project.repo_identifier) === FCR_REPOSITORY;
+}
+
+function validateIndependentReviewPolicy(
+  value: unknown,
+): { ok: true; policy: IndependentReviewPolicy } | { ok: false; error: string } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, error: 'independentReview.policy must be an object' };
+  }
+  const candidate = value as Record<string, unknown>;
+  const requiredSemanticReviews = candidate['requiredSemanticReviews'];
+  if (!Number.isInteger(requiredSemanticReviews) || Number(requiredSemanticReviews) < 1 || Number(requiredSemanticReviews) > 4) {
+    return { ok: false, error: 'independentReview.policy.requiredSemanticReviews must be an integer from 1 to 4' };
+  }
+  if (candidate['requireDeterministicReview'] !== true) {
+    return { ok: false, error: 'FCR independent review policy must require deterministic review' };
+  }
+  if (candidate['blockOnP2'] !== true) {
+    return { ok: false, error: 'FCR independent review policy must keep P2 findings merge-blocking' };
+  }
+  const rawTrusted = candidate['trustedSemanticReviewerIds'];
+  if (!Array.isArray(rawTrusted) || rawTrusted.length === 0 || rawTrusted.some((reviewer) => !text(reviewer))) {
+    return { ok: false, error: 'independentReview.policy.trustedSemanticReviewerIds must contain reviewer identities' };
+  }
+  const trustedSemanticReviewerIds = rawTrusted.map((reviewer) => text(reviewer));
+  const normalized = trustedSemanticReviewerIds.map((reviewer) => reviewer.toLowerCase());
+  if (new Set(normalized).size !== normalized.length) {
+    return { ok: false, error: 'independentReview.policy.trustedSemanticReviewerIds must be unique' };
+  }
+  if (trustedSemanticReviewerIds.length < Number(requiredSemanticReviews)) {
+    return { ok: false, error: 'independentReview policy has fewer trusted reviewers than required semantic reviews' };
+  }
+
+  return {
+    ok: true,
+    policy: {
+      requiredSemanticReviews: Number(requiredSemanticReviews),
+      requireDeterministicReview: true,
+      blockOnP2: true,
+      trustedSemanticReviewerIds,
+    },
+  };
+}
+
+function validateIndependentReviewApproval(
+  value: unknown,
+): { ok: true; pullRequestNumber: number; policy: IndependentReviewPolicy } | { ok: false; error: string } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, error: 'FCR merge approval requires independentReview metadata' };
+  }
+  const candidate = value as Record<string, unknown>;
+  const pullRequestNumber = candidate['pullRequestNumber'];
+  if (!Number.isInteger(pullRequestNumber) || Number(pullRequestNumber) <= 0) {
+    return { ok: false, error: 'independentReview.pullRequestNumber must be a positive integer' };
+  }
+  const policyResult = validateIndependentReviewPolicy(candidate['policy']);
+  if (!policyResult.ok) return policyResult;
+  return {
+    ok: true,
+    pullRequestNumber: Number(pullRequestNumber),
+    policy: policyResult.policy,
+  };
+}
+
+function readPinnedIndependentReview(
+  value: unknown,
+): { ok: true; review: FounderPinnedIndependentReview } | { ok: false; error: string } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, error: 'Mission has no founder-pinned independent review policy' };
+  }
+  const candidate = value as Record<string, unknown>;
+  const pullRequestNumber = candidate['pullRequestNumber'];
+  const baseSha = lower(candidate['baseSha']);
+  const authorIdentity = text(candidate['authorIdentity']);
+  const policyHash = lower(candidate['policyHash']);
+  if (!Number.isInteger(pullRequestNumber) || Number(pullRequestNumber) <= 0) {
+    return { ok: false, error: 'Pinned independent review PR number is invalid' };
+  }
+  if (!FULL_SHA.test(baseSha)) return { ok: false, error: 'Pinned independent review base SHA is invalid' };
+  if (!authorIdentity) return { ok: false, error: 'Pinned independent review author identity is missing' };
+  if (!SHA256.test(policyHash)) return { ok: false, error: 'Pinned independent review policy hash is invalid' };
+  const policyResult = validateIndependentReviewPolicy(candidate['policy']);
+  if (!policyResult.ok) return policyResult;
+  return {
+    ok: true,
+    review: {
+      pullRequestNumber: Number(pullRequestNumber),
+      baseSha,
+      authorIdentity,
+      policy: policyResult.policy,
+      policyHash,
+    },
+  };
+}
 
 function configuredRepositoryProvider(
   project: RepositoryProjectRow,
@@ -207,7 +332,7 @@ approvalsRouter.post(
 
     const { data: mission, error: missionError } = await supabase
       .from('missions')
-      .select('id, project_id, status, branch_ref, policy_snapshot')
+      .select('id, project_id, status, branch_ref, base_ref, policy_snapshot')
       .eq('id', missionId)
       .single();
 
@@ -237,15 +362,9 @@ approvalsRouter.post(
     }
 
     if (result.status === 'converged' && gateId === 'merge' && mission.status === 'in_review') {
-      // Nothing in this codebase ever wrote policy_snapshot.expectedHeadSha,
-      // which the merge-execution route (below) unconditionally requires to
-      // match before it will merge anything — meaning no mission could ever
-      // actually reach a completable merge, regardless of proof-gate result.
-      // This is the natural point to pin it: the founder is approving merge
-      // of the branch's CURRENT exact commit, resolved fresh right now, not
-      // whatever it drifts to later (the execute route separately re-checks
-      // this hasn't moved since).
       let expectedHeadSha: string | null = null;
+      let independentReview: FounderPinnedIndependentReview | null = null;
+
       if (mission.branch_ref) {
         const { data: project } = await supabase
           .from('projects')
@@ -254,7 +373,8 @@ approvalsRouter.post(
           .maybeSingle();
 
         if (project?.repo_identifier) {
-          const configured = configuredRepositoryProvider(project as RepositoryProjectRow);
+          const projectRow = project as RepositoryProjectRow;
+          const configured = configuredRepositoryProvider(projectRow);
           if ('error' in configured) {
             return res.status(502).json({
               ok: false,
@@ -271,6 +391,69 @@ approvalsRouter.post(
               detail: err instanceof Error ? err.message : String(err),
             });
           }
+
+          if (isFounderControlRoomRepository(projectRow)) {
+            const reviewApproval = validateIndependentReviewApproval(body['independentReview']);
+            if (!reviewApproval.ok) {
+              return res.status(400).json({
+                ok: false,
+                code: 'INDEPENDENT_REVIEW_POLICY_REQUIRED',
+                error: reviewApproval.error,
+              });
+            }
+            if (typeof configured.provider.getPullRequestReviewContext !== 'function') {
+              return res.status(502).json({
+                ok: false,
+                code: 'INDEPENDENT_REVIEW_PROVIDER_UNAVAILABLE',
+                error: 'Repository provider cannot supply exact pull request review context.',
+              });
+            }
+
+            let pullRequest;
+            try {
+              pullRequest = await configured.provider.getPullRequestReviewContext(
+                project.slug,
+                reviewApproval.pullRequestNumber,
+              );
+            } catch (err) {
+              return res.status(502).json({
+                ok: false,
+                code: 'INDEPENDENT_REVIEW_PR_READ_FAILED',
+                error: 'Proof passed but exact pull request identity could not be read — approval not persisted.',
+                detail: err instanceof Error ? err.message : String(err),
+              });
+            }
+
+            const expectedBaseRef = text(mission.base_ref) || 'main';
+            const prMismatch =
+              lower(pullRequest.repository) !== FCR_REPOSITORY
+              || lower(pullRequest.headRepository) !== FCR_REPOSITORY
+              || pullRequest.baseRef !== expectedBaseRef
+              || pullRequest.headRef !== mission.branch_ref
+              || lower(pullRequest.headSha) !== lower(expectedHeadSha);
+            if (prMismatch) {
+              return res.status(409).json({
+                ok: false,
+                code: 'INDEPENDENT_REVIEW_PR_MISMATCH',
+                error: 'Founder approval PR does not match the exact FCR branch/base/head being approved.',
+              });
+            }
+            if (!FULL_SHA.test(text(pullRequest.baseSha)) || !text(pullRequest.authorIdentity)) {
+              return res.status(502).json({
+                ok: false,
+                code: 'INDEPENDENT_REVIEW_PR_IDENTITY_INCOMPLETE',
+                error: 'Provider PR identity is missing an exact base SHA or author identity.',
+              });
+            }
+
+            independentReview = {
+              pullRequestNumber: reviewApproval.pullRequestNumber,
+              baseSha: lower(pullRequest.baseSha),
+              authorIdentity: text(pullRequest.authorIdentity),
+              policy: reviewApproval.policy,
+              policyHash: independentReviewPolicyHash(reviewApproval.policy),
+            };
+          }
         }
       }
 
@@ -280,7 +463,13 @@ approvalsRouter.post(
           status: 'approved',
           updated_at: new Date().toISOString(),
           ...(expectedHeadSha
-            ? { policy_snapshot: { ...(mission.policy_snapshot as Record<string, unknown> ?? {}), expectedHeadSha } }
+            ? {
+                policy_snapshot: {
+                  ...(mission.policy_snapshot as Record<string, unknown> ?? {}),
+                  expectedHeadSha,
+                  ...(independentReview ? { independentReview } : {}),
+                },
+              }
             : {}),
         })
         .eq('id', missionId)
@@ -403,7 +592,8 @@ approvalsRouter.post(
       return res.status(500).json({ error: 'Project repository configuration not found.' });
     }
 
-    const configured = configuredRepositoryProvider(project as RepositoryProjectRow);
+    const projectRow = project as RepositoryProjectRow;
+    const configured = configuredRepositoryProvider(projectRow);
     if ('error' in configured) {
       return res.status(503).json({
         error: 'Repository provider is not configured.',
@@ -472,14 +662,6 @@ approvalsRouter.post(
         const baseRef = (payload['baseRef'] as string) ?? 'main';
         await provider.createBranch(project.slug, baseRef, branchName);
 
-        // Pin the exact commit this mission's sandbox now stands on. Without
-        // this, policy_snapshot.expectedHeadSha never exists while the
-        // mission is sandboxed/in_review — MissionController's wrongHead
-        // check against it is permanently vacuous, and the guarded terminal
-        // (which hard-requires this pin at those exact statuses) can never
-        // run for any mission. A failure here doesn't roll back the branch,
-        // which already exists — it's reported as a warning, same as a
-        // failed mission-state update below.
         let expectedHeadSha: string | null = null;
         try {
           expectedHeadSha = await provider.resolveRef(project.slug, branchName);
@@ -517,7 +699,7 @@ approvalsRouter.post(
           ? payload['expectedHeadSha'].toLowerCase()
           : '';
         if (!head) throw new Error('No head branch to merge');
-        if (!/^[0-9a-f]{40}$/.test(expectedHeadSha)) {
+        if (!FULL_SHA.test(expectedHeadSha)) {
           throw new Error('Merge requires expectedHeadSha as a full 40-character commit SHA.');
         }
 
@@ -537,6 +719,78 @@ approvalsRouter.post(
           throw new Error(`${evidenceResult.error} ${JSON.stringify(evidenceResult.details ?? {})}`);
         }
 
+        let independentReviewEvidence: Record<string, unknown> | null = null;
+        if (isFounderControlRoomRepository(projectRow)) {
+          const pinnedResult = readPinnedIndependentReview(mission.policy_snapshot?.independentReview);
+          if (!pinnedResult.ok) {
+            throw new Error(`Independent review gate blocked: ${pinnedResult.error}`);
+          }
+          const pinned = pinnedResult.review;
+          if (typeof provider.getPullRequestReviewContext !== 'function') {
+            throw new Error('Independent review gate blocked: repository provider cannot supply pull request context');
+          }
+
+          const pullRequest = await provider.getPullRequestReviewContext(project.slug, pinned.pullRequestNumber);
+          const providerIdentityMatches =
+            lower(pullRequest.repository) === FCR_REPOSITORY
+            && lower(pullRequest.headRepository) === FCR_REPOSITORY
+            && pullRequest.baseRef === base
+            && pullRequest.headRef === head
+            && lower(pullRequest.baseSha) === pinned.baseSha
+            && lower(pullRequest.headSha) === expectedHeadSha
+            && lower(pullRequest.authorIdentity) === lower(pinned.authorIdentity);
+          if (!providerIdentityMatches) {
+            throw new Error('Independent review gate blocked: provider PR identity changed after founder approval');
+          }
+
+          const currentPolicyHash = independentReviewPolicyHash(pinned.policy);
+          if (currentPolicyHash !== pinned.policyHash) {
+            throw new Error('Independent review gate blocked: founder-pinned policy hash does not match policy content');
+          }
+
+          const diff = await provider.compare(project.slug, pinned.baseSha, expectedHeadSha);
+          if (diff.behindBy !== 0 || diff.aheadBy < 1) {
+            throw new Error(
+              `Independent review gate blocked: reviewed head must be current with approved base (ahead=${diff.aheadBy}, behind=${diff.behindBy})`,
+            );
+          }
+          const diffHash = independentReviewDiffHash(diff);
+          const reviews = Array.isArray(payload['independentReviews'])
+            ? payload['independentReviews'] as IndependentReviewReceipt[]
+            : [];
+          const reviewGate = await evaluateIndependentReviewGate(
+            provider,
+            {
+              projectId: project.slug,
+              repository: project.repo_identifier,
+              pullRequestNumber: pinned.pullRequestNumber,
+              baseSha: pinned.baseSha,
+              headSha: expectedHeadSha,
+              diffHash,
+              policyHash: pinned.policyHash,
+              authorIdentity: pinned.authorIdentity,
+            },
+            reviews,
+            pinned.policy,
+          );
+          if (!reviewGate.reviewGateSatisfied) {
+            throw new Error(`Independent review gate blocked: ${reviewGate.blockers.join('; ')}`);
+          }
+          independentReviewEvidence = {
+            pullRequestNumber: pinned.pullRequestNumber,
+            baseSha: pinned.baseSha,
+            headSha: expectedHeadSha,
+            diffHash,
+            policyHash: pinned.policyHash,
+            witnessedReviewHashes: reviewGate.witnessedReviewHashes,
+            semanticClearCount: reviewGate.semanticClearCount,
+            deterministicClearCount: reviewGate.deterministicClearCount,
+          };
+        }
+
+        // This is deliberately after independent review. Review/provider reads
+        // may take time; the mutable head must still equal the approved SHA at
+        // the last possible moment before integration.
         const currentHeadSha = await provider.resolveRef(project.slug, head);
         if (currentHeadSha !== expectedHeadSha) {
           throw new Error(
@@ -551,6 +805,7 @@ approvalsRouter.post(
           base,
           expectedHeadSha,
           evidence: evidenceResult.summary,
+          ...(independentReviewEvidence ? { independentReview: independentReviewEvidence } : {}),
         };
 
         const { error: missionUpdateError } = await supabase
