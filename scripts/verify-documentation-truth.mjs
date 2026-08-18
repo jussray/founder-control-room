@@ -98,6 +98,8 @@ const launchLoop = read('.ai/skills/juss-flow-launch-loop/SKILL.md');
 const consistencyChecks = [
   [readme.includes('Documentation truth gate'), 'README must describe the Documentation truth gate'],
   [readme.includes('first-party LinkedIn') && readme.includes('provider-neutral n8n'), 'README must describe current LinkedIn + n8n distribution authority'],
+  [readme.includes('`.control/capability.json`') && readme.includes('canonical capability authority'), 'README must name capability.json as canonical capability authority'],
+  [readme.includes('`.control/capability.yaml`') && readme.includes('compatibility pointer'), 'README must keep legacy capability.yaml visibly non-authoritative'],
   [publicTruth.includes('Current executable publication authority'), 'public communication contract must declare current executable publication authority'],
   [publicTruth.includes('exact Current You approval'), 'public communication contract must require exact Current You approval for the current executable path'],
   [!publicTruth.includes('This standing authorization removes the need for per-post founder approval'), 'public communication contract must not retain the superseded no-per-post-approval claim as current truth'],
