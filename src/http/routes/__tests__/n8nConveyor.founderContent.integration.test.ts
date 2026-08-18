@@ -179,6 +179,31 @@ describe('n8n founder-content route', () => {
     expect(serialized).not.toContain('invalidProviders');
   });
 
+  it('redacts credential-like invalid provider values from execution errors', async () => {
+    const credentialLikeInvalidValue = 'sk-proj-super-secret-credential-material';
+    mockDispatchFounderContent.mockResolvedValue({
+      ok: false,
+      code: 'ORCHESTRATION_NOT_CONFIGURED',
+      status: 503,
+      request: null,
+      receipt: null,
+      reasons: [
+        `n8n founder-content provider allowlist contains unsupported values: ${credentialLikeInvalidValue}`,
+      ],
+    });
+
+    const res = await request(buildApp())
+      .post('/automation/conveyor/founder-content')
+      .set('Authorization', BEARER)
+      .send({});
+
+    expect(res.status).toBe(503);
+    expect(res.body.reasons).toEqual([
+      'n8n founder-content provider allowlist contains unsupported values',
+    ]);
+    expect(JSON.stringify(res.body)).not.toContain(credentialLikeInvalidValue);
+  });
+
   it('binds execution identity to the authenticated founder and never trusts body identity', async () => {
     mockDispatchFounderContent.mockResolvedValue({
       ok: true,
