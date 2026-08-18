@@ -41,6 +41,10 @@ test('recovery returns only a sanitized receipt to the fixed founder control iss
   assert.match(returnStep, /matchingApplicationCount/);
   assert.match(returnStep, /credentialFailures/);
   assert.match(returnStep, /apiVersionMatchesExpectedSha/);
+  assert.match(returnStep, /finalOriginMatchesExpected/);
+  assert.match(returnStep, /unexpectedOriginDetected/);
+  assert.match(returnStep, /accessInterceptDetected/);
+  assert.match(returnStep, /errorPresent/);
   assert.match(returnStep, /jq -e 'type == "object"' "\$access_receipt"/);
   assert.match(returnStep, /jq -e 'type == "object"' "\$browser_receipt"/);
   assert.doesNotMatch(returnStep, /jq empty "\$access_receipt"/);
@@ -50,6 +54,8 @@ test('recovery returns only a sanitized receipt to the fixed founder control iss
   assert.match(returnStep, /Provider truth: `UNKNOWN`/);
   assert.match(returnStep, /Browser proof: `UNKNOWN`/);
   assert.doesNotMatch(returnStep, /matchingApplications/);
+  assert.doesNotMatch(returnStep, /\n\s*finalOrigin,\s*\n/);
+  assert.doesNotMatch(returnStep, /\n\s*error\s*\n/);
   assert.doesNotMatch(returnStep, /cat "\$access_receipt"/);
   assert.doesNotMatch(returnStep, /cat "\$browser_receipt"/);
 });
