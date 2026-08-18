@@ -77,6 +77,8 @@ const NATIVE_REVIEW_WINDOW_MINUTES = 20;
 const NATIVE_REVIEW_WINDOW_MS = NATIVE_REVIEW_WINDOW_MINUTES * 60 * 1000;
 const PROVIDER_NEUTRAL_EXECUTION_IDENTITY = 'fcr/n8n-founder-content-execution-identity@v2' as const;
 const PROVIDER_NEUTRAL_CADENCE_PROVIDER = 'n8n' as const;
+const CURRENT_LANGUAGE = /\b(currently|right now|is live|are live|is green|are green|remains|still (?:is|are|has|have)|now (?:is|are|has|have))\b/i;
+const HISTORICAL_LANGUAGE = /\b(built|shipped|implemented|added|merged|completed|released|tested|verified|fixed|created|introduced|deployed|reached|grew|was|were|did)\b/i;
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -131,6 +133,51 @@ function assertCallerDoesNotContradictAuthorization(
 
   if (conflicts.length > 0) {
     throw new Error(`N8N_FOUNDER_CONTENT_AUTHORITY_CONFLICT: ${conflicts.join('; ')}`);
+  }
+}
+
+function assertDeferredProviderClaimsAreHistoricallyDurable(
+  input: FirstPartyFounderDistributionInput,
+  authorization: FounderContentAuthorization,
+): void {
+  const proposal = input.proposal && typeof input.proposal === 'object'
+    ? input.proposal as Record<string, unknown>
+    : {};
+  const publicPayload = proposal.public_payload && typeof proposal.public_payload === 'object'
+    ? proposal.public_payload as Record<string, unknown>
+    : {};
+  const claims = Array.isArray(publicPayload.public_claims) ? publicPayload.public_claims : [];
+  const reasons: string[] = [];
+
+  if (claims.length === 0) {
+    reasons.push('scheduled provider routes require canonical public claims');
+  }
+
+  claims.forEach((value, index) => {
+    const claim = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+    const claimId = text(claim.claim_id).toLowerCase() || `index-${index}`;
+    const temporalClass = text(claim.temporal_class).toLowerCase();
+    const temporalVersion = text(claim.temporal_version).toLowerCase();
+    const claimText = text(claim.text);
+
+    if (temporalClass !== 'historical_version') {
+      reasons.push(`claim ${claimId} is ${temporalClass || 'unclassified'}; deferred publication only accepts historical_version claims`);
+    }
+    if (temporalVersion !== authorization.source.commit_sha) {
+      reasons.push(`claim ${claimId} must bind historical truth to the exact authorized source commit`);
+    }
+    if (CURRENT_LANGUAGE.test(claimText)) {
+      reasons.push(`historical claim ${claimId} uses current-state language`);
+    }
+    if (!HISTORICAL_LANGUAGE.test(claimText)) {
+      reasons.push(`historical claim ${claimId} must use explicit historical framing`);
+    }
+  });
+
+  if (reasons.length > 0) {
+    throw new Error(
+      `N8N_FOUNDER_CONTENT_TEMPORAL_REVALIDATION_REQUIRED: ${reasons.join('; ')}; current repository, runtime, and metric claims require execution-time FCR revalidation rather than a deferred provider queue`,
+    );
   }
 }
 
@@ -223,6 +270,7 @@ export function buildProviderNeutralN8nFounderContentEnvelope(
 ): FirstPartyFounderScheduleEnvelope {
   const authorization = exactAuthorization(input);
   assertCallerDoesNotContradictAuthorization(input, authorization);
+  assertDeferredProviderClaimsAreHistoricallyDurable(input, authorization);
 
   const platform = text(authorization.content.platform).toLowerCase();
   const provider = resolveN8nFounderContentProvider(input, platform);
