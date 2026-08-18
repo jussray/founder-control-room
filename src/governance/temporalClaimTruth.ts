@@ -78,7 +78,7 @@ const OWNED_REPO = /^jussray\/[A-Za-z0-9._-]+$/;
 const CURRENT_LANGUAGE = /\b(currently|right now|is live|are live|is green|are green|remains|still (?:is|are|has|have)|now (?:is|are|has|have))\b/i;
 const HISTORICAL_LANGUAGE = /\b(built|shipped|implemented|added|merged|completed|released|tested|verified|fixed|created|introduced|deployed|reached|grew|was|were|did)\b/i;
 const CURRENT_RUNTIME_LANGUAGE = /(?:\b(?:production|runtime|site|app|api|service|endpoint|deployment)\b.{0,80}\b(?:live|healthy|up|reachable|serving|available)\b)|(?:\b(?:live|healthy|up|reachable|serving|available)\b.{0,80}\b(?:production|runtime|site|app|api|service|endpoint|deployment)\b)/i;
-const METRIC_LANGUAGE = /(?:\b\d[\d,.]*\s*(?:followers?|impressions?|users?|downloads?|signups?|customers?|sales|engagements?|views?|reactions?|comments?|shares?|clicks?|members?\s+reached|people\s+reached)\b)|(?:\b(?:revenue|mrr|arr|gmv|conversion|engagement rate)\b.{0,30}(?:\$\s?\d|\d[\d,.]*|\d+(?:\.\d+)?%))|(?:\d+(?:\.\d+)?%)/i;
+const METRIC_LANGUAGE = /(?:\b\d[\d,.]*\s*(?:followers?|impressions?|users?|downloads?|signups?|customers?|sales|engagements?|views?|reactions?|comments?|shares?|clicks?|likes?|members?\s+reached|people\s+reached)\b)|(?:\breached\s+\d[\d,.]*\s+(?:members?|people)\b)|(?:\b(?:revenue|mrr|arr|gmv|conversion|engagement rate)\b.{0,30}(?:\$\s?\d|\d[\d,.]*|\d+(?:\.\d+)?%))|(?:\d+(?:\.\d+)?%)/i;
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
