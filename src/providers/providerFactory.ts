@@ -134,6 +134,11 @@ class LazyRepositoryProvider implements RepositoryProvider {
         "Founder Control Room integration requires provider-backed pull-request context in the same execution",
       );
     }
+    if (base !== FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH || context.baseRef !== FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH) {
+      throw new Error(
+        `Founder Control Room reviewed integration authority is pinned to ${FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH}`,
+      );
+    }
     if (base !== context.baseRef || head !== context.headRef) {
       throw new Error(
         `Founder Control Room integration refs changed after review context: expected ${context.baseRef}<-${context.headRef}, received ${base}<-${head}`,
