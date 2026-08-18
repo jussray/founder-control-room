@@ -88,6 +88,12 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
 
+      - name: Prove Repository Settings canonical ruleset safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright test e2e/repository-settings-ruleset.spec.ts --reporter=list 2>&1 | tee logs/repository-settings-ruleset.log
+
       - name: Prove mobile Content Manager flow
         shell: bash
         run: |
