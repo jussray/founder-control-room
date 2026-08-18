@@ -14,20 +14,23 @@ vi.mock('../../../lib/supabaseAuthClient.js', () => ({
   supabaseAuth: { auth: { getUser: mockGetUser } },
 }));
 vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
-vi.mock('../../../lib/n8nFounderContentOrchestrator.js', async () => {
-  const actual = await vi.importActual<typeof import('../../../lib/n8nFounderContentOrchestrator.js')>(
-    '../../../lib/n8nFounderContentOrchestrator.js',
+vi.mock('../../../lib/n8nProviderNeutralFounderContentOrchestrator.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../lib/n8nProviderNeutralFounderContentOrchestrator.js')>(
+    '../../../lib/n8nProviderNeutralFounderContentOrchestrator.js',
   );
   return {
     ...actual,
-    dispatchN8nFounderContent: mockDispatchFounderContent,
+    dispatchProviderNeutralN8nFounderContent: mockDispatchFounderContent,
   };
 });
 
 import express from 'express';
 import request from 'supertest';
 import { n8nConveyorRouter } from '../n8nConveyor.js';
-import { N8N_FOUNDER_CONTENT_CONTRACT } from '../../../lib/n8nFounderContentOrchestrator.js';
+import {
+  N8N_FOUNDER_CONTENT_CONTRACT,
+  N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
+} from '../../../lib/n8nProviderNeutralFounderContentOrchestrator.js';
 
 const FOUNDER_EMAIL = 'founder@example.com';
 const BEARER = 'Bearer test-token';
@@ -67,7 +70,7 @@ describe('n8n founder-content route', () => {
     expect(mockDispatchFounderContent).not.toHaveBeenCalled();
   });
 
-  it('exposes the bounded founder-content orchestration contract to an authenticated founder', async () => {
+  it('exposes bounded provider contracts separately from runtime enablement', async () => {
     const res = await request(buildApp())
       .get('/automation/conveyor')
       .set('Authorization', BEARER);
@@ -76,6 +79,13 @@ describe('n8n founder-content route', () => {
     expect(res.body.founderContent).toEqual(expect.objectContaining({
       contract: N8N_FOUNDER_CONTENT_CONTRACT,
       route: '/founder-content',
+      providerSelection: 'founder-authenticated-bounded-platform-compatible',
+      providerContractRoutes: N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
+      providerRuntimeConfiguration: {
+        env: 'N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS',
+        defaultEnabled: ['buffer'],
+        rule: 'contract-capable-does-not-imply-runtime-enabled',
+      },
       finalPublishedTruth: 'fcr-provider-readback-only',
       authority: {
         orchestrate: true,
@@ -93,13 +103,16 @@ describe('n8n founder-content route', () => {
       ok: true,
       code: 'DISPATCHED',
       status: 202,
-      request: { orchestrationId: 'fcr-n8n-social-v1:test' },
+      request: {
+        orchestrationId: 'fcr-n8n-social-v1:test',
+        providerRequest: { provider: 'meta' },
+      },
       receipt: {
         orchestrationId: 'fcr-n8n-social-v1:test',
-        provider: 'buffer',
+        provider: 'meta',
         state: 'scheduled',
-        providerItemId: 'buffer-post-1',
-        providerRequestId: 'buffer-request-1',
+        providerItemId: 'meta-post-1',
+        providerRequestId: 'meta-request-1',
         truthState: 'provider_schedule_receipt_pending_readback',
         published: false,
         requiresProviderReadback: true,
@@ -110,6 +123,7 @@ describe('n8n founder-content route', () => {
     const envelope = {
       lane: 'first_party_founder_governed_schedule',
       authority: { authorization_mode: 'exact-current-you' },
+      n8n_provider: 'meta',
       executedBy: 'attacker@example.com',
     };
 
@@ -124,6 +138,7 @@ describe('n8n founder-content route', () => {
     });
     expect(res.body.contract).toBe(N8N_FOUNDER_CONTENT_CONTRACT);
     expect(res.body.founder).toEqual({ userId: 'founder-user-1' });
+    expect(res.body.receipt.provider).toBe('meta');
     expect(res.body.receipt.published).toBe(false);
     expect(res.body.receipt.requiresProviderReadback).toBe(true);
     expect(res.body.finalPublishedTruth).toBe('fcr-provider-readback-only');
