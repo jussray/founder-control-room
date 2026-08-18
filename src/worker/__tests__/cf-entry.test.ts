@@ -1,5 +1,6 @@
 import type { ExportedHandler } from '@cloudflare/workers-types';
 import { describe, expect, it, vi } from 'vitest';
+import { FCR_EMAIL_FROM } from '../projectEmail.js';
 import {
   composeWorkerHandler,
   validateWorkerEnv,
@@ -21,6 +22,10 @@ const VALID_ENV: ControlRoomWorkerEnv = {
   GITHUB_PRIVATE_KEY: 'private-key-test-value',
   FOUNDER_ALLOWED_ORIGINS: 'https://control.example.com,https://staging.control.example.com',
   FOUNDER_API_URL: 'https://api.control.example.com',
+  FCR_EMAIL: {
+    send: vi.fn().mockResolvedValue({ messageId: 'email-test-id' }),
+  },
+  FCR_EMAIL_FROM,
   FCR_V10_CAPABILITY_PLAN_CONTRACT: 'juss-v10/capability-plan@v1',
   FCR_V10_CONVEYOR_CONTRACT: 'founder-control-room/n8n-conveyor@v3',
   FCR_V10_MAX_RUNTIME_AUTHORITY: 'draft',
@@ -45,6 +50,18 @@ describe('Cloudflare Worker binding validation', () => {
   it('reports every missing required service binding in one failure', () => {
     expect(() => validateWorkerEnv({ SUPABASE_URL: `https://${PROJECT_REF}.supabase.co` }))
       .toThrow('Missing required Worker bindings: SUPABASE_PROJECT_REF');
+  });
+
+  it('rejects a missing outbound FCR email binding', () => {
+    expect(() => validateWorkerEnv({ ...VALID_ENV, FCR_EMAIL: undefined }))
+      .toThrow('Missing required Worker binding: FCR_EMAIL');
+  });
+
+  it('rejects a sender identity that drifts away from the checked-in FCR identity', () => {
+    expect(() => validateWorkerEnv({
+      ...VALID_ENV,
+      FCR_EMAIL_FROM: 'welcome@sekretbip.net',
+    })).toThrow('FCR_EMAIL_FROM must match the checked-in Founder Control Room sender identity');
   });
 
   it('rejects a Worker with no GitHub authentication path', () => {
