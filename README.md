@@ -27,7 +27,7 @@ Current implementation includes:
 - provider-independent repository abstractions and guarded exact-head execution;
 - founder approval and reservation boundaries;
 - deterministic Cloudflare reasoning and exact-deployed-SHA browser witness contracts;
-- MCP capability discovery/policy boundaries;
+- canonical capability governance through `.control/capability.json`;
 - constitutional project skill routing;
 - Founder OS / Chief AI coordination contracts;
 - freshness-aware federated truth receipts surfaced into founder decisions;
@@ -61,6 +61,24 @@ change the truth
 Historical material stays available as provenance. When it no longer describes current authority, label it `HISTORICAL`, `SUPERSEDED`, `REVALIDATION_REQUIRED`, or otherwise point to the current authority instead of deleting the record or letting it compete silently with current truth.
 
 The documentation verifier emits sanitized coverage/state evidence only. It does not expose credentials, private proof, raw diffs, private prompts, customer data, or provider payloads, and analytics may observe but never authorize or renew truth.
+
+## Capability authority
+
+`.control/capability.json` is the **canonical capability authority** for repository capability declarations and current capability verification.
+
+`.control/capability.yaml` is retained only as a **compatibility pointer** for older tooling or historical references. It must not become a second editable source of capability truth, and a future agent must not reconcile disagreement by choosing whichever file is more convenient.
+
+Capability source declaration is still not runtime proof. Keep these layers separate:
+
+```text
+canonical capability declaration
+-> repository verifier proof
+-> configured provider/tool state
+-> active execution capability
+-> observed outcome proof
+```
+
+If capability authority changes again, update the canonical schema/verifier and this current-state documentation in the same bounded change instead of letting JSON/YAML drift reappear.
 
 ## Production authority and current provider topology
 
@@ -252,7 +270,9 @@ Reasoning does not grant production mutation authority.
 
 ### MCP and capability governance
 
-The repository contains bounded capability declarations and policies for supported tool/provider slots. Repository declarations are intent/configuration, not proof that a live external integration is installed, authenticated, healthy, or authorized for mutation.
+The canonical capability declaration is `.control/capability.json`. The repository uses schema/verifier proof to decide whether that declaration is internally valid. Live tool/provider installation, authentication, health, and mutation authority remain separate runtime facts.
+
+The legacy `.control/capability.yaml` compatibility pointer must not be treated as a second source of authority.
 
 ### Constitutional skill routing
 
