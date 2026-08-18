@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type {
   RepositoryProvider,
   ReviewSignal,
@@ -18,6 +18,8 @@ const HEAD = "b".repeat(40);
 const DIFF = "1".repeat(64);
 const POLICY = "2".repeat(64);
 const TRUSTED_SEMANTIC = "semantic-reviewer-1";
+const FCR_TRUSTED_REVIEWERS_ENV = "FCR_TRUSTED_SEMANTIC_REVIEWER_IDS";
+let previousTrustedReviewers: string | undefined;
 
 const context: IndependentReviewContext = {
   projectId: "founder-control-room",
@@ -130,6 +132,16 @@ const policy = {
 };
 
 describe("independent review receipt gate", () => {
+  beforeEach(() => {
+    previousTrustedReviewers = process.env[FCR_TRUSTED_REVIEWERS_ENV];
+    process.env[FCR_TRUSTED_REVIEWERS_ENV] = TRUSTED_SEMANTIC;
+  });
+
+  afterEach(() => {
+    if (previousTrustedReviewers === undefined) delete process.env[FCR_TRUSTED_REVIEWERS_ENV];
+    else process.env[FCR_TRUSTED_REVIEWERS_ENV] = previousTrustedReviewers;
+  });
+
   it("accepts current provider-backed semantic approval plus Python check without granting merge authority", async () => {
     const reviews = [
       receipt(TRUSTED_SEMANTIC, "semantic"),
@@ -141,6 +153,45 @@ describe("independent review receipt gate", () => {
     expect(result.deterministicClearCount).toBe(1);
     expect(result.mergeAuthorized).toBe(false);
     expect(result.executionAuthorized).toBe(false);
+  });
+
+  it("fails closed when FCR server-owned reviewer configuration is missing", async () => {
+    delete process.env[FCR_TRUSTED_REVIEWERS_ENV];
+    const reviews = [
+      receipt(TRUSTED_SEMANTIC, "semantic"),
+      receipt("python-static-review-v1", "deterministic"),
+    ];
+    const result = await evaluateIndependentReviewGate(providerFor(reviews), context, reviews, policy);
+    expect(result.reviewGateSatisfied).toBe(false);
+    expect(result.blockers.join(" ")).toMatch(/server-owned FCR_TRUSTED_SEMANTIC_REVIEWER_IDS/);
+  });
+
+  it("rejects a caller-selected FCR reviewer policy that differs from server authority", async () => {
+    const callerPolicy = { ...policy, trustedSemanticReviewerIds: ["caller-selected-reviewer"] };
+    const reviews = [
+      receipt("caller-selected-reviewer", "semantic"),
+      receipt("python-static-review-v1", "deterministic"),
+    ];
+    const result = await evaluateIndependentReviewGate(providerFor(reviews), context, reviews, callerPolicy);
+    expect(result.reviewGateSatisfied).toBe(false);
+    expect(result.blockers.join(" ")).toMatch(/must match the server-owned semantic reviewer policy/);
+  });
+
+  it("rejects a caller-selected FCR semantic quorum that differs from server authority", async () => {
+    process.env[FCR_TRUSTED_REVIEWERS_ENV] = `${TRUSTED_SEMANTIC},semantic-reviewer-2`;
+    const callerPolicy = {
+      ...policy,
+      requiredSemanticReviews: 2,
+      trustedSemanticReviewerIds: [TRUSTED_SEMANTIC, "semantic-reviewer-2"],
+    };
+    const reviews = [
+      receipt(TRUSTED_SEMANTIC, "semantic"),
+      receipt("semantic-reviewer-2", "semantic"),
+      receipt("python-static-review-v1", "deterministic"),
+    ];
+    const result = await evaluateIndependentReviewGate(providerFor(reviews), context, reviews, callerPolicy);
+    expect(result.reviewGateSatisfied).toBe(false);
+    expect(result.blockers.join(" ")).toMatch(/must match the server-owned semantic reviewer policy/);
   });
 
   it("does not let Python-only review satisfy the semantic requirement", async () => {
