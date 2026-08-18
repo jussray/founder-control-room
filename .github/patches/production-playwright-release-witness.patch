@@ -1,0 +1,66 @@
+diff --git a/.github/workflows/deploy.yml b/.github/workflows/deploy.yml
+--- a/.github/workflows/deploy.yml
++++ b/.github/workflows/deploy.yml
+@@ -450,13 +450,60 @@ jobs:
+           PY
+         env:
+           PUBLIC_URL: https://foundercontrolroom.org
+ 
++  # ── 3a. Production Playwright exact-SHA witness ──────────────────────────────
++  production-playwright:
++    name: Production Playwright Exact-SHA Witness
++    runs-on: ubuntu-22.04
++    timeout-minutes: 15
++    environment: production
++    needs: smoke-test
++    env:
++      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
++      PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
++      PRODUCTION_RELEASE_WITNESS_REQUIRED: 'true'
++      EXPECTED_RELEASE_SHA: ${{ inputs.expected_head_sha }}
++      DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
++      PUBLIC_URL: https://foundercontrolroom.org
++    steps:
++      - name: Check out exact deployed commit
++        uses: actions/checkout@v4
++        with:
++          ref: ${{ inputs.expected_head_sha }}
++          persist-credentials: false
++
++      - name: Set up Node
++        uses: actions/setup-node@v4
++        with:
++          node-version: '24'
++          cache: 'npm'
++
++      - name: Install dependencies
++        run: npm ci
++
++      - name: Install Chromium
++        run: npx playwright install chromium --with-deps
++
++      - name: Prove production browser and runtime share one release
++        run: npx playwright test e2e/production-release-sha.spec.ts --reporter=list
++
++      - name: Upload production Playwright release evidence
++        if: always()
++        uses: actions/upload-artifact@v4
++        with:
++          name: production-release-witness-${{ inputs.expected_head_sha }}
++          path: |
++            playwright-report/
++            test-results/
++          if-no-files-found: warn
++          retention-days: 30
++
+   # ── 4. Verified proof-of-ship payload ───────────────────────────────────────
+   proof-of-ship:
+     name: Proof of Ship — Verify and Schedule with Founder Review
+     runs-on: ubuntu-latest
+     timeout-minutes: 12
+     environment: production
+-    needs: smoke-test
+-    if: needs.smoke-test.result == 'success'
++    needs: production-playwright
++    if: needs.production-playwright.result == 'success'
+     env:
