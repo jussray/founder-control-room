@@ -40,6 +40,13 @@ describe('documentation truth contract', () => {
     expect(futureYouMe).toContain('HISTORICAL ZAPIER BUDGET');
   });
 
+  it('documents the single capability authority after the current-main transition', () => {
+    expect(readme).toContain('`.control/capability.json`');
+    expect(readme).toContain('canonical capability authority');
+    expect(readme).toContain('`.control/capability.yaml`');
+    expect(readme).toContain('compatibility pointer');
+  });
+
   it('keeps truth decay, FutureYou, and the founder workflow connected', () => {
     expect(truthDecay).toContain('Documentation truth gate');
     expect(truthDecay).toContain('Truth Lease');
@@ -51,6 +58,6 @@ describe('documentation truth contract', () => {
   it('never treats documentation analytics as authority', () => {
     expect(verifier).toContain('documentationCoveragePercent');
     expect(truthDecay).toContain('Analytics remains observation-only');
-    expect(globalAi).toContain('analytics may observe');
+    expect(globalAi.toLowerCase()).toContain('analytics may observe');
   });
 });
