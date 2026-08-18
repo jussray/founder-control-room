@@ -1,7 +1,7 @@
 {
   "kind": "fcr/cloudflare-worker-git-authority-policy@v1",
   "policyVersion": 1,
-  "workerName": "founder-control-room2",
+  "workerName": "founder-control-room",
   "apiHostname": "api.foundercontrolroom.org",
   "canonicalProductionAuthority": "github-manual-deploy-workflow",
   "safetyInvariant": "native-worker-git-must-not-promote-production",

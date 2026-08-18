@@ -13,6 +13,10 @@ const authorityScript = readFileSync(
   new URL('../../../scripts/inspect-cloudflare-build.mjs', import.meta.url),
   'utf8',
 );
+const workerConfig = readFileSync(
+  new URL('../../../wrangler.worker.toml', import.meta.url),
+  'utf8',
+);
 const authorityPolicy = JSON.parse(
   readFileSync(
     new URL('../../../config/cloudflare-worker-git-authority-policy.json', import.meta.url),
@@ -30,6 +34,16 @@ describe('Cloudflare Worker Git authority contract', () => {
     expect(authorityWorkflow).not.toContain('CF_EXPECT_WORKER_GIT_MODE');
     expect(authorityWorkflow).toContain('FCR_CLOUDFLARE_BUILDS_USER_TOKEN');
     expect(authorityWorkflow).toContain('test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"');
+  });
+
+  it('binds desired Worker identity to canonical Worker config instead of provider observation', () => {
+    const canonicalWorkerName = workerConfig.match(/^name\s*=\s*"([^"]+)"/m)?.[1];
+
+    expect(canonicalWorkerName).toBe('founder-control-room');
+    expect(authorityPolicy.policyRole).toBe('desired-state-only');
+    expect(authorityPolicy.workerName).toBe(canonicalWorkerName);
+    expect(authorityWorkflow).toContain(`CF_WORKER_NAME: ${canonicalWorkerName}`);
+    expect(authorityWorkflow).not.toContain('CF_WORKER_NAME: founder-control-room2');
   });
 
   it('keeps read-only Workers Builds inspection credentials separate from deploy credentials', () => {
