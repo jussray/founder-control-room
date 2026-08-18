@@ -30,6 +30,8 @@ n8nConveyorRouter.use(requireFounder);
 
 type JsonRecord = Record<string, unknown>;
 
+const INVALID_PROVIDER_REASON_PREFIX = 'n8n founder-content provider allowlist contains unsupported values';
+
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -46,6 +48,13 @@ function stringArray(value: unknown): string[] | null {
 
 function capabilityPlan(value: unknown): V10CapabilityPlan | null {
   return isV10CapabilityPlan(value) ? value : null;
+}
+
+function redactFounderContentReasons(reasons: string[]): string[] {
+  return reasons.map((reason) =>
+    reason.startsWith(`${INVALID_PROVIDER_REASON_PREFIX}:`)
+      ? INVALID_PROVIDER_REASON_PREFIX
+      : reason);
 }
 
 n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
@@ -180,6 +189,7 @@ n8nConveyorRouter.post('/founder-content', async (req: FounderRequest, res) => {
 
   return res.status(result.status).json({
     ...result,
+    reasons: redactFounderContentReasons(result.reasons),
     contract: N8N_FOUNDER_CONTENT_CONTRACT,
     founder: req.founder ? { userId: req.founder.userId } : null,
     finalPublishedTruth: 'fcr-provider-readback-only',
