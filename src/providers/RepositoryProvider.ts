@@ -83,6 +83,22 @@ export interface ReviewSignal {
   detailsUrl?: string;
 }
 
+/**
+ * Provider-backed identity for one pull/merge request under review. This is
+ * intentionally read-only and exact-head aware so merge gates never have to
+ * trust caller-supplied PR metadata for author, base, or head identity.
+ */
+export interface PullRequestReviewContext {
+  number: number;
+  repository: string;
+  headRepository: string;
+  baseRef: string;
+  headRef: string;
+  baseSha: string;
+  headSha: string;
+  authorIdentity: string;
+}
+
 export interface DiffFile {
   path: string;
   status: "added" | "modified" | "removed" | "renamed";
@@ -191,6 +207,16 @@ export interface RepositoryProvider {
    * must fail closed when semantic review is required and this is absent.
    */
   listReviewSignals?(projectId: string, pullRequestNumber: number): Promise<ReviewSignal[]>;
+
+  /**
+   * Returns immutable provider-backed PR identity for review gating. Optional
+   * for providers that do not expose PR/MR metadata; review-gated merges fail
+   * closed when this capability is required but unavailable.
+   */
+  getPullRequestReviewContext?(
+    projectId: string,
+    pullRequestNumber: number,
+  ): Promise<PullRequestReviewContext>;
 
   /** Creates a new branch from `baseRef`. Returns the created branch name. */
   createBranch(projectId: string, baseRef: string, name: string): Promise<string>;
