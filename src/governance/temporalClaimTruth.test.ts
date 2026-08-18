@@ -145,21 +145,36 @@ describe('temporal public-claim truth', () => {
     }
   });
 
-  it('rejects present-tense metrics mislabeled as repository truth but preserves explicit historical metrics', async () => {
+  it('keeps metric claims on analytics authority even when the wording is historical', async () => {
     for (const claimText of [
       'We now have 54 followers.',
       'The product has 120 users.',
       'Conversion is 12.5%.',
+      'Recorded 13 engagements during the audit window.',
+      'Reached 2,160 members during the audit window.',
+      'Received 9 comments during the audit window.',
     ]) {
-      const receipt = await verify('current_repo_state', SOURCE, claimText);
+      const receipt = await verify('historical_version', NEWER, claimText);
       expect(receipt.publishSafe).toBe(false);
       expect(receipt.claims[0].state).toBe('INVALID');
       expect(receipt.claims[0].displayLabel).toContain('requires metric evidence');
     }
 
-    const historical = await verify('historical_version', NEWER, 'Reached 54 followers during this build period.');
-    expect(historical.publishSafe).toBe(true);
-    expect(historical.claims[0].state).toBe('HISTORICAL_VERIFIED');
+    const historicalMetric = await verify(
+      'historical_version',
+      NEWER,
+      'Reached 54 followers during this build period.',
+    );
+    expect(historicalMetric.publishSafe).toBe(false);
+    expect(historicalMetric.claims[0].state).toBe('INVALID');
+    expect(historicalMetric.claims[0].displayLabel).toContain(
+      'non-metric evidence cannot establish analytics truth',
+    );
+
+    const metric = await verify('metric', SOURCE, 'Reached 54 followers during this build period.');
+    expect(metric.publishSafe).toBe(false);
+    expect(metric.claims[0].state).toBe('REVALIDATION_REQUIRED');
+    expect(metric.claims[0].displayLabel).toContain('fresh analytics read required');
   });
 
   it('rejects changed evidence binding, missing classifications, and forged truth hash', async () => {

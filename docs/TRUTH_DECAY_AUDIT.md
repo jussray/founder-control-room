@@ -104,6 +104,16 @@ The next gate must be visible. A stale claim is not labeled failed when it was o
 
 This prevents a confusing product experience where yesterday's successful state looks identical to a freshly verified state.
 
+For founder content, the same product rule now applies to performance feedback: analytics can shape the next proposed story, but the UI must keep **learning signal**, **claim truth**, **founder approval**, and **publication outcome** visibly separate.
+
+The Content Manager learning loop therefore uses three private strategy dimensions:
+
+- **Distribution** — whether strong stories are reaching enough people;
+- **Resonance** — whether founder thesis, correction, proof, or human-product stakes produce meaningful response;
+- **Compounding** — whether recurring readership and follower growth improve across snapshots.
+
+Those signals may rank future story shapes. They do not become public claims automatically.
+
 ## Data Analytics
 
 Measure truth quality without storing sauce.
@@ -132,6 +142,36 @@ Do not emit:
 
 Useful portfolio metrics include stale-claim block rate, invalidation rate, revalidation success rate, and time from verification to invalidation. Analytics remains observation-only and cannot renew a lease or authorize a claim.
 
+### Analytics-authority redteam
+
+A fresh founder-content audit exposed a second truth-decay failure mode: **historical wording does not fix an authority mismatch**.
+
+The unsafe pattern was:
+
+```text
+analytics fact observed
+→ number is later written in past tense
+→ claim is labeled historical_version
+→ repository SHA is offered as proof
+→ FCR accepts the wrong authority for the fact
+```
+
+A repository commit can prove repository state. It cannot prove a follower count, impression count, user count, sales count, conversion rate, or other platform/business metric.
+
+The corrected invariant is:
+
+> A metric remains a metric even when it is historically true. Historical tense changes time semantics; it does not change evidence authority.
+
+Therefore:
+
+- numeric analytics claims may not be laundered through `historical_version`;
+- `metric` claims remain blocked until a dedicated fresh analytics verifier exists;
+- private analytics snapshots may guide story selection without entering the public payload;
+- raw workbook totals are not baked into Content Manager UI or source-controlled public copy;
+- FutureYou may recommend a story based on an old snapshot, but it may not restate the old number as current truth or use it to authorize publication.
+
+This keeps the learning loop useful without turning analytics into a covert truth authority.
+
 ## Founder-content / sauce boundary
 
 The public post should tell the progress story, not expose the recipe.
@@ -140,23 +180,29 @@ Truth revalidation is designed to happen inside FCR. Provider payloads need only
 
 A post may say what was built, what changed for the product, what was learned, and what evidence class supports it. It does not need to reveal how the implementation works.
 
+Analytics may change **which** public-safe story Chief proposes next. It may not bypass the sauce guard, claim classifier, Current You approval, temporal revalidation, or provider readback gates.
+
 ## OODA / L99 operating loop
 
 ```text
 OBSERVE
 fresh repository/provider/runtime facts
++ private analytics outcome snapshots
 
 ORIENT
 separate Current You intent from objective evidence
+separate content-learning signals from claim authority
 
 DECIDE
 build or renew a bounded truth lease for the exact claim
+choose a public-safe story shape without leaking private metrics
 
 ACT
-use the claim only while the lease is CURRENT
+use the claim only while the required truth boundary is satisfied
+publish only after exact Current You approval and provider proof
 
 LOOP
-re-observe after merge, deploy, provider write, or any dependency transition
+re-observe after merge, deploy, provider write, analytics snapshot, or any dependency transition
 ```
 
 The strongest optimization is not faster claiming. It is shortening the distance between observation and use, while making invalidation automatic and visible.
@@ -175,7 +221,10 @@ The strongest optimization is not faster claiming. It is shortening the distance
 10. A stale lease cannot become standing authority.
 11. Analytics cannot renew truth.
 12. Provider success after publication does not retroactively validate a false pre-publication product claim.
+13. Historical wording does not let a metric inherit repository authority.
+14. FutureYou may advise from analytics history but may not silently promote historical metrics to current facts.
+15. Content optimization may alter story selection, never the evidence required for the claim.
 
 ## Rollback
 
-The truth-lease contract is additive and side-effect free. Revert the contract/test/document commit if it causes incompatibility. No database, provider, credential, DNS, publication, or deployment state is mutated by this audit slice.
+The truth-lease contract and analytics-authority guard are fail-closed. Revert the focused semantic-guard, Content Manager learning-loop, test, and audit commits if they cause incompatibility. No database, provider credential, DNS, LinkedIn publication, or deployment state is mutated by this audit slice.
