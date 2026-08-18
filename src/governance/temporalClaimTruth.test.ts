@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildTemporalClaimTruthContextFromCanonical,
   revalidateTemporalPublicClaims,
+  temporalClaimTextDomainErrors,
   temporalClaimTruthContextHash,
   temporalTruthAnalytics,
   type CanonicalPublicClaim,
@@ -124,6 +125,7 @@ describe('temporal public-claim truth', () => {
       'Production is live and verified at this version.',
       'The deployment is green and remains healthy.',
       'The system currently serves the verified release.',
+      'The product supports verified scheduling and was tested at this version.',
     ]) {
       const receipt = await verify('historical_version', NEWER, claimText);
       expect(receipt.publishSafe).toBe(false);
@@ -145,36 +147,47 @@ describe('temporal public-claim truth', () => {
     }
   });
 
-  it('keeps metric claims on analytics authority even when the wording is historical', async () => {
+  it('keeps metric claims on analytics authority even when wording is historical', async () => {
     for (const claimText of [
       'We now have 54 followers.',
       'The product has 120 users.',
       'Conversion is 12.5%.',
-      'Recorded 13 engagements during the audit window.',
-      'Reached 2,160 members during the audit window.',
-      'Received 9 comments during the audit window.',
+      'Reached 54 followers during this build period.',
+      'Recorded 13 engagements during the release window.',
+      'Reached 2,160 members during the campaign.',
+      'Received 9 comments after launch.',
     ]) {
-      const receipt = await verify('historical_version', NEWER, claimText);
+      const temporalClass: TemporalClaimClass = claimText.startsWith('Reached') || claimText.startsWith('Recorded') || claimText.startsWith('Received')
+        ? 'historical_version'
+        : 'current_repo_state';
+      const receipt = await verify(temporalClass, temporalClass === 'historical_version' ? NEWER : SOURCE, claimText);
       expect(receipt.publishSafe).toBe(false);
       expect(receipt.claims[0].state).toBe('INVALID');
       expect(receipt.claims[0].displayLabel).toContain('requires metric evidence');
+      expect(receipt.claims[0].displayLabel).toContain('non-metric evidence cannot establish analytics truth');
     }
-
-    const historicalMetric = await verify(
-      'historical_version',
-      NEWER,
-      'Reached 54 followers during this build period.',
-    );
-    expect(historicalMetric.publishSafe).toBe(false);
-    expect(historicalMetric.claims[0].state).toBe('INVALID');
-    expect(historicalMetric.claims[0].displayLabel).toContain(
-      'non-metric evidence cannot establish analytics truth',
-    );
 
     const metric = await verify('metric', SOURCE, 'Reached 54 followers during this build period.');
     expect(metric.publishSafe).toBe(false);
     expect(metric.claims[0].state).toBe('REVALIDATION_REQUIRED');
     expect(metric.claims[0].displayLabel).toContain('fresh analytics read required');
+  });
+
+  it('exports one semantic-domain classifier for exact copy and canonical claims', () => {
+    expect(temporalClaimTextDomainErrors({
+      label: 'approved deferred copy',
+      text: 'Reached 54 followers during this build period.',
+      temporalClass: 'historical_version',
+    })).toEqual(expect.arrayContaining([
+      expect.stringContaining('requires metric evidence'),
+    ]));
+    expect(temporalClaimTextDomainErrors({
+      label: 'approved deferred copy',
+      text: 'The product supports verified scheduling and was tested at this version.',
+      temporalClass: 'historical_version',
+    })).toEqual(expect.arrayContaining([
+      expect.stringContaining('current-state language'),
+    ]));
   });
 
   it('rejects changed evidence binding, missing classifications, and forged truth hash', async () => {

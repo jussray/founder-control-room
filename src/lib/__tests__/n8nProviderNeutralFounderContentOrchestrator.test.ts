@@ -40,12 +40,12 @@ function proposal(platform: string): Record<string, unknown> {
       draft_text: `Verified ${platform} founder progress without exposing private implementation details.`,
       public_claims: [{
         claim_id: `${platform}-proof-bound`,
-        text: `The ${platform} founder update is bound to verified repository evidence.`,
+        text: `The ${platform} founder update was bound to verified repository evidence.`,
         truth_state: 'verified',
         public_safe: true,
         evidence_ref: EVIDENCE_REF,
         evidence_scope: 'provider-neutral-social-contract',
-        temporal_class: 'current_repo_state',
+        temporal_class: 'historical_version',
         temporal_version: SOURCE_SHA,
       }],
       proof_link: null,
@@ -236,6 +236,59 @@ describe('provider-neutral n8n founder-content routing', () => {
     expect(result.provider_request.review_window_minutes).toBe(20);
     expect(result.provider_request.share_now_allowed).toBe(false);
     expect(result.source.proof_url).toBeUndefined();
+  });
+
+  it('refuses once-current claims on every deferred provider route', () => {
+    const proposed = proposal('facebook');
+    const payload = proposed.public_payload as Record<string, unknown>;
+    payload.public_claims = [{
+      claim_id: 'facebook-current',
+      text: 'The facebook founder update is currently bound to repository state.',
+      truth_state: 'verified',
+      public_safe: true,
+      evidence_ref: EVIDENCE_REF,
+      evidence_scope: 'provider-neutral-social-contract',
+      temporal_class: 'current_repo_state',
+      temporal_version: SOURCE_SHA,
+    }];
+    proposed.proposal_hash = hashPublicPayload(canonicalChiefIdentity(proposed));
+
+    expect(() => buildProviderNeutralN8nFounderContentEnvelope({
+      n8n_provider: 'meta',
+      proposal: proposed,
+      approval: approval(proposed, 'facebook'),
+      now: NOW,
+    })).toThrow(/TEMPORAL_REVALIDATION_REQUIRED/);
+
+    expect(() => buildProviderNeutralN8nFounderContentEnvelope({
+      n8n_provider: 'buffer',
+      proposal: proposed,
+      approval: approval(proposed, 'facebook'),
+      now: NOW,
+    })).toThrow(/TEMPORAL_REVALIDATION_REQUIRED/);
+  });
+
+  it('refuses historical labels that still use current-state copy', () => {
+    const proposed = proposal('instagram');
+    const payload = proposed.public_payload as Record<string, unknown>;
+    payload.public_claims = [{
+      claim_id: 'instagram-mislabeled',
+      text: 'The instagram founder update is currently verified.',
+      truth_state: 'verified',
+      public_safe: true,
+      evidence_ref: EVIDENCE_REF,
+      evidence_scope: 'provider-neutral-social-contract',
+      temporal_class: 'historical_version',
+      temporal_version: SOURCE_SHA,
+    }];
+    proposed.proposal_hash = hashPublicPayload(canonicalChiefIdentity(proposed));
+
+    expect(() => buildProviderNeutralN8nFounderContentEnvelope({
+      n8n_provider: 'meta',
+      proposal: proposed,
+      approval: approval(proposed, 'instagram'),
+      now: NOW,
+    })).toThrow(/historical claim instagram-mislabeled uses current-state language/);
   });
 
   it('builds TikTok from the same authorization contract and rejects caller attempts to change source or copy', () => {

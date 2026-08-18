@@ -8,6 +8,8 @@ This repository has three separate configuration planes:
 
 A value configured in one plane does not automatically exist in another. Never copy secret values into repository files, PRs, logs, screenshots, or chat.
 
+Cloudflare dashboard token **display names are operator labels, not execution bindings**. A label such as `founder-control-room build token` does not prove which GitHub secret or workflow consumes that credential. For operational truth, use the exact GitHub secret name referenced by the current workflow plus a successful provider verification/readback receipt. If either is missing, the binding is unknown.
+
 ## Cloudflare Pages
 
 Pages serves the browser frontend at `foundercontrolroom.org` and requires no application secrets.
@@ -46,12 +48,14 @@ Secrets marked required cause the named workflow job to fail if absent.
 |---|---|---|
 | `CLOUDFLARE_API_TOKEN` | canonical `founder-control-room` deploy and reconcile workflows | Canonical Worker mutation credential with only the permissions required for the `founder-control-room` Worker. Do not reuse it for the review-email Worker or read-only Builds inspection. |
 | `CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN` | `review-email-worker-reconcile.yml` | Dedicated mutation credential for `founder-control-room-review-email`. Keep separate from the canonical Worker deploy token. |
-| `CLOUDFLARE_BUILDS_API_TOKEN` | manual build diagnostics | User-scoped read credential for Cloudflare Builds diagnostics. Keep separate from deploy tokens. |
+| `FCR_CLOUDFLARE_BUILDS_USER_TOKEN` | `cloudflare-build-diagnostic.yml` | Dedicated user-scoped read credential for FCR Workers Builds/provider-authority diagnostics. Keep separate from deploy tokens. The current workflow maps this exact GitHub secret to `CF_API_TOKEN`. |
 | `CLOUDFLARE_ACCOUNT_ID` | deploy and diagnostic workflows | Cloudflare account ID. |
 | `CF_SESSIONS_KV_NAMESPACE_ID` | Worker deployment where enabled | KV namespace identifier for sessions. |
 | `CF_FEATURE_FLAGS_KV_NAMESPACE_ID` | Worker deployment where enabled | KV namespace identifier for feature flags. |
 
 The authority boundary is **provider + environment + operation class**, not one token per script. Canonical Worker deploy and canonical Worker reconciliation may share the same production mutation credential because they operate on the same authority surface. The review-email Worker and read-only Builds observer use separate credentials.
+
+A documentation name is never allowed to override current executable workflow truth. When a workflow secret name changes, update this registry in the same repair lane or classify the old entry as historical rather than leaving a once-true name presented as current.
 
 ---
 
@@ -155,7 +159,7 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] GITHUB_PRIVATE_KEY
 [ ] CLOUDFLARE_API_TOKEN for canonical founder-control-room mutation only
 [ ] CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN for founder-control-room-review-email only
-[ ] CLOUDFLARE_BUILDS_API_TOKEN for read-only Builds inspection
+[ ] FCR_CLOUDFLARE_BUILDS_USER_TOKEN for read-only FCR Workers Builds inspection
 [ ] CLOUDFLARE_ACCOUNT_ID
 [ ] DEPLOY_URL=https://api.foundercontrolroom.org
 [ ] FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
