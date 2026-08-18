@@ -5,6 +5,11 @@
       "url": "https://mcp.cloudflare.com/mcp",
       "enabled": true
     },
+    "cloudflare-stack": {
+      "type": "remote",
+      "url": "https://stack.mcp.cloudflare.com/mcp",
+      "enabled": true
+    },
     "cloudflare-docs": {
       "type": "remote",
       "url": "https://docs.mcp.cloudflare.com/mcp",

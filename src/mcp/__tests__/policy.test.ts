@@ -65,6 +65,43 @@ describe("MCP Phase 1 policy", () => {
     ).toMatchObject({ decision: "deny" });
   });
 
+  it("keeps Cloudflare Stack fail-closed for generic execute", () => {
+    const cloudflareStack = DEFAULT_MCP_SERVERS.find(
+      (server) => server.id === "cloudflare-stack",
+    );
+    if (!cloudflareStack) throw new Error("Cloudflare Stack MCP definition missing");
+
+    const env = {
+      NODE_ENV: "development",
+      MCP_CLOUDFLARE_STACK_URL: "https://stack.mcp.cloudflare.com/mcp",
+    } as NodeJS.ProcessEnv;
+
+    expect(
+      evaluateMcpPolicy({
+        server: cloudflareStack,
+        projectId: "founder-control-room",
+        toolName: "search",
+        env,
+      }),
+    ).toMatchObject({ decision: "allow", risk: "read" });
+    expect(
+      evaluateMcpPolicy({
+        server: cloudflareStack,
+        projectId: "founder-control-room",
+        toolName: "execute",
+        env,
+      }),
+    ).toMatchObject({ decision: "deny" });
+    expect(
+      evaluateMcpPolicy({
+        server: cloudflareStack,
+        projectId: "founder-control-room",
+        toolName: "update_access_policy",
+        env,
+      }),
+    ).toMatchObject({ decision: "deny" });
+  });
+
   it("denies write tools even when the provider is configured", () => {
     expect(
       evaluateMcpPolicy({

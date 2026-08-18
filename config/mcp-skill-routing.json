@@ -35,6 +35,13 @@
       ],
       "boundary": "Account-scoped Cloudflare API Code Mode. Read by default; writes, deployments, DNS, billing, credentials, and destructive actions require separate founder approval and provider evidence."
     },
+    "cloudflare-stack": {
+      "skills": [
+        "control-room-repo-contract",
+        "control-room-cloudflare-agent-fleet"
+      ],
+      "boundary": "Supplemental Cloudflare Stack MCP endpoint. Treat it as provider context only; the in-app Control Room hub permits read-shaped tools and denies generic execute or mutation-capable tools until provider-level read-only authority is proven."
+    },
     "cloudflare-docs": {
       "skills": [
         "control-room-repo-contract",
