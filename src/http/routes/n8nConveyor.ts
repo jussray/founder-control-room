@@ -11,8 +11,9 @@ import {
 } from '../../lib/n8nConveyor.js';
 import {
   N8N_FOUNDER_CONTENT_CONTRACT,
-  dispatchN8nFounderContent,
-} from '../../lib/n8nFounderContentOrchestrator.js';
+  N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
+  dispatchProviderNeutralN8nFounderContent,
+} from '../../lib/n8nProviderNeutralFounderContentOrchestrator.js';
 import { FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT } from '../../lib/firstPartyFounderContentExecutor.js';
 import {
   dispatchTemporallyGovernedFounderContentPublishNow,
@@ -64,6 +65,8 @@ n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
       contract: N8N_FOUNDER_CONTENT_CONTRACT,
       route: '/founder-content',
       inputAuthority: 'canonical-fcr-proposal-approval-firewall-input',
+      providerSelection: 'founder-authenticated-bounded-platform-compatible',
+      providerRoutes: N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
       authority: {
         orchestrate: true,
         requestProviderWrite: true,
@@ -147,7 +150,7 @@ n8nConveyorRouter.post('/founder-content/publish-now', async (req: FounderReques
 
 n8nConveyorRouter.post('/founder-content', async (req: FounderRequest, res) => {
   const input = (req.body ?? {}) as JsonRecord;
-  const result = await dispatchN8nFounderContent(input, {
+  const result = await dispatchProviderNeutralN8nFounderContent(input, {
     executedBy: req.founder!.email,
   });
 
