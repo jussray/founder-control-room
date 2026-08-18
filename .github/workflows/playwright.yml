@@ -5,12 +5,15 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_run:
+    workflows: [Deploy]
+    types: [completed]
 
 permissions:
   contents: read
 
 concurrency:
-  group: playwright-e2e-${{ github.event.pull_request.number || github.ref }}
+  group: playwright-e2e-${{ github.event.pull_request.number || github.event.workflow_run.id || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -20,6 +23,7 @@ env:
 
 jobs:
   playwright:
+    if: github.event_name != 'workflow_run'
     name: Playwright E2E
     runs-on: ubuntu-22.04
     timeout-minutes: 30
@@ -139,4 +143,57 @@ jobs:
           name: server-logs-${{ env.EXPECTED_HEAD_SHA }}
           path: logs/
           if-no-files-found: ignore
+          retention-days: 30
+
+  production-release-witness:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    name: Production Playwright Exact-SHA Witness
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    environment: production
+    env:
+      PRODUCTION_RELEASE_WITNESS_REQUIRED: 'true'
+      EXPECTED_RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+      DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+      PUBLIC_URL: https://foundercontrolroom.org
+
+    steps:
+      - name: Check out the Deploy run head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Record and verify witness source head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'deploy_run_head=%s\nchecked_out=%s\n' "$EXPECTED_RELEASE_SHA" "$actual"
+          test "$actual" = "$EXPECTED_RELEASE_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Prove deployed runtime and browser share the Deploy run SHA
+        run: npx playwright test e2e/production-release-sha.spec.ts --reporter=list
+
+      - name: Upload production release witness evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: production-release-witness-${{ github.event.workflow_run.head_sha }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
           retention-days: 30
