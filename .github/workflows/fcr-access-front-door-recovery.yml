@@ -63,11 +63,16 @@ jobs:
           test "$actual" = "$EXPECTED_HEAD_SHA"
           test "$current_main" = "$EXPECTED_HEAD_SHA"
 
+          approval_reference_receipt='not-required-for-read-only'
           if [[ "$APPLY" == 'true' ]]; then
             if [[ ! "$APPROVAL_REFERENCE" =~ ^[A-Za-z0-9._:-]{8,200}$ ]]; then
               echo '::error title=Missing mutation approval::apply=true requires an auditable 8-200 character approval_reference.'
               exit 1
             fi
+            approval_reference_receipt="sha256:$(printf '%s' "$APPROVAL_REFERENCE" | sha256sum | awk '{print $1}')"
+          elif [[ -n "${APPROVAL_REFERENCE:-}" ]]; then
+            echo '::error title=Unexpected mutation approval::apply=false must not carry approval_reference.'
+            exit 1
           fi
 
           {
@@ -75,7 +80,7 @@ jobs:
             echo
             echo "- Exact current main: \`$EXPECTED_HEAD_SHA\`"
             echo "- Apply requested: \`$APPLY\`"
-            echo "- Approval reference: \`${APPROVAL_REFERENCE:-not-required-for-read-only}\`"
+            echo "- Approval reference receipt: \`$approval_reference_receipt\`"
             echo '- Mutation scope: add foundercontrolroom.org to the existing Access organization exemption list only'
             echo '- Explicit matching Access application: blocks automatic mutation'
             echo '- DNS mutation: none'
