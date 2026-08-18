@@ -15,8 +15,8 @@ The Control Room is a private, repository-agnostic governance service. Its stand
 | `playwright` | Browser-visible verification and recovery-path proof | Browser/runtime evidence; it does not authorize code or provider mutations |
 | `figma` | Design context and implementation handoff | Design evidence only; no deploy, migration, spending, or external-action authority |
 | `supabase` | Inspect the Control Room's own schema and Supabase documentation | Project `oojzfmmywbvficgybaxd`, read-only, `database,docs` only |
-| `cloudflare` | Cloudflare API/provider context | Read by default; mutations remain separately approved |
-| `cloudflare-stack` | Supplemental Cloudflare Stack provider context at `https://stack.mcp.cloudflare.com/mcp` | Repository clients authenticate through their supported client flow; the in-app Hub stays fail-closed for generic `execute` and mutation-shaped tools |
+| `cloudflare` | Official Cloudflare API MCP at `https://mcp.cloudflare.com/mcp` | Provider-supported OAuth/API-token connection. Read by default; mutations remain separately approved |
+| `cloudflare-stack` | User-supplied supplemental endpoint at `https://stack.mcp.cloudflare.com/mcp` | Experimental repository-client context only. It is not current provider authority because no matching Cloudflare documentation or source-of-truth registration has been verified |
 | `cloudflare-docs` | Current Cloudflare product documentation | Documentation only |
 | `cloudflare-bindings` | Inspect Worker bindings and project wiring | Binding mutations remain separately approved |
 | `cloudflare-builds` | Inspect Control Room Worker build evidence | No deploy or setting changes without separate approval |
@@ -26,15 +26,17 @@ The Control Room is a private, repository-agnostic governance service. Its stand
 
 The repository-agent configuration above does **not** automatically make a remote server callable by the running Control Room.
 
-The in-app Hub uses `src/mcp/defaultRegistry.ts`, environment/connection-vault authority, server-specific allowlists, and MCP evidence receipts. For Cloudflare Stack specifically:
+The in-app Hub uses `src/mcp/defaultRegistry.ts`, environment/connection-vault authority, server-specific allowlists, and MCP evidence receipts. For Cloudflare:
 
-- the runtime endpoint and any bearer credential are not committed;
-- the server remains unavailable until its runtime authority is configured;
-- read-shaped tool names may be considered by policy;
-- generic `execute` and mutation-shaped tools are denied;
+- runtime provider authority is the documented `https://mcp.cloudflare.com/mcp` endpoint;
+- the bearer credential is a dedicated least-privilege read token referenced as `FCR_CLOUDFLARE_MCP_READ_TOKEN` and is never committed;
+- the normal Hub may use the provider's `search` tool for API/schema discovery;
+- generic Code Mode `execute` remains denied in normal Hub policy because its tool name alone cannot prove that the embedded request is read-only;
+- the exact-head `Cloudflare API MCP Read Diagnostic` is the only standing lane allowed to call `execute`, and the repository-owned probe hard-codes a single `GET /accounts/{account_id}` request before recording a redacted receipt;
+- the user-supplied `stack.mcp.cloudflare.com` endpoint is not registered as in-app provider authority;
 - provider/OAuth availability in an IDE does not prove production runtime authorization.
 
-This intentionally prevents a generic Code Mode `execute` surface from being mislabeled as read-only merely because the provider connection exists.
+This keeps Cloudflare provider proof useful without turning a generic code-execution tool into an accidentally privileged Control Room capability.
 
 ## Deliberately excluded
 
