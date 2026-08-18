@@ -40,7 +40,7 @@ test('recovery never echoes raw receipts into the public job summary', () => {
   assert.doesNotMatch(summaryStep, /```json/);
 });
 
-test('recovery returns only a sanitized receipt to the fixed founder control issue', () => {
+test('recovery returns only bounded sanitized fields to the fixed founder control issue', () => {
   const returnStep = recoveryWorkflow.match(
     /- name: Return sanitized recovery receipt to founder control issue([\s\S]*)$/,
   )?.[1] ?? '';
@@ -67,6 +67,8 @@ test('recovery returns only a sanitized receipt to the fixed founder control iss
   assert.doesNotMatch(returnStep, /matchingApplications/);
   assert.doesNotMatch(returnStep, /\n\s*finalOrigin,\s*\n/);
   assert.doesNotMatch(returnStep, /\n\s*error\s*\n/);
+  assert.doesNotMatch(returnStep, /\n\s*blocker,\s*\n/);
+  assert.doesNotMatch(returnStep, /\n\s*nextAction\s*[,}]?/);
   assert.doesNotMatch(returnStep, /cat "\$access_receipt"/);
   assert.doesNotMatch(returnStep, /cat "\$browser_receipt"/);
 });
