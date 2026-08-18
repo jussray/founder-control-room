@@ -1,5 +1,6 @@
 import { hash } from "node:crypto";
 import type {
+  Diff,
   RepositoryProvider,
   ReviewSignal,
   VerificationSignal,
@@ -77,12 +78,93 @@ export interface IndependentReviewGateResult {
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
+const MAX_COMPLETE_COMPARE_FILES = 299;
 const REVIEWER_KINDS = new Set<ReviewerKind>(["semantic", "deterministic"]);
 const SEVERITIES = new Set<ReviewSeverity>(["P0", "P1", "P2", "P3"]);
 const VERDICTS = new Set<ReviewVerdict>(["clear", "needs_review", "blocked"]);
+const FCR_REPOSITORY = "jussray/founder-control-room";
+const FCR_TRUSTED_REVIEWERS_ENV = "FCR_TRUSTED_SEMANTIC_REVIEWER_IDS";
 
 const text = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const lower = (value: unknown): string => text(value).toLowerCase();
+const isGitHubAppBotIdentity = (value: unknown): boolean => /\[bot\]$/i.test(text(value));
+
+export function independentReviewPolicyHash(policy: IndependentReviewPolicy): string {
+  const trustedReviewerIds = Array.isArray(policy?.trustedSemanticReviewerIds)
+    ? policy.trustedSemanticReviewerIds.map(lower).filter(Boolean).sort()
+    : [];
+  return hash("sha256", JSON.stringify([
+    policy?.requiredSemanticReviews,
+    policy?.requireDeterministicReview === true,
+    policy?.blockOnP2 === true,
+    trustedReviewerIds,
+  ]), "hex");
+}
+
+function fcrServerOwnedPolicy(env: NodeJS.ProcessEnv): IndependentReviewPolicy | null {
+  const raw = text(env[FCR_TRUSTED_REVIEWERS_ENV]);
+  if (!raw) return null;
+  const trustedSemanticReviewerIds = raw.split(",").map((value) => value.trim()).filter(Boolean);
+  if (trustedSemanticReviewerIds.length === 0 || trustedSemanticReviewerIds.length > 8) return null;
+  const normalized = trustedSemanticReviewerIds.map(lower);
+  if (new Set(normalized).size !== normalized.length) return null;
+  if (normalized.some(isGitHubAppBotIdentity)) return null;
+  return {
+    requiredSemanticReviews: 1,
+    requireDeterministicReview: true,
+    blockOnP2: true,
+    trustedSemanticReviewerIds,
+  };
+}
+
+function fcrServerPolicyBlockers(
+  context: IndependentReviewContext,
+  policy: IndependentReviewPolicy,
+  env: NodeJS.ProcessEnv,
+): string[] {
+  if (lower(context.repository) !== FCR_REPOSITORY) return [];
+  const serverPolicy = fcrServerOwnedPolicy(env);
+  if (!serverPolicy) {
+    return [`FCR merge requires valid server-owned ${FCR_TRUSTED_REVIEWERS_ENV} configuration`];
+  }
+  if (independentReviewPolicyHash(policy) !== independentReviewPolicyHash(serverPolicy)) {
+    return ["FCR independent review policy must match the server-owned semantic reviewer policy"];
+  }
+  return [];
+}
+
+export function independentReviewDiffHash(diff: Diff): string {
+  const files = Array.isArray(diff?.files) ? [...diff.files] : [];
+  // GitHub's compare endpoint exposes at most 300 changed files. Seeing 300
+  // therefore cannot prove whether the comparison is complete. FCR prefers a
+  // false negative over reviewing a silently truncated file set; split the PR
+  // or use a future provider primitive that attests the full changed-file set.
+  if (files.length > MAX_COMPLETE_COMPARE_FILES) {
+    throw new Error(
+      `Independent review diff completeness is unproven for ${files.length} files; provider comparisons must contain at most ${MAX_COMPLETE_COMPARE_FILES} files`,
+    );
+  }
+  const filesWithoutPatch = files.filter((file) => typeof file.patch !== "string");
+  if (filesWithoutPatch.length > 0) {
+    throw new Error(
+      `Independent review diff content is incomplete for: ${filesWithoutPatch.map((file) => file.path).sort().join(", ")}`,
+    );
+  }
+  files.sort((left, right) => left.path.localeCompare(right.path));
+  return hash("sha256", JSON.stringify([
+    lower(diff?.base),
+    lower(diff?.head),
+    diff?.aheadBy,
+    diff?.behindBy,
+    files.map((file) => [
+      file.path,
+      file.status,
+      file.additions,
+      file.deletions,
+      file.patch,
+    ]),
+  ]), "hex");
+}
 
 function reviewSeed(review: IndependentReviewReceipt): string {
   const findings = Array.isArray(review?.findings) ? review.findings : [];
@@ -142,6 +224,9 @@ function validateReceipt(review: IndependentReviewReceipt, context: IndependentR
   if (!REVIEWER_KINDS.has(review.reviewer?.kind)) errors.push("Unsupported reviewer kind");
   if (!text(review.reviewer?.provider) || !text(review.reviewer?.runtime)) errors.push("Reviewer provider/runtime are required");
   if (lower(review.reviewer?.id) === lower(context.authorIdentity)) errors.push("Patch author cannot satisfy independent review");
+  if (review.reviewer?.kind === "semantic" && isGitHubAppBotIdentity(review.reviewer?.id)) {
+    errors.push("GitHub App bot cannot satisfy independent semantic review");
+  }
 
   if (!Array.isArray(review.findings) || review.findings.length > 100) {
     errors.push("Review findings must contain at most 100 items");
@@ -228,12 +313,14 @@ export async function evaluateIndependentReviewGate(
   context: IndependentReviewContext,
   reviews: IndependentReviewReceipt[],
   policy: IndependentReviewPolicy,
+  env: NodeJS.ProcessEnv = process.env,
 ): Promise<IndependentReviewGateResult> {
   const blockers: string[] = [];
   if (!FULL_SHA.test(text(context.baseSha)) || !FULL_SHA.test(text(context.headSha))) blockers.push("Gate context requires full base/head SHAs");
   if (!SHA256.test(text(context.diffHash)) || !SHA256.test(text(context.policyHash))) blockers.push("Gate context requires sha256 diff/policy hashes");
   if (!Number.isInteger(context.pullRequestNumber) || context.pullRequestNumber <= 0) blockers.push("Gate context requires a positive pull request number");
   if (!text(context.projectId) || !text(context.repository) || !text(context.authorIdentity)) blockers.push("Gate context requires project, repository, and author identity");
+  blockers.push(...fcrServerPolicyBlockers(context, policy, env));
   if (!Number.isInteger(policy?.requiredSemanticReviews) || policy.requiredSemanticReviews < 1 || policy.requiredSemanticReviews > 4) {
     blockers.push("Policy requires between 1 and 4 semantic reviews");
   }
@@ -243,6 +330,10 @@ export async function evaluateIndependentReviewGate(
   } else {
     const normalized = policy.trustedSemanticReviewerIds.map(lower).filter(Boolean);
     if (new Set(normalized).size !== normalized.length) blockers.push("Trusted semantic reviewer identities must be unique");
+    const botReviewers = normalized.filter(isGitHubAppBotIdentity);
+    if (botReviewers.length > 0) {
+      blockers.push(`Trusted semantic reviewer policy cannot include GitHub App bot identities: ${botReviewers.join(", ")}`);
+    }
     if (Number.isInteger(policy.requiredSemanticReviews) && normalized.length < policy.requiredSemanticReviews) {
       blockers.push("Policy has fewer trusted semantic reviewers than required semantic reviews");
     }
