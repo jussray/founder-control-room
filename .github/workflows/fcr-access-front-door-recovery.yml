@@ -19,6 +19,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: fcr-access-front-door-recovery-production
@@ -62,11 +63,16 @@ jobs:
           test "$actual" = "$EXPECTED_HEAD_SHA"
           test "$current_main" = "$EXPECTED_HEAD_SHA"
 
+          approval_reference_receipt='not-required-for-read-only'
           if [[ "$APPLY" == 'true' ]]; then
             if [[ ! "$APPROVAL_REFERENCE" =~ ^[A-Za-z0-9._:-]{8,200}$ ]]; then
               echo '::error title=Missing mutation approval::apply=true requires an auditable 8-200 character approval_reference.'
               exit 1
             fi
+            approval_reference_receipt="sha256:$(printf '%s' "$APPROVAL_REFERENCE" | sha256sum | awk '{print $1}')"
+          elif [[ -n "${APPROVAL_REFERENCE:-}" ]]; then
+            echo '::error title=Unexpected mutation approval::apply=false must not carry approval_reference.'
+            exit 1
           fi
 
           {
@@ -74,7 +80,7 @@ jobs:
             echo
             echo "- Exact current main: \`$EXPECTED_HEAD_SHA\`"
             echo "- Apply requested: \`$APPLY\`"
-            echo "- Approval reference: \`${APPROVAL_REFERENCE:-not-required-for-read-only}\`"
+            echo "- Approval reference receipt: \`$approval_reference_receipt\`"
             echo '- Mutation scope: add foundercontrolroom.org to the existing Access organization exemption list only'
             echo '- Explicit matching Access application: blocks automatic mutation'
             echo '- DNS mutation: none'
@@ -100,13 +106,13 @@ jobs:
       - name: Inspect live Access state without mutation
         env:
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
-        run: node scripts/reconcile-cloudflare-access-public-zone.mjs
+        run: node scripts/reconcile-cloudflare-access-public-zone.mjs >/dev/null 2>&1
 
       - name: Apply bounded Access exemption with dedicated admin authority
         if: inputs.apply == true
         env:
           CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
-        run: node scripts/reconcile-cloudflare-access-public-zone.mjs --apply
+        run: node scripts/reconcile-cloudflare-access-public-zone.mjs --apply >/dev/null 2>&1
 
       - name: Install Chromium for post-apply proof
         if: inputs.apply == true
@@ -114,33 +120,206 @@ jobs:
 
       - name: Verify recovered front door and exact runtime SHA with Playwright
         if: inputs.apply == true
-        run: node scripts/verify-fcr-front-door-playwright.mjs
+        run: node scripts/verify-fcr-front-door-playwright.mjs >/dev/null 2>&1
 
-      - name: Publish structured recovery summary
+      - name: Return sanitized recovery receipt to founder control issue
         if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RETURN_ISSUE: '485'
+          JOB_STATUS: ${{ job.status }}
+          WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         shell: bash
         run: |
-          for receipt in \
-            test-results/fcr-access-front-door-recovery.json \
-            test-results/fcr-access-front-door-browser-proof.json; do
-            if [[ -f "$receipt" ]]; then
-              {
-                echo "## $(basename "$receipt")"
-                echo
-                echo '```json'
-                cat "$receipt"
-                echo '```'
-              } >> "$GITHUB_STEP_SUMMARY"
-            fi
-          done
+          set -euo pipefail
+          access_receipt='test-results/fcr-access-front-door-recovery.json'
+          browser_receipt='test-results/fcr-access-front-door-browser-proof.json'
+          public_receipt='test-results/fcr-access-front-door-public-receipt.md'
+          mkdir -p test-results
 
-      - name: Upload recovery evidence
+          safe_expected_head_sha='UNKNOWN'
+          if [[ "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            safe_expected_head_sha="$EXPECTED_HEAD_SHA"
+          fi
+
+          {
+            echo '## FCR Cloudflare Access receipt'
+            echo
+            echo "- Exact head: \`$safe_expected_head_sha\`"
+            echo "- Workflow run: $WORKFLOW_RUN_URL"
+            echo "- Job status: \`$JOB_STATUS\`"
+
+            if [[ ! -f "$access_receipt" ]]; then
+              echo '- Access provider receipt: `missing`'
+              echo '- Provider truth: `UNKNOWN` because the workflow ended before a structured Access receipt was produced.'
+            elif [[ "$safe_expected_head_sha" == 'UNKNOWN' ]] || ! jq -e -s \
+              --arg expectedHeadSha "$safe_expected_head_sha" \
+              --arg accountId "$CLOUDFLARE_ACCOUNT_ID" '
+                def iso8601:
+                  type == "string"
+                  and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$");
+                def digits_or_null:
+                  . == null or (type == "string" and test("^[0-9]+$"));
+                def bool_or_null:
+                  . == null or type == "boolean";
+                def credential_source:
+                  . == null
+                  or . == "CLOUDFLARE_ACCESS_API_TOKEN"
+                  or . == "CLOUDFLARE_ACCESS_ADMIN_API_TOKEN";
+                def credential_failure:
+                  type == "object"
+                  and (.source == "CLOUDFLARE_ACCESS_API_TOKEN" or .source == "CLOUDFLARE_ACCESS_ADMIN_API_TOKEN")
+                  and (
+                    .reason == "missing"
+                    or .reason == "account-id-substitution"
+                    or .reason == "non-ascii"
+                    or .reason == "bearer-prefix"
+                    or .reason == "assignment-wrapper"
+                    or .reason == "wrapping-quotes"
+                    or .reason == "whitespace"
+                    or .reason == "non-printable"
+                    or .reason == "provider-read-failed"
+                  )
+                  and ((has("status") | not) or .status == null or (.status | type == "number" and floor == . and . >= 100 and . <= 599))
+                  and ((has("providerCodes") | not) or (.providerCodes | type == "array" and all(.[]; type == "number" and floor == .)));
+                length == 1
+                and (
+                  .[0]
+                  | type == "object"
+                  and .schemaVersion == 2
+                  and .scope == "fcr-access-front-door-recovery"
+                  and (.observedAt | iso8601)
+                  and (.workflowRunId | digits_or_null)
+                  and (.workflowRunAttempt | digits_or_null)
+                  and .expectedHeadSha == $expectedHeadSha
+                  and (
+                    .state == "unknown"
+                    or .state == "clear"
+                    or .state == "attention"
+                    or .state == "mutated-needs-browser-proof"
+                    or .state == "blocked"
+                  )
+                  and (.applyRequested | type == "boolean")
+                  and (.mutationPerformed | type == "boolean")
+                  and .accountId == $accountId
+                  and .zone == "foundercontrolroom.org"
+                  and (.credentialSource | credential_source)
+                  and (.credentialFailures | type == "array" and all(.[]; credential_failure))
+                  and (.denyUnmatchedRequests | bool_or_null)
+                  and (.alreadyExempt | bool_or_null)
+                  and (.matchingApplicationCount == null or (.matchingApplicationCount | type == "number" and floor == . and . >= 0))
+                  and (
+                    .action == "none"
+                    or .action == "deny-unmatched-disabled"
+                    or .action == "already-exempt"
+                    or .action == "would-add-zone-exemption"
+                    or .action == "added-zone-exemption"
+                  )
+                  and (
+                    .classification == null
+                    or .classification == "account-authority-mismatch"
+                    or .classification == "dedicated-admin-credential-required"
+                    or .classification == "dedicated-read-credential-required"
+                    or .classification == "provider-read-failed"
+                    or .classification == "provider-credential-invalid"
+                    or .classification == "explicit-access-application-match"
+                    or .classification == "provider-recovery-failed"
+                  )
+                )
+              ' "$access_receipt" >/dev/null 2>&1; then
+              echo '- Access provider receipt: `malformed`'
+              echo '- Provider truth: `UNKNOWN` because the structured Access receipt failed the single-document public schema allowlist.'
+            else
+              echo '- Access provider receipt: `present`'
+              echo
+              echo '```json'
+              jq -s '.[0] | {
+                schemaVersion,
+                scope,
+                observedAt,
+                workflowRunId,
+                workflowRunAttempt,
+                expectedHeadSha,
+                state,
+                applyRequested,
+                mutationPerformed,
+                accountId,
+                zone,
+                credentialSource,
+                credentialFailures: [.credentialFailures[] | {source, reason, status, providerCodes}],
+                denyUnmatchedRequests,
+                alreadyExempt,
+                matchingApplicationCount,
+                action,
+                classification
+              }' "$access_receipt"
+              echo '```'
+            fi
+
+            if [[ ! -f "$browser_receipt" ]]; then
+              echo
+              echo '- Browser proof receipt: `missing`'
+            elif [[ "$safe_expected_head_sha" == 'UNKNOWN' ]] || ! jq -e -s \
+              --arg expectedHeadSha "$safe_expected_head_sha" '
+                def iso8601:
+                  type == "string"
+                  and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$");
+                def status_or_null:
+                  . == null or (type == "number" and floor == . and . >= 100 and . <= 599);
+                def origin_or_null:
+                  . == null or (type == "string" and test("^https://[A-Za-z0-9.-]+(?::[0-9]{1,5})?$"));
+                length == 1
+                and (
+                  .[0]
+                  | type == "object"
+                  and .schemaVersion == 1
+                  and .scope == "fcr-access-front-door-browser-proof"
+                  and (.observedAt | iso8601)
+                  and .expectedHeadSha == $expectedHeadSha
+                  and .requestedOrigin == "https://foundercontrolroom.org"
+                  and (.finalOrigin | origin_or_null)
+                  and (.navigationStatus | status_or_null)
+                  and (.apiVersionStatus | status_or_null)
+                  and (.apiVersionMatchesExpectedSha | type == "boolean")
+                  and (.state == "unknown" or .state == "proven" or .state == "failed")
+                  and ((has("error") | not) or .error == null or (.error | type == "string" and length <= 2000))
+                )
+              ' "$browser_receipt" >/dev/null 2>&1; then
+              echo
+              echo '- Browser proof receipt: `malformed`'
+              echo '- Browser proof: `UNKNOWN` because the structured browser receipt failed the single-document public schema allowlist.'
+            else
+              echo
+              echo '- Browser proof receipt: `present`'
+              echo
+              echo '```json'
+              jq -s '.[0] | {
+                schemaVersion,
+                scope,
+                observedAt,
+                expectedHeadSha,
+                requestedOrigin,
+                finalOriginMatchesExpected: (.finalOrigin != null and .finalOrigin == .requestedOrigin),
+                unexpectedOriginDetected: (.finalOrigin != null and .finalOrigin != .requestedOrigin),
+                accessInterceptDetected: (((.finalOrigin // "") | test("cloudflareaccess\\.com"; "i")) or ((.error // "") | test("Cloudflare Access"; "i"))),
+                navigationStatus,
+                apiVersionStatus,
+                apiVersionMatchesExpectedSha,
+                state,
+                errorPresent: (((.error // "") | length) > 0)
+              }' "$browser_receipt"
+              echo '```'
+            fi
+          } > "$public_receipt"
+
+          gh issue comment "$RETURN_ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$public_receipt"
+          cat "$public_receipt" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload sanitized recovery evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: fcr-access-front-door-recovery-${{ env.EXPECTED_HEAD_SHA }}-${{ github.run_attempt }}
-          path: |
-            test-results/fcr-access-front-door-recovery.json
-            test-results/fcr-access-front-door-browser-proof.json
+          name: fcr-access-front-door-public-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/fcr-access-front-door-public-receipt.md
           if-no-files-found: ignore
           retention-days: 30
