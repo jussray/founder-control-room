@@ -70,7 +70,7 @@ describe('n8n founder-content route', () => {
     expect(mockDispatchFounderContent).not.toHaveBeenCalled();
   });
 
-  it('exposes the bounded provider-neutral founder-content contract to an authenticated founder', async () => {
+  it('exposes bounded provider contracts separately from runtime enablement', async () => {
     const res = await request(buildApp())
       .get('/automation/conveyor')
       .set('Authorization', BEARER);
@@ -80,7 +80,12 @@ describe('n8n founder-content route', () => {
       contract: N8N_FOUNDER_CONTENT_CONTRACT,
       route: '/founder-content',
       providerSelection: 'founder-authenticated-bounded-platform-compatible',
-      providerRoutes: N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
+      providerContractRoutes: N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
+      providerRuntimeConfiguration: {
+        env: 'N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS',
+        defaultEnabled: ['buffer'],
+        rule: 'contract-capable-does-not-imply-runtime-enabled',
+      },
       finalPublishedTruth: 'fcr-provider-readback-only',
       authority: {
         orchestrate: true,
