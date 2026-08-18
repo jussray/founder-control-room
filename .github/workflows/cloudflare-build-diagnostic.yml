@@ -19,7 +19,7 @@ jobs:
     environment: production
     env:
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
-      CF_WORKER_NAME: founder-control-room2
+      CF_WORKER_NAME: founder-control-room
       CF_API_HOSTNAME: api.foundercontrolroom.org
       CF_ACCOUNT_ID: 9b59861bd1747cf7525571b4c51d2aa0
       CF_WORKER_GIT_AUTHORITY_POLICY: config/cloudflare-worker-git-authority-policy.json
