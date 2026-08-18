@@ -1,8 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { Request, RequestHandler, Response } from 'express';
 import { createBuildEvent, type BuildEvent, type BuildEventInput } from '../../buildEvents/buildEvent.js';
-import { supabase } from '../../lib/supabaseClient.js';
-import { storeBuildEvent, type BuildEventStoreDisposition } from '../../services/buildEventStore.js';
+import type { BuildEventStoreDisposition } from '../../services/buildEventStore.js';
 
 const TOKEN_CONTEXT = 'founder-control-room/build-event-receipts/v1';
 
@@ -60,6 +59,7 @@ export function deriveBuildEventReceiptToken(mcpToken: string, producer: string)
 }
 
 async function findProject(slug: string): Promise<ProjectRecord | null> {
+  const { supabase } = await import('../../lib/supabaseClient.js');
   const { data, error } = await supabase
     .from('projects')
     .select('id, slug, repo_identifier')
@@ -72,6 +72,14 @@ async function findProject(slug: string): Promise<ProjectRecord | null> {
     slug: String(data.slug),
     repoIdentifier: data.repo_identifier ? String(data.repo_identifier) : null,
   };
+}
+
+async function storeEvent(
+  projectId: string,
+  event: BuildEvent,
+): Promise<BuildEventStoreDisposition> {
+  const { storeBuildEvent } = await import('../../services/buildEventStore.js');
+  return storeBuildEvent(projectId, event);
 }
 
 function policyError(
@@ -97,7 +105,7 @@ export function createBuildEventReceiptIngestHandler(
 ): RequestHandler {
   const env = dependencies.env ?? process.env;
   const projectLookup = dependencies.findProject ?? findProject;
-  const eventStore = dependencies.storeEvent ?? storeBuildEvent;
+  const eventStore = dependencies.storeEvent ?? storeEvent;
 
   return async function handleBuildEventReceiptIngest(req: Request, res: Response) {
     headers(res);
