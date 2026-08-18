@@ -1,5 +1,6 @@
 import { hash } from "node:crypto";
 import type {
+  Diff,
   RepositoryProvider,
   ReviewSignal,
   VerificationSignal,
@@ -83,6 +84,36 @@ const VERDICTS = new Set<ReviewVerdict>(["clear", "needs_review", "blocked"]);
 
 const text = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const lower = (value: unknown): string => text(value).toLowerCase();
+
+export function independentReviewPolicyHash(policy: IndependentReviewPolicy): string {
+  const trustedReviewerIds = Array.isArray(policy?.trustedSemanticReviewerIds)
+    ? policy.trustedSemanticReviewerIds.map(lower).filter(Boolean).sort()
+    : [];
+  return hash("sha256", JSON.stringify([
+    policy?.requiredSemanticReviews,
+    policy?.requireDeterministicReview === true,
+    policy?.blockOnP2 === true,
+    trustedReviewerIds,
+  ]), "hex");
+}
+
+export function independentReviewDiffHash(diff: Diff): string {
+  const files = Array.isArray(diff?.files) ? [...diff.files] : [];
+  files.sort((left, right) => left.path.localeCompare(right.path));
+  return hash("sha256", JSON.stringify([
+    lower(diff?.base),
+    lower(diff?.head),
+    diff?.aheadBy,
+    diff?.behindBy,
+    files.map((file) => [
+      file.path,
+      file.status,
+      file.additions,
+      file.deletions,
+      file.patch ?? "",
+    ]),
+  ]), "hex");
+}
 
 function reviewSeed(review: IndependentReviewReceipt): string {
   const findings = Array.isArray(review?.findings) ? review.findings : [];
