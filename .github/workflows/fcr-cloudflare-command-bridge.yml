@@ -1,0 +1,107 @@
+name: FCR Cloudflare Command Bridge
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  dispatch:
+    if: ${{ github.event.issue.number == 485 && github.event.comment.user.login == 'jussray' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Parse exact founder Cloudflare command
+        id: parse
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          read -r command action sha approval extra <<< "$COMMENT_BODY"
+
+          if [[ "$command" != '/cloudflare-fcr-access' ]]; then
+            echo 'Not a Cloudflare FCR Access command; exiting without dispatch.'
+            exit 0
+          fi
+
+          if [[ "$action" != 'inspect' && "$action" != 'apply' ]]; then
+            echo '::error title=Invalid Cloudflare command::action must be inspect or apply.'
+            exit 1
+          fi
+
+          if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error title=Invalid exact head::command must bind to a lowercase 40-character SHA.'
+            exit 1
+          fi
+
+          if [[ -n "${extra:-}" ]]; then
+            echo '::error title=Unexpected arguments::command contains extra fields.'
+            exit 1
+          fi
+
+          if [[ "$action" == 'inspect' ]]; then
+            if [[ -n "${approval:-}" ]]; then
+              echo '::error title=Unexpected approval::inspect accepts only the exact SHA.'
+              exit 1
+            fi
+            apply='false'
+            approval_reference=''
+          else
+            if [[ ! "${approval:-}" =~ ^[A-Za-z0-9._:-]{8,200}$ ]]; then
+              echo '::error title=Missing mutation approval::apply requires an auditable 8-200 character approval reference.'
+              exit 1
+            fi
+            apply='true'
+            approval_reference="$approval"
+          fi
+
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "apply=$apply" >> "$GITHUB_OUTPUT"
+          echo "approval_reference=$approval_reference" >> "$GITHUB_OUTPUT"
+
+      - name: Verify command SHA is exact current main
+        if: steps.parse.outputs.sha != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ steps.parse.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_main="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
+          printf 'expected=%s\ncurrent_main=%s\n' "$EXPECTED_HEAD_SHA" "$current_main"
+          test "$current_main" = "$EXPECTED_HEAD_SHA"
+
+      - name: Dispatch bounded FCR Access workflow
+        if: steps.parse.outputs.sha != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ steps.parse.outputs.sha }}
+          APPLY: ${{ steps.parse.outputs.apply }}
+          APPROVAL_REFERENCE: ${{ steps.parse.outputs.approval_reference }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(jq -n \
+            --arg ref main \
+            --arg sha "$EXPECTED_HEAD_SHA" \
+            --arg approval "$APPROVAL_REFERENCE" \
+            --argjson apply "$APPLY" \
+            '{ref:$ref, inputs:{expected_head_sha:$sha, apply:$apply, approval_reference:$approval}}')"
+
+          gh api \
+            --method POST \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/fcr-access-front-door-recovery.yml/dispatches" \
+            --input - <<< "$payload"
+
+          {
+            echo '## FCR Cloudflare command dispatched'
+            echo
+            echo "- Exact current main: \`$EXPECTED_HEAD_SHA\`"
+            echo "- Apply: \`$APPLY\`"
+            echo '- Target: foundercontrolroom.org Access front door only'
+          } >> "$GITHUB_STEP_SUMMARY"
