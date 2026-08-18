@@ -1,6 +1,8 @@
 import { pluginDescriptorFor } from '../lib/pluginCenter.js';
 
 export const FOUNDER_HUBSPOT_ACCOUNT_ID = '246754542';
+export const DEFAULT_HUBSPOT_SNAPSHOT_MAX_AGE_MS = 5 * 60 * 1000;
+const MAX_FUTURE_CLOCK_SKEW_MS = 30 * 1000;
 
 export type HubSpotProjectAuthority =
   | 'canonical-repository'
@@ -96,17 +98,23 @@ export const FOUNDER_HUBSPOT_PROJECTS = Object.freeze([
 ] as const satisfies readonly FounderHubSpotProjectRegistration[]);
 
 export interface HubSpotProjectRecordSnapshot {
-  id: string | number;
-  dealname: string;
+  id?: string | number | null;
+  dealname?: string | null;
   pipeline?: string | null;
   dealstage?: string | null;
 }
 
 export interface HubSpotReadOnlySnapshot {
-  accountId: string | number;
-  records: readonly HubSpotProjectRecordSnapshot[];
+  accountId?: string | number | null;
+  observedAt?: string | null;
+  records?: readonly HubSpotProjectRecordSnapshot[] | null;
   /** Optional local CLI evidence from `hs account current`. */
   cliAccountId?: string | number | null;
+}
+
+export interface HubSpotReadOnlyPreflightOptions {
+  now?: Date;
+  maxSnapshotAgeMs?: number;
 }
 
 export type HubSpotCliBindingState = 'verified' | 'unverified' | 'mismatch';
@@ -116,6 +124,8 @@ export interface HubSpotReadOnlyPreflightResult {
   mode: 'read-only';
   expectedAccountId: string;
   observedAccountId: string;
+  observedAt: string | null;
+  snapshotAgeMs: number | null;
   cliBinding: HubSpotCliBindingState;
   registeredProjectCount: number;
   observedProjectCount: number;
@@ -130,8 +140,18 @@ function normalizedId(value: string | number | null | undefined): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function normalizedName(value: string): string {
-  return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
+function normalizedDisplayName(value: unknown): string {
+  return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
+}
+
+function normalizedNameKey(value: unknown): string {
+  return normalizedDisplayName(value).toLocaleLowerCase('en-US');
+}
+
+function parsedTimestamp(value: unknown): number | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : null;
 }
 
 function registryContractErrors(): string[] {
@@ -145,7 +165,7 @@ function registryContractErrors(): string[] {
     }
     ids.add(project.dealId);
 
-    const normalized = normalizedName(project.dealName);
+    const normalized = normalizedNameKey(project.dealName);
     if (names.has(normalized)) {
       errors.push(`HubSpot founder-project registry repeats deal name ${project.dealName}.`);
     }
@@ -169,7 +189,7 @@ function registryContractErrors(): string[] {
 }
 
 export function registeredHubSpotProject(
-  dealId: string | number,
+  dealId: string | number | null | undefined,
 ): FounderHubSpotProjectRegistration | null {
   const normalized = normalizedId(dealId);
   return FOUNDER_HUBSPOT_PROJECTS.find((project) => project.dealId === normalized) ?? null;
@@ -177,6 +197,7 @@ export function registeredHubSpotProject(
 
 export function preflightHubSpotReadOnlySnapshot(
   snapshot: HubSpotReadOnlySnapshot,
+  options: HubSpotReadOnlyPreflightOptions = {},
 ): HubSpotReadOnlyPreflightResult {
   const errors = registryContractErrors();
   const warnings: string[] = [
@@ -184,12 +205,35 @@ export function preflightHubSpotReadOnlySnapshot(
   ];
   const observedAccountId = normalizedId(snapshot.accountId);
   const cliAccountId = normalizedId(snapshot.cliAccountId);
+  const records = Array.isArray(snapshot.records) ? snapshot.records : [];
+  const nowMs = options.now?.getTime() ?? Date.now();
+  const requestedMaxAgeMs = options.maxSnapshotAgeMs ?? DEFAULT_HUBSPOT_SNAPSHOT_MAX_AGE_MS;
+  const maxSnapshotAgeMs = Number.isFinite(requestedMaxAgeMs) && requestedMaxAgeMs > 0
+    ? requestedMaxAgeMs
+    : DEFAULT_HUBSPOT_SNAPSHOT_MAX_AGE_MS;
+  const observedAtMs = parsedTimestamp(snapshot.observedAt);
+  const observedAt = observedAtMs === null ? null : new Date(observedAtMs).toISOString();
+  const snapshotAgeMs = observedAtMs === null ? null : nowMs - observedAtMs;
   let cliBinding: HubSpotCliBindingState = 'unverified';
 
   if (observedAccountId !== FOUNDER_HUBSPOT_ACCOUNT_ID) {
     errors.push(
       `HubSpot workspace must be exactly ${FOUNDER_HUBSPOT_ACCOUNT_ID}; observed ${observedAccountId || 'missing'}.`,
     );
+  }
+
+  if (observedAtMs === null) {
+    errors.push('HubSpot project snapshot must include a valid observedAt timestamp.');
+  } else if (snapshotAgeMs !== null && snapshotAgeMs < -MAX_FUTURE_CLOCK_SKEW_MS) {
+    errors.push('HubSpot project snapshot observedAt is too far in the future to be trusted.');
+  } else if (snapshotAgeMs !== null && snapshotAgeMs > maxSnapshotAgeMs) {
+    errors.push(
+      `HubSpot project snapshot is stale by ${snapshotAgeMs}ms; maximum allowed age is ${maxSnapshotAgeMs}ms.`,
+    );
+  }
+
+  if (!Array.isArray(snapshot.records)) {
+    errors.push('HubSpot project snapshot must include an array of founder-project records.');
   }
 
   if (snapshot.cliAccountId !== undefined && snapshot.cliAccountId !== null) {
@@ -211,8 +255,8 @@ export function preflightHubSpotReadOnlySnapshot(
   const observedIds = new Set<string>();
   const observedNames = new Set<string>();
 
-  for (const record of snapshot.records) {
-    const recordId = normalizedId(record.id);
+  for (const record of records) {
+    const recordId = normalizedId(record?.id);
     if (!recordId) {
       errors.push('HubSpot project snapshot contains a record without a usable ID.');
       continue;
@@ -224,13 +268,14 @@ export function preflightHubSpotReadOnlySnapshot(
     }
     observedIds.add(recordId);
 
-    const normalizedDealName = normalizedName(record.dealname);
-    if (!normalizedDealName) {
+    const dealName = normalizedDisplayName(record?.dealname);
+    const dealNameKey = normalizedNameKey(dealName);
+    if (!dealName) {
       errors.push(`HubSpot deal ${recordId} is missing its deal name.`);
-    } else if (observedNames.has(normalizedDealName)) {
-      errors.push(`HubSpot project snapshot repeats deal name ${record.dealname}.`);
+    } else if (observedNames.has(dealNameKey)) {
+      errors.push(`HubSpot project snapshot repeats deal name ${dealName}.`);
     }
-    observedNames.add(normalizedDealName);
+    if (dealNameKey) observedNames.add(dealNameKey);
 
     const expected = expectedById.get(recordId);
     if (!expected) {
@@ -238,9 +283,9 @@ export function preflightHubSpotReadOnlySnapshot(
       continue;
     }
 
-    if (normalizedDealName !== normalizedName(expected.dealName)) {
+    if (dealName !== expected.dealName) {
       errors.push(
-        `HubSpot deal ${recordId} must be named exactly ${expected.dealName}; observed ${record.dealname || 'missing'}.`,
+        `HubSpot deal ${recordId} must be named exactly ${expected.dealName}; observed ${dealName || 'missing'}.`,
       );
     }
   }
@@ -256,9 +301,11 @@ export function preflightHubSpotReadOnlySnapshot(
     mode: 'read-only',
     expectedAccountId: FOUNDER_HUBSPOT_ACCOUNT_ID,
     observedAccountId,
+    observedAt,
+    snapshotAgeMs,
     cliBinding,
     registeredProjectCount: FOUNDER_HUBSPOT_PROJECTS.length,
-    observedProjectCount: snapshot.records.length,
+    observedProjectCount: records.length,
     mutationAllowed: false,
     allowedOperations: ['list_registered_projects', 'validate_project_snapshot'],
     errors,
@@ -278,11 +325,16 @@ export class HubSpotReadOnlyProvider {
     return FOUNDER_HUBSPOT_PROJECTS;
   }
 
-  projectByDealId(dealId: string | number): FounderHubSpotProjectRegistration | null {
+  projectByDealId(
+    dealId: string | number | null | undefined,
+  ): FounderHubSpotProjectRegistration | null {
     return registeredHubSpotProject(dealId);
   }
 
-  preflight(snapshot: HubSpotReadOnlySnapshot): HubSpotReadOnlyPreflightResult {
-    return preflightHubSpotReadOnlySnapshot(snapshot);
+  preflight(
+    snapshot: HubSpotReadOnlySnapshot,
+    options: HubSpotReadOnlyPreflightOptions = {},
+  ): HubSpotReadOnlyPreflightResult {
+    return preflightHubSpotReadOnlySnapshot(snapshot, options);
   }
 }
