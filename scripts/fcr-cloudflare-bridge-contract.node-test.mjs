@@ -29,6 +29,17 @@ test('recovery workflow is production-gated and separates read from mutation aut
   assert.match(recoveryWorkflow, /verify-fcr-front-door-playwright\.mjs/);
 });
 
+test('recovery never echoes raw receipts into the public job summary', () => {
+  const summaryStep = recoveryWorkflow.match(
+    /- name: Publish sanitized recovery summary([\s\S]*?)- name: Upload recovery evidence/,
+  )?.[1] ?? '';
+
+  assert.match(summaryStep, /jq -e 'type == "object"' "\$receipt"/);
+  assert.match(summaryStep, /Raw recovery receipts are retained in the workflow artifact/);
+  assert.doesNotMatch(summaryStep, /cat "\$receipt"/);
+  assert.doesNotMatch(summaryStep, /```json/);
+});
+
 test('recovery returns only a sanitized receipt to the fixed founder control issue', () => {
   const returnStep = recoveryWorkflow.match(
     /- name: Return sanitized recovery receipt to founder control issue([\s\S]*)$/,
