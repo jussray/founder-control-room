@@ -26,6 +26,7 @@ import type { ProofEvidence } from '../../proof-gate/index.js';
 import type { EvidenceKind } from '../../reconciliation/types.js';
 import { WEBHOOK_ONLY_EVIDENCE_KINDS } from '../../reconciliation/types.js';
 import type { PatchFileChange, RepositoryProvider } from '../../providers/RepositoryProvider.js';
+import { enforceMergeReviewAuthority } from '../../review/mergeReviewAuthority.js';
 
 /** Mission states in which the branch is still under active work — safe to patch. */
 const PATCHABLE_MISSION_STATUSES = new Set(['sandboxed', 'in_review']);
@@ -62,7 +63,7 @@ function configuredRepositoryProvider(
   project: RepositoryProjectRow,
 ): { provider: RepositoryProvider; config: ProviderProjectConfig } | { error: string } {
   if (!project.repo_identifier) {
-    return { error: `Repository identifier is missing for project "${project.slug}"` };
+    return { error: `Repository identifier is missing for project \"${project.slug}\"` };
   }
 
   const config: ProviderProjectConfig = {
@@ -355,7 +356,7 @@ approvalsRouter.post(
       return res.status(403).json({
         error: `Action '${actionType}' requires a passing proof gate result within the last 15 minutes.`,
         code: 'PROOF_GATE_REQUIRED',
-        hint: `Call POST /approvals/${missionId}/run-proof-gate with gateId: "${actionType}" first.`,
+        hint: `Call POST /approvals/${missionId}/run-proof-gate with gateId: \"${actionType}\" first.`,
       });
     }
 
@@ -544,6 +545,15 @@ approvalsRouter.post(
           );
         }
 
+        const reviewAuthority = await enforceMergeReviewAuthority({
+          provider,
+          projectId: project.slug,
+          repository: project.repo_identifier as string,
+          baseRef: base,
+          headSha: expectedHeadSha,
+          payload,
+        });
+
         const mergeCommitSha = await provider.integrate(project.slug, base, head);
         executionResult = {
           mergeCommitSha,
@@ -551,6 +561,7 @@ approvalsRouter.post(
           base,
           expectedHeadSha,
           evidence: evidenceResult.summary,
+          reviewAuthority,
         };
 
         const { error: missionUpdateError } = await supabase
@@ -637,7 +648,7 @@ approvalsRouter.post(
       }
       if (change['delete'] !== true && typeof change['content'] !== 'string') {
         return res.status(400).json({
-          error: `changes for "${change['path'] as string}" must include string content unless delete is true`,
+          error: `changes for \"${change['path'] as string}\" must include string content unless delete is true`,
         });
       }
     }
@@ -660,7 +671,7 @@ approvalsRouter.post(
     }
     if (!mission.branch_ref) {
       return res.status(409).json({
-        error: 'Mission has no branch yet. Call POST /:missionId/execute with actionType "create_branch" first.',
+        error: 'Mission has no branch yet. Call POST /:missionId/execute with actionType \"create_branch\" first.',
         code: 'MISSION_HAS_NO_BRANCH',
       });
     }
