@@ -137,6 +137,16 @@ function assertCallerDoesNotContradictAuthorization(
   }
 }
 
+function assertHistoricalDeferredText(label: string, value: unknown, reasons: string[]): void {
+  const candidate = text(value);
+  if (CURRENT_LANGUAGE.test(candidate) || CURRENT_STATE_GRAMMAR.test(candidate)) {
+    reasons.push(`${label} uses current-state language`);
+  }
+  if (!HISTORICAL_LANGUAGE.test(candidate)) {
+    reasons.push(`${label} must use explicit historical framing`);
+  }
+}
+
 function assertDeferredProviderClaimsAreHistoricallyDurable(
   input: FirstPartyFounderDistributionInput,
   authorization: FounderContentAuthorization,
@@ -149,6 +159,8 @@ function assertDeferredProviderClaimsAreHistoricallyDurable(
     : {};
   const claims = Array.isArray(publicPayload.public_claims) ? publicPayload.public_claims : [];
   const reasons: string[] = [];
+
+  assertHistoricalDeferredText('approved deferred copy', authorization.content.text, reasons);
 
   if (claims.length === 0) {
     reasons.push('scheduled provider routes require canonical public claims');
@@ -167,12 +179,7 @@ function assertDeferredProviderClaimsAreHistoricallyDurable(
     if (temporalVersion !== authorization.source.commit_sha) {
       reasons.push(`claim ${claimId} must bind historical truth to the exact authorized source commit`);
     }
-    if (CURRENT_LANGUAGE.test(claimText) || CURRENT_STATE_GRAMMAR.test(claimText)) {
-      reasons.push(`historical claim ${claimId} uses current-state language`);
-    }
-    if (!HISTORICAL_LANGUAGE.test(claimText)) {
-      reasons.push(`historical claim ${claimId} must use explicit historical framing`);
-    }
+    assertHistoricalDeferredText(`historical claim ${claimId}`, claimText, reasons);
   });
 
   if (reasons.length > 0) {
