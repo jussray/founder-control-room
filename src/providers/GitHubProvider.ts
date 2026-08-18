@@ -203,6 +203,12 @@ export class GitHubProvider implements RepositoryProvider {
       repo,
       pull_number: pullRequestNumber,
     });
+    if (data.state !== "open") {
+      throw new Error(`GitHubProvider: pull request #${pullRequestNumber} must be open for independent review`);
+    }
+    if (data.draft === true) {
+      throw new Error(`GitHubProvider: pull request #${pullRequestNumber} must be ready for review, not draft`);
+    }
 
     return {
       number: data.number,
