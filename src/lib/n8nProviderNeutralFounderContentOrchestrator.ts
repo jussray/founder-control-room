@@ -76,6 +76,7 @@ const DEFAULT_PROVIDER: N8nFounderContentProvider = 'buffer';
 const NATIVE_REVIEW_WINDOW_MINUTES = 20;
 const NATIVE_REVIEW_WINDOW_MS = NATIVE_REVIEW_WINDOW_MINUTES * 60 * 1000;
 const PROVIDER_NEUTRAL_EXECUTION_IDENTITY = 'fcr/n8n-founder-content-execution-identity@v2' as const;
+const PROVIDER_NEUTRAL_CADENCE_PROVIDER = 'n8n' as const;
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -444,12 +445,24 @@ export async function dispatchProviderNeutralN8nFounderContent(
 
   try {
     const cadence = await reserveFounderContentCadence({
-      provider: 'n8n',
+      provider: PROVIDER_NEUTRAL_CADENCE_PROVIDER,
       channel: request.platform,
       contentId: envelope.content_id,
       requestedScheduleAt: envelope.provider_request.schedule_at,
     });
-    envelope = applyFounderContentCadenceSchedule(envelope, cadence);
+    const cadenceProjection = applyFounderContentCadenceSchedule({
+      provider: PROVIDER_NEUTRAL_CADENCE_PROVIDER,
+      channel: request.platform,
+      content_id: envelope.content_id,
+      provider_request: { schedule_at: envelope.provider_request.schedule_at },
+    }, cadence);
+    envelope = {
+      ...envelope,
+      provider_request: {
+        ...envelope.provider_request,
+        schedule_at: cadenceProjection.provider_request.schedule_at,
+      },
+    };
     request = buildProviderNeutralN8nFounderContentRequest(envelope);
   } catch (error) {
     return {
