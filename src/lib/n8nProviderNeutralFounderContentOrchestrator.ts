@@ -22,19 +22,7 @@ import {
 } from './n8nFounderContentOrchestrator.js';
 
 export const N8N_FOUNDER_CONTENT_PROVIDER_ROUTES = {
-  buffer: [
-    'linkedin',
-    'facebook',
-    'instagram',
-    'threads',
-    'x',
-    'tiktok',
-    'youtube_shorts',
-    'pinterest',
-    'bluesky',
-    'mastodon',
-    'google_business',
-  ],
+  buffer: ['linkedin', 'facebook'],
   meta: ['facebook', 'instagram', 'threads'],
   tiktok: ['tiktok'],
   x: ['x'],
@@ -46,6 +34,11 @@ export const N8N_FOUNDER_CONTENT_PROVIDER_ROUTES = {
 } as const;
 
 export type N8nFounderContentProvider = keyof typeof N8N_FOUNDER_CONTENT_PROVIDER_ROUTES;
+
+export interface N8nFounderContentProviderConfig {
+  enabledProviders: N8nFounderContentProvider[];
+  invalidProviders: string[];
+}
 
 const DEFAULT_PROVIDER: N8nFounderContentProvider = 'buffer';
 
@@ -59,6 +52,26 @@ function stableHash(value: unknown): string {
 
 function requestedProvider(input: FirstPartyFounderDistributionInput): string {
   return text(input.n8n_provider).toLowerCase() || DEFAULT_PROVIDER;
+}
+
+export function readN8nFounderContentProviderConfig(
+  env: NodeJS.ProcessEnv = process.env,
+): N8nFounderContentProviderConfig {
+  const raw = text(env.N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS);
+  if (!raw) {
+    return { enabledProviders: [DEFAULT_PROVIDER], invalidProviders: [] };
+  }
+
+  const requested = [...new Set(raw
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean))];
+  const invalidProviders = requested.filter((provider) => !(provider in N8N_FOUNDER_CONTENT_PROVIDER_ROUTES));
+  const enabledProviders = requested.filter(
+    (provider): provider is N8nFounderContentProvider => provider in N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
+  );
+
+  return { enabledProviders, invalidProviders };
 }
 
 export function providerSupportsFounderContentPlatform(provider: string, platform: string): boolean {
@@ -203,7 +216,8 @@ export async function dispatchProviderNeutralN8nFounderContent(
     };
   }
 
-  const config = readN8nFounderContentConfig(options.env ?? process.env);
+  const env = options.env ?? process.env;
+  const config = readN8nFounderContentConfig(env);
   if (!config.enabled) {
     return {
       ok: false,
@@ -222,6 +236,31 @@ export async function dispatchProviderNeutralN8nFounderContent(
       request,
       receipt: null,
       reasons: ['n8n founder-content webhook and bearer token must be configured'],
+    };
+  }
+
+  const providerConfig = readN8nFounderContentProviderConfig(env);
+  if (providerConfig.invalidProviders.length > 0) {
+    return {
+      ok: false,
+      code: 'ORCHESTRATION_NOT_CONFIGURED',
+      status: 503,
+      request,
+      receipt: null,
+      reasons: [`n8n founder-content provider allowlist contains unsupported values: ${providerConfig.invalidProviders.join(', ')}`],
+    };
+  }
+  if (!providerConfig.enabledProviders.includes(request.providerRequest.provider as N8nFounderContentProvider)) {
+    return {
+      ok: false,
+      code: 'ORCHESTRATION_NOT_CONFIGURED',
+      status: 503,
+      request,
+      receipt: null,
+      reasons: [
+        `n8n provider ${request.providerRequest.provider} is contract-capable but not runtime-enabled`,
+        'set N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS only after the matching n8n provider adapter is configured and verified',
+      ],
     };
   }
 
