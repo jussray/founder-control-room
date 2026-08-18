@@ -76,14 +76,14 @@ test('always-path output independently sanitizes the requested head before publi
   assert.doesNotMatch(artifactStep, /EXPECTED_HEAD_SHA/);
 });
 
-test('public receipt validators require exactly one parsed JSON document', () => {
+test('public receipt validators and projections require exactly one parsed JSON document', () => {
   const returnStep = recoveryWorkflow.match(
     /- name: Return sanitized recovery receipt to founder control issue([\s\S]*?)- name: Upload sanitized recovery evidence/,
   )?.[1] ?? '';
 
   assert.equal((returnStep.match(/jq -e -s/g) ?? []).length, 2);
   assert.equal((returnStep.match(/length == 1/g) ?? []).length, 2);
-  assert.ok((returnStep.match(/\.\[0\]/g) ?? []).length >= 2);
+  assert.equal((returnStep.match(/jq -s '\.\[0\] \| \{/g) ?? []).length, 2);
   assert.match(returnStep, /single-document public schema allowlist/);
 });
 
