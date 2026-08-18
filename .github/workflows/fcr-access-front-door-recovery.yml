@@ -220,12 +220,14 @@ jobs:
                 observedAt,
                 expectedHeadSha,
                 requestedOrigin,
-                finalOrigin,
+                finalOriginMatchesExpected: (.finalOrigin != null and .requestedOrigin != null and .finalOrigin == .requestedOrigin),
+                unexpectedOriginDetected: (.finalOrigin != null and .requestedOrigin != null and .finalOrigin != .requestedOrigin),
+                accessInterceptDetected: (((.finalOrigin // "") | test("cloudflareaccess\\.com"; "i")) or (((.error // "") | tostring) | test("Cloudflare Access"; "i"))),
                 navigationStatus,
                 apiVersionStatus,
                 apiVersionMatchesExpectedSha,
                 state,
-                error
+                errorPresent: (((.error // "") | tostring | length) > 0)
               }' "$browser_receipt"
               echo '```'
             fi
