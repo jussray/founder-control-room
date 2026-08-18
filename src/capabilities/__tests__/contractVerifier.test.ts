@@ -10,6 +10,10 @@ const verifierPath = join(repoRoot, 'scripts/verify-capability-contract.mjs');
 const canonicalContract = JSON.parse(
   readFileSync(join(repoRoot, '.control/capability.json'), 'utf8'),
 );
+const canonicalLegacyPointer = readFileSync(
+  join(repoRoot, '.control/capability.yaml'),
+  'utf8',
+);
 const fixtureRoot = mkdtempSync(join(tmpdir(), 'fcr-capability-contract-'));
 let fixtureSequence = 0;
 
@@ -17,10 +21,16 @@ afterAll(() => {
   rmSync(fixtureRoot, { recursive: true, force: true });
 });
 
-function runVerifier(contract: unknown) {
-  const fixturePath = join(fixtureRoot, `contract-${fixtureSequence++}.json`);
+function runVerifier(
+  contract: unknown,
+  legacyPointer = canonicalLegacyPointer,
+) {
+  const sequence = fixtureSequence++;
+  const fixturePath = join(fixtureRoot, `contract-${sequence}.json`);
+  const legacyFixturePath = join(fixtureRoot, `capability-${sequence}.yaml`);
   writeFileSync(fixturePath, `${JSON.stringify(contract, null, 2)}\n`, 'utf8');
-  return spawnSync(process.execPath, [verifierPath, fixturePath], {
+  writeFileSync(legacyFixturePath, legacyPointer, 'utf8');
+  return spawnSync(process.execPath, [verifierPath, fixturePath, legacyFixturePath], {
     cwd: repoRoot,
     encoding: 'utf8',
   });
@@ -78,6 +88,31 @@ describe('Capability Contract verifier', () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain(
       `${verifiedCapability.id} cannot be verified without evidence_ids`,
+    );
+  });
+
+  it('rejects legacy YAML that regains independent capability state', () => {
+    const conflictingLegacy = `${canonicalLegacyPointer}\ncapabilities:\n  - id: BUILD\n    status: verified\n`;
+
+    const result = runVerifier(canonicalContract, conflictingLegacy);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain(
+      'must not carry independent capabilities state',
+    );
+  });
+
+  it('rejects a legacy YAML pointer that names a different authority', () => {
+    const wrongPointer = canonicalLegacyPointer.replace(
+      'canonical_source: .control/capability.json',
+      'canonical_source: .control/other.json',
+    );
+
+    const result = runVerifier(canonicalContract, wrongPointer);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain(
+      'must point to .control/capability.json as canonical authority',
     );
   });
 });
