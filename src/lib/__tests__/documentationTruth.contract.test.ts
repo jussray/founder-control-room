@@ -10,6 +10,9 @@ const truthDecay = read('docs/TRUTH_DECAY_AUDIT.md');
 const mergeAuthority = read('docs/FOUNDER_MERGE_AUTHORITY.md');
 const launchLoop = read('.ai/skills/juss-flow-launch-loop/SKILL.md');
 const globalAi = read('GLOBAL_AI.md');
+const chatgpt = read('CHATGPT.md');
+const claude = read('CLAUDE.md');
+const perplexity = read('PERPLEXITY.md');
 const verifier = read('scripts/verify-documentation-truth.mjs');
 const workflow = read('.github/workflows/documentation-truth.yml');
 const ci = read('.github/workflows/ci.yml');
@@ -43,6 +46,20 @@ describe('documentation truth contract', () => {
     expect(futureYouMe).toContain('first-party LinkedIn');
     expect(futureYouMe).toContain('provider-neutral n8n');
     expect(futureYouMe).toContain('HISTORICAL ZAPIER BUDGET');
+  });
+
+  it('keeps ChatGPT, Claude, and Perplexity on the same truth-aging constitution', () => {
+    for (const contract of [chatgpt, claude, perplexity]) {
+      expect(contract).toContain('GLOBAL_AI.md');
+      expect(contract).toContain('TRUTH_DECAY_AUDIT.md');
+      expect(contract).toContain('Documentation truth');
+      expect(contract).toContain('Truth Lease');
+    }
+
+    expect(chatgpt).toContain('provider-neutral n8n');
+    expect(claude).toContain('provider-neutral n8n');
+    expect(perplexity).toContain('provider-neutral n8n');
+    expect(claude).not.toContain('Current provider truth:\n\n```text\nClaude with connected Zapier MCP');
   });
 
   it('documents the single capability authority after the current-main transition', () => {
