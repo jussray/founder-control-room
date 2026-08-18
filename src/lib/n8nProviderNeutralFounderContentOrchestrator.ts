@@ -78,6 +78,7 @@ const NATIVE_REVIEW_WINDOW_MS = NATIVE_REVIEW_WINDOW_MINUTES * 60 * 1000;
 const PROVIDER_NEUTRAL_EXECUTION_IDENTITY = 'fcr/n8n-founder-content-execution-identity@v2' as const;
 const PROVIDER_NEUTRAL_CADENCE_PROVIDER = 'n8n' as const;
 const CURRENT_LANGUAGE = /\b(currently|right now|is live|are live|is green|are green|remains|still (?:is|are|has|have)|now (?:is|are|has|have))\b/i;
+const CURRENT_STATE_GRAMMAR = /\b(?:is|are|has|have|does|supports|works|exists|runs|uses|includes|provides|allows|can|will)\b/i;
 const HISTORICAL_LANGUAGE = /\b(built|shipped|implemented|added|merged|completed|released|tested|verified|fixed|created|introduced|deployed|reached|grew|was|were|did)\b/i;
 
 function text(value: unknown): string {
@@ -166,7 +167,7 @@ function assertDeferredProviderClaimsAreHistoricallyDurable(
     if (temporalVersion !== authorization.source.commit_sha) {
       reasons.push(`claim ${claimId} must bind historical truth to the exact authorized source commit`);
     }
-    if (CURRENT_LANGUAGE.test(claimText)) {
+    if (CURRENT_LANGUAGE.test(claimText) || CURRENT_STATE_GRAMMAR.test(claimText)) {
       reasons.push(`historical claim ${claimId} uses current-state language`);
     }
     if (!HISTORICAL_LANGUAGE.test(claimText)) {
