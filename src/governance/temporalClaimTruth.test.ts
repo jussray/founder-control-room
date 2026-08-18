@@ -150,8 +150,11 @@ describe('temporal public-claim truth', () => {
       'We now have 54 followers.',
       'The product has 120 users.',
       'Conversion is 12.5%.',
+      'Recorded 13 engagements during the audit window.',
+      'Reached 2,160 members during the audit window.',
+      'Received 9 comments during the audit window.',
     ]) {
-      const receipt = await verify('current_repo_state', SOURCE, claimText);
+      const receipt = await verify('historical_version', NEWER, claimText);
       expect(receipt.publishSafe).toBe(false);
       expect(receipt.claims[0].state).toBe('INVALID');
       expect(receipt.claims[0].displayLabel).toContain('requires metric evidence');
@@ -165,7 +168,7 @@ describe('temporal public-claim truth', () => {
     expect(historicalMetric.publishSafe).toBe(false);
     expect(historicalMetric.claims[0].state).toBe('INVALID');
     expect(historicalMetric.claims[0].displayLabel).toContain(
-      'repository version proof cannot establish analytics truth',
+      'non-metric evidence cannot establish analytics truth',
     );
 
     const metric = await verify('metric', SOURCE, 'Reached 54 followers during this build period.');
