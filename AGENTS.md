@@ -6,7 +6,10 @@ Read these before changing code, configuration, schemas, providers, verification
 - [`Founder Intelligence Agent Entry Point`](./AGENTS_FOUNDER_INTELLIGENCE.md) for the portfolio constitution, remembrance loop, and inheritance registry
 - [`founder-control-room-operator`](.agents/skills/founder-control-room-operator/SKILL.md) for the repository-scoped 5W1H operating contract
 - [`GLOBAL_AI.md`](./GLOBAL_AI.md)
+- [`.ai/skills/juss-flow-launch-loop/SKILL.md`](./.ai/skills/juss-flow-launch-loop/SKILL.md)
 - [`Founder Merge Authority`](./docs/FOUNDER_MERGE_AUTHORITY.md)
+- [`Truth Decay Audit`](./docs/TRUTH_DECAY_AUDIT.md)
+- [`Public Communication Truth Contract`](./docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md)
 - [`skills/portfolio-control-plane/SKILL.md`](./skills/portfolio-control-plane/SKILL.md)
 - [`skills/typescript-audit/SKILL.md`](./skills/typescript-audit/SKILL.md) before TypeScript, TSX, JavaScript, Node, Worker, build, PR, draft PR, or mergeability edits
 - [`skills/typescript-root-cause-debugger/SKILL.md`](./skills/typescript-root-cause-debugger/SKILL.md) for ranked root-cause debugging before patch proposals
@@ -20,9 +23,7 @@ Read these before changing code, configuration, schemas, providers, verification
 
 For Se'kret Bip splash, founding-preview, waiting-list, sponsor, or social launch work, also read [`docs/private/JUSS_PRIVATE_OPERATING_PLAN.md`](docs/private/JUSS_PRIVATE_OPERATING_PLAN.md).
 
-For messaging, lead generation, sales automation, unified inbox, consent, outreach,
-email, SMS, calls, webchat, Instagram, Facebook, WhatsApp, Telegram, Viber, or
-channel-adapter work, also read:
+For messaging, lead generation, sales automation, unified inbox, consent, outreach, email, SMS, calls, webchat, Instagram, Facebook, WhatsApp, Telegram, Viber, or channel-adapter work, also read:
 
 - [`.ai/skills/unified-growth-inbox/SKILL.md`](.ai/skills/unified-growth-inbox/SKILL.md)
 - [`docs/private/UNIFIED_GROWTH_INBOX_PLAN.md`](docs/private/UNIFIED_GROWTH_INBOX_PLAN.md)
@@ -30,11 +31,11 @@ channel-adapter work, also read:
 - [`config/unified-growth-inbox.channels.json`](config/unified-growth-inbox.channels.json)
 - [`src/types/growthInbox.ts`](src/types/growthInbox.ts)
 
-The default growth-inbox mode is `draft_only`. No live outreach, calling, campaign,
-credential creation, paid provider enablement, deployment, or pricing/discount action
-is authorized merely because the skill or contract exists.
+The default growth-inbox mode is `draft_only`. No live outreach, calling, campaign, credential creation, paid provider enablement, deployment, pricing/discount action, or publication is authorized merely because a skill or connector exists.
 
-Use the exact founder stack:
+## Founder stack compatibility and expanded reasoning
+
+The existing routing shorthand remains supported:
 
 ```text
 /elonmusk /garyvee lindymode redteam l99 redteam ooda /truthmode
@@ -46,31 +47,85 @@ For commercial work add:
 /sales /devil
 ```
 
-`/sales` constructs the strongest truthful exchange. `/devil` attacks both the premise and selected plan. Neither authorizes outreach, pricing, discounts, spending, publication, checkout, deployment, migration, or database mutation. Repository merges may proceed under the standing conditions in `docs/FOUNDER_MERGE_AUTHORITY.md`.
+`/sales` constructs the strongest truthful exchange. `/devil` attacks both the premise and selected plan. Neither authorizes outreach, pricing, discounts, spending, publication, checkout, deployment, migration, or database mutation.
+
+The expanded implementation semantics are governed by `GLOBAL_AI.md` and the Juss Flow launch loop:
+
+```text
+ULTRATHINK
++ Product Design
++ Data Analytics
++ Redteam I
++ Lindy
++ L99
++ OODA
++ Hormozi
++ Bill Gates
++ Elon Musk
++ Redteam II
++ Documentation Truth
+```
+
+Reasoning may run in parallel. Mutation authority stays serialized.
 
 ## Required loop
 
-1. Inspect repository, branch, provider state, auth boundaries, migrations, tests, commercial evidence, launch evidence, Cloudflare evidence, runtime truth, open PRs, and draft PRs.
-2. Complete 5W1H and identify the next authority gate.
-3. Attack the premise before designing the solution or offer.
-4. Apply the Lindy screen and map authority, provenance, project boundaries, state, evidence, economics, event history, failure modes, release truth, and rollback through L99.
-5. Attack the selected plan before implementation or execution.
-6. Make the smallest coherent, reversible change and verify it, including behavior tests and Playwright when a user-facing web/runtime path changes.
+1. Inspect current repository, branch, `main`, provider state, auth boundaries, migrations, tests, Product Design evidence, analytics evidence, launch evidence, Cloudflare/runtime truth, open PRs, draft PRs, and current-state docs.
+2. Complete 5W1H and identify the next authority/freshness gate.
+3. Redteam I: attack the premise before designing the solution or offer.
+4. Apply Product Design + Data Analytics + Lindy + L99. Map authority, provenance, project boundaries, state, evidence, economics, temporal validity, event history, failure modes, release truth, Sauce Guard, and rollback.
+5. Re-orient through OODA using current evidence, not remembered state.
+6. Apply Hormozi: increase useful outcome/proof while reducing delay, founder effort, cognitive load, and maintenance burden without inventing demand or traction.
 7. Run the Bill Gates pass: identify the bottleneck, highest-leverage correction, reusable standard, and what must not be scaled yet.
-8. Run the Elon Musk pass: question requirements, delete unnecessary complexity, simplify the remaining system, shorten the proof loop, and automate last.
-9. Re-observe through OODA and report proof plus the next founder approval gate.
+8. Run the Elon Musk pass: question requirements, delete unnecessary complexity, simplify the remaining system, shorten the proof loop, and automate last without deleting safety/authority/evidence boundaries.
+9. Make the smallest coherent reversible change.
+10. Redteam II: attack the selected implementation for false greens, stale truth, privilege expansion, sauce leakage, duplicate authority, provider drift, stale-branch overwrite, and rollback gaps.
+11. Verify with behavior tests, exact-head repository checks, Playwright when user-facing paths change, and Documentation Truth when current-state truth changes.
+12. Before merge, re-read current `main`, exact candidate head, review state, and applicable provider state.
+13. After merge, re-read resulting `main`, post-merge Documentation Truth, provider/runtime evidence, stale/superseded docs/PRs, and the next launch bottleneck.
 
 ## Implementation rule
 
-The reasoning loop continues while code is being written. It is not a decorative preamble pasted above a diff after the interesting mistakes have already happened.
+The reasoning loop continues while code is being written. It is not a decorative preamble pasted above a diff after the important mistakes already happened.
 
-For material implementation, maintain this sequence:
+For material implementation, maintain:
 
 ```text
-Goal → Reality → Redteam I → Lindy → L99 → Redteam II → OODA → Bill Gates → Elon Musk → Proof → Rollback → Next gate
+Goal → Reality → ULTRATHINK → Product Design + Data Analytics → Redteam I → Lindy → L99 → OODA → Hormozi → Bill Gates → Elon Musk → Implement → Proof → Redteam II → Documentation Truth → Rollback → Next gate
 ```
 
-Re-observe after meaningful edits, schema changes, workflow changes, and test results. Compilation, unit tests, CI, and runtime proof are separate evidence layers. Do not convert one into a claim about the others.
+Compilation, unit tests, CI, Documentation Truth, provider readback, deployment, runtime, publication, analytics, and human outcomes are separate evidence layers. Never convert one into a claim about all the others.
+
+## Truth Lease / FutureYou-ME safety
+
+A fact may have been true when observed and unsafe when reused later. A hash proves identity, not continued reality.
+
+At consequential merge, deploy, schedule, publish, provider, completion-claim, and launch boundaries:
+
+- identify the claim and load-bearing dependencies;
+- re-observe authoritative current evidence;
+- classify `CURRENT`, `HISTORICAL`, `STALE`, `SUPERSEDED/INVALIDATED`, or `UNKNOWN`;
+- use present-tense operational language only while current;
+- preserve older evidence as provenance instead of deleting it;
+- never let Current You preference override contradictory repository/provider/runtime evidence; and
+- never let FutureYou/model guidance become evidence or approval.
+
+Use the generic Truth Lease where no stronger domain-specific temporal gate already exists.
+
+## Documentation Truth
+
+README files, AI contracts, runbooks, PR descriptions, issues, and current-state docs can influence future actions. They are part of the truth surface.
+
+For truth-sensitive architecture, authority, provider, capability, publishing, workflow, deployment, or launch changes:
+
+- update `README.md` and applicable current-state docs in the same bounded change;
+- mark contradictory older material historical/superseded/stale or point it to the new authority;
+- run `Documentation Truth` on the exact PR head;
+- require it inside CI / Required Gate;
+- run it again on merged `main`; and
+- re-observe provider/runtime truth before reusing present-tense claims.
+
+Do not hard-code a durable “current main SHA,” refresh date, provider result, or PR state into prose and assume it renews itself.
 
 ## Codex provider baseline
 
@@ -91,78 +146,60 @@ Store the API key outside the repository, for example in `~/.codex/.env`:
 OPENAI_API_KEY=replace_with_local_secret
 ```
 
-Never commit `.codex/.env`, `OPENAI_API_KEY`, `MODEL_API_KEY`, service-role keys, provider tokens, or any other secret. Model choice does not override this file, `GLOBAL_AI.md`, repository skills, verification gates, Founder Merge Authority, or explicit founder approval gates.
+Never commit `.codex/.env`, `OPENAI_API_KEY`, `MODEL_API_KEY`, service-role keys, provider tokens, or another secret. Model choice does not override repository contracts or approval gates.
 
-## OpenAI Platform and Zapier key handoff
+## OpenAI Platform, Zapier, n8n, and Founder Signal Engine
 
-For Founder Signal Engine automation, Codex and ChatGPT agents must treat Zapier as an operable workflow cockpit only when the current environment exposes a direct Zapier/control connector or the approved OpenAI Developers invocation bridge. Zapier's GitHub app is a deterministic read/write metadata layer, not a GitHub Actions workflow-runtime or administration layer. OpenAI Platform remains the key/model layer.
+For Founder Signal Engine automation, Codex and ChatGPT agents must **treat Zapier as an operable workflow cockpit only** when the current environment exposes a direct Zapier/control connector or the approved OpenAI Developers invocation bridge. Zapier's GitHub app is a deterministic read/write metadata layer, not a GitHub Actions workflow-runtime or administration layer. OpenAI Platform remains a key/model layer, not publication authority.
 
 Canonical Zapier key intent:
 
 ```text
 OpenAI Platform key name: zapier-founder-signal-engine
 Status: existing provider-held key reference; do not recreate, rotate, or duplicate without explicit founder approval.
-Purpose: allow Zapier to call OpenAI for Founder Signal Engine 5W1H analysis, draft generation, routing decisions, and review-task content.
-Target: Ray's OpenAI Platform organization/project selected through the OpenAI Platform connector.
+Purpose: allow an authorized workflow to call OpenAI for Founder Signal Engine analysis/draft/routing work.
 ```
 
-Agent steering rule for Founder Signal Engine Day 3:
+Current product architecture is provider-neutral:
 
 ```text
-Goal: make the workflow actually run and capture proof.
-Path: deterministic GitHub metadata evidence -> Zapier -> OpenAI 5W1H -> review-only Buffer/HubSpot path when allowed -> Founder Control Room evidence.
-Direct path: use a native Zapier or equivalent control connector when available.
-ChatGPT fallback: use @OpenAI Developers with the existing zapier-founder-signal-engine key reference through the approved Catch Hook, webhook, or named bridge target.
-Manual fallback: only give Ray exact Zapier UI steps after confirming neither a direct connector nor an approved bridge invocation path is available.
+verified product/repository evidence
+-> FCR truth + founder authority
+-> Chief / ME / FutureYou proposal
+-> Sauce Guard + temporal truth
+-> exact Current You authority for the executable route
+-> channel router
+   -> first-party LinkedIn where configured and proven
+   -> provider-neutral n8n for bounded multistep social adapters
+   -> Zapier / Buffer where they still add connector, scheduling, or fallback value
+-> provider readback
+-> FCR outcome receipt
+-> observation-only analytics
 ```
 
-Agent rules:
+Keep `contract-capable`, `configured/allowlisted`, `adapter-proven`, and `provider-outcome-proven` separate.
+
+### Adapter/tool rules preserved for compatibility
 
 - First discover whether the current environment has a native Zapier, automation, browser-control, MCP, or equivalent connector that can inspect Zap history, edit Zap steps, test actions, or update app connections.
-- When a native connector exists, use it only within its declared Zapier workflow scope. For GitHub evidence, prefer `Find Repository` -> `Get File Contents` -> `Find Issue` or `Find Pull Request` -> `Find Branch` when required.
-- Never treat Zapier's GitHub app as authority to inspect GitHub Actions jobs or logs, download artifacts, rerun workflows, merge, deploy, delete branches, change rulesets, or modify credentials.
-- For Actions failure triage without an Actions-capable connector, use Gmail failure evidence -> ChatGPT structured summary -> deterministic GitHub metadata lookup -> bounded issue/comment -> Founder Control Room evidence.
-- When ChatGPT or another approved agent has no native Zapier connector, read [`.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md`](./.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md) and invoke the approved OpenAI Developers bridge using the existing `zapier-founder-signal-engine` key reference.
-- “Call the key” means invoke the secure provider-held key reference through the approved bridge. It never means reading, copying, displaying, logging, or pasting the raw secret.
-- Do not start secure key setup, rotate the Zapier-specific key, or create a duplicate merely because direct Zapier tooling is absent. Credential changes require explicit founder approval for that exact action.
-- A bridge may perform only the capabilities it explicitly exposes. Invocation access does not silently grant Zapier inspection, editing, credential, billing, or administration authority.
-- Require a real Zapier run ID or retain the exact provider error. Do not claim that Zapier, OpenAI, Buffer, HubSpot, or the full chain ran without the corresponding evidence.
-- Do not stop at “I cannot access Zapier” until tool discovery confirms there is no usable direct connector or approved OpenAI Developers bridge path in the current environment.
-- Never ask Ray to paste the raw key into GitHub, HubSpot, Founder Control Room, issue comments, PR bodies, repository files, screenshots, logs, or chat-visible documentation.
-- Never commit the Zapier OpenAI key or any placeholder that looks like a live secret.
-- Do not reuse the local Codex `OPENAI_API_KEY` for Zapier unless Ray explicitly authorizes that separate provider configuration. Prefer the established dedicated Zapier key reference.
-- If the bridge or Zapier fails at the OpenAI step, first verify that the invocation uses the existing dedicated key reference and that the named target is bound and active.
-- If Zapier reaches HubSpot, the HubSpot task or note must be associated with the `Founder Signal Engine` deal rather than created as a floating task.
-- Sensitive teen, family, journal, voice, media, or wellness repositories remain on the GitHub/Gmail/ChatGPT evidence path unless a separate privacy-safe marketing contract is approved.
-- `jussray/founder-control-room` may receive bounded issues, comments, drafts, and review tasks from this path, but it must not auto-merge or auto-deploy through Zapier.
+- When a native connector exists, use it only within its declared workflow scope. For GitHub metadata evidence, prefer `Find Repository` -> `Get File Contents` -> `Find Issue` or `Find Pull Request` -> `Find Branch` when required.
+- **Never treat Zapier's GitHub app as authority to inspect GitHub Actions jobs or logs**, download artifacts, rerun workflows, merge, deploy, delete branches, change rulesets, or modify credentials.
+- For Actions failure triage without an Actions-capable connector, use `Gmail failure evidence -> ChatGPT structured summary -> deterministic GitHub metadata lookup -> bounded issue/comment -> Founder Control Room evidence`.
+- When ChatGPT or another approved agent has no native Zapier connector, read [`.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md`](./.ai/skills/chatgpt-openai-developers-zapier-bridge/SKILL.md) and use **OpenAI Developers** only through the approved bridge/action scope.
+- “Call the key” means invoke a secure provider-held key reference. It never means reading, copying, displaying, logging, or pasting the raw secret.
+- Do not start secure key setup, rotate the Zapier-specific key, or create a duplicate merely because direct Zapier tooling is absent.
+- A bridge may perform only capabilities it explicitly exposes. Invocation access does not grant Zapier administration, credential, billing, or unrelated mutation authority.
+- **Require a real Zapier run ID** or retain the exact provider error when a claim depends on Zapier execution.
+- Never ask Juss to paste raw keys into GitHub, HubSpot, Founder Control Room, issues, PR bodies, repository files, screenshots, logs, or chat-visible docs.
+- Never commit the Zapier OpenAI key or a placeholder that resembles a live secret.
+- Do not reuse a local Codex `OPENAI_API_KEY` for Zapier unless Juss explicitly authorizes that separate provider configuration.
+- If Zapier reaches HubSpot, the HubSpot task or note must be associated with the appropriate audited Founder Signal Engine record rather than created as floating evidence.
+- **Sensitive teen, family, journal, voice, media, or wellness repositories** remain outside broad marketing ingestion unless a separately reviewed privacy-safe contract authorizes bounded public-safe evidence.
+- `jussray/founder-control-room` may receive bounded issues, comments, drafts, and review tasks from this path, but it **must not auto-merge or auto-deploy through Zapier**.
 
-Correct workflow boundary:
+### Historical Day 3 provenance
 
-```text
-GitHub metadata evidence
--> direct Zapier trigger or approved OpenAI Developers bridge invocation
--> existing OpenAI Platform key reference used inside the configured workflow
--> OpenAI 5W1H send gate
--> review-only Buffer draft/queue or HubSpot task/note when allowed
--> Founder Control Room evidence record tied to the exact GitHub SHA
-```
-
-Required 5W1H behavior for Zapier OpenAI calls:
-
-```text
-Who:
-What:
-Where:
-When:
-Why:
-How:
-Send decision: publish-draft, review-only, internal-only, or research-task
-Missing proof or missing context:
-```
-
-If the 5W1H block is incomplete, Zapier must not publish or send. It should create a HubSpot research/review task associated with the Founder Signal Engine deal.
-
-Current Day 3 source:
+The following exact event is retained as historical provenance, not current execution authority:
 
 ```text
 Repository: jussray/Sekret-Bip
@@ -170,29 +207,53 @@ PR: #599
 Merge commit: f4573d360a8fea99b301f33a2a21192525725f7b
 ```
 
-The GitHub source event is complete. Day 3 does not pass until the Zapier run ID, OpenAI 5W1H result, review artifact, HubSpot deal-associated evidence when applicable, and Founder Control Room proof exist.
+That record may explain an earlier Day 3 workflow. It must not be reused as current GitHub, Zapier, Buffer, HubSpot, publication, or Founder Control Room state without fresh evidence.
+
+Historical adapter instructions and task budgets may remain useful implementation provenance, but they cannot override the current FCR → exact Current You → direct/provider-neutral n8n/bounded Zapier → provider-readback architecture.
+
+If a 5W1H block is incomplete, do not publish or send. Create only the bounded research/review artifact currently authorized by the applicable provider contract.
+
+## Founder-owned publishing / Sauce Guard
+
+The product should be able to post verified progress about Juss's products from Founder Control Room without exposing the private recipe.
+
+Public-safe story may include what changed, what problem was solved, what was learned, why it matters, approved public proof, and a truthful next gate.
+
+Keep private prompts, raw diffs, credentials, private provider payloads, private metrics, customer/private data, unreleased roadmap detail, internal evidence references, security-sensitive details, and proprietary mechanics behind Sauce Guard.
+
+A standing eligibility policy does not automatically become execution authority. Publication follows the current executable route-specific Current You and provider-readback contracts in `docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md`.
+
+Investor email remains separate and requires the applicable standing policy plus recipient-specific qualification before any send authority can be considered.
 
 ## Product Design and Supabase truth
 
-Product Design screenshot or prototype evidence can identify visual, UX, and accessibility issues, but it does not prove Supabase Auth, RLS, Storage, Realtime, Edge Functions, schema behavior, or deployment safety.
+Product Design screenshot/prototype evidence can identify visual, UX, and accessibility issues, but it does not prove Supabase Auth, RLS, Storage, Realtime, Edge Functions, schema behavior, or deployment safety.
 
-When a product surface depends on Supabase, keep design evidence and Supabase evidence separate: design QA can pass while Supabase verification remains blocked.
+When a product surface depends on Supabase, keep **design evidence and Supabase evidence separate**: design QA can pass while Supabase verification remains blocked.
+
+Product Design should make capability, configuration, authority, temporal truth, provider state, outcome, and next gate distinct.
+
+Data Analytics is observation-only. It may measure safe counts, rates, comparable windows, stale-claim blocks, revalidation outcomes, documentation drift, provider readback, and correction latency. It may not renew truth or approve action.
+
+## FCR independent review and live GitHub
+
+Founder Control Room in-app merges have a current independent-review membrane. For FCR, reviewer trust is server-owned at evaluation through `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS`.
+
+Author self-review, stale-head review, generic comments, and app/bot substitution do not satisfy a qualifying non-author semantic-review requirement.
+
+The FCR in-app review membrane and live GitHub repository rulesets are separate provider surfaces. Source code does not prove live required approvals, stale-review dismissal, last-push approval, review-thread resolution, strict status checks, or bypass actor/mode configuration. Fresh GitHub provider readback is required for those claims.
 
 ## Release-truth outage classification
 
-Founder Control Room is the first and authoritative place to record and interpret cross-repo release truth.
+Founder Control Room is the first place to record and interpret cross-repo release truth.
 
 When GitHub Actions fails, classify the evidence before assigning blame:
 
 - `runner_startup_failure`: runner/job startup failed before meaningful steps executed, especially no steps, no logs, or null log URLs.
-- `workflow_no_jobs`: the workflow schedules no jobs or is skipped before jobs exist.
-- `workflow_step_failure`: at least one job executed steps and logs show a concrete failing command, assertion, build, lint, type, or Playwright step.
+- `workflow_no_jobs`: workflow schedules no jobs or is skipped before jobs exist.
+- `workflow_step_failure`: at least one job executed steps and logs show a concrete failing command, assertion, build, lint, type, contract, or Playwright step.
 
-Never claim a code regression when GitHub jobs have no executed steps or logs. Treat zero-step/no-log failures as infrastructure evidence. This infrastructure outage still gates release truth when repository rules require executed checks, Playwright proof, or exact-head evidence.
-
-For every incident record, capture repository, PR, branch, head SHA, workflow, run, job evidence, classification, Cloudflare build/deploy status, runtime evidence, impact, and next gate.
-
-Cloudflare build/deploy evidence is release truth, but it is separate from GitHub Actions. A successful Cloudflare build does not prove GitHub checks, Playwright, auth, data, privacy, or app behavior passed. A GitHub runner outage does not prove application failure. Record both without blending them.
+Never claim a code regression when jobs have no executed steps/logs. Cloudflare build/deploy evidence and GitHub Actions evidence remain separate.
 
 ## Canonical project routing
 
@@ -200,41 +261,34 @@ Only `jussray/Sekret-Bip` is the active Se'kret Bip working repository. Other Bi
 
 Active work may proceed in Founder Control Room, `jussray/Sekret-Bip`, `jussray/StoryEngine`, Chief/PromptOS, Juss Beautiful Hair repos, and clothing/storefront repos when each repo's local gates are satisfied.
 
-## GitHub Actions Secrets
+## GitHub Actions secrets
 
 All secrets required by `.github/workflows/` are documented in [`docs/SECRETS.md`](./docs/SECRETS.md).
 
-Before triggering a deploy, verify the full checklist in that file. Key secrets added this session:
-
-| Secret | Used by | Purpose |
-|---|---|---|
-| `RECONCILE_SHARED_SECRET` | `deploy.yml / reconcile`, `POST /api/reconcile` | Authenticates inbound DriftReports. Minimum 32 random hex chars. Must be set in GitHub Secrets AND in Sekret-Bip and StoryEngine for cross-service reconciliation. Generate with `openssl rand -hex 32`. |
-
-> Never commit, log, or expose `RECONCILE_SHARED_SECRET`. Never put it in a `NEXT_PUBLIC_*` var.
-
-The Elon Musk pass may delete duplicate workflows, redundant adapters, stale requirements, and unnecessary state transitions. It may not delete founder approvals, privacy boundaries, auditability, rollback, or evidence requirements merely to move faster.
+Never commit, log, expose, or publish secret values. Secret-name presence proves wiring only; provider validity/permission remains separate.
 
 ## Non-negotiable boundaries
 
-- Preserve the `RepositoryProvider` abstraction.
+- Preserve `RepositoryProvider` abstraction.
 - Keep Control Room Supabase, credentials, and data separate from every managed project.
-- Never copy private user, family, customer, vendor, media, credential, or commercially sensitive data into operational storage, prompts, sales analysis, Product Design captures, QA reports, Figma boards, prototypes, or outreach.
-- Preserve founder allowlist authorization, audit events, project isolation, and separate approval gates.
+- Never copy private user, family, customer, vendor, media, credential, or commercially sensitive data into operational storage, prompts, sales analysis, Product Design captures, QA reports, prototypes, analytics, or outreach.
+- Preserve founder allowlist authorization, audit events, project isolation, independent review where required, and **separate approval gates**.
 - Do not expose provider tokens or service-role keys.
-- Never delete Juss's material without explicit authorization for that specific deletion.
-- Do not invent demand, scarcity, customer statements, eligibility, savings, performance, inventory, delivery, or authority.
-- Merge when appropriate under `docs/FOUNDER_MERGE_AUTHORITY.md`. Do not deploy, roll back, alter auth/RLS, contact external parties, publish externally, change commercial terms, spend funds, or perform destructive writes without explicit founder approval for that exact action. The exception is a compliant post inside an approved automated publishing class explicitly authorized by `docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md`; all other external communication remains separately gated.
-- Apply repository-specific skills when acting on managed projects; portfolio rules never replace local product, privacy, verification, sales, brand/IP, Supabase, Product Design, or rollback contracts.
+- Never delete Juss's material/history without explicit authority for that specific deletion.
+- Do not invent demand, scarcity, customer statements, eligibility, savings, performance, inventory, delivery, authority, review state, publication, or provider success.
+- Merge only under `docs/FOUNDER_MERGE_AUTHORITY.md` and the current exact-head/review/provider gates.
+- Do not deploy, roll back, alter auth/RLS, contact external parties, publish, change commercial terms, spend funds, mutate provider bindings/rulesets, or perform destructive writes without separate exact authority.
+- Repository-specific skills never replace local product, privacy, verification, sales, brand/IP, Supabase, Product Design, temporal truth, Documentation Truth, or rollback contracts.
 
 ## Figma build and implementation
 
-For every Figma, dashboard design, design-system, design-to-code, Code Connect, prototype, or visual QA task, also read `.agents/skills/figma-build-implement/SKILL.md` and `.figma/repository-profile.json`.
+For Figma, dashboard design, design-system, design-to-code, Code Connect, prototype, or visual QA work, also read `.agents/skills/figma-build-implement/SKILL.md` and `.figma/repository-profile.json`.
 
-Figma is a founder specification and review surface. It cannot create mission truth, evidence provenance, provider truth, approval authority, migration state, integration proof, deployment proof, or rollback authority. Use only synthetic or sanitized operational data.
+Figma is a founder specification/review surface. It cannot create mission truth, evidence provenance, provider truth, approval authority, migration state, integration proof, deployment proof, or rollback authority. Use only synthetic/sanitized operational data.
 
 ## Evidence report
 
-List goal, reality, premise risk, Lindy choice, L99 boundaries, selected decision, plan risk, OODA action, Bill Gates bottleneck/leverage findings, Elon Musk requirement/deletion/simplification/feedback/automation findings, files changed, behavior changed, tests run, Playwright result or inapplicability, failures or skips, security impact, provider impact, Supabase impact, Product Design evidence status, commercial assumptions, disqualifiers, brand/IP impact, Cloudflare/Control Room proof when applicable, rollback, unresolved risk, and next gate.
+List goal, reality, ULTRATHINK decomposition, Product Design state, Data Analytics/truth state, premise risk, Lindy choice, L99 boundaries, OODA decision, Hormozi value pass, Bill Gates bottleneck/leverage, Elon Musk requirement/deletion/simplification/feedback/automation findings, selected-plan Redteam, files changed, behavior changed, checks run, Playwright result/inapplicability, Documentation Truth, security/provider/Supabase impact, commercial assumptions, rollback, truth age/superseded state, unresolved risk, and next gate.
 
 ## Fact-check and portable founder approvals
 
