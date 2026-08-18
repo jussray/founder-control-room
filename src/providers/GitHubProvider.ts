@@ -9,6 +9,7 @@ import type {
   VerificationSignalStatus,
   ReviewSignal,
   ReviewSignalState,
+  PullRequestReviewContext,
   Diff,
   DiffFile,
   Patch,
@@ -186,6 +187,33 @@ export class GitHubProvider implements RepositoryProvider {
       submittedAt: review.submitted_at ?? undefined,
       detailsUrl: review._links?.html?.href ?? undefined,
     }));
+  }
+
+  async getPullRequestReviewContext(
+    projectId: string,
+    pullRequestNumber: number,
+  ): Promise<PullRequestReviewContext> {
+    const { owner, repo } = this.locate(projectId);
+    if (!Number.isInteger(pullRequestNumber) || pullRequestNumber <= 0) {
+      throw new Error("GitHubProvider: pullRequestNumber must be a positive integer");
+    }
+
+    const { data } = await this.octokit.pulls.get({
+      owner,
+      repo,
+      pull_number: pullRequestNumber,
+    });
+
+    return {
+      number: data.number,
+      repository: `${owner}/${repo}`,
+      headRepository: data.head.repo?.full_name ?? "",
+      baseRef: data.base.ref,
+      headRef: data.head.ref,
+      baseSha: data.base.sha,
+      headSha: data.head.sha,
+      authorIdentity: data.user?.login ?? "",
+    };
   }
 
   async createBranch(
