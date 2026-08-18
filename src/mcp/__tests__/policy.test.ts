@@ -65,20 +65,26 @@ describe("MCP Phase 1 policy", () => {
     ).toMatchObject({ decision: "deny" });
   });
 
-  it("keeps Cloudflare Stack fail-closed for generic execute", () => {
-    const cloudflareStack = DEFAULT_MCP_SERVERS.find(
-      (server) => server.id === "cloudflare-stack",
+  it("uses the official Cloudflare API MCP and keeps generic execute blocked", () => {
+    const cloudflareApi = DEFAULT_MCP_SERVERS.find(
+      (server) => server.id === "cloudflare-api",
     );
-    if (!cloudflareStack) throw new Error("Cloudflare Stack MCP definition missing");
+    if (!cloudflareApi) throw new Error("Cloudflare API MCP definition missing");
 
     const env = {
       NODE_ENV: "development",
-      MCP_CLOUDFLARE_STACK_URL: "https://stack.mcp.cloudflare.com/mcp",
+      MCP_CLOUDFLARE_API_URL: "https://mcp.cloudflare.com/mcp",
+      FCR_CLOUDFLARE_MCP_READ_TOKEN: "test-only-token",
     } as NodeJS.ProcessEnv;
 
+    expect(cloudflareApi.endpointEnv).toBe("MCP_CLOUDFLARE_API_URL");
+    expect(cloudflareApi.authTokenEnv).toBe("FCR_CLOUDFLARE_MCP_READ_TOKEN");
+    expect(
+      DEFAULT_MCP_SERVERS.some((server) => server.id === "cloudflare-stack"),
+    ).toBe(false);
     expect(
       evaluateMcpPolicy({
-        server: cloudflareStack,
+        server: cloudflareApi,
         projectId: "founder-control-room",
         toolName: "search",
         env,
@@ -86,17 +92,9 @@ describe("MCP Phase 1 policy", () => {
     ).toMatchObject({ decision: "allow", risk: "read" });
     expect(
       evaluateMcpPolicy({
-        server: cloudflareStack,
+        server: cloudflareApi,
         projectId: "founder-control-room",
         toolName: "execute",
-        env,
-      }),
-    ).toMatchObject({ decision: "deny" });
-    expect(
-      evaluateMcpPolicy({
-        server: cloudflareStack,
-        projectId: "founder-control-room",
-        toolName: "update_access_policy",
         env,
       }),
     ).toMatchObject({ decision: "deny" });

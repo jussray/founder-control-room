@@ -1,0 +1,94 @@
+name: Cloudflare API MCP Read Diagnostic
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_head_sha:
+        description: Exact current main commit whose MCP read diagnostic is approved to run
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Read-only Cloudflare MCP provider receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    env:
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+      CF_ACCOUNT_ID: 9b59861bd1747cf7525571b4c51d2aa0
+      CF_MCP_API_URL: https://mcp.cloudflare.com/mcp
+      CF_MCP_API_TOKEN: ${{ secrets.FCR_CLOUDFLARE_MCP_READ_TOKEN }}
+
+    steps:
+      - name: Checkout exact diagnostic head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact diagnostic head is current main
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=Invalid exact head::expected_head_sha must be a lowercase 40-character commit SHA."
+            exit 1
+          fi
+
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+
+          ACTUAL_HEAD_SHA="$(git rev-parse HEAD)"
+          CURRENT_MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
+
+          echo "Expected diagnostic SHA: $EXPECTED_HEAD_SHA"
+          echo "Checked-out SHA:         $ACTUAL_HEAD_SHA"
+          echo "Current main SHA:         $CURRENT_MAIN_SHA"
+
+          test "$ACTUAL_HEAD_SHA" = "$EXPECTED_HEAD_SHA"
+          test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Verify dedicated MCP read token is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$CF_MCP_API_TOKEN" ]; then
+            echo "::error::FCR_CLOUDFLARE_MCP_READ_TOKEN is not available to this workflow."
+            exit 1
+          fi
+
+      - name: Probe official Cloudflare API MCP with fixed GET-only request
+        run: node scripts/probe-cloudflare-api-mcp.mjs
+
+      - name: Publish redacted MCP summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f test-results/cloudflare-mcp-read-receipt.json ]; then
+            {
+              echo "## Cloudflare API MCP Read Diagnostic"
+              echo
+              echo '```json'
+              cat test-results/cloudflare-mcp-read-receipt.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload redacted MCP receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-api-mcp-read-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/cloudflare-mcp-read-receipt.json
+          if-no-files-found: warn
+          retention-days: 30

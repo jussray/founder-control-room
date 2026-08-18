@@ -42,18 +42,21 @@ Secrets marked required cause the named workflow job to fail if absent.
 
 ---
 
-## Cloudflare deployment credentials
+## Cloudflare deployment and read credentials
 
 | Secret | Required by | Description |
 |---|---|---|
-| `CLOUDFLARE_API_TOKEN` | canonical `founder-control-room` deploy and reconcile workflows | Canonical Worker mutation credential with only the permissions required for the `founder-control-room` Worker. Do not reuse it for the review-email Worker or read-only Builds inspection. |
+| `CLOUDFLARE_API_TOKEN` | canonical `founder-control-room` deploy and reconcile workflows | Canonical Worker mutation credential with only the permissions required for the `founder-control-room` Worker. Do not reuse it for the review-email Worker, MCP read proof, or read-only Builds inspection. |
 | `CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN` | `review-email-worker-reconcile.yml` | Dedicated mutation credential for `founder-control-room-review-email`. Keep separate from the canonical Worker deploy token. |
 | `FCR_CLOUDFLARE_BUILDS_USER_TOKEN` | `cloudflare-build-diagnostic.yml` | Dedicated user-scoped read credential for FCR Workers Builds/provider-authority diagnostics. Keep separate from deploy tokens. The current workflow maps this exact GitHub secret to `CF_API_TOKEN`. |
+| `FCR_CLOUDFLARE_MCP_READ_TOKEN` | `cloudflare-mcp-read-diagnostic.yml` | Dedicated least-privilege API token for the official Cloudflare API MCP bearer-auth proof. The standing probe performs only a fixed `GET /accounts/{account_id}` request. Do not grant Edit/Write permissions and do not reuse the deploy token. |
 | `CLOUDFLARE_ACCOUNT_ID` | deploy and diagnostic workflows | Cloudflare account ID. |
 | `CF_SESSIONS_KV_NAMESPACE_ID` | Worker deployment where enabled | KV namespace identifier for sessions. |
 | `CF_FEATURE_FLAGS_KV_NAMESPACE_ID` | Worker deployment where enabled | KV namespace identifier for feature flags. |
 
-The authority boundary is **provider + environment + operation class**, not one token per script. Canonical Worker deploy and canonical Worker reconciliation may share the same production mutation credential because they operate on the same authority surface. The review-email Worker and read-only Builds observer use separate credentials.
+The authority boundary is **provider + environment + operation class**, not one token per script. Canonical Worker deploy and canonical Worker reconciliation may share the same production mutation credential because they operate on the same authority surface. The review-email Worker, Workers Builds observer, and MCP read witness remain separate because they have different privilege and evidence boundaries.
+
+For the current MCP read witness, create a token scoped to the Founder Control Room account with the minimum account-read permission required for account details. Do not add Access Edit, Workers Scripts Edit/Write, DNS Edit/Write, or other mutation permissions merely to make the probe green. Installing this token into the running Worker is a separate founder-approved runtime activation; the GitHub diagnostic secret does not automatically become a Worker binding.
 
 A documentation name is never allowed to override current executable workflow truth. When a workflow secret name changes, update this registry in the same repair lane or classify the old entry as historical rather than leaving a once-true name presented as current.
 
@@ -160,6 +163,7 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] CLOUDFLARE_API_TOKEN for canonical founder-control-room mutation only
 [ ] CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN for founder-control-room-review-email only
 [ ] FCR_CLOUDFLARE_BUILDS_USER_TOKEN for read-only FCR Workers Builds inspection
+[ ] FCR_CLOUDFLARE_MCP_READ_TOKEN for official Cloudflare API MCP GET-only provider proof
 [ ] CLOUDFLARE_ACCOUNT_ID
 [ ] DEPLOY_URL=https://api.foundercontrolroom.org
 [ ] FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
