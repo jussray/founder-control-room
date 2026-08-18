@@ -29,7 +29,7 @@ Current implementation includes:
 - an FCR-specific provider-grounded independent-review membrane before in-app provider integration;
 - server-owned FCR semantic reviewer trust through `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` at the review evaluator boundary;
 - canonical capability governance through `.control/capability.json`;
-- deterministic Cloudflare reasoning, request-trace/source contracts, and founder-gated Access recovery tooling whose source existence does not itself prove live provider configuration;
+- deterministic Cloudflare reasoning, request-trace/source contracts, and founder-gated Access recovery tooling with sanitized-only public receipts, single-document validation/projection, and fail-closed `UNKNOWN` evidence whose source existence does not itself prove live provider configuration;
 - freshness-aware federated truth receipts and a bounded Truth Lease contract for claims that can decay;
 - a durable founder-only **Founder Switchboard** with explicit BUILT / CONFIGURED / ACTIVE / PROVEN states and guarded authority modes;
 - a privacy-safe public skill-testing evidence loop with `/devil` v1 structured receipts and aggregate analytics;
@@ -254,7 +254,7 @@ A terminal run is verification evidence only for the scope that actually execute
 
 ### Cloudflare reasoning and recovery
 
-Read-only reasoning can assess desired commit, provider evidence, release markers, health, credential/configuration failures, evidence freshness, and deployment authority. Recovery/source workflows remain bounded by their exact provider permissions and do not prove live configuration until readback succeeds.
+Read-only reasoning can assess desired commit, provider evidence, release markers, health, credential/configuration failures, evidence freshness, and deployment authority. The founder-gated Access recovery lane additionally constrains **public evidence**: unsafe heads become `UNKNOWN`, Access/browser receipt streams must contain exactly one schema-valid document, public projections emit only that validated document, and raw provider/browser receipts stay ephemeral. These repository controls do not prove live Access configuration or runtime health; provider readback and deployed-path proof remain separate.
 
 ### MCP and capability governance
 
