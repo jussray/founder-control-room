@@ -197,14 +197,12 @@ jobs:
                 accountId,
                 zone,
                 credentialSource,
-                credentialFailures: [.credentialFailures[]? | {source, reason, status, providerCodes, nextAction}],
+                credentialFailures: [.credentialFailures[]? | {source, reason, status, providerCodes}],
                 denyUnmatchedRequests,
                 alreadyExempt,
                 matchingApplicationCount,
                 action,
-                blocker,
-                classification,
-                nextAction
+                classification
               }' "$access_receipt"
               echo '```'
             fi
