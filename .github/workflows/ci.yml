@@ -12,6 +12,7 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  DOC_TRUTH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
 
 jobs:
   typecheck:
@@ -170,6 +171,36 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  documentation-truth:
+    name: Documentation truth
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact head with history
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\nbase=%s\n' "$EXPECTED_HEAD_SHA" "$actual" "$DOC_TRUTH_BASE_SHA"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify documentation truth
+        run: node scripts/verify-documentation-truth.mjs
+      - name: Upload documentation truth report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-truth-ci-${{ github.run_id }}
+          path: artifacts/documentation-truth-report.json
+          if-no-files-found: error
+          retention-days: 14
+
   migration-lint:
     name: Migration lint
     runs-on: ubuntu-latest
@@ -192,6 +223,7 @@ jobs:
       - e2e
       - python-tests
       - rls-contract
+      - documentation-truth
     runs-on: ubuntu-latest
     steps:
       - name: Enforce load-bearing CI results
@@ -203,15 +235,17 @@ jobs:
           E2E_RESULT: ${{ needs.e2e.result }}
           PYTHON_RESULT: ${{ needs.python-tests.result }}
           RLS_RESULT: ${{ needs.rls-contract.result }}
+          DOCUMENTATION_TRUTH_RESULT: ${{ needs.documentation-truth.result }}
         run: |
           set -euo pipefail
-          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\npython=%s\nrls=%s\n' \
+          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\npython=%s\nrls=%s\ndocumentation_truth=%s\n' \
             "$TYPECHECK_RESULT" \
             "$LINT_RESULT" \
             "$TEST_RESULT" \
             "$E2E_RESULT" \
             "$PYTHON_RESULT" \
-            "$RLS_RESULT"
+            "$RLS_RESULT" \
+            "$DOCUMENTATION_TRUTH_RESULT"
 
           for result in \
             "$TYPECHECK_RESULT" \
@@ -219,7 +253,8 @@ jobs:
             "$TEST_RESULT" \
             "$E2E_RESULT" \
             "$PYTHON_RESULT" \
-            "$RLS_RESULT"; do
+            "$RLS_RESULT" \
+            "$DOCUMENTATION_TRUTH_RESULT"; do
             if [ "$result" != "success" ]; then
               echo "Required Gate blocked: at least one load-bearing CI job is not successful."
               exit 1
