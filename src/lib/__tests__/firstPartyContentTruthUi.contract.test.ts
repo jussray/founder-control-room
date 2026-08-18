@@ -45,6 +45,22 @@ describe('first-party founder content truth UI contract', () => {
     expect(source).not.toContain('Cambiante, Buffer, or another approved actuator owns');
   });
 
+  it('turns private analytics into draft learning without turning it into claim authority', () => {
+    expect(source).toContain('data-content-learning-loop');
+    expect(source).toContain('data-private-metrics-state="withheld"');
+    expect(source).toContain('data-metric-claim-state="fresh-verifier-required"');
+    expect(source).toContain('data-learning-axis="distribution"');
+    expect(source).toContain('data-learning-axis="resonance"');
+    expect(source).toContain('data-learning-axis="compounding"');
+    expect(source).toContain('data-story-archetype="founder-thesis"');
+    expect(source).toContain('data-story-archetype="build-correct"');
+    expect(source).toContain('data-story-archetype="proof-lesson"');
+    expect(source).toContain('data-story-archetype="human-product-stake"');
+    expect(source).toContain('Metrics stay private by default');
+    expect(source).toContain('repository proof may support repository claims, not analytics claims');
+    expect(source).toContain('those claims stay BLOCKED for first-party publication');
+  });
+
   it('states the no-lie boundary between capability, authorization, dispatch, and publication', () => {
     expect(source).toContain('Capability, authorization, dispatch, and publication remain separate truths.');
     expect(source).toContain('FCR must never translate capability, approval, dispatch, a provider request, or missing provider evidence into “published.”');
