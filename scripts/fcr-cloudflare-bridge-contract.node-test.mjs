@@ -41,8 +41,10 @@ test('recovery returns only a sanitized receipt to the fixed founder control iss
   assert.match(returnStep, /matchingApplicationCount/);
   assert.match(returnStep, /credentialFailures/);
   assert.match(returnStep, /apiVersionMatchesExpectedSha/);
-  assert.match(returnStep, /jq empty "\$access_receipt"/);
-  assert.match(returnStep, /jq empty "\$browser_receipt"/);
+  assert.match(returnStep, /jq -e 'type == "object"' "\$access_receipt"/);
+  assert.match(returnStep, /jq -e 'type == "object"' "\$browser_receipt"/);
+  assert.doesNotMatch(returnStep, /jq empty "\$access_receipt"/);
+  assert.doesNotMatch(returnStep, /jq empty "\$browser_receipt"/);
   assert.match(returnStep, /Access provider receipt: `malformed`/);
   assert.match(returnStep, /Browser proof receipt: `malformed`/);
   assert.match(returnStep, /Provider truth: `UNKNOWN`/);
