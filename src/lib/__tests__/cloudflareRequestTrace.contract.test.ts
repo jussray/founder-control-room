@@ -43,10 +43,11 @@ describe("Cloudflare request trace witness", () => {
     expect(tracer).toContain("Bearer [REDACTED]");
   });
 
-  it("appends request-path evidence to the existing authority receipt even after an earlier audit failure", () => {
+  it("appends request-path evidence after provider reads but only on exact current main", () => {
+    expect(workflow).toContain("id: verify_head");
     expect(workflow).toContain("node scripts/trace-cloudflare-request.mjs");
-    expect(workflow).toMatch(
-      /- name: Trace public request path through Cloudflare\n        if: always\(\)/,
+    expect(workflow).toContain(
+      "if: always() && steps.verify_head.outcome == 'success'",
     );
     expect(tracer).toContain("receipt.requestTrace = requestTrace");
     expect(tracer).toContain("cloudflare-build-diagnostic.json");
