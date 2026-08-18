@@ -162,6 +162,12 @@ Observe the contradiction
 → automate only repeated read-only evidence refresh
 ```
 
+## Project-scoped outbound email
+
+Cloudflare outbound email is a capability boundary, not a global portfolio transport. Founder Control Room's canonical Worker uses the `FCR_EMAIL` send binding and pins the sender identity to `welcome@api.foundercontrolroom.org`; the application wrapper does not accept caller-controlled `from`. Other projects do not inherit that binding merely because they share the same founder or Cloudflare account.
+
+Repository configuration can prove the desired binding name and sender restriction. It cannot prove Cloudflare has onboarded the sender domain, the deployed Worker currently exposes that binding, or a message was accepted/delivered. Those claims require fresh provider/runtime evidence and must remain separate from source truth.
+
 ## Verification
 
 ```bash
