@@ -76,6 +76,17 @@ test('always-path output independently sanitizes the requested head before publi
   assert.doesNotMatch(artifactStep, /EXPECTED_HEAD_SHA/);
 });
 
+test('public receipt validators require exactly one parsed JSON document', () => {
+  const returnStep = recoveryWorkflow.match(
+    /- name: Return sanitized recovery receipt to founder control issue([\s\S]*?)- name: Upload sanitized recovery evidence/,
+  )?.[1] ?? '';
+
+  assert.equal((returnStep.match(/jq -e -s/g) ?? []).length, 2);
+  assert.equal((returnStep.match(/length == 1/g) ?? []).length, 2);
+  assert.ok((returnStep.match(/\.\[0\]/g) ?? []).length >= 2);
+  assert.match(returnStep, /single-document public schema allowlist/);
+});
+
 test('Access receipt must pass a bounded field schema before any public projection', () => {
   const returnStep = recoveryWorkflow.match(
     /- name: Return sanitized recovery receipt to founder control issue([\s\S]*?)- name: Upload sanitized recovery evidence/,
@@ -100,7 +111,7 @@ test('Access receipt must pass a bounded field schema before any public projecti
   assert.match(returnStep, /\.matchingApplicationCount == null/);
   assert.match(returnStep, /\.action == "would-add-zone-exemption"/);
   assert.match(returnStep, /\.classification == "explicit-access-application-match"/);
-  assert.match(returnStep, /failed the public schema allowlist/);
+  assert.match(returnStep, /failed the single-document public schema allowlist/);
 });
 
 test('browser receipt must pass a bounded field schema before derived public booleans', () => {
