@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockDispatchFounderContent,
@@ -60,6 +60,10 @@ beforeEach(() => {
   }));
 });
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe('n8n founder-content route', () => {
   it('rejects unauthenticated founder-content orchestration', async () => {
     const res = await request(buildApp())
@@ -70,7 +74,7 @@ describe('n8n founder-content route', () => {
     expect(mockDispatchFounderContent).not.toHaveBeenCalled();
   });
 
-  it('exposes bounded provider contracts separately from runtime enablement', async () => {
+  it('exposes bounded provider contracts separately from redacted runtime observation', async () => {
     const res = await request(buildApp())
       .get('/automation/conveyor')
       .set('Authorization', BEARER);
@@ -86,6 +90,20 @@ describe('n8n founder-content route', () => {
         defaultEnabled: ['buffer'],
         rule: 'contract-capable-does-not-imply-runtime-enabled',
       },
+      providerRuntimeReadback: {
+        n8n: {
+          configured: false,
+          enabled: false,
+        },
+        providerAllowlist: {
+          enabledProviders: ['buffer'],
+          invalidProviders: [],
+        },
+        adapterProof: 'not-observed',
+        liveProbeRequired: true,
+        providerOutcomeProofRequired: true,
+        secretsExposed: false,
+      },
       finalPublishedTruth: 'fcr-provider-readback-only',
       authority: {
         orchestrate: true,
@@ -96,6 +114,57 @@ describe('n8n founder-content route', () => {
         readPrivateEvidence: false,
       },
     }));
+
+    const serialized = JSON.stringify(res.body);
+    expect(serialized).not.toContain('webhookUrl');
+    expect(serialized).not.toContain('bearerToken');
+    expect(serialized).not.toContain('configured-at-runtime');
+  });
+
+  it('reports n8n and provider allowlist state without exposing runtime secrets', async () => {
+    vi.stubEnv('N8N_FOUNDER_CONTENT_ENABLED', 'true');
+    vi.stubEnv('N8N_FOUNDER_CONTENT_WEBHOOK_URL', 'https://n8n.example/webhook/founder-content');
+    vi.stubEnv('N8N_FOUNDER_CONTENT_BEARER_TOKEN', 'configured-at-runtime');
+    vi.stubEnv('N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS', 'buffer,meta,tiktok');
+
+    const res = await request(buildApp())
+      .get('/automation/conveyor')
+      .set('Authorization', BEARER);
+
+    expect(res.status).toBe(200);
+    expect(res.body.founderContent.providerRuntimeReadback).toEqual({
+      n8n: {
+        configured: true,
+        enabled: true,
+      },
+      providerAllowlist: {
+        enabledProviders: ['buffer', 'meta', 'tiktok'],
+        invalidProviders: [],
+      },
+      adapterProof: 'not-observed',
+      liveProbeRequired: true,
+      providerOutcomeProofRequired: true,
+      secretsExposed: false,
+    });
+
+    const serialized = JSON.stringify(res.body);
+    expect(serialized).not.toContain('https://n8n.example/webhook/founder-content');
+    expect(serialized).not.toContain('configured-at-runtime');
+  });
+
+  it('surfaces invalid provider allowlist values without leaking other environment data', async () => {
+    vi.stubEnv('N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS', 'meta,unknown-provider');
+
+    const res = await request(buildApp())
+      .get('/automation/conveyor')
+      .set('Authorization', BEARER);
+
+    expect(res.status).toBe(200);
+    expect(res.body.founderContent.providerRuntimeReadback.providerAllowlist).toEqual({
+      enabledProviders: ['meta'],
+      invalidProviders: ['unknown-provider'],
+    });
+    expect(res.body.founderContent.providerRuntimeReadback.adapterProof).toBe('not-observed');
   });
 
   it('binds execution identity to the authenticated founder and never trusts body identity', async () => {
@@ -104,11 +173,11 @@ describe('n8n founder-content route', () => {
       code: 'DISPATCHED',
       status: 202,
       request: {
-        orchestrationId: 'fcr-n8n-social-v1:test',
+        orchestrationId: 'fcr-n8n-social-v2:test',
         providerRequest: { provider: 'meta' },
       },
       receipt: {
-        orchestrationId: 'fcr-n8n-social-v1:test',
+        orchestrationId: 'fcr-n8n-social-v2:test',
         provider: 'meta',
         state: 'scheduled',
         providerItemId: 'meta-post-1',
