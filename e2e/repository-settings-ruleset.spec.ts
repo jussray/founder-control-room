@@ -1,11 +1,48 @@
+import { createServer, type Server } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { test, expect } from '@playwright/test';
 
 const CANONICAL_RULESET = 'Founder Control Room main exact-head gate';
 const SETTINGS_PATH = '/control-room/repository-settings.html';
 
+let server: Server;
+let baseUrl = '';
+
+test.beforeAll(async () => {
+  const html = await readFile(join(process.cwd(), 'public/control-room/repository-settings.html'), 'utf8');
+
+  server = createServer((request, response) => {
+    if (request.url === SETTINGS_PATH) {
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      response.end(html);
+      return;
+    }
+
+    response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+    response.end('not found');
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Repository Settings proof server did not expose a TCP port');
+  baseUrl = `http://127.0.0.1:${address.port}`;
+});
+
+test.afterAll(async () => {
+  if (!server) return;
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
+});
+
 test.describe('Repository Settings ruleset safety', () => {
   test('defaults active FCR main protection to the canonical hardened gate', async ({ page }) => {
-    await page.goto(SETTINGS_PATH);
+    await page.goto(`${baseUrl}${SETTINGS_PATH}`);
 
     await expect(page.locator('input[name="projectSlug"]')).toHaveValue('founder-control-room');
     await expect(page.locator('input[name="name"]')).toHaveValue(CANONICAL_RULESET);
@@ -29,7 +66,7 @@ test.describe('Repository Settings ruleset safety', () => {
       }
     });
 
-    await page.goto(SETTINGS_PATH);
+    await page.goto(`${baseUrl}${SETTINGS_PATH}`);
     await page.locator('input[name="name"]').fill('protect-main');
     await page.locator('button[type="submit"]').click();
 
@@ -42,7 +79,7 @@ test.describe('Repository Settings ruleset safety', () => {
   test('preserves deliberate rename flexibility outside active FCR main protection', async ({ page }) => {
     let submittedBody: Record<string, unknown> | null = null;
 
-    await page.goto(SETTINGS_PATH);
+    await page.goto(`${baseUrl}${SETTINGS_PATH}`);
     await page.evaluate(() => {
       sessionStorage.setItem('fcr_session', JSON.stringify({ access_token: 'playwright-test-token' }));
     });
