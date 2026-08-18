@@ -22,6 +22,10 @@ function provider() {
   } as unknown as RepositoryProvider;
 }
 
+function env(reviewers = 'independent-reviewer'): NodeJS.ProcessEnv {
+  return { FCR_TRUSTED_SEMANTIC_REVIEWER_IDS: reviewers };
+}
+
 function payload() {
   return {
     independentReviewReceipts: [{
@@ -29,12 +33,6 @@ function payload() {
       diffHash: DIFF_HASH,
       policyHash: POLICY_HASH,
     }],
-    independentReviewPolicy: {
-      requiredSemanticReviews: 1,
-      requireDeterministicReview: true,
-      blockOnP2: true,
-      trustedSemanticReviewerIds: ['independent-reviewer'],
-    },
   };
 }
 
@@ -76,11 +74,59 @@ describe('merge review authority bridge', () => {
       baseRef: 'main',
       headSha: HEAD_SHA,
       payload: {},
+      env: env(),
     })).rejects.toThrow(/independentReviewReceipts/);
     expect(mockEvaluate).not.toHaveBeenCalled();
   });
 
-  it('derives repository, current base SHA, exact head SHA, and founder author identity instead of trusting caller context', async () => {
+  it('fails closed when server-owned trusted reviewer configuration is absent', async () => {
+    await expect(enforceMergeReviewAuthority({
+      provider: provider(),
+      projectId: 'founder-control-room',
+      repository: 'jussray/founder-control-room',
+      baseRef: 'main',
+      headSha: HEAD_SHA,
+      payload: payload(),
+      env: {},
+    })).rejects.toThrow(/FCR_TRUSTED_SEMANTIC_REVIEWER_IDS/);
+    expect(mockEvaluate).not.toHaveBeenCalled();
+  });
+
+  it('rejects caller-supplied reviewer policy instead of allowing trust redefinition', async () => {
+    await expect(enforceMergeReviewAuthority({
+      provider: provider(),
+      projectId: 'founder-control-room',
+      repository: 'jussray/founder-control-room',
+      baseRef: 'main',
+      headSha: HEAD_SHA,
+      payload: {
+        ...payload(),
+        independentReviewPolicy: {
+          requiredSemanticReviews: 1,
+          requireDeterministicReview: false,
+          blockOnP2: true,
+          trustedSemanticReviewerIds: ['caller-chosen-reviewer'],
+        },
+      },
+      env: env(),
+    })).rejects.toThrow(/server-owned/);
+    expect(mockEvaluate).not.toHaveBeenCalled();
+  });
+
+  it('rejects duplicate server-configured reviewer identities', async () => {
+    await expect(enforceMergeReviewAuthority({
+      provider: provider(),
+      projectId: 'founder-control-room',
+      repository: 'jussray/founder-control-room',
+      baseRef: 'main',
+      headSha: HEAD_SHA,
+      payload: payload(),
+      env: env('Independent-Reviewer,independent-reviewer'),
+    })).rejects.toThrow(/must be unique/);
+    expect(mockEvaluate).not.toHaveBeenCalled();
+  });
+
+  it('derives repository context and reviewer trust from server authority instead of caller policy', async () => {
     const repoProvider = provider();
     const requestPayload = payload();
 
@@ -91,6 +137,7 @@ describe('merge review authority bridge', () => {
       baseRef: 'main',
       headSha: HEAD_SHA,
       payload: requestPayload,
+      env: env('trusted-human-reviewer'),
     });
 
     expect(repoProvider.getRef).toHaveBeenCalledWith('founder-control-room', 'main');
@@ -107,7 +154,12 @@ describe('merge review authority bridge', () => {
         authorIdentity: 'jussray',
       },
       requestPayload.independentReviewReceipts,
-      requestPayload.independentReviewPolicy,
+      {
+        requiredSemanticReviews: 1,
+        requireDeterministicReview: true,
+        blockOnP2: true,
+        trustedSemanticReviewerIds: ['trusted-human-reviewer'],
+      },
     );
     expect(result).toMatchObject({
       required: true,
@@ -134,6 +186,7 @@ describe('merge review authority bridge', () => {
       baseRef: 'main',
       headSha: HEAD_SHA,
       payload: payload(),
+      env: env(),
     })).rejects.toThrow(/exact-head provider PR-review witness/);
   });
 });
