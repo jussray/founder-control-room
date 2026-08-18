@@ -4,87 +4,193 @@
 > This is proprietary software. No license to use, copy, modify, distribute,
 > sublicense, or create derivative works is granted. See [LICENSE](LICENSE).
 
-Founder Control Room is a provider-independent founder operating plane for governed repository work, approvals, evidence, capability control, release control, production verification, rollback, and cross-project decision support.
+Founder Control Room is a provider-independent founder operating plane for governed repository work, approvals, evidence, capability control, release control, production verification, rollback, founder-content distribution, and cross-project decision support.
 
-It manages Se'kret Bip and related founder systems without making GitHub, Cloudflare, Supabase, or any other provider the product constitution.
+It manages Se'kret Bip and related founder systems without making GitHub, Cloudflare, Supabase, n8n, Zapier, HubSpot, or another provider the product constitution.
 
 ## Current repository truth
 
-**Last refreshed:** 2026-08-15  
-**Implementation baseline audited for this documentation:** `2c632243fc8bae1331624e08d279c7fb4ad904ed`
+**Current identity is resolved at use time.** A hard-coded SHA, date, PR body, issue comment, screenshot, or provider result is historical evidence once the underlying state moves.
 
-A documentation-only merge may advance `main` beyond that baseline without changing the implementation evidence summarized here. Resolve fresh current `main` before making any new exact-head claim.
+For a present-tense repository claim:
 
-The audited implementation baseline includes:
+1. resolve current `main` from GitHub;
+2. bind repository evidence to that exact SHA;
+3. distinguish repository, CI, provider, deployment, runtime, browser, account, publication, analytics, and human-outcome truth;
+4. apply the applicable temporal gate or Truth Lease when the claim can decay; and
+5. preserve older exact-version evidence as historical or superseded instead of silently promoting it back into current authority.
+
+Exact SHAs belong in PRs, retained receipts, artifacts, incident records, and historical provenance. They do not automatically renew themselves as current truth after another merge.
+
+Current implementation includes:
 
 - provider-independent repository abstractions and guarded exact-head execution;
-- founder approval and reservation boundaries;
-- deterministic Cloudflare reasoning;
-- MCP capability discovery/policy boundaries;
-- constitutional project skill routing;
-- Founder OS / Chief AI coordination contracts;
-- freshness-aware federated truth receipts surfaced into founder decisions;
-- a durable founder-only **Founder Switchboard** with explicit BUILT / CONFIGURED / ACTIVE / PROVEN states, desired-state overrides, stale-head detection, atomic audit receipts, an enforced privileged-execution kill switch, observe-only provider intent, and locked-off high-consequence gates;
-- a privacy-safe public skill-testing evidence loop with `/devil` v1 round registry, structured receipts, KPI calculations, aggregate field reporting, and focused tests;
-- desktop/mobile Playwright proof for scoped truth-receipt and Switchboard behavior; and
-- bounded production Worker reconciliation that does not silently inherit database mutation authority.
+- founder proof, idempotency/reservation, and rollback boundaries;
+- an FCR-specific provider-grounded independent-review membrane before in-app provider integration;
+- server-owned FCR semantic reviewer trust through `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` at the review evaluator boundary;
+- canonical capability governance through `.control/capability.json`;
+- deterministic Cloudflare reasoning, request-trace/source contracts, and founder-gated Access recovery tooling whose source existence does not itself prove live provider configuration;
+- freshness-aware federated truth receipts and a bounded Truth Lease contract for claims that can decay;
+- a durable founder-only **Founder Switchboard** with explicit BUILT / CONFIGURED / ACTIVE / PROVEN states and guarded authority modes;
+- a privacy-safe public skill-testing evidence loop with `/devil` v1 structured receipts and aggregate analytics;
+- first-party LinkedIn founder-content execution with exact Current You authority, temporal revalidation, one-shot reservation, and provider readback requirements;
+- provider-neutral n8n founder-content orchestration contracts that keep contract capability separate from runtime configuration and final provider outcome;
+- bounded Zapier/Buffer integration where it still adds connector, scheduling, or fallback value without becoming publication authority;
+- HubSpot integration boundaries that keep CRM metadata and external communication separate from repository truth and founder authority;
+- desktop/mobile Playwright proof for scoped Control Room behavior; and
+- bounded production/recovery workflows that do not silently inherit unrelated database, credential, publication, or provider-mutation authority.
 
-Repository configuration, a green CI badge, provider upload, or HTTP success does not by itself prove production truth.
+Repository configuration, a green CI badge, a merge, a provider upload, a scheduler acceptance, or HTTP success does not by itself prove production or publication truth.
 
-## Current production gate
+## Documentation truth gate
 
-The newest founder-approved Worker reconciliation evidence is GitHub Actions run `31864568036`, executed against exact then-current `main@eebdfb718a24fc04b574d28611a62b6041f1d4e6` before later repository work advanced `main`.
+README files, current-state docs, PR descriptions, issues, AI operating contracts, and runbooks can affect future decisions. They are therefore part of the truth surface, not harmless commentary.
 
-Verified execution:
+For truth-sensitive architecture, authority, provider, publishing, capability, workflow, or launch changes:
 
-1. exact approved commit checkout succeeded;
-2. production authority and current-main verification succeeded at that run;
-3. the production configuration validation step failed;
-4. downstream Worker reconciliation and runtime proof were skipped.
+```text
+change the operational truth
+-> refresh README + applicable current-state docs in the same bounded PR
+-> run Documentation Truth on the exact PR head
+-> require Documentation Truth inside CI / Required Gate
+-> merge only when the normal authority membrane is satisfied
+-> run Documentation Truth again on the merged main transition
+-> re-observe provider/runtime facts before reusing present-tense claims
+```
 
-Issue #182 records that the GitHub `production` environment supplied an **empty `CLOUDFLARE_API_TOKEN`** to the guarded Worker reconcile. Therefore:
+Historical material stays available as provenance. When it no longer describes current authority, mark it `HISTORICAL`, `SUPERSEDED`, `STALE`, `REVALIDATION_REQUIRED`, or point it to the current authority instead of deleting the record or letting it compete silently with fresh truth.
 
-- no Worker deployment executed;
-- no Supabase database mutation executed;
-- runtime `/health` / `/version` release proof did not run; and
-- that guarded production attempt remains blocked evidence, not a successful deployment receipt.
+The verifier emits sanitized counts, domains, coverage, and failure reasons only. It does not store credentials, raw private evidence, raw diffs, private prompts, customer data, private metrics, or provider payloads. Analytics may observe documentation drift but never authorize, renew, or rewrite objective truth.
 
-Because the repository has advanced beyond the SHA proven by that production attempt, any future production action must re-establish exact-current-main authority for the then-current SHA after the production credential binding is reconciled.
+A docs-only truth-sync merge closes an existing drift cycle. Its post-merge receipt closes the transition without forcing another documentation edit merely because the merge commit SHA changed.
 
-Do not bypass that gate, create a second production deploy path, or resurrect the retired `founder-control-room2` Worker.
+## Capability authority
 
-The intended production topology remains:
+`.control/capability.json` is the **canonical capability authority** for repository capability declarations.
+
+`.control/capability.yaml` is a non-authoritative compatibility pointer. It intentionally carries no independent capability, health, deploy, rollback, proof, or verification state.
+
+Keep these layers separate:
+
+```text
+canonical declaration
+-> repository verifier proof
+-> configured provider/tool state
+-> active execution capability
+-> observed outcome proof
+```
+
+The mutable capability ledger itself does not prove current-head CI, deployment, or runtime health. Read immutable current evidence for those claims.
+
+## Independent review and merge truth
+
+Founder Control Room's in-app merge path requires exact provider PR identity, exact-head machine evidence, canonical diff/policy hashes, provider-backed review witnesses, non-author semantic review, deterministic review, P2 blocking, and a last-moment head re-read before provider integration.
+
+For FCR, the reviewer policy passed into the evaluator must match the server-owned semantic reviewer set configured through `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS`. Caller-supplied policy representation cannot redefine that trusted set.
+
+This source/runtime membrane is **not proof of the live GitHub repository ruleset**. GitHub web/API merges, required approval counts, stale-review dismissal, last-push approval, thread-resolution rules, strict status freshness, and bypass actor/mode configuration are separate provider facts that require current GitHub readback.
+
+A GitHub merge outside the in-app FCR execution path does not prove the FCR independent-review contract was used.
+
+## Founder-owned progress publishing
+
+The product goal is deliberate: **Founder Control Room should be able to tell verified progress about the founder's own products from the founder's own product without giving away the private recipe.**
+
+Current architecture separates story, authority, transport, and outcome:
+
+```text
+verified product / repository evidence
+-> Chief proposes a public-safe, channel-native story
+-> Sauce Guard keeps private machinery private
+-> temporal claim classification and revalidation
+-> exact Current You authority for the executable route
+-> channel router
+   -> first-party LinkedIn where configured and proven
+   -> provider-neutral n8n for bounded supported adapters
+   -> Zapier / Buffer where they still add bounded connector or scheduling value
+-> provider readback
+-> Founder Control Room outcome receipt
+-> observation-only analytics
+```
+
+Public-safe progress may explain what changed, what was learned, why it matters, an approved public proof, and an honest unresolved next gate.
+
+Keep private prompts, raw diffs, credentials, internal evidence references, private provider payloads, private metrics, customer/private data, security-sensitive implementation details, unreleased roadmap detail, and proprietary mechanics behind Sauce Guard.
+
+For social destinations keep these states separate:
+
+```text
+contract-capable
+-> configured / allowlisted
+-> adapter-proven
+-> provider-outcome-proven
+```
+
+A platform-native draft is not proof that the provider adapter is live. n8n acceptance is not publication truth. Provider readback remains terminal external-state evidence.
+
+Investor email is a separate authority class and must never auto-send without the applicable standing policy **and recipient-specific qualification**.
+
+## Production authority and Cloudflare topology
+
+Production does **not** deploy merely because `main` moved or because a Cloudflare build succeeded.
+
+The repository's canonical topology is:
 
 ```text
 foundercontrolroom.org
   -> Cloudflare Pages project: founder-control-room
+  -> static/browser assets from Pages
+  -> dynamic API traffic through the Pages `FCR_API` Service Binding in source
 
 api.foundercontrolroom.org
-  -> single canonical Worker: founder-control-room
+  -> canonical Worker: founder-control-room
 ```
 
-The obsolete `founder-control-room2` identity must not be recreated.
+The retired `founder-control-room2` identity must not be recreated.
+
+Current Pages source fails closed when `FCR_API` is unavailable and verifies the bound service identity on dynamic responses. **Source dependence on that binding does not prove the live Pages project currently has the correct provider binding.** Provider configuration and exact runtime behavior require current Cloudflare readback and deployed-path proof.
+
+Native Cloudflare Worker/Pages build receipts are provider build/deploy evidence for the exact artifact they name. They do not prove the guarded production release path, database migration, auth behavior, browser behavior, fleet-wide runtime identity, or publication outcome.
+
+Production release evidence remains incomplete until the applicable authorized lane proves, for one exact current-main SHA:
+
+- current deployment authority;
+- required production configuration and bindings;
+- provider mutation success for the authorized scope;
+- migration evidence only when database mutation is actually in scope;
+- canonical Worker identity;
+- `/health` and `/version` identity;
+- Pages/API routing and service identity;
+- required browser/runtime proof; and
+- rollback ownership.
+
+### Historical production provenance
+
+Earlier production attempts and their exact SHAs/run IDs remain useful incident evidence, including attempts that passed exact-head checkout but failed configuration before deployment/runtime proof. They are **historical provenance**, not a permanent statement of the current production blocker.
+
+Before naming a current production blocker, re-read current GitHub, Cloudflare, and runtime evidence.
 
 ## State → Evidence → Claim
 
 Founder Control Room treats completion as an evidence-bearing state.
 
-For any material claim, identify:
+For any material claim identify:
 
 1. **State** — what actually changed;
 2. **Evidence** — what proves it;
-3. **Authority** — which system or actor produced that evidence; and
-4. **Claim coverage** — which boundaries the evidence proves and which remain unknown.
+3. **Authority** — which system or actor produced that evidence;
+4. **Temporal validity** — whether the evidence is still current for this use; and
+5. **Claim coverage** — which boundaries the evidence proves and which remain unknown.
 
-Keep repository, CI, provider, database, browser, device, account, and runtime witnesses separate.
+Keep repository, CI, provider, database, browser, device, account, publication, analytics, and runtime witnesses separate.
 
-`VERIFIED`, `INFERRED`, `UNKNOWN`, and `BLOCKED` are not interchangeable labels.
+`VERIFIED`, `INFERRED`, `UNKNOWN`, `BLOCKED`, `STALE`, `SUPERSEDED`, and `HISTORICAL` are not interchangeable labels.
 
 ## Founder Switchboard
 
-The Founder Switchboard is the current visual control surface for audited portfolio capabilities.
+The Founder Switchboard is the visual control surface for audited portfolio capabilities.
 
-It deliberately separates four questions that are often collapsed into one misleading “green” state:
+It deliberately separates four questions that are often collapsed into one misleading green state:
 
 ```text
 BUILT -> CONFIGURED -> ACTIVE -> PROVEN
@@ -94,28 +200,26 @@ A capability can exist in source without being configured, configured without be
 
 Switchboard controls are authority-aware:
 
-- **enforced** controls can have a real server-side effect inside their already-granted authority, including the privileged-execution master kill switch;
-- **observe-only** controls record desired/provider intent without pretending the repository can mutate an external provider;
+- **enforced** controls can have a real server-side effect inside already-granted authority;
+- **observe-only** controls record desired/provider intent without pretending the repository can mutate the external provider; and
 - **locked-off** controls keep high-consequence actions outside the active authority membrane until code/evidence changes the lock through review.
 
-Desired-state changes produce durable audit receipts. Stale-head detection prevents an old repository audit from being presented as current capability truth.
-
-The Switchboard does not create new deployment, database, credential, billing, publication, destructive-action, or rollback authority.
+The Switchboard does not create deployment, database, credential, billing, publication, destructive-action, or rollback authority.
 
 ## Why this exists
 
-GitHub is a host and workflow platform built on Git. Cloudflare is a deployment/runtime provider. Supabase is a database/auth provider. None of them should silently become the founder's control constitution.
+GitHub is a source/review/workflow provider. Cloudflare is a deployment/runtime provider. Supabase is a database/auth provider. n8n and Zapier are orchestration providers. HubSpot is a CRM provider. None of them should silently become the founder's control constitution.
 
 Founder Control Room keeps the useful properties:
 
 - versioned source;
-- exact refs;
-- diffs and review;
-- CI evidence;
+- exact refs and diffs;
+- review and CI evidence;
 - approval boundaries;
 - rollback;
 - audit trails;
-- provider read-back; and
+- temporal truth;
+- provider readback; and
 - founder-ready truth receipts.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full architecture.
@@ -127,11 +231,12 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full architecture.
 - [`CHATGPT.md`](CHATGPT.md) — ChatGPT operating contract
 - [`CLAUDE.md`](CLAUDE.md) — Claude / Claude Code overlay
 - [`PERPLEXITY.md`](PERPLEXITY.md) — Perplexity overlay
-- [`docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`](docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md) — canonical product/architecture contract
-- [`docs/PRODUCT_DESIGN_PARALLEL_BUILD_SPEC.md`](docs/PRODUCT_DESIGN_PARALLEL_BUILD_SPEC.md) — UX/product parallel-build contract
+- [`.ai/skills/juss-flow-launch-loop/SKILL.md`](.ai/skills/juss-flow-launch-loop/SKILL.md) — bounded implementation/review/merge loop
+- [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md) — current repository integration authority
+- [`docs/TRUTH_DECAY_AUDIT.md`](docs/TRUTH_DECAY_AUDIT.md) — truth-aging / FutureYou-ME failure contract
+- [`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md`](docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md) — public truth and Sauce Guard boundary
 - [`docs/PROVIDERS.md`](docs/PROVIDERS.md) — provider handoffs
-- [`docs/CLOUDFLARE_REASONING.md`](docs/CLOUDFLARE_REASONING.md) — Cloudflare OODA/L99 recovery contract
-- [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md) — standing evidence-based repository integration authority
+- [`docs/CLOUDFLARE_REASONING.md`](docs/CLOUDFLARE_REASONING.md) — Cloudflare reasoning/recovery contract
 
 Provider overlays may become stricter, but they do not become competing constitutions or expand their own authority.
 
@@ -139,7 +244,7 @@ Provider overlays may become stricter, but they do not become competing constitu
 
 ### Repository and mission control
 
-Founder Control Room can model projects, proposals, missions, verification runs, exact refs, and approval state while keeping repository-provider concerns behind an interface.
+Founder Control Room can model projects, proposals, missions, verification runs, exact refs, evidence, approval state, and guarded repository integration while keeping repository-provider concerns behind an interface.
 
 ### Guarded terminal
 
@@ -147,68 +252,27 @@ The terminal executes only registered commands against an exact verified checkou
 
 A terminal run is verification evidence only for the scope that actually executed.
 
-### Cloudflare reasoning
+### Cloudflare reasoning and recovery
 
-Read-only reasoning is exposed through the provider reasoning contract:
-
-```text
-:cloudflare reason <project>
-```
-
-```http
-GET  /cloudflare/contract
-POST /cloudflare/:slug/reason
-```
-
-It can assess desired commit, Worker/Pages evidence, release markers, health, credential failures, evidence freshness, and deployment authority.
-
-Reasoning does not grant production mutation authority.
+Read-only reasoning can assess desired commit, provider evidence, release markers, health, credential/configuration failures, evidence freshness, and deployment authority. Recovery/source workflows remain bounded by their exact provider permissions and do not prove live configuration until readback succeeds.
 
 ### MCP and capability governance
 
-The repository contains bounded capability declarations and policies for supported tool/provider slots. Repository declarations are intent/configuration, not proof that a live external integration is installed, authenticated, healthy, or authorized for mutation.
+The canonical capability declaration is `.control/capability.json`. Repository declarations are intent/configuration, not proof that a live external integration is installed, authenticated, healthy, or authorized for mutation.
 
 ### Constitutional skill routing
 
-Project skills are selected under repository authority, privacy, proof, runtime-discovery, commercial, provider, messaging, and mutation constraints. A skill cannot expand its own authority ceiling.
+Project skills are selected under repository authority, privacy, proof, runtime-discovery, commercial, provider, messaging, temporal-truth, and mutation constraints. A skill cannot expand its own authority ceiling.
 
 ### Federated truth receipts
 
-The audited implementation can assess freshness-aware repository truth receipts and surface bounded founder recommendations in the Control Room UI.
-
-The current browser proof covers desktop and mobile rendering for the scoped truth-receipt behavior. It is not a claim that every upstream provider or production surface is healthy.
+The implementation can assess freshness-aware repository truth receipts and surface bounded founder recommendations. Browser proof for a scoped behavior is not a claim that every upstream provider or production surface is healthy.
 
 ### Public skill-testing evidence loop
 
-The repository now contains an instrumented, privacy-safe field-testing loop for public skills. The first registered round is `/devil` v1 and includes:
+The repository contains an instrumented, privacy-safe field-testing loop for public skills, including structured public-safe receipts, named round/version identity, KPI calculations, and aggregate reporting that does not expose raw submission content.
 
-- a structured public-safe receipt model;
-- a named round registry bound to the skill/version under test;
-- KPI calculations for valid-test submission rate, iteration yield, and repeat testers;
-- aggregate reporting that does not expose raw submission content; and
-- focused tests for analytics and reporting behavior.
-
-This proves the repository instrumentation exists. It does **not** by itself prove that a public campaign has run, that testers submitted data, that distribution occurred, or that a new skill version earned promotion.
-
-## Production deployment authority
-
-Production does **not** deploy merely because `main` moved.
-
-The canonical production path is approval-bound and exact-head gated. Depending on the maintenance scope, the repository uses the full guarded deployment lane or a narrower Worker-only reconciliation lane. Narrow maintenance lanes must not silently inherit unrelated Supabase/database mutation authority.
-
-Production release evidence remains incomplete until the applicable lane proves:
-
-- exact approved current-main SHA;
-- required production configuration;
-- provider mutation success for the authorized scope;
-- migration ledger evidence when database mutation is actually authorized;
-- canonical Worker identity;
-- `/health`;
-- `/version.gitSha` matching the approved SHA;
-- public-safe guardrails; and
-- required runtime/browser proof.
-
-The current known production blocker is configuration/credential binding in the GitHub `production` environment, not evidence that another Worker or deployment architecture should be invented.
+That proves repository instrumentation exists. It does not by itself prove a public campaign ran, testers submitted data, distribution occurred, or a new skill version earned promotion.
 
 ## Data boundary
 
@@ -224,7 +288,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Public-safe configuration may live in `.env.example`; secret values do not belong in source, logs, retained artifacts, or browser bundles.
+Public-safe configuration may live in `.env.example`; secret values do not belong in source, logs, retained artifacts, browser bundles, or public posts.
 
 ## Founder authentication
 
@@ -232,15 +296,7 @@ Founder-only routes require verified session/auth state plus the founder allowli
 
 ## Guarded founder terminal
 
-The terminal is enabled only when the repository/environment policy permits it and all applicable checks pass, including:
-
-- founder authentication;
-- allowed origin/loopback constraints;
-- reviewed workspace root;
-- registered command ID;
-- exact mission/repository commit;
-- checkout HEAD equality; and
-- allowed risk for the current mission state.
+The terminal is enabled only when repository/environment policy permits it and all applicable checks pass, including founder authentication, allowed origin constraints, reviewed workspace root, registered command identity, exact mission/repository commit, checkout equality, and allowed risk for the current mission state.
 
 Approved branch/merge actions use reservation/idempotency controls before provider mutation so ambiguous provider success cannot be silently replayed.
 
@@ -251,20 +307,25 @@ Approved branch/merge actions use reservation/idempotency controls before provid
 | Read project/evidence | Founder-authenticated or explicitly public-safe read |
 | Run bounded verification | Applicable founder/repository authority |
 | Create branch | Separate repository write authority |
-| Merge focused repository repair | Standing evidence-based merge authority only when exact-head gates are satisfied |
+| Merge through FCR | Exact-head machine proof + current FCR independent-review membrane + repository authority |
+| Merge through live GitHub surface | Separate live GitHub ruleset/provider authority and readback |
 | Deploy / mutate production | Separate exact production authority |
 | Database migration | Separate migration/database authority |
 | Credentials/secrets | Separate credential authority |
-| Publication / billing / destructive action | Separate exact authority |
+| Publication | Exact route-specific Current You authority + provider outcome proof |
+| Investor email | Applicable standing policy + recipient-specific qualification + send authority |
+| Billing / destructive action | Separate exact authority |
 | Rollback | Separate rollback authority |
 
 No approval silently carries forward to another authority class.
 
 ## Documentation rule
 
-Current `main`, executable implementation, exact-head verification, and provider/runtime receipts outrank stale Markdown.
+Current `main`, executable implementation, exact-head verification, current founder intent, and authoritative provider/runtime receipts outrank stale Markdown.
 
-Markdown should be repaired when it materially drifts from verified truth. Do **not** modify implementation merely to make stale prose true. Historical documents may remain historical as long as they are not presented as current authority.
+Markdown must be repaired when it materially drifts from verified truth. Do **not** change implementation merely to make stale prose true. Historical documents may remain historical as long as they cannot masquerade as present-state authority.
+
+The `Documentation Truth` verifier makes this rule load-bearing for truth-sensitive changes and rechecks the merged transition on `main`.
 
 ## License
 
