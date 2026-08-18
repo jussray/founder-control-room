@@ -117,23 +117,30 @@ jobs:
         if: inputs.apply == true
         run: node scripts/verify-fcr-front-door-playwright.mjs
 
-      - name: Publish structured recovery summary
+      - name: Publish sanitized recovery summary
         if: always()
         shell: bash
         run: |
-          for receipt in \
-            test-results/fcr-access-front-door-recovery.json \
-            test-results/fcr-access-front-door-browser-proof.json; do
-            if [[ -f "$receipt" ]]; then
-              {
-                echo "## $(basename "$receipt")"
-                echo
-                echo '```json'
-                cat "$receipt"
-                echo '```'
-              } >> "$GITHUB_STEP_SUMMARY"
-            fi
-          done
+          set -euo pipefail
+          {
+            echo '## FCR Access front-door receipt availability'
+            echo
+            for receipt in \
+              test-results/fcr-access-front-door-recovery.json \
+              test-results/fcr-access-front-door-browser-proof.json; do
+              label="$(basename "$receipt")"
+              if [[ ! -f "$receipt" ]]; then
+                echo "- $label: \`missing\`"
+              elif ! jq -e 'type == "object"' "$receipt" >/dev/null 2>&1; then
+                echo "- $label: \`malformed\`"
+              else
+                state="$(jq -r 'if (.state | type) == "string" then .state else "unknown" end' "$receipt")"
+                echo "- $label: \`present\` (state: \`$state\`)"
+              fi
+            done
+            echo
+            echo '- Raw recovery receipts are retained in the workflow artifact and are not echoed into the job summary.'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload recovery evidence
         if: always()
