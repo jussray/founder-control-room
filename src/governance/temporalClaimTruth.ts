@@ -72,10 +72,17 @@ export interface RepositoryTruthResolver {
   currentVersion(sourceRepo: string): Promise<string>;
 }
 
+export interface TemporalClaimTextDomainInput {
+  label: string;
+  text: string;
+  temporalClass: TemporalClaimClass;
+}
+
 const HASH = /^[0-9a-f]{64}$/i;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const OWNED_REPO = /^jussray\/[A-Za-z0-9._-]+$/;
 const CURRENT_LANGUAGE = /\b(currently|right now|is live|are live|is green|are green|remains|still (?:is|are|has|have)|now (?:is|are|has|have))\b/i;
+const CURRENT_STATE_GRAMMAR = /\b(?:is|are|has|have|does|supports|works|exists|runs|uses|includes|provides|allows|can|will)\b/i;
 const HISTORICAL_LANGUAGE = /\b(built|shipped|implemented|added|merged|completed|released|tested|verified|fixed|created|introduced|deployed|reached|grew|was|were|did)\b/i;
 const CURRENT_RUNTIME_LANGUAGE = /(?:\b(?:production|runtime|site|app|api|service|endpoint|deployment)\b.{0,80}\b(?:live|healthy|up|reachable|serving|available)\b)|(?:\b(?:live|healthy|up|reachable|serving|available)\b.{0,80}\b(?:production|runtime|site|app|api|service|endpoint|deployment)\b)/i;
 const METRIC_LANGUAGE = /(?:\b\d[\d,.]*\s*(?:followers?|impressions?|users?|downloads?|signups?|customers?|sales|engagements?|views?|reactions?|comments?|shares?|clicks?|likes?|members?\s+reached|people\s+reached)\b)|(?:\breached\s+\d[\d,.]*\s+(?:members?|people)\b)|(?:\b(?:revenue|mrr|arr|gmv|conversion|engagement rate)\b.{0,30}(?:\$\s?\d|\d[\d,.]*|\d+(?:\.\d+)?%))|(?:\d+(?:\.\d+)?%)/i;
@@ -136,6 +143,31 @@ export function buildTemporalClaimTruthContextFromCanonical(input: {
   });
 }
 
+export function temporalClaimTextDomainErrors(input: TemporalClaimTextDomainInput): string[] {
+  const errors: string[] = [];
+  const candidate = text(input.text);
+  const label = text(input.label) || 'claim';
+
+  if (input.temporalClass === 'historical_version') {
+    if (CURRENT_LANGUAGE.test(candidate) || CURRENT_STATE_GRAMMAR.test(candidate)) {
+      errors.push(`${label} uses current-state language`);
+    }
+    if (!HISTORICAL_LANGUAGE.test(candidate)) {
+      errors.push(`${label} must use explicit historical framing`);
+    }
+  }
+
+  if (input.temporalClass === 'current_repo_state' && CURRENT_RUNTIME_LANGUAGE.test(candidate)) {
+    errors.push(`${label} uses runtime-state language and requires current_runtime evidence`);
+  }
+
+  if (input.temporalClass !== 'metric' && METRIC_LANGUAGE.test(candidate)) {
+    errors.push(`metric language in ${label} requires metric evidence; non-metric evidence cannot establish analytics truth`);
+  }
+
+  return errors;
+}
+
 function invalidReceipt(
   context: TemporalClaimTruthContext,
   checkedAt: string,
@@ -167,26 +199,11 @@ function invalidReceipt(
 }
 
 function semanticDomainErrors(claim: CanonicalPublicClaim): string[] {
-  const errors: string[] = [];
-
-  if (claim.temporalClass === 'historical_version') {
-    if (CURRENT_LANGUAGE.test(claim.text)) {
-      errors.push(`historical claim ${claim.claimId} uses explicit current-state language`);
-    }
-    if (!HISTORICAL_LANGUAGE.test(claim.text)) {
-      errors.push(`historical claim ${claim.claimId} must use explicit historical framing`);
-    }
-  }
-
-  if (claim.temporalClass === 'current_repo_state' && CURRENT_RUNTIME_LANGUAGE.test(claim.text)) {
-    errors.push(`current repository claim ${claim.claimId} uses runtime-state language and requires current_runtime evidence`);
-  }
-
-  if (claim.temporalClass !== 'metric' && METRIC_LANGUAGE.test(claim.text)) {
-    errors.push(`metric language in claim ${claim.claimId} requires metric evidence; non-metric evidence cannot establish analytics truth`);
-  }
-
-  return errors;
+  return temporalClaimTextDomainErrors({
+    label: `claim ${claim.claimId}`,
+    text: claim.text,
+    temporalClass: claim.temporalClass,
+  });
 }
 
 export async function revalidateTemporalPublicClaims(input: {
