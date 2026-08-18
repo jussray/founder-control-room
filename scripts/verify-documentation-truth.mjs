@@ -41,18 +41,18 @@ const changedFiles = git('diff', '--name-only', `${baseSha}..${headSha}`)
   .filter(Boolean);
 
 const truthSensitiveRules = [
-  { domain: 'publishing', match: /^src\/lib\/(?:firstParty|temporallyGoverned|n8n|founderSignal|truthLease)/ },
+  { domain: 'publishing', match: /^src\/lib\/(?:firstPartyFounderContent|temporallyGovernedFounderContent|n8nFounderContent|n8nProviderNeutralFounderContent|founderSignal)/ },
   { domain: 'publishing', match: /^src\/http\/routes\/n8nConveyor\.ts$/ },
   { domain: 'publishing', match: /^tools\/zapier\/(?:founder-content|social-distribution|buffer)/ },
   { domain: 'truth-governance', match: /^src\/governance\// },
-  { domain: 'truth-governance', match: /^src\/lib\/mergeAuthorityBoundary\.ts$/ },
+  { domain: 'truth-governance', match: /^src\/lib\/(?:mergeAuthorityBoundary|truthLease)\.ts$/ },
   { domain: 'truth-governance', match: /^src\/futureyou\// },
-  { domain: 'provider-authority', match: /^src\/providers\// },
-  { domain: 'provider-authority', match: /^config\/cloudflare-worker-git-authority-policy\.json$/ },
-  { domain: 'provider-authority', match: /^wrangler\.worker\.toml$/ },
-  { domain: 'provider-authority', match: /^\.github\/workflows\/(?:deploy|cloudflare-build-diagnostic)\.yml$/ },
+  { domain: 'repository-provider-authority', match: /^src\/providers\// },
+  { domain: 'cloudflare-provider-authority', match: /^config\/cloudflare-worker-git-authority-policy\.json$/ },
+  { domain: 'cloudflare-provider-authority', match: /^wrangler\.worker\.toml$/ },
+  { domain: 'cloudflare-provider-authority', match: /^\.github\/workflows\/(?:deploy|cloudflare-build-diagnostic)\.yml$/ },
   { domain: 'capability-authority', match: /^\.control\/capability\.(?:json|yaml)$/ },
-  { domain: 'workflow-authority', match: /^\.github\/workflows\/(?:ci|quality-gate|pr-recovery-exact-head|founder-repo-cycle)\.yml$/ },
+  { domain: 'workflow-authority', match: /^\.github\/workflows\/(?:ci|quality-gate|pr-recovery-exact-head|founder-repo-cycle|documentation-truth)\.yml$/ },
 ];
 
 const truthSensitiveChanges = changedFiles
@@ -64,6 +64,11 @@ const truthSensitiveChanges = changedFiles
 
 const changedDocs = changedFiles.filter((file) =>
   file === 'README.md' ||
+  file === 'GLOBAL_AI.md' ||
+  file === 'AGENTS.md' ||
+  file === 'CHATGPT.md' ||
+  file === 'CLAUDE.md' ||
+  file === 'PERPLEXITY.md' ||
   file.endsWith('.md') && (file.startsWith('docs/') || file.startsWith('.ai/skills/')),
 );
 
@@ -77,8 +82,10 @@ if (truthSensitiveChanges.length > 0) {
   if (domains.has('truth-governance') || domains.has('workflow-authority')) {
     requiredDocs.add('docs/FOUNDER_MERGE_AUTHORITY.md');
     requiredDocs.add('.ai/skills/juss-flow-launch-loop/SKILL.md');
+    requiredDocs.add('GLOBAL_AI.md');
   }
-  if (domains.has('provider-authority')) requiredDocs.add('docs/CLOUDFLARE_REASONING.md');
+  if (domains.has('repository-provider-authority')) requiredDocs.add('docs/PROVIDERS.md');
+  if (domains.has('cloudflare-provider-authority')) requiredDocs.add('docs/CLOUDFLARE_REASONING.md');
   if (domains.has('capability-authority')) requiredDocs.add('README.md');
 
   for (const required of requiredDocs) {
