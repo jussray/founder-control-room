@@ -5,14 +5,13 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const outputDir = resolve(repoRoot, 'test-results/pages-api-recovery');
-const originalFetch = globalThis.fetch;
 
-type AssetBinding = {
+type FetchBinding = {
   fetch(request: Request): Promise<Response>;
 };
 
 type PagesHandler = {
-  fetch(request: Request, env: { ASSETS: AssetBinding }): Promise<Response>;
+  fetch(request: Request, env: { ASSETS: FetchBinding; FCR_API: FetchBinding }): Promise<Response>;
 };
 
 async function loadHandler(): Promise<PagesHandler> {
@@ -26,22 +25,20 @@ const assets = {
   fetch: async (_request: Request) => new Response('asset', { status: 200 }),
 };
 
-test.afterEach(() => {
-  globalThis.fetch = originalFetch;
-});
-
 test('renders conservative auth recovery guidance on desktop and mobile', async ({ page }) => {
   const handler = await loadHandler();
-  globalThis.fetch = async () => new Response('Hello world', {
-    status: 200,
-    headers: { 'content-type': 'text/plain' },
-  });
+  const fcrApi = {
+    fetch: async (_request: Request) => new Response('Hello world', {
+      status: 200,
+      headers: { 'content-type': 'text/plain' },
+    }),
+  };
 
   const response = await handler.fetch(
     new Request('https://foundercontrolroom.org/auth/callback?type=magiclink', {
       headers: { accept: 'text/html' },
     }),
-    { ASSETS: assets },
+    { ASSETS: assets, FCR_API: fcrApi },
   );
 
   expect(response.status).toBe(503);
@@ -89,13 +86,15 @@ test('renders conservative auth recovery guidance on desktop and mobile', async 
 
 test('offers retry only for a safe read navigation', async ({ page }) => {
   const handler = await loadHandler();
-  globalThis.fetch = async () => new Response('Connection timed out', { status: 522 });
+  const fcrApi = {
+    fetch: async (_request: Request) => new Response('Connection timed out', { status: 522 }),
+  };
 
   const response = await handler.fetch(
     new Request('https://foundercontrolroom.org/health', {
       headers: { accept: 'text/html' },
     }),
-    { ASSETS: assets },
+    { ASSETS: assets, FCR_API: fcrApi },
   );
 
   expect(response.status).toBe(503);
@@ -108,21 +107,23 @@ test('offers retry only for a safe read navigation', async ({ page }) => {
   );
 });
 
-test('preserves a verified Founder Control Room API response', async () => {
+test('preserves a verified Founder Control Room API response through the service binding', async () => {
   const handler = await loadHandler();
-  globalThis.fetch = async () => new Response('{"ok":true}', {
-    status: 200,
-    headers: {
-      'content-type': 'application/json',
-      'x-founder-control-room-service': 'founder-control-room',
-    },
-  });
+  const fcrApi = {
+    fetch: async (_request: Request) => new Response('{"ok":true}', {
+      status: 200,
+      headers: {
+        'content-type': 'application/json',
+        'x-founder-control-room-service': 'founder-control-room',
+      },
+    }),
+  };
 
   const response = await handler.fetch(
     new Request('https://foundercontrolroom.org/health', {
       headers: { accept: 'application/json' },
     }),
-    { ASSETS: assets },
+    { ASSETS: assets, FCR_API: fcrApi },
   );
 
   expect(response.status).toBe(200);

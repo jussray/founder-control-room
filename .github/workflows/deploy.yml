@@ -339,11 +339,19 @@ jobs:
           FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON: >-
             {"id":"founder-signal-draft-only-v2","enabled":false,"routes":[{"channel":"linkedin","audienceSegment":"build-in-public"},{"channel":"facebook","audienceSegment":"build-in-public"}],"repositories":[],"repositoryScope":{"mode":"all_owned","owner":"jussray"},"approvedRecipientIds":[],"expiresAt":null}
 
+  pages-release:
+    name: Cloudflare Pages Production Release
+    needs: worker-deploy
+    uses: ./.github/workflows/pages-production-release.yml
+    with:
+      expected_head_sha: ${{ inputs.expected_head_sha }}
+    secrets: inherit
+
   # ── 3. Post-deploy exact-SHA and fail-closed broad grant proof ───────────────
   smoke-test:
     name: Smoke Test
     runs-on: ubuntu-latest
-    needs: worker-deploy
+    needs: pages-release
     steps:
       - uses: actions/checkout@v4
         with:

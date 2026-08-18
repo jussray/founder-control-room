@@ -1,0 +1,112 @@
+name: Pages Production Release
+
+on:
+  workflow_call:
+    inputs:
+      expected_head_sha:
+        description: Exact approved main commit for the release
+        required: true
+        type: string
+    secrets:
+      CLOUDFLARE_ACCOUNT_ID:
+        required: true
+      CLOUDFLARE_API_TOKEN:
+        required: true
+      CLOUDFLARE_DEPLOY_HOOK_URL:
+        required: true
+      DEPLOY_URL:
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  pages-release:
+    name: Pages exact-SHA deploy and live browser proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production
+    env:
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_DEPLOY_HOOK_URL: ${{ secrets.CLOUDFLARE_DEPLOY_HOOK_URL }}
+      CLOUDFLARE_PAGES_PROJECT: founder-control-room
+      CLOUDFLARE_PAGES_BRANCH: main
+      DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+      LIVE_ORIGIN: https://foundercontrolroom.org
+
+    steps:
+      - name: Check out exact approved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Re-read current main before triggering Pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          current_main="$(git rev-parse refs/remotes/origin/main)"
+          checked_out="$(git rev-parse HEAD)"
+          printf 'expected=%s\nchecked_out=%s\ncurrent_main=%s\n' \
+            "$EXPECTED_HEAD_SHA" "$checked_out" "$current_main"
+          test "$checked_out" = "$EXPECTED_HEAD_SHA"
+          test "$current_main" = "$EXPECTED_HEAD_SHA"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Verify Worker already serves the exact approved SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEPLOY_URL="${DEPLOY_URL%/}"
+          version_body="$(curl --fail --silent --show-error \
+            --proto '=https' --proto-redir '=https' --max-redirs 0 \
+            --connect-timeout 10 --max-time 20 \
+            "$DEPLOY_URL/version")"
+          VERSION_BODY="$version_body" EXPECTED_SHA="$EXPECTED_HEAD_SHA" python3 - <<'PY'
+          import json
+          import os
+
+          body = json.loads(os.environ['VERSION_BODY'])
+          if body.get('service') != 'founder-control-room':
+              raise SystemExit('Worker identity mismatch before Pages deployment')
+          if body.get('gitSha') != os.environ['EXPECTED_SHA']:
+              raise SystemExit('Worker exact-SHA proof failed before Pages deployment')
+          PY
+
+      - name: Trigger and verify exact Cloudflare Pages deployment
+        run: node scripts/deploy-cloudflare-pages.mjs
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run live Pages and Worker exact-release Playwright proof
+        run: >-
+          npx playwright test
+          -c playwright.live-release.config.ts
+          e2e/live-pages-worker-release.spec.ts
+
+      - name: Upload Pages provider and browser receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-production-release-${{ inputs.expected_head_sha }}
+          path: |
+            test-results/cloudflare-pages-deployment.json
+            playwright-report/live-release/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 30
