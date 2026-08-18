@@ -29,6 +29,29 @@ test('recovery workflow is production-gated and separates read from mutation aut
   assert.match(recoveryWorkflow, /verify-fcr-front-door-playwright\.mjs/);
 });
 
+test('recovery returns only a sanitized receipt to the fixed founder control issue', () => {
+  const returnStep = recoveryWorkflow.match(
+    /- name: Return sanitized recovery receipt to founder control issue([\s\S]*)$/,
+  )?.[1] ?? '';
+
+  assert.match(recoveryWorkflow, /issues:\s*write/);
+  assert.match(returnStep, /RETURN_ISSUE:\s*'485'/);
+  assert.match(returnStep, /WORKFLOW_RUN_URL/);
+  assert.match(returnStep, /gh issue comment "\$RETURN_ISSUE" --repo "\$GITHUB_REPOSITORY"/);
+  assert.match(returnStep, /matchingApplicationCount/);
+  assert.match(returnStep, /credentialFailures/);
+  assert.match(returnStep, /apiVersionMatchesExpectedSha/);
+  assert.match(returnStep, /jq empty "\$access_receipt"/);
+  assert.match(returnStep, /jq empty "\$browser_receipt"/);
+  assert.match(returnStep, /Access provider receipt: `malformed`/);
+  assert.match(returnStep, /Browser proof receipt: `malformed`/);
+  assert.match(returnStep, /Provider truth: `UNKNOWN`/);
+  assert.match(returnStep, /Browser proof: `UNKNOWN`/);
+  assert.doesNotMatch(returnStep, /matchingApplications/);
+  assert.doesNotMatch(returnStep, /cat "\$access_receipt"/);
+  assert.doesNotMatch(returnStep, /cat "\$browser_receipt"/);
+});
+
 test('provider mutation is limited to the Access organization exemption update', () => {
   const putCalls = [...reconciliation.matchAll(/'PUT'/g)];
   assert.equal(putCalls.length, 1);
