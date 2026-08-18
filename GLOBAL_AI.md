@@ -31,6 +31,14 @@ ULTRATHINK
 + Redteam II
 ```
 
+The historical shorthand remains a compatibility alias for existing skills/verifiers:
+
+```text
+/garyvee lindymode redteam l99 redteam ooda
+```
+
+The alias preserves older routing vocabulary only. It does not replace the expanded reasoning stack, add authority, or make any named persona a source of truth.
+
 Repeated Redteam passes are intentional.
 
 1. **ULTRATHINK** — decompose cross-repository, provider, authority, privacy, production, documentation, and temporal dependencies before mutation.
