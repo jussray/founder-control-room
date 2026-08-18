@@ -1,0 +1,69 @@
+name: FCR Cloudflare Bridge Contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/fcr-access-front-door-recovery.yml'
+      - '.github/workflows/fcr-cloudflare-command-bridge.yml'
+      - '.github/workflows/fcr-cloudflare-bridge-contract.yml'
+      - 'scripts/provider-credential-contract.mjs'
+      - 'scripts/provider-credential-contract.node-test.mjs'
+      - 'scripts/reconcile-cloudflare-access-public-zone.mjs'
+      - 'scripts/reconcile-cloudflare-access-public-zone.node-test.mjs'
+      - 'scripts/fcr-cloudflare-bridge-contract.node-test.mjs'
+      - 'scripts/verify-fcr-front-door-playwright.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fcr-access-front-door-recovery.yml'
+      - '.github/workflows/fcr-cloudflare-command-bridge.yml'
+      - '.github/workflows/fcr-cloudflare-bridge-contract.yml'
+      - 'scripts/provider-credential-contract.mjs'
+      - 'scripts/provider-credential-contract.node-test.mjs'
+      - 'scripts/reconcile-cloudflare-access-public-zone.mjs'
+      - 'scripts/reconcile-cloudflare-access-public-zone.node-test.mjs'
+      - 'scripts/fcr-cloudflare-bridge-contract.node-test.mjs'
+      - 'scripts/verify-fcr-front-door-playwright.mjs'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  contract:
+    name: Cloudflare bridge authority contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Verify exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Verify bridge syntax and authority contracts
+        run: |
+          node --check scripts/provider-credential-contract.mjs
+          node --check scripts/reconcile-cloudflare-access-public-zone.mjs
+          node --check scripts/verify-fcr-front-door-playwright.mjs
+          node --test scripts/provider-credential-contract.node-test.mjs
+          node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
+          node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs

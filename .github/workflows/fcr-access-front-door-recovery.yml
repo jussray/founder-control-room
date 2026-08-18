@@ -1,0 +1,146 @@
+name: FCR Access Front Door Recovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_head_sha:
+        description: 'Exact current main SHA approved for FCR front-door inspection or recovery'
+        required: true
+        type: string
+      apply:
+        description: 'Apply only the bounded foundercontrolroom.org Access exemption after inspection'
+        required: true
+        type: boolean
+        default: false
+      approval_reference:
+        description: 'Auditable founder approval reference; required when apply=true'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fcr-access-front-door-recovery-production
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+  CLOUDFLARE_ACCOUNT_ID: '9b59861bd1747cf7525571b4c51d2aa0'
+
+jobs:
+  recover:
+    name: Inspect or restore FCR public Access front door
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    steps:
+      - name: Check out exact approved current main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Verify exact current main and mutation approval
+        env:
+          APPLY: ${{ inputs.apply }}
+          APPROVAL_REFERENCE: ${{ inputs.approval_reference }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error title=Invalid exact head::expected_head_sha must be a lowercase 40-character commit SHA.'
+            exit 1
+          fi
+
+          actual="$(git rev-parse HEAD)"
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          current_main="$(git rev-parse refs/remotes/origin/main)"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          test "$current_main" = "$EXPECTED_HEAD_SHA"
+
+          if [[ "$APPLY" == 'true' ]]; then
+            if [[ ! "$APPROVAL_REFERENCE" =~ ^[A-Za-z0-9._:-]{8,200}$ ]]; then
+              echo '::error title=Missing mutation approval::apply=true requires an auditable 8-200 character approval_reference.'
+              exit 1
+            fi
+          fi
+
+          {
+            echo '## FCR Access front-door authority gate'
+            echo
+            echo "- Exact current main: \`$EXPECTED_HEAD_SHA\`"
+            echo "- Apply requested: \`$APPLY\`"
+            echo "- Approval reference: \`${APPROVAL_REFERENCE:-not-required-for-read-only}\`"
+            echo '- Mutation scope: add foundercontrolroom.org to the existing Access organization exemption list only'
+            echo '- Explicit matching Access application: blocks automatic mutation'
+            echo '- DNS mutation: none'
+            echo '- Worker route mutation: none'
+            echo '- Database mutation: none'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Prove credential and bounded recovery contracts
+        run: |
+          node --test scripts/provider-credential-contract.node-test.mjs
+          node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
+          node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
+
+      - name: Inspect live Access state without mutation
+        env:
+          CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
+        run: node scripts/reconcile-cloudflare-access-public-zone.mjs
+
+      - name: Apply bounded Access exemption with dedicated admin authority
+        if: inputs.apply == true
+        env:
+          CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
+        run: node scripts/reconcile-cloudflare-access-public-zone.mjs --apply
+
+      - name: Install Chromium for post-apply proof
+        if: inputs.apply == true
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify recovered front door and exact runtime SHA with Playwright
+        if: inputs.apply == true
+        run: node scripts/verify-fcr-front-door-playwright.mjs
+
+      - name: Publish structured recovery summary
+        if: always()
+        shell: bash
+        run: |
+          for receipt in \
+            test-results/fcr-access-front-door-recovery.json \
+            test-results/fcr-access-front-door-browser-proof.json; do
+            if [[ -f "$receipt" ]]; then
+              {
+                echo "## $(basename "$receipt")"
+                echo
+                echo '```json'
+                cat "$receipt"
+                echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
+      - name: Upload recovery evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-access-front-door-recovery-${{ env.EXPECTED_HEAD_SHA }}-${{ github.run_attempt }}
+          path: |
+            test-results/fcr-access-front-door-recovery.json
+            test-results/fcr-access-front-door-browser-proof.json
+          if-no-files-found: ignore
+          retention-days: 30
