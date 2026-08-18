@@ -8,6 +8,7 @@ const expectedServerNames = [
   'cloudflare-builds',
   'cloudflare-docs',
   'cloudflare-observability',
+  'cloudflare-stack',
   'context7',
   'figma',
   'github',
@@ -20,6 +21,7 @@ const expectedCloudflareServerNames = [
   'cloudflare-builds',
   'cloudflare-docs',
   'cloudflare-observability',
+  'cloudflare-stack',
 ];
 
 const expectedRemoteUrls = {
@@ -27,6 +29,7 @@ const expectedRemoteUrls = {
   context7: 'https://mcp.context7.com/mcp',
   figma: 'https://mcp.figma.com/mcp',
   cloudflare: 'https://mcp.cloudflare.com/mcp',
+  'cloudflare-stack': 'https://stack.mcp.cloudflare.com/mcp',
   'cloudflare-docs': 'https://docs.mcp.cloudflare.com/mcp',
   'cloudflare-bindings': 'https://bindings.mcp.cloudflare.com/mcp',
   'cloudflare-builds': 'https://builds.mcp.cloudflare.com/mcp',

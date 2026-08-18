@@ -3,6 +3,9 @@
     "cloudflare": {
       "serverUrl": "https://mcp.cloudflare.com/mcp"
     },
+    "cloudflare-stack": {
+      "serverUrl": "https://stack.mcp.cloudflare.com/mcp"
+    },
     "cloudflare-docs": {
       "serverUrl": "https://docs.mcp.cloudflare.com/mcp"
     },

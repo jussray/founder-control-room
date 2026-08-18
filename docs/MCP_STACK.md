@@ -1,34 +1,43 @@
 # Founder Control Room MCP stack
 
-Last reviewed: 2026-07-19
+Last reviewed: 2026-08-18
 
-This file governs which MCP servers an AI agent (e.g. Claude Code) may use
-while **developing this repository**. It is a different thing from the
-Control Room's own **MCP / Connector Hub** (`project_connections` +
-`GET /agents` + `GET /authority-levels`), which is a data registry of
-connectors for the PROJECTS the Control Room manages (Se'kret Bip and
-future projects) — inventory and authority-level bookkeeping, not a live
-tool connection. Don't conflate the two: this file is about what tools help
-build the Control Room; the Connector Hub is about what the Control Room
-records regarding each managed project's own tool surface.
+This file governs which MCP servers an AI agent may use while **developing this repository**. It is different from the Control Room's own **MCP / Connector Hub** (`project_connections` + `GET /agents` + `GET /authority-levels`), which records connectors and authority for managed projects. Do not conflate the repository agent fleet with the in-app Connector Hub.
 
-The Control Room is a private, repository-agnostic governance service. Its default MCP stack supports repository inspection, current implementation documentation, its own database schema, and its own Cloudflare deployment evidence.
+The Control Room is a private, repository-agnostic governance service. Its standing repository MCP stack supports repository inspection, current implementation documentation, browser proof, design context, its own database schema, and Cloudflare provider/deployment evidence.
 
-## Connected servers
+## Connected repository-agent servers
 
 | Server | Purpose | Boundary |
 | --- | --- | --- |
 | `github` | Repository, PR, Actions, code-security, and secret-protection context | Selected toolsets only; no committed PAT or Authorization header |
-| `context7` | Current documentation for Octokit, Supabase JS, Express, TypeScript, Vitest, Wrangler, and related libraries | Documentation only; no private project payloads or secrets |
+| `context7` | Current implementation/library documentation | Documentation only; no private project payloads or secrets |
+| `playwright` | Browser-visible verification and recovery-path proof | Browser/runtime evidence; it does not authorize code or provider mutations |
+| `figma` | Design context and implementation handoff | Design evidence only; no deploy, migration, spending, or external-action authority |
 | `supabase` | Inspect the Control Room's own schema and Supabase documentation | Project `oojzfmmywbvficgybaxd`, read-only, `database,docs` only |
+| `cloudflare` | Cloudflare API/provider context | Read by default; mutations remain separately approved |
+| `cloudflare-stack` | Supplemental Cloudflare Stack provider context at `https://stack.mcp.cloudflare.com/mcp` | Repository clients authenticate through their supported client flow; the in-app Hub stays fail-closed for generic `execute` and mutation-shaped tools |
 | `cloudflare-docs` | Current Cloudflare product documentation | Documentation only |
-| `cloudflare-builds` | Inspect Control Room Worker build evidence | OAuth; no deploy or setting changes without separate approval |
+| `cloudflare-bindings` | Inspect Worker bindings and project wiring | Binding mutations remain separately approved |
+| `cloudflare-builds` | Inspect Control Room Worker build evidence | No deploy or setting changes without separate approval |
 | `cloudflare-observability` | Inspect sanitized runtime logs and analytics | Never query or paste access tokens, service-role keys, founder sessions, or raw project payloads |
+
+## In-app Control Room MCP Hub boundary
+
+The repository-agent configuration above does **not** automatically make a remote server callable by the running Control Room.
+
+The in-app Hub uses `src/mcp/defaultRegistry.ts`, environment/connection-vault authority, server-specific allowlists, and MCP evidence receipts. For Cloudflare Stack specifically:
+
+- the runtime endpoint and any bearer credential are not committed;
+- the server remains unavailable until its runtime authority is configured;
+- read-shaped tool names may be considered by policy;
+- generic `execute` and mutation-shaped tools are denied;
+- provider/OAuth availability in an IDE does not prove production runtime authorization.
+
+This intentionally prevents a generic Code Mode `execute` surface from being mislabeled as read-only merely because the provider connection exists.
 
 ## Deliberately excluded
 
-- Playwright — the exclusion condition ("no frontend") is now false: `public/control-room/` is a real, tested, served frontend as of 2026-07-19. Reconsider adding it for browser-verified proof of UI changes. Not added automatically here — enabling a new MCP server for this repo's Claude Code sessions is the founder's call, not something to change unprompted.
-- Figma — still excluded. There is no active source-design implementation workflow in this repo (no Figma files, no Code Connect mapping). Reconsider once one exists.
 - DBHub and generic database MCP servers. The project-scoped read-only Supabase server covers the current schema-inspection need.
 - Netdata while the service runs on managed infrastructure without claimed persistent hosts.
 - GitHub Insiders and local Docker GitHub MCP as committed defaults.
@@ -36,7 +45,7 @@ The Control Room is a private, repository-agnostic governance service. Its defau
 
 ## Data boundary
 
-The Control Room may inspect its own operational schema and sanitized repository metadata. Do not send or retrieve raw Se'kret Bip teen/parent content, Juss Beautiful Hair customer/vendor data, Stripe payloads, production credentials, or other project secrets through this stack.
+The Control Room may inspect its own operational schema and sanitized repository/provider metadata. Do not send or retrieve raw Se'kret Bip teen/parent content, Juss Beautiful Hair customer/vendor data, Stripe payloads, production credentials, or other project secrets through this stack.
 
 ## Verification prompts
 
@@ -53,7 +62,11 @@ Use Supabase MCP to list the configured Control Room project's tables, migration
 ```
 
 ```text
-Use Cloudflare Builds and Observability to report the latest Control Room Worker build and sanitized runtime errors. Do not deploy or change settings.
+Use Cloudflare provider MCPs to inspect current bindings, build state, Access/provider configuration, and sanitized runtime evidence. Prefer provider truth over screenshots or stale documentation. Do not mutate provider state without the separately approved authority path.
+```
+
+```text
+Use Playwright for any user-facing UI/runtime claim before merge.
 ```
 
 ## Validation
