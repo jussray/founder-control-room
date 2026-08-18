@@ -65,6 +65,25 @@ try {
   assert.equal(founderCards, 3, 'founder progress lane must keep public, private, and authority boundaries visible');
   assert.equal(await founderLane.locator('button, .action').count(), 0, 'capability must not be presented as an already-authorized publish control');
 
+  const learningLoop = page.locator('[data-content-learning-loop]');
+  await learningLoop.waitFor({ state: 'visible' });
+  assert.equal(await learningLoop.getAttribute('data-analytics-authority'), 'observation-only');
+  assert.equal(await learningLoop.getAttribute('data-private-metrics-state'), 'withheld');
+  assert.equal(await learningLoop.getAttribute('data-metric-claim-state'), 'fresh-verifier-required');
+  assert.equal(await learningLoop.locator('[data-learning-axis]').count(), 3);
+  assert.equal(await learningLoop.locator('[data-story-archetype]').count(), 4);
+  const learningAxes = await learningLoop.locator('[data-learning-axis]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-learning-axis')));
+  assert.deepEqual(learningAxes, ['distribution', 'resonance', 'compounding']);
+  const storyArchetypes = await learningLoop.locator('[data-story-archetype]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-story-archetype')));
+  assert.deepEqual(storyArchetypes, ['founder-thesis', 'build-correct', 'proof-lesson', 'human-product-stake']);
+  const learningText = await learningLoop.innerText();
+  assert.match(learningText, /Learn from attention without turning analytics into authority\./i);
+  assert.match(learningText, /Metrics stay private by default/i);
+  assert.match(learningText, /repository proof may support repository claims, not analytics claims/i);
+  assert.match(learningText, /those claims stay BLOCKED for first-party publication/i);
+  assert.match(learningText, /private snapshot may still guide which public-safe story shape/i);
+  assert.doesNotMatch(learningText, /\b42\b|\b52\b|\b3,?740\b/, 'private workbook totals must not be baked into the public Content Manager');
+
   const status = page.locator('[aria-label="Content authority status"]');
   assert.equal(await status.locator('[data-founder-engine-state]').getAttribute('data-founder-engine-state'), 'contract-ready');
   assert.equal(await status.locator('[data-first-party-linkedin-capability]').getAttribute('data-first-party-linkedin-capability'), 'implemented');
@@ -114,11 +133,13 @@ try {
     flowWidth: document.querySelector('.flow')?.clientWidth ?? 0,
     flowScrollWidth: document.querySelector('.flow')?.scrollWidth ?? 0,
     founderLaneWidth: document.querySelector('[data-founder-progress-lane]')?.clientWidth ?? 0,
+    learningLoopWidth: document.querySelector('[data-content-learning-loop]')?.clientWidth ?? 0,
   }));
 
   assert.equal(dimensions.pageWidth, dimensions.viewportWidth, 'page must not overflow the mobile viewport');
   assert(dimensions.flowScrollWidth > dimensions.flowWidth, 'workflow must remain horizontally explorable on mobile');
   assert(dimensions.founderLaneWidth > 0 && dimensions.founderLaneWidth <= dimensions.viewportWidth, 'founder progress lane must fit the mobile viewport');
+  assert(dimensions.learningLoopWidth > 0 && dimensions.learningLoopWidth <= dimensions.viewportWidth, 'content learning loop must fit the mobile viewport');
 
   await page.locator('.action.primary').focus();
   assert.equal(await page.evaluate(() => document.activeElement?.textContent?.trim()), 'Open proof ledger');
@@ -146,6 +167,13 @@ try {
       outcomeState: 'unknown',
       analyticsAuthority: 'observation-only',
       fakeWriteControls: 0,
+    },
+    contentLearning: {
+      analyticsAuthority: 'observation-only',
+      privateMetricsState: 'withheld',
+      metricClaimState: 'fresh-verifier-required',
+      axes: learningAxes,
+      storyArchetypes,
     },
     screenshot: 'test-results/content-manager-mobile.png',
     overflow: dimensions,
