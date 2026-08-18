@@ -82,6 +82,8 @@ const MAX_COMPLETE_COMPARE_FILES = 299;
 const REVIEWER_KINDS = new Set<ReviewerKind>(["semantic", "deterministic"]);
 const SEVERITIES = new Set<ReviewSeverity>(["P0", "P1", "P2", "P3"]);
 const VERDICTS = new Set<ReviewVerdict>(["clear", "needs_review", "blocked"]);
+const FCR_REPOSITORY = "jussray/founder-control-room";
+const FCR_TRUSTED_REVIEWERS_ENV = "FCR_TRUSTED_SEMANTIC_REVIEWER_IDS";
 
 const text = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const lower = (value: unknown): string => text(value).toLowerCase();
@@ -97,6 +99,38 @@ export function independentReviewPolicyHash(policy: IndependentReviewPolicy): st
     policy?.blockOnP2 === true,
     trustedReviewerIds,
   ]), "hex");
+}
+
+function fcrServerOwnedPolicy(env: NodeJS.ProcessEnv): IndependentReviewPolicy | null {
+  const raw = text(env[FCR_TRUSTED_REVIEWERS_ENV]);
+  if (!raw) return null;
+  const trustedSemanticReviewerIds = raw.split(",").map((value) => value.trim()).filter(Boolean);
+  if (trustedSemanticReviewerIds.length === 0 || trustedSemanticReviewerIds.length > 8) return null;
+  const normalized = trustedSemanticReviewerIds.map(lower);
+  if (new Set(normalized).size !== normalized.length) return null;
+  if (normalized.some(isGitHubAppBotIdentity)) return null;
+  return {
+    requiredSemanticReviews: 1,
+    requireDeterministicReview: true,
+    blockOnP2: true,
+    trustedSemanticReviewerIds,
+  };
+}
+
+function fcrServerPolicyBlockers(
+  context: IndependentReviewContext,
+  policy: IndependentReviewPolicy,
+  env: NodeJS.ProcessEnv,
+): string[] {
+  if (lower(context.repository) !== FCR_REPOSITORY) return [];
+  const serverPolicy = fcrServerOwnedPolicy(env);
+  if (!serverPolicy) {
+    return [`FCR merge requires valid server-owned ${FCR_TRUSTED_REVIEWERS_ENV} configuration`];
+  }
+  if (independentReviewPolicyHash(policy) !== independentReviewPolicyHash(serverPolicy)) {
+    return ["FCR independent review policy must match the server-owned semantic reviewer policy"];
+  }
+  return [];
 }
 
 export function independentReviewDiffHash(diff: Diff): string {
@@ -279,12 +313,14 @@ export async function evaluateIndependentReviewGate(
   context: IndependentReviewContext,
   reviews: IndependentReviewReceipt[],
   policy: IndependentReviewPolicy,
+  env: NodeJS.ProcessEnv = process.env,
 ): Promise<IndependentReviewGateResult> {
   const blockers: string[] = [];
   if (!FULL_SHA.test(text(context.baseSha)) || !FULL_SHA.test(text(context.headSha))) blockers.push("Gate context requires full base/head SHAs");
   if (!SHA256.test(text(context.diffHash)) || !SHA256.test(text(context.policyHash))) blockers.push("Gate context requires sha256 diff/policy hashes");
   if (!Number.isInteger(context.pullRequestNumber) || context.pullRequestNumber <= 0) blockers.push("Gate context requires a positive pull request number");
   if (!text(context.projectId) || !text(context.repository) || !text(context.authorIdentity)) blockers.push("Gate context requires project, repository, and author identity");
+  blockers.push(...fcrServerPolicyBlockers(context, policy, env));
   if (!Number.isInteger(policy?.requiredSemanticReviews) || policy.requiredSemanticReviews < 1 || policy.requiredSemanticReviews > 4) {
     blockers.push("Policy requires between 1 and 4 semantic reviews");
   }
