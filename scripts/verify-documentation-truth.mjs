@@ -50,6 +50,7 @@ const truthSensitiveRules = [
   { domain: 'truth-governance', match: /^src\/futureyou\/(?!.*\.test\.ts$)/ },
   { domain: 'capability-authority', match: /^\.control\/capability\.(?:json|yaml)$/ },
   { domain: 'workflow-authority', match: /^\.github\/workflows\/(?:ci|quality-gate|pr-recovery-exact-head|founder-repo-cycle|documentation-truth)\.yml$/ },
+  { domain: 'cloudflare-authority', match: /^public\/_worker\.js$/ },
   { domain: 'cloudflare-authority', match: /^\.github\/workflows\/(?:deploy|cloudflare-build-diagnostic|fcr-access-front-door-recovery)\.yml$/ },
   { domain: 'cloudflare-authority', match: /^config\/cloudflare-/ },
   { domain: 'cloudflare-authority', match: /^wrangler\./ },
@@ -74,7 +75,10 @@ if (domains.has('merge-authority') || domains.has('workflow-authority')) {
 if (domains.has('publishing')) requiredDocs.add('docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md');
 if (domains.has('truth-governance')) requiredDocs.add('docs/TRUTH_DECAY_AUDIT.md');
 if (domains.has('repository-provider')) requiredDocs.add('docs/PROVIDERS.md');
-if (domains.has('cloudflare-authority')) requiredDocs.add('docs/CLOUDFLARE_REASONING.md');
+if (domains.has('cloudflare-authority')) {
+  requiredDocs.add('docs/CLOUDFLARE_REASONING.md');
+  requiredDocs.add('docs/deployment/CLOUDFLARE_WORKER_TARGETS.md');
+}
 
 const failures = [];
 for (const required of requiredDocs) {
@@ -90,6 +94,7 @@ const chatgpt = read('CHATGPT.md');
 const launchLoop = read('.ai/skills/juss-flow-launch-loop/SKILL.md');
 const publicTruth = read('docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md');
 const truthDecay = read('docs/TRUTH_DECAY_AUDIT.md');
+const cloudflareTargets = read('docs/deployment/CLOUDFLARE_WORKER_TARGETS.md');
 const ci = read('.github/workflows/ci.yml');
 const documentationWorkflow = read('.github/workflows/documentation-truth.yml');
 
@@ -110,6 +115,8 @@ const consistencyChecks = [
   [publicTruth.includes('Temporal reuse and truth decay') && publicTruth.includes('Sauce boundary'), 'public communication contract must preserve temporal truth and sauce boundaries'],
   [truthDecay.includes('Documentation truth gate'), 'truth-decay audit must record the documentation drift control'],
   [truthDecay.includes('Analytics remains observation-only'), 'truth-decay audit must keep analytics observation-only'],
+  [cloudflareTargets.includes('FCR_API') && cloudflareTargets.includes('Service Binding'), 'Cloudflare target docs must describe the Pages FCR_API service-binding dependency'],
+  [cloudflareTargets.includes('not a claim that the current Cloudflare Pages project is configured correctly'), 'Cloudflare target docs must keep source dependency separate from live provider proof'],
   [ci.includes('documentation-truth:') && ci.includes('- documentation-truth'), 'CI Required Gate must depend on Documentation Truth'],
   [documentationWorkflow.includes('Documentation truth gate') && documentationWorkflow.includes('scripts/verify-documentation-truth.mjs'), 'standalone Documentation Truth workflow must execute the verifier'],
 ];
