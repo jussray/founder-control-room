@@ -85,7 +85,20 @@ source capability
 -> deployed browser/runtime proof
 ```
 
-Do not infer live provider configuration from a workflow file, secret name, token display label, or successful unrelated Cloudflare build.
+The current recovery evidence contract is deliberately fail-closed and public-safe:
+
+- `expected_head_sha` is independently reduced to an exact lowercase 40-character SHA or literal `UNKNOWN` on the always-path before public output;
+- Access-provider and browser receipt files are treated as untrusted JSON streams;
+- each validator slurps the stream, requires exactly one parsed document, and validates only `.[0]` against bounded schema/type/enum rules;
+- each public JSON projection independently slurps and projects only `.[0]`, preventing extra documents from being emitted even after validation;
+- raw producer stdout/stderr and raw Access/browser receipt JSON are not published or retained as public evidence;
+- raw browser origin/error text, matching Access application names/objects, free-form blocker/next-action prose, tokens, and raw provider payloads stay out of public issue comments, Actions summaries, and retained public artifacts;
+- one sanitized Markdown receipt is reused for the fixed founder control issue, Actions summary, and retained artifact; and
+- apply-mode approval references are validated but represented in the recovery authority summary only by a SHA-256 receipt, while read-only runs reject an approval reference.
+
+Those guarantees describe **repository evidence handling**, not the live Cloudflare provider state. A sanitized receipt may truthfully report `missing`, `malformed`, or `UNKNOWN`; that is preferable to leaking or inventing provider truth.
+
+Do not infer live provider configuration from a workflow file, secret name, token display label, sanitized receipt, or successful unrelated Cloudflare build.
 
 ## Required Worker secrets
 
@@ -115,7 +128,7 @@ Provider build/deploy comments, preview URLs, and successful uploads are useful 
 
 ## Documentation truth
 
-When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, or runtime proof requirements change, update this document in the same bounded repository change.
+When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, recovery evidence/publication boundaries, or runtime proof requirements change, update this document in the same bounded repository change.
 
 Current executable source and authoritative provider readback outrank an older version of this runbook. Preserve older deployment evidence as historical provenance rather than deleting it.
 
