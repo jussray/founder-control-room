@@ -249,8 +249,8 @@ export function preflightHubSpotReadOnlySnapshot(
     warnings.push('Local HubSpot CLI binding was not supplied; workstation account binding remains unverified.');
   }
 
-  const expectedById = new Map(
-    FOUNDER_HUBSPOT_PROJECTS.map((project) => [project.dealId, project] as const),
+  const expectedById = new Map<string, FounderHubSpotProjectRegistration>(
+    FOUNDER_HUBSPOT_PROJECTS.map((project) => [project.dealId, project]),
   );
   const observedIds = new Set<string>();
   const observedNames = new Set<string>();
