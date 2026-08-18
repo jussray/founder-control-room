@@ -19,6 +19,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: fcr-access-front-door-recovery-production
@@ -144,3 +145,80 @@ jobs:
             test-results/fcr-access-front-door-browser-proof.json
           if-no-files-found: ignore
           retention-days: 30
+
+      - name: Return sanitized recovery receipt to founder control issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RETURN_ISSUE: '485'
+          JOB_STATUS: ${{ job.status }}
+          WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          access_receipt='test-results/fcr-access-front-door-recovery.json'
+          browser_receipt='test-results/fcr-access-front-door-browser-proof.json'
+          body="$(mktemp)"
+
+          {
+            echo '## FCR Cloudflare Access receipt'
+            echo
+            echo "- Exact head: \`$EXPECTED_HEAD_SHA\`"
+            echo "- Workflow run: $WORKFLOW_RUN_URL"
+            echo "- Job status: \`$JOB_STATUS\`"
+
+            if [[ -f "$access_receipt" ]]; then
+              echo '- Access provider receipt: `present`'
+              echo
+              echo '```json'
+              jq '{
+                schemaVersion,
+                scope,
+                observedAt,
+                workflowRunId,
+                workflowRunAttempt,
+                expectedHeadSha,
+                state,
+                applyRequested,
+                mutationPerformed,
+                accountId,
+                zone,
+                credentialSource,
+                credentialFailures: [.credentialFailures[]? | {source, reason, status, providerCodes, nextAction}],
+                denyUnmatchedRequests,
+                alreadyExempt,
+                matchingApplicationCount,
+                action,
+                blocker,
+                classification,
+                nextAction
+              }' "$access_receipt"
+              echo '```'
+            else
+              echo '- Access provider receipt: `missing`'
+              echo '- Provider truth: `UNKNOWN` because the workflow ended before a structured Access receipt was produced.'
+            fi
+
+            if [[ -f "$browser_receipt" ]]; then
+              echo
+              echo '- Browser proof receipt: `present`'
+              echo
+              echo '```json'
+              jq '{
+                schemaVersion,
+                scope,
+                observedAt,
+                expectedHeadSha,
+                requestedOrigin,
+                finalOrigin,
+                navigationStatus,
+                apiVersionStatus,
+                apiVersionMatchesExpectedSha,
+                state,
+                error
+              }' "$browser_receipt"
+              echo '```'
+            fi
+          } > "$body"
+
+          gh issue comment "$RETURN_ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$body"
