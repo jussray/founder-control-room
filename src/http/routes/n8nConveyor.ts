@@ -12,7 +12,6 @@ import {
 import {
   N8N_FOUNDER_CONTENT_CONTRACT,
   N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
-  dispatchProviderNeutralN8nFounderContent,
 } from '../../lib/n8nProviderNeutralFounderContentOrchestrator.js';
 import { FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT } from '../../lib/firstPartyFounderContentExecutor.js';
 import { founderConveyorReadiness } from '../../lib/n8nConveyorReadiness.js';
@@ -60,6 +59,8 @@ n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
     founderContent: {
       contract: N8N_FOUNDER_CONTENT_CONTRACT,
       route: '/founder-content',
+      enabled: false,
+      blockedBy: 'L99_AUTHORITATIVE_APPROVAL_STORE_REQUIRED',
       inputAuthority: 'canonical-fcr-proposal-approval-firewall-input',
       providerSelection: 'founder-authenticated-bounded-platform-compatible',
       providerContractRoutes: N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
@@ -70,12 +71,14 @@ n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
       },
       authority: {
         orchestrate: true,
-        requestProviderWrite: true,
+        requestProviderWrite: false,
         authorizePublication: false,
         changeCopy: false,
         markPublished: false,
         readPrivateEvidence: false,
       },
+      authoritativeApprovalStoreReadbackRequired: true,
+      callerSuppliedApprovalIsAuthority: false,
       finalPublishedTruth: 'fcr-provider-readback-only',
       directPublish: {
         contract: FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
@@ -139,6 +142,21 @@ n8nConveyorRouter.post('/advance', async (req: FounderRequest, res) => {
   });
 });
 
+function authorityStoreRequired(req: FounderRequest, res: Parameters<Parameters<typeof n8nConveyorRouter.post>[1]>[1]) {
+  return res.status(409).json({
+    ok: false,
+    code: 'L99_AUTHORITY_REQUIRED',
+    published: false,
+    authorityRequired: 'L99_AUTHORITATIVE_APPROVAL_STORE',
+    reasons: [
+      'External n8n/provider mutation is disabled until execution rereads an exact founder ApprovalReceipt from authoritative storage.',
+      'A structurally valid approval object supplied by the browser, model, queue, or n8n workflow is evidence about authority, not authority itself.',
+    ],
+    founder: req.founder ? { userId: req.founder.userId } : null,
+    finalPublishedTruth: 'fcr-provider-readback-only',
+  });
+}
+
 n8nConveyorRouter.post('/founder-content/publish-now', async (req: FounderRequest, res) => {
   return res.status(409).json({
     ok: false,
@@ -157,15 +175,5 @@ n8nConveyorRouter.post('/founder-content/publish-now', async (req: FounderReques
 });
 
 n8nConveyorRouter.post('/founder-content', async (req: FounderRequest, res) => {
-  const input = (req.body ?? {}) as JsonRecord;
-  const result = await dispatchProviderNeutralN8nFounderContent(input, {
-    executedBy: req.founder!.email,
-  });
-
-  return res.status(result.status).json({
-    ...result,
-    contract: N8N_FOUNDER_CONTENT_CONTRACT,
-    founder: req.founder ? { userId: req.founder.userId } : null,
-    finalPublishedTruth: 'fcr-provider-readback-only',
-  });
+  return authorityStoreRequired(req, res);
 });
