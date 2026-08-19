@@ -32,6 +32,12 @@ Perplexity does not know private repository, Supabase, provider, or production s
 
 Current repository provider and evidence layer. Branches, commits, PRs, checks, merges, deployments, and runtime health are separate states. Preserve the `RepositoryProvider` boundary so GitHub can be replaced.
 
+Production GitHub authentication should prefer short-lived installation credentials from an FCR-owned GitHub App configured with `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY`; `GITHUB_TOKEN` remains a bounded local/development fallback. Install the App only on `jussray/founder-control-room` unless a broader repository scope is separately reviewed and proven.
+
+For an active ruleset protecting `jussray/founder-control-room` `main`, repository identity is constitutional and mutable project slugs are not. The ruleset must preserve the FCR approval/check/force-push/deletion floor, and its bypass list must contain exactly one App actor whose numeric ID equals trusted `GITHUB_APP_ID`. Caller-supplied, missing, mismatched, or additional bypass integration IDs fail closed. Provider readback must still prove the observed ruleset matches the requested policy; source validation alone is not live GitHub authority.
+
+The signed GitHub webhook surface uses `GITHUB_WEBHOOK_SECRET` to verify `X-Hub-Signature-256` before accepting provider events. Private keys and webhook secrets never belong in source, PR bodies, issue comments, logs, screenshots, browser bundles, or chat-visible documentation.
+
 ## Supabase
 
 Owns Control Room authentication and operational storage inside this project’s separate trust boundary. Service-role credentials stay server-side. Founder access requires session validation plus allowlist authorization.
