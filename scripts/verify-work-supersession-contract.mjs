@@ -23,8 +23,12 @@ for (const rule of [
   'runtimeSensitiveClosureRequiresCurrentHeadProof',
   'closedHistoricalEvidenceMustRemainRecoverable',
   'orphanedSupersessionReactivatesObligation',
+  'structuralReceiptValidationIsNotProviderProof',
+  'closureExecutorMustAcquireProviderEvidenceInternally',
+  'untrustedCallerReceiptCannotAuthorizeClosure',
 ]) assert.equal(lifecycle.rules[rule], true, `${rule} must fail closed`);
 assert.equal(lifecycle.authorityUnit, 'obligation');
+assert.equal(lifecycle.retirementExecutorStatus, 'not-implemented');
 
 const fullSha = /^[0-9a-f]{40}$/i;
 const residueKinds = new Set(lifecycle.requiredResidueKinds);
@@ -55,6 +59,16 @@ function replacementGraphHasCycle(edges) {
   return [...graph.keys()].some(visit);
 }
 
+/**
+ * Structural validation only.
+ *
+ * This function MUST NOT be used as closure authority. A caller can forge the
+ * strings inside inventoryEvidence/replacement. Any future retirement executor
+ * has to acquire provider compare/PR evidence inside its own trusted execution,
+ * bind that observed evidence to the receipt, then independently authorize the
+ * provider mutation. Until that executor exists, authorizesClosure is always
+ * false and RepositoryProvider exposes no deleteBranch capability.
+ */
 export function validateSupersessionReceipt(receipt) {
   const errors = [];
   for (const field of lifecycle.requiredReceiptFields) {
@@ -137,9 +151,16 @@ export function validateSupersessionReceipt(receipt) {
   }
   if (replacementGraphHasCycle(receipt.replacementEdges)) errors.push('replacement-cycle');
 
-  const closableBeforeBoolean = errors.length === 0;
-  if (receipt.safeToClose !== closableBeforeBoolean) errors.push('safeToClose-mismatch');
-  return { safeToClose: errors.length === 0, errors };
+  const structurallyClosable = errors.length === 0;
+  if (receipt.safeToClose !== structurallyClosable) errors.push('safeToClose-mismatch');
+
+  return {
+    structurallyValid: errors.length === 0,
+    structurallyClosable: errors.length === 0,
+    providerProvenanceVerified: false,
+    authorizesClosure: false,
+    errors,
+  };
 }
 
 const fileToken = 'file:src/security.ts';
@@ -176,12 +197,15 @@ const base = {
   safeToClose: true,
 };
 
-assert.equal(validateSupersessionReceipt(base).safeToClose, true);
-assert.equal(validateSupersessionReceipt({ ...base, unresolvedRequiredResidue: ['migration'], safeToClose: false }).safeToClose, false);
-assert.equal(validateSupersessionReceipt({ ...base, replacement: { ...base.replacement, state: 'stale' }, safeToClose: false }).safeToClose, false);
-assert.equal(validateSupersessionReceipt({ ...base, runtimeSensitive: true, currentProof: { headSha: 'e'.repeat(40), status: 'passed' }, safeToClose: false }).safeToClose, false);
-assert.equal(validateSupersessionReceipt({ ...base, replacementEdges: [{ source: 'pull/1', replacement: 'pull/2' }, { source: 'pull/2', replacement: 'pull/1' }], safeToClose: false }).safeToClose, false);
-assert.equal(validateSupersessionReceipt({ ...base, residue: base.residue.map((item) => item.kind === 'code' ? { ...item, covers: [fileToken] } : item), safeToClose: false }).safeToClose, false);
-assert.equal(validateSupersessionReceipt({ ...base, replacement: null, outcomeDisposition: 'founder-cancelled', safeToClose: true }).safeToClose, true);
+const validStructure = validateSupersessionReceipt(base);
+assert.equal(validStructure.structurallyClosable, true);
+assert.equal(validStructure.providerProvenanceVerified, false);
+assert.equal(validStructure.authorizesClosure, false);
+assert.equal(validateSupersessionReceipt({ ...base, unresolvedRequiredResidue: ['migration'], safeToClose: false }).structurallyClosable, false);
+assert.equal(validateSupersessionReceipt({ ...base, replacement: { ...base.replacement, state: 'stale' }, safeToClose: false }).structurallyClosable, false);
+assert.equal(validateSupersessionReceipt({ ...base, runtimeSensitive: true, currentProof: { headSha: 'e'.repeat(40), status: 'passed' }, safeToClose: false }).structurallyClosable, false);
+assert.equal(validateSupersessionReceipt({ ...base, replacementEdges: [{ source: 'pull/1', replacement: 'pull/2' }, { source: 'pull/2', replacement: 'pull/1' }], safeToClose: false }).structurallyClosable, false);
+assert.equal(validateSupersessionReceipt({ ...base, residue: base.residue.map((item) => item.kind === 'code' ? { ...item, covers: [fileToken] } : item), safeToClose: false }).structurallyClosable, false);
+assert.equal(validateSupersessionReceipt({ ...base, replacement: null, outcomeDisposition: 'founder-cancelled', safeToClose: true }).structurallyClosable, true);
 
-console.log('Work supersession contract verified: provider inventory is fully and singly accounted, obligations survive containers, replacement provenance is acyclic, current proof is required when runtime-sensitive, and history remains recoverable.');
+console.log('Work supersession contract verified: structural receipts are non-authorizing; provider evidence must be acquired inside a future trusted retirement executor, while inventory coverage, residue, replacement provenance, current proof, and history fail closed.');
