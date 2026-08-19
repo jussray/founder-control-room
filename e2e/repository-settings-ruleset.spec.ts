@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { test, expect } from '@playwright/test';
 
 const CANONICAL_RULESET = 'Founder Control Room main exact-head gate';
+const REQUIRED_CHECKS = 'Required Gate, Verify test-ledger contract, Independent Review Gate';
 const SETTINGS_PATH = '/control-room/repository-settings.html';
 
 let server: Server;
@@ -50,9 +51,7 @@ test.describe('Repository Settings ruleset safety', () => {
     await expect(page.locator('input[name="targetRefs"]')).toHaveValue('main');
     await expect(page.locator('input[name="requirePullRequest"]')).toBeChecked();
     await expect(page.locator('input[name="requiredApprovingReviewCount"]')).toHaveValue('1');
-    await expect(page.locator('input[name="requiredStatusCheckNames"]')).toHaveValue(
-      'Required Gate, Verify test-ledger contract',
-    );
+    await expect(page.locator('input[name="requiredStatusCheckNames"]')).toHaveValue(REQUIRED_CHECKS);
   });
 
   test('blocks an accidental second active FCR main ruleset before any provider request', async ({ page }) => {
@@ -73,6 +72,25 @@ test.describe('Repository Settings ruleset safety', () => {
     await expect(page.locator('#result')).toContainText(
       `Blocked: active Founder Control Room main protection must update the canonical ruleset "${CANONICAL_RULESET}"`,
     );
+    expect(mutationRequests).toBe(0);
+  });
+
+  test('blocks active FCR main protection when Independent Review Gate is omitted', async ({ page }) => {
+    let mutationRequests = 0;
+    page.on('request', (request) => {
+      if (
+        request.method() === 'POST' &&
+        request.url().includes('/projects/founder-control-room/ruleset')
+      ) {
+        mutationRequests += 1;
+      }
+    });
+
+    await page.goto(`${baseUrl}${SETTINGS_PATH}`);
+    await page.locator('input[name="requiredStatusCheckNames"]').fill('Required Gate, Verify test-ledger contract');
+    await page.locator('button[type="submit"]').click();
+
+    await expect(page.locator('#result')).toContainText('Blocked: active Founder Control Room main protection is missing required status checks: Independent Review Gate');
     expect(mutationRequests).toBe(0);
   });
 
