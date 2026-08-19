@@ -37,3 +37,6 @@ jobs:
 
       - name: Verify branch lifecycle contract
         run: node scripts/verify-branch-lifecycle-contract.mjs
+
+      - name: Verify branch deletion membrane
+        run: node scripts/verify-branch-deletion-membrane.mjs
