@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import {
   createFounderControlDecision,
   FOUNDER_CONTROL_SURFACES,
+  founderControlProposalBindingErrors,
   type FounderControlDecision,
   type FounderControlDecisionValue,
   type FounderControlProposalBinding,
@@ -91,6 +92,10 @@ export function createFounderPermissionRequest(input: {
     throw new Error('unsupported founder control surface');
   }
   const proposal = normalizedProposal(input.proposal);
+  const proposalErrors = founderControlProposalBindingErrors(proposal);
+  if (proposalErrors.length > 0) {
+    throw new Error(proposalErrors.join('; '));
+  }
   const note = text(input.note).slice(0, 1000) || null;
   const requestHash = founderPermissionRequestHash({
     requestId,
@@ -115,6 +120,10 @@ export function resolveFounderPermissionRequest(input: {
 }): FounderPermissionResolution {
   if (input.request.contract !== FOUNDER_PERMISSION_REQUEST_CONTRACT) {
     throw new Error('founder permission request contract is unsupported');
+  }
+  const proposalErrors = founderControlProposalBindingErrors(input.request.proposal);
+  if (proposalErrors.length > 0) {
+    throw new Error(proposalErrors.join('; '));
   }
   const expectedHash = founderPermissionRequestHash({
     requestId: input.request.requestId,
