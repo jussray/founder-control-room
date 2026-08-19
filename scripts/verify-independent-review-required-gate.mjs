@@ -50,7 +50,7 @@ export function latestReviewsByReviewer(reviews) {
 }
 
 export function qualifyingReviewCandidates({ reviews, trustedReviewerIds, authorIdentity, headSha }) {
-  if (!FULL_SHA.test(text(headSha))) throw new Error('Independent review gate requires an exact 40-character PR head SHA');
+  if (!FULL_SHA.test(text(headSha))) throw new Error('Independent review audit requires an exact 40-character PR head SHA');
   const trusted = new Set(trustedReviewerIds.map(lower));
   const author = lower(authorIdentity);
   const latest = latestReviewsByReviewer(reviews);
@@ -76,7 +76,7 @@ async function githubJson(url, token) {
       Accept: 'application/vnd.github+json',
       Authorization: `Bearer ${token}`,
       'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'fcr-independent-review-required-gate',
+      'User-Agent': 'fcr-independent-review-advisory-audit',
     },
   });
   if (!response.ok) {
@@ -96,7 +96,7 @@ async function listReviews(repository, pullRequestNumber, token) {
     if (!Array.isArray(batch)) throw new Error('GitHub review readback must be an array');
     reviews.push(...batch);
     if (batch.length < 100) break;
-    if (page === 10) throw new Error('Independent review gate refuses more than 1000 review submissions');
+    if (page === 10) throw new Error('Independent review audit refuses more than 1000 review submissions');
   }
   return reviews;
 }
@@ -116,14 +116,14 @@ export async function verifyIndependentReviewRequiredGate(env = process.env) {
   const expectedHeadSha = lower(env.EXPECTED_HEAD_SHA);
 
   if (eventName === 'push') {
-    console.log('Independent review gate: post-merge push run; PR review is not applicable.');
+    console.log('Independent review audit: post-merge push run; PR review is not applicable.');
     return { status: 'not-applicable', repository, headSha: expectedHeadSha };
   }
 
   if (eventName !== 'pull_request' && eventName !== 'pull_request_review') {
-    throw new Error(`Independent review gate does not support event ${eventName || 'UNKNOWN'}`);
+    throw new Error(`Independent review audit does not support event ${eventName || 'UNKNOWN'}`);
   }
-  if (repository !== FCR_REPOSITORY) throw new Error(`Independent review gate is scoped to ${FCR_REPOSITORY}`);
+  if (repository !== FCR_REPOSITORY) throw new Error(`Independent review audit is scoped to ${FCR_REPOSITORY}`);
   if (!FULL_SHA.test(expectedHeadSha)) throw new Error('EXPECTED_HEAD_SHA must be an exact 40-character SHA');
 
   const token = text(env.GITHUB_TOKEN);
@@ -165,7 +165,7 @@ export async function verifyIndependentReviewRequiredGate(env = process.env) {
 
   if (candidates.length === 0) {
     throw new Error(
-      `Independent review blocked for PR #${pullRequestNumber}: require a latest exact-head APPROVED review from a trusted non-author human with exactly one Review-Receipt: <sha256> line`,
+      `Independent review audit blocked for PR #${pullRequestNumber}: require a latest exact-head APPROVED review from a trusted non-author human with exactly one Review-Receipt: <sha256> line`,
     );
   }
 
@@ -175,19 +175,19 @@ export async function verifyIndependentReviewRequiredGate(env = process.env) {
   }
   if (authorized.length === 0) {
     throw new Error(
-      `Independent review blocked for PR #${pullRequestNumber}: no qualifying trusted reviewer has current write authority`,
+      `Independent review audit blocked for PR #${pullRequestNumber}: no qualifying trusted reviewer has current write authority`,
     );
   }
 
   console.log(JSON.stringify({
-    contract: 'fcr/github-required-independent-review@v1',
+    contract: 'fcr/github-independent-review-advisory@v1',
     repository,
     pullRequestNumber,
     headSha: expectedHeadSha,
     authorIdentity,
     qualifyingReviewerIds: authorized.map((candidate) => candidate.reviewerId).sort(),
     receiptHashes: authorized.map((candidate) => candidate.receiptHash).sort(),
-    reviewGateSatisfied: true,
+    advisoryReviewSatisfied: true,
   }, null, 2));
 
   return { status: 'passed', pullRequestNumber, headSha: expectedHeadSha, authorized };
