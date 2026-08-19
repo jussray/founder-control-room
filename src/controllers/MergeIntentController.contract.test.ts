@@ -21,6 +21,10 @@ const enqueueMigration = readFileSync(
   'supabase/migrations/20260819093400_enqueue_merge_intent_reconciliation.sql',
   'utf8',
 );
+const reapprovalLoop = readFileSync(
+  'supabase/migrations/20260819093500_merge_intent_reapproval_loop.sql',
+  'utf8',
+);
 const controller = readFileSync('src/controllers/MergeIntentController.ts', 'utf8');
 const scheduler = readFileSync('src/worker/scheduler.ts', 'utf8');
 const reconciler = readFileSync('src/worker/reconciler.ts', 'utf8');
@@ -128,6 +132,16 @@ describe('merge intent liveness contract', () => {
     expect(enqueueMigration).toMatch(/new\.revision is distinct from old\.revision/);
     expect(enqueueMigration).not.toMatch(/after update of revision on merge_intents/);
     expect(enqueueMigration).toMatch(/from merge_intents\nwhere state = 'waiting'/);
+  });
+
+  it('returns durable revocations to in_review so explicit founder reapproval can create a new revision', () => {
+    expect(reapprovalLoop).toMatch(/after update of state on merge_intents/);
+    expect(reapprovalLoop).toMatch(/new\.state in \('needs_review', 'stale', 'expired', 'blocked'\)/);
+    expect(reapprovalLoop).toMatch(/set status = 'in_review'/);
+    expect(reapprovalLoop).toMatch(/and status = 'approved'/);
+    expect(reapprovalLoop).toMatch(/new\.status = 'in_review'/);
+    expect(reapprovalLoop).toMatch(/v_intent_state in \('needs_review', 'stale', 'expired', 'blocked'\)/);
+    expect(reapprovalLoop).toMatch(/preserves the sticky revocation state/);
   });
 
   it('keeps the two-minute approved-mission sweep as a fallback on the same reconciler chassis', () => {
