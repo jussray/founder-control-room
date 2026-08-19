@@ -15,6 +15,8 @@ This contract applies before publishing, scheduling, sending, announcing, promot
 → Temporal reuse check
 → Draft
 → Review or approved automation
+→ Issue exact-copy approval when the active route requires it
+→ Atomically claim that stored approval at execution
 → Publish or hold
 → Capture the published artifact
 → Record outcome evidence
@@ -101,7 +103,25 @@ This is an internal control framework inspired by sound accounting practice. It 
 
 An approved automated publishing class defines the maximum class of communication that automation may handle. It does **not** weaken a more specific executable authority contract.
 
-Current first-party founder-content execution uses exact Current You authority: the exact public payload, proposal identity, channel, source version, and Current You approval must remain bound at execution. A standing class authorization must never be interpreted as permission to bypass that exact-proposal approval membrane when the active route requires it.
+Current first-party founder-content execution uses exact Current You authority and an FCR-owned approval store. Caller-supplied approval JSON is not publication authority. For the authoritative first-party route, an authenticated founder first confirms the exact copy; FCR then issues and persists a one-shot approval bound to the exact proposal hash, public-payload hash, authorization hash, channel, source repository/SHA, founder identity, approval time, and expiry. Execution must atomically claim the matching unrevoked, unconsumed, unexpired stored approval before temporal revalidation and provider mutation.
+
+The active route therefore separates approval issuance from publication:
+
+```text
+exact public-safe proposal
+→ authenticated founder + confirm_exact_copy
+→ FCR issues and stores exact one-shot approval
+→ publish request references the exact authorization_hash
+→ FCR atomically claims the matching stored approval
+→ temporal claim revalidation
+→ provider mutation
+→ provider readback
+→ durable publication receipt
+```
+
+Changing approved copy, evidence identity, proposal identity, source version, channel, or governing authorization fingerprint requires a fresh matching approval. A consumed approval is not replay authority after a downstream failure. Approval existence, approval issuance, or successful approval claim is not publication truth; provider readback remains terminal evidence of the external artifact.
+
+A standing class authorization must never be interpreted as permission to bypass that exact-proposal approval membrane when the active route requires it.
 
 This class boundary does not authorize:
 
@@ -112,7 +132,7 @@ This class boundary does not authorize:
 - crisis communications, admissions of liability, political statements, or other high-consequence communications not explicitly approved as a separate class;
 - bypassing a hold condition because a scheduler or model is technically able to publish.
 
-Fresh approval is required whenever the active executable route requires exact Current You approval, whenever the proposal or approved copy changes, or whenever the post falls outside the approved class or crosses a high-consequence boundary.
+Fresh approval is required whenever the active executable route requires exact Current You approval, whenever the proposal or approved copy changes, whenever the stored approval no longer exactly matches execution identity, or whenever the post falls outside the approved class or crosses a high-consequence boundary.
 
 ## Posting requirements
 
@@ -126,6 +146,7 @@ Every material post must have:
 - no invented metrics, testimonials, partnerships, users, revenue, deployment, or approval;
 - no implication of founder approval when only an agent drafted the content;
 - a reviewable draft or an approved automated publishing class plus every stricter route-specific authority requirement;
+- an exact stored approval claim when the active first-party route requires one;
 - a captured URL, observable platform artifact, message ID, or equivalent evidence after publication;
 - a correction path when the post becomes inaccurate.
 
@@ -160,6 +181,7 @@ Hold the post when:
 - a current-state claim is being sent through a deferred queue that cannot revalidate it at publication time;
 - configuration/readiness evidence is being used as proof that n8n, Buffer, or another provider actually executed or published;
 - the post falls outside the approved automated publishing class or a stricter exact Current You gate is unsatisfied;
+- the active first-party route cannot read and atomically claim an exact matching FCR-owned approval;
 - the post depends on a workflow that failed before executing steps;
 - private, sensitive, proprietary, or security-relevant information could be exposed;
 - urgency is being used to bypass truth or review;
@@ -167,6 +189,6 @@ Hold the post when:
 
 ## Completion standard
 
-A posting workflow is not complete when a draft exists, a scheduler accepted it, or an automation was triggered.
+A posting workflow is not complete when a draft exists, an approval is issued, a stored approval is claimed, a scheduler accepted it, or an automation was triggered.
 
 It is complete only when the intended publication artifact is observable, its claims remain accurate for their declared temporal class, the platform result is reconciled, and the evidence is recorded.

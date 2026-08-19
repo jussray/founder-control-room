@@ -1,0 +1,288 @@
+import { randomUUID } from 'node:crypto';
+import type { SupabaseClient } from '@supabase/supabase-js';
+// @ts-expect-error -- canonical founder-content authority intentionally remains the CommonJS firewall contract.
+import founderContentAuthorizationContract from '../../tools/zapier/founder-content-authorization-contract.cjs';
+
+type JsonRecord = Record<string, unknown>;
+
+interface CanonicalFounderContentContract {
+  authorizeFounderContentPublication(input: {
+    proposal: JsonRecord;
+    approval: JsonRecord;
+    now: string;
+  }): JsonRecord;
+  canonicalChiefIdentity(proposal: JsonRecord): JsonRecord;
+  hashPublicPayload(value: unknown): string;
+}
+
+const canonicalFounderContent = founderContentAuthorizationContract as CanonicalFounderContentContract;
+
+export const FOUNDER_CONTENT_APPROVAL_STORE_CONTRACT = 'fcr/founder-content-approval-store@v1' as const;
+const MAX_APPROVAL_TTL_MS = 30 * 60 * 1000;
+
+export interface FounderContentIssuedApproval {
+  contract: typeof FOUNDER_CONTENT_APPROVAL_STORE_CONTRACT;
+  approvalId: string;
+  proposalHash: string;
+  publicPayloadHash: string;
+  authorizationHash: string;
+  platform: string;
+  sourceRepo: string;
+  sourceCommitSha: string;
+  approvedAt: string;
+  expiresAt: string;
+  approval: JsonRecord;
+}
+
+export interface FounderContentApprovalClaim {
+  ok: true;
+  approval: JsonRecord;
+  approvalId: string;
+  authorizationHash: string;
+  publicPayloadHash: string;
+}
+
+export interface FounderContentApprovalClaimFailure {
+  ok: false;
+  code: 'APPROVAL_NOT_FOUND' | 'APPROVAL_NOT_CURRENT' | 'APPROVAL_STORE_FAILED';
+  reason: string;
+}
+
+export interface FounderContentApprovalRepository {
+  issue(input: FounderContentIssuedApproval & { founderUserId: string }): Promise<boolean>;
+  claim(input: {
+    founderUserId: string;
+    approvalId: string;
+    proposalHash: string;
+    publicPayloadHash: string;
+    authorizationHash: string;
+    consumedBy: string;
+    now: string;
+  }): Promise<FounderContentApprovalClaim | FounderContentApprovalClaimFailure>;
+}
+
+function text(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function record(value: unknown): JsonRecord {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonRecord : {};
+}
+
+function parseTime(value: unknown, label: string): number {
+  const raw = text(value);
+  const ms = Date.parse(raw);
+  if (!raw || Number.isNaN(ms)) throw new Error(`${label} must be a valid timestamp`);
+  return ms;
+}
+
+function canonicalIssue({
+  proposal,
+  founderUserId,
+  now,
+}: {
+  proposal: JsonRecord;
+  founderUserId: string;
+  now: string;
+}): FounderContentIssuedApproval {
+  if (!text(founderUserId)) throw new Error('authenticated founder user id is required');
+  const nowMs = parseTime(now, 'now');
+  const identity = canonicalFounderContent.canonicalChiefIdentity(proposal);
+  const source = record(identity.source);
+  const payload = record(identity.public_payload);
+  const currentYou = record(identity.current_you);
+  const freshness = record(identity.freshness);
+  const proposalExpiresMs = parseTime(freshness.expires_at, 'proposal expiry');
+  const expiresMs = Math.min(nowMs + MAX_APPROVAL_TTL_MS, proposalExpiresMs);
+  if (expiresMs <= nowMs) throw new Error('proposal is already expired');
+
+  const approvalId = `fca:${randomUUID()}`;
+  const proposalHash = text(proposal.proposal_hash).toLowerCase();
+  const publicPayloadHash = canonicalFounderContent.hashPublicPayload(payload).toLowerCase();
+  const platform = text(payload.platform).toLowerCase();
+  const approvedAt = new Date(nowMs).toISOString();
+  const expiresAt = new Date(expiresMs).toISOString();
+  const approval: JsonRecord = {
+    approval_id: approvalId,
+    proposal_hash: proposalHash,
+    public_payload_hash: publicPayloadHash,
+    current_you: {
+      authenticated: true,
+      source: 'current_authenticated_founder',
+      intent_id: text(currentYou.intent_id),
+      intent_version: currentYou.intent_version,
+      observed_at: approvedAt,
+      supersedes_stale_content_intent: true,
+    },
+    channels: [platform],
+    revoked: false,
+    used: false,
+    approved_at: approvedAt,
+    expires_at: expiresAt,
+  };
+
+  const authorization = canonicalFounderContent.authorizeFounderContentPublication({
+    proposal,
+    approval,
+    now: approvedAt,
+  });
+  const authorizationHash = text(authorization.authorization_hash).toLowerCase();
+
+  return Object.freeze({
+    contract: FOUNDER_CONTENT_APPROVAL_STORE_CONTRACT,
+    approvalId,
+    proposalHash,
+    publicPayloadHash,
+    authorizationHash,
+    platform,
+    sourceRepo: text(source.repo),
+    sourceCommitSha: text(source.commit_sha).toLowerCase(),
+    approvedAt,
+    expiresAt,
+    approval: Object.freeze(approval),
+  });
+}
+
+export function buildFounderContentIssuedApproval(input: {
+  proposal: JsonRecord;
+  founderUserId: string;
+  now: string;
+}): FounderContentIssuedApproval {
+  return canonicalIssue(input);
+}
+
+function supabaseRepository(client: SupabaseClient): FounderContentApprovalRepository {
+  return {
+    async issue(input) {
+      const { error } = await client
+        .from('founder_content_approvals')
+        .insert({
+          approval_id: input.approvalId,
+          founder_user_id: input.founderUserId,
+          proposal_hash: input.proposalHash,
+          public_payload_hash: input.publicPayloadHash,
+          authorization_hash: input.authorizationHash,
+          platform: input.platform,
+          source_repo: input.sourceRepo,
+          source_commit_sha: input.sourceCommitSha,
+          approval: input.approval,
+          approved_at: input.approvedAt,
+          expires_at: input.expiresAt,
+          revoked_at: null,
+          consumed_at: null,
+          consumed_by: null,
+        });
+      return !error;
+    },
+
+    async claim(input) {
+      const { data, error } = await client
+        .from('founder_content_approvals')
+        .update({
+          consumed_at: input.now,
+          consumed_by: input.consumedBy,
+        })
+        .eq('approval_id', input.approvalId)
+        .eq('founder_user_id', input.founderUserId)
+        .eq('proposal_hash', input.proposalHash)
+        .eq('public_payload_hash', input.publicPayloadHash)
+        .eq('authorization_hash', input.authorizationHash)
+        .is('revoked_at', null)
+        .is('consumed_at', null)
+        .gt('expires_at', input.now)
+        .select('approval, approval_id, authorization_hash, public_payload_hash')
+        .maybeSingle();
+
+      if (error) {
+        return { ok: false, code: 'APPROVAL_STORE_FAILED', reason: error.message } as const;
+      }
+      if (!data) {
+        const { data: existing, error: lookupError } = await client
+          .from('founder_content_approvals')
+          .select('approval_id')
+          .eq('approval_id', input.approvalId)
+          .eq('founder_user_id', input.founderUserId)
+          .maybeSingle();
+        if (lookupError) {
+          return { ok: false, code: 'APPROVAL_STORE_FAILED', reason: lookupError.message } as const;
+        }
+        return existing
+          ? { ok: false, code: 'APPROVAL_NOT_CURRENT', reason: 'authoritative approval is expired, revoked, consumed, or no longer matches the exact proposal/copy' } as const
+          : { ok: false, code: 'APPROVAL_NOT_FOUND', reason: 'authoritative approval was not issued to this founder' } as const;
+      }
+
+      return {
+        ok: true,
+        approval: record(data.approval),
+        approvalId: text(data.approval_id),
+        authorizationHash: text(data.authorization_hash).toLowerCase(),
+        publicPayloadHash: text(data.public_payload_hash).toLowerCase(),
+      } as const;
+    },
+  };
+}
+
+async function defaultRepository(): Promise<FounderContentApprovalRepository> {
+  const { supabase } = await import('./supabaseClient.js');
+  return supabaseRepository(supabase);
+}
+
+export async function issueFounderContentApproval({
+  proposal,
+  founderUserId,
+  now = new Date().toISOString(),
+  repository,
+}: {
+  proposal: JsonRecord;
+  founderUserId: string;
+  now?: string;
+  repository?: FounderContentApprovalRepository;
+}): Promise<FounderContentIssuedApproval> {
+  const issued = buildFounderContentIssuedApproval({ proposal, founderUserId, now });
+  const store = repository ?? await defaultRepository();
+  const persisted = await store.issue({ ...issued, founderUserId });
+  if (!persisted) throw new Error('authoritative founder-content approval could not be persisted');
+  return issued;
+}
+
+export async function claimFounderContentApproval({
+  proposal,
+  founderUserId,
+  approvalId,
+  authorizationHash,
+  expectedPublicPayloadHash,
+  consumedBy,
+  now = new Date().toISOString(),
+  repository,
+}: {
+  proposal: JsonRecord;
+  founderUserId: string;
+  approvalId: string;
+  authorizationHash: string;
+  expectedPublicPayloadHash?: string;
+  consumedBy: string;
+  now?: string;
+  repository?: FounderContentApprovalRepository;
+}): Promise<FounderContentApprovalClaim | FounderContentApprovalClaimFailure> {
+  const identity = canonicalFounderContent.canonicalChiefIdentity(proposal);
+  const publicPayloadHash = canonicalFounderContent.hashPublicPayload(record(identity.public_payload)).toLowerCase();
+  const expected = text(expectedPublicPayloadHash).toLowerCase();
+  if (expected && expected !== publicPayloadHash) {
+    return {
+      ok: false,
+      code: 'APPROVAL_NOT_CURRENT',
+      reason: 'public payload confirmation does not match the exact proposal copy',
+    };
+  }
+
+  const store = repository ?? await defaultRepository();
+  return store.claim({
+    founderUserId: text(founderUserId),
+    approvalId: text(approvalId).toLowerCase(),
+    proposalHash: text(proposal.proposal_hash).toLowerCase(),
+    publicPayloadHash,
+    authorizationHash: text(authorizationHash).toLowerCase(),
+    consumedBy: text(consumedBy),
+    now,
+  });
+}
