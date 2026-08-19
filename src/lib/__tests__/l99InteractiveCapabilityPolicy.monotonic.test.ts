@@ -61,6 +61,87 @@ describe('interactive authority monotonicity', () => {
     ).toBe(false);
   });
 
+  it('rejects dropping a founder-receipt constraint on the same capability', () => {
+    expect(
+      interactiveEnvelopeIsSubset(
+        {
+          ...parent,
+          requiresFounderReceipt: false,
+        },
+        parent,
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects dropping a Playwright-proof constraint on the same capability', () => {
+    expect(
+      interactiveEnvelopeIsSubset(
+        {
+          ...parent,
+          requiresPlaywrightProof: false,
+        },
+        parent,
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects clearing or extending a bounded expiry', () => {
+    expect(
+      interactiveEnvelopeIsSubset(
+        {
+          ...parent,
+          expiresAt: null,
+        },
+        parent,
+      ),
+    ).toBe(false);
+
+    expect(
+      interactiveEnvelopeIsSubset(
+        {
+          ...parent,
+          expiresAt: '2026-08-21T00:00:00Z',
+        },
+        parent,
+      ),
+    ).toBe(false);
+  });
+
+  it('allows an earlier expiry', () => {
+    expect(
+      interactiveEnvelopeIsSubset(
+        {
+          ...parent,
+          expiresAt: '2026-08-19T12:00:00Z',
+        },
+        parent,
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects cross-family capability laundering even at a lower numeric level', () => {
+    const terminalParent: L99InteractiveAuthorityEnvelope = {
+      ...parent,
+      capability: 'terminal.exec',
+      targetPatterns: ['shared-target'],
+      allowedOperations: ['read'],
+      externalMutation: false,
+      requiresFounderReceipt: false,
+      requiresPlaywrightProof: false,
+      expiresAt: null,
+    };
+
+    expect(
+      interactiveEnvelopeIsSubset(
+        {
+          ...terminalParent,
+          capability: 'browser.read',
+        },
+        terminalParent,
+      ),
+    ).toBe(false);
+  });
+
   it('rejects a changed bound input fingerprint', () => {
     const fingerprintParent: L99InteractiveAuthorityEnvelope = {
       ...parent,
@@ -68,6 +149,8 @@ describe('interactive authority monotonicity', () => {
       targetPatterns: ['sandbox://job-1'],
       allowedOperations: ['pytest'],
       externalMutation: false,
+      requiresFounderReceipt: false,
+      requiresPlaywrightProof: false,
       fingerprints: {
         inputFingerprint: 'input:abc',
         environmentFingerprint: 'env:def',
@@ -102,6 +185,8 @@ describe('interactive authority monotonicity', () => {
       targetPatterns: ['sandbox://job-1'],
       allowedOperations: ['snapshot'],
       externalMutation: false,
+      requiresFounderReceipt: false,
+      requiresPlaywrightProof: false,
       fingerprints: {
         inputFingerprint: 'input:abc',
         environmentFingerprint: 'env:def',
@@ -136,6 +221,8 @@ describe('interactive authority monotonicity', () => {
       targetPatterns: ['sandbox://job-1'],
       allowedOperations: ['pytest'],
       externalMutation: false,
+      requiresFounderReceipt: false,
+      requiresPlaywrightProof: false,
       fingerprints: {
         inputFingerprint: 'input:abc',
         environmentFingerprint: 'env:def',
@@ -157,6 +244,36 @@ describe('interactive authority monotonicity', () => {
             ...sandboxParent.sandboxIsolation!,
             networkAccess: true,
           },
+          requiresFounderReceipt: true,
+        },
+        sandboxParent,
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects stripping a sandbox isolation envelope', () => {
+    const sandboxParent: L99InteractiveAuthorityEnvelope = {
+      ...parent,
+      capability: 'sandbox.read',
+      targetPatterns: ['sandbox://job-1'],
+      allowedOperations: ['read'],
+      externalMutation: false,
+      requiresFounderReceipt: false,
+      requiresPlaywrightProof: false,
+      sandboxIsolation: {
+        networkAccess: false,
+        secretsAccess: false,
+        productionAccess: false,
+        persistentStorage: false,
+      },
+      expiresAt: null,
+    };
+
+    expect(
+      interactiveEnvelopeIsSubset(
+        {
+          ...sandboxParent,
+          sandboxIsolation: null,
         },
         sandboxParent,
       ),
