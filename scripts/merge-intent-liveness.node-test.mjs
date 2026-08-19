@@ -43,7 +43,7 @@ test('merge intent is explicitly a projection, never approval or provider mutati
 });
 
 test('reconciliation distinguishes base drift, candidate drift, expiry, and provider identity drift', () => {
-  assert.match(controller, /state: 'expired'/);
+  assert.match(controller, /setState\(intent, 'expired', 'founder merge proof expired before execution'\)/);
   assert.match(controller, /'needs_review', 'candidate head changed after approval'/);
   assert.match(controller, /'stale', 'target base moved after approval'/);
   assert.match(controller, /'blocked', 'provider PR identity changed after approval'/);
