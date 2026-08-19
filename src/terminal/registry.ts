@@ -14,7 +14,7 @@ function spec(
   args: readonly string[],
   risk: TerminalCommandSpec['risk'],
   options: Pick<TerminalCommandSpec, 'evidenceKind'> &
-    Partial<Pick<TerminalCommandSpec, 'timeoutMs' | 'maxOutputBytes' | 'allowedEnvNames'>> = {},
+    Partial<Pick<TerminalCommandSpec, 'timeoutMs' | 'maxOutputBytes' | 'allowedEnvNames' | 'costClass'>> = {},
 ): TerminalCommandSpec {
   return {
     projectSlug,
@@ -24,6 +24,7 @@ function spec(
     executable,
     args,
     risk,
+    costClass: options.costClass ?? 'included',
     timeoutMs: options.timeoutMs ?? VERIFY_TIMEOUT,
     maxOutputBytes: options.maxOutputBytes ?? OUTPUT_CAP,
     evidenceKind: options.evidenceKind,
