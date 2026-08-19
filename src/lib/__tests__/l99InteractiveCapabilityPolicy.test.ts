@@ -16,6 +16,12 @@ function envelope(
     externalMutation: false,
     requiresFounderReceipt: false,
     requiresPlaywrightProof: false,
+    fingerprints: {
+      inputFingerprint: null,
+      environmentFingerprint: null,
+      outputFingerprint: null,
+    },
+    sandboxIsolation: null,
     expiresAt: null,
     ...overrides,
   };
@@ -95,5 +101,99 @@ describe('L99 interactive capability policy', () => {
     });
 
     expect(interactiveEnvelopeIsSubset(child, parent)).toBe(true);
+  });
+
+  it('requires an explicit sandbox isolation envelope', () => {
+    expect(
+      validateInteractiveEnvelope(
+        envelope({
+          capability: 'sandbox.create',
+          targetPatterns: ['sandbox://job-1'],
+          allowedOperations: ['create'],
+          sandboxIsolation: null,
+        }),
+      ),
+    ).toContain('sandbox capability requires an explicit isolation envelope');
+  });
+
+  it('requires exact input and environment fingerprints for sandbox execution', () => {
+    expect(
+      validateInteractiveEnvelope(
+        envelope({
+          capability: 'sandbox.exec',
+          targetPatterns: ['sandbox://job-1'],
+          allowedOperations: ['pytest'],
+          sandboxIsolation: {
+            networkAccess: false,
+            secretsAccess: false,
+            productionAccess: false,
+            persistentStorage: false,
+          },
+        }),
+      ),
+    ).toContain('sandbox.exec requires exact input and environment fingerprints');
+  });
+
+  it('requires founder authority for sandbox network, secrets, or production access', () => {
+    expect(
+      validateInteractiveEnvelope(
+        envelope({
+          capability: 'sandbox.exec',
+          targetPatterns: ['sandbox://job-1'],
+          allowedOperations: ['pytest'],
+          fingerprints: {
+            inputFingerprint: 'input:abc',
+            environmentFingerprint: 'env:def',
+            outputFingerprint: null,
+          },
+          sandboxIsolation: {
+            networkAccess: true,
+            secretsAccess: false,
+            productionAccess: false,
+            persistentStorage: false,
+          },
+          requiresFounderReceipt: false,
+        }),
+      ),
+    ).toContain('sandbox ambient authority requires a founder receipt');
+  });
+
+  it('requires founder receipt and exact output fingerprint before sandbox export', () => {
+    expect(
+      validateInteractiveEnvelope(
+        envelope({
+          capability: 'sandbox.export',
+          targetPatterns: ['sandbox://job-1'],
+          allowedOperations: ['export'],
+          externalMutation: true,
+          requiresFounderReceipt: true,
+          sandboxIsolation: {
+            networkAccess: false,
+            secretsAccess: false,
+            productionAccess: false,
+            persistentStorage: false,
+          },
+        }),
+      ),
+    ).toContain('sandbox.export requires founder receipt and exact output fingerprint');
+  });
+
+  it('requires founder receipt before destroying a sandbox', () => {
+    expect(
+      validateInteractiveEnvelope(
+        envelope({
+          capability: 'sandbox.destroy',
+          targetPatterns: ['sandbox://job-1'],
+          allowedOperations: ['destroy'],
+          sandboxIsolation: {
+            networkAccess: false,
+            secretsAccess: false,
+            productionAccess: false,
+            persistentStorage: false,
+          },
+          requiresFounderReceipt: false,
+        }),
+      ),
+    ).toContain('sandbox.destroy requires a founder receipt');
   });
 });
