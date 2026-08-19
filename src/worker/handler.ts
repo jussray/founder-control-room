@@ -2,6 +2,10 @@ import type { ExportedHandler } from '@cloudflare/workers-types';
 import { V10_CAPABILITY_PLAN_CONTRACT } from '../founder-os-lab/capabilityKernel.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../lib/founderConveyorReceipt.js';
 import {
+  isChiefAiServiceBinding,
+  type ChiefAiServiceBinding,
+} from './chiefAiBinding.js';
+import {
   FCR_EMAIL_FROM,
   isProjectEmailBinding,
   type ProjectEmailBinding,
@@ -20,6 +24,7 @@ export interface ControlRoomWorkerEnv {
   GITHUB_TOKEN?: string;
   FOUNDER_ALLOWED_ORIGINS: string;
   FOUNDER_API_URL: string;
+  CHIEF_AI: ChiefAiServiceBinding;
   FCR_EMAIL: ProjectEmailBinding;
   FCR_EMAIL_FROM: string;
   FCR_V10_CAPABILITY_PLAN_CONTRACT: string;
@@ -65,6 +70,10 @@ export function validateWorkerEnv(
 
   if (missing.length) {
     throw new Error(`Missing required Worker bindings: ${missing.join(', ')}`);
+  }
+
+  if (!isChiefAiServiceBinding(env.CHIEF_AI)) {
+    throw new Error('Missing required Worker binding: CHIEF_AI');
   }
 
   if (!isProjectEmailBinding(env.FCR_EMAIL)) {
