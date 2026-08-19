@@ -95,7 +95,33 @@ describe('n8n founder-content route', () => {
         markPublished: false,
         readPrivateEvidence: false,
       },
+      directPublish: expect.objectContaining({
+        enabled: false,
+        blockedBy: 'L99_AUTHORITATIVE_APPROVAL_STORE_REQUIRED',
+        authoritativeApprovalStoreReadbackRequired: true,
+        callerSuppliedApprovalIsAuthority: false,
+      }),
     }));
+  });
+
+  it('fail-closes direct external publication until an authoritative ApprovalStore readback exists', async () => {
+    const res = await request(buildApp())
+      .post('/automation/conveyor/founder-content/publish-now')
+      .set('Authorization', BEARER)
+      .send({
+        proposal: { kind: 'chief-ai/founder-content-proposal' },
+        approval: { approval_id: 'caller-supplied' },
+        confirmation: { confirm_publication: true },
+        current_you: { authenticated: true },
+      });
+
+    expect(res.status).toBe(409);
+    expect(res.body.ok).toBe(false);
+    expect(res.body.code).toBe('L99_AUTHORITY_REQUIRED');
+    expect(res.body.published).toBe(false);
+    expect(res.body.authorityRequired).toBe('L99_AUTHORITATIVE_APPROVAL_STORE');
+    expect(res.body.reasons.join(' ')).toContain('authoritative storage');
+    expect(res.body.founder).toEqual({ userId: 'founder-user-1' });
   });
 
   it('binds execution identity to the authenticated founder and never trusts body identity', async () => {
