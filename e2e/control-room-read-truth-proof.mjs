@@ -7,6 +7,7 @@ import { chromium } from 'playwright';
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PUBLIC_ROOT = join(REPO_ROOT, 'public');
 const RESULTS_ROOT = join(REPO_ROOT, 'test-results');
+const serverRequests = [];
 
 const mime = {
   '.html': 'text/html; charset=utf-8',
@@ -21,6 +22,7 @@ const server = createServer((req, res) => {
     ? 'control-room/index.html'
     : url.pathname.replace(/^\/+/, '');
   const filePath = normalize(join(PUBLIC_ROOT, relative));
+  serverRequests.push(`${req.method ?? 'GET'} ${url.pathname}`);
 
   if (!filePath.startsWith(PUBLIC_ROOT)) {
     res.writeHead(403).end('forbidden');
@@ -46,7 +48,11 @@ const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] }
 const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
 const page = await context.newPage();
 const pageErrors = [];
+const requestFailures = [];
 page.on('pageerror', (error) => pageErrors.push(error.message));
+page.on('requestfailed', (request) => {
+  requestFailures.push(`${request.method()} ${new URL(request.url()).pathname}: ${request.failure()?.errorText ?? 'unknown failure'}`);
+});
 
 await page.route(`${BASE_URL}/**`, async (route) => {
   const request = route.request();
@@ -93,6 +99,21 @@ await page.route(`${BASE_URL}/**`, async (route) => {
   });
 });
 
+async function waitForFounderProjects(label) {
+  try {
+    await page.locator('.founder-email').waitFor({ state: 'visible', timeout: 10_000 });
+    await page.locator('#project-list').waitFor({ state: 'visible', timeout: 10_000 });
+  } catch (error) {
+    const diagnostic = await page.evaluate(() => ({
+      readyState: document.readyState,
+      href: location.href,
+      bodyText: document.body?.innerText?.slice(0, 800) ?? null,
+      scripts: Array.from(document.scripts).map((script) => script.src),
+    })).catch(() => null);
+    throw new Error(`${label} did not reach founder Projects readiness: ${error instanceof Error ? error.message : String(error)} diagnostic=${JSON.stringify(diagnostic)} serverRequests=${JSON.stringify(serverRequests)} requestFailures=${JSON.stringify(requestFailures)} pageErrors=${JSON.stringify(pageErrors)}`);
+  }
+}
+
 try {
   mkdirSync(RESULTS_ROOT, { recursive: true });
 
@@ -103,10 +124,10 @@ try {
     email: 'founder@example.com',
   });
   await page.goto(`${BASE_URL}/control-room/#${founderFragment.toString()}`, {
-    waitUntil: 'domcontentloaded',
+    waitUntil: 'commit',
+    timeout: 10_000,
   });
-  await page.locator('.founder-email').waitFor();
-  await page.locator('#project-list').waitFor();
+  await waitForFounderProjects('failed-read boot');
 
   await page.screenshot({
     path: join(RESULTS_ROOT, 'control-room-projects-failed-read-mobile.png'),
@@ -131,7 +152,7 @@ try {
 
   const failedSnapshot = shellState.readTruth;
   const unknown = page.locator('[data-read-truth="projects-unknown"]');
-  await unknown.waitFor();
+  await unknown.waitFor({ state: 'visible', timeout: 10_000 });
   const unknownText = await unknown.innerText();
 
   if (!unknownText.includes('UNKNOWN')) {
@@ -149,9 +170,10 @@ try {
   });
 
   projectReadMode = 'ready-empty';
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.locator('.founder-email').waitFor();
-  await page.locator('#project-list').waitFor();
+  serverRequests.length = 0;
+  requestFailures.length = 0;
+  await page.reload({ waitUntil: 'commit', timeout: 10_000 });
+  await waitForFounderProjects('verified-empty reload');
   const readyText = await page.locator('#project-list').innerText();
   if (!readyText.includes('No projects registered yet.')) {
     throw new Error(`Verified successful empty read did not render the empty state: ${readyText}`);
@@ -170,6 +192,9 @@ try {
 
   if (pageErrors.length > 0) {
     throw new Error(`Unexpected browser page errors: ${pageErrors.join(' | ')}`);
+  }
+  if (requestFailures.length > 0) {
+    throw new Error(`Unexpected browser request failures: ${requestFailures.join(' | ')}`);
   }
 
   console.log('PASS: failed project reads render UNKNOWN; successful empty reads render verified empty state.');
