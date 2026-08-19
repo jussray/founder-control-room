@@ -8,8 +8,10 @@ export const capabilitiesRouter = Router();
 
 capabilitiesRouter.use(requireFounder);
 
+const PROJECT_HEALTH_CAPABILITY_ID = 'project-health-refresh-v1';
+const PROJECT_HEALTH_RESOURCE_ID = `capability:${PROJECT_HEALTH_CAPABILITY_ID}`;
 const DYNAMIC_CAPABILITIES = new Map([
-  ['project-health-refresh-v1', { controller: 'ProjectController' }],
+  [PROJECT_HEALTH_CAPABILITY_ID, { controller: 'ProjectController', resourceId: PROJECT_HEALTH_RESOURCE_ID }],
 ]);
 
 capabilitiesRouter.get('/', (_req, res) => {
@@ -23,7 +25,9 @@ capabilitiesRouter.post('/:capabilityId/runs', async (req: FounderRequest, res) 
     return res.status(404).json({ error: 'Capability does not have a dynamic runtime.' });
   }
 
-  const body = req.body as Record<string, unknown>;
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+    ? req.body as Record<string, unknown>
+    : {};
   const projectSlug = typeof body.projectSlug === 'string' ? body.projectSlug.trim() : '';
   if (!projectSlug) {
     return res.status(400).json({ error: 'projectSlug is required' });
@@ -45,7 +49,7 @@ capabilitiesRouter.post('/:capabilityId/runs', async (req: FounderRequest, res) 
     const runId = await enqueueReconcile({
       projectId: String(project.id),
       controller: runtime.controller,
-      resourceId: null,
+      resourceId: runtime.resourceId,
       reason: 'founder_triggered',
     });
 
@@ -74,7 +78,12 @@ capabilitiesRouter.get('/runs/:runId', async (req: FounderRequest, res) => {
     .maybeSingle();
 
   if (workError) return res.status(500).json({ error: workError.message });
-  if (!work || work.controller !== 'ProjectController' || work.reason !== 'founder_triggered') {
+  if (
+    !work
+    || work.controller !== 'ProjectController'
+    || work.reason !== 'founder_triggered'
+    || work.resource_id !== PROJECT_HEALTH_RESOURCE_ID
+  ) {
     return res.status(404).json({ error: 'Dynamic capability run not found' });
   }
 
@@ -105,10 +114,10 @@ capabilitiesRouter.get('/runs/:runId', async (req: FounderRequest, res) => {
   return res.json({
     run: {
       id: work.id,
-      capabilityId: 'project-health-refresh-v1',
+      capabilityId: PROJECT_HEALTH_CAPABILITY_ID,
       state,
       attemptCount: Number(work.attempt_count ?? 0),
-      lastError: work.last_error ?? null,
+      hasRetryError: Boolean(work.last_error),
       queuedAt: work.available_at,
       claimedAt: work.claimed_at ?? null,
       completedAt: work.completed_at ?? null,
