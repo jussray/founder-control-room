@@ -22,6 +22,16 @@ const VALID_ENV: ControlRoomWorkerEnv = {
   GITHUB_PRIVATE_KEY: 'private-key-test-value',
   FOUNDER_ALLOWED_ORIGINS: 'https://control.example.com,https://staging.control.example.com',
   FOUNDER_API_URL: 'https://api.control.example.com',
+  CHIEF_AI: {
+    version: vi.fn().mockResolvedValue({
+      ok: true,
+      service: 'chief-ai',
+      rpcContract: 'juss-v10/chief-fcr-rpc@v1',
+      capabilityPlanContract: 'juss-v10/capability-plan@v1',
+      releaseSha: 'a'.repeat(40),
+    }),
+    createCapabilityPlan: vi.fn(),
+  },
   FCR_EMAIL: {
     send: vi.fn().mockResolvedValue({ messageId: 'email-test-id' }),
   },
@@ -50,6 +60,11 @@ describe('Cloudflare Worker binding validation', () => {
   it('reports every missing required service binding in one failure', () => {
     expect(() => validateWorkerEnv({ SUPABASE_URL: `https://${PROJECT_REF}.supabase.co` }))
       .toThrow('Missing required Worker bindings: SUPABASE_PROJECT_REF');
+  });
+
+  it('rejects a missing Chief AI service binding', () => {
+    expect(() => validateWorkerEnv({ ...VALID_ENV, CHIEF_AI: undefined }))
+      .toThrow('Missing required Worker binding: CHIEF_AI');
   });
 
   it('rejects a missing outbound FCR email binding', () => {
