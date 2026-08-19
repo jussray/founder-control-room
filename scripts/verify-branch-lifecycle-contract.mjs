@@ -19,7 +19,12 @@ assert.equal(lifecycle.rules.retirementRequiresDispositionForEveryUniqueSlice, t
 assert.equal(lifecycle.rules.retirementRequiresZeroUnclassifiedResidual, true);
 assert.equal(lifecycle.rules.unknownResidualBlocksRetirement, true);
 assert.equal(lifecycle.rules.unresolvedReviewFindingsBlockRetirement, true);
+assert.equal(lifecycle.rules.carriedForwardRequiresProviderVerifiedDestination, true);
+assert.equal(lifecycle.rules.carriedForwardDestinationRequiresExactHead, true);
+assert.equal(lifecycle.rules.directBranchDeletionExposed, false);
+assert.equal(lifecycle.rules.branchDeletionRequiresReceiptAwareReconciler, true);
 assert.equal(lifecycle.inventorySource, 'provider-compare');
+assert.equal(lifecycle.destinationEvidenceSource, 'provider-readback');
 
 const allowedDispositions = new Set([
   'integrated',
@@ -45,6 +50,34 @@ const requiredReceiptFields = [
 assert.deepEqual(lifecycle.requiredRetirementReceiptFields, requiredReceiptFields);
 
 const fullSha = /^[0-9a-f]{40}$/i;
+const liveDestinationStates = new Set(['open', 'merged', 'main']);
+
+function validNonEmptyString(value) {
+  return typeof value === 'string' && value.trim() !== '';
+}
+
+function validateDestinationEvidence(slice, errors) {
+  const destination = slice.destinationEvidence;
+  if (!destination || typeof destination !== 'object' || Array.isArray(destination)) {
+    errors.push(`invalid-destination:${slice.id}`);
+    return;
+  }
+  if (destination.source !== lifecycle.destinationEvidenceSource) {
+    errors.push(`invalid-destination-source:${slice.id}`);
+  }
+  if (!validNonEmptyString(destination.repository)) {
+    errors.push(`invalid-destination-repository:${slice.id}`);
+  }
+  if (!validNonEmptyString(destination.ref)) {
+    errors.push(`invalid-destination-ref:${slice.id}`);
+  }
+  if (typeof destination.headSha !== 'string' || !fullSha.test(destination.headSha)) {
+    errors.push(`invalid-destination-head:${slice.id}`);
+  }
+  if (!liveDestinationStates.has(destination.state)) {
+    errors.push(`invalid-destination-state:${slice.id}`);
+  }
+}
 
 function validateRetirementReceipt(receipt) {
   const errors = [];
@@ -54,9 +87,7 @@ function validateRetirementReceipt(receipt) {
   }
 
   for (const field of ['repository', 'branch']) {
-    if (typeof receipt[field] !== 'string' || receipt[field].trim() === '') {
-      errors.push(`invalid:${field}`);
-    }
+    if (!validNonEmptyString(receipt[field])) errors.push(`invalid:${field}`);
   }
 
   for (const field of ['headSha', 'mergeBaseSha', 'currentMainSha']) {
@@ -95,7 +126,7 @@ function validateRetirementReceipt(receipt) {
     } else {
       const seen = new Set();
       for (const file of inventory.uniqueFiles) {
-        if (typeof file !== 'string' || file.trim() === '') {
+        if (!validNonEmptyString(file)) {
           errors.push(`invalid:inventory-file:${String(file)}`);
           continue;
         }
@@ -112,7 +143,7 @@ function validateRetirementReceipt(receipt) {
     errors.push('invalid:uniqueSlices');
   } else {
     for (const [index, slice] of receipt.uniqueSlices.entries()) {
-      if (!slice || typeof slice.id !== 'string' || slice.id.trim() === '') {
+      if (!slice || !validNonEmptyString(slice.id)) {
         errors.push(`invalid:uniqueSlices[${index}].id`);
         continue;
       }
@@ -135,16 +166,14 @@ function validateRetirementReceipt(receipt) {
         }
       }
 
-      if (slice.disposition === 'carried-forward' &&
-          (typeof slice.destination !== 'string' || slice.destination.trim() === '')) {
-        errors.push(`missing-destination:${slice.id}`);
+      if (slice.disposition === 'carried-forward') {
+        validateDestinationEvidence(slice, errors);
       }
-      if (slice.disposition === 'intentionally-discarded' &&
-          (typeof slice.reason !== 'string' || slice.reason.trim() === '')) {
+      if (slice.disposition === 'intentionally-discarded' && !validNonEmptyString(slice.reason)) {
         errors.push(`missing-reason:${slice.id}`);
       }
       if ((slice.disposition === 'integrated' || slice.disposition === 'superseded') &&
-          (typeof slice.evidence !== 'string' || slice.evidence.trim() === '')) {
+          !validNonEmptyString(slice.evidence)) {
         errors.push(`missing-evidence:${slice.id}`);
       }
     }
@@ -231,17 +260,53 @@ const staleOnly = {
 };
 assert.equal(validateRetirementReceipt(staleOnly).retirable, false, 'stale alone must never imply retirable');
 
-const carriedForwardWithoutDestination = {
+const carriedForwardLabelOnly = {
   ...baseReceipt,
   inventoryEvidence: {
     ...baseReceipt.inventoryEvidence,
     uniqueFiles: ['test/security.test.ts'],
   },
-  uniqueSlices: [{ id: 'test', disposition: 'carried-forward', covers: ['file:test/security.test.ts'] }],
+  uniqueSlices: [{
+    id: 'test',
+    disposition: 'carried-forward',
+    destination: 'PR #43',
+    covers: ['file:test/security.test.ts'],
+  }],
   safeToClose: false,
   safeToDeleteBranch: false,
 };
-assert.equal(validateRetirementReceipt(carriedForwardWithoutDestination).retirable, false);
+assert.equal(
+  validateRetirementReceipt(carriedForwardLabelOnly).retirable,
+  false,
+  'a prose destination label is not provider-verified carry-forward evidence',
+);
+
+const carriedForwardStaleDestination = {
+  ...baseReceipt,
+  inventoryEvidence: {
+    ...baseReceipt.inventoryEvidence,
+    uniqueFiles: ['test/security.test.ts'],
+  },
+  uniqueSlices: [{
+    id: 'test',
+    disposition: 'carried-forward',
+    destinationEvidence: {
+      source: 'provider-readback',
+      repository: 'jussray/example',
+      ref: 'pull/43',
+      headSha: 'f'.repeat(40),
+      state: 'stale',
+    },
+    covers: ['file:test/security.test.ts'],
+  }],
+  safeToClose: false,
+  safeToDeleteBranch: false,
+};
+assert.equal(
+  validateRetirementReceipt(carriedForwardStaleDestination).retirable,
+  false,
+  'a destination already classified stale cannot satisfy current carry-forward evidence',
+);
 
 const discardedWithoutReason = {
   ...baseReceipt,
@@ -295,7 +360,13 @@ const fullyAccounted = {
     {
       id: 'migration',
       disposition: 'carried-forward',
-      destination: 'PR #43',
+      destinationEvidence: {
+        source: 'provider-readback',
+        repository: 'jussray/example',
+        ref: 'pull/43',
+        headSha: 'f'.repeat(40),
+        state: 'open',
+      },
       covers: ['file:supabase/migrations/001.sql'],
     },
     {
@@ -308,4 +379,4 @@ const fullyAccounted = {
 };
 assert.equal(validateRetirementReceipt(fullyAccounted).retirable, true);
 
-console.log('Branch lifecycle contract verified: stale != superseded != retirable; provider inventory coverage, review findings, and residual work must all reconcile to zero.');
+console.log('Branch lifecycle contract verified: stale != superseded != retirable; provider inventory, verified carry-forward destinations, review findings, and residual work must all reconcile to zero.');
