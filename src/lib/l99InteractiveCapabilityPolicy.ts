@@ -53,12 +53,94 @@ export const L99_INTERACTIVE_CAPABILITY_POLICY = Object.freeze({
     orchestrationCannotWidenInteractiveAuthority: true,
     derivationPreservesExactCapability: true,
     mutationClassificationCannotBeDowngraded: true,
+    runtimeShapeFailsClosed: true,
   }),
 });
 
+const CAPABILITIES = new Set<string>([
+  'terminal.read',
+  'terminal.exec',
+  'browser.open',
+  'browser.read',
+  'browser.interact',
+  'browser.external_mutation',
+  'sandbox.create',
+  'sandbox.read',
+  'sandbox.exec',
+  'sandbox.snapshot',
+  'sandbox.export',
+  'sandbox.destroy',
+]);
+const ENVELOPE_FIELDS = new Set([
+  'capability',
+  'targetPatterns',
+  'allowedOperations',
+  'externalMutation',
+  'requiresFounderReceipt',
+  'requiresPlaywrightProof',
+  'fingerprints',
+  'sandboxIsolation',
+  'expiresAt',
+]);
+const FINGERPRINT_FIELDS = new Set([
+  'inputFingerprint',
+  'environmentFingerprint',
+  'outputFingerprint',
+]);
+const ISOLATION_FIELDS = new Set([
+  'networkAccess',
+  'secretsAccess',
+  'productionAccess',
+  'persistentStorage',
+]);
 const SHA256 = /^[0-9a-f]{64}$/i;
 const TERMINAL_OPERATION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const FORBIDDEN_TERMINAL_OPERATION_ID = /^(?:sh|bash|zsh|fish|cmd(?:\.exe)?|powershell|pwsh)(?:$|[._:-])/i;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasOnlyFields(value: Record<string, unknown>, allowed: ReadonlySet<string>): boolean {
+  return Object.keys(value).every((key) => allowed.has(key));
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === 'string';
+}
+
+function isFingerprintBinding(value: unknown): value is L99FingerprintBinding {
+  if (!isRecord(value) || !hasOnlyFields(value, FINGERPRINT_FIELDS)) return false;
+  return isNullableString(value.inputFingerprint)
+    && isNullableString(value.environmentFingerprint)
+    && isNullableString(value.outputFingerprint);
+}
+
+function isSandboxIsolation(value: unknown): value is L99SandboxIsolation {
+  if (!isRecord(value) || !hasOnlyFields(value, ISOLATION_FIELDS)) return false;
+  return typeof value.networkAccess === 'boolean'
+    && typeof value.secretsAccess === 'boolean'
+    && typeof value.productionAccess === 'boolean'
+    && typeof value.persistentStorage === 'boolean';
+}
+
+export function isL99InteractiveAuthorityEnvelope(value: unknown): value is L99InteractiveAuthorityEnvelope {
+  if (!isRecord(value) || !hasOnlyFields(value, ENVELOPE_FIELDS)) return false;
+  return typeof value.capability === 'string'
+    && CAPABILITIES.has(value.capability)
+    && isStringArray(value.targetPatterns)
+    && isStringArray(value.allowedOperations)
+    && typeof value.externalMutation === 'boolean'
+    && typeof value.requiresFounderReceipt === 'boolean'
+    && typeof value.requiresPlaywrightProof === 'boolean'
+    && isFingerprintBinding(value.fingerprints)
+    && (value.sandboxIsolation === null || isSandboxIsolation(value.sandboxIsolation))
+    && (value.expiresAt === null || typeof value.expiresAt === 'string');
+}
 
 function fingerprintIsSubset(child: string | null, parent: string | null): boolean {
   if (parent === null) return true;
@@ -132,7 +214,7 @@ export function interactiveEnvelopeIsSubset(
   if (child.capability !== parent.capability) return false;
 
   // Mutation classification is security metadata, not optional decoration. A child
-  // may not hide a parent's external side-effect classification.
+  // may not hide or change the parent's external side-effect classification.
   if (child.externalMutation !== parent.externalMutation) return false;
 
   if (parent.requiresFounderReceipt && !child.requiresFounderReceipt) return false;
@@ -153,11 +235,21 @@ export function interactiveEnvelopeIsSubset(
   return true;
 }
 
-export function validateInteractiveEnvelope(
-  envelope: L99InteractiveAuthorityEnvelope,
-): string[] {
+export function validateInteractiveEnvelope(envelope: unknown): string[] {
+  if (!isL99InteractiveAuthorityEnvelope(envelope)) {
+    return ['interactive authority envelope shape is invalid'];
+  }
+
   const errors: string[] = [];
   const isSandbox = envelope.capability.startsWith('sandbox.');
+
+  if (envelope.targetPatterns.length === 0 || envelope.targetPatterns.some((target) => !target.trim())) {
+    errors.push('interactive authority requires at least one non-blank target pattern');
+  }
+
+  if (envelope.allowedOperations.length === 0 || envelope.allowedOperations.some((operation) => !operation.trim())) {
+    errors.push('interactive authority requires at least one non-blank allowed operation');
+  }
 
   errors.push(...validateFingerprints(envelope.fingerprints));
 
