@@ -218,7 +218,7 @@ function proofGateStack(onMissionUpdate = vi.fn()) {
   });
 }
 
-function executeStack(options: { founderFinal?: boolean; approvedAt?: string; founderIdentity?: string } = {}) {
+function executeStack(options: { founderFinal?: boolean } = {}) {
   authSuccess();
   providerDefaults();
 
@@ -230,28 +230,16 @@ function executeStack(options: { founderFinal?: boolean; approvedAt?: string; fo
     policy: founderFinal ? founderFinalPolicy : reviewPolicy,
     policyHash: POLICY_HASH,
   };
-  const policySnapshot: Record<string, unknown> = {
-    expectedHeadSha: HEAD_SHA,
-    independentReview,
-  };
-  if (founderFinal) {
-    policySnapshot.founderFinalReview = {
-      contract: 'juss-v10/founder-final-merge@v1',
-      pullRequestNumber: 470,
-      baseSha: BASE_SHA,
-      headSha: HEAD_SHA,
-      founderIdentity: options.founderIdentity ?? FOUNDER_EMAIL,
-      approvedAt: options.approvedAt ?? new Date().toISOString(),
-    };
-  }
-
   const mission = {
     id: MISSION_ID,
     project_id: PROJECT_ID,
     status: 'approved',
     branch_ref: 'mission/review-gate',
     required_checks: ['typecheck'],
-    policy_snapshot: policySnapshot,
+    policy_snapshot: {
+      expectedHeadSha: HEAD_SHA,
+      independentReview,
+    },
   };
 
   const auditUpdate = vi.fn(() => twoEqUpdate());
@@ -338,6 +326,18 @@ function executeStack(options: { founderFinal?: boolean; approvedAt?: string; fo
   return { auditUpdate };
 }
 
+function clearReviewGate() {
+  mockEvaluateIndependentReviewGate.mockResolvedValue({
+    reviewGateSatisfied: true,
+    mergeAuthorized: false,
+    executionAuthorized: false,
+    witnessedReviewHashes: [REVIEW_HASH],
+    semanticClearCount: 0,
+    deterministicClearCount: 1,
+    blockers: [],
+  });
+}
+
 describe('FCR independent review merge membrane', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -357,7 +357,7 @@ describe('FCR independent review merge membrane', () => {
     expect(onMissionUpdate).not.toHaveBeenCalled();
   });
 
-  it('pins exact provider PR identity and founder-final authority from the authenticated founder', async () => {
+  it('pins exact provider PR identity and founder-final policy without minting final founder authority early', async () => {
     const onMissionUpdate = vi.fn();
     proofGateStack(onMissionUpdate);
 
@@ -372,7 +372,8 @@ describe('FCR independent review merge membrane', () => {
 
     expect(response.status).toBe(200);
     expect(mockGetPullRequestReviewContext).toHaveBeenCalledWith('founder-control-room', 470);
-    expect(onMissionUpdate).toHaveBeenCalledWith(expect.objectContaining({
+    const update = onMissionUpdate.mock.calls[0]?.[0];
+    expect(update).toEqual(expect.objectContaining({
       status: 'approved',
       policy_snapshot: expect.objectContaining({
         existing: 'preserved',
@@ -384,16 +385,9 @@ describe('FCR independent review merge membrane', () => {
           policy: founderFinalPolicy,
           policyHash: POLICY_HASH,
         },
-        founderFinalReview: expect.objectContaining({
-          contract: 'juss-v10/founder-final-merge@v1',
-          pullRequestNumber: 470,
-          baseSha: BASE_SHA,
-          headSha: HEAD_SHA,
-          founderIdentity: FOUNDER_EMAIL,
-          approvedAt: expect.any(String),
-        }),
       }),
     }));
+    expect(update.policy_snapshot).not.toHaveProperty('founderFinalReview');
   });
 
   it('keeps the prior trusted-human review mode compatible for already-pinned missions', async () => {
@@ -449,19 +443,12 @@ describe('FCR independent review merge membrane', () => {
     expect(auditUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
   });
 
-  it('integrates founder-final only after deterministic review and exact authenticated founder receipt both match', async () => {
+  it('integrates founder-final only after deterministic review and execution-time founder confirmation', async () => {
     executeStack({ founderFinal: true });
-    mockEvaluateIndependentReviewGate.mockResolvedValue({
-      reviewGateSatisfied: true,
-      mergeAuthorized: false,
-      executionAuthorized: false,
-      witnessedReviewHashes: [REVIEW_HASH],
-      semanticClearCount: 0,
-      deterministicClearCount: 1,
-      blockers: [],
-    });
+    clearReviewGate();
 
     const independentReviews = [{ reviewHash: REVIEW_HASH }];
+    const before = Date.now();
     const response = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/execute`)
       .set('Authorization', BEARER)
@@ -473,6 +460,7 @@ describe('FCR independent review merge membrane', () => {
           base: 'main',
           expectedHeadSha: HEAD_SHA,
           independentReviews,
+          founderFinalReview: { pullRequestNumber: 470, confirmExactCandidate: true },
         },
       });
 
@@ -502,26 +490,19 @@ describe('FCR independent review merge membrane', () => {
       headSha: HEAD_SHA,
       founderIdentity: FOUNDER_EMAIL,
     });
+    expect(Date.parse(response.body.result.founderFinalReview.approvedAt)).toBeGreaterThanOrEqual(before);
   });
 
-  it('fails closed when the founder-final receipt belongs to another founder identity', async () => {
-    executeStack({ founderFinal: true, founderIdentity: 'other-founder@example.com' });
-    mockEvaluateIndependentReviewGate.mockResolvedValue({
-      reviewGateSatisfied: true,
-      mergeAuthorized: false,
-      executionAuthorized: false,
-      witnessedReviewHashes: [REVIEW_HASH],
-      semanticClearCount: 0,
-      deterministicClearCount: 1,
-      blockers: [],
-    });
+  it('fails closed after deterministic review when founder-final confirmation is missing', async () => {
+    executeStack({ founderFinal: true });
+    clearReviewGate();
 
     const response = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/execute`)
       .set('Authorization', BEARER)
       .send({
         actionType: 'merge',
-        idempotencyKey: 'founder-final-wrong-founder',
+        idempotencyKey: 'founder-final-missing',
         payload: {
           head: 'mission/review-gate',
           base: 'main',
@@ -531,31 +512,62 @@ describe('FCR independent review merge membrane', () => {
       });
 
     expect(response.status).toBe(409);
-    expect(response.body.error).toMatch(/founder receipt does not match/i);
-    expect(mockEvaluateIndependentReviewGate).not.toHaveBeenCalled();
+    expect(response.body.error).toMatch(/founder-final merge approval requires founderFinalReview metadata/i);
+    expect(mockEvaluateIndependentReviewGate).toHaveBeenCalledOnce();
     expect(mockIntegrate).not.toHaveBeenCalled();
   });
 
-  it('fails closed when the founder-final receipt is stale', async () => {
-    executeStack({ founderFinal: true, approvedAt: new Date(Date.now() - 16 * 60 * 1_000).toISOString() });
+  it('fails closed after deterministic review when founder confirms another pull request', async () => {
+    executeStack({ founderFinal: true });
+    clearReviewGate();
 
     const response = await request(buildApp())
       .post(`/approvals/${MISSION_ID}/execute`)
       .set('Authorization', BEARER)
       .send({
         actionType: 'merge',
-        idempotencyKey: 'founder-final-stale',
+        idempotencyKey: 'founder-final-wrong-pr',
         payload: {
           head: 'mission/review-gate',
           base: 'main',
           expectedHeadSha: HEAD_SHA,
           independentReviews: [{ reviewHash: REVIEW_HASH }],
+          founderFinalReview: { pullRequestNumber: 471, confirmExactCandidate: true },
         },
       });
 
     expect(response.status).toBe(409);
-    expect(response.body.error).toMatch(/stale or future-dated/i);
-    expect(mockEvaluateIndependentReviewGate).not.toHaveBeenCalled();
+    expect(response.body.error).toMatch(/founder confirmation does not match the reviewed pull request/i);
+    expect(mockEvaluateIndependentReviewGate).toHaveBeenCalledOnce();
+    expect(mockIntegrate).not.toHaveBeenCalled();
+  });
+
+  it('rejects caller attempts to redefine founder-final policy at execution', async () => {
+    executeStack({ founderFinal: true });
+    clearReviewGate();
+
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'merge',
+        idempotencyKey: 'founder-final-policy-injection',
+        payload: {
+          head: 'mission/review-gate',
+          base: 'main',
+          expectedHeadSha: HEAD_SHA,
+          independentReviews: [{ reviewHash: REVIEW_HASH }],
+          founderFinalReview: {
+            pullRequestNumber: 470,
+            confirmExactCandidate: true,
+            policy: { requireDeterministicReview: false },
+          },
+        },
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toMatch(/server-owned and cannot be redefined/i);
+    expect(mockEvaluateIndependentReviewGate).toHaveBeenCalledOnce();
     expect(mockIntegrate).not.toHaveBeenCalled();
   });
 
