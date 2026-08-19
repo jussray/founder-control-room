@@ -4,6 +4,8 @@ import { createBuildEvent, type BuildEvent, type BuildEventInput } from '../../b
 import type { BuildEventStoreDisposition } from '../../services/buildEventStore.js';
 
 const TOKEN_CONTEXT = 'founder-control-room/build-event-receipts/v1';
+const MAX_EVENT_AGE_MS = 24 * 60 * 60 * 1_000;
+const MAX_FUTURE_SKEW_MS = 5 * 60 * 1_000;
 
 export interface BuildEventProducerPolicy {
   repository: string;
@@ -14,7 +16,7 @@ export interface BuildEventProducerPolicy {
 export const BUILD_EVENT_PRODUCERS: Readonly<Record<string, BuildEventProducerPolicy>> = {
   'sekret-bip-release-observer': {
     repository: 'jussray/Sekret-Bip',
-    sources: ['cloudflare', 'playwright', 'supabase', 'system'],
+    sources: ['cloudflare', 'playwright', 'supabase'],
     categories: ['runtime', 'verification', 'artifact'],
   },
 };
@@ -29,6 +31,7 @@ export interface BuildEventReceiptDependencies {
   env?: NodeJS.ProcessEnv;
   findProject?: (slug: string) => Promise<ProjectRecord | null>;
   storeEvent?: (projectId: string, event: BuildEvent) => Promise<BuildEventStoreDisposition>;
+  now?: () => number;
 }
 
 function headers(res: Response) {
@@ -86,14 +89,34 @@ function policyError(
   event: BuildEvent,
   producerPolicy: BuildEventProducerPolicy,
   project: ProjectRecord,
+  nowMs: number,
 ): string | null {
   if (event.authority === 'authorized') return 'external_receipts_cannot_authorize';
   if (event.source === 'founder') return 'external_receipts_cannot_impersonate_founder';
+  if (event.source === 'system') return 'external_receipts_cannot_impersonate_system';
   if (!producerPolicy.sources.includes(event.source)) return 'producer_source_not_allowed';
   if (!producerPolicy.categories.includes(event.category)) return 'producer_category_not_allowed';
   if (project.repoIdentifier !== producerPolicy.repository) return 'producer_project_mismatch';
   if (event.repository?.name !== producerPolicy.repository) return 'event_repository_mismatch';
   if (!event.repository?.commitSha) return 'exact_commit_sha_required';
+  if (event.repository.branch !== 'main' || event.repository.refKind !== 'branch-head') {
+    return 'production_receipt_requires_main_branch_head';
+  }
+
+  const occurredAtMs = Date.parse(event.occurredAt);
+  if (occurredAtMs > nowMs + MAX_FUTURE_SKEW_MS) return 'event_occurred_at_too_far_in_future';
+  if (occurredAtMs < nowMs - MAX_EVENT_AGE_MS) return 'event_receipt_expired';
+
+  if (event.category === 'runtime') {
+    if (!event.runtime?.releaseSha) return 'runtime_release_sha_required';
+    if (event.runtime.releaseSha !== event.repository.commitSha) return 'runtime_release_sha_mismatch';
+  }
+  if (event.category === 'verification') {
+    if (!event.verification?.exactCommitSha) return 'verification_exact_sha_required';
+    if (event.verification.exactCommitSha !== event.repository.commitSha) {
+      return 'verification_exact_sha_mismatch';
+    }
+  }
   if (event.truth === 'verified' && event.evidenceRefs.length === 0 && event.evidenceUrls.length === 0) {
     return 'verified_receipt_requires_evidence';
   }
@@ -106,6 +129,7 @@ export function createBuildEventReceiptIngestHandler(
   const env = dependencies.env ?? process.env;
   const projectLookup = dependencies.findProject ?? findProject;
   const eventStore = dependencies.storeEvent ?? storeEvent;
+  const now = dependencies.now ?? Date.now;
 
   return async function handleBuildEventReceiptIngest(req: Request, res: Response) {
     headers(res);
@@ -146,7 +170,7 @@ export function createBuildEventReceiptIngestHandler(
       const project = await projectLookup(slug);
       if (!project) return res.status(404).json({ error: 'project not registered' });
 
-      const rejected = policyError(event, producerPolicy, project);
+      const rejected = policyError(event, producerPolicy, project, now());
       if (rejected) return res.status(403).json({ error: rejected });
 
       const disposition = await eventStore(project.id, event);
