@@ -23,27 +23,59 @@ export interface ProviderProjectConfig {
 
 const FOUNDER_CONTROL_ROOM_PROJECT_ID = "founder-control-room";
 const FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH = "main";
+export const FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME = "Founder Control Room main exact-head gate";
+const FOUNDER_CONTROL_ROOM_REQUIRED_STATUS_CHECKS = [
+  "Required Gate",
+  "Verify test-ledger contract",
+] as const;
 
 /**
  * Founder Control Room's own merge policy must fail closed before a provider
  * mutation is attempted. Other projects retain provider-neutral flexibility,
  * including evaluate-only or zero-review rulesets when their own policy allows
- * it; FCR main is the constitutional authority surface and cannot opt out of
- * pull-request review through an omitted or zero review count.
+ * it. FCR main is the constitutional authority surface: an active policy must
+ * retain the complete minimum floor, and the canonical ruleset may not be
+ * disabled, demoted to evaluate mode, or retargeted away from main through the
+ * generic repository-administration route.
  */
 export function assertRulesetGovernancePolicy(projectId: string, config: RulesetConfig): void {
-  const protectsFounderControlRoomMain =
-    projectId === FOUNDER_CONTROL_ROOM_PROJECT_ID
-    && config.enforcement === "active"
-    && config.targetRefs.includes(FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH);
+  const isFounderControlRoom = projectId === FOUNDER_CONTROL_ROOM_PROJECT_ID;
+  const targetsFounderControlRoomMain = config.targetRefs.includes(FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH);
+  const isCanonicalFounderControlRoomRuleset =
+    isFounderControlRoom && config.name === FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME;
 
-  if (!protectsFounderControlRoomMain) return;
+  if (isCanonicalFounderControlRoomRuleset) {
+    if (config.enforcement !== "active") {
+      throw new Error("Founder Control Room canonical main governance must remain actively enforced");
+    }
+    if (!targetsFounderControlRoomMain) {
+      throw new Error("Founder Control Room canonical main governance must continue targeting main");
+    }
+  }
+
+  const protectsFounderControlRoomMain =
+    isFounderControlRoom
+    && config.enforcement === "active"
+    && targetsFounderControlRoomMain;
+
+  if (!protectsFounderControlRoomMain && !isCanonicalFounderControlRoomRuleset) return;
 
   if (!config.requirePullRequest) {
     throw new Error("Founder Control Room main governance requires pull-request enforcement");
   }
   if (!Number.isInteger(config.requiredApprovingReviewCount) || config.requiredApprovingReviewCount < 1) {
     throw new Error("Founder Control Room main governance requires at least one approving review");
+  }
+  for (const requiredCheck of FOUNDER_CONTROL_ROOM_REQUIRED_STATUS_CHECKS) {
+    if (!config.requiredStatusCheckNames.includes(requiredCheck)) {
+      throw new Error(`Founder Control Room main governance requires status check: ${requiredCheck}`);
+    }
+  }
+  if (!config.blockForcePushes) {
+    throw new Error("Founder Control Room main governance must block force pushes");
+  }
+  if (!config.blockDeletion) {
+    throw new Error("Founder Control Room main governance must block branch deletion");
   }
 }
 
@@ -145,9 +177,6 @@ class LazyRepositoryProvider implements RepositoryProvider {
       );
     }
 
-    // Last-mile TOCTOU membrane: re-read BOTH mutable refs immediately before
-    // handing control to the provider mutation. The semantic review is bound to
-    // context.baseSha/context.headSha; moving either ref invalidates that review.
     const currentBaseSha = await delegate.resolveRef(projectId, base);
     const currentHeadSha = await delegate.resolveRef(projectId, head);
     if (currentBaseSha.toLowerCase() !== context.baseSha.toLowerCase()) {
@@ -208,8 +237,6 @@ async function githubProvider(project: ProviderProjectConfig): Promise<Repositor
   const fallbackToken = process.env.GITHUB_TOKEN?.trim();
   const appId = process.env.GITHUB_APP_ID?.trim();
   const privateKey = process.env.GITHUB_PRIVATE_KEY?.trim();
-  // GITHUB_TOKEN remains a local/development fallback only; production prefers
-  // repository-scoped GitHub App installation credentials minted on demand.
   const token = appId && privateKey
     ? await getGitHubInstallationToken(appId, privateKey, project.repo_identifier)
     : fallbackToken!;
@@ -232,15 +259,6 @@ async function gitlabProvider(project: ProviderProjectConfig): Promise<Repositor
   });
 }
 
-/**
- * Provider construction belongs in one place so routes, reconcilers, and
- * mission runners do not grow direct host dependencies.
- *
- * GitHub prefers a repository-scoped App installation token, while GitLab
- * consumes its own provider token and optional self-managed instance URL.
- * Authentication is demand-driven and cached so callers retain the synchronous
- * factory contract without coupling project existence to either provider.
- */
 export function providerForProject(project: ProviderProjectConfig): RepositoryProvider {
   if (project.repo_provider === "github") {
     return new LazyRepositoryProvider("github", () => githubProvider(project));
