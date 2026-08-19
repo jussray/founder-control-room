@@ -52,7 +52,8 @@
         </div>
         <div>
           <label>Ruleset name</label>
-          <input name="name" value="protect-main" required />
+          <input name="name" value="Founder Control Room main exact-head gate" required />
+          <p class="muted">For active Founder Control Room protection on <span class="mono">main</span>, keep this canonical name so the existing provider ruleset is updated instead of creating an overlapping duplicate.</p>
         </div>
         <div>
           <label>Enforcement</label>
@@ -71,15 +72,15 @@
       <h3>Rules</h3>
       <div class="grid">
         <div>
-          <label class="checkbox"><input type="checkbox" name="requirePullRequest" /> Require a pull request before merging</label>
+          <label class="checkbox"><input type="checkbox" name="requirePullRequest" checked /> Require a pull request before merging</label>
           <label class="checkbox"><input type="checkbox" name="blockForcePushes" checked /> Block force pushes</label>
           <label class="checkbox"><input type="checkbox" name="blockDeletion" checked /> Block branch deletion</label>
         </div>
         <div>
           <label>Required approving review count (only used if PR is required)</label>
-          <input name="requiredApprovingReviewCount" type="number" min="0" value="0" />
+          <input name="requiredApprovingReviewCount" type="number" min="0" value="1" />
           <label>Required status check names (comma-separated, optional)</label>
-          <input name="requiredStatusCheckNames" placeholder="Typecheck, Lint" />
+          <input name="requiredStatusCheckNames" value="Required Gate, Verify test-ledger contract" />
         </div>
       </div>
 
@@ -109,6 +110,7 @@
 
   <script>
     const STORAGE_KEY = 'fcr_session';
+    const FCR_MAIN_RULESET_NAME = 'Founder Control Room main exact-head gate';
     const nodes = {
       form: document.getElementById('ruleset-form'),
       idempotencyKey: document.getElementById('idempotency-key'),
@@ -143,13 +145,26 @@
       e.preventDefault();
       const values = new FormData(nodes.form);
       const slug = String(values.get('projectSlug') || '').trim();
+      const name = String(values.get('name') || '').trim();
+      const enforcement = String(values.get('enforcement') || 'active');
+      const targetRefs = splitList(String(values.get('targetRefs') || ''));
       const bypassAppId = String(values.get('bypassAppId') || '').trim();
+
+      const protectsActiveFcrMain =
+        slug === 'founder-control-room' &&
+        enforcement === 'active' &&
+        targetRefs.includes('main');
+
+      if (protectsActiveFcrMain && name !== FCR_MAIN_RULESET_NAME) {
+        nodes.result.textContent = `Blocked: active Founder Control Room main protection must update the canonical ruleset "${FCR_MAIN_RULESET_NAME}". Rename/migration must use a separately reviewed administration path.`;
+        return;
+      }
 
       const body = {
         idempotencyKey: String(values.get('idempotencyKey') || '').trim(),
-        name: String(values.get('name') || '').trim(),
-        enforcement: String(values.get('enforcement') || 'active'),
-        targetRefs: splitList(String(values.get('targetRefs') || '')),
+        name,
+        enforcement,
+        targetRefs,
         requirePullRequest: values.get('requirePullRequest') === 'on',
         requiredApprovingReviewCount: Number(values.get('requiredApprovingReviewCount') || 0),
         requiredStatusCheckNames: splitList(String(values.get('requiredStatusCheckNames') || '')),
