@@ -44,4 +44,20 @@ describe('Founder Control Room completion claim UI contract', () => {
     expect(source).toContain('warningCount: claim.warningCount');
     expect(source).not.toContain('detail: evidence.payload');
   });
+
+  it('correlates concurrent completion evidence with a bounded expiring same-action queue', () => {
+    expect(source).toContain('const pendingExecutionEvidence = []');
+    expect(source).toContain('const completionEvidenceTtlMs = 30_000');
+    expect(source).toContain('const maxPendingExecutionEvidence = 8');
+    expect(source).toContain('prunePendingExecutionEvidence');
+    expect(source).toContain('enqueueExecutionEvidence(body.actionType, payload)');
+    expect(source).toContain('findIndex((entry) => entry.actionType === actionType)');
+    expect(source).toContain('pendingExecutionEvidence.splice(index, 1)[0]');
+  });
+
+  it('fails closed when a legacy success notice has no matching execution evidence', () => {
+    expect(source).toContain('evidence?.payload ?? null');
+    expect(source).toContain('applyClaimToNotice(notice, actionType, evidence?.payload ?? null)');
+    expect(source).not.toContain('let lastExecutionEvidence = null');
+  });
 });
