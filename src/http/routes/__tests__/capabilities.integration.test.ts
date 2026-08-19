@@ -243,6 +243,51 @@ describe('GET /capabilities/runs/:runId', () => {
     }));
   });
 
+  it('reports terminally abandoned work as failed without returning stale observation data', async () => {
+    authorizeFounder();
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderAllowlistBuilder();
+      if (table === 'controller_outbox') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({
+                data: {
+                  id: 'failed-run',
+                  project_id: 'project-1',
+                  controller: 'ProjectController',
+                  resource_id: DYNAMIC_RESOURCE_ID,
+                  reason: 'founder_triggered',
+                  available_at: '2026-08-19T09:59:58.000Z',
+                  claimed_at: null,
+                  completed_at: '2026-08-19T10:00:01.000Z',
+                  attempt_count: 5,
+                  last_error: 'Terminal reconciliation failure after 5 attempt(s)',
+                },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
+    const res = await request(buildApp())
+      .get('/capabilities/runs/failed-run')
+      .set('Authorization', BEARER);
+
+    expect(res.status).toBe(200);
+    expect(res.body.run).toEqual(expect.objectContaining({
+      id: 'failed-run',
+      capabilityId: 'project-health-refresh-v1',
+      state: 'failed',
+      attemptCount: 5,
+      hasRetryError: true,
+      observation: null,
+    }));
+  });
+
   it('refuses to relabel unrelated reconciliation work as a capability run', async () => {
     authorizeFounder();
     supabaseMock.from.mockImplementation((table: string) => {
