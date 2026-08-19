@@ -167,6 +167,31 @@ describe('Founder Control Room read-only remote MCP', () => {
     expect(invokeReadTool).not.toHaveBeenCalled();
   });
 
+  it('rejects nested secret-bearing provider arguments before the hub boundary', async () => {
+    const invokeReadTool = vi.fn();
+    const response = await request(buildApp({ invokeReadTool }))
+      .post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(
+        rpc('tools/call', {
+          name: 'invoke_read_tool',
+          arguments: {
+            serverId: 'github',
+            projectId: 'founder-control-room',
+            toolName: 'get_repository',
+            arguments: {
+              owner: 'jussray',
+              nested: { api_key: 'must-never-cross' },
+            },
+          },
+        }),
+      );
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.message).toContain('Secret-bearing argument key is not allowed');
+    expect(invokeReadTool).not.toHaveBeenCalled();
+  });
+
   it('maps FCR policy denials to a blocked MCP response without widening authority', async () => {
     const invokeReadTool = vi.fn(async () => {
       throw new Error(
