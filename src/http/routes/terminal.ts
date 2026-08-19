@@ -125,10 +125,10 @@ export function createTerminalRouter(runnerOverride?: TerminalExecutor) {
       });
     }
 
-    if (command.risk === 'write' && body['confirmWrite'] !== true) {
+    if (command.risk === 'write') {
       return res.status(409).json({
-        error: 'Write-risk commands require confirmWrite: true for this request.',
-        code: 'WRITE_CONFIRMATION_REQUIRED',
+        error: 'Write-risk terminal execution is disabled on the legacy route until an exact L99 ApprovalReceipt is verified at execution time.',
+        code: 'L99_AUTHORITY_REQUIRED',
       });
     }
 
@@ -171,9 +171,7 @@ export function createTerminalRouter(runnerOverride?: TerminalExecutor) {
       });
     }
 
-    const allowedStatuses = command.risk === 'write'
-      ? new Set(['sandboxed'])
-      : new Set(['sandboxed', 'in_review']);
+    const allowedStatuses = new Set(['sandboxed', 'in_review']);
     if (!allowedStatuses.has(mission.status)) {
       return res.status(409).json({
         error: `Command risk '${command.risk}' is not allowed while mission is '${mission.status}'.`,
@@ -182,8 +180,6 @@ export function createTerminalRouter(runnerOverride?: TerminalExecutor) {
       });
     }
 
-    // Recover from a process crash without allowing two live runs. Fresh runs
-    // remain protected by both the DB partial unique index and the runner map.
     const staleCutoff = new Date(Date.now() - 60 * 60_000).toISOString();
     const { error: staleCleanupError } = await supabase
       .from('terminal_runs')
