@@ -25,6 +25,10 @@ const reapprovalLoop = readFileSync(
   'supabase/migrations/20260819093500_merge_intent_reapproval_loop.sql',
   'utf8',
 );
+const readinessVocabulary = readFileSync(
+  'supabase/migrations/20260819093600_merge_intent_truthful_readiness.sql',
+  'utf8',
+);
 const controller = readFileSync('src/controllers/MergeIntentController.ts', 'utf8');
 const scheduler = readFileSync('src/worker/scheduler.ts', 'utf8');
 const reconciler = readFileSync('src/worker/reconciler.ts', 'utf8');
@@ -67,12 +71,21 @@ describe('merge intent liveness contract', () => {
   it('keeps merge intent as a projection, never positive approval or provider-mutation authority', () => {
     expect(migration).toMatch(/Never approval or provider-mutation authority/);
     expect(migration).toMatch(/READY does not authorize merge execution/);
-    expect(controller).toMatch(/READY is a liveness projection only; guarded \/execute remains merge authority/);
+    expect(controller).toMatch(/This only removes the liveness veto so guarded \/execute can evaluate full machine evidence, independent review, provider identity, and exact-head authority/);
     expect(controller).not.toMatch(/\.integrate\(/);
     expect(controller).not.toMatch(/\.createBranch\(/);
     expect(controller).not.toMatch(/\.commitPatch\(/);
     expect(controller).not.toMatch(/\.deleteBranch\(/);
     expect(controller).not.toMatch(/applyBranchRuleset/);
+  });
+
+  it('uses truthful vocabulary: identity freshness is REVALIDATED, READY is reserved for full policy proof', () => {
+    expect(readinessVocabulary).toMatch(/'revalidated'/);
+    expect(readinessVocabulary).toMatch(/READY remains reserved for a future projection/);
+    expect(readinessVocabulary).toMatch(/REVALIDATED means exact approved PR\/base\/head\/diff identity is fresh enough/);
+    expect(controller).toMatch(/state: 'revalidated'/);
+    expect(controller).toMatch(/Merge intent identity is REVALIDATED/);
+    expect(controller).not.toMatch(/state: 'ready',\n\s*approved_diff_hash/);
   });
 
   it('distinguishes base drift, candidate drift, expiry, and provider identity drift', () => {
@@ -108,14 +121,14 @@ describe('merge intent liveness contract', () => {
     expect(controller).toMatch(/intent\.state === 'merged'/);
   });
 
-  it('uses READY as a deny-only execution precondition while preserving guarded execute authority', () => {
+  it('uses REVALIDATED/READY as a deny-only execution precondition while preserving guarded execute authority', () => {
     expect(executionVeto).toMatch(/before insert on approval_executions/);
     expect(executionVeto).toMatch(/for update/);
-    expect(executionVeto).toMatch(/if v_state <> 'ready'/);
-    expect(executionVeto).toMatch(/READY intent has no canonical approved diff witness/);
+    expect(executionVeto).toMatch(/if v_state not in \('revalidated', 'ready'\)/);
+    expect(executionVeto).toMatch(/merge intent has no canonical approved diff witness/);
     expect(executionVeto).toMatch(/merge intent founder proof lease expired/);
     expect(executionVeto).toMatch(/state = 'executing'/);
-    expect(executionVeto).toMatch(/and state = 'ready'/);
+    expect(executionVeto).toMatch(/state in \('revalidated', 'ready'\)/);
     expect(executionVeto).toMatch(/execution_id = new\.id/);
 
     const reservationIndex = approvals.indexOf(".from('approval_executions')\n      .insert");
