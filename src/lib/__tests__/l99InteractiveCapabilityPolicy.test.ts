@@ -6,6 +6,10 @@ import {
   type L99InteractiveAuthorityEnvelope,
 } from '../l99InteractiveCapabilityPolicy.js';
 
+const INPUT_SHA = 'a'.repeat(64);
+const ENV_SHA = 'b'.repeat(64);
+const OUTPUT_SHA = 'c'.repeat(64);
+
 function envelope(
   overrides: Partial<L99InteractiveAuthorityEnvelope> = {},
 ): L99InteractiveAuthorityEnvelope {
@@ -52,24 +56,17 @@ describe('L99 interactive capability policy', () => {
     ).toContain('terminal.exec requires an explicit command allowlist');
   });
 
-  it('rejects raw shell text and generic shell ids from terminal.exec allowlists', () => {
-    expect(
-      validateInteractiveEnvelope(
-        envelope({
-          capability: 'terminal.exec',
-          allowedOperations: ['git status'],
-        }),
-      ),
-    ).toContain('terminal.exec allowlist must contain bounded operation ids, not arbitrary shell commands');
-
-    expect(
-      validateInteractiveEnvelope(
-        envelope({
-          capability: 'terminal.exec',
-          allowedOperations: ['bash'],
-        }),
-      ),
-    ).toContain('terminal.exec allowlist must contain bounded operation ids, not arbitrary shell commands');
+  it('rejects raw shell text, shell-like ids, and path-like terminal operation ids', () => {
+    for (const operation of ['git status', 'bash', 'bash:run', '../../bin/sh']) {
+      expect(
+        validateInteractiveEnvelope(
+          envelope({
+            capability: 'terminal.exec',
+            allowedOperations: [operation],
+          }),
+        ),
+      ).toContain('terminal.exec allowlist must contain bounded operation ids, not arbitrary shell commands');
+    }
   });
 
   it('accepts bounded terminal operation ids', () => {
@@ -77,7 +74,7 @@ describe('L99 interactive capability policy', () => {
       validateInteractiveEnvelope(
         envelope({
           capability: 'terminal.exec',
-          allowedOperations: ['git:status', 'test:unit'],
+          allowedOperations: ['git:status', 'test:unit', 'verify.playwright'],
         }),
       ),
     ).not.toContain('terminal.exec allowlist must contain bounded operation ids, not arbitrary shell commands');
@@ -165,19 +162,41 @@ describe('L99 interactive capability policy', () => {
   it('rejects invalid or expired expiry timestamps', () => {
     expect(
       validateInteractiveEnvelope(
-        envelope({
-          expiresAt: 'not-a-timestamp',
-        }),
+        envelope({ expiresAt: 'not-a-timestamp' }),
       ),
     ).toContain('expiresAt must be a valid timestamp');
 
     expect(
       validateInteractiveEnvelope(
-        envelope({
-          expiresAt: '2000-01-01T00:00:00Z',
-        }),
+        envelope({ expiresAt: '2000-01-01T00:00:00Z' }),
       ),
     ).toContain('expiresAt must be in the future');
+  });
+
+  it('requires cryptographic sha256 fingerprints rather than arbitrary labels', () => {
+    expect(
+      validateInteractiveEnvelope(
+        envelope({
+          fingerprints: {
+            inputFingerprint: 'input:abc',
+            environmentFingerprint: ENV_SHA,
+            outputFingerprint: null,
+          },
+        }),
+      ),
+    ).toContain('inputFingerprint must be a 64-hex sha256 fingerprint');
+
+    expect(
+      validateInteractiveEnvelope(
+        envelope({
+          fingerprints: {
+            inputFingerprint: INPUT_SHA,
+            environmentFingerprint: ENV_SHA,
+            outputFingerprint: OUTPUT_SHA,
+          },
+        }),
+      ),
+    ).not.toContain('inputFingerprint must be a 64-hex sha256 fingerprint');
   });
 
   it('allows a narrower browser read scope to remain inside a wider read scope', () => {
@@ -249,8 +268,8 @@ describe('L99 interactive capability policy', () => {
           targetPatterns: ['sandbox://job-1'],
           allowedOperations: ['pytest'],
           fingerprints: {
-            inputFingerprint: 'input:abc',
-            environmentFingerprint: 'env:def',
+            inputFingerprint: INPUT_SHA,
+            environmentFingerprint: ENV_SHA,
             outputFingerprint: null,
           },
           sandboxIsolation: {
@@ -292,9 +311,9 @@ describe('L99 interactive capability policy', () => {
           externalMutation: false,
           requiresFounderReceipt: true,
           fingerprints: {
-            inputFingerprint: 'input:abc',
-            environmentFingerprint: 'env:def',
-            outputFingerprint: 'output:123',
+            inputFingerprint: INPUT_SHA,
+            environmentFingerprint: ENV_SHA,
+            outputFingerprint: OUTPUT_SHA,
           },
           sandboxIsolation: {
             networkAccess: false,
