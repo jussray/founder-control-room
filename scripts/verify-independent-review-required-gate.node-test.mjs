@@ -39,14 +39,14 @@ test('review receipt requires exactly one full sha256 marker', () => {
   );
 });
 
-test('latest review from a reviewer is authoritative', () => {
+test('latest review from a reviewer is authoritative evidence for the advisory audit', () => {
   const older = review({ id: 1, state: 'APPROVED', submitted_at: '2026-08-19T01:00:00Z' });
   const newer = review({ id: 2, state: 'CHANGES_REQUESTED', submitted_at: '2026-08-19T01:01:00Z' });
   const latest = latestReviewsByReviewer([older, newer]);
   assert.equal(latest.get('trusted-human')?.id, 2);
 });
 
-test('exact-head trusted non-author approval with one receipt qualifies', () => {
+test('exact-head trusted non-author approval with one receipt qualifies as advisory evidence', () => {
   const candidates = qualifyingReviewCandidates({
     reviews: [review()],
     trustedReviewerIds: ['trusted-human'],
