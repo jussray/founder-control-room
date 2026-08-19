@@ -19,12 +19,15 @@ import {
   v10CapabilityPlanHash,
   type V10CapabilityPlan,
 } from '../../../founder-os-lab/capabilityKernel.js';
-import { installChiefAiServiceBinding } from '../../../worker/chiefAiBinding.js';
+import {
+  CHIEF_AI_EXPECTED_RELEASE_SHA,
+  installChiefAiServiceBinding,
+} from '../../../worker/chiefAiBinding.js';
 import { founderOsSkillsRouter } from '../founderOsSkills.js';
 
 const FOUNDER_EMAIL = 'founder@example.com';
 const BEARER = 'Bearer test-token';
-const RELEASE_SHA = '73c36e61dae96bf1bb94990d3b5e5a6a0bb70b24';
+const RELEASE_SHA = CHIEF_AI_EXPECTED_RELEASE_SHA;
 
 function buildApp() {
   const app = express();
@@ -177,6 +180,28 @@ describe('Founder OS Chief AI Cloudflare binding routes', () => {
         ok: true,
         ...metadata(),
         service: 'wrong-worker',
+      }),
+      createCapabilityPlan: vi.fn(),
+    });
+
+    const response = await request(buildApp())
+      .get('/founder-os/chief/version')
+      .set('Authorization', BEARER);
+
+    expect(response.status).toBe(502);
+    expect(response.body).toMatchObject({
+      ok: false,
+      error: { code: 'chief_ai_binding_invalid' },
+    });
+  });
+
+  it('fails closed when Chief reports a valid but unapproved release SHA', async () => {
+    founderSession();
+    installChiefAiServiceBinding({
+      version: vi.fn().mockResolvedValue({
+        ok: true,
+        ...metadata(),
+        releaseSha: 'd'.repeat(40),
       }),
       createCapabilityPlan: vi.fn(),
     });
