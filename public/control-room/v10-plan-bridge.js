@@ -5,6 +5,8 @@
   const privilegedActions = new Set(['create_branch', 'merge']);
   const executePath = /^\/approvals\/[^/]+\/execute$/;
   const pendingExecutionEvidence = [];
+  const inFlightExecutionActions = new Map();
+  const ambiguousExecutionActions = new Set();
   const completionEvidenceTtlMs = 30_000;
   const maxPendingExecutionEvidence = 8;
 
@@ -121,6 +123,25 @@
     }
   }
 
+  function clearPendingExecutionEvidence(actionType) {
+    for (let index = pendingExecutionEvidence.length - 1; index >= 0; index -= 1) {
+      if (pendingExecutionEvidence[index].actionType === actionType) {
+        pendingExecutionEvidence.splice(index, 1);
+      }
+    }
+  }
+
+  function beginExecutionRequest(actionType) {
+    prunePendingExecutionEvidence();
+    const inFlight = inFlightExecutionActions.get(actionType) ?? 0;
+    const hasUnconsumedEvidence = pendingExecutionEvidence.some((entry) => entry.actionType === actionType);
+    if (inFlight > 0 || hasUnconsumedEvidence) {
+      ambiguousExecutionActions.add(actionType);
+      clearPendingExecutionEvidence(actionType);
+    }
+    inFlightExecutionActions.set(actionType, inFlight + 1);
+  }
+
   function enqueueExecutionEvidence(actionType, payload) {
     prunePendingExecutionEvidence();
     pendingExecutionEvidence.push({ actionType, payload, capturedAt: Date.now() });
@@ -129,11 +150,35 @@
     }
   }
 
+  function finishExecutionRequest(actionType, payload) {
+    const current = inFlightExecutionActions.get(actionType) ?? 0;
+    const remaining = Math.max(0, current - 1);
+    const ambiguous = ambiguousExecutionActions.has(actionType);
+
+    if (!ambiguous && payload) {
+      enqueueExecutionEvidence(actionType, payload);
+    } else {
+      clearPendingExecutionEvidence(actionType);
+    }
+
+    if (remaining === 0) {
+      inFlightExecutionActions.delete(actionType);
+      ambiguousExecutionActions.delete(actionType);
+    } else {
+      inFlightExecutionActions.set(actionType, remaining);
+    }
+  }
+
   function takePendingExecutionEvidence(actionType) {
     prunePendingExecutionEvidence();
-    const index = pendingExecutionEvidence.findIndex((entry) => entry.actionType === actionType);
-    if (index < 0) return null;
-    return pendingExecutionEvidence.splice(index, 1)[0];
+    const matches = pendingExecutionEvidence
+      .map((entry, index) => ({ entry, index }))
+      .filter(({ entry }) => entry.actionType === actionType);
+    if (matches.length !== 1) {
+      if (matches.length > 1) clearPendingExecutionEvidence(actionType);
+      return null;
+    }
+    return pendingExecutionEvidence.splice(matches[0].index, 1)[0];
   }
 
   function applyClaimToNotice(notice, actionType, payload) {
@@ -201,15 +246,21 @@
           }),
         };
 
-    const response = await nativeFetch(input, nextInit);
+    beginExecutionRequest(body.actionType);
     try {
-      const payload = await response.clone().json();
-      if (response.ok && payload?.ok === true) {
-        enqueueExecutionEvidence(body.actionType, payload);
+      const response = await nativeFetch(input, nextInit);
+      let evidencePayload = null;
+      try {
+        const payload = await response.clone().json();
+        if (response.ok && payload?.ok === true) evidencePayload = payload;
+      } catch {
+        // Missing or malformed execution evidence must never become a completion claim.
       }
-    } catch {
-      // Missing or malformed execution evidence must never become a completion claim.
+      finishExecutionRequest(body.actionType, evidencePayload);
+      return response;
+    } catch (error) {
+      finishExecutionRequest(body.actionType, null);
+      throw error;
     }
-    return response;
   };
 })();
