@@ -29,7 +29,7 @@ function ruleOfType(ruleset, type) {
   return rules.find((rule) => rule?.type === type) ?? null;
 }
 
-export function rulesetSnapshot(ruleset, targetRef = 'main') {
+export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = targetRef) {
   const pull = ruleOfType(ruleset, 'pull_request');
   const status = ruleOfType(ruleset, 'required_status_checks');
   const statusChecks = Array.isArray(status?.parameters?.required_status_checks)
@@ -45,7 +45,8 @@ export function rulesetSnapshot(ruleset, targetRef = 'main') {
       }))
     : [];
   const targets = branchTargets(ruleset);
-  const targetToken = `refs/heads/${targetRef}`;
+  const targetTokens = new Set([`refs/heads/${targetRef}`]);
+  if (text(defaultBranch) === text(targetRef)) targetTokens.add('~DEFAULT_BRANCH');
 
   return {
     id: ruleset?.id == null ? '' : String(ruleset.id),
@@ -53,7 +54,7 @@ export function rulesetSnapshot(ruleset, targetRef = 'main') {
     enforcement: text(ruleset?.enforcement),
     target: text(ruleset?.target),
     targetRefs: targets,
-    targetsRequestedRef: targets.includes(targetToken),
+    targetsRequestedRef: targets.some((target) => targetTokens.has(target)),
     requirePullRequest: Boolean(pull),
     requiredApprovingReviewCount: Number(pull?.parameters?.required_approving_review_count ?? 0),
     dismissStaleReviewsOnPush: pull?.parameters?.dismiss_stale_reviews_on_push === true,
@@ -93,11 +94,18 @@ export function canonicalFloorSatisfied(snapshot) {
     && snapshot.blockDeletion === true;
 }
 
-export function buildReport({ repository, targetRef = 'main', fullRulesets, collaborators, canonicalName = CANONICAL_RULESET_NAME }) {
+export function buildReport({
+  repository,
+  targetRef = 'main',
+  defaultBranch = targetRef,
+  fullRulesets,
+  collaborators,
+  canonicalName = CANONICAL_RULESET_NAME,
+}) {
   const { owner } = parseRepository(repository);
   const snapshots = fullRulesets
     .filter((ruleset) => ruleset?.target === 'branch')
-    .map((ruleset) => rulesetSnapshot(ruleset, targetRef));
+    .map((ruleset) => rulesetSnapshot(ruleset, targetRef, defaultBranch));
   const activeTargetingRef = snapshots.filter((snapshot) =>
     snapshot.enforcement === 'active' && snapshot.targetsRequestedRef);
   const canonicalMatches = snapshots.filter((snapshot) => snapshot.name === canonicalName);
@@ -108,6 +116,7 @@ export function buildReport({ repository, targetRef = 'main', fullRulesets, coll
     contract: CONTRACT,
     repository,
     targetRef,
+    defaultBranch,
     canonicalRulesetName: canonicalName,
     observedAt: new Date().toISOString(),
     providerMutationPerformed: false,
@@ -135,6 +144,7 @@ export function buildBlockedReport({ repository, targetRef = 'main', reason = 'p
     contract: CONTRACT,
     repository: text(repository) || 'unknown',
     targetRef: text(targetRef) || 'main',
+    defaultBranch: null,
     canonicalRulesetName: CANONICAL_RULESET_NAME,
     observedAt: new Date().toISOString(),
     providerMutationPerformed: false,
@@ -196,6 +206,11 @@ async function listAll(path, token) {
 export async function collectGovernancePreflight({ token, repository, targetRef = 'main' }) {
   if (!text(token)) throw new Error('GITHUB_TOKEN is required for governance preflight');
   const { owner, repo } = parseRepository(repository);
+  const repositoryState = await githubGet(
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
+    token,
+  );
+  const defaultBranch = text(repositoryState?.default_branch) || targetRef;
   const rulesetSummaries = await listAll(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/rulesets?includes_parents=false`, token);
   const fullRulesets = [];
   for (const ruleset of rulesetSummaries) {
@@ -209,7 +224,7 @@ export async function collectGovernancePreflight({ token, repository, targetRef 
     `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/collaborators?affiliation=all`,
     token,
   );
-  return buildReport({ repository, targetRef, fullRulesets, collaborators });
+  return buildReport({ repository, targetRef, defaultBranch, fullRulesets, collaborators });
 }
 
 async function main() {
@@ -239,6 +254,7 @@ async function main() {
     contract: report.contract,
     repository: report.repository,
     targetRef: report.targetRef,
+    defaultBranch: report.defaultBranch,
     status: report.status,
     observationComplete: report.observationComplete,
     blocker: report.blocker,
