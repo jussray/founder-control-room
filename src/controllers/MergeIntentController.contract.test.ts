@@ -48,8 +48,11 @@ describe('merge intent liveness contract', () => {
     expect(migration).toMatch(/after update of status on missions/);
     expect(migration).toMatch(/new\.status = 'approved'/);
     expect(migration).toMatch(/v_repository <> 'jussray\/founder-control-room'/);
+    expect(migration).toMatch(/project_id = new\.project_id/);
+    expect(migration).toMatch(/coalesce\(btrim\(approved_by\), ''\) <> ''/);
     expect(migration).toMatch(/gate_id = 'merge'/);
     expect(migration).toMatch(/status = 'pass'/);
+    expect(migration).toMatch(/order by ran_at desc, id desc/);
     expect(migration).toMatch(/ran_at < now\(\) - interval '15 minutes'/);
     expect(migration).toMatch(/raise exception 'FCR merge approval cannot persist merge intent/);
     expect(migration).toMatch(/on conflict \(mission_id\) do update set/);
