@@ -3,7 +3,10 @@
 
   const nativeFetch = window.fetch.bind(window);
   const privilegedActions = new Set(['create_branch', 'merge']);
-  const executePath = /^\/approvals\/[^/]+\/execute$/;
+  const executePath = /^\/approvals\/([^/]+)\/execute$/;
+  const HASH = /^[0-9a-f]{64}$/i;
+  const FULL_SHA = /^[0-9a-f]{40}$/i;
+  const FOUNDER_DECISION_CONTRACT = 'juss-v10/founder-control-decision@v1';
   let lastExecutionEvidence = null;
 
   function formForAction(actionType) {
@@ -16,28 +19,47 @@
     return formForAction(actionType)?.querySelector('textarea[name="capabilityPlan"]') ?? null;
   }
 
+  function parseJsonObject(raw, label) {
+    let value;
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      throw new Error(`${label} must be valid JSON.`);
+    }
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error(`${label} must be a JSON object.`);
+    }
+    return value;
+  }
+
   function readCapabilityPlan(actionType) {
     const field = planFieldForAction(actionType);
     const raw = field?.value.trim() ?? '';
     if (!raw) {
       throw new Error('Attach the Chief AI V10 capability plan before privileged execution.');
     }
-
-    let plan;
-    try {
-      plan = JSON.parse(raw);
-    } catch {
-      throw new Error('Chief AI V10 capability plan must be valid JSON.');
-    }
-
-    if (!plan || typeof plan !== 'object' || Array.isArray(plan)) {
-      throw new Error('Chief AI V10 capability plan must be a JSON object.');
-    }
-
-    return plan;
+    return parseJsonObject(raw, 'Chief AI V10 capability plan');
   }
 
-  function addPlanField(form, actionType) {
+  function readDecisionReceipt() {
+    const field = formForAction('merge')?.querySelector('textarea[name="decisionReceipt"]');
+    const raw = field?.value.trim() ?? '';
+    if (!raw) {
+      throw new Error('Attach the Chief AI V10 decision receipt before merge execution.');
+    }
+    return parseJsonObject(raw, 'Chief AI V10 decision receipt');
+  }
+
+  function readPromptOSDecisionHash() {
+    const field = formForAction('merge')?.querySelector('input[name="promptOSDecisionHash"]');
+    const value = field?.value.trim().toLowerCase() ?? '';
+    if (!HASH.test(value)) {
+      throw new Error('PromptOS decision hash must be the exact 64-character SHA-256 from the validated Chief decision.');
+    }
+    return value;
+  }
+
+  function addAuthorityFields(form, actionType) {
     if (!form || form.querySelector('[data-v10-plan-bridge]')) return;
 
     const wrapper = document.createElement('div');
@@ -58,10 +80,108 @@
         Paste the exact plan produced by Chief AI for this ${actionType === 'merge' ? 'merge' : 'branch creation'}.
         Founder Control Room transports it unchanged and validates it server-side; it does not generate or persist the plan here.
       </p>
+      ${actionType === 'merge' ? `
+        <label>Chief AI V10 decision receipt JSON</label>
+        <textarea
+          class="code"
+          name="decisionReceipt"
+          rows="8"
+          required
+          autocomplete="off"
+          spellcheck="false"
+          aria-describedby="v10-decision-help-merge"
+          placeholder='{"contract":"juss-v10/decision-cycle@v1", ...}'
+        ></textarea>
+        <p class="muted" id="v10-decision-help-merge">
+          Paste the exact portable decision receipt from Chief AI. Founder Control Room validates the receipt and keeps only its decision hash on the execution envelope.
+        </p>
+        <label>PromptOS decision hash</label>
+        <input
+          class="code"
+          name="promptOSDecisionHash"
+          inputmode="text"
+          minlength="64"
+          maxlength="64"
+          pattern="[0-9a-fA-F]{64}"
+          required
+          autocomplete="off"
+          spellcheck="false"
+          aria-describedby="v10-promptos-help-merge"
+          placeholder="64-character SHA-256"
+        />
+        <p class="muted" id="v10-promptos-help-merge">
+          Supply the exact PromptOS handoff hash. Clicking Execute merge is the founder-explicit approval event; the browser binds that click to this decision, the capability plan, project, mission, and exact head before the server re-validates everything.
+        </p>
+      ` : ''}
     `;
 
     const submitRow = form.querySelector('button[type="submit"]')?.parentElement ?? null;
     form.insertBefore(wrapper, submitRow);
+  }
+
+  function normalizeProposal(proposal) {
+    return {
+      proposalId: String(proposal.proposalId ?? '').trim(),
+      proposalHash: String(proposal.proposalHash ?? '').trim().toLowerCase(),
+      projectSlug: String(proposal.projectSlug ?? '').trim(),
+      actionType: String(proposal.actionType ?? '').trim(),
+      expectedHeadSha: String(proposal.expectedHeadSha ?? '').trim().toLowerCase() || null,
+      capabilityPlanHash: String(proposal.capabilityPlanHash ?? '').trim().toLowerCase() || null,
+    };
+  }
+
+  async function sha256Hex(value) {
+    if (!window.crypto?.subtle) {
+      throw new Error('Secure browser hashing is unavailable; founder decision binding cannot be created.');
+    }
+    const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function createFounderMergeDecision(missionId, plan, decisionReceipt) {
+    const proposal = normalizeProposal({
+      proposalId: missionId,
+      proposalHash: decisionReceipt?.decisionHash,
+      projectSlug: plan?.projectSlug,
+      actionType: 'merge',
+      expectedHeadSha: plan?.expectedHeadSha,
+      capabilityPlanHash: plan?.planHash,
+    });
+
+    if (!proposal.proposalId) throw new Error('Mission identity is required for founder decision binding.');
+    if (!HASH.test(proposal.proposalHash)) throw new Error('Chief decision receipt must contain a valid decisionHash.');
+    if (!proposal.projectSlug) throw new Error('Capability plan project is required for founder decision binding.');
+    if (!FULL_SHA.test(proposal.expectedHeadSha ?? '')) throw new Error('Capability plan exact head is required for founder decision binding.');
+    if (!HASH.test(proposal.capabilityPlanHash ?? '')) throw new Error('Capability plan hash is required for founder decision binding.');
+
+    const surface = 'fcr';
+    const decision = 'approved';
+    const decisionHash = await sha256Hex(JSON.stringify([
+      FOUNDER_DECISION_CONTRACT,
+      proposal.proposalId,
+      proposal.proposalHash,
+      proposal.projectSlug,
+      proposal.actionType,
+      proposal.expectedHeadSha,
+      proposal.capabilityPlanHash,
+      surface,
+      decision,
+      true,
+      true,
+      false,
+    ]));
+
+    return {
+      contract: FOUNDER_DECISION_CONTRACT,
+      proposal,
+      surface,
+      decision,
+      founderExplicit: true,
+      scopeLocked: true,
+      changesAllowed: false,
+      executionAuthorized: true,
+      decisionHash,
+    };
   }
 
   function shortSha(value) {
@@ -130,8 +250,8 @@
   }
 
   function augmentPrivilegedForms() {
-    addPlanField(document.querySelector('#create-branch-form'), 'create_branch');
-    addPlanField(document.querySelector('#execute-merge-form'), 'merge');
+    addAuthorityFields(document.querySelector('#create-branch-form'), 'create_branch');
+    addAuthorityFields(document.querySelector('#execute-merge-form'), 'merge');
     applyEvidenceBackedCompletionClaim();
   }
 
@@ -145,8 +265,9 @@
     const requestUrl = input instanceof Request ? input.url : String(input);
     const url = new URL(requestUrl, window.location.origin);
     const method = String(init.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+    const executeMatch = url.pathname.match(executePath);
 
-    if (method !== 'POST' || !executePath.test(url.pathname) || typeof init.body !== 'string') {
+    if (method !== 'POST' || !executeMatch || typeof init.body !== 'string') {
       return nativeFetch(input, init);
     }
 
@@ -161,17 +282,26 @@
       return nativeFetch(input, init);
     }
 
-    const nextInit = body.capabilityPlan !== undefined
-      ? init
-      : {
-          ...init,
-          body: JSON.stringify({
-            ...body,
-            capabilityPlan: readCapabilityPlan(body.actionType),
-          }),
-        };
+    const capabilityPlan = body.capabilityPlan ?? readCapabilityPlan(body.actionType);
+    let nextBody = { ...body, capabilityPlan };
 
-    const response = await nativeFetch(input, nextInit);
+    if (body.actionType === 'merge') {
+      const decisionReceipt = body.decisionReceipt ?? readDecisionReceipt();
+      const promptOSDecisionHash = String(body.promptOSDecisionHash ?? readPromptOSDecisionHash()).trim().toLowerCase();
+      const founderDecision = body.founderDecision
+        ?? await createFounderMergeDecision(decodeURIComponent(executeMatch[1]), capabilityPlan, decisionReceipt);
+      nextBody = {
+        ...nextBody,
+        decisionReceipt,
+        promptOSDecisionHash,
+        founderDecision,
+      };
+    }
+
+    const response = await nativeFetch(input, {
+      ...init,
+      body: JSON.stringify(nextBody),
+    });
     try {
       const payload = await response.clone().json();
       lastExecutionEvidence = response.ok && payload?.ok === true

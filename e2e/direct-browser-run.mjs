@@ -6,6 +6,11 @@ import {
   v10CapabilityPlanHash,
   v10CapabilityRegistryHash,
 } from '../dist/founder-os-lab/capabilityKernel.js';
+import {
+  V10_DECISION_CYCLE_CONTRACT,
+  V10_DECISION_LENSES,
+  v10DecisionReceiptHash,
+} from '../dist/lib/v10DecisionAuthorityGate.js';
 
 const proxyEnvKeys = [
   'HTTP_PROXY',
@@ -79,6 +84,51 @@ function chiefPlan(projectSlug, requestedAuthority, expectedHeadSha) {
   return { ...base, planHash: v10CapabilityPlanHash(base) };
 }
 
+function chiefDecisionReceipt(projectSlug, expectedHeadSha) {
+  const base = {
+    contract: V10_DECISION_CYCLE_CONTRACT,
+    goal: 'Authorize only the exact founder-reviewed merge after every required V10 witness is bound.',
+    workspaceId: 'e2e-workspace',
+    projectSlug,
+    expectedHeadSha: String(expectedHeadSha).trim().toLowerCase(),
+    customerOutcome: 'The intended reviewed change reaches the default branch without approval identity drift.',
+    desiredState: 'Chief recommendation, PromptOS handoff, founder approval, capability plan, and exact head resolve to one merge identity.',
+    currentState: 'The exact branch head is reviewed and proof-gated for merge.',
+    bottleneck: 'Privileged execution must prove that the founder approved the same decision that Chief and PromptOS carried.',
+    decisionClass: 'high-consequence',
+    reality: {
+      verified: ['The browser scenario has exact-head GitHub evidence and a passing founder proof gate.'],
+      inferred: ['Binding one decision identity reduces cross-surface interpretation drift.'],
+      unknown: ['No post-merge runtime claim is made by this local provider fixture.'],
+      blocked: [],
+    },
+    lensReports: V10_DECISION_LENSES.map((lens) => ({
+      lens,
+      finding: `${lens} confirms the exact merge identity must remain bounded.`,
+      recommendation: `${lens} requires the existing proof and rollback gates to remain intact.`,
+      confidence: 0.9,
+      evidenceRefs: [`e2e:${lens}`],
+      assumptions: [`fixture:${lens}`],
+      risks: [`drift:${lens}`],
+      blockers: [],
+      requestedEvidence: [`exact:${lens}`],
+      metrics: [],
+    })),
+    dissent: ['Redteam blocks any merge whose decision, founder approval, plan, or exact head diverges.'],
+    candidateOptions: ['Bind exact decision identity before merge.', 'Leave decision identity implicit.'],
+    recommendation: 'Bind the portable decision and explicit founder approval to the exact merge execution.',
+    authorityCeiling: 'reason',
+    proofRequirements: ['exact-head execution evidence', 'founder decision binding', 'independent review receipt'],
+    outcomeSignals: ['one-bound-merge-execution'],
+    rollback: 'Revert the merge commit if downstream proof fails.',
+    stopConditions: ['decision hash mismatch', 'founder decision mismatch', 'head drift'],
+    nextGate: 'Founder Control Room may resolve merge authority only after the exact founder decision validates.',
+    requiresFounderApproval: true,
+    executionAuthorized: false,
+  };
+  return { ...base, decisionHash: v10DecisionReceiptHash(base) };
+}
+
 // run.mjs performs one privileged create_branch directly with Node fetch for
 // the guarded-terminal proof. Bind that provider-boundary call to the same
 // canonical Chief plan/approved registry used by the real browser forms.
@@ -111,9 +161,19 @@ async function withV10PlanAwarePage(page) {
 
     if (selector === '#execute-merge-form button[type=submit]') {
       const expectedHeadSha = await page.locator('#execute-merge-form input[name="expectedHeadSha"]').inputValue();
+      const plan = chiefPlan('demo-project', 'privileged', expectedHeadSha);
+      const decisionReceipt = chiefDecisionReceipt('demo-project', expectedHeadSha);
       await page.fill(
         '#execute-merge-form textarea[name="capabilityPlan"]',
-        JSON.stringify(chiefPlan('demo-project', 'privileged', expectedHeadSha)),
+        JSON.stringify(plan),
+      );
+      await page.fill(
+        '#execute-merge-form textarea[name="decisionReceipt"]',
+        JSON.stringify(decisionReceipt),
+      );
+      await page.fill(
+        '#execute-merge-form input[name="promptOSDecisionHash"]',
+        decisionReceipt.decisionHash,
       );
     }
 

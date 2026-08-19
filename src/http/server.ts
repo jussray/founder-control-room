@@ -64,6 +64,7 @@ import { requireProjectReadAudit } from './middleware/projectReadAudit.js';
 import { requireFounder } from './middleware/requireFounder.js';
 import { requirePortfolioSwitchOn } from './middleware/requirePortfolioSwitchOn.js';
 import { requireV10PrivilegedApprovalBinding } from './middleware/v10PrivilegedApprovalBinding.js';
+import { requireV10DecisionFounderBinding } from './middleware/v10DecisionFounderBinding.js';
 import { requireFounderSignalEngineMcpToken } from './middleware/founderSignalEngineMcpAuth.js';
 import { requireFounderSignalEngineReviewOnly } from './middleware/founderSignalEngineWriteGate.js';
 
@@ -257,13 +258,14 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/projects', requireProjectReadAudit, projectsRouter);
   // Privileged mission execution still uses the existing approvals router, but
   // it must now pass founder authentication + founder master switch + V10
-  // plan/registry/exact-head binding before the route may reserve an
-  // approval_executions row.
+  // plan/registry/exact-head binding + portable Chief/PromptOS/founder
+  // decision binding before the route may reserve an approval_executions row.
   app.post(
     '/approvals/:missionId/execute',
     requireFounder,
     requirePortfolioSwitchOn('fcr-privileged-execution-master'),
     requireV10PrivilegedApprovalBinding,
+    requireV10DecisionFounderBinding,
   );
   app.use('/approvals', approvalsRouter);
   app.use('/l99', l99Router);
