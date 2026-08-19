@@ -180,6 +180,8 @@ export function createTerminalRouter(runnerOverride?: TerminalExecutor) {
       });
     }
 
+    // Recover from a process crash without allowing two live runs. Fresh runs
+    // remain protected by both the DB partial unique index and the runner map.
     const staleCutoff = new Date(Date.now() - 60 * 60_000).toISOString();
     const { error: staleCleanupError } = await supabase
       .from('terminal_runs')
