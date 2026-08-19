@@ -25,6 +25,8 @@ Exact SHAs belong in PRs, retained receipts, artifacts, incident records, and hi
 Current implementation includes:
 
 - provider-independent repository abstractions and guarded exact-head execution;
+- an obligation-aware work supersession contract in which stale/similar branches are only candidates, provider inventory and required residue must be fully and singly accounted, replacement provenance must remain explicit and acyclic, runtime-sensitive closure proof must be current-head-bound, and historical evidence remains recoverable;
+- a canonical repository-provider deletion membrane: ambient `deleteBranch()` authority is intentionally absent until a future obligation-aware receipt reconciler exists and proves safe retirement before provider mutation;
 - founder proof, idempotency/reservation, and rollback boundaries;
 - an FCR-specific provider-grounded independent-review membrane before in-app provider integration;
 - a canonical FCR founder-final merge policy that keeps deterministic independent review load-bearing, binds authenticated founder approval to the exact PR/base/head, and preserves the older server-owned semantic-review policy only for already-pinned compatibility paths;
