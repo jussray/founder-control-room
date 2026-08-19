@@ -59,11 +59,13 @@ async function enqueueActiveMissionResync(): Promise<void> {
 
   if (!projects?.length) return;
 
-  // Projects with active missions get targeted resync
+  // Projects with active or approved missions get targeted resync. Approved
+  // missions stay enumerable here until execution/cancellation so founder merge
+  // intent cannot disappear between proof-gate approval and /execute.
   const { data: activeMissions } = await supabase
     .from('missions')
-    .select('id, project_id')
-    .in('status', ['implementing', 'preview_ready', 'deploying', 'verifying'])
+    .select('id, project_id, status')
+    .in('status', ['implementing', 'preview_ready', 'deploying', 'verifying', 'approved'])
     .in('project_id', projects.map((p: { id: string }) => p.id));
 
   for (const mission of activeMissions ?? []) {
@@ -73,6 +75,16 @@ async function enqueueActiveMissionResync(): Promise<void> {
       resourceId: mission.id,
       reason: 'periodic_resync',
     });
+
+    if (mission.status === 'approved') {
+      await enqueueReconcile({
+        projectId: mission.project_id,
+        controller: 'MergeIntentController',
+        resourceId: mission.id,
+        reason: 'periodic_resync',
+      });
+    }
+
     await enqueueReconcile({
       projectId: mission.project_id,
       controller: 'ProjectController',
