@@ -67,11 +67,20 @@ The current Founder OS sandbox already starts from a zero-ambient-authority post
 
 ## Current terminal integration state
 
-The legacy guarded terminal remains available for bounded read/verify commands under its existing founder, mission, command-registry, and exact-head checks. Write-risk commands are now fail-closed on that route: `confirmWrite: true` is no longer execution authority, and write requests return `L99_AUTHORITY_REQUIRED` until an exact L99 ApprovalReceipt is verified at execution time.
+The legacy guarded terminal is now **read-only execution**. Commands classified `read` may still run under the existing founder, terminal-enabled/loopback, project-verification, mission, command-registry, and exact-head guards.
 
-Command Bridge preserves the same boundary. Read/verify requests may still resolve to the guarded terminal endpoint; write-risk requests do not receive an executable terminal endpoint and instead report `L99_APPROVAL_RECEIPT` as the missing authority.
+Commands classified `verify` or `write` are fail-closed on the legacy route and return `L99_AUTHORITY_REQUIRED` with `L99_APPROVAL_RECEIPT` as the missing authority. `confirmWrite: true` is not execution authority.
 
-This is a **deny-until-integrated safety fuse**, not completed write execution wiring. The repository does not yet verify an L99 ApprovalReceipt and then execute the approved write command on this path. That later integration must bind the exact operation ID to a separately reviewed fixed command template and must reread authoritative policy/approval state immediately before execution.
+This distinction is intentional. A registry entry such as `npm test`, `npm run build`, Playwright, or a repository Python script is executable code from the checked-out repository head. Exact SHA proves which source is present; it does not prove the source is safe to execute. An in-review or otherwise untrusted head can redefine repository scripts, so `verify` must not be treated as equivalent to `read`.
+
+Command Bridge preserves the same boundary:
+
+- `read` risk may resolve to the guarded terminal endpoint;
+- `verify` and `write` risk receive no runnable terminal endpoint and instead require `L99_APPROVAL_RECEIPT`.
+
+The current repository has one production instantiation of `GuardedTerminalRunner`: the terminal HTTP route. Other current constructor references are the runner implementation/tests. Therefore this deny fuse sits on today's real caller rather than beside it.
+
+This is a **deny-until-integrated safety fuse**, not completed executable authority wiring. The repository does not yet verify an L99 ApprovalReceipt and then execute an approved `verify` or `write` command. That later integration must run through an isolated execution boundary, bind the exact operation ID to a separately reviewed fixed command template, and reread authoritative policy/approval state immediately before execution.
 
 Terminal operation IDs are bounded policy identifiers, not shell fragments or filesystem paths. The future executor must resolve an approved ID through a fixed registry/template mapping; it must never pass the operation ID or user-supplied text directly to a shell or interpreter.
 
