@@ -55,12 +55,13 @@ describe('merge intent liveness contract', () => {
     expect(migration).toMatch(/on conflict \(mission_id\) do update set/);
   });
 
-  it('backfills or fail-closes every already-approved FCR mission using founder-attributed proof', () => {
+  it('backfills or fail-closes every already-approved FCR mission using founder-attributed project-bound proof', () => {
     expect(backfill).toMatch(/m\.status = 'approved'/);
     expect(backfill).toMatch(/lower\(coalesce\(p\.repo_identifier, ''\)\) = 'jussray\/founder-control-room'/);
     expect(backfill).toMatch(/Merge-intent liveness migration blocked/);
     expect(backfill).toMatch(/insert into merge_intents/);
     expect(backfill).toMatch(/cross join lateral/);
+    expect(backfill).toMatch(/pgr\.project_id = m\.project_id/);
     expect(backfill).toMatch(/coalesce\(btrim\(pgr\.approved_by\), ''\) <> ''/);
     expect(backfill).toMatch(/order by pgr\.ran_at desc, pgr\.id desc/);
     expect(backfill).toMatch(/then 'expired'/);
@@ -164,9 +165,11 @@ describe('merge intent liveness contract', () => {
     expect(reapprovalLoop).toMatch(/Merge-intent reapproval-loop postcondition failed/);
   });
 
-  it('keeps the two-minute approved-mission sweep as a fallback on the same reconciler chassis', () => {
+  it('keeps the two-minute approved-mission sweep as a projection-driven fallback', () => {
     expect(scheduler).toMatch(/'approved'/);
-    expect(scheduler).toMatch(/mission\.status === 'approved'/);
+    expect(scheduler).toMatch(/\.from\('merge_intents'\)/);
+    expect(scheduler).toMatch(/mergeIntentMissionIds/);
+    expect(scheduler).toMatch(/mission\.status === 'approved' && mergeIntentMissionIds\.has\(mission\.id\)/);
     expect(scheduler).toMatch(/controller: 'MergeIntentController'/);
     expect(reconciler).toMatch(/import \{ MergeIntentController \}/);
     expect(reconciler).toMatch(/\['MergeIntentController', new MergeIntentController\(\)\]/);
