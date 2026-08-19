@@ -42,10 +42,13 @@
       "retirementRequiresZeroUnclassifiedResidual": true,
       "unknownResidualBlocksRetirement": true,
       "unresolvedReviewFindingsBlockRetirement": true,
+      "carriedForwardRequiresProviderVerifiedDestination": true,
+      "carriedForwardDestinationRequiresExactHead": true,
       "directBranchDeletionExposed": false,
       "branchDeletionRequiresReceiptAwareReconciler": true
     },
     "inventorySource": "provider-compare",
+    "destinationEvidenceSource": "provider-readback",
     "allowedDispositions": [
       "integrated",
       "superseded",
