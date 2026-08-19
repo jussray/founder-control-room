@@ -45,14 +45,34 @@ describe('Founder Control Room completion claim UI contract', () => {
     expect(source).not.toContain('detail: evidence.payload');
   });
 
-  it('correlates concurrent completion evidence with a bounded expiring same-action queue', () => {
+  it('bounds and expires pending completion evidence', () => {
     expect(source).toContain('const pendingExecutionEvidence = []');
     expect(source).toContain('const completionEvidenceTtlMs = 30_000');
     expect(source).toContain('const maxPendingExecutionEvidence = 8');
     expect(source).toContain('prunePendingExecutionEvidence');
-    expect(source).toContain('enqueueExecutionEvidence(body.actionType, payload)');
-    expect(source).toContain('findIndex((entry) => entry.actionType === actionType)');
-    expect(source).toContain('pendingExecutionEvidence.splice(index, 1)[0]');
+    expect(source).toContain('while (pendingExecutionEvidence.length > maxPendingExecutionEvidence)');
+  });
+
+  it('fails closed instead of correlating concurrent same-action executions by timing alone', () => {
+    expect(source).toContain('const inFlightExecutionActions = new Map()');
+    expect(source).toContain('const ambiguousExecutionActions = new Set()');
+    expect(source).toContain('beginExecutionRequest(body.actionType)');
+    expect(source).toContain('inFlight > 0 || hasUnconsumedEvidence');
+    expect(source).toContain('ambiguousExecutionActions.add(actionType)');
+    expect(source).toContain('clearPendingExecutionEvidence(actionType)');
+    expect(source).toContain('if (!ambiguous && payload)');
+  });
+
+  it('requires exactly one same-action evidence candidate before witnessing a legacy notice', () => {
+    expect(source).toContain('matches.length !== 1');
+    expect(source).toContain('if (matches.length > 1) clearPendingExecutionEvidence(actionType)');
+    expect(source).toContain('pendingExecutionEvidence.splice(matches[0].index, 1)[0]');
+  });
+
+  it('clears stale same-action evidence when a later request fails or returns malformed evidence', () => {
+    expect(source).toContain('finishExecutionRequest(body.actionType, evidencePayload)');
+    expect(source).toContain('finishExecutionRequest(body.actionType, null)');
+    expect(source).toContain('Missing or malformed execution evidence must never become a completion claim.');
   });
 
   it('fails closed when a legacy success notice has no matching execution evidence', () => {
