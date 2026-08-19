@@ -15,10 +15,6 @@ import {
   dispatchProviderNeutralN8nFounderContent,
 } from '../../lib/n8nProviderNeutralFounderContentOrchestrator.js';
 import { FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT } from '../../lib/firstPartyFounderContentExecutor.js';
-import {
-  dispatchTemporallyGovernedFounderContentPublishNow,
-  type TemporallyGovernedFounderPublishInput,
-} from '../../lib/temporallyGovernedFounderContentExecutor.js';
 import { founderConveyorReadiness } from '../../lib/n8nConveyorReadiness.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../../lib/founderConveyorReceipt.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
@@ -85,7 +81,11 @@ n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
         contract: FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
         route: '/founder-content/publish-now',
         provider: 'linkedin',
+        enabled: false,
+        blockedBy: 'L99_AUTHORITATIVE_APPROVAL_STORE_REQUIRED',
         exactCurrentYouApprovalRequired: true,
+        authoritativeApprovalStoreReadbackRequired: true,
+        callerSuppliedApprovalIsAuthority: false,
         temporalClaimTruthRequired: true,
         historicalTruthPreserved: true,
         currentRepoStateRevalidatedAtExecution: true,
@@ -140,13 +140,16 @@ n8nConveyorRouter.post('/advance', async (req: FounderRequest, res) => {
 });
 
 n8nConveyorRouter.post('/founder-content/publish-now', async (req: FounderRequest, res) => {
-  const input = (req.body ?? {}) as unknown as TemporallyGovernedFounderPublishInput;
-  const result = await dispatchTemporallyGovernedFounderContentPublishNow(input, {
-    executedBy: req.founder!.email,
-  });
-
-  return res.status(result.status).json({
-    ...result,
+  return res.status(409).json({
+    ok: false,
+    code: 'L99_AUTHORITY_REQUIRED',
+    contract: FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
+    published: false,
+    authorityRequired: 'L99_AUTHORITATIVE_APPROVAL_STORE',
+    reasons: [
+      'Direct external publication is disabled until execution rereads an exact founder ApprovalReceipt from authoritative storage.',
+      'A structurally valid approval object supplied by the browser, model, queue, or n8n workflow is evidence about authority, not authority itself.',
+    ],
     founder: req.founder ? { userId: req.founder.userId } : null,
     finalPublishedTruth: 'fcr-provider-readback-only',
     currentTruthPolicy: 'historical-preserved-current-revalidated',
