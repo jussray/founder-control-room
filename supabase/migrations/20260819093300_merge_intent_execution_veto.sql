@@ -7,6 +7,10 @@
 -- exact approved candidate REVALIDATED (or a future stronger READY projection).
 -- The guarded /execute path must still pass every proof, evidence, review,
 -- provider-identity, diff, and exact-head gate afterwards.
+--
+-- REVALIDATED/READY is leased, not permanent. The fallback sweep runs every two
+-- minutes; execution requires a reconciliation witness no older than three
+-- minutes so a stalled reconciler fails closed.
 -- =============================================================================
 
 begin;
@@ -22,6 +26,7 @@ declare
   v_state text;
   v_proof_expires_at timestamptz;
   v_diff_hash text;
+  v_last_reconciled_at timestamptz;
 begin
   if new.action_type <> 'merge' or new.mission_id is null then
     return new;
@@ -40,8 +45,8 @@ begin
   -- Lock the current approval projection for the duration of the reservation
   -- insert. A concurrent reconciler cannot overwrite it between veto and the
   -- AFTER INSERT lifecycle projection.
-  select state, proof_expires_at, approved_diff_hash
-    into v_state, v_proof_expires_at, v_diff_hash
+  select state, proof_expires_at, approved_diff_hash, last_reconciled_at
+    into v_state, v_proof_expires_at, v_diff_hash, v_last_reconciled_at
     from merge_intents
    where mission_id = new.mission_id
    for update;
@@ -62,6 +67,12 @@ begin
   if v_diff_hash is null or v_diff_hash !~ '^[0-9a-f]{64}$' then
     raise exception
       'FCR merge execution vetoed: merge intent has no canonical approved diff witness';
+  end if;
+
+  if v_last_reconciled_at is null
+     or v_last_reconciled_at < now() - interval '3 minutes' then
+    raise exception
+      'FCR merge execution vetoed: merge-intent revalidation lease is stale';
   end if;
 
   if v_proof_expires_at is null or v_proof_expires_at <= now() then
