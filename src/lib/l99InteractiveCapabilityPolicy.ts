@@ -311,6 +311,13 @@ export function validateInteractiveEnvelope(envelope: unknown): string[] {
   }
 
   if (
+    envelope.capability === 'sandbox.create'
+    && hasSandboxAmbientAuthority(envelope.sandboxIsolation)
+  ) {
+    errors.push('sandbox.create must start with zero ambient authority');
+  }
+
+  if (
     isSandbox
     && hasSandboxAmbientAuthority(envelope.sandboxIsolation)
     && !envelope.requiresFounderReceipt
