@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import {
   isV10CapabilityPlan,
   type V10CapabilityPlan,
@@ -142,7 +142,7 @@ n8nConveyorRouter.post('/advance', async (req: FounderRequest, res) => {
   });
 });
 
-function authorityStoreRequired(req: FounderRequest, res: Parameters<Parameters<typeof n8nConveyorRouter.post>[1]>[1]) {
+function authorityStoreRequired(req: FounderRequest, res: Response) {
   return res.status(409).json({
     ok: false,
     code: 'L99_AUTHORITY_REQUIRED',
