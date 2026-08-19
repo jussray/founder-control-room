@@ -158,6 +158,31 @@ describe('L99 interactive capability policy', () => {
     ).toContain('sandbox ambient authority requires a founder receipt');
   });
 
+  it('requires sandbox export to be classified as an external mutation', () => {
+    expect(
+      validateInteractiveEnvelope(
+        envelope({
+          capability: 'sandbox.export',
+          targetPatterns: ['sandbox://job-1'],
+          allowedOperations: ['export'],
+          externalMutation: false,
+          requiresFounderReceipt: true,
+          fingerprints: {
+            inputFingerprint: 'input:abc',
+            environmentFingerprint: 'env:def',
+            outputFingerprint: 'output:123',
+          },
+          sandboxIsolation: {
+            networkAccess: false,
+            secretsAccess: false,
+            productionAccess: false,
+            persistentStorage: false,
+          },
+        }),
+      ),
+    ).toContain('sandbox.export must be classified as an external mutation');
+  });
+
   it('requires founder receipt and exact output fingerprint before sandbox export', () => {
     expect(
       validateInteractiveEnvelope(
