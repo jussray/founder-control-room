@@ -49,13 +49,16 @@ export const L99_INTERACTIVE_CAPABILITY_POLICY = Object.freeze({
     sandboxExportRequiresFounderReceiptAndOutputFingerprint: true,
     sandboxDestroyRequiresFounderReceipt: true,
     fingerprintsProveIdentityNotAuthority: true,
+    fingerprintsAreSha256: true,
     orchestrationCannotWidenInteractiveAuthority: true,
     derivationPreservesExactCapability: true,
+    mutationClassificationCannotBeDowngraded: true,
   }),
 });
 
-const TERMINAL_OPERATION_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
-const FORBIDDEN_TERMINAL_OPERATION_ID = /^(?:sh|bash|zsh|fish|cmd(?:\.exe)?|powershell|pwsh)$/i;
+const SHA256 = /^[0-9a-f]{64}$/i;
+const TERMINAL_OPERATION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const FORBIDDEN_TERMINAL_OPERATION_ID = /^(?:sh|bash|zsh|fish|cmd(?:\.exe)?|powershell|pwsh)(?:$|[._:-])/i;
 
 function fingerprintIsSubset(child: string | null, parent: string | null): boolean {
   if (parent === null) return true;
@@ -100,6 +103,23 @@ function hasSandboxAmbientAuthority(isolation: L99SandboxIsolation | null): bool
   );
 }
 
+function validateFingerprints(fingerprints: L99FingerprintBinding): string[] {
+  const errors: string[] = [];
+  const entries: Array<[keyof L99FingerprintBinding, string | null]> = [
+    ['inputFingerprint', fingerprints.inputFingerprint],
+    ['environmentFingerprint', fingerprints.environmentFingerprint],
+    ['outputFingerprint', fingerprints.outputFingerprint],
+  ];
+
+  for (const [name, value] of entries) {
+    if (value !== null && !SHA256.test(value)) {
+      errors.push(`${name} must be a 64-hex sha256 fingerprint`);
+    }
+  }
+
+  return errors;
+}
+
 export function interactiveEnvelopeIsSubset(
   child: L99InteractiveAuthorityEnvelope,
   parent: L99InteractiveAuthorityEnvelope,
@@ -110,7 +130,10 @@ export function interactiveEnvelopeIsSubset(
   // A capability is a typed authority boundary, not a scalar rank. Derivation may
   // narrow scope inside one capability, but changing capability requires a new grant.
   if (child.capability !== parent.capability) return false;
-  if (child.externalMutation && !parent.externalMutation) return false;
+
+  // Mutation classification is security metadata, not optional decoration. A child
+  // may not hide a parent's external side-effect classification.
+  if (child.externalMutation !== parent.externalMutation) return false;
 
   if (parent.requiresFounderReceipt && !child.requiresFounderReceipt) return false;
   if (parent.requiresPlaywrightProof && !child.requiresPlaywrightProof) return false;
@@ -135,6 +158,8 @@ export function validateInteractiveEnvelope(
 ): string[] {
   const errors: string[] = [];
   const isSandbox = envelope.capability.startsWith('sandbox.');
+
+  errors.push(...validateFingerprints(envelope.fingerprints));
 
   if (envelope.expiresAt !== null) {
     const expiresAt = Date.parse(envelope.expiresAt);
