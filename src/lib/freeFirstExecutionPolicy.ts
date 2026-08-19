@@ -1,3 +1,5 @@
+export const FREE_FIRST_EXECUTION_POLICY_VERSION = 'free-first-v1';
+
 export type ExecutionCostClass = 'free' | 'included' | 'metered' | 'paid';
 
 export interface FreeFirstMissionPolicySnapshot {
@@ -17,6 +19,10 @@ export interface FreeFirstCostDecision {
 function record(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
+}
+
+export function isExecutionCostCurrentlyAuthorized(costClass: ExecutionCostClass): boolean {
+  return costClass === 'free' || costClass === 'included';
 }
 
 export function missionRequiresFreeFirst(
@@ -41,7 +47,7 @@ export function evaluateFreeFirstCostGate(input: {
     return { allowed: true, governed: false, reason: 'mission_not_free_first' };
   }
 
-  if (input.costClass === 'free' || input.costClass === 'included') {
+  if (isExecutionCostCurrentlyAuthorized(input.costClass)) {
     return { allowed: true, governed: true, reason: 'free_or_included_execution' };
   }
 
