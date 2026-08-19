@@ -7,6 +7,7 @@ export const REQUIRED_CHECKS = ['Required Gate', 'Verify test-ledger contract'];
 
 const API_VERSION = '2026-03-10';
 const API_ROOT = 'https://api.github.com';
+const RECEIPT_PATH = 'artifacts/github-governance-preflight.json';
 
 function text(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -110,6 +111,8 @@ export function buildReport({ repository, targetRef = 'main', fullRulesets, coll
     canonicalRulesetName: canonicalName,
     observedAt: new Date().toISOString(),
     providerMutationPerformed: false,
+    observationComplete: true,
+    blocker: null,
     activeRulesetCountTargetingRef: activeTargetingRef.length,
     canonicalRulesetMatchCount: canonicalMatches.length,
     canonicalRuleset: canonical,
@@ -127,6 +130,40 @@ export function buildReport({ repository, targetRef = 'main', fullRulesets, coll
   };
 }
 
+export function buildBlockedReport({ repository, targetRef = 'main', reason = 'provider_read_unavailable' }) {
+  return {
+    contract: CONTRACT,
+    repository: text(repository) || 'unknown',
+    targetRef: text(targetRef) || 'main',
+    canonicalRulesetName: CANONICAL_RULESET_NAME,
+    observedAt: new Date().toISOString(),
+    providerMutationPerformed: false,
+    observationComplete: false,
+    blocker: reason,
+    activeRulesetCountTargetingRef: null,
+    canonicalRulesetMatchCount: null,
+    canonicalRuleset: null,
+    canonicalFloorSatisfied: false,
+    independentReviewerReady: false,
+    eligibleNonOwnerWriteReviewerCount: null,
+    observedBranchRulesets: [],
+    status: 'BLOCKED',
+  };
+}
+
+export function classifyProviderReadFailure(error) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  if (/403|resource not accessible|forbidden/i.test(message)) return 'provider_read_forbidden';
+  if (/401|bad credentials|requires authentication/i.test(message)) return 'provider_read_unauthenticated';
+  if (/GITHUB_TOKEN is required/i.test(message)) return 'provider_read_token_missing';
+  return 'provider_read_failed';
+}
+
+function writeReceipt(report) {
+  mkdirSync('artifacts', { recursive: true });
+  writeFileSync(RECEIPT_PATH, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+}
+
 async function githubGet(path, token) {
   const response = await fetch(`${API_ROOT}${path}`, {
     headers: {
@@ -139,7 +176,7 @@ async function githubGet(path, token) {
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     const message = typeof body?.message === 'string' ? body.message : `HTTP ${response.status}`;
-    throw new Error(`GitHub provider read failed for ${path}: ${message}`);
+    throw new Error(`GitHub provider read failed for ${path}: HTTP ${response.status}: ${message}`);
   }
   return body;
 }
@@ -176,32 +213,55 @@ export async function collectGovernancePreflight({ token, repository, targetRef 
 }
 
 async function main() {
-  const report = await collectGovernancePreflight({
-    token: process.env.GITHUB_TOKEN,
-    repository: process.env.GITHUB_REPOSITORY,
-    targetRef: process.env.FCR_GOVERNANCE_TARGET_REF || 'main',
-  });
+  const repository = process.env.GITHUB_REPOSITORY;
+  const targetRef = process.env.FCR_GOVERNANCE_TARGET_REF || 'main';
+  let report;
+  let blocked = false;
 
-  mkdirSync('artifacts', { recursive: true });
-  writeFileSync('artifacts/github-governance-preflight.json', `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  try {
+    report = await collectGovernancePreflight({
+      token: process.env.GITHUB_TOKEN,
+      repository,
+      targetRef,
+    });
+  } catch (error) {
+    blocked = true;
+    report = buildBlockedReport({
+      repository,
+      targetRef,
+      reason: classifyProviderReadFailure(error),
+    });
+  }
+
+  writeReceipt(report);
 
   console.log(JSON.stringify({
     contract: report.contract,
     repository: report.repository,
     targetRef: report.targetRef,
     status: report.status,
+    observationComplete: report.observationComplete,
+    blocker: report.blocker,
     activeRulesetCountTargetingRef: report.activeRulesetCountTargetingRef,
     canonicalRulesetMatchCount: report.canonicalRulesetMatchCount,
     canonicalFloorSatisfied: report.canonicalFloorSatisfied,
     independentReviewerReady: report.independentReviewerReady,
     eligibleNonOwnerWriteReviewerCount: report.eligibleNonOwnerWriteReviewerCount,
   }, null, 2));
+
+  if (blocked) process.exitCode = 1;
 }
 
 const invokedAsScript = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (invokedAsScript) {
   main().catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
+    const report = buildBlockedReport({
+      repository: process.env.GITHUB_REPOSITORY,
+      targetRef: process.env.FCR_GOVERNANCE_TARGET_REF || 'main',
+      reason: classifyProviderReadFailure(error),
+    });
+    writeReceipt(report);
+    console.error(JSON.stringify({ contract: CONTRACT, status: report.status, blocker: report.blocker }));
     process.exit(1);
   });
 }
