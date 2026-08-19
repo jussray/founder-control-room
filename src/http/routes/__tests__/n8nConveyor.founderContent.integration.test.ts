@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockDispatchFounderContent,
+  mockDirectPublish,
   mockGetUser,
   supabaseMock,
 } = vi.hoisted(() => ({
   mockDispatchFounderContent: vi.fn(),
+  mockDirectPublish: vi.fn(),
   mockGetUser: vi.fn(),
   supabaseMock: { from: vi.fn() },
 }));
@@ -23,6 +25,9 @@ vi.mock('../../../lib/n8nProviderNeutralFounderContentOrchestrator.js', async ()
     dispatchProviderNeutralN8nFounderContent: mockDispatchFounderContent,
   };
 });
+vi.mock('../../../lib/temporallyGovernedFounderContentExecutor.js', () => ({
+  dispatchTemporallyGovernedFounderContentPublishNow: mockDirectPublish,
+}));
 
 import express from 'express';
 import request from 'supertest';
@@ -31,6 +36,7 @@ import {
   N8N_FOUNDER_CONTENT_CONTRACT,
   N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
 } from '../../../lib/n8nProviderNeutralFounderContentOrchestrator.js';
+import { FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT } from '../../../lib/firstPartyFounderContentExecutor.js';
 
 const FOUNDER_EMAIL = 'founder@example.com';
 const BEARER = 'Bearer test-token';
@@ -68,9 +74,10 @@ describe('n8n founder-content route', () => {
 
     expect(res.status).toBe(401);
     expect(mockDispatchFounderContent).not.toHaveBeenCalled();
+    expect(mockDirectPublish).not.toHaveBeenCalled();
   });
 
-  it('exposes bounded provider contracts and secret-safe activation readiness separately from live proof', async () => {
+  it('exposes readiness without advertising external mutation authority', async () => {
     const res = await request(buildApp())
       .get('/automation/conveyor')
       .set('Authorization', BEARER);
@@ -79,6 +86,8 @@ describe('n8n founder-content route', () => {
     expect(res.body.founderContent).toEqual(expect.objectContaining({
       contract: N8N_FOUNDER_CONTENT_CONTRACT,
       route: '/founder-content',
+      enabled: false,
+      blockedBy: 'L99_AUTHORITATIVE_APPROVAL_STORE_REQUIRED',
       providerSelection: 'founder-authenticated-bounded-platform-compatible',
       providerContractRoutes: N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
       providerRuntimeConfiguration: {
@@ -91,63 +100,78 @@ describe('n8n founder-content route', () => {
         liveVerified: false,
         secretValuesExposed: false,
       }),
-      finalPublishedTruth: 'fcr-provider-readback-only',
       authority: {
-        orchestrate: true,
-        requestProviderWrite: true,
+        orchestrate: false,
+        requestProviderWrite: false,
         authorizePublication: false,
         changeCopy: false,
         markPublished: false,
         readPrivateEvidence: false,
       },
+      authoritativeApprovalStoreReadbackRequired: true,
+      callerSuppliedApprovalIsAuthority: false,
+      finalPublishedTruth: 'fcr-provider-readback-only',
+      directPublish: expect.objectContaining({
+        contract: FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
+        enabled: false,
+        blockedBy: 'L99_AUTHORITATIVE_APPROVAL_STORE_REQUIRED',
+        authoritativeApprovalStoreReadbackRequired: true,
+        callerSuppliedApprovalIsAuthority: false,
+      }),
     }));
     expect(res.body.founderContent.readiness).not.toHaveProperty('webhookUrl');
     expect(res.body.founderContent.readiness).not.toHaveProperty('bearerToken');
   });
 
-  it('binds execution identity to the authenticated founder and never trusts body identity', async () => {
-    mockDispatchFounderContent.mockResolvedValue({
-      ok: true,
-      code: 'DISPATCHED',
-      status: 202,
-      request: {
-        orchestrationId: 'fcr-n8n-social-v1:test',
-        providerRequest: { provider: 'meta' },
-      },
-      receipt: {
-        orchestrationId: 'fcr-n8n-social-v1:test',
-        provider: 'meta',
-        state: 'scheduled',
-        providerItemId: 'meta-post-1',
-        providerRequestId: 'meta-request-1',
-        truthState: 'provider_schedule_receipt_pending_readback',
-        published: false,
-        requiresProviderReadback: true,
-      },
-      reasons: [],
-    });
-
-    const envelope = {
-      lane: 'first_party_founder_governed_schedule',
-      authority: { authorization_mode: 'exact-current-you' },
-      n8n_provider: 'meta',
-      executedBy: 'attacker@example.com',
-    };
-
+  it('rejects caller-supplied approval evidence before provider-neutral orchestration', async () => {
     const res = await request(buildApp())
       .post('/automation/conveyor/founder-content')
       .set('Authorization', BEARER)
-      .send(envelope);
+      .send({
+        lane: 'first_party_founder_governed_schedule',
+        authority: { authorization_mode: 'exact-current-you' },
+        approval: { approval_id: 'caller-supplied' },
+        n8n_provider: 'buffer',
+      });
 
-    expect(res.status).toBe(202);
-    expect(mockDispatchFounderContent).toHaveBeenCalledWith(envelope, {
-      executedBy: FOUNDER_EMAIL,
-    });
-    expect(res.body.contract).toBe(N8N_FOUNDER_CONTENT_CONTRACT);
-    expect(res.body.founder).toEqual({ userId: 'founder-user-1' });
-    expect(res.body.receipt.provider).toBe('meta');
-    expect(res.body.receipt.published).toBe(false);
-    expect(res.body.receipt.requiresProviderReadback).toBe(true);
-    expect(res.body.finalPublishedTruth).toBe('fcr-provider-readback-only');
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual(expect.objectContaining({
+      ok: false,
+      code: 'L99_AUTHORITY_REQUIRED',
+      contract: N8N_FOUNDER_CONTENT_CONTRACT,
+      published: false,
+      authorityRequired: 'L99_AUTHORITATIVE_APPROVAL_STORE',
+      operation: 'orchestrate',
+      founder: { userId: 'founder-user-1' },
+      finalPublishedTruth: 'fcr-provider-readback-only',
+    }));
+    expect(res.body.reasons.join(' ')).toContain('authoritative storage');
+    expect(mockDispatchFounderContent).not.toHaveBeenCalled();
+  });
+
+  it('rejects caller-supplied approval evidence before direct publication', async () => {
+    const res = await request(buildApp())
+      .post('/automation/conveyor/founder-content/publish-now')
+      .set('Authorization', BEARER)
+      .send({
+        proposal: { kind: 'chief-ai/founder-content-proposal' },
+        approval: { approval_id: 'caller-supplied' },
+        confirmation: { confirm_publication: true },
+        current_you: { authenticated: true },
+      });
+
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual(expect.objectContaining({
+      ok: false,
+      code: 'L99_AUTHORITY_REQUIRED',
+      contract: FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
+      published: false,
+      authorityRequired: 'L99_AUTHORITATIVE_APPROVAL_STORE',
+      operation: 'publish',
+      founder: { userId: 'founder-user-1' },
+      finalPublishedTruth: 'fcr-provider-readback-only',
+    }));
+    expect(res.body.reasons.join(' ')).toContain('authoritative storage');
+    expect(mockDirectPublish).not.toHaveBeenCalled();
   });
 });
