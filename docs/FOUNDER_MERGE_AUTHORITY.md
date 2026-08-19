@@ -6,6 +6,8 @@ Juss authorizes repository changes to be merged when the acting AI or operator d
 
 This standing authority replaces blanket `do not merge` language in active operating instructions. It does not require another merge-only confirmation when every applicable merge condition below is satisfied.
 
+For `jussray/founder-control-room`, the normal merge path remains independent-review-first. The founder also retains a separate, explicit, auditable manual-merge override described below. Ordinary words such as `approved`, `merge`, `continue`, `cont`, or `audit` do not by themselves invoke that exception.
+
 ## Merge conditions
 
 A merge is appropriate only when:
@@ -43,6 +45,28 @@ For `jussray/founder-control-room` it requires, at minimum:
 
 The request may carry review metadata or a pinned policy representation for identity/hashing, but it cannot redefine the trusted semantic reviewer set. The evaluator fails closed when the policy hash differs from the server-owned FCR reviewer policy, when the server configuration is absent or invalid, when the reviewer is the author, when a GitHub App bot is offered as the semantic reviewer, or when the provider witness is stale or mismatched.
 
+### Explicit founder manual-merge override
+
+The founder retains final manual merge authority as a deliberately separate exception path. This exception does **not** redefine a founder self-review as an independent approval and does **not** make the ordinary independent-review path optional.
+
+A founder override is valid only when the founder explicitly invokes the exception for the exact candidate being merged and an auditable receipt records, before or contemporaneously with the merge:
+
+- repository and pull request number;
+- target branch and current base SHA;
+- exact final head SHA;
+- founder identity;
+- explicit `FOUNDER_MANUAL_MERGE_OVERRIDE` authority class;
+- reason the normal independent-review path is being overridden;
+- current machine-check state, including every non-green or unavailable required signal;
+- current review and unresolved-thread state;
+- current provider/ruleset truth, classified `CURRENT`, `UNKNOWN`, or `BLOCKED` rather than guessed;
+- rollback or safe forward-fix;
+- timestamp and durable receipt/provenance location.
+
+The override must fail closed when the head or base changes after the receipt is prepared. It cannot silently authorize a deployment, publication, provider-policy mutation, secret/credential change, database mutation, destructive action, billing commitment, or other separately gated side effect.
+
+A founder override may acknowledge a known provider-governance gap; it must not relabel that gap as fixed. Historical founder-executed merges without this explicit receipt remain historical governance evidence, not retroactive compliant overrides.
+
 ### In-app FCR authority is not the live GitHub ruleset
 
 The source/runtime FCR merge membrane and the **live GitHub repository ruleset are a separate provider gate**.
@@ -50,6 +74,8 @@ The source/runtime FCR merge membrane and the **live GitHub repository ruleset a
 A correct in-app review engine does not prove that GitHub's web/API merge surface independently enforces the same approval count, stale-review dismissal, last-push approval, thread resolution, strict status freshness, bypass actors, or bypass modes. Those provider protections require their own current GitHub readback.
 
 Do not claim repository-wide GitHub governance is fixed merely because the FCR source gate is strong. Conversely, a GitHub merge that occurred outside the in-app FCR path does not prove the in-app independent-review contract was satisfied.
+
+The explicit founder manual-merge override is an exception to the normal merge authorization path, not evidence that the live provider ruleset enforces the normal path. Provider enforcement and founder exception authority must remain separately observable.
 
 ## Documentation truth
 
@@ -61,7 +87,7 @@ For a truth-sensitive change:
 implementation / authority / provider truth changes
 -> update README + applicable current-state docs in the same bounded PR
 -> run Documentation Truth on the exact PR head
--> merge only with the normal repository gates satisfied
+-> merge only with the normal repository gates satisfied or an explicit founder manual-merge override receipt
 -> run Documentation Truth again on the merged main transition
 -> re-observe provider/runtime truth before reusing present-tense claims
 ```
@@ -76,7 +102,7 @@ A GitHub Actions infrastructure outage can gate merge and release truth without 
 
 When jobs have no executed steps or no logs, agents must not blame the diff. They must record the exact PR, head SHA, workflow, run, job evidence, classification, impact, Cloudflare/runtime evidence if available, and the next gate in Founder Control Room.
 
-If remaining evidence is sufficient for a docs-only, policy-only, or otherwise low-risk focused change, a merge may still be appropriate only when every other applicable authority gate is satisfied. If the change requires executed CI, independent review, Playwright, deployment proof, auth proof, migration proof, runtime proof, or Documentation Truth proof that is unavailable, leave the PR open and state the exact blocker.
+If remaining evidence is sufficient for a docs-only, policy-only, or otherwise low-risk focused change, a merge may still be appropriate only when every other applicable authority gate is satisfied or the founder explicitly invokes the manual-merge override with the required receipt. If the change requires executed CI, independent review, Playwright, deployment proof, auth proof, migration proof, runtime proof, or Documentation Truth proof that is unavailable, leave the PR open unless the explicit override is valid for that exact merge and the missing evidence is recorded rather than treated as green.
 
 ## Canonical project routing
 
@@ -84,7 +110,7 @@ Only `jussray/Sekret-Bip` is the active Se’kret Bip working repository. Other 
 
 ## Separate gates remain separate
 
-This standing merge authority does not automatically authorize:
+This standing merge authority and the founder manual-merge override do not automatically authorize:
 
 - production deployment or public release;
 - database migration or destructive data writes;
@@ -98,6 +124,6 @@ Those actions still require their own exact approval unless a later founder dire
 
 ## Operating rule
 
-Do not merge merely because a PR exists or because a badge looks green. Merge when it is the correct, evidence-backed integration step and the current authority membrane is satisfied.
+Do not merge merely because a PR exists or because a badge looks green. Merge when it is the correct, evidence-backed integration step and either the normal current authority membrane is satisfied or the founder has explicitly invoked the exact-candidate manual-merge override with its required receipt.
 
 Immediately before merge, re-read current `main`, the exact PR head, required checks, review state, and applicable provider state. After merge, re-read the resulting `main`, Documentation Truth, and the next release/runtime gate. Old-head green remains historical evidence only.
