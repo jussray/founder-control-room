@@ -27,7 +27,7 @@ Current implementation includes:
 - provider-independent repository abstractions and guarded exact-head execution;
 - founder proof, idempotency/reservation, and rollback boundaries;
 - an FCR-specific provider-grounded independent-review membrane before in-app provider integration;
-- server-owned FCR semantic reviewer trust through `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` at the review evaluator boundary;
+- a canonical FCR founder-final merge policy that keeps deterministic independent review load-bearing, binds authenticated founder approval to the exact PR/base/head, and preserves the older server-owned semantic-review policy only for already-pinned compatibility paths;
 - canonical capability governance through `.control/capability.json`;
 - deterministic Cloudflare reasoning, request-trace/source contracts, and founder-gated Access recovery tooling whose source existence does not itself prove live provider configuration;
 - a secret-free exact-head Cloudflare bridge authority contract that is load-bearing inside CI / `Required Gate`, while live Cloudflare and GitHub provider state remain separate authority facts;
@@ -84,15 +84,17 @@ canonical declaration
 
 The mutable capability ledger itself does not prove current-head CI, deployment, or runtime health. Read immutable current evidence for those claims.
 
-## Independent review and merge truth
+## Independent review and founder-final merge truth
 
-Founder Control Room's in-app merge path requires exact provider PR identity, exact-head machine evidence, canonical diff/policy hashes, provider-backed review witnesses, non-author semantic review, deterministic review, P2 blocking, and a last-moment head re-read before provider integration.
+Founder Control Room's canonical in-app merge path requires exact provider PR identity, exact-head machine evidence, canonical diff/policy hashes, a passed exact-head deterministic independent-review witness, P2 blocking, an authenticated founder-final approval bound to the exact PR/base/head, and a last-moment head re-read before provider integration.
 
-For FCR, the reviewer policy passed into the evaluator must match the server-owned semantic reviewer set configured through `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS`. Caller-supplied policy representation cannot redefine that trusted set.
+The deterministic review remains proposal-only and non-authorizing. The authenticated founder-final receipt supplies the final human authority only after independent proof is current. Founder self-approval is therefore **not** relabeled as independent review.
+
+New founder-final approvals use a server-owned policy with zero required semantic humans, deterministic review required, P2 blocking, and `founderFinalApprovalRequired: true`. The older `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` policy remains compatibility-only for missions already pinned under the earlier human-semantic-review model.
 
 This source/runtime membrane is **not proof of the live GitHub repository ruleset**. GitHub web/API merges, required approval counts, stale-review dismissal, last-push approval, thread-resolution rules, strict status freshness, and bypass actor/mode configuration are separate provider facts that require current GitHub readback.
 
-A GitHub merge outside the in-app FCR execution path does not prove the FCR independent-review contract was used.
+A GitHub merge outside the in-app FCR execution path does not prove the FCR deterministic-review + founder-final contract was used.
 
 ## Founder-owned progress publishing
 
@@ -313,7 +315,7 @@ Approved branch/merge actions use reservation/idempotency controls before provid
 | Read project/evidence | Founder-authenticated or explicitly public-safe read |
 | Run bounded verification | Applicable founder/repository authority |
 | Create branch | Separate repository write authority |
-| Merge through FCR | Exact-head machine proof + current FCR independent-review membrane + repository authority |
+| Merge through FCR | Exact-head machine proof + deterministic independent review + authenticated exact-candidate founder-final approval + repository authority |
 | Merge through live GitHub surface | Separate live GitHub ruleset/provider authority and readback |
 | Deploy / mutate production | Separate exact production authority |
 | Database migration | Separate migration/database authority |
