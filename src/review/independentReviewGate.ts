@@ -62,8 +62,13 @@ export interface IndependentReviewPolicy {
   requireDeterministicReview: boolean;
   /** P2 is unresolved review work and must remain merge-blocking in v1. */
   blockOnP2: true;
-  /** Provider identities allowed to satisfy semantic review. */
+  /** Provider identities allowed to satisfy semantic review. Empty only for founder-final mode. */
   trustedSemanticReviewerIds: string[];
+  /**
+   * FCR founder-final mode keeps independent deterministic review load-bearing
+   * while making the authenticated founder the final human authority.
+   */
+  founderFinalApprovalRequired?: true;
 }
 
 export interface IndependentReviewGateResult {
@@ -85,23 +90,37 @@ const VERDICTS = new Set<ReviewVerdict>(["clear", "needs_review", "blocked"]);
 const FCR_REPOSITORY = "jussray/founder-control-room";
 const FCR_TRUSTED_REVIEWERS_ENV = "FCR_TRUSTED_SEMANTIC_REVIEWER_IDS";
 
+export const FCR_FOUNDER_FINAL_REVIEW_POLICY: IndependentReviewPolicy = Object.freeze({
+  requiredSemanticReviews: 0,
+  requireDeterministicReview: true,
+  blockOnP2: true,
+  trustedSemanticReviewerIds: [],
+  founderFinalApprovalRequired: true,
+});
+
 const text = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const lower = (value: unknown): string => text(value).toLowerCase();
 const isGitHubAppBotIdentity = (value: unknown): boolean => /\[bot\]$/i.test(text(value));
+const isFounderFinalPolicy = (policy: IndependentReviewPolicy): boolean =>
+  policy?.founderFinalApprovalRequired === true;
 
 export function independentReviewPolicyHash(policy: IndependentReviewPolicy): string {
   const trustedReviewerIds = Array.isArray(policy?.trustedSemanticReviewerIds)
     ? policy.trustedSemanticReviewerIds.map(lower).filter(Boolean).sort()
     : [];
-  return hash("sha256", JSON.stringify([
+  const seed: unknown[] = [
     policy?.requiredSemanticReviews,
     policy?.requireDeterministicReview === true,
     policy?.blockOnP2 === true,
     trustedReviewerIds,
-  ]), "hex");
+  ];
+  // Preserve legacy policy hashes. Founder-final is an explicit new authority
+  // mode and therefore gets a distinct policy identity.
+  if (policy?.founderFinalApprovalRequired === true) seed.push("founder-final");
+  return hash("sha256", JSON.stringify(seed), "hex");
 }
 
-function fcrServerOwnedPolicy(env: NodeJS.ProcessEnv): IndependentReviewPolicy | null {
+function fcrServerOwnedSemanticPolicy(env: NodeJS.ProcessEnv): IndependentReviewPolicy | null {
   const raw = text(env[FCR_TRUSTED_REVIEWERS_ENV]);
   if (!raw) return null;
   const trustedSemanticReviewerIds = raw.split(",").map((value) => value.trim()).filter(Boolean);
@@ -123,9 +142,19 @@ function fcrServerPolicyBlockers(
   env: NodeJS.ProcessEnv,
 ): string[] {
   if (lower(context.repository) !== FCR_REPOSITORY) return [];
-  const serverPolicy = fcrServerOwnedPolicy(env);
+
+  if (isFounderFinalPolicy(policy)) {
+    if (independentReviewPolicyHash(policy) !== independentReviewPolicyHash(FCR_FOUNDER_FINAL_REVIEW_POLICY)) {
+      return ["FCR founder-final review policy must match the server-owned deterministic-review policy"];
+    }
+    return [];
+  }
+
+  // Compatibility path for already-approved missions that were pinned under
+  // the earlier trusted-human semantic-review policy.
+  const serverPolicy = fcrServerOwnedSemanticPolicy(env);
   if (!serverPolicy) {
-    return [`FCR merge requires valid server-owned ${FCR_TRUSTED_REVIEWERS_ENV} configuration`];
+    return [`FCR legacy semantic-review mode requires valid server-owned ${FCR_TRUSTED_REVIEWERS_ENV} configuration`];
   }
   if (independentReviewPolicyHash(policy) !== independentReviewPolicyHash(serverPolicy)) {
     return ["FCR independent review policy must match the server-owned semantic reviewer policy"];
@@ -316,19 +345,31 @@ export async function evaluateIndependentReviewGate(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<IndependentReviewGateResult> {
   const blockers: string[] = [];
+  const founderFinalMode = isFounderFinalPolicy(policy);
   if (!FULL_SHA.test(text(context.baseSha)) || !FULL_SHA.test(text(context.headSha))) blockers.push("Gate context requires full base/head SHAs");
   if (!SHA256.test(text(context.diffHash)) || !SHA256.test(text(context.policyHash))) blockers.push("Gate context requires sha256 diff/policy hashes");
   if (!Number.isInteger(context.pullRequestNumber) || context.pullRequestNumber <= 0) blockers.push("Gate context requires a positive pull request number");
   if (!text(context.projectId) || !text(context.repository) || !text(context.authorIdentity)) blockers.push("Gate context requires project, repository, and author identity");
   blockers.push(...fcrServerPolicyBlockers(context, policy, env));
-  if (!Number.isInteger(policy?.requiredSemanticReviews) || policy.requiredSemanticReviews < 1 || policy.requiredSemanticReviews > 4) {
-    blockers.push("Policy requires between 1 and 4 semantic reviews");
+
+  const minimumSemanticReviews = founderFinalMode ? 0 : 1;
+  if (!Number.isInteger(policy?.requiredSemanticReviews)
+    || policy.requiredSemanticReviews < minimumSemanticReviews
+    || policy.requiredSemanticReviews > 4) {
+    blockers.push(
+      founderFinalMode
+        ? "Founder-final policy requires between 0 and 4 semantic reviews"
+        : "Policy requires between 1 and 4 semantic reviews",
+    );
   }
   if (policy?.blockOnP2 !== true) blockers.push("Independent review v1 requires P2 findings to remain merge-blocking");
-  if (!Array.isArray(policy?.trustedSemanticReviewerIds) || policy.trustedSemanticReviewerIds.length === 0) {
-    blockers.push("Policy requires at least one trusted semantic reviewer identity");
+  if (!Array.isArray(policy?.trustedSemanticReviewerIds)) {
+    blockers.push("Policy trustedSemanticReviewerIds must be an array");
   } else {
     const normalized = policy.trustedSemanticReviewerIds.map(lower).filter(Boolean);
+    if (!founderFinalMode && normalized.length === 0) {
+      blockers.push("Policy requires at least one trusted semantic reviewer identity");
+    }
     if (new Set(normalized).size !== normalized.length) blockers.push("Trusted semantic reviewer identities must be unique");
     const botReviewers = normalized.filter(isGitHubAppBotIdentity);
     if (botReviewers.length > 0) {

@@ -85,6 +85,13 @@ function failedReviewError(result: IndependentReviewGateResult): Error {
   );
 }
 
+/**
+ * @deprecated Compatibility-only adapter for missions pinned under the earlier
+ * server-owned human semantic-review policy. The canonical FCR merge path now
+ * lives in `src/http/routes/approvals.ts` and requires deterministic exact-head
+ * review followed by a separately authenticated founder-final approval. Do not
+ * use this helper as complete merge authority for new FCR missions.
+ */
 export async function enforceMergeReviewAuthority(
   input: MergeReviewAuthorityInput,
 ): Promise<MergeReviewAuthorityProof> {
