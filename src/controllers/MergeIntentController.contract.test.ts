@@ -13,6 +13,14 @@ const revisionGuard = readFileSync(
   'supabase/migrations/20260819093200_merge_intent_revision_guard.sql',
   'utf8',
 );
+const executionVeto = readFileSync(
+  'supabase/migrations/20260819093300_merge_intent_execution_veto.sql',
+  'utf8',
+);
+const enqueueMigration = readFileSync(
+  'supabase/migrations/20260819093400_enqueue_merge_intent_reconciliation.sql',
+  'utf8',
+);
 const controller = readFileSync('src/controllers/MergeIntentController.ts', 'utf8');
 const scheduler = readFileSync('src/worker/scheduler.ts', 'utf8');
 const reconciler = readFileSync('src/worker/reconciler.ts', 'utf8');
@@ -39,19 +47,20 @@ describe('merge intent liveness contract', () => {
     expect(migration).toMatch(/on conflict \(mission_id\) do update set/);
   });
 
-  it('backfills or fail-closes every already-approved FCR mission', () => {
+  it('backfills or fail-closes every already-approved FCR mission using founder-attributed proof', () => {
     expect(backfill).toMatch(/m\.status = 'approved'/);
     expect(backfill).toMatch(/lower\(coalesce\(p\.repo_identifier, ''\)\) = 'jussray\/founder-control-room'/);
     expect(backfill).toMatch(/Merge-intent liveness migration blocked/);
     expect(backfill).toMatch(/insert into merge_intents/);
     expect(backfill).toMatch(/cross join lateral/);
+    expect(backfill).toMatch(/coalesce\(btrim\(pgr\.approved_by\), ''\) <> ''/);
     expect(backfill).toMatch(/order by pgr\.ran_at desc, pgr\.id desc/);
     expect(backfill).toMatch(/then 'expired'/);
     expect(backfill).toMatch(/Merge-intent liveness postcondition failed/);
     expect(backfill).toMatch(/left join merge_intents mi on mi\.mission_id = m\.id/);
   });
 
-  it('keeps merge intent as a projection, never approval or provider-mutation authority', () => {
+  it('keeps merge intent as a projection, never positive approval or provider-mutation authority', () => {
     expect(migration).toMatch(/Never approval or provider-mutation authority/);
     expect(migration).toMatch(/READY does not authorize merge execution/);
     expect(controller).toMatch(/READY is a liveness projection only; guarded \/execute remains merge authority/);
@@ -74,13 +83,14 @@ describe('merge intent liveness contract', () => {
     expect(controller).toMatch(/canonical provider diff hash changed for the approved candidate pair/);
   });
 
-  it('makes needs-review/stale/expired/cancelled sticky until a new approval revision', () => {
+  it('makes revocation states sticky until a new approval revision', () => {
     expect(controller).toMatch(/intent\.state === 'needs_review'/);
     expect(controller).toMatch(/new founder review\/approval revision is required/);
     expect(controller).toMatch(/intent\.state === 'stale'/);
     expect(controller).toMatch(/new revalidation\/approval revision is required/);
     expect(controller).toMatch(/intent\.state === 'expired'/);
     expect(controller).toMatch(/intent\.state === 'cancelled'/);
+    expect(controller).toMatch(/intent\.state === 'blocked'/);
   });
 
   it('uses approval revision plus observed-state compare-and-set against execution/reapproval races', () => {
@@ -94,27 +104,38 @@ describe('merge intent liveness contract', () => {
     expect(controller).toMatch(/intent\.state === 'merged'/);
   });
 
-  it('sweeps approved missions through the existing durable reconciler chassis', () => {
-    expect(scheduler).toMatch(/'approved'/);
-    expect(scheduler).toMatch(/mission\.status === 'approved'/);
-    expect(scheduler).toMatch(/controller: 'MergeIntentController'/);
-    expect(reconciler).toMatch(/import \{ MergeIntentController \}/);
-    expect(reconciler).toMatch(/\['MergeIntentController', new MergeIntentController\(\)\]/);
-  });
-
-  it('projects the existing guarded execution ledger without moving execution authority', () => {
-    expect(migration).toMatch(/after insert on approval_executions/);
-    expect(migration).toMatch(/new\.status = 'pending'/);
-    expect(migration).toMatch(/state = 'executing'/);
-    expect(migration).toMatch(/new\.status = 'succeeded'/);
-    expect(migration).toMatch(/state = 'merged'/);
-    expect(migration).toMatch(/new\.status = 'failed'/);
-    expect(migration).toMatch(/state = 'blocked'/);
+  it('uses READY as a deny-only execution precondition while preserving guarded execute authority', () => {
+    expect(executionVeto).toMatch(/before insert on approval_executions/);
+    expect(executionVeto).toMatch(/for update/);
+    expect(executionVeto).toMatch(/if v_state <> 'ready'/);
+    expect(executionVeto).toMatch(/READY intent has no canonical approved diff witness/);
+    expect(executionVeto).toMatch(/merge intent founder proof lease expired/);
+    expect(executionVeto).toMatch(/state = 'executing'/);
+    expect(executionVeto).toMatch(/and state = 'ready'/);
+    expect(executionVeto).toMatch(/execution_id = new\.id/);
 
     const reservationIndex = approvals.indexOf(".from('approval_executions')\n      .insert");
     const providerMutationIndex = approvals.indexOf('provider.integrate(project.slug, base, head)');
     expect(reservationIndex).toBeGreaterThanOrEqual(0);
     expect(providerMutationIndex).toBeGreaterThan(reservationIndex);
+  });
+
+  it('wakes approval/reapproval immediately through the existing append-only outbox', () => {
+    expect(enqueueMigration).toMatch(/insert into controller_outbox/);
+    expect(enqueueMigration).toMatch(/'MergeIntentController'/);
+    expect(enqueueMigration).toMatch(/after insert on merge_intents/);
+    expect(enqueueMigration).toMatch(/after update on merge_intents/);
+    expect(enqueueMigration).toMatch(/new\.revision is distinct from old\.revision/);
+    expect(enqueueMigration).not.toMatch(/after update of revision on merge_intents/);
+    expect(enqueueMigration).toMatch(/from merge_intents\nwhere state = 'waiting'/);
+  });
+
+  it('keeps the two-minute approved-mission sweep as a fallback on the same reconciler chassis', () => {
+    expect(scheduler).toMatch(/'approved'/);
+    expect(scheduler).toMatch(/mission\.status === 'approved'/);
+    expect(scheduler).toMatch(/controller: 'MergeIntentController'/);
+    expect(reconciler).toMatch(/import \{ MergeIntentController \}/);
+    expect(reconciler).toMatch(/\['MergeIntentController', new MergeIntentController\(\)\]/);
   });
 
   it('keeps merge-intent storage service-role-only', () => {
