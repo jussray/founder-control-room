@@ -313,6 +313,7 @@ Merge only when:
 - scope and intent match;
 - exact head/base remain current;
 - required checks genuinely executed and passed;
+- FCR `Required Gate` includes and successfully enforces the secret-free exact-head Cloudflare bridge authority contract; this is repository CI evidence, not live-provider proof;
 - user-facing changes have current Playwright proof when relevant;
 - Documentation Truth is green when applicable;
 - required independent review is genuinely satisfied by the repository's current authority membrane;
