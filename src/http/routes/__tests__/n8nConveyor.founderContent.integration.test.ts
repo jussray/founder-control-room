@@ -70,7 +70,7 @@ describe('n8n founder-content route', () => {
     expect(mockDispatchFounderContent).not.toHaveBeenCalled();
   });
 
-  it('exposes bounded provider contracts separately from runtime enablement', async () => {
+  it('exposes bounded provider contracts and secret-safe activation readiness separately from live proof', async () => {
     const res = await request(buildApp())
       .get('/automation/conveyor')
       .set('Authorization', BEARER);
@@ -86,6 +86,11 @@ describe('n8n founder-content route', () => {
         defaultEnabled: ['buffer'],
         rule: 'contract-capable-does-not-imply-runtime-enabled',
       },
+      readiness: expect.objectContaining({
+        liveProbeRequired: true,
+        liveVerified: false,
+        secretValuesExposed: false,
+      }),
       finalPublishedTruth: 'fcr-provider-readback-only',
       authority: {
         orchestrate: true,
@@ -96,6 +101,8 @@ describe('n8n founder-content route', () => {
         readPrivateEvidence: false,
       },
     }));
+    expect(res.body.founderContent.readiness).not.toHaveProperty('webhookUrl');
+    expect(res.body.founderContent.readiness).not.toHaveProperty('bearerToken');
   });
 
   it('binds execution identity to the authenticated founder and never trusts body identity', async () => {
