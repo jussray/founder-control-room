@@ -62,13 +62,15 @@ export function createTerminalRouter(runnerOverride?: TerminalExecutor) {
 
     return res.json({
       project: { slug: project.slug, name: project.name },
-      commands: listTerminalCommands(projectSlug).map((command) => ({
-        id: command.id,
-        label: command.label,
-        risk: command.risk,
-        timeoutMs: command.timeoutMs,
-        evidenceKind: command.evidenceKind ?? null,
-      })),
+      commands: listTerminalCommands(projectSlug)
+        .filter((command) => command.risk === 'read')
+        .map((command) => ({
+          id: command.id,
+          label: command.label,
+          risk: command.risk,
+          timeoutMs: command.timeoutMs,
+          evidenceKind: command.evidenceKind ?? null,
+        })),
     });
   });
 
