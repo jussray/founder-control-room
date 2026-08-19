@@ -41,7 +41,9 @@
       "retirementRequiresDispositionForEveryUniqueSlice": true,
       "retirementRequiresZeroUnclassifiedResidual": true,
       "unknownResidualBlocksRetirement": true,
-      "unresolvedReviewFindingsBlockRetirement": true
+      "unresolvedReviewFindingsBlockRetirement": true,
+      "directBranchDeletionExposed": false,
+      "branchDeletionRequiresReceiptAwareReconciler": true
     },
     "inventorySource": "provider-compare",
     "allowedDispositions": [
