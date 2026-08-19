@@ -1,5 +1,12 @@
+import { createRequire } from 'node:module';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FounderContentApprovalRepository } from '../founderContentApprovalStore.js';
+
+const require = createRequire(import.meta.url);
+const { canonicalChiefIdentity, hashPublicPayload } = require('../../../tools/zapier/founder-content-authorization-contract.cjs') as {
+  canonicalChiefIdentity: (proposal: Record<string, unknown>) => Record<string, any>;
+  hashPublicPayload: (value: unknown) => string;
+};
 
 const { mockTemporalPublish } = vi.hoisted(() => ({ mockTemporalPublish: vi.fn() }));
 vi.mock('../temporallyGovernedFounderContentExecutor.js', () => ({
@@ -9,8 +16,12 @@ vi.mock('../temporallyGovernedFounderContentExecutor.js', () => ({
 import { dispatchAuthoritativeFounderContentPublishNow } from '../authoritativeFounderContentPublisher.js';
 
 const PROPOSAL_HASH = 'a'.repeat(64);
-const PUBLIC_PAYLOAD_HASH = 'b'.repeat(64);
 const AUTHORIZATION_HASH = 'c'.repeat(64);
+const TEST_PROPOSAL = {
+  proposal_hash: PROPOSAL_HASH,
+  public_payload: { platform: 'linkedin', draft_text: 'Exact approved copy.' },
+};
+const PUBLIC_PAYLOAD_HASH = hashPublicPayload(canonicalChiefIdentity(TEST_PROPOSAL).public_payload);
 const STORED_APPROVAL = {
   approval_id: 'fca:approval-1',
   proposal_hash: PROPOSAL_HASH,
@@ -34,10 +45,7 @@ function repository(result: Awaited<ReturnType<FounderContentApprovalRepository[
 
 function request() {
   return {
-    proposal: {
-      proposal_hash: PROPOSAL_HASH,
-      public_payload: { platform: 'linkedin', draft_text: 'Exact approved copy.' },
-    },
+    proposal: TEST_PROPOSAL,
     approval_id: 'fca:approval-1',
     confirmation: {
       confirm_publication: true,
@@ -94,6 +102,7 @@ describe('authoritative founder-content publisher', () => {
       founderUserId: 'founder-user-1',
       approvalId: 'fca:approval-1',
       authorizationHash: AUTHORIZATION_HASH,
+      publicPayloadHash: PUBLIC_PAYLOAD_HASH,
       consumedBy: 'founder@example.com',
     }));
     expect(mockTemporalPublish).toHaveBeenCalledWith(expect.objectContaining({
@@ -149,6 +158,30 @@ describe('authoritative founder-content publisher', () => {
     });
 
     expect(result.ok).toBe(false);
+    expect(store.claim).not.toHaveBeenCalled();
+    expect(mockTemporalPublish).not.toHaveBeenCalled();
+  });
+
+  it('rejects a mistyped copy hash before the approval repository is touched', async () => {
+    const store = repository({
+      ok: true,
+      approval: STORED_APPROVAL,
+      approvalId: 'fca:approval-1',
+      authorizationHash: AUTHORIZATION_HASH,
+      publicPayloadHash: PUBLIC_PAYLOAD_HASH,
+    });
+
+    const result = await dispatchAuthoritativeFounderContentPublishNow({
+      ...request(),
+      confirmation: { ...request().confirmation, public_payload_hash: 'f'.repeat(64) },
+    }, {
+      founderUserId: 'founder-user-1',
+      founderIdentity: 'founder@example.com',
+      approvalRepository: store,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.reasons.join(' ')).toContain('public payload confirmation does not match');
     expect(store.claim).not.toHaveBeenCalled();
     expect(mockTemporalPublish).not.toHaveBeenCalled();
   });
