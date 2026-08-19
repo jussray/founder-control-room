@@ -36,6 +36,7 @@ Current implementation includes:
 - a privacy-safe public skill-testing evidence loop with `/devil` v1 structured receipts and aggregate analytics;
 - first-party LinkedIn founder-content execution with exact Current You authority, temporal revalidation, one-shot reservation, and provider readback requirements;
 - provider-neutral n8n founder-content orchestration contracts that keep contract capability separate from runtime configuration and final provider outcome;
+- founder-authenticated n8n/Buffer activation readiness that exposes configuration presence and provider allowlist state without returning webhook/token values or promoting configuration into live proof;
 - bounded Zapier/Buffer integration where it still adds connector, scheduling, or fallback value without becoming publication authority;
 - HubSpot integration boundaries that keep CRM metadata and external communication separate from repository truth and founder authority;
 - desktop/mobile Playwright proof for scoped Control Room behavior; and
@@ -126,6 +127,8 @@ contract-capable
 -> adapter-proven
 -> provider-outcome-proven
 ```
+
+The founder-authenticated conveyor status may report `not-configured`, `ready-for-probe`, `enabled-misconfigured`, `invalid-provider-configuration`, or `enabled-awaiting-proof`, including whether Buffer is ready for one controlled probe. Those are configuration/readiness states only. `liveVerified` remains false until a separate controlled provider probe and provider readback succeed.
 
 A platform-native draft is not proof that the provider adapter is live. n8n acceptance is not publication truth. Provider readback remains terminal external-state evidence.
 

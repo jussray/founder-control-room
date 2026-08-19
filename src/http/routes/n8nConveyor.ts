@@ -19,7 +19,10 @@ import {
   dispatchTemporallyGovernedFounderContentPublishNow,
   type TemporallyGovernedFounderPublishInput,
 } from '../../lib/temporallyGovernedFounderContentExecutor.js';
-import { founderConveyorReadiness } from '../../lib/n8nConveyorReadiness.js';
+import {
+  founderContentOrchestrationReadiness,
+  founderConveyorReadiness,
+} from '../../lib/n8nConveyorReadiness.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../../lib/founderConveyorReceipt.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
@@ -48,6 +51,7 @@ function capabilityPlan(value: unknown): V10CapabilityPlan | null {
 
 n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
   const readiness = founderConveyorReadiness();
+  const founderContentReadiness = founderContentOrchestrationReadiness();
   return res.json({
     contract: FOUNDER_CONVEYOR_CONTRACT,
     capabilityPlanContract: 'juss-v10/capability-plan@v1',
@@ -72,6 +76,7 @@ n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
         defaultEnabled: ['buffer'],
         rule: 'contract-capable-does-not-imply-runtime-enabled',
       },
+      readiness: founderContentReadiness,
       authority: {
         orchestrate: true,
         requestProviderWrite: true,

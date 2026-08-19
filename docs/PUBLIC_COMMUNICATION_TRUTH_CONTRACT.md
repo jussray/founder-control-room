@@ -48,6 +48,8 @@ One layer does not prove another. Do not describe committed code as deployed, a 
 
 A publication claim requires an observable platform artifact. A draft, scheduler acceptance, workflow trigger, or model response is not that artifact.
 
+Founder-content orchestration readiness is a separate preflight truth layer. An authenticated status surface may report whether n8n founder-content orchestration is enabled, whether required webhook/token configuration is present, which bounded providers are allowlisted, and whether Buffer is ready for one controlled probe. It must expose presence/state only, never secret values. A readiness result does not prove a webhook executed, Buffer accepted a schedule, a post published, or provider readback succeeded. Configuration can make `bufferReadyForProbe` true while `liveVerified` remains false.
+
 ## /confess
 
 Before release, state internally and, when material to the audience, publicly:
@@ -156,6 +158,7 @@ Hold the post when:
 - the accounting-control check does not pass;
 - temporal classification is missing, mismatched to the wording, or no longer valid at the use boundary;
 - a current-state claim is being sent through a deferred queue that cannot revalidate it at publication time;
+- configuration/readiness evidence is being used as proof that n8n, Buffer, or another provider actually executed or published;
 - the post falls outside the approved automated publishing class or a stricter exact Current You gate is unsatisfied;
 - the post depends on a workflow that failed before executing steps;
 - private, sensitive, proprietary, or security-relevant information could be exposed;
