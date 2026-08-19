@@ -43,6 +43,30 @@ export function governanceProjectIdForRepository(
     : projectId;
 }
 
+export function assertFounderControlRoomTrustedBypassActor(
+  config: RulesetConfig,
+  trustedGitHubAppId: string | undefined,
+): void {
+  const protectsFounderControlRoomMain =
+    config.enforcement === "active"
+    && config.targetRefs.includes(FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH);
+  if (!protectsFounderControlRoomMain) return;
+
+  const trustedAppId = trustedGitHubAppId?.trim() ?? "";
+  if (!/^\d+$/.test(trustedAppId)) {
+    throw new Error("Founder Control Room main governance requires a trusted GITHUB_APP_ID bypass identity");
+  }
+
+  const bypassActors = config.bypassActors ?? [];
+  if (
+    bypassActors.length !== 1
+    || bypassActors[0]?.kind !== "app"
+    || bypassActors[0].id.trim() !== trustedAppId
+  ) {
+    throw new Error("Founder Control Room main governance bypass must exactly match the trusted GitHub App identity");
+  }
+}
+
 /**
  * Founder Control Room's own merge policy must fail closed before a provider
  * mutation is attempted. Other projects retain provider-neutral flexibility,
@@ -236,6 +260,9 @@ class LazyRepositoryProvider implements RepositoryProvider {
   async applyBranchRuleset(projectId: string, config: RulesetConfig): Promise<RulesetResult> {
     const governanceProjectId = this.governanceProjectId(projectId);
     assertRulesetGovernancePolicy(governanceProjectId, config, this.repositoryIdentifier);
+    if (governanceProjectId === FOUNDER_CONTROL_ROOM_PROJECT_ID) {
+      assertFounderControlRoomTrustedBypassActor(config, process.env.GITHUB_APP_ID);
+    }
     const delegate = await this.delegate();
     if (!delegate.applyBranchRuleset) {
       throw new Error(`${delegate.name}: does not support applyBranchRuleset`);
