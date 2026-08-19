@@ -10,26 +10,79 @@ const tracer = readFileSync(
   resolve(process.cwd(), "scripts/trace-cloudflare-request.mjs"),
   "utf8",
 );
+const hostPolicy = JSON.parse(
+  readFileSync(
+    resolve(process.cwd(), "config/cloudflare-request-trace-host-policy.json"),
+    "utf8",
+  ),
+) as {
+  schemaVersion: number;
+  zone: string;
+  reviewedHosts: Array<{
+    hostname: string;
+    required: boolean;
+    expectedEdgeProxy: boolean;
+  }>;
+};
 
 describe("Cloudflare request trace witness", () => {
-  it("uses the current Cloudflare request-tracer endpoint and a fully qualified URL", () => {
-    expect(tracer).toContain("/request-tracer/trace");
-    expect(tracer).not.toContain("/request-tracer/tracer");
-    expect(tracer).toContain("https://www.foundercontrolroom.org/");
-    expect(workflow).toContain(
-      "CF_REQUEST_TRACE_URL: https://www.foundercontrolroom.org/",
+  it("discovers the whole FCR DNS hostname inventory before tracing", () => {
+    expect(hostPolicy.schemaVersion).toBe(1);
+    expect(hostPolicy.zone).toBe("foundercontrolroom.org");
+    expect(hostPolicy.reviewedHosts.map((host) => host.hostname)).toEqual(
+      expect.arrayContaining([
+        "foundercontrolroom.org",
+        "www.foundercontrolroom.org",
+        "api.foundercontrolroom.org",
+      ]),
     );
+    expect(tracer).toContain('const HTTP_RECORD_TYPES = new Set(["A", "AAAA", "CNAME"])');
+    expect(tracer).toContain("REQUEST_TRACE_ZONE_DISCOVERY_FAILED");
+    expect(tracer).toContain("/dns_records?");
+    expect(tracer).toContain("buildInventory(dnsRecords, policy)");
+    expect(tracer).toContain("traceEligibleHosts");
   });
 
-  it("uses a dedicated read-only tracer credential instead of the deploy credential", () => {
+  it("uses separate least-privilege tracer and DNS-inventory credentials", () => {
     expect(workflow).toContain(
       "CF_REQUEST_TRACER_TOKEN: ${{ secrets.FCR_CLOUDFLARE_REQUEST_TRACER_TOKEN }}",
     );
+    expect(workflow).toContain(
+      "CF_DNS_INVENTORY_TOKEN: ${{ secrets.FCR_CLOUDFLARE_DNS_INVENTORY_TOKEN }}",
+    );
+    expect(workflow).toContain(
+      "CF_REQUEST_TRACE_POLICY: config/cloudflare-request-trace-host-policy.json",
+    );
     expect(tracer).toContain("process.env.CF_REQUEST_TRACER_TOKEN");
+    expect(tracer).toContain("process.env.CF_DNS_INVENTORY_TOKEN");
     expect(tracer).not.toContain("process.env.CF_API_TOKEN");
   });
 
-  it("keeps the trace witness read-only and non-authoritative", () => {
+  it("detects newly added, missing required, and proxy-state-drift hostnames", () => {
+    expect(tracer).toContain("newHosts");
+    expect(tracer).toContain("missingRequiredHosts");
+    expect(tracer).toContain("proxyStateDrift");
+    expect(tracer).toContain("REQUEST_TRACE_NEW_UNREVIEWED_HOSTS");
+    expect(tracer).toContain("REQUEST_TRACE_REQUIRED_HOSTS_MISSING");
+    expect(tracer).toContain("REQUEST_TRACE_PROXY_STATE_DRIFT");
+    expect(tracer).toContain('createHash("sha256")');
+    expect(tracer).toContain("inventoryHash");
+  });
+
+  it("traces every discovered proxied HTTP hostname while classifying non-edge and wildcard records", () => {
+    expect(tracer).toContain("entry.edgeProxied ||= record?.proxied === true");
+    expect(tracer).toContain("traceEligible: entry.edgeProxied && directHttpHostname && !wildcard");
+    expect(tracer).toContain("for (const host of traceEligibleHosts)");
+    expect(tracer).toContain("await traceHost(host.hostname)");
+    expect(tracer).toContain("WILDCARD_NOT_DIRECTLY_TRACEABLE");
+    expect(tracer).toContain("DNS_ONLY_NOT_CLOUDFLARE_EDGE");
+    expect(tracer).toContain("wildcardHosts");
+    expect(tracer).toContain("dnsOnlyHosts");
+  });
+
+  it("keeps the Request Trace witness simulated, read-only, and non-authoritative", () => {
+    expect(tracer).toContain("/request-tracer/trace");
+    expect(tracer).not.toContain("/request-tracer/tracer");
     expect(tracer).toContain('new Set(["GET", "HEAD"])');
     expect(tracer).toContain("REQUEST_TRACE_METHOD_UNSAFE");
     expect(tracer).toContain("requestSimulation: true");
@@ -44,8 +97,9 @@ describe("Cloudflare request trace witness", () => {
     expect(tracer).not.toContain("origin status code");
   });
 
-  it("redacts and minimizes trace output instead of persisting raw or free-form rule payloads", () => {
+  it("never persists raw DNS targets or free-form Cloudflare trace rule payloads", () => {
     expect(tracer).toContain("summarizeTrace(trace)");
+    expect(tracer).not.toContain("record.content");
     expect(tracer).not.toContain("action_parameters");
     expect(tracer).not.toContain("item.expression");
     expect(tracer).not.toContain("item.name");
@@ -53,8 +107,9 @@ describe("Cloudflare request trace witness", () => {
     expect(tracer).toContain("Bearer [REDACTED]");
   });
 
-  it("appends request-path evidence after provider reads but only on exact current main", () => {
+  it("runs full host discovery only after exact-current-main verification", () => {
     expect(workflow).toContain("id: verify_head");
+    expect(workflow).toContain("Discover and trace FCR Cloudflare host inventory");
     expect(workflow).toContain("node scripts/trace-cloudflare-request.mjs");
     expect(workflow).toContain(
       "if: always() && steps.verify_head.outcome == 'success'",
