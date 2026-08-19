@@ -14,9 +14,11 @@ on:
       - 'test/ai-company-parity.test.ts'
       - 'tools/zapier/buffer-content-firewall.cjs'
       - 'tools/zapier/buffer-review-window.cjs'
+      - 'tools/zapier/social-attribution-readback.cjs'
       - 'tools/zapier/test-buffer-content-firewall.cjs'
       - 'tools/zapier/test-buffer-review-window.cjs'
       - 'tools/zapier/test-buffer-provider-contract.cjs'
+      - 'tools/zapier/test-social-attribution-readback.cjs'
       - 'package.json'
       - '.github/workflows/buffer-provider-contract.yml'
   workflow_dispatch:
@@ -53,6 +55,9 @@ jobs:
 
       - name: Verify executable Buffer review-window contract
         run: npm run verify:buffer-content
+
+      - name: Verify social attribution readback truth boundary
+        run: node tools/zapier/test-social-attribution-readback.cjs
 
       - name: Verify planning envelope and live-capability gates
         run: node scripts/verify-zapier-task-budget.mjs
