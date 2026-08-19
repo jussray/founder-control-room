@@ -18,7 +18,7 @@ const parent: L99InteractiveAuthorityEnvelope = {
     outputFingerprint: null,
   },
   sandboxIsolation: null,
-  expiresAt: '2026-08-20T00:00:00Z',
+  expiresAt: '2999-08-20T00:00:00Z',
 };
 
 describe('interactive authority monotonicity', () => {
@@ -100,7 +100,7 @@ describe('interactive authority monotonicity', () => {
       interactiveEnvelopeIsSubset(
         {
           ...parent,
-          expiresAt: '2026-08-21T00:00:00Z',
+          expiresAt: '2999-08-21T00:00:00Z',
         },
         parent,
       ),
@@ -112,11 +112,23 @@ describe('interactive authority monotonicity', () => {
       interactiveEnvelopeIsSubset(
         {
           ...parent,
-          expiresAt: '2026-08-19T12:00:00Z',
+          expiresAt: '2999-08-19T12:00:00Z',
         },
         parent,
       ),
     ).toBe(true);
+  });
+
+  it('rejects an already-expired child even when it is earlier than the parent', () => {
+    expect(
+      interactiveEnvelopeIsSubset(
+        {
+          ...parent,
+          expiresAt: '2000-01-01T00:00:00Z',
+        },
+        parent,
+      ),
+    ).toBe(false);
   });
 
   it('rejects cross-family capability laundering even at a lower numeric level', () => {
