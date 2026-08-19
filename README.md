@@ -30,6 +30,7 @@ Current implementation includes:
 - server-owned FCR semantic reviewer trust through `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` at the review evaluator boundary;
 - canonical capability governance through `.control/capability.json`;
 - deterministic Cloudflare reasoning, request-trace/source contracts, and founder-gated Access recovery tooling whose source existence does not itself prove live provider configuration;
+- a secret-free exact-head Cloudflare bridge authority contract that is load-bearing inside CI / `Required Gate`, while live Cloudflare and GitHub provider state remain separate authority facts;
 - freshness-aware federated truth receipts and a bounded Truth Lease contract for claims that can decay;
 - a durable founder-only **Founder Switchboard** with explicit BUILT / CONFIGURED / ACTIVE / PROVEN states and guarded authority modes;
 - a privacy-safe public skill-testing evidence loop with `/devil` v1 structured receipts and aggregate analytics;

@@ -201,6 +201,35 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  cloudflare-bridge-authority:
+    name: Cloudflare bridge authority contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify Cloudflare bridge syntax and authority contracts
+        run: |
+          node --check scripts/provider-credential-contract.mjs
+          node --check scripts/reconcile-cloudflare-access-public-zone.mjs
+          node --check scripts/verify-fcr-front-door-playwright.mjs
+          node --test scripts/provider-credential-contract.node-test.mjs
+          node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
+          node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
+
   migration-lint:
     name: Migration lint
     runs-on: ubuntu-latest
@@ -224,6 +253,7 @@ jobs:
       - python-tests
       - rls-contract
       - documentation-truth
+      - cloudflare-bridge-authority
     runs-on: ubuntu-latest
     steps:
       - name: Enforce load-bearing CI results
@@ -236,16 +266,18 @@ jobs:
           PYTHON_RESULT: ${{ needs.python-tests.result }}
           RLS_RESULT: ${{ needs.rls-contract.result }}
           DOCUMENTATION_TRUTH_RESULT: ${{ needs.documentation-truth.result }}
+          CLOUDFLARE_AUTHORITY_RESULT: ${{ needs.cloudflare-bridge-authority.result }}
         run: |
           set -euo pipefail
-          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\npython=%s\nrls=%s\ndocumentation_truth=%s\n' \
+          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\npython=%s\nrls=%s\ndocumentation_truth=%s\ncloudflare_authority=%s\n' \
             "$TYPECHECK_RESULT" \
             "$LINT_RESULT" \
             "$TEST_RESULT" \
             "$E2E_RESULT" \
             "$PYTHON_RESULT" \
             "$RLS_RESULT" \
-            "$DOCUMENTATION_TRUTH_RESULT"
+            "$DOCUMENTATION_TRUTH_RESULT" \
+            "$CLOUDFLARE_AUTHORITY_RESULT"
 
           for result in \
             "$TYPECHECK_RESULT" \
@@ -254,7 +286,8 @@ jobs:
             "$E2E_RESULT" \
             "$PYTHON_RESULT" \
             "$RLS_RESULT" \
-            "$DOCUMENTATION_TRUTH_RESULT"; do
+            "$DOCUMENTATION_TRUTH_RESULT" \
+            "$CLOUDFLARE_AUTHORITY_RESULT"; do
             if [ "$result" != "success" ]; then
               echo "Required Gate blocked: at least one load-bearing CI job is not successful."
               exit 1
