@@ -18,6 +18,7 @@ import { capabilitiesRouter } from '../capabilities.js';
 
 const FOUNDER_EMAIL = 'founder@example.com';
 const BEARER = 'Bearer test-token';
+const DYNAMIC_RESOURCE_ID = 'capability:project-health-refresh-v1';
 
 function buildApp() {
   const app = express();
@@ -101,7 +102,7 @@ describe('POST /capabilities/:capabilityId/runs', () => {
     expect(mockEnqueueReconcile).toHaveBeenCalledWith({
       projectId: 'project-1',
       controller: 'ProjectController',
-      resourceId: null,
+      resourceId: DYNAMIC_RESOURCE_ID,
       reason: 'founder_triggered',
     });
     expect(res.body.run).toEqual(expect.objectContaining({
@@ -111,6 +112,22 @@ describe('POST /capabilities/:capabilityId/runs', () => {
       state: 'queued',
       authority: 'read_only',
     }));
+  });
+
+  it('rejects empty input without enqueueing work', async () => {
+    authorizeFounder();
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderAllowlistBuilder();
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
+    const res = await request(buildApp())
+      .post('/capabilities/project-health-refresh-v1/runs')
+      .set('Authorization', BEARER);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('projectSlug is required');
+    expect(mockEnqueueReconcile).not.toHaveBeenCalled();
   });
 
   it('does not let template-only capabilities pretend to have a runtime', async () => {
@@ -180,7 +197,7 @@ describe('GET /capabilities/runs/:runId', () => {
                   id: 'run-1',
                   project_id: 'project-1',
                   controller: 'ProjectController',
-                  resource_id: null,
+                  resource_id: DYNAMIC_RESOURCE_ID,
                   reason: 'founder_triggered',
                   available_at: '2026-08-19T09:59:58.000Z',
                   claimed_at: '2026-08-19T09:59:59.000Z',
@@ -224,5 +241,42 @@ describe('GET /capabilities/runs/:runId', () => {
       state: 'completed',
       observation,
     }));
+  });
+
+  it('refuses to relabel unrelated reconciliation work as a capability run', async () => {
+    authorizeFounder();
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderAllowlistBuilder();
+      if (table === 'controller_outbox') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({
+                data: {
+                  id: 'other-run',
+                  project_id: 'project-1',
+                  controller: 'ProjectController',
+                  resource_id: null,
+                  reason: 'founder_triggered',
+                  available_at: '2026-08-19T09:59:58.000Z',
+                  claimed_at: null,
+                  completed_at: null,
+                  attempt_count: 0,
+                  last_error: null,
+                },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
+    const res = await request(buildApp())
+      .get('/capabilities/runs/other-run')
+      .set('Authorization', BEARER);
+
+    expect(res.status).toBe(404);
   });
 });
