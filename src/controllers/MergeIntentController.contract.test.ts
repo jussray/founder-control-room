@@ -9,6 +9,10 @@ const backfill = readFileSync(
   'supabase/migrations/20260819093100_backfill_approved_merge_intents.sql',
   'utf8',
 );
+const revisionGuard = readFileSync(
+  'supabase/migrations/20260819093200_merge_intent_revision_guard.sql',
+  'utf8',
+);
 const controller = readFileSync('src/controllers/MergeIntentController.ts', 'utf8');
 const scheduler = readFileSync('src/worker/scheduler.ts', 'utf8');
 const reconciler = readFileSync('src/worker/reconciler.ts', 'utf8');
@@ -59,13 +63,35 @@ describe('merge intent liveness contract', () => {
   });
 
   it('distinguishes base drift, candidate drift, expiry, and provider identity drift', () => {
-    expect(controller).toMatch(/setState\(intent, 'expired', 'founder merge proof expired before execution'\)/);
-    expect(controller).toMatch(/'needs_review', 'candidate head changed after approval'/);
-    expect(controller).toMatch(/'stale', 'target base moved after approval'/);
-    expect(controller).toMatch(/'blocked', 'provider PR identity changed after approval'/);
+    expect(controller).toMatch(/state: 'expired', stale_reason: 'founder merge proof expired before execution'/);
+    expect(controller).toMatch(/state: 'needs_review'/);
+    expect(controller).toMatch(/candidate head changed after approval/);
+    expect(controller).toMatch(/state: 'stale'/);
+    expect(controller).toMatch(/target base moved after approval/);
+    expect(controller).toMatch(/provider PR identity changed after approval/);
     expect(controller).toMatch(/independentReviewDiffHash\(diff\)/);
     expect(controller).toMatch(/approved_diff_hash: intent\.approved_diff_hash \?\? observedDiffHash/);
     expect(controller).toMatch(/canonical provider diff hash changed for the approved candidate pair/);
+  });
+
+  it('makes needs-review/stale/expired/cancelled sticky until a new approval revision', () => {
+    expect(controller).toMatch(/intent\.state === 'needs_review'/);
+    expect(controller).toMatch(/new founder review\/approval revision is required/);
+    expect(controller).toMatch(/intent\.state === 'stale'/);
+    expect(controller).toMatch(/new revalidation\/approval revision is required/);
+    expect(controller).toMatch(/intent\.state === 'expired'/);
+    expect(controller).toMatch(/intent\.state === 'cancelled'/);
+  });
+
+  it('uses approval revision plus observed-state compare-and-set against execution/reapproval races', () => {
+    expect(revisionGuard).toMatch(/add column if not exists revision bigint not null default 1/);
+    expect(revisionGuard).toMatch(/new\.revision := old\.revision \+ 1/);
+    expect(revisionGuard).toMatch(/Projection-only writes never get to manufacture a new approval revision/);
+    expect(controller).toMatch(/\.eq\('revision', intent\.revision\)/);
+    expect(controller).toMatch(/\.eq\('state', intent\.state\)/);
+    expect(controller).toMatch(/if \(!data\) return concurrentAdvance\(intent\)/);
+    expect(controller).toMatch(/intent\.state === 'executing'/);
+    expect(controller).toMatch(/intent\.state === 'merged'/);
   });
 
   it('sweeps approved missions through the existing durable reconciler chassis', () => {
