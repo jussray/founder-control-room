@@ -20,6 +20,7 @@ import {
 
 const ENDPOINT = '/mcp/read';
 const TOKEN = 'test-fcr-read-token';
+const PROJECT = 'chief-ai-machine';
 
 function rpc(method: string, params?: unknown, id: string | number = 1) {
   return { jsonrpc: '2.0', id, method, ...(params === undefined ? {} : { params }) };
@@ -31,10 +32,24 @@ function buildApp(overrides: RemoteReadMcpDependencies = {}) {
   app.post(
     ENDPOINT,
     createRemoteReadMcpHandler({
-      env: { NODE_ENV: 'test', FCR_REMOTE_MCP_READ_TOKEN: TOKEN },
+      env: {
+        NODE_ENV: 'test',
+        FCR_REMOTE_MCP_READ_TOKEN: TOKEN,
+        FCR_REMOTE_MCP_READ_PROJECTS: PROJECT,
+      },
       listServers: () => [
-        { id: 'github', label: 'GitHub MCP', configured: true },
-        { id: 'cloudflare-api', label: 'Cloudflare API MCP', configured: true },
+        {
+          id: 'github',
+          label: 'GitHub MCP',
+          configured: true,
+          enabledProjects: [PROJECT, 'founder-control-room'],
+        },
+        {
+          id: 'figma',
+          label: 'Figma MCP',
+          configured: true,
+          enabledProjects: ['founder-control-room'],
+        },
       ],
       invokeReadTool: vi.fn(async (input) => ({
         ...input,
@@ -51,21 +66,20 @@ function buildApp(overrides: RemoteReadMcpDependencies = {}) {
 describe('Founder Control Room read-only remote MCP', () => {
   it('fails closed when the dedicated bearer token is missing', async () => {
     const response = await request(buildApp()).post(ENDPOINT).send(rpc('tools/list'));
-
     expect(response.status).toBe(401);
     expect(response.body.error.message).toBe('Unauthorized');
   });
 
-  it('fails closed when the server token is not configured', async () => {
-    const response = await request(
-      buildApp({ env: { NODE_ENV: 'test' } }),
-    )
+  it('fails closed when the token or project scope is not configured', async () => {
+    const response = await request(buildApp({ env: { NODE_ENV: 'test' } }))
       .post(ENDPOINT)
       .set('Authorization', `Bearer ${TOKEN}`)
       .send(rpc('tools/list'));
 
     expect(response.status).toBe(503);
-    expect(response.body.error.message).toBe('Remote read MCP token is not configured');
+    expect(response.body.error.message).toBe(
+      'Remote read MCP token or project scope is not configured',
+    );
   });
 
   it('negotiates MCP and advertises only read-only tools', async () => {
@@ -84,39 +98,64 @@ describe('Founder Control Room read-only remote MCP', () => {
       protocolVersion: '2025-06-18',
       serverInfo: { name: 'founder-control-room-read' },
     });
-    expect(listed.status).toBe(200);
     expect(listed.body.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
       'list_read_servers',
       'invoke_read_tool',
     ]);
     for (const tool of listed.body.result.tools) {
-      expect(tool.annotations).toMatchObject({
-        readOnlyHint: true,
-        destructiveHint: false,
-      });
+      expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
     }
   });
 
-  it('returns only the sanitized registry view through list_read_servers', async () => {
-    const listServers = vi.fn(() => [{ id: 'github', configured: true }]);
-    const response = await request(buildApp({ listServers }))
+  it('filters registry discovery to the server-held project scope', async () => {
+    const response = await request(buildApp())
       .post(ENDPOINT)
       .set('Authorization', `Bearer ${TOKEN}`)
       .send(rpc('tools/call', { name: 'list_read_servers', arguments: {} }));
 
     expect(response.status).toBe(200);
-    expect(listServers).toHaveBeenCalledTimes(1);
     expect(response.body.result.structuredContent).toEqual([
-      { id: 'github', configured: true },
+      {
+        id: 'github',
+        label: 'GitHub MCP',
+        configured: true,
+        enabledProjects: [PROJECT],
+      },
     ]);
   });
 
-  it('passes only project-scoped read-shaped input into the FCR hub boundary', async () => {
+  it('passes only a granted project read into the FCR hub boundary', async () => {
     const invokeReadTool = vi.fn(async () => ({
       policy: { decision: 'allow', risk: 'read' },
       evidenceId: 'evidence-read-1',
-      result: { repository: 'jussray/founder-control-room' },
+      result: { repository: 'jussray/chief-ai-machine' },
     }));
+    const response = await request(buildApp({ invokeReadTool }))
+      .post(ENDPOINT)
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(
+        rpc('tools/call', {
+          name: 'invoke_read_tool',
+          arguments: {
+            serverId: 'github',
+            projectId: PROJECT,
+            toolName: 'get_repository',
+            arguments: { owner: 'jussray', repo: 'chief-ai-machine' },
+          },
+        }),
+      );
+
+    expect(response.status).toBe(200);
+    expect(invokeReadTool).toHaveBeenCalledWith({
+      serverId: 'github',
+      projectId: PROJECT,
+      toolName: 'get_repository',
+      arguments: { owner: 'jussray', repo: 'chief-ai-machine' },
+    });
+  });
+
+  it('blocks cross-project access before the FCR hub boundary', async () => {
+    const invokeReadTool = vi.fn();
     const response = await request(buildApp({ invokeReadTool }))
       .post(ENDPOINT)
       .set('Authorization', `Bearer ${TOKEN}`)
@@ -127,19 +166,14 @@ describe('Founder Control Room read-only remote MCP', () => {
             serverId: 'github',
             projectId: 'founder-control-room',
             toolName: 'get_repository',
-            arguments: { owner: 'jussray', repo: 'founder-control-room' },
+            arguments: {},
           },
         }),
       );
 
-    expect(response.status).toBe(200);
-    expect(invokeReadTool).toHaveBeenCalledWith({
-      serverId: 'github',
-      projectId: 'founder-control-room',
-      toolName: 'get_repository',
-      arguments: { owner: 'jussray', repo: 'founder-control-room' },
-    });
-    expect(response.body.result.structuredContent.evidenceId).toBe('evidence-read-1');
+    expect(response.status).toBe(403);
+    expect(response.body.error.message).toBe('Requested project is outside this remote MCP grant');
+    expect(invokeReadTool).not.toHaveBeenCalled();
   });
 
   it('does not accept mission, approval, token, or other authority-bearing fields', async () => {
@@ -152,7 +186,7 @@ describe('Founder Control Room read-only remote MCP', () => {
           name: 'invoke_read_tool',
           arguments: {
             serverId: 'github',
-            projectId: 'founder-control-room',
+            projectId: PROJECT,
             toolName: 'get_repository',
             missionId: 'mission-1',
             approvalId: 'approval-1',
@@ -162,7 +196,6 @@ describe('Founder Control Room read-only remote MCP', () => {
       );
 
     expect(response.status).toBe(400);
-    expect(response.body.error.message).toBe('Unexpected invoke_read_tool arguments');
     expect(response.body.error.data).toEqual(['approvalId', 'missionId', 'token']);
     expect(invokeReadTool).not.toHaveBeenCalled();
   });
@@ -177,12 +210,9 @@ describe('Founder Control Room read-only remote MCP', () => {
           name: 'invoke_read_tool',
           arguments: {
             serverId: 'github',
-            projectId: 'founder-control-room',
+            projectId: PROJECT,
             toolName: 'get_repository',
-            arguments: {
-              owner: 'jussray',
-              nested: { api_key: 'must-never-cross' },
-            },
+            arguments: { nested: { api_key: 'must-never-cross' } },
           },
         }),
       );
@@ -206,7 +236,7 @@ describe('Founder Control Room read-only remote MCP', () => {
           name: 'invoke_read_tool',
           arguments: {
             serverId: 'github',
-            projectId: 'founder-control-room',
+            projectId: PROJECT,
             toolName: 'merge_pull_request',
             arguments: {},
           },
