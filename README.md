@@ -34,7 +34,7 @@ Current implementation includes:
 - freshness-aware federated truth receipts and a bounded Truth Lease contract for claims that can decay;
 - a durable founder-only **Founder Switchboard** with explicit BUILT / CONFIGURED / ACTIVE / PROVEN states and guarded authority modes;
 - a privacy-safe public skill-testing evidence loop with `/devil` v1 structured receipts and aggregate analytics;
-- first-party LinkedIn founder-content execution with exact Current You authority, temporal revalidation, one-shot reservation, and provider readback requirements;
+- first-party LinkedIn founder-content execution with exact Current You authority, FCR-owned one-shot approval storage/claim, temporal revalidation, and provider readback requirements;
 - provider-neutral n8n founder-content orchestration contracts that keep contract capability separate from runtime configuration and final provider outcome;
 - founder-authenticated n8n/Buffer activation readiness that exposes configuration presence and provider allowlist state without returning webhook/token values or promoting configuration into live proof;
 - bounded Zapier/Buffer integration where it still adds connector, scheduling, or fallback value without becoming publication authority;
@@ -104,16 +104,24 @@ Current architecture separates story, authority, transport, and outcome:
 verified product / repository evidence
 -> Chief proposes a public-safe, channel-native story
 -> Sauce Guard keeps private machinery private
--> temporal claim classification and revalidation
--> exact Current You authority for the executable route
+-> temporal claim classification
+-> authenticated Current You confirms the exact public copy
+-> FCR issues + persists an exact one-shot approval
+-> publish request references the exact authorization hash
+-> FCR atomically claims the matching stored approval
+-> execution-time temporal revalidation
 -> channel router
    -> first-party LinkedIn where configured and proven
-   -> provider-neutral n8n for bounded supported adapters
+   -> provider-neutral n8n only where an equally authoritative adapter exists
    -> Zapier / Buffer where they still add bounded connector or scheduling value
 -> provider readback
 -> Founder Control Room outcome receipt
 -> observation-only analytics
 ```
+
+For the first-party route, caller-supplied approval JSON is not publication authority. `POST /automation/conveyor/founder-content/approvals` requires authenticated exact-copy confirmation before FCR issues and stores the one-shot authority. `POST /automation/conveyor/founder-content/publish-now` must reference the exact `authorization_hash`; FCR then claims the exact matching unrevoked, unconsumed, unexpired stored approval before temporal revalidation or provider mutation.
+
+Changing the approved copy, proposal/public-payload identity, source version, channel, or authorization fingerprint requires fresh matching approval. A consumed approval does not become replay authority after downstream failure. Approval issuance or claim is still not publication truth. Provider readback remains terminal external-state evidence.
 
 Public-safe progress may explain what changed, what was learned, why it matters, an approved public proof, and an honest unresolved next gate.
 
@@ -318,7 +326,7 @@ Approved branch/merge actions use reservation/idempotency controls before provid
 | Deploy / mutate production | Separate exact production authority |
 | Database migration | Separate migration/database authority |
 | Credentials/secrets | Separate credential authority |
-| Publication | Exact route-specific Current You authority + provider outcome proof |
+| Publication | Exact route-specific Current You authority + FCR-owned exact one-shot approval claim + provider outcome proof |
 | Investor email | Applicable standing policy + recipient-specific qualification + send authority |
 | Billing / destructive action | Separate exact authority |
 | Rollback | Separate rollback authority |
