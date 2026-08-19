@@ -7,6 +7,7 @@ import { hubForMcpProject } from '../../mcp/vaultHub.js';
 const MCP_PROTOCOL_VERSION = '2025-06-18';
 const READ_TOOL_NAME = 'invoke_read_tool';
 const LIST_SERVERS_TOOL_NAME = 'list_read_servers';
+const PROJECT_SLUG = /^[a-z0-9][a-z0-9-]{0,119}$/;
 
 type JsonRecord = Record<string, unknown>;
 type JsonRpcId = string | number | null;
@@ -61,13 +62,36 @@ function secureEqual(actual: string, expected: string): boolean {
   return timingSafeEqual(actualBuffer, expectedBuffer);
 }
 
+function configuredProjectScope(env: NodeJS.ProcessEnv): Set<string> {
+  const raw = env.FCR_REMOTE_MCP_READ_PROJECTS?.trim() ?? '';
+  const projects = raw
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  if (projects.length === 0 || projects.some((project) => !PROJECT_SLUG.test(project))) {
+    return new Set();
+  }
+  return new Set(projects);
+}
+
+function scopedRegistryView(value: unknown, allowedProjects: Set<string>): unknown {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!isRecord(entry) || !Array.isArray(entry.enabledProjects)) return [];
+    const enabledProjects = entry.enabledProjects.filter(
+      (project): project is string => typeof project === 'string' && allowedProjects.has(project),
+    );
+    return enabledProjects.length > 0 ? [{ ...entry, enabledProjects }] : [];
+  });
+}
+
 function toolDefinitions() {
   return [
     {
       name: LIST_SERVERS_TOOL_NAME,
       title: 'List read-only MCP servers',
       description:
-        'List the Founder Control Room MCP provider registry using its sanitized public view. This tool cannot invoke a provider.',
+        'List only MCP provider registry entries available to this server-held project scope. This tool cannot invoke a provider.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
       annotations: {
         readOnlyHint: true,
@@ -80,7 +104,7 @@ function toolDefinitions() {
       name: READ_TOOL_NAME,
       title: 'Invoke an approved read-only MCP tool',
       description:
-        'Route a project-scoped provider read through Founder Control Room. FCR policy is authoritative and blocks write, destructive, unapproved, unconfigured, or out-of-project tools before provider execution.',
+        'Route a project-scoped provider read through Founder Control Room. The server-held project scope and FCR provider policy both must allow the request before provider execution.',
       inputSchema: {
         type: 'object',
         additionalProperties: false,
@@ -140,8 +164,11 @@ export function createRemoteReadMcpHandler(
 
   return async (req: Request, res: ExpressResponse): Promise<void> => {
     const configuredToken = env.FCR_REMOTE_MCP_READ_TOKEN?.trim();
-    if (!configuredToken) {
-      res.status(503).json(rpcError(null, -32001, 'Remote read MCP token is not configured'));
+    const allowedProjects = configuredProjectScope(env);
+    if (!configuredToken || allowedProjects.size === 0) {
+      res.status(503).json(
+        rpcError(null, -32001, 'Remote read MCP token or project scope is not configured'),
+      );
       return;
     }
 
@@ -169,7 +196,7 @@ export function createRemoteReadMcpHandler(
           capabilities: { tools: { listChanged: false } },
           serverInfo: { name: 'founder-control-room-read', version: '0.1.0' },
           instructions:
-            'Read-only Founder Control Room gateway. Provider mutations and authority-bearing calls are not exposed.',
+            'Read-only Founder Control Room gateway. Provider mutations, credentials, cross-project access, and authority-bearing calls are not exposed.',
         }),
       );
       return;
@@ -196,7 +223,9 @@ export function createRemoteReadMcpHandler(
         res.status(400).json(rpcError(id, -32602, 'list_read_servers accepts no arguments'));
         return;
       }
-      res.json(rpcResult(id, toolResult(listServers())));
+      res.json(
+        rpcResult(id, toolResult(scopedRegistryView(listServers(), allowedProjects))),
+      );
       return;
     }
 
@@ -226,6 +255,12 @@ export function createRemoteReadMcpHandler(
           -32602,
           'serverId, projectId, toolName, and object arguments are required',
         ),
+      );
+      return;
+    }
+    if (!allowedProjects.has(projectId)) {
+      res.status(403).json(
+        rpcError(id, -32003, 'Requested project is outside this remote MCP grant'),
       );
       return;
     }
