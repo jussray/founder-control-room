@@ -14,6 +14,7 @@ import { httpServerHandler } from 'cloudflare:node';
 import { env } from 'cloudflare:workers';
 import { createServer as createNodeHttpServer } from 'node:http';
 import type { ExportedHandler } from '@cloudflare/workers-types';
+import { installChiefAiServiceBinding } from './chiefAiBinding.js';
 import {
   composeWorkerHandler,
   validateWorkerEnv,
@@ -21,6 +22,7 @@ import {
 } from './handler.js';
 
 validateWorkerEnv(env);
+installChiefAiServiceBinding(env.CHIEF_AI);
 
 const { createServer: createExpressApp } = await import('../http/server.js');
 const app = createExpressApp();
