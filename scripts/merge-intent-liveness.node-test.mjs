@@ -6,6 +6,10 @@ const migration = readFileSync(
   'supabase/migrations/20260819093000_merge_intent_liveness.sql',
   'utf8',
 );
+const backfill = readFileSync(
+  'supabase/migrations/20260819093100_backfill_approved_merge_intents.sql',
+  'utf8',
+);
 const controller = readFileSync('src/controllers/MergeIntentController.ts', 'utf8');
 const scheduler = readFileSync('src/worker/scheduler.ts', 'utf8');
 const reconciler = readFileSync('src/worker/reconciler.ts', 'utf8');
@@ -29,6 +33,18 @@ test('FCR approval transition cannot commit without a durable exact-candidate in
   assert.match(migration, /ran_at < now\(\) - interval '15 minutes'/);
   assert.match(migration, /raise exception 'FCR merge approval cannot persist merge intent/);
   assert.match(migration, /on conflict \(mission_id\) do update set/);
+});
+
+test('migration backfills or fail-closes every already-approved FCR mission', () => {
+  assert.match(backfill, /m\.status = 'approved'/);
+  assert.match(backfill, /lower\(coalesce\(p\.repo_identifier, ''\)\) = 'jussray\/founder-control-room'/);
+  assert.match(backfill, /Merge-intent liveness migration blocked/);
+  assert.match(backfill, /insert into merge_intents/);
+  assert.match(backfill, /cross join lateral/);
+  assert.match(backfill, /order by pgr\.ran_at desc, pgr\.id desc/);
+  assert.match(backfill, /then 'expired'/);
+  assert.match(backfill, /Merge-intent liveness postcondition failed/);
+  assert.match(backfill, /left join merge_intents mi on mi\.mission_id = m\.id/);
 });
 
 test('merge intent is explicitly a projection, never approval or provider mutation authority', () => {
