@@ -13,6 +13,7 @@ const RECEIPT_ROOT_TOKEN = 'build-event-receipt-root-test-token';
 const PRODUCER = 'sekret-bip-release-observer';
 const RECEIPT_TOKEN = deriveBuildEventReceiptToken(RECEIPT_ROOT_TOKEN, PRODUCER);
 const SHA = '1234567890abcdef1234567890abcdef12345678';
+const NOW_MS = Date.parse('2026-08-18T21:00:00.000Z');
 
 function runtimeEvent(overrides: Record<string, unknown> = {}) {
   return {
@@ -46,6 +47,7 @@ function appWith(
     FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: MCP_TOKEN,
     FCR_BUILD_EVENT_RECEIPT_ROOT_TOKEN: RECEIPT_ROOT_TOKEN,
   },
+  nowMs = NOW_MS,
 ) {
   const app = express();
   const storedEvents: BuildEvent[] = [];
@@ -61,6 +63,7 @@ function appWith(
     express.json(),
     createBuildEventReceiptIngestHandler({
       env,
+      now: () => nowMs,
       findProject: async (slug) => slug === 'sekret-bip'
         ? { id: 'project-1', slug, repoIdentifier: 'jussray/Sekret-Bip' }
         : null,
@@ -181,6 +184,66 @@ describe('build-event receipt ingress', () => {
 
     expect(response.status).toBe(503);
     expect(response.body.error).toBe('Build-event receipt ingest is not configured');
+    expect(harness.storeCalls()).toBe(0);
+  });
+
+  it('rejects future-dated and expired receipts before they can poison current truth ordering', async () => {
+    const harness = appWith();
+    const future = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(runtimeEvent({
+      occurredAt: new Date(NOW_MS + 6 * 60 * 1_000).toISOString(),
+    }));
+    const expired = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(runtimeEvent({
+      occurredAt: new Date(NOW_MS - 24 * 60 * 60 * 1_000 - 1).toISOString(),
+    }));
+
+    expect(future.status).toBe(403);
+    expect(future.body.error).toBe('event_occurred_at_too_far_in_future');
+    expect(expired.status).toBe(403);
+    expect(expired.body.error).toBe('event_receipt_expired');
+    expect(harness.storeCalls()).toBe(0);
+  });
+
+  it('rejects external system impersonation and non-main production provenance', async () => {
+    const harness = appWith();
+    const systemSource = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(runtimeEvent({ source: 'system' }));
+    const proposalHead = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(runtimeEvent({
+      repository: {
+        name: 'jussray/Sekret-Bip',
+        branch: 'feature/test',
+        refKind: 'proposal-head',
+        commitSha: SHA,
+      },
+    }));
+
+    expect(systemSource.status).toBe(403);
+    expect(systemSource.body.error).toMatch(/external_receipts_cannot_impersonate_system|producer_source_not_allowed/);
+    expect(proposalHead.status).toBe(403);
+    expect(proposalHead.body.error).toBe('production_receipt_requires_main_branch_head');
+    expect(harness.storeCalls()).toBe(0);
+  });
+
+  it('rejects runtime SHA drift inside one production receipt', async () => {
+    const harness = appWith();
+    const response = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(runtimeEvent({
+      runtime: {
+        service: 'sekret-bip-production',
+        environment: 'production',
+        releaseSha: 'abcdefabcdefabcdefabcdefabcdefabcdefabcd',
+      },
+    }));
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('runtime_release_sha_mismatch');
     expect(harness.storeCalls()).toBe(0);
   });
 
