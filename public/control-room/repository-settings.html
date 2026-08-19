@@ -80,7 +80,8 @@
           <label>Required approving review count (only used if PR is required)</label>
           <input name="requiredApprovingReviewCount" type="number" min="0" value="1" />
           <label>Required status check names (comma-separated, optional)</label>
-          <input name="requiredStatusCheckNames" value="Required Gate, Verify test-ledger contract" />
+          <input name="requiredStatusCheckNames" value="Required Gate, Verify test-ledger contract, Independent Review Gate" />
+          <p class="muted">Active Founder Control Room <span class="mono">main</span> protection must keep the independent-review check load-bearing alongside machine proof.</p>
         </div>
       </div>
 
@@ -111,6 +112,7 @@
   <script>
     const STORAGE_KEY = 'fcr_session';
     const FCR_MAIN_RULESET_NAME = 'Founder Control Room main exact-head gate';
+    const FCR_MAIN_REQUIRED_CHECKS = ['Required Gate', 'Verify test-ledger contract', 'Independent Review Gate'];
     const nodes = {
       form: document.getElementById('ruleset-form'),
       idempotencyKey: document.getElementById('idempotency-key'),
@@ -148,6 +150,7 @@
       const name = String(values.get('name') || '').trim();
       const enforcement = String(values.get('enforcement') || 'active');
       const targetRefs = splitList(String(values.get('targetRefs') || ''));
+      const requiredStatusCheckNames = splitList(String(values.get('requiredStatusCheckNames') || ''));
       const bypassAppId = String(values.get('bypassAppId') || '').trim();
 
       const protectsActiveFcrMain =
@@ -160,6 +163,14 @@
         return;
       }
 
+      if (protectsActiveFcrMain) {
+        const missingRequiredChecks = FCR_MAIN_REQUIRED_CHECKS.filter((check) => !requiredStatusCheckNames.includes(check));
+        if (missingRequiredChecks.length > 0) {
+          nodes.result.textContent = `Blocked: active Founder Control Room main protection is missing required status checks: ${missingRequiredChecks.join(', ')}`;
+          return;
+        }
+      }
+
       const body = {
         idempotencyKey: String(values.get('idempotencyKey') || '').trim(),
         name,
@@ -167,7 +178,7 @@
         targetRefs,
         requirePullRequest: values.get('requirePullRequest') === 'on',
         requiredApprovingReviewCount: Number(values.get('requiredApprovingReviewCount') || 0),
-        requiredStatusCheckNames: splitList(String(values.get('requiredStatusCheckNames') || '')),
+        requiredStatusCheckNames,
         blockForcePushes: values.get('blockForcePushes') === 'on',
         blockDeletion: values.get('blockDeletion') === 'on',
         bypassActors: bypassAppId ? [{ kind: 'app', id: bypassAppId }] : [],
