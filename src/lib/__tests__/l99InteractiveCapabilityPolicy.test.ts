@@ -52,14 +52,74 @@ describe('L99 interactive capability policy', () => {
     ).toContain('terminal.exec requires an explicit command allowlist');
   });
 
+  it('rejects raw shell text and generic shell ids from terminal.exec allowlists', () => {
+    expect(
+      validateInteractiveEnvelope(
+        envelope({
+          capability: 'terminal.exec',
+          allowedOperations: ['git status'],
+        }),
+      ),
+    ).toContain('terminal.exec allowlist must contain bounded operation ids, not arbitrary shell commands');
+
+    expect(
+      validateInteractiveEnvelope(
+        envelope({
+          capability: 'terminal.exec',
+          allowedOperations: ['bash'],
+        }),
+      ),
+    ).toContain('terminal.exec allowlist must contain bounded operation ids, not arbitrary shell commands');
+  });
+
+  it('accepts bounded terminal operation ids', () => {
+    expect(
+      validateInteractiveEnvelope(
+        envelope({
+          capability: 'terminal.exec',
+          allowedOperations: ['git:status', 'test:unit'],
+        }),
+      ),
+    ).not.toContain('terminal.exec allowlist must contain bounded operation ids, not arbitrary shell commands');
+  });
+
   it('keeps browser.open mutation-free', () => {
     expect(
       validateInteractiveEnvelope(
         envelope({
           externalMutation: true,
+          requiresFounderReceipt: true,
         }),
       ),
-    ).toContain('browser.open cannot carry external mutation authority');
+    ).toContain('browser external mutation must use browser.external_mutation');
+  });
+
+  it('prevents browser.interact from laundering external mutation authority', () => {
+    expect(
+      validateInteractiveEnvelope(
+        envelope({
+          capability: 'browser.interact',
+          allowedOperations: ['click'],
+          externalMutation: true,
+          requiresFounderReceipt: true,
+          requiresPlaywrightProof: true,
+        }),
+      ),
+    ).toContain('browser external mutation must use browser.external_mutation');
+  });
+
+  it('requires browser.external_mutation to be explicitly classified as mutation', () => {
+    expect(
+      validateInteractiveEnvelope(
+        envelope({
+          capability: 'browser.external_mutation',
+          allowedOperations: ['submit'],
+          externalMutation: false,
+          requiresFounderReceipt: true,
+          requiresPlaywrightProof: true,
+        }),
+      ),
+    ).toContain('browser.external_mutation must be classified as an external mutation');
   });
 
   it('requires founder receipt for browser external mutation', () => {
@@ -76,6 +136,20 @@ describe('L99 interactive capability policy', () => {
     ).toContain('browser external mutation requires a founder receipt');
   });
 
+  it('requires founder receipt for any envelope explicitly carrying external mutation', () => {
+    expect(
+      validateInteractiveEnvelope(
+        envelope({
+          capability: 'terminal.exec',
+          targetPatterns: ['terminal://repo'],
+          allowedOperations: ['git:push'],
+          externalMutation: true,
+          requiresFounderReceipt: false,
+        }),
+      ),
+    ).toContain('external mutation requires a founder receipt');
+  });
+
   it('requires Playwright proof for interactive browser authority', () => {
     expect(
       validateInteractiveEnvelope(
@@ -86,6 +160,16 @@ describe('L99 interactive capability policy', () => {
         }),
       ),
     ).toContain('interactive browser authority requires Playwright proof');
+  });
+
+  it('rejects invalid expiry timestamps', () => {
+    expect(
+      validateInteractiveEnvelope(
+        envelope({
+          expiresAt: 'not-a-timestamp',
+        }),
+      ),
+    ).toContain('expiresAt must be a valid timestamp');
   });
 
   it('allows a narrower browser read scope to remain inside a wider read scope', () => {
@@ -116,6 +200,21 @@ describe('L99 interactive capability policy', () => {
     ).toContain('sandbox capability requires an explicit isolation envelope');
   });
 
+  it('rejects sandbox isolation authority on non-sandbox capabilities', () => {
+    expect(
+      validateInteractiveEnvelope(
+        envelope({
+          sandboxIsolation: {
+            networkAccess: false,
+            secretsAccess: false,
+            productionAccess: false,
+            persistentStorage: false,
+          },
+        }),
+      ),
+    ).toContain('non-sandbox capability cannot carry sandbox isolation authority');
+  });
+
   it('requires exact input and environment fingerprints for sandbox execution', () => {
     expect(
       validateInteractiveEnvelope(
@@ -134,7 +233,7 @@ describe('L99 interactive capability policy', () => {
     ).toContain('sandbox.exec requires exact input and environment fingerprints');
   });
 
-  it('requires founder authority for sandbox network, secrets, or production access', () => {
+  it('requires founder authority for sandbox network, secrets, production, or persistence access', () => {
     expect(
       validateInteractiveEnvelope(
         envelope({
@@ -151,6 +250,23 @@ describe('L99 interactive capability policy', () => {
             secretsAccess: false,
             productionAccess: false,
             persistentStorage: false,
+          },
+          requiresFounderReceipt: false,
+        }),
+      ),
+    ).toContain('sandbox ambient authority requires a founder receipt');
+
+    expect(
+      validateInteractiveEnvelope(
+        envelope({
+          capability: 'sandbox.read',
+          targetPatterns: ['sandbox://job-1'],
+          allowedOperations: ['read'],
+          sandboxIsolation: {
+            networkAccess: false,
+            secretsAccess: false,
+            productionAccess: false,
+            persistentStorage: true,
           },
           requiresFounderReceipt: false,
         }),
