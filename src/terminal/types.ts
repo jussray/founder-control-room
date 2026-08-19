@@ -1,6 +1,7 @@
 import type { EvidenceKind } from '../reconciliation/types.js';
 
 export type TerminalCommandRisk = 'read' | 'verify' | 'write';
+export type TerminalCommandCostClass = 'free' | 'included' | 'metered' | 'paid';
 export type TerminalRunStatus =
   | 'running'
   | 'passed'
@@ -16,6 +17,7 @@ export interface TerminalCommandSpec {
   args: readonly string[];
   relativeCwd: string;
   risk: TerminalCommandRisk;
+  costClass: TerminalCommandCostClass;
   timeoutMs: number;
   maxOutputBytes: number;
   evidenceKind?: EvidenceKind;
