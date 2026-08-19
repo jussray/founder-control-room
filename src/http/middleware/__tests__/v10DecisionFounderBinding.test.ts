@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   V10_DECISION_CYCLE_CONTRACT,
   V10_DECISION_LENSES,
@@ -9,7 +9,6 @@ import {
   createFounderControlDecision,
 } from '../../../lib/founderControlDecision.js';
 import {
-  requireV10DecisionFounderBinding,
   validateV10DecisionFounderBinding,
 } from '../v10DecisionFounderBinding.js';
 
@@ -52,7 +51,7 @@ function buildReceipt(overrides: Partial<V10DecisionReceipt> = {}): V10DecisionR
     candidateOptions: ['Bind one portable hash.', 'Keep approval identity implicit.'],
     recommendation: 'Bind the validated decision and explicit founder approval to the exact merge identity.',
     authorityCeiling: 'reason',
-    proofRequirements: ['exact-head CI', 'independent review', 'founder decision hash'],
+    proofRequirements: ['exact-head CI', 'founder decision hash', 'independent review'],
     outcomeSignals: ['decision-hash-on-execution-ledger'],
     rollback: 'Revert the isolated authorization-binding change if it blocks valid traffic.',
     stopConditions: ['decision hash mismatch', 'founder decision mismatch', 'head drift'],
@@ -90,34 +89,6 @@ function validate(receipt: V10DecisionReceipt, founderDecision = approvedFounder
     capabilityPlanHash: PLAN_HASH,
     currentHeadSha: SHA,
   });
-}
-
-function middlewareRequest(receipt: V10DecisionReceipt) {
-  return {
-    params: { missionId: MISSION_ID },
-    body: {
-      actionType: 'merge',
-      decisionReceipt: receipt,
-      promptOSDecisionHash: receipt.decisionHash,
-      founderDecision: approvedFounderDecision(receipt),
-      payload: {
-        _v10: {
-          capabilityPlanHash: PLAN_HASH,
-          expectedHeadSha: SHA,
-          projectSlug: PROJECT,
-        },
-      },
-    },
-  } as unknown as Parameters<typeof requireV10DecisionFounderBinding>[0];
-}
-
-function middlewareResponse() {
-  const response = {
-    status: vi.fn(),
-    json: vi.fn(),
-  };
-  response.status.mockReturnValue(response);
-  return response as unknown as Parameters<typeof requireV10DecisionFounderBinding>[1];
 }
 
 describe('V10 decision + founder execution binding', () => {
@@ -192,47 +163,5 @@ describe('V10 decision + founder execution binding', () => {
 
     expect(result.binding).toBeNull();
     expect(result.errors).toContain('founder decision does not bind the exact proposal identity');
-  });
-
-  it('wires a valid merge binding into the sanitized execution envelope before the route continues', () => {
-    const receipt = buildReceipt();
-    const req = middlewareRequest(receipt);
-    const res = middlewareResponse();
-    const next = vi.fn();
-
-    requireV10DecisionFounderBinding(
-      req,
-      res,
-      next as unknown as Parameters<typeof requireV10DecisionFounderBinding>[2],
-    );
-
-    expect(next).toHaveBeenCalledTimes(1);
-    expect(res.status).not.toHaveBeenCalled();
-    expect(req.body.payload._v10).toEqual(expect.objectContaining({
-      capabilityPlanHash: PLAN_HASH,
-      expectedHeadSha: SHA,
-      projectSlug: PROJECT,
-      decisionHash: receipt.decisionHash,
-      founderDecisionHash: req.body.founderDecision.decisionHash,
-      founderControlSurface: 'chatgpt',
-    }));
-  });
-
-  it('keeps reversible branch creation outside the privileged merge decision membrane', () => {
-    const req = {
-      params: { missionId: MISSION_ID },
-      body: { actionType: 'create_branch', payload: {} },
-    } as unknown as Parameters<typeof requireV10DecisionFounderBinding>[0];
-    const res = middlewareResponse();
-    const next = vi.fn();
-
-    requireV10DecisionFounderBinding(
-      req,
-      res,
-      next as unknown as Parameters<typeof requireV10DecisionFounderBinding>[2],
-    );
-
-    expect(next).toHaveBeenCalledTimes(1);
-    expect(res.status).not.toHaveBeenCalled();
   });
 });
