@@ -22,6 +22,12 @@ import {
   FOUNDER_OS_LAB_PROVIDERS,
 } from '../../founder-os-lab/registry.js';
 import { runFounderOsSandbox } from '../../founder-os-lab/sandbox.js';
+import {
+  UNTRUSTED_ARTIFACT_SOURCES,
+  untrustedArtifactContentHash,
+  type UntrustedArtifact,
+  type UntrustedArtifactSource,
+} from '../../security/untrustedArtifactBoundary.js';
 import { requireFounder } from '../middleware/requireFounder.js';
 
 export const founderOsSkillsRouter = Router();
@@ -42,6 +48,7 @@ const PROJECTS = new Set<FounderOsLabProjectAdapterId>(
   FOUNDER_OS_LAB_PROJECT_ADAPTERS.map((project) => project.id),
 );
 const PROJECT_AUDIENCES = new Set<FounderOsLabProjectAudience>(['teen', 'bip-jr']);
+const UNTRUSTED_SOURCES = new Set<string>(UNTRUSTED_ARTIFACT_SOURCES);
 const TOP_LEVEL_FIELDS = new Set([
   'goal',
   'action',
@@ -52,6 +59,7 @@ const TOP_LEVEL_FIELDS = new Set([
   'project',
   'capabilityPlan',
   'socialPost',
+  'untrustedArtifacts',
 ]);
 const EVIDENCE_FIELDS = new Set([
   'repository',
@@ -77,6 +85,14 @@ const APPROVAL_FIELDS = new Set([
   'projectSlug',
   'expectedHeadSha',
   'capabilityPlanHash',
+]);
+const UNTRUSTED_ARTIFACT_FIELDS = new Set([
+  'id',
+  'source',
+  'content',
+  'contentHash',
+  'uri',
+  'authorId',
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -121,6 +137,20 @@ function boundedHttpsUrls(value: unknown, maximumItems: number): string[] | null
     if (!urls.includes(parsed.href)) urls.push(parsed.href);
   }
   return urls;
+}
+
+function boundedHttpsUrl(value: unknown): string | undefined | null {
+  if (value === undefined || value === null) return undefined;
+  const candidate = boundedString(value, 2_000);
+  if (!candidate) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return null;
+  return parsed.href;
 }
 
 function parseApproval(value: unknown): FounderOsLabApproval | undefined | null {
@@ -271,6 +301,47 @@ function parseCapabilityPlan(value: unknown): V10CapabilityPlan | undefined | nu
   return isV10CapabilityPlan(value) ? value : null;
 }
 
+function parseUntrustedArtifacts(value: unknown): UntrustedArtifact[] | undefined | null {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value) || value.length === 0 || value.length > 20) return null;
+
+  const artifacts: UntrustedArtifact[] = [];
+  const ids = new Set<string>();
+  for (const item of value) {
+    if (!isRecord(item) || !hasOnlyFields(item, UNTRUSTED_ARTIFACT_FIELDS)) return null;
+    const id = boundedString(item.id, 160);
+    const source = typeof item.source === 'string' && UNTRUSTED_SOURCES.has(item.source)
+      ? item.source as UntrustedArtifactSource
+      : null;
+    const content = typeof item.content === 'string' && item.content.trim() && item.content.length <= 50_000
+      ? item.content
+      : null;
+    const uri = boundedHttpsUrl(item.uri);
+    const authorId = item.authorId === undefined
+      ? undefined
+      : boundedString(item.authorId, 300) ?? null;
+
+    if (!id || !source || !content || uri === null || authorId === null || ids.has(id)) return null;
+    ids.add(id);
+
+    const contentHash = untrustedArtifactContentHash(content);
+    if (item.contentHash !== undefined) {
+      const submittedHash = boundedString(item.contentHash, 64)?.toLowerCase() ?? null;
+      if (!submittedHash || !SHA256.test(submittedHash) || submittedHash !== contentHash) return null;
+    }
+
+    artifacts.push({
+      id,
+      source,
+      content,
+      contentHash,
+      ...(uri ? { uri } : {}),
+      ...(authorId ? { authorId } : {}),
+    });
+  }
+  return artifacts;
+}
+
 founderOsSkillsRouter.post('/preview', (req, res) => {
   const body = req.body as unknown;
   if (!isRecord(body) || !hasOnlyFields(body, TOP_LEVEL_FIELDS)) {
@@ -300,6 +371,7 @@ founderOsSkillsRouter.post('/preview', (req, res) => {
     : isRecord(body.socialPost)
       ? body.socialPost as unknown as FirstPartySocialPostInput
       : null;
+  const untrustedArtifacts = parseUntrustedArtifacts(body.untrustedArtifacts);
 
   if (
     !goal
@@ -311,6 +383,7 @@ founderOsSkillsRouter.post('/preview', (req, res) => {
     || project === null
     || capabilityPlan === null
     || socialPost === null
+    || untrustedArtifacts === null
   ) {
     return res.status(400).json({ error: 'Founder OS preview input is malformed or outside the checked-in registry.' });
   }
@@ -325,6 +398,7 @@ founderOsSkillsRouter.post('/preview', (req, res) => {
     ...(project ? { project } : {}),
     ...(capabilityPlan ? { capabilityPlan } : {}),
     ...(socialPost ? { socialPost } : {}),
+    ...(untrustedArtifacts ? { untrustedArtifacts } : {}),
   };
 
   const result = runFounderOsSandbox(request);
