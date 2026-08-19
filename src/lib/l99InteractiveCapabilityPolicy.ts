@@ -175,8 +175,13 @@ export function validateInteractiveEnvelope(
   const errors: string[] = [];
   const isSandbox = envelope.capability.startsWith('sandbox.');
 
-  if (envelope.expiresAt !== null && !Number.isFinite(Date.parse(envelope.expiresAt))) {
-    errors.push('expiresAt must be a valid timestamp');
+  if (envelope.expiresAt !== null) {
+    const expiresAt = Date.parse(envelope.expiresAt);
+    if (!Number.isFinite(expiresAt)) {
+      errors.push('expiresAt must be a valid timestamp');
+    } else if (expiresAt <= Date.now()) {
+      errors.push('expiresAt must be in the future');
+    }
   }
 
   if (envelope.capability === 'terminal.exec' && envelope.allowedOperations.length === 0) {
