@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import {
   isV10CapabilityPlan,
   type V10CapabilityPlan,
@@ -12,13 +12,8 @@ import {
 import {
   N8N_FOUNDER_CONTENT_CONTRACT,
   N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
-  dispatchProviderNeutralN8nFounderContent,
 } from '../../lib/n8nProviderNeutralFounderContentOrchestrator.js';
 import { FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT } from '../../lib/firstPartyFounderContentExecutor.js';
-import {
-  dispatchTemporallyGovernedFounderContentPublishNow,
-  type TemporallyGovernedFounderPublishInput,
-} from '../../lib/temporallyGovernedFounderContentExecutor.js';
 import {
   founderContentOrchestrationReadiness,
   founderConveyorReadiness,
@@ -49,6 +44,28 @@ function capabilityPlan(value: unknown): V10CapabilityPlan | null {
   return isV10CapabilityPlan(value) ? value : null;
 }
 
+function authorityStoreRequired(
+  req: FounderRequest,
+  res: Response,
+  contract: string,
+  operation: 'orchestrate' | 'publish',
+) {
+  return res.status(409).json({
+    ok: false,
+    code: 'L99_AUTHORITY_REQUIRED',
+    contract,
+    published: false,
+    authorityRequired: 'L99_AUTHORITATIVE_APPROVAL_STORE',
+    operation,
+    reasons: [
+      'External founder-content mutation is disabled until execution rereads an exact founder ApprovalReceipt from authoritative storage.',
+      'A structurally valid approval object supplied by the browser, model, queue, or n8n workflow is evidence about authority, not authority itself.',
+    ],
+    founder: req.founder ? { userId: req.founder.userId } : null,
+    finalPublishedTruth: 'fcr-provider-readback-only',
+  });
+}
+
 n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
   const readiness = founderConveyorReadiness();
   const founderContentReadiness = founderContentOrchestrationReadiness();
@@ -68,6 +85,8 @@ n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
     founderContent: {
       contract: N8N_FOUNDER_CONTENT_CONTRACT,
       route: '/founder-content',
+      enabled: false,
+      blockedBy: 'L99_AUTHORITATIVE_APPROVAL_STORE_REQUIRED',
       inputAuthority: 'canonical-fcr-proposal-approval-firewall-input',
       providerSelection: 'founder-authenticated-bounded-platform-compatible',
       providerContractRoutes: N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
@@ -78,19 +97,25 @@ n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
       },
       readiness: founderContentReadiness,
       authority: {
-        orchestrate: true,
-        requestProviderWrite: true,
+        orchestrate: false,
+        requestProviderWrite: false,
         authorizePublication: false,
         changeCopy: false,
         markPublished: false,
         readPrivateEvidence: false,
       },
+      authoritativeApprovalStoreReadbackRequired: true,
+      callerSuppliedApprovalIsAuthority: false,
       finalPublishedTruth: 'fcr-provider-readback-only',
       directPublish: {
         contract: FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
         route: '/founder-content/publish-now',
         provider: 'linkedin',
+        enabled: false,
+        blockedBy: 'L99_AUTHORITATIVE_APPROVAL_STORE_REQUIRED',
         exactCurrentYouApprovalRequired: true,
+        authoritativeApprovalStoreReadbackRequired: true,
+        callerSuppliedApprovalIsAuthority: false,
         temporalClaimTruthRequired: true,
         historicalTruthPreserved: true,
         currentRepoStateRevalidatedAtExecution: true,
@@ -145,29 +170,9 @@ n8nConveyorRouter.post('/advance', async (req: FounderRequest, res) => {
 });
 
 n8nConveyorRouter.post('/founder-content/publish-now', async (req: FounderRequest, res) => {
-  const input = (req.body ?? {}) as unknown as TemporallyGovernedFounderPublishInput;
-  const result = await dispatchTemporallyGovernedFounderContentPublishNow(input, {
-    executedBy: req.founder!.email,
-  });
-
-  return res.status(result.status).json({
-    ...result,
-    founder: req.founder ? { userId: req.founder.userId } : null,
-    finalPublishedTruth: 'fcr-provider-readback-only',
-    currentTruthPolicy: 'historical-preserved-current-revalidated',
-  });
+  return authorityStoreRequired(req, res, FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT, 'publish');
 });
 
 n8nConveyorRouter.post('/founder-content', async (req: FounderRequest, res) => {
-  const input = (req.body ?? {}) as JsonRecord;
-  const result = await dispatchProviderNeutralN8nFounderContent(input, {
-    executedBy: req.founder!.email,
-  });
-
-  return res.status(result.status).json({
-    ...result,
-    contract: N8N_FOUNDER_CONTENT_CONTRACT,
-    founder: req.founder ? { userId: req.founder.userId } : null,
-    finalPublishedTruth: 'fcr-provider-readback-only',
-  });
+  return authorityStoreRequired(req, res, N8N_FOUNDER_CONTENT_CONTRACT, 'orchestrate');
 });
