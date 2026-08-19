@@ -20,6 +20,14 @@ preview_urls = true
 [observability]
 enabled = true
 
+# Private Chief AI capability. FCR may call only the named FCR entrypoint on
+# the canonical chief-ai Worker. This is a Cloudflare Service Binding, not a
+# public-origin fetch and not a reverse authority grant into FCR.
+[[services]]
+binding = "CHIEF_AI"
+service = "chief-ai"
+entrypoint = "FounderControlRoomEntrypoint"
+
 # Outbound transactional email capability. This binding alone sends nothing;
 # application code must explicitly invoke it. Keep the provider boundary
 # project-scoped: FCR code uses FCR_EMAIL and may send only from the checked-in
