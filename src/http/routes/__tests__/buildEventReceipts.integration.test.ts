@@ -9,8 +9,9 @@ import type { BuildEvent } from '../../../buildEvents/buildEvent.js';
 import type { BuildEventStoreDisposition } from '../../../services/buildEventStore.js';
 
 const MCP_TOKEN = 'founder-signal-test-token';
+const RECEIPT_ROOT_TOKEN = 'build-event-receipt-root-test-token';
 const PRODUCER = 'sekret-bip-release-observer';
-const RECEIPT_TOKEN = deriveBuildEventReceiptToken(MCP_TOKEN, PRODUCER);
+const RECEIPT_TOKEN = deriveBuildEventReceiptToken(RECEIPT_ROOT_TOKEN, PRODUCER);
 const SHA = '1234567890abcdef1234567890abcdef12345678';
 
 function runtimeEvent(overrides: Record<string, unknown> = {}) {
@@ -39,7 +40,13 @@ function runtimeEvent(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function appWith(disposition: BuildEventStoreDisposition = 'stored') {
+function appWith(
+  disposition: BuildEventStoreDisposition = 'stored',
+  env: NodeJS.ProcessEnv = {
+    FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: MCP_TOKEN,
+    FCR_BUILD_EVENT_RECEIPT_ROOT_TOKEN: RECEIPT_ROOT_TOKEN,
+  },
+) {
   const app = express();
   const storedEvents: BuildEvent[] = [];
   let storeCalls = 0;
@@ -53,7 +60,7 @@ function appWith(disposition: BuildEventStoreDisposition = 'stored') {
     '/ingest/build-events/:slug',
     express.json(),
     createBuildEventReceiptIngestHandler({
-      env: { FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: MCP_TOKEN },
+      env,
       findProject: async (slug) => slug === 'sekret-bip'
         ? { id: 'project-1', slug, repoIdentifier: 'jussray/Sekret-Bip' }
         : null,
@@ -130,6 +137,50 @@ describe('build-event receipt ingress', () => {
 
     expect(missing.status).toBe(401);
     expect(wrong.status).toBe(401);
+    expect(harness.storeCalls()).toBe(0);
+  });
+
+  it('does not let a remote MCP bearer derive build-observer authority', async () => {
+    const harness = appWith();
+    const tokenDerivedFromMcpBearer = deriveBuildEventReceiptToken(MCP_TOKEN, PRODUCER);
+    const response = await request(harness.app)
+      .post('/ingest/build-events/sekret-bip')
+      .set('x-build-event-producer', PRODUCER)
+      .set('x-build-event-receipt-token', tokenDerivedFromMcpBearer)
+      .send(runtimeEvent());
+
+    expect(response.status).toBe(401);
+    expect(harness.storeCalls()).toBe(0);
+  });
+
+  it('fails closed if build-receipt and remote-MCP credential roots are accidentally reused', async () => {
+    const harness = appWith('stored', {
+      FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: MCP_TOKEN,
+      FCR_BUILD_EVENT_RECEIPT_ROOT_TOKEN: MCP_TOKEN,
+    });
+    const response = await request(harness.app)
+      .post('/ingest/build-events/sekret-bip')
+      .set('x-build-event-producer', PRODUCER)
+      .set('x-build-event-receipt-token', deriveBuildEventReceiptToken(MCP_TOKEN, PRODUCER))
+      .send(runtimeEvent());
+
+    expect(response.status).toBe(503);
+    expect(response.body.error).toBe('Build-event receipt credential isolation is invalid');
+    expect(harness.storeCalls()).toBe(0);
+  });
+
+  it('fails closed when the dedicated build-receipt root is not configured', async () => {
+    const harness = appWith('stored', {
+      FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: MCP_TOKEN,
+    });
+    const response = await request(harness.app)
+      .post('/ingest/build-events/sekret-bip')
+      .set('x-build-event-producer', PRODUCER)
+      .set('x-build-event-receipt-token', RECEIPT_TOKEN)
+      .send(runtimeEvent());
+
+    expect(response.status).toBe(503);
+    expect(response.body.error).toBe('Build-event receipt ingest is not configured');
     expect(harness.storeCalls()).toBe(0);
   });
 
