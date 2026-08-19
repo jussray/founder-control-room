@@ -403,5 +403,5 @@ founderOsSkillsRouter.post('/preview', (req, res) => {
 
   const result = runFounderOsSandbox(request);
   res.set('Cache-Control', 'no-store');
-  return res.status(result.status === 'blocked' ? 422 : 200).json(result);
+  return res.status(result.status === 'simulated' ? 200 : 422).json(result);
 });
