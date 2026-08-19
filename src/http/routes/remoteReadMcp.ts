@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { Request, RequestHandler, Response as ExpressResponse } from 'express';
 import { McpHub } from '../../mcp/hub.js';
+import { assertNoSecretArguments } from '../../mcp/safety.js';
 import { hubForMcpProject } from '../../mcp/vaultHub.js';
 
 const MCP_PROTOCOL_VERSION = '2025-06-18';
@@ -230,6 +231,7 @@ export function createRemoteReadMcpHandler(
     }
 
     try {
+      assertNoSecretArguments(toolArguments);
       const result = await invokeReadTool({
         serverId,
         projectId,
