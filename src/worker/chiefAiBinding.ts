@@ -9,6 +9,9 @@ export const CHIEF_AI_BINDING_NAME = 'CHIEF_AI' as const;
 export const CHIEF_AI_SERVICE_IDENTITY = 'chief-ai' as const;
 export const CHIEF_AI_ENTRYPOINT = 'FounderControlRoomEntrypoint' as const;
 export const CHIEF_AI_RPC_CONTRACT = 'juss-v10/chief-fcr-rpc@v1' as const;
+// Candidate pin for Chief PR #117. This must be refreshed to the exact deployed
+// Chief release SHA after Chief merges/releases and before FCR #514 may merge.
+export const CHIEF_AI_EXPECTED_RELEASE_SHA = '9ec2ccb3b18a6b4821bbc584030ba46372c31996' as const;
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 
@@ -74,11 +77,16 @@ function parseServiceMetadata(value: unknown): ChiefAiServiceMetadata {
     throw new Error('Chief AI release SHA is missing or invalid');
   }
 
+  const releaseSha = value.releaseSha.trim().toLowerCase();
+  if (releaseSha !== CHIEF_AI_EXPECTED_RELEASE_SHA) {
+    throw new Error('Chief AI release SHA does not match the expected artifact');
+  }
+
   return {
     service: CHIEF_AI_SERVICE_IDENTITY,
     rpcContract: CHIEF_AI_RPC_CONTRACT,
     capabilityPlanContract: V10_CAPABILITY_PLAN_CONTRACT,
-    releaseSha: value.releaseSha.trim().toLowerCase(),
+    releaseSha,
   };
 }
 
