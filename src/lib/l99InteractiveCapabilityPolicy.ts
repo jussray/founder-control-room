@@ -162,6 +162,10 @@ export function validateInteractiveEnvelope(
     errors.push('sandbox.exec requires an explicit execution allowlist');
   }
 
+  if (envelope.capability === 'sandbox.export' && !envelope.externalMutation) {
+    errors.push('sandbox.export must be classified as an external mutation');
+  }
+
   if (
     envelope.capability === 'sandbox.export'
     && (!envelope.requiresFounderReceipt || !envelope.fingerprints.outputFingerprint)
