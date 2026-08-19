@@ -36,9 +36,13 @@ export function latestReviewsByReviewer(reviews) {
     const previousTime = Date.parse(text(previous?.submitted_at));
     const currentId = Number(review?.id ?? 0);
     const previousId = Number(previous?.id ?? 0);
+    const currentTimeValid = !Number.isNaN(currentTime);
+    const previousTimeValid = !Number.isNaN(previousTime);
+
     if (!previous
-      || (!Number.isNaN(currentTime) && (Number.isNaN(previousTime) || currentTime > previousTime))
-      || (currentTime === previousTime && currentId > previousId)) {
+      || (currentTimeValid && (!previousTimeValid || currentTime > previousTime))
+      || (currentTimeValid === previousTimeValid && currentTime === previousTime && currentId > previousId)
+      || (!currentTimeValid && !previousTimeValid && currentId > previousId)) {
       latest.set(reviewerId, review);
     }
   }
