@@ -12,6 +12,12 @@ const parent: L99InteractiveAuthorityEnvelope = {
   externalMutation: true,
   requiresFounderReceipt: true,
   requiresPlaywrightProof: true,
+  fingerprints: {
+    inputFingerprint: null,
+    environmentFingerprint: null,
+    outputFingerprint: null,
+  },
+  sandboxIsolation: null,
   expiresAt: '2026-08-20T00:00:00Z',
 };
 
@@ -51,6 +57,74 @@ describe('interactive authority monotonicity', () => {
           allowedOperations: [...parent.allowedOperations, 'delete'],
         },
         parent,
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects a changed bound input fingerprint', () => {
+    const fingerprintParent: L99InteractiveAuthorityEnvelope = {
+      ...parent,
+      capability: 'sandbox.exec',
+      targetPatterns: ['sandbox://job-1'],
+      allowedOperations: ['pytest'],
+      externalMutation: false,
+      fingerprints: {
+        inputFingerprint: 'input:abc',
+        environmentFingerprint: 'env:def',
+        outputFingerprint: null,
+      },
+      sandboxIsolation: {
+        networkAccess: false,
+        secretsAccess: false,
+        productionAccess: false,
+        persistentStorage: false,
+      },
+    };
+
+    expect(
+      interactiveEnvelopeIsSubset(
+        {
+          ...fingerprintParent,
+          fingerprints: {
+            ...fingerprintParent.fingerprints,
+            inputFingerprint: 'input:changed',
+          },
+        },
+        fingerprintParent,
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects sandbox authority widening to network access', () => {
+    const sandboxParent: L99InteractiveAuthorityEnvelope = {
+      ...parent,
+      capability: 'sandbox.exec',
+      targetPatterns: ['sandbox://job-1'],
+      allowedOperations: ['pytest'],
+      externalMutation: false,
+      fingerprints: {
+        inputFingerprint: 'input:abc',
+        environmentFingerprint: 'env:def',
+        outputFingerprint: null,
+      },
+      sandboxIsolation: {
+        networkAccess: false,
+        secretsAccess: false,
+        productionAccess: false,
+        persistentStorage: false,
+      },
+    };
+
+    expect(
+      interactiveEnvelopeIsSubset(
+        {
+          ...sandboxParent,
+          sandboxIsolation: {
+            ...sandboxParent.sandboxIsolation!,
+            networkAccess: true,
+          },
+        },
+        sandboxParent,
       ),
     ).toBe(false);
   });
