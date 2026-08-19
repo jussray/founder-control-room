@@ -21,8 +21,9 @@ preview_urls = true
 enabled = true
 
 # Outbound transactional email capability. This binding alone sends nothing;
-# application code must explicitly invoke it. Restrict the provider boundary
-# to the approved sender identity from the start.
+# application code must explicitly invoke it. Keep the provider boundary
+# project-scoped: FCR code uses FCR_EMAIL and may send only from the checked-in
+# FCR sender identity below. Do not replace this with a generic EMAIL binding.
 [[send_email]]
 name = "FCR_EMAIL"
 allowed_sender_addresses = ["welcome@api.foundercontrolroom.org"]
@@ -40,6 +41,7 @@ SUPABASE_URL = "https://oojzfmmywbvficgybaxd.supabase.co"
 SUPABASE_PROJECT_REF = "oojzfmmywbvficgybaxd"
 FOUNDER_ALLOWED_ORIGINS = "https://foundercontrolroom.org"
 FOUNDER_API_URL = "https://foundercontrolroom.org"
+FCR_EMAIL_FROM = "welcome@api.foundercontrolroom.org"
 FCR_V10_CAPABILITY_PLAN_CONTRACT = "juss-v10/capability-plan@v1"
 FCR_V10_CONVEYOR_CONTRACT = "founder-control-room/n8n-conveyor@v3"
 FCR_V10_MAX_RUNTIME_AUTHORITY = "draft"
