@@ -125,10 +125,15 @@ export function createTerminalRouter(runnerOverride?: TerminalExecutor) {
       });
     }
 
-    if (command.risk === 'write') {
+    // Repository-defined verify/build/test commands still execute code from the
+    // checked-out head. Exact SHA proves identity, not that those scripts are safe.
+    // Until the receipt-aware sandbox executor exists, the legacy terminal may run
+    // only commands explicitly classified as read-only.
+    if (command.risk !== 'read') {
       return res.status(409).json({
-        error: 'Write-risk terminal execution is disabled on the legacy route until an exact L99 ApprovalReceipt is verified at execution time.',
+        error: 'Executable non-read terminal commands are disabled on the legacy route until an exact L99 ApprovalReceipt is verified by the sandboxed executor at execution time.',
         code: 'L99_AUTHORITY_REQUIRED',
+        authorityRequired: 'L99_APPROVAL_RECEIPT',
       });
     }
 
