@@ -1,18 +1,15 @@
-name: Independent Review Gate
+name: Independent Review Contract Tests (advisory)
 
 on:
   pull_request:
     branches: [main]
     types: [opened, reopened, synchronize, ready_for_review]
-  pull_request_review:
-    types: [submitted, edited, dismissed]
 
 permissions:
   contents: read
-  pull-requests: read
 
 concurrency:
-  group: independent-review-${{ github.repository }}-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  group: independent-review-contract-${{ github.repository }}-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
   cancel-in-progress: true
 
 env:
@@ -20,18 +17,18 @@ env:
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
 jobs:
-  independent-review:
-    name: Independent Review Gate
+  contract-tests:
+    name: Independent Review Contract Tests (advisory)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Check out exact PR head
+      - name: Check out exact PR head for advisory contract tests
         uses: actions/checkout@v4
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
           persist-credentials: false
 
-      - name: Record and verify exact head
+      - name: Record exact candidate head
         shell: bash
         run: |
           set -euo pipefail
@@ -43,11 +40,11 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Verify independent-review gate contracts
+      - name: Verify independent-review contract semantics
         run: node --test scripts/verify-independent-review-required-gate.node-test.mjs
 
-      - name: Verify live provider review on exact head
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          FCR_TRUSTED_SEMANTIC_REVIEWER_IDS: ${{ vars.FCR_TRUSTED_SEMANTIC_REVIEWER_IDS }}
-        run: node scripts/verify-independent-review-required-gate.mjs
+      - name: Record authority boundary
+        shell: bash
+        run: |
+          printf '%s\n' 'This candidate-controlled workflow is advisory only.'
+          printf '%s\n' 'Native GitHub ruleset review enforcement and authoritative provider readback remain merge authority.'
