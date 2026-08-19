@@ -24,5 +24,38 @@
     "executionRequiresExactProposalBinding": true,
     "executionReceiptRequired": true,
     "providerSuccessIsOutcomeProof": false
+  },
+  "branchLifecycle": {
+    "classifications": [
+      "stale",
+      "superseded",
+      "retirable"
+    ],
+    "rules": {
+      "staleDoesNotImplySuperseded": true,
+      "staleDoesNotImplyRetirable": true,
+      "retirementRequiresUniqueWorkInventory": true,
+      "retirementRequiresDispositionForEveryUniqueSlice": true,
+      "retirementRequiresZeroUnclassifiedResidual": true,
+      "unknownResidualBlocksRetirement": true
+    },
+    "allowedDispositions": [
+      "integrated",
+      "superseded",
+      "carried-forward",
+      "intentionally-discarded"
+    ],
+    "requiredRetirementReceiptFields": [
+      "repository",
+      "branch",
+      "headSha",
+      "mergeBaseSha",
+      "currentMainSha",
+      "uniqueSlices",
+      "unresolvedReviewFindings",
+      "residualUniqueWork",
+      "safeToClose",
+      "safeToDeleteBranch"
+    ]
   }
 }
