@@ -30,15 +30,15 @@ import { StripeSyncWitnessController } from '../controllers/StripeSyncWitnessCon
 import type { ReconcileReason, ReconcileResult } from '../reconciliation/types.js';
 
 const CONTROLLERS = new Map<string, BaseController>([
-  ['CheckRunController', new CheckRunController()],
-  ['ChangeProposalController', new ChangeProposalController()],
-  ['ManifestController', new ManifestController()],
-  ['MergeIntentController', new MergeIntentController()],
-  ['MissionController', new MissionController()],
-  ['ProjectController', new ProjectController()],
-  ['ReleaseController', new ReleaseController()],
-  ['ProofGateController', new ProofGateController()],
-  ['StripeSyncWitnessController', new StripeSyncWitnessController()],
+  ["CheckRunController", new CheckRunController()],
+  ["ChangeProposalController", new ChangeProposalController()],
+  ["ManifestController", new ManifestController()],
+  ["MergeIntentController", new MergeIntentController()],
+  ["MissionController", new MissionController()],
+  ["ProjectController", new ProjectController()],
+  ["ReleaseController", new ReleaseController()],
+  ["ProofGateController", new ProofGateController()],
+  ["StripeSyncWitnessController", new StripeSyncWitnessController()],
 ]);
 
 const MAX_ATTEMPTS = 5;
@@ -51,7 +51,7 @@ async function writeReconciliationRun(
   startedAt: Date,
 ): Promise<void> {
   try {
-    await supabase.from('reconciliation_runs').insert({
+    await supabase.from("reconciliation_runs").insert({
       project_id: item.projectId,
       controller: item.controller,
       resource_id: item.resourceId,
