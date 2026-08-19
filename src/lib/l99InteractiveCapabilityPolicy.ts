@@ -50,40 +50,9 @@ export const L99_INTERACTIVE_CAPABILITY_POLICY = Object.freeze({
     sandboxDestroyRequiresFounderReceipt: true,
     fingerprintsProveIdentityNotAuthority: true,
     orchestrationCannotWidenInteractiveAuthority: true,
+    derivationPreservesExactCapability: true,
   }),
 });
-
-type CapabilityFamily = 'terminal' | 'browser' | 'sandbox';
-
-const FAMILY: Record<L99InteractiveCapability, CapabilityFamily> = {
-  'terminal.read': 'terminal',
-  'terminal.exec': 'terminal',
-  'browser.open': 'browser',
-  'browser.read': 'browser',
-  'browser.interact': 'browser',
-  'browser.external_mutation': 'browser',
-  'sandbox.create': 'sandbox',
-  'sandbox.read': 'sandbox',
-  'sandbox.exec': 'sandbox',
-  'sandbox.snapshot': 'sandbox',
-  'sandbox.export': 'sandbox',
-  'sandbox.destroy': 'sandbox',
-};
-
-const LEVEL: Record<L99InteractiveCapability, number> = {
-  'terminal.read': 0,
-  'browser.open': 0,
-  'browser.read': 0,
-  'sandbox.read': 0,
-  'sandbox.create': 1,
-  'browser.interact': 1,
-  'sandbox.snapshot': 1,
-  'terminal.exec': 2,
-  'sandbox.exec': 2,
-  'browser.external_mutation': 3,
-  'sandbox.export': 3,
-  'sandbox.destroy': 3,
-};
 
 const TERMINAL_OPERATION_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
 const FORBIDDEN_TERMINAL_OPERATION_ID = /^(?:sh|bash|zsh|fish|cmd(?:\.exe)?|powershell|pwsh)$/i;
@@ -138,21 +107,13 @@ export function interactiveEnvelopeIsSubset(
   if (validateInteractiveEnvelope(parent).length > 0) return false;
   if (validateInteractiveEnvelope(child).length > 0) return false;
 
-  if (FAMILY[child.capability] !== FAMILY[parent.capability]) return false;
-  if (LEVEL[child.capability] > LEVEL[parent.capability]) return false;
+  // A capability is a typed authority boundary, not a scalar rank. Derivation may
+  // narrow scope inside one capability, but changing capability requires a new grant.
+  if (child.capability !== parent.capability) return false;
   if (child.externalMutation && !parent.externalMutation) return false;
 
-  if (
-    child.capability === parent.capability
-    && parent.requiresFounderReceipt
-    && !child.requiresFounderReceipt
-  ) return false;
-
-  if (
-    child.capability === parent.capability
-    && parent.requiresPlaywrightProof
-    && !child.requiresPlaywrightProof
-  ) return false;
+  if (parent.requiresFounderReceipt && !child.requiresFounderReceipt) return false;
+  if (parent.requiresPlaywrightProof && !child.requiresPlaywrightProof) return false;
 
   const parentTargets = new Set(parent.targetPatterns);
   if (child.targetPatterns.some((target) => !parentTargets.has(target))) return false;
