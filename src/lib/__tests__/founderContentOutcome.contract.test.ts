@@ -2,8 +2,15 @@ import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { buildFounderContentOutcomeObservation } = require('../../../tools/zapier/founder-content-outcome-contract.cjs') as {
+const {
+  buildFounderContentOutcomeObservation,
+  buildFounderContentLearningRequest,
+} = require('../../../tools/zapier/founder-content-outcome-contract.cjs') as {
   buildFounderContentOutcomeObservation: (input: Record<string, unknown>) => Record<string, any>;
+  buildFounderContentLearningRequest: (
+    observation: Record<string, unknown>,
+    options: { secret: string; key_id: string; issued_at: string },
+  ) => Record<string, any>;
 };
 
 const base = {
@@ -97,5 +104,73 @@ describe('founder content outcome observation contract', () => {
     expect(first.observation_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(second.observation_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(first.observation_hash).not.toBe(second.observation_hash);
+  });
+
+  it('signs the exact observation bytes for Chief with an interoperable HMAC test vector', () => {
+    const observation = buildFounderContentOutcomeObservation({
+      ...base,
+      provider_state: 'published',
+      provider_receipt_id: 'buffer-receipt-123',
+      observed_at: '2026-08-19T21:00:00.000Z',
+      metrics: {
+        impressions: 1200,
+        reactions: 42,
+        comments: 9,
+        profile_views: 21,
+        attributed_visits: 17,
+        qualified_conversations: 3,
+        attributed_contacts: 2,
+        attributed_deals: null,
+      },
+    });
+    const request = buildFounderContentLearningRequest(observation, {
+      secret: 'fixture-fcr-learning-secret',
+      key_id: 'founder-content-learning-v1',
+      issued_at: '2026-08-19T22:00:00.000Z',
+    });
+
+    expect(observation.observation_hash).toBe('6421424f851374efc617813190a10c4204585e3e7917dedafdc92bc1301c12d3');
+    expect(request.contract).toBe('juss-v10/fcr-founder-content-learning-http@v1');
+    expect(request.method).toBe('POST');
+    expect(request.path).toBe('/api/chief/founder-content-learning');
+    expect(request.body_hash).toBe('33fa996757c1936230db77bc17fb684b1cde25795599a836d94a1383c89f92c2');
+    expect(request.headers['X-FCR-Learning-Signature'])
+      .toBe('ad79928db19b479541828086bc60fb18714454ca8002eb388f6c61c01093f62d');
+    expect(request.authority).toMatchObject({
+      source_authentication_only: true,
+      learning_authority: 'advisory_only',
+      can_authorize_publish: false,
+      can_execute: false,
+      can_increase_authority: false,
+    });
+    expect(JSON.stringify(request)).not.toContain('fixture-fcr-learning-secret');
+  });
+
+  it('refuses to sign evidence that was tampered after the observation hash was created', () => {
+    const observation = buildFounderContentOutcomeObservation({ ...base, metrics: { impressions: 10 } });
+    const tampered = {
+      ...observation,
+      metrics: { ...observation.metrics, impressions: 999 },
+    };
+
+    expect(() => buildFounderContentLearningRequest(tampered, {
+      secret: 'fixture-fcr-learning-secret',
+      key_id: 'founder-content-learning-v1',
+      issued_at: '2026-08-19T22:00:00.000Z',
+    })).toThrow(/observation_hash does not match outcome identity/);
+  });
+
+  it('refuses to sign an observation that tries to launder analytics into publish authority', () => {
+    const observation = buildFounderContentOutcomeObservation({ ...base, metrics: {} });
+    const widened = {
+      ...observation,
+      authority: { ...observation.authority, can_authorize_publish: true },
+    };
+
+    expect(() => buildFounderContentLearningRequest(widened, {
+      secret: 'fixture-fcr-learning-secret',
+      key_id: 'founder-content-learning-v1',
+      issued_at: '2026-08-19T22:00:00.000Z',
+    })).toThrow(/authority must remain advisory-only and non-authorizing/);
   });
 });
