@@ -119,7 +119,7 @@ describe('POST /founder-os/preview untrusted artifact boundary', () => {
         }],
       });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(422);
     expect(response.body).toMatchObject({
       status: 'quarantined',
       plannerInvoked: false,
