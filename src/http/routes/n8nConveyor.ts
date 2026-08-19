@@ -39,6 +39,17 @@ function record(value: unknown): JsonRecord {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonRecord : {};
 }
 
+function publicationConfirmation(value: unknown) {
+  const candidate = record(value);
+  const truthContextHash = text(candidate.truth_context_hash);
+  return {
+    confirm_publication: candidate.confirm_publication === true,
+    authorization_hash: text(candidate.authorization_hash),
+    public_payload_hash: text(candidate.public_payload_hash),
+    ...(truthContextHash ? { truth_context_hash: truthContextHash } : {}),
+  };
+}
+
 function stage(value: unknown): FounderConveyorStage | null {
   const candidate = text(value) as FounderConveyorStage;
   return FOUNDER_CONVEYOR_STAGES.includes(candidate) ? candidate : null;
@@ -247,7 +258,7 @@ n8nConveyorRouter.post('/founder-content/publish-now', async (req: FounderReques
   const result = await dispatchAuthoritativeFounderContentPublishNow({
     proposal: record(body.proposal),
     approval_id: text(body.approval_id),
-    confirmation: record(body.confirmation),
+    confirmation: publicationConfirmation(body.confirmation),
   }, {
     founderUserId: founder.userId,
     founderIdentity: founder.email,
