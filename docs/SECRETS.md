@@ -79,6 +79,7 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `GITHUB_TOKEN` | secret | Local/development fallback only when the GitHub App pair is absent. |
 | `FOUNDER_ALLOWED_ORIGINS` | non-secret variable | `https://foundercontrolroom.org`. |
 | `FOUNDER_API_URL` | non-secret variable | `https://foundercontrolroom.org` so auth callbacks return through Pages and are proxied to the API Worker. |
+| `CHIEF_AI` | Cloudflare Service Binding / named RPC | Required one-way binding to service `chief-ai`, entrypoint `FounderControlRoomEntrypoint`. This is not a shared secret and does not grant Chief reverse FCR authority. |
 | `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` | secret | Scoped, revocable, fail-closed automation grant. |
 | `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN` | secret | Dedicated MCP bearer token. This is not an OpenAI API key. |
 | `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL` | secret | Private approved Zapier Catch Hook URL. |
@@ -87,6 +88,8 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `REPOSITORY_INGEST_SECRET` | secret | Optional repository-verification ingest credential. |
 
 The Worker intentionally fails closed when required bindings are absent, empty, malformed, or when the GitHub App pair is incomplete. Do not weaken `validateWorkerEnv` to bypass provider configuration.
+
+`CHIEF_AI` intentionally has no duplicate `CHIEF_AI_TOKEN` or public-origin fallback. The Cloudflare Service Binding is the transport/capability boundary; FCR additionally verifies Chief service identity, RPC contract, capability-plan contract, and runtime release SHA before accepting a response.
 
 The existing provider-held OpenAI key reference remains:
 
@@ -103,7 +106,9 @@ After configuration, capture:
 3. binding-name read-back without values;
 4. direct API `/health` response;
 5. Pages-proxied `/health` response;
-6. MCP probe receipt and explicit Zapier run ID when the bridge is tested.
+6. founder-authenticated `CHIEF_AI` version receipt with Chief runtime SHA and matching contracts;
+7. founder-authenticated proposal-only Chief capability-plan receipt; and
+8. MCP probe receipt and explicit Zapier run ID when the bridge is tested.
 
 ---
 
@@ -183,6 +188,7 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] GITHUB_APP_ID + GITHUB_PRIVATE_KEY
 [ ] FOUNDER_ALLOWED_ORIGINS=https://foundercontrolroom.org
 [ ] FOUNDER_API_URL=https://foundercontrolroom.org
+[ ] CHIEF_AI -> chief-ai / FounderControlRoomEntrypoint
 [ ] FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
 [ ] FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
 [ ] ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
