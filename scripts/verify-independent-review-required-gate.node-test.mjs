@@ -46,6 +46,13 @@ test('latest review from a reviewer is authoritative advisory evidence', () => {
   assert.equal(latest.get('trusted-human')?.id, 2);
 });
 
+test('malformed timestamps fall back to larger review id', () => {
+  const older = review({ id: 1, state: 'APPROVED', submitted_at: null });
+  const newer = review({ id: 2, state: 'CHANGES_REQUESTED', submitted_at: 'not-a-date' });
+  const latest = latestReviewsByReviewer([older, newer]);
+  assert.equal(latest.get('trusted-human')?.id, 2);
+});
+
 test('exact-head trusted non-author approval with one receipt qualifies as advisory evidence', () => {
   const candidates = qualifyingReviewCandidates({
     reviews: [review()],
