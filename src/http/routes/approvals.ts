@@ -80,15 +80,6 @@ interface FounderPinnedIndependentReview {
   policyHash: string;
 }
 
-interface FounderPinnedFinalReview {
-  contract: typeof FOUNDER_FINAL_REVIEW_CONTRACT;
-  pullRequestNumber: number;
-  baseSha: string;
-  headSha: string;
-  founderIdentity: string;
-  approvedAt: string;
-}
-
 export const approvalsRouter = Router();
 approvalsRouter.use(requireFounder);
 
@@ -229,43 +220,6 @@ function readPinnedIndependentReview(
       authorIdentity,
       policy: policyResult.policy,
       policyHash,
-    },
-  };
-}
-
-function readPinnedFounderFinalReview(
-  value: unknown,
-): { ok: true; review: FounderPinnedFinalReview } | { ok: false; error: string } {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return { ok: false, error: 'Mission has no founder-final review receipt' };
-  }
-  const candidate = value as Record<string, unknown>;
-  const contract = candidate['contract'];
-  const pullRequestNumber = candidate['pullRequestNumber'];
-  const baseSha = lower(candidate['baseSha']);
-  const headSha = lower(candidate['headSha']);
-  const founderIdentity = text(candidate['founderIdentity']);
-  const approvedAt = text(candidate['approvedAt']);
-  if (contract !== FOUNDER_FINAL_REVIEW_CONTRACT) return { ok: false, error: 'Founder-final review contract is invalid' };
-  if (!Number.isInteger(pullRequestNumber) || Number(pullRequestNumber) <= 0) {
-    return { ok: false, error: 'Founder-final review PR number is invalid' };
-  }
-  if (!FULL_SHA.test(baseSha) || !FULL_SHA.test(headSha)) {
-    return { ok: false, error: 'Founder-final review requires exact base/head SHAs' };
-  }
-  if (!founderIdentity) return { ok: false, error: 'Founder-final review founder identity is missing' };
-  if (!approvedAt || Number.isNaN(Date.parse(approvedAt))) {
-    return { ok: false, error: 'Founder-final review approval time is invalid' };
-  }
-  return {
-    ok: true,
-    review: {
-      contract: FOUNDER_FINAL_REVIEW_CONTRACT,
-      pullRequestNumber: Number(pullRequestNumber),
-      baseSha,
-      headSha,
-      founderIdentity,
-      approvedAt,
     },
   };
 }
@@ -451,7 +405,6 @@ approvalsRouter.post(
     if (result.status === 'converged' && gateId === 'merge' && mission.status === 'in_review') {
       let expectedHeadSha: string | null = null;
       let independentReview: FounderPinnedIndependentReview | null = null;
-      let founderFinalReview: FounderPinnedFinalReview | null = null;
 
       if (mission.branch_ref) {
         const { data: project } = await supabase
@@ -573,17 +526,6 @@ approvalsRouter.post(
               policy: reviewPolicy,
               policyHash: independentReviewPolicyHash(reviewPolicy),
             };
-
-            if (founderFinalApproval?.ok) {
-              founderFinalReview = {
-                contract: FOUNDER_FINAL_REVIEW_CONTRACT,
-                pullRequestNumber,
-                baseSha: lower(pullRequest.baseSha),
-                headSha: lower(expectedHeadSha),
-                founderIdentity: req.founder!.email,
-                approvedAt: new Date().toISOString(),
-              };
-            }
           }
         }
       }
@@ -599,7 +541,6 @@ approvalsRouter.post(
                   ...(mission.policy_snapshot as Record<string, unknown> ?? {}),
                   expectedHeadSha,
                   ...(independentReview ? { independentReview } : {}),
-                  ...(founderFinalReview ? { founderFinalReview } : {}),
                 },
               }
             : {}),
@@ -860,36 +801,6 @@ approvalsRouter.post(
           }
           const pinned = pinnedResult.review;
           const founderFinalMode = pinned.policy.founderFinalApprovalRequired === true;
-          const founderFinalResult = founderFinalMode
-            ? readPinnedFounderFinalReview(mission.policy_snapshot?.founderFinalReview)
-            : null;
-          if (founderFinalResult && !founderFinalResult.ok) {
-            throw new Error(`Founder-final review gate blocked: ${founderFinalResult.error}`);
-          }
-          const founderFinal = founderFinalResult?.ok ? founderFinalResult.review : null;
-
-          if (founderFinal) {
-            const approvalAgeMs = Date.now() - Date.parse(founderFinal.approvedAt);
-            const founderFinalMatches =
-              founderFinal.pullRequestNumber === pinned.pullRequestNumber
-              && founderFinal.baseSha === pinned.baseSha
-              && founderFinal.headSha === expectedHeadSha
-              && lower(founderFinal.founderIdentity) === lower(req.founder!.email);
-            if (!founderFinalMatches) {
-              throw new Error('Founder-final review gate blocked: authenticated founder receipt does not match the exact approved PR/base/head');
-            }
-            if (approvalAgeMs < -60_000 || approvalAgeMs > PROOF_GATE_TTL_MS) {
-              throw new Error('Founder-final review gate blocked: exact-candidate founder approval is stale or future-dated');
-            }
-            founderFinalReviewEvidence = {
-              contract: founderFinal.contract,
-              pullRequestNumber: founderFinal.pullRequestNumber,
-              baseSha: founderFinal.baseSha,
-              headSha: founderFinal.headSha,
-              founderIdentity: founderFinal.founderIdentity,
-              approvedAt: founderFinal.approvedAt,
-            };
-          }
 
           if (typeof provider.getPullRequestReviewContext !== 'function') {
             throw new Error('Independent review gate blocked: repository provider cannot supply pull request context');
@@ -952,6 +863,27 @@ approvalsRouter.post(
             deterministicClearCount: reviewGate.deterministicClearCount,
             authorityMode: founderFinalMode ? 'deterministic-review-then-founder-final' : 'legacy-independent-human-review',
           };
+
+          // Founder-final is deliberately consumed only after independent
+          // deterministic review has passed. This is the final human authority
+          // for this exact candidate, not another independent review receipt.
+          if (founderFinalMode) {
+            const finalApproval = validateFounderFinalReviewApproval(payload['founderFinalReview']);
+            if (!finalApproval.ok) {
+              throw new Error(`Founder-final review gate blocked: ${finalApproval.error}`);
+            }
+            if (finalApproval.pullRequestNumber !== pinned.pullRequestNumber) {
+              throw new Error('Founder-final review gate blocked: founder confirmation does not match the reviewed pull request');
+            }
+            founderFinalReviewEvidence = {
+              contract: FOUNDER_FINAL_REVIEW_CONTRACT,
+              pullRequestNumber: pinned.pullRequestNumber,
+              baseSha: pinned.baseSha,
+              headSha: expectedHeadSha,
+              founderIdentity: req.founder!.email,
+              approvedAt: new Date().toISOString(),
+            };
+          }
         }
 
         // This is deliberately after review/founder-final validation. Provider
