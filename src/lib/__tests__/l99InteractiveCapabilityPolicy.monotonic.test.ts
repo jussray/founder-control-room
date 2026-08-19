@@ -22,7 +22,7 @@ const parent: L99InteractiveAuthorityEnvelope = {
 };
 
 describe('interactive authority monotonicity', () => {
-  it('allows a narrower read-only browser grant', () => {
+  it('requires a separate grant when the capability changes', () => {
     expect(
       interactiveEnvelopeIsSubset(
         {
@@ -31,10 +31,43 @@ describe('interactive authority monotonicity', () => {
           allowedOperations: ['read'],
           externalMutation: false,
           requiresFounderReceipt: false,
+          requiresPlaywrightProof: false,
         },
         parent,
       ),
-    ).toBe(true);
+    ).toBe(false);
+  });
+
+  it('rejects same-family capability laundering', () => {
+    const sandboxParent: L99InteractiveAuthorityEnvelope = {
+      ...parent,
+      capability: 'sandbox.export',
+      targetPatterns: ['sandbox://job-1'],
+      allowedOperations: ['pytest'],
+      externalMutation: true,
+      fingerprints: {
+        inputFingerprint: 'input:abc',
+        environmentFingerprint: 'env:def',
+        outputFingerprint: 'output:123',
+      },
+      sandboxIsolation: {
+        networkAccess: false,
+        secretsAccess: false,
+        productionAccess: false,
+        persistentStorage: false,
+      },
+    };
+
+    expect(
+      interactiveEnvelopeIsSubset(
+        {
+          ...sandboxParent,
+          capability: 'sandbox.exec',
+          externalMutation: false,
+        },
+        sandboxParent,
+      ),
+    ).toBe(false);
   });
 
   it('rejects a target expansion', () => {
@@ -61,7 +94,7 @@ describe('interactive authority monotonicity', () => {
     ).toBe(false);
   });
 
-  it('rejects dropping a founder-receipt constraint on the same capability', () => {
+  it('rejects dropping a founder-receipt constraint', () => {
     expect(
       interactiveEnvelopeIsSubset(
         {
@@ -73,7 +106,7 @@ describe('interactive authority monotonicity', () => {
     ).toBe(false);
   });
 
-  it('rejects dropping a Playwright-proof constraint on the same capability', () => {
+  it('rejects dropping a Playwright-proof constraint', () => {
     expect(
       interactiveEnvelopeIsSubset(
         {
@@ -107,7 +140,7 @@ describe('interactive authority monotonicity', () => {
     ).toBe(false);
   });
 
-  it('allows an earlier expiry', () => {
+  it('allows an earlier expiry inside the same capability', () => {
     expect(
       interactiveEnvelopeIsSubset(
         {
@@ -131,7 +164,7 @@ describe('interactive authority monotonicity', () => {
     ).toBe(false);
   });
 
-  it('rejects cross-family capability laundering even at a lower numeric level', () => {
+  it('rejects cross-family capability laundering', () => {
     const terminalParent: L99InteractiveAuthorityEnvelope = {
       ...parent,
       capability: 'terminal.exec',
