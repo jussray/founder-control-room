@@ -27,6 +27,22 @@ The interactive envelope may bind:
 
 If an upstream envelope already binds a fingerprint, every downstream envelope must preserve that exact value. A downstream stage may add a previously-unbound fingerprint as evidence becomes available, but it may not replace a bound value.
 
+Fingerprint lineage should eventually support the same proof shape used elsewhere in FCR:
+
+```text
+source/input fingerprint
+        ↓
+environment/runtime fingerprint
+        ↓
+execution fingerprint
+        ↓
+output/artifact fingerprint
+        ↓
+provider/runtime witness
+```
+
+A fingerprint mismatch is an identity failure. A fingerprint match is not an authorization grant.
+
 ## Sandbox default
 
 The current Founder OS sandbox already starts from a zero-ambient-authority posture: network, providers, database, filesystem, environment, subprocess, secrets, dynamic code, wall clock, randomness, and public URLs are disabled by default. L99 preserves that default. Any future access to network, secrets, production, or persistent storage must be an explicit, founder-bound grant rather than an implicit property of being inside a sandbox.
