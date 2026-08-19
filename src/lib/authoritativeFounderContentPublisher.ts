@@ -83,6 +83,7 @@ export async function dispatchAuthoritativeFounderContentPublishNow(
     founderUserId,
     approvalId,
     authorizationHash,
+    expectedPublicPayloadHash: publicPayloadHash,
     consumedBy: founderIdentity,
     now,
     repository: options.approvalRepository,
