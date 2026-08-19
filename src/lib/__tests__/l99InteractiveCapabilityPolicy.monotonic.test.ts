@@ -95,6 +95,40 @@ describe('interactive authority monotonicity', () => {
     ).toBe(false);
   });
 
+  it('allows a downstream stage to bind a previously unknown output fingerprint', () => {
+    const sandboxParent: L99InteractiveAuthorityEnvelope = {
+      ...parent,
+      capability: 'sandbox.snapshot',
+      targetPatterns: ['sandbox://job-1'],
+      allowedOperations: ['snapshot'],
+      externalMutation: false,
+      fingerprints: {
+        inputFingerprint: 'input:abc',
+        environmentFingerprint: 'env:def',
+        outputFingerprint: null,
+      },
+      sandboxIsolation: {
+        networkAccess: false,
+        secretsAccess: false,
+        productionAccess: false,
+        persistentStorage: false,
+      },
+    };
+
+    expect(
+      interactiveEnvelopeIsSubset(
+        {
+          ...sandboxParent,
+          fingerprints: {
+            ...sandboxParent.fingerprints,
+            outputFingerprint: 'output:123',
+          },
+        },
+        sandboxParent,
+      ),
+    ).toBe(true);
+  });
+
   it('rejects sandbox authority widening to network access', () => {
     const sandboxParent: L99InteractiveAuthorityEnvelope = {
       ...parent,
