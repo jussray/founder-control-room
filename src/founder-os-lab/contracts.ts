@@ -1,4 +1,5 @@
 import type { FirstPartySocialPostInput } from '../lib/firstPartySocialPublisher.js';
+import type { UntrustedArtifact } from '../security/untrustedArtifactBoundary.js';
 import type { V10CapabilityPlan } from './capabilityKernel.js';
 
 export const FOUNDER_OS_LAB_VERSION = 'founder-os-lab-v1' as const;
@@ -140,6 +141,7 @@ export interface FounderOsLabRequest {
   project?: FounderOsLabProjectContext;
   capabilityPlan?: V10CapabilityPlan;
   socialPost?: FirstPartySocialPostInput;
+  untrustedArtifacts?: UntrustedArtifact[];
 }
 
 export interface FounderOsLabProviderRoute {
