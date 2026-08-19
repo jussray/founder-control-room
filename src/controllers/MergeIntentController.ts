@@ -19,6 +19,7 @@ const SHA256 = /^[0-9a-f]{64}$/i;
 
 type MergeIntentState =
   | 'waiting'
+  | 'revalidated'
   | 'ready'
   | 'stale'
   | 'needs_review'
@@ -170,6 +171,14 @@ export class MergeIntentController extends BaseController {
     }
     if (intent.state === 'executing') {
       return result('converged', 'Guarded merge execution is already in progress.', intent, 'executing');
+    }
+    if (intent.state === 'ready') {
+      return result(
+        'converged',
+        'A stronger full-readiness projection is already present; this identity-only reconciler will not downgrade it.',
+        intent,
+        'ready',
+      );
     }
     if (intent.state === 'needs_review') {
       return result('blocked', 'Candidate/authority drift was observed; a new founder review/approval revision is required.', intent, 'needs_review');
@@ -499,7 +508,7 @@ export class MergeIntentController extends BaseController {
     return this.transition(
       intent,
       {
-        state: 'ready',
+        state: 'revalidated',
         approved_diff_hash: intent.approved_diff_hash ?? observedDiffHash,
         last_observed_base_sha: currentBase,
         last_observed_head_sha: currentHead,
@@ -507,8 +516,8 @@ export class MergeIntentController extends BaseController {
         stale_reason: null,
       },
       'converged',
-      'Merge intent identity is fresh. READY is a liveness projection only; guarded /execute remains merge authority.',
-      'ready',
+      'Merge intent identity is REVALIDATED. This only removes the liveness veto so guarded /execute can evaluate full machine evidence, independent review, provider identity, and exact-head authority.',
+      'revalidated',
     );
   }
 
