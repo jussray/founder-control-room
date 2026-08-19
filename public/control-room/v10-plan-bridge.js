@@ -4,7 +4,9 @@
   const nativeFetch = window.fetch.bind(window);
   const privilegedActions = new Set(['create_branch', 'merge']);
   const executePath = /^\/approvals\/[^/]+\/execute$/;
-  let lastExecutionEvidence = null;
+  const pendingExecutionEvidence = [];
+  const completionEvidenceTtlMs = 30_000;
+  const maxPendingExecutionEvidence = 8;
 
   function formForAction(actionType) {
     return actionType === 'merge'
@@ -111,22 +113,50 @@
     }));
   }
 
-  function applyEvidenceBackedCompletionClaim() {
-    const evidence = lastExecutionEvidence;
-    if (!evidence) return;
+  function prunePendingExecutionEvidence(now = Date.now()) {
+    for (let index = pendingExecutionEvidence.length - 1; index >= 0; index -= 1) {
+      if (now - pendingExecutionEvidence[index].capturedAt > completionEvidenceTtlMs) {
+        pendingExecutionEvidence.splice(index, 1);
+      }
+    }
+  }
 
-    const expectedText = evidence.actionType === 'merge' ? 'Merge executed.' : 'Branch created.';
-    const notice = [...document.querySelectorAll('#root .notice')]
-      .find((node) => node.textContent?.trim() === expectedText);
-    if (!notice) return;
+  function enqueueExecutionEvidence(actionType, payload) {
+    prunePendingExecutionEvidence();
+    pendingExecutionEvidence.push({ actionType, payload, capturedAt: Date.now() });
+    while (pendingExecutionEvidence.length > maxPendingExecutionEvidence) {
+      pendingExecutionEvidence.shift();
+    }
+  }
 
-    const claim = completionClaim(evidence.actionType, evidence.payload);
+  function takePendingExecutionEvidence(actionType) {
+    prunePendingExecutionEvidence();
+    const index = pendingExecutionEvidence.findIndex((entry) => entry.actionType === actionType);
+    if (index < 0) return null;
+    return pendingExecutionEvidence.splice(index, 1)[0];
+  }
+
+  function applyClaimToNotice(notice, actionType, payload) {
+    const claim = completionClaim(actionType, payload);
     notice.textContent = claim.text;
     notice.dataset.completionClaim = claim.status === 'witnessed' ? 'evidence-backed' : 'unverified';
     notice.dataset.claimStatus = claim.status;
     notice.dataset.evidenceCount = String(claim.evidenceKinds.length);
-    emitCompletionObservation(evidence.actionType, claim);
-    lastExecutionEvidence = null;
+    emitCompletionObservation(actionType, claim);
+  }
+
+  function applyEvidenceBackedCompletionClaim() {
+    prunePendingExecutionEvidence();
+    const notice = [...document.querySelectorAll('#root .notice')]
+      .find((node) => {
+        const text = node.textContent?.trim();
+        return text === 'Merge executed.' || text === 'Branch created.';
+      });
+    if (!notice) return;
+
+    const actionType = notice.textContent?.trim() === 'Merge executed.' ? 'merge' : 'create_branch';
+    const evidence = takePendingExecutionEvidence(actionType);
+    applyClaimToNotice(notice, actionType, evidence?.payload ?? null);
   }
 
   function augmentPrivilegedForms() {
@@ -174,11 +204,11 @@
     const response = await nativeFetch(input, nextInit);
     try {
       const payload = await response.clone().json();
-      lastExecutionEvidence = response.ok && payload?.ok === true
-        ? { actionType: body.actionType, payload }
-        : null;
+      if (response.ok && payload?.ok === true) {
+        enqueueExecutionEvidence(body.actionType, payload);
+      }
     } catch {
-      lastExecutionEvidence = null;
+      // Missing or malformed execution evidence must never become a completion claim.
     }
     return response;
   };
