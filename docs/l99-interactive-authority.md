@@ -15,6 +15,12 @@ Terminal, browser, and sandbox access are explicit capabilities, not ambient age
 - `sandbox.export`: move a specific output across the sandbox boundary only with founder receipt and exact output fingerprint.
 - `sandbox.destroy`: terminal sandbox lifecycle mutation; requires founder receipt.
 
+## Monotonic derivation
+
+A capability is a typed authority boundary, not a scalar permission level. A downstream envelope may narrow targets, operations, expiry, isolation, and evidence bindings **inside the same exact capability**, but it may not change the capability identifier.
+
+For example, `sandbox.export` cannot derive `sandbox.exec`, `sandbox.create` cannot derive `sandbox.snapshot`, and `browser.external_mutation` cannot silently become `browser.read`. If a later stage needs a different capability, it must obtain a separate grant for that capability. This avoids authority laundering through relationships that look numerically “weaker” but authorize a different execution surface or lifecycle action.
+
 ## Fingerprints
 
 Fingerprints prove identity, not permission. A matching fingerprint can establish that the exact input, environment, or output is the object under discussion, but it cannot create a capability, widen an authority envelope, or replace founder approval.
