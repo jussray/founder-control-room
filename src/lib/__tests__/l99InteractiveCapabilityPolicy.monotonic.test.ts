@@ -5,6 +5,11 @@ import {
   type L99InteractiveAuthorityEnvelope,
 } from '../l99InteractiveCapabilityPolicy.js';
 
+const INPUT_SHA = 'a'.repeat(64);
+const ENV_SHA = 'b'.repeat(64);
+const OUTPUT_SHA = 'c'.repeat(64);
+const CHANGED_SHA = 'd'.repeat(64);
+
 const parent: L99InteractiveAuthorityEnvelope = {
   capability: 'browser.external_mutation',
   targetPatterns: ['https://example.com'],
@@ -46,9 +51,9 @@ describe('interactive authority monotonicity', () => {
       allowedOperations: ['pytest'],
       externalMutation: true,
       fingerprints: {
-        inputFingerprint: 'input:abc',
-        environmentFingerprint: 'env:def',
-        outputFingerprint: 'output:123',
+        inputFingerprint: INPUT_SHA,
+        environmentFingerprint: ENV_SHA,
+        outputFingerprint: OUTPUT_SHA,
       },
       sandboxIsolation: {
         networkAccess: false,
@@ -114,6 +119,29 @@ describe('interactive authority monotonicity', () => {
           requiresPlaywrightProof: false,
         },
         parent,
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects downgrading external-mutation classification on the same capability', () => {
+    const terminalParent: L99InteractiveAuthorityEnvelope = {
+      ...parent,
+      capability: 'terminal.exec',
+      targetPatterns: ['terminal://repo'],
+      allowedOperations: ['provider:deploy'],
+      externalMutation: true,
+      requiresFounderReceipt: true,
+      requiresPlaywrightProof: false,
+      expiresAt: null,
+    };
+
+    expect(
+      interactiveEnvelopeIsSubset(
+        {
+          ...terminalParent,
+          externalMutation: false,
+        },
+        terminalParent,
       ),
     ).toBe(false);
   });
@@ -197,8 +225,8 @@ describe('interactive authority monotonicity', () => {
       requiresFounderReceipt: false,
       requiresPlaywrightProof: false,
       fingerprints: {
-        inputFingerprint: 'input:abc',
-        environmentFingerprint: 'env:def',
+        inputFingerprint: INPUT_SHA,
+        environmentFingerprint: ENV_SHA,
         outputFingerprint: null,
       },
       sandboxIsolation: {
@@ -215,7 +243,7 @@ describe('interactive authority monotonicity', () => {
           ...fingerprintParent,
           fingerprints: {
             ...fingerprintParent.fingerprints,
-            inputFingerprint: 'input:changed',
+            inputFingerprint: CHANGED_SHA,
           },
         },
         fingerprintParent,
@@ -233,8 +261,8 @@ describe('interactive authority monotonicity', () => {
       requiresFounderReceipt: false,
       requiresPlaywrightProof: false,
       fingerprints: {
-        inputFingerprint: 'input:abc',
-        environmentFingerprint: 'env:def',
+        inputFingerprint: INPUT_SHA,
+        environmentFingerprint: ENV_SHA,
         outputFingerprint: null,
       },
       sandboxIsolation: {
@@ -251,7 +279,7 @@ describe('interactive authority monotonicity', () => {
           ...sandboxParent,
           fingerprints: {
             ...sandboxParent.fingerprints,
-            outputFingerprint: 'output:123',
+            outputFingerprint: OUTPUT_SHA,
           },
         },
         sandboxParent,
@@ -269,8 +297,8 @@ describe('interactive authority monotonicity', () => {
       requiresFounderReceipt: false,
       requiresPlaywrightProof: false,
       fingerprints: {
-        inputFingerprint: 'input:abc',
-        environmentFingerprint: 'env:def',
+        inputFingerprint: INPUT_SHA,
+        environmentFingerprint: ENV_SHA,
         outputFingerprint: null,
       },
       sandboxIsolation: {
