@@ -194,7 +194,7 @@ describe('guarded terminal route', () => {
     expect(mockRun).not.toHaveBeenCalled();
   });
 
-  it('requires an explicit confirmation for write-risk commands', async () => {
+  it('fail-closes write-risk commands until L99 verifies an exact ApprovalReceipt', async () => {
     authSuccess();
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'founder_users') return founderUsersRow();
@@ -204,9 +204,16 @@ describe('guarded terminal route', () => {
     const response = await request(app())
       .post('/terminal/untold-stories/run')
       .set('Authorization', BEARER)
-      .send({ missionId: MISSION_ID, commandId: 'deps.install', expectedCommitSha: HEAD });
+      .send({
+        missionId: MISSION_ID,
+        commandId: 'deps.install',
+        expectedCommitSha: HEAD,
+        confirmWrite: true,
+      });
+
     expect(response.status).toBe(409);
-    expect(response.body.code).toBe('WRITE_CONFIRMATION_REQUIRED');
+    expect(response.body.code).toBe('L99_AUTHORITY_REQUIRED');
+    expect(mockRun).not.toHaveBeenCalled();
   });
 
   it('rejects a caller SHA that does not match the mission policy snapshot', async () => {
@@ -221,21 +228,17 @@ describe('guarded terminal route', () => {
     expect(mockRun).not.toHaveBeenCalled();
   });
 
-  it('does not allow dependency writes after a mission enters review', async () => {
+  it('preserves read/verify terminal execution while write authority is closed', async () => {
     successfulDatabase({ missionStatus: 'in_review' });
+    mockRun.mockResolvedValue(passingRun());
+
     const response = await request(app())
       .post('/terminal/untold-stories/run')
       .set('Authorization', BEARER)
-      .send({
-        missionId: MISSION_ID,
-        commandId: 'deps.install',
-        expectedCommitSha: HEAD,
-        confirmWrite: true,
-      });
+      .send({ missionId: MISSION_ID, commandId: 'verify.playwright', expectedCommitSha: HEAD });
 
-    expect(response.status).toBe(409);
-    expect(response.body.code).toBe('COMMAND_NOT_ALLOWED_IN_MISSION_STATE');
-    expect(mockRun).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(mockRun).toHaveBeenCalledTimes(1);
   });
 
   it('persists bounded exact-head evidence for a passing verification command', async () => {
