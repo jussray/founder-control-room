@@ -15,6 +15,12 @@ Terminal, browser, and sandbox access are explicit capabilities, not ambient age
 - `sandbox.export`: move a specific output across the sandbox boundary only with founder receipt and exact output fingerprint.
 - `sandbox.destroy`: terminal sandbox lifecycle mutation; requires founder receipt.
 
+## Runtime shape boundary
+
+TypeScript types are not runtime authority. Any envelope crossing JSON, provider, workflow, MCP, browser, or other runtime boundaries must pass the runtime shape guard before it can be validated or derived.
+
+The guard rejects unknown capability identifiers, unknown top-level or nested authority fields, non-boolean authority flags, malformed fingerprint/isolation objects, non-string target/operation collections, and missing/invalid required fields. Valid envelopes also require at least one non-blank target and one non-blank allowed operation. An unknown field must never become a shadow permission that sits outside the validated/hash-bound contract.
+
 ## Monotonic derivation
 
 A capability is a typed authority boundary, not a scalar permission level. A downstream envelope may narrow targets, operations, expiry, isolation, and evidence bindings **inside the same exact capability**, but it may not change the capability identifier.
@@ -36,6 +42,8 @@ The interactive envelope may bind:
 - `outputFingerprint`: SHA-256 of the exact artifact/result permitted for export or downstream proof.
 
 If an upstream envelope already binds a fingerprint, every downstream envelope must preserve that exact digest. A downstream stage may add a previously-unbound fingerprint as evidence becomes available, but it may not replace a bound digest.
+
+A syntactically valid digest is necessary but not sufficient evidence. The receipt-aware executor must recompute the relevant SHA-256 from the exact canonical bytes/manifest at the point where identity matters and compare it to the bound digest. Merely receiving a 64-hex string from an untrusted caller does not prove identity.
 
 Fingerprint lineage should eventually support the same proof shape used elsewhere in FCR:
 
