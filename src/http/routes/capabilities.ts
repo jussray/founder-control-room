@@ -88,7 +88,9 @@ capabilitiesRouter.get('/runs/:runId', async (req: FounderRequest, res) => {
   }
 
   const state = work.completed_at
-    ? 'completed'
+    ? work.last_error
+      ? 'failed'
+      : 'completed'
     : work.claimed_at
       ? 'running'
       : work.last_error
