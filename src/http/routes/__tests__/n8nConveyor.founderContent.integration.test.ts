@@ -122,7 +122,7 @@ describe('n8n founder-content route', () => {
     expect(mockIssueApproval).not.toHaveBeenCalled();
   });
 
-  it('advertises only first-party direct publication through authoritative approval readback', async () => {
+  it('advertises route implementation without pretending direct publication is runtime-ready', async () => {
     const res = await request(buildApp())
       .get('/automation/conveyor')
       .set('Authorization', BEARER);
@@ -148,12 +148,18 @@ describe('n8n founder-content route', () => {
         route: '/founder-content/publish-now',
         approvalRoute: '/founder-content/approvals',
         approvalStoreContract: FOUNDER_CONTENT_APPROVAL_STORE_CONTRACT,
-        enabled: true,
+        provider: 'linkedin',
+        routeImplemented: true,
+        executionReadiness: 'unknown-until-live-preflight',
+        runtimeReadyClaimAllowed: false,
         approvalObjectAcceptedFromCaller: false,
         callerSuppliedApprovalIsAuthority: false,
         oneShotApprovalClaimRequired: true,
+        providerReadbackRequired: true,
       }),
     }));
+    expect(res.body.founderContent.directPublish).not.toHaveProperty('enabled');
+    expect(res.body.founderContent.directPublish.nextRuntimeGate).toContain('approval-store migration state');
     expect(res.body.founderContent.readiness).not.toHaveProperty('webhookUrl');
     expect(res.body.founderContent.readiness).not.toHaveProperty('bearerToken');
   });
