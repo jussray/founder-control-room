@@ -32,6 +32,64 @@ function envelope(
 }
 
 describe('L99 interactive capability policy', () => {
+  it('fails closed on unknown runtime capabilities and unknown authority fields', () => {
+    expect(
+      validateInteractiveEnvelope({
+        ...envelope(),
+        capability: 'root.exec',
+      }),
+    ).toEqual(['interactive authority envelope shape is invalid']);
+
+    expect(
+      validateInteractiveEnvelope({
+        ...envelope(),
+        hiddenAuthority: true,
+      }),
+    ).toEqual(['interactive authority envelope shape is invalid']);
+  });
+
+  it('fails closed on malformed nested fingerprint or isolation shapes', () => {
+    expect(
+      validateInteractiveEnvelope({
+        ...envelope(),
+        fingerprints: {
+          inputFingerprint: null,
+          environmentFingerprint: null,
+          outputFingerprint: null,
+          permission: 'admin',
+        },
+      }),
+    ).toEqual(['interactive authority envelope shape is invalid']);
+
+    expect(
+      validateInteractiveEnvelope({
+        ...envelope({
+          capability: 'sandbox.read',
+          targetPatterns: ['sandbox://job-1'],
+          allowedOperations: ['read'],
+        }),
+        sandboxIsolation: {
+          networkAccess: false,
+          secretsAccess: false,
+          productionAccess: false,
+          persistentStorage: 'false',
+        },
+      }),
+    ).toEqual(['interactive authority envelope shape is invalid']);
+  });
+
+  it('requires explicit non-blank targets and operations', () => {
+    const errors = validateInteractiveEnvelope(
+      envelope({
+        targetPatterns: [],
+        allowedOperations: [],
+      }),
+    );
+
+    expect(errors).toContain('interactive authority requires at least one non-blank target pattern');
+    expect(errors).toContain('interactive authority requires at least one non-blank allowed operation');
+  });
+
   it('does not allow a browser-open grant to widen into an external mutation', () => {
     const parent = envelope();
     const child = envelope({
