@@ -1,10 +1,10 @@
 -- =============================================================================
--- Close the merge-intent reapproval loop
+-- Close the FCR merge-intent reapproval loop
 --
 -- Sticky liveness revocation must have a supported recovery path. FCR's founder
 -- approval route only creates a fresh approval from mission.status=in_review.
--- Therefore a durable intent revocation returns an approved mission to review.
--- This is deny-only: it removes approval, never grants it.
+-- Therefore a durable FCR intent revocation returns an approved mission to
+-- review. This is deny-only: it removes approval, never grants it.
 -- =============================================================================
 
 begin;
@@ -20,6 +20,7 @@ set search_path = public
 as $$
 declare
   v_intent_state text;
+  v_repository text;
 begin
   if new.status = 'integrated' then
     update merge_intents
@@ -32,15 +33,17 @@ begin
   end if;
 
   if old.status = 'approved' and new.status <> 'approved' then
-    select state
-      into v_intent_state
+    select state, lower(repository)
+      into v_intent_state, v_repository
       from merge_intents
      where mission_id = new.id;
 
-    -- This exact transition is the supported safety/reapproval loop. The intent
-    -- has already recorded WHY approval was revoked and must keep that reason
-    -- until a new founder approval refreshes it to WAITING with a new revision.
-    if new.status = 'in_review'
+    -- This exact transition is the supported FCR safety/reapproval loop. The
+    -- intent has already recorded WHY approval was revoked and must keep that
+    -- reason until a new founder approval refreshes it to WAITING with a new
+    -- revision. Future projects do not inherit this workflow implicitly.
+    if v_repository = 'jussray/founder-control-room'
+       and new.status = 'in_review'
        and v_intent_state in ('needs_review', 'stale', 'expired', 'blocked') then
       update merge_intents
          set last_reconciled_at = coalesce(last_reconciled_at, now()),
@@ -71,7 +74,8 @@ security definer
 set search_path = public
 as $$
 begin
-  if new.state not in ('needs_review', 'stale', 'expired', 'blocked')
+  if lower(new.repository) <> 'jussray/founder-control-room'
+     or new.state not in ('needs_review', 'stale', 'expired', 'blocked')
      or new.state is not distinct from old.state then
     return new;
   end if;
@@ -100,15 +104,16 @@ create trigger merge_intents_return_revoked_to_review
   execute function return_revoked_fcr_merge_to_review();
 
 -- Historical backfill ran before this trigger existed. Immediately reconcile
--- any already-revoked intent with mission status so installation itself cannot
--- leave "mission=approved / intent=expired|blocked|stale|needs_review" truth
--- split. The replaced mission lifecycle function above preserves the reason.
+-- any already-revoked FCR intent with mission status so installation itself
+-- cannot leave "mission=approved / intent=expired|blocked|stale|needs_review"
+-- truth split. The replaced mission lifecycle function above preserves reason.
 update missions m
    set status = 'in_review',
        updated_at = now()
   from merge_intents mi
  where mi.mission_id = m.id
    and mi.project_id = m.project_id
+   and lower(mi.repository) = 'jussray/founder-control-room'
    and m.status = 'approved'
    and mi.state in ('needs_review', 'stale', 'expired', 'blocked');
 
@@ -122,18 +127,19 @@ begin
     into v_split_count
     from merge_intents mi
     join missions m on m.id = mi.mission_id
-   where m.status = 'approved'
+   where lower(mi.repository) = 'jussray/founder-control-room'
+     and m.status = 'approved'
      and mi.state in ('needs_review', 'stale', 'expired', 'blocked');
 
   if v_split_count > 0 then
     raise exception
-      'Merge-intent reapproval-loop postcondition failed: % revoked intent(s) still have approved missions',
+      'Merge-intent reapproval-loop postcondition failed: % revoked FCR intent(s) still have approved missions',
       v_split_count;
   end if;
 end;
 $$;
 
 comment on function return_revoked_fcr_merge_to_review() is
-  'Deny-only recovery loop: observed merge-intent revocation returns approved FCR mission to in_review so explicit founder reapproval can create a new revision.';
+  'FCR-only deny/recovery loop: observed merge-intent revocation returns an approved FCR mission to in_review so explicit founder reapproval can create a new revision.';
 
 commit;
