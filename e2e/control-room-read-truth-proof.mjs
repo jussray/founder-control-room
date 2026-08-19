@@ -106,8 +106,10 @@ try {
     email: 'founder@example.com',
   });
   await page.goto(`${BASE_URL}/control-room/#${founderFragment.toString()}`, {
-    waitUntil: 'networkidle',
+    waitUntil: 'domcontentloaded',
   });
+  await page.locator('.founder-email').waitFor();
+  await page.locator('#project-list').waitFor();
 
   await page.screenshot({
     path: join(RESULTS_ROOT, 'control-room-projects-failed-read-mobile.png'),
@@ -150,7 +152,8 @@ try {
   });
 
   projectReadMode = 'ready-empty';
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.locator('.founder-email').waitFor();
   await page.locator('#project-list').waitFor();
   const readyText = await page.locator('#project-list').innerText();
   if (!readyText.includes('No projects registered yet.')) {
