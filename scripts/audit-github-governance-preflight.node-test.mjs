@@ -2,8 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CANONICAL_RULESET_NAME,
+  buildBlockedReport,
   buildReport,
   canonicalFloorSatisfied,
+  classifyProviderReadFailure,
   collaboratorCanReview,
   rulesetSnapshot,
 } from './audit-github-governance-preflight.mjs';
@@ -83,6 +85,7 @@ test('report requires exactly one canonical active main ruleset plus reviewer re
     ],
   });
   assert.equal(ready.status, 'READY');
+  assert.equal(ready.observationComplete, true);
   assert.equal(ready.activeRulesetCountTargetingRef, 1);
   assert.equal(ready.canonicalRulesetMatchCount, 1);
   assert.equal(ready.eligibleNonOwnerWriteReviewerCount, 1);
@@ -94,4 +97,28 @@ test('report requires exactly one canonical active main ruleset plus reviewer re
   });
   assert.equal(duplicate.status, 'NOT_READY');
   assert.equal(duplicate.activeRulesetCountTargetingRef, 2);
+});
+
+test('provider-read failure produces a sanitized blocked receipt instead of fake not-ready state', () => {
+  const report = buildBlockedReport({
+    repository: 'jussray/founder-control-room',
+    targetRef: 'main',
+    reason: 'provider_read_forbidden',
+  });
+  assert.equal(report.status, 'BLOCKED');
+  assert.equal(report.observationComplete, false);
+  assert.equal(report.blocker, 'provider_read_forbidden');
+  assert.equal(report.canonicalFloorSatisfied, false);
+  assert.equal(report.independentReviewerReady, false);
+  assert.equal(report.activeRulesetCountTargetingRef, null);
+  assert.equal(report.canonicalRuleset, null);
+  assert.deepEqual(report.observedBranchRulesets, []);
+  assert.equal(Object.hasOwn(report, 'errorMessage'), false);
+});
+
+test('provider-read failures are classified without retaining raw provider text', () => {
+  assert.equal(classifyProviderReadFailure(new Error('HTTP 403: Resource not accessible by integration')), 'provider_read_forbidden');
+  assert.equal(classifyProviderReadFailure(new Error('HTTP 401: Bad credentials')), 'provider_read_unauthenticated');
+  assert.equal(classifyProviderReadFailure(new Error('GITHUB_TOKEN is required for governance preflight')), 'provider_read_token_missing');
+  assert.equal(classifyProviderReadFailure(new Error('socket closed')), 'provider_read_failed');
 });
