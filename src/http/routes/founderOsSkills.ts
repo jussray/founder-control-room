@@ -22,6 +22,13 @@ import {
   FOUNDER_OS_LAB_PROVIDERS,
 } from '../../founder-os-lab/registry.js';
 import { runFounderOsSandbox } from '../../founder-os-lab/sandbox.js';
+import {
+  CHIEF_AI_BINDING_NAME,
+  CHIEF_AI_ENTRYPOINT,
+  CHIEF_AI_SERVICE_IDENTITY,
+  readChiefAiServiceVersion,
+  requestChiefAiCapabilityPlan,
+} from '../../worker/chiefAiBinding.js';
 import { requireFounder } from '../middleware/requireFounder.js';
 
 export const founderOsSkillsRouter = Router();
@@ -270,6 +277,59 @@ function parseCapabilityPlan(value: unknown): V10CapabilityPlan | undefined | nu
   if (value === undefined || value === null) return undefined;
   return isV10CapabilityPlan(value) ? value : null;
 }
+
+function chiefBindingReceipt(chief: {
+  rpcContract: string;
+  capabilityPlanContract: string;
+  releaseSha: string;
+}) {
+  return {
+    name: CHIEF_AI_BINDING_NAME,
+    service: CHIEF_AI_SERVICE_IDENTITY,
+    entrypoint: CHIEF_AI_ENTRYPOINT,
+    rpcContract: chief.rpcContract,
+    capabilityPlanContract: chief.capabilityPlanContract,
+    releaseSha: chief.releaseSha,
+  };
+}
+
+function chiefBindingFailure(error: unknown) {
+  return {
+    ok: false,
+    error: {
+      code: 'chief_ai_binding_invalid',
+      message: error instanceof Error ? error.message : 'Chief AI binding could not be verified.',
+    },
+  };
+}
+
+founderOsSkillsRouter.get('/chief/version', async (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    const chief = await readChiefAiServiceVersion();
+    return res.status(200).json({
+      ok: true,
+      binding: chiefBindingReceipt(chief),
+      chief,
+    });
+  } catch (error) {
+    return res.status(502).json(chiefBindingFailure(error));
+  }
+});
+
+founderOsSkillsRouter.post('/chief/capability-plan', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    const chief = await requestChiefAiCapabilityPlan(req.body as unknown);
+    return res.status(chief.status).json({
+      ok: chief.ok,
+      binding: chiefBindingReceipt(chief),
+      result: chief.result,
+    });
+  } catch (error) {
+    return res.status(502).json(chiefBindingFailure(error));
+  }
+});
 
 founderOsSkillsRouter.post('/preview', (req, res) => {
   const body = req.body as unknown;
