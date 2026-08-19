@@ -3,9 +3,9 @@
 --
 -- merge_intents is NOT approval authority. It can never make a merge eligible.
 -- It can, however, preserve observed historical drift by refusing the existing
--- approval_executions reservation until an explicit new approval revision
--- refreshes the intent. The guarded /execute path must still pass every proof,
--- evidence, review, provider-identity, diff, and exact-head gate afterwards.
+-- approval_executions reservation until the read-only reconciler has proved the
+-- exact approved candidate READY. The guarded /execute path must still pass
+-- every proof, evidence, review, provider-identity, diff, and exact-head gate.
 -- =============================================================================
 
 begin;
@@ -20,6 +20,7 @@ declare
   v_repository text;
   v_state text;
   v_proof_expires_at timestamptz;
+  v_diff_hash text;
 begin
   if new.action_type <> 'merge' or new.mission_id is null then
     return new;
@@ -38,8 +39,8 @@ begin
   -- Lock the current approval projection for the duration of the reservation
   -- insert. A concurrent reconciler cannot overwrite it between veto and the
   -- AFTER INSERT lifecycle projection.
-  select state, proof_expires_at
-    into v_state, v_proof_expires_at
+  select state, proof_expires_at, approved_diff_hash
+    into v_state, v_proof_expires_at, v_diff_hash
     from merge_intents
    where mission_id = new.mission_id
    for update;
@@ -49,10 +50,17 @@ begin
       'FCR merge execution vetoed: approved mission has no durable merge intent';
   end if;
 
-  if v_state not in ('waiting', 'ready') then
+  -- READY only removes this liveness veto. It does not authorize merge. The
+  -- existing /execute gates run after this reservation and remain authoritative.
+  if v_state <> 'ready' then
     raise exception
-      'FCR merge execution vetoed: merge intent state % requires explicit reapproval/reconciliation',
+      'FCR merge execution vetoed: merge intent state % is not READY and requires reconciliation/reapproval',
       v_state;
+  end if;
+
+  if v_diff_hash is null or v_diff_hash !~ '^[0-9a-f]{64}$' then
+    raise exception
+      'FCR merge execution vetoed: READY intent has no canonical approved diff witness';
   end if;
 
   if v_proof_expires_at is null or v_proof_expires_at <= now() then
@@ -96,7 +104,7 @@ begin
            stale_reason = null,
            updated_at = now()
      where mission_id = new.mission_id
-       and state in ('waiting', 'ready');
+       and state = 'ready';
     return new;
   end if;
 
@@ -117,7 +125,7 @@ begin
   if new.status = 'failed' then
     update merge_intents
        set state = 'blocked',
-           stale_reason = 'guarded merge execution failed; re-reconcile before any new approval',
+           stale_reason = 'guarded merge execution failed; explicit reapproval/reconciliation is required',
            failure_count = failure_count + 1,
            last_reconciled_at = now(),
            updated_at = now()
