@@ -89,14 +89,25 @@ export function commandBridgeSeverityForRisk(risk: CommandBridgeRisk): 'info' | 
 }
 
 export function executionPayloadForRequest(request: Pick<CommandBridgeRequestSnapshot, 'projectSlug' | 'missionId' | 'commandId' | 'expectedCommitSha' | 'risk'>) {
+  const body = {
+    missionId: request.missionId,
+    commandId: request.commandId,
+    expectedCommitSha: request.expectedCommitSha,
+  };
+
+  if (request.risk !== 'read') {
+    return {
+      endpoint: null,
+      method: 'POST',
+      body,
+      authorityRequired: 'L99_APPROVAL_RECEIPT' as const,
+    };
+  }
+
   return {
     endpoint: request.projectSlug ? `/terminal/${encodeURIComponent(request.projectSlug)}/run` : null,
     method: 'POST',
-    body: {
-      missionId: request.missionId,
-      commandId: request.commandId,
-      expectedCommitSha: request.expectedCommitSha,
-      ...(request.risk === 'write' ? { confirmWrite: true } : {}),
-    },
+    body,
+    authorityRequired: null,
   };
 }
