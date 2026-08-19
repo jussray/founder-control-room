@@ -34,6 +34,7 @@ begin
          select 1
            from proof_gate_results pgr
           where pgr.mission_id = m.id
+            and pgr.project_id = m.project_id
             and pgr.gate_id = 'merge'
             and pgr.status = 'pass'
             and coalesce(btrim(pgr.approved_by), '') <> ''
@@ -100,6 +101,7 @@ cross join lateral (
   select pgr.id, pgr.approved_by, pgr.ran_at
     from proof_gate_results pgr
    where pgr.mission_id = m.id
+     and pgr.project_id = m.project_id
      and pgr.gate_id = 'merge'
      and pgr.status = 'pass'
      and coalesce(btrim(pgr.approved_by), '') <> ''
