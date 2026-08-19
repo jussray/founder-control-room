@@ -4,6 +4,7 @@ import { McpHub, advertisedToolNames } from "../../mcp/hub.js";
 import type { McpInvocationRequest } from "../../mcp/types.js";
 import { hubForMcpProject } from "../../mcp/vaultHub.js";
 import { connectionVaultRouter } from "./connectionVault.js";
+import { founderPermissionsRouter } from "./founderPermissions.js";
 import { handleRemoteReadMcp } from "./remoteReadMcp.js";
 
 export const mcpRouter = Router();
@@ -46,6 +47,11 @@ mcpRouter.post("/read", handleRemoteReadMcp);
 // workflow-facing resolver uses short-lived hashed FCR bearer tokens; founder
 // administration routes remain protected by requireFounder inside the router.
 mcpRouter.use("/vault", connectionVaultRouter);
+
+// Portable founder permission broker. Approved conversational surfaces can
+// submit one exact proposal through founder authentication, but the request
+// carries zero execution authority until a separate explicit founder decision.
+mcpRouter.use("/founder-permissions", founderPermissionsRouter);
 
 mcpRouter.get("/servers", requireFounder, (_req, res) => {
   return res.json({ servers: registryHub.listServers() });
