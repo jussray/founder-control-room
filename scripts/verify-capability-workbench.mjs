@@ -19,13 +19,29 @@ try {
 const app = await readFile(new URL('../public/control-room/capabilities.js', import.meta.url), 'utf8');
 for (const boundary of [
   "fetch('/capabilities'",
+  'Find the safest way to do the next thing.',
   'Copy only. No action runs from this screen.',
+  'mobileDetailOpen',
+  'back-to-capabilities',
+  'resetSearch',
   'replaceAll',
 ]) {
   if (!app.includes(boundary)) throw new Error(`Missing workbench boundary: ${boundary}`);
 }
 if (app.includes('capability-registry')) {
   throw new Error('Static workbench must not import a public capability registry');
+}
+if (/Reviewed<br>Aug\s+\d{1,2},\s+20\d{2}/.test(app)) {
+  throw new Error('Workbench must not hard-code a review date that can decay into false current truth');
+}
+
+const styles = await readFile(new URL('../public/control-room/capabilities.css', import.meta.url), 'utf8');
+for (const boundary of [
+  '.workbench.mobile-detail-open .results{display:none}',
+  '.workbench.mobile-detail-open .detail{display:block}',
+  '.mobile-back{display:inline-flex',
+]) {
+  if (!styles.includes(boundary)) throw new Error(`Missing mobile workbench boundary: ${boundary}`);
 }
 
 const route = await readFile(new URL('../src/http/routes/capabilities.ts', import.meta.url), 'utf8');
