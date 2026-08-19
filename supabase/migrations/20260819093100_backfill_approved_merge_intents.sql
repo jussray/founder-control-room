@@ -102,6 +102,7 @@ cross join lateral (
    where pgr.mission_id = m.id
      and pgr.gate_id = 'merge'
      and pgr.status = 'pass'
+     and coalesce(btrim(pgr.approved_by), '') <> ''
    order by pgr.ran_at desc, pgr.id desc
    limit 1
 ) proof
