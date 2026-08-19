@@ -68,6 +68,31 @@ async function enqueueActiveMissionResync(): Promise<void> {
     .in('status', ['implementing', 'preview_ready', 'deploying', 'verifying', 'approved'])
     .in('project_id', projects.map((p: { id: string }) => p.id));
 
+  const approvedMissionIds = (activeMissions ?? [])
+    .filter((mission) => mission.status === 'approved')
+    .map((mission) => mission.id);
+
+  const mergeIntentMissionIds = new Set<string>();
+  if (approvedMissionIds.length > 0) {
+    const { data: intents, error: intentsError } = await supabase
+      .from('merge_intents')
+      .select('mission_id')
+      .in('mission_id', approvedMissionIds);
+
+    if (intentsError) {
+      console.error(JSON.stringify({
+        ts: new Date().toISOString(),
+        scheduler: 'merge_intent_sweep',
+        level: 'error',
+        message: intentsError.message,
+      }));
+    } else {
+      for (const intent of intents ?? []) {
+        if (typeof intent.mission_id === 'string') mergeIntentMissionIds.add(intent.mission_id);
+      }
+    }
+  }
+
   for (const mission of activeMissions ?? []) {
     await enqueueReconcile({
       projectId: mission.project_id,
@@ -76,7 +101,7 @@ async function enqueueActiveMissionResync(): Promise<void> {
       reason: 'periodic_resync',
     });
 
-    if (mission.status === 'approved') {
+    if (mission.status === 'approved' && mergeIntentMissionIds.has(mission.id)) {
       await enqueueReconcile({
         projectId: mission.project_id,
         controller: 'MergeIntentController',
