@@ -52,8 +52,8 @@ function tokenMatches(provided: string | undefined, expected: string): boolean {
   return timingSafeEqual(left, right);
 }
 
-export function deriveBuildEventReceiptToken(mcpToken: string, producer: string): string {
-  return createHmac('sha256', mcpToken)
+export function deriveBuildEventReceiptToken(rootToken: string, producer: string): string {
+  return createHmac('sha256', rootToken)
     .update(`${TOKEN_CONTEXT}:${producer}`)
     .digest('hex');
 }
@@ -114,12 +114,20 @@ export function createBuildEventReceiptIngestHandler(
     const producerPolicy = BUILD_EVENT_PRODUCERS[producer];
     if (!producerPolicy) return res.status(401).json({ error: 'Unauthorized' });
 
-    const mcpToken = env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN?.trim();
-    if (!mcpToken) {
+    const receiptRootToken = env.FCR_BUILD_EVENT_RECEIPT_ROOT_TOKEN?.trim();
+    if (!receiptRootToken) {
       return res.status(503).json({ error: 'Build-event receipt ingest is not configured' });
     }
 
-    const expectedToken = deriveBuildEventReceiptToken(mcpToken, producer);
+    // Keep remote-MCP invocation authority and build-observation authority on
+    // different credentials. A client that legitimately knows the MCP bearer
+    // must not be able to derive a producer receipt credential.
+    const mcpToken = env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN?.trim();
+    if (mcpToken && tokenMatches(receiptRootToken, mcpToken)) {
+      return res.status(503).json({ error: 'Build-event receipt credential isolation is invalid' });
+    }
+
+    const expectedToken = deriveBuildEventReceiptToken(receiptRootToken, producer);
     if (!tokenMatches(req.get('x-build-event-receipt-token'), expectedToken)) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
