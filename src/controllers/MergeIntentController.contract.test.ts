@@ -121,11 +121,14 @@ describe('merge intent liveness contract', () => {
     expect(controller).toMatch(/intent\.state === 'merged'/);
   });
 
-  it('uses REVALIDATED/READY as a deny-only execution precondition while preserving guarded execute authority', () => {
+  it('uses leased REVALIDATED/READY as a deny-only execution precondition while preserving guarded execute authority', () => {
     expect(executionVeto).toMatch(/before insert on approval_executions/);
     expect(executionVeto).toMatch(/for update/);
     expect(executionVeto).toMatch(/if v_state not in \('revalidated', 'ready'\)/);
     expect(executionVeto).toMatch(/merge intent has no canonical approved diff witness/);
+    expect(executionVeto).toMatch(/last_reconciled_at/);
+    expect(executionVeto).toMatch(/now\(\) - interval '3 minutes'/);
+    expect(executionVeto).toMatch(/revalidation lease is stale/);
     expect(executionVeto).toMatch(/merge intent founder proof lease expired/);
     expect(executionVeto).toMatch(/state = 'executing'/);
     expect(executionVeto).toMatch(/state in \('revalidated', 'ready'\)/);
@@ -147,16 +150,17 @@ describe('merge intent liveness contract', () => {
     expect(enqueueMigration).toMatch(/from merge_intents\nwhere state = 'waiting'/);
   });
 
-  it('returns durable revocations to in_review so explicit founder reapproval can create a new revision', () => {
+  it('returns durable FCR revocations to in_review so explicit founder reapproval can create a new revision', () => {
     expect(reapprovalLoop).toMatch(/after update of state on merge_intents/);
+    expect(reapprovalLoop).toMatch(/lower\(new\.repository\) <> 'jussray\/founder-control-room'/);
     expect(reapprovalLoop).toMatch(/new\.state in \('needs_review', 'stale', 'expired', 'blocked'\)/);
     expect(reapprovalLoop).toMatch(/set status = 'in_review'/);
     expect(reapprovalLoop).toMatch(/and status = 'approved'/);
+    expect(reapprovalLoop).toMatch(/v_repository = 'jussray\/founder-control-room'/);
     expect(reapprovalLoop).toMatch(/new\.status = 'in_review'/);
     expect(reapprovalLoop).toMatch(/v_intent_state in \('needs_review', 'stale', 'expired', 'blocked'\)/);
     expect(reapprovalLoop).toMatch(/preserve the sticky revocation state/);
-    expect(reapprovalLoop).toMatch(/from merge_intents mi/);
-    expect(reapprovalLoop).toMatch(/mi\.state in \('needs_review', 'stale', 'expired', 'blocked'\)/);
+    expect(reapprovalLoop).toMatch(/lower\(mi\.repository\) = 'jussray\/founder-control-room'/);
     expect(reapprovalLoop).toMatch(/Merge-intent reapproval-loop postcondition failed/);
   });
 
