@@ -66,6 +66,9 @@ const MUTATING_ACTIONS = new Set<FcrSkillRouterAction>([
 const EXPLICIT_SKILL_ALIASES: Readonly<Record<string, string>> = {
   goalfix: 'goalfix',
   'repo-truth': 'repo-truth',
+  'truth-decay': 'truth-decay-audit',
+  'truth-decay-audit': 'truth-decay-audit',
+  truthdecay: 'truth-decay-audit',
   'review-verify-merge': 'review-verify-merge',
   'proof-led-publishing': 'proof-led-publishing',
   'juss-chief-ai': 'juss-chief-ai',

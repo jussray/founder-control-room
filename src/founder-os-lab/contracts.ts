@@ -18,6 +18,7 @@ export type FounderOsLabSkillId =
   | 'juss-chief-ai'
   | 'goalfix'
   | 'repo-truth'
+  | 'truth-decay-audit'
   | 'proof-led-publishing'
   | 'review-verify-merge';
 
