@@ -17,15 +17,19 @@ export interface ChiefAiServiceBinding {
   createCapabilityPlan(input: unknown): Promise<unknown>;
 }
 
-export interface ChiefAiServiceVersion {
-  ok: true;
+interface ChiefAiServiceMetadata {
   service: typeof CHIEF_AI_SERVICE_IDENTITY;
   rpcContract: typeof CHIEF_AI_RPC_CONTRACT;
   capabilityPlanContract: typeof V10_CAPABILITY_PLAN_CONTRACT;
   releaseSha: string;
 }
 
-export interface ChiefAiCapabilityPlanResponse extends ChiefAiServiceVersion {
+export interface ChiefAiServiceVersion extends ChiefAiServiceMetadata {
+  ok: true;
+}
+
+export interface ChiefAiCapabilityPlanResponse extends ChiefAiServiceMetadata {
+  ok: boolean;
   status: number;
   result: unknown;
   capabilityPlan: V10CapabilityPlan | null;
@@ -55,9 +59,8 @@ export function getChiefAiServiceBinding(): ChiefAiServiceBinding {
   return runtimeBinding;
 }
 
-function parseServiceMetadata(value: unknown): ChiefAiServiceVersion {
+function parseServiceMetadata(value: unknown): ChiefAiServiceMetadata {
   if (!isRecord(value)) throw new Error('Chief AI service response must be an object');
-  if (value.ok !== true) throw new Error('Chief AI service metadata must report ok=true');
   if (value.service !== CHIEF_AI_SERVICE_IDENTITY) {
     throw new Error('Chief AI service identity mismatch');
   }
@@ -72,7 +75,6 @@ function parseServiceMetadata(value: unknown): ChiefAiServiceVersion {
   }
 
   return {
-    ok: true,
     service: CHIEF_AI_SERVICE_IDENTITY,
     rpcContract: CHIEF_AI_RPC_CONTRACT,
     capabilityPlanContract: V10_CAPABILITY_PLAN_CONTRACT,
@@ -83,7 +85,12 @@ function parseServiceMetadata(value: unknown): ChiefAiServiceVersion {
 export async function readChiefAiServiceVersion(
   binding: ChiefAiServiceBinding = getChiefAiServiceBinding(),
 ): Promise<ChiefAiServiceVersion> {
-  return parseServiceMetadata(await binding.version());
+  const raw = await binding.version();
+  const metadata = parseServiceMetadata(raw);
+  if (!isRecord(raw) || raw.ok !== true) {
+    throw new Error('Chief AI service metadata must report ok=true');
+  }
+  return { ok: true, ...metadata };
 }
 
 export async function requestChiefAiCapabilityPlan(
@@ -93,16 +100,25 @@ export async function requestChiefAiCapabilityPlan(
   const raw = await binding.createCapabilityPlan(input);
   const metadata = parseServiceMetadata(raw);
   if (!isRecord(raw)) throw new Error('Chief AI capability-plan response must be an object');
+  if (typeof raw.ok !== 'boolean') {
+    throw new Error('Chief AI capability-plan response must report an operation outcome');
+  }
 
   const status = raw.status;
   if (!Number.isInteger(status) || (status as number) < 100 || (status as number) > 599) {
     throw new Error('Chief AI capability-plan response status is invalid');
   }
 
+  const succeeded = (status as number) >= 200 && (status as number) < 300;
+  if (raw.ok !== succeeded) {
+    throw new Error('Chief AI capability-plan outcome does not match its HTTP-equivalent status');
+  }
+
   const result = raw.result;
-  if ((status as number) < 200 || (status as number) >= 300) {
+  if (!succeeded) {
     return {
       ...metadata,
+      ok: false,
       status: status as number,
       result,
       capabilityPlan: null,
@@ -121,6 +137,7 @@ export async function requestChiefAiCapabilityPlan(
 
   return {
     ...metadata,
+    ok: true,
     status: status as number,
     result,
     capabilityPlan,
