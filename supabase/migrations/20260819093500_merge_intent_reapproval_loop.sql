@@ -99,6 +99,40 @@ create trigger merge_intents_return_revoked_to_review
   )
   execute function return_revoked_fcr_merge_to_review();
 
+-- Historical backfill ran before this trigger existed. Immediately reconcile
+-- any already-revoked intent with mission status so installation itself cannot
+-- leave "mission=approved / intent=expired|blocked|stale|needs_review" truth
+-- split. The replaced mission lifecycle function above preserves the reason.
+update missions m
+   set status = 'in_review',
+       updated_at = now()
+  from merge_intents mi
+ where mi.mission_id = m.id
+   and mi.project_id = m.project_id
+   and m.status = 'approved'
+   and mi.state in ('needs_review', 'stale', 'expired', 'blocked');
+
+-- Install-time postcondition: no revoked FCR intent may still advertise an
+-- approved mission after this migration commits.
+do $$
+declare
+  v_split_count integer;
+begin
+  select count(*)
+    into v_split_count
+    from merge_intents mi
+    join missions m on m.id = mi.mission_id
+   where m.status = 'approved'
+     and mi.state in ('needs_review', 'stale', 'expired', 'blocked');
+
+  if v_split_count > 0 then
+    raise exception
+      'Merge-intent reapproval-loop postcondition failed: % revoked intent(s) still have approved missions',
+      v_split_count;
+  end if;
+end;
+$$;
+
 comment on function return_revoked_fcr_merge_to_review() is
   'Deny-only recovery loop: observed merge-intent revocation returns approved FCR mission to in_review so explicit founder reapproval can create a new revision.';
 
