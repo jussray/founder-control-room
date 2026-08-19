@@ -177,6 +177,9 @@ class LazyRepositoryProvider implements RepositoryProvider {
       );
     }
 
+    // Last-mile TOCTOU membrane: re-read BOTH mutable refs immediately before
+    // handing control to the provider mutation. The semantic review is bound to
+    // context.baseSha/context.headSha; moving either ref invalidates that review.
     const currentBaseSha = await delegate.resolveRef(projectId, base);
     const currentHeadSha = await delegate.resolveRef(projectId, head);
     if (currentBaseSha.toLowerCase() !== context.baseSha.toLowerCase()) {
@@ -237,6 +240,8 @@ async function githubProvider(project: ProviderProjectConfig): Promise<Repositor
   const fallbackToken = process.env.GITHUB_TOKEN?.trim();
   const appId = process.env.GITHUB_APP_ID?.trim();
   const privateKey = process.env.GITHUB_PRIVATE_KEY?.trim();
+  // GITHUB_TOKEN remains a local/development fallback only; production prefers
+  // repository-scoped GitHub App installation credentials minted on demand.
   const token = appId && privateKey
     ? await getGitHubInstallationToken(appId, privateKey, project.repo_identifier)
     : fallbackToken!;
@@ -259,6 +264,15 @@ async function gitlabProvider(project: ProviderProjectConfig): Promise<Repositor
   });
 }
 
+/**
+ * Provider construction belongs in one place so routes, reconcilers, and
+ * mission runners do not grow direct host dependencies.
+ *
+ * GitHub prefers a repository-scoped App installation token, while GitLab
+ * consumes its own provider token and optional self-managed instance URL.
+ * Authentication is demand-driven and cached so callers retain the synchronous
+ * factory contract without coupling project existence to either provider.
+ */
 export function providerForProject(project: ProviderProjectConfig): RepositoryProvider {
   if (project.repo_provider === "github") {
     return new LazyRepositoryProvider("github", () => githubProvider(project));
