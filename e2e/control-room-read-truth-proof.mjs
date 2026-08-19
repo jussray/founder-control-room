@@ -1,10 +1,10 @@
 import { createServer } from 'node:http';
 import { mkdirSync, readFileSync } from 'node:fs';
-import { dirname, extname, join, normalize } from 'node:path';
+import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
-const REPO_ROOT = dirname(fileURLToPath(new URL('../', import.meta.url)));
+const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PUBLIC_ROOT = join(REPO_ROOT, 'public');
 const RESULTS_ROOT = join(REPO_ROOT, 'test-results');
 
