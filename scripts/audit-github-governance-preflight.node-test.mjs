@@ -17,7 +17,7 @@ function canonicalRuleset(overrides = {}) {
     target: 'branch',
     enforcement: 'active',
     bypass_actors: [{ actor_type: 'Integration', actor_id: 123456, bypass_mode: 'always' }],
-    conditions: { ref_name: { include: ['refs/heads/main'], exclude: [] } },
+    conditions: { ref_name: { include: ['~DEFAULT_BRANCH'], exclude: [] } },
     rules: [
       {
         type: 'pull_request',
@@ -45,8 +45,8 @@ function canonicalRuleset(overrides = {}) {
   };
 }
 
-test('canonical hardened FCR main ruleset satisfies the floor', () => {
-  const snapshot = rulesetSnapshot(canonicalRuleset());
+test('canonical hardened FCR default-branch ruleset satisfies the floor', () => {
+  const snapshot = rulesetSnapshot(canonicalRuleset(), 'main', 'main');
   assert.equal(snapshot.targetsRequestedRef, true);
   assert.equal(snapshot.requiredApprovingReviewCount, 1);
   assert.equal(snapshot.dismissStaleReviewsOnPush, true);
@@ -58,14 +58,25 @@ test('canonical hardened FCR main ruleset satisfies the floor', () => {
   assert.equal(canonicalFloorSatisfied(snapshot), true);
 });
 
+test('default-branch sentinel resolves only to the observed repository default branch', () => {
+  const sentinel = canonicalRuleset();
+  assert.equal(rulesetSnapshot(sentinel, 'main', 'main').targetsRequestedRef, true);
+  assert.equal(rulesetSnapshot(sentinel, 'release', 'main').targetsRequestedRef, false);
+
+  const literal = canonicalRuleset({
+    conditions: { ref_name: { include: ['refs/heads/main'], exclude: [] } },
+  });
+  assert.equal(rulesetSnapshot(literal, 'main', 'main').targetsRequestedRef, true);
+});
+
 test('zero review or stale-review policy cannot satisfy the floor', () => {
   const zeroReview = canonicalRuleset();
   zeroReview.rules[0].parameters.required_approving_review_count = 0;
-  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(zeroReview)), false);
+  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(zeroReview, 'main', 'main')), false);
 
   const staleAllowed = canonicalRuleset();
   staleAllowed.rules[0].parameters.dismiss_stale_reviews_on_push = false;
-  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(staleAllowed)), false);
+  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(staleAllowed, 'main', 'main')), false);
 });
 
 test('collaborator readiness requires non-owner write authority and excludes bots', () => {
@@ -78,6 +89,8 @@ test('collaborator readiness requires non-owner write authority and excludes bot
 test('report requires exactly one canonical active main ruleset plus reviewer readiness', () => {
   const ready = buildReport({
     repository: 'jussray/founder-control-room',
+    targetRef: 'main',
+    defaultBranch: 'main',
     fullRulesets: [canonicalRuleset()],
     collaborators: [
       { login: 'jussray', permissions: { admin: true } },
@@ -86,12 +99,15 @@ test('report requires exactly one canonical active main ruleset plus reviewer re
   });
   assert.equal(ready.status, 'READY');
   assert.equal(ready.observationComplete, true);
+  assert.equal(ready.defaultBranch, 'main');
   assert.equal(ready.activeRulesetCountTargetingRef, 1);
   assert.equal(ready.canonicalRulesetMatchCount, 1);
   assert.equal(ready.eligibleNonOwnerWriteReviewerCount, 1);
 
   const duplicate = buildReport({
     repository: 'jussray/founder-control-room',
+    targetRef: 'main',
+    defaultBranch: 'main',
     fullRulesets: [canonicalRuleset(), { ...canonicalRuleset(), id: 999, name: 'duplicate-main-gate' }],
     collaborators: [{ login: 'reviewer', permissions: { maintain: true } }],
   });
@@ -108,6 +124,7 @@ test('provider-read failure produces a sanitized blocked receipt instead of fake
   assert.equal(report.status, 'BLOCKED');
   assert.equal(report.observationComplete, false);
   assert.equal(report.blocker, 'provider_read_forbidden');
+  assert.equal(report.defaultBranch, null);
   assert.equal(report.canonicalFloorSatisfied, false);
   assert.equal(report.independentReviewerReady, false);
   assert.equal(report.activeRulesetCountTargetingRef, null);
