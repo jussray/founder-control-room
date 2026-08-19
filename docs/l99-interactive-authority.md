@@ -21,17 +21,21 @@ A capability is a typed authority boundary, not a scalar permission level. A dow
 
 For example, `sandbox.export` cannot derive `sandbox.exec`, `sandbox.create` cannot derive `sandbox.snapshot`, and `browser.external_mutation` cannot silently become `browser.read`. If a later stage needs a different capability, it must obtain a separate grant for that capability. This avoids authority laundering through relationships that look numerically “weaker” but authorize a different execution surface or lifecycle action.
 
+`externalMutation` is also sticky security metadata. If the approved parent classifies an operation as externally mutating, a child may not relabel the same capability/operation as non-mutating to escape mutation-specific gates. A different risk classification requires a separately justified grant rather than silent derivation.
+
 ## Fingerprints
 
 Fingerprints prove identity, not permission. A matching fingerprint can establish that the exact input, environment, or output is the object under discussion, but it cannot create a capability, widen an authority envelope, or replace founder approval.
 
+L99 fingerprints use the repository's existing cryptographic identity convention: each non-null fingerprint must be a **64-hex SHA-256 digest**. Friendly labels, opaque names, timestamps, provider IDs, or arbitrary nonempty strings are not fingerprints and must not satisfy an identity binding.
+
 The interactive envelope may bind:
 
-- `inputFingerprint`: exact source/input packet used for execution;
-- `environmentFingerprint`: exact sandbox/tool/runtime environment;
-- `outputFingerprint`: exact artifact/result permitted for export or downstream proof.
+- `inputFingerprint`: SHA-256 of the exact source/input packet used for execution;
+- `environmentFingerprint`: SHA-256 of the exact sandbox/tool/runtime environment manifest;
+- `outputFingerprint`: SHA-256 of the exact artifact/result permitted for export or downstream proof.
 
-If an upstream envelope already binds a fingerprint, every downstream envelope must preserve that exact value. A downstream stage may add a previously-unbound fingerprint as evidence becomes available, but it may not replace a bound value.
+If an upstream envelope already binds a fingerprint, every downstream envelope must preserve that exact digest. A downstream stage may add a previously-unbound fingerprint as evidence becomes available, but it may not replace a bound digest.
 
 Fingerprint lineage should eventually support the same proof shape used elsewhere in FCR:
 
@@ -61,6 +65,8 @@ Command Bridge preserves the same boundary. Read/verify requests may still resol
 
 This is a **deny-until-integrated safety fuse**, not completed write execution wiring. The repository does not yet verify an L99 ApprovalReceipt and then execute the approved write command on this path. That later integration must bind the exact operation ID to a separately reviewed fixed command template and must reread authoritative policy/approval state immediately before execution.
 
+Terminal operation IDs are bounded policy identifiers, not shell fragments or filesystem paths. The future executor must resolve an approved ID through a fixed registry/template mapping; it must never pass the operation ID or user-supplied text directly to a shell or interpreter.
+
 n8n may coordinate these capabilities but cannot widen them. A workflow, prompt, MCP handle, terminal route, browser session, Playwright session, sandbox instance, or fingerprint is not an authorization grant by itself.
 
-Any later execution integration must preserve the exact target, operation, isolation envelope, expiry, fingerprint bindings, reservation, and action hash approved upstream, and must reacquire runtime/UI proof where the integrated surface is user-visible or interactive.
+Any later execution integration must preserve the exact capability, mutation classification, target, operation, isolation envelope, expiry, fingerprint bindings, reservation, and action hash approved upstream, and must reacquire runtime/UI proof where the integrated surface is user-visible or interactive.
