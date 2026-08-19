@@ -23,7 +23,7 @@ create table if not exists merge_intents (
   approved_base_sha        text not null check (approved_base_sha ~ '^[0-9a-f]{40}$'),
   approved_head_sha        text not null check (approved_head_sha ~ '^[0-9a-f]{40}$'),
   -- Deterministic provider-diff witness for the immutable approved base/head
-  -- pair. It is derived by MergeIntentController before READY, because the
+  -- pair. It is derived by MergeIntentController before REVALIDATED, because the
   -- database trigger intentionally performs no provider/network reads.
   approved_diff_hash       text check (approved_diff_hash is null or approved_diff_hash ~ '^[0-9a-f]{64}$'),
   approval_proof_id        uuid not null references proof_gate_results(id) on delete restrict,
@@ -74,7 +74,7 @@ grant select, insert, update, delete on table merge_intents to service_role;
 comment on table merge_intents is
   'Enumerable merge liveness/audit projection. Never approval or provider-mutation authority.';
 comment on column merge_intents.approved_diff_hash is
-  'Canonical provider diff hash derived from the immutable approved base/head pair before READY; nullable only while waiting for first reconciliation.';
+  'Canonical provider diff hash derived from the immutable approved base/head pair before REVALIDATED; nullable only while waiting for first reconciliation.';
 comment on column merge_intents.state is
   'Projection state only. READY does not authorize merge execution.';
 
@@ -83,9 +83,9 @@ comment on column merge_intents.state is
 --
 -- FCR already pins provider-backed PR/base/head/author/review-policy identity in
 -- missions.policy_snapshot before changing in_review -> approved. This trigger
--- converts those pinned facts plus the latest passing merge proof into durable
--- liveness state. Any missing fact aborts the approval update, so an approved
--- FCR mission cannot commit without an intent row.
+-- converts those pinned facts plus one concrete fresh passing merge proof into
+-- durable liveness state. Any missing fact aborts the approval update, so an
+-- approved FCR mission cannot commit without an intent row.
 -- -----------------------------------------------------------------------------
 create or replace function project_fcr_merge_intent_on_approval()
 returns trigger
@@ -145,12 +145,14 @@ begin
     into v_proof
     from proof_gate_results
    where mission_id = new.id
+     and project_id = new.project_id
      and gate_id = 'merge'
      and status = 'pass'
-   order by ran_at desc
+     and coalesce(btrim(approved_by), '') <> ''
+   order by ran_at desc, id desc
    limit 1;
 
-  if v_proof.id is null or coalesce(btrim(v_proof.approved_by), '') = '' then
+  if v_proof.id is null then
     raise exception 'FCR merge approval cannot persist merge intent: passing founder proof is missing';
   end if;
 
