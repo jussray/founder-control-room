@@ -27,6 +27,7 @@
   },
   "workLifecycle": {
     "authorityUnit": "obligation",
+    "retirementExecutorStatus": "not-implemented",
     "classifications": [
       "active",
       "supersession-candidate",
@@ -69,6 +70,9 @@
       "runtimeSensitiveClosureRequiresCurrentHeadProof": true,
       "closedHistoricalEvidenceMustRemainRecoverable": true,
       "orphanedSupersessionReactivatesObligation": true,
+      "structuralReceiptValidationIsNotProviderProof": true,
+      "closureExecutorMustAcquireProviderEvidenceInternally": true,
+      "untrustedCallerReceiptCannotAuthorizeClosure": true,
       "directBranchDeletionExposed": false,
       "branchDeletionRequiresReceiptAwareReconciler": true
     },
