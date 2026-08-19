@@ -182,6 +182,10 @@ export interface RulesetResult {
  * Provider-agnostic repository interface. All write methods correspond to
  * separately approval-gated L99 actions. Read methods may be used by Repo
  * Brain during discussion and reconciliation, but every read is still logged.
+ *
+ * Branch deletion is deliberately not ambient repository authority. A stale
+ * branch is not necessarily superseded or retirable. Deletion may return only
+ * through an obligation-aware retirement reconciler with a verified receipt.
  */
 export interface RepositoryProvider {
   readonly name: string;
@@ -233,9 +237,6 @@ export interface RepositoryProvider {
    * immediately before invoking this method. Returns the resulting commit SHA.
    */
   integrate(projectId: string, base: string, head: string): Promise<string>;
-
-  /** Deletes a branch — used for "reject and delete branch". */
-  deleteBranch(projectId: string, branch: string): Promise<void>;
 
   /**
    * Applies (creates or updates, by name) a branch protection ruleset.
