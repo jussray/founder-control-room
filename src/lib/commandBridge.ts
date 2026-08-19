@@ -50,7 +50,7 @@ export const COMMAND_BRIDGE_MAX_REQUEST_WINDOW_MINUTES = 24 * 60;
 
 export const COMMAND_BRIDGE_CONTRACT: CommandBridgeContract = Object.freeze({
   id: 'founder-control-room-command-bridge',
-  version: '1.0.0',
+  version: '1.1.0',
   label: 'Founder Command Bridge',
   purpose: 'Agents request power. Founder directs commands. Guarded terminal produces receipts.',
   maxRequestWindowMinutes: COMMAND_BRIDGE_MAX_REQUEST_WINDOW_MINUTES,
@@ -59,7 +59,7 @@ export const COMMAND_BRIDGE_CONTRACT: CommandBridgeContract = Object.freeze({
     'Every command request is tied to a project, mission, approved command id, and exact expected commit SHA.',
     'The founder can approve, deny, or let a request expire before any terminal execution.',
     'Execution still runs through the guarded terminal allowlist; Command Bridge never expands the command registry.',
-    'Write-risk commands require explicit confirmation and are never implied by an agent request.',
+    'Write-risk command approval is not execution authority; exact L99 receipt verification is required before execution.',
     'Every request, approval, denial, and execution link leaves an auditable event or state row.',
   ]),
   forbiddenPatterns: Object.freeze([
@@ -68,6 +68,7 @@ export const COMMAND_BRIDGE_CONTRACT: CommandBridgeContract = Object.freeze({
     'command execution without mission id',
     'command execution without exact expected head SHA',
     'unbounded stdout or stderr',
+    'write execution from Command Bridge approval without an L99 ApprovalReceipt',
     'provider or production action without a separate gate',
   ]),
 });
@@ -89,6 +90,19 @@ export function commandBridgeSeverityForRisk(risk: CommandBridgeRisk): 'info' | 
 }
 
 export function executionPayloadForRequest(request: Pick<CommandBridgeRequestSnapshot, 'projectSlug' | 'missionId' | 'commandId' | 'expectedCommitSha' | 'risk'>) {
+  if (request.risk === 'write') {
+    return {
+      endpoint: null,
+      method: 'POST',
+      body: {
+        missionId: request.missionId,
+        commandId: request.commandId,
+        expectedCommitSha: request.expectedCommitSha,
+      },
+      authorityRequired: 'L99_APPROVAL_RECEIPT' as const,
+    };
+  }
+
   return {
     endpoint: request.projectSlug ? `/terminal/${encodeURIComponent(request.projectSlug)}/run` : null,
     method: 'POST',
@@ -96,7 +110,7 @@ export function executionPayloadForRequest(request: Pick<CommandBridgeRequestSna
       missionId: request.missionId,
       commandId: request.commandId,
       expectedCommitSha: request.expectedCommitSha,
-      ...(request.risk === 'write' ? { confirmWrite: true } : {}),
     },
+    authorityRequired: null,
   };
 }
