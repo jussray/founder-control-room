@@ -6,6 +6,18 @@ Juss authorizes repository changes to be merged when the acting AI or operator d
 
 This standing authority replaces blanket `do not merge` language in active operating instructions. It does not require another merge-only confirmation when every applicable merge condition below is satisfied.
 
+For Founder Control Room itself, the canonical human authority model is now **founder-final review**:
+
+```text
+deterministic independent review
+-> exact provider PR/base/head + diff readback
+-> authenticated founder final approval of that exact candidate
+-> last-moment ref freshness check
+-> merge
+```
+
+Founder final approval is a separate authority class. It must never be mislabeled as independent semantic review.
+
 ## Merge conditions
 
 A merge is appropriate only when:
@@ -26,30 +38,48 @@ A merge is appropriate only when:
 - rollback or safe forward-fix is understood;
 - the merge itself does not silently execute a separately gated action.
 
-## Independent review for Founder Control Room merges
+## Independent review + founder-final authority for Founder Control Room merges
 
-The Founder Control Room in-app merge path has an additional load-bearing independent-review membrane before repository provider integration.
+The Founder Control Room in-app merge path keeps **independent review load-bearing**, but the canonical FCR policy no longer requires a second human semantic reviewer merely because the founder authored the patch.
 
-For `jussray/founder-control-room` it requires, at minimum:
+For `jussray/founder-control-room` the canonical path requires, at minimum:
 
-- an exact open, non-draft pull request whose repository, base ref/SHA, head ref/SHA, and author identity match the founder-approved mission;
+- an exact open pull request whose repository, base ref/SHA, head ref/SHA, and author identity match the founder-approved mission;
 - a canonical exact diff hash from the provider comparison;
-- a deterministic review witness on the exact head;
-- at least one trusted non-author semantic review on the exact head;
-- P2 findings to remain merge-blocking;
-- provider-backed review signals and receipt hashes to match the submitted review evidence;
+- at least one deterministic independent review receipt with a passed provider-backed witness on the exact head;
+- P0/P1 blocked findings and unresolved P2 findings to remain merge-blocking;
+- exact-head machine evidence required by the mission;
+- an authenticated founder-final receipt bound to the exact PR number, base SHA, head SHA, founder identity, and approval time;
+- the founder-final receipt to remain fresh inside the merge proof window;
+- the provider PR identity and diff to be re-read after approval;
 - the mutable head to be re-read immediately before provider integration; and
-- the review policy presented to the evaluator to match the **server-owned** reviewer trust configured through `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS`.
+- the founder-final policy presented to the evaluator to match the server-owned deterministic founder-final policy.
 
-The request may carry review metadata or a pinned policy representation for identity/hashing, but it cannot redefine the trusted semantic reviewer set. The evaluator fails closed when the policy hash differs from the server-owned FCR reviewer policy, when the server configuration is absent or invalid, when the reviewer is the author, when a GitHub App bot is offered as the semantic reviewer, or when the provider witness is stale or mismatched.
+The canonical founder-final policy is intentionally narrow:
+
+```text
+requiredSemanticReviews: 0
+requireDeterministicReview: true
+blockOnP2: true
+trustedSemanticReviewerIds: []
+founderFinalApprovalRequired: true
+```
+
+A caller cannot turn deterministic review off, weaken P2 handling, substitute model output for founder authority, redefine the policy, or reuse a founder approval against another PR/base/head. The deterministic review receipt itself remains proposal-only and non-authorizing. The authenticated founder-final receipt supplies the final human authority after the independent proof layer passes.
+
+### Legacy pinned semantic-review missions
+
+Missions already approved under the earlier server-owned semantic-review policy may continue to validate that pinned policy for compatibility. In that historical mode, `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` remains the server-owned trusted semantic reviewer set and author self-review still cannot satisfy independent semantic review.
+
+New canonical FCR founder-final approvals do **not** depend on `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS`. Do not revive that environment variable as a requirement for the founder-final path.
 
 ### In-app FCR authority is not the live GitHub ruleset
 
 The source/runtime FCR merge membrane and the **live GitHub repository ruleset are a separate provider gate**.
 
-A correct in-app review engine does not prove that GitHub's web/API merge surface independently enforces the same approval count, stale-review dismissal, last-push approval, thread resolution, strict status freshness, bypass actors, or bypass modes. Those provider protections require their own current GitHub readback.
+A correct in-app founder-final review engine does not prove that GitHub's web/API merge surface independently enforces the same approval count, stale-review dismissal, last-push approval, thread resolution, strict status freshness, bypass actors, or bypass modes. Those provider protections require their own current GitHub readback.
 
-Do not claim repository-wide GitHub governance is fixed merely because the FCR source gate is strong. Conversely, a GitHub merge that occurred outside the in-app FCR path does not prove the in-app independent-review contract was satisfied.
+Do not claim repository-wide GitHub governance is fixed merely because the FCR source gate is strong. Conversely, a GitHub merge that occurred outside the in-app FCR path does not prove the in-app deterministic-review + founder-final contract was satisfied.
 
 ## Documentation truth
 
@@ -76,7 +106,7 @@ A GitHub Actions infrastructure outage can gate merge and release truth without 
 
 When jobs have no executed steps or no logs, agents must not blame the diff. They must record the exact PR, head SHA, workflow, run, job evidence, classification, impact, Cloudflare/runtime evidence if available, and the next gate in Founder Control Room.
 
-If remaining evidence is sufficient for a docs-only, policy-only, or otherwise low-risk focused change, a merge may still be appropriate only when every other applicable authority gate is satisfied. If the change requires executed CI, independent review, Playwright, deployment proof, auth proof, migration proof, runtime proof, or Documentation Truth proof that is unavailable, leave the PR open and state the exact blocker.
+If remaining evidence is sufficient for a docs-only, policy-only, or otherwise low-risk focused change, a merge may still be appropriate only when every other applicable authority gate is satisfied. If the change requires executed CI, deterministic review, Playwright, deployment proof, auth proof, migration proof, runtime proof, or Documentation Truth proof that is unavailable, leave the PR open and state the exact blocker.
 
 ## Canonical project routing
 
@@ -100,4 +130,4 @@ Those actions still require their own exact approval unless a later founder dire
 
 Do not merge merely because a PR exists or because a badge looks green. Merge when it is the correct, evidence-backed integration step and the current authority membrane is satisfied.
 
-Immediately before merge, re-read current `main`, the exact PR head, required checks, review state, and applicable provider state. After merge, re-read the resulting `main`, Documentation Truth, and the next release/runtime gate. Old-head green remains historical evidence only.
+Immediately before merge, re-read current `main`, the exact PR head, required checks, review state, founder-final receipt state, and applicable provider state. After merge, re-read the resulting `main`, Documentation Truth, and the next release/runtime gate. Old-head green remains historical evidence only.
