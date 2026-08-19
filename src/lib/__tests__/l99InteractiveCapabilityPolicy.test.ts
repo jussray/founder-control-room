@@ -162,7 +162,7 @@ describe('L99 interactive capability policy', () => {
     ).toContain('interactive browser authority requires Playwright proof');
   });
 
-  it('rejects invalid expiry timestamps', () => {
+  it('rejects invalid or expired expiry timestamps', () => {
     expect(
       validateInteractiveEnvelope(
         envelope({
@@ -170,6 +170,14 @@ describe('L99 interactive capability policy', () => {
         }),
       ),
     ).toContain('expiresAt must be a valid timestamp');
+
+    expect(
+      validateInteractiveEnvelope(
+        envelope({
+          expiresAt: '2000-01-01T00:00:00Z',
+        }),
+      ),
+    ).toContain('expiresAt must be in the future');
   });
 
   it('allows a narrower browser read scope to remain inside a wider read scope', () => {
