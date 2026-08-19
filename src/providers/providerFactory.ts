@@ -165,10 +165,6 @@ class LazyRepositoryProvider implements RepositoryProvider {
     return delegate.integrate(projectId, base, head);
   }
 
-  async deleteBranch(projectId: string, branch: string): Promise<void> {
-    return (await this.delegate()).deleteBranch(projectId, branch);
-  }
-
   async applyBranchRuleset(projectId: string, config: RulesetConfig): Promise<RulesetResult> {
     assertRulesetGovernancePolicy(projectId, config);
     const delegate = await this.delegate();
