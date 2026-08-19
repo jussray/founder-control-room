@@ -22,12 +22,26 @@ export interface ProviderProjectConfig {
 }
 
 const FOUNDER_CONTROL_ROOM_PROJECT_ID = "founder-control-room";
+const FOUNDER_CONTROL_ROOM_REPOSITORY = "jussray/founder-control-room";
 const FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH = "main";
 export const FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME = "Founder Control Room main exact-head gate";
 const FOUNDER_CONTROL_ROOM_REQUIRED_STATUS_CHECKS = [
   "Required Gate",
   "Verify test-ledger contract",
 ] as const;
+
+function isFounderControlRoomRepository(repositoryIdentifier: string | undefined): boolean {
+  return repositoryIdentifier?.trim().toLowerCase() === FOUNDER_CONTROL_ROOM_REPOSITORY;
+}
+
+export function governanceProjectIdForRepository(
+  projectId: string,
+  repositoryIdentifier?: string,
+): string {
+  return isFounderControlRoomRepository(repositoryIdentifier)
+    ? FOUNDER_CONTROL_ROOM_PROJECT_ID
+    : projectId;
+}
 
 /**
  * Founder Control Room's own merge policy must fail closed before a provider
@@ -36,10 +50,16 @@ const FOUNDER_CONTROL_ROOM_REQUIRED_STATUS_CHECKS = [
  * it. FCR main is the constitutional authority surface: an active policy must
  * retain the complete minimum floor, and the canonical ruleset may not be
  * disabled, demoted to evaluate mode, or retargeted away from main through the
- * generic repository-administration route.
+ * generic repository-administration route. Repository identity, not a mutable
+ * project slug alias, determines whether that constitutional floor applies.
  */
-export function assertRulesetGovernancePolicy(projectId: string, config: RulesetConfig): void {
-  const isFounderControlRoom = projectId === FOUNDER_CONTROL_ROOM_PROJECT_ID;
+export function assertRulesetGovernancePolicy(
+  projectId: string,
+  config: RulesetConfig,
+  repositoryIdentifier?: string,
+): void {
+  const governanceProjectId = governanceProjectIdForRepository(projectId, repositoryIdentifier);
+  const isFounderControlRoom = governanceProjectId === FOUNDER_CONTROL_ROOM_PROJECT_ID;
   const targetsFounderControlRoomMain = config.targetRefs.includes(FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH);
   const isCanonicalFounderControlRoomRuleset =
     isFounderControlRoom && config.name === FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME;
@@ -82,12 +102,18 @@ export function assertRulesetGovernancePolicy(projectId: string, config: Ruleset
 class LazyRepositoryProvider implements RepositoryProvider {
   readonly name: string;
   private readonly factory: () => Promise<RepositoryProvider>;
+  private readonly repositoryIdentifier: string;
   private delegatePromise: Promise<RepositoryProvider> | null = null;
   private readonly pullRequestContextByProject = new Map<string, PullRequestReviewContext>();
 
-  constructor(name: string, factory: () => Promise<RepositoryProvider>) {
+  constructor(
+    name: string,
+    factory: () => Promise<RepositoryProvider>,
+    repositoryIdentifier: string,
+  ) {
     this.name = name;
     this.factory = factory;
+    this.repositoryIdentifier = repositoryIdentifier;
   }
 
   private delegate(): Promise<RepositoryProvider> {
@@ -202,12 +228,13 @@ class LazyRepositoryProvider implements RepositoryProvider {
   }
 
   async applyBranchRuleset(projectId: string, config: RulesetConfig): Promise<RulesetResult> {
-    assertRulesetGovernancePolicy(projectId, config);
+    const governanceProjectId = governanceProjectIdForRepository(projectId, this.repositoryIdentifier);
+    assertRulesetGovernancePolicy(governanceProjectId, config, this.repositoryIdentifier);
     const delegate = await this.delegate();
     if (!delegate.applyBranchRuleset) {
       throw new Error(`${delegate.name}: does not support applyBranchRuleset`);
     }
-    return delegate.applyBranchRuleset(projectId, config);
+    return delegate.applyBranchRuleset(governanceProjectId, config);
   }
 }
 
@@ -246,9 +273,14 @@ async function githubProvider(project: ProviderProjectConfig): Promise<Repositor
     ? await getGitHubInstallationToken(appId, privateKey, project.repo_identifier)
     : fallbackToken!;
 
+  const projectMap: Record<string, string> = { [project.slug]: project.repo_identifier };
+  if (isFounderControlRoomRepository(project.repo_identifier)) {
+    projectMap[FOUNDER_CONTROL_ROOM_PROJECT_ID] = project.repo_identifier;
+  }
+
   return new GitHubProvider({
     token,
-    projectMap: { [project.slug]: project.repo_identifier },
+    projectMap,
     baseUrl: process.env.GITHUB_API_BASE_URL,
   });
 }
@@ -275,10 +307,10 @@ async function gitlabProvider(project: ProviderProjectConfig): Promise<Repositor
  */
 export function providerForProject(project: ProviderProjectConfig): RepositoryProvider {
   if (project.repo_provider === "github") {
-    return new LazyRepositoryProvider("github", () => githubProvider(project));
+    return new LazyRepositoryProvider("github", () => githubProvider(project), project.repo_identifier);
   }
   if (project.repo_provider === "gitlab") {
-    return new LazyRepositoryProvider("gitlab", () => gitlabProvider(project));
+    return new LazyRepositoryProvider("gitlab", () => gitlabProvider(project), project.repo_identifier);
   }
   throw new Error(`No RepositoryProvider implementation for "${project.repo_provider}" yet`);
 }
