@@ -141,7 +141,10 @@ describe('merge intent liveness contract', () => {
     expect(reapprovalLoop).toMatch(/and status = 'approved'/);
     expect(reapprovalLoop).toMatch(/new\.status = 'in_review'/);
     expect(reapprovalLoop).toMatch(/v_intent_state in \('needs_review', 'stale', 'expired', 'blocked'\)/);
-    expect(reapprovalLoop).toMatch(/preserves the sticky revocation state/);
+    expect(reapprovalLoop).toMatch(/preserve the sticky revocation state/);
+    expect(reapprovalLoop).toMatch(/from merge_intents mi/);
+    expect(reapprovalLoop).toMatch(/mi\.state in \('needs_review', 'stale', 'expired', 'blocked'\)/);
+    expect(reapprovalLoop).toMatch(/Merge-intent reapproval-loop postcondition failed/);
   });
 
   it('keeps the two-minute approved-mission sweep as a fallback on the same reconciler chassis', () => {
