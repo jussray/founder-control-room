@@ -59,7 +59,7 @@ export const COMMAND_BRIDGE_CONTRACT: CommandBridgeContract = Object.freeze({
     'Every command request is tied to a project, mission, approved command id, and exact expected commit SHA.',
     'The founder can approve, deny, or let a request expire before any terminal execution.',
     'Execution still runs through the guarded terminal allowlist; Command Bridge never expands the command registry.',
-    'Write-risk commands require explicit confirmation and are never implied by an agent request.',
+    'Write-risk cards may be founder-approved as requests, but execution remains blocked until exact L99 authority is verified.',
     'Every request, approval, denial, and execution link leaves an auditable event or state row.',
   ]),
   forbiddenPatterns: Object.freeze([
@@ -96,7 +96,6 @@ export function executionPayloadForRequest(request: Pick<CommandBridgeRequestSna
       missionId: request.missionId,
       commandId: request.commandId,
       expectedCommitSha: request.expectedCommitSha,
-      ...(request.risk === 'write' ? { confirmWrite: true } : {}),
     },
   };
 }
