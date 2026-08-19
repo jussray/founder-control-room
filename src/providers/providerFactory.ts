@@ -121,6 +121,10 @@ class LazyRepositoryProvider implements RepositoryProvider {
     return this.delegatePromise;
   }
 
+  private governanceProjectId(projectId: string): string {
+    return governanceProjectIdForRepository(projectId, this.repositoryIdentifier);
+  }
+
   async getProject(projectId: string): Promise<ProjectRepo> {
     return (await this.delegate()).getProject(projectId);
   }
@@ -150,7 +154,7 @@ class LazyRepositoryProvider implements RepositoryProvider {
     if (!delegate.listReviewSignals) {
       throw new Error(`${delegate.name}: does not support provider-backed pull-request reviews`);
     }
-    return delegate.listReviewSignals(projectId, pullRequestNumber);
+    return delegate.listReviewSignals(this.governanceProjectId(projectId), pullRequestNumber);
   }
 
   async getPullRequestReviewContext(
@@ -161,9 +165,10 @@ class LazyRepositoryProvider implements RepositoryProvider {
     if (!delegate.getPullRequestReviewContext) {
       throw new Error(`${delegate.name}: does not support provider-backed pull-request context`);
     }
-    const context = await delegate.getPullRequestReviewContext(projectId, pullRequestNumber);
-    if (projectId === FOUNDER_CONTROL_ROOM_PROJECT_ID) {
-      this.pullRequestContextByProject.set(projectId, context);
+    const governanceProjectId = this.governanceProjectId(projectId);
+    const context = await delegate.getPullRequestReviewContext(governanceProjectId, pullRequestNumber);
+    if (governanceProjectId === FOUNDER_CONTROL_ROOM_PROJECT_ID) {
+      this.pullRequestContextByProject.set(governanceProjectId, context);
     }
     return context;
   }
@@ -177,16 +182,17 @@ class LazyRepositoryProvider implements RepositoryProvider {
   }
 
   async compare(projectId: string, base: string, head: string): Promise<Diff> {
-    return (await this.delegate()).compare(projectId, base, head);
+    return (await this.delegate()).compare(this.governanceProjectId(projectId), base, head);
   }
 
   async integrate(projectId: string, base: string, head: string): Promise<string> {
     const delegate = await this.delegate();
-    if (projectId !== FOUNDER_CONTROL_ROOM_PROJECT_ID) {
+    const governanceProjectId = this.governanceProjectId(projectId);
+    if (governanceProjectId !== FOUNDER_CONTROL_ROOM_PROJECT_ID) {
       return delegate.integrate(projectId, base, head);
     }
 
-    const context = this.pullRequestContextByProject.get(projectId);
+    const context = this.pullRequestContextByProject.get(governanceProjectId);
     if (!context) {
       throw new Error(
         "Founder Control Room integration requires provider-backed pull-request context in the same execution",
@@ -206,8 +212,8 @@ class LazyRepositoryProvider implements RepositoryProvider {
     // Last-mile TOCTOU membrane: re-read BOTH mutable refs immediately before
     // handing control to the provider mutation. The semantic review is bound to
     // context.baseSha/context.headSha; moving either ref invalidates that review.
-    const currentBaseSha = await delegate.resolveRef(projectId, base);
-    const currentHeadSha = await delegate.resolveRef(projectId, head);
+    const currentBaseSha = await delegate.resolveRef(governanceProjectId, base);
+    const currentHeadSha = await delegate.resolveRef(governanceProjectId, head);
     if (currentBaseSha.toLowerCase() !== context.baseSha.toLowerCase()) {
       throw new Error(
         `Founder Control Room base moved after review context: current ${currentBaseSha}, reviewed ${context.baseSha}`,
@@ -219,8 +225,8 @@ class LazyRepositoryProvider implements RepositoryProvider {
       );
     }
 
-    this.pullRequestContextByProject.delete(projectId);
-    return delegate.integrate(projectId, base, head);
+    this.pullRequestContextByProject.delete(governanceProjectId);
+    return delegate.integrate(governanceProjectId, base, head);
   }
 
   async deleteBranch(projectId: string, branch: string): Promise<void> {
@@ -228,7 +234,7 @@ class LazyRepositoryProvider implements RepositoryProvider {
   }
 
   async applyBranchRuleset(projectId: string, config: RulesetConfig): Promise<RulesetResult> {
-    const governanceProjectId = governanceProjectIdForRepository(projectId, this.repositoryIdentifier);
+    const governanceProjectId = this.governanceProjectId(projectId);
     assertRulesetGovernancePolicy(governanceProjectId, config, this.repositoryIdentifier);
     const delegate = await this.delegate();
     if (!delegate.applyBranchRuleset) {
