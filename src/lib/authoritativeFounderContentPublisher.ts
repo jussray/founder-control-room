@@ -32,6 +32,10 @@ function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function positiveInteger(value: unknown): number | undefined {
+  return Number.isInteger(value) && Number(value) > 0 ? Number(value) : undefined;
+}
+
 function blocked(reasons: string[]): TemporallyGovernedFounderPublishResult {
   return {
     ok: false,
@@ -98,6 +102,12 @@ export async function dispatchAuthoritativeFounderContentPublishNow(
     return blocked(['claimed authoritative approval does not match the exact browser confirmation']);
   }
 
+  const storedCurrentYou = claim.approval.current_you as JsonRecord | undefined;
+  const intentVersion = positiveInteger(storedCurrentYou?.intent_version);
+  if (!intentVersion) {
+    return blocked(['claimed authoritative approval has an invalid Current You intent version']);
+  }
+
   return dispatchTemporallyGovernedFounderContentPublishNow({
     proposal: input.proposal,
     approval: claim.approval,
@@ -110,8 +120,8 @@ export async function dispatchAuthoritativeFounderContentPublishNow(
     current_you: {
       authenticated: true,
       source: 'current_authenticated_founder',
-      intent_id: text((claim.approval.current_you as JsonRecord | undefined)?.intent_id),
-      intent_version: (claim.approval.current_you as JsonRecord | undefined)?.intent_version,
+      intent_id: text(storedCurrentYou?.intent_id),
+      intent_version: intentVersion,
       observed_at: now,
     },
   }, {
