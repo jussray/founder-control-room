@@ -6,13 +6,14 @@ import {
   type V10CapabilityPlan,
 } from '../../founder-os-lab/capabilityKernel.js';
 import {
+  CHIEF_AI_EXPECTED_RELEASE_SHA,
   CHIEF_AI_RPC_CONTRACT,
   readChiefAiServiceVersion,
   requestChiefAiCapabilityPlan,
   type ChiefAiServiceBinding,
 } from '../chiefAiBinding.js';
 
-const RELEASE_SHA = '73c36e61dae96bf1bb94990d3b5e5a6a0bb70b24';
+const RELEASE_SHA = CHIEF_AI_EXPECTED_RELEASE_SHA;
 
 function validPlan(): V10CapabilityPlan {
   const base = {
@@ -51,7 +52,7 @@ function metadata() {
 }
 
 describe('Chief AI Cloudflare service binding', () => {
-  it('accepts a healthy version receipt bound to service, contracts, and release SHA', async () => {
+  it('accepts a healthy version receipt bound to service, contracts, and the pinned release SHA', async () => {
     const binding: ChiefAiServiceBinding = {
       version: vi.fn().mockResolvedValue({ ok: true, ...metadata() }),
       createCapabilityPlan: vi.fn(),
@@ -68,6 +69,7 @@ describe('Chief AI Cloudflare service binding', () => {
       { ...metadata(), service: 'not-chief' },
       { ...metadata(), rpcContract: 'juss-v10/chief-fcr-rpc@v0' },
       { ...metadata(), releaseSha: 'unknown' },
+      { ...metadata(), releaseSha: 'd'.repeat(40) },
     ];
 
     for (const value of cases) {
