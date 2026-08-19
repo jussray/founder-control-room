@@ -18,6 +18,7 @@ function command(overrides: Partial<TerminalCommandSpec> = {}): TerminalCommandS
     args: ['-e', 'console.log("ok")'],
     relativeCwd: 'project',
     risk: 'verify',
+    costClass: 'included',
     timeoutMs: 5_000,
     maxOutputBytes: 16_384,
     evidenceKind: 'unit_test',
