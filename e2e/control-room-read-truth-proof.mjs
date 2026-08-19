@@ -1,11 +1,12 @@
 import { createServer } from 'node:http';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const REPO_ROOT = dirname(fileURLToPath(new URL('../', import.meta.url)));
 const PUBLIC_ROOT = join(REPO_ROOT, 'public');
+const RESULTS_ROOT = join(REPO_ROOT, 'test-results');
 
 const mime = {
   '.html': 'text/html; charset=utf-8',
@@ -101,6 +102,8 @@ await page.route(`${BASE_URL}/**`, async (route) => {
 });
 
 try {
+  mkdirSync(RESULTS_ROOT, { recursive: true });
+
   await page.goto(`${BASE_URL}/control-room/`, { waitUntil: 'networkidle' });
   const unknown = page.locator('[data-read-truth="projects-unknown"]');
   await unknown.waitFor();
@@ -116,6 +119,10 @@ try {
   if (failedSnapshot?.state !== 'error' || failedSnapshot?.httpStatus !== 503) {
     throw new Error(`Read-truth diagnostic mismatch after failure: ${JSON.stringify(failedSnapshot)}`);
   }
+  await page.screenshot({
+    path: join(RESULTS_ROOT, 'control-room-projects-unknown-mobile.png'),
+    fullPage: true,
+  });
 
   projectReadMode = 'ready-empty';
   await page.reload({ waitUntil: 'networkidle' });
@@ -131,6 +138,10 @@ try {
   if (readySnapshot?.state !== 'ready' || readySnapshot?.httpStatus !== 200) {
     throw new Error(`Read-truth diagnostic mismatch after successful empty read: ${JSON.stringify(readySnapshot)}`);
   }
+  await page.screenshot({
+    path: join(RESULTS_ROOT, 'control-room-projects-verified-empty-mobile.png'),
+    fullPage: true,
+  });
 
   console.log('PASS: failed project reads render UNKNOWN; successful empty reads render verified empty state.');
 } finally {
