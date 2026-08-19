@@ -3,7 +3,10 @@ import type { RulesetConfig } from "../RepositoryProvider.js";
 import {
   assertRulesetGovernancePolicy,
   FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME,
+  governanceProjectIdForRepository,
 } from "../providerFactory.js";
+
+const FCR_REPOSITORY = "jussray/founder-control-room";
 
 const baseConfig: RulesetConfig = {
   name: "founder-control-room-main-exact-head-gate",
@@ -24,6 +27,19 @@ const canonicalConfig: RulesetConfig = {
 describe("Founder Control Room ruleset governance", () => {
   it("accepts an active FCR main ruleset only when the constitutional floor is preserved", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", baseConfig)).not.toThrow();
+  });
+
+  it("binds FCR constitutional identity to repository identity instead of a mutable project slug", () => {
+    expect(governanceProjectIdForRepository("fcr-alias", FCR_REPOSITORY)).toBe("founder-control-room");
+    expect(() => assertRulesetGovernancePolicy(
+      "fcr-alias",
+      { ...canonicalConfig, enforcement: "disabled" },
+      FCR_REPOSITORY,
+    )).toThrow(/must remain actively enforced/);
+  });
+
+  it("does not canonicalize an alias for a different repository", () => {
+    expect(governanceProjectIdForRepository("fcr-alias", "jussray/other-repo")).toBe("fcr-alias");
   });
 
   it("fails closed when FCR main requests zero approving reviews", () => {
@@ -103,7 +119,7 @@ describe("Founder Control Room ruleset governance", () => {
       requiredStatusCheckNames: [],
       blockForcePushes: false,
       blockDeletion: false,
-    })).not.toThrow();
+    }, "jussray/Sekret-Bip")).not.toThrow();
   });
 
   it("allows FCR to evaluate a separately named proposed ruleset without mutating the canonical policy", () => {
@@ -116,6 +132,6 @@ describe("Founder Control Room ruleset governance", () => {
       requiredStatusCheckNames: [],
       blockForcePushes: false,
       blockDeletion: false,
-    })).not.toThrow();
+    }, FCR_REPOSITORY)).not.toThrow();
   });
 });
