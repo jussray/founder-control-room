@@ -47,6 +47,14 @@ A fingerprint mismatch is an identity failure. A fingerprint match is not an aut
 
 The current Founder OS sandbox already starts from a zero-ambient-authority posture: network, providers, database, filesystem, environment, subprocess, secrets, dynamic code, wall clock, randomness, and public URLs are disabled by default. L99 preserves that default. Any future access to network, secrets, production, or persistent storage must be an explicit, founder-bound grant rather than an implicit property of being inside a sandbox.
 
+## Current terminal integration state
+
+The legacy guarded terminal remains available for bounded read/verify commands under its existing founder, mission, command-registry, and exact-head checks. Write-risk commands are now fail-closed on that route: `confirmWrite: true` is no longer execution authority, and write requests return `L99_AUTHORITY_REQUIRED` until an exact L99 ApprovalReceipt is verified at execution time.
+
+Command Bridge preserves the same boundary. Read/verify requests may still resolve to the guarded terminal endpoint; write-risk requests do not receive an executable terminal endpoint and instead report `L99_APPROVAL_RECEIPT` as the missing authority.
+
+This is a **deny-until-integrated safety fuse**, not completed write execution wiring. The repository does not yet verify an L99 ApprovalReceipt and then execute the approved write command on this path. That later integration must bind the exact operation ID to a separately reviewed fixed command template and must reread authoritative policy/approval state immediately before execution.
+
 n8n may coordinate these capabilities but cannot widen them. A workflow, prompt, MCP handle, terminal route, browser session, Playwright session, sandbox instance, or fingerprint is not an authorization grant by itself.
 
-The later execution integration must reread authoritative policy/approval state immediately before any external side effect and must preserve the exact target, operation, isolation envelope, expiry, fingerprint bindings, reservation, and action hash approved upstream.
+Any later execution integration must preserve the exact target, operation, isolation envelope, expiry, fingerprint bindings, reservation, and action hash approved upstream, and must reacquire runtime/UI proof where the integrated surface is user-visible or interactive.
