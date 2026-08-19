@@ -35,10 +35,15 @@
       "staleDoesNotImplySuperseded": true,
       "staleDoesNotImplyRetirable": true,
       "retirementRequiresUniqueWorkInventory": true,
+      "retirementRequiresInventoryEvidence": true,
+      "inventoryCoverageMustBeComplete": true,
+      "inventoryCoverageMustBeSingleDisposition": true,
       "retirementRequiresDispositionForEveryUniqueSlice": true,
       "retirementRequiresZeroUnclassifiedResidual": true,
-      "unknownResidualBlocksRetirement": true
+      "unknownResidualBlocksRetirement": true,
+      "unresolvedReviewFindingsBlockRetirement": true
     },
+    "inventorySource": "provider-compare",
     "allowedDispositions": [
       "integrated",
       "superseded",
@@ -51,6 +56,7 @@
       "headSha",
       "mergeBaseSha",
       "currentMainSha",
+      "inventoryEvidence",
       "uniqueSlices",
       "unresolvedReviewFindings",
       "residualUniqueWork",
