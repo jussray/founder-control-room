@@ -4,9 +4,9 @@
 -- merge_intents is NOT approval authority. It can never make a merge eligible.
 -- It can, however, preserve observed historical drift by refusing the existing
 -- approval_executions reservation until the read-only reconciler has proved the
--- exact approved candidate REVALIDATED. The guarded /execute path must still
--- pass every proof, evidence, review, provider-identity, diff, and exact-head
--- gate. REVALIDATED is deliberately weaker than merge READY.
+-- exact approved candidate REVALIDATED (or a future stronger READY projection).
+-- The guarded /execute path must still pass every proof, evidence, review,
+-- provider-identity, diff, and exact-head gate afterwards.
 -- =============================================================================
 
 begin;
@@ -51,17 +51,17 @@ begin
       'FCR merge execution vetoed: approved mission has no durable merge intent';
   end if;
 
-  -- REVALIDATED only removes this liveness veto. It does not authorize merge.
+  -- REVALIDATED/READY only remove this liveness veto. Neither authorizes merge.
   -- The existing /execute evidence/review/provider gates remain authoritative.
-  if v_state <> 'revalidated' then
+  if v_state not in ('revalidated', 'ready') then
     raise exception
-      'FCR merge execution vetoed: merge intent state % is not REVALIDATED and requires reconciliation/reapproval',
+      'FCR merge execution vetoed: merge intent state % is not REVALIDATED/READY and requires reconciliation/reapproval',
       v_state;
   end if;
 
   if v_diff_hash is null or v_diff_hash !~ '^[0-9a-f]{64}$' then
     raise exception
-      'FCR merge execution vetoed: REVALIDATED intent has no canonical approved diff witness';
+      'FCR merge execution vetoed: merge intent has no canonical approved diff witness';
   end if;
 
   if v_proof_expires_at is null or v_proof_expires_at <= now() then
@@ -105,7 +105,7 @@ begin
            stale_reason = null,
            updated_at = now()
      where mission_id = new.mission_id
-       and state = 'revalidated';
+       and state in ('revalidated', 'ready');
     return new;
   end if;
 
