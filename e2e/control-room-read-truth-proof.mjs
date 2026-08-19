@@ -44,18 +44,8 @@ const BASE_URL = `http://127.0.0.1:${address.port}`;
 let projectReadMode = 'fail';
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
-await context.addInitScript(() => {
-  if (location.protocol === 'http:') {
-    sessionStorage.setItem('fcr_session', JSON.stringify({
-      access_token: 'proof-token',
-      refresh_token: '',
-      expires_at: 4102444800,
-      email: 'founder@example.com',
-    }));
-  }
-});
-
 const page = await context.newPage();
+
 await page.route(`${BASE_URL}/**`, async (route) => {
   const request = route.request();
   const url = new URL(request.url());
@@ -104,7 +94,29 @@ await page.route(`${BASE_URL}/**`, async (route) => {
 try {
   mkdirSync(RESULTS_ROOT, { recursive: true });
 
+  // Establish the real page origin first. The unauthenticated shell performs no
+  // privileged reads, so the test can then seed only the browser session and
+  // reload without relying on addInitScript timing around an opaque origin.
   await page.goto(`${BASE_URL}/control-room/`, { waitUntil: 'networkidle' });
+  await page.evaluate(() => {
+    sessionStorage.setItem('fcr_session', JSON.stringify({
+      access_token: 'proof-token',
+      refresh_token: '',
+      expires_at: 4102444800,
+      email: 'founder@example.com',
+    }));
+  });
+
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.locator('#project-list').waitFor();
+  await page.screenshot({
+    path: join(RESULTS_ROOT, 'control-room-projects-failed-read-mobile.png'),
+    fullPage: true,
+  });
+
+  const failedSnapshot = await page.evaluate(() => window.__FCR_READ_TRUTH__?.projects?.());
+  console.log('failed-read snapshot', JSON.stringify(failedSnapshot));
+
   const unknown = page.locator('[data-read-truth="projects-unknown"]');
   await unknown.waitFor();
   const unknownText = await unknown.innerText();
@@ -115,7 +127,6 @@ try {
   if ((await page.locator('#project-list').innerText()).includes('No projects registered yet.')) {
     throw new Error('Failed authoritative read was mislabeled as a verified empty project registry');
   }
-  const failedSnapshot = await page.evaluate(() => window.__FCR_READ_TRUTH__?.projects?.());
   if (failedSnapshot?.state !== 'error' || failedSnapshot?.httpStatus !== 503) {
     throw new Error(`Read-truth diagnostic mismatch after failure: ${JSON.stringify(failedSnapshot)}`);
   }
