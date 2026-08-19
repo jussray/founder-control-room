@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RulesetConfig } from "../RepositoryProvider.js";
 import {
+  assertFounderControlRoomTrustedBypassActor,
   assertRulesetGovernancePolicy,
   FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME,
   governanceProjectIdForRepository,
@@ -110,6 +111,37 @@ describe("Founder Control Room ruleset governance", () => {
       ...canonicalConfig,
       targetRefs: ["release"],
     })).toThrow(/continue targeting main/);
+  });
+
+  it("requires the active FCR main ruleset bypass to match the configured GitHub App id exactly", () => {
+    expect(() => assertFounderControlRoomTrustedBypassActor({
+      ...canonicalConfig,
+      bypassActors: [{ kind: "app", id: "123456" }],
+    }, "123456")).not.toThrow();
+  });
+
+  it("fails closed when the trusted GitHub App id is unavailable", () => {
+    expect(() => assertFounderControlRoomTrustedBypassActor({
+      ...canonicalConfig,
+      bypassActors: [{ kind: "app", id: "123456" }],
+    }, undefined)).toThrow(/trusted GITHUB_APP_ID/);
+  });
+
+  it("rejects a caller-supplied bypass app that does not match trusted configuration", () => {
+    expect(() => assertFounderControlRoomTrustedBypassActor({
+      ...canonicalConfig,
+      bypassActors: [{ kind: "app", id: "999999" }],
+    }, "123456")).toThrow(/must exactly match/);
+  });
+
+  it("rejects additional FCR main bypass actors even when the trusted app is present", () => {
+    expect(() => assertFounderControlRoomTrustedBypassActor({
+      ...canonicalConfig,
+      bypassActors: [
+        { kind: "app", id: "123456" },
+        { kind: "app", id: "999999" },
+      ],
+    }, "123456")).toThrow(/must exactly match/);
   });
 
   it("does not impose FCR's review floor on another project's policy", () => {
