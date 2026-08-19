@@ -82,7 +82,7 @@ function successfulDatabase(options: DatabaseOptions = {}) {
         select: () => ({
           eq: () => ({
             maybeSingle: () => Promise.resolve({
-              data: { id: PROJECT_ID, slug: 'untold-stories', verification_enabled: true },
+              data: { id: PROJECT_ID, slug: 'untold-stories', name: 'Untold Stories', verification_enabled: true },
               error: null,
             }),
           }),
@@ -166,6 +166,25 @@ describe('guarded terminal route', () => {
       .send({ missionId: MISSION_ID, commandId: 'git.status', expectedCommitSha: HEAD });
     expect(response.status).toBe(503);
     expect(response.body.code).toBe('TERMINAL_DISABLED');
+  });
+
+  it('exposes only read-only operations through legacy command discovery', async () => {
+    successfulDatabase();
+
+    const response = await request(app())
+      .get('/terminal/untold-stories/commands')
+      .set('Authorization', BEARER);
+
+    expect(response.status).toBe(200);
+    expect(response.body.commands).toHaveLength(3);
+    expect(response.body.commands.every((command: { risk: string }) => command.risk === 'read')).toBe(true);
+    expect(response.body.commands.map((command: { id: string }) => command.id)).toEqual([
+      'git.head',
+      'git.status',
+      'git.diff-stat',
+    ]);
+    expect(response.body.commands.some((command: { id: string }) => command.id.startsWith('verify.'))).toBe(false);
+    expect(response.body.commands.some((command: { id: string }) => command.id.startsWith('deps.'))).toBe(false);
   });
 
   it('rejects arbitrary command IDs before any process starts', async () => {
