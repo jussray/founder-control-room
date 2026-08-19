@@ -45,6 +45,8 @@ let projectReadMode = 'fail';
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
 const page = await context.newPage();
+const pageErrors = [];
+page.on('pageerror', (error) => pageErrors.push(error.message));
 
 await page.route(`${BASE_URL}/**`, async (route) => {
   const request = route.request();
@@ -94,29 +96,41 @@ await page.route(`${BASE_URL}/**`, async (route) => {
 try {
   mkdirSync(RESULTS_ROOT, { recursive: true });
 
-  // Establish the real page origin first. The unauthenticated shell performs no
-  // privileged reads, so the test can then seed only the browser session and
-  // reload without relying on addInitScript timing around an opaque origin.
-  await page.goto(`${BASE_URL}/control-room/`, { waitUntil: 'networkidle' });
-  await page.evaluate(() => {
-    sessionStorage.setItem('fcr_session', JSON.stringify({
-      access_token: 'proof-token',
-      refresh_token: '',
-      expires_at: 4102444800,
-      email: 'founder@example.com',
-    }));
+  // Exercise the application's canonical session handoff instead of manufacturing
+  // browser state out of band. The fragment is consumed by app.js and stripped
+  // before the founder shell renders, matching the real /auth/callback contract.
+  const founderFragment = new URLSearchParams({
+    access_token: 'proof-token',
+    refresh_token: '',
+    expires_at: '4102444800',
+    email: 'founder@example.com',
+  });
+  await page.goto(`${BASE_URL}/control-room/#${founderFragment.toString()}`, {
+    waitUntil: 'networkidle',
   });
 
-  await page.reload({ waitUntil: 'networkidle' });
-  await page.locator('#project-list').waitFor();
   await page.screenshot({
     path: join(RESULTS_ROOT, 'control-room-projects-failed-read-mobile.png'),
     fullPage: true,
   });
 
-  const failedSnapshot = await page.evaluate(() => window.__FCR_READ_TRUTH__?.projects?.());
-  console.log('failed-read snapshot', JSON.stringify(failedSnapshot));
+  const shellState = await page.evaluate(() => ({
+    sessionPresent: Boolean(sessionStorage.getItem('fcr_session')),
+    projectListPresent: Boolean(document.querySelector('#project-list')),
+    founderEmail: document.querySelector('.founder-email')?.textContent ?? null,
+    bodyText: document.body.innerText.slice(0, 600),
+    readTruth: window.__FCR_READ_TRUTH__?.projects?.() ?? null,
+  }));
+  console.log('founder-shell snapshot', JSON.stringify(shellState));
 
+  if (!shellState.sessionPresent || shellState.founderEmail !== 'founder@example.com') {
+    throw new Error(`Canonical founder session handoff did not reach the shell: ${JSON.stringify(shellState)}`);
+  }
+  if (!shellState.projectListPresent) {
+    throw new Error(`Founder shell rendered without the Projects surface: ${JSON.stringify(shellState)} pageErrors=${JSON.stringify(pageErrors)}`);
+  }
+
+  const failedSnapshot = shellState.readTruth;
   const unknown = page.locator('[data-read-truth="projects-unknown"]');
   await unknown.waitFor();
   const unknownText = await unknown.innerText();
@@ -153,6 +167,10 @@ try {
     path: join(RESULTS_ROOT, 'control-room-projects-verified-empty-mobile.png'),
     fullPage: true,
   });
+
+  if (pageErrors.length > 0) {
+    throw new Error(`Unexpected browser page errors: ${pageErrors.join(' | ')}`);
+  }
 
   console.log('PASS: failed project reads render UNKNOWN; successful empty reads render verified empty state.');
 } finally {
