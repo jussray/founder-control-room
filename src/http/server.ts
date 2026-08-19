@@ -6,6 +6,7 @@ import { onboardingRouter } from './routes/onboarding.js';
 import { founderOnboardingRouter } from './routes/founderOnboarding.js';
 import { projectsRouter } from './routes/projects.js';
 import { buildEventsRouter } from './routes/buildEvents.js';
+import { handleBuildEventReceiptIngest } from './routes/buildEventReceipts.js';
 import { reasoningRunsRouter } from './routes/reasoningRuns.js';
 import { approvalsRouter } from './routes/approvals.js';
 import { l99Router } from './routes/l99.js';
@@ -155,6 +156,12 @@ export function createServer(options: CreateServerOptions = {}) {
     '/ingest/repository-verification',
     express.raw({ type: 'application/json', limit: '512kb' }),
     handleRepositoryVerificationIngest,
+  );
+  app.post(
+    '/ingest/build-events/:slug',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '32kb' }),
+    handleBuildEventReceiptIngest,
   );
   app.post(
     '/ingest/hair-commerce-receipts',
