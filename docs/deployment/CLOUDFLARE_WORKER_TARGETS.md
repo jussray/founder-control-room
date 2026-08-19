@@ -8,6 +8,7 @@ Founder Control Room uses Cloudflare Pages for the browser frontend and one cano
 |---|---|---|---|---|
 | Pages project | `foundercontrolroom.org` static frontend + same-origin edge proxy | `public/` via `scripts/build-pages.mjs` | Build: `npm run build:pages`; output: `dist-pages` | none |
 | `founder-control-room` Worker | `api.foundercontrolroom.org` API, auth, MCP, reconciliation | `wrangler.worker.toml` | Build: `npm run build`; deploy: `npm run deploy` | every minute |
+| `chief-ai` Worker | private proposal/reasoning capability consumed by FCR through `CHIEF_AI` | `jussray/chief-ai-machine` | independently released Chief Worker | none from FCR |
 | `founder-control-room-review-email` Worker | private email command intake | `wrangler.email.toml` | dedicated reviewed workflow | none |
 | `founder-control-room-deletion-queue` Worker | account-deletion processing | `wrangler.deletion-queue.toml` | dedicated reviewed workflow | every 6 hours |
 
@@ -71,6 +72,33 @@ FOUNDER_ALLOWED_ORIGINS: https://foundercontrolroom.org
 
 The canonical Worker owns the reconciliation cron because no duplicate HTTP Worker should exist.
 
+### Chief AI service-binding boundary
+
+The canonical FCR Worker has one outbound Cloudflare Service Binding for Chief AI:
+
+```text
+binding: CHIEF_AI
+service: chief-ai
+entrypoint: FounderControlRoomEntrypoint
+rpc contract: juss-v10/chief-fcr-rpc@v1
+capability-plan contract: juss-v10/capability-plan@v1
+```
+
+This binding is deliberately one-way. FCR may ask the named Chief entrypoint for a release/version receipt or a proposal-only capability plan. Chief receives no reverse FCR binding, merge capability, terminal capability, approval capability, Supabase credential, GitHub credential, or execution authority from this relationship.
+
+FCR treats the binding as load-bearing at Worker startup and revalidates every Chief response across the trust boundary. A usable response must identify service `chief-ai`, match the checked-in RPC contract and capability-plan contract, and include a full Chief runtime release SHA. A successful capability-plan response is then independently validated by FCR's V10 capability-plan validator before it may enter the existing founder-control path.
+
+The founder-authenticated FCR routes are:
+
+```text
+GET  /founder-os/chief/version
+POST /founder-os/chief/capability-plan
+```
+
+The POST route remains behind the existing same-origin browser mutation gate in the canonical FCR HTTP server. Neither route grants execution. Chief remains proposal-only and FCR remains the authority boundary for registry resolution, exact-head verification, founder approval, receipts, and downstream execution gates.
+
+Checked-in `[[services]]` configuration proves repository intent only. Before calling the Chief/FCR path live, require authoritative Cloudflare readback or deployed-path evidence proving `CHIEF_AI` resolves to service `chief-ai` and named entrypoint `FounderControlRoomEntrypoint` in the intended account/environment.
+
 ### Outbound email boundary
 
 The canonical Worker owns the FCR outbound Cloudflare Email Service capability through the project-scoped binding `FCR_EMAIL`. Repository source pins the only allowed FCR sender identity to `welcome@api.foundercontrolroom.org` in both `src/worker/projectEmail.ts` and `wrangler.worker.toml`; application callers may provide recipients/content but not a different `from` identity. A generic `EMAIL` binding or another project's sender must not be substituted into this Worker without a separate reviewed authority change.
@@ -97,6 +125,8 @@ Do not infer live provider configuration from a workflow file, secret name, toke
 
 Configure applicable secrets in the canonical Worker secret store and, where named by guarded workflows, in the GitHub `production` environment.
 
+`CHIEF_AI` is a Cloudflare Service Binding, not a shared application secret. Do not add a duplicate Chief API token merely to recreate a boundary Cloudflare already provides. If future Chief methods require a separate authorization layer, add it as a separately reviewed contract rather than silently widening this binding.
+
 Never copy secret values into repository files, logs, screenshots, issue comments, PR bodies, documentation, or public content. A secret name or presence check proves wiring only; provider acceptance/permission is a separate truth.
 
 ## Verification gate
@@ -110,12 +140,15 @@ At minimum verify:
 3. the canonical Worker deployment/version intended for production succeeds;
 4. required secrets/configuration are available for the authorized scope;
 5. the Pages `FCR_API` Service Binding is provider-proven to target the canonical `founder-control-room` Worker;
-6. `https://api.foundercontrolroom.org/health` returns the expected service identity/health payload;
-7. `https://foundercontrolroom.org/health` reaches the same canonical API service through the Pages binding;
-8. `/version` or equivalent runtime identity matches the approved exact SHA where that contract applies;
-9. authentication returns to `/control-room/` on the Pages origin;
-10. required Playwright/browser proof runs against the deployed path; and
-11. founder-content/provider claims use their own exact authorization and provider-readback gates.
+6. the FCR `CHIEF_AI` Service Binding is provider-proven to target `chief-ai` at `FounderControlRoomEntrypoint`;
+7. the founder-authenticated Chief version route reports service `chief-ai`, RPC contract `juss-v10/chief-fcr-rpc@v1`, capability-plan contract `juss-v10/capability-plan@v1`, and the intended Chief release SHA;
+8. a founder-authenticated capability-plan request traverses the binding and returns a proposal that FCR independently validates while execution remains unauthorized;
+9. `https://api.foundercontrolroom.org/health` returns the expected service identity/health payload;
+10. `https://foundercontrolroom.org/health` reaches the same canonical API service through the Pages binding;
+11. `/version` or equivalent runtime identity matches the approved exact SHA where that contract applies;
+12. authentication returns to `/control-room/` on the Pages origin;
+13. required Playwright/browser proof runs against the deployed path; and
+14. founder-content/provider claims use their own exact authorization and provider-readback gates.
 
 Provider build/deploy comments, preview URLs, and successful uploads are useful evidence for the artifact they name. They do not substitute for runtime binding identity, auth, browser, publication, or fleet-wide proof.
 
@@ -130,7 +163,8 @@ Current executable source and authoritative provider readback outrank an older v
 - Pages: roll back to the prior verified Pages deployment.
 - API Worker: redeploy the prior exact Worker SHA through the authorized Worker release path.
 - Proxy: revert the focused `public/_worker.js` change and matching deployment contract together; do not silently point the browser at an unverified origin.
-- Service binding: revert only the affected Pages binding through separately authorized provider mutation; preserve unrelated bindings/configuration.
+- Pages service binding: revert only the affected `FCR_API` Pages binding through separately authorized provider mutation; preserve unrelated bindings/configuration.
+- Chief service binding: remove or revert only `CHIEF_AI` and its matching named Chief entrypoint change; do not create a public-token fallback to mask binding failure.
 - Access: remove only the bounded exemption/change that was separately authorized, preserving unrelated Access policy.
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.
