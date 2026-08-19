@@ -250,6 +250,7 @@ export async function claimFounderContentApproval({
   founderUserId,
   approvalId,
   authorizationHash,
+  expectedPublicPayloadHash,
   consumedBy,
   now = new Date().toISOString(),
   repository,
@@ -258,12 +259,22 @@ export async function claimFounderContentApproval({
   founderUserId: string;
   approvalId: string;
   authorizationHash: string;
+  expectedPublicPayloadHash?: string;
   consumedBy: string;
   now?: string;
   repository?: FounderContentApprovalRepository;
 }): Promise<FounderContentApprovalClaim | FounderContentApprovalClaimFailure> {
   const identity = canonicalFounderContent.canonicalChiefIdentity(proposal);
   const publicPayloadHash = canonicalFounderContent.hashPublicPayload(record(identity.public_payload)).toLowerCase();
+  const expected = text(expectedPublicPayloadHash).toLowerCase();
+  if (expected && expected !== publicPayloadHash) {
+    return {
+      ok: false,
+      code: 'APPROVAL_NOT_CURRENT',
+      reason: 'public payload confirmation does not match the exact proposal copy',
+    };
+  }
+
   const store = repository ?? await defaultRepository();
   return store.claim({
     founderUserId: text(founderUserId),
