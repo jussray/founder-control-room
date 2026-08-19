@@ -1,3 +1,4 @@
+import { isExecutionCostCurrentlyAuthorized } from '../lib/freeFirstExecutionPolicy.js';
 import type { TerminalCommandSpec } from './types.js';
 
 const VERIFY_TIMEOUT = 10 * 60_000;
@@ -147,11 +148,16 @@ export const TERMINAL_COMMANDS: readonly TerminalCommandSpec[] = [
 ] as const;
 
 export function listTerminalCommands(projectSlug: string): TerminalCommandSpec[] {
-  return TERMINAL_COMMANDS.filter((command) => command.projectSlug === projectSlug);
+  return TERMINAL_COMMANDS.filter(
+    (command) => command.projectSlug === projectSlug && isExecutionCostCurrentlyAuthorized(command.costClass),
+  );
 }
 
 export function getTerminalCommand(projectSlug: string, commandId: string): TerminalCommandSpec | undefined {
   return TERMINAL_COMMANDS.find(
-    (command) => command.projectSlug === projectSlug && command.id === commandId,
+    (command) =>
+      command.projectSlug === projectSlug
+      && command.id === commandId
+      && isExecutionCostCurrentlyAuthorized(command.costClass),
   );
 }
