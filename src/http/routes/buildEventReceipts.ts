@@ -1,36 +1,64 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { Request, RequestHandler, Response } from 'express';
 import { createBuildEvent, type BuildEvent, type BuildEventInput } from '../../buildEvents/buildEvent.js';
+import {
+  createDefaultPassedCoverageWitnessReader,
+  type PassedCoverageProject,
+  type PassedCoverageWitnessReader,
+} from '../../buildEvents/releaseCoverageWitness.js';
 import type { BuildEventStoreDisposition } from '../../services/buildEventStore.js';
 
 const TOKEN_CONTEXT = 'founder-control-room/build-event-receipts/v1';
 const MAX_EVENT_AGE_MS = 24 * 60 * 60 * 1_000;
 const MAX_FUTURE_SKEW_MS = 5 * 60 * 1_000;
 
+export interface BuildReleaseCoveragePolicy {
+  service: string;
+  environment: 'production';
+  source: BuildEventInput['source'];
+  minimumWindowSeconds: number;
+  maximumWindowSeconds: number;
+  maximumObservationAgeSeconds: number;
+  maximumWitnessAgeSeconds: number;
+  minimumRequestCount: number;
+  maximumPriorReleaseShareBps: number;
+  allowedRouteClasses: readonly string[];
+}
+
 export interface BuildEventProducerPolicy {
   repository: string;
   sources: readonly BuildEventInput['source'][];
   categories: readonly BuildEventInput['category'][];
+  coverage?: BuildReleaseCoveragePolicy;
 }
 
 export const BUILD_EVENT_PRODUCERS: Readonly<Record<string, BuildEventProducerPolicy>> = {
   'sekret-bip-release-observer': {
     repository: 'jussray/Sekret-Bip',
     sources: ['cloudflare', 'playwright', 'supabase'],
-    categories: ['runtime', 'verification', 'artifact'],
+    categories: ['runtime', 'verification', 'artifact', 'analytics'],
+    coverage: {
+      service: 'sekret-bip-production',
+      environment: 'production',
+      source: 'cloudflare',
+      minimumWindowSeconds: 15 * 60,
+      maximumWindowSeconds: 30 * 60,
+      maximumObservationAgeSeconds: 60 * 60,
+      maximumWitnessAgeSeconds: 15 * 60,
+      minimumRequestCount: 25,
+      maximumPriorReleaseShareBps: 500,
+      allowedRouteClasses: ['front-door'],
+    },
   },
 };
 
-interface ProjectRecord {
-  id: string;
-  slug: string;
-  repoIdentifier: string | null;
-}
+interface ProjectRecord extends PassedCoverageProject {}
 
 export interface BuildEventReceiptDependencies {
   env?: NodeJS.ProcessEnv;
   findProject?: (slug: string) => Promise<ProjectRecord | null>;
   storeEvent?: (projectId: string, event: BuildEvent) => Promise<BuildEventStoreDisposition>;
+  passedCoverageWitnessReader?: PassedCoverageWitnessReader;
   now?: () => number;
 }
 
@@ -65,7 +93,7 @@ async function findProject(slug: string): Promise<ProjectRecord | null> {
   const { supabase } = await import('../../lib/supabaseClient.js');
   const { data, error } = await supabase
     .from('projects')
-    .select('id, slug, repo_identifier')
+    .select('id, slug, repo_provider, repo_identifier')
     .eq('slug', slug)
     .maybeSingle();
   if (error) throw new Error('project_lookup_failed');
@@ -73,6 +101,7 @@ async function findProject(slug: string): Promise<ProjectRecord | null> {
   return {
     id: String(data.id),
     slug: String(data.slug),
+    repoProvider: data.repo_provider ? String(data.repo_provider) : null,
     repoIdentifier: data.repo_identifier ? String(data.repo_identifier) : null,
   };
 }
@@ -117,6 +146,60 @@ function policyError(
       return 'verification_exact_sha_mismatch';
     }
   }
+
+  if (event.coverage) {
+    const coveragePolicy = producerPolicy.coverage;
+    if (!coveragePolicy) return 'coverage_receipts_not_configured_for_producer';
+    if (event.coverage.service !== coveragePolicy.service) return 'coverage_service_not_allowed';
+    if (event.coverage.environment !== coveragePolicy.environment) return 'coverage_environment_not_allowed';
+    if (event.source !== coveragePolicy.source) return 'coverage_source_not_allowed';
+    if (!event.coverage.routeClasses.every((routeClass) => (
+      coveragePolicy.allowedRouteClasses.includes(routeClass.name)
+    ))) {
+      return 'coverage_route_class_not_allowed';
+    }
+    if (event.coverage.releaseSha !== event.repository.commitSha) {
+      return 'coverage_release_sha_mismatch';
+    }
+
+    const coverageWindowStartedAtMs = Date.parse(event.coverage.windowStartedAt);
+    const coverageWindowEndedAtMs = Date.parse(event.coverage.windowEndedAt);
+    const coverageWindowMs = coverageWindowEndedAtMs - coverageWindowStartedAtMs;
+    if (coverageWindowMs > coveragePolicy.maximumWindowSeconds * 1_000) {
+      return 'coverage_window_too_long';
+    }
+    if (coverageWindowEndedAtMs > occurredAtMs) {
+      return 'coverage_window_ends_after_receipt';
+    }
+    if (coverageWindowEndedAtMs > nowMs) {
+      return 'coverage_window_ends_in_future';
+    }
+    if (nowMs - coverageWindowEndedAtMs > coveragePolicy.maximumObservationAgeSeconds * 1_000) {
+      return 'coverage_window_too_old';
+    }
+
+    if (event.status === 'passed') {
+      if (coverageWindowMs < coveragePolicy.minimumWindowSeconds * 1_000) {
+        return 'coverage_window_too_short';
+      }
+      if (event.coverage.requestCount < coveragePolicy.minimumRequestCount) {
+        return 'coverage_minimum_request_count_not_met';
+      }
+      if (event.coverage.unclassifiedRequestCount > 0) {
+        return 'coverage_unclassified_requests_not_allowed';
+      }
+      if (
+        event.coverage.priorReleaseRequestCount * 10_000
+        > coveragePolicy.maximumPriorReleaseShareBps * event.coverage.requestCount
+      ) {
+        return 'coverage_prior_release_share_above_policy';
+      }
+      if (event.coverage.tailReasons?.includes('unknown')) {
+        return 'coverage_unknown_tail_not_allowed';
+      }
+    }
+  }
+
   if (event.truth === 'verified' && event.evidenceRefs.length === 0 && event.evidenceUrls.length === 0) {
     return 'verified_receipt_requires_evidence';
   }
@@ -129,6 +212,8 @@ export function createBuildEventReceiptIngestHandler(
   const env = dependencies.env ?? process.env;
   const projectLookup = dependencies.findProject ?? findProject;
   const eventStore = dependencies.storeEvent ?? storeEvent;
+  const coverageWitness = dependencies.passedCoverageWitnessReader
+    ?? createDefaultPassedCoverageWitnessReader(env);
   const now = dependencies.now ?? Date.now;
 
   return async function handleBuildEventReceiptIngest(req: Request, res: Response) {
@@ -170,8 +255,21 @@ export function createBuildEventReceiptIngestHandler(
       const project = await projectLookup(slug);
       if (!project) return res.status(404).json({ error: 'project not registered' });
 
-      const rejected = policyError(event, producerPolicy, project, now());
+      const receiptNow = now();
+      const rejected = policyError(event, producerPolicy, project, receiptNow);
       if (rejected) return res.status(403).json({ error: rejected });
+
+      if (event.coverage && event.status === 'passed') {
+        const witness = await coverageWitness.verify({
+          project,
+          event,
+          maximumWitnessAgeSeconds: producerPolicy.coverage!.maximumWitnessAgeSeconds,
+          nowMs: receiptNow,
+        });
+        if (witness.status !== 'verified') {
+          return res.status(409).json({ accepted: false, error: witness.code });
+        }
+      }
 
       const disposition = await eventStore(project.id, event);
       if (disposition === 'conflict') {
@@ -185,7 +283,7 @@ export function createBuildEventReceiptIngestHandler(
         contract: event.contract,
       });
     } catch {
-      return res.status(503).json({ error: 'Build-event receipt store unavailable' });
+      return res.status(503).json({ error: 'Build-event receipt verification or store unavailable' });
     }
   };
 }

@@ -6,6 +6,7 @@ import {
   deriveBuildEventReceiptToken,
 } from '../buildEventReceipts.js';
 import type { BuildEvent } from '../../../buildEvents/buildEvent.js';
+import type { PassedCoverageWitnessReader } from '../../../buildEvents/releaseCoverageWitness.js';
 import type { BuildEventStoreDisposition } from '../../../services/buildEventStore.js';
 
 const MCP_TOKEN = 'founder-signal-test-token';
@@ -41,6 +42,59 @@ function runtimeEvent(overrides: Record<string, unknown> = {}) {
   };
 }
 
+
+function coverageEvent(overrides: Record<string, unknown> = {}) {
+  return {
+    eventId: `sekret-coverage:${SHA}`,
+    occurredAt: '2026-08-18T20:52:23.735Z',
+    source: 'cloudflare',
+    category: 'analytics',
+    phase: 'observe',
+    truth: 'verified',
+    authority: 'observed',
+    status: 'passed',
+    repository: {
+      name: 'jussray/Sekret-Bip',
+      branch: 'main',
+      refKind: 'branch-head',
+      commitSha: SHA,
+    },
+    coverage: {
+      service: 'sekret-bip-production',
+      environment: 'production',
+      releaseSha: SHA,
+      windowStartedAt: '2026-08-18T20:35:00.000Z',
+      windowEndedAt: '2026-08-18T20:50:00.000Z',
+      sampleSource: 'analytics-engine',
+      requestCount: 25,
+      currentReleaseRequestCount: 24,
+      priorReleaseRequestCount: 1,
+      unclassifiedRequestCount: 0,
+      routeClasses: [{
+        name: 'front-door',
+        requestCount: 25,
+        currentReleaseRequestCount: 24,
+        priorReleaseRequestCount: 1,
+        unclassifiedRequestCount: 0,
+      }],
+      tailReasons: ['cached-edge-response'],
+    },
+    evidenceRefs: [`cloudflare-analytics:${SHA}`],
+    ...overrides,
+  };
+}
+
+function acceptedCoverageWitness(): PassedCoverageWitnessReader {
+  return {
+    verify: async () => ({
+      status: 'verified',
+      currentMainSha: SHA,
+      deploymentSha: SHA,
+      observedAt: new Date(NOW_MS).toISOString(),
+    }),
+  };
+}
+
 function appWith(
   disposition: BuildEventStoreDisposition = 'stored',
   env: NodeJS.ProcessEnv = {
@@ -48,6 +102,7 @@ function appWith(
     FCR_BUILD_EVENT_RECEIPT_ROOT_TOKEN: RECEIPT_ROOT_TOKEN,
   },
   nowMs = NOW_MS,
+  passedCoverageWitnessReader: PassedCoverageWitnessReader = acceptedCoverageWitness(),
 ) {
   const app = express();
   const storedEvents: BuildEvent[] = [];
@@ -65,9 +120,10 @@ function appWith(
       env,
       now: () => nowMs,
       findProject: async (slug) => slug === 'sekret-bip'
-        ? { id: 'project-1', slug, repoIdentifier: 'jussray/Sekret-Bip' }
+        ? { id: 'project-1', slug, repoProvider: 'github', repoIdentifier: 'jussray/Sekret-Bip' }
         : null,
       storeEvent,
+      passedCoverageWitnessReader,
     }),
   );
   return {
@@ -104,6 +160,302 @@ describe('build-event receipt ingress', () => {
     expect(stored?.runtime?.releaseSha).toBe(SHA);
     expect(stored?.truth).toBe('verified');
     expect(stored?.authority).toBe('observed');
+  });
+
+
+  it('accepts policy-bound aggregate coverage without promoting it to runtime identity', async () => {
+    const harness = appWith();
+    const response = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent());
+
+    expect(response.status).toBe(201);
+    expect(harness.storeCalls()).toBe(1);
+    expect(harness.storedEvents[0]?.coverage?.releaseSha).toBe(SHA);
+    expect(harness.storedEvents[0]?.runtime).toBeUndefined();
+  });
+
+  it('does not persist a passed coverage receipt without an independent current-main and provider witness', async () => {
+    const harness = appWith('stored', undefined, NOW_MS, {
+      verify: async () => ({ status: 'mismatch', code: 'coverage_witness_current_main_mismatch' }),
+    });
+    const response = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent());
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      accepted: false,
+      error: 'coverage_witness_current_main_mismatch',
+    });
+    expect(harness.storeCalls()).toBe(0);
+  });
+
+  it('fails closed when independent coverage evidence cannot be read', async () => {
+    const harness = appWith('stored', undefined, NOW_MS, {
+      verify: async () => {
+        throw new Error('provider_evidence_unavailable');
+      },
+    });
+    const response = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent());
+
+    expect(response.status).toBe(503);
+    expect(response.body.error).toBe('Build-event receipt verification or store unavailable');
+    expect(harness.storeCalls()).toBe(0);
+  });
+
+  it('rejects coverage that does not meet the predeclared observation policy', async () => {
+    const harness = appWith();
+    const insufficient = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      coverage: {
+        service: 'sekret-bip-production',
+        environment: 'production',
+        releaseSha: SHA,
+        windowStartedAt: '2026-08-18T20:35:00.000Z',
+        windowEndedAt: '2026-08-18T20:50:00.000Z',
+        sampleSource: 'analytics-engine',
+        requestCount: 24,
+        currentReleaseRequestCount: 24,
+        priorReleaseRequestCount: 0,
+        unclassifiedRequestCount: 0,
+        routeClasses: [{
+          name: 'front-door',
+          requestCount: 24,
+          currentReleaseRequestCount: 24,
+          priorReleaseRequestCount: 0,
+          unclassifiedRequestCount: 0,
+        }],
+      },
+    }));
+    expect(insufficient.status).toBe(403);
+    expect(insufficient.body.error).toBe('coverage_minimum_request_count_not_met');
+
+    const priorTail = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      coverage: {
+        service: 'sekret-bip-production',
+        environment: 'production',
+        releaseSha: SHA,
+        windowStartedAt: '2026-08-18T20:35:00.000Z',
+        windowEndedAt: '2026-08-18T20:50:00.000Z',
+        sampleSource: 'analytics-engine',
+        requestCount: 25,
+        currentReleaseRequestCount: 23,
+        priorReleaseRequestCount: 2,
+        unclassifiedRequestCount: 0,
+        routeClasses: [{
+          name: 'front-door',
+          requestCount: 25,
+          currentReleaseRequestCount: 23,
+          priorReleaseRequestCount: 2,
+          unclassifiedRequestCount: 0,
+        }],
+        tailReasons: ['cached-edge-response'],
+      },
+    }));
+    expect(priorTail.status).toBe(403);
+    expect(priorTail.body.error).toBe('coverage_prior_release_share_above_policy');
+
+    const unclassified = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      coverage: {
+        service: 'sekret-bip-production',
+        environment: 'production',
+        releaseSha: SHA,
+        windowStartedAt: '2026-08-18T20:35:00.000Z',
+        windowEndedAt: '2026-08-18T20:50:00.000Z',
+        sampleSource: 'analytics-engine',
+        requestCount: 25,
+        currentReleaseRequestCount: 24,
+        priorReleaseRequestCount: 0,
+        unclassifiedRequestCount: 1,
+        routeClasses: [{
+          name: 'front-door',
+          requestCount: 25,
+          currentReleaseRequestCount: 24,
+          priorReleaseRequestCount: 0,
+          unclassifiedRequestCount: 1,
+        }],
+      },
+    }));
+    expect(unclassified.status).toBe(403);
+    expect(unclassified.body.error).toBe('coverage_unclassified_requests_not_allowed');
+
+    const unapprovedRoute = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      coverage: {
+        service: 'sekret-bip-production',
+        environment: 'production',
+        releaseSha: SHA,
+        windowStartedAt: '2026-08-18T20:35:00.000Z',
+        windowEndedAt: '2026-08-18T20:50:00.000Z',
+        sampleSource: 'analytics-engine',
+        requestCount: 25,
+        currentReleaseRequestCount: 25,
+        priorReleaseRequestCount: 0,
+        unclassifiedRequestCount: 0,
+        routeClasses: [{
+          name: 'internal-admin',
+          requestCount: 25,
+          currentReleaseRequestCount: 25,
+          priorReleaseRequestCount: 0,
+          unclassifiedRequestCount: 0,
+        }],
+      },
+    }));
+    expect(unapprovedRoute.status).toBe(403);
+    expect(unapprovedRoute.body.error).toBe('coverage_route_class_not_allowed');
+
+    expect(harness.storeCalls()).toBe(0);
+  });
+
+  it('rejects a coverage receipt with mismatched release identity or synthetic proof', async () => {
+    const harness = appWith();
+    const mismatchedRelease = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      coverage: {
+        service: 'sekret-bip-production',
+        environment: 'production',
+        releaseSha: 'abcdefabcdefabcdefabcdefabcdefabcdefabcd',
+        windowStartedAt: '2026-08-18T20:35:00.000Z',
+        windowEndedAt: '2026-08-18T20:50:00.000Z',
+        sampleSource: 'analytics-engine',
+        requestCount: 25,
+        currentReleaseRequestCount: 25,
+        priorReleaseRequestCount: 0,
+        unclassifiedRequestCount: 0,
+        routeClasses: [{
+          name: 'front-door',
+          requestCount: 25,
+          currentReleaseRequestCount: 25,
+          priorReleaseRequestCount: 0,
+          unclassifiedRequestCount: 0,
+        }],
+      },
+    }));
+    expect(mismatchedRelease.status).toBe(403);
+    expect(mismatchedRelease.body.error).toBe('coverage_release_sha_mismatch');
+
+    const synthetic = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      source: 'playwright',
+      coverage: {
+        service: 'sekret-bip-production',
+        environment: 'production',
+        releaseSha: SHA,
+        windowStartedAt: '2026-08-18T20:35:00.000Z',
+        windowEndedAt: '2026-08-18T20:50:00.000Z',
+        sampleSource: 'synthetic-probe',
+        requestCount: 1,
+        currentReleaseRequestCount: 1,
+        priorReleaseRequestCount: 0,
+        unclassifiedRequestCount: 0,
+        routeClasses: [{
+          name: 'front-door',
+          requestCount: 1,
+          currentReleaseRequestCount: 1,
+          priorReleaseRequestCount: 0,
+          unclassifiedRequestCount: 0,
+        }],
+      },
+    }));
+    expect(synthetic.status).toBe(400);
+    expect(synthetic.body.error).toBe('invalid_build_event');
+    expect(harness.storeCalls()).toBe(0);
+  });
+
+  it('rejects stale, future-ending, and overly broad coverage windows', async () => {
+    const harness = appWith();
+    const stale = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      coverage: {
+        ...coverageEvent().coverage,
+        windowStartedAt: '2026-08-18T18:30:00.000Z',
+        windowEndedAt: '2026-08-18T18:45:00.000Z',
+      },
+    }));
+    const delayedReceipt = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      occurredAt: '2026-08-17T22:01:00.000Z',
+      coverage: {
+        ...coverageEvent().coverage,
+        windowStartedAt: '2026-08-17T21:45:00.000Z',
+        windowEndedAt: '2026-08-17T22:00:00.000Z',
+      },
+    }));
+    const futureEnding = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      coverage: {
+        ...coverageEvent().coverage,
+        windowStartedAt: '2026-08-18T20:38:00.000Z',
+        windowEndedAt: '2026-08-18T20:53:00.000Z',
+      },
+    }));
+    const tooLong = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      coverage: {
+        ...coverageEvent().coverage,
+        windowStartedAt: '2026-08-18T20:10:00.000Z',
+        windowEndedAt: '2026-08-18T20:50:00.000Z',
+      },
+    }));
+
+    expect(stale.status).toBe(403);
+    expect(stale.body.error).toBe('coverage_window_too_old');
+    expect(delayedReceipt.status).toBe(403);
+    expect(delayedReceipt.body.error).toBe('coverage_window_too_old');
+    expect(futureEnding.status).toBe(403);
+    expect(futureEnding.body.error).toBe('coverage_window_ends_after_receipt');
+    expect(tooLong.status).toBe(403);
+    expect(tooLong.body.error).toBe('coverage_window_too_long');
+    expect(harness.storeCalls()).toBe(0);
+  });
+
+  it('accepts coverage exactly at the declared maximum window and observation age', async () => {
+    const harness = appWith();
+    const response = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      coverage: {
+        ...coverageEvent().coverage,
+        windowStartedAt: '2026-08-18T19:30:00.000Z',
+        windowEndedAt: '2026-08-18T20:00:00.000Z',
+      },
+    }));
+
+    expect(response.status).toBe(201);
+    expect(harness.storeCalls()).toBe(1);
+  });
+
+  it('rejects a coverage window that ends after the receiver clock', async () => {
+    const harness = appWith();
+    const response = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      occurredAt: '2026-08-18T21:04:00.000Z',
+      coverage: {
+        ...coverageEvent().coverage,
+        windowStartedAt: '2026-08-18T20:48:00.000Z',
+        windowEndedAt: '2026-08-18T21:03:00.000Z',
+      },
+    }));
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('coverage_window_ends_in_future');
+    expect(harness.storeCalls()).toBe(0);
   });
 
   it('is idempotent when the store reports a duplicate', async () => {

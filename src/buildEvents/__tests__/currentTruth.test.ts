@@ -143,6 +143,156 @@ describe('current truth projection', () => {
     expect(snapshot.quality.inferredEvents).toBe(1);
   });
 
+
+  it('keeps aggregate rollout coverage separate from binary runtime identity', () => {
+    const events = [
+      createBuildEvent({
+        eventId: 'github:main-for-coverage',
+        occurredAt: '2026-08-16T03:00:00Z',
+        source: 'github',
+        category: 'source',
+        phase: 'build',
+        truth: 'verified',
+        authority: 'observed',
+        status: 'completed',
+        repository: {
+          name: 'jussray/Sekret-Bip',
+          branch: 'main',
+          refKind: 'branch-head',
+          commitSha: MAIN_SHA,
+        },
+        evidenceRefs: evidence('main-for-coverage'),
+      }),
+      createBuildEvent({
+        eventId: 'cloudflare:current-rollout-coverage',
+        occurredAt: '2026-08-16T03:10:00Z',
+        source: 'cloudflare',
+        category: 'analytics',
+        phase: 'observe',
+        truth: 'verified',
+        authority: 'observed',
+        status: 'passed',
+        repository: {
+          name: 'jussray/Sekret-Bip',
+          branch: 'main',
+          refKind: 'branch-head',
+          commitSha: MAIN_SHA,
+        },
+        coverage: {
+          service: 'sekret-bip-production',
+          environment: 'production',
+          releaseSha: MAIN_SHA,
+          windowStartedAt: '2026-08-16T02:50:00Z',
+          windowEndedAt: '2026-08-16T03:05:00Z',
+          sampleSource: 'analytics-engine',
+          requestCount: 25,
+          currentReleaseRequestCount: 25,
+          priorReleaseRequestCount: 0,
+          unclassifiedRequestCount: 0,
+          routeClasses: [{
+            name: 'front-door',
+            requestCount: 25,
+            currentReleaseRequestCount: 25,
+            priorReleaseRequestCount: 0,
+            unclassifiedRequestCount: 0,
+          }],
+        },
+        evidenceRefs: evidence('current-rollout-coverage'),
+      }),
+      createBuildEvent({
+        eventId: 'cloudflare:old-rollout-coverage',
+        occurredAt: '2026-08-16T03:20:00Z',
+        source: 'cloudflare',
+        category: 'analytics',
+        phase: 'observe',
+        truth: 'verified',
+        authority: 'observed',
+        status: 'passed',
+        repository: {
+          name: 'jussray/Sekret-Bip',
+          branch: 'main',
+          refKind: 'branch-head',
+          commitSha: OLD_SHA,
+        },
+        coverage: {
+          service: 'sekret-bip-production',
+          environment: 'production',
+          releaseSha: OLD_SHA,
+          windowStartedAt: '2026-08-16T03:00:00Z',
+          windowEndedAt: '2026-08-16T03:15:00Z',
+          sampleSource: 'analytics-engine',
+          requestCount: 25,
+          currentReleaseRequestCount: 25,
+          priorReleaseRequestCount: 0,
+          unclassifiedRequestCount: 0,
+          routeClasses: [{
+            name: 'front-door',
+            requestCount: 25,
+            currentReleaseRequestCount: 25,
+            priorReleaseRequestCount: 0,
+            unclassifiedRequestCount: 0,
+          }],
+        },
+        evidenceRefs: evidence('old-rollout-coverage'),
+      }),
+    ];
+
+    const snapshot = buildCurrentTruthProjection('sekret-bip', events);
+
+    expect(snapshot.runtimes).toEqual({});
+    expect(snapshot.coverage).toEqual({});
+    expect(snapshot.quality.staleCurrentFacts).toBe(0);
+    expect(snapshot.quality.staleCoverageFacts).toBe(1);
+  });
+
+  it('does not render coverage current without a verified current-main fact', () => {
+    const events = [
+      createBuildEvent({
+        eventId: 'cloudflare:unbound-rollout-coverage',
+        occurredAt: '2026-08-16T03:20:00Z',
+        source: 'cloudflare',
+        category: 'analytics',
+        phase: 'observe',
+        truth: 'verified',
+        authority: 'observed',
+        status: 'passed',
+        repository: {
+          name: 'jussray/Sekret-Bip',
+          branch: 'main',
+          refKind: 'branch-head',
+          commitSha: MAIN_SHA,
+        },
+        coverage: {
+          service: 'sekret-bip-production',
+          environment: 'production',
+          releaseSha: MAIN_SHA,
+          windowStartedAt: '2026-08-16T03:00:00Z',
+          windowEndedAt: '2026-08-16T03:15:00Z',
+          sampleSource: 'analytics-engine',
+          requestCount: 25,
+          currentReleaseRequestCount: 25,
+          priorReleaseRequestCount: 0,
+          unclassifiedRequestCount: 0,
+          routeClasses: [{
+            name: 'front-door',
+            requestCount: 25,
+            currentReleaseRequestCount: 25,
+            priorReleaseRequestCount: 0,
+            unclassifiedRequestCount: 0,
+          }],
+        },
+        evidenceRefs: evidence('unbound-rollout-coverage'),
+      }),
+    ];
+
+    const snapshot = buildCurrentTruthProjection('sekret-bip', events);
+
+    expect(snapshot.source.currentMainSha).toBeNull();
+    expect(snapshot.coverage).toEqual({});
+    expect(snapshot.quality.staleCoverageFacts).toBe(0);
+    expect(snapshot.quality.unboundCoverageFacts).toBe(1);
+  });
+
   it('leaves runtime truth absent when only source and provider facts exist', () => {
     const events = [
       createBuildEvent({
