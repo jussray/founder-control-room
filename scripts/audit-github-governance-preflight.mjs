@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-export const CONTRACT = 'fcr/github-governance-preflight@v1';
+export const CONTRACT = 'fcr/github-governance-preflight@v2';
 export const CANONICAL_RULESET_NAME = 'Founder Control Room main exact-head gate';
 export const REQUIRED_CHECKS = ['Required Gate', 'Verify test-ledger contract'];
 
@@ -29,6 +29,12 @@ function ruleOfType(ruleset, type) {
   return rules.find((rule) => rule?.type === type) ?? null;
 }
 
+export function trustedBypassPolicy(appId) {
+  const id = text(appId);
+  if (!/^\d+$/.test(id)) return null;
+  return [{ actorType: 'Integration', actorId: id, bypassMode: 'always' }];
+}
+
 export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = targetRef) {
   const pull = ruleOfType(ruleset, 'pull_request');
   const status = ruleOfType(ruleset, 'required_status_checks');
@@ -37,13 +43,14 @@ export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = tar
         .map((entry) => text(entry?.context))
         .filter(Boolean)
     : [];
-  const bypassActors = Array.isArray(ruleset?.bypass_actors)
+  const bypassObservationComplete = Array.isArray(ruleset?.bypass_actors);
+  const bypassActors = bypassObservationComplete
     ? ruleset.bypass_actors.map((actor) => ({
         actorType: text(actor?.actor_type),
         actorId: actor?.actor_id == null ? null : String(actor.actor_id),
         bypassMode: text(actor?.bypass_mode),
-      }))
-    : [];
+      })).sort((a, b) => `${a.actorType}:${a.actorId}:${a.bypassMode}`.localeCompare(`${b.actorType}:${b.actorId}:${b.bypassMode}`))
+    : null;
   const targets = branchTargets(ruleset);
   const targetTokens = new Set([`refs/heads/${targetRef}`]);
   if (text(defaultBranch) === text(targetRef)) targetTokens.add('~DEFAULT_BRANCH');
@@ -64,6 +71,7 @@ export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = tar
     requiredStatusCheckNames: statusChecks.sort(),
     blockForcePushes: Boolean(ruleOfType(ruleset, 'non_fast_forward')),
     blockDeletion: Boolean(ruleOfType(ruleset, 'deletion')),
+    bypassObservationComplete,
     bypassActors,
   };
 }
@@ -76,7 +84,13 @@ export function collaboratorCanReview(collaborator, ownerLogin) {
   return permissions.push === true || permissions.maintain === true || permissions.admin === true;
 }
 
-export function canonicalFloorSatisfied(snapshot) {
+export function bypassPolicyMatches(snapshot, expectedBypassActors) {
+  if (!snapshot?.bypassObservationComplete || !Array.isArray(snapshot.bypassActors)) return false;
+  if (!Array.isArray(expectedBypassActors)) return false;
+  return JSON.stringify(snapshot.bypassActors) === JSON.stringify(expectedBypassActors);
+}
+
+export function canonicalFloorSatisfied(snapshot, expectedBypassActors) {
   if (!snapshot) return false;
   const checks = new Set(snapshot.requiredStatusCheckNames);
   return snapshot.name === CANONICAL_RULESET_NAME
@@ -91,7 +105,8 @@ export function canonicalFloorSatisfied(snapshot) {
     && snapshot.strictRequiredStatusChecks === true
     && REQUIRED_CHECKS.every((check) => checks.has(check))
     && snapshot.blockForcePushes === true
-    && snapshot.blockDeletion === true;
+    && snapshot.blockDeletion === true
+    && bypassPolicyMatches(snapshot, expectedBypassActors);
 }
 
 export function buildReport({
@@ -101,8 +116,10 @@ export function buildReport({
   fullRulesets,
   collaborators,
   canonicalName = CANONICAL_RULESET_NAME,
+  trustedGitHubAppId,
 }) {
   const { owner } = parseRepository(repository);
+  const expectedBypassActors = trustedBypassPolicy(trustedGitHubAppId);
   const snapshots = fullRulesets
     .filter((ruleset) => ruleset?.target === 'branch')
     .map((ruleset) => rulesetSnapshot(ruleset, targetRef, defaultBranch));
@@ -111,6 +128,14 @@ export function buildReport({
   const canonicalMatches = snapshots.filter((snapshot) => snapshot.name === canonicalName);
   const canonical = canonicalMatches[0] ?? null;
   const eligibleReviewers = collaborators.filter((collaborator) => collaboratorCanReview(collaborator, owner));
+  const bypassObservationComplete = canonical?.bypassObservationComplete === true;
+  const observationComplete = expectedBypassActors !== null && (canonical === null || bypassObservationComplete);
+  const blocker = expectedBypassActors === null
+    ? 'trusted_bypass_policy_unavailable'
+    : canonical !== null && !bypassObservationComplete
+      ? 'bypass_observation_unavailable'
+      : null;
+  const canonicalFloor = canonicalFloorSatisfied(canonical, expectedBypassActors);
 
   return {
     contract: CONTRACT,
@@ -120,22 +145,26 @@ export function buildReport({
     canonicalRulesetName: canonicalName,
     observedAt: new Date().toISOString(),
     providerMutationPerformed: false,
-    observationComplete: true,
-    blocker: null,
+    observationComplete,
+    blocker,
     activeRulesetCountTargetingRef: activeTargetingRef.length,
     canonicalRulesetMatchCount: canonicalMatches.length,
     canonicalRuleset: canonical,
-    canonicalFloorSatisfied: canonicalFloorSatisfied(canonical),
+    canonicalFloorSatisfied: canonicalFloor,
+    bypassObservationComplete: canonical === null ? null : bypassObservationComplete,
+    trustedBypassPolicyAvailable: expectedBypassActors !== null,
+    bypassPolicySatisfied: canonical === null ? false : bypassPolicyMatches(canonical, expectedBypassActors),
     independentReviewerReady: eligibleReviewers.length > 0,
     eligibleNonOwnerWriteReviewerCount: eligibleReviewers.length,
     observedBranchRulesets: snapshots,
-    status:
-      canonicalMatches.length === 1
-      && activeTargetingRef.length === 1
-      && canonicalFloorSatisfied(canonical)
-      && eligibleReviewers.length > 0
-        ? 'READY'
-        : 'NOT_READY',
+    status: !observationComplete
+      ? 'BLOCKED'
+      : canonicalMatches.length === 1
+        && activeTargetingRef.length === 1
+        && canonicalFloor
+        && eligibleReviewers.length > 0
+          ? 'READY'
+          : 'NOT_READY',
   };
 }
 
@@ -154,6 +183,9 @@ export function buildBlockedReport({ repository, targetRef = 'main', reason = 'p
     canonicalRulesetMatchCount: null,
     canonicalRuleset: null,
     canonicalFloorSatisfied: false,
+    bypassObservationComplete: null,
+    trustedBypassPolicyAvailable: false,
+    bypassPolicySatisfied: false,
     independentReviewerReady: false,
     eligibleNonOwnerWriteReviewerCount: null,
     observedBranchRulesets: [],
@@ -203,7 +235,7 @@ async function listAll(path, token) {
   return results;
 }
 
-export async function collectGovernancePreflight({ token, repository, targetRef = 'main' }) {
+export async function collectGovernancePreflight({ token, repository, targetRef = 'main', trustedGitHubAppId }) {
   if (!text(token)) throw new Error('GITHUB_TOKEN is required for governance preflight');
   const { owner, repo } = parseRepository(repository);
   const repositoryState = await githubGet(
@@ -224,7 +256,7 @@ export async function collectGovernancePreflight({ token, repository, targetRef 
     `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/collaborators?affiliation=all`,
     token,
   );
-  return buildReport({ repository, targetRef, defaultBranch, fullRulesets, collaborators });
+  return buildReport({ repository, targetRef, defaultBranch, fullRulesets, collaborators, trustedGitHubAppId });
 }
 
 async function main() {
@@ -238,7 +270,9 @@ async function main() {
       token: process.env.GITHUB_TOKEN,
       repository,
       targetRef,
+      trustedGitHubAppId: process.env.GITHUB_APP_ID,
     });
+    blocked = report.status === 'BLOCKED';
   } catch (error) {
     blocked = true;
     report = buildBlockedReport({
@@ -261,6 +295,9 @@ async function main() {
     activeRulesetCountTargetingRef: report.activeRulesetCountTargetingRef,
     canonicalRulesetMatchCount: report.canonicalRulesetMatchCount,
     canonicalFloorSatisfied: report.canonicalFloorSatisfied,
+    bypassObservationComplete: report.bypassObservationComplete,
+    trustedBypassPolicyAvailable: report.trustedBypassPolicyAvailable,
+    bypassPolicySatisfied: report.bypassPolicySatisfied,
     independentReviewerReady: report.independentReviewerReady,
     eligibleNonOwnerWriteReviewerCount: report.eligibleNonOwnerWriteReviewerCount,
   }, null, 2));
