@@ -10,6 +10,8 @@ import type {
 } from './buildEvent.js';
 
 export const CURRENT_TRUTH_CONTRACT = 'fcr/current-truth@v1' as const;
+/** Coverage is a bounded observation, not a durable green status. */
+export const CURRENT_COVERAGE_TRUTH_LEASE_MS = 60 * 60 * 1_000;
 
 export interface CurrentTruthFact<T> {
   value: T;
@@ -37,6 +39,7 @@ export interface CurrentTruthQuality {
   unknownCurrentFacts: number;
   staleCurrentFacts: number;
   staleCoverageFacts: number;
+  expiredCoverageFacts: number;
   unboundCoverageFacts: number;
   latestEventAt: string | null;
 }
@@ -133,10 +136,21 @@ function boundSha(event: BuildEvent): string | null {
     ?? null;
 }
 
+function coverageWithinTruthLease(
+  coverage: BuildReleaseCoverageRef,
+  nowMs: number,
+): boolean {
+  const windowEndedAtMs = Date.parse(coverage.windowEndedAt);
+  return Number.isFinite(windowEndedAtMs)
+    && windowEndedAtMs <= nowMs
+    && nowMs - windowEndedAtMs <= CURRENT_COVERAGE_TRUTH_LEASE_MS;
+}
+
 function quality(
   events: readonly BuildEvent[],
   currentFacts: readonly BuildEvent[],
   currentMainSha: string | null,
+  expiredCoverageFacts: number,
   unboundCoverageFacts: number,
 ): CurrentTruthQuality {
   const countTruth = (items: readonly BuildEvent[], truth: BuildEventTruth) =>
@@ -162,6 +176,7 @@ function quality(
           Boolean(event.coverage && event.coverage.releaseSha !== currentMainSha)
         )).length
       : 0,
+    expiredCoverageFacts,
     unboundCoverageFacts,
     latestEventAt: events[0]?.occurredAt ?? null,
   };
@@ -170,6 +185,7 @@ function quality(
 export function buildCurrentTruthProjection(
   projectSlug: string,
   inputEvents: readonly BuildEvent[],
+  nowMs = Date.now(),
 ): CurrentTruthProjection {
   const events = newestFirst(inputEvents);
 
@@ -219,6 +235,13 @@ export function buildCurrentTruthProjection(
     (event) => event.coverage ?? null,
   );
 
+  const expiredCoverageFacts = Object.values(coverage).filter((coverageFact) => (
+    !coverageWithinTruthLease(coverageFact.value, nowMs)
+  )).length;
+  for (const [key, coverageFact] of Object.entries(coverage)) {
+    if (!coverageWithinTruthLease(coverageFact.value, nowMs)) delete coverage[key];
+  }
+
   const unboundCoverageFacts = currentMainSha ? 0 : Object.keys(coverage).length;
   if (!currentMainSha) {
     for (const key of Object.keys(coverage)) delete coverage[key];
@@ -262,6 +285,7 @@ export function buildCurrentTruthProjection(
       events,
       selectedCurrentFacts,
       currentMainSha?.value ?? null,
+      expiredCoverageFacts,
       unboundCoverageFacts,
     ),
   };

@@ -12,7 +12,8 @@ import type { BuildEventStoreDisposition } from '../../../services/buildEventSto
 const MCP_TOKEN = 'founder-signal-test-token';
 const RECEIPT_ROOT_TOKEN = 'build-event-receipt-root-test-token';
 const PRODUCER = 'sekret-bip-release-observer';
-const RECEIPT_TOKEN = deriveBuildEventReceiptToken(RECEIPT_ROOT_TOKEN, PRODUCER);
+const PROJECT_SLUG = 'sekret-bip';
+const RECEIPT_TOKEN = deriveBuildEventReceiptToken(RECEIPT_ROOT_TOKEN, PRODUCER, PROJECT_SLUG);
 const SHA = '1234567890abcdef1234567890abcdef12345678';
 const NOW_MS = Date.parse('2026-08-18T21:00:00.000Z');
 
@@ -103,6 +104,12 @@ function appWith(
   },
   nowMs = NOW_MS,
   passedCoverageWitnessReader: PassedCoverageWitnessReader = acceptedCoverageWitness(),
+  findProjectOverride?: (slug: string) => Promise<{
+    id: string;
+    slug: string;
+    repoProvider: string | null;
+    repoIdentifier: string | null;
+  } | null>,
 ) {
   const app = express();
   const storedEvents: BuildEvent[] = [];
@@ -119,9 +126,9 @@ function appWith(
     createBuildEventReceiptIngestHandler({
       env,
       now: () => nowMs,
-      findProject: async (slug) => slug === 'sekret-bip'
+      findProject: findProjectOverride ?? (async (slug) => slug === PROJECT_SLUG
         ? { id: 'project-1', slug, repoProvider: 'github', repoIdentifier: 'jussray/Sekret-Bip' }
-        : null,
+        : null),
       storeEvent,
       passedCoverageWitnessReader,
     }),
@@ -173,6 +180,37 @@ describe('build-event receipt ingress', () => {
     expect(harness.storeCalls()).toBe(1);
     expect(harness.storedEvents[0]?.coverage?.releaseSha).toBe(SHA);
     expect(harness.storedEvents[0]?.runtime).toBeUndefined();
+  });
+
+  it('binds a producer credential and project lookup to the one enrolled project', async () => {
+    const harness = appWith();
+    const otherProject = await authorized(
+      request(harness.app).post('/ingest/build-events/another-project'),
+    ).send(runtimeEvent());
+    expect(otherProject.status).toBe(403);
+    expect(otherProject.body.error).toBe('producer_project_not_allowed');
+
+    const wrongProvider = appWith(
+      'stored',
+      undefined,
+      NOW_MS,
+      acceptedCoverageWitness(),
+      async (slug) => slug === PROJECT_SLUG
+        ? {
+            id: 'project-1',
+            slug,
+            repoProvider: 'gitlab',
+            repoIdentifier: 'jussray/Sekret-Bip',
+          }
+        : null,
+    );
+    const providerMismatch = await authorized(
+      request(wrongProvider.app).post('/ingest/build-events/sekret-bip'),
+    ).send(runtimeEvent());
+    expect(providerMismatch.status).toBe(403);
+    expect(providerMismatch.body.error).toBe('producer_repository_provider_mismatch');
+    expect(harness.storeCalls()).toBe(0);
+    expect(wrongProvider.storeCalls()).toBe(0);
   });
 
   it('does not persist a passed coverage receipt without an independent current-main and provider witness', async () => {
@@ -497,7 +535,7 @@ describe('build-event receipt ingress', () => {
 
   it('does not let a remote MCP bearer derive build-observer authority', async () => {
     const harness = appWith();
-    const tokenDerivedFromMcpBearer = deriveBuildEventReceiptToken(MCP_TOKEN, PRODUCER);
+    const tokenDerivedFromMcpBearer = deriveBuildEventReceiptToken(MCP_TOKEN, PRODUCER, PROJECT_SLUG);
     const response = await request(harness.app)
       .post('/ingest/build-events/sekret-bip')
       .set('x-build-event-producer', PRODUCER)
@@ -516,7 +554,7 @@ describe('build-event receipt ingress', () => {
     const response = await request(harness.app)
       .post('/ingest/build-events/sekret-bip')
       .set('x-build-event-producer', PRODUCER)
-      .set('x-build-event-receipt-token', deriveBuildEventReceiptToken(MCP_TOKEN, PRODUCER))
+      .set('x-build-event-receipt-token', deriveBuildEventReceiptToken(MCP_TOKEN, PRODUCER, PROJECT_SLUG))
       .send(runtimeEvent());
 
     expect(response.status).toBe(503);

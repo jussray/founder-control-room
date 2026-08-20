@@ -1,7 +1,9 @@
 import type { BuildEvent } from './buildEvent.js';
-import { createRepositoryProvider } from '../providers/RepositoryProviderFactory.js';
+import { createAppAwareRepositoryProvider } from '../providers/RepositoryProviderFactory.js';
+import { createHash } from 'node:crypto';
 
 const EXACT_SHA = /^[0-9a-f]{40}$/i;
+const SHA256_DIGEST = /^[0-9a-f]{64}$/i;
 const HEALTHY_DEPLOYMENT_STATES = new Set([
   'active',
   'completed',
@@ -32,6 +34,7 @@ export interface PassedCoverageWitnessInput {
   project: PassedCoverageProject;
   event: BuildEvent;
   maximumWitnessAgeSeconds: number;
+  providerWitness: IndependentCoverageWitnessBinding;
   nowMs?: number;
 }
 
@@ -51,12 +54,31 @@ export interface PassedCoverageWitnessReader {
   verify(input: PassedCoverageWitnessInput): Promise<PassedCoverageWitnessResult>;
 }
 
+/**
+ * A server-owned provider observation must be bound to this exact deployment
+ * target. A same-project Cloudflare observation is not enough: DNS, routes,
+ * health probes, and unrelated deployments are not rollout evidence.
+ */
+export interface IndependentCoverageWitnessBinding {
+  provider: 'cloudflare';
+  resourceType: string;
+  resourceId: string;
+  eventType: string;
+}
+
 export interface IndependentDeploymentObservation {
   sourceEventId: string | null;
   providerEventProcessed: boolean;
+  providerEventType: string | null;
+  providerEventResourceType: string | null;
+  providerEventResourceId: string | null;
+  resourceType: string | null;
+  resourceId: string | null;
   environment: string | null;
   commitSha: string | null;
   observedAt: string | null;
+  deploymentCompletedAt: string | null;
+  coverageDigest: string | null;
   status: string | null;
 }
 
@@ -65,6 +87,10 @@ export interface IndependentCoverageWitnessAssessmentInput {
   currentMainSha: string;
   maximumWitnessAgeSeconds: number;
   nowMs: number;
+  coverageWindowStartedAt: string;
+  coverageWindowEndedAt: string;
+  expectedCoverageDigest: string;
+  providerWitness: IndependentCoverageWitnessBinding;
   observations: readonly IndependentDeploymentObservation[];
 }
 
@@ -80,6 +106,10 @@ function asString(value: unknown): string | null {
 
 function normalizedSha(value: string | null): string | null {
   return value && EXACT_SHA.test(value) ? value.toLowerCase() : null;
+}
+
+function normalizedDigest(value: string | null): string | null {
+  return value && SHA256_DIGEST.test(value) ? value.toLowerCase() : null;
 }
 
 function normalizedState(value: string | null): string | null {
@@ -100,18 +130,54 @@ function latestFirst(
   ));
 }
 
-function isTrustedProductionObservation(observation: IndependentDeploymentObservation): boolean {
+function isTrustedProductionObservation(
+  observation: IndependentDeploymentObservation,
+  binding: IndependentCoverageWitnessBinding,
+): boolean {
   return Boolean(
     observation.sourceEventId
       && observation.providerEventProcessed
+      && observation.providerEventType === binding.eventType
+      && observation.providerEventResourceType === binding.resourceType
+      && observation.providerEventResourceId === binding.resourceId
+      && observation.resourceType === binding.resourceType
+      && observation.resourceId === binding.resourceId
       && observation.environment?.toLowerCase() === 'production',
   );
 }
 
 /**
- * Assesses server-owned evidence only. Caller-supplied build-event data is not
- * an input here other than the expected SHA; `project_events` is deliberately
- * excluded so a receipt cannot witness itself.
+ * The digest binds every aggregate field to a server-owned provider
+ * observation without persisting routes, request identifiers, or raw logs in
+ * the control plane. The Cloudflare normalizer must calculate the same digest
+ * from its independent aggregate before it writes `coverage_digest`.
+ */
+export function coverageWitnessDigest(coverage: NonNullable<BuildEvent['coverage']>): string {
+  const canonical = {
+    contract: 'fcr/coverage-witness@v1',
+    service: coverage.service,
+    environment: coverage.environment,
+    releaseSha: coverage.releaseSha.toLowerCase(),
+    windowStartedAt: new Date(coverage.windowStartedAt).toISOString(),
+    windowEndedAt: new Date(coverage.windowEndedAt).toISOString(),
+    sampleSource: coverage.sampleSource,
+    requestCount: coverage.requestCount,
+    currentReleaseRequestCount: coverage.currentReleaseRequestCount,
+    priorReleaseRequestCount: coverage.priorReleaseRequestCount,
+    unclassifiedRequestCount: coverage.unclassifiedRequestCount,
+    routeClasses: [...coverage.routeClasses]
+      .map((routeClass) => ({ ...routeClass }))
+      .sort((left, right) => left.name.localeCompare(right.name)),
+    tailReasons: [...(coverage.tailReasons ?? [])].sort(),
+  };
+  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
+/**
+ * Assesses server-owned evidence only. Caller-supplied receipt fields provide
+ * expected values that must exactly match independent provider evidence;
+ * `project_events` is deliberately excluded so a receipt cannot witness
+ * itself.
  */
 export function assessIndependentCoverageWitness(
   input: IndependentCoverageWitnessAssessmentInput,
@@ -125,7 +191,25 @@ export function assessIndependentCoverageWitness(
     return { status: 'mismatch', code: 'coverage_witness_current_main_mismatch' };
   }
 
-  const latest = latestFirst(input.observations.filter(isTrustedProductionObservation))[0];
+  const coverageWindowStartedAtMs = timestampMs(input.coverageWindowStartedAt);
+  const coverageWindowEndedAtMs = timestampMs(input.coverageWindowEndedAt);
+  if (
+    coverageWindowStartedAtMs === null
+    || coverageWindowEndedAtMs === null
+    || coverageWindowEndedAtMs <= coverageWindowStartedAtMs
+  ) {
+    return { status: 'missing', code: 'coverage_witness_coverage_window_invalid' };
+  }
+  const expectedCoverageDigest = normalizedDigest(input.expectedCoverageDigest);
+  if (!expectedCoverageDigest) {
+    return { status: 'missing', code: 'coverage_witness_coverage_digest_invalid' };
+  }
+
+  const latest = latestFirst(
+    input.observations.filter((observation) => (
+      isTrustedProductionObservation(observation, input.providerWitness)
+    )),
+  )[0];
   if (!latest) return { status: 'missing', code: 'coverage_witness_cloudflare_observation_missing' };
 
   const observedAtMs = timestampMs(latest.observedAt);
@@ -134,6 +218,17 @@ export function assessIndependentCoverageWitness(
   }
   if (observedAtMs > input.nowMs || input.nowMs - observedAtMs > input.maximumWitnessAgeSeconds * 1_000) {
     return { status: 'stale', code: 'coverage_witness_cloudflare_observation_stale' };
+  }
+  if (observedAtMs < coverageWindowEndedAtMs) {
+    return { status: 'stale', code: 'coverage_witness_coverage_observation_precedes_window' };
+  }
+
+  const deploymentCompletedAtMs = timestampMs(latest.deploymentCompletedAt);
+  if (deploymentCompletedAtMs === null) {
+    return { status: 'missing', code: 'coverage_witness_deployment_completion_missing' };
+  }
+  if (deploymentCompletedAtMs > coverageWindowStartedAtMs) {
+    return { status: 'mismatch', code: 'coverage_witness_deployment_after_coverage_window' };
   }
 
   const deploymentState = normalizedState(latest.status);
@@ -149,6 +244,9 @@ export function assessIndependentCoverageWitness(
   if (!deploymentState || !HEALTHY_DEPLOYMENT_STATES.has(deploymentState)) {
     return { status: 'missing', code: 'coverage_witness_deployment_health_missing' };
   }
+  if (normalizedDigest(latest.coverageDigest) !== expectedCoverageDigest) {
+    return { status: 'mismatch', code: 'coverage_witness_independent_aggregate_mismatch' };
+  }
 
   return {
     status: 'verified',
@@ -160,14 +258,20 @@ export function assessIndependentCoverageWitness(
 
 function observationFromRow(
   value: unknown,
-  processedProviderEventIds: ReadonlySet<string>,
+  providerEvents: ReadonlyMap<string, ProviderEventIdentity>,
 ): IndependentDeploymentObservation {
   const row = asRecord(value);
   const state = asRecord(row['observed_state']);
   const sourceEventId = asString(row['source_event_id']);
+  const providerEvent = sourceEventId ? providerEvents.get(sourceEventId) : undefined;
   return {
     sourceEventId,
-    providerEventProcessed: Boolean(sourceEventId && processedProviderEventIds.has(sourceEventId)),
+    providerEventProcessed: providerEvent?.processed ?? false,
+    providerEventType: providerEvent?.eventType ?? null,
+    providerEventResourceType: providerEvent?.resourceType ?? null,
+    providerEventResourceId: providerEvent?.resourceId ?? null,
+    resourceType: asString(row['resource_type']),
+    resourceId: asString(row['resource_id']),
     environment: asString(state['environment']),
     commitSha: normalizedSha(
       asString(state['commit_sha'])
@@ -175,6 +279,8 @@ function observationFromRow(
         ?? asString(state['sha']),
     ),
     observedAt: asString(row['observed_at']),
+    deploymentCompletedAt: asString(state['deployment_completed_at']),
+    coverageDigest: normalizedDigest(asString(state['coverage_digest'])),
     status: asString(state['status'])
       ?? asString(state['state'])
       ?? asString(state['conclusion'])
@@ -182,15 +288,25 @@ function observationFromRow(
   };
 }
 
+interface ProviderEventIdentity {
+  processed: boolean;
+  eventType: string | null;
+  resourceType: string | null;
+  resourceId: string | null;
+}
+
 async function loadIndependentCloudflareObservations(
   projectId: string,
+  binding: IndependentCoverageWitnessBinding,
 ): Promise<IndependentDeploymentObservation[]> {
   const { supabase } = await import('../lib/supabaseClient.js');
   const observationsResult = await supabase
     .from('provider_observations')
-    .select('observed_state,observed_at,source_event_id')
+    .select('resource_type,resource_id,observed_state,observed_at,source_event_id')
     .eq('project_id', projectId)
-    .eq('provider', 'cloudflare')
+    .eq('provider', binding.provider)
+    .eq('resource_type', binding.resourceType)
+    .eq('resource_id', binding.resourceId)
     .order('observed_at', { ascending: false })
     .limit(50);
   if (observationsResult.error) throw new Error('coverage_witness_cloudflare_observations_unavailable');
@@ -200,24 +316,37 @@ async function loadIndependentCloudflareObservations(
     .map((row) => asString(asRecord(row)['source_event_id']))
     .filter((id): id is string => Boolean(id));
   if (sourceEventIds.length === 0) {
-    return observationRows.map((row) => observationFromRow(row, new Set()));
+    return observationRows.map((row) => observationFromRow(row, new Map()));
   }
 
   const sourceEventsResult = await supabase
     .from('provider_events')
-    .select('id,provider,processing_status')
+    .select('id,provider,processing_status,event_type,resource_type,resource_id')
     .eq('project_id', projectId)
+    .eq('provider', binding.provider)
+    .eq('event_type', binding.eventType)
+    .eq('resource_type', binding.resourceType)
+    .eq('resource_id', binding.resourceId)
     .in('id', sourceEventIds);
   if (sourceEventsResult.error) throw new Error('coverage_witness_cloudflare_source_events_unavailable');
 
-  const processedProviderEventIds = new Set(
+  const providerEvents = new Map<string, ProviderEventIdentity>(
     ((sourceEventsResult.data ?? []) as unknown[])
       .map(asRecord)
-      .filter((row) => row['provider'] === 'cloudflare' && row['processing_status'] === 'processed')
-      .map((row) => asString(row['id']))
-      .filter((id): id is string => Boolean(id)),
+      .map((row) => {
+        const id = asString(row['id']);
+        return id
+          ? [id, {
+              processed: row['processing_status'] === 'processed',
+              eventType: asString(row['event_type']),
+              resourceType: asString(row['resource_type']),
+              resourceId: asString(row['resource_id']),
+            }] as const
+          : null;
+      })
+      .filter((entry): entry is readonly [string, ProviderEventIdentity] => Boolean(entry)),
   );
-  return observationRows.map((row) => observationFromRow(row, processedProviderEventIds));
+  return observationRows.map((row) => observationFromRow(row, providerEvents));
 }
 
 export function createDefaultPassedCoverageWitnessReader(
@@ -232,11 +361,17 @@ export function createDefaultPassedCoverageWitnessReader(
       if (!input.project.repoProvider || !input.project.repoIdentifier) {
         return { status: 'missing', code: 'coverage_witness_repository_connection_missing' };
       }
+      if (!input.event.coverage) {
+        return { status: 'missing', code: 'coverage_witness_coverage_missing' };
+      }
 
       // Read a separate, server-owned Cloudflare evidence lane first. It never
       // consults project_events, where the submitted receipt will be stored.
-      const observations = await loadIndependentCloudflareObservations(input.project.id);
-      const provider = createRepositoryProvider({
+      const observations = await loadIndependentCloudflareObservations(
+        input.project.id,
+        input.providerWitness,
+      );
+      const provider = await createAppAwareRepositoryProvider({
         slug: input.project.slug,
         repoProvider: input.project.repoProvider,
         repoIdentifier: input.project.repoIdentifier,
@@ -253,6 +388,10 @@ export function createDefaultPassedCoverageWitnessReader(
         currentMainSha,
         maximumWitnessAgeSeconds: input.maximumWitnessAgeSeconds,
         nowMs: input.nowMs ?? Date.now(),
+        coverageWindowStartedAt: input.event.coverage.windowStartedAt,
+        coverageWindowEndedAt: input.event.coverage.windowEndedAt,
+        expectedCoverageDigest: coverageWitnessDigest(input.event.coverage),
+        providerWitness: input.providerWitness,
         observations,
       });
     },

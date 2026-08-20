@@ -15,6 +15,7 @@ export interface BuildEventReadResult {
 
 const BUILD_EVENT_TYPE = 'build_event';
 const BUILD_EVENT_LIMIT = 500;
+const BUILD_EVENT_SOURCE_LIMIT = 500;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -41,6 +42,14 @@ function severity(event: BuildEvent): 'info' | 'warning' | 'error' {
 
 function sameEvent(left: BuildEvent, right: BuildEvent): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function isVerifiedCurrentMainSource(event: BuildEvent): boolean {
+  return event.truth === 'verified'
+    && event.category === 'source'
+    && event.repository?.refKind === 'branch-head'
+    && event.repository.branch === 'main'
+    && Boolean(event.repository.commitSha);
 }
 
 export async function storeBuildEvent(
@@ -81,25 +90,55 @@ export async function storeBuildEvent(
 }
 
 export async function loadBuildEvents(projectId: string): Promise<BuildEventReadResult> {
-  const { data, error } = await supabase
-    .from('project_events')
-    .select('metadata, created_at')
-    .eq('project_id', projectId)
-    .eq('event_type', BUILD_EVENT_TYPE)
-    .order('created_at', { ascending: false })
-    .limit(BUILD_EVENT_LIMIT);
+  const [eventsResult, mainSourceResult] = await Promise.all([
+    supabase
+      .from('project_events')
+      .select('metadata, created_at')
+      .eq('project_id', projectId)
+      .eq('event_type', BUILD_EVENT_TYPE)
+      .order('created_at', { ascending: false })
+      .limit(BUILD_EVENT_LIMIT),
+    // Current truth depends on the latest verified main identity even when
+    // high-volume observations push that source event out of the bounded
+    // general event feed. Query the narrow JSONB shape separately and retain
+    // only a fully validated event below.
+    supabase
+      .from('project_events')
+      .select('metadata, created_at')
+      .eq('project_id', projectId)
+      .eq('event_type', BUILD_EVENT_TYPE)
+      .contains('metadata', {
+        contract: BUILD_EVENT_CONTRACT,
+        category: 'source',
+        truth: 'verified',
+        repository: { branch: 'main', refKind: 'branch-head' },
+      })
+      .order('created_at', { ascending: false })
+      .limit(BUILD_EVENT_SOURCE_LIMIT),
+  ]);
 
-  if (error) throw new Error('build_event_read_failed');
+  if (eventsResult.error || mainSourceResult.error) throw new Error('build_event_read_failed');
 
   const events: BuildEvent[] = [];
   let invalidStoredEvents = 0;
-  for (const row of data ?? []) {
+  for (const row of eventsResult.data ?? []) {
     const event = storedEvent(row.metadata);
     if (!event) {
       invalidStoredEvents += 1;
       continue;
     }
     events.push(event);
+  }
+
+  for (const row of mainSourceResult.data ?? []) {
+    const event = storedEvent(row.metadata);
+    if (!event) {
+      invalidStoredEvents += 1;
+      continue;
+    }
+    if (!isVerifiedCurrentMainSource(event)) continue;
+    if (!events.some((existing) => existing.eventId === event.eventId)) events.push(event);
+    break;
   }
 
   return { events, invalidStoredEvents };

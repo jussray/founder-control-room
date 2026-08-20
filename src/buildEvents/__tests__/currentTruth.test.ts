@@ -7,6 +7,7 @@ const AUDITED_SHA = 'b'.repeat(40);
 const MAIN_SHA = 'c'.repeat(40);
 const INFERRED_SHA = 'd'.repeat(40);
 const PROPOSAL_SHA = 'e'.repeat(40);
+const FIXTURE_NOW_MS = Date.parse('2026-08-16T03:30:00Z');
 
 function evidence(id: string) {
   return [`test-evidence:${id}`];
@@ -132,7 +133,7 @@ describe('current truth projection', () => {
       }),
     ];
 
-    const snapshot = buildCurrentTruthProjection('sekret-bip', events);
+    const snapshot = buildCurrentTruthProjection('sekret-bip', events, FIXTURE_NOW_MS);
 
     expect(snapshot.source.currentMainSha?.value).toBe(MAIN_SHA);
     expect(snapshot.source.auditedSha?.value).toBe(AUDITED_SHA);
@@ -237,7 +238,7 @@ describe('current truth projection', () => {
       }),
     ];
 
-    const snapshot = buildCurrentTruthProjection('sekret-bip', events);
+    const snapshot = buildCurrentTruthProjection('sekret-bip', events, FIXTURE_NOW_MS);
 
     expect(snapshot.runtimes).toEqual({});
     expect(snapshot.coverage).toEqual({});
@@ -285,7 +286,7 @@ describe('current truth projection', () => {
       }),
     ];
 
-    const snapshot = buildCurrentTruthProjection('sekret-bip', events);
+    const snapshot = buildCurrentTruthProjection('sekret-bip', events, FIXTURE_NOW_MS);
 
     expect(snapshot.source.currentMainSha).toBeNull();
     expect(snapshot.coverage).toEqual({});
@@ -327,9 +328,76 @@ describe('current truth projection', () => {
       }),
     ];
 
-    const snapshot = buildCurrentTruthProjection('sekret-bip', events);
+    const snapshot = buildCurrentTruthProjection('sekret-bip', events, FIXTURE_NOW_MS);
     expect(snapshot.source.currentMainSha?.value).toBe(MAIN_SHA);
     expect(snapshot.runtimes).toEqual({});
     expect(snapshot.providers['github:deployment:1']).toBeDefined();
+  });
+
+  it('expires a completed coverage window instead of presenting it as a durable current green state', () => {
+    const events = [
+      createBuildEvent({
+        eventId: 'github:main-for-expiring-coverage',
+        occurredAt: '2026-08-16T03:00:00Z',
+        source: 'github',
+        category: 'source',
+        phase: 'build',
+        truth: 'verified',
+        authority: 'observed',
+        status: 'completed',
+        repository: {
+          name: 'jussray/Sekret-Bip',
+          branch: 'main',
+          refKind: 'branch-head',
+          commitSha: MAIN_SHA,
+        },
+        evidenceRefs: evidence('main-for-expiring-coverage'),
+      }),
+      createBuildEvent({
+        eventId: 'cloudflare:expiring-rollout-coverage',
+        occurredAt: '2026-08-16T03:10:00Z',
+        source: 'cloudflare',
+        category: 'analytics',
+        phase: 'observe',
+        truth: 'verified',
+        authority: 'observed',
+        status: 'passed',
+        repository: {
+          name: 'jussray/Sekret-Bip',
+          branch: 'main',
+          refKind: 'branch-head',
+          commitSha: MAIN_SHA,
+        },
+        coverage: {
+          service: 'sekret-bip-production',
+          environment: 'production',
+          releaseSha: MAIN_SHA,
+          windowStartedAt: '2026-08-16T02:50:00Z',
+          windowEndedAt: '2026-08-16T03:05:00Z',
+          sampleSource: 'analytics-engine',
+          requestCount: 25,
+          currentReleaseRequestCount: 25,
+          priorReleaseRequestCount: 0,
+          unclassifiedRequestCount: 0,
+          routeClasses: [{
+            name: 'front-door',
+            requestCount: 25,
+            currentReleaseRequestCount: 25,
+            priorReleaseRequestCount: 0,
+            unclassifiedRequestCount: 0,
+          }],
+        },
+        evidenceRefs: evidence('expiring-rollout-coverage'),
+      }),
+    ];
+
+    const snapshot = buildCurrentTruthProjection(
+      'sekret-bip',
+      events,
+      Date.parse('2026-08-16T04:05:00Z'),
+    );
+
+    expect(snapshot.coverage).toEqual({});
+    expect(snapshot.quality.expiredCoverageFacts).toBe(1);
   });
 });

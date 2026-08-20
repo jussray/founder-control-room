@@ -8,6 +8,16 @@ The original FCR trigger was exact-head repository proof that remained historica
 
 This is not best modeled as fabrication. It is **truth decay**: a Time-of-Check / Time-of-Use failure applied to claims, docs, automation, and agent behavior.
 
+## 2026-08 control correction: self-attested rollout evidence
+
+The first rollout-coverage contract made the receipt shape, release identity, and deployment health explicit, but a signed observer could still self-attest aggregate rollout counts. A healthy deployment witness answered “did this SHA deploy?”; it did not answer “did these aggregate counts come from the independent provider readback?” A same-project but unrelated Cloudflare observation could also have been mistaken for the enrolled deployment target.
+
+The corrected rule is deliberately stricter: a passed coverage receipt must be project-bound, target-bound, ordered after a provider-owned deployment completion, and match a digest written by the server-owned aggregate observation. Until the independent normalizer supplies that exact evidence, the safe outcome is no passed coverage claim.
+
+Even a correctly accepted coverage receipt is not permanent truth. Current Truth applies a 60-minute lease to the completed observation window, retains the latest validated main-source fact outside its high-volume general event window, and returns expired coverage as historical rather than present-tense green. The release witness uses the same repository-scoped GitHub App credential path as the provider layer; it does not require an accidental production fallback token.
+
+The Documentation Truth gate had a parallel weakness: it treated a touched document path as a refresh. It now requires a substantive document diff plus a structured receipt that maps every changed truth-sensitive source file to an explicit invariant. That receipt is review evidence, not a claim that a provider, deployment, or public outcome is live.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit

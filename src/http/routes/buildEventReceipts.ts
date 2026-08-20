@@ -3,12 +3,13 @@ import type { Request, RequestHandler, Response } from 'express';
 import { createBuildEvent, type BuildEvent, type BuildEventInput } from '../../buildEvents/buildEvent.js';
 import {
   createDefaultPassedCoverageWitnessReader,
+  type IndependentCoverageWitnessBinding,
   type PassedCoverageProject,
   type PassedCoverageWitnessReader,
 } from '../../buildEvents/releaseCoverageWitness.js';
 import type { BuildEventStoreDisposition } from '../../services/buildEventStore.js';
 
-const TOKEN_CONTEXT = 'founder-control-room/build-event-receipts/v1';
+const TOKEN_CONTEXT = 'founder-control-room/build-event-receipts/v2';
 const MAX_EVENT_AGE_MS = 24 * 60 * 60 * 1_000;
 const MAX_FUTURE_SKEW_MS = 5 * 60 * 1_000;
 
@@ -23,10 +24,13 @@ export interface BuildReleaseCoveragePolicy {
   minimumRequestCount: number;
   maximumPriorReleaseShareBps: number;
   allowedRouteClasses: readonly string[];
+  providerWitness: IndependentCoverageWitnessBinding;
 }
 
 export interface BuildEventProducerPolicy {
+  projectSlug: string;
   repository: string;
+  repositoryProvider: 'github';
   sources: readonly BuildEventInput['source'][];
   categories: readonly BuildEventInput['category'][];
   coverage?: BuildReleaseCoveragePolicy;
@@ -34,7 +38,9 @@ export interface BuildEventProducerPolicy {
 
 export const BUILD_EVENT_PRODUCERS: Readonly<Record<string, BuildEventProducerPolicy>> = {
   'sekret-bip-release-observer': {
+    projectSlug: 'sekret-bip',
     repository: 'jussray/Sekret-Bip',
+    repositoryProvider: 'github',
     sources: ['cloudflare', 'playwright', 'supabase'],
     categories: ['runtime', 'verification', 'artifact', 'analytics'],
     coverage: {
@@ -48,6 +54,12 @@ export const BUILD_EVENT_PRODUCERS: Readonly<Record<string, BuildEventProducerPo
       minimumRequestCount: 25,
       maximumPriorReleaseShareBps: 500,
       allowedRouteClasses: ['front-door'],
+      providerWitness: {
+        provider: 'cloudflare',
+        resourceType: 'worker-deployment',
+        resourceId: 'sekret-bip-production',
+        eventType: 'deployment.completed',
+      },
     },
   },
 };
@@ -83,9 +95,15 @@ function tokenMatches(provided: string | undefined, expected: string): boolean {
   return timingSafeEqual(left, right);
 }
 
-export function deriveBuildEventReceiptToken(rootToken: string, producer: string): string {
+export function deriveBuildEventReceiptToken(
+  rootToken: string,
+  producer: string,
+  projectSlug: string,
+): string {
+  const target = projectSlug.trim();
+  if (!target) throw new Error('build-event receipt project binding is required');
   return createHmac('sha256', rootToken)
-    .update(`${TOKEN_CONTEXT}:${producer}`)
+    .update(`${TOKEN_CONTEXT}:${producer}:${target}`)
     .digest('hex');
 }
 
@@ -125,7 +143,11 @@ function policyError(
   if (event.source === 'system') return 'external_receipts_cannot_impersonate_system';
   if (!producerPolicy.sources.includes(event.source)) return 'producer_source_not_allowed';
   if (!producerPolicy.categories.includes(event.category)) return 'producer_category_not_allowed';
+  if (project.slug !== producerPolicy.projectSlug) return 'producer_project_mismatch';
   if (project.repoIdentifier !== producerPolicy.repository) return 'producer_project_mismatch';
+  if (project.repoProvider?.toLowerCase() !== producerPolicy.repositoryProvider) {
+    return 'producer_repository_provider_mismatch';
+  }
   if (event.repository?.name !== producerPolicy.repository) return 'event_repository_mismatch';
   if (!event.repository?.commitSha) return 'exact_commit_sha_required';
   if (event.repository.branch !== 'main' || event.repository.refKind !== 'branch-head') {
@@ -223,6 +245,12 @@ export function createBuildEventReceiptIngestHandler(
     const producerPolicy = BUILD_EVENT_PRODUCERS[producer];
     if (!producerPolicy) return res.status(401).json({ error: 'Unauthorized' });
 
+    const slug = req.params.slug?.trim();
+    if (!slug) return res.status(400).json({ error: 'project slug is required' });
+    if (slug !== producerPolicy.projectSlug) {
+      return res.status(403).json({ error: 'producer_project_not_allowed' });
+    }
+
     const receiptRootToken = env.FCR_BUILD_EVENT_RECEIPT_ROOT_TOKEN?.trim();
     if (!receiptRootToken) {
       return res.status(503).json({ error: 'Build-event receipt ingest is not configured' });
@@ -236,13 +264,14 @@ export function createBuildEventReceiptIngestHandler(
       return res.status(503).json({ error: 'Build-event receipt credential isolation is invalid' });
     }
 
-    const expectedToken = deriveBuildEventReceiptToken(receiptRootToken, producer);
+    const expectedToken = deriveBuildEventReceiptToken(
+      receiptRootToken,
+      producer,
+      producerPolicy.projectSlug,
+    );
     if (!tokenMatches(req.get('x-build-event-receipt-token'), expectedToken)) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-
-    const slug = req.params.slug?.trim();
-    if (!slug) return res.status(400).json({ error: 'project slug is required' });
 
     let event: BuildEvent;
     try {
@@ -264,6 +293,7 @@ export function createBuildEventReceiptIngestHandler(
           project,
           event,
           maximumWitnessAgeSeconds: producerPolicy.coverage!.maximumWitnessAgeSeconds,
+          providerWitness: producerPolicy.coverage!.providerWitness,
           nowMs: receiptNow,
         });
         if (witness.status !== 'verified') {

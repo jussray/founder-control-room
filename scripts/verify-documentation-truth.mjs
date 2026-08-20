@@ -4,6 +4,8 @@ import path from 'node:path';
 
 const root = process.cwd();
 const FULL_SHA = /^[0-9a-f]{40}$/i;
+const DOCUMENTATION_RECEIPT_PATH = 'docs/DOCUMENTATION_TRUTH_RECEIPT.json';
+const DOCUMENTATION_RECEIPT_CONTRACT = 'fcr/documentation-truth-receipt@v1';
 
 function git(...args) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
@@ -28,6 +30,9 @@ function resolveBaseSha() {
 const baseSha = resolveBaseSha();
 const headSha = git('rev-parse', 'HEAD').toLowerCase();
 if (!FULL_SHA.test(headSha)) throw new Error('DOCUMENTATION_TRUTH_HEAD_INVALID');
+if (baseSha === headSha) {
+  throw new Error('DOCUMENTATION_TRUTH_BASE_EQUALS_HEAD: a truth receipt requires a non-empty reviewed range');
+}
 
 try {
   git('merge-base', '--is-ancestor', baseSha, headSha);
@@ -50,6 +55,8 @@ const truthSensitiveRules = [
   { domain: 'truth-governance', match: /^src\/futureyou\/(?!.*\.test\.ts$)/ },
   { domain: 'truth-governance', match: /^src\/buildEvents\/(?!__tests\/)(?!.*\.test\.ts$)/ },
   { domain: 'truth-governance', match: /^src\/http\/routes\/(?:buildEvents|buildEventReceipts)\.ts$/ },
+  { domain: 'truth-governance', match: /^src\/services\/buildEventStore\.ts$/ },
+  { domain: 'truth-governance', match: /^scripts\/verify-documentation-truth\.mjs$/ },
   { domain: 'capability-authority', match: /^\.control\/capability\.(?:json|yaml)$/ },
   { domain: 'workflow-authority', match: /^\.github\/workflows\/(?:ci|quality-gate|pr-recovery-exact-head|founder-repo-cycle|documentation-truth)\.yml$/ },
   { domain: 'cloudflare-authority', match: /^public\/_worker\.js$/ },
@@ -83,9 +90,94 @@ if (domains.has('cloudflare-authority')) {
 }
 
 const failures = [];
+
+function nonEmptyString(value, maximumLength = 600) {
+  return typeof value === 'string' && value.trim().length > 0 && value.trim().length <= maximumLength;
+}
+
+function semanticDocChange(relativePath) {
+  const diff = git('diff', '--unified=0', '--no-ext-diff', `${baseSha}..${headSha}`, '--', relativePath);
+  return diff.split('\n').some((line) => {
+    if (!line.startsWith('+') && !line.startsWith('-')) return false;
+    if (line.startsWith('+++') || line.startsWith('---')) return false;
+    const content = line.slice(1).trim();
+    return Boolean(content) && !content.startsWith('<!--') && !content.startsWith('-->');
+  });
+}
+
+function documentationReceipt() {
+  let parsed;
+  try {
+    parsed = JSON.parse(read(DOCUMENTATION_RECEIPT_PATH));
+  } catch {
+    failures.push('documentation truth receipt must be valid JSON');
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    failures.push('documentation truth receipt must be an object');
+    return null;
+  }
+  if (parsed.contract !== DOCUMENTATION_RECEIPT_CONTRACT) {
+    failures.push('documentation truth receipt contract is invalid');
+  }
+  if (!nonEmptyString(parsed.purpose)) {
+    failures.push('documentation truth receipt must state a bounded purpose');
+  }
+  if (!Array.isArray(parsed.domains) || parsed.domains.some((value) => !nonEmptyString(value, 120))) {
+    failures.push('documentation truth receipt domains are invalid');
+  }
+  if (!Array.isArray(parsed.changes)) {
+    failures.push('documentation truth receipt changes are invalid');
+    return null;
+  }
+
+  const claimsByPath = new Map();
+  for (const change of parsed.changes) {
+    if (!change || typeof change !== 'object' || Array.isArray(change)) {
+      failures.push('documentation truth receipt change is invalid');
+      continue;
+    }
+    if (!nonEmptyString(change.path, 300) || !Array.isArray(change.claims)
+      || change.claims.length === 0 || change.claims.some((claim) => !nonEmptyString(claim))) {
+      failures.push('documentation truth receipt change must name a path and one or more bounded invariants');
+      continue;
+    }
+    claimsByPath.set(change.path, change.claims);
+  }
+  return {
+    domains: new Set(Array.isArray(parsed.domains) ? parsed.domains : []),
+    claimsByPath,
+  };
+}
+
+let receipt = null;
+if (truthSensitiveChanges.length > 0) {
+  if (!changedFiles.includes(DOCUMENTATION_RECEIPT_PATH)) {
+    failures.push(`truth-sensitive change requires a current documentation receipt: ${DOCUMENTATION_RECEIPT_PATH}`);
+  }
+  if (!semanticDocChange(DOCUMENTATION_RECEIPT_PATH)) {
+    failures.push('documentation truth receipt must contain a substantive, non-comment change');
+  }
+  receipt = documentationReceipt();
+  if (receipt) {
+    for (const domain of domains) {
+      if (!receipt.domains.has(domain)) {
+        failures.push(`documentation truth receipt must name changed domain: ${domain}`);
+      }
+    }
+    for (const change of truthSensitiveChanges) {
+      if (!receipt.claimsByPath.has(change.file)) {
+        failures.push(`documentation truth receipt must name a claimed invariant for: ${change.file}`);
+      }
+    }
+  }
+}
+
 for (const required of requiredDocs) {
   if (!changedFiles.includes(required)) {
     failures.push(`truth-sensitive change requires current documentation refresh: ${required}`);
+  } else if (!semanticDocChange(required)) {
+    failures.push(`truth-sensitive change requires a substantive documentation refresh: ${required}`);
   }
 }
 
@@ -146,11 +238,12 @@ const changedDocs = changedFiles.filter((file) =>
   || file === 'CHATGPT.md'
   || file === 'CLAUDE.md'
   || file === 'PERPLEXITY.md'
+  || file === DOCUMENTATION_RECEIPT_PATH
   || file.endsWith('.md') && (file.startsWith('docs/') || file.startsWith('.ai/skills/')),
 );
 
 const report = {
-  contract: 'fcr/documentation-truth@v1',
+  contract: 'fcr/documentation-truth@v2',
   baseSha,
   headSha,
   changedFileCount: changedFiles.length,
@@ -161,6 +254,15 @@ const report = {
   documentationCoveragePercent: requiredDocs.size === 0
     ? 100
     : Math.round(([...requiredDocs].filter((file) => changedFiles.includes(file)).length / requiredDocs.size) * 100),
+  documentationReceipt: truthSensitiveChanges.length === 0
+    ? { required: false }
+    : {
+        required: true,
+        path: DOCUMENTATION_RECEIPT_PATH,
+        updated: changedFiles.includes(DOCUMENTATION_RECEIPT_PATH),
+        declaredDomainCount: receipt?.domains.size ?? 0,
+        declaredInvariantCount: receipt?.claimsByPath.size ?? 0,
+      },
   consistencyCheckCount: consistencyChecks.length,
   failureCount: failures.length,
   failures,
