@@ -33,7 +33,7 @@ const config = {
   enforcement: "active" as const,
   targetRefs: ["main"],
   requirePullRequest: true,
-  requiredApprovingReviewCount: 1,
+  requiredApprovingReviewCount: 0,
   requiredStatusCheckNames: ["Required Gate", "Verify test-ledger contract"],
   blockForcePushes: true,
   blockDeletion: true,
@@ -49,8 +49,8 @@ function strongReadback(request: TestConfig = config) {
       type: "pull_request",
       parameters: {
         required_approving_review_count: request.requiredApprovingReviewCount,
-        dismiss_stale_reviews_on_push: true,
-        require_last_push_approval: true,
+        dismiss_stale_reviews_on_push: false,
+        require_last_push_approval: false,
         required_review_thread_resolution: true,
       },
     },
@@ -113,10 +113,7 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     mockGetRepoRulesets.mockResolvedValue({ data: [] });
     mockGetRepoRuleset.mockResolvedValue({ data: strongReadback() });
     mockListCollaborators.mockResolvedValue({
-      data: [
-        { login: "jussray", permissions: { push: true } },
-        { login: "independent-reviewer", permissions: { push: true } },
-      ],
+      data: [{ login: "jussray", permissions: { push: true } }],
     });
     mockCreateRepoRuleset.mockResolvedValue({
       data: { id: 1, name: config.name, enforcement: "active" },
@@ -126,22 +123,17 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     });
   });
 
-  it("maps active FCR main review policy to stale-review and last-push protections", async () => {
+  it("maps active FCR main founder-final policy to zero human approvals plus exact-head protections", async () => {
     const provider = buildProvider();
     await provider.applyBranchRuleset("founder-control-room", config);
 
-    expect(mockListCollaborators).toHaveBeenCalledWith({
-      owner: "jussray",
-      repo: "founder-control-room",
-      affiliation: "all",
-      per_page: 100,
-    });
+    expect(mockListCollaborators).not.toHaveBeenCalled();
 
     const pullRequestRule = pullRequestRuleFromLastCreate();
     expect(pullRequestRule.parameters).toMatchObject({
-      required_approving_review_count: 1,
-      dismiss_stale_reviews_on_push: true,
-      require_last_push_approval: true,
+      required_approving_review_count: 0,
+      dismiss_stale_reviews_on_push: false,
+      require_last_push_approval: false,
       required_review_thread_resolution: true,
     });
 
@@ -158,13 +150,13 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     });
   });
 
-  it("rejects a weak FCR main policy before provider mutation", async () => {
+  it("rejects a legacy human-review FCR main policy before provider mutation", async () => {
     const provider = buildProvider();
 
     await expect(provider.applyBranchRuleset("founder-control-room", {
       ...config,
-      requiredApprovingReviewCount: 0,
-    })).rejects.toThrow("at least one approving review is required");
+      requiredApprovingReviewCount: 1,
+    })).rejects.toThrow("approving review count must be 0 under founder-final authority");
 
     expect(mockListCollaborators).not.toHaveBeenCalled();
     expect(mockCreateRepoRuleset).not.toHaveBeenCalled();
@@ -172,34 +164,37 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     expect(mockGetRepoRuleset).not.toHaveBeenCalled();
   });
 
-  it("rejects an independent-review policy when no non-owner writer can satisfy it", async () => {
-    mockListCollaborators.mockResolvedValue({
-      data: [{ login: "jussray", permissions: { push: true } }],
-    });
-
+  it("allows the solo-founder topology without weakening deterministic review", async () => {
     const provider = buildProvider();
-    await expect(provider.applyBranchRuleset("founder-control-room", config))
-      .rejects.toThrow("non-owner collaborator with write authority");
+    await expect(provider.applyBranchRuleset("founder-control-room", config)).resolves.toMatchObject({
+      name: config.name,
+      enforcement: "active",
+    });
+    expect(mockListCollaborators).not.toHaveBeenCalled();
+  });
 
+  it("rejects missing canonical exact-head checks before provider mutation", async () => {
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", {
+      ...config,
+      requiredStatusCheckNames: ["Required Gate"],
+    })).rejects.toThrow("required status check is missing: Verify test-ledger contract");
     expect(mockCreateRepoRuleset).not.toHaveBeenCalled();
-    expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
-    expect(mockGetRepoRuleset).not.toHaveBeenCalled();
   });
 
-  it("does not count a non-owner read-only collaborator as independent-review capability", async () => {
-    mockListCollaborators.mockResolvedValue({
-      data: [
-        { login: "jussray", permissions: { push: true } },
-        { login: "reader", permissions: { push: false } },
-      ],
-    });
-
+  it("rejects missing force-push or deletion protection before provider mutation", async () => {
     const provider = buildProvider();
-    await expect(provider.applyBranchRuleset("founder-control-room", config))
-      .rejects.toThrow("non-owner collaborator with write authority");
+    await expect(provider.applyBranchRuleset("founder-control-room", {
+      ...config,
+      blockForcePushes: false,
+    })).rejects.toThrow("force pushes must be blocked");
+    await expect(provider.applyBranchRuleset("founder-control-room", {
+      ...config,
+      blockDeletion: false,
+    })).rejects.toThrow("branch deletion must be blocked");
   });
 
-  it("accepts renamed policy and additional protected refs when semantics round-trip", async () => {
+  it("accepts renamed policy and additional protected refs when founder-final semantics round-trip", async () => {
     const flexible = {
       ...config,
       name: "FCR main governance v2",
@@ -223,9 +218,9 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
       {
         type: "pull_request",
         parameters: {
-          required_approving_review_count: 0,
-          dismiss_stale_reviews_on_push: false,
-          require_last_push_approval: false,
+          required_approving_review_count: 1,
+          dismiss_stale_reviews_on_push: true,
+          require_last_push_approval: true,
           required_review_thread_resolution: false,
         },
       },
@@ -276,11 +271,13 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
       .rejects.toThrow("bypass actors do not match the requested policy");
   });
 
-  it("does not impose FCR-specific stale-review semantics on another project", async () => {
+  it("does not impose FCR-specific founder-final semantics on another project", async () => {
+    const otherProjectConfig = { ...config, requiredApprovingReviewCount: 1 };
     const provider = buildProvider();
-    await provider.applyBranchRuleset("sekret-bip", config);
+    await provider.applyBranchRuleset("sekret-bip", otherProjectConfig);
 
     const pullRequestRule = pullRequestRuleFromLastCreate();
+    expect(pullRequestRule.parameters.required_approving_review_count).toBe(1);
     expect(pullRequestRule.parameters.dismiss_stale_reviews_on_push).toBe(false);
     expect(pullRequestRule.parameters.require_last_push_approval).toBe(false);
     expect(pullRequestRule.parameters.required_review_thread_resolution).toBe(true);
