@@ -14,8 +14,8 @@ import {
   type TemporalClaimClass,
   type TemporalClaimTruthReceipt,
 } from '../governance/temporalClaimTruth.js';
-// @ts-expect-error -- canonical founder-content authority intentionally remains the CommonJS firewall contract.
-import founderContentAuthorizationContract from '../../tools/zapier/founder-content-authorization-contract.cjs';
+// @ts-expect-error -- canonical founder-content authority is the provider-neutral CommonJS firewall contract.
+import founderContentAuthorizationContract from '../../tools/founder-content-contracts/founder-content-authorization-contract.cjs';
 
 type JsonRecord = Record<string, unknown>;
 
