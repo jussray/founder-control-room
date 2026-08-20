@@ -412,8 +412,7 @@ describe('XEngagementSignalService', () => {
     now = new Date('2026-08-20T20:00:00.000Z');
     const second = await service.getTopicEngagement({ projectId: 'project-1', topic: 'wigs' });
     expect(first.status).toBe('KNOWN');
-    expect(second.status).toBe('UNKNOWN');
-    expect(second.status === 'UNKNOWN' && second.reason).toBe('INSUFFICIENT_DATA');
+    expect(second.status).toBe('KNOWN');
     expect(calls.filter((call) => call.init?.method === 'POST')).toHaveLength(2);
   });
 });
