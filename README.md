@@ -32,6 +32,7 @@ Current implementation includes:
 - a canonical FCR founder-final merge policy that keeps deterministic independent review load-bearing, binds authenticated founder approval to the exact PR/base/head, and preserves the older server-owned semantic-review policy only for already-pinned compatibility paths;
 - canonical capability governance through `.control/capability.json`;
 - deterministic Cloudflare reasoning, request-trace/source contracts, and founder-gated Access recovery tooling whose source existence does not itself prove live provider configuration;
+- a read-only Cloudflare hostname-inventory witness that discovers the reviewed zone's HTTP-relevant DNS names, classifies inventory/proxy drift, and simulates Request Trace per eligible proxied hostname without granting provider-mutation authority or persisting DNS targets/origin IPs;
 - a secret-free exact-head Cloudflare bridge authority contract that is load-bearing inside CI / `Required Gate`, while live Cloudflare and GitHub provider state remain separate authority facts;
 - freshness-aware federated truth receipts and a bounded Truth Lease contract for claims that can decay;
 - a durable founder-only **Founder Switchboard** with explicit BUILT / CONFIGURED / ACTIVE / PROVEN states and guarded authority modes;
@@ -173,6 +174,8 @@ The retired `founder-control-room2` identity must not be recreated.
 The canonical Worker also owns FCR's outbound Cloudflare Email Service capability through the project-scoped `FCR_EMAIL` binding. Its sender identity is pinned in source/config to `welcome@api.foundercontrolroom.org`; callers cannot supply another project's `from` address, and other portfolio projects do not inherit this capability by default. Checked repository configuration is not proof that Cloudflare has onboarded the sender domain, that the deployed Worker exposes the binding, or that a message was delivered.
 
 Current Pages source fails closed when `FCR_API` is unavailable and verifies the bound service identity on dynamic responses. **Source dependence on that binding does not prove the live Pages project currently has the correct provider binding.** Provider configuration and exact runtime behavior require current Cloudflare readback and deployed-path proof.
+
+The read-only hostname-inventory audit is also evidence-only. Its checked source proves the intended discovery, drift-classification, redaction, and Request Trace behavior; it does **not** prove which hostnames Cloudflare currently serves. A live hostname/proxy-state claim requires the manual audit to run against an exact SHA that is still current `main`, using the dedicated read-only DNS inventory and Request Tracer authorities. Its receipt cannot authorize DNS, Access, route, Worker, credential, or deployment mutation.
 
 Native Cloudflare Worker/Pages build receipts are provider build/deploy evidence for the exact artifact they name. They do not prove the guarded production release path, database migration, auth behavior, browser behavior, fleet-wide runtime identity, or publication outcome.
 

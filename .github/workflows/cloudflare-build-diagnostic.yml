@@ -24,9 +24,10 @@ jobs:
       CF_ACCOUNT_ID: 9b59861bd1747cf7525571b4c51d2aa0
       CF_WORKER_GIT_AUTHORITY_POLICY: config/cloudflare-worker-git-authority-policy.json
       CF_API_TOKEN: ${{ secrets.FCR_CLOUDFLARE_BUILDS_USER_TOKEN }}
-      CF_REQUEST_TRACE_URL: https://www.foundercontrolroom.org/
+      CF_REQUEST_TRACE_POLICY: config/cloudflare-request-trace-host-policy.json
       CF_REQUEST_TRACE_METHOD: GET
       CF_REQUEST_TRACER_TOKEN: ${{ secrets.FCR_CLOUDFLARE_REQUEST_TRACER_TOKEN }}
+      CF_DNS_INVENTORY_TOKEN: ${{ secrets.FCR_CLOUDFLARE_DNS_INVENTORY_TOKEN }}
 
     steps:
       - name: Checkout exact audit head
@@ -64,7 +65,7 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - name: Verify dedicated read-only Workers Builds token is available
+      - name: Verify dedicated read-only Cloudflare audit tokens are available
         shell: bash
         run: |
           set -euo pipefail
@@ -72,11 +73,19 @@ jobs:
             echo "::error::FCR_CLOUDFLARE_BUILDS_USER_TOKEN is not available to this workflow."
             exit 1
           fi
+          if [ -z "$CF_REQUEST_TRACER_TOKEN" ]; then
+            echo "::error::FCR_CLOUDFLARE_REQUEST_TRACER_TOKEN is not available to this workflow."
+            exit 1
+          fi
+          if [ -z "$CF_DNS_INVENTORY_TOKEN" ]; then
+            echo "::error::FCR_CLOUDFLARE_DNS_INVENTORY_TOKEN is not available to this workflow."
+            exit 1
+          fi
 
       - name: Audit provider truth against current Worker Git authority policy
         run: node scripts/inspect-cloudflare-build.mjs
 
-      - name: Trace public request path through Cloudflare
+      - name: Discover and trace FCR Cloudflare host inventory
         if: always() && steps.verify_head.outcome == 'success'
         run: node scripts/trace-cloudflare-request.mjs
 

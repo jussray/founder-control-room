@@ -93,6 +93,21 @@ source capability
 
 Do not infer live provider configuration from a workflow file, secret name, token display label, or successful unrelated Cloudflare build.
 
+## Read-only hostname inventory boundary
+
+The manual `Cloudflare Worker Git Authority Audit` can observe the live FCR zone without becoming deployment or DNS authority. On an exact SHA that is still current `main`, it may use dedicated read-only authorities to:
+
+1. resolve the reviewed `foundercontrolroom.org` zone;
+2. enumerate paginated A, AAAA, and CNAME records;
+3. derive only in-zone HTTP-relevant hostname metadata without retaining DNS targets or origin IPs;
+4. compare discovered hosts with `config/cloudflare-request-trace-host-policy.json`;
+5. classify new hosts, missing required hosts, proxy-state drift, wildcards, DNS-only hosts, and trace-eligible proxied hosts; and
+6. simulate Cloudflare Request Trace independently for each eligible proxied hostname.
+
+The sanitized receipt may prove what that provider read observed at that time. Checked workflow/script source alone does not prove the current zone inventory, proxy state, Access behavior, origin identity, or runtime SHA. The audit explicitly remains `requestSimulation: true`, `runtimeShaVerified: false`, and `canAuthorizeProviderMutation: false`.
+
+A failing or unavailable read is `UNKNOWN`/blocked evidence, not permission to infer the missing provider state and not permission to mutate DNS, routes, Access, Workers, credentials, or deployment configuration.
+
 ## Required Worker secrets
 
 Configure applicable secrets in the canonical Worker secret store and, where named by guarded workflows, in the GitHub `production` environment.
@@ -121,7 +136,7 @@ Provider build/deploy comments, preview URLs, and successful uploads are useful 
 
 ## Documentation truth
 
-When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, or runtime proof requirements change, update this document in the same bounded repository change.
+When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, hostname-inventory/Request Trace behavior, or runtime proof requirements change, update this document in the same bounded repository change.
 
 Current executable source and authoritative provider readback outrank an older version of this runbook. Preserve older deployment evidence as historical provenance rather than deleting it.
 

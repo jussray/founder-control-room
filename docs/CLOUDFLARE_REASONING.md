@@ -162,6 +162,21 @@ Observe the contradiction
 → automate only repeated read-only evidence refresh
 ```
 
+## Read-only hostname inventory and Request Trace
+
+The manual `Cloudflare Worker Git Authority Audit` has a bounded provider-observation lane for FCR hostnames. Its source contract:
+
+- resolves the reviewed `foundercontrolroom.org` zone through a dedicated read-only DNS inventory authority;
+- paginates the zone's A, AAAA, and CNAME records and derives in-zone HTTP-relevant hostnames without retaining DNS `content`, origin IPs, or target values;
+- compares the discovered inventory with `config/cloudflare-request-trace-host-policy.json`;
+- classifies new hosts, missing required hosts, proxy-state drift, wildcard hosts, DNS-only hosts, and directly traceable proxied hosts;
+- runs Cloudflare Request Trace independently for each eligible proxied hostname through a separate read-only Request Tracer authority; and
+- writes only the sanitized inventory/trace receipt, including an inventory hash and bounded trace summaries.
+
+The workflow intentionally requires its requested SHA to equal current `main` before provider observation. A PR source check can prove the audit code and contract, but it cannot prove current Cloudflare hostname inventory. Until the manual workflow runs successfully against an exact still-current main SHA, live hostname/proxy/trace state remains `UNKNOWN` rather than inferred from repository configuration.
+
+The receipt preserves `requestSimulation: true`, `runtimeShaVerified: false`, and `canAuthorizeProviderMutation: false`. It therefore cannot authorize or prove a DNS mutation, Access change, route change, Worker deployment, credential change, or production release.
+
 ## Project-scoped outbound email
 
 Cloudflare outbound email is a capability boundary, not a global portfolio transport. Founder Control Room's canonical Worker uses the `FCR_EMAIL` send binding and pins the sender identity to `welcome@api.foundercontrolroom.org`; the application wrapper does not accept caller-controlled `from`. Other projects do not inherit that binding merely because they share the same founder or Cloudflare account.
