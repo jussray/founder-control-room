@@ -194,22 +194,17 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     })).rejects.toThrow("branch deletion must be blocked");
   });
 
-  it("accepts renamed policy and additional protected refs when founder-final semantics round-trip", async () => {
-    const flexible = {
+  it("rejects a renamed overlapping active FCR main ruleset before provider mutation", async () => {
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", {
       ...config,
       name: "FCR main governance v2",
       targetRefs: ["main", "release"],
-    };
-    mockCreateRepoRuleset.mockResolvedValue({
-      data: { id: 1, name: flexible.name, enforcement: "active" },
-    });
-    mockGetRepoRuleset.mockResolvedValue({ data: strongReadback(flexible) });
+    })).rejects.toThrow("ruleset name must remain canonical");
 
-    const provider = buildProvider();
-    await expect(provider.applyBranchRuleset("founder-control-room", flexible)).resolves.toMatchObject({
-      name: flexible.name,
-      enforcement: "active",
-    });
+    expect(mockCreateRepoRuleset).not.toHaveBeenCalled();
+    expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
+    expect(mockGetRepoRuleset).not.toHaveBeenCalled();
   });
 
   it("fails closed when provider read-back does not match the hardened FCR policy", async () => {
