@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { executionPayloadForRequest } from './commandBridge.js';
+import { executionPayloadForRequest } from '../commandBridge.js';
 
 describe('Command Bridge L99 authority boundary', () => {
   it('does not manufacture confirmWrite for an approved write-risk card', () => {
