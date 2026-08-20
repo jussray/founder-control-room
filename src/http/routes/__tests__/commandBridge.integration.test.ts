@@ -176,7 +176,7 @@ describe('POST /command-bridge/requests', () => {
 });
 
 describe('POST /command-bridge/requests/:requestId/approve', () => {
-  it('approves a requested command card and returns the exact guarded terminal payload', async () => {
+  it('approves a verification card without returning runnable terminal authority', async () => {
     authSuccess();
     const approved = requestRow({ status: 'approved', approved_by: FOUNDER_EMAIL, approved_at: new Date().toISOString() });
     supabaseMock.from.mockImplementation((table: string) => {
@@ -207,13 +207,14 @@ describe('POST /command-bridge/requests/:requestId/approve', () => {
     expect(res.status).toBe(200);
     expect(res.body.request.status).toBe('approved');
     expect(res.body.execution).toMatchObject({
-      endpoint: `/terminal/${PROJECT_SLUG}/run`,
+      endpoint: null,
       method: 'POST',
       body: {
         missionId: MISSION_ID,
         commandId: 'verify.typecheck',
         expectedCommitSha: HEAD,
       },
+      authorityRequired: 'L99_APPROVAL_RECEIPT',
     });
   });
 });
