@@ -24,12 +24,12 @@ The only enrolled coverage producer is `sekret-bip-release-observer` for the exi
 It is permitted to submit signed `analytics` events only when all of the following are true:
 
 - the receipt is bound to the exact `main` commit SHA for `jussray/Sekret-Bip`;
-- the observed release SHA equals that repository SHA;
+- a server-owned witness re-reads current `main` and confirms the observed release SHA equals that SHA;
 - the producer source is Cloudflare;
 - the event carries aggregate route-class counts, never raw paths, query strings, request IDs, client identifiers, headers, bodies, tokens, or user data; and
 - the event is observation-only and cannot be interpreted as runtime identity, merge approval, or deployment authority.
 
-The production source still needs a separately authorized provider configuration and a real aggregate-readback implementation before it can emit an accepted receipt. This change creates neither a secret nor a provider binding.
+A signed receipt is not its own witness. A `passed` receipt is accepted only after a server-owned reader verifies both the current repository `main` SHA and a fresh Cloudflare production observation tied to a processed provider event. It never reads `project_events`, where the submitted receipt is stored. The production source still needs a separately authorized provider configuration and a real aggregate-readback implementation before it can emit an accepted receipt. This change creates neither a secret nor a provider binding.
 
 ## Predeclared initial policy
 
@@ -39,6 +39,7 @@ The policy is committed before an observation, so a desired release cannot negot
 | --- | --- |
 | Window | 15 to 30 minutes |
 | Receipt freshness | Window must have ended no more than 60 minutes before the receiver evaluates the receipt |
+| Independent deployment witness | Fresh (at most 15 minutes old), healthy Cloudflare production observation tied to a processed provider event for the exact SHA |
 | Real sampled requests | At least 25 |
 | Previous-release share | At most 500 basis points (5%) |
 | Unclassified responses | Zero for a passed coverage receipt |
@@ -47,7 +48,7 @@ The policy is committed before an observation, so a desired release cannot negot
 | Allowed route classes | `front-door` only; a fixed safe label, not a path |
 | Synthetic probes | May never produce verified or passed coverage |
 
-This is not a claim that 15 minutes, 25 requests, or 5% is universally correct. It is a deliberately visible starting policy. A passed receipt must also use a complete 15–30 minute window that ends no more than 60 minutes before the receiver evaluates it; the receiver rejects stale, future-ending, and overlong windows. Changing it requires a reviewed source change before the next observation.
+This is not a claim that 15 minutes, 25 requests, or 5% is universally correct. It is a deliberately visible starting policy. A passed receipt must also use a complete 15–30 minute window that ends no more than 60 minutes before the receiver evaluates it; the receiver rejects stale, future-ending, and overlong windows. Separately, its current-main and Cloudflare provider witness must be fresh and exact-SHA matched at use time. Changing it requires a reviewed source change before the next observation.
 
 ## Portfolio applicability
 
@@ -73,9 +74,9 @@ A coverage receipt carries:
 - allowlisted safe route classes; and
 - a named tail reason when prior-release traffic remains.
 
-A sequence of bounded receipts over adjacent windows is the rollout curve. The current-truth projection intentionally exposes only the newest coverage fact; the receipt history remains the evidence for the distribution's shape.
+A sequence of bounded receipts over adjacent windows is the rollout curve. The current-truth projection exposes coverage only when its release SHA matches the latest verified `main`. A SHA-mismatched receipt remains historical evidence and increments the stale-coverage quality counter; if no verified `main` is available, coverage is withheld and counted as unbound rather than rendering a current green state.
 
-The schema fails closed on raw-looking route strings, invalid counts, mismatched subtotals, synthetic-as-verified coverage, unknown tails on a passed receipt, unclassified traffic on a passed receipt, SHA drift, stale or future-ending coverage windows, stale receipt time, and producer/repository impersonation.
+The schema fails closed on raw-looking route strings, invalid counts, mismatched subtotals, synthetic-as-verified coverage, unknown tails on a passed receipt, unclassified traffic on a passed receipt, receipt SHA drift, independent-provider/main SHA drift, stale or future-ending coverage windows, stale receipt time, and producer/repository impersonation.
 
 The projection exposes `runtimes` and `coverage` as separate facts. A runtime witness remains binary. Coverage may pass its initial observation policy while remaining a time-bound distribution that must be re-observed after the next deploy.
 
@@ -85,7 +86,7 @@ The projection exposes `runtimes` and `coverage` as separate facts. A runtime wi
 2. Deploy only through its separately authorized release path.
 3. Prove identity through the exact release witness and provider/runtime evidence.
 4. Collect provider-backed aggregate observations over the declared window and route classes.
-5. Submit a signed receipt bound to the exact repository and release SHA.
+5. Submit a signed receipt bound to the exact repository and release SHA; the receiver re-reads current `main` and independent Cloudflare provider evidence before accepting `passed`.
 6. Explain any named tail; hold the coverage state as `UNKNOWN` if it is incomplete.
 7. Re-observe after a new deployment, routing change, cache change, or provider transition.
 

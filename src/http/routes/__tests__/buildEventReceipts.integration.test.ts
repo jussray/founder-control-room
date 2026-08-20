@@ -6,6 +6,7 @@ import {
   deriveBuildEventReceiptToken,
 } from '../buildEventReceipts.js';
 import type { BuildEvent } from '../../../buildEvents/buildEvent.js';
+import type { PassedCoverageWitnessReader } from '../../../buildEvents/releaseCoverageWitness.js';
 import type { BuildEventStoreDisposition } from '../../../services/buildEventStore.js';
 
 const MCP_TOKEN = 'founder-signal-test-token';
@@ -83,6 +84,17 @@ function coverageEvent(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function acceptedCoverageWitness(): PassedCoverageWitnessReader {
+  return {
+    verify: async () => ({
+      status: 'verified',
+      currentMainSha: SHA,
+      deploymentSha: SHA,
+      observedAt: new Date(NOW_MS).toISOString(),
+    }),
+  };
+}
+
 function appWith(
   disposition: BuildEventStoreDisposition = 'stored',
   env: NodeJS.ProcessEnv = {
@@ -90,6 +102,7 @@ function appWith(
     FCR_BUILD_EVENT_RECEIPT_ROOT_TOKEN: RECEIPT_ROOT_TOKEN,
   },
   nowMs = NOW_MS,
+  passedCoverageWitnessReader: PassedCoverageWitnessReader = acceptedCoverageWitness(),
 ) {
   const app = express();
   const storedEvents: BuildEvent[] = [];
@@ -107,9 +120,10 @@ function appWith(
       env,
       now: () => nowMs,
       findProject: async (slug) => slug === 'sekret-bip'
-        ? { id: 'project-1', slug, repoIdentifier: 'jussray/Sekret-Bip' }
+        ? { id: 'project-1', slug, repoProvider: 'github', repoIdentifier: 'jussray/Sekret-Bip' }
         : null,
       storeEvent,
+      passedCoverageWitnessReader,
     }),
   );
   return {
@@ -159,6 +173,37 @@ describe('build-event receipt ingress', () => {
     expect(harness.storeCalls()).toBe(1);
     expect(harness.storedEvents[0]?.coverage?.releaseSha).toBe(SHA);
     expect(harness.storedEvents[0]?.runtime).toBeUndefined();
+  });
+
+  it('does not persist a passed coverage receipt without an independent current-main and provider witness', async () => {
+    const harness = appWith('stored', undefined, NOW_MS, {
+      verify: async () => ({ status: 'mismatch', code: 'coverage_witness_current_main_mismatch' }),
+    });
+    const response = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent());
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      accepted: false,
+      error: 'coverage_witness_current_main_mismatch',
+    });
+    expect(harness.storeCalls()).toBe(0);
+  });
+
+  it('fails closed when independent coverage evidence cannot be read', async () => {
+    const harness = appWith('stored', undefined, NOW_MS, {
+      verify: async () => {
+        throw new Error('provider_evidence_unavailable');
+      },
+    });
+    const response = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent());
+
+    expect(response.status).toBe(503);
+    expect(response.body.error).toBe('Build-event receipt verification or store unavailable');
+    expect(harness.storeCalls()).toBe(0);
   });
 
   it('rejects coverage that does not meet the predeclared observation policy', async () => {

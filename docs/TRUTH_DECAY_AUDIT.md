@@ -151,6 +151,12 @@ A docs-only truth-sync merge closes an earlier drift cycle. It still receives a 
 
 A durable README should not hard-code a “current SHA” and pretend that value automatically renews after every merge. Exact SHAs belong in receipts/provenance; current identity is resolved at use time.
 
+### Release-coverage at-use gate
+
+A signed rollout-coverage receipt is still sender-supplied observation. For a `passed` coverage claim, Founder Control Room must re-read current repository `main` and independently read a fresh production deployment witness from the Cloudflare provider-observation lane. The witness must be tied to a processed provider event and must not reuse `project_events`, where the receipt itself is stored.
+
+If main, deployment SHA, freshness, health, or independent provenance cannot be verified, the receipt is retained only as non-passing history or blocked from persistence; it cannot render a current green coverage fact. Current Truth hides SHA-mismatched coverage and withholds coverage when no verified main fact exists, reporting stale and unbound coverage quality separately.
+
 ## Product Design
 
 Founder-facing truth must not collapse into one green badge.

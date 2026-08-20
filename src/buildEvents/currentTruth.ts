@@ -36,6 +36,8 @@ export interface CurrentTruthQuality {
   inferredCurrentFacts: number;
   unknownCurrentFacts: number;
   staleCurrentFacts: number;
+  staleCoverageFacts: number;
+  unboundCoverageFacts: number;
   latestEventAt: string | null;
 }
 
@@ -135,6 +137,7 @@ function quality(
   events: readonly BuildEvent[],
   currentFacts: readonly BuildEvent[],
   currentMainSha: string | null,
+  unboundCoverageFacts: number,
 ): CurrentTruthQuality {
   const countTruth = (items: readonly BuildEvent[], truth: BuildEventTruth) =>
     items.filter((event) => event.truth === truth).length;
@@ -154,6 +157,12 @@ function quality(
           return Boolean(sha && sha !== currentMainSha);
         }).length
       : 0,
+    staleCoverageFacts: currentMainSha
+      ? events.filter((event) => (
+          Boolean(event.coverage && event.coverage.releaseSha !== currentMainSha)
+        )).length
+      : 0,
+    unboundCoverageFacts,
     latestEventAt: events[0]?.occurredAt ?? null,
   };
 }
@@ -210,6 +219,15 @@ export function buildCurrentTruthProjection(
     (event) => event.coverage ?? null,
   );
 
+  const unboundCoverageFacts = currentMainSha ? 0 : Object.keys(coverage).length;
+  if (!currentMainSha) {
+    for (const key of Object.keys(coverage)) delete coverage[key];
+  } else {
+    for (const [key, coverageFact] of Object.entries(coverage)) {
+      if (coverageFact.value.releaseSha !== currentMainSha.value) delete coverage[key];
+    }
+  }
+
   const verifications = latestByKey(
     events,
     (event) => event.verification?.kind ?? null,
@@ -244,6 +262,7 @@ export function buildCurrentTruthProjection(
       events,
       selectedCurrentFacts,
       currentMainSha?.value ?? null,
+      unboundCoverageFacts,
     ),
   };
 }

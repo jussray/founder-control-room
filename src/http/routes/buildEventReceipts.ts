@@ -1,6 +1,11 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { Request, RequestHandler, Response } from 'express';
 import { createBuildEvent, type BuildEvent, type BuildEventInput } from '../../buildEvents/buildEvent.js';
+import {
+  createDefaultPassedCoverageWitnessReader,
+  type PassedCoverageProject,
+  type PassedCoverageWitnessReader,
+} from '../../buildEvents/releaseCoverageWitness.js';
 import type { BuildEventStoreDisposition } from '../../services/buildEventStore.js';
 
 const TOKEN_CONTEXT = 'founder-control-room/build-event-receipts/v1';
@@ -14,6 +19,7 @@ export interface BuildReleaseCoveragePolicy {
   minimumWindowSeconds: number;
   maximumWindowSeconds: number;
   maximumObservationAgeSeconds: number;
+  maximumWitnessAgeSeconds: number;
   minimumRequestCount: number;
   maximumPriorReleaseShareBps: number;
   allowedRouteClasses: readonly string[];
@@ -38,6 +44,7 @@ export const BUILD_EVENT_PRODUCERS: Readonly<Record<string, BuildEventProducerPo
       minimumWindowSeconds: 15 * 60,
       maximumWindowSeconds: 30 * 60,
       maximumObservationAgeSeconds: 60 * 60,
+      maximumWitnessAgeSeconds: 15 * 60,
       minimumRequestCount: 25,
       maximumPriorReleaseShareBps: 500,
       allowedRouteClasses: ['front-door'],
@@ -45,16 +52,13 @@ export const BUILD_EVENT_PRODUCERS: Readonly<Record<string, BuildEventProducerPo
   },
 };
 
-interface ProjectRecord {
-  id: string;
-  slug: string;
-  repoIdentifier: string | null;
-}
+interface ProjectRecord extends PassedCoverageProject {}
 
 export interface BuildEventReceiptDependencies {
   env?: NodeJS.ProcessEnv;
   findProject?: (slug: string) => Promise<ProjectRecord | null>;
   storeEvent?: (projectId: string, event: BuildEvent) => Promise<BuildEventStoreDisposition>;
+  passedCoverageWitnessReader?: PassedCoverageWitnessReader;
   now?: () => number;
 }
 
@@ -89,7 +93,7 @@ async function findProject(slug: string): Promise<ProjectRecord | null> {
   const { supabase } = await import('../../lib/supabaseClient.js');
   const { data, error } = await supabase
     .from('projects')
-    .select('id, slug, repo_identifier')
+    .select('id, slug, repo_provider, repo_identifier')
     .eq('slug', slug)
     .maybeSingle();
   if (error) throw new Error('project_lookup_failed');
@@ -97,6 +101,7 @@ async function findProject(slug: string): Promise<ProjectRecord | null> {
   return {
     id: String(data.id),
     slug: String(data.slug),
+    repoProvider: data.repo_provider ? String(data.repo_provider) : null,
     repoIdentifier: data.repo_identifier ? String(data.repo_identifier) : null,
   };
 }
@@ -207,6 +212,8 @@ export function createBuildEventReceiptIngestHandler(
   const env = dependencies.env ?? process.env;
   const projectLookup = dependencies.findProject ?? findProject;
   const eventStore = dependencies.storeEvent ?? storeEvent;
+  const coverageWitness = dependencies.passedCoverageWitnessReader
+    ?? createDefaultPassedCoverageWitnessReader(env);
   const now = dependencies.now ?? Date.now;
 
   return async function handleBuildEventReceiptIngest(req: Request, res: Response) {
@@ -248,8 +255,21 @@ export function createBuildEventReceiptIngestHandler(
       const project = await projectLookup(slug);
       if (!project) return res.status(404).json({ error: 'project not registered' });
 
-      const rejected = policyError(event, producerPolicy, project, now());
+      const receiptNow = now();
+      const rejected = policyError(event, producerPolicy, project, receiptNow);
       if (rejected) return res.status(403).json({ error: rejected });
+
+      if (event.coverage && event.status === 'passed') {
+        const witness = await coverageWitness.verify({
+          project,
+          event,
+          maximumWitnessAgeSeconds: producerPolicy.coverage!.maximumWitnessAgeSeconds,
+          nowMs: receiptNow,
+        });
+        if (witness.status !== 'verified') {
+          return res.status(409).json({ accepted: false, error: witness.code });
+        }
+      }
 
       const disposition = await eventStore(project.id, event);
       if (disposition === 'conflict') {
@@ -263,7 +283,7 @@ export function createBuildEventReceiptIngestHandler(
         contract: event.contract,
       });
     } catch {
-      return res.status(503).json({ error: 'Build-event receipt store unavailable' });
+      return res.status(503).json({ error: 'Build-event receipt verification or store unavailable' });
     }
   };
 }
