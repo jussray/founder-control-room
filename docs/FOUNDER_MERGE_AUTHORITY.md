@@ -96,6 +96,8 @@ implementation / authority / provider truth changes
 -> re-observe provider/runtime truth before reusing present-tense claims
 ```
 
+Default test discovery has a distinct proof boundary: an exclusion ledger only says a candidate test is absent from the default suite. It must be base-bound, cannot grow in a candidate PR, and must shrink when the excluded path is repaired or removed; it never proves universal CI non-execution.
+
 Historical evidence stays useful. Mark older contradictory material `HISTORICAL`, `SUPERSEDED`, `REVALIDATION_REQUIRED`, or otherwise point it to the newer authority instead of deleting provenance or letting old present-tense guidance compete silently with current truth.
 
 A docs-only truth-sync merge closes an earlier drift cycle. Its post-merge Documentation Truth receipt closes that transition and does not create an infinite requirement to rewrite the docs again merely because the merge commit SHA changed.
