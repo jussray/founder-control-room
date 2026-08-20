@@ -12,17 +12,17 @@ type Env = {
   SANDBOX_SCOPE?: string;
 };
 
-type ExecRequest = {
+type ProbeRequest = {
   taskId?: unknown;
-  argv?: unknown;
-  cwd?: unknown;
 };
 
-const MAX_ARGS = 16;
-const MAX_ARG_LENGTH = 512;
-const MAX_OUTPUT_LENGTH = 16_384;
-const EXEC_TIMEOUT_MS = 30_000;
-const ALLOWED_EXECUTABLES = new Set(['node', 'npm', 'npx', 'git']);
+const MAX_OUTPUT_LENGTH = 4_096;
+const EXEC_TIMEOUT_MS = 10_000;
+const PROBE_ARGV = Object.freeze([
+  'node',
+  '-e',
+  'process.stdout.write("cloudflare-sandbox-ok")',
+]);
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, {
@@ -45,33 +45,6 @@ function parseTaskId(value: unknown): string | null {
   return /^sbx_[a-z0-9]{8,48}$/.test(normalized) ? normalized : null;
 }
 
-function parseArgv(value: unknown): string[] | null {
-  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_ARGS) return null;
-  if (
-    value.some(
-      (item) =>
-        typeof item !== 'string' ||
-        item.length === 0 ||
-        item.length > MAX_ARG_LENGTH ||
-        item.includes('\u0000'),
-    )
-  ) {
-    return null;
-  }
-
-  const argv = value as string[];
-  return ALLOWED_EXECUTABLES.has(argv[0]) ? argv : null;
-}
-
-function parseCwd(value: unknown): string | undefined | null {
-  if (value === undefined || value === null || value === '') return undefined;
-  if (typeof value !== 'string') return null;
-
-  const isWorkspacePath = value === '/workspace' || value.startsWith('/workspace/');
-  if (!isWorkspacePath || value.includes('..') || value.length > 256) return null;
-  return value;
-}
-
 function clamp(value: unknown): string {
   return typeof value === 'string' ? value.slice(0, MAX_OUTPUT_LENGTH) : '';
 }
@@ -86,12 +59,16 @@ export default {
         service: 'founder-control-room-sandbox',
         scope: env.SANDBOX_SCOPE || 'portfolio-control-plane',
         authorityMode: 'transport-only',
-        executionAuthorityWired: false,
+        genericExecutionEnabled: false,
         internetEgress: false,
       });
     }
 
-    if (url.pathname !== '/v1/exec') return json({ error: 'not_found' }, 404);
+    if (url.pathname === '/v1/exec') {
+      return json({ error: 'execution_authority_not_wired' }, 403);
+    }
+
+    if (url.pathname !== '/v1/probe') return json({ error: 'not_found' }, 404);
     if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
     if (!env.SANDBOX_ADMIN_TOKEN) return json({ error: 'sandbox_not_configured' }, 503);
     if (!authorized(request, env)) return json({ error: 'unauthorized' }, 401);
@@ -101,46 +78,41 @@ export default {
       return json({ error: 'json_required' }, 415);
     }
 
-    let body: ExecRequest;
+    let body: ProbeRequest;
     try {
-      body = (await request.json()) as ExecRequest;
+      body = (await request.json()) as ProbeRequest;
     } catch {
       return json({ error: 'invalid_json' }, 400);
     }
 
     const taskId = parseTaskId(body.taskId);
-    const argv = parseArgv(body.argv);
-    const cwd = parseCwd(body.cwd);
-
-    if (!taskId || !argv || cwd === null) {
-      return json({ error: 'invalid_execution_request' }, 400);
-    }
+    if (!taskId) return json({ error: 'invalid_probe_request' }, 400);
 
     const sandbox = getSandbox(env.Sandbox, taskId);
 
     try {
-      const process = await sandbox.exec(argv, {
-        cwd,
+      const process = await sandbox.exec([...PROBE_ARGV], {
         timeout: EXEC_TIMEOUT_MS,
       });
       const output = await process.output({ encoding: 'utf8' });
+      const stdout = clamp(output.stdout);
 
       return json({
-        ok: output.exitCode === 0,
+        ok: output.exitCode === 0 && stdout === 'cloudflare-sandbox-ok',
         taskId,
         processId: process.id,
         exitCode: output.exitCode,
         timedOut: output.timedOut === true,
         truncated: output.truncated === true,
-        stdout: clamp(output.stdout),
+        stdout,
         stderr: clamp(output.stderr),
       });
     } catch (error) {
-      console.error('CLOUDFLARE_SANDBOX_EXECUTION_FAILED', {
+      console.error('CLOUDFLARE_SANDBOX_PROBE_FAILED', {
         taskId,
         name: error instanceof Error ? error.name : 'UnknownError',
       });
-      return json({ error: 'sandbox_execution_failed', taskId }, 502);
+      return json({ error: 'sandbox_probe_failed', taskId }, 502);
     } finally {
       await sandbox.destroy().catch(() => undefined);
     }
