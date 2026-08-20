@@ -678,7 +678,7 @@ describe('build-event receipt ingress', () => {
         environment: 'production',
         releaseSha: SHA,
       },
-    }));
+    });
 
     expect(response.status).toBe(403);
     expect(response.body.error).toBe('producer_category_not_allowed');
