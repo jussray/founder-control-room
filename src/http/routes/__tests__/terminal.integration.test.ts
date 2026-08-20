@@ -194,7 +194,7 @@ describe('guarded terminal route', () => {
     expect(mockRun).not.toHaveBeenCalled();
   });
 
-  it('requires an explicit confirmation for write-risk commands', async () => {
+  it('requires L99 authority for write-risk commands even without confirmWrite', async () => {
     authSuccess();
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'founder_users') return founderUsersRow();
@@ -206,7 +206,8 @@ describe('guarded terminal route', () => {
       .set('Authorization', BEARER)
       .send({ missionId: MISSION_ID, commandId: 'deps.install', expectedCommitSha: HEAD });
     expect(response.status).toBe(409);
-    expect(response.body.code).toBe('WRITE_CONFIRMATION_REQUIRED');
+    expect(response.body.code).toBe('L99_AUTHORITY_REQUIRED');
+    expect(mockRun).not.toHaveBeenCalled();
   });
 
   it('rejects a caller SHA that does not match the mission policy snapshot', async () => {
@@ -221,7 +222,7 @@ describe('guarded terminal route', () => {
     expect(mockRun).not.toHaveBeenCalled();
   });
 
-  it('does not allow dependency writes after a mission enters review', async () => {
+  it('keeps dependency writes behind L99 authority after a mission enters review', async () => {
     successfulDatabase({ missionStatus: 'in_review' });
     const response = await request(app())
       .post('/terminal/untold-stories/run')
@@ -234,7 +235,7 @@ describe('guarded terminal route', () => {
       });
 
     expect(response.status).toBe(409);
-    expect(response.body.code).toBe('COMMAND_NOT_ALLOWED_IN_MISSION_STATE');
+    expect(response.body.code).toBe('L99_AUTHORITY_REQUIRED');
     expect(mockRun).not.toHaveBeenCalled();
   });
 
