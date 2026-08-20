@@ -70,7 +70,7 @@ describe("Cloudflare request trace witness", () => {
   });
 
   it("traces every discovered proxied HTTP hostname while classifying non-edge and wildcard records", () => {
-    expect(tracer).toContain("entry.edgeProxied ||= record?.proxied === true");
+    expect(tracer).toContain("existing.edgeProxied ||= record?.proxied === true");
     expect(tracer).toContain("traceEligible: entry.edgeProxied && directHttpHostname && !wildcard");
     expect(tracer).toContain("for (const host of traceEligibleHosts)");
     expect(tracer).toContain("await traceHost(host.hostname)");
