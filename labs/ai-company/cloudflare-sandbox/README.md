@@ -18,7 +18,7 @@ An authenticated internal caller may invoke one fixed synthetic evidence task:
   timestamp, and nonce;
 - each successful request destroys its sandbox before returning;
 - a subject-scoped Durable Object rejects duplicate nonces and allows one
-  request per minute.
+  request per rolling minute.
 
 It is **not** a browser sandbox, consumer feature, teen-data path, generic code
 executor, repository checkout service, or production deployment.

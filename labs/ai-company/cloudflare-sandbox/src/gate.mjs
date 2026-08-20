@@ -1,6 +1,6 @@
 export const NONCE_TTL_MS = 10 * 60 * 1_000;
 export const RATE_WINDOW_MS = 60 * 1_000;
-export const MAX_REQUESTS_PER_WINDOW = 1;
+export const LAST_ACCEPTED_AT_KEY = 'rate:last-accepted-at';
 
 const NONCE_PATTERN = /^[A-Za-z0-9_-]{16,95}$/;
 
@@ -43,16 +43,16 @@ export class SandboxRequestGate {
       return json({ code: 'replayed_request' }, 409);
     }
 
-    const bucket = Math.floor(now / RATE_WINDOW_MS);
-    const rateKey = `rate:${bucket}`;
-    const requestCount = (await this.state.storage.get(rateKey)) ?? 0;
-    if (typeof requestCount !== 'number' || requestCount >= MAX_REQUESTS_PER_WINDOW) {
+    // This is a rolling limit, not a minute-aligned bucket: two envelopes on
+    // opposite sides of a wall-clock boundary must not execute back to back.
+    const lastAcceptedAt = await this.state.storage.get(LAST_ACCEPTED_AT_KEY);
+    if (typeof lastAcceptedAt === 'number' && now - lastAcceptedAt < RATE_WINDOW_MS) {
       return json({ code: 'rate_limited' }, 429);
     }
 
     await this.state.storage.put({
       [nonceKey]: now + NONCE_TTL_MS,
-      [rateKey]: requestCount + 1,
+      [LAST_ACCEPTED_AT_KEY]: now,
     });
     await this.state.storage.setAlarm(now + NONCE_TTL_MS);
     return json({ code: 'accepted' }, 200);
@@ -70,16 +70,5 @@ export class SandboxRequestGate {
     }
     if (expiredKeys.length > 0) await this.state.storage.delete(expiredKeys);
 
-    // Rate buckets are intentionally short lived. Retaining every historical
-    // minute would turn a long-running subject gate into an unbounded storage
-    // sink even though only the current bucket affects admission.
-    const currentBucket = Math.floor(now / RATE_WINDOW_MS);
-    const rateEntries = await this.state.storage.list({ prefix: 'rate:' });
-    const obsoleteRateKeys = [];
-    for (const [key] of rateEntries) {
-      const bucket = Number(key.slice('rate:'.length));
-      if (Number.isSafeInteger(bucket) && bucket < currentBucket) obsoleteRateKeys.push(key);
-    }
-    if (obsoleteRateKeys.length > 0) await this.state.storage.delete(obsoleteRateKeys);
   }
 }
