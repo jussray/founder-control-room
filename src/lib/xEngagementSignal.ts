@@ -4,12 +4,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 export const X_ENGAGEMENT_ACTOR_SLUG = 'apidojo/tweet-scraper';
 export const X_ENGAGEMENT_ACTOR_API_ID = 'apidojo~tweet-scraper';
 export const X_ENGAGEMENT_PROVIDER = 'apify';
-export const X_ENGAGEMENT_RESOURCE_TYPE = 'founder_signal_x_engagement';
+export const X_ENGAGEMENT_SIGNAL_TYPE = 'founder_signal_x_engagement';
 export const X_ENGAGEMENT_FETCH_COUNT = 50;
 export const X_ENGAGEMENT_TOP_POOL = 40;
 export const X_ENGAGEMENT_SAMPLE_SIZE = 10;
 export const X_ENGAGEMENT_MIN_REPLIES = 50;
 export const X_ENGAGEMENT_WINDOW_HOURS = 48;
+export const X_ENGAGEMENT_HARD_MAX_CHARGE_USD = 0.1;
 
 const APIFY_API_BASE = 'https://api.apify.com/v2';
 const LIVE_TRUE = new Set(['1', 'true', 'yes', 'on']);
@@ -20,6 +21,7 @@ type UnknownReason =
   | 'LIVE_DISABLED'
   | 'TOKEN_MISSING'
   | 'COST_CAP_MISSING'
+  | 'COST_CAP_INVALID'
   | 'INVALID_TOPIC'
   | 'ACTOR_UNAVAILABLE'
   | 'APIFY_ERROR'
@@ -86,14 +88,12 @@ export interface XEngagementSignalStore {
   get(resourceId: string): Promise<XEngagementCacheEnvelope | null>;
   acquire(resourceId: string): Promise<XEngagementLease | null>;
   reserve(input: {
-    projectId: string;
     resourceId: string;
     topicKey: string;
     dateKey: string;
     reservedAt: string;
   }): Promise<void>;
   complete(input: {
-    projectId: string;
     resourceId: string;
     topicKey: string;
     dateKey: string;
@@ -233,18 +233,18 @@ function parseCacheEnvelope(value: unknown): XEngagementCacheEnvelope | null {
   ) return null;
 
   if (row.state === 'COMPLETE' && !isSignal(row.result)) return null;
-
   return row as unknown as XEngagementCacheEnvelope;
 }
 
 function runtimeConfigError(config: XEngagementRuntimeConfig): UnknownReason | null {
   if (!config.liveEnabled) return 'LIVE_DISABLED';
   if (!config.token?.trim()) return 'TOKEN_MISSING';
-  if (
-    typeof config.maxTotalChargeUsd !== 'number'
-    || !Number.isFinite(config.maxTotalChargeUsd)
-    || config.maxTotalChargeUsd <= 0
-  ) return 'COST_CAP_MISSING';
+  if (typeof config.maxTotalChargeUsd !== 'number' || !Number.isFinite(config.maxTotalChargeUsd)) {
+    return 'COST_CAP_MISSING';
+  }
+  if (config.maxTotalChargeUsd <= 0 || config.maxTotalChargeUsd > X_ENGAGEMENT_HARD_MAX_CHARGE_USD) {
+    return 'COST_CAP_INVALID';
+  }
   return null;
 }
 
@@ -257,7 +257,7 @@ export function resolveXEngagementRuntimeConfig(
     liveEnabled: LIVE_TRUE.has((env.X_ENGAGEMENT_LIVE_ENABLED ?? '').trim().toLowerCase()),
     token: env.APIFY_TOKEN?.trim() || undefined,
     maxTotalChargeUsd:
-      parsedMaxCharge !== undefined && Number.isFinite(parsedMaxCharge) && parsedMaxCharge > 0
+      parsedMaxCharge !== undefined && Number.isFinite(parsedMaxCharge)
         ? parsedMaxCharge
         : undefined,
   };
@@ -288,7 +288,6 @@ export class XEngagementSignalService {
   readonly #now: () => Date;
   readonly #inFlight = new Map<string, Promise<XEngagementSignal>>();
   #actorValidated = false;
-  #actorUnavailable = false;
 
   constructor(options: XEngagementSignalServiceOptions) {
     this.#config = options.config;
@@ -297,15 +296,10 @@ export class XEngagementSignalService {
     this.#now = options.now ?? (() => new Date());
   }
 
-  async getTopicEngagement(input: {
-    projectId: string;
-    topic: string;
-  }): Promise<XEngagementSignal> {
-    const topic = normalizedTopic(input.topic);
+  async getTopicEngagement(topicInput: string): Promise<XEngagementSignal> {
+    const topic = normalizedTopic(topicInput);
     const now = this.#now();
-    if (!topic || topic.length > 120 || !input.projectId.trim()) {
-      return unknown(topic, 'INVALID_TOPIC', now);
-    }
+    if (!topic || topic.length > 120) return unknown(topic, 'INVALID_TOPIC', now);
 
     const normalized = topicKey(topic);
     const day = dateKey(now);
@@ -313,16 +307,8 @@ export class XEngagementSignalService {
     const existingInFlight = this.#inFlight.get(id);
     if (existingInFlight) return existingInFlight;
 
-    const task = this.#getOrFetch({
-      projectId: input.projectId,
-      topic,
-      topicKey: normalized,
-      day,
-      resourceId: id,
-      now,
-    });
+    const task = this.#getOrFetch({ topic, topicKey: normalized, day, resourceId: id, now });
     this.#inFlight.set(id, task);
-
     try {
       return await task;
     } finally {
@@ -331,7 +317,6 @@ export class XEngagementSignalService {
   }
 
   async #getOrFetch(input: {
-    projectId: string;
     topic: string;
     topicKey: string;
     day: string;
@@ -364,13 +349,11 @@ export class XEngagementSignalService {
       if (secondRead?.state === 'COMPLETE' && secondRead.result) return asCached(secondRead.result);
       if (secondRead?.state === 'RESERVED') return unknown(input.topic, 'CACHE_RESERVED', input.now, true);
 
-      const actorAvailable = await this.#validateActor();
-      if (!actorAvailable) return unknown(input.topic, 'ACTOR_UNAVAILABLE', input.now);
+      if (!(await this.#validateActor())) return unknown(input.topic, 'ACTOR_UNAVAILABLE', input.now);
 
       const reservedAt = input.now.toISOString();
       try {
         await this.#store.reserve({
-          projectId: input.projectId,
           resourceId: input.resourceId,
           topicKey: input.topicKey,
           dateKey: input.day,
@@ -381,10 +364,8 @@ export class XEngagementSignalService {
       }
 
       const result = await this.#runActor(input.topic, input.now);
-
       try {
         await this.#store.complete({
-          projectId: input.projectId,
           resourceId: input.resourceId,
           topicKey: input.topicKey,
           dateKey: input.day,
@@ -402,15 +383,13 @@ export class XEngagementSignalService {
       try {
         await this.#store.release(lease);
       } catch {
-        // The durable reservation/result remains the cost guard even if lease cleanup fails.
+        // Durable reservation/result state still prevents a second paid topic/day run.
       }
     }
   }
 
   async #validateActor(): Promise<boolean> {
-    if (this.#actorValidated) return !this.#actorUnavailable;
-    this.#actorValidated = true;
-
+    if (this.#actorValidated) return true;
     try {
       const response = await this.#fetch(`${APIFY_API_BASE}/acts/${X_ENGAGEMENT_ACTOR_API_ID}`, {
         method: 'GET',
@@ -419,21 +398,19 @@ export class XEngagementSignalService {
           accept: 'application/json',
         },
       });
-      this.#actorUnavailable = !response.ok;
+      if (!response.ok) return false;
+      this.#actorValidated = true;
+      return true;
     } catch {
-      this.#actorUnavailable = true;
+      return false;
     }
-
-    return !this.#actorUnavailable;
   }
 
   async #runActor(topic: string, now: Date): Promise<XEngagementSignal> {
     const window = windowFor(now);
     const phrase = safeSearchPhrase(topic);
     const maxCharge = this.#config.maxTotalChargeUsd;
-    if (!this.#config.token || maxCharge === undefined) {
-      return unknown(topic, 'APIFY_ERROR', now);
-    }
+    if (!this.#config.token || maxCharge === undefined) return unknown(topic, 'APIFY_ERROR', now);
 
     const query = new URLSearchParams({
       clean: 'true',
@@ -441,7 +418,6 @@ export class XEngagementSignalService {
       maxItems: String(X_ENGAGEMENT_FETCH_COUNT),
       maxTotalChargeUsd: String(maxCharge),
     });
-
     const url = `${APIFY_API_BASE}/acts/${X_ENGAGEMENT_ACTOR_API_ID}/run-sync-get-dataset-items?${query}`;
     const actorInput = {
       searchTerms: [`"${phrase}"`],
@@ -505,15 +481,12 @@ export function createSupabaseXEngagementSignalStore(client: SupabaseClient): XE
   return {
     async get(id) {
       const { data, error } = await client
-        .from('provider_observations')
-        .select('observed_state, observed_at')
+        .from('portfolio_signal_observations')
+        .select('observed_state')
         .eq('provider', X_ENGAGEMENT_PROVIDER)
-        .eq('resource_type', X_ENGAGEMENT_RESOURCE_TYPE)
+        .eq('signal_type', X_ENGAGEMENT_SIGNAL_TYPE)
         .eq('resource_id', id)
-        .order('observed_at', { ascending: false })
-        .limit(1)
         .maybeSingle();
-
       if (error) throw error;
       if (!data) return null;
       return parseCacheEnvelope(data.observed_state);
@@ -534,7 +507,6 @@ export function createSupabaseXEngagementSignalStore(client: SupabaseClient): XE
         .eq('lease_key', key)
         .single();
       if (leaseError || !lease?.claimed_at) throw leaseError ?? new Error('lease token missing');
-
       return { leaseKey: key, claimedAt: String(lease.claimed_at) };
     },
 
@@ -547,10 +519,9 @@ export function createSupabaseXEngagementSignalStore(client: SupabaseClient): XE
         state: 'RESERVED',
         reservedAt: input.reservedAt,
       });
-      const { error } = await client.from('provider_observations').insert({
-        project_id: input.projectId,
+      const { error } = await client.from('portfolio_signal_observations').insert({
         provider: X_ENGAGEMENT_PROVIDER,
-        resource_type: X_ENGAGEMENT_RESOURCE_TYPE,
+        signal_type: X_ENGAGEMENT_SIGNAL_TYPE,
         resource_id: input.resourceId,
         observed_state: envelope,
         observed_at: input.reservedAt,
@@ -569,11 +540,10 @@ export function createSupabaseXEngagementSignalStore(client: SupabaseClient): XE
         result: input.result,
       });
       const { error } = await client
-        .from('provider_observations')
+        .from('portfolio_signal_observations')
         .update({ observed_state: envelope, observed_at: input.result.observedAt })
-        .eq('project_id', input.projectId)
         .eq('provider', X_ENGAGEMENT_PROVIDER)
-        .eq('resource_type', X_ENGAGEMENT_RESOURCE_TYPE)
+        .eq('signal_type', X_ENGAGEMENT_SIGNAL_TYPE)
         .eq('resource_id', input.resourceId);
       if (error) throw error;
     },
