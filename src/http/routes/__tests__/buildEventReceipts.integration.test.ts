@@ -372,7 +372,7 @@ describe('build-event receipt ingress', () => {
     expect(stale.body.error).toBe('coverage_window_too_old');
     expect(delayedReceipt.status).toBe(403);
     expect(delayedReceipt.body.error).toBe('coverage_window_too_old');
-        expect(futureEnding.status).toBe(403);
+    expect(futureEnding.status).toBe(403);
     expect(futureEnding.body.error).toBe('coverage_window_ends_after_receipt');
     expect(tooLong.status).toBe(403);
     expect(tooLong.body.error).toBe('coverage_window_too_long');
