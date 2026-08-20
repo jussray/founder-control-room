@@ -49,12 +49,18 @@ describe("Cloudflare Worker Git authority audit", () => {
     );
   });
 
-  it("fails explicitly when the dedicated observer token is unavailable", () => {
+  it("fails explicitly when any dedicated read-only Cloudflare audit token is unavailable", () => {
     expect(workflow).toContain(
-      "Verify dedicated read-only Workers Builds token is available",
+      "Verify dedicated read-only Cloudflare audit tokens are available",
     );
     expect(workflow).toContain(
       "FCR_CLOUDFLARE_BUILDS_USER_TOKEN is not available to this workflow.",
+    );
+    expect(workflow).toContain(
+      "FCR_CLOUDFLARE_REQUEST_TRACER_TOKEN is not available to this workflow.",
+    );
+    expect(workflow).toContain(
+      "FCR_CLOUDFLARE_DNS_INVENTORY_TOKEN is not available to this workflow.",
     );
   });
 
