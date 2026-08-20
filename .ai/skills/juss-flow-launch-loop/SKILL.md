@@ -226,8 +226,9 @@ For every truth-sensitive change to architecture, authority, publishing, provide
 3. preserve provenance explaining why an older statement was once valid;
 4. run `Documentation Truth` on the exact PR head;
 5. require Documentation Truth in CI / Required Gate;
-6. run the same verifier on the merged-main transition; and
-7. if provider/runtime reality changes after merge, re-observe and repair the affected current-state doc before reusing its present-tense claim.
+6. for default test discovery, bind existing excluded-test debt to the exact base and reject both candidate-added and stale ledger entries;
+7. run the same verifier on the merged-main transition; and
+8. if provider/runtime reality changes after merge, re-observe and repair the affected current-state doc before reusing its present-tense claim.
 
 A docs-only truth-sync merge closes an existing drift cycle. The post-merge verifier closes that transition; it does not create an infinite requirement to rewrite itself again.
 

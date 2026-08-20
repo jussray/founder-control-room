@@ -2,20 +2,11 @@
 
 ## Reality
 
-`vitest.config.ts` discovers only `src/**/__tests__/**/*.test.ts`.
+`vitest.config.ts` discovers only `src/**/__tests__/**/*.test.ts` by default.
 
-A test file placed anywhere else under `src/` is **silently skipped**. It does not fail, it does not warn, it produces no output at all — `npm test` simply reports success over a smaller set than the repository appears to contain.
+A candidate test file outside that exact pattern is silently absent from the default `npm test` suite: it does not fail, warn, or appear in that suite's result. That is not evidence that the file never runs anywhere in CI—targeted workflows can invoke individual suites. The defect is narrower and still serious: a green default Vitest result can cover fewer candidate tests than the repository contains.
 
-Measured on `main` at the time this document was written:
-
-| Metric | Count |
-|---|---|
-| Test files under `src/` | 237 |
-| Discovered by `npm test` | 200 |
-| **Never executed in CI** | **37** |
-| Tests executed by `npm test` | 1285 |
-| Tests executed when discovery is broadened | 1533 |
-| **Tests never executed in CI** | **248** |
+`scripts/test-discovery-baseline.json` is the current, machine-checked inventory of default-excluded candidate test files. Run `npm run verify:test-discovery` on the exact head for counts; do not reuse a historical count as a present-tense CI claim.
 
 ## Why this matters more than the raw count
 
@@ -27,16 +18,13 @@ The undiscovered set is not incidental coverage. It disproportionately contains 
 - `src/proof-gate/issueClose.test.ts`
 - `src/governance/*.test.ts`, including two files explicitly named `*.redteam.test.ts`
 
-A green CI badge has therefore never been evidence that merge authority, review gating, credential vault handling, or the governance runtime behave as their tests assert.
+A green **default Vitest** result alone is therefore not evidence that merge authority, review gating, credential vault handling, or the governance runtime behave as their excluded tests assert. A targeted workflow can add evidence only for the exact file, head, and result it executed.
 
-This failure mode has already shipped twice and been repaired individually rather than systemically:
-
-- `src/capabilities/score.test.ts` (repaired in PR #154)
-- `src/futureyou/missionControl.test.ts` (introduced by PR #421 and still undiscovered)
+This failure mode has historically been repaired one file at a time rather than systemically. Treat individual PR references and prior test counts as provenance, not current proof.
 
 ## Known failures inside the undiscovered set
 
-Running the undiscovered files reveals **6 currently failing tests** that CI has never reported. These are pre-existing on `main`; broadening discovery would surface them, not cause them.
+Historical exploration found six failing tests among files absent from default discovery. That is **historical evidence**, not a current assertion that those files never ran in every CI workflow or still fail on the present head. Broadening discovery can surface existing failures; it does not cause them.
 
 ### `src/governance/portfolioGovernanceProfiles.test.ts` — 3 failures
 
@@ -64,12 +52,12 @@ Whether each represents a genuine regression in truthful vocabulary or a legitim
 
 `scripts/verify-test-discovery.mjs` (npm script `verify:test-discovery`, wired into CI as a Required Gate job) enforces:
 
-- the recorded baseline in `scripts/test-discovery-baseline.json` may **shrink**;
-- it may **never grow**.
+- the baseline is compared with the exact PR/push base SHA, so a candidate cannot add a newly default-excluded test to its own allowlist;
+- the recorded baseline may **shrink**, but it may **never grow** from a candidate-only path;
+- a stale entry must be removed when its test is moved into default discovery or deleted; and
+- candidate `.test` and `.spec` files across supported JavaScript and TypeScript suffixes are checked, not just `.test.ts` files.
 
-Adding a new test file outside a `__tests__/` directory fails CI with the exact path and the required move.
-
-This deliberately does **not** fail on the existing 37-file backlog. Turning CI red on pre-existing failures would block every unrelated change; the ratchet stops the bleeding first and keeps the remaining debt named, counted, and visible.
+Adding a new candidate test excluded from the default suite fails CI with the exact path and the required move. This deliberately does not make every historical debt item fail the default suite immediately; it stops new debt, keeps existing debt named, and requires a focused repair before a prior exclusion can return.
 
 ## Paying down the debt
 

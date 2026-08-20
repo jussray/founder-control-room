@@ -136,7 +136,8 @@ For truth-sensitive architecture, authority, publishing, capability, provider, w
 - mark contradictory older material historical/superseded or point it to the newer authority rather than deleting provenance;
 - run `Documentation Truth` on the exact PR head;
 - require Documentation Truth inside CI / Required Gate;
-- run it again on merged `main`; and
+- run it again on merged `main`;
+- bind default test-discovery debt to the exact base so a candidate cannot launder a new excluded test into its own baseline; and
 - re-read provider/runtime truth after merge before reusing present-tense production claims.
 
 Do not hard-code a durable “current main SHA” into prose and pretend it renews itself. Exact SHAs belong in receipts and historical evidence; current identity is resolved at use time.

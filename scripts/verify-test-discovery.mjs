@@ -2,31 +2,33 @@
 /**
  * Test discovery ratchet.
  *
- * vitest.config.ts discovers only `src/(star)(star)/__tests__/(star)(star)/(star).test.ts`.
- * Any test file placed outside a `__tests__/` directory is silently skipped by
- * `npm test` -- it does not fail, it does not warn, it simply never runs.
+ * The default Vitest configuration runs only
+ * src/(glob)/__tests__/(glob)/.test.ts. Candidate test files outside that exact
+ * pattern are excluded from the default npm test gate. They can still be run
+ * by a dedicated workflow, so this verifier never calls them "never run in
+ * CI" without an exact workflow receipt.
  *
- * That failure mode has already shipped real regressions twice (the capability
- * score test and the FutureYou missionControl test), so this verifier makes the
- * gap measurable and prevents it from getting worse.
- *
- * Contract:
- *   - the recorded baseline may SHRINK (move a file into `__tests__/`)
- *   - the recorded baseline may NEVER GROW (a new hidden test file fails CI)
- *
- * This verifier deliberately does not fail on the existing backlog. Turning CI
- * red on 37 pre-existing files would block every unrelated change; the ratchet
- * stops the bleeding first and keeps the remaining debt named and visible.
+ * The recorded debt is base-bound: a pull request may remove entries by
+ * making a candidate discoverable or deleting it, but it cannot add a newly
+ * excluded test to its own baseline.
  */
 
-import { readFileSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
-import { join, posix } from 'node:path';
+import { posix } from 'node:path';
 
 const BASELINE_PATH = 'scripts/test-discovery-baseline.json';
 const VITEST_CONFIG_PATH = 'vitest.config.ts';
-const TEST_SUFFIX = '.test.ts';
-const DISCOVERED_SEGMENT = '__tests__';
+const DEFAULT_INCLUDE_PATTERN = 'src/**/__tests__/**/*.test.ts';
+const CANDIDATE_TEST_FILE = /\.(?:test|spec)\.(?:[cm]?[jt]sx?)$/i;
+
+function fail(messages) {
+  console.error('\nTest discovery contract FAILED:');
+  for (const message of messages) console.error(`- ${message}`);
+  console.error('');
+  process.exit(1);
+}
 
 async function collectTestFiles(dir) {
   const found = [];
@@ -36,66 +38,108 @@ async function collectTestFiles(dir) {
   } catch {
     return found;
   }
+
   for (const entry of entries) {
     if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
     const full = posix.join(dir, entry.name);
     if (entry.isDirectory()) {
       found.push(...(await collectTestFiles(full)));
-    } else if (entry.isFile() && entry.name.endsWith(TEST_SUFFIX)) {
+    } else if (entry.isFile() && CANDIDATE_TEST_FILE.test(entry.name)) {
       found.push(full);
     }
   }
   return found;
 }
 
-function fail(message) {
-  console.error(`\nTest discovery contract FAILED: ${message}\n`);
-  process.exit(1);
+function isDefaultVitestTest(file, includePattern) {
+  if (includePattern !== DEFAULT_INCLUDE_PATTERN) {
+    fail([
+      `unsupported Vitest include pattern '${includePattern}'. Update this verifier and ${BASELINE_PATH} together.`,
+    ]);
+  }
+  return file.startsWith('src/')
+    && file.split('/').includes('__tests__')
+    && file.endsWith('.test.ts');
+}
+
+function baseUndiscoveredTests(baseRef, includePattern) {
+  try {
+    return execFileSync('git', ['ls-tree', '-r', '--name-only', baseRef, '--', 'src'], {
+      encoding: 'utf8',
+    })
+      .split('\n')
+      .filter(Boolean)
+      .filter((file) => CANDIDATE_TEST_FILE.test(file))
+      .filter((file) => !isDefaultVitestTest(file, includePattern));
+  } catch (error) {
+    fail([
+      `could not read base test inventory at ${baseRef}; CI must fetch and retain TEST_DISCOVERY_BASE_SHA`,
+      error instanceof Error ? error.message : String(error),
+    ]);
+  }
 }
 
 if (!existsSync(BASELINE_PATH)) {
-  fail(`missing baseline file ${BASELINE_PATH}`);
+  fail([`missing baseline file ${BASELINE_PATH}`]);
 }
 
 const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
-const recorded = new Set(baseline.undiscovered ?? []);
+const baselineEntries = baseline.undiscovered;
+if (!Array.isArray(baselineEntries)) {
+  fail([`${BASELINE_PATH} must contain an undiscovered array`]);
+}
+if (new Set(baselineEntries).size !== baselineEntries.length) {
+  fail([`${BASELINE_PATH} must not contain duplicate entries`]);
+}
+if (baselineEntries.some((file) => typeof file !== 'string' || !CANDIDATE_TEST_FILE.test(file))) {
+  fail([`${BASELINE_PATH} contains a path that is not a supported test-file suffix`]);
+}
 
-// Guard the assumption this verifier is built on: if the include pattern is
-// broadened, this script must be revisited rather than silently passing.
+const includePattern = baseline.includePattern;
 const vitestConfig = readFileSync(VITEST_CONFIG_PATH, 'utf8');
-if (!vitestConfig.includes(baseline.includePattern)) {
-  fail(
-    `${VITEST_CONFIG_PATH} no longer contains the recorded include pattern ` +
-      `'${baseline.includePattern}'. Update ${BASELINE_PATH} and this verifier together.`,
-  );
+if (typeof includePattern !== 'string' || !vitestConfig.includes(includePattern)) {
+  fail([
+    `${VITEST_CONFIG_PATH} no longer contains the recorded include pattern. Update ${BASELINE_PATH} and this verifier together.`,
+  ]);
 }
 
 const allTests = (await collectTestFiles('src')).sort();
-const undiscovered = allTests.filter((file) => !file.split('/').includes(DISCOVERED_SEGMENT));
-const discoveredCount = allTests.length - undiscovered.length;
+const undiscovered = allTests.filter((file) => !isDefaultVitestTest(file, includePattern));
+const recorded = new Set(baselineEntries);
+const failures = [];
+const baseRef = process.env.TEST_DISCOVERY_BASE_SHA?.trim();
 
-const added = undiscovered.filter((file) => !recorded.has(file));
-const fixed = [...recorded].filter((file) => !undiscovered.includes(file)).sort();
-
-console.log(`Test files under src/: ${allTests.length}`);
-console.log(`  discovered by npm test: ${discoveredCount}`);
-console.log(`  NOT discovered (never run): ${undiscovered.length}`);
-
-if (fixed.length > 0) {
-  console.log(`\n${fixed.length} file(s) moved into test discovery since the baseline:`);
-  for (const file of fixed) console.log(`  + ${file}`);
-  console.log(`\nShrink the ratchet by removing them from ${BASELINE_PATH}.`);
+if (baseRef && !/^0+$/.test(baseRef)) {
+  const baseUndiscovered = new Set(baseUndiscoveredTests(baseRef, includePattern));
+  const introducedBaselineEntries = baselineEntries.filter((file) => !baseUndiscovered.has(file));
+  if (introducedBaselineEntries.length > 0) {
+    failures.push(
+      `baseline records test files absent from the base's default-discovery debt: ${introducedBaselineEntries.join(', ')}`,
+    );
+  }
+} else {
+  console.log('Base debt comparison skipped locally; CI must set TEST_DISCOVERY_BASE_SHA.');
 }
 
-if (added.length > 0) {
-  console.error(`\n${added.length} NEW test file(s) are outside a ${DISCOVERED_SEGMENT}/ directory`);
-  console.error('and will therefore never run in CI:');
-  for (const file of added) console.error(`  - ${file}`);
-  fail(
-    `move each file into a ${DISCOVERED_SEGMENT}/ directory beside its subject ` +
-      `(for example src/foo/bar.test.ts -> src/foo/__tests__/bar.test.ts) so it is actually executed.`,
+const stale = baselineEntries.filter((file) => !undiscovered.includes(file)).sort();
+if (stale.length > 0) {
+  failures.push(
+    `baseline still lists tests no longer excluded from default discovery: ${stale.join(', ')}. Remove paid-down entries from ${BASELINE_PATH}.`,
   );
 }
 
-console.log(`\nTest discovery ratchet holding at ${undiscovered.length} known-undiscovered file(s).`);
-console.log('No new hidden test files were introduced.');
+const added = undiscovered.filter((file) => !recorded.has(file));
+if (added.length > 0) {
+  failures.push(
+    `new tests are excluded from default npm test discovery: ${added.join(', ')}. Move them into a matching __tests__/*.test.ts path or record pre-existing base debt only.`,
+  );
+}
+
+console.log(`Candidate test files under src/: ${allTests.length}`);
+console.log(`  matched by default npm test discovery: ${allTests.length - undiscovered.length}`);
+console.log(`  excluded from default npm test discovery: ${undiscovered.length}`);
+
+if (failures.length > 0) fail(failures);
+
+console.log(`\nTest discovery ratchet holding at ${undiscovered.length} known default-excluded file(s).`);
+console.log('No new default-excluded test files were introduced.');
