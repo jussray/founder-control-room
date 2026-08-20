@@ -1,4 +1,5 @@
 import { GitHubProvider } from "./GitHubProvider.js";
+import { getGitHubInstallationToken } from "./githubAppAuth.js";
 import type { RepositoryProvider } from "./RepositoryProvider.js";
 
 export interface RepositoryConnectionInput {
@@ -69,6 +70,57 @@ export function createRepositoryProvider(
     return new GitHubProvider({
       token,
       projectMap: { [connection.projectId]: connection.repository },
+    });
+  }
+
+  throw new Error(
+    `No RepositoryProvider implementation for "${connection.provider}" yet`,
+  );
+}
+
+export interface AppAwareRepositoryProviderDependencies {
+  getInstallationToken?: (
+    appId: string,
+    privateKey: string,
+    repositoryIdentifier: string,
+  ) => Promise<string>;
+}
+
+/**
+ * Builds a read-only repository provider with the same credential precedence
+ * used by the canonical provider factory: a repository-scoped GitHub App
+ * installation token in production, then an explicit local development token.
+ * This async seam is deliberately separate from the legacy synchronous helper
+ * so callers that need App auth cannot silently fall back or lose the target
+ * repository binding.
+ */
+export async function createAppAwareRepositoryProvider(
+  input: RepositoryConnectionInput,
+  env: NodeJS.ProcessEnv = process.env,
+  dependencies: AppAwareRepositoryProviderDependencies = {},
+): Promise<RepositoryProvider> {
+  const connection = normalizeRepositoryConnection(input);
+
+  if (connection.provider === "github") {
+    const fallbackToken = env.GITHUB_TOKEN?.trim();
+    const appId = env.GITHUB_APP_ID?.trim();
+    const privateKey = env.GITHUB_PRIVATE_KEY?.trim();
+    if (Boolean(appId) !== Boolean(privateKey)) {
+      throw new Error('GITHUB_APP_ID and GITHUB_PRIVATE_KEY must be configured together');
+    }
+    if (!fallbackToken && !(appId && privateKey)) {
+      throw new Error(
+        "GitHub authentication is not configured; set GITHUB_APP_ID and GITHUB_PRIVATE_KEY or a local GITHUB_TOKEN fallback",
+      );
+    }
+    const getInstallationToken = dependencies.getInstallationToken ?? getGitHubInstallationToken;
+    const token = appId && privateKey
+      ? await getInstallationToken(appId, privateKey, connection.repository)
+      : fallbackToken!;
+    return new GitHubProvider({
+      token,
+      projectMap: { [connection.projectId]: connection.repository },
+      baseUrl: env.GITHUB_API_BASE_URL,
     });
   }
 

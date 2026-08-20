@@ -1,5 +1,8 @@
 import { Router, type Response } from 'express';
-import { buildCurrentTruthProjection } from '../../buildEvents/currentTruth.js';
+import {
+  buildCurrentTruthProjection,
+} from '../../buildEvents/currentTruth.js';
+import { revalidateCurrentProjectMain } from '../../buildEvents/currentMainRevalidation.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { loadBuildEvents } from '../../services/buildEventStore.js';
 import { requireFounder } from '../middleware/requireFounder.js';
@@ -26,15 +29,26 @@ buildEventsRouter.get('/:slug/current-truth', async (req, res) => {
   try {
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('id, slug, name, repo_identifier')
+      .select('id, slug, name, repo_provider, repo_identifier')
       .eq('slug', slug)
       .maybeSingle();
 
     if (projectError) throw new Error('project_lookup_failed');
     if (!project) return res.status(404).json({ error: 'project not registered' });
 
+    const repository = project.repo_identifier?.trim();
+    if (!repository) throw new Error('project_repository_identity_unavailable');
     const read = await loadBuildEvents(project.id);
-    const snapshot = buildCurrentTruthProjection(project.slug, read.events);
+    // Resolve mutable main after the durable-event read, immediately before
+    // projection, so a slow database query cannot lengthen the identity race.
+    const currentMainRevalidation = await revalidateCurrentProjectMain(project);
+
+    const snapshot = buildCurrentTruthProjection({
+      projectSlug: project.slug,
+      repository,
+      events: read.events,
+      currentMainRevalidation,
+    });
 
     return res.status(200).json({
       project: {

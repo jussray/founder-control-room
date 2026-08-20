@@ -8,6 +8,16 @@ The original FCR trigger was exact-head repository proof that remained historica
 
 This is not best modeled as fabrication. It is **truth decay**: a Time-of-Check / Time-of-Use failure applied to claims, docs, automation, and agent behavior.
 
+## 2026-08 control correction: self-attested rollout evidence
+
+The first rollout-coverage contract made the receipt shape, release identity, and deployment health explicit, but a signed observer could still self-attest aggregate rollout counts. A healthy deployment witness answered “did this SHA deploy?”; it did not answer “did these aggregate counts come from the independent provider readback?” A same-project but unrelated Cloudflare observation could also have been mistaken for the enrolled deployment target.
+
+The corrected rule is deliberately stricter: a passed coverage receipt must be project-bound, target-bound, ordered after a provider-owned deployment completion, and match a digest written by the server-owned aggregate observation. Until the independent normalizer supplies that exact evidence, the safe outcome is no passed coverage claim.
+
+Even a correctly accepted coverage receipt is not permanent truth. Current Truth applies a 60-minute lease to the completed observation window, retains GitHub branch-head events only as last-observed source provenance, and returns coverage as historical unless the display read completes a fresh, repository-bound GitHub `main` revalidation. A delayed or out-of-order webhook cannot resurrect an older SHA as current. The release witness uses the same repository-scoped GitHub App credential path as the provider layer and rejects a partial App configuration instead of accidentally falling back to a token.
+
+The Documentation Truth gate had a parallel weakness: it treated a touched document path as a refresh. It now rejects punctuation-only and hidden-comment edits, and requires a meaningful structured receipt that maps every changed truth-sensitive source path to a path-bound invariant. That receipt establishes review traceability, not a claim that a provider, deployment, public outcome, or source change has been independently proven semantically true.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -138,7 +148,7 @@ The verifier classifies truth-sensitive changed files by domain and requires the
 It also checks cross-document invariants that are easy to regress during fast-moving work, including:
 
 - README does not freeze a manual “Last refreshed” date as current authority;
-- current repository identity is resolved at use time;
+- current repository identity is resolved at use time only by separately authorized provider revalidation, while webhook facts remain historical last-observed provenance;
 - FCR merge docs describe the independent-review membrane and server-owned reviewer trust;
 - live GitHub ruleset enforcement stays a separate provider truth;
 - the founder-content story keeps first-party LinkedIn, provider-neutral n8n, exact Current You authority, provider readback, and Sauce Guard distinct;
@@ -149,13 +159,15 @@ The verifier emits a sanitized `fcr/documentation-truth@v1` receipt with counts,
 
 A docs-only truth-sync merge closes an earlier drift cycle. It still receives a post-merge verification receipt, but the merge commit changing identity does not require a second self-referential docs edit.
 
-A durable README should not hard-code a “current SHA” and pretend that value automatically renews after every merge. Exact SHAs belong in receipts/provenance; current identity is resolved at use time.
+A durable README should not hard-code a “current SHA” and pretend that value automatically renews after every merge. Exact SHAs belong in receipts/provenance; current identity is resolved at use time only by separately authorized provider revalidation.
 
 ### Release-coverage at-use gate
 
 A signed rollout-coverage receipt is still sender-supplied observation. For a `passed` coverage claim, Founder Control Room must re-read current repository `main` and independently read a fresh production deployment witness from the Cloudflare provider-observation lane. The witness must be tied to a processed provider event and must not reuse `project_events`, where the receipt itself is stored.
 
-If main, deployment SHA, freshness, health, or independent provenance cannot be verified, the receipt is retained only as non-passing history or blocked from persistence; it cannot render a current green coverage fact. Current Truth hides SHA-mismatched coverage and withholds coverage when no verified main fact exists, reporting stale and unbound coverage quality separately.
+If main, deployment SHA, freshness, health, or independent provenance cannot be verified, the receipt is retained only as non-passing history or blocked from persistence; it cannot render a current green coverage fact. Current Truth hides SHA-mismatched coverage and withholds coverage unless the display read completes a fresh GitHub `main` revalidation; a received webhook main fact is last-observed history, not a substitute.
+
+Legacy external receipt shapes are also not grandfathered into durable operational truth. Current Truth renders runtime only from a server-owned event and renders provider or verification facts only from GitHub or system observation bound to the enrolled repository. Tightening a producer's capability therefore closes both future ingestion and historical projection paths.
 
 ## Product Design
 

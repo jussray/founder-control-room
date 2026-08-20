@@ -10,7 +10,7 @@ It manages Se'kret Bip and related founder systems without making GitHub, Cloudf
 
 ## Current repository truth
 
-**Current identity is resolved at use time.** A hard-coded SHA, date, PR body, issue comment, screenshot, or provider result is historical evidence once the underlying state moves.
+**Current identity is resolved at use time only by a separately authorized live-provider revalidation.** A hard-coded SHA, date, PR body, issue comment, screenshot, provider result, or received webhook is historical evidence once the underlying state moves. A stored GitHub branch-head event is explicitly a last-observed source fact, not current-main proof.
 
 For a present-tense repository claim:
 
@@ -36,6 +36,7 @@ Current implementation includes:
 - a secret-free exact-head Cloudflare bridge authority contract that is load-bearing inside CI / `Required Gate`, while live Cloudflare and GitHub provider state remain separate authority facts;
 - freshness-aware federated truth receipts and a bounded Truth Lease contract for claims that can decay;
 - a typed [release-identity / rollout-coverage contract](docs/RELEASE_IDENTITY_AND_COVERAGE.md) that keeps binary version identity separate from privacy-safe aggregate traffic observation, with predeclared thresholds and no merge, deploy, or authorization effect;
+- a project-bound, independently witnessed rollout-coverage ingress that accepts only Cloudflare aggregate `passed` observations, rejects self-attested/control-plane claims, wrong deployment targets, stale/out-of-order evidence, and expired coverage windows, and withholds current coverage until a read-through GitHub main revalidation supplies the matching identity;
 - a durable founder-only **Founder Switchboard** with explicit BUILT / CONFIGURED / ACTIVE / PROVEN states and guarded authority modes;
 - a privacy-safe public skill-testing evidence loop with `/devil` v1 structured receipts and aggregate analytics;
 - first-party LinkedIn founder-content execution with exact Current You authority, FCR-owned one-shot approval storage/claim, temporal revalidation, and provider readback requirements;
@@ -69,7 +70,7 @@ Default-suite test discovery has a bounded evidence claim: a baseline entry mean
 
 Historical material stays available as provenance. When it no longer describes current authority, mark it `HISTORICAL`, `SUPERSEDED`, `STALE`, `REVALIDATION_REQUIRED`, or point it to the current authority instead of deleting the record or letting it compete silently with fresh truth.
 
-The verifier emits sanitized counts, domains, coverage, and failure reasons only. It does not store credentials, raw private evidence, raw diffs, private prompts, customer data, private metrics, or provider payloads. Analytics may observe documentation drift but never authorize, renew, or rewrite objective truth.
+The verifier emits sanitized counts, domains, coverage, and failure reasons only. A truth-sensitive change must also update a structured documentation receipt that names each changed source path and a meaningful, path-bound invariant; punctuation-only, hidden-comment, whitespace-only, or pathless receipt touches cannot satisfy the gate. This establishes traceability and materiality, not independent semantic or live-provider proof, so human/security review remains required. The verifier does not store credentials, raw private evidence, raw diffs, private prompts, customer data, private metrics, or provider payloads. Analytics may observe documentation drift but never authorize, renew, or rewrite objective truth.
 
 A docs-only truth-sync merge closes an existing drift cycle. Its post-merge receipt closes the transition without forcing another documentation edit merely because the merge commit SHA changed.
 
