@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CANONICAL_RULESET_NAME,
+  REQUIRED_APPROVING_REVIEW_COUNT,
   buildBlockedReport,
   buildReport,
   canonicalFloorSatisfied,
@@ -22,9 +23,9 @@ function canonicalRuleset(overrides = {}) {
       {
         type: 'pull_request',
         parameters: {
-          dismiss_stale_reviews_on_push: true,
-          require_last_push_approval: true,
-          required_approving_review_count: 1,
+          dismiss_stale_reviews_on_push: false,
+          require_last_push_approval: false,
+          required_approving_review_count: REQUIRED_APPROVING_REVIEW_COUNT,
           required_review_thread_resolution: true,
         },
       },
@@ -45,12 +46,12 @@ function canonicalRuleset(overrides = {}) {
   };
 }
 
-test('canonical hardened FCR default-branch ruleset satisfies the floor', () => {
+test('canonical founder-final FCR default-branch ruleset satisfies the provider floor', () => {
   const snapshot = rulesetSnapshot(canonicalRuleset(), 'main', 'main');
   assert.equal(snapshot.targetsRequestedRef, true);
-  assert.equal(snapshot.requiredApprovingReviewCount, 1);
-  assert.equal(snapshot.dismissStaleReviewsOnPush, true);
-  assert.equal(snapshot.requireLastPushApproval, true);
+  assert.equal(snapshot.requiredApprovingReviewCount, 0);
+  assert.equal(snapshot.dismissStaleReviewsOnPush, false);
+  assert.equal(snapshot.requireLastPushApproval, false);
   assert.equal(snapshot.requiredReviewThreadResolution, true);
   assert.equal(snapshot.strictRequiredStatusChecks, true);
   assert.equal(snapshot.blockForcePushes, true);
@@ -69,40 +70,45 @@ test('default-branch sentinel resolves only to the observed repository default b
   assert.equal(rulesetSnapshot(literal, 'main', 'main').targetsRequestedRef, true);
 });
 
-test('zero review or stale-review policy cannot satisfy the floor', () => {
-  const zeroReview = canonicalRuleset();
-  zeroReview.rules[0].parameters.required_approving_review_count = 0;
-  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(zeroReview, 'main', 'main')), false);
+test('legacy human-review semantics or missing branch protections cannot satisfy the floor', () => {
+  const legacyReview = canonicalRuleset();
+  legacyReview.rules[0].parameters.required_approving_review_count = 1;
+  legacyReview.rules[0].parameters.dismiss_stale_reviews_on_push = true;
+  legacyReview.rules[0].parameters.require_last_push_approval = true;
+  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(legacyReview, 'main', 'main')), false);
 
-  const staleAllowed = canonicalRuleset();
-  staleAllowed.rules[0].parameters.dismiss_stale_reviews_on_push = false;
-  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(staleAllowed, 'main', 'main')), false);
+  const missingThreadResolution = canonicalRuleset();
+  missingThreadResolution.rules[0].parameters.required_review_thread_resolution = false;
+  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(missingThreadResolution, 'main', 'main')), false);
+
+  const missingChecks = canonicalRuleset();
+  missingChecks.rules[1].parameters.required_status_checks = [{ context: 'Required Gate' }];
+  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(missingChecks, 'main', 'main')), false);
 });
 
-test('collaborator readiness requires non-owner write authority and excludes bots', () => {
+test('collaborator readiness remains informational and excludes owner and bots', () => {
   assert.equal(collaboratorCanReview({ login: 'jussray', permissions: { admin: true } }, 'jussray'), false);
   assert.equal(collaboratorCanReview({ login: 'reviewer[bot]', type: 'Bot', permissions: { push: true } }, 'jussray'), false);
   assert.equal(collaboratorCanReview({ login: 'reader', permissions: { pull: true } }, 'jussray'), false);
   assert.equal(collaboratorCanReview({ login: 'reviewer', permissions: { push: true } }, 'jussray'), true);
 });
 
-test('report requires exactly one canonical active main ruleset plus reviewer readiness', () => {
-  const ready = buildReport({
+test('report requires exactly one canonical active main ruleset but not a second human reviewer', () => {
+  const soloFounderReady = buildReport({
     repository: 'jussray/founder-control-room',
     targetRef: 'main',
     defaultBranch: 'main',
     fullRulesets: [canonicalRuleset()],
-    collaborators: [
-      { login: 'jussray', permissions: { admin: true } },
-      { login: 'reviewer', permissions: { push: true } },
-    ],
+    collaborators: [{ login: 'jussray', permissions: { admin: true } }],
   });
-  assert.equal(ready.status, 'READY');
-  assert.equal(ready.observationComplete, true);
-  assert.equal(ready.defaultBranch, 'main');
-  assert.equal(ready.activeRulesetCountTargetingRef, 1);
-  assert.equal(ready.canonicalRulesetMatchCount, 1);
-  assert.equal(ready.eligibleNonOwnerWriteReviewerCount, 1);
+  assert.equal(soloFounderReady.status, 'READY');
+  assert.equal(soloFounderReady.observationComplete, true);
+  assert.equal(soloFounderReady.defaultBranch, 'main');
+  assert.equal(soloFounderReady.activeRulesetCountTargetingRef, 1);
+  assert.equal(soloFounderReady.canonicalRulesetMatchCount, 1);
+  assert.equal(soloFounderReady.independentHumanReviewerRequired, false);
+  assert.equal(soloFounderReady.independentReviewerReady, false);
+  assert.equal(soloFounderReady.eligibleNonOwnerWriteReviewerCount, 0);
 
   const duplicate = buildReport({
     repository: 'jussray/founder-control-room',
@@ -126,6 +132,7 @@ test('provider-read failure produces a sanitized blocked receipt instead of fake
   assert.equal(report.blocker, 'provider_read_forbidden');
   assert.equal(report.defaultBranch, null);
   assert.equal(report.canonicalFloorSatisfied, false);
+  assert.equal(report.independentHumanReviewerRequired, false);
   assert.equal(report.independentReviewerReady, false);
   assert.equal(report.activeRulesetCountTargetingRef, null);
   assert.equal(report.canonicalRuleset, null);
