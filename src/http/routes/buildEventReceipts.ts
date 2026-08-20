@@ -13,7 +13,7 @@ export interface BuildReleaseCoveragePolicy {
   source: BuildEventInput['source'];
   minimumWindowSeconds: number;
   maximumWindowSeconds: number;
-  maximumReceiptLagSeconds: number;
+  maximumObservationAgeSeconds: number;
   minimumRequestCount: number;
   maximumPriorReleaseShareBps: number;
   allowedRouteClasses: readonly string[];
@@ -37,7 +37,7 @@ export const BUILD_EVENT_PRODUCERS: Readonly<Record<string, BuildEventProducerPo
       source: 'cloudflare',
       minimumWindowSeconds: 15 * 60,
       maximumWindowSeconds: 30 * 60,
-      maximumReceiptLagSeconds: 60 * 60,
+      maximumObservationAgeSeconds: 60 * 60,
       minimumRequestCount: 25,
       maximumPriorReleaseShareBps: 500,
       allowedRouteClasses: ['front-door'],
@@ -160,14 +160,16 @@ function policyError(
     const coverageWindowStartedAtMs = Date.parse(event.coverage.windowStartedAt);
     const coverageWindowEndedAtMs = Date.parse(event.coverage.windowEndedAt);
     const coverageWindowMs = coverageWindowEndedAtMs - coverageWindowStartedAtMs;
-    const coverageReceiptLagMs = occurredAtMs - coverageWindowEndedAtMs;
     if (coverageWindowMs > coveragePolicy.maximumWindowSeconds * 1_000) {
       return 'coverage_window_too_long';
     }
-    if (coverageReceiptLagMs < 0) {
+    if (coverageWindowEndedAtMs > occurredAtMs) {
       return 'coverage_window_ends_after_receipt';
     }
-    if (coverageReceiptLagMs > coveragePolicy.maximumReceiptLagSeconds * 1_000) {
+    if (coverageWindowEndedAtMs > nowMs) {
+      return 'coverage_window_ends_in_future';
+    }
+    if (nowMs - coverageWindowEndedAtMs > coveragePolicy.maximumObservationAgeSeconds * 1_000) {
       return 'coverage_window_too_old';
     }
 

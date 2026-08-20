@@ -38,7 +38,7 @@ The policy is committed before an observation, so a desired release cannot negot
 | Dimension | Initial policy |
 | --- | --- |
 | Window | 15 to 30 minutes |
-| Receipt freshness | Window must end no more than 60 minutes before its signed receipt |
+| Receipt freshness | Window must have ended no more than 60 minutes before the receiver evaluates the receipt |
 | Real sampled requests | At least 25 |
 | Previous-release share | At most 500 basis points (5%) |
 | Unclassified responses | Zero for a passed coverage receipt |
@@ -47,7 +47,7 @@ The policy is committed before an observation, so a desired release cannot negot
 | Allowed route classes | `front-door` only; a fixed safe label, not a path |
 | Synthetic probes | May never produce verified or passed coverage |
 
-This is not a claim that 15 minutes, 25 requests, or 5% is universally correct. It is a deliberately visible starting policy. A passed receipt must also use a complete 15–30 minute window and arrive no more than 60 minutes after that window ends; the receiver rejects stale, future-ending, and overlong windows. Changing it requires a reviewed source change before the next observation.
+This is not a claim that 15 minutes, 25 requests, or 5% is universally correct. It is a deliberately visible starting policy. A passed receipt must also use a complete 15–30 minute window that ends no more than 60 minutes before the receiver evaluates it; the receiver rejects stale, future-ending, and overlong windows. Changing it requires a reviewed source change before the next observation.
 
 ## Portfolio applicability
 

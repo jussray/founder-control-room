@@ -339,6 +339,16 @@ describe('build-event receipt ingress', () => {
         windowEndedAt: '2026-08-18T18:45:00.000Z',
       },
     }));
+    const delayedReceipt = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      occurredAt: '2026-08-17T22:01:00.000Z',
+      coverage: {
+        ...coverageEvent().coverage,
+        windowStartedAt: '2026-08-17T21:45:00.000Z',
+        windowEndedAt: '2026-08-17T22:00:00.000Z',
+      },
+    }));
     const futureEnding = await authorized(
       request(harness.app).post('/ingest/build-events/sekret-bip'),
     ).send(coverageEvent({
@@ -360,7 +370,9 @@ describe('build-event receipt ingress', () => {
 
     expect(stale.status).toBe(403);
     expect(stale.body.error).toBe('coverage_window_too_old');
-    expect(futureEnding.status).toBe(403);
+    expect(delayedReceipt.status).toBe(403);
+    expect(delayedReceipt.body.error).toBe('coverage_window_too_old');
+        expect(futureEnding.status).toBe(403);
     expect(futureEnding.body.error).toBe('coverage_window_ends_after_receipt');
     expect(tooLong.status).toBe(403);
     expect(tooLong.body.error).toBe('coverage_window_too_long');
