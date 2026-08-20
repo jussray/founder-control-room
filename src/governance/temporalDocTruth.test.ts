@@ -19,6 +19,7 @@ const truthDecay = read('docs/TRUTH_DECAY_AUDIT.md');
 const cloudflareTargets = read('docs/deployment/CLOUDFLARE_WORKER_TARGETS.md');
 const ci = read('.github/workflows/ci.yml');
 const documentationWorkflow = read('.github/workflows/documentation-truth.yml');
+const documentationVerifier = read('scripts/verify-documentation-truth.mjs');
 
 const FORBIDDEN_REPOSITORY_WIDE_STALE_CLAIMS = [
   'Status: `CLASSIFICATION_ONLY_NO_GENERATION_NO_PROVIDER_CALLS`',
@@ -130,6 +131,13 @@ describe('repository documentation truth control', () => {
     expect(ci).toContain('DOCUMENTATION_TRUTH_RESULT: ${{ needs.documentation-truth.result }}');
     expect(documentationWorkflow).toContain('Documentation truth gate');
     expect(documentationWorkflow).toContain('scripts/verify-documentation-truth.mjs');
+  });
+
+  it('rejects cosmetic documentation and pathless invariant receipts', () => {
+    expect(documentationVerifier).toContain('MINIMUM_MEANINGFUL_DOC_TEXT_LENGTH');
+    expect(documentationVerifier).toContain('visibleOutsideHtmlComments');
+    expect(documentationVerifier).toContain('meaningfulInvariant(claim, sourcePath)');
+    expect(documentationVerifier).toContain('meaningful path-bound invariant');
   });
 
   it('keeps documentation analytics observation-only', () => {

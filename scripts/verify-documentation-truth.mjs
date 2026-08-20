@@ -6,6 +6,8 @@ const root = process.cwd();
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const DOCUMENTATION_RECEIPT_PATH = 'docs/DOCUMENTATION_TRUTH_RECEIPT.json';
 const DOCUMENTATION_RECEIPT_CONTRACT = 'fcr/documentation-truth-receipt@v1';
+const MINIMUM_MEANINGFUL_DOC_TEXT_LENGTH = 32;
+const MINIMUM_MEANINGFUL_INVARIANT_LENGTH = 48;
 
 function git(...args) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
@@ -95,14 +97,58 @@ function nonEmptyString(value, maximumLength = 600) {
   return typeof value === 'string' && value.trim().length > 0 && value.trim().length <= maximumLength;
 }
 
+function normalizedNarrativeText(value) {
+  return String(value)
+    .replace(/[\`*_>#~\[\]{}()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function meaningfulNarrative(value, minimumLength = MINIMUM_MEANINGFUL_DOC_TEXT_LENGTH) {
+  const normalized = normalizedNarrativeText(value);
+  const words = normalized.match(/[A-Za-z0-9][A-Za-z0-9'-]*/g) ?? [];
+  return normalized.length >= minimumLength
+    && words.length >= 5
+    && words.some((word) => word.length >= 4);
+}
+
+function visibleOutsideHtmlComments(value, state) {
+  let cursor = 0;
+  let visible = '';
+  while (cursor < value.length) {
+    if (state.insideComment) {
+      const closing = value.indexOf('-->', cursor);
+      if (closing < 0) return visible;
+      state.insideComment = false;
+      cursor = closing + 3;
+      continue;
+    }
+
+    const opening = value.indexOf('<!--', cursor);
+    if (opening < 0) return `${visible}${value.slice(cursor)}`;
+    visible += value.slice(cursor, opening);
+    state.insideComment = true;
+    cursor = opening + 4;
+  }
+  return visible;
+}
+
 function semanticDocChange(relativePath) {
   const diff = git('diff', '--unified=0', '--no-ext-diff', `${baseSha}..${headSha}`, '--', relativePath);
+  const commentState = { added: { insideComment: false }, removed: { insideComment: false } };
   return diff.split('\n').some((line) => {
     if (!line.startsWith('+') && !line.startsWith('-')) return false;
     if (line.startsWith('+++') || line.startsWith('---')) return false;
-    const content = line.slice(1).trim();
-    return Boolean(content) && !content.startsWith('<!--') && !content.startsWith('-->');
+    const state = line.startsWith('+') ? commentState.added : commentState.removed;
+    const content = visibleOutsideHtmlComments(line.slice(1), state);
+    return meaningfulNarrative(content);
   });
+}
+
+function meaningfulInvariant(claim, sourcePath) {
+  return meaningfulNarrative(claim, MINIMUM_MEANINGFUL_INVARIANT_LENGTH)
+    && normalizedNarrativeText(claim).includes(sourcePath)
+    && /\b(must|cannot|requires?|rejects?|withhold|binds?|only|never|fail(?:s|ed)?\s+closed)\b/i.test(claim);
 }
 
 function documentationReceipt() {
@@ -120,10 +166,12 @@ function documentationReceipt() {
   if (parsed.contract !== DOCUMENTATION_RECEIPT_CONTRACT) {
     failures.push('documentation truth receipt contract is invalid');
   }
-  if (!nonEmptyString(parsed.purpose)) {
+  if (!nonEmptyString(parsed.purpose) || !meaningfulNarrative(parsed.purpose, MINIMUM_MEANINGFUL_INVARIANT_LENGTH)) {
     failures.push('documentation truth receipt must state a bounded purpose');
   }
-  if (!Array.isArray(parsed.domains) || parsed.domains.some((value) => !nonEmptyString(value, 120))) {
+  if (!Array.isArray(parsed.domains)
+    || parsed.domains.some((value) => !nonEmptyString(value, 120) || !/^[a-z][a-z0-9-]{2,119}$/.test(value))
+    || new Set(parsed.domains).size !== parsed.domains.length) {
     failures.push('documentation truth receipt domains are invalid');
   }
   if (!Array.isArray(parsed.changes)) {
@@ -166,8 +214,9 @@ if (truthSensitiveChanges.length > 0) {
       }
     }
     for (const change of truthSensitiveChanges) {
-      if (!receipt.claimsByPath.has(change.file)) {
-        failures.push(`documentation truth receipt must name a claimed invariant for: ${change.file}`);
+      const claims = receipt.claimsByPath.get(change.file) ?? [];
+      if (!claims.some((claim) => meaningfulInvariant(claim, change.file))) {
+        failures.push(`documentation truth receipt must name a meaningful path-bound invariant for: ${change.file}`);
       }
     }
   }

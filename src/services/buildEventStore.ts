@@ -44,9 +44,12 @@ function sameEvent(left: BuildEvent, right: BuildEvent): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function isVerifiedCurrentMainSource(event: BuildEvent): boolean {
-  return event.truth === 'verified'
+function isVerifiedLastObservedMainSource(event: BuildEvent): boolean {
+  return event.source === 'github'
+    && event.truth === 'verified'
+    && event.authority === 'observed'
     && event.category === 'source'
+    && event.status === 'completed'
     && event.repository?.refKind === 'branch-head'
     && event.repository.branch === 'main'
     && Boolean(event.repository.commitSha);
@@ -98,10 +101,11 @@ export async function loadBuildEvents(projectId: string): Promise<BuildEventRead
       .eq('event_type', BUILD_EVENT_TYPE)
       .order('created_at', { ascending: false })
       .limit(BUILD_EVENT_LIMIT),
-    // Current truth depends on the latest verified main identity even when
-    // high-volume observations push that source event out of the bounded
-    // general event feed. Query the narrow JSONB shape separately and retain
-    // only a fully validated event below.
+    // Retain the latest GitHub-observed main-source provenance even when
+    // high-volume observations push it out of the bounded general feed. It
+    // is explicitly *not* current-main proof: webhook delivery can be late
+    // or out of order, so current truth requires a distinct canonical
+    // revalidation witness.
     supabase
       .from('project_events')
       .select('metadata, created_at')
@@ -109,8 +113,11 @@ export async function loadBuildEvents(projectId: string): Promise<BuildEventRead
       .eq('event_type', BUILD_EVENT_TYPE)
       .contains('metadata', {
         contract: BUILD_EVENT_CONTRACT,
+        source: 'github',
         category: 'source',
         truth: 'verified',
+        authority: 'observed',
+        status: 'completed',
         repository: { branch: 'main', refKind: 'branch-head' },
       })
       .order('created_at', { ascending: false })
@@ -136,7 +143,7 @@ export async function loadBuildEvents(projectId: string): Promise<BuildEventRead
       invalidStoredEvents += 1;
       continue;
     }
-    if (!isVerifiedCurrentMainSource(event)) continue;
+    if (!isVerifiedLastObservedMainSource(event)) continue;
     if (!events.some((existing) => existing.eventId === event.eventId)) events.push(event);
     break;
   }

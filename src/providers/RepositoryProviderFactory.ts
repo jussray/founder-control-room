@@ -105,6 +105,9 @@ export async function createAppAwareRepositoryProvider(
     const fallbackToken = env.GITHUB_TOKEN?.trim();
     const appId = env.GITHUB_APP_ID?.trim();
     const privateKey = env.GITHUB_PRIVATE_KEY?.trim();
+    if (Boolean(appId) !== Boolean(privateKey)) {
+      throw new Error('GITHUB_APP_ID and GITHUB_PRIVATE_KEY must be configured together');
+    }
     if (!fallbackToken && !(appId && privateKey)) {
       throw new Error(
         "GitHub authentication is not configured; set GITHUB_APP_ID and GITHUB_PRIVATE_KEY or a local GITHUB_TOKEN fallback",

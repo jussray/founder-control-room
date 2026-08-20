@@ -29,6 +29,7 @@ It is permitted to submit signed `analytics` events only when all of the followi
 - the witness is for the enrolled Cloudflare deployment resource and processed deployment-completion event, not another same-project Cloudflare resource;
 - the provider-owned deployment completion predates the claimed coverage window, and its aggregate digest matches the receipt's privacy-safe aggregate;
 - the producer source is Cloudflare;
+- the event is a `passed` `observe` coverage receipt, rather than a generic analytics, runtime, verification, provider, decision, audit, goal, or next-gate assertion;
 - the event carries aggregate route-class counts, never raw paths, query strings, request IDs, client identifiers, headers, bodies, tokens, or user data; and
 - the event is observation-only and cannot be interpreted as runtime identity, merge approval, or deployment authority.
 
@@ -45,7 +46,7 @@ The policy is committed before an observation, so a desired release cannot negot
 | Independent deployment witness | Fresh (at most 15 minutes old), healthy Cloudflare production observation for the enrolled deployment target, tied to a matching processed deployment-completion event for the exact SHA |
 | Deployment ordering | Provider-owned deployment-completion time must be no later than the coverage window start |
 | Aggregate provenance | A server-owned provider observation must carry the canonical digest of the same privacy-safe aggregate; receipt counts are not self-authenticating |
-| Current-truth lease | A completed coverage window expires from the current projection after 60 minutes and remains historical evidence rather than a durable green status |
+| Current-truth lease | A completed coverage window is eligible only with a fresh read-through GitHub `main` revalidation and expires from the current projection after 60 minutes; otherwise it remains historical evidence rather than a durable green status |
 | Real sampled requests | At least 25 |
 | Previous-release share | At most 500 basis points (5%) |
 | Unclassified responses | Zero for a passed coverage receipt |
@@ -80,11 +81,11 @@ A coverage receipt carries:
 - allowlisted safe route classes; and
 - a named tail reason when prior-release traffic remains.
 
-A sequence of bounded receipts over adjacent windows is the rollout curve. The current-truth projection exposes coverage only when its release SHA matches the latest verified `main` **and** its completed window is within the declared 60-minute Truth Lease. A SHA-mismatched receipt remains historical evidence and increments the stale-coverage quality counter; an expired receipt is withheld and counted as expired; if no verified `main` is available, coverage is withheld and counted as unbound rather than rendering a current green state. The event reader separately retains the newest validated main-source fact so high-volume observations cannot silently evict identity from the bounded feed.
+A sequence of bounded receipts over adjacent windows is the rollout curve. The current-truth projection exposes coverage only when an authenticated read-through GitHub `main` revalidation made for that read matches its release SHA **and** its completed window is within the declared 60-minute Truth Lease. GitHub webhook branch-head events are retained as last-observed provenance, not current-main proof, because delivery can be delayed or out of order. A SHA-mismatched receipt remains historical evidence and increments the stale-coverage quality counter; an expired receipt is withheld and counted as expired; a non-passed or otherwise ineligible receipt is withheld; and absent live revalidation coverage is withheld and counted as unbound rather than rendering a current green state.
 
-The schema fails closed on raw-looking route strings, invalid counts, mismatched subtotals, synthetic-as-verified coverage, unknown tails on a passed receipt, unclassified traffic on a passed receipt, receipt SHA drift, independent-provider/main SHA drift, a wrong project or repository provider, a wrong provider deployment target, a deployment that follows the claimed window, a missing or mismatched server-owned aggregate digest, stale or future-ending coverage windows, stale receipt time, and producer/repository impersonation.
+The schema fails closed on raw-looking route strings, invalid counts, mismatched subtotals, synthetic-as-verified coverage, unknown tails on a passed receipt, unclassified traffic on a passed receipt, non-passed coverage, receipt SHA drift, independent-provider/main SHA drift, a wrong project or repository provider, a wrong provider deployment target, a deployment that follows the claimed window, a missing or mismatched server-owned aggregate digest, stale or future-ending coverage windows, stale receipt time, producer/repository impersonation, and a coverage credential attempting to inject runtime, verification, audit, provider, decision, goal, or next-gate control-plane facts.
 
-The projection exposes `runtimes` and `coverage` as separate facts. A runtime witness remains binary. Coverage may pass its initial observation policy while remaining a time-bound distribution that must be re-observed after the next deploy.
+The projection exposes `runtimes` and `coverage` as separate facts. A runtime witness remains binary, but only a server-owned runtime event may render as current; a legacy external receipt remains historical even if it carries a matching SHA. GitHub- or system-observed provider and verification facts are likewise distinct from externally submitted coverage. Coverage may pass its initial observation policy while remaining a time-bound distribution that must be re-observed after the next deploy.
 
 ## Operating loop
 
@@ -93,9 +94,10 @@ The projection exposes `runtimes` and `coverage` as separate facts. A runtime wi
 3. Prove identity through the exact release witness and provider/runtime evidence.
 4. Collect provider-backed aggregate observations over the declared window and route classes.
 5. Have the separately authorized Cloudflare normalizer write the enrolled deployment completion and the matching aggregate digest from its own aggregate readback.
-6. Submit a signed receipt bound to the enrolled project, exact repository, and release SHA; the receiver re-reads current `main` and independent Cloudflare evidence before accepting `passed`.
-7. Explain any named tail; hold the coverage state as `UNKNOWN` if it is incomplete.
-8. Re-observe after a new deployment, routing change, cache change, or provider transition.
+6. Submit a signed Cloudflare aggregate receipt bound to the enrolled project, exact repository, and release SHA; the receiver re-reads current `main` and independent Cloudflare evidence before accepting `passed`.
+7. Treat accepted coverage as historical until the display read performs a separately authorized GitHub `main` revalidation; webhook delivery alone cannot make a mutable branch current.
+8. Explain any named tail; hold the coverage state as `UNKNOWN` if it is incomplete.
+9. Re-observe after a new deployment, routing change, cache change, or provider transition.
 
 ## Rollback
 

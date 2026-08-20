@@ -50,7 +50,7 @@ function query(rows: unknown[]) {
 }
 
 describe('build-event read retention', () => {
-  it('retains the newest validated main source fact when it has aged out of the bounded general feed', async () => {
+  it('retains the newest GitHub-observed main source fact as historical provenance when it ages out of the bounded feed', async () => {
     const generalFeed = query([]);
     const retainedMain = query([{ metadata: sourceEvent() }]);
     mockFrom
@@ -62,8 +62,11 @@ describe('build-event read retention', () => {
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.eventId).toBe('github:retained-main-source');
     expect(retainedMain.contains).toHaveBeenCalledWith('metadata', expect.objectContaining({
+      source: 'github',
       category: 'source',
       truth: 'verified',
+      authority: 'observed',
+      status: 'completed',
       repository: { branch: 'main', refKind: 'branch-head' },
     }));
   });

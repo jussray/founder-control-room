@@ -89,4 +89,18 @@ describe("RepositoryProviderFactory", () => {
     );
     expect(provider.name).toBe("github");
   });
+
+  it("fails closed for a partial GitHub App configuration instead of silently using a fallback token", async () => {
+    await expect(createAppAwareRepositoryProvider(
+      {
+        slug: "sekret-bip",
+        repoProvider: "github",
+        repoIdentifier: "jussray/Sekret-Bip",
+      },
+      {
+        GITHUB_APP_ID: "123456",
+        GITHUB_TOKEN: "local-fallback-that-must-not-win",
+      },
+    )).rejects.toThrow("GITHUB_APP_ID and GITHUB_PRIVATE_KEY must be configured together");
+  });
 });

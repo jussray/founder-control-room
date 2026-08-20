@@ -9,43 +9,55 @@
     {
       "path": "src/buildEvents/buildEvent.ts",
       "claims": [
-        "Coverage events retain bounded aggregate-only shape validation and cannot carry raw request evidence."
+        "src/buildEvents/buildEvent.ts: coverage events must retain bounded aggregate-only shape validation and cannot carry raw request evidence."
       ]
     },
     {
       "path": "src/buildEvents/currentTruth.ts",
       "claims": [
-        "Coverage is withheld from current truth unless it is bound to a verified main identity and its completed observation window is still inside the declared Truth Lease."
+        "src/buildEvents/currentTruth.ts: webhook main facts must remain last-observed provenance, current coverage must use a fresh read-through GitHub revalidation and passed verified lease, and legacy external operational assertions cannot render as current."
+      ]
+    },
+    {
+      "path": "src/buildEvents/currentMainRevalidation.ts",
+      "claims": [
+        "src/buildEvents/currentMainRevalidation.ts: current-main identity must be read from the enrolled GitHub provider at display time, bind the enrolled repository and `main` branch, and reject a non-exact SHA."
       ]
     },
     {
       "path": "src/buildEvents/releaseCoverageWitness.ts",
       "claims": [
-        "A passed coverage claim requires a server-owned, exact-target Cloudflare witness, deployment-to-window ordering, an independently written aggregate digest, and the canonical App-aware repository credential path."
+        "src/buildEvents/releaseCoverageWitness.ts: a passed coverage claim must require a server-owned exact-target Cloudflare witness, deployment-to-window ordering, an independently written aggregate digest, and the canonical App-aware repository credential path."
       ]
     },
     {
       "path": "src/http/routes/buildEventReceipts.ts",
       "claims": [
-        "A release-observer credential is scoped to the enrolled project and cannot submit passed coverage without the matching independent witness."
+        "src/http/routes/buildEventReceipts.ts: the release-observer credential must be project-bound Cloudflare analytics coverage only, reject control-plane fields and non-passed receipts, and require the matching independent witness."
       ]
     },
     {
       "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
-        "Truth-sensitive changes require a substantive documentation refresh and a structured invariant receipt; whitespace-only documentation edits cannot satisfy the gate."
+        "scripts/verify-documentation-truth.mjs: truth-sensitive changes must reject punctuation-only or hidden-comment documentation edits and require a meaningful path-bound invariant receipt."
       ]
     },
     {
       "path": "src/providers/RepositoryProviderFactory.ts",
       "claims": [
-        "Repository reads that need production identity proof prefer a repository-scoped GitHub App installation credential and retain an explicit local-token fallback only for development."
+        "src/providers/RepositoryProviderFactory.ts: repository reads that need production identity proof must reject partial GitHub App credentials and otherwise prefer a repository-scoped installation credential over an explicit local fallback."
       ]
     },
     {
       "path": "src/services/buildEventStore.ts",
       "claims": [
-        "The bounded current-truth event feed separately retains the newest validated main-source fact so high observation volume cannot erase the identity needed to classify coverage."
+        "src/services/buildEventStore.ts: the bounded feed must retain the newest GitHub-observed main source as historical provenance without treating webhook arrival order as current-main proof."
+      ]
+    },
+    {
+      "path": "src/http/routes/buildEvents.ts",
+      "claims": [
+        "src/http/routes/buildEvents.ts: the current-truth route must bind projection evaluation to the enrolled project repository and fail closed when that repository identity is unavailable."
       ]
     }
   ]

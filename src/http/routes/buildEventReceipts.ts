@@ -41,8 +41,10 @@ export const BUILD_EVENT_PRODUCERS: Readonly<Record<string, BuildEventProducerPo
     projectSlug: 'sekret-bip',
     repository: 'jussray/Sekret-Bip',
     repositoryProvider: 'github',
-    sources: ['cloudflare', 'playwright', 'supabase'],
-    categories: ['runtime', 'verification', 'artifact', 'analytics'],
+    // This credential belongs to the aggregate coverage observer only. It
+    // must not be able to self-label runtime, CI, or provider authority.
+    sources: ['cloudflare'],
+    categories: ['analytics'],
     coverage: {
       service: 'sekret-bip-production',
       environment: 'production',
@@ -141,6 +143,11 @@ function policyError(
   if (event.authority === 'authorized') return 'external_receipts_cannot_authorize';
   if (event.source === 'founder') return 'external_receipts_cannot_impersonate_founder';
   if (event.source === 'system') return 'external_receipts_cannot_impersonate_system';
+  if (event.goal || event.nextGate) return 'external_receipts_cannot_set_control_plane_intent';
+  if (event.repository?.auditedCommitSha) return 'external_receipts_cannot_set_audited_identity';
+  if (event.provider || event.runtime || event.verification || event.decision) {
+    return 'coverage_receipt_contains_unallowed_control_fact';
+  }
   if (!producerPolicy.sources.includes(event.source)) return 'producer_source_not_allowed';
   if (!producerPolicy.categories.includes(event.category)) return 'producer_category_not_allowed';
   if (project.slug !== producerPolicy.projectSlug) return 'producer_project_mismatch';
@@ -183,6 +190,7 @@ function policyError(
     if (event.coverage.releaseSha !== event.repository.commitSha) {
       return 'coverage_release_sha_mismatch';
     }
+    if (event.status !== 'passed') return 'coverage_receipt_requires_passed_status';
 
     const coverageWindowStartedAtMs = Date.parse(event.coverage.windowStartedAt);
     const coverageWindowEndedAtMs = Date.parse(event.coverage.windowEndedAt);
@@ -200,26 +208,31 @@ function policyError(
       return 'coverage_window_too_old';
     }
 
-    if (event.status === 'passed') {
-      if (coverageWindowMs < coveragePolicy.minimumWindowSeconds * 1_000) {
-        return 'coverage_window_too_short';
-      }
-      if (event.coverage.requestCount < coveragePolicy.minimumRequestCount) {
-        return 'coverage_minimum_request_count_not_met';
-      }
-      if (event.coverage.unclassifiedRequestCount > 0) {
-        return 'coverage_unclassified_requests_not_allowed';
-      }
-      if (
-        event.coverage.priorReleaseRequestCount * 10_000
-        > coveragePolicy.maximumPriorReleaseShareBps * event.coverage.requestCount
-      ) {
-        return 'coverage_prior_release_share_above_policy';
-      }
-      if (event.coverage.tailReasons?.includes('unknown')) {
-        return 'coverage_unknown_tail_not_allowed';
-      }
+    if (coverageWindowMs < coveragePolicy.minimumWindowSeconds * 1_000) {
+      return 'coverage_window_too_short';
     }
+    if (event.coverage.requestCount < coveragePolicy.minimumRequestCount) {
+      return 'coverage_minimum_request_count_not_met';
+    }
+    if (event.coverage.unclassifiedRequestCount > 0) {
+      return 'coverage_unclassified_requests_not_allowed';
+    }
+    if (
+      event.coverage.priorReleaseRequestCount * 10_000
+      > coveragePolicy.maximumPriorReleaseShareBps * event.coverage.requestCount
+    ) {
+      return 'coverage_prior_release_share_above_policy';
+    }
+    if (event.coverage.tailReasons?.includes('unknown')) {
+      return 'coverage_unknown_tail_not_allowed';
+    }
+  }
+
+  if (producerPolicy.coverage && !event.coverage) {
+    return 'coverage_required_for_producer';
+  }
+  if (producerPolicy.coverage && event.phase !== 'observe') {
+    return 'coverage_receipt_requires_observe_phase';
   }
 
   if (event.truth === 'verified' && event.evidenceRefs.length === 0 && event.evidenceUrls.length === 0) {
@@ -288,7 +301,7 @@ export function createBuildEventReceiptIngestHandler(
       const rejected = policyError(event, producerPolicy, project, receiptNow);
       if (rejected) return res.status(403).json({ error: rejected });
 
-      if (event.coverage && event.status === 'passed') {
+      if (event.coverage) {
         const witness = await coverageWitness.verify({
           project,
           event,

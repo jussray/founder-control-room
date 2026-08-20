@@ -18,29 +18,10 @@ const SHA = '1234567890abcdef1234567890abcdef12345678';
 const NOW_MS = Date.parse('2026-08-18T21:00:00.000Z');
 
 function runtimeEvent(overrides: Record<string, unknown> = {}) {
-  return {
+  return coverageEvent({
     eventId: `sekret-release:${SHA}`,
-    occurredAt: '2026-08-18T20:52:23.735Z',
-    source: 'cloudflare',
-    category: 'runtime',
-    phase: 'observe',
-    truth: 'verified',
-    authority: 'observed',
-    status: 'passed',
-    repository: {
-      name: 'jussray/Sekret-Bip',
-      branch: 'main',
-      refKind: 'branch-head',
-      commitSha: SHA,
-    },
-    runtime: {
-      service: 'sekret-bip-production',
-      environment: 'production',
-      releaseSha: SHA,
-    },
-    evidenceRefs: [`github-actions:release:${SHA}`],
     ...overrides,
-  };
+  });
 }
 
 
@@ -147,7 +128,7 @@ function authorized(req: request.Test) {
 }
 
 describe('build-event receipt ingress', () => {
-  it('accepts an exact-SHA observed production receipt and preserves the existing build-event contract', async () => {
+  it('accepts an exact-SHA observed coverage receipt and preserves the existing build-event contract', async () => {
     const harness = appWith();
     const response = await authorized(
       request(harness.app).post('/ingest/build-events/sekret-bip'),
@@ -164,7 +145,8 @@ describe('build-event receipt ingress', () => {
     const stored = harness.storedEvents[0];
     expect(stored).toBeDefined();
     expect(stored?.repository?.commitSha).toBe(SHA);
-    expect(stored?.runtime?.releaseSha).toBe(SHA);
+    expect(stored?.coverage?.releaseSha).toBe(SHA);
+    expect(stored?.runtime).toBeUndefined();
     expect(stored?.truth).toBe('verified');
     expect(stored?.authority).toBe('observed');
   });
@@ -226,6 +208,69 @@ describe('build-event receipt ingress', () => {
       accepted: false,
       error: 'coverage_witness_current_main_mismatch',
     });
+    expect(harness.storeCalls()).toBe(0);
+  });
+
+  it('rejects non-passed coverage before it can bypass its independent witness', async () => {
+    let witnessCalls = 0;
+    const harness = appWith('stored', undefined, NOW_MS, {
+      verify: async () => {
+        witnessCalls += 1;
+        return {
+          status: 'verified' as const,
+          currentMainSha: SHA,
+          deploymentSha: SHA,
+          observedAt: new Date(NOW_MS).toISOString(),
+        };
+      },
+    });
+    const response = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({ status: 'completed' }));
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('coverage_receipt_requires_passed_status');
+    expect(witnessCalls).toBe(0);
+    expect(harness.storeCalls()).toBe(0);
+  });
+
+  it('does not let the coverage credential set founder control-plane intent', async () => {
+    const harness = appWith();
+    const injectedGoal = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({ goal: 'publish-now' }));
+    const wrongPhase = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({ phase: 'deploy' }));
+    const injectedRuntime = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      runtime: {
+        service: 'sekret-bip-production',
+        environment: 'production',
+        releaseSha: SHA,
+      },
+    }));
+    const injectedAudit = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      repository: {
+        name: 'jussray/Sekret-Bip',
+        branch: 'main',
+        refKind: 'branch-head',
+        commitSha: SHA,
+        auditedCommitSha: 'a'.repeat(40),
+      },
+    }));
+
+    expect(injectedGoal.status).toBe(403);
+    expect(injectedGoal.body.error).toBe('external_receipts_cannot_set_control_plane_intent');
+    expect(wrongPhase.status).toBe(403);
+    expect(wrongPhase.body.error).toBe('coverage_receipt_requires_observe_phase');
+    expect(injectedRuntime.status).toBe(403);
+    expect(injectedRuntime.body.error).toBe('coverage_receipt_contains_unallowed_control_fact');
+    expect(injectedAudit.status).toBe(403);
+    expect(injectedAudit.body.error).toBe('external_receipts_cannot_set_audited_identity');
     expect(harness.storeCalls()).toBe(0);
   });
 
@@ -620,20 +665,23 @@ describe('build-event receipt ingress', () => {
     expect(harness.storeCalls()).toBe(0);
   });
 
-  it('rejects runtime SHA drift inside one production receipt', async () => {
+  it('does not let the coverage credential self-label a runtime truth claim', async () => {
     const harness = appWith();
     const response = await authorized(
       request(harness.app).post('/ingest/build-events/sekret-bip'),
-    ).send(runtimeEvent({
+    ).send({
+      ...runtimeEvent(),
+      category: 'runtime',
+      coverage: undefined,
       runtime: {
         service: 'sekret-bip-production',
         environment: 'production',
-        releaseSha: 'abcdefabcdefabcdefabcdefabcdefabcdefabcd',
+        releaseSha: SHA,
       },
     }));
 
     expect(response.status).toBe(403);
-    expect(response.body.error).toBe('runtime_release_sha_mismatch');
+    expect(response.body.error).toBe('producer_category_not_allowed');
     expect(harness.storeCalls()).toBe(0);
   });
 
