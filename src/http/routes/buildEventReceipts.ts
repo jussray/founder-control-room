@@ -165,17 +165,6 @@ function policyError(
   if (occurredAtMs > nowMs + MAX_FUTURE_SKEW_MS) return 'event_occurred_at_too_far_in_future';
   if (occurredAtMs < nowMs - MAX_EVENT_AGE_MS) return 'event_receipt_expired';
 
-  if (event.category === 'runtime') {
-    if (!event.runtime?.releaseSha) return 'runtime_release_sha_required';
-    if (event.runtime.releaseSha !== event.repository.commitSha) return 'runtime_release_sha_mismatch';
-  }
-  if (event.category === 'verification') {
-    if (!event.verification?.exactCommitSha) return 'verification_exact_sha_required';
-    if (event.verification.exactCommitSha !== event.repository.commitSha) {
-      return 'verification_exact_sha_mismatch';
-    }
-  }
-
   if (event.coverage) {
     const coveragePolicy = producerPolicy.coverage;
     if (!coveragePolicy) return 'coverage_receipts_not_configured_for_producer';

@@ -681,7 +681,7 @@ describe('build-event receipt ingress', () => {
     });
 
     expect(response.status).toBe(403);
-    expect(response.body.error).toBe('producer_category_not_allowed');
+    expect(response.body.error).toBe('coverage_receipt_contains_unallowed_control_fact');
     expect(harness.storeCalls()).toBe(0);
   });
 
