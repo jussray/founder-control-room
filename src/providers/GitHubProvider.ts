@@ -30,6 +30,9 @@ export interface GitHubProviderConfig {
   baseUrl?: string;
 }
 
+const FCR_MAIN_CANONICAL_RULESET_NAME = "Founder Control Room main exact-head gate";
+const FCR_MAIN_REQUIRED_STATUS_CHECKS = ["Required Gate", "Verify test-ledger contract"];
+
 /**
  * First RepositoryProvider implementation. Talks to GitHub via Octokit so
  * every other Control Room subsystem can stay repository-agnostic.
@@ -379,31 +382,15 @@ export class GitHubProvider implements RepositoryProvider {
     config: RulesetConfig,
   ): Promise<RulesetResult> {
     const { owner, repo } = this.locate(projectId);
-    const hardenFounderControlRoomMainReview =
+    const hardenFounderControlRoomMainGovernance =
       projectId === "founder-control-room"
       && config.enforcement === "active"
       && config.targetRefs.includes("main");
 
-    if (hardenFounderControlRoomMainReview) {
+    if (hardenFounderControlRoomMainGovernance) {
       const errors = fcrMainRulesetConfigErrors(config);
       if (errors.length > 0) {
         throw new Error(`GitHubProvider: FCR main ruleset config rejected: ${errors.join("; ")}`);
-      }
-
-      const { data: collaborators } = await this.octokit.repos.listCollaborators({
-        owner,
-        repo,
-        affiliation: "all",
-        per_page: 100,
-      });
-      const ownerLogin = owner.toLowerCase();
-      const independentReviewerReady = collaborators.some((collaborator) =>
-        collaborator.login.toLowerCase() !== ownerLogin
-        && collaborator.permissions?.push === true);
-      if (!independentReviewerReady) {
-        throw new Error(
-          "GitHubProvider: FCR main independent-review policy cannot be activated until a non-owner collaborator with write authority is available",
-        );
       }
     }
 
@@ -417,9 +404,9 @@ export class GitHubProvider implements RepositoryProvider {
       rules.push({
         type: "pull_request",
         parameters: {
-          dismiss_stale_reviews_on_push: hardenFounderControlRoomMainReview,
+          dismiss_stale_reviews_on_push: false,
           require_code_owner_review: false,
-          require_last_push_approval: hardenFounderControlRoomMainReview,
+          require_last_push_approval: false,
           required_approving_review_count: config.requiredApprovingReviewCount,
           required_review_thread_resolution: true,
         },
@@ -468,7 +455,7 @@ export class GitHubProvider implements RepositoryProvider {
       ? await this.octokit.repos.updateRepoRuleset({ ...payload, ruleset_id: match.id })
       : await this.octokit.repos.createRepoRuleset(payload);
 
-    if (hardenFounderControlRoomMainReview) {
+    if (hardenFounderControlRoomMainGovernance) {
       const { data: readback } = await this.octokit.repos.getRepoRuleset({
         owner,
         repo,
@@ -505,10 +492,20 @@ type RulesetReadback = {
 
 function fcrMainRulesetConfigErrors(config: RulesetConfig): string[] {
   const errors: string[] = [];
-  if (!config.requirePullRequest) errors.push("pull requests must be required");
-  if (!Number.isInteger(config.requiredApprovingReviewCount) || config.requiredApprovingReviewCount < 1) {
-    errors.push("at least one approving review is required");
+  if (config.name !== FCR_MAIN_CANONICAL_RULESET_NAME) {
+    errors.push(`ruleset name must remain canonical: ${FCR_MAIN_CANONICAL_RULESET_NAME}`);
   }
+  if (!config.requirePullRequest) errors.push("pull requests must be required");
+  if (!Number.isInteger(config.requiredApprovingReviewCount) || config.requiredApprovingReviewCount !== 0) {
+    errors.push("approving review count must be 0 under founder-final authority");
+  }
+  for (const check of FCR_MAIN_REQUIRED_STATUS_CHECKS) {
+    if (!config.requiredStatusCheckNames.includes(check)) {
+      errors.push(`required status check is missing: ${check}`);
+    }
+  }
+  if (!config.blockForcePushes) errors.push("force pushes must be blocked");
+  if (!config.blockDeletion) errors.push("branch deletion must be blocked");
   return errors;
 }
 
@@ -554,8 +551,12 @@ function fcrMainRulesetReadbackErrors(config: RulesetConfig, value: unknown): st
   if (pullParameters.required_approving_review_count !== config.requiredApprovingReviewCount) {
     errors.push("approving review count does not match requested policy");
   }
-  if (pullParameters.dismiss_stale_reviews_on_push !== true) errors.push("stale approvals are not dismissed on push");
-  if (pullParameters.require_last_push_approval !== true) errors.push("last-push approval is not required");
+  if (pullParameters.dismiss_stale_reviews_on_push !== false) {
+    errors.push("stale-review dismissal must remain disabled when no human approvals are required");
+  }
+  if (pullParameters.require_last_push_approval !== false) {
+    errors.push("last-push human approval must remain disabled under founder-final authority");
+  }
   if (pullParameters.required_review_thread_resolution !== true) errors.push("review-thread resolution is not required");
 
   if (config.requiredStatusCheckNames.length > 0) {
