@@ -88,12 +88,14 @@ export interface XEngagementSignalStore {
   get(resourceId: string): Promise<XEngagementCacheEnvelope | null>;
   acquire(resourceId: string): Promise<XEngagementLease | null>;
   reserve(input: {
+    projectId: string;
     resourceId: string;
     topicKey: string;
     dateKey: string;
     reservedAt: string;
   }): Promise<void>;
   complete(input: {
+    projectId: string;
     resourceId: string;
     topicKey: string;
     dateKey: string;
@@ -296,10 +298,15 @@ export class XEngagementSignalService {
     this.#now = options.now ?? (() => new Date());
   }
 
-  async getTopicEngagement(topicInput: string): Promise<XEngagementSignal> {
-    const topic = normalizedTopic(topicInput);
+  async getTopicEngagement(input: {
+    projectId: string;
+    topic: string;
+  }): Promise<XEngagementSignal> {
+    const topic = normalizedTopic(input.topic);
     const now = this.#now();
-    if (!topic || topic.length > 120) return unknown(topic, 'INVALID_TOPIC', now);
+    if (!topic || topic.length > 120 || !input.projectId.trim()) {
+      return unknown(topic, 'INVALID_TOPIC', now);
+    }
 
     const normalized = topicKey(topic);
     const day = dateKey(now);
@@ -307,7 +314,14 @@ export class XEngagementSignalService {
     const existingInFlight = this.#inFlight.get(id);
     if (existingInFlight) return existingInFlight;
 
-    const task = this.#getOrFetch({ topic, topicKey: normalized, day, resourceId: id, now });
+    const task = this.#getOrFetch({
+      projectId: input.projectId,
+      topic,
+      topicKey: normalized,
+      day,
+      resourceId: id,
+      now,
+    });
     this.#inFlight.set(id, task);
     try {
       return await task;
@@ -317,6 +331,7 @@ export class XEngagementSignalService {
   }
 
   async #getOrFetch(input: {
+    projectId: string;
     topic: string;
     topicKey: string;
     day: string;
@@ -354,6 +369,7 @@ export class XEngagementSignalService {
       const reservedAt = input.now.toISOString();
       try {
         await this.#store.reserve({
+          projectId: input.projectId,
           resourceId: input.resourceId,
           topicKey: input.topicKey,
           dateKey: input.day,
@@ -366,6 +382,7 @@ export class XEngagementSignalService {
       const result = await this.#runActor(input.topic, input.now);
       try {
         await this.#store.complete({
+          projectId: input.projectId,
           resourceId: input.resourceId,
           topicKey: input.topicKey,
           dateKey: input.day,
