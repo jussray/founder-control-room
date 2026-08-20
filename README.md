@@ -40,7 +40,7 @@ Current implementation includes:
 - a privacy-safe public skill-testing evidence loop with `/devil` v1 structured receipts and aggregate analytics;
 - first-party LinkedIn founder-content execution with exact Current You authority, FCR-owned one-shot approval storage/claim, temporal revalidation, and provider readback requirements;
 - provider-neutral n8n founder-content orchestration contracts that keep contract capability separate from runtime configuration and final provider outcome;
-- provider-neutral founder-content contracts under `tools/founder-content-contracts/`, with `tools/zapier/` retained only as compatibility exports for bounded connector and scheduling paths;
+- provider-neutral founder-content contracts under `tools/founder-content-contracts/`, with core approval storage, first-party execution, and temporal revalidation importing the canonical provider-neutral authorization contract directly while `tools/zapier/` remains a compatibility export surface for bounded connector and scheduling callers;
 - founder-authenticated n8n/Buffer activation readiness that exposes configuration presence and provider allowlist state without returning webhook/token values or promoting configuration into live proof;
 - bounded Zapier/Buffer integration where it still adds connector, scheduling, or fallback value without becoming publication authority;
 - HubSpot integration boundaries that keep CRM metadata and external communication separate from repository truth and founder authority;
