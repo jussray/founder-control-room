@@ -6,6 +6,8 @@ Authoritative code:
 
 - `src/lib/xEngagementSignal.ts`
 - `src/lib/__tests__/xEngagementSignal.test.ts`
+- `src/http/routes/xEngagementSignalMcp.ts`
+- `src/http/routes/__tests__/xEngagementSignalMcp.test.ts`
 - `supabase/migrations/20260820003500_portfolio_signal_observations.sql`
 
 ## Founder outcome
@@ -35,6 +37,24 @@ founder decision / existing publication gates
 ```
 
 Product repositories are consumers of a normalized aggregate signal. They do not receive `APIFY_TOKEN`, raw scraped posts, author identities, or a second paid-scraper implementation.
+
+## Portable read-only MCP seam
+
+FCR exposes the aggregate through a separate read-only companion MCP endpoint:
+
+```text
+POST /mcp/founder-signal-x-engagement
+```
+
+It uses the existing `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN` credential root and advertises one tool:
+
+```text
+get_x_engagement_signal(projectId, topic)
+```
+
+The handler repeats bearer authentication as defense in depth even though the server mounts the shared MCP auth middleware first. The tool is annotated read-only, destructive=false, and idempotent. It returns only the normalized signal, Gate 3 state, and explicit non-authority metadata.
+
+The publishing/write-authority middleware is intentionally **not** mounted on this endpoint because there is no publication or mutation action to authorize. This does not create a second authority lane: the tool cannot publish, change content, elevate permissions, accept provider credentials in arguments, or bypass the existing publication path. ChatGPT, Claude, or another approved portable workbench may consume this endpoint as an evidence surface while FCR remains provider owner and proof ledger.
 
 ## Adapter contract
 
@@ -119,7 +139,7 @@ A topic can still disclose private strategy, so the observation remains inside t
 
 ### Chief AI Machine + PromptOS
 
-**Reasoning consumers, not provider owners.** They may compare a `KNOWN` normalized aggregate against an explicitly supplied owned-channel median. `UNKNOWN` must remain HOLD. They must not acquire `APIFY_TOKEN`, call the actor directly, or convert advisory evidence into execution authority.
+**Reasoning consumers, not provider owners.** They may compare a `KNOWN` normalized aggregate against an explicitly supplied owned-channel median. `UNKNOWN` must remain HOLD. They must not acquire `APIFY_TOKEN`, call the actor directly, or convert advisory evidence into execution authority. Portable workbenches can reach the aggregate through the FCR read-only MCP tool rather than installing a provider adapter in Chief or PromptOS.
 
 ### StoryEngine
 
@@ -155,6 +175,7 @@ Repository implementation proves only the adapter contract. It does not prove:
 - the token is configured;
 - live use is enabled;
 - the portfolio-signal migration has been applied to the intended FCR database;
+- the read-only MCP endpoint has been deployed to the intended FCR runtime;
 - a paid run has occurred;
 - the actor currently returned useful data;
 - a campaign was approved or published; or
@@ -168,10 +189,11 @@ contract-capable
 → migration-applied
 → live-enabled
 → adapter-proven
+→ MCP-runtime-proven
 → provider-outcome-proven
 → business-outcome-observed
 ```
 
 ## Rollback
 
-Close/revert the focused FCR adapter and migration source change and leave live enablement off. Product repositories require no provider rollback because they do not own the token, billing, actor, or cache.
+Close/revert the focused FCR adapter, MCP seam, and migration source change and leave live enablement off. Product repositories require no provider rollback because they do not own the token, billing, actor, or cache.
