@@ -10,7 +10,8 @@ import {
   type XEngagementSignalMcpDependencies,
 } from '../xEngagementSignalMcp.js';
 
-const TOKEN = 'test-founder-signal-engine-mcp-token';
+const READ_TOKEN = 'test-founder-signal-read-mcp-token';
+const WRITE_TOKEN = 'test-founder-signal-engine-mcp-token';
 const ENDPOINT = '/mcp/founder-signal-x-engagement';
 
 function rpc(method: string, params?: unknown, id: number | string = 1) {
@@ -30,7 +31,10 @@ function buildApp(overrides: XEngagementSignalMcpDependencies = {}) {
   app.post(
     ENDPOINT,
     createXEngagementSignalMcpHandler({
-      env: { FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: TOKEN },
+      env: {
+        FOUNDER_SIGNAL_READ_MCP_TOKEN: READ_TOKEN,
+        FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: WRITE_TOKEN,
+      },
       getSignal: vi.fn(async ({ topic }) => ({
         status: 'UNKNOWN' as const,
         topic,
@@ -49,8 +53,17 @@ function buildApp(overrides: XEngagementSignalMcpDependencies = {}) {
 }
 
 describe('X engagement read-only MCP', () => {
-  it('requires the existing Founder Signal MCP bearer token before tool discovery', async () => {
+  it('requires the dedicated read-only bearer token before tool discovery', async () => {
     const response = await request(buildApp()).post(ENDPOINT).send(rpc('tools/list'));
+    expect(response.status).toBe(401);
+    expect(response.body.error.message).toBe('Unauthorized');
+  });
+
+  it('rejects the broader Founder Signal write token at the read-only endpoint', async () => {
+    const response = await request(buildApp())
+      .post(ENDPOINT)
+      .set('authorization', `Bearer ${WRITE_TOKEN}`)
+      .send(rpc('tools/list'));
     expect(response.status).toBe(401);
     expect(response.body.error.message).toBe('Unauthorized');
   });
@@ -58,7 +71,7 @@ describe('X engagement read-only MCP', () => {
   it('advertises exactly one observation-only tool', async () => {
     const response = await request(buildApp())
       .post(ENDPOINT)
-      .set('authorization', `Bearer ${TOKEN}`)
+      .set('authorization', `Bearer ${READ_TOKEN}`)
       .send(rpc('tools/list'));
 
     expect(response.status).toBe(200);
@@ -87,7 +100,7 @@ describe('X engagement read-only MCP', () => {
     }));
     const response = await request(buildApp({ getSignal }))
       .post(ENDPOINT)
-      .set('authorization', `Bearer ${TOKEN}`)
+      .set('authorization', `Bearer ${READ_TOKEN}`)
       .send(toolCall({ projectId: 'jbh-private', topic: 'lace wigs' }));
 
     expect(response.status).toBe(200);
@@ -121,7 +134,7 @@ describe('X engagement read-only MCP', () => {
     }));
     const response = await request(buildApp({ getSignal }))
       .post(ENDPOINT)
-      .set('authorization', `Bearer ${TOKEN}`)
+      .set('authorization', `Bearer ${READ_TOKEN}`)
       .send(toolCall({ projectId: 'chief-ai-machine', topic: 'founder systems' }));
 
     expect(response.status).toBe(200);
@@ -138,7 +151,7 @@ describe('X engagement read-only MCP', () => {
     const getSignal = vi.fn();
     const response = await request(buildApp({ getSignal }))
       .post(ENDPOINT)
-      .set('authorization', `Bearer ${TOKEN}`)
+      .set('authorization', `Bearer ${READ_TOKEN}`)
       .send(toolCall({ projectId: '', topic: 'x', token: 'must-not-be-accepted' }));
 
     expect(response.status).toBe(400);
@@ -147,7 +160,7 @@ describe('X engagement read-only MCP', () => {
     expect(getSignal).not.toHaveBeenCalled();
   });
 
-  it('is mounted outside browser CSRF with the shared MCP auth and no write-authority middleware', () => {
+  it('is mounted outside browser CSRF with dedicated read auth and no write-authority middleware', () => {
     const server = readFileSync(new URL('../../server.ts', import.meta.url), 'utf8');
     const routeStart = server.indexOf("'/mcp/founder-signal-x-engagement'");
     const csrfStart = server.indexOf('app.use(requireSameOriginBrowserMutation)');
@@ -155,8 +168,9 @@ describe('X engagement read-only MCP', () => {
     expect(routeStart).toBeLessThan(csrfStart);
 
     const routeWindow = server.slice(routeStart, routeStart + 400);
-    expect(routeWindow).toContain('requireFounderSignalEngineMcpToken');
+    expect(routeWindow).toContain('requireFounderSignalReadMcpToken');
     expect(routeWindow).toContain('handleXEngagementSignalMcp');
+    expect(routeWindow).not.toContain('requireFounderSignalEngineMcpToken');
     expect(routeWindow).not.toContain('requireFounderSignalEngineReviewOnly');
   });
 });
