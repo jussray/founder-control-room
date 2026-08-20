@@ -16,6 +16,8 @@ const APIFY_API_BASE = 'https://api.apify.com/v2';
 const LIVE_TRUE = new Set(['1', 'true', 'yes', 'on']);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const LEASE_TTL_SECONDS = 300;
+const CREDENTIAL_LIKE_TOPIC =
+  /(sk-[A-Za-z0-9_-]{12,}|Bearer\s+\S+|(?:api|service)[_-]?(?:key|token)\s*[:=]|(?:password|secret|token)\s*[:=]\s*\S{4,})/i;
 
 type UnknownReason =
   | 'LIVE_DISABLED'
@@ -304,7 +306,12 @@ export class XEngagementSignalService {
   }): Promise<XEngagementSignal> {
     const topic = normalizedTopic(input.topic);
     const now = this.#now();
-    if (!topic || topic.length > 120 || !input.projectId.trim()) {
+    if (
+      !topic
+      || topic.length > 120
+      || !input.projectId.trim()
+      || CREDENTIAL_LIKE_TOPIC.test(topic)
+    ) {
       return unknown(topic, 'INVALID_TOPIC', now);
     }
 
