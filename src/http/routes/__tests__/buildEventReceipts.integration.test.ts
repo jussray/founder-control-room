@@ -234,7 +234,7 @@ describe('build-event receipt ingress', () => {
     expect(harness.storeCalls()).toBe(0);
   });
 
-  it('does not let the coverage credential set founder control-plane intent', async () => {
+  it('fails closed on coverage control-plane fields at the schema or policy boundary', async () => {
     const harness = appWith();
     const injectedGoal = await authorized(
       request(harness.app).post('/ingest/build-events/sekret-bip'),
@@ -265,10 +265,10 @@ describe('build-event receipt ingress', () => {
 
     expect(injectedGoal.status).toBe(403);
     expect(injectedGoal.body.error).toBe('external_receipts_cannot_set_control_plane_intent');
-    expect(wrongPhase.status).toBe(403);
-    expect(wrongPhase.body.error).toBe('coverage_receipt_requires_observe_phase');
-    expect(injectedRuntime.status).toBe(403);
-    expect(injectedRuntime.body.error).toBe('coverage_receipt_contains_unallowed_control_fact');
+    expect(wrongPhase.status).toBe(400);
+    expect(wrongPhase.body.error).toBe('invalid_build_event');
+    expect(injectedRuntime.status).toBe(400);
+    expect(injectedRuntime.body.error).toBe('invalid_build_event');
     expect(injectedAudit.status).toBe(403);
     expect(injectedAudit.body.error).toBe('external_receipts_cannot_set_audited_identity');
     expect(harness.storeCalls()).toBe(0);
@@ -713,6 +713,7 @@ describe('build-event receipt ingress', () => {
       category: 'decision',
       authority: 'authorized',
       decision: { value: 'approved', scope: 'merge' },
+      coverage: undefined,
       runtime: undefined,
     });
 
