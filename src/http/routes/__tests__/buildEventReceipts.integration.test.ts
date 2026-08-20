@@ -328,6 +328,45 @@ describe('build-event receipt ingress', () => {
     expect(harness.storeCalls()).toBe(0);
   });
 
+  it('rejects stale, future-ending, and overly broad coverage windows', async () => {
+    const harness = appWith();
+    const stale = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      coverage: {
+        ...coverageEvent().coverage,
+        windowStartedAt: '2026-08-18T18:30:00.000Z',
+        windowEndedAt: '2026-08-18T18:45:00.000Z',
+      },
+    }));
+    const futureEnding = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      coverage: {
+        ...coverageEvent().coverage,
+        windowStartedAt: '2026-08-18T20:38:00.000Z',
+        windowEndedAt: '2026-08-18T20:53:00.000Z',
+      },
+    }));
+    const tooLong = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      coverage: {
+        ...coverageEvent().coverage,
+        windowStartedAt: '2026-08-18T20:10:00.000Z',
+        windowEndedAt: '2026-08-18T20:50:00.000Z',
+      },
+    }));
+
+    expect(stale.status).toBe(403);
+    expect(stale.body.error).toBe('coverage_window_too_old');
+    expect(futureEnding.status).toBe(403);
+    expect(futureEnding.body.error).toBe('coverage_window_ends_after_receipt');
+    expect(tooLong.status).toBe(403);
+    expect(tooLong.body.error).toBe('coverage_window_too_long');
+    expect(harness.storeCalls()).toBe(0);
+  });
+
   it('is idempotent when the store reports a duplicate', async () => {
     const harness = appWith('duplicate');
     const response = await authorized(

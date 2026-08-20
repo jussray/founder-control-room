@@ -37,7 +37,8 @@ The policy is committed before an observation, so a desired release cannot negot
 
 | Dimension | Initial policy |
 | --- | --- |
-| Window | At least 15 minutes |
+| Window | 15 to 30 minutes |
+| Receipt freshness | Window must end no more than 60 minutes before its signed receipt |
 | Real sampled requests | At least 25 |
 | Previous-release share | At most 500 basis points (5%) |
 | Unclassified responses | Zero for a passed coverage receipt |
@@ -46,7 +47,7 @@ The policy is committed before an observation, so a desired release cannot negot
 | Allowed route classes | `front-door` only; a fixed safe label, not a path |
 | Synthetic probes | May never produce verified or passed coverage |
 
-This is not a claim that 15 minutes, 25 requests, or 5% is universally correct. It is a deliberately visible starting policy. Changing it requires a reviewed source change before the next observation.
+This is not a claim that 15 minutes, 25 requests, or 5% is universally correct. It is a deliberately visible starting policy. A passed receipt must also use a complete 15–30 minute window and arrive no more than 60 minutes after that window ends; the receiver rejects stale, future-ending, and overlong windows. Changing it requires a reviewed source change before the next observation.
 
 ## Portfolio applicability
 
@@ -74,7 +75,7 @@ A coverage receipt carries:
 
 A sequence of bounded receipts over adjacent windows is the rollout curve. The current-truth projection intentionally exposes only the newest coverage fact; the receipt history remains the evidence for the distribution's shape.
 
-The schema fails closed on raw-looking route strings, invalid counts, mismatched subtotals, synthetic-as-verified coverage, unknown tails on a passed receipt, unclassified traffic on a passed receipt, SHA drift, stale receipt time, and producer/repository impersonation.
+The schema fails closed on raw-looking route strings, invalid counts, mismatched subtotals, synthetic-as-verified coverage, unknown tails on a passed receipt, unclassified traffic on a passed receipt, SHA drift, stale or future-ending coverage windows, stale receipt time, and producer/repository impersonation.
 
 The projection exposes `runtimes` and `coverage` as separate facts. A runtime witness remains binary. Coverage may pass its initial observation policy while remaining a time-bound distribution that must be re-observed after the next deploy.
 
