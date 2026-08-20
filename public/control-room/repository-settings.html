@@ -41,6 +41,7 @@
 
     <section class="panel">
       <p class="warn">⚠ This changes real branch protection on the live repository. Requiring pull requests here will also block this app's own <span class="mono">integrate()</span> merges (a direct-write Merges API call, not a PR merge) unless this app's own GitHub App identity is listed as a bypass actor below.</p>
+      <p class="muted" id="founder-final-policy-note">Founder Control Room <span class="mono">main</span> uses founder-final authority: GitHub requires the pull request and exact-head machine gates, while deterministic independent review remains load-bearing inside <span class="mono">Required Gate</span>. GitHub human approval count is therefore <span class="mono">0</span>; authenticated founder-final approval remains a separate FCR authority receipt.</p>
     </section>
 
     <form id="ruleset-form" class="panel">
@@ -77,8 +78,9 @@
           <label class="checkbox"><input type="checkbox" name="blockDeletion" checked /> Block branch deletion</label>
         </div>
         <div>
-          <label>Required approving review count (only used if PR is required)</label>
-          <input name="requiredApprovingReviewCount" type="number" min="0" value="1" />
+          <label>Required approving GitHub review count</label>
+          <input name="requiredApprovingReviewCount" type="number" min="0" value="0" />
+          <p class="muted">For active FCR <span class="mono">main</span>, this must remain 0. Independent review is deterministic and exact-head; founder-final approval is authenticated separately.</p>
           <label>Required status check names (comma-separated, optional)</label>
           <input name="requiredStatusCheckNames" value="Required Gate, Verify test-ledger contract" />
         </div>
@@ -111,6 +113,7 @@
   <script>
     const STORAGE_KEY = 'fcr_session';
     const FCR_MAIN_RULESET_NAME = 'Founder Control Room main exact-head gate';
+    const FCR_MAIN_REQUIRED_CHECKS = ['Required Gate', 'Verify test-ledger contract'];
     const nodes = {
       form: document.getElementById('ruleset-form'),
       idempotencyKey: document.getElementById('idempotency-key'),
@@ -149,6 +152,11 @@
       const enforcement = String(values.get('enforcement') || 'active');
       const targetRefs = splitList(String(values.get('targetRefs') || ''));
       const bypassAppId = String(values.get('bypassAppId') || '').trim();
+      const requirePullRequest = values.get('requirePullRequest') === 'on';
+      const requiredApprovingReviewCount = Number(values.get('requiredApprovingReviewCount') || 0);
+      const requiredStatusCheckNames = splitList(String(values.get('requiredStatusCheckNames') || ''));
+      const blockForcePushes = values.get('blockForcePushes') === 'on';
+      const blockDeletion = values.get('blockDeletion') === 'on';
 
       const protectsActiveFcrMain =
         slug === 'founder-control-room' &&
@@ -160,16 +168,30 @@
         return;
       }
 
+      if (protectsActiveFcrMain) {
+        const missingChecks = FCR_MAIN_REQUIRED_CHECKS.filter((check) => !requiredStatusCheckNames.includes(check));
+        if (
+          !requirePullRequest ||
+          requiredApprovingReviewCount !== 0 ||
+          missingChecks.length > 0 ||
+          !blockForcePushes ||
+          !blockDeletion
+        ) {
+          nodes.result.textContent = 'Blocked: active Founder Control Room main protection must preserve founder-final authority: PR required, 0 GitHub human approvals, Required Gate + Verify test-ledger contract, force-push block, and deletion block.';
+          return;
+        }
+      }
+
       const body = {
         idempotencyKey: String(values.get('idempotencyKey') || '').trim(),
         name,
         enforcement,
         targetRefs,
-        requirePullRequest: values.get('requirePullRequest') === 'on',
-        requiredApprovingReviewCount: Number(values.get('requiredApprovingReviewCount') || 0),
-        requiredStatusCheckNames: splitList(String(values.get('requiredStatusCheckNames') || '')),
-        blockForcePushes: values.get('blockForcePushes') === 'on',
-        blockDeletion: values.get('blockDeletion') === 'on',
+        requirePullRequest,
+        requiredApprovingReviewCount,
+        requiredStatusCheckNames,
+        blockForcePushes,
+        blockDeletion,
         bypassActors: bypassAppId ? [{ kind: 'app', id: bypassAppId }] : [],
       };
 
