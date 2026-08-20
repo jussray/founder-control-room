@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   CANONICAL_RULESET_NAME,
   buildBlockedReport,
@@ -194,4 +195,25 @@ test('provider-read failures are classified without retaining raw provider text'
   assert.equal(classifyProviderReadFailure(new Error('HTTP 401: Bad credentials')), 'provider_read_unauthenticated');
   assert.equal(classifyProviderReadFailure(new Error('GITHUB_TOKEN is required for governance preflight')), 'provider_read_token_missing');
   assert.equal(classifyProviderReadFailure(new Error('socket closed')), 'provider_read_failed');
+});
+
+test('workflow keeps production App identity outside the pull-request execution path', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/github-governance-preflight.yml', import.meta.url), 'utf8');
+  const [contractSide, providerSide] = workflow.split('  governance-provider-read:');
+
+  assert.ok(providerSide, 'governance-provider-read job must exist');
+  assert.match(workflow, /pull_request:/);
+  assert.match(workflow, /push:\n\s+branches: \[main\]/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(contractSide, /governance-contract:/);
+  assert.doesNotMatch(contractSide, /environment:\s*production/);
+  assert.doesNotMatch(contractSide, /secrets\.GITHUB_APP_ID/);
+
+  assert.match(providerSide, /needs:\s*governance-contract/);
+  assert.match(providerSide, /environment:\s*production/);
+  assert.match(providerSide, /github\.event_name == 'push'/);
+  assert.match(providerSide, /github\.event_name == 'workflow_dispatch'/);
+  assert.match(providerSide, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(providerSide, /GITHUB_APP_ID:\s*\$\{\{ secrets\.GITHUB_APP_ID \}\}/);
+  assert.match(providerSide, /ref:\s*\$\{\{ github\.sha \}\}/);
 });
