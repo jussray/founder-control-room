@@ -1,9 +1,10 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-export const CONTRACT = 'fcr/github-governance-preflight@v1';
+export const CONTRACT = 'fcr/github-governance-preflight@v2';
 export const CANONICAL_RULESET_NAME = 'Founder Control Room main exact-head gate';
 export const REQUIRED_CHECKS = ['Required Gate', 'Verify test-ledger contract'];
+export const REQUIRED_APPROVING_REVIEW_COUNT = 0;
 
 const API_VERSION = '2026-03-10';
 const API_ROOT = 'https://api.github.com';
@@ -84,9 +85,9 @@ export function canonicalFloorSatisfied(snapshot) {
     && snapshot.target === 'branch'
     && snapshot.targetsRequestedRef === true
     && snapshot.requirePullRequest === true
-    && snapshot.requiredApprovingReviewCount >= 1
-    && snapshot.dismissStaleReviewsOnPush === true
-    && snapshot.requireLastPushApproval === true
+    && snapshot.requiredApprovingReviewCount === REQUIRED_APPROVING_REVIEW_COUNT
+    && snapshot.dismissStaleReviewsOnPush === false
+    && snapshot.requireLastPushApproval === false
     && snapshot.requiredReviewThreadResolution === true
     && snapshot.strictRequiredStatusChecks === true
     && REQUIRED_CHECKS.every((check) => checks.has(check))
@@ -111,6 +112,7 @@ export function buildReport({
   const canonicalMatches = snapshots.filter((snapshot) => snapshot.name === canonicalName);
   const canonical = canonicalMatches[0] ?? null;
   const eligibleReviewers = collaborators.filter((collaborator) => collaboratorCanReview(collaborator, owner));
+  const floorSatisfied = canonicalFloorSatisfied(canonical);
 
   return {
     contract: CONTRACT,
@@ -125,15 +127,15 @@ export function buildReport({
     activeRulesetCountTargetingRef: activeTargetingRef.length,
     canonicalRulesetMatchCount: canonicalMatches.length,
     canonicalRuleset: canonical,
-    canonicalFloorSatisfied: canonicalFloorSatisfied(canonical),
+    canonicalFloorSatisfied: floorSatisfied,
+    independentHumanReviewerRequired: false,
     independentReviewerReady: eligibleReviewers.length > 0,
     eligibleNonOwnerWriteReviewerCount: eligibleReviewers.length,
     observedBranchRulesets: snapshots,
     status:
       canonicalMatches.length === 1
       && activeTargetingRef.length === 1
-      && canonicalFloorSatisfied(canonical)
-      && eligibleReviewers.length > 0
+      && floorSatisfied
         ? 'READY'
         : 'NOT_READY',
   };
@@ -154,6 +156,7 @@ export function buildBlockedReport({ repository, targetRef = 'main', reason = 'p
     canonicalRulesetMatchCount: null,
     canonicalRuleset: null,
     canonicalFloorSatisfied: false,
+    independentHumanReviewerRequired: false,
     independentReviewerReady: false,
     eligibleNonOwnerWriteReviewerCount: null,
     observedBranchRulesets: [],
@@ -261,6 +264,7 @@ async function main() {
     activeRulesetCountTargetingRef: report.activeRulesetCountTargetingRef,
     canonicalRulesetMatchCount: report.canonicalRulesetMatchCount,
     canonicalFloorSatisfied: report.canonicalFloorSatisfied,
+    independentHumanReviewerRequired: report.independentHumanReviewerRequired,
     independentReviewerReady: report.independentReviewerReady,
     eligibleNonOwnerWriteReviewerCount: report.eligibleNonOwnerWriteReviewerCount,
   }, null, 2));
