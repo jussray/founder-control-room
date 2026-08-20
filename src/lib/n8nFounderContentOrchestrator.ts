@@ -5,7 +5,7 @@ import {
 } from './founderContentCadence.js';
 import { executionScopeMatches } from './idempotencyScope.js';
 // @ts-expect-error -- the canonical #428 social-distribution contract is CommonJS and intentionally remains the single authority implementation.
-import socialDistributionContract from '../../tools/zapier/social-distribution-contract.cjs';
+import socialDistributionContract from '../../tools/founder-content-contracts/social-distribution-contract.cjs';
 
 export const N8N_FOUNDER_CONTENT_CONTRACT = 'fcr/n8n-founder-content-orchestration@v1' as const;
 export const N8N_FOUNDER_CONTENT_EVENT = 'founder-content.schedule.requested' as const;

@@ -121,6 +121,8 @@ exact public-safe proposal
 
 Changing approved copy, evidence identity, proposal identity, source version, channel, or governing authorization fingerprint requires a fresh matching approval. A consumed approval is not replay authority after a downstream failure. Approval existence, approval issuance, or successful approval claim is not publication truth; provider readback remains terminal evidence of the external artifact.
 
+Provider-neutral contract placement does not change publication authority or prove a provider migration. Canonical founder-content contracts live under `tools/founder-content-contracts/`; legacy `tools/zapier/` paths are compatibility exports for bounded connector and scheduling paths. n8n, Zapier, Buffer, or any later adapter remains a provider boundary: it may not create founder authority, it may not turn configuration or scheduler acceptance into publication truth, and it still requires the same exact approval, temporal revalidation, provider mutation, readback, and durable receipt.
+
 A standing class authorization must never be interpreted as permission to bypass that exact-proposal approval membrane when the active route requires it.
 
 This class boundary does not authorize:
