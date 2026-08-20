@@ -31,6 +31,7 @@ import { n8nConveyorRouter } from './routes/n8nConveyor.js';
 import { switchboardRouter } from './routes/switchboard.js';
 import { securityPostureRouter } from './routes/securityPosture.js';
 import { handleFounderSignalEngineMcp } from './routes/founderSignalEngineMcp.js';
+import { handleXEngagementSignalMcp } from './routes/xEngagementSignalMcp.js';
 import { handleFounderSignalReviewContextIngest } from './routes/founderSignalReviewContexts.js';
 import { handleFounderSignalReviewEmailIngest } from './routes/founderSignalReviewEmailIngress.js';
 import { handleHairCommerceReceiptIngest } from './routes/hairCommerceReceipts.js';
@@ -205,6 +206,13 @@ export function createServer(options: CreateServerOptions = {}) {
     requireFounderSignalEngineMcpToken,
     requireFounderSignalEngineReviewOnly,
     handleFounderSignalEngineMcp,
+  );
+  app.post(
+    '/mcp/founder-signal-x-engagement',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '16kb' }),
+    requireFounderSignalEngineMcpToken,
+    handleXEngagementSignalMcp,
   );
 
   app.use(requireSameOriginBrowserMutation);
