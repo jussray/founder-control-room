@@ -18,7 +18,7 @@
     if (!list) return;
 
     if (projectTruth.state === 'idle' || projectTruth.state === 'loading') {
-      if (list.querySelector('.card')) return;
+      if (list.querySelector('.card') || list.querySelector('[data-read-truth="projects-loading"]')) return;
       list.innerHTML = '<p class="muted" data-read-truth="projects-loading" role="status" aria-live="polite">Loading current project truth…</p>';
       return;
     }
@@ -27,6 +27,8 @@
       const status = Number.isInteger(projectTruth.httpStatus)
         ? ` (HTTP ${projectTruth.httpStatus})`
         : '';
+      const existing = list.querySelector('[data-read-truth="projects-unknown"]');
+      if (existing && existing.textContent?.includes(`authoritative read failed${status}`)) return;
       list.innerHTML = `
         <p class="error" data-read-truth="projects-unknown" role="alert">
           Projects unavailable. Current project registration state is UNKNOWN because the authoritative read failed${status}.
