@@ -6,6 +6,7 @@ Authoritative code:
 
 - `src/lib/xEngagementSignal.ts`
 - `src/lib/__tests__/xEngagementSignal.test.ts`
+- `supabase/migrations/20260820003500_portfolio_signal_observations.sql`
 
 ## Founder outcome
 
@@ -58,7 +59,7 @@ These conditions return `UNKNOWN`:
 
 - live provider use is disabled;
 - token is missing;
-- founder-set cost cap is missing;
+- founder-set cost cap is missing or invalid;
 - topic input is invalid;
 - actor validation fails;
 - provider/rate-limit/network failure;
@@ -75,10 +76,10 @@ Live calls require all three runtime values:
 ```text
 X_ENGAGEMENT_LIVE_ENABLED=true
 APIFY_TOKEN=<private provider secret>
-X_ENGAGEMENT_MAX_CHARGE_USD=<explicit positive cap>
+X_ENGAGEMENT_MAX_CHARGE_USD=<explicit positive cap at or below 0.10>
 ```
 
-No value is committed to source.
+No secret value is committed to source. The adapter also hard-fails closed when the configured per-run cap exceeds `$0.10`, so a typo cannot silently turn this narrow signal lookup into an open-ended provider spend.
 
 The cache identity is:
 
@@ -86,11 +87,13 @@ The cache identity is:
 normalized topic + UTC date
 ```
 
-FCR uses the existing service-role-only `provider_observations` table as durable cache state and the existing atomic controller-lease RPC for cross-process contention.
+FCR uses the dedicated service-role-only `portfolio_signal_observations` table for this cross-project public-market aggregate. It deliberately does **not** use project-scoped `provider_observations`, because project evidence must remain partitioned even when a public-market signal is reusable portfolio-wide. The existing atomic controller-lease RPC handles cross-process contention.
+
+The caller still supplies its project identity so the request remains project-aware at the service boundary, but the public-market cache is not partitioned by product. No product-private data is written into the portfolio cache.
 
 Before the paid actor POST, FCR writes a durable `RESERVED` observation. Therefore a worker crash after reservation fails closed as `UNKNOWN / CACHE_RESERVED` for the rest of that UTC topic/day instead of silently starting a second paid run.
 
-A successful or failed provider result becomes `COMPLETE` and is reused by every portfolio project asking for the same normalized topic on the same UTC date. This is intentionally a shared public-market observation, not shared project-private data.
+A successful or failed provider result becomes `COMPLETE` and is reused by every portfolio project asking for the same normalized topic on the same UTC date. This is intentionally a shared public-market observation, not shared project-private evidence.
 
 ## Privacy and Sauce Guard
 
@@ -151,6 +154,7 @@ Repository implementation proves only the adapter contract. It does not prove:
 - an Apify account or plan exists;
 - the token is configured;
 - live use is enabled;
+- the portfolio-signal migration has been applied to the intended FCR database;
 - a paid run has occurred;
 - the actor currently returned useful data;
 - a campaign was approved or published; or
@@ -161,6 +165,7 @@ Keep these truth states separate:
 ```text
 contract-capable
 → configured
+→ migration-applied
 → live-enabled
 → adapter-proven
 → provider-outcome-proven
@@ -169,4 +174,4 @@ contract-capable
 
 ## Rollback
 
-Close/revert the focused FCR adapter change and leave live enablement off. Product repositories require no provider rollback because they do not own the token, billing, actor, or cache.
+Close/revert the focused FCR adapter and migration source change and leave live enablement off. Product repositories require no provider rollback because they do not own the token, billing, actor, or cache.
