@@ -42,6 +42,41 @@ describe('X engagement portfolio boundaries', () => {
     expect(fetchCalls).toBe(0);
   });
 
+  it('rejects credential-like text before hashing, caching, or provider egress', async () => {
+    let fetchCalls = 0;
+    let storeCalls = 0;
+    const store: XEngagementSignalStore = {
+      async get() { storeCalls += 1; return null; },
+      async acquire() { storeCalls += 1; return null; },
+      async reserve() { storeCalls += 1; },
+      async complete() { storeCalls += 1; },
+      async release() { storeCalls += 1; },
+    };
+    const fetchImpl: typeof fetch = async () => {
+      fetchCalls += 1;
+      throw new Error('network must not be reached');
+    };
+    const service = new XEngagementSignalService({
+      config: {
+        liveEnabled: true,
+        token: 'private-test-token',
+        maxTotalChargeUsd: 0.05,
+      },
+      store,
+      fetchImpl,
+      now: () => new Date('2026-08-19T20:00:00.000Z'),
+    });
+
+    const result = await service.getTopicEngagement({
+      projectId: 'chief-ai-machine',
+      topic: 'api_key=supersecretvalue',
+    });
+    expect(result.status).toBe('UNKNOWN');
+    expect(result.status === 'UNKNOWN' && result.reason).toBe('INVALID_TOPIC');
+    expect(fetchCalls).toBe(0);
+    expect(storeCalls).toBe(0);
+  });
+
   it('keeps the reusable signal cache outside project-scoped provider observations', () => {
     const migration = readFileSync(
       new URL('../../../supabase/migrations/20260820003500_portfolio_signal_observations.sql', import.meta.url),
