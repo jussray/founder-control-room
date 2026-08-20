@@ -143,7 +143,9 @@ function coverageWithinTruthLease(
   const windowEndedAtMs = Date.parse(coverage.windowEndedAt);
   return Number.isFinite(windowEndedAtMs)
     && windowEndedAtMs <= nowMs
-    && nowMs - windowEndedAtMs <= CURRENT_COVERAGE_TRUTH_LEASE_MS;
+    // A lease is valid on [windowEndedAt, windowEndedAt + lease), so an
+    // aggregate stops being "current" at its exact expiry boundary.
+    && nowMs - windowEndedAtMs < CURRENT_COVERAGE_TRUTH_LEASE_MS;
 }
 
 function quality(

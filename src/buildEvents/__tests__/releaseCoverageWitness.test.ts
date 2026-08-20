@@ -95,9 +95,9 @@ describe('independent passed coverage witness', () => {
 
   it('rejects stale, self-witnessing, and deployment-SHA-mismatched evidence', () => {
     expect(assess(
-      [observation({ observedAt: '2026-08-20T15:44:59.999Z' })],
+      [observation({ observedAt: '2026-08-20T15:45:00.000Z' })],
       SHA,
-      20 * 60,
+      14 * 60,
     )).toEqual({
       status: 'stale',
       code: 'coverage_witness_cloudflare_observation_stale',
@@ -149,7 +149,11 @@ describe('independent passed coverage witness', () => {
       status: 'mismatch',
       code: 'coverage_witness_independent_aggregate_mismatch',
     });
-    expect(assess([observation({ observedAt: '2026-08-20T15:44:59.999Z' })])).toEqual({
+    expect(assess(
+      [observation({ observedAt: '2026-08-20T15:44:59.999Z' })],
+      SHA,
+      20 * 60,
+    )).toEqual({
       status: 'stale',
       code: 'coverage_witness_coverage_observation_precedes_window',
     });
