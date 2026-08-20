@@ -6,8 +6,10 @@ Authoritative code:
 
 - `src/lib/xEngagementSignal.ts`
 - `src/lib/__tests__/xEngagementSignal.test.ts`
+- `src/lib/__tests__/xEngagementSignal.boundary.test.ts`
 - `src/http/routes/xEngagementSignalMcp.ts`
 - `src/http/routes/__tests__/xEngagementSignalMcp.test.ts`
+- `src/http/middleware/founderSignalReadMcpAuth.ts`
 - `supabase/migrations/20260820003500_portfolio_signal_observations.sql`
 
 ## Founder outcome
@@ -46,15 +48,23 @@ FCR exposes the aggregate through a separate read-only companion MCP endpoint:
 POST /mcp/founder-signal-x-engagement
 ```
 
-It uses the existing `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN` credential root and advertises one tool:
+It uses a dedicated least-privilege bearer credential:
+
+```text
+FOUNDER_SIGNAL_READ_MCP_TOKEN
+```
+
+That credential must be different from `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN`. A ChatGPT, Claude, or other read-only workbench that can ask for market evidence must not inherit access to the broader Founder Signal write bridge.
+
+The endpoint advertises one tool:
 
 ```text
 get_x_engagement_signal(projectId, topic)
 ```
 
-The handler repeats bearer authentication as defense in depth even though the server mounts the shared MCP auth middleware first. The tool is annotated read-only, destructive=false, and idempotent. It returns only the normalized signal, Gate 3 state, and explicit non-authority metadata.
+The server mounts dedicated read-MCP authentication, and the route handler repeats the same bearer check as defense in depth. The broader write token is rejected. The tool is annotated read-only, destructive=false, and idempotent. It returns only the normalized signal, Gate 3 state, and explicit non-authority metadata.
 
-The publishing/write-authority middleware is intentionally **not** mounted on this endpoint because there is no publication or mutation action to authorize. This does not create a second authority lane: the tool cannot publish, change content, elevate permissions, accept provider credentials in arguments, or bypass the existing publication path. ChatGPT, Claude, or another approved portable workbench may consume this endpoint as an evidence surface while FCR remains provider owner and proof ledger.
+The publishing/write-authority middleware is intentionally **not** mounted on this endpoint because there is no publication or mutation action to authorize. This does not create a second authority lane: the tool cannot publish, change content, elevate permissions, accept provider credentials in arguments, or bypass the existing publication path. Portable workbenches may consume it as an evidence surface while FCR remains provider owner and proof ledger.
 
 ## Adapter contract
 
@@ -71,6 +81,8 @@ The current actor contract requires at least 50 returned tweets per query, so v1
 
 Provider filtering is treated as candidate retrieval, not final truth. Local filtering remains authoritative for the 48-hour and reply-count rules.
 
+Credential-like topic input is rejected before hashing, durable storage, or provider egress. The adapter is not a secret transport. The MCP schema also rejects unexpected arguments such as caller-supplied tokens.
+
 ## UNKNOWN means HOLD
 
 The result is never coerced to zero.
@@ -80,7 +92,7 @@ These conditions return `UNKNOWN`:
 - live provider use is disabled;
 - token is missing;
 - founder-set cost cap is missing or invalid;
-- topic input is invalid;
+- topic input is invalid or credential-like;
 - actor validation fails;
 - provider/rate-limit/network failure;
 - no qualifying rows remain;
@@ -99,7 +111,7 @@ APIFY_TOKEN=<private provider secret>
 X_ENGAGEMENT_MAX_CHARGE_USD=<explicit positive cap at or below 0.10>
 ```
 
-No secret value is committed to source. The adapter also hard-fails closed when the configured per-run cap exceeds `$0.10`, so a typo cannot silently turn this narrow signal lookup into an open-ended provider spend.
+No secret value is committed to source. The adapter hard-fails closed when the configured per-run cap exceeds `$0.10`, so a typo cannot silently turn this narrow signal lookup into an open-ended provider spend.
 
 The cache identity is:
 
@@ -129,7 +141,7 @@ It does not retain:
 - customer/user data; or
 - project-private content.
 
-A topic can still disclose private strategy, so the observation remains inside the trusted FCR data boundary and must not be rendered into public evidence by default.
+A topic can still disclose private strategy, so callers must supply public-market topics only. Credential-like content is rejected in code, but the trusted FCR boundary remains the place for this aggregate and it must not be rendered into public proof by default.
 
 ## Project audit disposition
 
@@ -139,31 +151,43 @@ A topic can still disclose private strategy, so the observation remains inside t
 
 ### Chief AI Machine + PromptOS
 
-**Reasoning consumers, not provider owners.** They may compare a `KNOWN` normalized aggregate against an explicitly supplied owned-channel median. `UNKNOWN` must remain HOLD. They must not acquire `APIFY_TOKEN`, call the actor directly, or convert advisory evidence into execution authority. Portable workbenches can reach the aggregate through the FCR read-only MCP tool rather than installing a provider adapter in Chief or PromptOS.
+**Reasoning consumers, not provider owners.** They may compare a `KNOWN` normalized aggregate against an explicitly supplied owned-channel median. `UNKNOWN` must remain HOLD. They must not acquire `APIFY_TOKEN`, call the actor directly, or convert advisory evidence into execution authority. Portable workbenches reach the aggregate through the dedicated FCR read-only MCP tool rather than installing a provider adapter in Chief or PromptOS.
 
 ### StoryEngine
 
-**Selection consumer.** Story-to-social ranking may use a normalized market signal as one evidence input. Story quality, canon, proof, and publication authority remain separate.
+**Selection consumer.** Story-to-social ranking may use a normalized market signal as one evidence input. Story quality, canon, proof, and publication authority remain separate. StoryEngine does not own the provider credential.
 
 ### Juss Beautiful Hair
 
-**Consumer.** The brand can use a portfolio signal for topic qualification. The public storefront must never own the token or scraper. The private JBH-local prototype is superseded only after this FCR replacement has transferred and proven all unique obligations.
+**Consumer.** The current public storefront `jussray/jussbeautifulhair-site` must never own the token or scraper. `jussray/jbh-private` may consume the FCR aggregate for private topic qualification, but its local adapter draft is a replacement candidate to retire only after this FCR obligation is fully proven. The older `jussray/jussbeautifulhair1` source and archived `jussray/Juss-beautiful-hair-` are not new provider targets.
 
 ### Untold Stories + SWEATS
 
-**Consumers when a campaign actually needs the signal.** No duplicate provider integration is justified. Their product/brand rules remain authoritative over topic fit.
+**Consumers only when a real campaign needs the signal.** No duplicate provider integration is justified. Their product/brand rules remain authoritative over topic fit. SWEATS currently has no implementation surface that justifies a local provider dependency.
 
-### Se'kret Bip
+### Se'kret Bip teen product
 
-**Sanitized marketing consumer only.** Raw X content, handles, replies, or scraped provider payloads must not cross into teen, journal, family, wellness, or parent-visibility data paths. Only the aggregate public-market signal may be considered by the external founder-content layer, behind the existing sensitive-repository output firewall.
+**Sanitized founder-marketing consumer only.** Raw X content, handles, replies, or scraped provider payloads must not cross into teen, journal, family, wellness, or parent-visibility data paths. Only the aggregate public-market signal may be considered by the external founder-content layer, behind the existing sensitive-repository output firewall.
 
-### SolContinuity + SleepWealth-Agent + other portfolio projects
+### Se'kret Bip Jr
 
-**No default integration.** FCR may supply the aggregate signal if a future marketing/research decision explicitly needs it. Repository ownership of a scraper is not created merely because FCR can observe X.
+**No child-product integration.** `jussray/Se-kretBip` is the ages 5–12 Bip Jr product, not a duplicate of the teen app. No raw or aggregate social signal belongs in child personalization, study, authority, Bridge, or supervised-contact logic. A separate external founder-marketing workflow may consume FCR evidence without sending it into child data paths.
 
-### Historical/duplicate repositories
+### Se'kret Bip demo and protected historical lanes
 
-**No integration.** Archived, superseded, demo-only, or explicitly protected repositories are not provider deployment targets.
+`jussray/sekret-bip-demo` is explicitly non-canonical demonstration-only and receives no provider integration. `jussray/don-t-touch-this-one` remains observe-only. Archived `jussray/do-not-use` receives no integration. `Juss-Co/Bip` currently has no product source that justifies a provider seam.
+
+### SolContinuity
+
+**No default integration.** Social engagement must not become resilience or quorum evidence. FCR may supply the aggregate only to a separate future marketing/research decision.
+
+### SleepWealth-Agent
+
+**Marketing-only, never trading signal.** X engagement must not enter risk, portfolio, trade, execution, or paper-trading decision logic. If the project later needs founder-marketing research, it consumes the same FCR aggregate outside the financial decision path.
+
+### Profile, archived, superseded, and demo-only repositories
+
+**No integration.** A repository's existence inside the portfolio does not create a reason to install a paid provider dependency. Provider ownership remains centralized unless a future evidence-backed architecture demonstrates a different authority boundary.
 
 ## Provider and policy boundary
 
@@ -171,8 +195,9 @@ A third-party scraper does not transfer X platform-policy or legal responsibilit
 
 Repository implementation proves only the adapter contract. It does not prove:
 
-- an Apify account or plan exists;
-- the token is configured;
+- an Apify account or paid plan exists;
+- either MCP token is configured;
+- `APIFY_TOKEN` is configured;
 - live use is enabled;
 - the portfolio-signal migration has been applied to the intended FCR database;
 - the read-only MCP endpoint has been deployed to the intended FCR runtime;
@@ -196,4 +221,4 @@ contract-capable
 
 ## Rollback
 
-Close/revert the focused FCR adapter, MCP seam, and migration source change and leave live enablement off. Product repositories require no provider rollback because they do not own the token, billing, actor, or cache.
+Close/revert the focused FCR adapter, read-only MCP seam, and migration source change and leave live enablement off. Product repositories require no provider rollback because they do not own the token, billing, actor, or cache.
