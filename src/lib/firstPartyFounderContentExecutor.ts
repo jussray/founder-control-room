@@ -9,8 +9,8 @@ import {
   LinkedInFirstPartyAdapterError,
   createLinkedInFirstPartyAdapter,
 } from './linkedinFirstPartyAdapter.js';
-// @ts-expect-error -- canonical founder-content authority is intentionally owned by the existing CommonJS firewall contract.
-import founderContentAuthorizationContract from '../../tools/zapier/founder-content-authorization-contract.cjs';
+// @ts-expect-error -- canonical founder-content authority is the provider-neutral CommonJS firewall contract.
+import founderContentAuthorizationContract from '../../tools/founder-content-contracts/founder-content-authorization-contract.cjs';
 
 export const FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT =
   'fcr/first-party-founder-content-publish@v1' as const;
