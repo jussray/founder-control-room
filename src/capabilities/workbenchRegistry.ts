@@ -10,6 +10,7 @@ export interface Capability {
   proof: string[];
   risk: string;
   implementation: string;
+  runtime?: 'dynamic';
 }
 
 const risk = {
@@ -19,6 +20,16 @@ const risk = {
 };
 
 export const capabilities = [
+  {
+    id: 'project-health-refresh-v1', kind: 'Automation', category: 'automations', score: 99, runtime: 'dynamic',
+    summary: 'Refresh current repository identity, default-branch head, and provider verification signals.',
+    purpose: 'Give the founder a current provider-backed repository health observation through FCR\'s durable reconciliation loop instead of relying on stale screen state.',
+    inputs: [['projectSlug', 'string', 'Registered active FCR project slug']],
+    environment: ['Registered active project', 'Repository provider connection available to FCR'],
+    proof: ['Durable controller_outbox run ID', 'Provider observation persisted by ProjectController', 'Run reaches a terminal reconciliation state'],
+    risk: 'Read-only provider reconciliation. It cannot merge, deploy, publish, change credentials, or mutate repository/provider configuration.',
+    implementation: 'Runtime-backed: POST /capabilities/project-health-refresh-v1/runs with { projectSlug }, then poll GET /capabilities/runs/:runId.',
+  },
   {
     id: 'webhook-verify-hmac-worker-v1', kind: 'Automation', category: 'automations', score: 98,
     summary: 'Verify raw webhook bytes with HMAC-SHA256 before parsing.',
