@@ -4,6 +4,7 @@ import type {
   BuildEventPhase,
   BuildEventProviderRef,
   BuildEventRuntimeRef,
+  BuildReleaseCoverageRef,
   BuildEventTruth,
   BuildEventVerificationRef,
 } from './buildEvent.js';
@@ -48,6 +49,7 @@ export interface CurrentTruthProjection {
   founderDecision: CurrentTruthFact<BuildEventDecisionRef> | null;
   providers: Record<string, CurrentTruthFact<BuildEventProviderRef>>;
   runtimes: Record<string, CurrentTruthFact<BuildEventRuntimeRef>>;
+  coverage: Record<string, CurrentTruthFact<BuildReleaseCoverageRef>>;
   verifications: Record<string, CurrentTruthFact<BuildEventVerificationRef>>;
   quality: CurrentTruthQuality;
 }
@@ -108,12 +110,14 @@ function currentFactEvents(
   events: readonly BuildEvent[],
   providers: Record<string, CurrentTruthFact<BuildEventProviderRef>>,
   runtimes: Record<string, CurrentTruthFact<BuildEventRuntimeRef>>,
+  coverage: Record<string, CurrentTruthFact<BuildReleaseCoverageRef>>,
   verifications: Record<string, CurrentTruthFact<BuildEventVerificationRef>>,
   founderDecision: CurrentTruthFact<BuildEventDecisionRef> | null,
 ): BuildEvent[] {
   const selectedIds = new Set<string>();
   for (const item of Object.values(providers)) selectedIds.add(item.eventId);
   for (const item of Object.values(runtimes)) selectedIds.add(item.eventId);
+  for (const item of Object.values(coverage)) selectedIds.add(item.eventId);
   for (const item of Object.values(verifications)) selectedIds.add(item.eventId);
   if (founderDecision) selectedIds.add(founderDecision.eventId);
   return events.filter((event) => selectedIds.has(event.eventId));
@@ -122,6 +126,7 @@ function currentFactEvents(
 function boundSha(event: BuildEvent): string | null {
   return event.verification?.exactCommitSha
     ?? event.runtime?.releaseSha
+    ?? event.coverage?.releaseSha
     ?? event.repository?.commitSha
     ?? null;
 }
@@ -197,6 +202,14 @@ export function buildCurrentTruthProjection(
     (event) => event.runtime ?? null,
   );
 
+  const coverage = latestByKey(
+    events,
+    (event) => event.coverage
+      ? `${event.coverage.service}:${event.coverage.environment}`
+      : null,
+    (event) => event.coverage ?? null,
+  );
+
   const verifications = latestByKey(
     events,
     (event) => event.verification?.kind ?? null,
@@ -207,6 +220,7 @@ export function buildCurrentTruthProjection(
     events,
     providers,
     runtimes,
+    coverage,
     verifications,
     founderDecision,
   );
@@ -224,6 +238,7 @@ export function buildCurrentTruthProjection(
     founderDecision,
     providers,
     runtimes,
+    coverage,
     verifications,
     quality: quality(
       events,

@@ -41,6 +41,48 @@ function runtimeEvent(overrides: Record<string, unknown> = {}) {
   };
 }
 
+
+function coverageEvent(overrides: Record<string, unknown> = {}) {
+  return {
+    eventId: `sekret-coverage:${SHA}`,
+    occurredAt: '2026-08-18T20:52:23.735Z',
+    source: 'cloudflare',
+    category: 'analytics',
+    phase: 'observe',
+    truth: 'verified',
+    authority: 'observed',
+    status: 'passed',
+    repository: {
+      name: 'jussray/Sekret-Bip',
+      branch: 'main',
+      refKind: 'branch-head',
+      commitSha: SHA,
+    },
+    coverage: {
+      service: 'sekret-bip-production',
+      environment: 'production',
+      releaseSha: SHA,
+      windowStartedAt: '2026-08-18T20:35:00.000Z',
+      windowEndedAt: '2026-08-18T20:50:00.000Z',
+      sampleSource: 'analytics-engine',
+      requestCount: 25,
+      currentReleaseRequestCount: 24,
+      priorReleaseRequestCount: 1,
+      unclassifiedRequestCount: 0,
+      routeClasses: [{
+        name: 'front-door',
+        requestCount: 25,
+        currentReleaseRequestCount: 24,
+        priorReleaseRequestCount: 1,
+        unclassifiedRequestCount: 0,
+      }],
+      tailReasons: ['cached-edge-response'],
+    },
+    evidenceRefs: [`cloudflare-analytics:${SHA}`],
+    ...overrides,
+  };
+}
+
 function appWith(
   disposition: BuildEventStoreDisposition = 'stored',
   env: NodeJS.ProcessEnv = {
@@ -104,6 +146,186 @@ describe('build-event receipt ingress', () => {
     expect(stored?.runtime?.releaseSha).toBe(SHA);
     expect(stored?.truth).toBe('verified');
     expect(stored?.authority).toBe('observed');
+  });
+
+
+  it('accepts policy-bound aggregate coverage without promoting it to runtime identity', async () => {
+    const harness = appWith();
+    const response = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent());
+
+    expect(response.status).toBe(201);
+    expect(harness.storeCalls()).toBe(1);
+    expect(harness.storedEvents[0]?.coverage?.releaseSha).toBe(SHA);
+    expect(harness.storedEvents[0]?.runtime).toBeUndefined();
+  });
+
+  it('rejects coverage that does not meet the predeclared observation policy', async () => {
+    const harness = appWith();
+    const insufficient = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      coverage: {
+        service: 'sekret-bip-production',
+        environment: 'production',
+        releaseSha: SHA,
+        windowStartedAt: '2026-08-18T20:35:00.000Z',
+        windowEndedAt: '2026-08-18T20:50:00.000Z',
+        sampleSource: 'analytics-engine',
+        requestCount: 24,
+        currentReleaseRequestCount: 24,
+        priorReleaseRequestCount: 0,
+        unclassifiedRequestCount: 0,
+        routeClasses: [{
+          name: 'front-door',
+          requestCount: 24,
+          currentReleaseRequestCount: 24,
+          priorReleaseRequestCount: 0,
+          unclassifiedRequestCount: 0,
+        }],
+      },
+    }));
+    expect(insufficient.status).toBe(403);
+    expect(insufficient.body.error).toBe('coverage_minimum_request_count_not_met');
+
+    const priorTail = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      coverage: {
+        service: 'sekret-bip-production',
+        environment: 'production',
+        releaseSha: SHA,
+        windowStartedAt: '2026-08-18T20:35:00.000Z',
+        windowEndedAt: '2026-08-18T20:50:00.000Z',
+        sampleSource: 'analytics-engine',
+        requestCount: 25,
+        currentReleaseRequestCount: 23,
+        priorReleaseRequestCount: 2,
+        unclassifiedRequestCount: 0,
+        routeClasses: [{
+          name: 'front-door',
+          requestCount: 25,
+          currentReleaseRequestCount: 23,
+          priorReleaseRequestCount: 2,
+          unclassifiedRequestCount: 0,
+        }],
+        tailReasons: ['cached-edge-response'],
+      },
+    }));
+    expect(priorTail.status).toBe(403);
+    expect(priorTail.body.error).toBe('coverage_prior_release_share_above_policy');
+
+    const unclassified = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      coverage: {
+        service: 'sekret-bip-production',
+        environment: 'production',
+        releaseSha: SHA,
+        windowStartedAt: '2026-08-18T20:35:00.000Z',
+        windowEndedAt: '2026-08-18T20:50:00.000Z',
+        sampleSource: 'analytics-engine',
+        requestCount: 25,
+        currentReleaseRequestCount: 24,
+        priorReleaseRequestCount: 0,
+        unclassifiedRequestCount: 1,
+        routeClasses: [{
+          name: 'front-door',
+          requestCount: 25,
+          currentReleaseRequestCount: 24,
+          priorReleaseRequestCount: 0,
+          unclassifiedRequestCount: 1,
+        }],
+      },
+    }));
+    expect(unclassified.status).toBe(403);
+    expect(unclassified.body.error).toBe('coverage_unclassified_requests_not_allowed');
+
+    const unapprovedRoute = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      coverage: {
+        service: 'sekret-bip-production',
+        environment: 'production',
+        releaseSha: SHA,
+        windowStartedAt: '2026-08-18T20:35:00.000Z',
+        windowEndedAt: '2026-08-18T20:50:00.000Z',
+        sampleSource: 'analytics-engine',
+        requestCount: 25,
+        currentReleaseRequestCount: 25,
+        priorReleaseRequestCount: 0,
+        unclassifiedRequestCount: 0,
+        routeClasses: [{
+          name: 'internal-admin',
+          requestCount: 25,
+          currentReleaseRequestCount: 25,
+          priorReleaseRequestCount: 0,
+          unclassifiedRequestCount: 0,
+        }],
+      },
+    }));
+    expect(unapprovedRoute.status).toBe(403);
+    expect(unapprovedRoute.body.error).toBe('coverage_route_class_not_allowed');
+
+    expect(harness.storeCalls()).toBe(0);
+  });
+
+  it('rejects a coverage receipt with mismatched release identity or synthetic proof', async () => {
+    const harness = appWith();
+    const mismatchedRelease = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      coverage: {
+        service: 'sekret-bip-production',
+        environment: 'production',
+        releaseSha: 'abcdefabcdefabcdefabcdefabcdefabcdefabcd',
+        windowStartedAt: '2026-08-18T20:35:00.000Z',
+        windowEndedAt: '2026-08-18T20:50:00.000Z',
+        sampleSource: 'analytics-engine',
+        requestCount: 25,
+        currentReleaseRequestCount: 25,
+        priorReleaseRequestCount: 0,
+        unclassifiedRequestCount: 0,
+        routeClasses: [{
+          name: 'front-door',
+          requestCount: 25,
+          currentReleaseRequestCount: 25,
+          priorReleaseRequestCount: 0,
+          unclassifiedRequestCount: 0,
+        }],
+      },
+    }));
+    expect(mismatchedRelease.status).toBe(403);
+    expect(mismatchedRelease.body.error).toBe('coverage_release_sha_mismatch');
+
+    const synthetic = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      source: 'playwright',
+      coverage: {
+        service: 'sekret-bip-production',
+        environment: 'production',
+        releaseSha: SHA,
+        windowStartedAt: '2026-08-18T20:35:00.000Z',
+        windowEndedAt: '2026-08-18T20:50:00.000Z',
+        sampleSource: 'synthetic-probe',
+        requestCount: 1,
+        currentReleaseRequestCount: 1,
+        priorReleaseRequestCount: 0,
+        unclassifiedRequestCount: 0,
+        routeClasses: [{
+          name: 'front-door',
+          requestCount: 1,
+          currentReleaseRequestCount: 1,
+          priorReleaseRequestCount: 0,
+          unclassifiedRequestCount: 0,
+        }],
+      },
+    }));
+    expect(synthetic.status).toBe(400);
+    expect(synthetic.body.error).toBe('invalid_build_event');
+    expect(harness.storeCalls()).toBe(0);
   });
 
   it('is idempotent when the store reports a duplicate', async () => {

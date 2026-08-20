@@ -7,17 +7,37 @@ const TOKEN_CONTEXT = 'founder-control-room/build-event-receipts/v1';
 const MAX_EVENT_AGE_MS = 24 * 60 * 60 * 1_000;
 const MAX_FUTURE_SKEW_MS = 5 * 60 * 1_000;
 
+export interface BuildReleaseCoveragePolicy {
+  service: string;
+  environment: 'production';
+  source: BuildEventInput['source'];
+  minimumWindowSeconds: number;
+  minimumRequestCount: number;
+  maximumPriorReleaseShareBps: number;
+  allowedRouteClasses: readonly string[];
+}
+
 export interface BuildEventProducerPolicy {
   repository: string;
   sources: readonly BuildEventInput['source'][];
   categories: readonly BuildEventInput['category'][];
+  coverage?: BuildReleaseCoveragePolicy;
 }
 
 export const BUILD_EVENT_PRODUCERS: Readonly<Record<string, BuildEventProducerPolicy>> = {
   'sekret-bip-release-observer': {
     repository: 'jussray/Sekret-Bip',
     sources: ['cloudflare', 'playwright', 'supabase'],
-    categories: ['runtime', 'verification', 'artifact'],
+    categories: ['runtime', 'verification', 'artifact', 'analytics'],
+    coverage: {
+      service: 'sekret-bip-production',
+      environment: 'production',
+      source: 'cloudflare',
+      minimumWindowSeconds: 15 * 60,
+      minimumRequestCount: 25,
+      maximumPriorReleaseShareBps: 500,
+      allowedRouteClasses: ['front-door'],
+    },
   },
 };
 
@@ -117,6 +137,45 @@ function policyError(
       return 'verification_exact_sha_mismatch';
     }
   }
+
+  if (event.coverage) {
+    const coveragePolicy = producerPolicy.coverage;
+    if (!coveragePolicy) return 'coverage_receipts_not_configured_for_producer';
+    if (event.coverage.service !== coveragePolicy.service) return 'coverage_service_not_allowed';
+    if (event.coverage.environment !== coveragePolicy.environment) return 'coverage_environment_not_allowed';
+    if (event.source !== coveragePolicy.source) return 'coverage_source_not_allowed';
+    if (!event.coverage.routeClasses.every((routeClass) => (
+      coveragePolicy.allowedRouteClasses.includes(routeClass.name)
+    ))) {
+      return 'coverage_route_class_not_allowed';
+    }
+    if (event.coverage.releaseSha !== event.repository.commitSha) {
+      return 'coverage_release_sha_mismatch';
+    }
+
+    if (event.status === 'passed') {
+      const windowMs = Date.parse(event.coverage.windowEndedAt) - Date.parse(event.coverage.windowStartedAt);
+      if (windowMs < coveragePolicy.minimumWindowSeconds * 1_000) {
+        return 'coverage_window_too_short';
+      }
+      if (event.coverage.requestCount < coveragePolicy.minimumRequestCount) {
+        return 'coverage_minimum_request_count_not_met';
+      }
+      if (event.coverage.unclassifiedRequestCount > 0) {
+        return 'coverage_unclassified_requests_not_allowed';
+      }
+      if (
+        event.coverage.priorReleaseRequestCount * 10_000
+        > coveragePolicy.maximumPriorReleaseShareBps * event.coverage.requestCount
+      ) {
+        return 'coverage_prior_release_share_above_policy';
+      }
+      if (event.coverage.tailReasons?.includes('unknown')) {
+        return 'coverage_unknown_tail_not_allowed';
+      }
+    }
+  }
+
   if (event.truth === 'verified' && event.evidenceRefs.length === 0 && event.evidenceUrls.length === 0) {
     return 'verified_receipt_requires_evidence';
   }
