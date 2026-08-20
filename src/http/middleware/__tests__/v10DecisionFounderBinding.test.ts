@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   V10_DECISION_CYCLE_CONTRACT,
   V10_DECISION_LENSES,
@@ -8,6 +8,11 @@ import {
 import {
   createFounderControlDecision,
 } from '../../../lib/founderControlDecision.js';
+
+vi.mock('../../../lib/supabaseClient.js', () => ({
+  supabase: { from: vi.fn() },
+}));
+
 import {
   validateTrustedFounderApproval,
   validateV10DecisionFounderBinding,
