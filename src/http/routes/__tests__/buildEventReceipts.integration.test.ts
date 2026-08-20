@@ -379,6 +379,40 @@ describe('build-event receipt ingress', () => {
     expect(harness.storeCalls()).toBe(0);
   });
 
+  it('accepts coverage exactly at the declared maximum window and observation age', async () => {
+    const harness = appWith();
+    const response = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      coverage: {
+        ...coverageEvent().coverage,
+        windowStartedAt: '2026-08-18T19:30:00.000Z',
+        windowEndedAt: '2026-08-18T20:00:00.000Z',
+      },
+    }));
+
+    expect(response.status).toBe(201);
+    expect(harness.storeCalls()).toBe(1);
+  });
+
+  it('rejects a coverage window that ends after the receiver clock', async () => {
+    const harness = appWith();
+    const response = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      occurredAt: '2026-08-18T21:04:00.000Z',
+      coverage: {
+        ...coverageEvent().coverage,
+        windowStartedAt: '2026-08-18T20:48:00.000Z',
+        windowEndedAt: '2026-08-18T21:03:00.000Z',
+      },
+    }));
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('coverage_window_ends_in_future');
+    expect(harness.storeCalls()).toBe(0);
+  });
+
   it('is idempotent when the store reports a duplicate', async () => {
     const harness = appWith('duplicate');
     const response = await authorized(
