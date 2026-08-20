@@ -107,13 +107,13 @@ function toolDefinition(): JsonRecord {
           minLength: 1,
           maxLength: MAX_PROJECT_ID_LENGTH,
           description:
-            'Requesting FCR project identifier for provenance. It does not partition the reusable public-market cache.',
+            'Requesting FCR project scope. It is validated at the tool boundary and does not partition the reusable public-market cache.',
         },
         topic: {
           type: 'string',
           minLength: 1,
           maxLength: MAX_TOPIC_LENGTH,
-          description: 'Public-market topic to qualify.',
+          description: 'Public-market topic to qualify. Do not send private strategy or credentials.',
         },
       },
     },
@@ -170,9 +170,9 @@ export function createXEngagementSignalMcpHandler(
   return async (req: Request, res: ExpressResponse): Promise<void> => {
     const body = req.body;
     const id = isRecord(body) ? rpcId(body.id) : null;
-    const configuredToken = env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN?.trim();
+    const configuredToken = env.FOUNDER_SIGNAL_READ_MCP_TOKEN?.trim();
     if (!configuredToken) {
-      res.status(503).json(rpcError(id, -32001, 'Founder Signal Engine MCP token is not configured'));
+      res.status(503).json(rpcError(id, -32001, 'Founder Signal read MCP token is not configured'));
       return;
     }
 
