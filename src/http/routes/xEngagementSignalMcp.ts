@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import type { Request, RequestHandler, Response as ExpressResponse } from 'express';
 import { supabase } from '../../lib/supabaseClient.js';
 import {
@@ -56,6 +57,19 @@ function boundedString(value: unknown, maxLength: number): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   return trimmed.length > 0 && trimmed.length <= maxLength ? trimmed : null;
+}
+
+function bearerToken(req: Request): string | null {
+  const authorization = req.header('authorization');
+  if (!authorization?.startsWith('Bearer ')) return null;
+  return boundedString(authorization.slice('Bearer '.length), 4096);
+}
+
+function secureEqual(actual: string, expected: string): boolean {
+  const actualBuffer = Buffer.from(actual);
+  const expectedBuffer = Buffer.from(expected);
+  if (actualBuffer.length !== expectedBuffer.length) return false;
+  return timingSafeEqual(actualBuffer, expectedBuffer);
 }
 
 function parseArguments(value: unknown): { value: QueryArguments | null; errors: string[] } {
@@ -156,6 +170,18 @@ export function createXEngagementSignalMcpHandler(
   return async (req: Request, res: ExpressResponse): Promise<void> => {
     const body = req.body;
     const id = isRecord(body) ? rpcId(body.id) : null;
+    const configuredToken = env.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN?.trim();
+    if (!configuredToken) {
+      res.status(503).json(rpcError(id, -32001, 'Founder Signal Engine MCP token is not configured'));
+      return;
+    }
+
+    const token = bearerToken(req);
+    if (!token || !secureEqual(token, configuredToken)) {
+      res.status(401).json(rpcError(id, -32000, 'Unauthorized'));
+      return;
+    }
+
     if (!isRecord(body) || body.jsonrpc !== '2.0' || typeof body.method !== 'string') {
       res.status(400).json(rpcError(id, -32600, 'Invalid JSON-RPC request'));
       return;
