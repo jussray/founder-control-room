@@ -67,6 +67,7 @@ import { requirePortfolioSwitchOn } from './middleware/requirePortfolioSwitchOn.
 import { requireV10PrivilegedApprovalBinding } from './middleware/v10PrivilegedApprovalBinding.js';
 import { requireV10DecisionFounderBinding } from './middleware/v10DecisionFounderBinding.js';
 import { requireFounderSignalEngineMcpToken } from './middleware/founderSignalEngineMcpAuth.js';
+import { requireFounderSignalReadMcpToken } from './middleware/founderSignalReadMcpAuth.js';
 import { requireFounderSignalEngineReviewOnly } from './middleware/founderSignalEngineWriteGate.js';
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
@@ -211,7 +212,7 @@ export function createServer(options: CreateServerOptions = {}) {
     '/mcp/founder-signal-x-engagement',
     rateLimitGeneral,
     express.json({ type: 'application/json', limit: '16kb' }),
-    requireFounderSignalEngineMcpToken,
+    requireFounderSignalReadMcpToken,
     handleXEngagementSignalMcp,
   );
 
