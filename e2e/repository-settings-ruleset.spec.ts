@@ -41,7 +41,7 @@ test.afterAll(async () => {
 });
 
 test.describe('Repository Settings ruleset safety', () => {
-  test('defaults active FCR main protection to the canonical hardened gate', async ({ page }) => {
+  test('defaults active FCR main protection to the canonical founder-final gate', async ({ page }) => {
     await page.goto(`${baseUrl}${SETTINGS_PATH}`);
 
     await expect(page.locator('input[name="projectSlug"]')).toHaveValue('founder-control-room');
@@ -49,10 +49,12 @@ test.describe('Repository Settings ruleset safety', () => {
     await expect(page.locator('select[name="enforcement"]')).toHaveValue('active');
     await expect(page.locator('input[name="targetRefs"]')).toHaveValue('main');
     await expect(page.locator('input[name="requirePullRequest"]')).toBeChecked();
-    await expect(page.locator('input[name="requiredApprovingReviewCount"]')).toHaveValue('1');
+    await expect(page.locator('input[name="requiredApprovingReviewCount"]')).toHaveValue('0');
     await expect(page.locator('input[name="requiredStatusCheckNames"]')).toHaveValue(
       'Required Gate, Verify test-ledger contract',
     );
+    await expect(page.locator('#founder-final-policy-note')).toContainText('founder-final authority');
+    await expect(page.locator('#founder-final-policy-note')).toContainText('deterministic independent review');
   });
 
   test('blocks an accidental second active FCR main ruleset before any provider request', async ({ page }) => {
@@ -72,6 +74,27 @@ test.describe('Repository Settings ruleset safety', () => {
 
     await expect(page.locator('#result')).toContainText(
       `Blocked: active Founder Control Room main protection must update the canonical ruleset "${CANONICAL_RULESET}"`,
+    );
+    expect(mutationRequests).toBe(0);
+  });
+
+  test('blocks legacy one-human-review drift before any provider request', async ({ page }) => {
+    let mutationRequests = 0;
+    page.on('request', (request) => {
+      if (
+        request.method() === 'POST' &&
+        request.url().includes('/projects/founder-control-room/ruleset')
+      ) {
+        mutationRequests += 1;
+      }
+    });
+
+    await page.goto(`${baseUrl}${SETTINGS_PATH}`);
+    await page.locator('input[name="requiredApprovingReviewCount"]').fill('1');
+    await page.locator('button[type="submit"]').click();
+
+    await expect(page.locator('#result')).toContainText(
+      'Blocked: active Founder Control Room main protection must preserve founder-final authority',
     );
     expect(mutationRequests).toBe(0);
   });
