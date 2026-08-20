@@ -52,7 +52,7 @@ an explicit cross-service credential decision.
 ## Local verification
 
 ```bash
-npm install
+npm ci --ignore-scripts --no-audit --no-fund
 npm run verify
 ```
 
@@ -66,7 +66,10 @@ container, egress, and retention settings.
 The Node test suite attacks the boundary at least ten ways across six classes:
 authentication, signature tampering, input validation, freshness, replay/rate
 control, and isolation/lifecycle. The contract test also verifies that the
-Sandbox SDK and Docker image use the same pinned `0.7.0` version.
+Sandbox SDK and Docker image use the same pinned `0.12.7` version.
+The lockfile fixes the reviewed dependency graph; `skipLibCheck` is limited to
+the upstream Sandbox dependency declarations, while this lab's TypeScript
+source remains strict-checked.
 
 ## Rollback
 

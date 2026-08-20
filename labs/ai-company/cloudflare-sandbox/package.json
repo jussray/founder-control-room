@@ -12,11 +12,11 @@
     "verify": "npm run typecheck && npm test"
   },
   "dependencies": {
-    "@cloudflare/sandbox": "0.7.0"
+    "@cloudflare/sandbox": "0.12.7"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260708.1",
-    "typescript": "5.5.4",
+    "typescript": "5.9.3",
     "wrangler": "4.110.0"
   },
   "engines": {

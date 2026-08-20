@@ -39,7 +39,20 @@ async function consumeInvocation(env: Env, invocation: SandboxInvocation) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ nonce: invocation.nonce, issuedAt: invocation.issuedAt }),
   });
-  const decision = await response.json<GateDecision>().catch(() => ({}));
+  let decision: GateDecision = {};
+  try {
+    const parsed: unknown = await response.json();
+    if (
+      typeof parsed === 'object'
+      && parsed !== null
+      && 'code' in parsed
+      && typeof parsed.code === 'string'
+    ) {
+      decision = { code: parsed.code };
+    }
+  } catch {
+    // Gate status is authoritative; a malformed receipt is represented safely.
+  }
   return { response, code: decision.code ?? 'gate_rejected' };
 }
 

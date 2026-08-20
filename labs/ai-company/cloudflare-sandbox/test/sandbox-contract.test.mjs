@@ -32,8 +32,12 @@ test('keeps the Sandbox SDK configuration isolated and version-aligned', async (
     tag: 'v1',
     new_sqlite_classes: ['Sandbox', 'SandboxRequestGate'],
   }]);
-  assert.equal(pkg.dependencies['@cloudflare/sandbox'], '0.7.0');
-  assert.equal(dockerfile.trim(), 'FROM docker.io/cloudflare/sandbox:0.7.0-python');
+  const sdkVersion = pkg.dependencies['@cloudflare/sandbox'];
+  assert.match(sdkVersion, /^\d+\.\d+\.\d+$/);
+  assert.equal(
+    dockerfile.trim(),
+    `FROM docker.io/cloudflare/sandbox:${sdkVersion}-python`,
+  );
 });
 
 test('keeps request data out of commands and destroys every ephemeral sandbox', async () => {
