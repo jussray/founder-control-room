@@ -25,6 +25,8 @@ const requiredAssets = [
   'control-room/quickscan.html',
   'control-room/quickscan.js',
   'control-room/quickscan.css',
+  'control-room/genesis.html',
+  'control-room/genesis.css',
   'portable-founder-console/index.html',
 ];
 
