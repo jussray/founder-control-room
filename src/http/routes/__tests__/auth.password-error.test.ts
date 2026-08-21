@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Session } from '@supabase/supabase-js';
+import type { Response } from 'express';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockGetUser,
@@ -36,11 +38,13 @@ vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
 
 import express from 'express';
 import request from 'supertest';
+import { writeFounderSession } from '../../../auth/founderSession.js';
 import { authRouter } from '../auth.js';
 
 const EMAIL = 'founder@example.com';
 const ACCESS_TOKEN = 'access-token-value';
 const REFRESH_TOKEN = 'refresh-token-value';
+const TEST_SIGNING_SECRET = 'founder-session-test-signing-secret-0123456789abcdef';
 const SESSION = {
   access_token: ACCESS_TOKEN,
   refresh_token: REFRESH_TOKEN,
@@ -56,18 +60,22 @@ function app() {
 }
 
 function browserCookie() {
-  const value = Buffer.from(JSON.stringify({
-    accessToken: ACCESS_TOKEN,
-    refreshToken: REFRESH_TOKEN,
-    expiresAt: 2_000_000_000,
-  })).toString('base64url');
-  return `fcr_session=${encodeURIComponent(value)}`;
+  let setCookie = '';
+  const res = {
+    setHeader(name: string, value: unknown) {
+      if (name.toLowerCase() === 'set-cookie') setCookie = String(value);
+      return res;
+    },
+  } as unknown as Response;
+  writeFounderSession(res, SESSION as unknown as Session);
+  return setCookie.split(';', 1)[0] ?? '';
 }
 
 describe('POST /auth/password provider failure', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.NODE_ENV = 'test';
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('FOUNDER_SESSION_SIGNING_SECRET', TEST_SIGNING_SECRET);
     mockGetUser.mockResolvedValue({
       data: { user: { id: 'founder-user', email: EMAIL } },
       error: null,
@@ -87,6 +95,10 @@ describe('POST /auth/password provider failure', () => {
         }),
       };
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('returns a controlled envelope without leaking the Supabase provider message', async () => {
