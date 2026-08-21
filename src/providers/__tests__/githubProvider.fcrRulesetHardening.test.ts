@@ -252,7 +252,7 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
 
     const provider = buildProvider();
     await expect(provider.applyBranchRuleset("founder-control-room", config))
-      .rejects.toThrow("FCR strict-freshness ruleset read-back mismatch");
+      .rejects.toThrow(/FCR strict-freshness ruleset 2 read-back mismatch/);
 
     expect(mockCreateRepoRuleset).toHaveBeenCalledTimes(1);
   });
