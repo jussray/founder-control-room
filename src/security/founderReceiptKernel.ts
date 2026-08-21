@@ -34,13 +34,10 @@ export interface FounderReceiptIssueInput {
   targetSha: string;
   scopeHash: string;
   evidenceRefs: string[];
+  keyId: string;
   expiresAt: string;
   receiptId?: string;
-}
-
-export interface FounderReceiptSigner {
-  keyId: string;
-  signingKey: string | Buffer;
+  issuedAt?: string;
 }
 
 export interface FounderReceiptVerificationContext {
@@ -54,17 +51,6 @@ export interface FounderReceiptVerificationContext {
   now?: string;
 }
 
-export interface FounderReceiptAuthoritySnapshot {
-  targetSha: string;
-  scopeHash: string;
-  evidenceRefs: string[];
-}
-
-export interface FounderReceiptAuthorityResolver {
-  /** Read the current authoritative target/scope/evidence immediately before consumption. */
-  resolve(receipt: FounderReceipt): FounderReceiptAuthoritySnapshot | Promise<FounderReceiptAuthoritySnapshot>;
-}
-
 export interface FounderReceiptConsumptionLedger {
   /** Atomically claim a receipt id. Returns false if it was already consumed. */
   claim(receiptId: string): boolean | Promise<boolean>;
@@ -72,13 +58,10 @@ export interface FounderReceiptConsumptionLedger {
 
 export type FounderReceiptFailureCode =
   | 'RECEIPT_INVALID'
-  | 'RECEIPT_KEY_MISMATCH'
   | 'RECEIPT_SIGNATURE_INVALID'
   | 'RECEIPT_NOT_YET_VALID'
   | 'RECEIPT_EXPIRED'
   | 'RECEIPT_SCOPE_MISMATCH'
-  | 'RECEIPT_AUTHORITY_UNAVAILABLE'
-  | 'RECEIPT_AUTHORITY_EXPIRED'
   | 'RECEIPT_REPLAYED';
 
 export type FounderReceiptVerificationResult =
@@ -97,12 +80,6 @@ function signingKeyBuffer(signingKey: string | Buffer): Buffer {
   return key;
 }
 
-function signerKeyId(signer: FounderReceiptSigner): string {
-  const keyId = text(signer.keyId);
-  if (!keyId) throw new Error('Founder receipt signer key id is required.');
-  return keyId;
-}
-
 function normalizedEvidenceRefs(value: unknown): string[] | null {
   if (!Array.isArray(value) || value.length === 0 || value.some((item) => !text(item))) return null;
   const refs = value.map((item) => text(item)).sort();
@@ -111,24 +88,6 @@ function normalizedEvidenceRefs(value: unknown): string[] | null {
 
 function sameStringArray(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
-}
-
-function normalizedAuthoritySnapshot(value: unknown): FounderReceiptAuthoritySnapshot | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const candidate = value as Record<string, unknown>;
-  const targetSha = text(candidate['targetSha']).toLowerCase();
-  const scopeHash = text(candidate['scopeHash']).toLowerCase();
-  const evidenceRefs = normalizedEvidenceRefs(candidate['evidenceRefs']);
-  const knownKeys = new Set(['targetSha', 'scopeHash', 'evidenceRefs']);
-  if (
-    Object.keys(candidate).some((key) => !knownKeys.has(key))
-    || !FULL_SHA.test(targetSha)
-    || !SHA256.test(scopeHash)
-    || !evidenceRefs
-  ) {
-    return null;
-  }
-  return { targetSha, scopeHash, evidenceRefs };
 }
 
 function receiptPayload(receipt: FounderReceiptClaims): string {
@@ -149,10 +108,8 @@ function receiptPayload(receipt: FounderReceiptClaims): string {
   });
 }
 
-function signClaims(receipt: FounderReceiptClaims, signer: FounderReceiptSigner): string {
-  return createHmac('sha256', signingKeyBuffer(signer.signingKey))
-    .update(receiptPayload(receipt))
-    .digest('hex');
+function signClaims(receipt: FounderReceiptClaims, signingKey: string | Buffer): string {
+  return createHmac('sha256', signingKeyBuffer(signingKey)).update(receiptPayload(receipt)).digest('hex');
 }
 
 function parseReceipt(value: unknown): FounderReceiptVerificationResult {
@@ -222,9 +179,10 @@ function parseReceipt(value: unknown): FounderReceiptVerificationResult {
 
 export function issueFounderReceipt(
   input: FounderReceiptIssueInput,
-  signer: FounderReceiptSigner,
+  signingKey: string | Buffer,
 ): FounderReceipt {
   const evidenceRefs = normalizedEvidenceRefs(input.evidenceRefs);
+  const issuedAt = input.issuedAt ?? new Date().toISOString();
   const claims: FounderReceiptClaims = {
     version: FOUNDER_RECEIPT_VERSION,
     receiptId: text(input.receiptId) || randomUUID(),
@@ -236,21 +194,21 @@ export function issueFounderReceipt(
     scopeHash: text(input.scopeHash).toLowerCase(),
     evidenceRefs: evidenceRefs ?? [],
     issuer: 'founder-control-room',
-    keyId: signerKeyId(signer),
-    issuedAt: new Date().toISOString(),
+    keyId: text(input.keyId),
+    issuedAt,
     expiresAt: text(input.expiresAt),
   };
 
   const validation = parseReceipt({ ...claims, signature: '0'.repeat(64) });
   if (!validation.ok) throw new Error(validation.error);
 
-  return { ...claims, signature: signClaims(claims, signer) };
+  return { ...claims, signature: signClaims(claims, signingKey) };
 }
 
 export function verifyFounderReceipt(
   value: unknown,
   context: FounderReceiptVerificationContext,
-  signer: FounderReceiptSigner,
+  signingKey: string | Buffer,
 ): FounderReceiptVerificationResult {
   const parsed = parseReceipt(value);
   if (!parsed.ok) return parsed;
@@ -261,12 +219,7 @@ export function verifyFounderReceipt(
     return { ok: false, code: 'RECEIPT_INVALID', error: 'Founder receipt verification evidence references are invalid.' };
   }
 
-  const expectedKeyId = signerKeyId(signer);
-  if (receipt.keyId !== expectedKeyId) {
-    return { ok: false, code: 'RECEIPT_KEY_MISMATCH', error: 'Founder receipt key identity does not match the trusted signer.' };
-  }
-
-  const expectedSignature = signClaims(receipt, signer);
+  const expectedSignature = signClaims(receipt, signingKey);
   const actual = Buffer.from(receipt.signature, 'hex');
   const expected = Buffer.from(expectedSignature, 'hex');
   if (actual.byteLength !== expected.byteLength || !timingSafeEqual(actual, expected)) {
@@ -302,42 +255,11 @@ export function verifyFounderReceipt(
 export async function consumeFounderReceipt(
   value: unknown,
   context: FounderReceiptVerificationContext,
-  signer: FounderReceiptSigner,
+  signingKey: string | Buffer,
   ledger: FounderReceiptConsumptionLedger,
-  authorityResolver: FounderReceiptAuthorityResolver,
 ): Promise<FounderReceiptVerificationResult> {
-  const verified = verifyFounderReceipt(value, context, signer);
+  const verified = verifyFounderReceipt(value, context, signingKey);
   if (!verified.ok) return verified;
-
-  let currentAuthority: FounderReceiptAuthoritySnapshot | null = null;
-  try {
-    currentAuthority = normalizedAuthoritySnapshot(await authorityResolver.resolve(verified.receipt));
-  } catch {
-    return {
-      ok: false,
-      code: 'RECEIPT_AUTHORITY_UNAVAILABLE',
-      error: 'Current founder receipt authority state could not be resolved.',
-    };
-  }
-  if (!currentAuthority) {
-    return {
-      ok: false,
-      code: 'RECEIPT_AUTHORITY_UNAVAILABLE',
-      error: 'Current founder receipt authority state is invalid.',
-    };
-  }
-
-  const authorityStillMatches =
-    currentAuthority.targetSha === verified.receipt.targetSha
-    && currentAuthority.scopeHash === verified.receipt.scopeHash
-    && sameStringArray(currentAuthority.evidenceRefs, verified.receipt.evidenceRefs);
-  if (!authorityStillMatches) {
-    return {
-      ok: false,
-      code: 'RECEIPT_AUTHORITY_EXPIRED',
-      error: 'Founder receipt remains historically valid, but its bound authority no longer matches current state.',
-    };
-  }
 
   const claimed = await ledger.claim(verified.receipt.receiptId);
   if (!claimed) {
