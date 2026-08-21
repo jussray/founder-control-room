@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  MAX_FOUNDER_RECEIPT_TTL_MS,
   consumeFounderReceipt,
   issueFounderReceipt,
   verifyFounderReceipt,
@@ -24,7 +25,7 @@ function receipt() {
       decisionId: 'decision-001',
       founderIdentity: 'founder@example.com',
       action: 'merge',
-      resource: 'jussray/founder-control-room#536',
+      resource: 'jussray/founder-control-room#577',
       targetSha: HEAD_SHA,
       scopeHash: SCOPE_HASH,
       evidenceRefs: ['evidence:independent-review', 'evidence:ci'],
@@ -41,7 +42,7 @@ function context(overrides: Partial<FounderReceiptVerificationContext> = {}): Fo
     decisionId: 'decision-001',
     founderIdentity: 'founder@example.com',
     action: 'merge',
-    resource: 'jussray/founder-control-room#536',
+    resource: 'jussray/founder-control-room#577',
     targetSha: HEAD_SHA,
     scopeHash: SCOPE_HASH,
     now: NOW,
@@ -100,6 +101,36 @@ describe('FounderReceiptKernel v1', () => {
     );
 
     expect(result).toMatchObject({ ok: false, code: 'RECEIPT_EXPIRED' });
+  });
+
+  it('rejects a future-dated receipt before its issuance time', () => {
+    const result = verifyFounderReceipt(
+      receipt(),
+      context({ now: '2026-08-21T05:59:59.000Z' }),
+      SIGNING_KEY,
+    );
+
+    expect(result).toMatchObject({ ok: false, code: 'RECEIPT_NOT_YET_VALID' });
+  });
+
+  it('refuses to issue a receipt with a god-mode lifetime', () => {
+    const expiresAt = new Date(Date.parse(ISSUED_AT) + MAX_FOUNDER_RECEIPT_TTL_MS + 1).toISOString();
+
+    expect(() => issueFounderReceipt(
+      {
+        decisionId: 'decision-long-lived',
+        founderIdentity: 'founder@example.com',
+        action: 'merge',
+        resource: 'jussray/founder-control-room#577',
+        targetSha: HEAD_SHA,
+        scopeHash: SCOPE_HASH,
+        evidenceRefs: ['evidence:ci'],
+        keyId: 'fcr-founder-receipt-test-key',
+        issuedAt: ISSUED_AT,
+        expiresAt,
+      },
+      SIGNING_KEY,
+    )).toThrow(/no longer than/);
   });
 
   it('rejects replay after the first atomic claim', async () => {
