@@ -112,6 +112,8 @@ Production GitHub authentication should prefer repository-scoped installation cr
 
 For any active ruleset protecting `jussray/founder-control-room` `main`, the only permitted bypass actor is exactly the numeric App identity configured by trusted `GITHUB_APP_ID`. Missing, mismatched, caller-supplied alternative, or additional bypass integration IDs fail closed. `GITHUB_WEBHOOK_SECRET` separately authenticates the signed `/api/webhooks/github` event ingress. Secret values never belong in source, PR bodies, issue comments, logs, screenshots, browser bundles, or chat-visible documentation.
 
+The ordinary GitHub merge path keeps its native approval/check membrane. The canonical FCR founder-final path must merge the exact provider-backed reviewed PR through the GitHub pull-request merge endpoint and the trusted App may cross the ruleset only with `pull_request` bypass mode; an `always` bypass or generic direct protected-branch integration is broader authority and must fail closed on provider readback.
+
 ## Founder-owned progress publishing
 
 The product goal is deliberate: **Founder Control Room should be able to tell verified progress about the founder's own products from the founder's own product without giving away the private recipe.**

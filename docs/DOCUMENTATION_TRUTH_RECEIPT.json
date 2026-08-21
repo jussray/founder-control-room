@@ -1,11 +1,33 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded invariants disclosed when truth-governance controls change; this is review evidence, not a live provider or production claim.",
+  "purpose": "Record the bounded repository-provider and workflow-authority invariants changed by the FCR split merge membrane, pull-request-only GitHub App authority, and exact-head Quality Gate repair; this is review evidence, not a live provider or production claim.",
   "domains": [
     "repository-provider",
-    "truth-governance"
+    "truth-governance",
+    "workflow-authority"
   ],
   "changes": [
+    {
+      "path": "src/providers/GitHubProvider.ts",
+      "claims": [
+        "src/providers/GitHubProvider.ts: an active FCR-main governance request must first apply and read back a separate strict required-status ruleset with zero bypass actors, exact requested checks, strict current-base policy, active enforcement, and no unexpected rule types before changing the review membrane; the composite result must receipt both component identities and partial failure after freshness verification must retain that component identity for reconciliation.",
+        "src/providers/GitHubProvider.ts: the FCR review membrane must retain pull-request approval freshness, last-push approval, review-thread resolution, force-push/deletion protection, exactly one numeric trusted GitHub App bypass in pull_request mode, and no bypassable required-status rule.",
+        "src/providers/GitHubProvider.ts: canonical FCR integration must bind the provider-backed reviewed PR number to freshly resolved exact base and head SHAs, may merge only through the pull-request endpoint, and must propagate provider rejection without falling back to generic direct protected-branch integration."
+      ]
+    },
+    {
+      "path": "src/providers/RepositoryProvider.ts",
+      "claims": [
+        "src/providers/RepositoryProvider.ts: ruleset bypass actors must remain explicit machine identities whose effective bypass scope is chosen and verified by the provider implementation; callers cannot grant themselves broader bypass authority through the provider-neutral contract.",
+        "src/providers/RepositoryProvider.ts: composite ruleset mutations may return provider-neutral component receipts so durable caller ledgers can identify every mutated provider object without guessing state."
+      ]
+    },
+    {
+      "path": ".github/workflows/quality-gate.yml",
+      "claims": [
+        ".github/workflows/quality-gate.yml: every pull-request Quality Gate job must checkout and verify the exact github.event.pull_request.head.sha before tests or builds, and a synthetic PR merge ref cannot satisfy exact-head candidate proof."
+      ]
+    },
     {
       "path": "src/buildEvents/buildEvent.ts",
       "claims": [
