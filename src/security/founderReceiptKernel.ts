@@ -47,6 +47,7 @@ export interface FounderReceiptVerificationContext {
   resource: string;
   targetSha: string;
   scopeHash: string;
+  evidenceRefs: string[];
   now?: string;
 }
 
@@ -83,6 +84,10 @@ function normalizedEvidenceRefs(value: unknown): string[] | null {
   if (!Array.isArray(value) || value.length === 0 || value.some((item) => !text(item))) return null;
   const refs = value.map((item) => text(item)).sort();
   return new Set(refs).size === refs.length ? refs : null;
+}
+
+function sameStringArray(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 function receiptPayload(receipt: FounderReceiptClaims): string {
@@ -209,6 +214,11 @@ export function verifyFounderReceipt(
   if (!parsed.ok) return parsed;
   const receipt = parsed.receipt;
 
+  const expectedEvidenceRefs = normalizedEvidenceRefs(context.evidenceRefs);
+  if (!expectedEvidenceRefs) {
+    return { ok: false, code: 'RECEIPT_INVALID', error: 'Founder receipt verification evidence references are invalid.' };
+  }
+
   const expectedSignature = signClaims(receipt, signingKey);
   const actual = Buffer.from(receipt.signature, 'hex');
   const expected = Buffer.from(expectedSignature, 'hex');
@@ -233,9 +243,10 @@ export function verifyFounderReceipt(
     && receipt.action === text(context.action)
     && receipt.resource === text(context.resource)
     && receipt.targetSha === text(context.targetSha).toLowerCase()
-    && receipt.scopeHash === text(context.scopeHash).toLowerCase();
+    && receipt.scopeHash === text(context.scopeHash).toLowerCase()
+    && sameStringArray(receipt.evidenceRefs, expectedEvidenceRefs);
   if (!scopeMatches) {
-    return { ok: false, code: 'RECEIPT_SCOPE_MISMATCH', error: 'Founder receipt does not match the requested action scope.' };
+    return { ok: false, code: 'RECEIPT_SCOPE_MISMATCH', error: 'Founder receipt does not match the requested action, target, scope, or evidence.' };
   }
 
   return { ok: true, receipt };
