@@ -160,3 +160,5 @@ jobs:
           git diff --cached --check
           git commit -m 'fix(governance): reacquire FCR base before integration'
           git push origin HEAD:fix/fcr-pr-only-app-bypass-b70a7da
+
+# retriggered after reacquiring onto main a4ca515ee100d0494e90b44bc7b49600c8b30c12
