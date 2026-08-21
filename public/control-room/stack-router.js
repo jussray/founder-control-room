@@ -64,6 +64,20 @@ function setConveyorReadiness(state, label) {
   text.textContent = label;
 }
 
+function ensureGenesisEvidenceLink() {
+  if (document.querySelector('[data-genesis-evidence]')) return;
+  const readiness = document.querySelector('[data-conveyor-readiness]');
+  if (!(readiness instanceof HTMLElement)) return;
+
+  const link = document.createElement('a');
+  link.href = '/control-room/genesis.html';
+  link.className = 'conveyor-readiness';
+  link.dataset.genesisEvidence = 'true';
+  link.textContent = 'Genesis evidence · view origin record';
+  link.setAttribute('aria-label', 'View Bip Genesis provenance evidence');
+  readiness.insertAdjacentElement('afterend', link);
+}
+
 async function refreshConveyorReadiness() {
   const token = founderAccessToken();
   if (!token) {
@@ -150,6 +164,8 @@ if (pendingTab && ALLOWED_TABS.has(pendingTab) && !activateTab(pendingTab)) {
     observer.observe(root, { childList: true, subtree: true });
   }
 }
+
+ensureGenesisEvidenceLink();
 
 const launchDock = document.querySelector('.launch-dock');
 if (launchDock instanceof HTMLDetailsElement) {
