@@ -1,9 +1,10 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded repository-provider authority invariants changed by the FCR pull-request-only GitHub App integration repair; this is review evidence, not a live provider or production claim.",
+  "purpose": "Record the bounded repository-provider and workflow-authority invariants changed by the FCR pull-request-only GitHub App and exact-head Quality Gate repair; this is review evidence, not a live provider or production claim.",
   "domains": [
     "repository-provider",
-    "truth-governance"
+    "truth-governance",
+    "workflow-authority"
   ],
   "changes": [
     {
@@ -17,6 +18,12 @@
       "path": "src/providers/RepositoryProvider.ts",
       "claims": [
         "src/providers/RepositoryProvider.ts: ruleset bypass actors must remain explicit machine identities whose effective bypass scope is chosen and verified by the provider implementation; callers cannot grant themselves broader bypass authority through the provider-neutral contract."
+      ]
+    },
+    {
+      "path": ".github/workflows/quality-gate.yml",
+      "claims": [
+        ".github/workflows/quality-gate.yml: every pull-request Quality Gate job must checkout and verify the exact github.event.pull_request.head.sha before tests or builds, and a synthetic PR merge ref cannot satisfy exact-head candidate proof."
       ]
     },
     {
