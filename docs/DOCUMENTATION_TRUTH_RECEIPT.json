@@ -3,7 +3,8 @@
   "purpose": "Record the bounded invariants disclosed when truth-governance controls change; this is review evidence, not a live provider or production claim.",
   "domains": [
     "repository-provider",
-    "truth-governance"
+    "truth-governance",
+    "cloudflare-authority"
   ],
   "changes": [
     {
@@ -70,6 +71,12 @@
       "path": "src/governance/productionTruthLease.ts",
       "claims": [
         "src/governance/productionTruthLease.ts: a production-truth lease may exist only when Cloudflare Worker/Pages identity, Playwright tested/runtime identity, independent review, Supabase production state, and repository main identity are bound to one exact candidate; any changed, stale, missing, or mismatched dependency must fail closed at use time."
+      ]
+    },
+    {
+      "path": "wrangler.worker.toml",
+      "claims": [
+        "wrangler.worker.toml: every canonical Worker build must execute the repository build-authority membrane; native Cloudflare Workers Builds may proceed only through non-promoting versions upload while production promotion remains bounded to the exact manual GitHub authority path."
       ]
     }
   ]
