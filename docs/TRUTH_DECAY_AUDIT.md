@@ -127,6 +127,8 @@ Generic Truth Lease capability must not be confused with universal enforcement. 
 
 Use the generic contract only where a consequential current-state claim still lacks an equivalent or stronger at-use gate.
 
+Portfolio governance composes those layers for evidence-dependent consequential actions. Founder authorization remains bound to the exact decision-context snapshot—selected intent, memory fact hashes, proof artifact hashes, and exact version—and the canonical hash of that snapshot must equal the Truth Lease claim hash. The authorization must also bind the exact lease hash. At the declared use boundary FCR re-observes the lease dependencies. Changed, stale, missing, invalid, or unbound truth forces `reconfirm`; a consequential action with no factual memory/proof dependency does not gain unnecessary Truth Lease ceremony.
+
 ## Documentation truth gate
 
 Documentation is part of the product/control plane when humans or agents use it to make current decisions.
@@ -300,6 +302,7 @@ The strongest optimization is not faster claiming. It is shortening the distance
 20. Source/runtime FCR review enforcement does not prove the live GitHub ruleset independently enforces it.
 21. Documentation synchronization must not create an infinite self-update loop; post-merge verification closes the transition.
 22. Preserve history. Supersede stale authority explicitly instead of deleting evidence simply because the current answer changed.
+23. An unchanged approved decision-context object is not proof that its external dependencies are still current; evidence-dependent consequential use must revalidate the bound Truth Lease at the use boundary.
 
 ## Rollback
 
