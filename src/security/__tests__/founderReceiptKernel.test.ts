@@ -5,6 +5,8 @@ import {
   consumeFounderReceipt,
   issueFounderReceipt,
   verifyFounderReceipt,
+  type FounderReceiptAuthorityResolver,
+  type FounderReceiptAuthoritySnapshot,
   type FounderReceiptConsumptionLedger,
   type FounderReceiptIssueInput,
   type FounderReceiptSigner,
@@ -58,6 +60,21 @@ function context(overrides: Partial<FounderReceiptVerificationContext> = {}): Fo
   };
 }
 
+function authoritySnapshot(overrides: Partial<FounderReceiptAuthoritySnapshot> = {}): FounderReceiptAuthoritySnapshot {
+  return {
+    targetSha: HEAD_SHA,
+    scopeHash: SCOPE_HASH,
+    evidenceRefs: EVIDENCE_REFS,
+    ...overrides,
+  };
+}
+
+function authorityResolver(
+  snapshot: FounderReceiptAuthoritySnapshot = authoritySnapshot(),
+): FounderReceiptAuthorityResolver {
+  return { resolve: () => snapshot };
+}
+
 class MemoryLedger implements FounderReceiptConsumptionLedger {
   private readonly consumed = new Set<string>();
 
@@ -78,9 +95,9 @@ describe('FounderReceiptKernel v1', () => {
     vi.useRealTimers();
   });
 
-  it('accepts and consumes one exact FCR-issued receipt', async () => {
+  it('accepts and consumes one exact FCR-issued receipt when live authority still matches', async () => {
     const ledger = new MemoryLedger();
-    const result = await consumeFounderReceipt(receipt(), context(), SIGNER, ledger);
+    const result = await consumeFounderReceipt(receipt(), context(), SIGNER, ledger, authorityResolver());
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -172,10 +189,61 @@ describe('FounderReceiptKernel v1', () => {
     expect(result).toMatchObject({ ok: false, code: 'RECEIPT_KEY_MISMATCH' });
   });
 
+  it('expires authorization when the live target moves even though the receipt remains cryptographically valid', async () => {
+    const ledger = new MemoryLedger();
+    const exactReceipt = receipt();
+
+    expect(verifyFounderReceipt(exactReceipt, context(), SIGNER).ok).toBe(true);
+
+    const stale = await consumeFounderReceipt(
+      exactReceipt,
+      context(),
+      SIGNER,
+      ledger,
+      authorityResolver(authoritySnapshot({ targetSha: OTHER_SHA })),
+    );
+    expect(stale).toMatchObject({ ok: false, code: 'RECEIPT_AUTHORITY_EXPIRED' });
+
+    const fresh = await consumeFounderReceipt(exactReceipt, context(), SIGNER, ledger, authorityResolver());
+    expect(fresh.ok).toBe(true);
+  });
+
+  it('expires authorization when live scope or evidence authority changes', async () => {
+    const changedScope = await consumeFounderReceipt(
+      receipt(),
+      context(),
+      SIGNER,
+      new MemoryLedger(),
+      authorityResolver(authoritySnapshot({ scopeHash: OTHER_SCOPE_HASH })),
+    );
+    const changedEvidence = await consumeFounderReceipt(
+      receipt(),
+      context(),
+      SIGNER,
+      new MemoryLedger(),
+      authorityResolver(authoritySnapshot({ evidenceRefs: ['evidence:ci', 'evidence:new-review'] })),
+    );
+
+    expect(changedScope).toMatchObject({ ok: false, code: 'RECEIPT_AUTHORITY_EXPIRED' });
+    expect(changedEvidence).toMatchObject({ ok: false, code: 'RECEIPT_AUTHORITY_EXPIRED' });
+  });
+
+  it('fails closed when current authority cannot be resolved', async () => {
+    const unavailable: FounderReceiptAuthorityResolver = {
+      resolve: () => {
+        throw new Error('provider unavailable');
+      },
+    };
+
+    const result = await consumeFounderReceipt(receipt(), context(), SIGNER, new MemoryLedger(), unavailable);
+
+    expect(result).toMatchObject({ ok: false, code: 'RECEIPT_AUTHORITY_UNAVAILABLE' });
+  });
+
   it('rejects replay after the first atomic claim', async () => {
     const ledger = new MemoryLedger();
-    const first = await consumeFounderReceipt(receipt(), context(), SIGNER, ledger);
-    const replay = await consumeFounderReceipt(receipt(), context(), SIGNER, ledger);
+    const first = await consumeFounderReceipt(receipt(), context(), SIGNER, ledger, authorityResolver());
+    const replay = await consumeFounderReceipt(receipt(), context(), SIGNER, ledger, authorityResolver());
 
     expect(first.ok).toBe(true);
     expect(replay).toMatchObject({ ok: false, code: 'RECEIPT_REPLAYED' });
