@@ -7,6 +7,7 @@ import {
   type FounderControlDecision,
   type FounderControlProposalBinding,
 } from '../../lib/founderControlDecision.js';
+import { readFounderSession } from '../../auth/founderSession.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import type { FounderRequest } from './requireFounder.js';
 
@@ -79,6 +80,35 @@ function executionEnvelope(value: unknown): SanitizedV10ExecutionEnvelope | null
   const projectSlug = text(value.projectSlug);
   if (!SHA256.test(capabilityPlanHash) || !FULL_SHA.test(expectedHeadSha) || !projectSlug) return null;
   return { capabilityPlanHash, expectedHeadSha, projectSlug };
+}
+
+/**
+ * A persisted proof-gate row is necessary but not, by itself, a distinct
+ * founder interaction boundary: the proof-gate route is also founder-authenticated
+ * and bearer-capable. Until registered conversational adapters can attest a
+ * separate founder action, bearer-only automation must not be able to mint or
+ * reuse a structurally valid approval and immediately execute a merge.
+ *
+ * The real same-origin Control Room browser carries both its API bearer header
+ * and the HttpOnly `fcr_session` cookie, so this containment fuse preserves the
+ * browser path while rejecting bearer-only merge execution. Non-merge lanes are
+ * deliberately unchanged.
+ */
+export function founderMergeTransportErrors(input: {
+  actionType: unknown;
+  authorization?: string | null;
+  hasFounderCookieSession: boolean;
+}): string[] {
+  if (text(input.actionType) !== 'merge') return [];
+  const authorization = typeof input.authorization === 'string'
+    ? input.authorization.trim()
+    : '';
+  if (/^Bearer\s+\S+/i.test(authorization) && !input.hasFounderCookieSession) {
+    return [
+      'privileged merge founder approval requires a same-origin founder browser session or a future registered adapter attestation; bearer-only API clients may request permission but may not self-approve merge execution',
+    ];
+  }
+  return [];
 }
 
 export function validateTrustedFounderApproval(
@@ -241,6 +271,19 @@ export async function requireV10DecisionFounderBinding(
 ) {
   const body = isRecord(req.body) ? req.body : null;
   if (text(body?.actionType) !== 'merge') return next();
+
+  const transportErrors = founderMergeTransportErrors({
+    actionType: body?.actionType,
+    authorization: req.header('authorization'),
+    hasFounderCookieSession: Boolean(readFounderSession(req)),
+  });
+  if (transportErrors.length > 0) {
+    return res.status(403).json({
+      error: 'Interactive founder approval is required for privileged merge execution.',
+      code: 'FOUNDER_INTERACTIVE_APPROVAL_REQUIRED',
+      reasons: transportErrors,
+    });
+  }
 
   const missionId = text(req.params.missionId);
   const founderEmail = text(req.founder?.email);
