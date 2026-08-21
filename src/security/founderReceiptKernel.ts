@@ -54,6 +54,17 @@ export interface FounderReceiptVerificationContext {
   now?: string;
 }
 
+export interface FounderReceiptAuthoritySnapshot {
+  targetSha: string;
+  scopeHash: string;
+  evidenceRefs: string[];
+}
+
+export interface FounderReceiptAuthorityResolver {
+  /** Read the current authoritative target/scope/evidence immediately before consumption. */
+  resolve(receipt: FounderReceipt): FounderReceiptAuthoritySnapshot | Promise<FounderReceiptAuthoritySnapshot>;
+}
+
 export interface FounderReceiptConsumptionLedger {
   /** Atomically claim a receipt id. Returns false if it was already consumed. */
   claim(receiptId: string): boolean | Promise<boolean>;
@@ -66,6 +77,8 @@ export type FounderReceiptFailureCode =
   | 'RECEIPT_NOT_YET_VALID'
   | 'RECEIPT_EXPIRED'
   | 'RECEIPT_SCOPE_MISMATCH'
+  | 'RECEIPT_AUTHORITY_UNAVAILABLE'
+  | 'RECEIPT_AUTHORITY_EXPIRED'
   | 'RECEIPT_REPLAYED';
 
 export type FounderReceiptVerificationResult =
@@ -98,6 +111,24 @@ function normalizedEvidenceRefs(value: unknown): string[] | null {
 
 function sameStringArray(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function normalizedAuthoritySnapshot(value: unknown): FounderReceiptAuthoritySnapshot | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  const targetSha = text(candidate['targetSha']).toLowerCase();
+  const scopeHash = text(candidate['scopeHash']).toLowerCase();
+  const evidenceRefs = normalizedEvidenceRefs(candidate['evidenceRefs']);
+  const knownKeys = new Set(['targetSha', 'scopeHash', 'evidenceRefs']);
+  if (
+    Object.keys(candidate).some((key) => !knownKeys.has(key))
+    || !FULL_SHA.test(targetSha)
+    || !SHA256.test(scopeHash)
+    || !evidenceRefs
+  ) {
+    return null;
+  }
+  return { targetSha, scopeHash, evidenceRefs };
 }
 
 function receiptPayload(receipt: FounderReceiptClaims): string {
@@ -273,9 +304,40 @@ export async function consumeFounderReceipt(
   context: FounderReceiptVerificationContext,
   signer: FounderReceiptSigner,
   ledger: FounderReceiptConsumptionLedger,
+  authorityResolver: FounderReceiptAuthorityResolver,
 ): Promise<FounderReceiptVerificationResult> {
   const verified = verifyFounderReceipt(value, context, signer);
   if (!verified.ok) return verified;
+
+  let currentAuthority: FounderReceiptAuthoritySnapshot | null = null;
+  try {
+    currentAuthority = normalizedAuthoritySnapshot(await authorityResolver.resolve(verified.receipt));
+  } catch {
+    return {
+      ok: false,
+      code: 'RECEIPT_AUTHORITY_UNAVAILABLE',
+      error: 'Current founder receipt authority state could not be resolved.',
+    };
+  }
+  if (!currentAuthority) {
+    return {
+      ok: false,
+      code: 'RECEIPT_AUTHORITY_UNAVAILABLE',
+      error: 'Current founder receipt authority state is invalid.',
+    };
+  }
+
+  const authorityStillMatches =
+    currentAuthority.targetSha === verified.receipt.targetSha
+    && currentAuthority.scopeHash === verified.receipt.scopeHash
+    && sameStringArray(currentAuthority.evidenceRefs, verified.receipt.evidenceRefs);
+  if (!authorityStillMatches) {
+    return {
+      ok: false,
+      code: 'RECEIPT_AUTHORITY_EXPIRED',
+      error: 'Founder receipt remains historically valid, but its bound authority no longer matches current state.',
+    };
+  }
 
   const claimed = await ledger.claim(verified.receipt.receiptId);
   if (!claimed) {
