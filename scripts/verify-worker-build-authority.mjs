@@ -34,6 +34,7 @@ const workersCi = process.env.WORKERS_CI === '1';
 const githubActions = process.env.GITHUB_ACTIONS === 'true';
 const githubWorkflow = process.env.GITHUB_WORKFLOW?.trim() || null;
 const githubEvent = process.env.GITHUB_EVENT_NAME?.trim() || null;
+const githubEventSha = process.env.GITHUB_SHA?.trim() || null;
 const workersCommit = process.env.WORKERS_CI_COMMIT_SHA?.trim() || null;
 const workersBranch = process.env.WORKERS_CI_BRANCH?.trim() || null;
 const workersBuildUuid = process.env.WORKERS_CI_BUILD_UUID?.trim() || null;
@@ -76,10 +77,16 @@ if (workerName !== EXPECTED_WORKER) {
 
   if (canonicalManualWorkflow && command === 'deploy') {
     executionContext = 'github-manual-production';
-    productionPromotionAuthorized = true;
-    if (!SHA_PATTERN.test(checkedOutSha || '')) {
+    sourceSha = checkedOutSha;
+
+    if (!SHA_PATTERN.test(checkedOutSha || '') || !SHA_PATTERN.test(githubEventSha || '')) {
       authorityDecision = 'block';
-      error = 'WORKER_BUILD_AUTHORITY_BLOCKED: canonical GitHub production deploy must run from an exact checked-out SHA.';
+      error = 'WORKER_BUILD_AUTHORITY_BLOCKED: canonical GitHub production deploy requires exact checked-out and event SHAs.';
+    } else if (checkedOutSha !== githubEventSha) {
+      authorityDecision = 'block';
+      error = `WORKER_BUILD_AUTHORITY_BLOCKED: checked-out production SHA ${checkedOutSha} does not match GitHub workflow SHA ${githubEventSha}.`;
+    } else {
+      productionPromotionAuthorized = true;
     }
   } else {
     executionContext = 'github-verification-only';
@@ -99,6 +106,7 @@ const receipt = {
   sourceSha: sourceSha || null,
   sourceBranch,
   buildUuid,
+  githubEventSha,
   authorityDecision,
   productionPromotionAuthorized,
   nativeWorkerGitPromotionAllowed: false,
