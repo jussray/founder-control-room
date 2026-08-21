@@ -2,10 +2,29 @@
   "contract": "fcr/documentation-truth-receipt@v1",
   "purpose": "Record the bounded invariants disclosed when truth-governance controls change; this is review evidence, not a live provider or production claim.",
   "domains": [
+    "publishing",
     "repository-provider",
     "truth-governance"
   ],
   "changes": [
+    {
+      "path": "src/http/routes/n8nConveyor.ts",
+      "claims": [
+        "src/http/routes/n8nConveyor.ts: founder-content execution must expose Buffer as the only active downstream transport, require an FCR-issued exact one-shot approval, keep caller-supplied approval objects non-authoritative, and keep direct LinkedIn inactive unless a later separately reviewed founder decision and provider proof re-enable it."
+      ]
+    },
+    {
+      "path": "src/lib/authoritativeBufferFounderContentScheduler.ts",
+      "claims": [
+        "src/lib/authoritativeBufferFounderContentScheduler.ts: Buffer readiness and Buffer-only provider configuration must pass before the one-shot FCR approval is consumed; after claim, an ambiguous provider result must not be blindly retried and requires reconciliation plus fresh authority."
+      ]
+    },
+    {
+      "path": "public/control-room/content-manager.html",
+      "claims": [
+        "public/control-room/content-manager.html: the current product surface must state Chief AI -> FCR -> Buffer, keep public proof links editorially optional while internal evidence remains mandatory, show direct LinkedIn inactive, and never translate scheduling or missing provider readback into published truth."
+      ]
+    },
     {
       "path": "src/buildEvents/buildEvent.ts",
       "claims": [
