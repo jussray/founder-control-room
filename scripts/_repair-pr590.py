@@ -162,7 +162,8 @@ path.write_text(text[:start] + replacement + text[end:])
 
 
 # 3. Provider regressions: successful composite result receipts both objects;
-# partial failure surfaces the verified first component.
+# partial failure surfaces the verified first component. The strict-freshness
+# mismatch assertion is already current on the branch before this one-shot runs.
 path = Path("src/providers/__tests__/githubProvider.fcrRulesetHardening.test.ts")
 text = path.read_text()
 old = '''    const provider = buildProvider();
@@ -180,11 +181,6 @@ new = '''    const provider = buildProvider();
     expect(mockCreateRepoRuleset).toHaveBeenCalledTimes(2);
 '''
 text = replace_once(text, old, new, "ruleset success receipt")
-old = '''      .rejects.toThrow("FCR strict-freshness ruleset read-back mismatch");
-'''
-new = '''      .rejects.toThrow(/FCR strict-freshness ruleset .* read-back mismatch/);
-'''
-text = replace_once(text, old, new, "freshness mismatch assertion")
 anchor = '''  it("updates both stable ruleset identities when they already exist", async () => {
 '''
 regression = '''  it("surfaces the verified freshness identity when the review mutation fails", async () => {
