@@ -1,0 +1,77 @@
+name: PR 590 Review Readback Repair
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - synchronize
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+jobs:
+  repair:
+    name: Repair PR 590 review-readback receipt
+    if: ${{ github.event.pull_request.number == 590 && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact PR head with write credential
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Verify exact starting head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Apply bounded reconciliation repair
+        run: python scripts/_repair-pr590-review-readback.py
+
+      - name: Remove repair scaffolding before proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/_repair-pr590-review-readback.yml scripts/_repair-pr590-review-readback.py
+          test ! -e .github/workflows/_repair-pr590-review-readback.yml
+          test ! -e scripts/_repair-pr590-review-readback.py
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run focused proof on helper-free tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run typecheck
+          npx vitest run src/providers/__tests__/githubProvider.fcrRulesetHardening.test.ts
+          git diff --check
+
+      - name: Commit clean repair
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/providers/GitHubProvider.ts \
+            src/providers/__tests__/githubProvider.fcrRulesetHardening.test.ts \
+            docs/PROVIDERS.md \
+            docs/DOCUMENTATION_TRUTH_RECEIPT.json
+          git diff --cached --check
+          git commit -m 'fix(governance): receipt review-readback partial mutations'
+          git push origin "HEAD:${HEAD_REF}"
