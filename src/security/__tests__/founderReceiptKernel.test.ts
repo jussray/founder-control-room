@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   MAX_FOUNDER_RECEIPT_TTL_MS,
@@ -6,10 +6,16 @@ import {
   issueFounderReceipt,
   verifyFounderReceipt,
   type FounderReceiptConsumptionLedger,
+  type FounderReceiptIssueInput,
+  type FounderReceiptSigner,
   type FounderReceiptVerificationContext,
 } from '../founderReceiptKernel.js';
 
 const SIGNING_KEY = 'test-founder-receipt-signing-key-32-bytes-minimum';
+const SIGNER: FounderReceiptSigner = {
+  keyId: 'fcr-founder-receipt-test-key',
+  signingKey: SIGNING_KEY,
+};
 const HEAD_SHA = 'a'.repeat(40);
 const OTHER_SHA = 'b'.repeat(40);
 const SCOPE_HASH = '1'.repeat(64);
@@ -19,23 +25,23 @@ const ISSUED_AT = '2026-08-21T06:00:00.000Z';
 const EXPIRES_AT = '2026-08-21T06:15:00.000Z';
 const NOW = '2026-08-21T06:05:00.000Z';
 
+function issueInput(overrides: Partial<FounderReceiptIssueInput> = {}): FounderReceiptIssueInput {
+  return {
+    receiptId: 'receipt-001',
+    decisionId: 'decision-001',
+    founderIdentity: 'founder@example.com',
+    action: 'merge',
+    resource: 'jussray/founder-control-room#577',
+    targetSha: HEAD_SHA,
+    scopeHash: SCOPE_HASH,
+    evidenceRefs: EVIDENCE_REFS,
+    expiresAt: EXPIRES_AT,
+    ...overrides,
+  };
+}
+
 function receipt() {
-  return issueFounderReceipt(
-    {
-      receiptId: 'receipt-001',
-      decisionId: 'decision-001',
-      founderIdentity: 'founder@example.com',
-      action: 'merge',
-      resource: 'jussray/founder-control-room#577',
-      targetSha: HEAD_SHA,
-      scopeHash: SCOPE_HASH,
-      evidenceRefs: EVIDENCE_REFS,
-      keyId: 'fcr-founder-receipt-test-key',
-      issuedAt: ISSUED_AT,
-      expiresAt: EXPIRES_AT,
-    },
-    SIGNING_KEY,
-  );
+  return issueFounderReceipt(issueInput(), SIGNER);
 }
 
 function context(overrides: Partial<FounderReceiptVerificationContext> = {}): FounderReceiptVerificationContext {
@@ -63,33 +69,44 @@ class MemoryLedger implements FounderReceiptConsumptionLedger {
 }
 
 describe('FounderReceiptKernel v1', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(ISSUED_AT));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('accepts and consumes one exact FCR-issued receipt', async () => {
     const ledger = new MemoryLedger();
-    const result = await consumeFounderReceipt(receipt(), context(), SIGNING_KEY, ledger);
+    const result = await consumeFounderReceipt(receipt(), context(), SIGNER, ledger);
 
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.receipt.action).toBe('merge');
       expect(result.receipt.targetSha).toBe(HEAD_SHA);
+      expect(result.receipt.issuedAt).toBe(ISSUED_AT);
+      expect(result.receipt.keyId).toBe(SIGNER.keyId);
     }
   });
 
   it('rejects a forged or tampered receipt', () => {
     const forged = { ...receipt(), founderIdentity: 'attacker@example.com' };
-    const result = verifyFounderReceipt(forged, context({ founderIdentity: 'attacker@example.com' }), SIGNING_KEY);
+    const result = verifyFounderReceipt(forged, context({ founderIdentity: 'attacker@example.com' }), SIGNER);
 
     expect(result).toMatchObject({ ok: false, code: 'RECEIPT_SIGNATURE_INVALID' });
   });
 
   it('rejects a receipt against a different exact target SHA', () => {
-    const result = verifyFounderReceipt(receipt(), context({ targetSha: OTHER_SHA }), SIGNING_KEY);
+    const result = verifyFounderReceipt(receipt(), context({ targetSha: OTHER_SHA }), SIGNER);
 
     expect(result).toMatchObject({ ok: false, code: 'RECEIPT_SCOPE_MISMATCH' });
   });
 
   it('rejects action and scope escalation', () => {
-    const wrongAction = verifyFounderReceipt(receipt(), context({ action: 'deploy' }), SIGNING_KEY);
-    const wrongScope = verifyFounderReceipt(receipt(), context({ scopeHash: OTHER_SCOPE_HASH }), SIGNING_KEY);
+    const wrongAction = verifyFounderReceipt(receipt(), context({ action: 'deploy' }), SIGNER);
+    const wrongScope = verifyFounderReceipt(receipt(), context({ scopeHash: OTHER_SCOPE_HASH }), SIGNER);
 
     expect(wrongAction).toMatchObject({ ok: false, code: 'RECEIPT_SCOPE_MISMATCH' });
     expect(wrongScope).toMatchObject({ ok: false, code: 'RECEIPT_SCOPE_MISMATCH' });
@@ -99,7 +116,7 @@ describe('FounderReceiptKernel v1', () => {
     const result = verifyFounderReceipt(
       receipt(),
       context({ evidenceRefs: ['evidence:ci', 'evidence:different-review'] }),
-      SIGNING_KEY,
+      SIGNER,
     );
 
     expect(result).toMatchObject({ ok: false, code: 'RECEIPT_SCOPE_MISMATCH' });
@@ -109,46 +126,56 @@ describe('FounderReceiptKernel v1', () => {
     const result = verifyFounderReceipt(
       receipt(),
       context({ now: '2026-08-21T06:15:00.000Z' }),
-      SIGNING_KEY,
+      SIGNER,
     );
 
     expect(result).toMatchObject({ ok: false, code: 'RECEIPT_EXPIRED' });
   });
 
   it('rejects a future-dated receipt before its issuance time', () => {
-    const result = verifyFounderReceipt(
-      receipt(),
-      context({ now: '2026-08-21T05:59:59.000Z' }),
-      SIGNING_KEY,
-    );
+    const futureDated = { ...receipt(), issuedAt: '2026-08-21T06:10:00.000Z' };
+    const result = verifyFounderReceipt(futureDated, context(), SIGNER);
 
-    expect(result).toMatchObject({ ok: false, code: 'RECEIPT_NOT_YET_VALID' });
+    expect(result).toMatchObject({ ok: false, code: 'RECEIPT_SIGNATURE_INVALID' });
+  });
+
+  it('does not let caller input choose a future issuance time', () => {
+    const untrusted = {
+      ...issueInput(),
+      issuedAt: '2030-01-01T00:00:00.000Z',
+    } as unknown as FounderReceiptIssueInput;
+
+    const result = issueFounderReceipt(untrusted, SIGNER);
+
+    expect(result.issuedAt).toBe(ISSUED_AT);
+    expect(result.expiresAt).toBe(EXPIRES_AT);
   });
 
   it('refuses to issue a receipt with a god-mode lifetime', () => {
     const expiresAt = new Date(Date.parse(ISSUED_AT) + MAX_FOUNDER_RECEIPT_TTL_MS + 1).toISOString();
 
-    expect(() => issueFounderReceipt(
-      {
-        decisionId: 'decision-long-lived',
-        founderIdentity: 'founder@example.com',
-        action: 'merge',
-        resource: 'jussray/founder-control-room#577',
-        targetSha: HEAD_SHA,
-        scopeHash: SCOPE_HASH,
-        evidenceRefs: ['evidence:ci'],
-        keyId: 'fcr-founder-receipt-test-key',
-        issuedAt: ISSUED_AT,
-        expiresAt,
-      },
-      SIGNING_KEY,
-    )).toThrow(/no longer than/);
+    expect(() => issueFounderReceipt(issueInput({
+      decisionId: 'decision-long-lived',
+      evidenceRefs: ['evidence:ci'],
+      expiresAt,
+    }), SIGNER)).toThrow(/no longer than/);
+  });
+
+  it('binds receipt key identity to the trusted signer configuration', () => {
+    const wrongKeyIdentity: FounderReceiptSigner = {
+      keyId: 'fcr-founder-receipt-other-key',
+      signingKey: SIGNING_KEY,
+    };
+
+    const result = verifyFounderReceipt(receipt(), context(), wrongKeyIdentity);
+
+    expect(result).toMatchObject({ ok: false, code: 'RECEIPT_KEY_MISMATCH' });
   });
 
   it('rejects replay after the first atomic claim', async () => {
     const ledger = new MemoryLedger();
-    const first = await consumeFounderReceipt(receipt(), context(), SIGNING_KEY, ledger);
-    const replay = await consumeFounderReceipt(receipt(), context(), SIGNING_KEY, ledger);
+    const first = await consumeFounderReceipt(receipt(), context(), SIGNER, ledger);
+    const replay = await consumeFounderReceipt(receipt(), context(), SIGNER, ledger);
 
     expect(first.ok).toBe(true);
     expect(replay).toMatchObject({ ok: false, code: 'RECEIPT_REPLAYED' });
@@ -156,7 +183,7 @@ describe('FounderReceiptKernel v1', () => {
 
   it('rejects unknown fields instead of accepting caller-defined authority metadata', () => {
     const attackerSupplied = { ...receipt(), approvedByAgent: 'claude' };
-    const result = verifyFounderReceipt(attackerSupplied, context(), SIGNING_KEY);
+    const result = verifyFounderReceipt(attackerSupplied, context(), SIGNER);
 
     expect(result).toMatchObject({ ok: false, code: 'RECEIPT_INVALID' });
   });
