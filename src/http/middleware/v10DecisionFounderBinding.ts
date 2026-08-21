@@ -7,6 +7,7 @@ import {
   type FounderControlDecision,
   type FounderControlProposalBinding,
 } from '../../lib/founderControlDecision.js';
+import { readFounderSession } from '../../auth/founderSession.js';
 import type { FounderRequest } from './requireFounder.js';
 
 type JsonRecord = Record<string, unknown>;
@@ -67,22 +68,25 @@ function executionEnvelope(value: unknown): SanitizedV10ExecutionEnvelope | null
 /**
  * The current v1 founder decision object is deterministic and request-carried.
  * Until a registered conversational adapter can attest the founder's user
- * action, a bearer-authenticated API client must not be able to manufacture
- * that object and immediately use it to merge. Branch creation keeps its
- * existing API path; privileged merge requires the same-origin founder browser
- * session that is already protected by the global CSRF gate.
+ * action, a bearer-only API client must not be able to manufacture that object
+ * and immediately use it to merge. The real browser currently sends both its
+ * normal API bearer header and the HttpOnly `fcr_session` cookie, so the
+ * emergency fuse distinguishes bearer-only automation from that same-origin
+ * founder browser session. This is a temporary containment membrane, not the
+ * final portable approval attestation design.
  */
 export function founderMergeTransportErrors(input: {
   actionType: unknown;
   authorization?: string | null;
+  hasFounderCookieSession: boolean;
 }): string[] {
   if (text(input.actionType) !== 'merge') return [];
   const authorization = typeof input.authorization === 'string'
     ? input.authorization.trim()
     : '';
-  if (/^Bearer\s+\S+/i.test(authorization)) {
+  if (/^Bearer\s+\S+/i.test(authorization) && !input.hasFounderCookieSession) {
     return [
-      'privileged merge founder approval requires an interactive same-origin founder browser session; bearer-authenticated API clients may request permission but may not self-approve merge execution',
+      'privileged merge founder approval requires a same-origin founder browser session or a future registered adapter attestation; bearer-only API clients may request permission but may not self-approve merge execution',
     ];
   }
   return [];
@@ -182,6 +186,7 @@ export function requireV10DecisionFounderBinding(
   const transportErrors = founderMergeTransportErrors({
     actionType: body?.actionType,
     authorization: req.header('authorization'),
+    hasFounderCookieSession: Boolean(readFounderSession(req)),
   });
   if (transportErrors.length > 0) {
     return res.status(403).json({
