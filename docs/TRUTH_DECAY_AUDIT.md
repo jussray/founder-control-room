@@ -129,6 +129,8 @@ Use the generic contract only where a consequential current-state claim still la
 
 Portfolio governance composes those layers for evidence-dependent consequential actions. Founder authorization remains bound to the exact decision-context snapshot—selected intent, memory fact hashes, proof artifact hashes, and exact version—and the canonical hash of that snapshot must equal the Truth Lease claim hash. The authorization must also bind the exact lease hash. At the declared use boundary FCR re-observes the lease dependencies. Changed, stale, missing, invalid, or unbound truth forces `reconfirm`; a consequential action with no factual memory/proof dependency does not gain unnecessary Truth Lease ceremony.
 
+Production governance now adds a production-specific composer on top of that generic lease rather than creating another evidence store. One production claim may be leased only when the exact repository head is simultaneously bound to matching Cloudflare Worker and Pages runtime identities, the FCR Supabase project/migration/advisor state, Playwright tested and observed runtime identity plus its artifact digest, and the exact-head independent-review receipt. The composer does not perform provider reads or mutations itself; it accepts already-authoritative observations and hashes them into the lease dependencies. At deploy, publish, completion-claim, or another consequential use boundary, every dependency must be freshly re-observed. A changed repository head, changed Cloudflare runtime, changed Supabase state, mismatched browser/runtime SHA, stale observation, missing provider witness, or review receipt for another head makes the production claim unusable until the evidence is rebuilt.
+
 ## Documentation truth gate
 
 Documentation is part of the product/control plane when humans or agents use it to make current decisions.
@@ -303,7 +305,8 @@ The strongest optimization is not faster claiming. It is shortening the distance
 21. Documentation synchronization must not create an infinite self-update loop; post-merge verification closes the transition.
 22. Preserve history. Supersede stale authority explicitly instead of deleting evidence simply because the current answer changed.
 23. An unchanged approved decision-context object is not proof that its external dependencies are still current; evidence-dependent consequential use must revalidate the bound Truth Lease at the use boundary.
+24. Independent green receipts do not compose into production truth unless they bind the same exact candidate and remain current together at the declared use boundary.
 
 ## Rollback
 
-The Truth Lease, temporal founder-content guards, analytics-authority guard, and Documentation Truth control are additive/fail-closed. Revert the focused contract/test/workflow/documentation change if it causes incompatibility. No database, provider credential, DNS, publication, provider ruleset, or production mutation is performed by the documentation-truth slice.
+The Truth Lease, production-specific lease composer, temporal founder-content guards, analytics-authority guard, and Documentation Truth control are additive/fail-closed. Revert the focused contract/test/workflow/documentation change if it causes incompatibility. No database, provider credential, DNS, publication, provider ruleset, or production mutation is performed by the documentation-truth slice.

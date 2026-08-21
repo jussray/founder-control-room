@@ -65,6 +65,12 @@
       "claims": [
         "src/governance/portfolioDecisionContext.ts: evidence-dependent consequential portfolio execution must bind founder authorization to the exact normalized decision-context Truth Lease and re-evaluate fresh dependency observations at the use boundary; stale, changed, missing, invalid, or unbound truth must reconfirm instead of execute."
       ]
+    },
+    {
+      "path": "src/governance/productionTruthLease.ts",
+      "claims": [
+        "src/governance/productionTruthLease.ts: a production-truth lease may exist only when Cloudflare Worker/Pages identity, Playwright tested/runtime identity, independent review, Supabase production state, and repository main identity are bound to one exact candidate; any changed, stale, missing, or mismatched dependency must fail closed at use time."
+      ]
     }
   ]
 }
