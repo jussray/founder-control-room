@@ -10,6 +10,13 @@ compatibility_flags = [
 workers_dev = true
 preview_urls = true
 
+# Every Wrangler build passes through the repository-owned authority membrane.
+# Native Cloudflare Workers Builds may verify/upload versions, but they may not
+# promote production. Canonical production promotion remains the exact-main,
+# founder-approved GitHub Deploy / Worker Reconcile workflows.
+[build]
+command = "node scripts/verify-worker-build-authority.mjs"
+
 # Cloudflare Pages owns foundercontrolroom.org and serves ./public.
 # This single surviving Worker owns backend, auth, MCP, and reconciliation
 # traffic at api.foundercontrolroom.org. The deleted founder-control-room2
