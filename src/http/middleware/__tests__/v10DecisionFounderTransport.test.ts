@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../../lib/supabaseClient.js', () => ({
+  supabase: { from: vi.fn() },
+}));
+
 import { founderMergeTransportErrors } from '../v10DecisionFounderBinding.js';
 
 describe('V10 founder merge transport authority', () => {
