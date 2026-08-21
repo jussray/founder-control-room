@@ -1,0 +1,173 @@
+import { randomUUID } from 'node:crypto';
+import {
+  QUICKSCAN_HIGH_PRIORITY_SCORE,
+  QUICKSCAN_PRICE_CENTS,
+  type ChiefQuickScanRecommendation,
+  type PromptWorkflowReference,
+  type QuickScanApproval,
+  type QuickScanEvidence,
+  type QuickScanLifecycleState,
+  type QuickScanOverrideReceipt,
+  type QuickScanProspect,
+  type QuickScanQualification,
+  type QuickScanScore,
+  type QuickScanSegment,
+} from './contracts.js';
+
+const NEXT: Record<QuickScanLifecycleState, QuickScanLifecycleState[]> = {
+  discovered: ['researched', 'closed_lost'],
+  researched: ['qualified_for_outreach', 'follow_up_later', 'closed_lost'],
+  qualified_for_outreach: ['draft_ready', 'disqualified', 'follow_up_later'],
+  draft_ready: ['approved_to_contact', 'follow_up_later', 'closed_lost'],
+  approved_to_contact: ['contacted', 'follow_up_later', 'closed_lost'],
+  contacted: ['replied', 'follow_up_later', 'closed_lost'],
+  replied: ['fit_check_scheduled', 'disqualified', 'follow_up_later'],
+  fit_check_scheduled: ['qualified', 'disqualified', 'follow_up_later'],
+  qualified: ['payment_link_ready', 'follow_up_later', 'closed_lost'],
+  disqualified: ['closed_lost', 'follow_up_later'],
+  payment_link_ready: ['payment_link_sent', 'follow_up_later', 'closed_lost'],
+  payment_link_sent: ['paid', 'follow_up_later', 'closed_lost'],
+  paid: ['diagnostic_scheduled'],
+  diagnostic_scheduled: ['diagnostic_complete', 'closed_lost'],
+  diagnostic_complete: ['delivery_due'],
+  delivery_due: ['delivered'],
+  delivered: ['closed_won'],
+  closed_won: [],
+  closed_lost: [],
+  follow_up_later: ['researched', 'draft_ready', 'fit_check_scheduled', 'payment_link_ready', 'closed_lost'],
+};
+
+const OVERRIDEABLE = new Set<string>([
+  'researched:qualified_for_outreach',
+  'replied:fit_check_scheduled',
+  'qualified:payment_link_ready',
+]);
+
+function now() { return new Date().toISOString(); }
+function id(prefix: string) { return `${prefix}_${randomUUID()}`; }
+
+export function calculateQuickScanScore(evidence: QuickScanEvidence[]): QuickScanScore {
+  const categories = new Set(evidence.map((item) => item.category));
+  const score: QuickScanScore = {
+    visibleFriction: categories.has('visible_friction') ? 2 : 0,
+    activeDemand: categories.has('active_demand') ? 2 : 0,
+    ownerReachable: categories.has('owner_reachable') ? 1 : 0,
+    repeatHighValue: categories.has('repeat_high_value_service') ? 2 : 0,
+    operationalComplexity: categories.has('operational_complexity') ? 1 : 0,
+    urgency: categories.has('urgency') ? 2 : 0,
+    total: 0,
+    evidenceIds: evidence.map((item) => item.id),
+    humanApproved: false,
+  };
+  score.total = score.visibleFriction + score.activeDemand + score.ownerReachable + score.repeatHighValue + score.operationalComplexity + score.urgency;
+  return score;
+}
+
+export function quickScanHighPriority(prospect: QuickScanProspect): boolean {
+  return prospect.lifecycleState !== 'disqualified' && prospect.score.total >= QUICKSCAN_HIGH_PRIORITY_SCORE;
+}
+
+export function qualificationIsValid(value?: QuickScanQualification): boolean {
+  return Boolean(value && value.decision === 'qualified' && value.authority === 'confirmed' && value.urgency === 'now'
+    && value.pain.trim() && value.frequency.trim() && value.economicImpact.trim());
+}
+
+export function assertQuickScanTransition(from: QuickScanLifecycleState, to: QuickScanLifecycleState): void {
+  if (!NEXT[from].includes(to)) throw new Error(`Invalid QuickScan lifecycle transition: ${from} -> ${to}`);
+}
+
+export function createOverrideReceipt(input: {
+  actor: string;
+  reason: string;
+  from: QuickScanLifecycleState;
+  to: QuickScanLifecycleState;
+  evidenceIds: string[];
+}): QuickScanOverrideReceipt {
+  if (!OVERRIDEABLE.has(`${input.from}:${input.to}`)) {
+    throw new Error(`QuickScan override is not permitted for ${input.from} -> ${input.to}`);
+  }
+  if (!input.actor.trim() || !input.reason.trim() || input.evidenceIds.length === 0) {
+    throw new Error('QuickScan override requires actor, reason, and evidence');
+  }
+  return { id: id('override'), ...input, createdAt: now() };
+}
+
+export function createProspect(input: { businessName: string; ownerName?: string; segment: QuickScanSegment }): QuickScanProspect {
+  const createdAt = now();
+  return {
+    id: id('prospect'),
+    businessName: input.businessName.trim(),
+    ownerName: input.ownerName?.trim() || undefined,
+    segment: input.segment,
+    lifecycleState: 'discovered',
+    evidence: [],
+    score: calculateQuickScanScore([]),
+    approvals: [],
+    overrideReceipts: [],
+    payment: { status: 'unpaid', amountCents: QUICKSCAN_PRICE_CENTS },
+    audit: [],
+    createdAt,
+    updatedAt: createdAt,
+  };
+}
+
+export function advanceProspect(prospect: QuickScanProspect, to: QuickScanLifecycleState, actor: string, override?: QuickScanOverrideReceipt): QuickScanProspect {
+  if (override) {
+    if (override.from !== prospect.lifecycleState || override.to !== to) throw new Error('QuickScan override does not bind this transition');
+    prospect.overrideReceipts.push(override);
+  } else {
+    assertQuickScanTransition(prospect.lifecycleState, to);
+  }
+  const from = prospect.lifecycleState;
+  prospect.lifecycleState = to;
+  prospect.updatedAt = now();
+  prospect.audit.push({ id: id('audit'), type: 'lifecycle.transition', message: `${from} -> ${to}`, actor, createdAt: prospect.updatedAt });
+  return prospect;
+}
+
+export function addEvidence(prospect: QuickScanProspect, evidence: Omit<QuickScanEvidence, 'id' | 'observedAt'>, actor: string): QuickScanProspect {
+  const item: QuickScanEvidence = { ...evidence, id: id('evidence'), observedAt: now() };
+  prospect.evidence.push(item);
+  prospect.score = calculateQuickScanScore(prospect.evidence);
+  prospect.updatedAt = now();
+  prospect.audit.push({ id: id('audit'), type: 'evidence.recorded', message: `${item.category}: ${item.note}`, actor, createdAt: prospect.updatedAt });
+  return prospect;
+}
+
+export function setChiefRecommendation(prospect: QuickScanProspect, recommendation: ChiefQuickScanRecommendation, selectedWorkflow: PromptWorkflowReference, actor = 'chief'): QuickScanProspect {
+  const used = recommendation.promptWorkflow;
+  if (JSON.stringify(used) !== JSON.stringify(selectedWorkflow)) {
+    throw new Error('Chief recommendation provenance does not match the PromptOS-selected workflow');
+  }
+  prospect.chiefRecommendation = recommendation;
+  prospect.updatedAt = now();
+  prospect.audit.push({ id: id('audit'), type: 'chief.recommendation', message: recommendation.nextAction, actor, createdAt: prospect.updatedAt });
+  return prospect;
+}
+
+export function proposeApproval(prospect: QuickScanProspect, input: Omit<QuickScanApproval, 'id' | 'decision'>): QuickScanApproval {
+  const approval: QuickScanApproval = { id: id('approval'), decision: 'PENDING', ...input };
+  prospect.approvals.push(approval);
+  return approval;
+}
+
+export function decideApproval(prospect: QuickScanProspect, approvalId: string, decision: 'APPROVE' | 'EDIT' | 'SKIP', actor: string, editedAction?: string): QuickScanProspect {
+  const approval = prospect.approvals.find((item) => item.id === approvalId);
+  if (!approval) throw new Error('QuickScan approval not found');
+  approval.decision = decision;
+  approval.decidedBy = actor;
+  approval.decidedAt = now();
+  if (decision === 'EDIT') {
+    if (!editedAction?.trim()) throw new Error('Edited QuickScan approval requires replacement action text');
+    approval.proposedAction = editedAction.trim();
+  }
+  prospect.updatedAt = now();
+  prospect.audit.push({ id: id('audit'), type: 'approval.decided', message: `${approval.action}:${decision}`, actor, createdAt: prospect.updatedAt });
+  return prospect;
+}
+
+export function recordQualification(prospect: QuickScanProspect, qualification: QuickScanQualification, actor: string): QuickScanProspect {
+  prospect.qualification = qualification;
+  const target: QuickScanLifecycleState = qualificationIsValid(qualification) ? 'qualified' : 'disqualified';
+  return advanceProspect(prospect, target, actor);
+}

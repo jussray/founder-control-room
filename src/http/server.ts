@@ -28,6 +28,7 @@ import { goalfixRouter } from './routes/goalfix.js';
 import { founderOsSkillsRouter } from './routes/founderOsSkills.js';
 import { mirrorRouter } from './routes/mirror.js';
 import { n8nConveyorRouter } from './routes/n8nConveyor.js';
+import { quickScanRouter } from './routes/quickscan.js';
 import { switchboardRouter } from './routes/switchboard.js';
 import { securityPostureRouter } from './routes/securityPosture.js';
 import { handleFounderSignalEngineMcp } from './routes/founderSignalEngineMcp.js';
@@ -292,6 +293,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/plugin-center', pluginCenterRouter);
   app.use('/command-bridge', commandBridgeRouter);
   app.use('/automation/conveyor', n8nConveyorRouter);
+  app.use('/quickscan', quickScanRouter);
   app.use('/design-os', designOsRouter);
   app.use('/cloudflare', cloudflareReasoningRouter);
   app.use('/mcp', mcpRouter);
