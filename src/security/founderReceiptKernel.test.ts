@@ -14,6 +14,7 @@ const HEAD_SHA = 'a'.repeat(40);
 const OTHER_SHA = 'b'.repeat(40);
 const SCOPE_HASH = '1'.repeat(64);
 const OTHER_SCOPE_HASH = '2'.repeat(64);
+const EVIDENCE_REFS = ['evidence:independent-review', 'evidence:ci'];
 const ISSUED_AT = '2026-08-21T06:00:00.000Z';
 const EXPIRES_AT = '2026-08-21T06:15:00.000Z';
 const NOW = '2026-08-21T06:05:00.000Z';
@@ -28,7 +29,7 @@ function receipt() {
       resource: 'jussray/founder-control-room#577',
       targetSha: HEAD_SHA,
       scopeHash: SCOPE_HASH,
-      evidenceRefs: ['evidence:independent-review', 'evidence:ci'],
+      evidenceRefs: EVIDENCE_REFS,
       keyId: 'fcr-founder-receipt-test-key',
       issuedAt: ISSUED_AT,
       expiresAt: EXPIRES_AT,
@@ -45,6 +46,7 @@ function context(overrides: Partial<FounderReceiptVerificationContext> = {}): Fo
     resource: 'jussray/founder-control-room#577',
     targetSha: HEAD_SHA,
     scopeHash: SCOPE_HASH,
+    evidenceRefs: EVIDENCE_REFS,
     now: NOW,
     ...overrides,
   };
@@ -91,6 +93,16 @@ describe('FounderReceiptKernel v1', () => {
 
     expect(wrongAction).toMatchObject({ ok: false, code: 'RECEIPT_SCOPE_MISMATCH' });
     expect(wrongScope).toMatchObject({ ok: false, code: 'RECEIPT_SCOPE_MISMATCH' });
+  });
+
+  it('rejects evidence substitution even when every other scope field matches', () => {
+    const result = verifyFounderReceipt(
+      receipt(),
+      context({ evidenceRefs: ['evidence:ci', 'evidence:different-review'] }),
+      SIGNING_KEY,
+    );
+
+    expect(result).toMatchObject({ ok: false, code: 'RECEIPT_SCOPE_MISMATCH' });
   });
 
   it('rejects an expired receipt', () => {
