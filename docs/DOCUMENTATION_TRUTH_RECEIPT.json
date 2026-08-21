@@ -1,11 +1,24 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded invariants disclosed when truth-governance controls change; this is review evidence, not a live provider or production claim.",
+  "purpose": "Record the bounded repository-provider authority invariants changed by the FCR pull-request-only GitHub App integration repair; this is review evidence, not a live provider or production claim.",
   "domains": [
     "repository-provider",
     "truth-governance"
   ],
   "changes": [
+    {
+      "path": "src/providers/GitHubProvider.ts",
+      "claims": [
+        "src/providers/GitHubProvider.ts: active FCR-main rulesets must retain the native approval and strict-check membrane, require exactly one numeric GitHub App bypass identity, emit that bypass only in pull_request mode, and reject provider read-back that widens the actor or bypass mode.",
+        "src/providers/GitHubProvider.ts: canonical FCR integration must bind the provider-backed reviewed PR number to freshly resolved exact base and head SHAs and may merge only through the pull-request endpoint; it must never fall back to generic direct protected-branch integration for FCR."
+      ]
+    },
+    {
+      "path": "src/providers/RepositoryProvider.ts",
+      "claims": [
+        "src/providers/RepositoryProvider.ts: ruleset bypass actors must remain explicit machine identities whose effective bypass scope is chosen and verified by the provider implementation; callers cannot grant themselves broader bypass authority through the provider-neutral contract."
+      ]
+    },
     {
       "path": "src/buildEvents/buildEvent.ts",
       "claims": [
