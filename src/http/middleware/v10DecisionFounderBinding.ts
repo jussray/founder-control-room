@@ -65,6 +65,30 @@ function executionEnvelope(value: unknown): SanitizedV10ExecutionEnvelope | null
 }
 
 /**
+ * The current v1 founder decision object is deterministic and request-carried.
+ * Until a registered conversational adapter can attest the founder's user
+ * action, a bearer-authenticated API client must not be able to manufacture
+ * that object and immediately use it to merge. Branch creation keeps its
+ * existing API path; privileged merge requires the same-origin founder browser
+ * session that is already protected by the global CSRF gate.
+ */
+export function founderMergeTransportErrors(input: {
+  actionType: unknown;
+  authorization?: string | null;
+}): string[] {
+  if (text(input.actionType) !== 'merge') return [];
+  const authorization = typeof input.authorization === 'string'
+    ? input.authorization.trim()
+    : '';
+  if (/^Bearer\s+\S+/i.test(authorization)) {
+    return [
+      'privileged merge founder approval requires an interactive same-origin founder browser session; bearer-authenticated API clients may request permission but may not self-approve merge execution',
+    ];
+  }
+  return [];
+}
+
+/**
  * Bind the portable Chief decision + PromptOS handoff + explicit founder
  * decision to the exact V10 execution identity already verified by the
  * privileged capability-plan middleware.
@@ -154,6 +178,18 @@ export function requireV10DecisionFounderBinding(
 ) {
   const body = isRecord(req.body) ? req.body : null;
   if (text(body?.actionType) !== 'merge') return next();
+
+  const transportErrors = founderMergeTransportErrors({
+    actionType: body?.actionType,
+    authorization: req.header('authorization'),
+  });
+  if (transportErrors.length > 0) {
+    return res.status(403).json({
+      error: 'Interactive founder approval is required for privileged merge execution.',
+      code: 'FOUNDER_INTERACTIVE_APPROVAL_REQUIRED',
+      reasons: transportErrors,
+    });
+  }
 
   const missionId = text(req.params.missionId);
   const payload = isRecord(body?.payload) ? body.payload : null;
