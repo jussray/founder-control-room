@@ -54,7 +54,18 @@ function isCloudflareAccessHost(rawUrl) {
 
 async function assertNormalAnonymousSurface(page, response, label) {
   const title = await page.title().catch(() => '');
-  const accessIntercepted = isCloudflareAccessHost(page.url()) || /cloudflare access/i.test(title);
+  const bodyText = (await page.locator('body').innerText({ timeout: 5_000 }).catch(() => '')).toLowerCase();
+  const accessPathMarkers = await page
+    .locator('a[href*="/cdn-cgi/access/"], form[action*="/cdn-cgi/access/"]')
+    .count()
+    .catch(() => 0);
+  const sameHostAccessBlock =
+    accessPathMarkers > 0 ||
+    (bodyText.includes('cloudflare access') &&
+      (bodyText.includes('sign in') || bodyText.includes('does not have access')));
+  const accessIntercepted =
+    isCloudflareAccessHost(page.url()) || /cloudflare access/i.test(title) || sameHostAccessBlock;
+
   if (accessIntercepted) {
     throw new Error(`BIP_LIVE_DEMO_BLOCKED_BY_CLOUDFLARE_ACCESS surface=${label}`);
   }
