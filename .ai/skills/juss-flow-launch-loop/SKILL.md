@@ -303,6 +303,8 @@ Review is a fresh attack, not self-congratulation.
 9. Rerun required checks on the exact head.
 10. Re-observe runtime/provider/design/analytics/docs evidence.
 
+For pull-request Quality Gate evidence, every job must checkout `github.event.pull_request.head.sha` and verify `git rev-parse HEAD` equals that expected head before running tests. A green workflow against GitHub's synthetic merge commit is useful merge-simulation evidence only and cannot be promoted to exact-head proof.
+
 Do not call author approval “independent review.” For canonical FCR merges, independent deterministic review attacks the patch first; the authenticated founder-final receipt supplies the separate final human authority for that exact candidate.
 
 ## Merge gate
