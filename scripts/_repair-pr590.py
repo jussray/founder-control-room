@@ -180,6 +180,11 @@ new = '''    const provider = buildProvider();
     expect(mockCreateRepoRuleset).toHaveBeenCalledTimes(2);
 '''
 text = replace_once(text, old, new, "ruleset success receipt")
+old = '''      .rejects.toThrow("FCR strict-freshness ruleset read-back mismatch");
+'''
+new = '''      .rejects.toThrow(/FCR strict-freshness ruleset .* read-back mismatch/);
+'''
+text = replace_once(text, old, new, "freshness mismatch assertion")
 anchor = '''  it("updates both stable ruleset identities when they already exist", async () => {
 '''
 regression = '''  it("surfaces the verified freshness identity when the review mutation fails", async () => {
