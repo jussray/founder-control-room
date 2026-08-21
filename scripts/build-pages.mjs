@@ -22,6 +22,9 @@ const requiredAssets = [
   'control-room/security.html',
   'control-room/security.js',
   'control-room/security.css',
+  'control-room/quickscan.html',
+  'control-room/quickscan.js',
+  'control-room/quickscan.css',
   'portable-founder-console/index.html',
 ];
 
