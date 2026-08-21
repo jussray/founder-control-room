@@ -1,0 +1,162 @@
+name: Repair PR 580 freshness seam
+
+on:
+  push:
+    branches:
+      - fix/fcr-pr-only-app-bypass-b70a7da
+    paths:
+      - .github/workflows/_repair-pr580.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: fix/fcr-pr-only-app-bypass-b70a7da
+          fetch-depth: 0
+
+      - name: Patch freshness seam and regression
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          approvals = Path('src/http/routes/approvals.ts')
+          text = approvals.read_text()
+
+          old_decl = """        let independentReviewEvidence: Record<string, unknown> | null = null;
+        let founderFinalReviewEvidence: Record<string, unknown> | null = null;
+"""
+          new_decl = """        let independentReviewEvidence: Record<string, unknown> | null = null;
+        let founderFinalReviewEvidence: Record<string, unknown> | null = null;
+        let reviewedBaseSha: string | null = null;
+"""
+          assert text.count(old_decl) == 1, 'expected review evidence declaration seam exactly once'
+          text = text.replace(old_decl, new_decl, 1)
+
+          old_pin = """          const pinned = pinnedResult.review;
+          const founderFinalMode = pinned.policy.founderFinalApprovalRequired === true;
+"""
+          new_pin = """          const pinned = pinnedResult.review;
+          reviewedBaseSha = pinned.baseSha;
+          const founderFinalMode = pinned.policy.founderFinalApprovalRequired === true;
+"""
+          assert text.count(old_pin) == 1, 'expected pinned review seam exactly once'
+          text = text.replace(old_pin, new_pin, 1)
+
+          old_freshness = """        // This is deliberately after review/founder-final validation. Provider
+        // reads may take time; the mutable head must still equal the approved
+        // SHA at the last possible moment before integration.
+        const currentHeadSha = await provider.resolveRef(project.slug, head);
+        if (currentHeadSha !== expectedHeadSha) {
+          throw new Error(
+            `Branch moved after verification: current ${currentHeadSha}, approved ${expectedHeadSha}.`,
+          );
+        }
+
+        const mergeCommitSha = await provider.integrate(project.slug, base, head);
+"""
+          new_freshness = """        // This is deliberately after review/founder-final validation. Provider
+        // reads may take time; both mutable FCR refs must still equal the
+        // reviewed candidate at the last possible moment before integration.
+        if (isFounderControlRoomRepository(projectRow)) {
+          if (!reviewedBaseSha) {
+            throw new Error('Independent review gate blocked: reviewed base SHA is unavailable before integration');
+          }
+          const currentBaseSha = await provider.resolveRef(project.slug, base);
+          if (currentBaseSha !== reviewedBaseSha) {
+            throw new Error(
+              `Base moved after verification: current ${currentBaseSha}, reviewed ${reviewedBaseSha}.`,
+            );
+          }
+        }
+
+        const currentHeadSha = await provider.resolveRef(project.slug, head);
+        if (currentHeadSha !== expectedHeadSha) {
+          throw new Error(
+            `Branch moved after verification: current ${currentHeadSha}, approved ${expectedHeadSha}.`,
+          );
+        }
+
+        const mergeCommitSha = await provider.integrate(project.slug, base, head);
+"""
+          assert text.count(old_freshness) == 1, 'expected final freshness seam exactly once'
+          approvals.write_text(text.replace(old_freshness, new_freshness, 1))
+
+          test = Path('src/http/routes/__tests__/approvals.independentReview.integration.test.ts')
+          t = test.read_text()
+
+          old_default = """  mockResolveRef.mockResolvedValue(HEAD_SHA);
+"""
+          new_default = """  mockResolveRef.mockImplementation(async (_projectId: string, ref: string) => (
+    ref === 'main' ? BASE_SHA : HEAD_SHA
+  ));
+"""
+          assert t.count(old_default) == 1, 'expected resolveRef default exactly once'
+          t = t.replace(old_default, new_default, 1)
+
+          old_expect = """    expect(mockResolveRef).toHaveBeenLastCalledWith('founder-control-room', 'mission/review-gate');
+    expect(mockIntegrate).toHaveBeenCalledWith('founder-control-room', 'main', 'mission/review-gate');
+"""
+          new_expect = """    expect(mockResolveRef).toHaveBeenNthCalledWith(1, 'founder-control-room', 'main');
+    expect(mockResolveRef).toHaveBeenNthCalledWith(2, 'founder-control-room', 'mission/review-gate');
+    expect(mockIntegrate).toHaveBeenCalledWith('founder-control-room', 'main', 'mission/review-gate');
+"""
+          assert t.count(old_expect) == 1, 'expected founder-final freshness assertion exactly once'
+          t = t.replace(old_expect, new_expect, 1)
+
+          anchor = """  it('fails closed after deterministic review when founder-final confirmation is missing', async () => {
+"""
+          regression = """  it('fails closed when the reviewed base moves before FCR integration', async () => {
+    executeStack({ founderFinal: true });
+    clearReviewGate();
+    const movedBaseSha = 'c'.repeat(40);
+    mockResolveRef.mockImplementation(async (_projectId: string, ref: string) => (
+      ref === 'main' ? movedBaseSha : HEAD_SHA
+    ));
+
+    const response = await request(buildApp())
+      .post(`/approvals/${MISSION_ID}/execute`)
+      .set('Authorization', BEARER)
+      .send({
+        actionType: 'merge',
+        idempotencyKey: 'founder-final-base-moved',
+        payload: {
+          head: 'mission/review-gate',
+          base: 'main',
+          expectedHeadSha: HEAD_SHA,
+          independentReviews: [{ reviewHash: REVIEW_HASH }],
+          founderFinalReview: { pullRequestNumber: 470, confirmExactCandidate: true },
+        },
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toMatch(/Base moved after verification/);
+    expect(mockResolveRef).toHaveBeenCalledWith('founder-control-room', 'main');
+    expect(mockIntegrate).not.toHaveBeenCalled();
+  });
+
+"""
+          assert t.count(anchor) == 1, 'expected regression insertion anchor exactly once'
+          test.write_text(t.replace(anchor, regression + anchor, 1))
+          PY
+
+      - name: Run focused regression
+        run: |
+          npm ci --ignore-scripts
+          npx vitest run src/http/routes/__tests__/approvals.independentReview.integration.test.ts src/providers/__tests__/githubProvider.fcrPullRequestMerge.test.ts
+
+      - name: Commit repair to PR branch
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/http/routes/approvals.ts src/http/routes/__tests__/approvals.independentReview.integration.test.ts
+          git diff --cached --check
+          git commit -m 'fix(governance): reacquire FCR base before integration'
+          git push origin HEAD:fix/fcr-pr-only-app-bypass-b70a7da
