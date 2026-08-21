@@ -60,9 +60,12 @@ if (workerName !== EXPECTED_WORKER) {
   sourceBranch = workersBranch;
   buildUuid = workersBuildUuid;
 
-  if (!SHA_PATTERN.test(workersCommit || '')) {
+  if (!SHA_PATTERN.test(workersCommit || '') || !SHA_PATTERN.test(checkedOutSha || '')) {
     authorityDecision = 'block';
-    error = 'WORKER_BUILD_AUTHORITY_BLOCKED: Workers Builds must provide an exact WORKERS_CI_COMMIT_SHA.';
+    error = 'WORKER_BUILD_AUTHORITY_BLOCKED: Workers Builds must provide exact provider and checked-out commit SHAs.';
+  } else if (workersCommit !== checkedOutSha) {
+    authorityDecision = 'block';
+    error = `WORKER_BUILD_AUTHORITY_BLOCKED: Workers Builds commit ${workersCommit} does not match checked-out source ${checkedOutSha}.`;
   } else if (!workersBranch || !workersBuildUuid) {
     authorityDecision = 'block';
     error = 'WORKER_BUILD_AUTHORITY_BLOCKED: Workers Builds branch and build UUID evidence are required.';
@@ -104,6 +107,7 @@ const receipt = {
   wranglerCommand: command,
   executionContext,
   sourceSha: sourceSha || null,
+  checkedOutSha,
   sourceBranch,
   buildUuid,
   githubEventSha,
