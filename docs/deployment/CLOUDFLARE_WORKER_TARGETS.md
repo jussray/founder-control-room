@@ -7,7 +7,7 @@ Founder Control Room uses Cloudflare Pages for the browser frontend and one cano
 | Cloudflare surface | Domain / role | Repository source | Build / deploy command | Cron |
 |---|---|---|---|---|
 | Pages project | `foundercontrolroom.org` static frontend + same-origin edge proxy | `public/` via `scripts/build-pages.mjs` | Build: `npm run build:pages`; output: `dist-pages` | none |
-| `founder-control-room` Worker | `api.foundercontrolroom.org` API, auth, MCP, reconciliation | `wrangler.worker.toml` | Build: `npm run build`; deploy: `npm run deploy` | every minute |
+| `founder-control-room` Worker | `api.foundercontrolroom.org` API, auth, MCP, reconciliation | `wrangler.worker.toml` | Build authority hook: `node scripts/verify-worker-build-authority.mjs`; production deploy: guarded GitHub workflow | every minute |
 | `founder-control-room-review-email` Worker | private email command intake | `wrangler.email.toml` | dedicated reviewed workflow | none |
 | `founder-control-room-deletion-queue` Worker | account-deletion processing | `wrangler.deletion-queue.toml` | dedicated reviewed workflow | every 6 hours |
 
@@ -70,6 +70,25 @@ FOUNDER_ALLOWED_ORIGINS: https://foundercontrolroom.org
 `FOUNDER_API_URL` points to the Pages origin intentionally. Supabase magic links return through Pages, Pages routes dynamic requests to the API Worker, and the Worker's relative `/control-room/` redirect lands back on the browser frontend.
 
 The canonical Worker owns the reconciliation cron because no duplicate HTTP Worker should exist.
+
+### Worker build authority invariant
+
+The canonical Worker configuration owns a custom Wrangler `[build]` hook:
+
+```text
+node scripts/verify-worker-build-authority.mjs
+```
+
+That hook makes the repository's production-authority boundary executable before Wrangler can promote a Worker build:
+
+- native Cloudflare Workers Builds must report an exact `WORKERS_CI_COMMIT_SHA` that equals the checked-out Git HEAD;
+- native builds must retain branch and build UUID evidence;
+- native Workers Builds may run only the non-promoting `wrangler versions upload` lane;
+- native `wrangler deploy` fails closed before production promotion;
+- GitHub production promotion is recognized only in the manual `Deploy` or `FCR Worker Reconcile` workflow-dispatch contexts when GitHub's exact workflow SHA equals the checked-out source SHA; and
+- ordinary CI/local verification does not become production authority.
+
+The hook emits a redacted `fcr/worker-build-authority-receipt@v1`. That receipt proves only the source/build authority decision it records. It cannot mutate Cloudflare, prove provider dashboard configuration, prove the active deployment, or replace `/health`, `/version`, Pages binding, and Playwright runtime evidence.
 
 ### Outbound email boundary
 
@@ -136,7 +155,7 @@ Provider build/deploy comments, preview URLs, and successful uploads are useful 
 
 ## Documentation truth
 
-When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, hostname-inventory/Request Trace behavior, or runtime proof requirements change, update this document in the same bounded repository change.
+When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, hostname-inventory/Request Trace behavior, Worker build-authority behavior, or runtime proof requirements change, update this document in the same bounded repository change.
 
 Current executable source and authoritative provider readback outrank an older version of this runbook. Preserve older deployment evidence as historical provenance rather than deleting it.
 
