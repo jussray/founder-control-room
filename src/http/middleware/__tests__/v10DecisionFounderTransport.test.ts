@@ -2,19 +2,29 @@ import { describe, expect, it } from 'vitest';
 import { founderMergeTransportErrors } from '../v10DecisionFounderBinding.js';
 
 describe('V10 founder merge transport authority', () => {
-  it('rejects bearer-authenticated merge execution so an API client cannot self-approve', () => {
+  it('rejects bearer-only merge execution so an API client cannot self-approve', () => {
     expect(founderMergeTransportErrors({
       actionType: 'merge',
       authorization: 'Bearer founder-api-session',
+      hasFounderCookieSession: false,
     })).toEqual([
-      'privileged merge founder approval requires an interactive same-origin founder browser session; bearer-authenticated API clients may request permission but may not self-approve merge execution',
+      'privileged merge founder approval requires a same-origin founder browser session or a future registered adapter attestation; bearer-only API clients may request permission but may not self-approve merge execution',
     ]);
+  });
+
+  it('preserves the real browser merge path when bearer and HttpOnly founder session are both present', () => {
+    expect(founderMergeTransportErrors({
+      actionType: 'merge',
+      authorization: 'Bearer browser-api-session',
+      hasFounderCookieSession: true,
+    })).toEqual([]);
   });
 
   it('preserves bearer-authenticated non-merge execution lanes', () => {
     expect(founderMergeTransportErrors({
       actionType: 'create_branch',
       authorization: 'Bearer founder-api-session',
+      hasFounderCookieSession: false,
     })).toEqual([]);
   });
 
@@ -22,6 +32,7 @@ describe('V10 founder merge transport authority', () => {
     expect(founderMergeTransportErrors({
       actionType: 'merge',
       authorization: null,
+      hasFounderCookieSession: true,
     })).toEqual([]);
   });
 });
