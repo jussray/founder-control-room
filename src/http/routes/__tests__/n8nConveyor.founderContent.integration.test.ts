@@ -1,14 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
-  mockDispatchFounderContent,
-  mockAuthoritativePublish,
+  mockAuthoritativeBufferSchedule,
   mockIssueApproval,
   mockGetUser,
   supabaseMock,
 } = vi.hoisted(() => ({
-  mockDispatchFounderContent: vi.fn(),
-  mockAuthoritativePublish: vi.fn(),
+  mockAuthoritativeBufferSchedule: vi.fn(),
   mockIssueApproval: vi.fn(),
   mockGetUser: vi.fn(),
   supabaseMock: { from: vi.fn() },
@@ -18,17 +16,9 @@ vi.mock('../../../lib/supabaseAuthClient.js', () => ({
   supabaseAuth: { auth: { getUser: mockGetUser } },
 }));
 vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
-vi.mock('../../../lib/n8nProviderNeutralFounderContentOrchestrator.js', async () => {
-  const actual = await vi.importActual<typeof import('../../../lib/n8nProviderNeutralFounderContentOrchestrator.js')>(
-    '../../../lib/n8nProviderNeutralFounderContentOrchestrator.js',
-  );
-  return {
-    ...actual,
-    dispatchProviderNeutralN8nFounderContent: mockDispatchFounderContent,
-  };
-});
-vi.mock('../../../lib/authoritativeFounderContentPublisher.js', () => ({
-  dispatchAuthoritativeFounderContentPublishNow: mockAuthoritativePublish,
+vi.mock('../../../lib/authoritativeBufferFounderContentScheduler.js', () => ({
+  AUTHORITATIVE_BUFFER_FOUNDER_CONTENT_CONTRACT: 'fcr/authoritative-buffer-founder-content@v1',
+  dispatchAuthoritativeBufferFounderContentSchedule: mockAuthoritativeBufferSchedule,
 }));
 vi.mock('../../../lib/founderContentApprovalStore.js', async () => {
   const actual = await vi.importActual<typeof import('../../../lib/founderContentApprovalStore.js')>(
@@ -43,11 +33,7 @@ vi.mock('../../../lib/founderContentApprovalStore.js', async () => {
 import express from 'express';
 import request from 'supertest';
 import { n8nConveyorRouter } from '../n8nConveyor.js';
-import {
-  N8N_FOUNDER_CONTENT_CONTRACT,
-  N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
-} from '../../../lib/n8nProviderNeutralFounderContentOrchestrator.js';
-import { FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT } from '../../../lib/firstPartyFounderContentExecutor.js';
+import { AUTHORITATIVE_BUFFER_FOUNDER_CONTENT_CONTRACT } from '../../../lib/authoritativeBufferFounderContentScheduler.js';
 import { FOUNDER_CONTENT_APPROVAL_STORE_CONTRACT } from '../../../lib/founderContentApprovalStore.js';
 
 const FOUNDER_EMAIL = 'founder@example.com';
@@ -88,96 +74,73 @@ beforeEach(() => {
     platform: 'linkedin',
     sourceRepo: 'jussray/founder-control-room',
     sourceCommitSha: 'd'.repeat(40),
-    approvedAt: '2026-08-19T07:30:00.000Z',
-    expiresAt: '2026-08-19T08:00:00.000Z',
+    approvedAt: '2026-08-20T20:00:00.000Z',
+    expiresAt: '2026-08-20T20:30:00.000Z',
     approval: {},
   });
-  mockAuthoritativePublish.mockResolvedValue({
+  mockAuthoritativeBufferSchedule.mockResolvedValue({
     ok: true,
-    code: 'PUBLISHED',
-    status: 200,
-    contract: FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
-    truthState: 'PUBLISHED',
-    published: true,
-    retrySafe: false,
-    freshApprovalMayRetry: false,
-    executionId: 'execution-1',
-    receipt: { externalPostId: 'urn:li:share:1' },
-    providerEvidence: {},
-    reasons: [],
-    temporalTruth: {},
-    temporalAnalytics: {},
+    code: 'BUFFER_SCHEDULE_ACCEPTED',
+    status: 202,
+    contract: AUTHORITATIVE_BUFFER_FOUNDER_CONTENT_CONTRACT,
+    transport: 'buffer',
+    published: false,
+    approvalConsumed: true,
+    freshApprovalRequiredForRetry: false,
+    request: { orchestrationId: 'buffer-op-1' },
+    receipt: { provider: 'buffer', state: 'scheduled', published: false },
+    reasons: ['Buffer accepted the governed schedule request'],
   });
 });
 
-describe('n8n founder-content route', () => {
+describe('founder-content Buffer route', () => {
   it('rejects unauthenticated founder-content orchestration', async () => {
     const res = await request(buildApp())
       .post('/automation/conveyor/founder-content')
       .send({});
 
     expect(res.status).toBe(401);
-    expect(mockDispatchFounderContent).not.toHaveBeenCalled();
-    expect(mockAuthoritativePublish).not.toHaveBeenCalled();
+    expect(mockAuthoritativeBufferSchedule).not.toHaveBeenCalled();
     expect(mockIssueApproval).not.toHaveBeenCalled();
   });
 
-  it('advertises route implementation without pretending direct publication is runtime-ready', async () => {
+  it('advertises Chief -> FCR -> Buffer as the only active transport', async () => {
     const res = await request(buildApp())
       .get('/automation/conveyor')
       .set('Authorization', BEARER);
 
     expect(res.status).toBe(200);
     expect(res.body.founderContent).toEqual(expect.objectContaining({
-      contract: N8N_FOUNDER_CONTENT_CONTRACT,
+      contract: AUTHORITATIVE_BUFFER_FOUNDER_CONTENT_CONTRACT,
       route: '/founder-content',
-      enabled: false,
-      blockedBy: 'L99_PROVIDER_NEUTRAL_AUTHORITATIVE_APPROVAL_ADAPTER_REQUIRED',
-      providerSelection: 'founder-authenticated-bounded-platform-compatible',
-      providerContractRoutes: N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
+      approvalRoute: '/founder-content/approvals',
+      routeImplemented: true,
+      canonicalAuthority: 'founder-control-room',
+      storyBrain: 'chief-ai-machine',
+      activeTransport: 'buffer',
+      transportPolicy: 'buffer-only',
       authority: expect.objectContaining({
-        orchestrate: false,
-        requestProviderWrite: false,
+        orchestrate: true,
+        requestProviderWrite: true,
         authorizePublication: false,
+        markPublished: false,
       }),
       authoritativeApprovalStoreReadbackRequired: true,
       callerSuppliedApprovalIsAuthority: false,
-      finalPublishedTruth: 'fcr-provider-readback-only',
-      directPublish: expect.objectContaining({
-        contract: FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
-        route: '/founder-content/publish-now',
-        approvalRoute: '/founder-content/approvals',
-        approvalStoreContract: FOUNDER_CONTENT_APPROVAL_STORE_CONTRACT,
-        provider: 'linkedin',
-        routeImplemented: true,
-        executionReadiness: 'unknown-until-live-preflight',
-        runtimeReadyClaimAllowed: false,
-        approvalObjectAcceptedFromCaller: false,
-        callerSuppliedApprovalIsAuthority: false,
-        oneShotApprovalClaimRequired: true,
-        providerReadbackRequired: true,
+      finalPublishedTruth: 'buffer-provider-readback-only',
+      directLinkedIn: expect.objectContaining({
+        active: false,
+        code: 'DIRECT_LINKEDIN_TRANSPORT_INACTIVE',
       }),
     }));
-    expect(res.body.founderContent.directPublish).not.toHaveProperty('enabled');
-    expect(res.body.founderContent.directPublish.nextRuntimeGate).toContain('approval-store migration state');
+    expect(res.body.founderContent.providerRuntimeConfiguration).toEqual(expect.objectContaining({
+      defaultEnabled: ['buffer'],
+      permitted: ['buffer'],
+    }));
+    expect(res.body.founderContent.providerRuntimeConfiguration.rejected).toContain('cambiante');
+    expect(res.body.founderContent.providerRuntimeConfiguration.rejected).toContain('linkedin-direct');
     expect(res.body.founderContent.readiness).not.toHaveProperty('webhookUrl');
     expect(res.body.founderContent.readiness).not.toHaveProperty('bearerToken');
-  });
-
-  it('keeps provider-neutral orchestration fail-closed', async () => {
-    const res = await request(buildApp())
-      .post('/automation/conveyor/founder-content')
-      .set('Authorization', BEARER)
-      .send({ approval_id: 'fca:approval-1' });
-
-    expect(res.status).toBe(409);
-    expect(res.body).toEqual(expect.objectContaining({
-      ok: false,
-      code: 'L99_AUTHORITY_REQUIRED',
-      contract: N8N_FOUNDER_CONTENT_CONTRACT,
-      authorityRequired: 'L99_PROVIDER_NEUTRAL_AUTHORITATIVE_APPROVAL_ADAPTER',
-    }));
-    expect(mockDispatchFounderContent).not.toHaveBeenCalled();
   });
 
   it('requires explicit exact-copy confirmation before FCR issues authority', async () => {
@@ -191,7 +154,7 @@ describe('n8n founder-content route', () => {
     expect(mockIssueApproval).not.toHaveBeenCalled();
   });
 
-  it('forbids caller-supplied approval objects at issuance and publication', async () => {
+  it('forbids caller-supplied approval objects at issuance and Buffer scheduling', async () => {
     const issue = await request(buildApp())
       .post('/automation/conveyor/founder-content/approvals')
       .set('Authorization', BEARER)
@@ -199,16 +162,16 @@ describe('n8n founder-content route', () => {
     expect(issue.status).toBe(400);
     expect(issue.body.code).toBe('CALLER_APPROVAL_OBJECT_FORBIDDEN');
 
-    const publish = await request(buildApp())
-      .post('/automation/conveyor/founder-content/publish-now')
+    const schedule = await request(buildApp())
+      .post('/automation/conveyor/founder-content')
       .set('Authorization', BEARER)
       .send({ proposal: {}, approval_id: 'fca:approval-1', approval: { approval_id: 'forged' } });
-    expect(publish.status).toBe(400);
-    expect(publish.body.code).toBe('CALLER_APPROVAL_OBJECT_FORBIDDEN');
-    expect(mockAuthoritativePublish).not.toHaveBeenCalled();
+    expect(schedule.status).toBe(400);
+    expect(schedule.body.code).toBe('CALLER_APPROVAL_OBJECT_FORBIDDEN');
+    expect(mockAuthoritativeBufferSchedule).not.toHaveBeenCalled();
   });
 
-  it('issues an FCR-owned one-shot approval bound to the authenticated founder', async () => {
+  it('issues an FCR-owned one-shot approval for the Buffer schedule lane', async () => {
     const res = await request(buildApp())
       .post('/automation/conveyor/founder-content/approvals')
       .set('Authorization', BEARER)
@@ -224,6 +187,7 @@ describe('n8n founder-content route', () => {
       authorization_hash: AUTHORIZATION_HASH,
       one_shot: true,
       caller_supplied_approval_is_authority: false,
+      active_transport: 'buffer',
     }));
     expect(mockIssueApproval).toHaveBeenCalledWith(expect.objectContaining({
       founderUserId: 'founder-user-1',
@@ -231,29 +195,53 @@ describe('n8n founder-content route', () => {
     }));
   });
 
-  it('publishes only through the authoritative approval-id membrane', async () => {
+  it('schedules only through the authoritative Buffer approval-id membrane', async () => {
     const res = await request(buildApp())
-      .post('/automation/conveyor/founder-content/publish-now')
+      .post('/automation/conveyor/founder-content')
       .set('Authorization', BEARER)
       .send({
         proposal: { proposal_hash: PROPOSAL_HASH },
         approval_id: 'fca:approval-1',
         confirmation: {
-          confirm_publication: true,
+          confirm_schedule: true,
           authorization_hash: AUTHORIZATION_HASH,
           public_payload_hash: PAYLOAD_HASH,
-          truth_context_hash: 'e'.repeat(64),
         },
       });
 
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual(expect.objectContaining({ ok: true, published: true, code: 'PUBLISHED' }));
-    expect(mockAuthoritativePublish).toHaveBeenCalledWith(expect.objectContaining({
+    expect(res.status).toBe(202);
+    expect(res.body).toEqual(expect.objectContaining({
+      ok: true,
+      transport: 'buffer',
+      published: false,
+      code: 'BUFFER_SCHEDULE_ACCEPTED',
+    }));
+    expect(mockAuthoritativeBufferSchedule).toHaveBeenCalledWith(expect.objectContaining({
       approval_id: 'fca:approval-1',
-      confirmation: expect.objectContaining({ authorization_hash: AUTHORIZATION_HASH }),
+      confirmation: expect.objectContaining({
+        confirm_schedule: true,
+        authorization_hash: AUTHORIZATION_HASH,
+        public_payload_hash: PAYLOAD_HASH,
+      }),
     }), {
       founderUserId: 'founder-user-1',
       founderIdentity: FOUNDER_EMAIL,
     });
+  });
+
+  it('keeps direct LinkedIn execution inactive instead of silently falling back', async () => {
+    const res = await request(buildApp())
+      .post('/automation/conveyor/founder-content/publish-now')
+      .set('Authorization', BEARER)
+      .send({ proposal: {}, approval_id: 'fca:approval-1' });
+
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual(expect.objectContaining({
+      ok: false,
+      code: 'DIRECT_LINKEDIN_TRANSPORT_INACTIVE',
+      activeTransport: 'buffer',
+      published: false,
+    }));
+    expect(mockAuthoritativeBufferSchedule).not.toHaveBeenCalled();
   });
 });
