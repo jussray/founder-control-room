@@ -145,6 +145,8 @@ try {
   await genesisLink.waitFor({ state: 'visible' });
   assert.equal(await genesisLink.getAttribute('href'), '/control-room/genesis.html');
   assert.match(await genesisLink.innerText(), /Genesis evidence.*view origin record/i);
+  assert.equal(await genesisLink.getAttribute('data-state'), null, 'Genesis evidence link must not carry readiness state');
+  assert.equal(await genesisLink.getAttribute('class'), 'genesis-evidence-link', 'Genesis evidence link must not reuse readiness styling');
 
   const initialText = await page.locator('[data-conveyor-readiness]').innerText();
   assert.doesNotMatch(initialText, /verified/i);
