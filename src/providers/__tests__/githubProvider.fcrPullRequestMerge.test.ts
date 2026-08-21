@@ -129,6 +129,21 @@ describe("GitHubProvider FCR reviewed pull-request integration", () => {
     expect(mockPullMerge).not.toHaveBeenCalled();
   });
 
+  it("propagates a provider freshness rejection after the final local read and never falls back to direct integration", async () => {
+    mockPullMerge.mockRejectedValueOnce(new Error("Required status checks require the pull request branch to be up to date"));
+
+    const provider = buildProvider();
+    await provider.getPullRequestReviewContext("founder-control-room", PR_NUMBER);
+    await provider.resolveRef("founder-control-room", "main");
+    await provider.resolveRef("founder-control-room", HEAD_REF);
+
+    await expect(provider.integrate("founder-control-room", "main", HEAD_REF))
+      .rejects.toThrow("pull request branch to be up to date");
+
+    expect(mockPullMerge).toHaveBeenCalledTimes(1);
+    expect(mockRepoMerge).not.toHaveBeenCalled();
+  });
+
   it("keeps generic repositories on the provider-neutral branch integration path", async () => {
     const provider = buildProvider();
     await provider.resolveRef("sekret-bip", "mission/feature");

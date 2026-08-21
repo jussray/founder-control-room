@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded repository-provider and workflow-authority invariants changed by the FCR pull-request-only GitHub App and exact-head Quality Gate repair; this is review evidence, not a live provider or production claim.",
+  "purpose": "Record the bounded repository-provider and workflow-authority invariants changed by the FCR split merge membrane, pull-request-only GitHub App authority, and exact-head Quality Gate repair; this is review evidence, not a live provider or production claim.",
   "domains": [
     "repository-provider",
     "truth-governance",
@@ -10,8 +10,9 @@
     {
       "path": "src/providers/GitHubProvider.ts",
       "claims": [
-        "src/providers/GitHubProvider.ts: active FCR-main rulesets must retain the native approval and strict-check membrane, require exactly one numeric GitHub App bypass identity, emit that bypass only in pull_request mode, and reject provider read-back that widens the actor or bypass mode.",
-        "src/providers/GitHubProvider.ts: canonical FCR integration must bind the provider-backed reviewed PR number to freshly resolved exact base and head SHAs and may merge only through the pull-request endpoint; it must never fall back to generic direct protected-branch integration for FCR."
+        "src/providers/GitHubProvider.ts: an active FCR-main governance request must first apply and read back a separate strict required-status ruleset with zero bypass actors, exact requested checks, strict current-base policy, active enforcement, and no unexpected rule types before changing the review membrane.",
+        "src/providers/GitHubProvider.ts: the FCR review membrane must retain pull-request approval freshness, last-push approval, review-thread resolution, force-push/deletion protection, exactly one numeric trusted GitHub App bypass in pull_request mode, and no bypassable required-status rule.",
+        "src/providers/GitHubProvider.ts: canonical FCR integration must bind the provider-backed reviewed PR number to freshly resolved exact base and head SHAs, may merge only through the pull-request endpoint, and must propagate provider rejection without falling back to generic direct protected-branch integration."
       ]
     },
     {

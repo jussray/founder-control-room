@@ -446,9 +446,10 @@ export class GitHubProvider implements RepositoryProvider {
     >["rules"] extends (infer R)[] | undefined
       ? R
       : never;
-    const rules: RepoRule[] = [];
+
+    const reviewRules: RepoRule[] = [];
     if (config.requirePullRequest) {
-      rules.push({
+      reviewRules.push({
         type: "pull_request",
         parameters: {
           dismiss_stale_reviews_on_push: hardenFounderControlRoomMainReview,
@@ -459,8 +460,11 @@ export class GitHubProvider implements RepositoryProvider {
         },
       });
     }
-    if (config.requiredStatusCheckNames.length > 0) {
-      rules.push({
+    // For FCR main, strict status/base-freshness is deliberately moved to a
+    // second no-bypass ruleset below. Other projects retain the prior single
+    // ruleset behavior.
+    if (config.requiredStatusCheckNames.length > 0 && !hardenFounderControlRoomMainReview) {
+      reviewRules.push({
         type: "required_status_checks",
         parameters: {
           do_not_enforce_on_create: false,
@@ -469,8 +473,8 @@ export class GitHubProvider implements RepositoryProvider {
         },
       });
     }
-    if (config.blockForcePushes) rules.push({ type: "non_fast_forward" });
-    if (config.blockDeletion) rules.push({ type: "deletion" });
+    if (config.blockForcePushes) reviewRules.push({ type: "non_fast_forward" });
+    if (config.blockDeletion) reviewRules.push({ type: "deletion" });
 
     const bypassActors = (config.bypassActors ?? []).map((actor) => {
       if (actor.kind === "app") {
@@ -496,12 +500,61 @@ export class GitHubProvider implements RepositoryProvider {
           exclude: [],
         },
       },
-      rules,
+      rules: reviewRules,
     };
 
     const { data: existing } = await this.octokit.repos.getRepoRulesets({ owner, repo, per_page: 100 });
-    const match = existing.find((ruleset) => ruleset.name === config.name);
 
+    if (hardenFounderControlRoomMainReview) {
+      // Apply and verify the no-bypass freshness membrane FIRST. If any provider
+      // call or readback fails, the review membrane is left untouched rather
+      // than creating a transient weakening while migrating the topology.
+      const freshnessName = fcrMainFreshnessRulesetName(config.name);
+      const freshnessRules: RepoRule[] = [{
+        type: "required_status_checks",
+        parameters: {
+          do_not_enforce_on_create: false,
+          required_status_checks: config.requiredStatusCheckNames.map((context) => ({ context })),
+          strict_required_status_checks_policy: true,
+        },
+      }];
+      const freshnessPayload = {
+        owner,
+        repo,
+        name: freshnessName,
+        target: "branch" as const,
+        enforcement: config.enforcement,
+        bypass_actors: [],
+        conditions: {
+          ref_name: {
+            include: config.targetRefs.map((ref) => `refs/heads/${ref}`),
+            exclude: [],
+          },
+        },
+        rules: freshnessRules,
+      };
+      const freshnessMatch = existing.find((ruleset) => ruleset.name === freshnessName);
+      const { data: freshnessData } = freshnessMatch
+        ? await this.octokit.repos.updateRepoRuleset({ ...freshnessPayload, ruleset_id: freshnessMatch.id })
+        : await this.octokit.repos.createRepoRuleset(freshnessPayload);
+      const { data: freshnessReadback } = await this.octokit.repos.getRepoRuleset({
+        owner,
+        repo,
+        ruleset_id: freshnessData.id,
+      });
+      const freshnessErrors = fcrMainFreshnessRulesetReadbackErrors(
+        config,
+        freshnessName,
+        freshnessReadback,
+      );
+      if (freshnessErrors.length > 0) {
+        throw new Error(
+          `GitHubProvider: FCR strict-freshness ruleset read-back mismatch: ${freshnessErrors.join("; ")}`,
+        );
+      }
+    }
+
+    const match = existing.find((ruleset) => ruleset.name === config.name);
     const { data } = match
       ? await this.octokit.repos.updateRepoRuleset({ ...payload, ruleset_id: match.id })
       : await this.octokit.repos.createRepoRuleset(payload);
@@ -512,9 +565,9 @@ export class GitHubProvider implements RepositoryProvider {
         repo,
         ruleset_id: data.id,
       });
-      const errors = fcrMainRulesetReadbackErrors(config, readback);
+      const errors = fcrMainReviewRulesetReadbackErrors(config, readback);
       if (errors.length > 0) {
-        throw new Error(`GitHubProvider: FCR main ruleset read-back mismatch: ${errors.join("; ")}`);
+        throw new Error(`GitHubProvider: FCR review ruleset read-back mismatch: ${errors.join("; ")}`);
       }
     }
 
@@ -547,6 +600,16 @@ function fcrMainRulesetConfigErrors(config: RulesetConfig): string[] {
   if (!Number.isInteger(config.requiredApprovingReviewCount) || config.requiredApprovingReviewCount < 1) {
     errors.push("at least one approving review is required");
   }
+  const requiredChecks = config.requiredStatusCheckNames.map((name) => name.trim());
+  if (requiredChecks.length === 0) {
+    errors.push("at least one required status check is required for the no-bypass freshness membrane");
+  }
+  if (requiredChecks.some((name) => name.length === 0)) {
+    errors.push("required status check names must be non-empty");
+  }
+  if (new Set(requiredChecks).size !== requiredChecks.length) {
+    errors.push("required status check names must be unique");
+  }
   const bypassActors = config.bypassActors ?? [];
   if (
     bypassActors.length !== 1
@@ -556,6 +619,10 @@ function fcrMainRulesetConfigErrors(config: RulesetConfig): string[] {
     errors.push("exactly one numeric GitHub App bypass actor is required");
   }
   return errors;
+}
+
+function fcrMainFreshnessRulesetName(reviewRulesetName: string): string {
+  return `${reviewRulesetName} [strict freshness]`;
 }
 
 function expectedBypassIdentities(config: RulesetConfig): string[] {
@@ -573,7 +640,21 @@ function observedBypassIdentities(readback: RulesetReadback): string[] {
     .sort();
 }
 
-function fcrMainRulesetReadbackErrors(config: RulesetConfig, value: unknown): string[] {
+function observedStatusCheckNames(readback: RulesetReadback): string[] {
+  const rules = Array.isArray(readback.rules) ? readback.rules : [];
+  const statusChecks = rules.find((rule) => rule.type === "required_status_checks");
+  const statusParameters = statusChecks?.parameters ?? {};
+  return (Array.isArray(statusParameters.required_status_checks)
+    ? statusParameters.required_status_checks
+        .map((entry) => entry && typeof entry === "object" && "context" in entry
+          ? String((entry as { context?: unknown }).context ?? "").trim()
+          : "")
+        .filter(Boolean)
+    : [])
+    .sort();
+}
+
+function fcrMainReviewRulesetReadbackErrors(config: RulesetConfig, value: unknown): string[] {
   const readback = (value && typeof value === "object" && !Array.isArray(value))
     ? value as RulesetReadback
     : {};
@@ -603,20 +684,8 @@ function fcrMainRulesetReadbackErrors(config: RulesetConfig, value: unknown): st
   if (pullParameters.dismiss_stale_reviews_on_push !== true) errors.push("stale approvals are not dismissed on push");
   if (pullParameters.require_last_push_approval !== true) errors.push("last-push approval is not required");
   if (pullParameters.required_review_thread_resolution !== true) errors.push("review-thread resolution is not required");
-
-  if (config.requiredStatusCheckNames.length > 0) {
-    const statusChecks = rules.find((rule) => rule.type === "required_status_checks");
-    const statusParameters = statusChecks?.parameters ?? {};
-    if (!statusChecks) errors.push("required status checks rule is missing");
-    if (statusParameters.strict_required_status_checks_policy !== true) errors.push("required status checks are not strict");
-    const requiredChecks = Array.isArray(statusParameters.required_status_checks)
-      ? statusParameters.required_status_checks
-          .map((entry) => entry && typeof entry === "object" && "context" in entry ? String((entry as { context?: unknown }).context ?? "") : "")
-          .filter(Boolean)
-      : [];
-    for (const required of config.requiredStatusCheckNames) {
-      if (!requiredChecks.includes(required)) errors.push(`provider read-back is missing requested check: ${required}`);
-    }
+  if (rules.some((rule) => rule.type === "required_status_checks")) {
+    errors.push("review membrane must not own bypassable required-status freshness");
   }
 
   if (config.blockForcePushes && !rules.some((rule) => rule.type === "non_fast_forward")) {
@@ -624,6 +693,51 @@ function fcrMainRulesetReadbackErrors(config: RulesetConfig, value: unknown): st
   }
   if (config.blockDeletion && !rules.some((rule) => rule.type === "deletion")) {
     errors.push("deletion protection is missing");
+  }
+  return errors;
+}
+
+function fcrMainFreshnessRulesetReadbackErrors(
+  config: RulesetConfig,
+  expectedName: string,
+  value: unknown,
+): string[] {
+  const readback = (value && typeof value === "object" && !Array.isArray(value))
+    ? value as RulesetReadback
+    : {};
+  const errors: string[] = [];
+  if (readback.name !== expectedName) errors.push("freshness ruleset name did not round-trip");
+  if (readback.enforcement !== config.enforcement) errors.push("freshness enforcement did not round-trip");
+
+  const observedTargets = readback.conditions?.ref_name?.include ?? [];
+  for (const target of config.targetRefs) {
+    const qualified = `refs/heads/${target}`;
+    if (!observedTargets.includes(qualified)) {
+      errors.push(`freshness provider read-back is missing requested target: ${qualified}`);
+    }
+  }
+
+  if (observedBypassIdentities(readback).length !== 0) {
+    errors.push("strict freshness ruleset must have zero bypass actors");
+  }
+
+  const rules = Array.isArray(readback.rules) ? readback.rules : [];
+  const statusRules = rules.filter((rule) => rule.type === "required_status_checks");
+  if (statusRules.length !== 1) errors.push("strict freshness ruleset must contain exactly one required-status rule");
+  const statusParameters = statusRules[0]?.parameters ?? {};
+  if (statusParameters.strict_required_status_checks_policy !== true) {
+    errors.push("strict freshness required status checks are not strict");
+  }
+  const expectedChecks = config.requiredStatusCheckNames.map((name) => name.trim()).sort();
+  const observedChecks = observedStatusCheckNames(readback);
+  if (JSON.stringify(observedChecks) !== JSON.stringify(expectedChecks)) {
+    errors.push("strict freshness required status checks do not exactly match the requested policy");
+  }
+  const unexpectedRuleTypes = rules
+    .map((rule) => String(rule.type ?? ""))
+    .filter((type) => type !== "required_status_checks");
+  if (unexpectedRuleTypes.length > 0) {
+    errors.push(`strict freshness ruleset contains unexpected rules: ${unexpectedRuleTypes.join(", ")}`);
   }
   return errors;
 }
