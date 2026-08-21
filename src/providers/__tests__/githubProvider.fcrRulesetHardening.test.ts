@@ -82,7 +82,11 @@ function freshnessReadback(request: TestConfig = config) {
     id: 2,
     name: freshnessName(request),
     enforcement: request.enforcement,
-    bypass_actors: [],
+    bypass_actors: [] as Array<{
+      actor_type: string;
+      actor_id: number;
+      bypass_mode: string;
+    }>,
     conditions: {
       ref_name: {
         include: request.targetRefs.map((ref) => `refs/heads/${ref}`),
