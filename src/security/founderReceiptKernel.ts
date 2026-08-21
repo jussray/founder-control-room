@@ -1,6 +1,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 
 export const FOUNDER_RECEIPT_VERSION = 'fcr-founder-receipt-v1' as const;
+export const MAX_FOUNDER_RECEIPT_TTL_MS = 15 * 60 * 1_000;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
 const MIN_SIGNING_KEY_BYTES = 32;
@@ -57,6 +58,7 @@ export interface FounderReceiptConsumptionLedger {
 export type FounderReceiptFailureCode =
   | 'RECEIPT_INVALID'
   | 'RECEIPT_SIGNATURE_INVALID'
+  | 'RECEIPT_NOT_YET_VALID'
   | 'RECEIPT_EXPIRED'
   | 'RECEIPT_SCOPE_MISMATCH'
   | 'RECEIPT_REPLAYED';
@@ -137,6 +139,8 @@ function parseReceipt(value: unknown): FounderReceiptVerificationResult {
     return { ok: false, code: 'RECEIPT_INVALID', error: 'Founder receipt contains unknown fields.' };
   }
 
+  const issuedAtMs = Date.parse(receipt.issuedAt);
+  const expiresAtMs = Date.parse(receipt.expiresAt);
   if (
     receipt.version !== FOUNDER_RECEIPT_VERSION
     || !receipt.receiptId
@@ -149,15 +153,20 @@ function parseReceipt(value: unknown): FounderReceiptVerificationResult {
     || !evidenceRefs
     || receipt.issuer !== 'founder-control-room'
     || !receipt.keyId
-    || Number.isNaN(Date.parse(receipt.issuedAt))
-    || Number.isNaN(Date.parse(receipt.expiresAt))
+    || Number.isNaN(issuedAtMs)
+    || Number.isNaN(expiresAtMs)
     || !SHA256.test(receipt.signature)
   ) {
     return { ok: false, code: 'RECEIPT_INVALID', error: 'Founder receipt shape is invalid.' };
   }
 
-  if (Date.parse(receipt.expiresAt) <= Date.parse(receipt.issuedAt)) {
-    return { ok: false, code: 'RECEIPT_INVALID', error: 'Founder receipt must expire after issuance.' };
+  const ttlMs = expiresAtMs - issuedAtMs;
+  if (ttlMs <= 0 || ttlMs > MAX_FOUNDER_RECEIPT_TTL_MS) {
+    return {
+      ok: false,
+      code: 'RECEIPT_INVALID',
+      error: `Founder receipt lifetime must be greater than zero and no longer than ${MAX_FOUNDER_RECEIPT_TTL_MS}ms.`,
+    };
   }
 
   return { ok: true, receipt };
@@ -208,7 +217,13 @@ export function verifyFounderReceipt(
   }
 
   const now = Date.parse(context.now ?? new Date().toISOString());
-  if (Number.isNaN(now) || Date.parse(receipt.expiresAt) <= now) {
+  if (Number.isNaN(now)) {
+    return { ok: false, code: 'RECEIPT_INVALID', error: 'Founder receipt verification time is invalid.' };
+  }
+  if (Date.parse(receipt.issuedAt) > now) {
+    return { ok: false, code: 'RECEIPT_NOT_YET_VALID', error: 'Founder receipt has not reached its issuance time.' };
+  }
+  if (Date.parse(receipt.expiresAt) <= now) {
     return { ok: false, code: 'RECEIPT_EXPIRED', error: 'Founder receipt is expired.' };
   }
 
