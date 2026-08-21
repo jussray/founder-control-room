@@ -40,6 +40,7 @@ export class GitHubProvider implements RepositoryProvider {
   private octokit: Octokit;
   private projectMap: Record<string, string>;
   private readonly resolvedRefs = new Map<string, string>();
+  private readonly pullRequestContextByProject = new Map<string, PullRequestReviewContext>();
 
   constructor(config: GitHubProviderConfig) {
     this.octokit = new Octokit({ auth: config.token, ...(config.baseUrl ? { baseUrl: config.baseUrl } : {}) });
@@ -210,7 +211,7 @@ export class GitHubProvider implements RepositoryProvider {
       throw new Error(`GitHubProvider: pull request #${pullRequestNumber} must be ready for review, not draft`);
     }
 
-    return {
+    const context: PullRequestReviewContext = {
       number: data.number,
       repository: `${owner}/${repo}`,
       headRepository: data.head.repo?.full_name ?? "",
@@ -220,6 +221,8 @@ export class GitHubProvider implements RepositoryProvider {
       headSha: data.head.sha,
       authorIdentity: data.user?.login ?? "",
     };
+    this.pullRequestContextByProject.set(projectId, context);
+    return context;
   }
 
   async createBranch(
@@ -338,18 +341,65 @@ export class GitHubProvider implements RepositoryProvider {
 
   async integrate(projectId: string, base: string, head: string): Promise<string> {
     const { owner, repo } = this.locate(projectId);
-    const key = this.resolvedRefKey(projectId, head);
+    const headKey = this.resolvedRefKey(projectId, head);
     const exactHeadSha = /^[0-9a-f]{40}$/i.test(head)
       ? head.toLowerCase()
-      : this.resolvedRefs.get(key);
+      : this.resolvedRefs.get(headKey);
 
     if (!exactHeadSha) {
       throw new Error(
-        `GitHubProvider: integrate(${base}, ${head}) requires resolveRef(${head}) immediately beforehand`
+        `GitHubProvider: integrate(${base}, ${head}) requires resolveRef(${head}) immediately beforehand`,
       );
     }
 
-    this.resolvedRefs.delete(key);
+    if (projectId === "founder-control-room") {
+      const context = this.pullRequestContextByProject.get(projectId);
+      if (!context) {
+        throw new Error("GitHubProvider: FCR integration requires provider-backed pull-request context");
+      }
+      if (context.baseRef !== base || context.headRef !== head) {
+        throw new Error(
+          `GitHubProvider: FCR integration refs changed after review context: expected ${context.baseRef}<-${context.headRef}, received ${base}<-${head}`,
+        );
+      }
+
+      const baseKey = this.resolvedRefKey(projectId, base);
+      const exactBaseSha = this.resolvedRefs.get(baseKey);
+      if (!exactBaseSha) {
+        throw new Error(
+          `GitHubProvider: FCR integrate(${base}, ${head}) requires resolveRef(${base}) immediately beforehand`,
+        );
+      }
+      if (exactBaseSha !== context.baseSha.toLowerCase()) {
+        throw new Error(
+          `GitHubProvider: FCR base moved after review context: current ${exactBaseSha}, reviewed ${context.baseSha}`,
+        );
+      }
+      if (exactHeadSha !== context.headSha.toLowerCase()) {
+        throw new Error(
+          `GitHubProvider: FCR head moved after review context: current ${exactHeadSha}, reviewed ${context.headSha}`,
+        );
+      }
+
+      this.resolvedRefs.delete(baseKey);
+      this.resolvedRefs.delete(headKey);
+      this.pullRequestContextByProject.delete(projectId);
+
+      const { data } = await this.octokit.pulls.merge({
+        owner,
+        repo,
+        pull_number: context.number,
+        sha: exactHeadSha,
+      });
+      if (!data.merged || !data.sha) {
+        throw new Error(
+          `GitHubProvider: pull request #${context.number} did not merge: ${data.message ?? "provider returned no merge SHA"}`,
+        );
+      }
+      return data.sha;
+    }
+
+    this.resolvedRefs.delete(headKey);
 
     const { data } = await this.octokit.repos.merge({
       owner,
@@ -389,22 +439,6 @@ export class GitHubProvider implements RepositoryProvider {
       if (errors.length > 0) {
         throw new Error(`GitHubProvider: FCR main ruleset config rejected: ${errors.join("; ")}`);
       }
-
-      const { data: collaborators } = await this.octokit.repos.listCollaborators({
-        owner,
-        repo,
-        affiliation: "all",
-        per_page: 100,
-      });
-      const ownerLogin = owner.toLowerCase();
-      const independentReviewerReady = collaborators.some((collaborator) =>
-        collaborator.login.toLowerCase() !== ownerLogin
-        && collaborator.permissions?.push === true);
-      if (!independentReviewerReady) {
-        throw new Error(
-          "GitHubProvider: FCR main independent-review policy cannot be activated until a non-owner collaborator with write authority is available",
-        );
-      }
     }
 
     type RepoRule = NonNullable<
@@ -440,7 +474,11 @@ export class GitHubProvider implements RepositoryProvider {
 
     const bypassActors = (config.bypassActors ?? []).map((actor) => {
       if (actor.kind === "app") {
-        return { actor_type: "Integration" as const, actor_id: Number(actor.id), bypass_mode: "always" as const };
+        return {
+          actor_type: "Integration" as const,
+          actor_id: Number(actor.id),
+          bypass_mode: hardenFounderControlRoomMainReview ? "pull_request" as const : "always" as const,
+        };
       }
       throw new Error(`GitHubProvider: unsupported bypass actor kind "${actor.kind}"`);
     });
@@ -509,13 +547,21 @@ function fcrMainRulesetConfigErrors(config: RulesetConfig): string[] {
   if (!Number.isInteger(config.requiredApprovingReviewCount) || config.requiredApprovingReviewCount < 1) {
     errors.push("at least one approving review is required");
   }
+  const bypassActors = config.bypassActors ?? [];
+  if (
+    bypassActors.length !== 1
+    || bypassActors[0]?.kind !== "app"
+    || !/^\d+$/.test(bypassActors[0].id.trim())
+  ) {
+    errors.push("exactly one numeric GitHub App bypass actor is required");
+  }
   return errors;
 }
 
 function expectedBypassIdentities(config: RulesetConfig): string[] {
   return (config.bypassActors ?? [])
     .map((actor) => {
-      if (actor.kind === "app") return `Integration:${Number(actor.id)}:always`;
+      if (actor.kind === "app") return `Integration:${Number(actor.id)}:pull_request`;
       return `unsupported:${actor.kind}:${actor.id}`;
     })
     .sort();

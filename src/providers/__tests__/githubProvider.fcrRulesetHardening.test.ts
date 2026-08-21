@@ -3,13 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
   mockGetRepoRulesets,
   mockGetRepoRuleset,
-  mockListCollaborators,
   mockCreateRepoRuleset,
   mockUpdateRepoRuleset,
 } = vi.hoisted(() => ({
   mockGetRepoRulesets: vi.fn(),
   mockGetRepoRuleset: vi.fn(),
-  mockListCollaborators: vi.fn(),
   mockCreateRepoRuleset: vi.fn(),
   mockUpdateRepoRuleset: vi.fn(),
 }));
@@ -19,7 +17,6 @@ vi.mock("@octokit/rest", () => ({
     repos = {
       getRepoRulesets: mockGetRepoRulesets,
       getRepoRuleset: mockGetRepoRuleset,
-      listCollaborators: mockListCollaborators,
       createRepoRuleset: mockCreateRepoRuleset,
       updateRepoRuleset: mockUpdateRepoRuleset,
     };
@@ -37,11 +34,10 @@ const config = {
   requiredStatusCheckNames: ["Required Gate", "Verify test-ledger contract"],
   blockForcePushes: true,
   blockDeletion: true,
+  bypassActors: [{ kind: "app" as const, id: "123" }],
 };
 
-type TestConfig = typeof config & {
-  bypassActors?: Array<{ kind: "app"; id: string }>;
-};
+type TestConfig = typeof config;
 
 function strongReadback(request: TestConfig = config) {
   const rules: Array<{ type: string; parameters?: Record<string, unknown> }> = [
@@ -72,10 +68,10 @@ function strongReadback(request: TestConfig = config) {
     id: 1,
     name: request.name,
     enforcement: request.enforcement,
-    bypass_actors: (request.bypassActors ?? []).map((actor) => ({
+    bypass_actors: request.bypassActors.map((actor) => ({
       actor_type: "Integration",
       actor_id: Number(actor.id),
-      bypass_mode: "always",
+      bypass_mode: "pull_request",
     })),
     conditions: {
       ref_name: {
@@ -97,14 +93,16 @@ function buildProvider() {
   });
 }
 
+function createPayload() {
+  return mockCreateRepoRuleset.mock.calls.at(-1)?.[0];
+}
+
 function pullRequestRuleFromLastCreate() {
-  const payload = mockCreateRepoRuleset.mock.calls.at(-1)?.[0];
-  return payload.rules.find((rule: { type: string }) => rule.type === "pull_request");
+  return createPayload().rules.find((rule: { type: string }) => rule.type === "pull_request");
 }
 
 function statusRuleFromLastCreate() {
-  const payload = mockCreateRepoRuleset.mock.calls.at(-1)?.[0];
-  return payload.rules.find((rule: { type: string }) => rule.type === "required_status_checks");
+  return createPayload().rules.find((rule: { type: string }) => rule.type === "required_status_checks");
 }
 
 describe("GitHubProvider FCR main ruleset hardening", () => {
@@ -112,12 +110,6 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     vi.clearAllMocks();
     mockGetRepoRulesets.mockResolvedValue({ data: [] });
     mockGetRepoRuleset.mockResolvedValue({ data: strongReadback() });
-    mockListCollaborators.mockResolvedValue({
-      data: [
-        { login: "jussray", permissions: { push: true } },
-        { login: "independent-reviewer", permissions: { push: true } },
-      ],
-    });
     mockCreateRepoRuleset.mockResolvedValue({
       data: { id: 1, name: config.name, enforcement: "active" },
     });
@@ -126,16 +118,9 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     });
   });
 
-  it("maps active FCR main review policy to stale-review and last-push protections", async () => {
+  it("keeps the normal review membrane while limiting the trusted app bypass to pull-request merges", async () => {
     const provider = buildProvider();
     await provider.applyBranchRuleset("founder-control-room", config);
-
-    expect(mockListCollaborators).toHaveBeenCalledWith({
-      owner: "jussray",
-      repo: "founder-control-room",
-      affiliation: "all",
-      per_page: 100,
-    });
 
     const pullRequestRule = pullRequestRuleFromLastCreate();
     expect(pullRequestRule.parameters).toMatchObject({
@@ -151,6 +136,9 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
       { context: "Required Gate" },
       { context: "Verify test-ledger contract" },
     ]);
+    expect(createPayload().bypass_actors).toEqual([
+      { actor_type: "Integration", actor_id: 123, bypass_mode: "pull_request" },
+    ]);
     expect(mockGetRepoRuleset).toHaveBeenCalledWith({
       owner: "jussray",
       repo: "founder-control-room",
@@ -158,7 +146,7 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     });
   });
 
-  it("rejects a weak FCR main policy before provider mutation", async () => {
+  it("rejects a weak FCR main normal-path review policy before provider mutation", async () => {
     const provider = buildProvider();
 
     await expect(provider.applyBranchRuleset("founder-control-room", {
@@ -166,37 +154,37 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
       requiredApprovingReviewCount: 0,
     })).rejects.toThrow("at least one approving review is required");
 
-    expect(mockListCollaborators).not.toHaveBeenCalled();
     expect(mockCreateRepoRuleset).not.toHaveBeenCalled();
     expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
     expect(mockGetRepoRuleset).not.toHaveBeenCalled();
   });
 
-  it("rejects an independent-review policy when no non-owner writer can satisfy it", async () => {
-    mockListCollaborators.mockResolvedValue({
-      data: [{ login: "jussray", permissions: { push: true } }],
-    });
-
+  it("rejects FCR main hardening without exactly one numeric GitHub App bypass identity", async () => {
     const provider = buildProvider();
-    await expect(provider.applyBranchRuleset("founder-control-room", config))
-      .rejects.toThrow("non-owner collaborator with write authority");
+
+    await expect(provider.applyBranchRuleset("founder-control-room", {
+      ...config,
+      bypassActors: [],
+    })).rejects.toThrow("exactly one numeric GitHub App bypass actor is required");
+
+    await expect(provider.applyBranchRuleset("founder-control-room", {
+      ...config,
+      bypassActors: [{ kind: "app", id: "not-numeric" }],
+    })).rejects.toThrow("exactly one numeric GitHub App bypass actor is required");
 
     expect(mockCreateRepoRuleset).not.toHaveBeenCalled();
     expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
-    expect(mockGetRepoRuleset).not.toHaveBeenCalled();
   });
 
-  it("does not count a non-owner read-only collaborator as independent-review capability", async () => {
-    mockListCollaborators.mockResolvedValue({
-      data: [
-        { login: "jussray", permissions: { push: true } },
-        { login: "reader", permissions: { push: false } },
-      ],
+  it("does not require a second collaborator before applying the protected normal path", async () => {
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", config)).resolves.toMatchObject({
+      name: config.name,
+      enforcement: "active",
     });
 
-    const provider = buildProvider();
-    await expect(provider.applyBranchRuleset("founder-control-room", config))
-      .rejects.toThrow("non-owner collaborator with write authority");
+    expect(mockCreateRepoRuleset).toHaveBeenCalledTimes(1);
+    expect(createPayload().bypass_actors[0].bypass_mode).toBe("pull_request");
   });
 
   it("accepts renamed policy and additional protected refs when semantics round-trip", async () => {
@@ -244,12 +232,12 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
       .rejects.toThrow("FCR main ruleset read-back mismatch");
   });
 
-  it("fails closed when provider read-back widens bypass authority", async () => {
+  it("fails closed when provider read-back widens bypass identity", async () => {
     const widened = strongReadback();
     widened.bypass_actors = [{
       actor_type: "Integration",
       actor_id: 999,
-      bypass_mode: "always",
+      bypass_mode: "pull_request",
     }];
     mockGetRepoRuleset.mockResolvedValue({ data: widened });
 
@@ -258,25 +246,21 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
       .rejects.toThrow("bypass actors do not match the requested policy");
   });
 
-  it("fails closed when provider read-back changes bypass mode for the same actor", async () => {
-    const configWithBypass: TestConfig = {
-      ...config,
-      bypassActors: [{ kind: "app", id: "123" }],
-    };
-    const wrongMode = strongReadback(configWithBypass);
+  it("fails closed when provider widens the trusted app bypass from pull-request-only to always", async () => {
+    const wrongMode = strongReadback();
     wrongMode.bypass_actors = [{
       actor_type: "Integration",
       actor_id: 123,
-      bypass_mode: "pull_request",
+      bypass_mode: "always",
     }];
     mockGetRepoRuleset.mockResolvedValue({ data: wrongMode });
 
     const provider = buildProvider();
-    await expect(provider.applyBranchRuleset("founder-control-room", configWithBypass))
+    await expect(provider.applyBranchRuleset("founder-control-room", config))
       .rejects.toThrow("bypass actors do not match the requested policy");
   });
 
-  it("does not impose FCR-specific stale-review semantics on another project", async () => {
+  it("keeps generic repositories on their existing always-bypass behavior", async () => {
     const provider = buildProvider();
     await provider.applyBranchRuleset("sekret-bip", config);
 
@@ -284,7 +268,9 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     expect(pullRequestRule.parameters.dismiss_stale_reviews_on_push).toBe(false);
     expect(pullRequestRule.parameters.require_last_push_approval).toBe(false);
     expect(pullRequestRule.parameters.required_review_thread_resolution).toBe(true);
-    expect(mockListCollaborators).not.toHaveBeenCalled();
+    expect(createPayload().bypass_actors).toEqual([
+      { actor_type: "Integration", actor_id: 123, bypass_mode: "always" },
+    ]);
     expect(mockGetRepoRuleset).not.toHaveBeenCalled();
   });
 });
