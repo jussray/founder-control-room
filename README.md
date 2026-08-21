@@ -36,6 +36,7 @@ Current implementation includes:
 - a secret-free exact-head Cloudflare bridge authority contract that is load-bearing inside CI / `Required Gate`, while live Cloudflare and GitHub provider state remain separate authority facts;
 - freshness-aware federated truth receipts and a bounded Truth Lease contract for claims that can decay;
 - evidence-dependent consequential portfolio execution that binds founder authorization to the exact approved decision context and Truth Lease, then re-observes the lease dependencies at the declared use boundary so changed, stale, missing, or invalidated truth forces reconfirmation instead of execution;
+- a production-specific Truth Lease composer that can bind one exact repository head to matching Cloudflare Worker/Pages runtime identity, Supabase production-state evidence, exact-runtime Playwright proof, and exact-head independent review, while failing closed when any required dependency is changed, stale, missing, or mismatched at use time;
 - a typed [release-identity / rollout-coverage contract](docs/RELEASE_IDENTITY_AND_COVERAGE.md) that keeps binary version identity separate from privacy-safe aggregate traffic observation, with predeclared thresholds and no merge, deploy, or authorization effect;
 - a project-bound, independently witnessed rollout-coverage ingress that accepts only Cloudflare aggregate `passed` observations, rejects self-attested/control-plane claims, wrong deployment targets, stale/out-of-order evidence, and expired coverage windows, and withholds current coverage until a read-through GitHub main revalidation supplies the matching identity;
 - a durable founder-only **Founder Switchboard** with explicit BUILT / CONFIGURED / ACTIVE / PROVEN states and guarded authority modes;
@@ -196,6 +197,8 @@ Production release evidence remains incomplete until the applicable authorized l
 - Pages/API routing and service identity;
 - required browser/runtime proof; and
 - rollback ownership.
+
+The production-specific Truth Lease does not manufacture any of those facts. It composes already-authoritative observations only after Cloudflare Worker/Pages identities, Playwright tested/runtime identity, Supabase production state, independent review, and the repository head all bind to the same exact candidate. At deploy, publish, completion-claim, or another consequential use boundary, those dependencies must be freshly re-observed; any missing, stale, changed, or mismatched dependency makes the production claim unusable until proof is rebuilt.
 
 ### Historical production provenance
 
