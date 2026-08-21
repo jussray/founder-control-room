@@ -144,8 +144,12 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
 
   it("separates no-bypass strict freshness from the pull-request-only review membrane", async () => {
     const provider = buildProvider();
-    await provider.applyBranchRuleset("founder-control-room", config);
+    const result = await provider.applyBranchRuleset("founder-control-room", config);
 
+    expect(result.components).toEqual([
+      { purpose: "review", id: "1", name: config.name, enforcement: "active" },
+      { purpose: "strict_freshness", id: "2", name: freshnessName(), enforcement: "active" },
+    ]);
     expect(mockCreateRepoRuleset).toHaveBeenCalledTimes(2);
     const freshnessPayload = mockCreateRepoRuleset.mock.calls[0]?.[0];
     const reviewPayload = mockCreateRepoRuleset.mock.calls[1]?.[0];
@@ -271,6 +275,22 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     const provider = buildProvider();
     await expect(provider.applyBranchRuleset("founder-control-room", config))
       .rejects.toThrow("bypass actors do not match the requested policy");
+  });
+
+  it("surfaces the verified freshness identity when the review mutation fails", async () => {
+    mockCreateRepoRuleset.mockImplementation(async (payload: { name: string; enforcement: string }) => {
+      if (payload.name === freshnessName()) {
+        return { data: { id: 2, name: payload.name, enforcement: payload.enforcement } };
+      }
+      throw new Error("review write failed");
+    });
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", config))
+      .rejects.toThrow(/strict-freshness ruleset .* \(2\).*review write failed/);
+
+    expect(mockCreateRepoRuleset.mock.calls.map((call) => call[0].name))
+      .toEqual([freshnessName(), config.name]);
   });
 
   it("updates both stable ruleset identities when they already exist", async () => {

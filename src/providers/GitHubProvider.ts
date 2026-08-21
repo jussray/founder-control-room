@@ -504,6 +504,7 @@ export class GitHubProvider implements RepositoryProvider {
     };
 
     const { data: existing } = await this.octokit.repos.getRepoRulesets({ owner, repo, per_page: 100 });
+    let freshnessComponent: NonNullable<RulesetResult["components"]>[number] | undefined;
 
     if (hardenFounderControlRoomMainReview) {
       // Apply and verify the no-bypass freshness membrane FIRST. If any provider
@@ -549,29 +550,63 @@ export class GitHubProvider implements RepositoryProvider {
       );
       if (freshnessErrors.length > 0) {
         throw new Error(
-          `GitHubProvider: FCR strict-freshness ruleset read-back mismatch: ${freshnessErrors.join("; ")}`,
+          `GitHubProvider: FCR strict-freshness ruleset ${freshnessData.id} read-back mismatch: ${freshnessErrors.join("; ")}`,
         );
       }
+      freshnessComponent = {
+        purpose: "strict_freshness",
+        id: String(freshnessData.id),
+        name: freshnessData.name,
+        enforcement: freshnessData.enforcement,
+      };
     }
 
-    const match = existing.find((ruleset) => ruleset.name === config.name);
-    const { data } = match
-      ? await this.octokit.repos.updateRepoRuleset({ ...payload, ruleset_id: match.id })
-      : await this.octokit.repos.createRepoRuleset(payload);
+    const applyReviewMembrane = async () => {
+      const match = existing.find((ruleset) => ruleset.name === config.name);
+      const { data } = match
+        ? await this.octokit.repos.updateRepoRuleset({ ...payload, ruleset_id: match.id })
+        : await this.octokit.repos.createRepoRuleset(payload);
 
-    if (hardenFounderControlRoomMainReview) {
-      const { data: readback } = await this.octokit.repos.getRepoRuleset({
-        owner,
-        repo,
-        ruleset_id: data.id,
-      });
-      const errors = fcrMainReviewRulesetReadbackErrors(config, readback);
-      if (errors.length > 0) {
-        throw new Error(`GitHubProvider: FCR review ruleset read-back mismatch: ${errors.join("; ")}`);
+      if (hardenFounderControlRoomMainReview) {
+        const { data: readback } = await this.octokit.repos.getRepoRuleset({
+          owner,
+          repo,
+          ruleset_id: data.id,
+        });
+        const errors = fcrMainReviewRulesetReadbackErrors(config, readback);
+        if (errors.length > 0) {
+          throw new Error(`GitHubProvider: FCR review ruleset ${data.id} read-back mismatch: ${errors.join("; ")}`);
+        }
       }
-    }
+      return data;
+    };
 
-    return { id: String(data.id), name: data.name, enforcement: data.enforcement };
+    const data = await applyReviewMembrane().catch((error: unknown) => {
+      if (!freshnessComponent) throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `GitHubProvider: FCR review membrane failed after verified strict-freshness ruleset ${freshnessComponent.name} (${freshnessComponent.id}): ${message}`,
+      );
+    });
+
+    return {
+      id: String(data.id),
+      name: data.name,
+      enforcement: data.enforcement,
+      ...(freshnessComponent
+        ? {
+            components: [
+              {
+                purpose: "review",
+                id: String(data.id),
+                name: data.name,
+                enforcement: data.enforcement,
+              },
+              freshnessComponent,
+            ],
+          }
+        : {}),
+    };
   }
 }
 

@@ -171,10 +171,20 @@ export interface RulesetConfig {
 }
 
 export interface RulesetResult {
-  /** Provider-specific ruleset identifier, for later reference or rollback. */
+  /** Provider-specific primary ruleset identifier. */
   id: string;
   name: string;
   enforcement: string;
+  /**
+   * Composite provider mutations expose every durable component identity so
+   * caller ledgers can reconcile partial success without guessing provider state.
+   */
+  components?: Array<{
+    purpose: string;
+    id: string;
+    name: string;
+    enforcement: string;
+  }>;
 }
 
 /**

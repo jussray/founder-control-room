@@ -267,56 +267,6 @@ jobs:
         run: supabase db lint --local
         continue-on-error: true
 
-  repair-pr590-composite-receipt:
-    if: github.event_name == 'pull_request' && github.event.pull_request.number == 590 && github.event.pull_request.head.repo.full_name == github.repository
-    name: Repair PR 590 composite ruleset receipt
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: write
-    steps:
-      - name: Check out exact PR head with write credential
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.EXPECTED_HEAD_SHA }}
-          fetch-depth: 0
-          persist-credentials: true
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - name: Apply bounded repair
-        run: python3 scripts/_repair-pr590.py
-      - name: Remove repair scaffolding before proof
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin a4ca515ee100d0494e90b44bc7b49600c8b30c12 --depth=1
-          git checkout FETCH_HEAD -- .github/workflows/ci.yml
-          rm scripts/_repair-pr590.py
-      - name: Run focused proof on clean working tree
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm ci --ignore-scripts
-          npm run typecheck
-          npx vitest run \
-            src/providers/__tests__/githubProvider.fcrRulesetHardening.test.ts \
-            src/providers/__tests__/githubProvider.fcrPullRequestMerge.test.ts \
-            src/http/routes/__tests__/projects.ruleset.integration.test.ts
-          git diff --check
-      - name: Commit clean repair
-        shell: bash
-        env:
-          TARGET_BRANCH: ${{ github.head_ref }}
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git diff --cached --check
-          git commit -m 'fix(governance): receipt split ruleset topology'
-          git push origin "HEAD:${TARGET_BRANCH}"
-
   required-gate:
     name: Required Gate
     if: ${{ always() }}
