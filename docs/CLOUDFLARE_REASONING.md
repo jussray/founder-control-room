@@ -183,6 +183,16 @@ Cloudflare outbound email is a capability boundary, not a global portfolio trans
 
 Repository configuration can prove the desired binding name and sender restriction. It cannot prove Cloudflare has onboarded the sender domain, the deployed Worker currently exposes that binding, or a message was accepted/delivered. Those claims require fresh provider/runtime evidence and must remain separate from source truth.
 
+## Worker build authority membrane
+
+`wrangler.worker.toml` runs `scripts/verify-worker-build-authority.mjs` as its custom Worker build hook. The hook is a repository-side fail-closed membrane, not a provider mutation authority.
+
+For native Cloudflare Workers Builds, the membrane requires the provider-reported commit SHA to equal the checked-out Git source, requires branch/build UUID evidence, and permits only the non-promoting `wrangler versions upload` command. A native `wrangler deploy` is rejected before promotion with `NATIVE_WORKER_GIT_PROMOTION_BLOCKED`.
+
+For GitHub Actions, production promotion is recognized only for the manual `Deploy` or `FCR Worker Reconcile` workflow-dispatch lanes when the checked-out SHA equals the exact GitHub workflow SHA. Ordinary CI remains verification-only. The emitted `fcr/worker-build-authority-receipt@v1` is redacted build evidence and explicitly cannot authorize provider mutation.
+
+This source membrane does not prove the current Cloudflare Workers Builds dashboard configuration, custom-domain routing, active deployment, or runtime SHA. Those remain separate provider/runtime readback gates.
+
 ## Verification
 
 ```bash
