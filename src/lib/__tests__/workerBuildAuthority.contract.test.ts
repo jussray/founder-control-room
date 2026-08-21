@@ -1,0 +1,131 @@
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
+import { afterEach, describe, expect, it } from 'vitest';
+
+const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
+const scriptPath = fileURLToPath(
+  new URL('../../../scripts/verify-worker-build-authority.mjs', import.meta.url),
+);
+const wranglerConfigPath = fileURLToPath(
+  new URL('../../../wrangler.worker.toml', import.meta.url),
+);
+
+const tempDirs: string[] = [];
+
+async function runAuthority(env: Record<string, string>) {
+  const dir = await mkdtemp(join(tmpdir(), 'fcr-build-authority-'));
+  tempDirs.push(dir);
+  const receiptPath = join(dir, 'receipt.json');
+  const result = spawnSync(process.execPath, [scriptPath], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      WORKERS_CI: '',
+      GITHUB_ACTIONS: '',
+      GITHUB_WORKFLOW: '',
+      GITHUB_EVENT_NAME: '',
+      WORKERS_CI_COMMIT_SHA: '',
+      WORKERS_CI_BRANCH: '',
+      WORKERS_CI_BUILD_UUID: '',
+      WRANGLER_COMMAND: '',
+      FCR_BUILD_AUTHORITY_RECEIPT_PATH: receiptPath,
+      ...env,
+    },
+  });
+  const receipt = JSON.parse(await readFile(receiptPath, 'utf8')) as Record<string, unknown>;
+  return { result, receipt };
+}
+
+afterEach(async () => {
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+});
+
+describe('Worker build authority membrane', () => {
+  it('allows Cloudflare Workers Builds only as a non-promoting version upload', async () => {
+    const { result, receipt } = await runAuthority({
+      WORKERS_CI: '1',
+      WORKERS_CI_COMMIT_SHA: 'a'.repeat(40),
+      WORKERS_CI_BRANCH: 'feature/test',
+      WORKERS_CI_BUILD_UUID: 'build-uuid-123',
+      WRANGLER_COMMAND: 'versions upload',
+    });
+
+    expect(result.status).toBe(0);
+    expect(receipt).toMatchObject({
+      ok: true,
+      executionContext: 'cloudflare-workers-builds',
+      sourceSha: 'a'.repeat(40),
+      sourceBranch: 'feature/test',
+      buildUuid: 'build-uuid-123',
+      authorityDecision: 'allow',
+      productionPromotionAuthorized: false,
+      nativeWorkerGitPromotionAllowed: false,
+    });
+  });
+
+  it('blocks a native Workers Builds production deploy before Wrangler can promote it', async () => {
+    const { result, receipt } = await runAuthority({
+      WORKERS_CI: '1',
+      WORKERS_CI_COMMIT_SHA: 'b'.repeat(40),
+      WORKERS_CI_BRANCH: 'main',
+      WORKERS_CI_BUILD_UUID: 'build-uuid-456',
+      WRANGLER_COMMAND: 'deploy',
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('NATIVE_WORKER_GIT_PROMOTION_BLOCKED');
+    expect(receipt).toMatchObject({
+      ok: false,
+      executionContext: 'cloudflare-workers-builds',
+      authorityDecision: 'block',
+      productionPromotionAuthorized: false,
+      nativeWorkerGitPromotionAllowed: false,
+    });
+  });
+
+  it('recognizes only the guarded manual GitHub workflows as production promotion contexts', async () => {
+    const { result, receipt } = await runAuthority({
+      GITHUB_ACTIONS: 'true',
+      GITHUB_EVENT_NAME: 'workflow_dispatch',
+      GITHUB_WORKFLOW: 'FCR Worker Reconcile',
+      WRANGLER_COMMAND: 'deploy',
+    });
+
+    expect(result.status).toBe(0);
+    expect(receipt).toMatchObject({
+      ok: true,
+      executionContext: 'github-manual-production',
+      authorityDecision: 'allow',
+      productionPromotionAuthorized: true,
+      nativeWorkerGitPromotionAllowed: false,
+    });
+    expect(receipt.sourceSha).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  it('keeps ordinary GitHub CI in verification-only mode', async () => {
+    const { result, receipt } = await runAuthority({
+      GITHUB_ACTIONS: 'true',
+      GITHUB_EVENT_NAME: 'pull_request',
+      GITHUB_WORKFLOW: 'CI',
+      WRANGLER_COMMAND: 'deploy',
+    });
+
+    expect(result.status).toBe(0);
+    expect(receipt).toMatchObject({
+      ok: true,
+      executionContext: 'github-verification-only',
+      productionPromotionAuthorized: false,
+      nativeWorkerGitPromotionAllowed: false,
+    });
+  });
+
+  it('wires the membrane into the canonical Worker custom build hook', async () => {
+    const config = await readFile(wranglerConfigPath, 'utf8');
+    expect(config).toContain('[build]');
+    expect(config).toContain('command = "node scripts/verify-worker-build-authority.mjs"');
+  });
+});
