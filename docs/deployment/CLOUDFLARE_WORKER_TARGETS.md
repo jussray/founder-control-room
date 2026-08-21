@@ -81,6 +81,8 @@ This checked-in binding and sender allowlist prove repository intent only. They 
 
 Repository source contains a founder-gated Cloudflare Access inspection/recovery lane. Its existence does **not** prove current Access application state, exemption state, token permissions, or production front-door availability.
 
+For the bounded mutation path, `apply=true` must carry an `issue-comment:<id>` receipt derived from the exact founder-authored GitHub issue #485 command. Before the dedicated Cloudflare admin credential can be used, the recovery workflow re-reads that comment and requires actor `jussray`, issue #485, the exact `/cloudflare-fcr-access apply <EXPECTED_HEAD_SHA>` body, and an `EXPECTED_HEAD_SHA` that still equals current `main`. Arbitrary caller-supplied approval text is not mutation authority. The GitHub receipt proves scoped authorization input only; Cloudflare mutation success and recovered browser/runtime behavior remain separate provider/runtime proof.
+
 Keep these truths separate:
 
 ```text
