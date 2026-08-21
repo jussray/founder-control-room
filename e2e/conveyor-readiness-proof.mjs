@@ -139,7 +139,7 @@ try {
   await page.locator('.launch-dock > summary').click();
   await expectReadiness('ready-for-probe', 'n8n configured · live probe required');
   assert.equal(lastAuthorization, `Bearer ${TOKEN}`);
-  await page.locator('.conveyor-readiness').scrollIntoViewIfNeeded();
+  await page.locator('[data-conveyor-readiness]').scrollIntoViewIfNeeded();
 
   const genesisLink = page.locator('[data-genesis-evidence]');
   await genesisLink.waitFor({ state: 'visible' });
