@@ -147,17 +147,75 @@ export function createServer(options: CreateServerOptions = {}) {
     app.use('/control-room', express.static(path.join(publicDir, 'control-room')));
   }
 
-  app.post('/webhooks/github', express.raw({ type: 'application/json', limit: BODY_LIMIT }), handleGitHubWebhook);
-  app.post('/ingest/repository-verification', express.raw({ type: 'application/json', limit: '512kb' }), handleRepositoryVerificationIngest);
-  app.post('/ingest/build-events/:slug', rateLimitGeneral, express.json({ type: 'application/json', limit: '32kb' }), handleBuildEventReceiptIngest);
-  app.post('/ingest/hair-commerce-receipts', rateLimitGeneral, express.json({ type: 'application/json', limit: '32kb' }), handleHairCommerceReceiptIngest);
-  app.post('/ingest/proof-of-ship-receipts', rateLimitGeneral, express.json({ type: 'application/json', limit: '32kb' }), handleProofOfShipReceiptIngest);
-  app.get('/ingest/proof-of-ship-receipts/by-commit/:owner/:repo/:sha', rateLimitGeneral, handleProofOfShipCommitLookup);
-  app.get('/ingest/proof-of-ship-receipts/:receiptId', rateLimitGeneral, handleProofOfShipReceiptLookup);
-  app.post('/ingest/founder-review-contexts', rateLimitGeneral, express.json({ type: 'application/json', limit: '32kb' }), handleFounderSignalReviewContextIngest);
-  app.post('/ingest/founder-review-email', rateLimitGeneral, express.raw({ type: 'application/json', limit: '16kb' }), handleFounderSignalReviewEmailIngest);
-  app.post('/mcp/founder-signal-engine', rateLimitGeneral, express.json({ type: 'application/json', limit: '64kb' }), requireFounderSignalEngineMcpToken, requireFounderSignalEngineReviewOnly, handleFounderSignalEngineMcp);
-  app.post('/mcp/founder-signal-x-engagement', rateLimitGeneral, express.json({ type: 'application/json', limit: '16kb' }), requireFounderSignalReadMcpToken, handleXEngagementSignalMcp);
+  // Webhooks, remote MCP calls, repo-runner pings, sanitized commerce
+  // receipts, downstream publication receipts, review contexts, and signed
+  // review-email receipts do not use browser cookies. Mount them before the
+  // browser same-origin mutation gate and give each endpoint strict parser/auth rules.
+  app.post(
+    '/webhooks/github',
+    express.raw({ type: 'application/json', limit: BODY_LIMIT }),
+    handleGitHubWebhook,
+  );
+  app.post(
+    '/ingest/repository-verification',
+    express.raw({ type: 'application/json', limit: '512kb' }),
+    handleRepositoryVerificationIngest,
+  );
+  app.post(
+    '/ingest/build-events/:slug',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '32kb' }),
+    handleBuildEventReceiptIngest,
+  );
+  app.post(
+    '/ingest/hair-commerce-receipts',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '32kb' }),
+    handleHairCommerceReceiptIngest,
+  );
+  app.post(
+    '/ingest/proof-of-ship-receipts',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '32kb' }),
+    handleProofOfShipReceiptIngest,
+  );
+  app.get(
+    '/ingest/proof-of-ship-receipts/by-commit/:owner/:repo/:sha',
+    rateLimitGeneral,
+    handleProofOfShipCommitLookup,
+  );
+  app.get(
+    '/ingest/proof-of-ship-receipts/:receiptId',
+    rateLimitGeneral,
+    handleProofOfShipReceiptLookup,
+  );
+  app.post(
+    '/ingest/founder-review-contexts',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '32kb' }),
+    handleFounderSignalReviewContextIngest,
+  );
+  app.post(
+    '/ingest/founder-review-email',
+    rateLimitGeneral,
+    express.raw({ type: 'application/json', limit: '16kb' }),
+    handleFounderSignalReviewEmailIngest,
+  );
+  app.post(
+    '/mcp/founder-signal-engine',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '64kb' }),
+    requireFounderSignalEngineMcpToken,
+    requireFounderSignalEngineReviewOnly,
+    handleFounderSignalEngineMcp,
+  );
+  app.post(
+    '/mcp/founder-signal-x-engagement',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '16kb' }),
+    requireFounderSignalReadMcpToken,
+    handleXEngagementSignalMcp,
+  );
 
   app.use(requireSameOriginBrowserMutation);
   app.use(express.json({ limit: BODY_LIMIT }));
@@ -165,21 +223,39 @@ export function createServer(options: CreateServerOptions = {}) {
   app.get('/health', (_req, res) => res.json({ ok: true }));
 
   app.get('/version', (_req, res) => {
-    res.set({ 'Cache-Control': 'no-store', 'Content-Type': 'application/json; charset=utf-8', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' });
+    res.set({
+      'Cache-Control': 'no-store',
+      'Content-Type': 'application/json; charset=utf-8',
+      'Referrer-Policy': 'no-referrer',
+      'X-Content-Type-Options': 'nosniff',
+    });
     res.status(200).json(deploymentVersion());
   });
 
   app.get('/guardrails', (_req, res) => {
-    res.set({ 'Cache-Control': 'no-store', 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'", 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' });
+    res.set({
+      'Cache-Control': 'no-store',
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Security-Policy':
+        "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+      'Referrer-Policy': 'no-referrer',
+      'X-Content-Type-Options': 'nosniff',
+    });
     res.status(200).send(renderGuardrailStatusPage());
   });
 
   app.get('/guardrails.json', (_req, res) => {
-    res.set({ 'Cache-Control': 'no-store', 'Content-Type': 'application/json; charset=utf-8', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' });
+    res.set({
+      'Cache-Control': 'no-store',
+      'Content-Type': 'application/json; charset=utf-8',
+      'Referrer-Policy': 'no-referrer',
+      'X-Content-Type-Options': 'nosniff',
+    });
     res.status(200).json(publicGuardrailSnapshot());
   });
 
   app.use(rateLimitGeneral);
+
   app.use('/', onboardingRouter);
   app.use('/auth', authRouter);
   app.use('/onboarding', founderOnboardingRouter);
@@ -190,7 +266,17 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/projects', buildEventsRouter);
   app.use('/projects', reasoningRunsRouter);
   app.use('/projects', requireProjectReadAudit, projectsRouter);
-  app.post('/approvals/:missionId/execute', requireFounder, requirePortfolioSwitchOn('fcr-privileged-execution-master'), requireV10PrivilegedApprovalBinding, requireV10DecisionFounderBinding);
+  // Privileged mission execution still uses the existing approvals router, but
+  // it must now pass founder authentication + founder master switch + V10
+  // plan/registry/exact-head binding + portable Chief/PromptOS/founder
+  // decision binding before the route may reserve an approval_executions row.
+  app.post(
+    '/approvals/:missionId/execute',
+    requireFounder,
+    requirePortfolioSwitchOn('fcr-privileged-execution-master'),
+    requireV10PrivilegedApprovalBinding,
+    requireV10DecisionFounderBinding,
+  );
   app.use('/approvals', approvalsRouter);
   app.use('/l99', l99Router);
   app.use('/terminal', terminalRouter);
@@ -213,8 +299,12 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/mcp', mcpRouter);
   app.use('/external-use', externalUseRouter);
   app.use('/economic-intelligence', economicIntelligenceRouter);
+
+  // Debug routes — CI and founder inspection only (no secrets exposed).
   app.use('/_debug', debugRouter);
+
   app.use(jsonParseErrorHandler);
   app.use(errorHandler);
+
   return app;
 }
