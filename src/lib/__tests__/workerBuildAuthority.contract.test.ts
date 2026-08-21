@@ -50,10 +50,10 @@ afterEach(async () => {
 });
 
 describe('Worker build authority membrane', () => {
-  it('allows Cloudflare Workers Builds only as a non-promoting version upload', async () => {
+  it('allows Cloudflare Workers Builds only as a non-promoting version upload of the exact checked-out source', async () => {
     const { result, receipt } = await runAuthority({
       WORKERS_CI: '1',
-      WORKERS_CI_COMMIT_SHA: 'a'.repeat(40),
+      WORKERS_CI_COMMIT_SHA: HEAD,
       WORKERS_CI_BRANCH: 'feature/test',
       WORKERS_CI_BUILD_UUID: 'build-uuid-123',
       WRANGLER_COMMAND: 'versions upload',
@@ -63,7 +63,8 @@ describe('Worker build authority membrane', () => {
     expect(receipt).toMatchObject({
       ok: true,
       executionContext: 'cloudflare-workers-builds',
-      sourceSha: 'a'.repeat(40),
+      sourceSha: HEAD,
+      checkedOutSha: HEAD,
       sourceBranch: 'feature/test',
       buildUuid: 'build-uuid-123',
       authorityDecision: 'allow',
@@ -72,10 +73,29 @@ describe('Worker build authority membrane', () => {
     });
   });
 
+  it('blocks Workers Builds when provider commit identity differs from checked-out source', async () => {
+    const { result, receipt } = await runAuthority({
+      WORKERS_CI: '1',
+      WORKERS_CI_COMMIT_SHA: 'a'.repeat(40),
+      WORKERS_CI_BRANCH: 'feature/test',
+      WORKERS_CI_BUILD_UUID: 'build-uuid-substitution',
+      WRANGLER_COMMAND: 'versions upload',
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('does not match checked-out source');
+    expect(receipt).toMatchObject({
+      ok: false,
+      executionContext: 'cloudflare-workers-builds',
+      authorityDecision: 'block',
+      productionPromotionAuthorized: false,
+    });
+  });
+
   it('blocks a native Workers Builds production deploy before Wrangler can promote it', async () => {
     const { result, receipt } = await runAuthority({
       WORKERS_CI: '1',
-      WORKERS_CI_COMMIT_SHA: 'b'.repeat(40),
+      WORKERS_CI_COMMIT_SHA: HEAD,
       WORKERS_CI_BRANCH: 'main',
       WORKERS_CI_BUILD_UUID: 'build-uuid-456',
       WRANGLER_COMMAND: 'deploy',
@@ -106,6 +126,7 @@ describe('Worker build authority membrane', () => {
       ok: true,
       executionContext: 'github-manual-production',
       sourceSha: HEAD,
+      checkedOutSha: HEAD,
       githubEventSha: HEAD,
       authorityDecision: 'allow',
       productionPromotionAuthorized: true,
