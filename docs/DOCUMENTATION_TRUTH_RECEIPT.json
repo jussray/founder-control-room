@@ -59,6 +59,12 @@
       "claims": [
         "src/http/routes/buildEvents.ts: the current-truth route must bind projection evaluation to the enrolled project repository and fail closed when that repository identity is unavailable."
       ]
+    },
+    {
+      "path": "src/governance/portfolioDecisionContext.ts",
+      "claims": [
+        "src/governance/portfolioDecisionContext.ts: evidence-dependent consequential portfolio execution must bind founder authorization to the exact normalized decision-context Truth Lease and re-evaluate fresh dependency observations at the use boundary; stale, changed, missing, invalid, or unbound truth must reconfirm instead of execute."
+      ]
     }
   ]
 }
