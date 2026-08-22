@@ -15,6 +15,12 @@
       ]
     },
     {
+      "path": ".github/workflows/n8n-runtime-integration-proof.yml",
+      "claims": [
+        ".github/workflows/n8n-runtime-integration-proof.yml: CI-only n8n runtime proof must mask generated bearer and encryption credentials before exporting them to later steps, while keeping the runtime ephemeral and non-production-authorizing."
+      ]
+    },
+    {
       "path": "src/buildEvents/buildEvent.ts",
       "claims": [
         "src/buildEvents/buildEvent.ts: coverage events must retain bounded aggregate-only shape validation and cannot carry raw request evidence."
