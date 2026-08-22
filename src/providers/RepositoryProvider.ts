@@ -131,11 +131,10 @@ export interface Patch {
 }
 
 /**
- * An actor exempted from a ruleset's restrictions. Needed because this
- * app's own `integrate()` writes to the protected branch directly (see
- * RulesetConfig doc comment) — without an explicit bypass entry for this
- * app's own machine identity, applying a ruleset that blocks direct writes
- * would also block the app's own founder-approved merge action.
+ * A machine identity that may cross a provider ruleset under a deliberately
+ * narrower authority path. The provider implementation owns the bypass mode:
+ * FCR's trusted GitHub App is constrained to reviewed pull-request merges,
+ * while other providers/projects may retain their existing integration mode.
  */
 export interface RulesetBypassActor {
   /** "app" = this Control Room's own GitHub App installation. */
@@ -164,18 +163,28 @@ export interface RulesetConfig {
   blockForcePushes: boolean;
   blockDeletion: boolean;
   /**
-   * Actors exempt from the rules above. Must explicitly include this app's
-   * own GitHub App identity if `requirePullRequest` is true, or the app's
-   * own integrate() (a direct merge-commit write, not a PR merge) breaks.
+   * Explicit machine identities allowed to cross the host ruleset through a
+   * provider-defined scoped bypass. Callers select the identity only; the
+   * provider must choose and verify the narrowest supported bypass mode.
    */
   bypassActors?: RulesetBypassActor[];
 }
 
 export interface RulesetResult {
-  /** Provider-specific ruleset identifier, for later reference or rollback. */
+  /** Provider-specific primary ruleset identifier. */
   id: string;
   name: string;
   enforcement: string;
+  /**
+   * Composite provider mutations expose every durable component identity so
+   * caller ledgers can reconcile partial success without guessing provider state.
+   */
+  components?: Array<{
+    purpose: string;
+    id: string;
+    name: string;
+    enforcement: string;
+  }>;
 }
 
 /**
