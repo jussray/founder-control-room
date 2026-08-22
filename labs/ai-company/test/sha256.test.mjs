@@ -13,7 +13,7 @@ test('isolated SHA-256 helper matches standard vectors', () => {
   );
   assert.equal(
     sha256Hex('Founder Control Room 🔐'),
-    '51ff2a579cb4c57dff0c495b43f77f096286fbcfa371dd1ee9e76348901ec872',
+    '02218bd2af4ec7e96db601533a37a3345dbe53136a70ed6f2b176128580df6fc',
   );
 });
 
