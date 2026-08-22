@@ -123,7 +123,7 @@ Changing approved copy, evidence identity, proposal identity, source version, ch
 
 Provider-neutral contract placement does not change publication authority or prove a provider migration. Canonical founder-content contracts live under `tools/founder-content-contracts/`; legacy `tools/zapier/` compatibility exports may remain for provider-specific callers, but core approval storage, direct publication, and temporal revalidation must import the canonical provider-neutral authority directly rather than making Zapier structurally load-bearing. n8n, Zapier, Buffer, or any later adapter remains a provider boundary: it may not create founder authority, it may not turn configuration or scheduler acceptance into publication truth, and it still requires the same exact approval, temporal revalidation, provider mutation, readback, and durable receipt.
 
-A source-level move away from Zapier ownership is not an n8n cutover. Until the checked n8n workflow is activated through the protected live probe and returns canonical persisted/provider readback evidence for the exact current-main target, Zapier remains an available provider-specific compatibility/fallback path and public language must not say that n8n has replaced it.
+A source-level move away from Zapier ownership is not an n8n cutover. A generic FCR stage-conveyor activation receipt is also not a founder-content cutover receipt. Until the checked founder-content n8n workflow is activated through its protected live path and returns canonical persisted evidence plus applicable downstream provider readback for the exact current-main target, Zapier remains an available provider-specific compatibility/fallback path and public language must not say that n8n has replaced it.
 
 A standing class authorization must never be interpreted as permission to bypass that exact-proposal approval membrane when the active route requires it.
 
@@ -184,6 +184,7 @@ Hold the post when:
 - temporal classification is missing, mismatched to the wording, or no longer valid at the use boundary;
 - a current-state claim is being sent through a deferred queue that cannot revalidate it at publication time;
 - configuration/readiness evidence is being used as proof that n8n, Buffer, or another provider actually executed or published;
+- a generic n8n stage-conveyor receipt is being used as proof that a founder-content provider write or publication occurred;
 - the post falls outside the approved automated publishing class or a stricter exact Current You gate is unsatisfied;
 - the active first-party route cannot read and atomically claim an exact matching FCR-owned approval;
 - the post depends on a workflow that failed before executing steps;
