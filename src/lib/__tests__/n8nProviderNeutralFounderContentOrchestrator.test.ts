@@ -11,7 +11,7 @@ import {
 } from '../n8nProviderNeutralFounderContentOrchestrator.js';
 import type { FirstPartyFounderScheduleEnvelope } from '../n8nFounderContentOrchestrator.js';
 // @ts-expect-error -- canonical founder-content authorization test helper is CommonJS.
-import founderContentAuthorizationContract from '../../../tools/zapier/founder-content-authorization-contract.cjs';
+import founderContentAuthorizationContract from '../../../tools/founder-content-contracts/founder-content-authorization-contract.cjs';
 
 const AUTH_HASH = 'a'.repeat(64);
 const PROPOSAL_HASH = 'b'.repeat(64);

@@ -1,106 +1,120 @@
-import { getSandbox, Sandbox as SandboxBase } from '@cloudflare/sandbox';
-import {
-  authenticateInvocation,
-  deriveSandboxSessionId,
-  deriveSubjectGateId,
-  type SandboxInvocation,
-} from './auth-core.mjs';
-import { SandboxRequestGate } from './gate.mjs';
+import { ContainerProxy, Sandbox, getSandbox } from '@cloudflare/sandbox';
 
-export class Sandbox extends SandboxBase {
+export { ContainerProxy };
+
+export class InternalSandbox extends Sandbox {
   enableInternet = false;
 }
 
-export { SandboxRequestGate } from './gate.mjs';
-
 type Env = {
-  Sandbox: DurableObjectNamespace<Sandbox>;
-  SandboxRequestGate: DurableObjectNamespace;
-  SANDBOX_RUNNER_HMAC_KEY?: string;
+  Sandbox: DurableObjectNamespace<InternalSandbox>;
+  SANDBOX_ADMIN_TOKEN?: string;
+  SANDBOX_SCOPE?: string;
 };
 
-type GateDecision = { code?: string };
+type ProbeRequest = {
+  taskId?: unknown;
+};
 
-const SYNTHETIC_EVIDENCE_COMMAND =
-  'python3 -c "import json; print(json.dumps({\'kind\': \'synthetic-evidence\', \'authority\': \'L0\', \'liveSideEffects\': False}))"';
+const MAX_OUTPUT_LENGTH = 4_096;
+const EXEC_TIMEOUT_MS = 10_000;
+const PROBE_ARGV = Object.freeze([
+  'node',
+  '-e',
+  'process.stdout.write("cloudflare-sandbox-ok")',
+]);
 
-function json(body: unknown, status = 200) {
+function json(body: unknown, status = 200): Response {
   return Response.json(body, {
     status,
-    headers: { 'cache-control': 'no-store' },
+    headers: {
+      'cache-control': 'no-store',
+    },
   });
 }
 
-async function consumeInvocation(env: Env, invocation: SandboxInvocation) {
-  const gateId = env.SandboxRequestGate.idFromName(await deriveSubjectGateId(invocation.subject));
-  const gate = env.SandboxRequestGate.get(gateId);
-  const response = await gate.fetch('https://sandbox-gate.internal/consume', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ nonce: invocation.nonce, issuedAt: invocation.issuedAt }),
-  });
-  let decision: GateDecision = {};
-  try {
-    const parsed: unknown = await response.json();
-    if (
-      typeof parsed === 'object'
-      && parsed !== null
-      && 'code' in parsed
-      && typeof parsed.code === 'string'
-    ) {
-      decision = { code: parsed.code };
-    }
-  } catch {
-    // Gate status is authoritative; a malformed receipt is represented safely.
-  }
-  return { response, code: decision.code ?? 'gate_rejected' };
+function authorized(request: Request, env: Env): boolean {
+  const expected = env.SANDBOX_ADMIN_TOKEN?.trim();
+  if (!expected) return false;
+  return request.headers.get('authorization') === `Bearer ${expected}`;
 }
 
-async function executeSyntheticEvidence(env: Env, invocation: SandboxInvocation) {
-  const sandbox = getSandbox(env.Sandbox, await deriveSandboxSessionId(invocation));
-  let response: Response;
-  let cleanupFailed = false;
+function parseTaskId(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  return /^sbx_[a-z0-9]{8,48}$/.test(normalized) ? normalized : null;
+}
 
-  try {
-    const result = await sandbox.exec(SYNTHETIC_EVIDENCE_COMMAND);
-    response = result.success && result.exitCode === 0
-      ? json({
-        status: 'simulated',
-        authority: 'L0',
-        liveSideEffects: false,
-        persistence: 'ephemeral',
-      })
-      : json({ code: 'sandbox_execution_failed' }, 502);
-  } catch {
-    response = json({ code: 'sandbox_execution_failed' }, 502);
-  } finally {
-    try {
-      await sandbox.destroy();
-    } catch {
-      cleanupFailed = true;
-    }
-  }
-
-  return cleanupFailed ? json({ code: 'sandbox_cleanup_failed' }, 502) : response;
+function clamp(value: unknown): string {
+  return typeof value === 'string' ? value.slice(0, MAX_OUTPUT_LENGTH) : '';
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const authentication = await authenticateInvocation(request, env.SANDBOX_RUNNER_HMAC_KEY);
-    if (!authentication.ok) {
-      const status = authentication.code === 'sandbox_unconfigured'
-        ? 503
-        : authentication.code === 'method_not_allowed'
-          ? 405
-          : 404;
-      return json({ code: authentication.code }, status);
+    const url = new URL(request.url);
+
+    if (url.pathname === '/health' && request.method === 'GET') {
+      return json({
+        ok: true,
+        service: 'founder-control-room-sandbox',
+        scope: env.SANDBOX_SCOPE || 'portfolio-control-plane',
+        authorityMode: 'transport-only',
+        genericExecutionEnabled: false,
+        internetEgress: false,
+      });
     }
 
-    const gate = await consumeInvocation(env, authentication.invocation);
-    if (!gate.response.ok) {
-      return json({ code: gate.code }, gate.response.status);
+    if (url.pathname === '/v1/exec') {
+      return json({ error: 'execution_authority_not_wired' }, 403);
     }
 
-    return executeSyntheticEvidence(env, authentication.invocation);
+    if (url.pathname !== '/v1/probe') return json({ error: 'not_found' }, 404);
+    if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
+    if (!env.SANDBOX_ADMIN_TOKEN) return json({ error: 'sandbox_not_configured' }, 503);
+    if (!authorized(request, env)) return json({ error: 'unauthorized' }, 401);
+
+    const contentType = request.headers.get('content-type') || '';
+    if (!contentType.toLowerCase().startsWith('application/json')) {
+      return json({ error: 'json_required' }, 415);
+    }
+
+    let body: ProbeRequest;
+    try {
+      body = (await request.json()) as ProbeRequest;
+    } catch {
+      return json({ error: 'invalid_json' }, 400);
+    }
+
+    const taskId = parseTaskId(body.taskId);
+    if (!taskId) return json({ error: 'invalid_probe_request' }, 400);
+
+    const sandbox = getSandbox(env.Sandbox, taskId);
+
+    try {
+      const process = await sandbox.exec([...PROBE_ARGV], {
+        timeout: EXEC_TIMEOUT_MS,
+      });
+      const output = await process.output({ encoding: 'utf8' });
+      const stdout = clamp(output.stdout);
+
+      return json({
+        ok: output.exitCode === 0 && stdout === 'cloudflare-sandbox-ok',
+        taskId,
+        processId: process.id,
+        exitCode: output.exitCode,
+        timedOut: output.timedOut === true,
+        truncated: output.truncated === true,
+        stdout,
+        stderr: clamp(output.stderr),
+      });
+    } catch (error) {
+      console.error('CLOUDFLARE_SANDBOX_PROBE_FAILED', {
+        taskId,
+        name: error instanceof Error ? error.name : 'UnknownError',
+      });
+      return json({ error: 'sandbox_probe_failed', taskId }, 502);
+    } finally {
+      await sandbox.destroy().catch(() => undefined);
+    }
   },
 };

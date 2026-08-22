@@ -21,7 +21,7 @@ import {
 } from '../../lib/founderContentApprovalStore.js';
 import {
   founderContentOrchestrationReadiness,
-  founderConveyorReadiness,
+  resolveFounderConveyorReadiness,
 } from '../../lib/n8nConveyorReadiness.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../../lib/founderConveyorReceipt.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
@@ -84,8 +84,8 @@ function providerNeutralAuthorityRequired(
   });
 }
 
-n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
-  const readiness = founderConveyorReadiness();
+n8nConveyorRouter.get('/', async (_req: FounderRequest, res) => {
+  const readiness = await resolveFounderConveyorReadiness();
   const founderContentReadiness = founderContentOrchestrationReadiness();
   return res.json({
     contract: FOUNDER_CONVEYOR_CONTRACT,

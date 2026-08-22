@@ -65,7 +65,7 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - name: Verify dedicated read-only Cloudflare audit tokens are available
+      - name: Verify core read-only Cloudflare Builds token is available
         shell: bash
         run: |
           set -euo pipefail
@@ -73,21 +73,48 @@ jobs:
             echo "::error::FCR_CLOUDFLARE_BUILDS_USER_TOKEN is not available to this workflow."
             exit 1
           fi
-          if [ -z "$CF_REQUEST_TRACER_TOKEN" ]; then
-            echo "::error::FCR_CLOUDFLARE_REQUEST_TRACER_TOKEN is not available to this workflow."
-            exit 1
-          fi
-          if [ -z "$CF_DNS_INVENTORY_TOKEN" ]; then
-            echo "::error::FCR_CLOUDFLARE_DNS_INVENTORY_TOKEN is not available to this workflow."
-            exit 1
-          fi
 
       - name: Audit provider truth against current Worker Git authority policy
+        id: core_authority
         run: node scripts/inspect-cloudflare-build.mjs
 
-      - name: Discover and trace FCR Cloudflare host inventory
+      - name: Preserve core authority verdict before optional enrichment
         if: always() && steps.verify_head.outcome == 'success'
+        shell: bash
+        run: |
+          if [ -f test-results/cloudflare-build-diagnostic.json ]; then
+            cp test-results/cloudflare-build-diagnostic.json test-results/cloudflare-build-diagnostic.core.json
+          fi
+
+      - name: Discover and trace FCR Cloudflare host inventory
+        id: trace_enrichment
+        if: always() && steps.verify_head.outcome == 'success' && env.CF_REQUEST_TRACER_TOKEN != '' && env.CF_DNS_INVENTORY_TOKEN != ''
+        continue-on-error: true
         run: node scripts/trace-cloudflare-request.mjs
+
+      - name: Restore core authority verdict after optional enrichment
+        if: always() && steps.verify_head.outcome == 'success'
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile, writeFile } from "node:fs/promises";
+
+          const corePath = "test-results/cloudflare-build-diagnostic.core.json";
+          const receiptPath = "test-results/cloudflare-build-diagnostic.json";
+
+          try {
+            const core = JSON.parse(await readFile(corePath, "utf8"));
+            const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+            if (receipt.requestTrace && typeof receipt.requestTrace === "object") {
+              receipt.requestTrace.optionalForCoreAuthority = true;
+            }
+            receipt.ok = core.ok === true;
+            receipt.error = core.error ?? null;
+            await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, "utf8");
+          } catch {
+            // If no core receipt exists, do not manufacture or upgrade authority truth.
+          }
+          NODE
 
       - name: Publish authority summary
         if: always()

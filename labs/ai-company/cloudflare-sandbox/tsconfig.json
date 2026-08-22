@@ -10,4 +10,12 @@
     "types": ["@cloudflare/workers-types"]
   },
   "include": ["src/**/*"]
+    "lib": ["ES2022", "WebWorker"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": false,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"]
 }

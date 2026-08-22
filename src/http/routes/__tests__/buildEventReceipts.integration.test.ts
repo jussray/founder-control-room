@@ -12,34 +12,16 @@ import type { BuildEventStoreDisposition } from '../../../services/buildEventSto
 const MCP_TOKEN = 'founder-signal-test-token';
 const RECEIPT_ROOT_TOKEN = 'build-event-receipt-root-test-token';
 const PRODUCER = 'sekret-bip-release-observer';
-const RECEIPT_TOKEN = deriveBuildEventReceiptToken(RECEIPT_ROOT_TOKEN, PRODUCER);
+const PROJECT_SLUG = 'sekret-bip';
+const RECEIPT_TOKEN = deriveBuildEventReceiptToken(RECEIPT_ROOT_TOKEN, PRODUCER, PROJECT_SLUG);
 const SHA = '1234567890abcdef1234567890abcdef12345678';
 const NOW_MS = Date.parse('2026-08-18T21:00:00.000Z');
 
 function runtimeEvent(overrides: Record<string, unknown> = {}) {
-  return {
+  return coverageEvent({
     eventId: `sekret-release:${SHA}`,
-    occurredAt: '2026-08-18T20:52:23.735Z',
-    source: 'cloudflare',
-    category: 'runtime',
-    phase: 'observe',
-    truth: 'verified',
-    authority: 'observed',
-    status: 'passed',
-    repository: {
-      name: 'jussray/Sekret-Bip',
-      branch: 'main',
-      refKind: 'branch-head',
-      commitSha: SHA,
-    },
-    runtime: {
-      service: 'sekret-bip-production',
-      environment: 'production',
-      releaseSha: SHA,
-    },
-    evidenceRefs: [`github-actions:release:${SHA}`],
     ...overrides,
-  };
+  });
 }
 
 
@@ -103,6 +85,12 @@ function appWith(
   },
   nowMs = NOW_MS,
   passedCoverageWitnessReader: PassedCoverageWitnessReader = acceptedCoverageWitness(),
+  findProjectOverride?: (slug: string) => Promise<{
+    id: string;
+    slug: string;
+    repoProvider: string | null;
+    repoIdentifier: string | null;
+  } | null>,
 ) {
   const app = express();
   const storedEvents: BuildEvent[] = [];
@@ -119,9 +107,9 @@ function appWith(
     createBuildEventReceiptIngestHandler({
       env,
       now: () => nowMs,
-      findProject: async (slug) => slug === 'sekret-bip'
+      findProject: findProjectOverride ?? (async (slug) => slug === PROJECT_SLUG
         ? { id: 'project-1', slug, repoProvider: 'github', repoIdentifier: 'jussray/Sekret-Bip' }
-        : null,
+        : null),
       storeEvent,
       passedCoverageWitnessReader,
     }),
@@ -140,7 +128,7 @@ function authorized(req: request.Test) {
 }
 
 describe('build-event receipt ingress', () => {
-  it('accepts an exact-SHA observed production receipt and preserves the existing build-event contract', async () => {
+  it('accepts an exact-SHA observed coverage receipt and preserves the existing build-event contract', async () => {
     const harness = appWith();
     const response = await authorized(
       request(harness.app).post('/ingest/build-events/sekret-bip'),
@@ -157,7 +145,8 @@ describe('build-event receipt ingress', () => {
     const stored = harness.storedEvents[0];
     expect(stored).toBeDefined();
     expect(stored?.repository?.commitSha).toBe(SHA);
-    expect(stored?.runtime?.releaseSha).toBe(SHA);
+    expect(stored?.coverage?.releaseSha).toBe(SHA);
+    expect(stored?.runtime).toBeUndefined();
     expect(stored?.truth).toBe('verified');
     expect(stored?.authority).toBe('observed');
   });
@@ -175,6 +164,37 @@ describe('build-event receipt ingress', () => {
     expect(harness.storedEvents[0]?.runtime).toBeUndefined();
   });
 
+  it('binds a producer credential and project lookup to the one enrolled project', async () => {
+    const harness = appWith();
+    const otherProject = await authorized(
+      request(harness.app).post('/ingest/build-events/another-project'),
+    ).send(runtimeEvent());
+    expect(otherProject.status).toBe(403);
+    expect(otherProject.body.error).toBe('producer_project_not_allowed');
+
+    const wrongProvider = appWith(
+      'stored',
+      undefined,
+      NOW_MS,
+      acceptedCoverageWitness(),
+      async (slug) => slug === PROJECT_SLUG
+        ? {
+            id: 'project-1',
+            slug,
+            repoProvider: 'gitlab',
+            repoIdentifier: 'jussray/Sekret-Bip',
+          }
+        : null,
+    );
+    const providerMismatch = await authorized(
+      request(wrongProvider.app).post('/ingest/build-events/sekret-bip'),
+    ).send(runtimeEvent());
+    expect(providerMismatch.status).toBe(403);
+    expect(providerMismatch.body.error).toBe('producer_repository_provider_mismatch');
+    expect(harness.storeCalls()).toBe(0);
+    expect(wrongProvider.storeCalls()).toBe(0);
+  });
+
   it('does not persist a passed coverage receipt without an independent current-main and provider witness', async () => {
     const harness = appWith('stored', undefined, NOW_MS, {
       verify: async () => ({ status: 'mismatch', code: 'coverage_witness_current_main_mismatch' }),
@@ -188,6 +208,69 @@ describe('build-event receipt ingress', () => {
       accepted: false,
       error: 'coverage_witness_current_main_mismatch',
     });
+    expect(harness.storeCalls()).toBe(0);
+  });
+
+  it('rejects non-passed coverage before it can bypass its independent witness', async () => {
+    let witnessCalls = 0;
+    const harness = appWith('stored', undefined, NOW_MS, {
+      verify: async () => {
+        witnessCalls += 1;
+        return {
+          status: 'verified' as const,
+          currentMainSha: SHA,
+          deploymentSha: SHA,
+          observedAt: new Date(NOW_MS).toISOString(),
+        };
+      },
+    });
+    const response = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({ status: 'completed' }));
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('coverage_receipt_requires_passed_status');
+    expect(witnessCalls).toBe(0);
+    expect(harness.storeCalls()).toBe(0);
+  });
+
+  it('fails closed on coverage control-plane fields at the schema or policy boundary', async () => {
+    const harness = appWith();
+    const injectedGoal = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({ goal: 'publish-now' }));
+    const wrongPhase = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({ phase: 'deploy' }));
+    const injectedRuntime = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      runtime: {
+        service: 'sekret-bip-production',
+        environment: 'production',
+        releaseSha: SHA,
+      },
+    }));
+    const injectedAudit = await authorized(
+      request(harness.app).post('/ingest/build-events/sekret-bip'),
+    ).send(coverageEvent({
+      repository: {
+        name: 'jussray/Sekret-Bip',
+        branch: 'main',
+        refKind: 'branch-head',
+        commitSha: SHA,
+        auditedCommitSha: 'a'.repeat(40),
+      },
+    }));
+
+    expect(injectedGoal.status).toBe(403);
+    expect(injectedGoal.body.error).toBe('external_receipts_cannot_set_control_plane_intent');
+    expect(wrongPhase.status).toBe(400);
+    expect(wrongPhase.body.error).toBe('invalid_build_event');
+    expect(injectedRuntime.status).toBe(400);
+    expect(injectedRuntime.body.error).toBe('invalid_build_event');
+    expect(injectedAudit.status).toBe(403);
+    expect(injectedAudit.body.error).toBe('external_receipts_cannot_set_audited_identity');
     expect(harness.storeCalls()).toBe(0);
   });
 
@@ -497,7 +580,7 @@ describe('build-event receipt ingress', () => {
 
   it('does not let a remote MCP bearer derive build-observer authority', async () => {
     const harness = appWith();
-    const tokenDerivedFromMcpBearer = deriveBuildEventReceiptToken(MCP_TOKEN, PRODUCER);
+    const tokenDerivedFromMcpBearer = deriveBuildEventReceiptToken(MCP_TOKEN, PRODUCER, PROJECT_SLUG);
     const response = await request(harness.app)
       .post('/ingest/build-events/sekret-bip')
       .set('x-build-event-producer', PRODUCER)
@@ -516,7 +599,7 @@ describe('build-event receipt ingress', () => {
     const response = await request(harness.app)
       .post('/ingest/build-events/sekret-bip')
       .set('x-build-event-producer', PRODUCER)
-      .set('x-build-event-receipt-token', deriveBuildEventReceiptToken(MCP_TOKEN, PRODUCER))
+      .set('x-build-event-receipt-token', deriveBuildEventReceiptToken(MCP_TOKEN, PRODUCER, PROJECT_SLUG))
       .send(runtimeEvent());
 
     expect(response.status).toBe(503);
@@ -582,20 +665,23 @@ describe('build-event receipt ingress', () => {
     expect(harness.storeCalls()).toBe(0);
   });
 
-  it('rejects runtime SHA drift inside one production receipt', async () => {
+  it('does not let the coverage credential self-label a runtime truth claim', async () => {
     const harness = appWith();
     const response = await authorized(
       request(harness.app).post('/ingest/build-events/sekret-bip'),
-    ).send(runtimeEvent({
+    ).send({
+      ...runtimeEvent(),
+      category: 'runtime',
+      coverage: undefined,
       runtime: {
         service: 'sekret-bip-production',
         environment: 'production',
-        releaseSha: 'abcdefabcdefabcdefabcdefabcdefabcdefabcd',
+        releaseSha: SHA,
       },
-    }));
+    });
 
     expect(response.status).toBe(403);
-    expect(response.body.error).toBe('runtime_release_sha_mismatch');
+    expect(response.body.error).toBe('coverage_receipt_contains_unallowed_control_fact');
     expect(harness.storeCalls()).toBe(0);
   });
 
@@ -627,6 +713,7 @@ describe('build-event receipt ingress', () => {
       category: 'decision',
       authority: 'authorized',
       decision: { value: 'approved', scope: 'merge' },
+      coverage: undefined,
       runtime: undefined,
     });
 

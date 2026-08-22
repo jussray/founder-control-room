@@ -22,7 +22,7 @@ import {
   type VerifiedN8nFounderContentReceipt,
 } from './n8nFounderContentOrchestrator.js';
 // @ts-expect-error -- canonical founder-content authorization is CommonJS and remains the single Current You authority implementation.
-import founderContentAuthorizationContract from '../../tools/zapier/founder-content-authorization-contract.cjs';
+import founderContentAuthorizationContract from '../../tools/founder-content-contracts/founder-content-authorization-contract.cjs';
 
 export const N8N_FOUNDER_CONTENT_PROVIDER_ROUTES = {
   buffer: ['linkedin', 'facebook'],

@@ -7,6 +7,7 @@ import {
   type V10CapabilityPlan,
 } from '../../founder-os-lab/capabilityKernel.js';
 import {
+  FCR_REQUIRED_PARALLEL_LENSES,
   FCR_SKILL_ROUTER_CONTRACT,
   routeFcrSkills,
   type FcrSkillRouterAction,
@@ -35,7 +36,7 @@ function plan(goal: string, capabilityIds: string[], overrides: Partial<V10Capab
     expectedHeadSha: HEAD,
     registryHash: REGISTRY_HASH,
     requestedAuthority: 'draft',
-    strategicLenses: ['futureyou', 'truthmode', 'redteam'],
+    strategicLenses: ['futureyou', 'truthmode', 'redteam', ...FCR_REQUIRED_PARALLEL_LENSES],
     routingReason: 'Chief AI selected the smallest bounded capability plan.',
     capabilities: capabilityIds.map(capability),
     proofRequirements: ['exact-head evidence'],
@@ -72,8 +73,31 @@ describe('FCR skill router trust gate', () => {
     expect(decision.contract).toBe(FCR_SKILL_ROUTER_CONTRACT);
     expect(decision.status).toBe('blocked');
     expect(decision.plannedCapabilityIds).toEqual([]);
+    expect(decision.requiredParallelLenses).toEqual([...FCR_REQUIRED_PARALLEL_LENSES]);
+    expect(decision.missingParallelLenses).toEqual([...FCR_REQUIRED_PARALLEL_LENSES]);
     expect(decision.errors).toContain('Chief AI capability plan is required before FCR may accept a skill route');
     expect(decision.executionAllowed).toBe(false);
+  });
+
+  it('requires Product Design, Data Analytics, and Deep Research on every routed plan', () => {
+    const goal = 'Plan the next smallest build.';
+    const decision = routeFcrSkills({
+      goal,
+      action: 'plan',
+      projectSlug: 'founder-control-room',
+      expectedHeadSha: HEAD,
+      expectedRegistryHash: REGISTRY_HASH,
+      capabilityPlan: plan(goal, ['juss-chief-ai'], { strategicLenses: ['futureyou', 'truthmode', 'redteam'] }),
+    });
+
+    expect(decision.status).toBe('blocked');
+    expect(decision.requiredParallelLenses).toEqual(['product-design', 'data-analytics', 'deep-research']);
+    expect(decision.missingParallelLenses).toEqual(['product-design', 'data-analytics', 'deep-research']);
+    expect(decision.errors).toEqual(expect.arrayContaining([
+      'Chief AI capability plan is missing required RayOS parallel lens: product-design',
+      'Chief AI capability plan is missing required RayOS parallel lens: data-analytics',
+      'Chief AI capability plan is missing required RayOS parallel lens: deep-research',
+    ]));
   });
 
   it('accepts Chief AI capability selection without reconstructing the stack from prompt keywords', () => {
@@ -84,9 +108,13 @@ describe('FCR skill router trust gate', () => {
 
     expect(decision.status).toBe('ready_for_runtime_discovery');
     expect(decision.plannedCapabilityIds).toEqual(['goalfix', 'repo-truth']);
+    expect(decision.missingParallelLenses).toEqual([]);
     expect(decision.requiredTools).toContain('forgejo');
     expect(decision.requiredTools).not.toContain('github');
     expect(decision.requiredProof).toContain('repository evidence resolved through RepositoryProvider:forgejo');
+    expect(decision.requiredProof.join(' ')).toMatch(/Product Design/);
+    expect(decision.requiredProof.join(' ')).toMatch(/Data Analytics/);
+    expect(decision.requiredProof.join(' ')).toMatch(/Deep Research/);
     expect(decision.runtimeDiscoveryRequired).toBe(true);
   });
 

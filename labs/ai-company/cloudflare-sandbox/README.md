@@ -1,77 +1,37 @@
-# AI Company Cloudflare Sandbox Lab
+# FCR Cloudflare Sandbox substrate
 
-This is a standalone, source-only Cloudflare Sandbox Worker for the Founder
-Control Room AI-company lab. It is deliberately not imported by the production
-FCR Worker, has no account ID or route, and sets `workers_dev: false`.
+This is an optional Cloudflare-backed sibling to `labs/ai-company/process-sandbox/`.
 
-## What it does
+The existing local Docker sandbox remains the deterministic isolation proof. This subproject proves that the same zero-ambient-authority posture can be carried onto Cloudflare Sandbox/Containers without changing the current FCR production Worker.
 
-An authenticated internal caller may invoke one fixed synthetic evidence task:
+## Current authority
 
-- the only executable command is checked-in Python that emits a static L0,
-  no-live-side-effects result;
-- request data never reaches a shell command, file API, egress API, terminal,
-  or preview URL;
-- the exported Sandbox subclass sets `enableInternet = false`; it has no
-  allowlist, outbound handler, tunnel, or service-exposure capability;
-- each request derives an opaque disposable sandbox ID from a signed subject,
-  timestamp, and nonce;
-- each successful request destroys its sandbox before returning;
-- a subject-scoped Durable Object rejects duplicate nonces and allows one
-  request per rolling minute.
+- Cloudflare Sandbox exists as an isolated runtime substrate only.
+- Generic `/v1/exec` is deliberately blocked with `execution_authority_not_wired`.
+- The only executable path is an authenticated fixed `/v1/probe` used to prove the Sandbox can start, run a fixed Node command, return bounded output, and be destroyed.
+- No FCR route, service binding, project adapter, terminal route, L99 capability, or user request currently invokes this Worker.
 
-It is **not** a browser sandbox, consumer feature, teen-data path, generic code
-executor, repository checkout service, or production deployment.
+## Isolation floor
 
-## Caller contract
+- Workers Paid / Containers are required before provider activation.
+- `workers_dev` is disabled and no custom route is declared.
+- `max_instances` is 1.
+- public internet egress starts disabled with `enableInternet = false`.
+- no Supabase, GitHub, OpenAI, Cloudflare provider, or other portfolio credential is passed into the Sandbox container.
+- output and runtime are bounded.
+- every probe destroys its Sandbox afterward.
 
-Only `POST /v1/synthetic-evidence` is accepted. The request has no body and
-must include:
-
-- `x-sandbox-subject`: an upstream-authenticated opaque session identifier;
-- `x-sandbox-issued-at`: a 13-digit Unix-millisecond timestamp within five
-  minutes of the worker clock;
-- `x-sandbox-nonce`: an unpredictable single-use nonce;
-- `x-sandbox-signature`: lowercase hex HMAC-SHA-256 using
-  `SANDBOX_RUNNER_HMAC_KEY` over exactly:
-
-```text
-fcr-ai-company-sandbox/v1
-POST
-/v1/synthetic-evidence
-<subject>
-<issuedAt>
-<nonce>
-```
-
-The caller must authenticate the principal before it constructs the signature.
-The HMAC secret is a Worker secret; it must never be supplied by a browser,
-logged, written into the sandbox, or copied into the primary FCR Worker without
-an explicit cross-service credential decision.
-
-## Local verification
+## Proof
 
 ```bash
-npm ci --ignore-scripts --no-audit --no-fund
-npm run verify
+npm install
+npm run check
 ```
 
-`wrangler dev` and `wrangler deploy --dry-run` build the container image, so
-Docker must be running. Do not deploy this lab until an owner has provisioned
-the separate Worker, set `SANDBOX_RUNNER_HMAC_KEY`, and reviewed paid-plan,
-container, egress, and retention settings.
+The repository workflow performs a Wrangler container dry-run only. It does not deploy the Worker or create a live Container.
 
-## Adversarial proof
+## Next authority gate
 
-The Node test suite attacks the boundary at least ten ways across six classes:
-authentication, signature tampering, input validation, freshness, replay/rate
-control, and isolation/lifecycle. The contract test also verifies that the
-Sandbox SDK and Docker image use the same pinned `0.12.7` version.
-The lockfile fixes the reviewed dependency graph; `skipLibCheck` is limited to
-the upstream Sandbox dependency declarations, while this lab's TypeScript
-source remains strict-checked.
+Do not enable generic execution or wire this Worker into FCR until the current L99/approval contract provides a verifiable exact execution envelope. At that point, the caller must prove the approved target, operation, exact source/release identity, expiry, and founder-required authority before the Sandbox is allocated.
 
-## Rollback
-
-Delete or revert this isolated lab directory. It has no route, production
-import, provider configuration, account credential, or deployment side effect.
+Long-lived credentials must remain in the trusted Worker runtime. If future sandboxed code needs outbound provider access, use explicit outbound handlers rather than injecting secrets into the container.
