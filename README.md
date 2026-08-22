@@ -45,7 +45,7 @@ Current implementation includes:
 - first-party LinkedIn founder-content execution with exact Current You authority, FCR-owned one-shot approval storage/claim, temporal revalidation, and provider readback requirements;
 - provider-neutral n8n founder-content orchestration contracts that keep contract capability separate from runtime configuration and final provider outcome;
 - provider-neutral founder-content contracts under `tools/founder-content-contracts/`, with core approval storage, first-party execution, and temporal revalidation importing the canonical provider-neutral authorization contract directly while `tools/zapier/` remains a compatibility export surface for bounded connector and scheduling callers;
-- founder-authenticated n8n/Buffer activation readiness that exposes configuration presence and provider allowlist state without returning webhook/token values or promoting configuration into live proof;
+- founder-authenticated n8n/Buffer activation readiness that exposes configuration presence and provider allowlist state without returning webhook/token values, and promotes the canonical conveyor to `enabled-live-verified` only when a retained activation-probe receipt matches the deployed exact `GIT_SHA`; stale, missing, or unreadable proof remains non-live and fail-closed;
 - bounded Zapier/Buffer integration where it still adds connector, scheduling, or fallback value without becoming publication authority;
 - HubSpot integration boundaries that keep CRM metadata and external communication separate from repository truth and founder authority;
 - desktop/mobile Playwright proof for scoped Control Room behavior; and
@@ -155,7 +155,7 @@ contract-capable
 -> provider-outcome-proven
 ```
 
-The founder-authenticated conveyor status may report `not-configured`, `ready-for-probe`, `enabled-misconfigured`, `invalid-provider-configuration`, or `enabled-awaiting-proof`, including whether Buffer is ready for one controlled probe. Those are configuration/readiness states only. `liveVerified` remains false until a separate controlled provider probe and provider readback succeed.
+The founder-authenticated conveyor status may report `not-configured`, `ready-for-probe`, `enabled-misconfigured`, `invalid-provider-configuration`, `enabled-awaiting-proof`, or `enabled-live-verified`, including whether Buffer is ready for one controlled probe. The canonical conveyor reaches `enabled-live-verified` only when a retained activation-probe receipt matches the deployed exact `GIT_SHA`. If the runtime SHA changes, that receipt remains valid historical evidence but no longer authorizes a present-tense live claim; stale-head, missing runtime SHA, or unavailable receipt readback must remain non-live. Conveyor live readiness still does not prove Buffer scheduling, LinkedIn publication, or any terminal provider outcome.
 
 A platform-native draft is not proof that the provider adapter is live. n8n acceptance is not publication truth. Provider readback remains terminal external-state evidence.
 
@@ -185,7 +185,7 @@ Current Pages source fails closed when `FCR_API` is unavailable and verifies the
 
 The read-only Cloudflare audit keeps its primary Worker Git authority receipt independent from optional hostname enrichment. The core authority readback requires the dedicated read-only Workers Builds user token; DNS inventory and Request Trace credentials are optional enrichment, and if either is unavailable the hostname/trace lane remains `UNKNOWN` without suppressing the core Worker Git authority receipt. The audit remains exact-current-main-bound and cannot authorize Cloudflare mutation.
 
-`wrangler.worker.toml` executes `scripts/verify-worker-build-authority.mjs` before canonical Worker builds. Native Cloudflare Workers Builds must bind their provider commit to the checked-out Git source and may use only non-promoting `wrangler versions upload`; a native `wrangler deploy` fails closed. Manual GitHub `Deploy` / `FCR Worker Reconcile` remains the only source-recognized production-promotion context, and its checked-out SHA must match the exact GitHub workflow SHA. This repository membrane does not prove or mutate the live Cloudflare Builds settings.
+`wrangler.worker.toml` executes `scripts/verify-worker-build-authority.mjs` before canonical Worker builds. Native Cloudflare Workers Builds must bind their provider commit to the checked-out Git source SHA and may use only non-promoting `wrangler versions upload`; a native `wrangler deploy` fails closed. Manual GitHub `Deploy` / `FCR Worker Reconcile` remains the only source-recognized production-promotion context, and its checked-out SHA must match the exact GitHub workflow SHA. This repository membrane does not prove or mutate the live Cloudflare Builds settings.
 
 Native Cloudflare Worker/Pages build receipts are provider build/deploy evidence for the exact artifact they name. They do not prove the guarded production release path, database migration, auth behavior, browser behavior, fleet-wide runtime identity, or publication outcome.
 
