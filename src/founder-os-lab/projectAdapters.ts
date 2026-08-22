@@ -46,15 +46,15 @@ interface NormalizedContractUrls {
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SEKRET_BIP_REPOSITORY = 'jussray/Sekret-Bip';
-const SEKRET_BIP_AUDITED_HEAD = '90d350a22cbdde1f1d5aa2ced1453a62fa298193';
+const SEKRET_BIP_AUDITED_HEAD = '467da149bad1720f87885a991a924aa143eb2ddd';
 const SEKRET_BIP_AUDITED_CONTRACT_BLOBS = {
-  'app/index.tsx': '46e73c816a392f289c377d5610243d8ef8189f7c',
-  'screens/WebWelcomeScreen.tsx': '2520c10810593ebcab93e2d3be2a14cff6bd32ce',
+  'app/index.tsx': '9fd126bbec9a9958ef9c39cf9a25356bee83bb87',
+  'screens/WebWelcomeScreen.tsx': '5f1dafb209a9e8aee050b61fe38ace808e99f4b1',
   'constants/frontDoorTheme.ts': '0c331d30058ad21ea3cbb51e0788165008992d2f',
   'docs/COMPANION_NAME_CANON.md': 'fec910ecd3c99b08f1305225cfe3d1b1e82aa171',
   'docs/FRONT_DOOR_VARIANTS.md': '171db3a64822a46d052b290b55ebc890dc7a8d76',
   'implementation-ledger.extensions/human-ai-identity-contract.json': '2266fb7f8bf51506011d976f5907e9656da5a67b',
-  'test/dual-front-door-contract.test.mjs': '6f4a3743a6accf9064877d3759ecb006f35a1b98',
+  'test/dual-front-door-contract.test.mjs': '1ceb267d7d20136d38fce95f2418fe22b6a1468e',
 } as const;
 const PROJECT_AUDIENCES: ReadonlySet<FounderOsLabProjectAudience> = new Set(['teen', 'bip-jr']);
 
