@@ -1,3 +1,5 @@
+import { installMissionBoard } from './mission-board.js';
+
 const PENDING_TAB_KEY = 'fcr_pending_tab';
 const SESSION_KEY = 'fcr_session';
 const CONVEYOR_CONTRACT = 'founder-control-room/n8n-conveyor@v3';
@@ -168,4 +170,5 @@ if (launchDock instanceof HTMLDetailsElement) {
   });
 }
 
+installMissionBoard();
 void refreshConveyorReadiness();

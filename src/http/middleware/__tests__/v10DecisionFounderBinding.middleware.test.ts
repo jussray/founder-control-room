@@ -26,6 +26,8 @@ function requestShape() {
     },
     params: { missionId: MISSION_ID },
     founder: { email: 'founder@example.com' },
+    headers: {},
+    header: vi.fn().mockReturnValue(null),
   };
 }
 
