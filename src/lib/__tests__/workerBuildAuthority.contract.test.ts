@@ -12,6 +12,7 @@ const scriptPath = fileURLToPath(
 const wranglerConfigPath = fileURLToPath(
   new URL('../../../wrangler.worker.toml', import.meta.url),
 );
+const packageJsonPath = fileURLToPath(new URL('../../../package.json', import.meta.url));
 const HEAD = execFileSync('git', ['rev-parse', 'HEAD'], {
   cwd: repoRoot,
   encoding: 'utf8',
@@ -170,6 +171,20 @@ describe('Worker build authority membrane', () => {
       productionPromotionAuthorized: false,
       nativeWorkerGitPromotionAllowed: false,
     });
+  });
+
+  it('keeps the Cloudflare dashboard build command bound to verification-only authority', async () => {
+    const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf8')) as {
+      scripts?: Record<string, string>;
+    };
+
+    expect(packageJson.scripts?.['deploy:api:production']).toBe('npm run cloudflare:build:verify');
+    expect(packageJson.scripts?.['cloudflare:build:verify']).toBe(
+      'node scripts/cloudflare-build-verification-only.mjs',
+    );
+    expect(packageJson.scripts?.['cloudflare:build:verify']).not.toMatch(
+      /wrangler|versions\s+(upload|deploy)|secret\s+put/i,
+    );
   });
 
   it('wires the membrane into the canonical Worker custom build hook', async () => {
