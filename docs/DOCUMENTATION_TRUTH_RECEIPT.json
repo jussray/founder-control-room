@@ -4,7 +4,8 @@
   "domains": [
     "repository-provider",
     "truth-governance",
-    "cloudflare-authority"
+    "cloudflare-authority",
+    "publishing"
   ],
   "changes": [
     {
@@ -83,6 +84,12 @@
       "path": "wrangler.worker.toml",
       "claims": [
         "wrangler.worker.toml: every canonical Worker build must execute the repository build-authority membrane; native Cloudflare Workers Builds may proceed only through non-promoting versions upload while production promotion remains bounded to the exact manual GitHub authority path."
+      ]
+    },
+    {
+      "path": "src/http/routes/n8nConveyor.ts",
+      "claims": [
+        "src/http/routes/n8nConveyor.ts: founder-authenticated conveyor readiness must resolve retained activation proof against the deployed exact GIT_SHA and must fail closed instead of claiming live verification when proof is missing, stale, or unreadable."
       ]
     }
   ]
