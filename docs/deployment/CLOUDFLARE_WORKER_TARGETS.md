@@ -114,7 +114,7 @@ Do not infer live provider configuration from a workflow file, secret name, toke
 
 ## Read-only hostname inventory boundary
 
-The manual `Cloudflare Worker Git Authority Audit` separates its core provider-authority receipt from optional hostname enrichment. The primary Worker Git inspection requires the dedicated read-only Workers Builds user token and may proceed without DNS inventory or Request Trace credentials. When either enrichment credential is unavailable, inventory/trace evidence is skipped and remains `UNKNOWN`; that absence must not suppress the core Worker Git authority readback.
+The manual `Cloudflare Worker Git Authority Audit` separates its core provider-authority receipt from optional hostname enrichment. The primary Worker Git inspection requires the dedicated read-only Workers Builds user token and may proceed without DNS inventory or Request Trace credentials. Missing enrichment credentials leave that evidence lane `UNKNOWN` without suppressing the core readback. If enrichment is attempted but its credentials or provider reads fail, the bounded inventory/trace evidence may record that failure, but it cannot downgrade or upgrade the snapshotted core Worker Git authority `ok`/`error` verdict. If the core receipt is absent or failed, enrichment can never manufacture successful core authority.
 
 When enrichment credentials are available, the audit may observe the live FCR zone without becoming deployment or DNS authority. On an exact SHA that is still current `main`, it may use dedicated read-only authorities to:
 
@@ -127,7 +127,7 @@ When enrichment credentials are available, the audit may observe the live FCR zo
 
 The sanitized receipt may prove what that provider read observed at that time. Checked workflow/script source alone does not prove the current zone inventory, proxy state, Access behavior, origin identity, or runtime SHA. The audit explicitly remains `requestSimulation: true`, `runtimeShaVerified: false`, and `canAuthorizeProviderMutation: false`.
 
-A failing or unavailable read is `UNKNOWN`/blocked evidence, not permission to infer the missing provider state and not permission to mutate DNS, routes, Access, Workers, credentials, or deployment configuration.
+A failing or unavailable enrichment read is `UNKNOWN`/blocked evidence in that enrichment lane, not permission to infer the missing provider state, not a reason to rewrite the core Worker Git authority verdict, and not permission to mutate DNS, routes, Access, Workers, credentials, or deployment configuration.
 
 ## Required Worker secrets
 
