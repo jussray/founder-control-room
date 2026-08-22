@@ -36,6 +36,14 @@ const tasks = [
     project: { slug: 'storyengine', name: 'StoryEngine' },
   },
   {
+    id: 'm-approved-unknown',
+    title: 'Hold release with unavailable proof',
+    status: 'approved',
+    risk_level: 'high',
+    updated_at: '2026-08-22T04:57:30.000Z',
+    project: { slug: 'sekret-bip', name: "Se’kret Bip" },
+  },
+  {
     id: 'm-deployed',
     title: 'Observe production truth',
     status: 'deployed',
@@ -53,12 +61,15 @@ const runs = {
 
 function laneMarkup() {
   const lanes = [
-    ['proposed', 'm-proposed', 'Repair provider witness'],
-    ['in_review', 'm-review', 'Review exact-head authority'],
-    ['approved', 'm-approved', 'Promote reviewed release'],
-    ['deployed', 'm-deployed', 'Observe production truth'],
+    ['proposed', [['m-proposed', 'Repair provider witness']]],
+    ['in_review', [['m-review', 'Review exact-head authority']]],
+    ['approved', [
+      ['m-approved', 'Promote reviewed release'],
+      ['m-approved-unknown', 'Hold release with unavailable proof'],
+    ]],
+    ['deployed', [['m-deployed', 'Observe production truth']]],
   ];
-  return lanes.map(([lane, id, title]) => `<div class="lane"><h4>${lane}</h4><div class="card" data-id="${id}"><div class="title">${title}</div></div></div>`).join('');
+  return lanes.map(([lane, cards]) => `<div class="lane"><h4>${lane}</h4>${cards.map(([id, title]) => `<div class="card" data-id="${id}"><div class="title">${title}</div></div>`).join('')}</div>`).join('');
 }
 
 function boardHtml() {
@@ -109,6 +120,9 @@ async function proveViewport(browser, { name, width, height, isMobile = false })
       if (match) {
         window.__missionBoardFetchCounts.runs += 1;
         const id = decodeURIComponent(match[1]);
+        if (id === 'm-approved-unknown') {
+          return { ok: false, status: 503, async json() { return { error: 'bench_unavailable' }; } };
+        }
         return { ok: true, status: 200, async json() { return { runs: runsFixture[id] ?? [] }; } };
       }
       return { ok: false, status: 404, async json() { return { error: 'fixture_not_found' }; } };
@@ -122,10 +136,10 @@ async function proveViewport(browser, { name, width, height, isMobile = false })
   const text = await panel.innerText();
   assert.match(text, /Evidence-aware mission board/i, `${name}: mission intelligence header renders`);
   assert.match(text, /Truth projection/i, `${name}: board declares read-only truth mode`);
-  assert.match(text, /Active work\s+3/i, `${name}: active work count is correct`);
+  assert.match(text, /Active work\s+4/i, `${name}: active work count is correct`);
   assert.match(text, /Proof passed\s+2/i, `${name}: passed proof count is correct`);
   assert.match(text, /Needs repair\s+1/i, `${name}: failed proof count is correct`);
-  assert.match(text, /Founder gate\s+1/i, `${name}: founder-gated mission count is correct`);
+  assert.match(text, /Founder gate\s+1/i, `${name}: only approved work with passing proof reaches the founder gate`);
   assert.match(text, /cannot grant merge, deploy, secret, or destructive authority/i, `${name}: authority boundary is explicit`);
 
   const proposed = page.locator('.card[data-id="m-proposed"]');
@@ -138,12 +152,17 @@ async function proveViewport(browser, { name, width, height, isMobile = false })
   assert.match(await review.innerText(), /Review gate/i, `${name}: passing in-review work points to independent review`);
 
   const approved = page.locator('.card[data-id="m-approved"]');
-  assert.match(await approved.innerText(), /Founder gate/i, `${name}: approved work remains founder-gated`);
+  assert.match(await approved.innerText(), /Founder gate/i, `${name}: approved work with passing proof remains founder-gated`);
   assert.match(await approved.innerText(), /Founder decides whether to integrate/i, `${name}: founder authority is preserved`);
+
+  const approvedUnknown = page.locator('.card[data-id="m-approved-unknown"]');
+  assert.match(await approvedUnknown.innerText(), /Proof unknown/i, `${name}: unavailable Bench proof stays visibly unknown`);
+  assert.match(await approvedUnknown.innerText(), /Proof required/i, `${name}: unavailable proof cannot masquerade as a founder integration gate`);
+  assert.match(await approvedUnknown.innerText(), /Reacquire fresh exact-head proof before the founder can consider integration/i, `${name}: missing proof fails closed before integration`);
 
   const initialFetchCounts = await page.evaluate(() => window.__missionBoardFetchCounts);
   assert.equal(initialFetchCounts.tasks, 1, `${name}: one current task-board read powers the projection`);
-  assert.equal(initialFetchCounts.runs, 3, `${name}: only active mission Bench proof is read`);
+  assert.equal(initialFetchCounts.runs, 4, `${name}: only active mission Bench proof is read`);
 
   await page.evaluate((lanes) => {
     const current = document.getElementById('mission-lanes');
@@ -157,7 +176,7 @@ async function proveViewport(browser, { name, width, height, isMobile = false })
 
   const rerenderFetchCounts = await page.evaluate(() => window.__missionBoardFetchCounts);
   assert.equal(rerenderFetchCounts.tasks, 2, `${name}: SPA rerender reacquires current task state`);
-  assert.equal(rerenderFetchCounts.runs, 3, `${name}: SPA rerender reuses short-lived Bench proof instead of refanning out`);
+  assert.equal(rerenderFetchCounts.runs, 5, `${name}: SPA rerender reuses cached proof and retries only the unavailable proof read`);
 
   const dimensions = await page.evaluate(() => ({
     viewportWidth: document.documentElement.clientWidth,
