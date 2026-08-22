@@ -1,15 +1,14 @@
-const SESSION_KEY = 'fcr_session';
 const BOARD_SELECTOR = '#mission-lanes';
-const MAX_PROOF_READS = 12;
+const MAX_PROOF_READS = 6;
 const PROOF_CACHE_TTL_MS = 10_000;
-const ACTIVE_STATUSES = new Set(['proposed', 'sandboxed', 'in_review', 'approved']);
+const PROOF_READ_STATUSES = new Set(['in_review', 'approved']);
 const TERMINAL_STATUSES = new Set(['integrated', 'deployed', 'rejected', 'rolled_back']);
 const STYLE_ID = 'fcr-mission-board-styles';
 const proofCache = new Map();
 
 function sessionToken() {
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
+    const raw = sessionStorage.getItem('fcr_session');
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     return typeof parsed?.access_token === 'string' && parsed.access_token.trim()
@@ -33,8 +32,22 @@ async function founderGet(path) {
     },
   });
 
-  if (!response.ok) throw new Error(`Mission board read failed (${response.status})`);
+  if (!response.ok) throw new Error(`Mission board proof read failed (${response.status})`);
   return response.json();
+}
+
+function tasksFromBoard(board) {
+  const tasks = [];
+  board.querySelectorAll('.lane').forEach((lane) => {
+    const heading = lane.querySelector('h4')?.textContent?.trim() ?? '';
+    const status = heading.replace(/\s*\(\d+\)\s*$/, '').trim();
+    if (!status) return;
+
+    lane.querySelectorAll('.card[data-id]').forEach((card) => {
+      if (card.dataset.id) tasks.push({ id: card.dataset.id, status });
+    });
+  });
+  return tasks;
 }
 
 function proofStateFromRuns(runs) {
@@ -54,6 +67,12 @@ function proofStateFromRuns(runs) {
     label: `Proof ${String(latest.status ?? 'pending')}`,
     checkedAt: latest.finished_at ?? latest.started_at ?? null,
   };
+}
+
+function lifecycleProof(task) {
+  if (task.status === 'proposed') return { state: 'not-required', label: 'Proof not required yet', checkedAt: null };
+  if (task.status === 'sandboxed') return { state: 'pending', label: 'Proof pending', checkedAt: null };
+  return { state: 'unknown', label: 'Proof unknown', checkedAt: null };
 }
 
 function nextGate(task, proof) {
@@ -120,6 +139,8 @@ function ensureStyles() {
 }
 
 function cachedProof(task) {
+  // Approved work is consequence-bearing. Re-read its Bench proof on every
+  // board render so a founder gate never rests on a short-lived UI cache.
   if (task.status === 'approved') return null;
   const cached = proofCache.get(task.id);
   if (!cached) return null;
@@ -139,26 +160,20 @@ async function readProof(task) {
 }
 
 async function collectProof(tasks) {
-  const proof = new Map();
+  const proof = new Map(tasks.map((task) => [task.id, lifecycleProof(task)]));
   const candidates = tasks
-    .filter((task) => ACTIVE_STATUSES.has(task.status))
+    .filter((task) => PROOF_READ_STATUSES.has(task.status))
     .slice(0, MAX_PROOF_READS);
 
   const results = await Promise.allSettled(candidates.map(async (task) => [task.id, await readProof(task)]));
-
   results.forEach((result) => {
     if (result.status === 'fulfilled') proof.set(result.value[0], result.value[1]);
   });
-
-  tasks.forEach((task) => {
-    if (!proof.has(task.id)) proof.set(task.id, { state: 'unknown', label: 'Proof unknown', checkedAt: null });
-  });
-
   return proof;
 }
 
 function buildSummary(tasks, proofById) {
-  const active = tasks.filter((task) => ACTIVE_STATUSES.has(task.status)).length;
+  const active = tasks.filter((task) => ['proposed', 'sandboxed', 'in_review', 'approved'].includes(task.status)).length;
   const passed = tasks.filter((task) => proofById.get(task.id)?.state === 'passed').length;
   const repair = tasks.filter((task) => proofById.get(task.id)?.state === 'failed').length;
   const founder = tasks.filter((task) => task.status === 'approved' && proofById.get(task.id)?.state === 'passed').length;
@@ -226,8 +241,11 @@ async function enhanceMissionBoard(board) {
 
   board.dataset.missionBoardState = 'loading';
   try {
-    const body = await founderGet('/dashboard/tasks');
-    const tasks = Array.isArray(body?.tasks) ? body.tasks : [];
+    // The existing Missions renderer already fetched /dashboard/tasks. Derive
+    // id + lifecycle state from that rendered board instead of creating a
+    // second task read path. Only consequence-bearing review stages need a
+    // separate read-only Bench lookup.
+    const tasks = tasksFromBoard(board);
     const proofById = await collectProof(tasks);
     ensureStyles();
     renderIntelligence(board, tasks, proofById);
