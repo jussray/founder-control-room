@@ -33,7 +33,10 @@ async function prove(browser, name, width, height, isMobile = false) {
   page.on('pageerror', (error) => pageErrors.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
 
-  await page.setContent(html());
+  await page.route('http://mission-board.test/', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'text/html', body: html() });
+  });
+  await page.goto('http://mission-board.test/', { waitUntil: 'domcontentloaded' });
   await page.evaluate((fixture) => {
     sessionStorage.setItem('fcr_session', JSON.stringify({ access_token: 'test-token' }));
     window.__reads = { tasks: 0, runs: 0 };
