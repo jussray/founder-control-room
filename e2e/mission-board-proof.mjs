@@ -51,14 +51,17 @@ const runs = {
   'm-approved': [{ status: 'passed', started_at: '2026-08-22T04:53:00.000Z', finished_at: '2026-08-22T04:54:00.000Z' }],
 };
 
-function boardHtml() {
+function laneMarkup() {
   const lanes = [
     ['proposed', 'm-proposed', 'Repair provider witness'],
     ['in_review', 'm-review', 'Review exact-head authority'],
     ['approved', 'm-approved', 'Promote reviewed release'],
     ['deployed', 'm-deployed', 'Observe production truth'],
   ];
+  return lanes.map(([lane, id, title]) => `<div class="lane"><h4>${lane}</h4><div class="card" data-id="${id}"><div class="title">${title}</div></div></div>`).join('');
+}
 
+function boardHtml() {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -71,9 +74,7 @@ function boardHtml() {
 <body>
 <div id="root" class="shell">
   <div class="panel">
-    <div class="grid-lanes" id="mission-lanes">
-      ${lanes.map(([lane, id, title]) => `<div class="lane"><h4>${lane}</h4><div class="card" data-id="${id}"><div class="title">${title}</div></div></div>`).join('')}
-    </div>
+    <div class="grid-lanes" id="mission-lanes">${laneMarkup()}</div>
   </div>
 </div>
 </body>
@@ -93,6 +94,7 @@ async function proveViewport(browser, { name, width, height, isMobile = false })
   await page.setContent(boardHtml(), { waitUntil: 'domcontentloaded' });
   await page.evaluate(({ tasksFixture, runsFixture }) => {
     sessionStorage.setItem('fcr_session', JSON.stringify({ access_token: 'founder-test-token', email: 'founder@example.com' }));
+    window.__missionBoardFetchCounts = { tasks: 0, runs: 0 };
     window.fetch = async (input, options = {}) => {
       const path = typeof input === 'string' ? input : input.url;
       const auth = options.headers?.Authorization ?? options.headers?.authorization ?? '';
@@ -100,10 +102,12 @@ async function proveViewport(browser, { name, width, height, isMobile = false })
         return { ok: false, status: 401, async json() { return { error: 'unauthorized' }; } };
       }
       if (path === '/dashboard/tasks') {
+        window.__missionBoardFetchCounts.tasks += 1;
         return { ok: true, status: 200, async json() { return { tasks: tasksFixture }; } };
       }
       const match = path.match(/^\/missions\/([^/]+)\/runs$/);
       if (match) {
+        window.__missionBoardFetchCounts.runs += 1;
         const id = decodeURIComponent(match[1]);
         return { ok: true, status: 200, async json() { return { runs: runsFixture[id] ?? [] }; } };
       }
@@ -136,6 +140,24 @@ async function proveViewport(browser, { name, width, height, isMobile = false })
   const approved = page.locator('.card[data-id="m-approved"]');
   assert.match(await approved.innerText(), /Founder gate/i, `${name}: approved work remains founder-gated`);
   assert.match(await approved.innerText(), /Founder decides whether to integrate/i, `${name}: founder authority is preserved`);
+
+  const initialFetchCounts = await page.evaluate(() => window.__missionBoardFetchCounts);
+  assert.equal(initialFetchCounts.tasks, 1, `${name}: one current task-board read powers the projection`);
+  assert.equal(initialFetchCounts.runs, 3, `${name}: only active mission Bench proof is read`);
+
+  await page.evaluate((lanes) => {
+    const current = document.getElementById('mission-lanes');
+    const replacement = document.createElement('div');
+    replacement.id = 'mission-lanes';
+    replacement.className = 'grid-lanes';
+    replacement.innerHTML = lanes;
+    current.replaceWith(replacement);
+  }, laneMarkup());
+  await page.locator('#mission-lanes[data-mission-board-state="ready"]').waitFor({ state: 'attached' });
+
+  const rerenderFetchCounts = await page.evaluate(() => window.__missionBoardFetchCounts);
+  assert.equal(rerenderFetchCounts.tasks, 2, `${name}: SPA rerender reacquires current task state`);
+  assert.equal(rerenderFetchCounts.runs, 3, `${name}: SPA rerender reuses short-lived Bench proof instead of refanning out`);
 
   const dimensions = await page.evaluate(() => ({
     viewportWidth: document.documentElement.clientWidth,
