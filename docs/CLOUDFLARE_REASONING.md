@@ -108,6 +108,8 @@ The reasoner may not automatically:
 
 Those remain separate founder approval gates. Approval never carries forward.
 
+For the bounded FCR Access recovery lane, `apply=true` does not accept arbitrary approval prose. The command bridge derives an `issue-comment:<id>` reference from the exact founder-authored GitHub issue #485 command, and the recovery workflow re-reads that comment before any dedicated admin credential can be used. The re-read must still prove founder `jussray`, issue #485, the exact `/cloudflare-fcr-access apply <current-main-sha>` command, and a SHA that remains current `main`. That GitHub receipt proves the scoped authorization input only; Cloudflare mutation success and browser/runtime recovery still require their own provider and runtime evidence.
+
 ## HTTP surfaces
 
 ### Public-safe contract

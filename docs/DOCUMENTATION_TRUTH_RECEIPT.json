@@ -27,6 +27,15 @@
       ]
     },
     {
+      "path": ".github/workflows/fcr-cloudflare-command-bridge.yml",
+      "claims": [
+        ".github/workflows/fcr-cloudflare-command-bridge.yml: a Cloudflare Access apply command must derive its approval reference from the exact founder-authored GitHub issue comment id and must not accept caller-supplied approval text as mutation authority."
+      ]
+    },
+    {
+      "path": ".github/workflows/fcr-access-front-door-recovery.yml",
+      "claims": [
+        ".github/workflows/fcr-access-front-door-recovery.yml: apply=true must require an issue-comment receipt and re-read GitHub to prove founder jussray, issue #485, the exact apply command, and the exact still-current main SHA before the dedicated Cloudflare admin credential can enter the mutation lane; that receipt is authorization evidence, not provider outcome proof."
       "path": "wrangler.worker.toml",
       "claims": [
         "wrangler.worker.toml: every canonical Worker build must execute the repository build-authority membrane; native Cloudflare Workers Builds may proceed only through non-promoting versions upload while production promotion remains bounded to the exact manual GitHub authority path."
