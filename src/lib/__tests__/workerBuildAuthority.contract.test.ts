@@ -13,6 +13,7 @@ const wranglerConfigPath = fileURLToPath(
   new URL('../../../wrangler.worker.toml', import.meta.url),
 );
 const packageJsonPath = fileURLToPath(new URL('../../../package.json', import.meta.url));
+const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const HEAD = execFileSync('git', ['rev-parse', 'HEAD'], {
   cwd: repoRoot,
   encoding: 'utf8',
@@ -173,7 +174,7 @@ describe('Worker build authority membrane', () => {
     });
   });
 
-  it('keeps the Cloudflare dashboard build command bound to verification-only authority', async () => {
+  it('executes the exact Cloudflare dashboard build command as verification-only authority', async () => {
     const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf8')) as {
       scripts?: Record<string, string>;
     };
@@ -185,6 +186,37 @@ describe('Worker build authority membrane', () => {
     expect(packageJson.scripts?.['cloudflare:build:verify']).not.toMatch(
       /wrangler|versions\s+(upload|deploy)|secret\s+put/i,
     );
+
+    const result = spawnSync(npmCommand, ['run', 'deploy:api:production'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        WORKERS_CI: '1',
+        WORKERS_CI_COMMIT_SHA: HEAD,
+        WORKERS_CI_BRANCH: 'feature/test',
+        WORKERS_CI_BUILD_UUID: 'build-command-contract',
+      },
+    });
+
+    expect(result.status).toBe(0);
+    const receiptLine = result.stdout
+      .trim()
+      .split('\n')
+      .reverse()
+      .find((line) => line.trim().startsWith('{'));
+    expect(receiptLine).toBeTruthy();
+    const receipt = JSON.parse(receiptLine ?? '{}') as Record<string, unknown>;
+    expect(receipt).toMatchObject({
+      contract: 'founder-control-room/cloudflare-build-verification-only@v1',
+      provider: 'cloudflare-workers-builds',
+      mode: 'verification-only',
+      commit_sha: HEAD,
+      production_mutation: false,
+      worker_version_upload: false,
+      runtime_secret_access_required: false,
+      production_authority: 'github-actions:.github/workflows/deploy.yml',
+    });
   });
 
   it('wires the membrane into the canonical Worker custom build hook', async () => {
