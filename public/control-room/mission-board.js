@@ -120,6 +120,7 @@ function ensureStyles() {
 }
 
 function cachedProof(task) {
+  if (task.status === 'approved') return null;
   const cached = proofCache.get(task.id);
   if (!cached) return null;
   if (cached.taskStatus !== task.status) return null;
