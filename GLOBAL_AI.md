@@ -90,6 +90,7 @@ Implementation rules:
 - Re-observe after every meaningful edit, test result, review, merge, provider write, or documentation transition.
 - Map code paths to explicit guardrails, evidence sources, temporal validity, and approval boundaries.
 - Treat compilation as syntax evidence, tests as behavioral evidence, CI as repository workflow evidence, provider readback as provider evidence, and runtime observation as deployment evidence. None substitutes for all the others.
+- A pull-request Quality Gate must checkout and verify `github.event.pull_request.head.sha` in every job; a successful synthetic PR merge-ref run is merge-simulation evidence, never exact-head candidate proof.
 - FCR CI must keep the secret-free exact-head Cloudflare bridge authority contract load-bearing inside `Required Gate`; that repository check does not substitute for live Cloudflare or GitHub provider readback.
 - Never code around an unknown provider state, schema state, credential state, review state, or failed workflow merely to make a patch appear complete.
 - Delete duplicate authority and dead workflow paths before adding another abstraction, credential, retry, or dashboard.
