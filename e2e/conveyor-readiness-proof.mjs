@@ -9,7 +9,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const publicDir = resolve(here, '../public');
 const outputDir = resolve(here, '../test-results');
 const SESSION_KEY = 'fcr_session';
-const CONTRACT = 'founder-control-room/n8n-conveyor@v2';
+const CONTRACT = 'founder-control-room/n8n-conveyor@v3';
 const TOKEN = 'proof-token';
 
 await mkdir(outputDir, { recursive: true });
