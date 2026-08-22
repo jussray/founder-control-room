@@ -50,7 +50,7 @@ One layer does not prove another. Do not describe committed code as deployed, a 
 
 A publication claim requires an observable platform artifact. A draft, scheduler acceptance, workflow trigger, or model response is not that artifact.
 
-Founder-content orchestration readiness is a separate preflight truth layer. An authenticated status surface may report whether n8n founder-content orchestration is enabled, whether required webhook/token configuration is present, which bounded providers are allowlisted, and whether Buffer is ready for one controlled probe. It must expose presence/state only, never secret values. A readiness result does not prove a webhook executed, Buffer accepted a schedule, a post published, or provider readback succeeded. Configuration can make `bufferReadyForProbe` true while `liveVerified` remains false.
+Founder-content orchestration readiness is a separate preflight truth layer. An authenticated status surface may report whether n8n founder-content orchestration is enabled, whether required webhook/token configuration is present, which bounded providers are allowlisted, and whether Buffer is ready for one controlled probe. It must expose presence/state only, never secret values. Configuration alone does not prove a webhook executed, Buffer accepted a schedule, a post published, or provider readback succeeded. For the canonical conveyor, `enabled-live-verified` is allowed only when a retained activation-probe receipt matches the deployed exact `GIT_SHA`; if the runtime SHA moves, the receipt remains historical evidence but its live authority expires and readiness returns to a non-live proof-needed state. Missing runtime identity or receipt readback also fails closed.
 
 ## /confess
 
