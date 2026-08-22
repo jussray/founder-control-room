@@ -163,6 +163,7 @@ async function collectProof(tasks) {
   const proof = new Map(tasks.map((task) => [task.id, lifecycleProof(task)]));
   const candidates = tasks
     .filter((task) => PROOF_READ_STATUSES.has(task.status))
+    .sort((left, right) => Number(right.status === 'approved') - Number(left.status === 'approved'))
     .slice(0, MAX_PROOF_READS);
 
   const results = await Promise.allSettled(candidates.map(async (task) => [task.id, await readProof(task)]));
