@@ -1,75 +1,14 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded invariants disclosed when truth-governance controls change; this is review evidence, not a live provider or production claim.",
+  "purpose": "Record the bounded n8n readiness invariant added by this source-only repair; receipt-aware status is repository behavior and must not be presented as proof that a persistent external n8n provider is already live.",
   "domains": [
-    "repository-provider",
-    "truth-governance"
+    "publishing"
   ],
   "changes": [
     {
-      "path": "src/buildEvents/buildEvent.ts",
+      "path": "src/http/routes/n8nConveyor.ts",
       "claims": [
-        "src/buildEvents/buildEvent.ts: coverage events must retain bounded aggregate-only shape validation and cannot carry raw request evidence."
-      ]
-    },
-    {
-      "path": "src/buildEvents/currentTruth.ts",
-      "claims": [
-        "src/buildEvents/currentTruth.ts: webhook main facts must remain last-observed provenance, current coverage must use a fresh read-through GitHub revalidation and passed verified lease, and legacy external operational assertions cannot render as current."
-      ]
-    },
-    {
-      "path": "src/buildEvents/currentMainRevalidation.ts",
-      "claims": [
-        "src/buildEvents/currentMainRevalidation.ts: current-main identity must be read from the enrolled GitHub provider at display time, bind the enrolled repository and `main` branch, and reject a non-exact SHA."
-      ]
-    },
-    {
-      "path": "src/buildEvents/releaseCoverageWitness.ts",
-      "claims": [
-        "src/buildEvents/releaseCoverageWitness.ts: a passed coverage claim must require a server-owned exact-target Cloudflare witness, deployment-to-window ordering, an independently written aggregate digest, and the canonical App-aware repository credential path."
-      ]
-    },
-    {
-      "path": "src/http/routes/buildEventReceipts.ts",
-      "claims": [
-        "src/http/routes/buildEventReceipts.ts: the release-observer credential must be project-bound Cloudflare analytics coverage only, reject control-plane fields and non-passed receipts, and require the matching independent witness."
-      ]
-    },
-    {
-      "path": "scripts/verify-documentation-truth.mjs",
-      "claims": [
-        "scripts/verify-documentation-truth.mjs: truth-sensitive changes must reject punctuation-only or hidden-comment documentation edits and require a meaningful path-bound invariant receipt."
-      ]
-    },
-    {
-      "path": "src/providers/RepositoryProviderFactory.ts",
-      "claims": [
-        "src/providers/RepositoryProviderFactory.ts: repository reads that need production identity proof must reject partial GitHub App credentials and otherwise prefer a repository-scoped installation credential over an explicit local fallback."
-      ]
-    },
-    {
-      "path": "src/services/buildEventStore.ts",
-      "claims": [
-        "src/services/buildEventStore.ts: the bounded feed must retain the newest GitHub-observed main source as historical provenance without treating webhook arrival order as current-main proof."
-      ]
-    },
-    {
-      "path": "src/http/routes/buildEvents.ts",
-      "claims": [
-        "src/http/routes/buildEvents.ts: the current-truth route must bind projection evaluation to the enrolled project repository and fail closed when that repository identity is unavailable."
-      ]
-    },
-    {
-      "path": "src/governance/portfolioDecisionContext.ts",
-      "claims": [
-        "src/governance/portfolioDecisionContext.ts: evidence-dependent consequential portfolio execution must bind founder authorization to the exact normalized decision-context Truth Lease and re-evaluate fresh dependency observations at the use boundary; stale, changed, missing, invalid, or unbound truth must reconfirm instead of execute."
-      ]
-    },
-    {
-      "path": "src/governance/productionTruthLease.ts",
-      "claims": [
-        "src/governance/productionTruthLease.ts: a production-truth lease may exist only when Cloudflare Worker/Pages identity, Playwright tested/runtime identity, independent review, Supabase production state, and repository main identity are bound to one exact candidate; any changed, stale, missing, or mismatched dependency must fail closed at use time."
+        "src/http/routes/n8nConveyor.ts: founder-authenticated conveyor readiness must resolve retained activation proof against the deployed exact GIT_SHA and must fail closed instead of claiming live verification when proof is missing, stale, or unreadable."
       ]
     }
   ]

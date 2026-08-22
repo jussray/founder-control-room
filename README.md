@@ -44,7 +44,8 @@ Current implementation includes:
 - first-party LinkedIn founder-content execution with exact Current You authority, FCR-owned one-shot approval storage/claim, temporal revalidation, and provider readback requirements;
 - provider-neutral n8n founder-content orchestration contracts that keep contract capability separate from runtime configuration and final provider outcome;
 - provider-neutral founder-content contracts under `tools/founder-content-contracts/`, with core approval storage, first-party execution, and temporal revalidation importing the canonical provider-neutral authorization contract directly while `tools/zapier/` remains a compatibility export surface for bounded connector and scheduling callers;
-- founder-authenticated n8n/Buffer activation readiness that exposes configuration presence and provider allowlist state without returning webhook/token values or promoting configuration into live proof;
+- founder-authenticated n8n stage-conveyor readiness that can read the existing sanitized receipt ledger and call the enabled runtime live-verified only when a retained accepted activation-probe receipt matches the deployed exact `GIT_SHA`, while stale-head, missing-runtime-SHA, missing-proof, and readback failures remain visibly unverified without exposing webhook/token values;
+- founder-authenticated n8n/Buffer founder-content activation readiness that exposes configuration presence and provider allowlist state without returning webhook/token values or promoting configuration into publication proof;
 - bounded Zapier/Buffer integration where it still adds connector, scheduling, or fallback value without becoming publication authority;
 - HubSpot integration boundaries that keep CRM metadata and external communication separate from repository truth and founder authority;
 - desktop/mobile Playwright proof for scoped Control Room behavior; and
@@ -154,7 +155,9 @@ contract-capable
 -> provider-outcome-proven
 ```
 
-The founder-authenticated conveyor status may report `not-configured`, `ready-for-probe`, `enabled-misconfigured`, `invalid-provider-configuration`, or `enabled-awaiting-proof`, including whether Buffer is ready for one controlled probe. Those are configuration/readiness states only. `liveVerified` remains false until a separate controlled provider probe and provider readback succeed.
+The generic founder stage-conveyor readiness may report `not-configured`, `ready-for-probe`, `enabled-awaiting-proof`, or `enabled-live-verified`. `enabled-live-verified` is allowed only when n8n is configured and enabled, the deployed FCR runtime exposes a valid exact `GIT_SHA`, and the newest retained accepted `n8n-live-probe-*` receipt for `founder-control-room` in `capability_execution_receipts` binds that same exact SHA. A stale-head receipt, missing receipt, missing runtime SHA, or receipt-ledger readback failure remains `enabled-awaiting-proof`; source support for this readback does not itself prove a persistent external n8n instance is live.
+
+The founder-content readiness is a separate publication-oriented boundary. It may report `not-configured`, `ready-for-probe`, `enabled-misconfigured`, `invalid-provider-configuration`, or `enabled-awaiting-proof`, including whether Buffer is ready for one controlled probe. Those states do not establish publication truth, and its `liveVerified` remains false until a separate controlled provider probe and provider readback succeed.
 
 A platform-native draft is not proof that the provider adapter is live. n8n acceptance is not publication truth. Provider readback remains terminal external-state evidence.
 
