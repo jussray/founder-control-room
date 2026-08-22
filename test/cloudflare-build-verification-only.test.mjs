@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 
 const scriptUrl = new URL('../scripts/cloudflare-build-verification-only.mjs', import.meta.url);
 const source = readFileSync(scriptUrl, 'utf8');
+const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 const validEnv = {
   ...process.env,
@@ -19,6 +20,21 @@ test('Cloudflare verification-only lane cannot mutate Worker state', () => {
   assert.match(source, /production_mutation:\s*false/);
   assert.match(source, /worker_version_upload:\s*false/);
   assert.match(source, /production_authority:\s*'github-actions:\.github\/workflows\/deploy\.yml'/);
+});
+
+test('Cloudflare dashboard build command resolves only to verification-only authority', () => {
+  assert.equal(
+    packageJson.scripts?.['deploy:api:production'],
+    'npm run cloudflare:build:verify',
+  );
+  assert.equal(
+    packageJson.scripts?.['cloudflare:build:verify'],
+    'node scripts/cloudflare-build-verification-only.mjs',
+  );
+  assert.doesNotMatch(
+    packageJson.scripts?.['cloudflare:build:verify'] ?? '',
+    /wrangler|versions\s+(upload|deploy)|secret\s+put/i,
+  );
 });
 
 test('Cloudflare verification-only lane emits an exact-SHA receipt', () => {
