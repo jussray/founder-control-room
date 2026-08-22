@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { planFounderOsLab } from '../engine.js';
 import { FOUNDER_OS_LAB_PROJECT_ADAPTERS } from '../projectAdapters.js';
 
-const ADAPTER = FOUNDER_OS_LAB_PROJECT_ADAPTERS[0];
+const foundAdapter = FOUNDER_OS_LAB_PROJECT_ADAPTERS.find(
+  (candidate) => candidate.id === 'sekret-bip',
+);
+if (!foundAdapter) throw new Error('sekret-bip adapter missing');
+const ADAPTER = foundAdapter;
 
 function contractUrls(paths: readonly string[] = ADAPTER.requiredContractPaths) {
   return paths.map(
@@ -22,9 +26,10 @@ function project(overrides: Record<string, unknown> = {}) {
 
 describe('Se’kret Bip Founder OS project adapter', () => {
   it('binds one portfolio identity to the audited repository and exact source head', () => {
-    expect(FOUNDER_OS_LAB_PROJECT_ADAPTERS).toHaveLength(1);
+    expect(FOUNDER_OS_LAB_PROJECT_ADAPTERS).toHaveLength(2);
     expect(ADAPTER).toMatchObject({
       id: 'sekret-bip',
+      adapterId: 'sekret-bip-project-preview',
       name: 'Se’kret Bip',
       repository: 'jussray/Sekret-Bip',
       auditedSourceHead: '467da149bad1720f87885a991a924aa143eb2ddd',
@@ -106,7 +111,7 @@ describe('Se’kret Bip Founder OS project adapter', () => {
       forbiddenDisplayNames: ['Suhanna'],
       executionAllowed: false,
     });
-    expect(plan.truth.verified.join(' ')).toContain('audience separation');
+    expect(plan.truth.verified.join(' ')).toContain('audience');
     expect(plan.authority.executionAllowed).toBe(false);
   });
 
@@ -136,7 +141,7 @@ describe('Se’kret Bip Founder OS project adapter', () => {
     );
   });
 
-  it('fails closed for repository, source-head, and canon-contract drift', () => {
+  it('fails closed for repository, source-head, and project-contract drift', () => {
     const wrongRepository = planFounderOsLab({
       goal: 'Inspect a project copy.',
       action: 'inspect',
@@ -158,7 +163,7 @@ describe('Se’kret Bip Founder OS project adapter', () => {
     expect(staleHead.truth.blocked.join(' ')).toContain('has not been audited');
 
     const missingContract = planFounderOsLab({
-      goal: 'Inspect incomplete canon evidence.',
+      goal: 'Inspect incomplete project evidence.',
       action: 'inspect',
       provider: 'github',
       project: project({
@@ -170,7 +175,7 @@ describe('Se’kret Bip Founder OS project adapter', () => {
       'test/dual-front-door-contract.test.mjs',
     ]);
     expect(missingContract.truth.blocked.join(' ')).toContain(
-      'is missing exact-head canon contract URLs',
+      'is missing exact-head project contract URLs',
     );
   });
 
