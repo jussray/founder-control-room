@@ -10,7 +10,7 @@
     {
       "path": ".github/workflows/cloudflare-build-diagnostic.yml",
       "claims": [
-        ".github/workflows/cloudflare-build-diagnostic.yml: the exact-current-main Worker Git authority audit must require the dedicated read-only Workers Builds user token for its primary provider readback, while request-trace and DNS-inventory credentials remain optional enrichment and cannot suppress the core authority receipt; the workflow remains read-only and cannot authorize provider mutation."
+        ".github/workflows/cloudflare-build-diagnostic.yml: the exact-current-main Worker Git authority audit must require the dedicated read-only Workers Builds user token for its primary provider readback; request-trace and DNS-inventory remain optional evidence lanes, and whether they are missing, malformed, or provider-rejected they may retain their own bounded evidence/error but cannot downgrade or upgrade the snapshotted core authority ok/error verdict; absence of a core receipt must never manufacture authority, and the workflow remains read-only and cannot authorize provider mutation."
       ]
     },
     {
