@@ -176,7 +176,7 @@ async function proveViewport(browser, { name, width, height, isMobile = false })
 
   const rerenderFetchCounts = await page.evaluate(() => window.__missionBoardFetchCounts);
   assert.equal(rerenderFetchCounts.tasks, 2, `${name}: SPA rerender reacquires current task state`);
-  assert.equal(rerenderFetchCounts.runs, 5, `${name}: SPA rerender reuses cached proof and retries only the unavailable proof read`);
+  assert.equal(rerenderFetchCounts.runs, 6, `${name}: SPA rerender reuses lower-authority cached proof but re-reads both approved missions`);
 
   const dimensions = await page.evaluate(() => ({
     viewportWidth: document.documentElement.clientWidth,
