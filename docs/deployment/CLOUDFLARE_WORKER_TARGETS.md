@@ -95,7 +95,9 @@ Do not infer live provider configuration from a workflow file, secret name, toke
 
 ## Read-only hostname inventory boundary
 
-The manual `Cloudflare Worker Git Authority Audit` can observe the live FCR zone without becoming deployment or DNS authority. On an exact SHA that is still current `main`, it may use dedicated read-only authorities to:
+The manual `Cloudflare Worker Git Authority Audit` separates its core provider-authority receipt from optional hostname enrichment. The primary Worker Git inspection requires the dedicated read-only Workers Builds user token and may proceed without DNS inventory or Request Trace credentials. When either enrichment credential is unavailable, inventory/trace evidence is skipped and remains `UNKNOWN`; that absence must not suppress the core Worker Git authority readback.
+
+When enrichment credentials are available, the audit may observe the live FCR zone without becoming deployment or DNS authority. On an exact SHA that is still current `main`, it may use dedicated read-only authorities to:
 
 1. resolve the reviewed `foundercontrolroom.org` zone;
 2. enumerate paginated A, AAAA, and CNAME records;
