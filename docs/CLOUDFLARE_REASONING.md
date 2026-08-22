@@ -164,13 +164,15 @@ Observe the contradiction
 
 ## Read-only hostname inventory and Request Trace
 
-The manual `Cloudflare Worker Git Authority Audit` has a bounded provider-observation lane for FCR hostnames. Its source contract:
+The manual `Cloudflare Worker Git Authority Audit` has a bounded provider-observation lane for FCR hostnames. Its primary Worker Git authority readback depends only on the dedicated read-only Workers Builds user token. DNS inventory and Request Trace credentials are optional enrichment: when either is unavailable, hostname/trace enrichment is skipped and remains `UNKNOWN`, but that absence must not suppress the core Worker Git authority receipt.
 
-- resolves the reviewed `foundercontrolroom.org` zone through a dedicated read-only DNS inventory authority;
+Its source contract:
+
+- resolves the reviewed `foundercontrolroom.org` zone through a dedicated read-only DNS inventory authority when that enrichment credential is available;
 - paginates the zone's A, AAAA, and CNAME records and derives in-zone HTTP-relevant hostnames without retaining DNS `content`, origin IPs, or target values;
 - compares the discovered inventory with `config/cloudflare-request-trace-host-policy.json`;
 - classifies new hosts, missing required hosts, proxy-state drift, wildcard hosts, DNS-only hosts, and directly traceable proxied hosts;
-- runs Cloudflare Request Trace independently for each eligible proxied hostname through a separate read-only Request Tracer authority; and
+- runs Cloudflare Request Trace independently for each eligible proxied hostname through a separate read-only Request Tracer authority when both enrichment credentials are available; and
 - writes only the sanitized inventory/trace receipt, including an inventory hash and bounded trace summaries.
 
 The workflow intentionally requires its requested SHA to equal current `main` before provider observation. A PR source check can prove the audit code and contract, but it cannot prove current Cloudflare hostname inventory. Until the manual workflow runs successfully against an exact still-current main SHA, live hostname/proxy/trace state remains `UNKNOWN` rather than inferred from repository configuration.
