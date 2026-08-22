@@ -182,7 +182,7 @@ The canonical Worker also owns FCR's outbound Cloudflare Email Service capabilit
 
 Current Pages source fails closed when `FCR_API` is unavailable and verifies the bound service identity on dynamic responses. **Source dependence on that binding does not prove the live Pages project currently has the correct provider binding.** Provider configuration and exact runtime behavior require current Cloudflare readback and deployed-path proof.
 
-The read-only hostname-inventory audit is also evidence-only. Its checked source proves the intended discovery, drift-classification, redaction, and Request Trace behavior; it does **not** prove which hostnames Cloudflare currently serves. A live hostname/proxy-state claim requires the manual audit to run against an exact SHA that is still current `main`, using the dedicated read-only DNS inventory and Request Tracer authorities. Its receipt cannot authorize DNS, Access, route, Worker, credential, or deployment mutation.
+The read-only Cloudflare audit keeps its primary Worker Git authority receipt independent from optional hostname enrichment. The core authority readback requires the dedicated read-only Workers Builds user token; DNS inventory and Request Trace credentials are optional enrichment, and if either is unavailable the hostname/trace lane remains `UNKNOWN` without suppressing the core Worker Git authority receipt. The audit remains exact-current-main-bound and cannot authorize Cloudflare mutation.
 
 Native Cloudflare Worker/Pages build receipts are provider build/deploy evidence for the exact artifact they name. They do not prove the guarded production release path, database migration, auth behavior, browser behavior, fleet-wide runtime identity, or publication outcome.
 
