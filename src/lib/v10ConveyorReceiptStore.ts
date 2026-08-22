@@ -118,8 +118,6 @@ function activationProbeFromRow(row: StoredRow | null): V10ConveyorActivationPro
 }
 
 async function findStoredReceipt(receiptId: string): Promise<StoredRow | null> {
-  // Dynamic import keeps local/unit callers free from privileged Supabase env
-  // requirements until production receipt persistence is actually requested.
   const { supabase } = await import('./supabaseClient.js');
   const { data, error } = await supabase
     .from('capability_execution_receipts')

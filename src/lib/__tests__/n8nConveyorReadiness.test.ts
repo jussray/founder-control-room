@@ -40,6 +40,8 @@ function readerFor(
       return record;
     },
   };
+function readerFor(record: V10ConveyorActivationProbeRecord | null): V10ConveyorReceiptReader {
+  return { async latestActivationProbe() { return record; } };
 }
 
 function liveEnv(gitSha?: string): NodeJS.ProcessEnv {
@@ -70,16 +72,10 @@ describe('n8n conveyor readiness', () => {
         expectedHeadSha: null,
         observedAt: null,
       },
+    expect(founderConveyorReadiness({ configured: false, enabled: false, webhookUrl: null, bearerToken: null })).toEqual({
+      state: 'not-configured', configured: false, enabled: false, liveProbeRequired: true, liveVerified: false,
+      proof: { state: 'not-observed', receiptId: null, expectedHeadSha: null, observedAt: null },
     });
-  });
-
-  it('reports ready-for-probe when credentials exist but execution remains disabled', () => {
-    expect(founderConveyorReadiness({
-      configured: true,
-      enabled: false,
-      webhookUrl: 'https://n8n.example.com/webhook/fcr',
-      bearerToken: 'server-side-secret',
-    }).state).toBe('ready-for-probe');
   });
 
   it('does not call an enabled provider verified without retained live proof', () => {
@@ -165,6 +161,28 @@ describe('n8n conveyor readiness', () => {
         state: 'readback-unavailable',
         expectedHeadSha: '1'.repeat(40),
       },
+      state: 'enabled-awaiting-proof', liveProbeRequired: true, liveVerified: false, proof: { state: 'not-observed' },
     });
+  });
+
+  it('marks n8n live only when retained activation proof matches the deployed exact SHA', async () => {
+    const gitSha = 'd'.repeat(40);
+    const result = await resolveFounderConveyorReadiness({ env: liveEnv(gitSha), receiptReader: readerFor(activationProbe(gitSha)) });
+    expect(result).toMatchObject({ state: 'enabled-live-verified', liveProbeRequired: false, liveVerified: true, proof: { state: 'verified', expectedHeadSha: gitSha } });
+  });
+
+  it('expires live authority after the deployed SHA moves', async () => {
+    const runtimeSha = 'e'.repeat(40);
+    const historicalSha = 'f'.repeat(40);
+    const result = await resolveFounderConveyorReadiness({ env: liveEnv(runtimeSha), receiptReader: readerFor(activationProbe(historicalSha)) });
+    expect(result).toMatchObject({ state: 'enabled-awaiting-proof', liveVerified: false, proof: { state: 'stale-head', expectedHeadSha: historicalSha } });
+  });
+
+  it('fails closed when runtime SHA or receipt readback is unavailable', async () => {
+    expect(await resolveFounderConveyorReadiness({ env: liveEnv(), receiptReader: readerFor(activationProbe('a'.repeat(40))) }))
+      .toMatchObject({ state: 'enabled-awaiting-proof', liveVerified: false, proof: { state: 'runtime-sha-unavailable' } });
+    const unavailable: V10ConveyorReceiptReader = { async latestActivationProbe() { throw new Error('provider unavailable'); } };
+    expect(await resolveFounderConveyorReadiness({ env: liveEnv('1'.repeat(40)), receiptReader: unavailable }))
+      .toMatchObject({ state: 'enabled-awaiting-proof', liveVerified: false, proof: { state: 'readback-unavailable' } });
   });
 });

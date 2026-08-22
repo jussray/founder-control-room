@@ -57,7 +57,7 @@ for (const control of ['Completeness','Accuracy','Consistency','Cut-off','Eviden
   requireValue(communication.includes(control), `public communication contract missing accounting control ${control}`);
 }
 
-for (const marker of ['standing authorization','observable platform artifact','Fresh approval is still required']) {
+for (const marker of ['standing class authorization','observable platform artifact','Fresh approval is required']) {
   requireValue(communication.includes(marker), `public communication contract missing ${JSON.stringify(marker)}`);
 }
 

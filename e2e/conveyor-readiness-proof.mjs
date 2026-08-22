@@ -156,9 +156,16 @@ try {
   await page.locator('.launch-dock > summary').click();
   await expectReadiness('ready-for-probe', 'n8n configured · live probe required');
   assert.equal(lastAuthorization, `Bearer ${TOKEN}`);
-  await page.locator('.conveyor-readiness').scrollIntoViewIfNeeded();
+  await page.locator('[data-conveyor-readiness]').scrollIntoViewIfNeeded();
 
-  const initialText = await page.locator('.conveyor-readiness').innerText();
+  const genesisLink = page.locator('[data-genesis-evidence]');
+  await genesisLink.waitFor({ state: 'visible' });
+  assert.equal(await genesisLink.getAttribute('href'), '/control-room/genesis.html');
+  assert.match(await genesisLink.innerText(), /Genesis evidence.*view origin record/i);
+  assert.equal(await genesisLink.getAttribute('data-state'), null, 'Genesis evidence link must not carry readiness state');
+  assert.equal(await genesisLink.getAttribute('class'), 'genesis-evidence-link', 'Genesis evidence link must not reuse readiness styling');
+
+  const initialText = await page.locator('[data-conveyor-readiness]').innerText();
   assert.doesNotMatch(initialText, /verified/i);
 
   const dimensions = await page.evaluate(() => ({
@@ -191,6 +198,7 @@ try {
   await refreshDock();
   await expectReadiness('enabled-live-verified', 'n8n live · exact-head receipt verified');
   assert.match(await page.locator('.conveyor-readiness').innerText(), /verified/i);
+  assert.match(await page.locator('[data-conveyor-readiness]').innerText(), /verified/i);
 
   await page.screenshot({
     path: resolve(outputDir, 'conveyor-readiness-live-verified-mobile.png'),
@@ -202,6 +210,14 @@ try {
   proofHead = null;
   await refreshDock();
   await expectReadiness('not-configured', 'n8n not configured');
+
+  const finalText = await page.locator('[data-conveyor-readiness]').innerText();
+  assert.doesNotMatch(finalText, /verified/i);
+
+  await genesisLink.click();
+  await page.waitForURL('**/control-room/genesis.html');
+  await page.locator('[data-testid="genesis-demo"]').waitFor({ state: 'visible' });
+  assert.match(await page.locator('[data-testid="authority-boundary"]').innerText(), /demo provenance only/i);
 
   console.log(JSON.stringify({
     ok: true,
@@ -217,6 +233,7 @@ try {
       'not-configured',
     ],
     authorization: 'Bearer <redacted>',
+    genesisRoute: '/control-room/genesis.html',
     screenshot: 'test-results/conveyor-readiness-live-verified-mobile.png',
     overflow: dimensions,
   }, null, 2));

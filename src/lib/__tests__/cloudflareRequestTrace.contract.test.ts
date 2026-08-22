@@ -90,6 +90,18 @@ describe("Cloudflare request trace witness", () => {
     expect(tracer).toContain("canAuthorizeProviderMutation: false");
   });
 
+  it("keeps optional enrichment from downgrading or upgrading core authority", () => {
+    expect(workflow).toContain("Preserve core authority verdict before optional enrichment");
+    expect(workflow).toContain("cloudflare-build-diagnostic.core.json");
+    expect(workflow).toContain("id: trace_enrichment");
+    expect(workflow).toContain("continue-on-error: true");
+    expect(workflow).toContain("Restore core authority verdict after optional enrichment");
+    expect(workflow).toContain("receipt.ok = core.ok === true");
+    expect(workflow).toContain("receipt.error = core.error ?? null");
+    expect(workflow).toContain("optionalForCoreAuthority = true");
+    expect(workflow).toContain("do not manufacture or upgrade authority truth");
+  });
+
   it("uses zone-response semantics rather than implying origin proof", () => {
     expect(tracer).toContain("zoneResponseStatusCode");
     expect(tracer).toContain("zone response status code");

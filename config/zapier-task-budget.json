@@ -94,6 +94,15 @@
       "linkedin_24h_gate",
       "linkedin_48h_gate",
       "linkedin_next_mutation",
+      "linkedin_past_fingerprint",
+      "linkedin_wrapper_vs_engine",
+      "linkedin_redteam_i",
+      "linkedin_redteam_ii",
+      "linkedin_ooda_decision",
+      "linkedin_lindy_check",
+      "linkedin_l99_check",
+      "linkedin_selected_lane",
+      "linkedin_narrative_advance",
       "linkedin_draft",
       "facebook_draft",
       "facebook_founder_draft",
@@ -130,6 +139,39 @@
       "target_mode": "beat_previous_verified_floor_without_sacrificing_quality",
       "baseline_source": "latest_verified_linkedin_analytics_or_platform_recap",
       "partial_window_policy": "never_classify_an_incomplete_or_rolling_window_as_a_decline_without_like_for_like_evidence",
+      "reasoning_order": [
+        "past_post_fingerprint",
+        "current_verified_movement",
+        "wrapper_vs_engine_diagnosis",
+        "redteam_i",
+        "redteam_ii",
+        "ooda",
+        "lindy",
+        "l99",
+        "lane_selection",
+        "narrative_advance",
+        "draft"
+      ],
+      "fingerprint_dimensions": [
+        "hook_structure",
+        "topic_wrapper",
+        "performance_engine",
+        "proof_style",
+        "audience_response",
+        "timing",
+        "repeated_language",
+        "distribution_vs_resonance",
+        "conversion_signal"
+      ],
+      "wrapper_vs_engine_policy": "do_not_treat_the_visible_topic_as_the_cause_of_performance_until_the_mechanics_are_tested_against_past_post_evidence",
+      "standing_lanes": [
+        "evidence_gap",
+        "founder_debugging",
+        "ai_authority_boundaries",
+        "human_centered_ai",
+        "founder_control_room_control_plane"
+      ],
+      "narrative_advance_policy": "each_new_post_must_change_or_advance_the_prior_public_narrative_instead_of_rephrasing_a_recent_angle",
       "required_post_elements": [
         "verified_build_or_operating_proof",
         "founder_specific_point_of_view",
@@ -140,8 +182,11 @@
         "impressions",
         "engagement_rate",
         "quality_comments",
+        "technical_profile_viewers",
         "profile_or_follower_conversion",
-        "warm_conversation_conversion"
+        "warm_conversation_conversion",
+        "investor_or_partner_signal",
+        "category_recognition"
       ],
       "measurement_windows_hours": [
         24,
@@ -302,6 +347,11 @@
     "partial_rolling_windows_never_define_decline": true,
     "warm_linkedin_conversations_are_conversion_signals": true,
     "linkedin_winner_mechanics_compound_into_next_post": true,
+    "linkedin_past_fingerprint_runs_before_drafting": true,
+    "linkedin_wrapper_vs_engine_is_explicit": true,
+    "linkedin_redteam_i_and_ii_required": true,
+    "linkedin_ooda_lindy_l99_required_before_lane_selection": true,
+    "linkedin_posts_must_advance_prior_narrative": true,
     "delete_or_disable_existing_zaps_automatically": false
   }
 }
