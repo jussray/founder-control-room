@@ -4,13 +4,20 @@
   "domains": [
     "repository-provider",
     "truth-governance",
-    "cloudflare-authority"
+    "cloudflare-authority",
+    "publishing"
   ],
   "changes": [
     {
       "path": ".github/workflows/cloudflare-build-diagnostic.yml",
       "claims": [
         ".github/workflows/cloudflare-build-diagnostic.yml: the exact-current-main Worker Git authority audit must require the dedicated read-only Workers Builds user token for its primary provider readback; request-trace and DNS-inventory remain optional evidence lanes, and whether they are missing, malformed, or provider-rejected they may retain their own bounded evidence/error but cannot downgrade or upgrade the snapshotted core authority ok/error verdict; absence of a core receipt must never manufacture authority, and the workflow remains read-only and cannot authorize provider mutation."
+      ]
+    },
+    {
+      "path": ".github/workflows/n8n-runtime-integration-proof.yml",
+      "claims": [
+        ".github/workflows/n8n-runtime-integration-proof.yml: CI-only n8n runtime proof must mask generated bearer and encryption credentials before exporting them to later steps, while keeping the runtime ephemeral and non-production-authorizing."
       ]
     },
     {
@@ -83,6 +90,12 @@
       "path": "wrangler.worker.toml",
       "claims": [
         "wrangler.worker.toml: every canonical Worker build must execute the repository build-authority membrane; native Cloudflare Workers Builds may proceed only through non-promoting versions upload while production promotion remains bounded to the exact manual GitHub authority path."
+      ]
+    },
+    {
+      "path": "src/http/routes/n8nConveyor.ts",
+      "claims": [
+        "src/http/routes/n8nConveyor.ts: authenticated conveyor readiness must resolve retained activation proof at request time and may report live only when the persisted activation receipt is bound to the deployed exact GIT_SHA; stale, missing, or unreadable proof must remain non-live, and no credential value may be exposed."
       ]
     }
   ]
