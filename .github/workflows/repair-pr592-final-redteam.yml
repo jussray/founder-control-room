@@ -1,0 +1,465 @@
+name: Repair PR 592 final red-team off branch
+
+on:
+  push:
+    branches:
+      - repair/pr592-final-redteam-10aa8ee
+
+permissions:
+  contents: write
+
+env:
+  EXPECTED_HEAD_SHA: 10aa8ee6774cb65282da3e33dd5be555792d2584
+  TARGET_BRANCH: fix/fcr-atomic-freshness-a4ca515-clean
+  RESULT_BRANCH: repair/pr592-final-redteam-result
+
+jobs:
+  repair:
+    name: Build clean PR 592 repair commit
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact PR 592 head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Verify target branch has not moved
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Apply bounded final red-team repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f"{label}: expected exactly one seam, found {count}")
+              return text.replace(old, new, 1)
+
+          provider = Path("src/providers/GitHubProvider.ts")
+          text = provider.read_text()
+
+          text = replace_once(
+              text,
+              '''    ref_name?: {
+              include?: string[];
+            };
+          ''',
+              '''    ref_name?: {
+              include?: string[];
+              exclude?: string[];
+            };
+          ''',
+              "ruleset condition shape",
+          )
+
+          text = replace_once(
+              text,
+              '''  const observedTargets = readback.conditions?.ref_name?.include ?? [];
+            for (const target of config.targetRefs) {
+              const qualified = `refs/heads/${target}`;
+              if (!observedTargets.includes(qualified)) errors.push(`provider read-back is missing requested target: ${qualified}`);
+            }
+
+            const expectedBypasses = expectedBypassIdentities(config);
+          ''',
+              '''  const expectedTargets = config.targetRefs.map((ref) => `refs/heads/${ref}`).sort();
+            const observedTargets = [...(readback.conditions?.ref_name?.include ?? [])].map(String).sort();
+            const observedExcludes = [...(readback.conditions?.ref_name?.exclude ?? [])].map(String).sort();
+            if (JSON.stringify(observedTargets) !== JSON.stringify(expectedTargets)) {
+              errors.push("review membrane target refs do not exactly match the requested policy");
+            }
+            if (observedExcludes.length !== 0) {
+              errors.push("review membrane must not exclude protected refs");
+            }
+
+            const expectedBypasses = expectedBypassIdentities(config);
+          ''',
+              "review target exactness",
+          )
+
+          text = replace_once(
+              text,
+              '''  const rules = Array.isArray(readback.rules) ? readback.rules : [];
+            const pullRequest = rules.find((rule) => rule.type === "pull_request");
+            const pullParameters = pullRequest?.parameters ?? {};
+            if (!pullRequest) errors.push("pull request rule is missing");
+          ''',
+              '''  const rules = Array.isArray(readback.rules) ? readback.rules : [];
+            const expectedRuleTypes = [
+              "pull_request",
+              ...(config.blockForcePushes ? ["non_fast_forward"] : []),
+              ...(config.blockDeletion ? ["deletion"] : []),
+            ].sort();
+            const observedRuleTypes = rules.map((rule) => String(rule.type ?? "")).sort();
+            if (JSON.stringify(observedRuleTypes) !== JSON.stringify(expectedRuleTypes)) {
+              errors.push("review membrane rule types do not exactly match the requested policy");
+            }
+            const pullRequests = rules.filter((rule) => rule.type === "pull_request");
+            if (pullRequests.length !== 1) errors.push("review membrane must contain exactly one pull request rule");
+            const pullRequest = pullRequests[0];
+            const pullParameters = pullRequest?.parameters ?? {};
+          ''',
+              "review rule exactness",
+          )
+
+          text = replace_once(
+              text,
+              '''  const observedTargets = readback.conditions?.ref_name?.include ?? [];
+            for (const target of config.targetRefs) {
+              const qualified = `refs/heads/${target}`;
+              if (!observedTargets.includes(qualified)) {
+                errors.push(`freshness provider read-back is missing requested target: ${qualified}`);
+              }
+            }
+
+            if (observedBypassIdentities(readback).length !== 0) {
+          ''',
+              '''  const expectedTargets = config.targetRefs.map((ref) => `refs/heads/${ref}`).sort();
+            const observedTargets = [...(readback.conditions?.ref_name?.include ?? [])].map(String).sort();
+            const observedExcludes = [...(readback.conditions?.ref_name?.exclude ?? [])].map(String).sort();
+            if (JSON.stringify(observedTargets) !== JSON.stringify(expectedTargets)) {
+              errors.push("strict freshness target refs do not exactly match the requested policy");
+            }
+            if (observedExcludes.length !== 0) {
+              errors.push("strict freshness ruleset must not exclude protected refs");
+            }
+
+            if (observedBypassIdentities(readback).length !== 0) {
+          ''',
+              "freshness target exactness",
+          )
+
+          text = replace_once(
+              text,
+              '''    const { data: existing } = await this.octokit.repos.getRepoRulesets({ owner, repo, per_page: 100 });
+              let freshnessComponent: NonNullable<RulesetResult["components"]>[number] | undefined;
+          ''',
+              '''    const { data: existing } = await this.octokit.repos.getRepoRulesets({ owner, repo, per_page: 100 });
+              let freshnessComponent: NonNullable<RulesetResult["components"]>[number] | undefined;
+              let reviewComponent: NonNullable<RulesetResult["components"]>[number] | undefined;
+          ''',
+              "review component declaration",
+          )
+
+          text = replace_once(
+              text,
+              '''      const { data } = match
+                ? await this.octokit.repos.updateRepoRuleset({ ...payload, ruleset_id: match.id })
+                : await this.octokit.repos.createRepoRuleset(payload);
+
+              if (hardenFounderControlRoomMainReview) {
+          ''',
+              '''      const { data } = match
+                ? await this.octokit.repos.updateRepoRuleset({ ...payload, ruleset_id: match.id })
+                : await this.octokit.repos.createRepoRuleset(payload);
+
+              reviewComponent = {
+                purpose: "review",
+                id: String(data.id),
+                name: data.name,
+                enforcement: data.enforcement,
+              };
+
+              if (hardenFounderControlRoomMainReview) {
+          ''',
+              "capture review mutation identity",
+          )
+
+          text = replace_once(
+              text,
+              '''      const message = error instanceof Error ? error.message : String(error);
+              throw new Error(
+                `GitHubProvider: FCR review membrane failed after verified strict-freshness ruleset ${freshnessComponent.name} (${freshnessComponent.id}): ${message}`,
+              );
+          ''',
+              '''      const message = error instanceof Error ? error.message : String(error);
+              const reviewMutation = reviewComponent
+                ? `; mutated review ruleset ${reviewComponent.name} (${reviewComponent.id}) also requires reconciliation`
+                : "";
+              throw new Error(
+                `GitHubProvider: FCR review membrane failed after verified strict-freshness ruleset ${freshnessComponent.name} (${freshnessComponent.id})${reviewMutation}: ${message}`,
+              );
+          ''',
+              "partial mutation error receipt",
+          )
+
+          provider.write_text(text)
+
+          test = Path("src/providers/__tests__/githubProvider.fcrRulesetReconciliation.test.ts")
+          test.write_text(r'''import { beforeEach, describe, expect, it, vi } from "vitest";
+
+          const {
+            mockGetRepoRulesets,
+            mockGetRepoRuleset,
+            mockCreateRepoRuleset,
+            mockUpdateRepoRuleset,
+          } = vi.hoisted(() => ({
+            mockGetRepoRulesets: vi.fn(),
+            mockGetRepoRuleset: vi.fn(),
+            mockCreateRepoRuleset: vi.fn(),
+            mockUpdateRepoRuleset: vi.fn(),
+          }));
+
+          vi.mock("@octokit/rest", () => ({
+            Octokit: class MockOctokit {
+              repos = {
+                getRepoRulesets: mockGetRepoRulesets,
+                getRepoRuleset: mockGetRepoRuleset,
+                createRepoRuleset: mockCreateRepoRuleset,
+                updateRepoRuleset: mockUpdateRepoRuleset,
+              };
+            },
+          }));
+
+          const { GitHubProvider } = await import("../GitHubProvider.js");
+
+          const config = {
+            name: "protect-main",
+            targetRefs: ["main"],
+            enforcement: "active" as const,
+            requirePullRequest: true,
+            requiredApprovingReviewCount: 1,
+            requiredStatusCheckNames: ["Required Gate"],
+            blockForcePushes: true,
+            blockDeletion: true,
+            bypassActors: [{ kind: "app" as const, id: "123" }],
+          };
+
+          function freshnessReadback() {
+            return {
+              id: 2,
+              name: "protect-main [strict freshness]",
+              enforcement: "active",
+              bypass_actors: [] as Array<{ actor_type: string; actor_id: number; bypass_mode: string }>,
+              conditions: { ref_name: { include: ["refs/heads/main"], exclude: [] as string[] } },
+              rules: [{
+                type: "required_status_checks",
+                parameters: {
+                  strict_required_status_checks_policy: true,
+                  required_status_checks: [{ context: "Required Gate" }],
+                },
+              }],
+            };
+          }
+
+          function reviewReadback() {
+            return {
+              id: 1,
+              name: "protect-main",
+              enforcement: "active",
+              bypass_actors: [{ actor_type: "Integration", actor_id: 123, bypass_mode: "pull_request" }],
+              conditions: { ref_name: { include: ["refs/heads/main"], exclude: [] as string[] } },
+              rules: [
+                {
+                  type: "pull_request",
+                  parameters: {
+                    required_approving_review_count: 1,
+                    dismiss_stale_reviews_on_push: true,
+                    require_last_push_approval: true,
+                    required_review_thread_resolution: true,
+                  },
+                },
+                { type: "non_fast_forward" },
+                { type: "deletion" },
+              ],
+            };
+          }
+
+          function buildProvider() {
+            return new GitHubProvider({
+              token: "test-token",
+              projectMap: { "founder-control-room": "jussray/founder-control-room" },
+            });
+          }
+
+          function installStrongMocks() {
+            mockCreateRepoRuleset.mockImplementation(async (payload: { name: string; enforcement: string }) => ({
+              data: {
+                id: payload.name.endsWith("[strict freshness]") ? 2 : 1,
+                name: payload.name,
+                enforcement: payload.enforcement,
+              },
+            }));
+            mockUpdateRepoRuleset.mockImplementation(async (payload: { name: string; enforcement: string }) => ({
+              data: {
+                id: payload.name.endsWith("[strict freshness]") ? 2 : 1,
+                name: payload.name,
+                enforcement: payload.enforcement,
+              },
+            }));
+            mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+              data: ruleset_id === 2 ? freshnessReadback() : reviewReadback(),
+            }));
+          }
+
+          describe("GitHubProvider FCR ruleset reconciliation", () => {
+            beforeEach(() => {
+              vi.clearAllMocks();
+              mockGetRepoRulesets.mockResolvedValue({ data: [] });
+              installStrongMocks();
+            });
+
+            it("rejects an added freshness target before touching the review membrane", async () => {
+              const widened = freshnessReadback();
+              widened.conditions.ref_name.include.push("refs/heads/release");
+              mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+                data: ruleset_id === 2 ? widened : reviewReadback(),
+              }));
+
+              await expect(buildProvider().applyBranchRuleset("founder-control-room", config))
+                .rejects.toThrow(/strict freshness target refs do not exactly match/);
+              expect(mockCreateRepoRuleset).toHaveBeenCalledTimes(1);
+            });
+
+            it("rejects a freshness exclusion before touching the review membrane", async () => {
+              const excluded = freshnessReadback();
+              excluded.conditions.ref_name.exclude.push("refs/heads/main");
+              mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+                data: ruleset_id === 2 ? excluded : reviewReadback(),
+              }));
+
+              await expect(buildProvider().applyBranchRuleset("founder-control-room", config))
+                .rejects.toThrow(/strict freshness ruleset must not exclude protected refs/);
+              expect(mockCreateRepoRuleset).toHaveBeenCalledTimes(1);
+            });
+
+            it("rejects an added review target and receipts both mutated identities", async () => {
+              const widened = reviewReadback();
+              widened.conditions.ref_name.include.push("refs/heads/release");
+              mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+                data: ruleset_id === 2 ? freshnessReadback() : widened,
+              }));
+
+              await expect(buildProvider().applyBranchRuleset("founder-control-room", config))
+                .rejects.toThrow(/strict-freshness ruleset .* \(2\); mutated review ruleset .* \(1\).*review membrane target refs do not exactly match/);
+              expect(mockCreateRepoRuleset).toHaveBeenCalledTimes(2);
+              expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
+            });
+
+            it("rejects an unexpected bypassable review rule and receipts both mutated identities", async () => {
+              const widened = reviewReadback();
+              widened.rules.push({ type: "required_signatures" } as never);
+              mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+                data: ruleset_id === 2 ? freshnessReadback() : widened,
+              }));
+
+              await expect(buildProvider().applyBranchRuleset("founder-control-room", config))
+                .rejects.toThrow(/mutated review ruleset .* \(1\).*review membrane rule types do not exactly match/);
+              expect(mockCreateRepoRuleset).toHaveBeenCalledTimes(2);
+              expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
+            });
+
+            it("retains both mutated component identities when review readback widens the app bypass", async () => {
+              const widened = reviewReadback();
+              widened.bypass_actors = [{ actor_type: "Integration", actor_id: 123, bypass_mode: "always" }];
+              mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+                data: ruleset_id === 2 ? freshnessReadback() : widened,
+              }));
+
+              await expect(buildProvider().applyBranchRuleset("founder-control-room", config))
+                .rejects.toThrow(/strict-freshness ruleset .* \(2\); mutated review ruleset .* \(1\).*bypass actors do not match/);
+              expect(mockCreateRepoRuleset.mock.calls.map((call) => call[0].name)).toEqual([
+                "protect-main [strict freshness]",
+                "protect-main",
+              ]);
+              expect(mockGetRepoRuleset.mock.calls.map((call) => call[0].ruleset_id)).toEqual([2, 1]);
+              expect(mockCreateRepoRuleset).toHaveBeenCalledTimes(2);
+              expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
+            });
+
+            it("does not claim a review mutation when the review write itself fails", async () => {
+              mockCreateRepoRuleset.mockImplementation(async (payload: { name: string; enforcement: string }) => {
+                if (payload.name.endsWith("[strict freshness]")) {
+                  return { data: { id: 2, name: payload.name, enforcement: payload.enforcement } };
+                }
+                throw new Error("review write failed before provider identity returned");
+              });
+
+              let thrown: unknown;
+              try {
+                await buildProvider().applyBranchRuleset("founder-control-room", config);
+              } catch (error) {
+                thrown = error;
+              }
+              expect(thrown).toBeInstanceOf(Error);
+              expect((thrown as Error).message).toMatch(/verified strict-freshness ruleset .* \(2\)/);
+              expect((thrown as Error).message).not.toContain("mutated review ruleset");
+              expect(mockCreateRepoRuleset).toHaveBeenCalledTimes(2);
+              expect(mockGetRepoRuleset).toHaveBeenCalledTimes(1);
+            });
+          });
+          ''')
+
+          providers = Path("docs/PROVIDERS.md")
+          text = providers.read_text()
+          old = 'A successful provider result receipts **both** ruleset component identities; if the later review mutation fails, the error retains the already-verified freshness ruleset name and ID for reconciliation. Missing, widened, additional, stale, non-strict, or mismatched provider readback fails closed.'
+          new = 'A successful provider result receipts **both** ruleset component identities. If the later review write fails, the error retains the already-verified freshness ruleset name and ID; if the review object is written but hardened readback then fails, the error retains **both** mutated provider identities so reconciliation never has to guess which objects changed. Readback must exactly match the requested protected-ref include set, contain zero ref exclusions, and preserve the exact requested rule-type topology; extra targets, exclusions, bypassable rules, widened identities, stale state, non-strict status policy, or any other mismatch fails closed.'
+          text = replace_once(text, old, new, "provider reconciliation documentation")
+          providers.write_text(text)
+
+          receipt_path = Path("docs/DOCUMENTATION_TRUTH_RECEIPT.json")
+          receipt = json.loads(receipt_path.read_text())
+          changes = {entry["path"]: entry for entry in receipt["changes"]}
+          old_claim = changes["src/providers/GitHubProvider.ts"]["claims"][0]
+          expected = 'src/providers/GitHubProvider.ts: an active FCR-main governance request must first apply and read back a separate strict required-status ruleset with zero bypass actors, exact requested checks, strict current-base policy, active enforcement, and no unexpected rule types before changing the review membrane; the composite result must receipt both component identities and partial failure after freshness verification must retain that component identity for reconciliation.'
+          if old_claim != expected:
+              raise RuntimeError("documentation receipt provider claim seam changed")
+          changes["src/providers/GitHubProvider.ts"]["claims"][0] = (
+              'src/providers/GitHubProvider.ts: an active FCR-main governance request must first apply and read back a separate strict required-status ruleset with zero bypass actors, exact requested checks, strict current-base policy, active enforcement, the exact requested include refs, zero ref exclusions, and no unexpected rule types before changing the review membrane; review readback must likewise preserve the exact requested include refs, zero exclusions, and exact bypassable review-rule type set; the composite result must receipt both component identities, review-write failure must retain the verified freshness identity, and review-readback failure after a successful review mutation must retain both mutated provider identities for reconciliation.'
+          )
+          receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
+          PY
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run focused proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run typecheck
+          npx vitest run \
+            src/providers/__tests__/githubProvider.fcrRulesetHardening.test.ts \
+            src/providers/__tests__/githubProvider.fcrRulesetReconciliation.test.ts
+          git diff --check
+
+      - name: Commit clean candidate delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            src/providers/GitHubProvider.ts \
+            src/providers/__tests__/githubProvider.fcrRulesetReconciliation.test.ts \
+            docs/PROVIDERS.md \
+            docs/DOCUMENTATION_TRUTH_RECEIPT.json
+          git diff --cached --check
+          git commit -m 'fix(governance): harden ruleset reconciliation receipts'
+
+      - name: Recheck target then publish result branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$TARGET_BRANCH"
+          test "$(git rev-parse "origin/$TARGET_BRANCH")" = "$EXPECTED_HEAD_SHA"
+          git push origin "HEAD:refs/heads/$RESULT_BRANCH"
