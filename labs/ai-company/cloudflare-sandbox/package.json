@@ -1,17 +1,25 @@
 {
-  "name": "@founder-control-room/cloudflare-sandbox",
-  "version": "0.0.0",
+  "name": "@juss/fcr-ai-company-cloudflare-sandbox",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "Source-only, synthetic-data Cloudflare Sandbox Worker for the Founder Control Room AI-company lab.",
   "scripts": {
-    "check": "wrangler deploy --dry-run --config wrangler.jsonc --outdir .wrangler-dry-run",
     "dev": "wrangler dev --config wrangler.jsonc",
-    "deploy": "wrangler deploy --config wrangler.jsonc --containers-rollout=immediate"
+    "dry-run": "wrangler deploy --dry-run --config wrangler.jsonc",
+    "test": "node --test test/*.test.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "verify": "npm run typecheck && npm test"
   },
   "dependencies": {
-    "@cloudflare/sandbox": "0.13.0-next.738.2"
+    "@cloudflare/sandbox": "0.12.7"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "5.20260708.1",
+    "typescript": "5.9.3",
     "wrangler": "4.110.0"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

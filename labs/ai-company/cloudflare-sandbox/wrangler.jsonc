@@ -1,14 +1,13 @@
 {
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "founder-control-room-sandbox",
+  "$schema": "https://unpkg.com/wrangler@4.110.0/config-schema.json",
+  "name": "fcr-ai-company-sandbox-lab",
   "main": "src/index.ts",
-  "tsconfig": "./tsconfig.json",
   "compatibility_date": "2026-08-20",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "containers": [
     {
-      "class_name": "InternalSandbox",
+      "class_name": "Sandbox",
       "image": "./Dockerfile",
       "instance_type": "lite",
       "max_instances": 1
@@ -17,18 +16,19 @@
   "durable_objects": {
     "bindings": [
       {
-        "name": "Sandbox",
-        "class_name": "InternalSandbox"
+        "class_name": "Sandbox",
+        "name": "Sandbox"
+      },
+      {
+        "class_name": "SandboxRequestGate",
+        "name": "SandboxRequestGate"
       }
     ]
   },
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["InternalSandbox"]
+      "new_sqlite_classes": ["Sandbox", "SandboxRequestGate"]
     }
-  ],
-  "vars": {
-    "SANDBOX_SCOPE": "portfolio-control-plane"
-  }
+  ]
 }
