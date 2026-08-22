@@ -3,9 +3,16 @@
   "purpose": "Record the bounded invariants disclosed when truth-governance controls change; this is review evidence, not a live provider or production claim.",
   "domains": [
     "repository-provider",
-    "truth-governance"
+    "truth-governance",
+    "cloudflare-authority"
   ],
   "changes": [
+    {
+      "path": ".github/workflows/cloudflare-build-diagnostic.yml",
+      "claims": [
+        ".github/workflows/cloudflare-build-diagnostic.yml: the exact-current-main Worker Git authority audit must require the dedicated read-only Workers Builds user token for its primary provider readback, while request-trace and DNS-inventory credentials remain optional enrichment and cannot suppress the core authority receipt; the workflow remains read-only and cannot authorize provider mutation."
+      ]
+    },
     {
       "path": "src/buildEvents/buildEvent.ts",
       "claims": [
