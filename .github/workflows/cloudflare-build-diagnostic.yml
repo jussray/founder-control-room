@@ -65,7 +65,7 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - name: Verify dedicated read-only Cloudflare audit tokens are available
+      - name: Verify core read-only Cloudflare Builds token is available
         shell: bash
         run: |
           set -euo pipefail
@@ -73,20 +73,12 @@ jobs:
             echo "::error::FCR_CLOUDFLARE_BUILDS_USER_TOKEN is not available to this workflow."
             exit 1
           fi
-          if [ -z "$CF_REQUEST_TRACER_TOKEN" ]; then
-            echo "::error::FCR_CLOUDFLARE_REQUEST_TRACER_TOKEN is not available to this workflow."
-            exit 1
-          fi
-          if [ -z "$CF_DNS_INVENTORY_TOKEN" ]; then
-            echo "::error::FCR_CLOUDFLARE_DNS_INVENTORY_TOKEN is not available to this workflow."
-            exit 1
-          fi
 
       - name: Audit provider truth against current Worker Git authority policy
         run: node scripts/inspect-cloudflare-build.mjs
 
       - name: Discover and trace FCR Cloudflare host inventory
-        if: always() && steps.verify_head.outcome == 'success'
+        if: always() && steps.verify_head.outcome == 'success' && env.CF_REQUEST_TRACER_TOKEN != '' && env.CF_DNS_INVENTORY_TOKEN != ''
         run: node scripts/trace-cloudflare-request.mjs
 
       - name: Publish authority summary
