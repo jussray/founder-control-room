@@ -1,9 +1,11 @@
 const SESSION_KEY = 'fcr_session';
 const BOARD_SELECTOR = '#mission-lanes';
-const MAX_PROOF_READS = 24;
+const MAX_PROOF_READS = 12;
+const PROOF_CACHE_TTL_MS = 10_000;
 const ACTIVE_STATUSES = new Set(['proposed', 'sandboxed', 'in_review', 'approved']);
 const TERMINAL_STATUSES = new Set(['integrated', 'deployed', 'rejected', 'rolled_back']);
 const STYLE_ID = 'fcr-mission-board-styles';
+const proofCache = new Map();
 
 function sessionToken() {
   try {
@@ -113,16 +115,31 @@ function ensureStyles() {
   document.head.appendChild(style);
 }
 
+function cachedProof(task) {
+  const cached = proofCache.get(task.id);
+  if (!cached) return null;
+  if (cached.taskStatus !== task.status) return null;
+  if (Date.now() - cached.cachedAt > PROOF_CACHE_TTL_MS) return null;
+  return cached.proof;
+}
+
+async function readProof(task) {
+  const cached = cachedProof(task);
+  if (cached) return cached;
+
+  const body = await founderGet(`/missions/${encodeURIComponent(task.id)}/runs`);
+  const proof = proofStateFromRuns(body?.runs ?? []);
+  proofCache.set(task.id, { taskStatus: task.status, cachedAt: Date.now(), proof });
+  return proof;
+}
+
 async function collectProof(tasks) {
   const proof = new Map();
   const candidates = tasks
     .filter((task) => ACTIVE_STATUSES.has(task.status))
     .slice(0, MAX_PROOF_READS);
 
-  const results = await Promise.allSettled(candidates.map(async (task) => {
-    const body = await founderGet(`/missions/${encodeURIComponent(task.id)}/runs`);
-    return [task.id, proofStateFromRuns(body?.runs ?? [])];
-  }));
+  const results = await Promise.allSettled(candidates.map(async (task) => [task.id, await readProof(task)]));
 
   results.forEach((result) => {
     if (result.status === 'fulfilled') proof.set(result.value[0], result.value[1]);
