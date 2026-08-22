@@ -24,9 +24,10 @@ jobs:
       CF_ACCOUNT_ID: 9b59861bd1747cf7525571b4c51d2aa0
       CF_WORKER_GIT_AUTHORITY_POLICY: config/cloudflare-worker-git-authority-policy.json
       CF_API_TOKEN: ${{ secrets.FCR_CLOUDFLARE_BUILDS_USER_TOKEN }}
-      CF_REQUEST_TRACE_URL: https://www.foundercontrolroom.org/
+      CF_REQUEST_TRACE_POLICY: config/cloudflare-request-trace-host-policy.json
       CF_REQUEST_TRACE_METHOD: GET
       CF_REQUEST_TRACER_TOKEN: ${{ secrets.FCR_CLOUDFLARE_REQUEST_TRACER_TOKEN }}
+      CF_DNS_INVENTORY_TOKEN: ${{ secrets.FCR_CLOUDFLARE_DNS_INVENTORY_TOKEN }}
 
     steps:
       - name: Checkout exact audit head
@@ -64,7 +65,7 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - name: Verify dedicated read-only Workers Builds token is available
+      - name: Verify core read-only Cloudflare Builds token is available
         shell: bash
         run: |
           set -euo pipefail
@@ -74,11 +75,46 @@ jobs:
           fi
 
       - name: Audit provider truth against current Worker Git authority policy
+        id: core_authority
         run: node scripts/inspect-cloudflare-build.mjs
 
-      - name: Trace public request path through Cloudflare
+      - name: Preserve core authority verdict before optional enrichment
         if: always() && steps.verify_head.outcome == 'success'
+        shell: bash
+        run: |
+          if [ -f test-results/cloudflare-build-diagnostic.json ]; then
+            cp test-results/cloudflare-build-diagnostic.json test-results/cloudflare-build-diagnostic.core.json
+          fi
+
+      - name: Discover and trace FCR Cloudflare host inventory
+        id: trace_enrichment
+        if: always() && steps.verify_head.outcome == 'success' && env.CF_REQUEST_TRACER_TOKEN != '' && env.CF_DNS_INVENTORY_TOKEN != ''
+        continue-on-error: true
         run: node scripts/trace-cloudflare-request.mjs
+
+      - name: Restore core authority verdict after optional enrichment
+        if: always() && steps.verify_head.outcome == 'success'
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile, writeFile } from "node:fs/promises";
+
+          const corePath = "test-results/cloudflare-build-diagnostic.core.json";
+          const receiptPath = "test-results/cloudflare-build-diagnostic.json";
+
+          try {
+            const core = JSON.parse(await readFile(corePath, "utf8"));
+            const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+            if (receipt.requestTrace && typeof receipt.requestTrace === "object") {
+              receipt.requestTrace.optionalForCoreAuthority = true;
+            }
+            receipt.ok = core.ok === true;
+            receipt.error = core.error ?? null;
+            await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, "utf8");
+          } catch {
+            // If no core receipt exists, do not manufacture or upgrade authority truth.
+          }
+          NODE
 
       - name: Publish authority summary
         if: always()

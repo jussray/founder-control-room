@@ -43,13 +43,57 @@ jobs:
           path: founder-control-room
           persist-credentials: false
 
-      - name: Check out canonical Chief AI main
+      - name: Resolve paired Chief AI authority
+        id: pair-ref
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          FCR_HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          selected_ref="main"
+          source="chief-ai-machine/main"
+          remote="https://github.com/jussray/chief-ai-machine.git"
+
+          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "$FCR_HEAD_REF" ]; then
+            git check-ref-format --branch "$FCR_HEAD_REF" >/dev/null
+            if git ls-remote --exit-code --heads "$remote" "refs/heads/$FCR_HEAD_REF" >/dev/null 2>&1; then
+              selected_ref="$FCR_HEAD_REF"
+              source="paired-same-name-branch"
+            fi
+          fi
+
+          selected_sha="$(git ls-remote --exit-code --heads "$remote" "refs/heads/$selected_ref" | awk 'NR==1 {print $1}')"
+          printf '%s' "$selected_sha" | grep -Eq '^[0-9a-f]{40}$'
+
+          printf 'ref=%s\n' "$selected_ref" >> "$GITHUB_OUTPUT"
+          printf 'sha=%s\n' "$selected_sha" >> "$GITHUB_OUTPUT"
+          printf 'source=%s\n' "$source" >> "$GITHUB_OUTPUT"
+          {
+            echo '## Founder ↔ Chief pair authority'
+            echo
+            printf -- '- FCR exact source: `%s`\n' "$GITHUB_SHA"
+            printf -- '- Chief logical ref selected: `%s`\n' "$selected_ref"
+            printf -- '- Chief exact SHA selected: `%s`\n' "$selected_sha"
+            printf -- '- Selection mode: `%s`\n' "$source"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check out exact Chief AI authority
         uses: actions/checkout@v4
         with:
           repository: jussray/chief-ai-machine
-          ref: main
+          ref: ${{ steps.pair-ref.outputs.sha }}
           path: chief-ai-machine
           persist-credentials: false
+
+      - name: Verify exact Chief AI checkout
+        shell: bash
+        working-directory: chief-ai-machine
+        env:
+          EXPECTED_CHIEF_SHA: ${{ steps.pair-ref.outputs.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_CHIEF_SHA"
 
       - uses: actions/setup-node@v4
         with:
@@ -60,4 +104,7 @@ jobs:
         env:
           PAIR_CONTRACT_PATH: ../chief-ai-machine/config/founder-chief-pair.contract.json
           PAIR_CROSS_REPO_REQUIRED: 'true'
+          PAIR_SELECTED_REF: ${{ steps.pair-ref.outputs.ref }}
+          PAIR_SELECTED_SHA: ${{ steps.pair-ref.outputs.sha }}
+          PAIR_SELECTION_MODE: ${{ steps.pair-ref.outputs.source }}
         run: node scripts/verify-founder-chief-pair.mjs

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { runCompanySimulation } from './company.mjs';
+import { sha256Hex } from './sha256.mjs';
 
 export const AI_COMPANY_SANDBOX_VERSION = 'ai-company-sandbox-v1';
 
@@ -92,6 +93,7 @@ function stableStringify(value) {
 
 function fingerprint(value) {
   return createHash('sha256').update(stableStringify(value), 'utf8').digest('hex');
+  return sha256Hex(stableStringify(value));
 }
 
 function sandboxMetadata(inputFingerprint, outputFingerprint = null) {

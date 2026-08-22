@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import {
   isV10CapabilityPlan,
   type V10CapabilityPlan,
@@ -12,9 +12,9 @@ import {
 import {
   N8N_FOUNDER_CONTENT_CONTRACT,
   N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
-  dispatchProviderNeutralN8nFounderContent,
 } from '../../lib/n8nProviderNeutralFounderContentOrchestrator.js';
 import { FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT } from '../../lib/firstPartyFounderContentExecutor.js';
+import { dispatchAuthoritativeFounderContentPublishNow } from '../../lib/authoritativeFounderContentPublisher.js';
 import {
   dispatchTemporallyGovernedFounderContentPublishNow,
   type TemporallyGovernedFounderPublishInput,
@@ -22,6 +22,12 @@ import {
 import {
   founderContentOrchestrationReadiness,
   founderConveyorReadiness,
+  FOUNDER_CONTENT_APPROVAL_STORE_CONTRACT,
+  issueFounderContentApproval,
+} from '../../lib/founderContentApprovalStore.js';
+import {
+  founderContentOrchestrationReadiness,
+  resolveFounderConveyorReadiness,
 } from '../../lib/n8nConveyorReadiness.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../../lib/founderConveyorReceipt.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
@@ -33,6 +39,21 @@ type JsonRecord = Record<string, unknown>;
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function record(value: unknown): JsonRecord {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonRecord : {};
+}
+
+function publicationConfirmation(value: unknown) {
+  const candidate = record(value);
+  const truthContextHash = text(candidate.truth_context_hash);
+  return {
+    confirm_publication: candidate.confirm_publication === true,
+    authorization_hash: text(candidate.authorization_hash),
+    public_payload_hash: text(candidate.public_payload_hash),
+    ...(truthContextHash ? { truth_context_hash: truthContextHash } : {}),
+  };
 }
 
 function stage(value: unknown): FounderConveyorStage | null {
@@ -51,6 +72,28 @@ function capabilityPlan(value: unknown): V10CapabilityPlan | null {
 
 n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
   const readiness = founderConveyorReadiness();
+function providerNeutralAuthorityRequired(
+  req: FounderRequest,
+  res: Response,
+) {
+  return res.status(409).json({
+    ok: false,
+    code: 'L99_AUTHORITY_REQUIRED',
+    contract: N8N_FOUNDER_CONTENT_CONTRACT,
+    published: false,
+    authorityRequired: 'L99_PROVIDER_NEUTRAL_AUTHORITATIVE_APPROVAL_ADAPTER',
+    operation: 'orchestrate',
+    reasons: [
+      'Provider-neutral founder-content mutation remains disabled in this slice.',
+      'Only the first-party LinkedIn path may consume the new authoritative FCR approval ledger; n8n/provider scheduling must gain the same readback contract separately before re-enablement.',
+    ],
+    founder: req.founder ? { userId: req.founder.userId } : null,
+    finalPublishedTruth: 'fcr-provider-readback-only',
+  });
+}
+
+n8nConveyorRouter.get('/', async (_req: FounderRequest, res) => {
+  const readiness = await resolveFounderConveyorReadiness();
   const founderContentReadiness = founderContentOrchestrationReadiness();
   return res.json({
     contract: FOUNDER_CONVEYOR_CONTRACT,
@@ -68,6 +111,8 @@ n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
     founderContent: {
       contract: N8N_FOUNDER_CONTENT_CONTRACT,
       route: '/founder-content',
+      enabled: false,
+      blockedBy: 'L99_PROVIDER_NEUTRAL_AUTHORITATIVE_APPROVAL_ADAPTER_REQUIRED',
       inputAuthority: 'canonical-fcr-proposal-approval-firewall-input',
       providerSelection: 'founder-authenticated-bounded-platform-compatible',
       providerContractRoutes: N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
@@ -78,19 +123,31 @@ n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
       },
       readiness: founderContentReadiness,
       authority: {
-        orchestrate: true,
-        requestProviderWrite: true,
+        orchestrate: false,
+        requestProviderWrite: false,
         authorizePublication: false,
         changeCopy: false,
         markPublished: false,
         readPrivateEvidence: false,
       },
+      authoritativeApprovalStoreReadbackRequired: true,
+      callerSuppliedApprovalIsAuthority: false,
       finalPublishedTruth: 'fcr-provider-readback-only',
       directPublish: {
         contract: FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
         route: '/founder-content/publish-now',
+        approvalRoute: '/founder-content/approvals',
+        approvalStoreContract: FOUNDER_CONTENT_APPROVAL_STORE_CONTRACT,
         provider: 'linkedin',
+        routeImplemented: true,
+        executionReadiness: 'unknown-until-live-preflight',
+        runtimeReadyClaimAllowed: false,
+        nextRuntimeGate: 'Verify approval-store migration state, live provider configuration, temporal preflight, and provider readback at the exact use boundary.',
         exactCurrentYouApprovalRequired: true,
+        authoritativeApprovalStoreReadbackRequired: true,
+        approvalObjectAcceptedFromCaller: false,
+        callerSuppliedApprovalIsAuthority: false,
+        oneShotApprovalClaimRequired: true,
         temporalClaimTruthRequired: true,
         historicalTruthPreserved: true,
         currentRepoStateRevalidatedAtExecution: true,
@@ -144,30 +201,82 @@ n8nConveyorRouter.post('/advance', async (req: FounderRequest, res) => {
   });
 });
 
-n8nConveyorRouter.post('/founder-content/publish-now', async (req: FounderRequest, res) => {
-  const input = (req.body ?? {}) as unknown as TemporallyGovernedFounderPublishInput;
-  const result = await dispatchTemporallyGovernedFounderContentPublishNow(input, {
-    executedBy: req.founder!.email,
-  });
+n8nConveyorRouter.post('/founder-content/approvals', async (req: FounderRequest, res) => {
+  const body = (req.body ?? {}) as JsonRecord;
+  const founder = req.founder;
+  if (!founder) return res.status(401).json({ ok: false, code: 'FOUNDER_SESSION_REQUIRED' });
+  if (body.confirm_exact_copy !== true) {
+    return res.status(400).json({
+      ok: false,
+      code: 'EXACT_COPY_CONFIRMATION_REQUIRED',
+      contract: FOUNDER_CONTENT_APPROVAL_STORE_CONTRACT,
+      reasons: ['confirm_exact_copy must be true before FCR issues publication authority'],
+    });
+  }
+  if (Object.hasOwn(body, 'approval')) {
+    return res.status(400).json({
+      ok: false,
+      code: 'CALLER_APPROVAL_OBJECT_FORBIDDEN',
+      contract: FOUNDER_CONTENT_APPROVAL_STORE_CONTRACT,
+      reasons: ['FCR issues the approval object; callers may not submit or override it'],
+    });
+  }
 
-  return res.status(result.status).json({
-    ...result,
-    founder: req.founder ? { userId: req.founder.userId } : null,
-    finalPublishedTruth: 'fcr-provider-readback-only',
-    currentTruthPolicy: 'historical-preserved-current-revalidated',
+  try {
+    const issued = await issueFounderContentApproval({
+      proposal: record(body.proposal),
+      founderUserId: founder.userId,
+    });
+    return res.status(201).json({
+      ok: true,
+      contract: issued.contract,
+      approval_id: issued.approvalId,
+      proposal_hash: issued.proposalHash,
+      public_payload_hash: issued.publicPayloadHash,
+      authorization_hash: issued.authorizationHash,
+      platform: issued.platform,
+      source: { repo: issued.sourceRepo, commit_sha: issued.sourceCommitSha },
+      approved_at: issued.approvedAt,
+      expires_at: issued.expiresAt,
+      one_shot: true,
+      caller_supplied_approval_is_authority: false,
+      next_gate: 'Confirm publication of this exact public payload before expiry.',
+    });
+  } catch (error) {
+    return res.status(409).json({
+      ok: false,
+      code: 'APPROVAL_NOT_ISSUED',
+      contract: FOUNDER_CONTENT_APPROVAL_STORE_CONTRACT,
+      reasons: [error instanceof Error ? error.message : 'authoritative approval issuance failed'],
+    });
+  }
+});
+
+n8nConveyorRouter.post('/founder-content/publish-now', async (req: FounderRequest, res) => {
+  const body = (req.body ?? {}) as JsonRecord;
+  const founder = req.founder;
+  if (!founder) return res.status(401).json({ ok: false, code: 'FOUNDER_SESSION_REQUIRED' });
+  if (Object.hasOwn(body, 'approval')) {
+    return res.status(400).json({
+      ok: false,
+      code: 'CALLER_APPROVAL_OBJECT_FORBIDDEN',
+      contract: FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
+      published: false,
+      reasons: ['publish-now accepts only an FCR-issued approval_id, never caller-supplied approval authority'],
+    });
+  }
+
+  const result = await dispatchAuthoritativeFounderContentPublishNow({
+    proposal: record(body.proposal),
+    approval_id: text(body.approval_id),
+    confirmation: publicationConfirmation(body.confirmation),
+  }, {
+    founderUserId: founder.userId,
+    founderIdentity: founder.email,
   });
+  return res.status(result.status).json(result);
 });
 
 n8nConveyorRouter.post('/founder-content', async (req: FounderRequest, res) => {
-  const input = (req.body ?? {}) as JsonRecord;
-  const result = await dispatchProviderNeutralN8nFounderContent(input, {
-    executedBy: req.founder!.email,
-  });
-
-  return res.status(result.status).json({
-    ...result,
-    contract: N8N_FOUNDER_CONTENT_CONTRACT,
-    founder: req.founder ? { userId: req.founder.userId } : null,
-    finalPublishedTruth: 'fcr-provider-readback-only',
-  });
+  return providerNeutralAuthorityRequired(req, res);
 });

@@ -1,6 +1,8 @@
+import { installMissionBoard } from './mission-board.js';
+
 const PENDING_TAB_KEY = 'fcr_pending_tab';
 const SESSION_KEY = 'fcr_session';
-const CONVEYOR_CONTRACT = 'founder-control-room/n8n-conveyor@v2';
+const CONVEYOR_CONTRACT = 'founder-control-room/n8n-conveyor@v3';
 const ALLOWED_TABS = new Set([
   'projects',
   'missions',
@@ -15,6 +17,7 @@ const READINESS_COPY = {
   'not-configured': 'n8n not configured',
   'ready-for-probe': 'n8n configured · live probe required',
   'enabled-awaiting-proof': 'n8n enabled · live proof missing',
+  'enabled-live-verified': 'n8n live · exact-head receipt verified',
 };
 
 function safeSessionGet(key) {
@@ -64,6 +67,15 @@ function setConveyorReadiness(state, label) {
   text.textContent = label;
 }
 
+function readinessCopy(readiness) {
+  if (readiness?.state === 'enabled-awaiting-proof') {
+    if (readiness?.proof?.state === 'stale-head') return 'n8n enabled · prior proof stale';
+    if (readiness?.proof?.state === 'readback-unavailable') return 'n8n enabled · proof readback unavailable';
+    if (readiness?.proof?.state === 'runtime-sha-unavailable') return 'n8n enabled · runtime SHA unavailable';
+  }
+  return READINESS_COPY[readiness?.state] ?? null;
+}
+
 async function refreshConveyorReadiness() {
   const token = founderAccessToken();
   if (!token) {
@@ -99,7 +111,7 @@ async function refreshConveyorReadiness() {
     }
 
     const state = body?.readiness?.state;
-    const label = READINESS_COPY[state];
+    const label = readinessCopy(body?.readiness);
     if (!label) {
       setConveyorReadiness('error', 'n8n readiness unavailable');
       return;
@@ -158,4 +170,5 @@ if (launchDock instanceof HTMLDetailsElement) {
   });
 }
 
+installMissionBoard();
 void refreshConveyorReadiness();

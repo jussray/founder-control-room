@@ -13,6 +13,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   DOC_TRUTH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+  TEST_DISCOVERY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
 
 jobs:
   typecheck:
@@ -88,6 +89,7 @@ jobs:
   e2e:
     name: Playwright e2e
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Check out exact head
         uses: actions/checkout@v4
@@ -230,6 +232,29 @@ jobs:
           node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
 
+  test-discovery:
+    name: Test discovery ratchet
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Prove the discovery ratchet rejects baseline laundering
+        run: node --test scripts/verify-test-discovery.node-test.mjs
+      - name: Verify no test is excluded from default discovery without base-bound debt
+        run: npm run verify:test-discovery
+
   migration-lint:
     name: Migration lint
     runs-on: ubuntu-latest
@@ -252,6 +277,7 @@ jobs:
       - e2e
       - python-tests
       - rls-contract
+      - test-discovery
       - documentation-truth
       - cloudflare-bridge-authority
     runs-on: ubuntu-latest
@@ -265,17 +291,19 @@ jobs:
           E2E_RESULT: ${{ needs.e2e.result }}
           PYTHON_RESULT: ${{ needs.python-tests.result }}
           RLS_RESULT: ${{ needs.rls-contract.result }}
+          DISCOVERY_RESULT: ${{ needs.test-discovery.result }}
           DOCUMENTATION_TRUTH_RESULT: ${{ needs.documentation-truth.result }}
           CLOUDFLARE_AUTHORITY_RESULT: ${{ needs.cloudflare-bridge-authority.result }}
         run: |
           set -euo pipefail
-          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\npython=%s\nrls=%s\ndocumentation_truth=%s\ncloudflare_authority=%s\n' \
+          printf 'typecheck=%s\nlint=%s\ntest=%s\ne2e=%s\npython=%s\nrls=%s\ndiscovery=%s\ndocumentation_truth=%s\ncloudflare_authority=%s\n' \
             "$TYPECHECK_RESULT" \
             "$LINT_RESULT" \
             "$TEST_RESULT" \
             "$E2E_RESULT" \
             "$PYTHON_RESULT" \
             "$RLS_RESULT" \
+            "$DISCOVERY_RESULT" \
             "$DOCUMENTATION_TRUTH_RESULT" \
             "$CLOUDFLARE_AUTHORITY_RESULT"
 
@@ -286,6 +314,7 @@ jobs:
             "$E2E_RESULT" \
             "$PYTHON_RESULT" \
             "$RLS_RESULT" \
+            "$DISCOVERY_RESULT" \
             "$DOCUMENTATION_TRUTH_RESULT" \
             "$CLOUDFLARE_AUTHORITY_RESULT"; do
             if [ "$result" != "success" ]; then

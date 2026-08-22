@@ -226,8 +226,9 @@ For every truth-sensitive change to architecture, authority, publishing, provide
 3. preserve provenance explaining why an older statement was once valid;
 4. run `Documentation Truth` on the exact PR head;
 5. require Documentation Truth in CI / Required Gate;
-6. run the same verifier on the merged-main transition; and
-7. if provider/runtime reality changes after merge, re-observe and repair the affected current-state doc before reusing its present-tense claim.
+6. for default test discovery, bind existing excluded-test debt to the exact base and reject both candidate-added and stale ledger entries;
+7. run the same verifier on the merged-main transition; and
+8. if provider/runtime reality changes after merge, re-observe and repair the affected current-state doc before reusing its present-tense claim.
 
 A docs-only truth-sync merge closes an existing drift cycle. The post-merge verifier closes that transition; it does not create an infinite requirement to rewrite itself again.
 
@@ -302,7 +303,7 @@ Review is a fresh attack, not self-congratulation.
 9. Rerun required checks on the exact head.
 10. Re-observe runtime/provider/design/analytics/docs evidence.
 
-Do not approve merely because the author and reviewer are the same agent.
+Do not call author approval “independent review.” For canonical FCR merges, independent deterministic review attacks the patch first; the authenticated founder-final receipt supplies the separate final human authority for that exact candidate.
 
 ## Merge gate
 
@@ -317,13 +318,16 @@ Merge only when:
 - user-facing changes have current Playwright proof when relevant;
 - Documentation Truth is green when applicable;
 - required independent review is genuinely satisfied by the repository's current authority membrane;
+- for canonical FCR in-app merges, deterministic exact-head review is green **before** an authenticated founder-final approval bound to the exact PR/base/head is accepted;
 - no unresolved critical review thread remains;
 - runtime/provider evidence is sufficient for the claim;
 - privacy, security, brand, data, and Sauce Guard boundaries pass;
 - rollback is understood; and
 - the PR does not mix unrelated risky work.
 
-FCR in-app independent-review enforcement and the live GitHub repository ruleset are separate authority surfaces. Never claim one proves the other without provider readback.
+Founder-final authority does not turn founder self-review into independent review, and it does not waive deterministic review, exact-head proof, P2 blocking, provider identity/diff readback, or last-moment ref freshness.
+
+FCR in-app deterministic-review/founder-final enforcement and the live GitHub repository ruleset are separate authority surfaces. Never claim one proves the other without provider readback.
 
 Use expected-head protection when supported. If `main` or the candidate head moves, prior green becomes historical and the candidate must be re-observed/reacquired.
 
@@ -363,7 +367,7 @@ After each merge or blocked attempt:
 8. Merge only if the current authority membrane is satisfied.
 9. Record proof, rollback, documentation state, truth age, and next gate.
 
-Do not run an uncontrolled autonomous merge loop. Each iteration remains bounded by current evidence, repository rules, independent review, provider permissions, temporal/documentation truth, and explicit irreversible-action gates.
+Do not run an uncontrolled autonomous merge loop. Each iteration remains bounded by current evidence, repository rules, independent review, founder-final authority where applicable, provider permissions, temporal/documentation truth, and explicit irreversible-action gates.
 
 ## Completion report
 

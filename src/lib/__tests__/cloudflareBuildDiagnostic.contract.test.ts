@@ -49,12 +49,21 @@ describe("Cloudflare Worker Git authority audit", () => {
     );
   });
 
-  it("fails explicitly when the dedicated observer token is unavailable", () => {
+  it("requires the core Builds token while keeping trace and DNS enrichment optional", () => {
     expect(workflow).toContain(
-      "Verify dedicated read-only Workers Builds token is available",
+      "Verify core read-only Cloudflare Builds token is available",
     );
     expect(workflow).toContain(
       "FCR_CLOUDFLARE_BUILDS_USER_TOKEN is not available to this workflow.",
+    );
+    expect(workflow).not.toContain(
+      "FCR_CLOUDFLARE_REQUEST_TRACER_TOKEN is not available to this workflow.",
+    );
+    expect(workflow).not.toContain(
+      "FCR_CLOUDFLARE_DNS_INVENTORY_TOKEN is not available to this workflow.",
+    );
+    expect(workflow).toContain(
+      "env.CF_REQUEST_TRACER_TOKEN != '' && env.CF_DNS_INVENTORY_TOKEN != ''",
     );
   });
 

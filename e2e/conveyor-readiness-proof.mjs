@@ -9,12 +9,16 @@ const here = dirname(fileURLToPath(import.meta.url));
 const publicDir = resolve(here, '../public');
 const outputDir = resolve(here, '../test-results');
 const SESSION_KEY = 'fcr_session';
-const CONTRACT = 'founder-control-room/n8n-conveyor@v2';
+const CONTRACT = 'founder-control-room/n8n-conveyor@v3';
 const TOKEN = 'proof-token';
+const EXACT_SHA = 'a'.repeat(40);
+const STALE_SHA = 'b'.repeat(40);
 
 await mkdir(outputDir, { recursive: true });
 
 let readinessState = 'ready-for-probe';
+let proofState = 'not-observed';
+let proofHead = null;
 let lastAuthorization = null;
 
 const contentTypes = {
@@ -64,15 +68,22 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    const liveVerified = readinessState === 'enabled-live-verified';
     json(res, 200, {
       contract: CONTRACT,
       stages: ['chat', 'workflows', 'code', 'projects', 'skills'],
       readiness: {
         state: readinessState,
         configured: readinessState !== 'not-configured',
-        enabled: readinessState === 'enabled-awaiting-proof',
-        liveProbeRequired: true,
-        liveVerified: false,
+        enabled: readinessState.startsWith('enabled-'),
+        liveProbeRequired: !liveVerified,
+        liveVerified,
+        proof: {
+          state: proofState,
+          receiptId: liveVerified ? `fcr-conveyor-receipt-v3:${'c'.repeat(64)}` : null,
+          expectedHeadSha: proofHead,
+          observedAt: proofHead ? '2026-08-21T21:30:00.000Z' : null,
+        },
       },
       authority: {
         advanceStage: true,
@@ -131,6 +142,12 @@ async function expectReadiness(state, label) {
   assert.equal(await page.locator('[data-conveyor-readiness-label]').innerText(), label);
 }
 
+async function refreshDock() {
+  const dock = page.locator('.launch-dock > summary');
+  await dock.click();
+  await dock.click();
+}
+
 try {
   await page.goto(`${baseUrl}/control-room/`, { waitUntil: 'domcontentloaded' });
 
@@ -139,9 +156,16 @@ try {
   await page.locator('.launch-dock > summary').click();
   await expectReadiness('ready-for-probe', 'n8n configured · live probe required');
   assert.equal(lastAuthorization, `Bearer ${TOKEN}`);
-  await page.locator('.conveyor-readiness').scrollIntoViewIfNeeded();
+  await page.locator('[data-conveyor-readiness]').scrollIntoViewIfNeeded();
 
-  const initialText = await page.locator('.conveyor-readiness').innerText();
+  const genesisLink = page.locator('[data-genesis-evidence]');
+  await genesisLink.waitFor({ state: 'visible' });
+  assert.equal(await genesisLink.getAttribute('href'), '/control-room/genesis.html');
+  assert.match(await genesisLink.innerText(), /Genesis evidence.*view origin record/i);
+  assert.equal(await genesisLink.getAttribute('data-state'), null, 'Genesis evidence link must not carry readiness state');
+  assert.equal(await genesisLink.getAttribute('class'), 'genesis-evidence-link', 'Genesis evidence link must not reuse readiness styling');
+
+  const initialText = await page.locator('[data-conveyor-readiness]').innerText();
   assert.doesNotMatch(initialText, /verified/i);
 
   const dimensions = await page.evaluate(() => ({
@@ -152,32 +176,64 @@ try {
   assert.equal(dimensions.pageWidth, dimensions.viewportWidth, 'readiness UI must not overflow the mobile viewport');
   assert(dimensions.dockWidth <= dimensions.viewportWidth, 'founder stack dock must fit mobile viewport');
 
+  readinessState = 'enabled-awaiting-proof';
+  proofState = 'not-observed';
+  proofHead = EXACT_SHA;
+  await refreshDock();
+  await expectReadiness('enabled-awaiting-proof', 'n8n enabled · live proof missing');
+
+  proofState = 'stale-head';
+  proofHead = STALE_SHA;
+  await refreshDock();
+  await expectReadiness('enabled-awaiting-proof', 'n8n enabled · prior proof stale');
+
+  proofState = 'readback-unavailable';
+  proofHead = EXACT_SHA;
+  await refreshDock();
+  await expectReadiness('enabled-awaiting-proof', 'n8n enabled · proof readback unavailable');
+
+  readinessState = 'enabled-live-verified';
+  proofState = 'verified';
+  proofHead = EXACT_SHA;
+  await refreshDock();
+  await expectReadiness('enabled-live-verified', 'n8n live · exact-head receipt verified');
+  assert.match(await page.locator('[data-conveyor-readiness]').innerText(), /verified/i);
+
   await page.screenshot({
-    path: resolve(outputDir, 'conveyor-readiness-mobile.png'),
+    path: resolve(outputDir, 'conveyor-readiness-live-verified-mobile.png'),
     fullPage: true,
   });
 
-  readinessState = 'enabled-awaiting-proof';
-  await page.locator('.launch-dock > summary').click();
-  await page.locator('.launch-dock > summary').click();
-  await expectReadiness('enabled-awaiting-proof', 'n8n enabled · live proof missing');
-
   readinessState = 'not-configured';
-  await page.locator('.launch-dock > summary').click();
-  await page.locator('.launch-dock > summary').click();
+  proofState = 'not-observed';
+  proofHead = null;
+  await refreshDock();
   await expectReadiness('not-configured', 'n8n not configured');
 
-  const finalText = await page.locator('.conveyor-readiness').innerText();
+  const finalText = await page.locator('[data-conveyor-readiness]').innerText();
   assert.doesNotMatch(finalText, /verified/i);
+
+  await genesisLink.click();
+  await page.waitForURL('**/control-room/genesis.html');
+  await page.locator('[data-testid="genesis-demo"]').waitFor({ state: 'visible' });
+  assert.match(await page.locator('[data-testid="authority-boundary"]').innerText(), /demo provenance only/i);
 
   console.log(JSON.stringify({
     ok: true,
     route: '/control-room/',
     viewport: '390x844',
     contract: CONTRACT,
-    provedStates: ['ready-for-probe', 'enabled-awaiting-proof', 'not-configured'],
+    provedStates: [
+      'ready-for-probe',
+      'enabled-awaiting-proof:not-observed',
+      'enabled-awaiting-proof:stale-head',
+      'enabled-awaiting-proof:readback-unavailable',
+      'enabled-live-verified',
+      'not-configured',
+    ],
     authorization: 'Bearer <redacted>',
-    screenshot: 'test-results/conveyor-readiness-mobile.png',
+    genesisRoute: '/control-room/genesis.html',
+    screenshot: 'test-results/conveyor-readiness-live-verified-mobile.png',
     overflow: dimensions,
   }, null, 2));
 } finally {

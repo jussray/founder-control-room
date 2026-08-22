@@ -44,6 +44,12 @@ const FCR_PROJECT = {
   repo_identifier: "jussray/founder-control-room",
 };
 
+const FCR_ALIAS_PROJECT = {
+  repo_provider: "github",
+  slug: "fcr-alias",
+  repo_identifier: "jussray/founder-control-room",
+};
+
 const OTHER_PROJECT = {
   repo_provider: "github",
   slug: "sekret-bip",
@@ -86,6 +92,20 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
 
     expect(mockGetPullRequestReviewContext).toHaveBeenCalledWith("founder-control-room", 474);
     expect(mockListReviewSignals).toHaveBeenCalledWith("founder-control-room", 474);
+  });
+
+  it("canonicalizes an alias of the FCR repository before review and integration authority", async () => {
+    const provider = providerForProject(FCR_ALIAS_PROJECT);
+
+    await expect(provider.getPullRequestReviewContext!("fcr-alias", 474))
+      .resolves.toEqual(reviewContext);
+    await expect(provider.integrate("fcr-alias", "main", "mission/review-gate"))
+      .resolves.toBe("merge-sha");
+
+    expect(mockGetPullRequestReviewContext).toHaveBeenCalledWith("founder-control-room", 474);
+    expect(mockResolveRef).toHaveBeenNthCalledWith(1, "founder-control-room", "main");
+    expect(mockResolveRef).toHaveBeenNthCalledWith(2, "founder-control-room", "mission/review-gate");
+    expect(mockIntegrate).toHaveBeenCalledWith("founder-control-room", "main", "mission/review-gate");
   });
 
   it("blocks FCR integration when no exact PR context was read in the same execution", async () => {

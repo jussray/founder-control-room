@@ -136,7 +136,8 @@ For truth-sensitive architecture, authority, publishing, capability, provider, w
 - mark contradictory older material historical/superseded or point it to the newer authority rather than deleting provenance;
 - run `Documentation Truth` on the exact PR head;
 - require Documentation Truth inside CI / Required Gate;
-- run it again on merged `main`; and
+- run it again on merged `main`;
+- bind default test-discovery debt to the exact base so a candidate cannot launder a new excluded test into its own baseline; and
 - re-read provider/runtime truth after merge before reusing present-tense production claims.
 
 Do not hard-code a durable “current main SHA” into prose and pretend it renews itself. Exact SHAs belong in receipts and historical evidence; current identity is resolved at use time.
@@ -180,13 +181,15 @@ Investor email remains separate. Never auto-send without both the applicable sta
 
 ## FCR merge review boundary
 
-The current in-app FCR merge path requires exact provider PR identity, exact-head machine proof, canonical diff/policy hashes, provider-backed review witnesses, independent non-author semantic review, deterministic review, P2 blocking, and a final mutable-head re-read before provider integration.
+The canonical in-app FCR merge path uses **deterministic independent review followed by authenticated founder-final approval**. It requires exact provider PR identity, exact-head machine proof, canonical diff/policy hashes, a passed deterministic exact-head review witness, P2 blocking, an authenticated founder-final receipt pinned to the exact PR/base/head, and a final mutable-head re-read before provider integration.
 
-For FCR, the review policy consumed by the evaluator must match server-owned reviewer trust from `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS`. Caller data may not redefine that trusted set.
+The deterministic review receipt remains proposal-only and cannot authorize the merge. Founder final approval is the separate human authority layer and must never be described as independent review. New founder-final approvals use a server-owned policy with zero required semantic humans and cannot be weakened by caller-supplied policy.
+
+The older `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` policy is compatibility-only for missions already pinned under the prior non-author semantic-review model. It is not a prerequisite for new canonical founder-final approvals.
 
 This source/runtime membrane does **not** prove the live GitHub repository ruleset independently enforces the same protections. Required approvals, stale-review dismissal, last-push approval, review-thread requirements, strict status freshness, and bypass actor/mode configuration are separate live-provider facts requiring current GitHub readback.
 
-Never use a GitHub merge that occurred outside the in-app FCR path as proof that the in-app review contract executed.
+Never use a GitHub merge that occurred outside the in-app FCR path as proof that the in-app founder-final contract executed.
 
 ## Provider roles
 
@@ -227,7 +230,7 @@ Require the applicable exact founder/provider authority before:
 - destructive database/event-history changes;
 - publication, sending, or external communication unless a current narrower contract explicitly authorizes that exact route/class.
 
-Repository merges are governed by `docs/FOUNDER_MERGE_AUTHORITY.md` and the applicable independent-review/provider gates.
+Repository merges are governed by `docs/FOUNDER_MERGE_AUTHORITY.md` and the applicable deterministic-review, founder-final, and provider gates.
 
 An audit authorizes inspection, not mutation.
 

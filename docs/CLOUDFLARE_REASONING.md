@@ -162,11 +162,38 @@ Observe the contradiction
 → automate only repeated read-only evidence refresh
 ```
 
+## Read-only hostname inventory and Request Trace
+
+The manual `Cloudflare Worker Git Authority Audit` has a bounded provider-observation lane for FCR hostnames. Its primary Worker Git authority readback depends only on the dedicated read-only Workers Builds user token. DNS inventory and Request Trace credentials are optional enrichment: when either is unavailable, hostname/trace enrichment is skipped and remains `UNKNOWN`, but that absence must not suppress the core Worker Git authority receipt. If optional enrichment is attempted and then fails because credentials are malformed, provider reads are rejected, the request method is unsafe, or the returned provider evidence is invalid, that failure remains visible inside the bounded `requestTrace` evidence lane but cannot downgrade or upgrade the snapshotted core Worker Git authority verdict.
+
+Its source contract:
+
+- resolves the reviewed `foundercontrolroom.org` zone through a dedicated read-only DNS inventory authority when that enrichment credential is available;
+- paginates the zone's A, AAAA, and CNAME records and derives in-zone HTTP-relevant hostnames without retaining DNS `content`, origin IPs, or target values;
+- compares the discovered inventory with `config/cloudflare-request-trace-host-policy.json`;
+- classifies new hosts, missing required hosts, proxy-state drift, wildcard hosts, DNS-only hosts, and directly traceable proxied hosts;
+- runs Cloudflare Request Trace independently for each eligible proxied hostname through a separate read-only Request Tracer authority when both enrichment credentials are available; and
+- writes only the sanitized inventory/trace receipt, including an inventory hash and bounded trace summaries.
+
+The workflow intentionally requires its requested SHA to equal current `main` before provider observation. A PR source check can prove the audit code and contract, but it cannot prove current Cloudflare hostname inventory. Until the manual workflow runs successfully against an exact still-current main SHA, live hostname/proxy/trace state remains `UNKNOWN` rather than inferred from repository configuration.
+
+The receipt preserves `requestSimulation: true`, `runtimeShaVerified: false`, and `canAuthorizeProviderMutation: false`. It therefore cannot authorize or prove a DNS mutation, Access change, route change, Worker deployment, credential change, or production release. The workflow may restore the top-level core `ok`/`error` verdict after optional enrichment, but it may not create a successful core verdict when the core receipt is absent or failed.
+
 ## Project-scoped outbound email
 
 Cloudflare outbound email is a capability boundary, not a global portfolio transport. Founder Control Room's canonical Worker uses the `FCR_EMAIL` send binding and pins the sender identity to `welcome@api.foundercontrolroom.org`; the application wrapper does not accept caller-controlled `from`. Other projects do not inherit that binding merely because they share the same founder or Cloudflare account.
 
 Repository configuration can prove the desired binding name and sender restriction. It cannot prove Cloudflare has onboarded the sender domain, the deployed Worker currently exposes that binding, or a message was accepted/delivered. Those claims require fresh provider/runtime evidence and must remain separate from source truth.
+
+## Worker build authority membrane
+
+`wrangler.worker.toml` runs `scripts/verify-worker-build-authority.mjs` as its custom Worker build hook. The hook is a repository-side fail-closed membrane, not a provider mutation authority.
+
+For native Cloudflare Workers Builds, the membrane requires the provider-reported commit SHA to equal the checked-out Git source, requires branch/build UUID evidence, and permits only the non-promoting `wrangler versions upload` command. A native `wrangler deploy` is rejected before promotion with `NATIVE_WORKER_GIT_PROMOTION_BLOCKED`.
+
+For GitHub Actions, production promotion is recognized only for the manual `Deploy` or `FCR Worker Reconcile` workflow-dispatch lanes when the checked-out SHA equals the exact GitHub workflow SHA. Ordinary CI remains verification-only. The emitted `fcr/worker-build-authority-receipt@v1` is redacted build evidence and explicitly cannot authorize provider mutation.
+
+This source membrane does not prove the current Cloudflare Workers Builds dashboard configuration, custom-domain routing, active deployment, or runtime SHA. Those remain separate provider/runtime readback gates.
 
 ## Verification
 

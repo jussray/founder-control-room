@@ -94,6 +94,94 @@ describe('BuildEvent contract', () => {
     }))).toContain('branch-head repository refs require a branch');
   });
 
+
+  it('keeps release coverage aggregate, route-classed, and separate from a runtime witness', () => {
+    const event = createBuildEvent(base({
+      source: 'cloudflare',
+      category: 'analytics',
+      phase: 'observe',
+      truth: 'verified',
+      status: 'passed',
+      coverage: {
+        service: 'sekret-bip-production',
+        environment: 'production',
+        releaseSha: SHA,
+        windowStartedAt: '2026-08-16T04:00:00Z',
+        windowEndedAt: '2026-08-16T04:15:00Z',
+        sampleSource: 'analytics-engine',
+        requestCount: 25,
+        currentReleaseRequestCount: 24,
+        priorReleaseRequestCount: 1,
+        unclassifiedRequestCount: 0,
+        routeClasses: [{
+          name: 'front-door',
+          requestCount: 25,
+          currentReleaseRequestCount: 24,
+          priorReleaseRequestCount: 1,
+          unclassifiedRequestCount: 0,
+        }],
+        tailReasons: ['cached-edge-response'],
+      },
+    }));
+
+    expect(event.coverage?.routeClasses[0]?.name).toBe('front-door');
+    expect(event.runtime).toBeUndefined();
+
+    const synthetic = validateBuildEvent(base({
+      source: 'playwright',
+      category: 'analytics',
+      phase: 'observe',
+      truth: 'verified',
+      status: 'passed',
+      coverage: {
+        service: 'sekret-bip-production',
+        environment: 'production',
+        releaseSha: SHA,
+        windowStartedAt: '2026-08-16T04:00:00Z',
+        windowEndedAt: '2026-08-16T04:15:00Z',
+        sampleSource: 'synthetic-probe',
+        requestCount: 1,
+        currentReleaseRequestCount: 1,
+        priorReleaseRequestCount: 0,
+        unclassifiedRequestCount: 0,
+        routeClasses: [{
+          name: 'front-door',
+          requestCount: 1,
+          currentReleaseRequestCount: 1,
+          priorReleaseRequestCount: 0,
+          unclassifiedRequestCount: 0,
+        }],
+      },
+    }));
+    expect(synthetic).toContain('synthetic coverage cannot be verified');
+
+    const rawPath = validateBuildEvent(base({
+      source: 'cloudflare',
+      category: 'analytics',
+      phase: 'observe',
+      coverage: {
+        service: 'sekret-bip-production',
+        environment: 'production',
+        releaseSha: SHA,
+        windowStartedAt: '2026-08-16T04:00:00Z',
+        windowEndedAt: '2026-08-16T04:15:00Z',
+        sampleSource: 'provider-logs',
+        requestCount: 1,
+        currentReleaseRequestCount: 1,
+        priorReleaseRequestCount: 0,
+        unclassifiedRequestCount: 0,
+        routeClasses: [{
+          name: '/api/private?email=user@example.com',
+          requestCount: 1,
+          currentReleaseRequestCount: 1,
+          priorReleaseRequestCount: 0,
+          unclassifiedRequestCount: 0,
+        }],
+      },
+    }));
+    expect(rawPath).toContain('coverage.routeClasses[0].name is invalid');
+  });
+
   it('requires evidence for verified claims and exact SHA shape', () => {
     expect(validateBuildEvent(base({ evidenceRefs: [], evidenceUrls: [] }))).toContain(
       'verified events require at least one evidence URL or evidence reference',

@@ -10,7 +10,7 @@ It manages Se'kret Bip and related founder systems without making GitHub, Cloudf
 
 ## Current repository truth
 
-**Current identity is resolved at use time.** A hard-coded SHA, date, PR body, issue comment, screenshot, or provider result is historical evidence once the underlying state moves.
+**Current identity is resolved at use time only by a separately authorized live-provider revalidation.** A hard-coded SHA, date, PR body, issue comment, screenshot, provider result, or received webhook is historical evidence once the underlying state moves. A stored GitHub branch-head event is explicitly a last-observed source fact, not current-main proof.
 
 For a present-tense repository claim:
 
@@ -25,17 +25,27 @@ Exact SHAs belong in PRs, retained receipts, artifacts, incident records, and hi
 Current implementation includes:
 
 - provider-independent repository abstractions and guarded exact-head execution;
+- an obligation-aware work supersession contract in which stale/similar branches are only candidates, provider inventory and required residue must be fully and singly accounted, replacement provenance must remain explicit and acyclic, runtime-sensitive closure proof must be current-head-bound, and historical evidence remains recoverable;
+- a canonical repository-provider deletion membrane: ambient `deleteBranch()` authority is intentionally absent until a future obligation-aware receipt reconciler exists and proves safe retirement before provider mutation;
 - founder proof, idempotency/reservation, and rollback boundaries;
 - an FCR-specific provider-grounded independent-review membrane before in-app provider integration;
-- server-owned FCR semantic reviewer trust through `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` at the review evaluator boundary;
+- a canonical FCR founder-final merge policy that keeps deterministic independent review load-bearing, binds authenticated founder approval to the exact PR/base/head, and preserves the older server-owned semantic-review policy only for already-pinned compatibility paths;
 - canonical capability governance through `.control/capability.json`;
 - deterministic Cloudflare reasoning, request-trace/source contracts, and founder-gated Access recovery tooling whose source existence does not itself prove live provider configuration;
+- a read-only Cloudflare hostname-inventory witness that discovers the reviewed zone's HTTP-relevant DNS names, classifies inventory/proxy drift, and simulates Request Trace per eligible proxied hostname without granting provider-mutation authority or persisting DNS targets/origin IPs;
 - a secret-free exact-head Cloudflare bridge authority contract that is load-bearing inside CI / `Required Gate`, while live Cloudflare and GitHub provider state remain separate authority facts;
+- a repository-owned Worker build authority membrane that binds native Workers Builds to the checked-out source SHA, permits only non-promoting native version uploads, and reserves production promotion for exact manual GitHub release authority without claiming live provider configuration;
 - freshness-aware federated truth receipts and a bounded Truth Lease contract for claims that can decay;
+- evidence-dependent consequential portfolio execution that binds founder authorization to the exact approved decision context and Truth Lease, then re-observes the lease dependencies at the declared use boundary so changed, stale, missing, or invalidated truth forces reconfirmation instead of execution;
+- a production-specific Truth Lease composer that can bind one exact repository head to matching Cloudflare Worker/Pages runtime identity, Supabase production-state evidence, exact-runtime Playwright proof, and exact-head independent review, while failing closed when any required dependency is changed, stale, missing, or mismatched at use time;
+- a typed [release-identity / rollout-coverage contract](docs/RELEASE_IDENTITY_AND_COVERAGE.md) that keeps binary version identity separate from privacy-safe aggregate traffic observation, with predeclared thresholds and no merge, deploy, or authorization effect;
+- a project-bound, independently witnessed rollout-coverage ingress that accepts only Cloudflare aggregate `passed` observations, rejects self-attested/control-plane claims, wrong deployment targets, stale/out-of-order evidence, and expired coverage windows, and withholds current coverage until a read-through GitHub main revalidation supplies the matching identity;
 - a durable founder-only **Founder Switchboard** with explicit BUILT / CONFIGURED / ACTIVE / PROVEN states and guarded authority modes;
 - a privacy-safe public skill-testing evidence loop with `/devil` v1 structured receipts and aggregate analytics;
-- first-party LinkedIn founder-content execution with exact Current You authority, temporal revalidation, one-shot reservation, and provider readback requirements;
+- first-party LinkedIn founder-content execution with exact Current You authority, FCR-owned one-shot approval storage/claim, temporal revalidation, and provider readback requirements;
 - provider-neutral n8n founder-content orchestration contracts that keep contract capability separate from runtime configuration and final provider outcome;
+- provider-neutral founder-content contracts under `tools/founder-content-contracts/`, with core approval storage, first-party execution, and temporal revalidation importing the canonical provider-neutral authorization contract directly while `tools/zapier/` remains a compatibility export surface for bounded connector and scheduling callers;
+- founder-authenticated n8n/Buffer activation readiness that exposes configuration presence and provider allowlist state without returning webhook/token values, and promotes the canonical conveyor to `enabled-live-verified` only when a retained activation-probe receipt matches the deployed exact `GIT_SHA`; stale, missing, or unreadable proof remains non-live and fail-closed;
 - bounded Zapier/Buffer integration where it still adds connector, scheduling, or fallback value without becoming publication authority;
 - HubSpot integration boundaries that keep CRM metadata and external communication separate from repository truth and founder authority;
 - desktop/mobile Playwright proof for scoped Control Room behavior; and
@@ -59,9 +69,11 @@ change the operational truth
 -> re-observe provider/runtime facts before reusing present-tense claims
 ```
 
+Default-suite test discovery has a bounded evidence claim: a baseline entry means the file is excluded from the default `npm test` suite, not that it never ran in every CI workflow. The base-bound ratchet cannot accept newly excluded candidate tests and requires stale debt entries to be removed.
+
 Historical material stays available as provenance. When it no longer describes current authority, mark it `HISTORICAL`, `SUPERSEDED`, `STALE`, `REVALIDATION_REQUIRED`, or point it to the current authority instead of deleting the record or letting it compete silently with fresh truth.
 
-The verifier emits sanitized counts, domains, coverage, and failure reasons only. It does not store credentials, raw private evidence, raw diffs, private prompts, customer data, private metrics, or provider payloads. Analytics may observe documentation drift but never authorize, renew, or rewrite objective truth.
+The verifier emits sanitized counts, domains, coverage, and failure reasons only. A truth-sensitive change must also update a structured documentation receipt that names each changed source path and a meaningful, path-bound invariant; punctuation-only, hidden-comment, whitespace-only, or pathless receipt touches cannot satisfy the gate. This establishes traceability and materiality, not independent semantic or live-provider proof, so human/security review remains required. The verifier does not store credentials, raw private evidence, raw diffs, private prompts, customer data, private metrics, or provider payloads. Analytics may observe documentation drift but never authorize, renew, or rewrite objective truth.
 
 A docs-only truth-sync merge closes an existing drift cycle. Its post-merge receipt closes the transition without forcing another documentation edit merely because the merge commit SHA changed.
 
@@ -83,15 +95,23 @@ canonical declaration
 
 The mutable capability ledger itself does not prove current-head CI, deployment, or runtime health. Read immutable current evidence for those claims.
 
-## Independent review and merge truth
+## Independent review and founder-final merge truth
 
-Founder Control Room's in-app merge path requires exact provider PR identity, exact-head machine evidence, canonical diff/policy hashes, provider-backed review witnesses, non-author semantic review, deterministic review, P2 blocking, and a last-moment head re-read before provider integration.
+Founder Control Room's canonical in-app merge path requires exact provider PR identity, exact-head machine evidence, canonical diff/policy hashes, a passed exact-head deterministic independent-review witness, P2 blocking, an authenticated founder-final approval bound to the exact PR/base/head, and a last-moment head re-read before provider integration.
 
-For FCR, the reviewer policy passed into the evaluator must match the server-owned semantic reviewer set configured through `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS`. Caller-supplied policy representation cannot redefine that trusted set.
+The deterministic review remains proposal-only and non-authorizing. The authenticated founder-final receipt supplies the final human authority only after independent proof is current. Founder self-approval is therefore **not** relabeled as independent review.
+
+New founder-final approvals use a server-owned policy with zero required semantic humans, deterministic review required, P2 blocking, and `founderFinalApprovalRequired: true`. The older `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` policy remains compatibility-only for missions already pinned under the earlier human-semantic-review model.
 
 This source/runtime membrane is **not proof of the live GitHub repository ruleset**. GitHub web/API merges, required approval counts, stale-review dismissal, last-push approval, thread-resolution rules, strict status freshness, and bypass actor/mode configuration are separate provider facts that require current GitHub readback.
 
-A GitHub merge outside the in-app FCR execution path does not prove the FCR independent-review contract was used.
+A GitHub merge outside the in-app FCR execution path does not prove the FCR deterministic-review + founder-final contract was used.
+
+### FCR GitHub App authority
+
+Production GitHub authentication should prefer repository-scoped installation credentials minted from `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY`. The FCR App should be installed only on `jussray/founder-control-room` unless broader scope is separately reviewed.
+
+For any active ruleset protecting `jussray/founder-control-room` `main`, the only permitted bypass actor is exactly the numeric App identity configured by trusted `GITHUB_APP_ID`. Missing, mismatched, caller-supplied alternative, or additional bypass integration IDs fail closed. `GITHUB_WEBHOOK_SECRET` separately authenticates the signed `/api/webhooks/github` event ingress. Secret values never belong in source, PR bodies, issue comments, logs, screenshots, browser bundles, or chat-visible documentation.
 
 ## Founder-owned progress publishing
 
@@ -103,16 +123,24 @@ Current architecture separates story, authority, transport, and outcome:
 verified product / repository evidence
 -> Chief proposes a public-safe, channel-native story
 -> Sauce Guard keeps private machinery private
--> temporal claim classification and revalidation
--> exact Current You authority for the executable route
+-> temporal claim classification
+-> authenticated Current You confirms the exact public copy
+-> FCR issues + persists an exact one-shot approval
+-> publish request references the exact authorization hash
+-> FCR atomically claims the matching stored approval
+-> execution-time temporal revalidation
 -> channel router
    -> first-party LinkedIn where configured and proven
-   -> provider-neutral n8n for bounded supported adapters
+   -> provider-neutral n8n only where an equally authoritative adapter exists
    -> Zapier / Buffer where they still add bounded connector or scheduling value
 -> provider readback
 -> Founder Control Room outcome receipt
 -> observation-only analytics
 ```
+
+For the first-party route, caller-supplied approval JSON is not publication authority. `POST /automation/conveyor/founder-content/approvals` requires authenticated exact-copy confirmation before FCR issues and stores the one-shot authority. `POST /automation/conveyor/founder-content/publish-now` must reference the exact `authorization_hash`; FCR then claims the exact matching unrevoked, unconsumed, unexpired stored approval before temporal revalidation or provider mutation.
+
+Changing the approved copy, proposal/public-payload identity, source version, channel, or authorization fingerprint requires fresh matching approval. A consumed approval does not become replay authority after downstream failure. Approval issuance or claim is still not publication truth. Provider readback remains terminal external-state evidence.
 
 Public-safe progress may explain what changed, what was learned, why it matters, an approved public proof, and an honest unresolved next gate.
 
@@ -126,6 +154,8 @@ contract-capable
 -> adapter-proven
 -> provider-outcome-proven
 ```
+
+The founder-authenticated conveyor status may report `not-configured`, `ready-for-probe`, `enabled-misconfigured`, `invalid-provider-configuration`, `enabled-awaiting-proof`, or `enabled-live-verified`, including whether Buffer is ready for one controlled probe. The canonical conveyor reaches `enabled-live-verified` only when a retained activation-probe receipt matches the deployed exact `GIT_SHA`. If the runtime SHA changes, that receipt remains valid historical evidence but no longer authorizes a present-tense live claim; stale-head, missing runtime SHA, or unavailable receipt readback must remain non-live. Conveyor live readiness still does not prove Buffer scheduling, LinkedIn publication, or any terminal provider outcome.
 
 A platform-native draft is not proof that the provider adapter is live. n8n acceptance is not publication truth. Provider readback remains terminal external-state evidence.
 
@@ -153,6 +183,10 @@ The canonical Worker also owns FCR's outbound Cloudflare Email Service capabilit
 
 Current Pages source fails closed when `FCR_API` is unavailable and verifies the bound service identity on dynamic responses. **Source dependence on that binding does not prove the live Pages project currently has the correct provider binding.** Provider configuration and exact runtime behavior require current Cloudflare readback and deployed-path proof.
 
+The read-only Cloudflare audit keeps its primary Worker Git authority receipt independent from optional hostname enrichment. The core authority readback requires the dedicated read-only Workers Builds user token; DNS inventory and Request Trace credentials are optional enrichment. Missing credentials leave hostname/trace evidence `UNKNOWN`, and attempted enrichment failures may remain visible in their bounded evidence lane, but neither case may downgrade or upgrade the snapshotted core Worker Git authority `ok`/`error` verdict. If the core receipt is absent or failed, enrichment cannot manufacture success. The audit remains exact-current-main-bound and cannot authorize Cloudflare mutation.
+
+`wrangler.worker.toml` executes `scripts/verify-worker-build-authority.mjs` before canonical Worker builds. Native Cloudflare Workers Builds must bind their provider commit to the checked-out Git source SHA and may use only non-promoting `wrangler versions upload`; a native `wrangler deploy` fails closed. Manual GitHub `Deploy` / `FCR Worker Reconcile` remains the only source-recognized production-promotion context, and its checked-out SHA must match the exact GitHub workflow SHA. This repository membrane does not prove or mutate the live Cloudflare Builds settings.
+
 Native Cloudflare Worker/Pages build receipts are provider build/deploy evidence for the exact artifact they name. They do not prove the guarded production release path, database migration, auth behavior, browser behavior, fleet-wide runtime identity, or publication outcome.
 
 Production release evidence remains incomplete until the applicable authorized lane proves, for one exact current-main SHA:
@@ -166,6 +200,8 @@ Production release evidence remains incomplete until the applicable authorized l
 - Pages/API routing and service identity;
 - required browser/runtime proof; and
 - rollback ownership.
+
+The production-specific Truth Lease does not manufacture any of those facts. It composes already-authoritative observations only after Cloudflare Worker/Pages identities, Playwright tested/runtime identity, Supabase production state, independent review, and the repository head all bind to the same exact candidate. At deploy, publish, completion-claim, or another consequential use boundary, those dependencies must be freshly re-observed; any missing, stale, changed, or mismatched dependency makes the production claim unusable until proof is rebuilt.
 
 ### Historical production provenance
 
@@ -310,12 +346,12 @@ Approved branch/merge actions use reservation/idempotency controls before provid
 | Read project/evidence | Founder-authenticated or explicitly public-safe read |
 | Run bounded verification | Applicable founder/repository authority |
 | Create branch | Separate repository write authority |
-| Merge through FCR | Exact-head machine proof + current FCR independent-review membrane + repository authority |
+| Merge through FCR | Exact-head machine proof + deterministic independent review + authenticated exact-candidate founder-final approval + repository authority |
 | Merge through live GitHub surface | Separate live GitHub ruleset/provider authority and readback |
 | Deploy / mutate production | Separate exact production authority |
 | Database migration | Separate migration/database authority |
 | Credentials/secrets | Separate credential authority |
-| Publication | Exact route-specific Current You authority + provider outcome proof |
+| Publication | Exact route-specific Current You authority + FCR-owned exact one-shot approval claim + provider outcome proof |
 | Investor email | Applicable standing policy + recipient-specific qualification + send authority |
 | Billing / destructive action | Separate exact authority |
 | Rollback | Separate rollback authority |

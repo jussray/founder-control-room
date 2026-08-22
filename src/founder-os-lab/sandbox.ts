@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 import type { FounderOsLabPlan, FounderOsLabRequest } from './contracts.js';
 import { planFounderOsLab } from './engine.js';
+import {
+  evaluateUntrustedArtifactBoundary,
+  type UntrustedArtifactBoundaryResult,
+} from '../security/untrustedArtifactBoundary.js';
 
 export const FOUNDER_OS_SANDBOX_VERSION = 'founder-os-sandbox-v1' as const;
 
@@ -27,6 +31,7 @@ export interface FounderOsSandboxRun {
   status: 'blocked' | 'quarantined' | 'simulated';
   plannerInvoked: boolean;
   violations: string[];
+  trustBoundary: UntrustedArtifactBoundaryResult;
   sandbox: {
     id: string;
     version: typeof FOUNDER_OS_SANDBOX_VERSION;
@@ -137,8 +142,9 @@ export function runFounderOsSandbox(
   request: FounderOsLabRequest,
   options: FounderOsSandboxOptions = {},
 ): Readonly<FounderOsSandboxRun> {
-  const input = cloneAndFreeze(request) as FounderOsLabRequest;
+  const input = cloneAndFreeze(request) as Readonly<FounderOsLabRequest>;
   const inputFingerprint = fingerprint(input);
+  const trustBoundary = evaluateUntrustedArtifactBoundary(input.untrustedArtifacts ?? []);
   const sandbox = {
     id: `founder-os-${inputFingerprint}`,
     version: FOUNDER_OS_SANDBOX_VERSION,
@@ -153,6 +159,7 @@ export function runFounderOsSandbox(
       status: 'blocked',
       plannerInvoked: false,
       violations: ['kill_switch_active'],
+      trustBoundary,
       sandbox,
       plan: null,
     } satisfies FounderOsSandboxRun);
@@ -166,25 +173,57 @@ export function runFounderOsSandbox(
       status: 'blocked',
       plannerInvoked: false,
       violations: ['input_fingerprint_mismatch'],
+      trustBoundary,
       sandbox,
       plan: null,
     } satisfies FounderOsSandboxRun);
   }
 
-  const before = stableStringify(input);
+  if (trustBoundary.errors.length > 0) {
+    return deepFreeze({
+      status: 'blocked',
+      plannerInvoked: false,
+      violations: ['untrusted_artifact_input_invalid'],
+      trustBoundary,
+      sandbox,
+      plan: null,
+    } satisfies FounderOsSandboxRun);
+  }
+
+  if (!trustBoundary.plannerInputAllowed) {
+    const violations = [
+      ...(trustBoundary.quarantinedArtifactIds.length > 0 ? ['untrusted_artifact_quarantined'] : []),
+      ...(trustBoundary.excludedArtifactIds.length > 0 ? ['untrusted_artifact_excluded'] : []),
+    ];
+    return deepFreeze({
+      status: 'quarantined',
+      plannerInvoked: false,
+      violations,
+      trustBoundary,
+      sandbox,
+      plan: null,
+    } satisfies FounderOsSandboxRun);
+  }
+
+  // External artifact text is deliberately not forwarded to the deterministic
+  // planner. Future model adapters must recompile allowed artifacts through the
+  // untrusted-reference renderer rather than treating retrieved text as authority.
+  const { untrustedArtifacts: _untrustedArtifacts, ...plannerRequest } = input;
+  const before = stableStringify(plannerRequest);
   let rawPlan: FounderOsLabPlan;
   try {
-    rawPlan = planFounderOsLab(input);
+    rawPlan = planFounderOsLab(plannerRequest as FounderOsLabRequest);
   } catch {
     return deepFreeze({
       status: 'blocked',
       plannerInvoked: true,
       violations: ['planner_input_rejected'],
+      trustBoundary,
       sandbox,
       plan: null,
     } satisfies FounderOsSandboxRun);
   }
-  const after = stableStringify(input);
+  const after = stableStringify(plannerRequest);
   const plan = cloneAndFreeze(rawPlan) as Readonly<FounderOsLabPlan>;
   const violations = [
     ...(before === after ? [] : ['sandbox_input_mutated']),
@@ -195,6 +234,7 @@ export function runFounderOsSandbox(
     status: violations.length > 0 ? 'quarantined' : 'simulated',
     plannerInvoked: true,
     violations: [...new Set(violations)],
+    trustBoundary,
     sandbox: {
       ...sandbox,
       outputFingerprint: fingerprint(plan),

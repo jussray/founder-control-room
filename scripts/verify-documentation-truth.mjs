@@ -4,6 +4,10 @@ import path from 'node:path';
 
 const root = process.cwd();
 const FULL_SHA = /^[0-9a-f]{40}$/i;
+const DOCUMENTATION_RECEIPT_PATH = 'docs/DOCUMENTATION_TRUTH_RECEIPT.json';
+const DOCUMENTATION_RECEIPT_CONTRACT = 'fcr/documentation-truth-receipt@v1';
+const MINIMUM_MEANINGFUL_DOC_TEXT_LENGTH = 32;
+const MINIMUM_MEANINGFUL_INVARIANT_LENGTH = 48;
 
 function git(...args) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
@@ -28,6 +32,9 @@ function resolveBaseSha() {
 const baseSha = resolveBaseSha();
 const headSha = git('rev-parse', 'HEAD').toLowerCase();
 if (!FULL_SHA.test(headSha)) throw new Error('DOCUMENTATION_TRUTH_HEAD_INVALID');
+if (baseSha === headSha) {
+  throw new Error('DOCUMENTATION_TRUTH_BASE_EQUALS_HEAD: a truth receipt requires a non-empty reviewed range');
+}
 
 try {
   git('merge-base', '--is-ancestor', baseSha, headSha);
@@ -48,6 +55,10 @@ const truthSensitiveRules = [
   { domain: 'publishing', match: /^src\/http\/routes\/n8nConveyor\.ts$/ },
   { domain: 'truth-governance', match: /^src\/governance\/(?!.*\.test\.ts$)/ },
   { domain: 'truth-governance', match: /^src\/futureyou\/(?!.*\.test\.ts$)/ },
+  { domain: 'truth-governance', match: /^src\/buildEvents\/(?!__tests\/)(?!.*\.test\.ts$)/ },
+  { domain: 'truth-governance', match: /^src\/http\/routes\/(?:buildEvents|buildEventReceipts)\.ts$/ },
+  { domain: 'truth-governance', match: /^src\/services\/buildEventStore\.ts$/ },
+  { domain: 'truth-governance', match: /^scripts\/verify-documentation-truth\.mjs$/ },
   { domain: 'capability-authority', match: /^\.control\/capability\.(?:json|yaml)$/ },
   { domain: 'workflow-authority', match: /^\.github\/workflows\/(?:ci|quality-gate|pr-recovery-exact-head|founder-repo-cycle|documentation-truth)\.yml$/ },
   { domain: 'cloudflare-authority', match: /^public\/_worker\.js$/ },
@@ -81,9 +92,141 @@ if (domains.has('cloudflare-authority')) {
 }
 
 const failures = [];
+
+function nonEmptyString(value, maximumLength = 600) {
+  return typeof value === 'string' && value.trim().length > 0 && value.trim().length <= maximumLength;
+}
+
+function normalizedNarrativeText(value) {
+  return String(value)
+    .replace(/[\`*_>#~\[\]{}()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function meaningfulNarrative(value, minimumLength = MINIMUM_MEANINGFUL_DOC_TEXT_LENGTH) {
+  const normalized = normalizedNarrativeText(value);
+  const words = normalized.match(/[A-Za-z0-9][A-Za-z0-9'-]*/g) ?? [];
+  return normalized.length >= minimumLength
+    && words.length >= 5
+    && words.some((word) => word.length >= 4);
+}
+
+function visibleOutsideHtmlComments(value, state) {
+  let cursor = 0;
+  let visible = '';
+  while (cursor < value.length) {
+    if (state.insideComment) {
+      const closing = value.indexOf('-->', cursor);
+      if (closing < 0) return visible;
+      state.insideComment = false;
+      cursor = closing + 3;
+      continue;
+    }
+
+    const opening = value.indexOf('<!--', cursor);
+    if (opening < 0) return `${visible}${value.slice(cursor)}`;
+    visible += value.slice(cursor, opening);
+    state.insideComment = true;
+    cursor = opening + 4;
+  }
+  return visible;
+}
+
+function semanticDocChange(relativePath) {
+  const diff = git('diff', '--unified=0', '--no-ext-diff', `${baseSha}..${headSha}`, '--', relativePath);
+  const commentState = { added: { insideComment: false }, removed: { insideComment: false } };
+  return diff.split('\n').some((line) => {
+    if (!line.startsWith('+') && !line.startsWith('-')) return false;
+    if (line.startsWith('+++') || line.startsWith('---')) return false;
+    const state = line.startsWith('+') ? commentState.added : commentState.removed;
+    const content = visibleOutsideHtmlComments(line.slice(1), state);
+    return meaningfulNarrative(content);
+  });
+}
+
+function meaningfulInvariant(claim, sourcePath) {
+  return meaningfulNarrative(claim, MINIMUM_MEANINGFUL_INVARIANT_LENGTH)
+    && normalizedNarrativeText(claim).includes(sourcePath)
+    && /\b(must|cannot|requires?|rejects?|withhold|binds?|only|never|fail(?:s|ed)?\s+closed)\b/i.test(claim);
+}
+
+function documentationReceipt() {
+  let parsed;
+  try {
+    parsed = JSON.parse(read(DOCUMENTATION_RECEIPT_PATH));
+  } catch {
+    failures.push('documentation truth receipt must be valid JSON');
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    failures.push('documentation truth receipt must be an object');
+    return null;
+  }
+  if (parsed.contract !== DOCUMENTATION_RECEIPT_CONTRACT) {
+    failures.push('documentation truth receipt contract is invalid');
+  }
+  if (!nonEmptyString(parsed.purpose) || !meaningfulNarrative(parsed.purpose, MINIMUM_MEANINGFUL_INVARIANT_LENGTH)) {
+    failures.push('documentation truth receipt must state a bounded purpose');
+  }
+  if (!Array.isArray(parsed.domains)
+    || parsed.domains.some((value) => !nonEmptyString(value, 120) || !/^[a-z][a-z0-9-]{2,119}$/.test(value))
+    || new Set(parsed.domains).size !== parsed.domains.length) {
+    failures.push('documentation truth receipt domains are invalid');
+  }
+  if (!Array.isArray(parsed.changes)) {
+    failures.push('documentation truth receipt changes are invalid');
+    return null;
+  }
+
+  const claimsByPath = new Map();
+  for (const change of parsed.changes) {
+    if (!change || typeof change !== 'object' || Array.isArray(change)) {
+      failures.push('documentation truth receipt change is invalid');
+      continue;
+    }
+    if (!nonEmptyString(change.path, 300) || !Array.isArray(change.claims)
+      || change.claims.length === 0 || change.claims.some((claim) => !nonEmptyString(claim))) {
+      failures.push('documentation truth receipt change must name a path and one or more bounded invariants');
+      continue;
+    }
+    claimsByPath.set(change.path, change.claims);
+  }
+  return {
+    domains: new Set(Array.isArray(parsed.domains) ? parsed.domains : []),
+    claimsByPath,
+  };
+}
+
+let receipt = null;
+if (truthSensitiveChanges.length > 0) {
+  if (!changedFiles.includes(DOCUMENTATION_RECEIPT_PATH)) {
+    failures.push(`truth-sensitive change requires a current documentation receipt: ${DOCUMENTATION_RECEIPT_PATH}`);
+  }
+  if (!semanticDocChange(DOCUMENTATION_RECEIPT_PATH)) {
+    failures.push('documentation truth receipt must contain a substantive, non-comment change');
+  }
+  receipt = documentationReceipt();
+  if (receipt) {
+    for (const domain of domains) {
+      if (!receipt.domains.has(domain)) {
+        failures.push(`documentation truth receipt must name changed domain: ${domain}`);
+      }
+    }
+    for (const change of truthSensitiveChanges) {
+      const claims = receipt.claimsByPath.get(change.file) ?? [];
+      if (!claims.some((claim) => meaningfulInvariant(claim, change.file))) {
+        failures.push(`documentation truth receipt must name a meaningful path-bound invariant for: ${change.file}`);
+      }
+    }
+  }
+}
+
 for (const required of requiredDocs) {
   if (!changedFiles.includes(required)) {
     failures.push(`truth-sensitive change requires current documentation refresh: ${required}`);
+  } else if (!semanticDocChange(required)) {
+    failures.push(`truth-sensitive change requires a substantive documentation refresh: ${required}`);
   }
 }
 
@@ -107,14 +250,16 @@ const consistencyChecks = [
   [readme.includes('Documentation truth gate'), 'README must describe the Documentation truth gate'],
   [readme.includes('first-party LinkedIn') && readme.includes('provider-neutral n8n'), 'README must describe the current founder-content execution mesh'],
   [readme.includes('`.control/capability.json`') && readme.includes('canonical capability authority'), 'README must name capability.json as canonical capability authority'],
-  [mergeAuthority.includes('Independent review') && mergeAuthority.includes('FCR_TRUSTED_SEMANTIC_REVIEWER_IDS'), 'merge authority must describe current FCR independent-review trust'],
+  [mergeAuthority.includes('deterministic independent review') && mergeAuthority.includes('founder-final') && mergeAuthority.includes('FCR_TRUSTED_SEMANTIC_REVIEWER_IDS'), 'merge authority must describe canonical founder-final review plus legacy semantic-review compatibility'],
   [mergeAuthority.includes('live GitHub') && mergeAuthority.includes('separate provider gate'), 'merge authority must distinguish FCR source/runtime enforcement from live GitHub provider enforcement'],
   [mergeAuthority.includes('Documentation truth'), 'merge authority must require documentation truth reconciliation'],
   [globalAi.includes('Truth Lease') && globalAi.includes('Documentation truth'), 'GLOBAL_AI must include truth-aging and documentation-truth rules'],
   [globalAi.includes('Product Design') && globalAi.includes('Data Analytics') && globalAi.includes('Hormozi'), 'GLOBAL_AI must include product, analytics, and value lenses'],
   [globalAi.includes('/garyvee lindymode redteam l99 redteam ooda'), 'GLOBAL_AI must preserve the legacy founder-stack compatibility alias'],
+  [globalAi.includes('deterministic independent review') && globalAi.includes('founder-final'), 'GLOBAL_AI must preserve the FCR deterministic-review then founder-final authority split'],
   [launchLoop.includes('Parallel lenses, serialized authority'), 'launch loop must preserve parallel reasoning with serialized authority'],
   [launchLoop.includes('Truth Lease') && launchLoop.includes('Documentation truth gate'), 'launch loop must include truth aging and documentation reconciliation'],
+  [launchLoop.includes('deterministic exact-head review') && launchLoop.includes('founder-final'), 'launch loop must preserve deterministic review before founder-final merge authority'],
   [agents.includes('Historical Day 3 provenance') && !agents.includes('Current Day 3 source:'), 'AGENTS must preserve old Day 3 state as historical provenance, never current authority'],
   [agents.includes('provider-neutral n8n') && agents.includes('Truth Lease') && agents.includes('Documentation Truth'), 'AGENTS must inherit the current provider-neutral truth-aging workflow'],
   [!agents.includes('approved automated publishing class explicitly authorized'), 'AGENTS must not retain the superseded standing automated-publication shortcut'],
@@ -142,11 +287,12 @@ const changedDocs = changedFiles.filter((file) =>
   || file === 'CHATGPT.md'
   || file === 'CLAUDE.md'
   || file === 'PERPLEXITY.md'
+  || file === DOCUMENTATION_RECEIPT_PATH
   || file.endsWith('.md') && (file.startsWith('docs/') || file.startsWith('.ai/skills/')),
 );
 
 const report = {
-  contract: 'fcr/documentation-truth@v1',
+  contract: 'fcr/documentation-truth@v2',
   baseSha,
   headSha,
   changedFileCount: changedFiles.length,
@@ -157,6 +303,15 @@ const report = {
   documentationCoveragePercent: requiredDocs.size === 0
     ? 100
     : Math.round(([...requiredDocs].filter((file) => changedFiles.includes(file)).length / requiredDocs.size) * 100),
+  documentationReceipt: truthSensitiveChanges.length === 0
+    ? { required: false }
+    : {
+        required: true,
+        path: DOCUMENTATION_RECEIPT_PATH,
+        updated: changedFiles.includes(DOCUMENTATION_RECEIPT_PATH),
+        declaredDomainCount: receipt?.domains.size ?? 0,
+        declaredInvariantCount: receipt?.claimsByPath.size ?? 0,
+      },
   consistencyCheckCount: consistencyChecks.length,
   failureCount: failures.length,
   failures,

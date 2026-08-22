@@ -153,6 +153,29 @@ export function createFounderSignalReviewEmailIngestHandler(
       return res.status(503).json({ error: 'Review email receipt store unavailable' });
     }
 
+    // The durable intake row is the replay boundary. A duplicate receipt may
+    // mean the first request already reached the provider but lost its HTTP
+    // response or process state. Re-entering command processing would create a
+    // concurrent double-dispatch window. Duplicate delivery is acknowledgement
+    // only; any uncertain first attempt must be reconciled separately.
+    if (disposition === 'duplicate') {
+      return res.status(200).json({
+        accepted: true,
+        duplicate: true,
+        ingressId: receipt.ingressId,
+        replyContextId: receipt.replyContextId,
+        commandType: receipt.commandType,
+        authorizationState: receipt.authorizationState,
+        executionAllowed: false,
+        providerActionsRequested: 0,
+        commandAuthorizationState: 'duplicate_no_redispatch',
+        providerDispatchAccepted: false,
+        providerExecutionProven: false,
+        authorizedProviderActionsRequested: 0,
+        idempotencyKey: null,
+      });
+    }
+
     let processing: FounderSignalReviewProcessingResult;
     try {
       processing = await processor(receipt);
@@ -168,9 +191,9 @@ export function createFounderSignalReviewEmailIngestHandler(
       });
     }
 
-    return res.status(disposition === 'stored' ? 201 : 200).json({
+    return res.status(201).json({
       accepted: true,
-      duplicate: disposition === 'duplicate',
+      duplicate: false,
       ingressId: receipt.ingressId,
       replyContextId: receipt.replyContextId,
       commandType: receipt.commandType,

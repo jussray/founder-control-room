@@ -5,8 +5,10 @@
  *   1. a fresh founder-approved proof_gate_results record; and
  *   2. complete machine evidence bound to the exact current head SHA.
  *
- * Founder Control Room merges additionally require a provider-backed,
- * exact-PR independent review gate before provider integration.
+ * Founder Control Room merges additionally require provider-backed exact-PR
+ * review evidence. The canonical founder-final mode requires deterministic
+ * independent review first, then an authenticated founder approval bound to
+ * the exact PR/base/head before provider integration.
  *
  * Every external mutation is reserved in approval_executions BEFORE the
  * provider call. A pending reservation blocks replay if the provider succeeds
@@ -30,6 +32,7 @@ import type { EvidenceKind } from '../../reconciliation/types.js';
 import { WEBHOOK_ONLY_EVIDENCE_KINDS } from '../../reconciliation/types.js';
 import type { PatchFileChange, RepositoryProvider } from '../../providers/RepositoryProvider.js';
 import {
+  FCR_FOUNDER_FINAL_REVIEW_POLICY,
   evaluateIndependentReviewGate,
   independentReviewDiffHash,
   independentReviewPolicyHash,
@@ -49,6 +52,7 @@ function isSafeRepoPath(path: string): boolean {
 const PROOF_GATED_ACTIONS = new Set(['merge', 'create_branch']);
 const PROOF_GATE_TTL_MS = 15 * 60 * 1_000;
 const FCR_REPOSITORY = 'jussray/founder-control-room';
+const FOUNDER_FINAL_REVIEW_CONTRACT = 'juss-v10/founder-final-merge@v1' as const;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
 
@@ -98,9 +102,18 @@ function validateIndependentReviewPolicy(
     return { ok: false, error: 'independentReview.policy must be an object' };
   }
   const candidate = value as Record<string, unknown>;
+  const founderFinalApprovalRequired = candidate['founderFinalApprovalRequired'] === true;
   const requiredSemanticReviews = candidate['requiredSemanticReviews'];
-  if (!Number.isInteger(requiredSemanticReviews) || Number(requiredSemanticReviews) < 1 || Number(requiredSemanticReviews) > 4) {
-    return { ok: false, error: 'independentReview.policy.requiredSemanticReviews must be an integer from 1 to 4' };
+  const minimumSemanticReviews = founderFinalApprovalRequired ? 0 : 1;
+  if (!Number.isInteger(requiredSemanticReviews)
+    || Number(requiredSemanticReviews) < minimumSemanticReviews
+    || Number(requiredSemanticReviews) > 4) {
+    return {
+      ok: false,
+      error: founderFinalApprovalRequired
+        ? 'founder-final review policy requires requiredSemanticReviews from 0 to 4'
+        : 'independentReview.policy.requiredSemanticReviews must be an integer from 1 to 4',
+    };
   }
   if (candidate['requireDeterministicReview'] !== true) {
     return { ok: false, error: 'FCR independent review policy must require deterministic review' };
@@ -109,8 +122,15 @@ function validateIndependentReviewPolicy(
     return { ok: false, error: 'FCR independent review policy must keep P2 findings merge-blocking' };
   }
   const rawTrusted = candidate['trustedSemanticReviewerIds'];
-  if (!Array.isArray(rawTrusted) || rawTrusted.length === 0 || rawTrusted.some((reviewer) => !text(reviewer))) {
-    return { ok: false, error: 'independentReview.policy.trustedSemanticReviewerIds must contain reviewer identities' };
+  if (!Array.isArray(rawTrusted)
+    || rawTrusted.some((reviewer) => !text(reviewer))
+    || (!founderFinalApprovalRequired && rawTrusted.length === 0)) {
+    return {
+      ok: false,
+      error: founderFinalApprovalRequired
+        ? 'founder-final review policy trustedSemanticReviewerIds must be an array'
+        : 'independentReview.policy.trustedSemanticReviewerIds must contain reviewer identities',
+    };
   }
   const trustedSemanticReviewerIds = rawTrusted.map((reviewer) => text(reviewer));
   const normalized = trustedSemanticReviewerIds.map((reviewer) => reviewer.toLowerCase());
@@ -128,6 +148,7 @@ function validateIndependentReviewPolicy(
       requireDeterministicReview: true,
       blockOnP2: true,
       trustedSemanticReviewerIds,
+      ...(founderFinalApprovalRequired ? { founderFinalApprovalRequired: true as const } : {}),
     },
   };
 }
@@ -150,6 +171,26 @@ function validateIndependentReviewApproval(
     pullRequestNumber: Number(pullRequestNumber),
     policy: policyResult.policy,
   };
+}
+
+function validateFounderFinalReviewApproval(
+  value: unknown,
+): { ok: true; pullRequestNumber: number } | { ok: false; error: string } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, error: 'FCR founder-final merge approval requires founderFinalReview metadata' };
+  }
+  const candidate = value as Record<string, unknown>;
+  const pullRequestNumber = candidate['pullRequestNumber'];
+  if (!Number.isInteger(pullRequestNumber) || Number(pullRequestNumber) <= 0) {
+    return { ok: false, error: 'founderFinalReview.pullRequestNumber must be a positive integer' };
+  }
+  if (candidate['confirmExactCandidate'] !== true) {
+    return { ok: false, error: 'founderFinalReview.confirmExactCandidate must be true' };
+  }
+  if (candidate['policy'] !== undefined || candidate['trustedSemanticReviewerIds'] !== undefined) {
+    return { ok: false, error: 'founder-final review policy is server-owned and cannot be redefined by the caller' };
+  }
+  return { ok: true, pullRequestNumber: Number(pullRequestNumber) };
 }
 
 function readPinnedIndependentReview(
@@ -393,12 +434,44 @@ approvalsRouter.post(
           }
 
           if (isFounderControlRoomRepository(projectRow)) {
-            const reviewApproval = validateIndependentReviewApproval(body['independentReview']);
-            if (!reviewApproval.ok) {
+            const founderFinalCandidate = body['founderFinalReview'];
+            const founderFinalApproval = founderFinalCandidate === undefined
+              ? null
+              : validateFounderFinalReviewApproval(founderFinalCandidate);
+            const legacyReviewApproval = founderFinalCandidate === undefined
+              ? validateIndependentReviewApproval(body['independentReview'])
+              : null;
+
+            if (founderFinalApproval && !founderFinalApproval.ok) {
               return res.status(400).json({
                 ok: false,
-                code: 'INDEPENDENT_REVIEW_POLICY_REQUIRED',
-                error: reviewApproval.error,
+                code: 'FOUNDER_FINAL_REVIEW_REQUIRED',
+                error: founderFinalApproval.error,
+              });
+            }
+            if (legacyReviewApproval && !legacyReviewApproval.ok) {
+              return res.status(400).json({
+                ok: false,
+                code: 'FOUNDER_FINAL_REVIEW_REQUIRED',
+                error: `${legacyReviewApproval.error}. Canonical FCR flow uses founderFinalReview.confirmExactCandidate=true.`,
+              });
+            }
+
+            const pullRequestNumber = founderFinalApproval?.ok
+              ? founderFinalApproval.pullRequestNumber
+              : legacyReviewApproval?.ok
+                ? legacyReviewApproval.pullRequestNumber
+                : null;
+            const reviewPolicy = founderFinalApproval?.ok
+              ? FCR_FOUNDER_FINAL_REVIEW_POLICY
+              : legacyReviewApproval?.ok
+                ? legacyReviewApproval.policy
+                : null;
+            if (!pullRequestNumber || !reviewPolicy) {
+              return res.status(400).json({
+                ok: false,
+                code: 'FOUNDER_FINAL_REVIEW_REQUIRED',
+                error: 'FCR merge approval requires founderFinalReview metadata bound to the exact candidate.',
               });
             }
             if (typeof configured.provider.getPullRequestReviewContext !== 'function') {
@@ -413,7 +486,7 @@ approvalsRouter.post(
             try {
               pullRequest = await configured.provider.getPullRequestReviewContext(
                 project.slug,
-                reviewApproval.pullRequestNumber,
+                pullRequestNumber,
               );
             } catch (err) {
               return res.status(502).json({
@@ -447,11 +520,11 @@ approvalsRouter.post(
             }
 
             independentReview = {
-              pullRequestNumber: reviewApproval.pullRequestNumber,
+              pullRequestNumber,
               baseSha: lower(pullRequest.baseSha),
               authorIdentity: text(pullRequest.authorIdentity),
-              policy: reviewApproval.policy,
-              policyHash: independentReviewPolicyHash(reviewApproval.policy),
+              policy: reviewPolicy,
+              policyHash: independentReviewPolicyHash(reviewPolicy),
             };
           }
         }
@@ -720,12 +793,15 @@ approvalsRouter.post(
         }
 
         let independentReviewEvidence: Record<string, unknown> | null = null;
+        let founderFinalReviewEvidence: Record<string, unknown> | null = null;
         if (isFounderControlRoomRepository(projectRow)) {
           const pinnedResult = readPinnedIndependentReview(mission.policy_snapshot?.independentReview);
           if (!pinnedResult.ok) {
             throw new Error(`Independent review gate blocked: ${pinnedResult.error}`);
           }
           const pinned = pinnedResult.review;
+          const founderFinalMode = pinned.policy.founderFinalApprovalRequired === true;
+
           if (typeof provider.getPullRequestReviewContext !== 'function') {
             throw new Error('Independent review gate blocked: repository provider cannot supply pull request context');
           }
@@ -785,12 +861,34 @@ approvalsRouter.post(
             witnessedReviewHashes: reviewGate.witnessedReviewHashes,
             semanticClearCount: reviewGate.semanticClearCount,
             deterministicClearCount: reviewGate.deterministicClearCount,
+            authorityMode: founderFinalMode ? 'deterministic-review-then-founder-final' : 'legacy-independent-human-review',
           };
+
+          // Founder-final is deliberately consumed only after independent
+          // deterministic review has passed. This is the final human authority
+          // for this exact candidate, not another independent review receipt.
+          if (founderFinalMode) {
+            const finalApproval = validateFounderFinalReviewApproval(payload['founderFinalReview']);
+            if (!finalApproval.ok) {
+              throw new Error(`Founder-final review gate blocked: ${finalApproval.error}`);
+            }
+            if (finalApproval.pullRequestNumber !== pinned.pullRequestNumber) {
+              throw new Error('Founder-final review gate blocked: founder confirmation does not match the reviewed pull request');
+            }
+            founderFinalReviewEvidence = {
+              contract: FOUNDER_FINAL_REVIEW_CONTRACT,
+              pullRequestNumber: pinned.pullRequestNumber,
+              baseSha: pinned.baseSha,
+              headSha: expectedHeadSha,
+              founderIdentity: req.founder!.email,
+              approvedAt: new Date().toISOString(),
+            };
+          }
         }
 
-        // This is deliberately after independent review. Review/provider reads
-        // may take time; the mutable head must still equal the approved SHA at
-        // the last possible moment before integration.
+        // This is deliberately after review/founder-final validation. Provider
+        // reads may take time; the mutable head must still equal the approved
+        // SHA at the last possible moment before integration.
         const currentHeadSha = await provider.resolveRef(project.slug, head);
         if (currentHeadSha !== expectedHeadSha) {
           throw new Error(
@@ -806,6 +904,7 @@ approvalsRouter.post(
           expectedHeadSha,
           evidence: evidenceResult.summary,
           ...(independentReviewEvidence ? { independentReview: independentReviewEvidence } : {}),
+          ...(founderFinalReviewEvidence ? { founderFinalReview: founderFinalReviewEvidence } : {}),
         };
 
         const { error: missionUpdateError } = await supabase

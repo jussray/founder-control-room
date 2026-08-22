@@ -276,8 +276,8 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
   if (projectValidated && projectResolution.route) {
     verified.push(
       `${projectResolution.route.name} is bound to ${projectResolution.route.repository} at audited source head ${projectResolution.route.auditedSourceHead}.`,
-      `All required ${projectResolution.route.id} canon contracts were supplied as exact-head GitHub blob URLs.`,
-      'Se’kret Bip display canon, legacy internal-id compatibility, audience separation, editable output, source trace, and factual AI identity boundaries remain required.',
+      `All required ${projectResolution.route.id} project contracts were supplied as exact-head GitHub blob URLs.`,
+      `Project adapter rules remain binding: ${projectResolution.route.rules.join(' ')}`,
     );
   }
   if (mutatingAction && missingPreflightEvidence.length === 0 && semanticEvidenceErrors.length === 0) {
@@ -401,7 +401,7 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
       evidence: capabilityPlan.valid && request.capabilityPlan
         ? `Governance validated Chief AI capability plan ${request.capabilityPlan.planHash} with declared registry hash ${request.capabilityPlan.registryHash} in memory; founder-approved registry snapshot resolution remains pending outside isolated preview.`
         : projectValidated && projectResolution.route
-          ? `The checked-in ${projectResolution.route.id} adapter and exact-head canon contract URLs were evaluated in memory.`
+          ? `The checked-in ${projectResolution.route.id} adapter and exact-head project contract URLs were evaluated in memory.`
           : socialValidated
             ? 'Existing first-party social validation passed in memory.'
             : `Only deterministic ${command.id} governance and ${provider.id} provider-preview contracts were evaluated.`,
@@ -413,7 +413,7 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
     ooda: {
       observe: [
         'Read the founder goal, supplied evidence, and Chief AI capability plan without inventing missing runtime truth.',
-        ...(request.project ? ['Read the submitted project identity, exact head, audience, and canon contract URLs.'] : []),
+        ...(request.project ? ['Read the submitted project identity, exact head, project context, and contract URLs.'] : []),
       ],
       orient: [
         `Apply the ${command.id} reasoning lens to the ${provider.id} preview target.`,
@@ -434,7 +434,9 @@ export function planFounderOsLab(request: FounderOsLabRequest): FounderOsLabPlan
         'Assert untrusted skill origins cannot raise their own authority ceiling.',
         'Assert mutating approvals are bound to project, exact head, and capability plan hash.',
         `Assert ${provider.id} supports ${request.action} before presenting a proceedable preview.`,
-        ...(request.project ? ['Assert project repository, audited head, required canon contracts, audience rules, editable output, source trace, and AI identity boundaries.'] : []),
+        ...(request.project && projectResolution.route
+          ? [`Assert project repository, audited head, required project contracts, and adapter rules: ${projectResolution.route.rules.join(' ')}`]
+          : []),
         ...(mutatingAction ? [`Assert required ${provider.id} preflight evidence is present and semantically bound before executor readiness.`] : []),
         ...(request.action === 'send-email' ? ['Assert provider identity proof is never treated as an allowed outbound DispatchDecision.'] : []),
         ...(socialValidated ? ['Assert the existing social validator accepts the supplied payload.'] : []),

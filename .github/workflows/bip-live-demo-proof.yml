@@ -1,0 +1,81 @@
+name: Bip Live Demo Proof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/config/demoPortfolio.ts'
+      - 'src/config/__tests__/demoPortfolio.test.ts'
+      - 'e2e/bip-live-demo-proof.mjs'
+      - '.github/workflows/bip-live-demo-proof.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/config/demoPortfolio.ts'
+      - 'src/config/__tests__/demoPortfolio.test.ts'
+      - 'e2e/bip-live-demo-proof.mjs'
+      - '.github/workflows/bip-live-demo-proof.yml'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  bip-live-demo:
+    name: Anonymous Bip product witness
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Prove typed demo contract
+        run: npx vitest run src/config/__tests__/demoPortfolio.test.ts
+
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Prove anonymous Se’kret Bip live journey
+        shell: bash
+        run: |
+          mkdir -p logs
+          set +e
+          node e2e/bip-live-demo-proof.mjs 2>&1 | tee logs/bip-live-demo-proof.log
+          status=${PIPESTATUS[0]}
+          echo "Bip live demo proof exit status: ${status}" | tee -a logs/bip-live-demo-proof.log
+          exit "${status}"
+
+      - name: Upload Bip live demo evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: bip-live-demo-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            test-results/bip-live-demo/
+            logs/bip-live-demo-proof.log
+          if-no-files-found: warn
+          retention-days: 30

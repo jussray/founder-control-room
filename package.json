@@ -17,6 +17,8 @@
     "cf:dev": "wrangler dev --config wrangler.worker.toml --port 8787",
     "cf:dry-run": "wrangler deploy --dry-run --config wrangler.worker.toml --outdir .wrangler/dry-run",
     "cf:dry-run:email": "wrangler deploy --dry-run --config wrangler.email.toml --outdir .wrangler/email-dry-run",
+    "cloudflare:build:verify": "node scripts/cloudflare-build-verification-only.mjs",
+    "deploy:api:production": "npm run cloudflare:build:verify",
     "deploy": "node scripts/assert-production-deploy-authority.mjs && wrangler deploy --config wrangler.worker.toml",
     "lint": "eslint 'src/**/*.ts'",
     "lint:design-os": "eslint 'src/design-os/**/*.ts' 'src/http/routes/designOs.ts' 'src/http/routes/designOs.test.ts' --max-warnings 0",
@@ -56,7 +58,8 @@
     "verify:goalfix": "vitest run src/goalfix/__tests__/engine.test.ts src/goalfix/__tests__/intent.test.ts src/goalfix/__tests__/skillRuntime.test.ts src/goalfix/__tests__/stagnation.test.ts src/http/routes/__tests__/goalfix.integration.test.ts src/http/routes/__tests__/goalfix.refresh.integration.test.ts",
     "verify:mirror": "vitest run src/http/routes/__tests__/mirror.integration.test.ts",
     "verify:mirror-contract": "node scripts/verify-mirror-and-fact-check-contract.mjs",
-    "proof:goalfix": "npm run build && node e2e/goalfix-proof.mjs && node e2e/goalfix-same-sha-proof.mjs"
+    "proof:goalfix": "npm run build && node e2e/goalfix-proof.mjs && node e2e/goalfix-same-sha-proof.mjs",
+    "verify:test-discovery": "node scripts/verify-test-discovery.mjs"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
