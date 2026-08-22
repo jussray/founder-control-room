@@ -505,6 +505,7 @@ export class GitHubProvider implements RepositoryProvider {
 
     const { data: existing } = await this.octokit.repos.getRepoRulesets({ owner, repo, per_page: 100 });
     let freshnessComponent: NonNullable<RulesetResult["components"]>[number] | undefined;
+    let reviewComponent: NonNullable<RulesetResult["components"]>[number] | undefined;
 
     if (hardenFounderControlRoomMainReview) {
       // Apply and verify the no-bypass freshness membrane FIRST. If any provider
@@ -567,6 +568,13 @@ export class GitHubProvider implements RepositoryProvider {
         ? await this.octokit.repos.updateRepoRuleset({ ...payload, ruleset_id: match.id })
         : await this.octokit.repos.createRepoRuleset(payload);
 
+      reviewComponent = {
+        purpose: "review",
+        id: String(data.id),
+        name: data.name,
+        enforcement: data.enforcement,
+      };
+
       if (hardenFounderControlRoomMainReview) {
         const { data: readback } = await this.octokit.repos.getRepoRuleset({
           owner,
@@ -584,8 +592,11 @@ export class GitHubProvider implements RepositoryProvider {
     const data = await applyReviewMembrane().catch((error: unknown) => {
       if (!freshnessComponent) throw error;
       const message = error instanceof Error ? error.message : String(error);
+      const reviewMutation = reviewComponent
+        ? `; mutated review ruleset ${reviewComponent.name} (${reviewComponent.id}) also requires reconciliation`
+        : "";
       throw new Error(
-        `GitHubProvider: FCR review membrane failed after verified strict-freshness ruleset ${freshnessComponent.name} (${freshnessComponent.id}): ${message}`,
+        `GitHubProvider: FCR review membrane failed after verified strict-freshness ruleset ${freshnessComponent.name} (${freshnessComponent.id})${reviewMutation}: ${message}`,
       );
     });
 
@@ -596,7 +607,7 @@ export class GitHubProvider implements RepositoryProvider {
       ...(freshnessComponent
         ? {
             components: [
-              {
+              reviewComponent ?? {
                 purpose: "review",
                 id: String(data.id),
                 name: data.name,
