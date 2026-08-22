@@ -6,7 +6,7 @@ const truthLeaseSource = readFileSync(
   'utf8',
 );
 const founderContentAuthority = readFileSync(
-  new URL('../../../tools/zapier/founder-content-authorization-contract.cjs', import.meta.url),
+  new URL('../../../tools/founder-content-contracts/founder-content-authorization-contract.cjs', import.meta.url),
   'utf8',
 );
 const workerGitPolicy = JSON.parse(

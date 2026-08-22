@@ -7,7 +7,7 @@ Founder Control Room uses Cloudflare Pages for the browser frontend and one cano
 | Cloudflare surface | Domain / role | Repository source | Build / deploy command | Cron |
 |---|---|---|---|---|
 | Pages project | `foundercontrolroom.org` static frontend + same-origin edge proxy | `public/` via `scripts/build-pages.mjs` | Build: `npm run build:pages`; output: `dist-pages` | none |
-| `founder-control-room` Worker | `api.foundercontrolroom.org` API, auth, MCP, reconciliation | `wrangler.worker.toml` | Build: `npm run build`; deploy: `npm run deploy` | every minute |
+| `founder-control-room` Worker | `api.foundercontrolroom.org` API, auth, MCP, reconciliation | `wrangler.worker.toml` | Build authority hook: `node scripts/verify-worker-build-authority.mjs`; production deploy: guarded GitHub workflow | every minute |
 | `founder-control-room-review-email` Worker | private email command intake | `wrangler.email.toml` | dedicated reviewed workflow | none |
 | `founder-control-room-deletion-queue` Worker | account-deletion processing | `wrangler.deletion-queue.toml` | dedicated reviewed workflow | every 6 hours |
 
@@ -71,6 +71,25 @@ FOUNDER_ALLOWED_ORIGINS: https://foundercontrolroom.org
 
 The canonical Worker owns the reconciliation cron because no duplicate HTTP Worker should exist.
 
+### Worker build authority invariant
+
+The canonical Worker configuration owns a custom Wrangler `[build]` hook:
+
+```text
+node scripts/verify-worker-build-authority.mjs
+```
+
+That hook makes the repository's production-authority boundary executable before Wrangler can promote a Worker build:
+
+- native Cloudflare Workers Builds must report an exact `WORKERS_CI_COMMIT_SHA` that equals the checked-out Git HEAD;
+- native builds must retain branch and build UUID evidence;
+- native Workers Builds may run only the non-promoting `wrangler versions upload` lane;
+- native `wrangler deploy` fails closed before production promotion;
+- GitHub production promotion is recognized only in the manual `Deploy` or `FCR Worker Reconcile` workflow-dispatch contexts when GitHub's exact workflow SHA equals the checked-out source SHA; and
+- ordinary CI/local verification does not become production authority.
+
+The hook emits a redacted `fcr/worker-build-authority-receipt@v1`. That receipt proves only the source/build authority decision it records. It cannot mutate Cloudflare, prove provider dashboard configuration, prove the active deployment, or replace `/health`, `/version`, Pages binding, and Playwright runtime evidence.
+
 ### Outbound email boundary
 
 The canonical Worker owns the FCR outbound Cloudflare Email Service capability through the project-scoped binding `FCR_EMAIL`. Repository source pins the only allowed FCR sender identity to `welcome@api.foundercontrolroom.org` in both `src/worker/projectEmail.ts` and `wrangler.worker.toml`; application callers may provide recipients/content but not a different `from` identity. A generic `EMAIL` binding or another project's sender must not be substituted into this Worker without a separate reviewed authority change.
@@ -95,7 +114,9 @@ Do not infer live provider configuration from a workflow file, secret name, toke
 
 ## Read-only hostname inventory boundary
 
-The manual `Cloudflare Worker Git Authority Audit` can observe the live FCR zone without becoming deployment or DNS authority. On an exact SHA that is still current `main`, it may use dedicated read-only authorities to:
+The manual `Cloudflare Worker Git Authority Audit` separates its core provider-authority receipt from optional hostname enrichment. The primary Worker Git inspection requires the dedicated read-only Workers Builds user token and may proceed without DNS inventory or Request Trace credentials. When either enrichment credential is unavailable, inventory/trace evidence is skipped and remains `UNKNOWN`; that absence must not suppress the core Worker Git authority readback.
+
+When enrichment credentials are available, the audit may observe the live FCR zone without becoming deployment or DNS authority. On an exact SHA that is still current `main`, it may use dedicated read-only authorities to:
 
 1. resolve the reviewed `foundercontrolroom.org` zone;
 2. enumerate paginated A, AAAA, and CNAME records;
@@ -136,7 +157,7 @@ Provider build/deploy comments, preview URLs, and successful uploads are useful 
 
 ## Documentation truth
 
-When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, hostname-inventory/Request Trace behavior, or runtime proof requirements change, update this document in the same bounded repository change.
+When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, hostname-inventory/Request Trace behavior, Worker build-authority behavior, or runtime proof requirements change, update this document in the same bounded repository change.
 
 Current executable source and authoritative provider readback outrank an older version of this runbook. Preserve older deployment evidence as historical provenance rather than deleting it.
 
