@@ -58,6 +58,9 @@ function proofStateFromRuns(runs) {
 
 function nextGate(task, proof) {
   if (proof.state === 'failed') return 'Repair failed proof before advancing.';
+  if (task.status === 'approved' && proof.state !== 'passed') {
+    return 'Reacquire fresh exact-head proof before the founder can consider integration.';
+  }
   if (task.status === 'proposed') return 'Founder decides whether to authorize a bounded sandbox branch.';
   if (task.status === 'sandboxed') return 'Build the focused change, then produce exact-head proof.';
   if (task.status === 'in_review') return proof.state === 'passed'
@@ -72,9 +75,10 @@ function nextGate(task, proof) {
 }
 
 function authorityLabel(task, proof) {
+  if (proof.state === 'failed') return { tone: 'blocked', text: 'Repair required' };
+  if (task.status === 'approved' && proof.state !== 'passed') return { tone: 'blocked', text: 'Proof required' };
   if (task.status === 'approved') return { tone: 'founder', text: 'Founder gate' };
   if (task.status === 'in_review' && proof.state === 'passed') return { tone: 'review', text: 'Review gate' };
-  if (proof.state === 'failed') return { tone: 'blocked', text: 'Repair required' };
   if (TERMINAL_STATUSES.has(task.status)) return { tone: 'terminal', text: 'Observed state' };
   return { tone: 'bounded', text: 'No execution authority' };
 }
@@ -156,7 +160,7 @@ function buildSummary(tasks, proofById) {
   const active = tasks.filter((task) => ACTIVE_STATUSES.has(task.status)).length;
   const passed = tasks.filter((task) => proofById.get(task.id)?.state === 'passed').length;
   const repair = tasks.filter((task) => proofById.get(task.id)?.state === 'failed').length;
-  const founder = tasks.filter((task) => task.status === 'approved').length;
+  const founder = tasks.filter((task) => task.status === 'approved' && proofById.get(task.id)?.state === 'passed').length;
 
   return [
     ['Active work', active],
