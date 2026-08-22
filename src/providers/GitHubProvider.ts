@@ -156,6 +156,13 @@ export class GitHubProvider implements RepositoryProvider {
       status: mapCheckStatus(run.status, run.conclusion),
       commitSha: run.head_sha,
       provider: this.name,
+      issuer: run.app?.id != null
+        ? {
+            kind: "app" as const,
+            id: String(run.app.id),
+            name: run.app.slug ?? undefined,
+          }
+        : undefined,
       startedAt: run.started_at ?? undefined,
       completedAt: run.completed_at ?? undefined,
       detailsUrl: run.details_url ?? undefined,

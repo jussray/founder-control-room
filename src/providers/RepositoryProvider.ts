@@ -42,6 +42,13 @@ export type VerificationSignalStatus =
   | "skipped"
   | "unknown";
 
+/** Provider-backed identity for the application that emitted a verification signal. */
+export interface VerificationSignalIssuer {
+  kind: "app";
+  id: string;
+  name?: string;
+}
+
 /**
  * A provider-neutral CI or verification signal attached to an exact commit.
  * GitHub check runs are one source; internal runners and Forgejo checks can
@@ -53,6 +60,8 @@ export interface VerificationSignal {
   status: VerificationSignalStatus;
   commitSha: string;
   provider: string;
+  /** Optional because not every provider exposes an issuer. Authority gates must fail closed when issuer identity is required. */
+  issuer?: VerificationSignalIssuer;
   startedAt?: string;
   completedAt?: string;
   detailsUrl?: string;
