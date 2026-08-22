@@ -58,7 +58,7 @@ export type FounderOsLabProviderId =
   | 'openai-platform'
   | 'hubspot';
 
-export type FounderOsLabProjectAdapterId = 'sekret-bip';
+export type FounderOsLabProjectAdapterId = 'sekret-bip' | 'chief-ai-machine';
 export type FounderOsLabProjectAudience = 'teen' | 'bip-jr';
 
 export type FounderOsLabCapabilityId =
@@ -75,6 +75,7 @@ export type FounderOsLabCapabilityId =
   | 'merge-readiness-preview'
   | 'deployment-readiness-preview'
   | 'outreach-readiness-preview'
+  | 'project-contract-validation'
   | 'project-canon-validation'
   | 'editable-design-preview';
 
@@ -85,7 +86,8 @@ export type FounderOsLabAdapterId =
   | 'merge-preview'
   | 'deployment-preview'
   | 'email-preview'
-  | 'sekret-bip-project-preview';
+  | 'sekret-bip-project-preview'
+  | 'chief-ai-machine-project-preview';
 
 export type FounderOsLabReadiness =
   | 'ready_for_review'
@@ -175,6 +177,7 @@ export interface FounderOsLabProjectRoute {
   contractPathsRequired: string[];
   contractPathsObserved: string[];
   contractPathsMissing: string[];
+  rules: string[];
   canonicalDisplayNames: string[];
   forbiddenDisplayNames: string[];
   legacyInternalIdsPreserved: boolean;

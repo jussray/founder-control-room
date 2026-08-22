@@ -34,7 +34,7 @@ describe('Se’kret Bip direct planner input hardening', () => {
     expect(blocked).toContain('sourceRepository must be exactly jussray/Sekret-Bip');
     expect(blocked).toContain('sourceCommitSha must be an exact 40-character hexadecimal SHA');
     expect(blocked).toContain('contractUrls must contain 1 to 20 unique bounded HTTPS URL strings');
-    expect(blocked).toContain('audience must be teen or bip-jr when supplied');
+    expect(blocked).toContain('audience must be one of: teen, bip-jr');
     expect(plan.authority.executionAllowed).toBe(false);
   });
 

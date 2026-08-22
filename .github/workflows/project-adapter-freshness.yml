@@ -1,0 +1,91 @@
+name: Portfolio Project Adapter Freshness
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/founder-os-lab/contracts.ts"
+      - "src/founder-os-lab/engine.ts"
+      - "src/founder-os-lab/projectAdapters.ts"
+      - "src/founder-os-lab/projectAdapterFreshness.ts"
+      - "src/founder-os-lab/__tests__/projectAdapters.test.ts"
+      - "src/founder-os-lab/__tests__/chiefAiProjectAdapter.test.ts"
+      - "src/founder-os-lab/__tests__/projectAdapterFreshness.test.ts"
+      - "scripts/verify-project-adapter-freshness.ts"
+      - ".github/workflows/project-adapter-freshness.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/founder-os-lab/contracts.ts"
+      - "src/founder-os-lab/engine.ts"
+      - "src/founder-os-lab/projectAdapters.ts"
+      - "src/founder-os-lab/projectAdapterFreshness.ts"
+      - "src/founder-os-lab/__tests__/projectAdapters.test.ts"
+      - "src/founder-os-lab/__tests__/chiefAiProjectAdapter.test.ts"
+      - "src/founder-os-lab/__tests__/projectAdapterFreshness.test.ts"
+      - "scripts/verify-project-adapter-freshness.ts"
+      - ".github/workflows/project-adapter-freshness.yml"
+  schedule:
+    - cron: "37 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  PROJECT_ADAPTER_FRESHNESS_RECEIPT: test-results/project-adapter-freshness.json
+
+concurrency:
+  group: project-adapter-freshness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  freshness:
+    name: Verify every project adapter exact source contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prove portfolio adapter contracts
+        run: >-
+          npx vitest run
+          src/founder-os-lab/__tests__/projectAdapterFreshness.test.ts
+          src/founder-os-lab/__tests__/projectAdapters.test.ts
+          src/founder-os-lab/__tests__/chiefAiProjectAdapter.test.ts
+
+      - name: Verify live main and audited project contract blobs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: npx tsx scripts/verify-project-adapter-freshness.ts
+
+      - name: Retain sanitized portfolio freshness receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-adapter-freshness-${{ env.EXPECTED_HEAD_SHA }}
+          path: ${{ env.PROJECT_ADAPTER_FRESHNESS_RECEIPT }}
+          if-no-files-found: error
+          retention-days: 30
