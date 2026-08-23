@@ -23,6 +23,7 @@ export type AuthorityReceipt = {
   evidenceRefs: string[];
   issuedAt: string;
   expiresAt: string;
+  consumedAt?: string;
   status: AuthorityReceiptStatus;
 };
 
@@ -30,7 +31,9 @@ export type AuthorityValidationFailure =
   | "expired"
   | "invalid_status"
   | "missing_evidence"
-  | "invalid_digest";
+  | "invalid_digest"
+  | "missing_action_binding"
+  | "missing_target_binding";
 
 export type AuthorityValidationResult =
   | { ok: true; receipt: AuthorityReceipt }
@@ -52,8 +55,16 @@ export function validateAuthorityReceipt(
     return { ok: false, reason: "missing_evidence" };
   }
 
-  if (!receipt.action.digest) {
+  if (!receipt.action.digest.startsWith("sha256:")) {
     return { ok: false, reason: "invalid_digest" };
+  }
+
+  if (!receipt.action.type) {
+    return { ok: false, reason: "missing_action_binding" };
+  }
+
+  if (!receipt.action.target) {
+    return { ok: false, reason: "missing_target_binding" };
   }
 
   return { ok: true, receipt };
