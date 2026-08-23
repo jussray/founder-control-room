@@ -14,10 +14,16 @@ const receipt = {
 };
 
 describe("authority receipt registry", () => {
-  it("allows one consumption", () => {
+  it("allows one consumption and records lifecycle transition", () => {
     const registry = new AuthorityReceiptRegistry();
 
-    expect(registry.consume(receipt).ok).toBe(true);
+    const result = registry.consume(receipt);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.receipt.status).toBe("consumed");
+      expect(result.receipt.consumedAt).toBeDefined();
+    }
   });
 
   it("blocks replay", () => {
