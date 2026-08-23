@@ -142,12 +142,8 @@ export function evaluateMainEvidenceV0(input: EvaluateMainEvidenceInputV0): Eval
       }
     }
 
-    if (state === 'VERIFIED' && previous?.authoritativeSha && previous.authoritativeSha !== authority.authoritativeSha && previous.state === 'VERIFIED') {
-      // Fresh qualifying evidence for the new SHA wins. The transition records the authority movement.
-      reason = 'RECOVERY_COMPLETE';
-    }
-    if (state !== 'VERIFIED' && previous?.authoritativeSha && previous.authoritativeSha !== authority.authoritativeSha && state === 'STALE') {
-      reason = reason === 'WITNESS_SHA_MISMATCH' ? 'MAIN_SHA_CHANGED' : reason;
+    if (state !== 'VERIFIED' && previous?.authoritativeSha && previous.authoritativeSha !== authority.authoritativeSha && state === 'STALE' && reason === 'WITNESS_SHA_MISMATCH') {
+      reason = 'MAIN_SHA_CHANGED';
     }
   }
 
@@ -168,7 +164,7 @@ export function evaluateMainEvidenceV0(input: EvaluateMainEvidenceInputV0): Eval
     reason,
     policyHash: input.policy.policyHash,
     missingWitnessIds: Object.freeze([...missingWitnessIds].sort()),
-    evaluatedAt: new Date(nowMs).toISOString(),
+    evaluatedAt: input.now,
     correlationId: input.correlationId,
   });
 
