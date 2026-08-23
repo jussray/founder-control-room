@@ -13,6 +13,7 @@ import {
   type QuickScanScore,
   type QuickScanSegment,
 } from './contracts.js';
+import type { VerifiedStripeCheckoutEvent } from './stripeWebhook.js';
 
 const NEXT: Record<QuickScanLifecycleState, QuickScanLifecycleState[]> = {
   discovered: ['researched', 'closed_lost'],
@@ -170,4 +171,48 @@ export function recordQualification(prospect: QuickScanProspect, qualification: 
   prospect.qualification = qualification;
   const target: QuickScanLifecycleState = qualificationIsValid(qualification) ? 'qualified' : 'disqualified';
   return advanceProspect(prospect, target, actor);
+}
+
+/**
+ * Marks a prospect paid from a signature-verified Stripe checkout.session.
+ * completed event. This is the only path that may transition to `paid`
+ * without a founder-supplied evidence string: the verified event itself is
+ * the evidence, recorded with Stripe's own identifiers so the claim can be
+ * checked against the Stripe Dashboard later.
+ *
+ * Refuses (rather than silently no-ops) when the event's payment_status is
+ * not `paid`, or when the prospect is not in `payment_link_sent` — a real
+ * webhook event is never enough on its own to skip founder-controlled
+ * qualification and approval.
+ */
+export function markPaidFromVerifiedStripeEvent(
+  prospect: QuickScanProspect,
+  event: VerifiedStripeCheckoutEvent,
+  actor: string,
+): QuickScanProspect {
+  if (event.paymentStatus !== 'paid') {
+    throw new Error(`QuickScan Stripe event ${event.eventId} reports payment_status=${event.paymentStatus}, not paid`);
+  }
+  if (prospect.lifecycleState !== 'payment_link_sent') {
+    throw new Error(`QuickScan prospect ${prospect.id} is ${prospect.lifecycleState}, not payment_link_sent; refusing to mark paid`);
+  }
+
+  const verifiedAt = now();
+  prospect.payment = {
+    ...prospect.payment,
+    status: 'paid',
+    verifiedBy: 'stripe_webhook',
+    verifiedAt,
+    stripeEventId: event.eventId,
+    stripeSessionId: event.sessionId,
+    stripePaymentIntentId: event.paymentIntentId ?? undefined,
+  };
+  prospect.audit.push({
+    id: id('audit'),
+    type: 'payment.stripe_webhook_verified',
+    message: `event ${event.eventId}: amount_total=${event.amountTotal ?? 'unknown'} ${event.currency ?? ''}`.trim(),
+    actor,
+    createdAt: verifiedAt,
+  });
+  return advanceProspect(prospect, 'paid', actor);
 }

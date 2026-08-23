@@ -17,6 +17,7 @@ import {
   recordQualification,
 } from '../../quickscan/engine.js';
 import { getQuickScanProspect, listQuickScanProspects, saveQuickScanProspect } from '../../quickscan/store.js';
+import { buildTrackedStripePaymentLinkUrl } from '../../quickscan/stripeWebhook.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 export const quickScanRouter = Router();
@@ -34,7 +35,15 @@ quickScanRouter.get('/', (_req, res) => {
   return res.json({
     ok: true,
     contract: QUICKSCAN_CONTRACT,
-    authority: { recommend: true, approve: true, recordManualOutcome: true, sendExternal: false, scrape: false, executeN8n: false },
+    authority: {
+      recommend: true,
+      approve: true,
+      recordManualOutcome: true,
+      sendExternal: false,
+      scrape: false,
+      executeN8n: false,
+      stripeWebhookConfigured: Boolean(process.env.STRIPE_QUICKSCAN_WEBHOOK_SECRET?.trim()),
+    },
     architecture: { fcr: 'authority-evidence-ui', chief: 'replaceable-reasoning', promptos: 'versioned-workflow-provenance', ultrathink: 'domain-rules', n8n: 'orchestration-disabled-v1' },
     priceCents: QUICKSCAN_PRICE_CENTS,
     prospects,
@@ -133,9 +142,16 @@ quickScanRouter.post('/prospects/:id/payment/manual', (req: FounderRequest, res)
   const paymentApproval = prospect.approvals.find((item) => item.action === 'payment_link' && (item.decision === 'APPROVE' || item.decision === 'EDIT'));
   if (!paymentApproval) return fail(res, 409, 'PAYMENT_APPROVAL_REQUIRED', 'founder approval is required before payment-link progression');
   const status = text(body.status);
+  let trackedPaymentLinkUrl: string | null = null;
   if (status === 'link_ready') {
-    prospect.payment = { ...prospect.payment, status: 'link_ready', paymentLinkUrl: text(body.paymentLinkUrl) || undefined };
+    const paymentLinkUrl = text(body.paymentLinkUrl) || undefined;
+    prospect.payment = { ...prospect.payment, status: 'link_ready', paymentLinkUrl };
     if (prospect.lifecycleState === 'qualified') advanceProspect(prospect, 'payment_link_ready', req.founder?.email ?? 'founder');
+    // The stored link stays exactly what the founder pasted; the tracked
+    // variant (with ?client_reference_id=<prospectId>) is what must actually
+    // be sent, or an inbound Stripe webhook cannot correlate back to this
+    // prospect. Computed on read, never persisted as the link of record.
+    trackedPaymentLinkUrl = paymentLinkUrl ? buildTrackedStripePaymentLinkUrl(paymentLinkUrl, prospect.id) : null;
   } else if (status === 'link_sent') {
     if (prospect.lifecycleState !== 'payment_link_ready') return fail(res, 409, 'PAYMENT_STATE_BLOCKED', 'payment link must be ready before it can be marked sent');
     prospect.payment.status = 'link_sent';
@@ -147,5 +163,11 @@ quickScanRouter.post('/prospects/:id/payment/manual', (req: FounderRequest, res)
     advanceProspect(prospect, 'paid', req.founder?.email ?? 'founder');
   } else return fail(res, 400, 'INVALID_PAYMENT_STATUS', 'supported manual statuses: link_ready, link_sent, paid');
   saveQuickScanProspect(prospect);
-  return res.json({ ok: true, externalMutation: false, stripeWebhookVerified: false, prospect });
+  return res.json({
+    ok: true,
+    externalMutation: false,
+    stripeWebhookVerified: false,
+    ...(trackedPaymentLinkUrl ? { trackedPaymentLinkUrl } : {}),
+    prospect,
+  });
 });

@@ -48,6 +48,7 @@ import {
 } from './routes/repositoryVerification.js';
 import { economicIntelligenceRouter } from './routes/economicIntelligence.js';
 import { handleGitHubWebhook } from './webhooks/github.js';
+import { handleStripeQuickScanWebhook } from './webhooks/stripeQuickScan.js';
 import { debugRouter } from './routes/debug.js';
 import { publicGuardrailSnapshot, renderGuardrailStatusPage } from '../guardrails.js';
 import { V10_CAPABILITY_PLAN_CONTRACT } from '../founder-os-lab/capabilityKernel.js';
@@ -155,6 +156,11 @@ export function createServer(options: CreateServerOptions = {}) {
     '/webhooks/github',
     express.raw({ type: 'application/json', limit: BODY_LIMIT }),
     handleGitHubWebhook,
+  );
+  app.post(
+    '/webhooks/stripe-quickscan',
+    express.raw({ type: 'application/json', limit: '64kb' }),
+    handleStripeQuickScanWebhook,
   );
   app.post(
     '/ingest/repository-verification',

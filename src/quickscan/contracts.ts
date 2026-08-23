@@ -110,7 +110,17 @@ export interface QuickScanProspect {
   chiefRecommendation?: ChiefQuickScanRecommendation;
   approvals: QuickScanApproval[];
   overrideReceipts: QuickScanOverrideReceipt[];
-  payment: { status: 'unpaid' | 'link_ready' | 'link_sent' | 'paid' | 'refunded'; amountCents: number; paymentLinkUrl?: string };
+  payment: {
+    status: 'unpaid' | 'link_ready' | 'link_sent' | 'paid' | 'refunded';
+    amountCents: number;
+    paymentLinkUrl?: string;
+    /** Present only once a Stripe webhook event has verified this prospect paid. */
+    verifiedBy?: 'stripe_webhook' | 'manual';
+    verifiedAt?: string;
+    stripeEventId?: string;
+    stripeSessionId?: string;
+    stripePaymentIntentId?: string;
+  };
   flow?: QuickScanFlow;
   delivery?: { loomUrl?: string; deliveredAt?: string };
   audit: Array<{ id: string; type: string; message: string; actor: string; createdAt: string }>;
