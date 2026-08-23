@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { canonicalSerialize } from '../src/canonical-serialize.js';
 import { evaluateMainEvidenceV0 } from '../src/evaluator.js';
 import type { MainEvidenceDecisionV0 } from '../src/main-evidence-decision.v0.js';
 import type { WitnessResultV0 } from '../src/witness-result.v0.js';
@@ -137,34 +138,45 @@ describe('Attack Ten portfolio refusal suite', () => {
     expect(decision.reason).toBe('INVALID_WITNESS_EVIDENCE');
   });
 
-  it('fails closed on duplicate witness IDs independent of transport order', () => {
+  it('duplicate witness results fail closed independent of transport order', () => {
     const pass = passingWitness('product.critical-journey');
-    const fail = { ...passingWitness('product.critical-journey'), state: 'FAIL' as const, correlationId: 'duplicate-fail' };
+    const fail = { ...pass, state: 'FAIL' as const, correlationId: 'duplicate-fail' };
     const code = passingWitness('code.required-ci');
 
-    const first = evaluate([code, pass, fail]);
-    const second = evaluate([fail, code, pass]);
+    const forward = evaluateMainEvidenceV0({
+      sourceAuthority: sourceAuthority(),
+      policy,
+      witnesses: [code, pass, fail],
+      now: NOW,
+      correlationId: CORRELATION_ID,
+    });
+    const reversed = evaluateMainEvidenceV0({
+      sourceAuthority: sourceAuthority(),
+      policy,
+      witnesses: [fail, pass, code],
+      now: NOW,
+      correlationId: CORRELATION_ID,
+    });
 
-    expect(first.state).toBe('UNKNOWN');
-    expect(first.reason).toBe('INVALID_WITNESS_EVIDENCE');
-    expect(second).toEqual(first);
+    expect(forward.decision.state).toBe('UNKNOWN');
+    expect(forward.decision.reason).toBe('INVALID_WITNESS_EVIDENCE');
+    expect(canonicalSerialize(forward)).toBe(canonicalSerialize(reversed));
   });
 
-  it('blocks a witness policy with duplicate required IDs', () => {
-    const invalidPolicy = {
+  it('duplicate required witness IDs fail closed as invalid policy', () => {
+    const duplicatePolicy = {
       ...policy,
       requiredWitnesses: [policy.requiredWitnesses[0], policy.requiredWitnesses[0]],
     };
-    const decision = evaluateMainEvidenceV0({
+    const result = evaluateMainEvidenceV0({
       sourceAuthority: sourceAuthority(),
-      policy: invalidPolicy,
+      policy: duplicatePolicy,
       witnesses: qualifyingWitnesses(),
       now: NOW,
       correlationId: CORRELATION_ID,
-    }).decision;
-
-    expect(decision.state).toBe('BLOCKED');
-    expect(decision.reason).toBe('INVALID_WITNESS_POLICY');
+    });
+    expect(result.decision.state).toBe('BLOCKED');
+    expect(result.decision.reason).toBe('INVALID_WITNESS_POLICY');
   });
 
   it('source authority unavailable is BLOCKED', () => {
