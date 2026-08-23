@@ -51,9 +51,19 @@ function decide(input: EvaluationInput, patch: DecisionPatch): MainEvidenceDecis
   };
 }
 
+function isValidTime(value: string | undefined): value is string {
+  return typeof value === 'string' && Number.isFinite(Date.parse(value));
+}
+
 export function evaluateMainEvidence(input: EvaluationInput): MainEvidenceDecisionV0 {
   const authority = input.sourceAuthority;
-  if (!authority || !authority.authoritativeSha || authority.repo !== input.repo || authority.branch !== 'main') {
+  if (
+    !authority
+    || !authority.authoritativeSha
+    || authority.repo !== input.repo
+    || authority.branch !== 'main'
+    || !isValidTime(authority.observedAt)
+  ) {
     return decide(input, {
       state: 'BLOCKED',
       reason: 'SOURCE_AUTHORITY_UNRESOLVED',
@@ -70,12 +80,26 @@ export function evaluateMainEvidence(input: EvaluationInput): MainEvidenceDecisi
     });
   }
 
+  const duplicateWitnessIds = input.witnessResults
+    .map((result) => result.witnessId)
+    .filter((id, index, all) => all.indexOf(id) !== index);
+  if (duplicateWitnessIds.length > 0) {
+    return decide(input, {
+      state: 'BLOCKED',
+      reason: 'INVALID_WITNESS_EVIDENCE',
+      nextRequiredAction: 'RESOLVE_WITNESS_EVIDENCE',
+      unresolvableWitnessIds: [...new Set(duplicateWitnessIds)],
+    });
+  }
+
   const results = new Map(input.witnessResults.map((result) => [result.witnessId, result]));
   const missing: string[] = [];
   const failed: string[] = [];
   const stale: string[] = [];
-  const mismatched: string[] = [];
+  const shaMismatched: string[] = [];
+  const scenarioMismatched: string[] = [];
   const unresolvable: string[] = [];
+  const invalid: string[] = [];
 
   for (const requirement of input.policy.requiredWitnesses) {
     const result = results.get(requirement.id);
@@ -88,15 +112,15 @@ export function evaluateMainEvidence(input: EvaluationInput): MainEvidenceDecisi
       continue;
     }
     if (requirement.scenarioFingerprint && result.scenarioFingerprint !== requirement.scenarioFingerprint) {
-      mismatched.push(requirement.id);
+      scenarioMismatched.push(requirement.id);
       continue;
     }
     if (requirement.exactShaRequired && result.evaluatedSha !== authority.authoritativeSha) {
-      mismatched.push(requirement.id);
+      shaMismatched.push(requirement.id);
       continue;
     }
-    if (!result.evidenceRef || !result.evidenceHash || !result.observedAt) {
-      unresolvable.push(requirement.id);
+    if (!result.evidenceRef || !result.evidenceHash || !isValidTime(result.observedAt)) {
+      invalid.push(requirement.id);
       continue;
     }
     if (result.state === 'UNRESOLVABLE') {
@@ -107,7 +131,15 @@ export function evaluateMainEvidence(input: EvaluationInput): MainEvidenceDecisi
       failed.push(requirement.id);
       continue;
     }
-    if (result.state === 'STALE' || (result.expiresAt && result.expiresAt <= input.now)) {
+
+    const observedAtMs = Date.parse(result.observedAt);
+    const nowMs = Date.parse(input.now);
+    const exceedsPolicyFreshness = requirement.freshnessWindowSeconds !== undefined
+      && Number.isFinite(nowMs)
+      && (nowMs - observedAtMs) > requirement.freshnessWindowSeconds * 1000;
+    const explicitExpiry = isValidTime(result.expiresAt) && Date.parse(result.expiresAt) <= nowMs;
+
+    if (result.state === 'STALE' || exceedsPolicyFreshness || explicitExpiry) {
       stale.push(requirement.id);
       continue;
     }
@@ -116,6 +148,14 @@ export function evaluateMainEvidence(input: EvaluationInput): MainEvidenceDecisi
     }
   }
 
+  if (invalid.length) {
+    return decide(input, {
+      state: 'BLOCKED',
+      reason: 'INVALID_WITNESS_EVIDENCE',
+      nextRequiredAction: 'RESOLVE_WITNESS_EVIDENCE',
+      unresolvableWitnessIds: invalid,
+    });
+  }
   if (unresolvable.length) {
     return decide(input, {
       state: 'BLOCKED',
@@ -132,12 +172,20 @@ export function evaluateMainEvidence(input: EvaluationInput): MainEvidenceDecisi
       failedWitnessIds: failed,
     });
   }
-  if (mismatched.length) {
+  if (scenarioMismatched.length) {
+    return decide(input, {
+      state: 'STALE',
+      reason: 'SCENARIO_MISMATCH',
+      nextRequiredAction: 'REACQUIRE_REQUIRED_WITNESSES',
+      mismatchedWitnessIds: scenarioMismatched,
+    });
+  }
+  if (shaMismatched.length) {
     return decide(input, {
       state: 'STALE',
       reason: 'WITNESS_SHA_MISMATCH',
       nextRequiredAction: 'INVESTIGATE_SHA_MISMATCH',
-      mismatchedWitnessIds: mismatched,
+      mismatchedWitnessIds: shaMismatched,
     });
   }
   if (stale.length) {
