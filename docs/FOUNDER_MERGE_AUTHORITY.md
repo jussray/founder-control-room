@@ -23,6 +23,8 @@ Founder final approval is a separate authority class. It must never be mislabele
 A merge is appropriate only when:
 
 - the repository, pull request, target branch, and exact head SHA are verified;
+- required PR proof jobs check out and verify the immutable PR head SHA; GitHub's synthetic pull-request merge ref may be useful integration evidence but is not interchangeable with exact-head evidence;
+- migration lint has the local Supabase/Postgres precondition it requires, and runner/setup/precondition failure must not be converted into a passing migration result;
 - the intended scope is understood and no unrelated work is being smuggled into the change;
 - code, configuration, docs, schemas, generated artifacts, and release-impacting changes have been reviewed;
 - required checks have genuinely executed and passed, or a documented infrastructure failure has been classified and distinguished from code-test evidence;
