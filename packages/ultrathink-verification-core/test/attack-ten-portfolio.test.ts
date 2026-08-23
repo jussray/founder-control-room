@@ -123,6 +123,20 @@ describe('Attack Ten portfolio refusal suite', () => {
     expect(decision.state).not.toBe('VERIFIED');
   });
 
+  it('rejects a PASS witness issued for another repository', () => {
+    const foreign = { ...passingWitness('product.critical-journey'), repo: 'jussray/foreign-project' };
+    const decision = evaluate([passingWitness('code.required-ci'), foreign]);
+    expect(decision.state).toBe('UNKNOWN');
+    expect(decision.reason).toBe('INVALID_WITNESS_EVIDENCE');
+  });
+
+  it('rejects a PASS witness with invalid branch provenance', () => {
+    const wrongBranch = { ...passingWitness('product.critical-journey'), branch: 'feature' as unknown as 'main' };
+    const decision = evaluate([passingWitness('code.required-ci'), wrongBranch]);
+    expect(decision.state).toBe('UNKNOWN');
+    expect(decision.reason).toBe('INVALID_WITNESS_EVIDENCE');
+  });
+
   it('source authority unavailable is BLOCKED', () => {
     const decision = evaluateMainEvidenceV0({
       sourceAuthority: null,
