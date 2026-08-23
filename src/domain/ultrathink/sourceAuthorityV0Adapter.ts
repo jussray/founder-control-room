@@ -1,9 +1,18 @@
-import type { SourceAuthorityV0 } from '../../../packages/ultrathink-verification-core/src/source-authority.v0.js';
 import { evaluateSourceAuthority, type SourceAuthorityRecord } from './sourceAuthority.js';
+
+export interface SourceAuthorityV0AdapterOutput {
+  kind: 'source-authority.v0';
+  repo: string;
+  branch: 'main';
+  authoritativeSha: string;
+  observedAt: string;
+  source: 'github';
+  correlationId: string;
+}
 
 export function adaptSourceAuthorityRecordV0(
   record: SourceAuthorityRecord,
-): SourceAuthorityV0 | null {
+): SourceAuthorityV0AdapterOutput | null {
   const evaluation = evaluateSourceAuthority(record);
 
   if (
