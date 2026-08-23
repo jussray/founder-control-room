@@ -15,8 +15,14 @@ export function createContinuityTransition(input: {
   if (input.prior && (input.prior.repo !== input.next.repo || input.prior.branch !== input.next.branch)) {
     throw new Error('CONTINUITY_INVALID: prior and next decisions must belong to the same repository branch');
   }
-  if (!Number.isFinite(Date.parse(input.occurredAt))) {
+
+  const occurredAtMs = Date.parse(input.occurredAt);
+  const evaluatedAtMs = Date.parse(input.next.evaluatedAt);
+  if (!Number.isFinite(occurredAtMs)) {
     throw new Error('CONTINUITY_INVALID: occurredAt must be a valid timestamp');
+  }
+  if (!Number.isFinite(evaluatedAtMs) || occurredAtMs < evaluatedAtMs) {
+    throw new Error('CONTINUITY_INVALID: transition cannot occur before the next decision was evaluated');
   }
   if (!input.correlationId.trim()) {
     throw new Error('CONTINUITY_INVALID: correlationId is required');
