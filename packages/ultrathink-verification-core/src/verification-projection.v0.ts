@@ -9,7 +9,6 @@ export type VerificationProjectionV0 = {
   reason: MainEvidenceReasonV0;
   missingWitnessIds: readonly string[];
   summary: string;
-  recovery: string;
   promotionBlocked: boolean;
   evaluatedAt: string;
   correlationId: string;
