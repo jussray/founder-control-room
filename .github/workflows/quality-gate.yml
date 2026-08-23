@@ -85,8 +85,13 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: 2.101.0
+      - name: Start local Supabase for migration lint
+        run: supabase start
       - name: Lint migrations
         run: supabase db lint --local
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup
 
   terminal-contract:
     name: "Guarded Terminal and AI Skill Contracts"
