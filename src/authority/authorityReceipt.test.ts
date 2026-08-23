@@ -29,4 +29,22 @@ describe("authority receipt", () => {
       validateAuthorityReceipt({ ...baseReceipt, evidenceRefs: [] }),
     ).toEqual({ ok: false, reason: "missing_evidence" });
   });
+
+  it("blocks receipts with non-sha256 digests", () => {
+    expect(
+      validateAuthorityReceipt({
+        ...baseReceipt,
+        action: { ...baseReceipt.action, digest: "md5:test" },
+      }),
+    ).toEqual({ ok: false, reason: "invalid_digest" });
+  });
+
+  it("blocks missing action binding", () => {
+    expect(
+      validateAuthorityReceipt({
+        ...baseReceipt,
+        action: { ...baseReceipt.action, type: "" },
+      }),
+    ).toEqual({ ok: false, reason: "missing_action_binding" });
+  });
 });
