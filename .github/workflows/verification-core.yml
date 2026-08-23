@@ -39,9 +39,9 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: Typecheck Verification Core
-        run: ./node_modules/.bin/tsc -p packages/ultrathink-verification-core/tsconfig.json
+        run: npm --prefix packages/ultrathink-verification-core run typecheck
 
       - name: Run Verification Core refusal suite
-        run: ./node_modules/.bin/vitest run packages/ultrathink-verification-core/test
+        run: npm --prefix packages/ultrathink-verification-core test
         env:
           NODE_ENV: test
