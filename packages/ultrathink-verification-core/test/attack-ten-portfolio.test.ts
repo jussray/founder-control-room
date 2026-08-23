@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { canonicalSerialize } from '../src/canonical-serialize.js';
 import { evaluateMainEvidenceV0 } from '../src/evaluator.js';
 import type { MainEvidenceDecisionV0 } from '../src/main-evidence-decision.v0.js';
 import type { WitnessResultV0 } from '../src/witness-result.v0.js';
@@ -135,6 +136,47 @@ describe('Attack Ten portfolio refusal suite', () => {
     const decision = evaluate([passingWitness('code.required-ci'), wrongBranch]);
     expect(decision.state).toBe('UNKNOWN');
     expect(decision.reason).toBe('INVALID_WITNESS_EVIDENCE');
+  });
+
+  it('duplicate witness results fail closed independent of transport order', () => {
+    const pass = passingWitness('product.critical-journey');
+    const fail = { ...pass, state: 'FAIL' as const, correlationId: 'duplicate-fail' };
+    const code = passingWitness('code.required-ci');
+
+    const forward = evaluateMainEvidenceV0({
+      sourceAuthority: sourceAuthority(),
+      policy,
+      witnesses: [code, pass, fail],
+      now: NOW,
+      correlationId: CORRELATION_ID,
+    });
+    const reversed = evaluateMainEvidenceV0({
+      sourceAuthority: sourceAuthority(),
+      policy,
+      witnesses: [fail, pass, code],
+      now: NOW,
+      correlationId: CORRELATION_ID,
+    });
+
+    expect(forward.decision.state).toBe('UNKNOWN');
+    expect(forward.decision.reason).toBe('INVALID_WITNESS_EVIDENCE');
+    expect(canonicalSerialize(forward)).toBe(canonicalSerialize(reversed));
+  });
+
+  it('duplicate required witness IDs fail closed as invalid policy', () => {
+    const duplicatePolicy = {
+      ...policy,
+      requiredWitnesses: [policy.requiredWitnesses[0], policy.requiredWitnesses[0]],
+    };
+    const result = evaluateMainEvidenceV0({
+      sourceAuthority: sourceAuthority(),
+      policy: duplicatePolicy,
+      witnesses: qualifyingWitnesses(),
+      now: NOW,
+      correlationId: CORRELATION_ID,
+    });
+    expect(result.decision.state).toBe('BLOCKED');
+    expect(result.decision.reason).toBe('INVALID_WITNESS_POLICY');
   });
 
   it('source authority unavailable is BLOCKED', () => {
