@@ -47,7 +47,20 @@ function classifyRequirement(params: {
   if (result.state === 'UNRESOLVABLE') return { state: 'BLOCKED', reason: 'WITNESS_UNRESOLVABLE' };
   if (result.state === 'STALE') return { state: 'STALE', reason: 'EVIDENCE_EXPIRED' };
 
-  if (!result.evaluatedSha || !result.policyHash || !result.evidenceRef || !result.evidenceHash || !result.observedAt) {
+  if (
+    result.kind !== 'witness-result.v0' ||
+    result.version !== 0 ||
+    result.repo !== authority.repo ||
+    result.repo !== policy.repo ||
+    result.branch !== authority.branch ||
+    !result.observer?.adapter ||
+    !result.observer?.version ||
+    !result.evaluatedSha ||
+    !result.policyHash ||
+    !result.evidenceRef ||
+    !result.evidenceHash ||
+    !result.observedAt
+  ) {
     return { state: 'UNKNOWN', reason: 'INVALID_WITNESS_EVIDENCE' };
   }
   if (result.evaluatedSha !== authority.authoritativeSha) return { state: 'STALE', reason: 'WITNESS_SHA_MISMATCH' };
@@ -82,19 +95,6 @@ const precedence: Record<MainEvidenceStateV0, number> = {
 };
 
 function projectionFor(decision: MainEvidenceDecisionV0): VerificationProjectionV0 {
-  const recoveryByReason: Record<MainEvidenceReasonV0, string> = {
-    RECOVERY_COMPLETE: 'No action required.',
-    MAIN_SHA_CHANGED: 'Reacquire all required witnesses for the authoritative main SHA.',
-    REQUIRED_WITNESS_MISSING: 'Collect the missing required witness evidence.',
-    WITNESS_SHA_MISMATCH: 'Reacquire stale witness evidence against the authoritative main SHA.',
-    WITNESS_FAILED: 'Investigate the failed witness, correct the cause, then rerun it.',
-    WITNESS_UNRESOLVABLE: 'Restore observation access or obtain a resolvable authoritative witness.',
-    INVALID_WITNESS_EVIDENCE: 'Reissue the witness with exact SHA, immutable evidence identity, and valid timestamps.',
-    EVIDENCE_EXPIRED: 'Reacquire expired witness evidence.',
-    POLICY_CHANGED: 'Reacquire witnesses under the current policy snapshot.',
-    SCENARIO_MISMATCH: 'Run the exact scenario required by the current witness policy.',
-    SOURCE_AUTHORITY_UNRESOLVED: 'Resolve the authoritative main SHA before evaluating project evidence.',
-  };
   return Object.freeze({
     kind: 'verification-projection.v0',
     repo: decision.repo,
@@ -104,7 +104,6 @@ function projectionFor(decision: MainEvidenceDecisionV0): VerificationProjection
     reason: decision.reason,
     missingWitnessIds: [...decision.missingWitnessIds].sort(),
     summary: `${decision.repo} ${decision.state}: ${decision.reason}`,
-    recovery: recoveryByReason[decision.reason],
     promotionBlocked: decision.state !== 'VERIFIED',
     evaluatedAt: decision.evaluatedAt,
     correlationId: decision.correlationId,
