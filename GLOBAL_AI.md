@@ -90,6 +90,8 @@ Implementation rules:
 - Re-observe after every meaningful edit, test result, review, merge, provider write, or documentation transition.
 - Map code paths to explicit guardrails, evidence sources, temporal validity, and approval boundaries.
 - Treat compilation as syntax evidence, tests as behavioral evidence, CI as repository workflow evidence, provider readback as provider evidence, and runtime observation as deployment evidence. None substitutes for all the others.
+- Required PR workflow evidence must execute against and verify the immutable PR head SHA. A GitHub synthetic pull-request merge ref may be useful integration evidence but cannot substitute for exact-head evidence.
+- Migration lint that targets `--local` must start its pinned local Supabase/Postgres dependency first and must fail closed on setup, runner, connection, or lint failure.
 - FCR CI must keep the secret-free exact-head Cloudflare bridge authority contract load-bearing inside `Required Gate`; that repository check does not substitute for live Cloudflare or GitHub provider readback.
 - Never code around an unknown provider state, schema state, credential state, review state, or failed workflow merely to make a patch appear complete.
 - Delete duplicate authority and dead workflow paths before adding another abstraction, credential, retry, or dashboard.
