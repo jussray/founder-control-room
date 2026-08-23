@@ -1,15 +1,28 @@
+import { validateAuthorityReceipt } from "./authorityReceipt.js";
 import type { AuthorityReceipt } from "./authorityReceipt.js";
 
 export type ReceiptConsumeResult =
   | { ok: true; receipt: AuthorityReceipt }
-  | { ok: false; reason: "already_consumed" | "invalid_receipt" };
+  | {
+      ok: false;
+      reason:
+        | "already_consumed"
+        | "invalid_receipt"
+        | "expired"
+        | "missing_evidence"
+        | "invalid_digest"
+        | "missing_action_binding"
+        | "missing_target_binding";
+    };
 
 export class AuthorityReceiptRegistry {
   private readonly consumed = new Set<string>();
 
   consume(receipt: AuthorityReceipt): ReceiptConsumeResult {
-    if (receipt.status !== "valid") {
-      return { ok: false, reason: "invalid_receipt" };
+    const validation = validateAuthorityReceipt(receipt);
+
+    if (!validation.ok) {
+      return validation;
     }
 
     if (this.consumed.has(receipt.id)) {
@@ -17,6 +30,14 @@ export class AuthorityReceiptRegistry {
     }
 
     this.consumed.add(receipt.id);
-    return { ok: true, receipt };
+
+    return {
+      ok: true,
+      receipt: {
+        ...receipt,
+        consumedAt: new Date().toISOString(),
+        status: "consumed",
+      },
+    };
   }
 }
