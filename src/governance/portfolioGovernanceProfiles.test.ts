@@ -151,7 +151,8 @@ describe('project-specific proof contracts', () => {
       proofs: [proof('commerce_provider_receipt_verified')], authorization: authorization('production_claim'),
     }));
     expect(verdict.decision).toBe('reconfirm');
-    expect(verdict.reasons.join(' ')).toContain('different intent');
+    expect(verdict.reasonCodes).toEqual(['execution_authorization_binding']);
+    expect(verdict.reasons.join(' ')).toMatch(/different intent|scope does not cover this action/);
   });
 
   it('fails closed when a consequential portfolio action cannot prove authorization replay state', () => {
