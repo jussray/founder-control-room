@@ -5,9 +5,11 @@ import {
   assertQuickScanTransition,
   createOverrideReceipt,
   createProspect,
+  markPaidFromVerifiedStripeEvent,
   setChiefRecommendation,
 } from '../engine.js';
 import type { PromptWorkflowReference } from '../contracts.js';
+import type { VerifiedStripeCheckoutEvent } from '../stripeWebhook.js';
 
 const SEGMENT = 'salon_studio_team_owner' as const;
 
@@ -17,6 +19,27 @@ function scoredProspect() {
     addEvidence(prospect, { category, note: `Observed ${category}` }, 'founder');
   }
   return prospect;
+}
+
+function prospectAtPaymentLinkSent() {
+  const prospect = scoredProspect();
+  for (const state of ['researched', 'qualified_for_outreach', 'draft_ready', 'approved_to_contact', 'contacted', 'replied', 'fit_check_scheduled', 'qualified', 'payment_link_ready', 'payment_link_sent'] as const) {
+    advanceProspect(prospect, state, 'founder');
+  }
+  return prospect;
+}
+
+function verifiedEvent(overrides: Partial<VerifiedStripeCheckoutEvent> = {}): VerifiedStripeCheckoutEvent {
+  return {
+    eventId: 'evt_1',
+    sessionId: 'cs_1',
+    paymentIntentId: 'pi_1',
+    clientReferenceId: 'prospect_1',
+    amountTotal: 24900,
+    currency: 'usd',
+    paymentStatus: 'paid',
+    ...overrides,
+  };
 }
 
 describe('QuickScan engine', () => {
@@ -58,5 +81,33 @@ describe('QuickScan engine', () => {
     expect(() => setChiefRecommendation(prospect, {
       summary: 'Mismatch', nextAction: 'approve_outreach', promptWorkflow: { ...selected, promptVersion: '3' },
     }, selected)).toThrow('provenance');
+  });
+
+  it('marks a prospect paid from a verified Stripe checkout event', () => {
+    const prospect = prospectAtPaymentLinkSent();
+    const result = markPaidFromVerifiedStripeEvent(prospect, verifiedEvent({ clientReferenceId: prospect.id }), 'stripe-webhook');
+
+    expect(result.lifecycleState).toBe('paid');
+    expect(result.payment).toMatchObject({
+      status: 'paid',
+      verifiedBy: 'stripe_webhook',
+      stripeEventId: 'evt_1',
+      stripeSessionId: 'cs_1',
+      stripePaymentIntentId: 'pi_1',
+    });
+    expect(result.audit.some((entry) => entry.type === 'payment.stripe_webhook_verified')).toBe(true);
+  });
+
+  it('refuses to mark paid from an event whose payment_status is not paid', () => {
+    const prospect = prospectAtPaymentLinkSent();
+    expect(() => markPaidFromVerifiedStripeEvent(prospect, verifiedEvent({ paymentStatus: 'unpaid' }), 'stripe-webhook'))
+      .toThrow('not paid');
+    expect(prospect.lifecycleState).toBe('payment_link_sent');
+  });
+
+  it('refuses a verified event when the prospect is not awaiting payment', () => {
+    const prospect = scoredProspect();
+    expect(() => markPaidFromVerifiedStripeEvent(prospect, verifiedEvent(), 'stripe-webhook'))
+      .toThrow('not payment_link_sent');
   });
 });

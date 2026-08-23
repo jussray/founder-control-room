@@ -20,7 +20,7 @@ const server = createServer(async (req, res) => {
   if (req.url === '/control-room/quickscan.html') { res.setHeader('content-type','text/html'); return res.end(await readFile(resolve(publicDir,'quickscan.html'))); }
   if (req.url === '/control-room/quickscan.css') { res.setHeader('content-type','text/css'); return res.end(await readFile(resolve(publicDir,'quickscan.css'))); }
   if (req.url === '/control-room/quickscan.js') { res.setHeader('content-type','text/javascript'); return res.end(await readFile(resolve(publicDir,'quickscan.js'))); }
-  if (req.url === '/quickscan' && req.method === 'GET') { res.setHeader('content-type','application/json'); return res.end(JSON.stringify({ contract:'founder-control-room/quickscan@v1', authority:{ sendExternal:false, executeN8n:false }, prospects:[prospect] })); }
+  if (req.url === '/quickscan' && req.method === 'GET') { res.setHeader('content-type','application/json'); return res.end(JSON.stringify({ contract:'founder-control-room/quickscan@v1', authority:{ sendExternal:false, executeN8n:false, stripeWebhookConfigured:false }, prospects:[prospect] })); }
   if (req.url?.includes('/approvals/approval_1/decision') && req.method === 'POST') {
     let body=''; for await (const chunk of req) body += chunk; decisions.push(JSON.parse(body));
     prospect.approvals[0].decision = decisions.at(-1).decision;
@@ -37,7 +37,7 @@ try {
   const truth = await page.locator('#truth').innerText();
   assert.match(truth, /External send: disabled/);
   assert.match(truth, /n8n execution: disabled/);
-  assert.match(truth, /Stripe webhook truth: not claimed/);
+  assert.match(truth, /Stripe webhook: not configured/);
   await page.locator('[data-id="prospect_demo"]').click();
   assert.match(await page.locator('#detail').innerText(), /Prompt provenance: quickscan-outreach-v1/);
   assert.equal(await page.locator('[data-decision="APPROVE"]').count(), 1);

@@ -40,6 +40,24 @@ describe('QuickScan founder-gated API', () => {
     expect(response.body.architecture).toMatchObject({ chief: 'replaceable-reasoning', promptos: 'versioned-workflow-provenance', n8n: 'orchestration-disabled-v1' });
   });
 
+  it('reports whether the Stripe QuickScan webhook is configured, without leaking the secret', async () => {
+    const original = process.env.STRIPE_QUICKSCAN_WEBHOOK_SECRET;
+    try {
+      delete process.env.STRIPE_QUICKSCAN_WEBHOOK_SECRET;
+      founderSession();
+      let response = await request(buildApp()).get('/quickscan').set('Authorization', BEARER);
+      expect(response.body.authority.stripeWebhookConfigured).toBe(false);
+
+      process.env.STRIPE_QUICKSCAN_WEBHOOK_SECRET = 'whsec_test';
+      response = await request(buildApp()).get('/quickscan').set('Authorization', BEARER);
+      expect(response.body.authority.stripeWebhookConfigured).toBe(true);
+      expect(JSON.stringify(response.body)).not.toContain('whsec_test');
+    } finally {
+      if (original === undefined) delete process.env.STRIPE_QUICKSCAN_WEBHOOK_SECRET;
+      else process.env.STRIPE_QUICKSCAN_WEBHOOK_SECRET = original;
+    }
+  });
+
   it('does not permit a direct contacted -> paid lifecycle jump', async () => {
     founderSession();
     const created = await request(buildApp()).post('/quickscan/prospects').set('Authorization', BEARER).send({ businessName: 'Example Studio', segment: 'salon_studio_team_owner' });
@@ -73,7 +91,8 @@ describe('QuickScan founder-gated API', () => {
     response = await request(buildApp()).post(`/quickscan/prospects/${id}/payment/manual`).set('Authorization', BEARER).send({ status: 'paid', evidence: 'manual receipt' });
     expect(response.status).toBe(409);
 
-    await request(buildApp()).post(`/quickscan/prospects/${id}/payment/manual`).set('Authorization', BEARER).send({ status: 'link_ready', paymentLinkUrl: 'https://buy.stripe.com/example' });
+    response = await request(buildApp()).post(`/quickscan/prospects/${id}/payment/manual`).set('Authorization', BEARER).send({ status: 'link_ready', paymentLinkUrl: 'https://buy.stripe.com/example' });
+    expect(response.body.trackedPaymentLinkUrl).toBe(`https://buy.stripe.com/example?client_reference_id=${id}`);
     await request(buildApp()).post(`/quickscan/prospects/${id}/payment/manual`).set('Authorization', BEARER).send({ status: 'link_sent' });
     response = await request(buildApp()).post(`/quickscan/prospects/${id}/payment/manual`).set('Authorization', BEARER).send({ status: 'paid' });
     expect(response.status).toBe(409);
