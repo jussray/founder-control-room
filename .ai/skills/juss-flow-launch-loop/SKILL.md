@@ -5,7 +5,7 @@ description: >
   release, documentation truth, and full-app-launch work. Converts ULTRATHINK,
   Product Design, Data Analytics, Redteam, Lindy, L99, OODA, Hormozi, Bill Gates,
   Elon Musk, GoalFix, and Juss Flow into an evidence-gated loop.
-version: 1.1
+version: 1.2
 visibility: private
 owner: Juss
 ---
@@ -285,6 +285,8 @@ Implementation rules:
 - add Playwright for changed user-facing paths;
 - keep mock/fallback/fixture/production paths visibly distinct;
 - attach evidence to exact branch/SHA;
+- required PR checks must check out and verify the immutable PR head; a synthetic PR merge ref is integration evidence only and cannot satisfy exact-head proof;
+- `supabase db lint --local` must run only after the pinned local Supabase/Postgres stack is started, and setup/connection failure is a failed gate rather than a lint pass;
 - update current README/docs when truth-sensitive behavior changes; and
 - report verified, inferred, blocked, stale, superseded, unknown, and untested separately.
 
@@ -313,7 +315,8 @@ Merge only when:
 
 - scope and intent match;
 - exact head/base remain current;
-- required checks genuinely executed and passed;
+- required checks genuinely executed and passed on the immutable PR head SHA, not merely on GitHub's synthetic merge ref;
+- migration lint ran against a started pinned local Supabase/Postgres stack and no setup/connection failure was treated as success;
 - FCR `Required Gate` includes and successfully enforces the secret-free exact-head Cloudflare bridge authority contract; this is repository CI evidence, not live-provider proof;
 - user-facing changes have current Playwright proof when relevant;
 - Documentation Truth is green when applicable;
