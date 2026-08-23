@@ -15,7 +15,7 @@ const policy: WitnessPolicyV0 = {
   policyHash: POLICY_HASH,
   repo: 'jussray/founder-control-room',
   requiredWitnesses: [
-    { id: 'typecheck', class: 'code', exactShaRequired: true },
+    { id: 'typecheck', class: 'code', exactShaRequired: true, freshnessWindowSeconds: 300 },
     { id: 'playwright', class: 'product', exactShaRequired: true, scenarioFingerprint: SCENARIO },
   ],
 };
@@ -54,7 +54,7 @@ function evaluate(results: WitnessResultV0[], prior?: MainEvidenceDecisionV0, ov
 
 describe('portfolio Attack Ten', () => {
   it('never verifies a green result from an earlier SHA', () => {
-    expect(evaluate([witness('typecheck', { evaluatedSha: SHA_A }), witness('playwright')]).state).toBe('STALE');
+    expect(evaluate([witness('typecheck', { evaluatedSha: SHA_A }), witness('playwright')])).toMatchObject({ state: 'STALE', reason: 'WITNESS_SHA_MISMATCH' });
   });
 
   it('preserves stale lineage when main advances before missing proof returns', () => {
@@ -68,7 +68,7 @@ describe('portfolio Attack Ten', () => {
   });
 
   it('never verifies a pass without immutable evaluated SHA', () => {
-    expect(evaluate([witness('typecheck', { evaluatedSha: undefined }), witness('playwright')]).state).toBe('STALE');
+    expect(evaluate([witness('typecheck', { evaluatedSha: undefined }), witness('playwright')])).toMatchObject({ state: 'STALE', reason: 'WITNESS_SHA_MISMATCH' });
   });
 
   it('invalidates inherited trust when policy changes', () => {
@@ -78,7 +78,7 @@ describe('portfolio Attack Ten', () => {
   });
 
   it('rejects the same witness name with a changed scenario fingerprint', () => {
-    expect(evaluate([witness('typecheck'), witness('playwright', { scenarioFingerprint: `sha256:${'9'.repeat(64)}` })]).state).toBe('STALE');
+    expect(evaluate([witness('typecheck'), witness('playwright', { scenarioFingerprint: `sha256:${'9'.repeat(64)}` })])).toMatchObject({ state: 'STALE', reason: 'SCENARIO_MISMATCH' });
   });
 
   it('never verifies an explicit MISSING result', () => {
@@ -89,8 +89,16 @@ describe('portfolio Attack Ten', () => {
     expect(evaluate([witness('typecheck', { state: 'STALE' }), witness('playwright')]).state).toBe('STALE');
   });
 
-  it('blocks unresolvable evidence instead of inferring trust', () => {
-    expect(evaluate([witness('typecheck', { evidenceRef: undefined }), witness('playwright')])).toMatchObject({ state: 'BLOCKED', reason: 'WITNESS_UNRESOLVABLE' });
+  it('blocks malformed witness evidence instead of inferring trust', () => {
+    expect(evaluate([witness('typecheck', { evidenceRef: undefined }), witness('playwright')])).toMatchObject({ state: 'BLOCKED', reason: 'INVALID_WITNESS_EVIDENCE' });
+  });
+
+  it('blocks duplicate witness ids instead of allowing last-write-wins', () => {
+    expect(evaluate([witness('typecheck'), witness('typecheck'), witness('playwright')])).toMatchObject({ state: 'BLOCKED', reason: 'INVALID_WITNESS_EVIDENCE' });
+  });
+
+  it('enforces policy freshness even without an explicit expiresAt', () => {
+    expect(evaluate([witness('typecheck', { observedAt: '2026-08-23T21:50:00.000Z' }), witness('playwright')])).toMatchObject({ state: 'STALE', reason: 'EVIDENCE_EXPIRED' });
   });
 
   it('blocks when source authority cannot be resolved', () => {
