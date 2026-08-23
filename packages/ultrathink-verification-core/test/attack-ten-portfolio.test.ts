@@ -137,6 +137,36 @@ describe('Attack Ten portfolio refusal suite', () => {
     expect(decision.reason).toBe('INVALID_WITNESS_EVIDENCE');
   });
 
+  it('fails closed on duplicate witness IDs independent of transport order', () => {
+    const pass = passingWitness('product.critical-journey');
+    const fail = { ...passingWitness('product.critical-journey'), state: 'FAIL' as const, correlationId: 'duplicate-fail' };
+    const code = passingWitness('code.required-ci');
+
+    const first = evaluate([code, pass, fail]);
+    const second = evaluate([fail, code, pass]);
+
+    expect(first.state).toBe('UNKNOWN');
+    expect(first.reason).toBe('INVALID_WITNESS_EVIDENCE');
+    expect(second).toEqual(first);
+  });
+
+  it('blocks a witness policy with duplicate required IDs', () => {
+    const invalidPolicy = {
+      ...policy,
+      requiredWitnesses: [policy.requiredWitnesses[0], policy.requiredWitnesses[0]],
+    };
+    const decision = evaluateMainEvidenceV0({
+      sourceAuthority: sourceAuthority(),
+      policy: invalidPolicy,
+      witnesses: qualifyingWitnesses(),
+      now: NOW,
+      correlationId: CORRELATION_ID,
+    }).decision;
+
+    expect(decision.state).toBe('BLOCKED');
+    expect(decision.reason).toBe('INVALID_WITNESS_POLICY');
+  });
+
   it('source authority unavailable is BLOCKED', () => {
     const decision = evaluateMainEvidenceV0({
       sourceAuthority: null,
