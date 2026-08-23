@@ -1,13 +1,20 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded n8n readiness invariant added by this source-only repair; receipt-aware status is repository behavior and must not be presented as proof that a persistent external n8n provider is already live.",
+  "purpose": "Record current truth-sensitive invariants, including exact-head workflow authority. Required PR verification must execute against the immutable pull-request head, not GitHub's synthetic merge ref; migration lint must start its local Supabase dependency and fail closed on real lint failure. These workflow facts do not authorize merge, deployment, database mutation, terminal execution, publication, commerce, or any other separately gated action.",
   "domains": [
     "repository-provider",
     "truth-governance",
     "cloudflare-authority",
-    "publishing"
+    "publishing",
+    "workflow-authority"
   ],
   "changes": [
+    {
+      "path": ".github/workflows/quality-gate.yml",
+      "claims": [
+        ".github/workflows/quality-gate.yml: every required pull-request Quality Gate job must check out EXPECTED_HEAD_SHA, immediately verify git HEAD equals that immutable SHA, and reject synthetic merge-ref substitution; Migration Lint must start the pinned local Supabase stack before running supabase db lint --local, remain load-bearing for Production Build, and stop the local stack in cleanup without converting a real lint failure into advisory success."
+      ]
+    },
     {
       "path": ".github/workflows/cloudflare-build-diagnostic.yml",
       "claims": [
