@@ -8,9 +8,11 @@ describe('continuity transition', () => {
       sourceAuthority: sourceAuthority(SHA_A),
       policy,
       witnesses: qualifyingWitnesses(SHA_A),
-      now: '2026-08-23T21:00:00.000Z',
+      now: NOW,
       correlationId: 'prior',
     }).decision;
+
+    expect(prior.state).toBe('VERIFIED');
 
     const current = evaluateMainEvidenceV0({
       sourceAuthority: sourceAuthority(SHA_B),
