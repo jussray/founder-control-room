@@ -11,6 +11,7 @@ import {
 const HEAD = '1'.repeat(40);
 const BASE = '2'.repeat(40);
 const DIGEST = `sha256:${'a'.repeat(64)}` as const;
+const VALID_NOW = new Date('2026-08-23T20:30:00.000Z');
 
 function receipt(overrides: Partial<AuthorityReceiptV2> = {}): AuthorityReceiptV2 {
   return {
@@ -54,10 +55,7 @@ class MemoryStore implements AuthorityReceiptV2ConsumptionStore {
 
 describe('AuthorityReceipt v2', () => {
   it('accepts a bounded active receipt for an exact repo head and base', () => {
-    const result = validateAuthorityReceiptV2(
-      receipt(),
-      new Date('2026-08-23T20:30:00.000Z'),
-    );
+    const result = validateAuthorityReceiptV2(receipt(), VALID_NOW);
 
     expect(result.ok).toBe(true);
   });
@@ -79,17 +77,24 @@ describe('AuthorityReceipt v2', () => {
             baseSha: BASE,
           },
         }),
+        VALID_NOW,
       ),
     ).toEqual({ ok: false, reason: 'invalid_subject' });
   });
 
   it('rejects receipts carrying revocation or supersession markers as active', () => {
     expect(
-      validateAuthorityReceiptV2(receipt({ revokedAt: '2026-08-23T20:10:00.000Z' })),
+      validateAuthorityReceiptV2(
+        receipt({ revokedAt: '2026-08-23T20:10:00.000Z' }),
+        VALID_NOW,
+      ),
     ).toEqual({ ok: false, reason: 'revocation_incomplete' });
 
     expect(
-      validateAuthorityReceiptV2(receipt({ supersededBy: 'receipt-2' })),
+      validateAuthorityReceiptV2(
+        receipt({ supersededBy: 'receipt-2' }),
+        VALID_NOW,
+      ),
     ).toEqual({ ok: false, reason: 'supersession_incomplete' });
   });
 
@@ -105,7 +110,7 @@ describe('AuthorityReceipt v2', () => {
       receipt: receipt(),
       currentAuthority,
       store,
-      now: new Date('2026-08-23T20:30:00.000Z'),
+      now: VALID_NOW,
     });
 
     expect(result.ok).toBe(true);
@@ -121,7 +126,7 @@ describe('AuthorityReceipt v2', () => {
       receipt: receipt(),
       currentAuthority: { revalidate: () => false },
       store: new MemoryStore(),
-      now: new Date('2026-08-23T20:30:00.000Z'),
+      now: VALID_NOW,
     });
 
     expect(result).toEqual({ ok: false, reason: 'current_authority_rejected' });
@@ -135,7 +140,7 @@ describe('AuthorityReceipt v2', () => {
       receipt: receipt(),
       currentAuthority,
       store,
-      now: new Date('2026-08-23T20:30:00.000Z'),
+      now: VALID_NOW,
     });
     expect(first.ok).toBe(true);
 
