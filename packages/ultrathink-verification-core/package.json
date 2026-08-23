@@ -1,0 +1,11 @@
+{
+  "name": "@jussray/ultrathink-verification-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "../../node_modules/.bin/tsc -p tsconfig.json --noEmit",
+    "test": "../../node_modules/.bin/vitest run test",
+    "verify": "npm run typecheck && npm run test"
+  }
+}
