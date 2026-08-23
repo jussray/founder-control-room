@@ -53,6 +53,10 @@ Current implementation includes:
 
 Repository configuration, a green CI badge, a merge, a provider upload, a scheduler acceptance, or HTTP success does not by itself prove production or publication truth.
 
+### Exact-head CI authority
+
+Required pull-request proof executes against the immutable PR head SHA and verifies the checked-out Git `HEAD` before the proof command runs. GitHub's synthetic pull-request merge ref can provide separate integration evidence, but it cannot satisfy an exact-head gate. `supabase db lint --local` also requires the pinned local Supabase/Postgres stack to be started first; setup, runner, connection, or lint failure remains a failed gate rather than a passing migration result.
+
 ## Documentation truth gate
 
 README files, current-state docs, PR descriptions, issues, AI operating contracts, and runbooks can affect future decisions. They are therefore part of the truth surface, not harmless commentary.
