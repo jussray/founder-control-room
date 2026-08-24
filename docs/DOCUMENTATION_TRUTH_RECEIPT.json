@@ -1,11 +1,12 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded n8n readiness invariant added by this source-only repair; receipt-aware status is repository behavior and must not be presented as proof that a persistent external n8n provider is already live.",
+  "purpose": "Record the bounded n8n readiness invariant plus the current FCR merge-authority and repository-provider invariants. Repository source may authenticate exact-head review witnesses and constrain merge/ruleset behavior, but source alone does not prove live GitHub ruleset state or provider mutation.",
   "domains": [
     "repository-provider",
     "truth-governance",
     "cloudflare-authority",
-    "publishing"
+    "publishing",
+    "merge-authority"
   ],
   "changes": [
     {
@@ -36,6 +37,24 @@
       "path": "src/http/routes/n8nConveyor.ts",
       "claims": [
         "src/http/routes/n8nConveyor.ts: authenticated conveyor readiness must resolve retained activation proof at request time and may report live only when the persisted activation receipt is bound to the deployed exact GIT_SHA; stale, missing, or unreadable proof must remain non-live, and no credential value may be exposed."
+      ]
+    },
+    {
+      "path": "src/providers/RepositoryProvider.ts",
+      "claims": [
+        "src/providers/RepositoryProvider.ts: verification signals may carry provider-backed App issuer identity; issuer remains optional for provider neutrality, but any authority gate that requires an issuer must fail closed when that identity is absent or mismatched. FCR ruleset results may expose every durable composite component identity so partial provider success can be reconciled without guessing provider state."
+      ]
+    },
+    {
+      "path": "src/providers/GitHubProvider.ts",
+      "claims": [
+        "src/providers/GitHubProvider.ts: GitHub Check Run evidence must preserve the provider-reported Check Run App identity, FCR integration must bind exact provider PR context plus exact base/head revalidation before using the pull-request merge endpoint, and the trusted FCR App bypass may be constrained to pull-request mode while strict freshness protection remains non-bypass. Provider readback mismatch or partial ruleset mutation must fail closed while retaining all known mutated component identities for reconciliation."
+      ]
+    },
+    {
+      "path": "src/review/independentReviewGate.ts",
+      "claims": [
+        "src/review/independentReviewGate.ts: the canonical FCR founder-final deterministic witness is accepted only when provider, expected check identity, passed status, exact reviewed head SHA, and provider-backed App issuer all match, with the issuer equal to the server-owned numeric GITHUB_APP_ID; missing or mismatched issuer identity remains merge-blocking and does not become semantic human review."
       ]
     }
   ]
