@@ -25,7 +25,7 @@
 .conveyor-readiness[data-state='not-configured']::before,.conveyor-readiness[data-state='enabled-awaiting-proof']::before{background:#ffd166}
 .conveyor-readiness[data-state='error']{border-color:rgba(255,125,139,.48)}
 .conveyor-readiness[data-state='error']::before{background:#ff7d8b}
-.genesis-evidence-link{display:inline-flex;align-items:center;gap:.35rem;width:max-content;max-width:100%;margin-top:.5rem;color:#c4b5fd;text-decoration:none;font:750 .7rem/1.25 system-ui,sans-serif}
+.genesis-evidence-link{display:inline-flex;align-items:center;gap:.35rem;width:max-content;max-width:100%;margin-top:.5rem;margin-right:.7rem;color:#c4b5fd;text-decoration:none;font:750 .7rem/1.25 system-ui,sans-serif}
 .genesis-evidence-link::before{content:'↗';flex:0 0 auto;color:#a78bfa;font-size:.76rem;line-height:1}
 .genesis-evidence-link:hover{text-decoration:underline;text-underline-offset:.2em}
 .genesis-evidence-link:focus-visible{outline:2px solid #ddd6fe;outline-offset:3px;border-radius:.2rem}
@@ -75,6 +75,7 @@ a.stage:focus-visible,.launch-dock summary:focus-visible{outline:3px solid #f8fa
           <span data-conveyor-readiness-label>Checking n8n readiness…</span>
         </span>
         <a class="genesis-evidence-link" data-genesis-evidence href="/control-room/genesis.html" aria-label="View Bip Genesis provenance evidence">Genesis evidence · view origin record</a>
+        <a class="genesis-evidence-link" data-evidence-trust-link href="/control-room/evidence-trust.html" aria-label="View the Evidence Trust Plane">Evidence trust plane · observation → authority</a>
       </div>
       <span class="loop-mark" aria-hidden="true">🔁</span>
     </header>

@@ -1,73 +1,33 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded n8n readiness and governance invariants present in this current-main candidate; repository receipts describe source truth and do not prove live GitHub, Cloudflare, n8n, or production provider state.",
+  "purpose": "Record the bounded Evidence Trust Plane and Documentation Truth invariants for this candidate without claiming durable receipt persistence, provider mutation, merge authority, deployment authority, or live production truth.",
   "domains": [
-    "repository-provider",
-    "truth-governance",
-    "cloudflare-authority",
-    "publishing",
-    "workflow-authority",
-    "merge-authority"
+    "evidence-authority",
+    "truth-governance"
   ],
   "changes": [
     {
-      "path": ".github/workflows/cloudflare-build-diagnostic.yml",
+      "path": "src/evidence/evidenceLifecycle.ts",
       "claims": [
-        ".github/workflows/cloudflare-build-diagnostic.yml: the exact-current-main Worker Git authority audit must require the dedicated read-only Workers Builds user token for its primary provider readback; request-trace and DNS-inventory remain optional evidence lanes, and whether they are missing, malformed, or provider-rejected they may retain their own bounded evidence/error but cannot downgrade or upgrade the snapshotted core authority ok/error verdict; absence of a core receipt must never manufacture authority, and the workflow remains read-only and cannot authorize provider mutation."
+        "src/evidence/evidenceLifecycle.ts: evidence authority must fail closed at use time when a receipt is expired, stale, superseded, unledgered, rejected, or not bound through GitHub API readback to an exact repository, full SHA, workflow, and run identity; a receipt may prepare review but can never authorize merge, deploy, production promotion, secret changes, policy changes, or deletion by itself."
       ]
     },
     {
-      "path": ".github/workflows/n8n-runtime-integration-proof.yml",
+      "path": "public/control-room/evidence-trust.html",
       "claims": [
-        ".github/workflows/n8n-runtime-integration-proof.yml: CI-only n8n runtime proof must mask generated bearer and encryption credentials before exporting them to later steps, while keeping the runtime ephemeral and non-production-authorizing."
+        "public/control-room/evidence-trust.html: the founder-facing Evidence Trust Plane must describe durable receipt storage as not wired by this slice, preserve observation versus verification versus authority boundaries, and keep evidence-state, may-unlock, and still-blocked labels available on mobile instead of presenting contract-only capability as implemented persistence."
       ]
     },
     {
-      "path": "src/buildEvents/buildEvent.ts",
+      "path": ".github/workflows/playwright.yml",
       "claims": [
-        "src/http/routes/n8nConveyor.ts: founder-authenticated conveyor readiness must resolve retained activation proof against the deployed exact GIT_SHA and must fail closed instead of claiming live verification when proof is missing, stale, or unreadable."
+        ".github/workflows/playwright.yml: the exact-head Playwright lane must execute the Evidence Trust Plane desktop and mobile proof when this authority surface changes; browser rendering proof remains non-authorizing and cannot prove provider mutation, durable persistence, merge authority, deployment authority, or production truth."
       ]
     },
     {
-      "path": "wrangler.worker.toml",
+      "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
-        "wrangler.worker.toml: every canonical Worker build must execute the repository build-authority membrane; native Cloudflare Workers Builds may proceed only through non-promoting versions upload while production promotion remains bounded to the exact manual GitHub authority path."
-      ]
-    },
-    {
-      "path": "src/http/routes/n8nConveyor.ts",
-      "claims": [
-        "src/http/routes/n8nConveyor.ts: authenticated conveyor readiness must resolve retained activation proof at request time and may report live only when the persisted activation receipt is bound to the deployed exact GIT_SHA; stale, missing, or unreadable proof must remain non-live, and no credential value may be exposed."
-      ]
-    },
-    {
-      "path": ".github/workflows/quality-gate.yml",
-      "claims": [
-        ".github/workflows/quality-gate.yml: pull-request Quality Gate jobs must checkout and verify the exact github.event.pull_request.head.sha; a successful synthetic merge-ref run is merge-simulation evidence and cannot satisfy exact-head candidate proof."
-      ]
-    },
-    {
-      "path": "src/providers/GitHubProvider.ts",
-      "claims": [
-        "src/providers/GitHubProvider.ts: canonical FCR integration must retain provider-backed reviewed PR context, revalidate exact base/head authority, use GitHub's pull-request merge endpoint without generic protected-branch fallback, keep strict status/current-base freshness in a zero-bypass ruleset, constrain the trusted App review bypass to pull_request mode, retain provider identities after partial mutation, and preserve GitHub Check Run App issuer identity without fabricating it."
-      ]
-    },
-    {
-      "path": "src/providers/RepositoryProvider.ts",
-      "claims": [
-        "src/providers/RepositoryProvider.ts: verification signals must carry provider-backed GitHub App issuer identity when GitHub supplies it so deterministic review can distinguish the trusted evidence producer from a same-name green check produced by another or unknown issuer; the provider must never fabricate issuer trust when GitHub omits that identity."
-      ]
-    },
-    {
-      "path": "src/review/independentReviewGate.ts",
-      "claims": [
-        "src/review/independentReviewGate.ts: canonical founder-final deterministic review requires numeric server-owned GITHUB_APP_ID and accepts the expected exact-head green GitHub witness only when its provider-backed App issuer matches that trusted identity; missing runtime identity, missing issuer, or mismatched issuer fails closed, while live GitHub ruleset enforcement remains separate provider truth."
-      ]
-    },
-    {
-      "path": "README.md",
-      "claims": [
-        "README.md: deterministic review authenticates the exact-head Check Run producer against server-owned GITHUB_APP_ID while preserving live GitHub ruleset enforcement as a separate provider fact that still requires provider readback."
+        "scripts/verify-documentation-truth.mjs: Documentation Truth must classify the Evidence Trust Plane source, founder-facing page, and Playwright authority workflow as evidence-authority truth-sensitive paths so architecture changes cannot false-green with zero truth-sensitive files; changing this verifier remains truth-governance and requires the corresponding current documentation refresh."
       ]
     }
   ]
