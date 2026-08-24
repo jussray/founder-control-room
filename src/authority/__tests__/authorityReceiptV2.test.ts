@@ -17,18 +17,10 @@ function receipt(overrides: Partial<AuthorityReceiptV2> = {}): AuthorityReceiptV
   return {
     contract: AUTHORITY_RECEIPT_V2_CONTRACT,
     id: 'receipt-1',
-    subject: {
-      repo: 'jussray/founder-control-room',
-      headSha: HEAD,
-      baseSha: BASE,
-    },
+    subject: { repo: 'jussray/founder-control-room', headSha: HEAD, baseSha: BASE },
     issuer: { type: 'human', id: 'founder' },
     scope: ['merge:founder-control-room'],
-    action: {
-      type: 'merge',
-      target: 'jussray/founder-control-room#999',
-      digest: DIGEST,
-    },
+    action: { type: 'merge', target: 'jussray/founder-control-room#999', digest: DIGEST },
     evidence: [
       { ref: `github:commit:${HEAD}`, class: 'repository' },
       { ref: 'github:check:quality-gate', class: 'ci' },
@@ -44,112 +36,69 @@ function receipt(overrides: Partial<AuthorityReceiptV2> = {}): AuthorityReceiptV
 class MemoryStore implements AuthorityReceiptV2ConsumptionStore {
   readonly consumed = new Map<string, string>();
 
-  has(receiptId: string): boolean {
-    return this.consumed.has(receiptId);
-  }
-
-  markConsumed(receiptId: string, consumedAt: string): void {
+  claim(receiptId: string, consumedAt: string): boolean {
+    if (this.consumed.has(receiptId)) return false;
     this.consumed.set(receiptId, consumedAt);
+    return true;
   }
 }
 
 describe('AuthorityReceipt v2', () => {
   it('accepts a bounded active receipt for an exact repo head and base', () => {
-    const result = validateAuthorityReceiptV2(receipt(), VALID_NOW);
-
-    expect(result.ok).toBe(true);
+    expect(validateAuthorityReceiptV2(receipt(), VALID_NOW).ok).toBe(true);
   });
 
   it('rejects expired and non-exact subject identity', () => {
-    expect(
-      validateAuthorityReceiptV2(
-        receipt(),
-        new Date('2026-08-23T21:00:00.000Z'),
-      ),
-    ).toEqual({ ok: false, reason: 'expired' });
-
-    expect(
-      validateAuthorityReceiptV2(
-        receipt({
-          subject: {
-            repo: 'jussray/founder-control-room',
-            headSha: 'not-a-sha',
-            baseSha: BASE,
-          },
-        }),
-        VALID_NOW,
-      ),
-    ).toEqual({ ok: false, reason: 'invalid_subject' });
+    expect(validateAuthorityReceiptV2(receipt(), new Date('2026-08-23T21:00:00.000Z')))
+      .toEqual({ ok: false, reason: 'expired' });
+    expect(validateAuthorityReceiptV2(receipt({ subject: {
+      repo: 'jussray/founder-control-room', headSha: 'not-a-sha', baseSha: BASE,
+    } }), VALID_NOW)).toEqual({ ok: false, reason: 'invalid_subject' });
   });
 
   it('rejects receipts carrying revocation or supersession markers as active', () => {
-    expect(
-      validateAuthorityReceiptV2(
-        receipt({ revokedAt: '2026-08-23T20:10:00.000Z' }),
-        VALID_NOW,
-      ),
-    ).toEqual({ ok: false, reason: 'revocation_incomplete' });
-
-    expect(
-      validateAuthorityReceiptV2(
-        receipt({ supersededBy: 'receipt-2' }),
-        VALID_NOW,
-      ),
-    ).toEqual({ ok: false, reason: 'supersession_incomplete' });
+    expect(validateAuthorityReceiptV2(receipt({ revokedAt: '2026-08-23T20:10:00.000Z' }), VALID_NOW))
+      .toEqual({ ok: false, reason: 'revocation_incomplete' });
+    expect(validateAuthorityReceiptV2(receipt({ supersededBy: 'receipt-2' }), VALID_NOW))
+      .toEqual({ ok: false, reason: 'supersession_incomplete' });
   });
 
   it('revalidates current authority immediately before consumption', async () => {
     const store = new MemoryStore();
-    const currentAuthority = {
-      revalidate(candidate: AuthorityReceiptV2) {
-        return candidate.subject.headSha === HEAD;
-      },
-    };
-
     const result = await consumeAuthorityReceiptV2({
       receipt: receipt(),
-      currentAuthority,
+      currentAuthority: { revalidate: (candidate) => candidate.subject.headSha === HEAD },
       store,
       now: VALID_NOW,
     });
-
     expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.receipt.status).toBe('consumed');
-      expect(result.receipt.consumedAt).toBe('2026-08-23T20:30:00.000Z');
-    }
+    if (result.ok) expect(result.receipt.status).toBe('consumed');
     expect(store.consumed.get('receipt-1')).toBe('2026-08-23T20:30:00.000Z');
   });
 
   it('fails closed when current authority rejects the receipt', async () => {
-    const result = await consumeAuthorityReceiptV2({
-      receipt: receipt(),
-      currentAuthority: { revalidate: () => false },
-      store: new MemoryStore(),
-      now: VALID_NOW,
-    });
-
-    expect(result).toEqual({ ok: false, reason: 'current_authority_rejected' });
+    expect(await consumeAuthorityReceiptV2({
+      receipt: receipt(), currentAuthority: { revalidate: () => false }, store: new MemoryStore(), now: VALID_NOW,
+    })).toEqual({ ok: false, reason: 'current_authority_rejected' });
   });
 
-  it('uses the injected store as the replay boundary', async () => {
+  it('uses an atomic store claim as the replay boundary', async () => {
     const store = new MemoryStore();
     const currentAuthority = { revalidate: () => true };
+    expect((await consumeAuthorityReceiptV2({ receipt: receipt(), currentAuthority, store, now: VALID_NOW })).ok).toBe(true);
+    expect(await consumeAuthorityReceiptV2({
+      receipt: receipt(), currentAuthority, store, now: new Date('2026-08-23T20:31:00.000Z'),
+    })).toEqual({ ok: false, reason: 'already_consumed' });
+  });
 
-    const first = await consumeAuthorityReceiptV2({
-      receipt: receipt(),
-      currentAuthority,
-      store,
-      now: VALID_NOW,
-    });
-    expect(first.ok).toBe(true);
-
-    const second = await consumeAuthorityReceiptV2({
-      receipt: receipt(),
-      currentAuthority,
-      store,
-      now: new Date('2026-08-23T20:31:00.000Z'),
-    });
-    expect(second).toEqual({ ok: false, reason: 'already_consumed' });
+  it('allows only one winner under concurrent consumption attempts', async () => {
+    const store = new MemoryStore();
+    const currentAuthority = { revalidate: async () => true };
+    const [first, second] = await Promise.all([
+      consumeAuthorityReceiptV2({ receipt: receipt(), currentAuthority, store, now: VALID_NOW }),
+      consumeAuthorityReceiptV2({ receipt: receipt(), currentAuthority, store, now: VALID_NOW }),
+    ]);
+    expect([first, second].filter((result) => result.ok)).toHaveLength(1);
+    expect([first, second].filter((result) => !result.ok && result.reason === 'already_consumed')).toHaveLength(1);
   });
 });
