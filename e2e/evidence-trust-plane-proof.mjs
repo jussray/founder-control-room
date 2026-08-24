@@ -79,10 +79,10 @@ async function proveViewport({ name, width, height, isMobile = false }) {
   assert.match(bodyText, /durable receipt storage is not wired here/i, `${name}: contract-only persistence boundary is explicit`);
   assert.match(bodyText, /n8n may create intake events and trigger read-only verification/i, `${name}: n8n sensor ceiling is explicit`);
   assert.match(bodyText, /cannot mark evidence verified/i, `${name}: n8n cannot self-promote evidence`);
-  assert.match(bodyText, /Merge · deploy · production promotion/i, `${name}: high consequence actions remain visibly blocked`);
-  assert.match(bodyText, /exact GitHub repository, SHA, workflow, and run scope/i, `${name}: merge-review preparation is visibly scope-bound`);
+  assert.match(bodyText, /expected GitHub repository and exact target SHA/i, `${name}: merge-review preparation is visibly target-bound`);
   assert.match(bodyText, /workflow conclusion is success/i, `${name}: verified failure cannot be presented as merge-review-ready`);
-  assert.match(bodyText, /active freshness lease/i, `${name}: merge-review preparation is visibly freshness-bounded`);
+  assert.match(bodyText, /no more than 60 minutes/i, `${name}: merge-review freshness lease is visibly duration-bounded`);
+  assert.match(bodyText, /Merge · deploy · production promotion · close issue · modify secrets · change policy · delete data/i, `${name}: complete current-receipt action ceiling is visible`);
 
   assert.equal(await page.getByRole('columnheader', { name: 'Evidence state' }).count(), 1, `${name}: evidence-state column header remains in the accessibility tree`);
   assert.equal(await page.getByRole('columnheader', { name: 'May unlock' }).count(), 1, `${name}: may-unlock column header remains in the accessibility tree`);
@@ -108,13 +108,7 @@ async function proveViewport({ name, width, height, isMobile = false }) {
   await page.screenshot({ path: screenshot, fullPage: true });
   await context.close();
 
-  results.push({
-    name,
-    viewport: { width, height },
-    screenshot: `test-results/evidence-trust-plane/${name}.png`,
-    pageErrors,
-    consoleErrors,
-  });
+  results.push({ name, viewport: { width, height }, screenshot: `test-results/evidence-trust-plane/${name}.png`, pageErrors, consoleErrors });
 }
 
 try {
