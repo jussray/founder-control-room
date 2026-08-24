@@ -93,6 +93,11 @@ export interface EvidenceAuthorityDecision {
   reasons: string[];
 }
 
+export interface MergeReviewTarget {
+  repository: string;
+  sha: string;
+}
+
 const HIGH_CONSEQUENCE_ACTIONS: EvidenceAction[] = [
   'merge',
   'deploy',
@@ -104,19 +109,25 @@ const HIGH_CONSEQUENCE_ACTIONS: EvidenceAction[] = [
 ];
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
+const MAX_FRESHNESS_LEASE_MS = 60 * 60 * 1000;
 
 function isPresent(value: string | undefined): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function supportsMergeReview(receipt: VerifiedEvidenceReceipt): boolean {
+function supportsMergeReview(receipt: VerifiedEvidenceReceipt, target: MergeReviewTarget): boolean {
   const { repository, workflow, runId, sha, workflowConclusion } = receipt.subject;
+  const expectedRepository = target.repository.trim();
+  const expectedSha = target.sha.trim().toLowerCase();
   return receipt.verifier.source === 'github_api'
     && isPresent(repository)
+    && repository.trim() === expectedRepository
     && isPresent(workflow)
     && isPresent(runId)
     && isPresent(sha)
     && FULL_SHA.test(sha.trim())
+    && FULL_SHA.test(expectedSha)
+    && sha.trim().toLowerCase() === expectedSha
     && workflowConclusion === 'success';
 }
 
@@ -129,6 +140,7 @@ function hasActiveFreshnessLease(receipt: VerifiedEvidenceReceipt, now: string):
 
   if ([observedAtMs, nowMs, expiresAtMs].some(Number.isNaN)) return false;
   if (observedAtMs >= expiresAtMs) return false;
+  if (expiresAtMs - observedAtMs > MAX_FRESHNESS_LEASE_MS) return false;
 
   return observedAtMs <= nowMs && nowMs < expiresAtMs;
 }
@@ -156,6 +168,7 @@ export function authorityForIntakeEvent(): EvidenceAuthorityDecision {
 
 export function authorityForVerifiedReceipt(
   receipt: VerifiedEvidenceReceipt,
+  target: MergeReviewTarget,
   now = new Date().toISOString(),
 ): EvidenceAuthorityDecision {
   const reasons: string[] = [];
@@ -207,7 +220,7 @@ export function authorityForVerifiedReceipt(
   }
 
   if (!hasActiveFreshnessLease(evaluatedReceipt, now)) {
-    reasons.push('Merge-review preparation requires an active freshness lease with observedAt <= now < expiresAt and observedAt < expiresAt.');
+    reasons.push('Merge-review preparation requires an active freshness lease with observedAt <= now < expiresAt, observedAt < expiresAt, and a maximum lifetime of 60 minutes.');
     return {
       allowedActions: ['inspect', 'create_evidence_task', 'request_readonly_verification'],
       forbiddenActions: [...HIGH_CONSEQUENCE_ACTIONS],
@@ -215,8 +228,8 @@ export function authorityForVerifiedReceipt(
     };
   }
 
-  if (!supportsMergeReview(evaluatedReceipt)) {
-    reasons.push('Merge-review preparation requires successful GitHub API workflow readback bound to repository, exact SHA, workflow, and run identity.');
+  if (!supportsMergeReview(evaluatedReceipt, target)) {
+    reasons.push('Merge-review preparation requires successful GitHub API workflow readback bound to the expected repository and exact target SHA, plus workflow and run identity.');
     return {
       allowedActions: ['inspect', 'create_evidence_task', 'request_readonly_verification'],
       forbiddenActions: [...HIGH_CONSEQUENCE_ACTIONS],
@@ -224,10 +237,10 @@ export function authorityForVerifiedReceipt(
     };
   }
 
-  reasons.push('Receipt is authoritative, ledgered, current, freshness-bounded, and scoped to a successful exact GitHub workflow identity.');
+  reasons.push('Receipt is authoritative, ledgered, current, freshness-bounded, and scoped to the expected repository and exact target SHA with a successful GitHub workflow identity.');
   return {
     allowedActions: ['inspect', 'create_evidence_task', 'request_readonly_verification', 'prepare_merge_review'],
-    forbiddenActions: ['merge', 'deploy', 'promote_production', 'close_issue', 'modify_secret', 'change_policy', 'delete_data'],
+    forbiddenActions: [...HIGH_CONSEQUENCE_ACTIONS],
     reasons,
   };
 }
