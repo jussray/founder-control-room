@@ -72,7 +72,7 @@ export function computeFounderDecisionReceiptId(receipt: FounderDecisionReceiptV
   return `fcr-founder-decision-v0:${digest}`;
 }
 
-export function validateFounderDecisionReceipt(receipt: FounderDecisionReceiptV0, now = Date.now()): string[] {
+export function validateFounderDecisionReceipt(receipt: FounderDecisionReceiptV0, now: number): string[] {
   const reasons: string[] = [];
   if (receipt.contract !== FOUNDER_DECISION_RECEIPT_CONTRACT) reasons.push('unsupported founder decision receipt contract');
   if (!RECEIPT_ID.test(text(receipt.receiptId, 120))) reasons.push('receiptId must be a founder decision receipt id');
@@ -81,13 +81,14 @@ export function validateFounderDecisionReceipt(receipt: FounderDecisionReceiptV0
   if (receipt.decision !== 'approve' && receipt.decision !== 'authorize' && receipt.decision !== 'reject') reasons.push('unsupported decision');
   if (!FULL_SHA.test(text(receipt.expectedHeadSha, 40))) reasons.push('expectedHeadSha must be a full Git SHA');
   if (!SHA256.test(text(receipt.capabilityPlanHash, 64))) reasons.push('capabilityPlanHash must be a sha256 hex digest');
+  if (!Number.isFinite(now)) reasons.push('now must be a finite timestamp');
   if (!text(receipt.createdAt, 80) || Number.isNaN(Date.parse(receipt.createdAt))) reasons.push('createdAt must be an ISO-compatible timestamp');
   if (receipt.expiresAt !== undefined) {
     if (!text(receipt.expiresAt, 80) || Number.isNaN(Date.parse(receipt.expiresAt))) {
       reasons.push('expiresAt must be an ISO-compatible timestamp');
     } else if (Date.parse(receipt.expiresAt) <= Date.parse(receipt.createdAt)) {
       reasons.push('expiresAt must be after createdAt');
-    } else if (Date.parse(receipt.expiresAt) < now) {
+    } else if (Number.isFinite(now) && Date.parse(receipt.expiresAt) < now) {
       reasons.push('founder decision receipt is expired');
     }
   }
@@ -107,6 +108,7 @@ export function validateFounderDecisionReceipt(receipt: FounderDecisionReceiptV0
 
 export function createFounderDecisionReceipt(
   input: Omit<FounderDecisionReceiptV0, 'contract' | 'receiptId'>,
+  now: number,
 ): FounderDecisionReceiptV0 {
   const candidate: FounderDecisionReceiptV0 = {
     contract: FOUNDER_DECISION_RECEIPT_CONTRACT,
@@ -117,7 +119,7 @@ export function createFounderDecisionReceipt(
     evidenceUrls: [...new Set(input.evidenceUrls.map((value) => value.trim()).filter(Boolean))].sort(),
   };
   candidate.receiptId = computeFounderDecisionReceiptId(candidate);
-  const reasons = validateFounderDecisionReceipt(candidate);
+  const reasons = validateFounderDecisionReceipt(candidate, now);
   if (reasons.length > 0) throw new Error(reasons.join('; '));
   return candidate;
 }
@@ -125,8 +127,9 @@ export function createFounderDecisionReceipt(
 export function validateCapabilityRequestDecisionBinding(
   request: CapabilityRequestV1,
   decision: FounderDecisionReceiptV0,
+  now: number,
 ): string[] {
-  const reasons = validateFounderDecisionReceipt(decision);
+  const reasons = validateFounderDecisionReceipt(decision, now);
   if (request.policyDecisionId !== decision.receiptId) reasons.push('capability request policyDecisionId does not match founder decision receipt');
   if (request.capabilityPlanHash !== decision.capabilityPlanHash) reasons.push('capability request plan hash does not match founder decision receipt');
   if (request.expectedHeadSha !== decision.expectedHeadSha) reasons.push('capability request head SHA does not match founder decision receipt');
