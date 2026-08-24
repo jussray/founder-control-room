@@ -4,7 +4,9 @@
   "domains": [
     "repository-provider",
     "truth-governance",
-    "cloudflare-authority"
+    "cloudflare-authority",
+    "workflow-authority",
+    "merge-authority"
   ],
   "changes": [
     {
@@ -83,6 +85,36 @@
       "path": "wrangler.worker.toml",
       "claims": [
         "wrangler.worker.toml: every canonical Worker build must execute the repository build-authority membrane; native Cloudflare Workers Builds may proceed only through non-promoting versions upload while production promotion remains bounded to the exact manual GitHub authority path."
+      ]
+    },
+    {
+      "path": ".github/workflows/quality-gate.yml",
+      "claims": [
+        ".github/workflows/quality-gate.yml: every pull-request Quality Gate job must checkout and verify the exact `github.event.pull_request.head.sha`; a successful synthetic merge-ref run is merge-simulation evidence and cannot satisfy exact-head candidate proof."
+      ]
+    },
+    {
+      "path": "src/providers/GitHubProvider.ts",
+      "claims": [
+        "src/providers/GitHubProvider.ts: canonical FCR integration must retain provider-backed reviewed PR context, revalidate exact base/head authority, merge through GitHub's pull-request endpoint without a generic protected-branch fallback, apply/read back the zero-bypass strict-freshness ruleset before the review membrane, narrow the trusted App bypass to `pull_request`, receipt partial provider mutation identities, and preserve GitHub Check Run App issuer identity without fabricating it."
+      ]
+    },
+    {
+      "path": "src/providers/RepositoryProvider.ts",
+      "claims": [
+        "src/providers/RepositoryProvider.ts: verification signals may carry provider-backed GitHub App issuer identity so deterministic review can distinguish the trusted evidence producer from same-name green checks produced by another or unknown issuer."
+      ]
+    },
+    {
+      "path": "src/review/independentReviewGate.ts",
+      "claims": [
+        "src/review/independentReviewGate.ts: canonical founder-final deterministic review requires a numeric server-owned `GITHUB_APP_ID` and accepts the expected exact-head green GitHub witness only when its provider-backed App issuer matches that trusted identity; missing runtime identity, missing issuer, or mismatched issuer fails closed, while live GitHub ruleset enforcement remains separate provider truth."
+      ]
+    },
+    {
+      "path": "README.md",
+      "claims": [
+        "README.md: deterministic review authenticates the exact-head Check Run producer against server-owned `GITHUB_APP_ID`, while explicitly preserving live GitHub ruleset enforcement as a separate provider fact requiring provider readback."
       ]
     }
   ]
