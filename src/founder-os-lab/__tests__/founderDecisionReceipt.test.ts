@@ -23,7 +23,7 @@ function decision() {
     expectedHeadSha: SHA,
     evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
     createdAt: '2026-08-24T22:55:00.000Z',
-    expiresAt: '2099-08-24T23:55:00.000Z',
+    expiresAt: '2026-08-24T23:30:00.000Z',
   }, NOW);
 }
 
@@ -67,6 +67,7 @@ describe('FounderDecisionReceiptV0', () => {
       expectedHeadSha: SHA,
       evidenceUrls: [],
       createdAt: '2026-08-24T22:55:00.000Z',
+      expiresAt: '2026-08-24T23:30:00.000Z',
     }, NOW)).toThrow('state-changing decisions require evidence URLs');
   });
 
@@ -92,11 +93,74 @@ describe('FounderDecisionReceiptV0', () => {
       expectedHeadSha: SHA,
       evidenceUrls: [],
       createdAt: '2026-08-24T22:55:00.000Z',
-      expiresAt: '2099-08-24T23:55:00.000Z',
     }, NOW);
     expect(validateCapabilityRequestDecisionBinding(request(rejected.receiptId), rejected, NOW)).toContain(
-      'rejected founder decision cannot authorize capability execution',
+      'capability execution requires an explicit founder authorization',
     );
+  });
+
+  it('rejects an approval receipt as execution authority', () => {
+    const approved = createFounderDecisionReceipt({
+      actor: { type: 'founder', id: 'jussray' },
+      decision: 'approve',
+      action: 'inspect',
+      capabilityPlanHash: HASH,
+      expectedHeadSha: SHA,
+      evidenceUrls: [],
+      createdAt: '2026-08-24T22:55:00.000Z',
+    }, NOW);
+    expect(validateCapabilityRequestDecisionBinding(request(approved.receiptId), approved, NOW)).toContain(
+      'capability execution requires an explicit founder authorization',
+    );
+  });
+
+  it('rejects automation-minted execution authority', () => {
+    expect(() => createFounderDecisionReceipt({
+      actor: { type: 'automation', id: 'workflow-bot' },
+      decision: 'authorize',
+      action: 'merge-code',
+      capabilityPlanHash: HASH,
+      expectedHeadSha: SHA,
+      evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
+      createdAt: '2026-08-24T22:55:00.000Z',
+      expiresAt: '2026-08-24T23:30:00.000Z',
+    }, NOW)).toThrow('only a founder actor can issue an execution authorization');
+  });
+
+  it('requires an explicit bounded expiry for execution authorization', () => {
+    expect(() => createFounderDecisionReceipt({
+      actor: { type: 'founder', id: 'jussray' },
+      decision: 'authorize',
+      action: 'merge-code',
+      capabilityPlanHash: HASH,
+      expectedHeadSha: SHA,
+      evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
+      createdAt: '2026-08-24T22:55:00.000Z',
+    }, NOW)).toThrow('execution authorization requires an explicit expiry');
+
+    expect(() => createFounderDecisionReceipt({
+      actor: { type: 'founder', id: 'jussray' },
+      decision: 'authorize',
+      action: 'merge-code',
+      capabilityPlanHash: HASH,
+      expectedHeadSha: SHA,
+      evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
+      createdAt: '2026-08-24T22:00:00.000Z',
+      expiresAt: '2026-08-25T00:00:01.000Z',
+    }, NOW)).toThrow('execution authorization lifetime may not exceed 60 minutes');
+  });
+
+  it('rejects a future-dated founder decision', () => {
+    expect(() => createFounderDecisionReceipt({
+      actor: { type: 'founder', id: 'jussray' },
+      decision: 'authorize',
+      action: 'merge-code',
+      capabilityPlanHash: HASH,
+      expectedHeadSha: SHA,
+      evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
+      createdAt: '2026-08-24T23:05:00.000Z',
+      expiresAt: '2026-08-24T23:30:00.000Z',
+    }, NOW)).toThrow('founder decision receipt cannot be future-dated');
   });
 
   it('rejects a forged canonical receipt id', () => {
@@ -115,7 +179,7 @@ describe('FounderDecisionReceiptV0', () => {
       capabilityPlanHash: HASH,
       expectedHeadSha: SHA,
       evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
-      createdAt: '2026-08-24T22:00:00.000Z',
+      createdAt: '2026-08-24T22:30:00.000Z',
       expiresAt: '2026-08-24T23:30:00.000Z',
     }, NOW);
     expect(validateFounderDecisionReceipt(receipt, Date.parse('2026-08-25T00:00:00.000Z'))).toContain(
