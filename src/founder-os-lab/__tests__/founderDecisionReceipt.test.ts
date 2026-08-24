@@ -58,7 +58,7 @@ describe('FounderDecisionReceiptV0', () => {
     expect(validateFounderDecisionReceipt(receipt, NOW)).toEqual([]);
   });
 
-  it('requires evidence for mutation authorization', () => {
+  it('requires evidence for state-changing authorization', () => {
     expect(() => createFounderDecisionReceipt({
       actor: { type: 'founder', id: 'jussray' },
       decision: 'authorize',
@@ -67,7 +67,7 @@ describe('FounderDecisionReceiptV0', () => {
       expectedHeadSha: SHA,
       evidenceUrls: [],
       createdAt: '2026-08-24T22:55:00.000Z',
-    }, NOW)).toThrow('mutation decisions require evidence URLs');
+    }, NOW)).toThrow('state-changing decisions require evidence URLs');
   });
 
   it('binds a capability request to the exact founder decision receipt', () => {
