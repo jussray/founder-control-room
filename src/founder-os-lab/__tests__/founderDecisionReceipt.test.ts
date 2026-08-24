@@ -4,6 +4,7 @@ import {
   createFounderDecisionReceipt,
   validateCapabilityRequestDecisionBinding,
   validateFounderDecisionReceipt,
+  type AuthenticatedFounderContextV0,
   type FounderDecisionReceiptV0,
 } from '../founderDecisionReceipt.js';
 import {
@@ -15,6 +16,11 @@ const SHA = 'a'.repeat(40);
 const OTHER_SHA = 'b'.repeat(40);
 const HASH = 'c'.repeat(64);
 const NOW = Date.parse('2026-08-24T23:00:00.000Z');
+const FOUNDER_CONTEXT: AuthenticatedFounderContextV0 = {
+  founderId: 'jussray',
+  source: 'registered-adapter',
+  sourceRef: 'chatgpt-adapter:v1:decision-1',
+};
 
 function decision() {
   return createFounderDecisionReceipt({
@@ -73,15 +79,20 @@ describe('FounderDecisionReceiptV0', () => {
     }, NOW)).toThrow('state-changing decisions require evidence URLs');
   });
 
-  it('binds a capability request to the exact founder decision receipt', () => {
+  it('binds a capability request to the exact founder decision receipt and authenticated founder', () => {
     const receipt = decision();
-    expect(validateCapabilityRequestDecisionBinding(request(receipt.receiptId), receipt, NOW)).toEqual([]);
+    expect(validateCapabilityRequestDecisionBinding(
+      request(receipt.receiptId),
+      receipt,
+      NOW,
+      FOUNDER_CONTEXT,
+    )).toEqual([]);
   });
 
   it('rejects a capability request pointed at another head SHA', () => {
     const receipt = decision();
     const candidate = { ...request(receipt.receiptId), expectedHeadSha: OTHER_SHA };
-    expect(validateCapabilityRequestDecisionBinding(candidate, receipt, NOW)).toContain(
+    expect(validateCapabilityRequestDecisionBinding(candidate, receipt, NOW, FOUNDER_CONTEXT)).toContain(
       'capability request head SHA does not match founder decision receipt',
     );
   });
@@ -96,7 +107,7 @@ describe('FounderDecisionReceiptV0', () => {
       evidenceUrls: [],
       createdAt: '2026-08-24T22:55:00.000Z',
     }, NOW);
-    expect(validateCapabilityRequestDecisionBinding(request(rejected.receiptId), rejected, NOW)).toContain(
+    expect(validateCapabilityRequestDecisionBinding(request(rejected.receiptId), rejected, NOW, FOUNDER_CONTEXT)).toContain(
       'capability execution requires an explicit founder authorization',
     );
   });
@@ -111,7 +122,7 @@ describe('FounderDecisionReceiptV0', () => {
       evidenceUrls: [],
       createdAt: '2026-08-24T22:55:00.000Z',
     }, NOW);
-    expect(validateCapabilityRequestDecisionBinding(request(approved.receiptId), approved, NOW)).toContain(
+    expect(validateCapabilityRequestDecisionBinding(request(approved.receiptId), approved, NOW, FOUNDER_CONTEXT)).toContain(
       'capability execution requires an explicit founder authorization',
     );
   });
@@ -127,6 +138,41 @@ describe('FounderDecisionReceiptV0', () => {
       createdAt: '2026-08-24T22:55:00.000Z',
       expiresAt: '2026-08-24T23:30:00.000Z',
     }, NOW)).toThrow('only a founder actor can issue an execution authorization');
+  });
+
+  it('rejects a spoofed founder even when the attacker recomputes the canonical receipt id', () => {
+    const forged = {
+      ...decision(),
+      actor: { type: 'founder', id: 'someone-else' },
+    } satisfies FounderDecisionReceiptV0;
+    forged.receiptId = computeFounderDecisionReceiptId(forged);
+
+    expect(validateFounderDecisionReceipt(forged, NOW)).toEqual([]);
+    expect(validateCapabilityRequestDecisionBinding(
+      request(forged.receiptId),
+      forged,
+      NOW,
+      FOUNDER_CONTEXT,
+    )).toContain('founder decision receipt does not match authenticated founder identity');
+  });
+
+  it('fails closed when trusted founder context is malformed', () => {
+    const receipt = decision();
+    const malformedContext = {
+      founderId: '',
+      source: 'untrusted-chat',
+      sourceRef: '',
+    } as unknown as AuthenticatedFounderContextV0;
+
+    const reasons = validateCapabilityRequestDecisionBinding(
+      request(receipt.receiptId),
+      receipt,
+      NOW,
+      malformedContext,
+    );
+    expect(reasons).toContain('authenticated founder id is required');
+    expect(reasons).toContain('founder authority must come from a trusted session or registered adapter');
+    expect(reasons).toContain('trusted founder source reference is required');
   });
 
   it('requires an explicit bounded expiry for execution authorization', () => {
