@@ -59,6 +59,9 @@ const truthSensitiveRules = [
   { domain: 'truth-governance', match: /^src\/http\/routes\/(?:buildEvents|buildEventReceipts)\.ts$/ },
   { domain: 'truth-governance', match: /^src\/services\/buildEventStore\.ts$/ },
   { domain: 'truth-governance', match: /^scripts\/verify-documentation-truth\.mjs$/ },
+  { domain: 'evidence-authority', match: /^src\/evidence\/(?!__tests__\/)(?!.*\.test\.ts$)/ },
+  { domain: 'evidence-authority', match: /^public\/control-room\/evidence-trust\.html$/ },
+  { domain: 'evidence-authority', match: /^\.github\/workflows\/playwright\.yml$/ },
   { domain: 'capability-authority', match: /^\.control\/capability\.(?:json|yaml)$/ },
   { domain: 'workflow-authority', match: /^\.github\/workflows\/(?:ci|quality-gate|pr-recovery-exact-head|founder-repo-cycle|documentation-truth)\.yml$/ },
   { domain: 'cloudflare-authority', match: /^public\/_worker\.js$/ },
@@ -84,7 +87,7 @@ if (domains.has('merge-authority') || domains.has('workflow-authority')) {
   requiredDocs.add('.ai/skills/juss-flow-launch-loop/SKILL.md');
 }
 if (domains.has('publishing')) requiredDocs.add('docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md');
-if (domains.has('truth-governance')) requiredDocs.add('docs/TRUTH_DECAY_AUDIT.md');
+if (domains.has('truth-governance') || domains.has('evidence-authority')) requiredDocs.add('docs/TRUTH_DECAY_AUDIT.md');
 if (domains.has('repository-provider')) requiredDocs.add('docs/PROVIDERS.md');
 if (domains.has('cloudflare-authority')) {
   requiredDocs.add('docs/CLOUDFLARE_REASONING.md');

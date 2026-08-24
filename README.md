@@ -359,3 +359,9 @@ Approved branch/merge actions use reservation/idempotency controls before provid
 | Rollback | Separate rollback authority |
 
 No approval silently carries forward to another authority class.
+
+## Evidence Trust Plane foundation
+
+The Evidence Trust Plane keeps observation, provider readback, evidence validity, and operational authority separate. In this slice, `src/evidence/evidenceLifecycle.ts` is a contract/evaluator foundation: a current ledgered receipt can reach `prepare_merge_review` only when GitHub API readback is bound to an exact repository, full SHA, workflow, and run identity, and expiration is re-evaluated at the use boundary. Rejected, stale, superseded, expired, unledgered, unscoped, or non-GitHub receipts fail closed for merge-review preparation.
+
+This foundation **does not wire durable receipt persistence**. `ledgerState` is supplied contract state until a separately reviewed store/writer exists and is proven. The founder-facing Evidence Trust Plane must therefore say persistence is required rather than implying it is already active. Even a properly scoped current receipt cannot authorize merge, deploy, production promotion, issue closure, secret mutation, policy mutation, or data deletion by itself.
