@@ -26,6 +26,7 @@ export interface FounderDecisionReceiptV0 {
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
 const RECEIPT_ID = /^fcr-founder-decision-v0:[0-9a-f]{64}$/i;
+const MAX_AUTHORIZATION_LEASE_MS = 60 * 60 * 1000;
 const STATE_CHANGING_ACTIONS = new Set<FounderOsLabAction>([
   'queue-social',
   'publish-social',
@@ -66,9 +67,7 @@ function validEvidenceUrl(value: string): boolean {
 }
 
 export function computeFounderDecisionReceiptId(receipt: FounderDecisionReceiptV0): string {
-  const digest = createHash('sha256')
-    .update(canonicalReceiptWithoutId(receipt), 'utf8')
-    .digest('hex');
+  const digest = createHash('sha256').update(canonicalReceiptWithoutId(receipt), 'utf8').digest('hex');
   return `fcr-founder-decision-v0:${digest}`;
 }
 
@@ -79,19 +78,40 @@ export function validateFounderDecisionReceipt(receipt: FounderDecisionReceiptV0
   if (!text(receipt.actor.id, 160)) reasons.push('actor id is required');
   if (receipt.actor.type !== 'founder' && receipt.actor.type !== 'automation') reasons.push('actor type must be founder or automation');
   if (receipt.decision !== 'approve' && receipt.decision !== 'authorize' && receipt.decision !== 'reject') reasons.push('unsupported decision');
+  if (receipt.decision === 'authorize' && receipt.actor.type !== 'founder') reasons.push('only a founder actor can issue an execution authorization');
   if (!FULL_SHA.test(text(receipt.expectedHeadSha, 40))) reasons.push('expectedHeadSha must be a full Git SHA');
   if (!SHA256.test(text(receipt.capabilityPlanHash, 64))) reasons.push('capabilityPlanHash must be a sha256 hex digest');
   if (!Number.isFinite(now)) reasons.push('now must be a finite timestamp');
-  if (!text(receipt.createdAt, 80) || Number.isNaN(Date.parse(receipt.createdAt))) reasons.push('createdAt must be an ISO-compatible timestamp');
+
+  const createdAtText = text(receipt.createdAt, 80);
+  const createdAtMs = Date.parse(createdAtText);
+  if (!createdAtText || Number.isNaN(createdAtMs)) {
+    reasons.push('createdAt must be an ISO-compatible timestamp');
+  } else if (Number.isFinite(now) && createdAtMs > now) {
+    reasons.push('founder decision receipt cannot be future-dated');
+  }
+
+  if (receipt.decision === 'authorize' && receipt.expiresAt === undefined) {
+    reasons.push('execution authorization requires an explicit expiry');
+  }
+
   if (receipt.expiresAt !== undefined) {
-    if (!text(receipt.expiresAt, 80) || Number.isNaN(Date.parse(receipt.expiresAt))) {
+    const expiresAtText = text(receipt.expiresAt, 80);
+    const expiresAtMs = Date.parse(expiresAtText);
+    if (!expiresAtText || Number.isNaN(expiresAtMs)) {
       reasons.push('expiresAt must be an ISO-compatible timestamp');
-    } else if (Date.parse(receipt.expiresAt) <= Date.parse(receipt.createdAt)) {
+    } else if (!Number.isNaN(createdAtMs) && expiresAtMs <= createdAtMs) {
       reasons.push('expiresAt must be after createdAt');
-    } else if (Number.isFinite(now) && Date.parse(receipt.expiresAt) < now) {
-      reasons.push('founder decision receipt is expired');
+    } else {
+      if (receipt.decision === 'authorize' && !Number.isNaN(createdAtMs) && expiresAtMs - createdAtMs > MAX_AUTHORIZATION_LEASE_MS) {
+        reasons.push('execution authorization lifetime may not exceed 60 minutes');
+      }
+      if (Number.isFinite(now) && expiresAtMs <= now) {
+        reasons.push('founder decision receipt is expired');
+      }
     }
   }
+
   if (!Array.isArray(receipt.evidenceUrls)) {
     reasons.push('evidenceUrls must be an array');
   } else if (receipt.evidenceUrls.some((value) => !validEvidenceUrl(text(value)))) {
@@ -133,6 +153,7 @@ export function validateCapabilityRequestDecisionBinding(
   if (request.policyDecisionId !== decision.receiptId) reasons.push('capability request policyDecisionId does not match founder decision receipt');
   if (request.capabilityPlanHash !== decision.capabilityPlanHash) reasons.push('capability request plan hash does not match founder decision receipt');
   if (request.expectedHeadSha !== decision.expectedHeadSha) reasons.push('capability request head SHA does not match founder decision receipt');
-  if (decision.decision === 'reject') reasons.push('rejected founder decision cannot authorize capability execution');
+  if (decision.actor.type !== 'founder') reasons.push('capability execution requires a founder-authored decision receipt');
+  if (decision.decision !== 'authorize') reasons.push('capability execution requires an explicit founder authorization');
   return reasons;
 }
