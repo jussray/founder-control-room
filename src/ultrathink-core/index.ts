@@ -10,7 +10,9 @@ export {
 
 export {
   evaluateFreshnessWitness,
+  type FreshnessEvidenceRef,
   type FreshnessEvaluation,
+  type FreshnessObservation,
   type FreshnessReason,
   type FreshnessStatus,
   type FreshnessWitness,
