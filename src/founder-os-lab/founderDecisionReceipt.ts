@@ -26,7 +26,7 @@ export interface FounderDecisionReceiptV0 {
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
 const RECEIPT_ID = /^fcr-founder-decision-v0:[0-9a-f]{64}$/i;
-const MUTATION_ACTIONS = new Set<FounderOsLabAction>([
+const STATE_CHANGING_ACTIONS = new Set<FounderOsLabAction>([
   'queue-social',
   'publish-social',
   'merge-code',
@@ -97,8 +97,8 @@ export function validateFounderDecisionReceipt(receipt: FounderDecisionReceiptV0
   } else if (receipt.evidenceUrls.some((value) => !validEvidenceUrl(text(value)))) {
     reasons.push('evidence URLs must be valid HTTPS URLs or localhost/127.0.0.1 HTTP URLs');
   }
-  if (MUTATION_ACTIONS.has(receipt.action) && receipt.decision !== 'reject' && receipt.evidenceUrls.length === 0) {
-    reasons.push('mutation decisions require evidence URLs');
+  if (STATE_CHANGING_ACTIONS.has(receipt.action) && receipt.decision !== 'reject' && receipt.evidenceUrls.length === 0) {
+    reasons.push('state-changing decisions require evidence URLs');
   }
   if (RECEIPT_ID.test(receipt.receiptId) && receipt.receiptId !== computeFounderDecisionReceiptId(receipt)) {
     reasons.push('receiptId does not match canonical founder decision content');
