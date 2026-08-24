@@ -55,7 +55,7 @@
     {
       "path": "src/providers/RepositoryProvider.ts",
       "claims": [
-        "src/providers/RepositoryProvider.ts: verification signals may carry provider-backed GitHub App issuer identity so deterministic review can distinguish the trusted evidence producer from a same-name green check produced by another or unknown issuer."
+        "src/providers/RepositoryProvider.ts: verification signals must carry provider-backed GitHub App issuer identity when GitHub supplies it so deterministic review can distinguish the trusted evidence producer from a same-name green check produced by another or unknown issuer; the provider must never fabricate issuer trust when GitHub omits that identity."
       ]
     },
     {
