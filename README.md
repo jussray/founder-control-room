@@ -99,7 +99,9 @@ The mutable capability ledger itself does not prove current-head CI, deployment,
 
 Founder Control Room's canonical in-app merge path requires exact provider PR identity, exact-head machine evidence, canonical diff/policy hashes, a passed exact-head deterministic independent-review witness, P2 blocking, an authenticated founder-final approval bound to the exact PR/base/head, and a last-moment head re-read before provider integration.
 
-The deterministic review remains proposal-only and non-authorizing. The authenticated founder-final receipt supplies the final human authority only after independent proof is current. Founder self-approval is therefore **not** relabeled as independent review.
+The deterministic review remains proposal-only and non-authorizing. For the canonical founder-final path, a deterministic GitHub Check Run witness is valid only when its exact head SHA, expected check identity, successful conclusion, and provider-backed Check Run App issuer all agree, and that issuer equals the server-owned numeric `GITHUB_APP_ID`; a missing or mismatched issuer fails closed. This source rule authenticates who produced the witness but does not prove that the live GitHub ruleset currently enforces the intended merge membrane.
+
+The authenticated founder-final receipt supplies the final human authority only after independent proof is current. Founder self-approval is therefore **not** relabeled as independent review.
 
 New founder-final approvals use a server-owned policy with zero required semantic humans, deterministic review required, P2 blocking, and `founderFinalApprovalRequired: true`. The older `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` policy remains compatibility-only for missions already pinned under the earlier human-semantic-review model.
 
