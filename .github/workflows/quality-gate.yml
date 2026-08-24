@@ -11,13 +11,19 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   typecheck:
     name: "Typecheck"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Record and verify exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -29,7 +35,12 @@ jobs:
     name: "Lint"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Record and verify exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -41,7 +52,12 @@ jobs:
     name: "Unit Tests"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Record and verify exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -56,11 +72,37 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  migration-lint:
+    name: "Migration Lint"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Record and verify exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.101.0
+      - name: Start local Supabase for migration lint
+        run: supabase start
+      - name: Lint migrations
+        run: supabase db lint --local
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup
+
   terminal-contract:
     name: "Guarded Terminal and AI Skill Contracts"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Record and verify exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -75,7 +117,12 @@ jobs:
     name: "RLS Migration Contract"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Record and verify exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -100,10 +147,16 @@ jobs:
       - typecheck
       - lint
       - unit-tests
+      - migration-lint
       - terminal-contract
       - rls-contract
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Record and verify exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -118,7 +171,12 @@ jobs:
     env:
       QODO_API_KEY: ${{ secrets.QODO_API_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Record and verify exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -142,9 +200,13 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact head
+        uses: actions/checkout@v4
         with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
           fetch-depth: 0
+      - name: Record and verify exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
       - name: Detect SonarQube configuration
         id: sonar_config
         shell: bash
