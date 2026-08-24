@@ -23,6 +23,12 @@ export interface FounderDecisionReceiptV0 {
   expiresAt?: string;
 }
 
+export interface AuthenticatedFounderContextV0 {
+  founderId: string;
+  source: 'trusted-session' | 'registered-adapter';
+  sourceRef: string;
+}
+
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
 const RECEIPT_ID = /^fcr-founder-decision-v0:[0-9a-f]{64}$/i;
@@ -74,6 +80,16 @@ function validEvidenceUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function validateAuthenticatedFounderContext(context: AuthenticatedFounderContextV0): string[] {
+  const reasons: string[] = [];
+  if (!text(context.founderId, 160)) reasons.push('authenticated founder id is required');
+  if (context.source !== 'trusted-session' && context.source !== 'registered-adapter') {
+    reasons.push('founder authority must come from a trusted session or registered adapter');
+  }
+  if (!text(context.sourceRef, 240)) reasons.push('trusted founder source reference is required');
+  return reasons;
 }
 
 export function computeFounderDecisionReceiptId(receipt: FounderDecisionReceiptV0): string {
@@ -165,12 +181,17 @@ export function validateCapabilityRequestDecisionBinding(
   request: CapabilityRequestV1,
   decision: FounderDecisionReceiptV0,
   now: number,
+  founderContext: AuthenticatedFounderContextV0,
 ): string[] {
-  const reasons = validateFounderDecisionReceipt(decision, now);
+  const reasons = [
+    ...validateFounderDecisionReceipt(decision, now),
+    ...validateAuthenticatedFounderContext(founderContext),
+  ];
   if (request.policyDecisionId !== decision.receiptId) reasons.push('capability request policyDecisionId does not match founder decision receipt');
   if (request.capabilityPlanHash !== decision.capabilityPlanHash) reasons.push('capability request plan hash does not match founder decision receipt');
   if (request.expectedHeadSha !== decision.expectedHeadSha) reasons.push('capability request head SHA does not match founder decision receipt');
   if (decision.actor.type !== 'founder') reasons.push('capability execution requires a founder-authored decision receipt');
+  if (decision.actor.id !== founderContext.founderId) reasons.push('founder decision receipt does not match authenticated founder identity');
   if (decision.decision !== 'authorize') reasons.push('capability execution requires an explicit founder authorization');
   return reasons;
 }
