@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  computeFounderDecisionReceiptId,
   createFounderDecisionReceipt,
   validateCapabilityRequestDecisionBinding,
   validateFounderDecisionReceipt,
+  type FounderDecisionReceiptV0,
 } from '../founderDecisionReceipt.js';
 import {
   CAPABILITY_REQUEST_CONTRACT,
@@ -169,6 +171,27 @@ describe('FounderDecisionReceiptV0', () => {
     expect(validateFounderDecisionReceipt(forged, NOW)).toContain(
       'receiptId does not match canonical founder decision content',
     );
+  });
+
+  it('rejects an unknown runtime action even when the attacker recomputes the digest', () => {
+    const receipt = decision();
+    const forged = {
+      ...receipt,
+      action: 'drop-database',
+    } as unknown as FounderDecisionReceiptV0;
+    forged.receiptId = computeFounderDecisionReceiptId(forged);
+
+    expect(validateFounderDecisionReceipt(forged, NOW)).toContain('unsupported founder action');
+  });
+
+  it('fails closed instead of throwing when evidenceUrls is malformed at runtime', () => {
+    const malformed = {
+      ...decision(),
+      evidenceUrls: null,
+    } as unknown as FounderDecisionReceiptV0;
+
+    expect(() => validateFounderDecisionReceipt(malformed, NOW)).not.toThrow();
+    expect(validateFounderDecisionReceipt(malformed, NOW)).toContain('evidenceUrls must be an array');
   });
 
   it('rejects an expired decision using caller-supplied time', () => {
