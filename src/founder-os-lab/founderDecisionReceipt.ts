@@ -27,6 +27,16 @@ const FULL_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
 const RECEIPT_ID = /^fcr-founder-decision-v0:[0-9a-f]{64}$/i;
 const MAX_AUTHORIZATION_LEASE_MS = 60 * 60 * 1000;
+const ALLOWED_ACTIONS = new Set<string>([
+  'inspect',
+  'plan',
+  'draft-social',
+  'queue-social',
+  'publish-social',
+  'merge-code',
+  'deploy-code',
+  'send-email',
+]);
 const STATE_CHANGING_ACTIONS = new Set<FounderOsLabAction>([
   'queue-social',
   'publish-social',
@@ -79,6 +89,7 @@ export function validateFounderDecisionReceipt(receipt: FounderDecisionReceiptV0
   if (receipt.actor.type !== 'founder' && receipt.actor.type !== 'automation') reasons.push('actor type must be founder or automation');
   if (receipt.decision !== 'approve' && receipt.decision !== 'authorize' && receipt.decision !== 'reject') reasons.push('unsupported decision');
   if (receipt.decision === 'authorize' && receipt.actor.type !== 'founder') reasons.push('only a founder actor can issue an execution authorization');
+  if (!ALLOWED_ACTIONS.has(text(receipt.action, 80))) reasons.push('unsupported founder action');
   if (!FULL_SHA.test(text(receipt.expectedHeadSha, 40))) reasons.push('expectedHeadSha must be a full Git SHA');
   if (!SHA256.test(text(receipt.capabilityPlanHash, 64))) reasons.push('capabilityPlanHash must be a sha256 hex digest');
   if (!Number.isFinite(now)) reasons.push('now must be a finite timestamp');
@@ -112,12 +123,18 @@ export function validateFounderDecisionReceipt(receipt: FounderDecisionReceiptV0
     }
   }
 
-  if (!Array.isArray(receipt.evidenceUrls)) {
+  const evidenceUrlsAreArray = Array.isArray(receipt.evidenceUrls);
+  if (!evidenceUrlsAreArray) {
     reasons.push('evidenceUrls must be an array');
   } else if (receipt.evidenceUrls.some((value) => !validEvidenceUrl(text(value)))) {
     reasons.push('evidence URLs must be valid HTTPS URLs or localhost/127.0.0.1 HTTP URLs');
   }
-  if (STATE_CHANGING_ACTIONS.has(receipt.action) && receipt.decision !== 'reject' && receipt.evidenceUrls.length === 0) {
+  if (
+    evidenceUrlsAreArray
+    && STATE_CHANGING_ACTIONS.has(receipt.action)
+    && receipt.decision !== 'reject'
+    && receipt.evidenceUrls.length === 0
+  ) {
     reasons.push('state-changing decisions require evidence URLs');
   }
   if (RECEIPT_ID.test(receipt.receiptId) && receipt.receiptId !== computeFounderDecisionReceiptId(receipt)) {
