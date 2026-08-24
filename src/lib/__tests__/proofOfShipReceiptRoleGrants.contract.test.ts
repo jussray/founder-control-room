@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
@@ -25,13 +25,45 @@ vi.mock('../../lib/supabase.js', () => ({ supabaseAdmin }));
 import { proofOfShipReceiptRepository } from '../../http/routes/proofOfShipReceipts.js';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+const migrationsDir = resolve(repositoryRoot, 'supabase/migrations');
 const migration = readFileSync(
-  resolve(
-    repositoryRoot,
-    'supabase/migrations/20260824152200_harden_proof_of_ship_receipt_role_grants.sql',
-  ),
+  resolve(migrationsDir, '20260824152200_harden_proof_of_ship_receipt_role_grants.sql'),
   'utf8',
 );
+
+function stripSqlComments(sql: string): string {
+  return sql
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/--.*$/gm, '');
+}
+
+function effectivePublicRoleGrantState(): Record<'anon' | 'authenticated', boolean | null> {
+  const state: Record<'anon' | 'authenticated', boolean | null> = {
+    anon: null,
+    authenticated: null,
+  };
+
+  for (const filename of readdirSync(migrationsDir).filter((name) => name.endsWith('.sql')).sort()) {
+    const sql = stripSqlComments(readFileSync(resolve(migrationsDir, filename), 'utf8'));
+    const statements = sql.split(';').map((statement) => statement.trim()).filter(Boolean);
+
+    for (const statement of statements) {
+      if (!/\bpublic\.proof_of_ship_receipts\b/i.test(statement)) continue;
+
+      for (const role of ['anon', 'authenticated'] as const) {
+        if (!new RegExp(`\\b${role}\\b`, 'i').test(statement)) continue;
+
+        if (/^\s*REVOKE\s+ALL\s+PRIVILEGES\b/i.test(statement)) {
+          state[role] = false;
+        } else if (/^\s*GRANT\s+/i.test(statement)) {
+          state[role] = true;
+        }
+      }
+    }
+  }
+
+  return state;
+}
 
 const validReceipt = {
   receiptId: '8fa23f1e-2844-4c65-a91a-e88bb91ecab4',
@@ -61,10 +93,12 @@ const validReceipt = {
 } as const;
 
 describe('proof-of-ship receipt role grants', () => {
-  it('revokes public-role table privileges from proof_of_ship_receipts', () => {
+  it('ends the ordered migration ledger with public-role privileges revoked', () => {
     expect(migration).toContain('REVOKE ALL PRIVILEGES');
-    expect(migration).toContain('ON TABLE public.proof_of_ship_receipts');
-    expect(migration).toContain('FROM anon, authenticated');
+    expect(effectivePublicRoleGrantState()).toEqual({
+      anon: false,
+      authenticated: false,
+    });
   });
 
   it('exercises receipt reads and writes through the service-role client', async () => {
