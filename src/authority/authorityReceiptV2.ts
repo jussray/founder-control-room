@@ -69,8 +69,7 @@ export interface AuthorityReceiptV2CurrentAuthority {
 }
 
 export interface AuthorityReceiptV2ConsumptionStore {
-  has(receiptId: string): Promise<boolean> | boolean;
-  markConsumed(receiptId: string, consumedAt: string): Promise<void> | void;
+  claim(receiptId: string, consumedAt: string): Promise<boolean> | boolean;
 }
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
@@ -146,16 +145,14 @@ export async function consumeAuthorityReceiptV2(input: {
   const validation = validateAuthorityReceiptV2(input.receipt, now);
   if (!validation.ok) return validation;
 
-  if (await input.store.has(input.receipt.id)) {
-    return { ok: false, reason: 'already_consumed' };
-  }
-
   if (!(await input.currentAuthority.revalidate(input.receipt))) {
     return { ok: false, reason: 'current_authority_rejected' };
   }
 
   const consumedAt = now.toISOString();
-  await input.store.markConsumed(input.receipt.id, consumedAt);
+  if (!(await input.store.claim(input.receipt.id, consumedAt))) {
+    return { ok: false, reason: 'already_consumed' };
+  }
 
   return {
     ok: true,
