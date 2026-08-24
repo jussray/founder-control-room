@@ -1,7 +1,28 @@
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+const { supabaseAdmin, from, select, eq, maybeSingle, insert } = vi.hoisted(() => {
+  const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+  const eq = vi.fn();
+  const select = vi.fn();
+  const insert = vi.fn().mockResolvedValue({ error: null });
+  const from = vi.fn();
+  const supabaseAdmin = vi.fn();
+
+  const query = { select, eq, maybeSingle, insert };
+  select.mockReturnValue(query);
+  eq.mockReturnValue(query);
+  from.mockReturnValue(query);
+  supabaseAdmin.mockReturnValue({ from });
+
+  return { supabaseAdmin, from, select, eq, maybeSingle, insert };
+});
+
+vi.mock('../../lib/supabase.js', () => ({ supabaseAdmin }));
+
+import { proofOfShipReceiptRepository } from '../../http/routes/proofOfShipReceipts.js';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const migration = readFileSync(
@@ -11,11 +32,33 @@ const migration = readFileSync(
   ),
   'utf8',
 );
-const receiptRoute = readFileSync(
-  resolve(repositoryRoot, 'src/http/routes/proofOfShipReceipts.ts'),
-  'utf8',
-);
-const supabaseClient = readFileSync(resolve(repositoryRoot, 'src/lib/supabase.ts'), 'utf8');
+
+const validReceipt = {
+  receiptId: '8fa23f1e-2844-4c65-a91a-e88bb91ecab4',
+  source: 'zapier',
+  sourceRepo: 'jussray/founder-control-room',
+  exactCommitSha: 'b'.repeat(40),
+  idempotencyKey: `jussray/founder-control-room:${'b'.repeat(40)}`,
+  linkedinBaselineRef: 'linkedin-export:2026-08-02..2026-08-08',
+  linkedinRisingFloorReady: true,
+  linkedinGrowthHypothesis: 'Lead with a concrete execution conflict and verified mechanism.',
+  linkedin24hGate: 'At least 150 impressions and 5% engagement rate after 24 hours.',
+  linkedin48hGate: 'Beat the verified individual-post floor without engagement falling below 5%.',
+  linkedinNextMutation: 'If distribution is weak but engagement holds, change the hook and format, not the proof.',
+  linkedinDraftSha256: 'c'.repeat(64),
+  bufferTerminalAction: 'schedule',
+  bufferScheduleId: 'buffer:scheduled:12345',
+  scheduledAt: '2026-08-08T06:40:00.000Z',
+  bufferPublicationStatus: 'published',
+  bufferPostId: 'buffer:post:12345',
+  livePostUrl: 'https://www.linkedin.com/feed/update/urn:li:activity:12345/',
+  publishedAt: '2026-08-08T06:41:00.000Z',
+  smsNotificationStatus: 'delivered',
+  smsProvider: 'twilio',
+  smsMessageId: 'SM1234567890abcdef',
+  smsDeliveredAt: '2026-08-08T06:41:05.000Z',
+  occurredAt: '2026-08-08T06:41:06.000Z',
+} as const;
 
 describe('proof-of-ship receipt role grants', () => {
   it('revokes public-role table privileges from proof_of_ship_receipts', () => {
@@ -24,9 +67,30 @@ describe('proof-of-ship receipt role grants', () => {
     expect(migration).toContain('FROM anon, authenticated');
   });
 
-  it('keeps receipt reads and writes on the service-role client', () => {
-    expect(receiptRoute).toContain("const { supabaseAdmin } = await import('../../lib/supabase.js')");
-    expect(receiptRoute).toContain('const admin = supabaseAdmin()');
-    expect(supabaseClient).toContain('SUPABASE_SERVICE_ROLE_KEY');
+  it('exercises receipt reads and writes through the service-role client', async () => {
+    vi.clearAllMocks();
+
+    const query = { select, eq, maybeSingle, insert };
+    select.mockReturnValue(query);
+    eq.mockReturnValue(query);
+    from.mockReturnValue(query);
+    supabaseAdmin.mockReturnValue({ from });
+    maybeSingle.mockResolvedValue({ data: null, error: null });
+    insert.mockResolvedValue({ error: null });
+
+    await expect(proofOfShipReceiptRepository.find(validReceipt.receiptId)).resolves.toBeNull();
+    await expect(proofOfShipReceiptRepository.store(validReceipt)).resolves.toBe('stored');
+
+    expect(supabaseAdmin).toHaveBeenCalledTimes(3);
+    expect(from).toHaveBeenCalledWith('proof_of_ship_receipts');
+    expect(select).toHaveBeenCalled();
+    expect(insert).toHaveBeenCalledOnce();
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        receipt_id: validReceipt.receiptId,
+        source_repo: validReceipt.sourceRepo,
+        exact_commit_sha: validReceipt.exactCommitSha,
+      }),
+    );
   });
 });
