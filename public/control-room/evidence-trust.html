@@ -18,36 +18,20 @@
   </section>
 
   <section class="trust-grid" aria-label="Evidence lifecycle dimensions">
-    <article class="trust-card" data-tone="waiting" data-evidence-state="observation">
-      <div class="trust-label"><span class="trust-dot" aria-hidden="true"></span>Observation</div>
-      <strong>Intake pending</strong>
-      <p>n8n, Gmail, GitHub notifications, and other sensors may report claims only.</p>
-    </article>
-    <article class="trust-card" data-tone="waiting" data-evidence-state="verification">
-      <div class="trust-label"><span class="trust-dot" aria-hidden="true"></span>Verification</div>
-      <strong>Provider readback required</strong>
-      <p>GitHub API, Cloudflare, Supabase, or Playwright must corroborate the claim independently.</p>
-    </article>
-    <article class="trust-card" data-tone="waiting" data-evidence-state="ledger">
-      <div class="trust-label"><span class="trust-dot" aria-hidden="true"></span>Ledger</div>
-      <strong>Persistence required</strong>
-      <p>This slice defines the receipt contract only; durable receipt storage is not wired here.</p>
-    </article>
-    <article class="trust-card" data-tone="waiting" data-evidence-state="validity">
-      <div class="trust-label"><span class="trust-dot" aria-hidden="true"></span>Validity</div>
-      <strong>Current · stale · superseded · expired</strong>
-      <p>A prior green receipt cannot certify a new SHA, deployment, runtime, or policy state.</p>
-    </article>
+    <article class="trust-card" data-tone="waiting" data-evidence-state="observation"><div class="trust-label"><span class="trust-dot" aria-hidden="true"></span>Observation</div><strong>Intake pending</strong><p>n8n, Gmail, GitHub notifications, and other sensors may report claims only.</p></article>
+    <article class="trust-card" data-tone="waiting" data-evidence-state="verification"><div class="trust-label"><span class="trust-dot" aria-hidden="true"></span>Verification</div><strong>Provider readback required</strong><p>GitHub API, Cloudflare, Supabase, or Playwright must corroborate the claim independently.</p></article>
+    <article class="trust-card" data-tone="waiting" data-evidence-state="ledger"><div class="trust-label"><span class="trust-dot" aria-hidden="true"></span>Ledger</div><strong>Persistence required</strong><p>This slice defines the receipt contract only; durable receipt storage is not wired here.</p></article>
+    <article class="trust-card" data-tone="waiting" data-evidence-state="validity"><div class="trust-label"><span class="trust-dot" aria-hidden="true"></span>Validity</div><strong>Current · stale · superseded · expired</strong><p>A prior green receipt cannot certify a new SHA, deployment, runtime, or policy state.</p></article>
   </section>
 
   <section class="trust-table" role="table" aria-label="Evidence authority boundaries">
     <div class="trust-row trust-head" role="row"><span role="columnheader">Evidence state</span><span role="columnheader">May unlock</span><span role="columnheader">Still blocked</span></div>
-    <div class="trust-row" role="row"><strong role="cell"><span class="trust-cell-label">Evidence state</span>Observation</strong><span role="cell"><span class="trust-cell-label">May unlock</span>Inspect · create evidence task · request read-only verification</span><span role="cell"><span class="trust-cell-label">Still blocked</span>Merge · deploy · close · secrets · policy changes</span></div>
-    <div class="trust-row" role="row"><strong role="cell"><span class="trust-cell-label">Evidence state</span>Current authoritative receipt</strong><span role="cell"><span class="trust-cell-label">May unlock</span>Prepare governed review only when exact GitHub repository, SHA, workflow, and run scope are bound, the workflow conclusion is success, and the receipt has an active freshness lease</span><span role="cell"><span class="trust-cell-label">Still blocked</span>Merge · deploy · production promotion until separate authority is satisfied</span></div>
+    <div class="trust-row" role="row"><strong role="cell"><span class="trust-cell-label">Evidence state</span>Observation</strong><span role="cell"><span class="trust-cell-label">May unlock</span>Inspect · create evidence task · request read-only verification</span><span role="cell"><span class="trust-cell-label">Still blocked</span>Merge · deploy · close issue · modify secrets · change policy · delete data · production promotion</span></div>
+    <div class="trust-row" role="row"><strong role="cell"><span class="trust-cell-label">Evidence state</span>Current authoritative receipt</strong><span role="cell"><span class="trust-cell-label">May unlock</span>Prepare governed review only when the receipt matches the expected GitHub repository and exact target SHA, workflow and run identity, the workflow conclusion is success, and a freshness lease is active for no more than 60 minutes</span><span role="cell"><span class="trust-cell-label">Still blocked</span>Merge · deploy · production promotion · close issue · modify secrets · change policy · delete data until separate authority is satisfied</span></div>
     <div class="trust-row" role="row"><strong role="cell"><span class="trust-cell-label">Evidence state</span>Stale / superseded receipt</strong><span role="cell"><span class="trust-cell-label">May unlock</span>Inspect · request fresh verification</span><span role="cell"><span class="trust-cell-label">Still blocked</span>All high-consequence actions</span></div>
   </section>
 
-  <p class="trust-note"><strong>n8n membrane:</strong> n8n may create intake events and trigger read-only verification. It cannot mark evidence verified, alter ledger verdicts, merge, deploy, close issues, modify secrets, or change policy.</p>
+  <p class="trust-note"><strong>n8n membrane:</strong> n8n may create intake events and trigger read-only verification. It cannot mark evidence verified, alter ledger verdicts, merge, deploy, close issues, modify secrets, change policy, or delete data.</p>
   <a class="trust-back" href="/control-room/">← Back to Founder Control Room</a>
 </main>
 </body>
