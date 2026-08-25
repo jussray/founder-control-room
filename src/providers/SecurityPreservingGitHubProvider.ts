@@ -111,7 +111,11 @@ export class SecurityPreservingGitHubProvider extends GitHubProvider {
       blockDeletion: config.blockDeletion,
     }) as UpdateRules;
 
-    const bypassActors: UpdateBypassActors = config.bypassActors === undefined
+    // Existing bypass posture is security state. The current HTTP route
+    // normalizes an omitted optional bypassActors field to [], so both absent
+    // and empty must fail closed to preservation here. A future explicit
+    // clear operation needs a distinct provider-neutral intent, not [] overloading.
+    const bypassActors: UpdateBypassActors = !config.bypassActors || config.bypassActors.length === 0
       ? (current.bypass_actors ?? []) as UpdateBypassActors
       : config.bypassActors.map((actor) => {
           if (actor.kind !== "app") {
