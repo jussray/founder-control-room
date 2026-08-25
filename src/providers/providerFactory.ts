@@ -1,5 +1,5 @@
 import { getGitHubInstallationToken } from "./githubAppAuth.js";
-import { GitHubProvider } from "./GitHubProvider.js";
+import { SecurityPreservingGitHubProvider } from "./SecurityPreservingGitHubProvider.js";
 import { GitLabProvider } from "./GitLabProvider.js";
 import type {
   Diff,
@@ -307,7 +307,7 @@ async function githubProvider(project: ProviderProjectConfig): Promise<Repositor
     projectMap[FOUNDER_CONTROL_ROOM_PROJECT_ID] = project.repo_identifier;
   }
 
-  return new GitHubProvider({
+  return new SecurityPreservingGitHubProvider({
     token,
     projectMap,
     baseUrl: process.env.GITHUB_API_BASE_URL,
