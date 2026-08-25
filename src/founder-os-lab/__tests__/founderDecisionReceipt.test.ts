@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  computeCapabilityRequestAuthorityDigest,
   computeFounderDecisionReceiptId,
   createFounderDecisionReceipt,
   validateCapabilityRequestDecisionBinding,
@@ -22,19 +23,6 @@ const FOUNDER_CONTEXT: AuthenticatedFounderContextV0 = {
   sourceRef: 'chatgpt-adapter:v1:decision-1',
 };
 
-function decision() {
-  return createFounderDecisionReceipt({
-    actor: { type: 'founder', id: 'jussray' },
-    decision: 'authorize',
-    action: 'merge-code',
-    capabilityPlanHash: HASH,
-    expectedHeadSha: SHA,
-    evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
-    createdAt: '2026-08-24T22:55:00.000Z',
-    expiresAt: '2026-08-24T23:30:00.000Z',
-  }, NOW);
-}
-
 function request(policyDecisionId: string): CapabilityRequestV1 {
   return {
     contract: CAPABILITY_REQUEST_CONTRACT,
@@ -56,12 +44,27 @@ function request(policyDecisionId: string): CapabilityRequestV1 {
   };
 }
 
+function decision() {
+  return createFounderDecisionReceipt({
+    actor: { type: 'founder', id: 'jussray' },
+    decision: 'authorize',
+    action: 'merge-code',
+    capabilityPlanHash: HASH,
+    expectedHeadSha: SHA,
+    requestDigest: computeCapabilityRequestAuthorityDigest(request('pending-founder-decision')),
+    evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
+    createdAt: '2026-08-24T22:55:00.000Z',
+    expiresAt: '2026-08-24T23:30:00.000Z',
+  }, NOW);
+}
+
 describe('FounderDecisionReceiptV0', () => {
   it('creates a canonical founder authority receipt bound to exact state', () => {
     const receipt = decision();
     expect(receipt.actor).toEqual({ type: 'founder', id: 'jussray' });
     expect(receipt.expectedHeadSha).toBe(SHA);
     expect(receipt.capabilityPlanHash).toBe(HASH);
+    expect(receipt.requestDigest).toBe(computeCapabilityRequestAuthorityDigest(request('anything')));
     expect(receipt.receiptId).toMatch(/^fcr-founder-decision-v0:[0-9a-f]{64}$/);
     expect(validateFounderDecisionReceipt(receipt, NOW)).toEqual([]);
   });
@@ -73,6 +76,7 @@ describe('FounderDecisionReceiptV0', () => {
       action: 'deploy-code',
       capabilityPlanHash: HASH,
       expectedHeadSha: SHA,
+      requestDigest: computeCapabilityRequestAuthorityDigest(request('pending')),
       evidenceUrls: [],
       createdAt: '2026-08-24T22:55:00.000Z',
       expiresAt: '2026-08-24T23:30:00.000Z',
@@ -81,20 +85,13 @@ describe('FounderDecisionReceiptV0', () => {
 
   it('binds a capability request to the exact founder decision receipt and authenticated founder', () => {
     const receipt = decision();
-    expect(validateCapabilityRequestDecisionBinding(
-      request(receipt.receiptId),
-      receipt,
-      NOW,
-      FOUNDER_CONTEXT,
-    )).toEqual([]);
+    expect(validateCapabilityRequestDecisionBinding(request(receipt.receiptId), receipt, NOW, FOUNDER_CONTEXT)).toEqual([]);
   });
 
   it('rejects a capability request pointed at another head SHA', () => {
     const receipt = decision();
     const candidate = { ...request(receipt.receiptId), expectedHeadSha: OTHER_SHA };
-    expect(validateCapabilityRequestDecisionBinding(candidate, receipt, NOW, FOUNDER_CONTEXT)).toContain(
-      'capability request head SHA does not match founder decision receipt',
-    );
+    expect(validateCapabilityRequestDecisionBinding(candidate, receipt, NOW, FOUNDER_CONTEXT)).toContain('capability request head SHA does not match founder decision receipt');
   });
 
   it('rejects execution after a founder rejection', () => {
@@ -107,9 +104,7 @@ describe('FounderDecisionReceiptV0', () => {
       evidenceUrls: [],
       createdAt: '2026-08-24T22:55:00.000Z',
     }, NOW);
-    expect(validateCapabilityRequestDecisionBinding(request(rejected.receiptId), rejected, NOW, FOUNDER_CONTEXT)).toContain(
-      'capability execution requires an explicit founder authorization',
-    );
+    expect(validateCapabilityRequestDecisionBinding(request(rejected.receiptId), rejected, NOW, FOUNDER_CONTEXT)).toContain('capability execution requires an explicit founder authorization');
   });
 
   it('rejects an approval receipt as execution authority', () => {
@@ -122,9 +117,7 @@ describe('FounderDecisionReceiptV0', () => {
       evidenceUrls: [],
       createdAt: '2026-08-24T22:55:00.000Z',
     }, NOW);
-    expect(validateCapabilityRequestDecisionBinding(request(approved.receiptId), approved, NOW, FOUNDER_CONTEXT)).toContain(
-      'capability execution requires an explicit founder authorization',
-    );
+    expect(validateCapabilityRequestDecisionBinding(request(approved.receiptId), approved, NOW, FOUNDER_CONTEXT)).toContain('capability execution requires an explicit founder authorization');
   });
 
   it('rejects automation-minted execution authority', () => {
@@ -134,6 +127,7 @@ describe('FounderDecisionReceiptV0', () => {
       action: 'merge-code',
       capabilityPlanHash: HASH,
       expectedHeadSha: SHA,
+      requestDigest: computeCapabilityRequestAuthorityDigest(request('pending')),
       evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
       createdAt: '2026-08-24T22:55:00.000Z',
       expiresAt: '2026-08-24T23:30:00.000Z',
@@ -141,35 +135,16 @@ describe('FounderDecisionReceiptV0', () => {
   });
 
   it('rejects a spoofed founder even when the attacker recomputes the canonical receipt id', () => {
-    const forged = {
-      ...decision(),
-      actor: { type: 'founder', id: 'someone-else' },
-    } satisfies FounderDecisionReceiptV0;
+    const forged = { ...decision(), actor: { type: 'founder', id: 'someone-else' } } satisfies FounderDecisionReceiptV0;
     forged.receiptId = computeFounderDecisionReceiptId(forged);
-
     expect(validateFounderDecisionReceipt(forged, NOW)).toEqual([]);
-    expect(validateCapabilityRequestDecisionBinding(
-      request(forged.receiptId),
-      forged,
-      NOW,
-      FOUNDER_CONTEXT,
-    )).toContain('founder decision receipt does not match authenticated founder identity');
+    expect(validateCapabilityRequestDecisionBinding(request(forged.receiptId), forged, NOW, FOUNDER_CONTEXT)).toContain('founder decision receipt does not match authenticated founder identity');
   });
 
   it('fails closed when trusted founder context is malformed', () => {
     const receipt = decision();
-    const malformedContext = {
-      founderId: '',
-      source: 'untrusted-chat',
-      sourceRef: '',
-    } as unknown as AuthenticatedFounderContextV0;
-
-    const reasons = validateCapabilityRequestDecisionBinding(
-      request(receipt.receiptId),
-      receipt,
-      NOW,
-      malformedContext,
-    );
+    const malformedContext = { founderId: '', source: 'untrusted-chat', sourceRef: '' } as unknown as AuthenticatedFounderContextV0;
+    const reasons = validateCapabilityRequestDecisionBinding(request(receipt.receiptId), receipt, NOW, malformedContext);
     expect(reasons).toContain('authenticated founder id is required');
     expect(reasons).toContain('founder authority must come from a trusted session or registered adapter');
     expect(reasons).toContain('trusted founder source reference is required');
@@ -182,6 +157,7 @@ describe('FounderDecisionReceiptV0', () => {
       action: 'merge-code',
       capabilityPlanHash: HASH,
       expectedHeadSha: SHA,
+      requestDigest: computeCapabilityRequestAuthorityDigest(request('pending')),
       evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
       createdAt: '2026-08-24T22:55:00.000Z',
     }, NOW)).toThrow('execution authorization requires an explicit expiry');
@@ -192,6 +168,7 @@ describe('FounderDecisionReceiptV0', () => {
       action: 'merge-code',
       capabilityPlanHash: HASH,
       expectedHeadSha: SHA,
+      requestDigest: computeCapabilityRequestAuthorityDigest(request('pending')),
       evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
       createdAt: '2026-08-24T22:00:00.000Z',
       expiresAt: '2026-08-25T00:00:01.000Z',
@@ -205,6 +182,7 @@ describe('FounderDecisionReceiptV0', () => {
       action: 'merge-code',
       capabilityPlanHash: HASH,
       expectedHeadSha: SHA,
+      requestDigest: computeCapabilityRequestAuthorityDigest(request('pending')),
       evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
       createdAt: '2026-08-24T23:05:00.000Z',
       expiresAt: '2026-08-24T23:30:00.000Z',
@@ -214,28 +192,18 @@ describe('FounderDecisionReceiptV0', () => {
   it('rejects a forged canonical receipt id', () => {
     const receipt = decision();
     const forged = { ...receipt, actor: { ...receipt.actor, id: 'someone-else' } };
-    expect(validateFounderDecisionReceipt(forged, NOW)).toContain(
-      'receiptId does not match canonical founder decision content',
-    );
+    expect(validateFounderDecisionReceipt(forged, NOW)).toContain('receiptId does not match canonical founder decision content');
   });
 
   it('rejects an unknown runtime action even when the attacker recomputes the digest', () => {
     const receipt = decision();
-    const forged = {
-      ...receipt,
-      action: 'drop-database',
-    } as unknown as FounderDecisionReceiptV0;
+    const forged = { ...receipt, action: 'drop-database' } as unknown as FounderDecisionReceiptV0;
     forged.receiptId = computeFounderDecisionReceiptId(forged);
-
     expect(validateFounderDecisionReceipt(forged, NOW)).toContain('unsupported founder action');
   });
 
   it('fails closed instead of throwing when evidenceUrls is malformed at runtime', () => {
-    const malformed = {
-      ...decision(),
-      evidenceUrls: null,
-    } as unknown as FounderDecisionReceiptV0;
-
+    const malformed = { ...decision(), evidenceUrls: null } as unknown as FounderDecisionReceiptV0;
     expect(() => validateFounderDecisionReceipt(malformed, NOW)).not.toThrow();
     expect(validateFounderDecisionReceipt(malformed, NOW)).toContain('evidenceUrls must be an array');
   });
@@ -247,12 +215,11 @@ describe('FounderDecisionReceiptV0', () => {
       action: 'merge-code',
       capabilityPlanHash: HASH,
       expectedHeadSha: SHA,
+      requestDigest: computeCapabilityRequestAuthorityDigest(request('pending')),
       evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
       createdAt: '2026-08-24T22:30:00.000Z',
       expiresAt: '2026-08-24T23:30:00.000Z',
     }, NOW);
-    expect(validateFounderDecisionReceipt(receipt, Date.parse('2026-08-25T00:00:00.000Z'))).toContain(
-      'founder decision receipt is expired',
-    );
+    expect(validateFounderDecisionReceipt(receipt, Date.parse('2026-08-25T00:00:00.000Z'))).toContain('founder decision receipt is expired');
   });
 });
