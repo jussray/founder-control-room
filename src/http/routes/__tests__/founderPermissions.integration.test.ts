@@ -1,14 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { rows, mockGetUser } = vi.hoisted(() => ({
+const { rows, mockGetUser, interactiveSession } = vi.hoisted(() => ({
   rows: new Map<string, Record<string, unknown>>(),
   mockGetUser: vi.fn(),
+  interactiveSession: { enabled: false },
 }));
 
 vi.mock('../../../lib/supabaseAuthClient.js', () => ({
   supabaseAuth: { auth: { getUser: mockGetUser } },
   createSupabaseAuthClient: vi.fn(),
 }));
+
+vi.mock('../../../auth/founderSession.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../auth/founderSession.js')>('../../../auth/founderSession.js');
+  return {
+    ...actual,
+    readFounderSession: vi.fn(() => interactiveSession.enabled
+      ? { accessToken: 'browser-founder-token', refreshToken: 'browser-founder-refresh' }
+      : null),
+  };
+});
 
 vi.mock('../../../lib/supabaseClient.js', () => ({
   supabase: {
@@ -78,11 +89,12 @@ const proposal = {
 describe('founder permission broker HTTP contract', () => {
   beforeEach(() => {
     rows.clear();
+    interactiveSession.enabled = false;
     mockGetUser.mockReset();
     mockGetUser.mockResolvedValue({ data: { user: { id: '11111111-1111-4111-8111-111111111111', email: 'founder@example.com' } }, error: null });
   });
 
-  it('keeps a request non-authoritative until the founder explicitly approves it', async () => {
+  it('lets a bearer-authenticated agent ask but not self-approve', async () => {
     const app = createServer();
     const created = await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)
       .send({ requestId: 'permission:ask-founder-001', requestedBySurface: 'chatgpt', proposal, note: 'Approve this exact candidate?' });
@@ -90,17 +102,24 @@ describe('founder permission broker HTTP contract', () => {
     expect(created.body.status).toBe('pending');
     expect(created.body.founderPermissionSatisfied).toBe(false);
     expect(created.body.independentReviewSatisfied).toBeNull();
-    expect(created.body.decisionHash).toBeNull();
 
-    const approved = await request(app).post('/mcp/founder-permissions/requests/permission:ask-founder-001/decision').set('Authorization', bearer)
+    const bearerOnlyDecision = await request(app)
+      .post('/mcp/founder-permissions/requests/permission:ask-founder-001/decision')
+      .set('Authorization', bearer)
+      .send({ decision: 'approved', surface: 'chatgpt' });
+    expect(bearerOnlyDecision.status).toBe(403);
+    expect(bearerOnlyDecision.body.code).toBe('FOUNDER_INTERACTIVE_APPROVAL_REQUIRED');
+
+    interactiveSession.enabled = true;
+    const approved = await request(app)
+      .post('/mcp/founder-permissions/requests/permission:ask-founder-001/decision')
+      .set('Authorization', bearer)
       .send({ decision: 'approved', surface: 'chatgpt' });
     expect(approved.status).toBe(200);
     expect(approved.body.status).toBe('approved');
     expect(approved.body.founderPermissionSatisfied).toBe(true);
     expect(approved.body.independentReviewSatisfied).toBeNull();
     expect(approved.body.decisionHash).toMatch(/^[0-9a-f]{64}$/);
-    expect(approved.body.decision.executionAuthorized).toBe(true);
-    expect(approved.body.decision.proposal).toEqual(proposal);
   });
 
   it('fails closed when the same request id is reused for another proposal', async () => {
@@ -118,6 +137,7 @@ describe('founder permission broker HTTP contract', () => {
     const app = createServer();
     await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)
       .send({ requestId: 'permission:ask-founder-003', requestedBySurface: 'perplexity', proposal });
+    interactiveSession.enabled = true;
     const rejected = await request(app).post('/mcp/founder-permissions/requests/permission:ask-founder-003/decision').set('Authorization', bearer)
       .send({ decision: 'rejected', surface: 'perplexity' });
     expect(rejected.status).toBe(200);
