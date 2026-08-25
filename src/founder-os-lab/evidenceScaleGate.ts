@@ -6,6 +6,11 @@ import {
   type CapabilityReceiptV1,
   type CapabilityRequestV1,
 } from './capabilityExecutionContracts.js';
+import {
+  validateCapabilityRequestDecisionBinding,
+  type AuthenticatedFounderContextV0,
+  type FounderDecisionReceiptV0,
+} from './founderDecisionReceipt.js';
 
 export const FCR_EVIDENCE_SCALE_GATE_CONTRACT = 'juss/fcr-evidence-scale-gate@v3' as const;
 export const FCR_EVALUATION_TIME_AUTHORITY_CONTRACT = 'juss/fcr-evaluation-time-authority@v1' as const;
@@ -161,6 +166,9 @@ export interface NormalizeCapabilityReceiptEvidenceInput {
   projectSlug: string;
   request: CapabilityRequestV1;
   receipt: CapabilityReceiptV1;
+  founderDecision?: FounderDecisionReceiptV0;
+  founderContext?: AuthenticatedFounderContextV0;
+  evaluatedAt?: number;
 }
 
 export interface NormalizeCapabilityReceiptEvidenceResult {
@@ -311,13 +319,9 @@ function normalizePolicy(raw: unknown): { policy: FcrEvidenceScalePolicy; failur
     ['maxCostPerPassUsd', policy.maxCostPerPassUsd],
     ['maxRetryRate', policy.maxRetryRate],
   ] as const) {
-    if (value !== undefined && value < 0) {
-      failures.push(`policy ${name} must be a finite non-negative number when supplied`);
-    }
+    if (value !== undefined && value < 0) failures.push(`policy ${name} must be a finite non-negative number when supplied`);
   }
-  if (policy.maxRetryRate !== undefined && policy.maxRetryRate > 1) {
-    failures.push('policy maxRetryRate must not exceed 1');
-  }
+  if (policy.maxRetryRate !== undefined && policy.maxRetryRate > 1) failures.push('policy maxRetryRate must not exceed 1');
 
   return { policy, failures: unique(failures) };
 }
@@ -344,23 +348,15 @@ function normalizeTimeAuthority(
   if (contract !== FCR_EVALUATION_TIME_AUTHORITY_CONTRACT) failures.push('timeAuthority contract is unsupported');
   if (authorityId !== 'control-room-runtime') failures.push('timeAuthority authorityId must be control-room-runtime');
   if (receiptProject !== projectSlug) failures.push('timeAuthority projectSlug does not match evaluated project');
-  if (receiptHead.toLowerCase() !== expectedHeadSha.toLowerCase()) {
-    failures.push('timeAuthority expectedHeadSha does not match evaluated head');
-  }
-  if (receiptPolicyDigest !== expectedPolicyDigest) {
-    failures.push('timeAuthority policyDigest does not match evaluated policy');
-  }
-  if (!/^fcr-time:[0-9a-f]{64}$/i.test(provenanceId)) {
-    failures.push('timeAuthority provenanceId must be an fcr-time sha256 receipt id');
-  }
+  if (receiptHead.toLowerCase() !== expectedHeadSha.toLowerCase()) failures.push('timeAuthority expectedHeadSha does not match evaluated head');
+  if (receiptPolicyDigest !== expectedPolicyDigest) failures.push('timeAuthority policyDigest does not match evaluated policy');
+  if (!/^fcr-time:[0-9a-f]{64}$/i.test(provenanceId)) failures.push('timeAuthority provenanceId must be an fcr-time sha256 receipt id');
 
   const evaluatedAtMs = Date.parse(evaluatedAt);
   const validUntilMs = Date.parse(validUntil);
   if (!evaluatedAt || Number.isNaN(evaluatedAtMs)) failures.push('timeAuthority evaluatedAt must be an ISO-compatible timestamp');
   if (!validUntil || Number.isNaN(validUntilMs)) failures.push('timeAuthority validUntil must be an ISO-compatible timestamp');
-  if (!Number.isNaN(evaluatedAtMs) && !Number.isNaN(validUntilMs) && validUntilMs < evaluatedAtMs) {
-    failures.push('timeAuthority validUntil must not precede evaluatedAt');
-  }
+  if (!Number.isNaN(evaluatedAtMs) && !Number.isNaN(validUntilMs) && validUntilMs < evaluatedAtMs) failures.push('timeAuthority validUntil must not precede evaluatedAt');
 
   return {
     authority: {
@@ -410,28 +406,16 @@ function normalizeEvidenceEntry(raw: unknown, index: number): {
   }
 
   const kindRaw = record.kind;
-  const kind = typeof kindRaw === 'string' && EVIDENCE_KINDS.has(kindRaw as FcrEvidenceKind)
-    ? kindRaw as FcrEvidenceKind
-    : 'artifact';
-  if (typeof kindRaw !== 'string' || !EVIDENCE_KINDS.has(kindRaw as FcrEvidenceKind)) {
-    failures.push(`evidence ${evidenceId || `<index:${index}>`} has unsupported kind: ${String(kindRaw)}`);
-  }
+  const kind = typeof kindRaw === 'string' && EVIDENCE_KINDS.has(kindRaw as FcrEvidenceKind) ? kindRaw as FcrEvidenceKind : 'artifact';
+  if (typeof kindRaw !== 'string' || !EVIDENCE_KINDS.has(kindRaw as FcrEvidenceKind)) failures.push(`evidence ${evidenceId || `<index:${index}>`} has unsupported kind: ${String(kindRaw)}`);
 
   const verdictRaw = record.verdict;
-  const verdict = typeof verdictRaw === 'string' && EVIDENCE_VERDICTS.has(verdictRaw as FcrEvidenceVerdict)
-    ? verdictRaw as FcrEvidenceVerdict
-    : 'INCONCLUSIVE';
-  if (typeof verdictRaw !== 'string' || !EVIDENCE_VERDICTS.has(verdictRaw as FcrEvidenceVerdict)) {
-    failures.push(`evidence ${evidenceId || `<index:${index}>`} has unsupported verdict: ${String(verdictRaw)}`);
-  }
+  const verdict = typeof verdictRaw === 'string' && EVIDENCE_VERDICTS.has(verdictRaw as FcrEvidenceVerdict) ? verdictRaw as FcrEvidenceVerdict : 'INCONCLUSIVE';
+  if (typeof verdictRaw !== 'string' || !EVIDENCE_VERDICTS.has(verdictRaw as FcrEvidenceVerdict)) failures.push(`evidence ${evidenceId || `<index:${index}>`} has unsupported verdict: ${String(verdictRaw)}`);
 
   const sourceRaw = record.source;
-  const source = typeof sourceRaw === 'string' && EVIDENCE_SOURCES.has(sourceRaw as FcrEvidenceSource)
-    ? sourceRaw as FcrEvidenceSource
-    : 'manual';
-  if (typeof sourceRaw !== 'string' || !EVIDENCE_SOURCES.has(sourceRaw as FcrEvidenceSource)) {
-    failures.push(`evidence ${evidenceId || `<index:${index}>`} has unsupported source: ${String(sourceRaw)}`);
-  }
+  const source = typeof sourceRaw === 'string' && EVIDENCE_SOURCES.has(sourceRaw as FcrEvidenceSource) ? sourceRaw as FcrEvidenceSource : 'manual';
+  if (typeof sourceRaw !== 'string' || !EVIDENCE_SOURCES.has(sourceRaw as FcrEvidenceSource)) failures.push(`evidence ${evidenceId || `<index:${index}>`} has unsupported source: ${String(sourceRaw)}`);
 
   const optionalMetric = (name: string): number | undefined => {
     if (!(name in record) || record[name] === undefined) return undefined;
@@ -448,11 +432,8 @@ function normalizeEvidenceEntry(raw: unknown, index: number): {
   let attempts: number | undefined;
   if ('attempts' in record && record.attempts !== undefined) {
     const value = asFiniteNumber(record.attempts);
-    if (value === null || !Number.isInteger(value) || value < 1) {
-      failures.push(`evidence ${evidenceId || `<index:${index}>`} attempts must be an integer of at least 1`);
-    } else {
-      attempts = value;
-    }
+    if (value === null || !Number.isInteger(value) || value < 1) failures.push(`evidence ${evidenceId || `<index:${index}>`} attempts must be an integer of at least 1`);
+    else attempts = value;
   }
 
   if (!evidenceId.trim()) failures.push('evidenceId is required');
@@ -460,9 +441,7 @@ function normalizeEvidenceEntry(raw: unknown, index: number): {
   if (!executionId.trim()) failures.push(`evidence ${evidenceId || `<index:${index}>`} executionId is required`);
   if (!provenanceId.trim()) failures.push(`evidence ${evidenceId || `<index:${index}>`} provenanceId is required`);
   if (!FULL_SHA.test(requestedHeadSha)) failures.push(`evidence ${evidenceId || `<index:${index}>`} requestedHeadSha is invalid`);
-  if (observedHeadSha !== null && !FULL_SHA.test(observedHeadSha)) {
-    failures.push(`evidence ${evidenceId || `<index:${index}>`} observedHeadSha is invalid`);
-  }
+  if (observedHeadSha !== null && !FULL_SHA.test(observedHeadSha)) failures.push(`evidence ${evidenceId || `<index:${index}>`} observedHeadSha is invalid`);
   if (!observedAt || Number.isNaN(Date.parse(observedAt))) failures.push(`evidence ${evidenceId || `<index:${index}>`} observedAt is invalid`);
 
   return {
@@ -501,18 +480,8 @@ function executionVerdict(entries: FcrEvidenceLedgerEntry[]): FcrEvidenceVerdict
   return 'PASS';
 }
 
-function executionMetric(
-  entries: FcrEvidenceLedgerEntry[],
-  field: 'latencyMs' | 'costUsd' | 'attempts',
-  failures: string[],
-): number | null {
-  const values = unique(
-    entries
-      .map((entry) => entry[field])
-      .filter((value): value is number => typeof value === 'number')
-      .map(String),
-  ).map(Number);
-
+function executionMetric(entries: FcrEvidenceLedgerEntry[], field: 'latencyMs' | 'costUsd' | 'attempts', failures: string[]): number | null {
+  const values = unique(entries.map((entry) => entry[field]).filter((value): value is number => typeof value === 'number').map(String)).map(Number);
   if (values.length === 0) return null;
   if (values.length > 1) {
     failures.push(`execution ${entries[0].executionId} has conflicting ${field} telemetry`);
@@ -521,29 +490,17 @@ function executionMetric(
   return values[0];
 }
 
-function executionIsFresh(
-  entries: FcrEvidenceLedgerEntry[],
-  evaluatedAtMs: number,
-  maxEvidenceAgeMs: number,
-): boolean {
+function executionIsFresh(entries: FcrEvidenceLedgerEntry[], evaluatedAtMs: number, maxEvidenceAgeMs: number): boolean {
   if (Number.isNaN(evaluatedAtMs)) return false;
   return entries.every((entry) => {
     const observedAtMs = Date.parse(entry.observedAt);
-    return !Number.isNaN(observedAtMs)
-      && observedAtMs <= evaluatedAtMs
-      && evaluatedAtMs - observedAtMs <= maxEvidenceAgeMs;
+    return !Number.isNaN(observedAtMs) && observedAtMs <= evaluatedAtMs && evaluatedAtMs - observedAtMs <= maxEvidenceAgeMs;
   });
 }
 
-export function normalizeCapabilityReceiptEvidence(
-  input: NormalizeCapabilityReceiptEvidenceInput,
-): NormalizeCapabilityReceiptEvidenceResult {
+export function normalizeCapabilityReceiptEvidence(input: NormalizeCapabilityReceiptEvidenceInput): NormalizeCapabilityReceiptEvidenceResult {
   const integrityFailures: string[] = [];
-  const empty = (): NormalizeCapabilityReceiptEvidenceResult => ({
-    evidence: [],
-    integrityFailures: unique(integrityFailures),
-    authenticity: 'checksum-only-unverified',
-  });
+  const empty = (): NormalizeCapabilityReceiptEvidenceResult => ({ evidence: [], integrityFailures: unique(integrityFailures), authenticity: 'checksum-only-unverified' });
 
   if (!isRecord(input)) {
     integrityFailures.push('capability receipt normalization input must be an object');
@@ -554,27 +511,35 @@ export function normalizeCapabilityReceiptEvidence(
   const projectSlug = asString(raw.projectSlug) ?? '';
   const request = raw.request;
   const receipt = raw.receipt;
+  const founderDecision = raw.founderDecision;
+  const founderContext = raw.founderContext;
+  const evaluatedAt = asFiniteNumber(raw.evaluatedAt);
+
   if (!projectSlug.trim()) integrityFailures.push('projectSlug is required for capability receipt normalization');
   if (!isRecord(request)) integrityFailures.push('capability request must be an object');
   if (!isRecord(receipt)) integrityFailures.push('capability receipt must be an object');
+  if (!isRecord(founderDecision)) integrityFailures.push('founder decision authorization is required before evidence normalization');
+  if (!isRecord(founderContext)) integrityFailures.push('authenticated founder context is required before evidence normalization');
+  if (evaluatedAt === null) integrityFailures.push('finite evaluation time is required before evidence normalization');
   if (integrityFailures.length > 0) return empty();
 
   const typedRequest = request as unknown as CapabilityRequestV1;
   const typedReceipt = receipt as unknown as CapabilityReceiptV1;
+  const typedDecision = founderDecision as unknown as FounderDecisionReceiptV0;
+  const typedFounderContext = founderContext as unknown as AuthenticatedFounderContextV0;
   try {
     integrityFailures.push(...validateCapabilityRequest(typedRequest));
     integrityFailures.push(...validateCapabilityReceipt(typedRequest, typedReceipt));
+    integrityFailures.push(...validateCapabilityRequestDecisionBinding(typedRequest, typedDecision, evaluatedAt, typedFounderContext));
   } catch {
-    integrityFailures.push('capability receipt validation failed at the runtime boundary');
+    integrityFailures.push('capability receipt or founder authorization validation failed at the runtime boundary');
   }
 
   const requestProject = isRecord(typedRequest.args) ? asString(typedRequest.args.projectSlug) ?? '' : '';
   if (!requestProject) integrityFailures.push('capability request does not carry a project binding');
   else if (requestProject !== projectSlug) integrityFailures.push('capability request project does not match normalization project');
 
-  if ((receipt as Record<string, unknown>).execution !== 'COMPLETED') {
-    integrityFailures.push('capability receipt execution must be COMPLETED before evidence normalization');
-  }
+  if ((receipt as Record<string, unknown>).execution !== 'COMPLETED') integrityFailures.push('capability receipt execution must be COMPLETED before evidence normalization');
   if (integrityFailures.length > 0) return empty();
 
   return {
@@ -609,12 +574,7 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
   const { policy, failures: policyFailures } = normalizePolicy(rawInput.policy);
   blockers.push(...policyFailures);
   const evaluatedPolicyDigest = computeEvidenceScalePolicyDigest(policy);
-  const { authority: timeAuthority, failures: timeAuthorityFailures } = normalizeTimeAuthority(
-    rawInput.timeAuthority,
-    projectSlug,
-    expectedHeadSha,
-    evaluatedPolicyDigest,
-  );
+  const { authority: timeAuthority, failures: timeAuthorityFailures } = normalizeTimeAuthority(rawInput.timeAuthority, projectSlug, expectedHeadSha, evaluatedPolicyDigest);
   blockers.push(...timeAuthorityFailures);
 
   const evidenceRaw = Array.isArray(rawInput.evidence) ? rawInput.evidence : [];
@@ -635,25 +595,15 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
     if (provenanceIds.has(entry.provenanceId)) integrityFailures.push(`duplicate provenanceId: ${entry.provenanceId}`);
     else provenanceIds.add(entry.provenanceId);
 
-    if (entry.projectSlug !== projectSlug) {
-      integrityFailures.push(`evidence ${entry.evidenceId || '<missing>'} projectSlug does not match evaluated project`);
-    }
-    if (
-      entry.verdict === 'PASS'
-      && entry.requestedHeadSha.toLowerCase() === expectedHeadSha.toLowerCase()
-      && entry.observedHeadSha?.toLowerCase() !== expectedHeadSha.toLowerCase()
-    ) {
-      integrityFailures.push(`PASS evidence ${entry.evidenceId || '<missing>'} is not bound to the exact expected head`);
-    }
+    if (entry.projectSlug !== projectSlug) integrityFailures.push(`evidence ${entry.evidenceId || '<missing>'} projectSlug does not match evaluated project`);
+    if (entry.verdict === 'PASS' && entry.requestedHeadSha.toLowerCase() === expectedHeadSha.toLowerCase() && entry.observedHeadSha?.toLowerCase() !== expectedHeadSha.toLowerCase()) integrityFailures.push(`PASS evidence ${entry.evidenceId || '<missing>'} is not bound to the exact expected head`);
   }
 
   const evaluatedAtMs = Date.parse(timeAuthority.evaluatedAt);
   const validUntilMs = Date.parse(timeAuthority.validUntil);
   for (const entry of evidence) {
     const observedAtMs = Date.parse(entry.observedAt);
-    if (!Number.isNaN(evaluatedAtMs) && !Number.isNaN(observedAtMs) && observedAtMs > evaluatedAtMs) {
-      integrityFailures.push(`evidence ${entry.evidenceId || '<missing>'} is dated after the evaluation window`);
-    }
+    if (!Number.isNaN(evaluatedAtMs) && !Number.isNaN(observedAtMs) && observedAtMs > evaluatedAtMs) integrityFailures.push(`evidence ${entry.evidenceId || '<missing>'} is dated after the evaluation window`);
   }
   blockers.push(...integrityFailures);
 
@@ -670,15 +620,10 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
     if (validUntilMs > allowedValidityEnd) blockers.push('timeAuthority validity exceeds the maximum evidence freshness window');
   }
 
-  const successfulExecutionGroups = freshExecutionGroups.filter((entries) =>
-    executionVerdict(entries) === 'PASS'
-    && entries.every((entry) => entry.observedHeadSha?.toLowerCase() === expectedHead),
-  );
+  const successfulExecutionGroups = freshExecutionGroups.filter((entries) => executionVerdict(entries) === 'PASS' && entries.every((entry) => entry.observedHeadSha?.toLowerCase() === expectedHead));
   const satisfiedKinds = new Set(successfulExecutionGroups.flat().map((entry) => entry.kind));
   const missingKinds = policy.requiredEvidenceKinds.filter((kind) => !satisfiedKinds.has(kind));
-  const proofCoverage = policy.requiredEvidenceKinds.length === 0
-    ? 0
-    : (policy.requiredEvidenceKinds.length - missingKinds.length) / policy.requiredEvidenceKinds.length;
+  const proofCoverage = policy.requiredEvidenceKinds.length === 0 ? 0 : (policy.requiredEvidenceKinds.length - missingKinds.length) / policy.requiredEvidenceKinds.length;
 
   const executionVerdicts = freshExecutionGroups.map(executionVerdict);
   const freshExactHeadPasses = successfulExecutionGroups.length;
@@ -688,26 +633,14 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
 
   if (evidence.length === 0) blockers.push('no evidence supplied');
   for (const kind of missingKinds) blockers.push(`missing fresh exact-head PASS execution for required kind: ${kind}`);
-  if (freshExactHeadPasses < policy.minFreshExactHeadPasses) {
-    blockers.push(`fresh exact-head PASS executions ${freshExactHeadPasses} are below required ${policy.minFreshExactHeadPasses}`);
-  }
-  if (passRate === null || passRate < policy.minPassRate) {
-    blockers.push(`pass rate ${passRate === null ? 'unavailable' : passRate.toFixed(4)} is below required ${policy.minPassRate}`);
-  }
-  if (failureRate === null || failureRate > policy.maxFailureRate) {
-    blockers.push(`failure rate ${failureRate === null ? 'unavailable' : failureRate.toFixed(4)} exceeds allowed ${policy.maxFailureRate}`);
-  }
+  if (freshExactHeadPasses < policy.minFreshExactHeadPasses) blockers.push(`fresh exact-head PASS executions ${freshExactHeadPasses} are below required ${policy.minFreshExactHeadPasses}`);
+  if (passRate === null || passRate < policy.minPassRate) blockers.push(`pass rate ${passRate === null ? 'unavailable' : passRate.toFixed(4)} is below required ${policy.minPassRate}`);
+  if (failureRate === null || failureRate > policy.maxFailureRate) blockers.push(`failure rate ${failureRate === null ? 'unavailable' : failureRate.toFixed(4)} exceeds allowed ${policy.maxFailureRate}`);
 
   const telemetryFailures: string[] = [];
-  const latencySamples = freshExecutionGroups
-    .map((entries) => executionMetric(entries, 'latencyMs', telemetryFailures))
-    .filter((value): value is number => value !== null);
-  const costSamples = freshExecutionGroups
-    .map((entries) => executionMetric(entries, 'costUsd', telemetryFailures))
-    .filter((value): value is number => value !== null);
-  const attemptSamples = freshExecutionGroups
-    .map((entries) => executionMetric(entries, 'attempts', telemetryFailures))
-    .filter((value): value is number => value !== null);
+  const latencySamples = freshExecutionGroups.map((entries) => executionMetric(entries, 'latencyMs', telemetryFailures)).filter((value): value is number => value !== null);
+  const costSamples = freshExecutionGroups.map((entries) => executionMetric(entries, 'costUsd', telemetryFailures)).filter((value): value is number => value !== null);
+  const attemptSamples = freshExecutionGroups.map((entries) => executionMetric(entries, 'attempts', telemetryFailures)).filter((value): value is number => value !== null);
   blockers.push(...telemetryFailures);
   integrityFailures.push(...telemetryFailures);
 
@@ -719,26 +652,14 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
   const retryRate = attemptSamples.length === 0 ? null : attemptSamples.filter((value) => value > 1).length / attemptSamples.length;
   const retryCoverage = ratio(attemptSamples.length, freshExecutionGroups.length);
 
-  if (policy.maxP95LatencyMs !== undefined && latencyCoverage !== 1) {
-    blockers.push(`latency telemetry coverage ${latencyCoverage === null ? 'unavailable' : latencyCoverage.toFixed(4)} is below required 1`);
-  }
-  if (policy.maxCostPerPassUsd !== undefined && costCoverage !== 1) {
-    blockers.push(`cost telemetry coverage ${costCoverage === null ? 'unavailable' : costCoverage.toFixed(4)} is below required 1`);
-  }
-  if (policy.maxRetryRate !== undefined && retryCoverage !== 1) {
-    blockers.push(`retry telemetry coverage ${retryCoverage === null ? 'unavailable' : retryCoverage.toFixed(4)} is below required 1`);
-  }
+  if (policy.maxP95LatencyMs !== undefined && latencyCoverage !== 1) blockers.push(`latency telemetry coverage ${latencyCoverage === null ? 'unavailable' : latencyCoverage.toFixed(4)} is below required 1`);
+  if (policy.maxCostPerPassUsd !== undefined && costCoverage !== 1) blockers.push(`cost telemetry coverage ${costCoverage === null ? 'unavailable' : costCoverage.toFixed(4)} is below required 1`);
+  if (policy.maxRetryRate !== undefined && retryCoverage !== 1) blockers.push(`retry telemetry coverage ${retryCoverage === null ? 'unavailable' : retryCoverage.toFixed(4)} is below required 1`);
 
   const recommendations: FcrOptimizationRecommendation[] = [];
-  if (policy.maxP95LatencyMs !== undefined && latencyCoverage === 1 && p95LatencyMs !== null && p95LatencyMs > policy.maxP95LatencyMs) {
-    recommendations.push({ code: 'reduce_latency', reason: 'Observed latency exceeds the declared policy budget.', observed: p95LatencyMs, threshold: policy.maxP95LatencyMs });
-  }
-  if (policy.maxCostPerPassUsd !== undefined && costCoverage === 1 && costPerPassUsd !== null && costPerPassUsd > policy.maxCostPerPassUsd) {
-    recommendations.push({ code: 'reduce_cost', reason: 'Observed cost per PASS exceeds the declared policy budget.', observed: costPerPassUsd, threshold: policy.maxCostPerPassUsd });
-  }
-  if (policy.maxRetryRate !== undefined && retryCoverage === 1 && retryRate !== null && retryRate > policy.maxRetryRate) {
-    recommendations.push({ code: 'reduce_retries', reason: 'Observed retry rate exceeds the declared policy budget.', observed: retryRate, threshold: policy.maxRetryRate });
-  }
+  if (policy.maxP95LatencyMs !== undefined && latencyCoverage === 1 && p95LatencyMs !== null && p95LatencyMs > policy.maxP95LatencyMs) recommendations.push({ code: 'reduce_latency', reason: 'Observed latency exceeds the declared policy budget.', observed: p95LatencyMs, threshold: policy.maxP95LatencyMs });
+  if (policy.maxCostPerPassUsd !== undefined && costCoverage === 1 && costPerPassUsd !== null && costPerPassUsd > policy.maxCostPerPassUsd) recommendations.push({ code: 'reduce_cost', reason: 'Observed cost per PASS exceeds the declared policy budget.', observed: costPerPassUsd, threshold: policy.maxCostPerPassUsd });
+  if (policy.maxRetryRate !== undefined && retryCoverage === 1 && retryRate !== null && retryRate > policy.maxRetryRate) recommendations.push({ code: 'reduce_retries', reason: 'Observed retry rate exceeds the declared policy budget.', observed: retryRate, threshold: policy.maxRetryRate });
 
   const uniqueBlockers = unique(blockers);
   const proofBlocked = uniqueBlockers.length > 0;
@@ -757,25 +678,9 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
     expiresAt: timeAuthority.validUntil,
     clockSource: 'declared-unverified',
     timeAuthority,
-    authority: {
-      status: 'unverified',
-      scaleReviewAllowed: false,
-      blockers: authorityBlockers,
-    },
-    policy: {
-      policyId: policy.policyId,
-      policyVersion: policy.policyVersion,
-      digest: evaluatedPolicyDigest,
-      source: 'unverified-input',
-      thresholds: stablePolicySnapshot(policy),
-    },
-    ledger: {
-      authenticity: 'unverified-input',
-      evidenceIds: evidence.map((entry) => entry.evidenceId),
-      executionIds: unique(evidence.map((entry) => entry.executionId)),
-      provenanceIds: evidence.map((entry) => entry.provenanceId),
-      integrityFailures: unique(integrityFailures),
-    },
+    authority: { status: 'unverified', scaleReviewAllowed: false, blockers: authorityBlockers },
+    policy: { policyId: policy.policyId, policyVersion: policy.policyVersion, digest: evaluatedPolicyDigest, source: 'unverified-input', thresholds: stablePolicySnapshot(policy) },
+    ledger: { authenticity: 'unverified-input', evidenceIds: evidence.map((entry) => entry.evidenceId), executionIds: unique(evidence.map((entry) => entry.executionId)), provenanceIds: evidence.map((entry) => entry.provenanceId), integrityFailures: unique(integrityFailures) },
     metrics: {
       totalEntries: evidence.length,
       historicalEntries,
@@ -795,15 +700,8 @@ export function evaluateEvidenceScaleGate(input: FcrEvidenceScaleInput): FcrEvid
       costCoverage,
       retryCoverage,
     },
-    evaluation: {
-      status: proofBlocked ? 'blocked' : 'meets_untrusted_proof_floor',
-      blockers: uniqueBlockers,
-    },
-    optimization: {
-      status: proofBlocked ? 'blocked_by_proof' : recommendations.length > 0 ? 'candidate' : 'none',
-      recommendations,
-      executionAllowed: false,
-    },
+    evaluation: { status: proofBlocked ? 'blocked' : 'meets_untrusted_proof_floor', blockers: uniqueBlockers },
+    optimization: { status: proofBlocked ? 'blocked_by_proof' : recommendations.length > 0 ? 'candidate' : 'none', recommendations, executionAllowed: false },
     scaleGate: {
       status: 'blocked',
       candidate,
