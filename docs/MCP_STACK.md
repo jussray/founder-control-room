@@ -1,6 +1,6 @@
 # Founder Control Room MCP stack
 
-Last reviewed: 2026-08-18
+Last reviewed: 2026-08-25
 
 This file governs which MCP servers an AI agent may use while **developing this repository**. It is different from the Control Room's own **MCP / Connector Hub** (`project_connections` + `GET /agents` + `GET /authority-levels`), which records connectors and authority for managed projects. Do not conflate the repository agent fleet with the in-app Connector Hub.
 
@@ -21,6 +21,20 @@ The Control Room is a private, repository-agnostic governance service. Its stand
 | `cloudflare-bindings` | Inspect Worker bindings and project wiring | Binding mutations remain separately approved |
 | `cloudflare-builds` | Inspect Control Room Worker build evidence | No deploy or setting changes without separate approval |
 | `cloudflare-observability` | Inspect sanitized runtime logs and analytics | Never query or paste access tokens, service-role keys, founder sessions, or raw project payloads |
+
+## Served remote read MCP boundary
+
+Founder Control Room also serves a separate read-only MCP gateway at `POST https://api.foundercontrolroom.org/mcp/read`. This is the remote bridge intended for external MCP clients that need governed repository/provider reads without inheriting Founder Control Room execution authority.
+
+- Authentication uses the dedicated Worker secret `FCR_REMOTE_MCP_READ_TOKEN`. It must not be reused for the write-capable Founder Signal Engine MCP or any provider credential.
+- Production project scope is server-held as `FCR_REMOTE_MCP_READ_PROJECTS=chief-ai-machine,founder-control-room`. Callers cannot add or substitute a project slug in order to widen the grant.
+- The gateway advertises only `list_read_servers` and `invoke_read_tool`; both remain behind the in-app MCP registry and policy boundary.
+- Provider tools still have to pass the configured server allowlist/denylist. A tool name matching create/update/delete/merge/write authority remains blocked by the underlying FCR MCP policy.
+- Mission IDs, approval IDs, bearer tokens, and other authority-bearing fields are not accepted as tool arguments. Nested secret-bearing arguments are rejected before the provider boundary.
+- If either the dedicated token or server-held project scope is absent, the endpoint fails closed rather than falling back to a broader grant.
+- The secret value belongs in the surviving `founder-control-room` Worker secret store only. Do not commit it to `.env`, Wrangler config, MCP client config, issues, screenshots, logs, or proof artifacts.
+
+This gateway is intentionally narrower than the full portfolio registry. Expanding it beyond Chief AI + Founder Control Room requires a separate authority decision and matching contract update.
 
 ## In-app Control Room MCP Hub boundary
 
