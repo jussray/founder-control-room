@@ -52,6 +52,7 @@ describe("SecurityPreservingGitHubProvider", () => {
             parameters: {
               required_approving_review_count: 1,
               dismiss_stale_reviews_on_push: true,
+              require_code_owner_review: true,
               require_last_push_approval: true,
               required_review_thread_resolution: true,
               require_extra_approval_for_unattributed_changes: true,
@@ -114,6 +115,7 @@ describe("SecurityPreservingGitHubProvider", () => {
     expect(pullRequest.parameters).toMatchObject({
       required_approving_review_count: 1,
       dismiss_stale_reviews_on_push: true,
+      require_code_owner_review: true,
       require_last_push_approval: true,
       required_review_thread_resolution: true,
       require_extra_approval_for_unattributed_changes: true,
@@ -136,7 +138,7 @@ describe("SecurityPreservingGitHubProvider", () => {
     });
   });
 
-  it("preserves existing bypass posture when the caller leaves bypassActors undefined", async () => {
+  it.each([undefined, []])("preserves existing bypass posture when caller supplies %s", async (bypassActors) => {
     mockGetRepoRuleset.mockResolvedValueOnce({
       data: {
         id: 21261587,
@@ -156,6 +158,7 @@ describe("SecurityPreservingGitHubProvider", () => {
       requiredStatusCheckNames: [],
       blockForcePushes: false,
       blockDeletion: false,
+      ...(bypassActors === undefined ? {} : { bypassActors }),
     });
 
     expect(mockUpdateRepoRuleset.mock.calls[0][0].bypass_actors).toEqual([
