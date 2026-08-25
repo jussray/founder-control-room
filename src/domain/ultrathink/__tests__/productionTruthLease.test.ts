@@ -106,6 +106,68 @@ describe('ULTRATHINK production truth lease', () => {
     expect(evaluateProductionTruthLease(lease({ sourceAuthority })).result).toBe('fail');
   });
 
+  it('fails when source SHA differs from the production artifact source SHA', () => {
+    const sourceAuthority = authorityRecord({
+      deployment: {
+        providerProject: 'founder-control-room',
+        deploymentId: 'deployment-mismatch-source-artifact',
+        artifactSourceSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        evidenceRef: 'cloudflare:deployment-mismatch-source-artifact',
+      },
+    });
+
+    expect(evaluateProductionTruthLease(lease({ sourceAuthority })).result).toBe('fail');
+  });
+
+  it('fails when the production artifact source SHA differs from the runtime release identity', () => {
+    const sourceAuthority = authorityRecord({
+      deployment: {
+        providerProject: 'founder-control-room',
+        deploymentId: 'deployment-mismatch-artifact-runtime',
+        artifactSourceSha: SHA,
+        evidenceRef: 'cloudflare:deployment-mismatch-artifact-runtime',
+      },
+      runtime: {
+        canonicalUrl: 'https://foundercontrolroom.org',
+        releaseIdentity: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        evidenceRef: 'runtime:mismatch-artifact-runtime',
+      },
+    });
+
+    expect(evaluateProductionTruthLease(lease({ sourceAuthority })).result).toBe('fail');
+  });
+
+  it('blocks when production artifact source SHA is missing', () => {
+    const sourceAuthority = authorityRecord({
+      deployment: {
+        providerProject: 'founder-control-room',
+        deploymentId: 'deployment-missing-artifact-source',
+        artifactSourceSha: '',
+        evidenceRef: 'cloudflare:deployment-missing-artifact-source',
+      },
+    });
+
+    expect(evaluateProductionTruthLease(lease({ sourceAuthority }))).toEqual({
+      result: 'blocked',
+      reason: 'source authority is not canonical',
+    });
+  });
+
+  it('blocks when canonical runtime release identity is missing', () => {
+    const sourceAuthority = authorityRecord({
+      runtime: {
+        canonicalUrl: 'https://foundercontrolroom.org',
+        releaseIdentity: '',
+        evidenceRef: 'runtime:missing-release-identity',
+      },
+    });
+
+    expect(evaluateProductionTruthLease(lease({ sourceAuthority }))).toEqual({
+      result: 'blocked',
+      reason: 'source authority is not canonical',
+    });
+  });
+
   it('blocks when source authority is unknown', () => {
     const sourceAuthority = authorityRecord({ deployment: undefined });
 
