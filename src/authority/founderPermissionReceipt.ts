@@ -44,6 +44,10 @@ export type FounderPermissionValidation =
   | { ok: true; receipt: FounderPermissionReceipt }
   | { ok: false; reason: FounderPermissionFailure | Exclude<AuthorityReceiptV2Validation, { ok: true }>['reason'] };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 function canonicalScope(scope: readonly string[]): string[] {
   return [...scope].map((value) => value.trim()).filter(Boolean).sort();
 }
@@ -52,19 +56,41 @@ function decisionMatchesReceipt(
   decision: FounderPermissionDecisionSnapshot,
   receipt: FounderPermissionReceipt,
 ): boolean {
-  return decision.decision === 'approved'
-    && decision.founderId === FOUNDER_PERMISSION_ISSUER_ID
-    && decision.subject.repo === receipt.subject.repo
-    && decision.subject.headSha.toLowerCase() === receipt.subject.headSha.toLowerCase()
-    && decision.subject.baseSha.toLowerCase() === receipt.subject.baseSha.toLowerCase()
-    && JSON.stringify(canonicalScope(decision.scope)) === JSON.stringify(canonicalScope(receipt.scope))
-    && decision.action.type === receipt.action.type
-    && decision.action.target === receipt.action.target
-    && decision.action.digest.toLowerCase() === receipt.action.digest.toLowerCase()
-    && decision.expiresAt === receipt.expiresAt
+  const rawDecision = decision as unknown;
+  if (!isRecord(rawDecision)) return false;
+
+  const subject = isRecord(rawDecision.subject) ? rawDecision.subject : null;
+  const action = isRecord(rawDecision.action) ? rawDecision.action : null;
+  const scope = Array.isArray(rawDecision.scope) && rawDecision.scope.every((value) => typeof value === 'string')
+    ? rawDecision.scope as string[]
+    : null;
+  if (!subject || !action || !scope) return false;
+
+  const decisionId = typeof rawDecision.decisionId === 'string' ? rawDecision.decisionId : '';
+  const founderId = typeof rawDecision.founderId === 'string' ? rawDecision.founderId : '';
+  const decisionState = typeof rawDecision.decision === 'string' ? rawDecision.decision : '';
+  const expiresAt = typeof rawDecision.expiresAt === 'string' ? rawDecision.expiresAt : '';
+  const repo = typeof subject.repo === 'string' ? subject.repo : '';
+  const headSha = typeof subject.headSha === 'string' ? subject.headSha : '';
+  const baseSha = typeof subject.baseSha === 'string' ? subject.baseSha : '';
+  const actionType = typeof action.type === 'string' ? action.type : '';
+  const actionTarget = typeof action.target === 'string' ? action.target : '';
+  const actionDigest = typeof action.digest === 'string' ? action.digest : '';
+
+  return decisionState === 'approved'
+    && founderId === FOUNDER_PERMISSION_ISSUER_ID
+    && repo === receipt.subject.repo
+    && headSha.toLowerCase() === receipt.subject.headSha.toLowerCase()
+    && baseSha.toLowerCase() === receipt.subject.baseSha.toLowerCase()
+    && JSON.stringify(canonicalScope(scope)) === JSON.stringify(canonicalScope(receipt.scope))
+    && actionType === receipt.action.type
+    && actionTarget === receipt.action.target
+    && actionDigest.toLowerCase() === receipt.action.digest.toLowerCase()
+    && expiresAt === receipt.expiresAt
+    && decisionId.length > 0
     && receipt.evidence.some((item) =>
       item.class === 'human-approval'
-      && item.ref === `fcr:founder-decision:${decision.decisionId}`
+      && item.ref === `fcr:founder-decision:${decisionId}`
     );
 }
 
