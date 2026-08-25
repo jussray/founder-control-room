@@ -28,6 +28,7 @@ set search_path = public, pg_temp
 as $$
 declare
   inserted_count integer;
+  normalized_head_sha text;
 begin
   if p_receipt_id is null or btrim(p_receipt_id) = '' then
     raise exception 'receipt_id is required';
@@ -35,12 +36,14 @@ begin
   if p_repository is null or btrim(p_repository) = '' then
     raise exception 'repository is required';
   end if;
-  if p_head_sha !~ '^[0-9a-f]{40}$' then
-    raise exception 'head_sha must be a lowercase 40-character commit SHA';
+  if p_head_sha !~* '^[0-9a-f]{40}$' then
+    raise exception 'head_sha must be a 40-character hexadecimal commit SHA';
   end if;
   if p_action_type is null or btrim(p_action_type) = '' then
     raise exception 'action_type is required';
   end if;
+
+  normalized_head_sha := lower(p_head_sha);
 
   insert into public.authority_receipt_consumptions (
     receipt_id,
@@ -52,7 +55,7 @@ begin
     p_receipt_id,
     p_consumed_at,
     p_repository,
-    p_head_sha,
+    normalized_head_sha,
     p_action_type
   )
   on conflict (receipt_id) do nothing;
