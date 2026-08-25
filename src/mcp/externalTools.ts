@@ -1,6 +1,8 @@
 import { requestHash } from './safety.js';
 import { hubForMcpProject } from './vaultHub.js';
+import { auditGitHubPullRequest } from './github-truth/audit.js';
 import { supabase } from '../lib/supabaseClient.js';
+import { createGitHubPrTruthReader } from '../providers/GitHubPrTruthReader.js';
 import {
   routeFcrSkills,
   type FcrSkillRouterAction,
@@ -9,6 +11,7 @@ import type { V10CapabilityPlan } from '../founder-os-lab/capabilityKernel.js';
 
 export const EXTERNAL_MCP_TOOL_NAMES = [
   'chief_audit_repository',
+  'github_audit_pr',
   'chief_list_capabilities',
   'chief_preview_capability_plan',
   'fcr_list_projects',
@@ -58,6 +61,12 @@ export interface ExternalMcpToolDependencies {
     projectId: string;
     toolName: string;
     arguments: Record<string, unknown>;
+  }) => Promise<unknown>;
+  auditPullRequest?: (input: {
+    projectSlug: string;
+    repository: string;
+    pullNumber: number;
+    expectedHeadSha?: string;
   }) => Promise<unknown>;
   listProjects?: (allowedProjects: ReadonlySet<string>) => Promise<unknown>;
   listCapabilities?: (projectSlug: string) => Promise<unknown>;
@@ -120,6 +129,13 @@ function projectSlug(value: unknown): string {
   return slug;
 }
 
+function positiveInteger(value: unknown, field: string): number {
+  if (!Number.isInteger(value) || (value as number) <= 0 || (value as number) > 2_147_483_647) {
+    throw new Error(`${field} must be a positive integer`);
+  }
+  return value as number;
+}
+
 function allowedProject(slug: string, allowedProjects: ReadonlySet<string>): string {
   if (!allowedProjects.has(slug)) {
     throw new Error('Requested project is outside this remote MCP grant');
@@ -139,6 +155,23 @@ async function defaultInvokeReadTool(input: {
     throw new Error('Remote read MCP refused a non-read policy result.');
   }
   return result;
+}
+
+async function defaultAuditPullRequest(
+  input: {
+    projectSlug: string;
+    repository: string;
+    pullNumber: number;
+    expectedHeadSha?: string;
+  },
+  env: NodeJS.ProcessEnv,
+) {
+  const reader = await createGitHubPrTruthReader(input.repository, env);
+  return auditGitHubPullRequest(reader, {
+    repository: input.repository,
+    pullNumber: input.pullNumber,
+    ...(input.expectedHeadSha ? { expectedHeadSha: input.expectedHeadSha } : {}),
+  });
 }
 
 async function projectRow(slug: string) {
@@ -452,6 +485,23 @@ export function externalMcpToolDefinitions(): JsonRecord[] {
       annotations: { ...readAnnotations, openWorldHint: true },
     },
     {
+      name: 'github_audit_pr',
+      title: 'Audit one Founder Control Room pull request',
+      description:
+        'Read GitHub-native PR, exact-head CI, workflow, review, and changed-file evidence for founder-control-room. Returns an evidence classification and a redacted receipt. It never approves, merges, comments, dispatches, or mutates GitHub.',
+      inputSchema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['projectId', 'pullNumber'],
+        properties: {
+          projectId: { type: 'string', enum: ['founder-control-room'] },
+          pullNumber: { type: 'integer', minimum: 1, maximum: 2147483647 },
+          expectedHeadSha: { type: 'string', pattern: '^[0-9a-fA-F]{40}$' },
+        },
+      },
+      annotations: readAnnotations,
+    },
+    {
       name: 'chief_list_capabilities',
       title: 'List observed Chief capabilities',
       description:
@@ -543,6 +593,8 @@ export function createExternalMcpToolExecutor(
 }) => Promise<JsonRecord> {
   const env = overrides.env ?? process.env;
   const invokeReadTool = overrides.invokeReadTool ?? defaultInvokeReadTool;
+  const auditPullRequest = overrides.auditPullRequest
+    ?? ((input) => defaultAuditPullRequest(input, env));
   const listProjects = overrides.listProjects ?? defaultListProjects;
   const listCapabilities = overrides.listCapabilities ?? defaultListCapabilities;
   const getCurrentTruth = overrides.getCurrentTruth ?? defaultGetCurrentTruth;
@@ -581,6 +633,22 @@ export function createExternalMcpToolExecutor(
           ...(ref ? { ref } : {}),
           ...(acknowledges ? { acknowledges } : {}),
         },
+      });
+    } else if (input.name === 'github_audit_pr') {
+      noUnexpectedKeys(input.arguments, ['projectId', 'pullNumber', 'expectedHeadSha'], input.name);
+      receiptProject = allowedProject(projectSlug(input.arguments.projectId), input.allowedProjects);
+      if (receiptProject !== 'founder-control-room') {
+        throw new Error('github_audit_pr v0 is restricted to founder-control-room');
+      }
+      const expectedHeadSha = optionalText(input.arguments.expectedHeadSha, 'expectedHeadSha', 40);
+      if (expectedHeadSha && !FULL_SHA.test(expectedHeadSha)) {
+        throw new Error('expectedHeadSha must be a full Git SHA');
+      }
+      result = await auditPullRequest({
+        projectSlug: receiptProject,
+        repository: 'jussray/founder-control-room',
+        pullNumber: positiveInteger(input.arguments.pullNumber, 'pullNumber'),
+        ...(expectedHeadSha ? { expectedHeadSha } : {}),
       });
     } else if (input.name === 'chief_list_capabilities') {
       allowedProject('chief-ai-machine', input.allowedProjects);
