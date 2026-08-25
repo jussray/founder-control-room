@@ -34,7 +34,7 @@
     {
       "path": "src/providers/SecurityPreservingGitHubProvider.ts",
       "claims": [
-        "src/providers/SecurityPreservingGitHubProvider.ts: an existing non-FCR named GitHub ruleset must be read before update so the compatibility membrane can preserve stronger provider-owned security and current bypass posture when the caller does not explicitly replace it; brand-new rulesets and FCR's constitutional main path continue through the existing canonical GitHubProvider semantics, and this source contract does not itself prove live provider state."
+        "src/providers/SecurityPreservingGitHubProvider.ts: an existing non-FCR named GitHub ruleset must be read before update and merged monotonically at the top level: enforcement cannot be demoted, existing included branch refs cannot be narrowed away, existing excluded refs are preserved, and explicit bypass replacement fails closed until a separate provider-aware bypass-authority contract can prove the replacement is non-widening; brand-new rulesets and FCR's constitutional main path continue through the existing canonical GitHubProvider semantics, and this source contract does not itself prove live provider state."
       ]
     },
     {
