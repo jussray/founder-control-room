@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   mergeExistingRulesetEnforcement,
   mergeExistingRulesetTargetRefs,
+  requestedRefsRemainingExcluded,
 } from "../SecurityPreservingGitHubProvider.js";
 
 const sourcePath = fileURLToPath(new URL("../SecurityPreservingGitHubProvider.ts", import.meta.url));
@@ -31,15 +32,21 @@ describe("SecurityPreservingGitHubProvider top-level security contract", () => {
     ]);
   });
 
-  it("distinguishes omitted bypass posture from an explicit clear while rejecting replacement", () => {
-    expect(source).toContain("config.bypassActors && config.bypassActors.length > 0");
-    expect(source).toContain("cannot replace existing bypass posture");
-    expect(source).toContain("config.bypassActors === undefined");
-    expect(source).toContain("current.bypass_actors ?? []");
-    expect(source).not.toContain('bypass_mode: "always" as const');
+  it("detects requested refs that remain explicitly excluded", () => {
+    expect(requestedRefsRemainingExcluded(
+      ["main", "release"],
+      ["refs/heads/main", "refs/heads/legacy"],
+    )).toEqual(["refs/heads/main"]);
   });
 
-  it("keeps omitted bypassActors absent from the founder ruleset request payload", () => {
+  it("rejects bypass replacement and never PUT-updates an existing non-FCR ruleset", () => {
+    expect(source).toContain("config.bypassActors && config.bypassActors.length > 0");
+    expect(source).toContain("cannot replace existing bypass posture");
+    expect(source).toContain("existing non-FCR ruleset updates are blocked until a concurrency-safe provider reconciliation contract exists");
+    expect(source).not.toContain("repos.updateRepoRuleset");
+  });
+
+  it("keeps omitted bypassActors distinct from an explicit empty list at the request boundary", () => {
     expect(projectsRouteSource).toContain('const bypassActorsInput = body["bypassActors"];');
     expect(projectsRouteSource).toContain("...(bypassActors !== undefined ? { bypassActors } : {}),");
     expect(projectsRouteSource).not.toContain('Array.isArray(body["bypassActors"]) ? body["bypassActors"] : []');
