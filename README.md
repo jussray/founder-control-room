@@ -117,6 +117,8 @@ Production GitHub authentication should prefer repository-scoped installation cr
 
 For any active ruleset protecting `jussray/founder-control-room` `main`, the only permitted bypass actor is exactly the numeric App identity configured by trusted `GITHUB_APP_ID`. Missing, mismatched, caller-supplied alternative, or additional bypass integration IDs fail closed. `GITHUB_WEBHOOK_SECRET` separately authenticates the signed `/api/webhooks/github` event ingress. Secret values never belong in source, PR bodies, issue comments, logs, screenshots, browser bundles, or chat-visible documentation.
 
+The remote MCP `github_audit_pr` v0 capability is a read-only GitHub evidence audit for `jussray/founder-control-room` only. It binds checks and workflow observations to the initially observed PR head SHA, re-reads the PR head before classification, treats stale or missing CI as incomplete/conflicted evidence, and can return `evidence_complete` for a current failed CI result because completeness describes the evidence set rather than code quality. The tool never grants merge approval, never performs a repository mutation, and writes only the existing redacted external-MCP receipt after a successful audit.
+
 ## Founder-owned progress publishing
 
 The product goal is deliberate: **Founder Control Room should be able to tell verified progress about the founder's own products from the founder's own product without giving away the private recipe.**
@@ -218,7 +220,6 @@ Before naming a current production blocker, re-read current GitHub, Cloudflare, 
 Founder Control Room treats completion as an evidence-bearing state.
 
 For any material claim identify:
-
 1. **State** — what actually changed;
 2. **Evidence** — what proves it;
 3. **Authority** — which system or actor produced that evidence;
