@@ -12,6 +12,7 @@ describe("mergeExistingRulesetSecurity", () => {
         parameters: {
           required_approving_review_count: 2,
           dismiss_stale_reviews_on_push: true,
+          require_code_owner_review: true,
           require_last_push_approval: true,
           required_review_thread_resolution: true,
           require_extra_approval_for_unattributed_changes: true,
@@ -92,10 +93,10 @@ describe("mergeExistingRulesetSecurity", () => {
     expect(pullRequest?.parameters).toMatchObject({
       required_approving_review_count: 2,
       dismiss_stale_reviews_on_push: true,
+      require_code_owner_review: true,
       require_last_push_approval: true,
       required_review_thread_resolution: true,
       require_extra_approval_for_unattributed_changes: true,
-      require_code_owner_review: false,
     });
 
     const statusChecks = merged.find((rule) => rule.type === "required_status_checks");
@@ -106,16 +107,21 @@ describe("mergeExistingRulesetSecurity", () => {
     ]);
   });
 
-  it("preserves an existing pull-request membrane even when a generic caller requests none", () => {
-    const existingRules = [{
-      type: "pull_request",
-      parameters: {
-        required_approving_review_count: 2,
-        dismiss_stale_reviews_on_push: true,
-        require_last_push_approval: true,
-        required_review_thread_resolution: true,
+  it("preserves existing managed protections when a generic caller requests none", () => {
+    const existingRules = [
+      { type: "deletion" },
+      { type: "non_fast_forward" },
+      {
+        type: "pull_request",
+        parameters: {
+          required_approving_review_count: 2,
+          dismiss_stale_reviews_on_push: true,
+          require_code_owner_review: true,
+          require_last_push_approval: true,
+          required_review_thread_resolution: true,
+        },
       },
-    }];
+    ];
 
     const merged = mergeExistingRulesetSecurity({
       existingRules,
@@ -171,6 +177,7 @@ describe("mergeExistingRulesetSecurity", () => {
         parameters: {
           required_approving_review_count: 1,
           dismiss_stale_reviews_on_push: false,
+          require_code_owner_review: false,
           require_last_push_approval: false,
           required_review_thread_resolution: false,
         },
