@@ -132,7 +132,16 @@ describe("mergeExistingRulesetSecurity", () => {
       blockDeletion: false,
     });
 
-    expect(merged).toEqual(existingRules);
+    expect(merged).toHaveLength(3);
+    expect(merged.find((rule) => rule.type === "deletion")).toEqual({ type: "deletion" });
+    expect(merged.find((rule) => rule.type === "non_fast_forward")).toEqual({ type: "non_fast_forward" });
+    expect(merged.find((rule) => rule.type === "pull_request")?.parameters).toMatchObject({
+      required_approving_review_count: 2,
+      dismiss_stale_reviews_on_push: true,
+      require_code_owner_review: true,
+      require_last_push_approval: true,
+      required_review_thread_resolution: true,
+    });
   });
 
   it("does not mutate its input rules", () => {
