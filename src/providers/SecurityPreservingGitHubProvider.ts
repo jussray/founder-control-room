@@ -2,15 +2,15 @@ import { Octokit } from "@octokit/rest";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 import { GitHubProvider, type GitHubProviderConfig } from "./GitHubProvider.js";
 import type { RulesetConfig, RulesetResult } from "./RepositoryProvider.js";
-import { mergeExistingRulesetSecurity, type RulesetRuleLike } from "./rulesetSecurityMerge.js";
+import type { RulesetRuleLike } from "./rulesetSecurityMerge.js";
 
 const FOUNDER_CONTROL_ROOM_PROJECT_ID = "founder-control-room";
 
-type UpdateRules = NonNullable<
-  RestEndpointMethodTypes["repos"]["updateRepoRuleset"]["parameters"]
+type CreateRules = NonNullable<
+  RestEndpointMethodTypes["repos"]["createRepoRuleset"]["parameters"]
 >["rules"];
-type UpdateBypassActors = NonNullable<
-  RestEndpointMethodTypes["repos"]["updateRepoRuleset"]["parameters"]
+type CreateBypassActors = NonNullable<
+  RestEndpointMethodTypes["repos"]["createRepoRuleset"]["parameters"]
 >["bypass_actors"];
 type RulesetEnforcement = RulesetConfig["enforcement"];
 
@@ -34,6 +34,18 @@ function normalizeBranchRef(ref: string): string {
 
 export function mergeExistingRulesetTargetRefs(existing: string[], requested: string[]): string[] {
   return [...new Set([...existing, ...requested].map(normalizeBranchRef))];
+}
+
+export function requestedRefsRemainingExcluded(requested: string[], excluded: string[]): string[] {
+  const normalizedRequested = requested.map(normalizeBranchRef);
+  const normalizedExcluded = excluded.map(normalizeBranchRef);
+  return normalizedRequested.filter((ref) => normalizedExcluded.some((excludedRef) => {
+    if (excludedRef === "~ALL" || excludedRef === "~DEFAULT_BRANCH") return true;
+    if (excludedRef === ref) return true;
+    if (!excludedRef.includes("*")) return false;
+    const escaped = excludedRef.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
+    return new RegExp(`^${escaped}$`).test(ref);
+  }));
 }
 
 export class SecurityPreservingGitHubProvider extends GitHubProvider {
@@ -77,49 +89,69 @@ export class SecurityPreservingGitHubProvider extends GitHubProvider {
     return rules;
   }
 
+  private requestedBypassActors(config: RulesetConfig): CreateBypassActors {
+    return (config.bypassActors ?? []).map((actor) => {
+      if (actor.kind !== "app") {
+        throw new Error(`SecurityPreservingGitHubProvider: unsupported bypass actor kind "${actor.kind}"`);
+      }
+      return {
+        actor_type: "Integration" as const,
+        actor_id: Number(actor.id),
+        bypass_mode: "always" as const,
+      };
+    });
+  }
+
   override async applyBranchRuleset(projectId: string, config: RulesetConfig): Promise<RulesetResult> {
     if (projectId === FOUNDER_CONTROL_ROOM_PROJECT_ID) return super.applyBranchRuleset(projectId, config);
 
     const { owner, repo } = this.locateRulesetRepository(projectId);
     const { data: summaries } = await this.adminOctokit.repos.getRepoRulesets({ owner, repo, per_page: 100 });
     const existing = summaries.find((ruleset) => ruleset.name === config.name);
-    if (!existing) return super.applyBranchRuleset(projectId, config);
+
+    if (!existing) {
+      const { data } = await this.adminOctokit.repos.createRepoRuleset({
+        owner,
+        repo,
+        name: config.name,
+        target: "branch",
+        enforcement: config.enforcement,
+        bypass_actors: this.requestedBypassActors(config),
+        conditions: {
+          ref_name: {
+            include: config.targetRefs.map(normalizeBranchRef),
+            exclude: [],
+          },
+        },
+        rules: this.requestedRules(config) as CreateRules,
+      });
+      return { id: String(data.id), name: data.name, enforcement: data.enforcement };
+    }
 
     const { data: current } = await this.adminOctokit.repos.getRepoRuleset({ owner, repo, ruleset_id: existing.id });
-    const mergedRules = mergeExistingRulesetSecurity({
-      existingRules: (current.rules ?? []) as RulesetRuleLike[],
-      requestedRules: this.requestedRules(config),
-      requiredStatusCheckNames: config.requiredStatusCheckNames,
-      requirePullRequest: config.requirePullRequest,
-      blockForcePushes: config.blockForcePushes,
-      blockDeletion: config.blockDeletion,
-    }) as UpdateRules;
 
     if (config.bypassActors && config.bypassActors.length > 0) {
       throw new Error(
         "SecurityPreservingGitHubProvider: existing ruleset updates cannot replace existing bypass posture without a separate bypass-authority contract",
       );
     }
-    const bypassActors = (current.bypass_actors ?? []) as UpdateBypassActors;
 
-    const currentEnforcement = current.enforcement as RulesetEnforcement;
-    const enforcement = mergeExistingRulesetEnforcement(currentEnforcement, config.enforcement);
-    const currentIncludes = current.conditions?.ref_name?.include ?? [];
-    const targetRefs = mergeExistingRulesetTargetRefs(currentIncludes, config.targetRefs);
     const currentExcludes = current.conditions?.ref_name?.exclude ?? [];
+    const conflictingRequestedRefs = requestedRefsRemainingExcluded(config.targetRefs, currentExcludes);
+    if (conflictingRequestedRefs.length > 0) {
+      throw new Error(
+        `SecurityPreservingGitHubProvider: requested target refs remain excluded by the existing ruleset: ${conflictingRequestedRefs.join(", ")}`,
+      );
+    }
 
-    const { data } = await this.adminOctokit.repos.updateRepoRuleset({
-      owner,
-      repo,
-      ruleset_id: existing.id,
-      name: config.name,
-      target: "branch",
-      enforcement,
-      bypass_actors: bypassActors,
-      conditions: { ref_name: { include: targetRefs, exclude: currentExcludes } },
-      rules: mergedRules,
-    });
-
-    return { id: String(data.id), name: data.name, enforcement: data.enforcement };
+    // GitHub's repository-ruleset update endpoint does not expose an atomic
+    // compare-and-swap/version precondition. Reconstructing a full PUT from a
+    // prior read can therefore overwrite provider hardening that lands between
+    // observation and mutation. Until a separately reviewed reconciliation
+    // contract can prove concurrency safety, existing non-FCR ruleset mutation
+    // must fail closed rather than submit a stale snapshot.
+    throw new Error(
+      "SecurityPreservingGitHubProvider: existing non-FCR ruleset updates are blocked until a concurrency-safe provider reconciliation contract exists",
+    );
   }
 }
