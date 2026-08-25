@@ -1,9 +1,10 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded Evidence Trust Plane and Documentation Truth invariants for this candidate without claiming durable receipt persistence, provider mutation, merge authority, deployment authority, or live production truth.",
+  "purpose": "Record the bounded Evidence Trust Plane, Documentation Truth, and repository-provider security-preservation invariants for this candidate without claiming durable receipt persistence, provider mutation, merge authority, deployment authority, or live production truth.",
   "domains": [
     "evidence-authority",
-    "truth-governance"
+    "truth-governance",
+    "repository-provider"
   ],
   "changes": [
     {
@@ -28,6 +29,24 @@
       "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
         "scripts/verify-documentation-truth.mjs: Documentation Truth must classify the Evidence Trust Plane source, founder-facing page, and Playwright authority workflow as evidence-authority truth-sensitive paths so architecture changes cannot false-green with zero truth-sensitive files; changing this verifier remains truth-governance and requires the corresponding current documentation refresh."
+      ]
+    },
+    {
+      "path": "src/providers/SecurityPreservingGitHubProvider.ts",
+      "claims": [
+        "src/providers/SecurityPreservingGitHubProvider.ts: an existing non-FCR named GitHub ruleset must be read before update so the compatibility membrane can preserve stronger provider-owned security and current bypass posture when the caller does not explicitly replace it; brand-new rulesets and FCR's constitutional main path continue through the existing canonical GitHubProvider semantics, and this source contract does not itself prove live provider state."
+      ]
+    },
+    {
+      "path": "src/providers/providerFactory.ts",
+      "claims": [
+        "src/providers/providerFactory.ts: GitHub repository-provider construction routes through SecurityPreservingGitHubProvider while preserving the existing LazyRepositoryProvider, GitHub App credential preference, FCR constitutional governance checks, exact reviewed base/head freshness membrane, and GitLab provider behavior."
+      ]
+    },
+    {
+      "path": "src/providers/rulesetSecurityMerge.ts",
+      "claims": [
+        "src/providers/rulesetSecurityMerge.ts: narrowing requested required-status contexts may remove unrequested check contexts but must not silently weaken stronger existing pull-request protections, deletion/non-fast-forward rules, unmanaged provider security rules, or retained status-check provider metadata for contexts that remain requested."
       ]
     }
   ]
