@@ -182,8 +182,17 @@ export function createFounderDecisionReceipt(input: Omit<FounderDecisionReceiptV
   return candidate;
 }
 
-export function validateCapabilityRequestDecisionBinding(request: CapabilityRequestV1, decision: FounderDecisionReceiptV0, now: number, founderContext: AuthenticatedFounderContextV0): string[] {
-  const reasons = [...validateFounderDecisionReceipt(decision, now), ...validateAuthenticatedFounderContext(founderContext)];
+export function validateCapabilityRequestDecisionBinding(
+  request: CapabilityRequestV1,
+  decision: FounderDecisionReceiptV0,
+  now: number | null,
+  founderContext: AuthenticatedFounderContextV0,
+): string[] {
+  const evaluationTime = typeof now === 'number' ? now : Number.NaN;
+  const reasons = [
+    ...validateFounderDecisionReceipt(decision, evaluationTime),
+    ...validateAuthenticatedFounderContext(founderContext),
+  ];
   if (request.policyDecisionId !== decision.receiptId) reasons.push('capability request policyDecisionId does not match founder decision receipt');
   if (request.capabilityPlanHash !== decision.capabilityPlanHash) reasons.push('capability request plan hash does not match founder decision receipt');
   if (request.expectedHeadSha !== decision.expectedHeadSha) reasons.push('capability request head SHA does not match founder decision receipt');
