@@ -9,11 +9,13 @@ import {
 import {
   addEvidence,
   advanceProspect,
+  assertUngatedQuickScanTransition,
   createOverrideReceipt,
   createProspect,
   decideApproval,
   proposeApproval,
   qualificationIsValid,
+  recordDelivery,
   recordQualification,
 } from '../../quickscan/engine.js';
 import { getQuickScanProspect, listQuickScanProspects, saveQuickScanProspect } from '../../quickscan/store.js';
@@ -80,6 +82,7 @@ quickScanRouter.post('/prospects/:id/transition', (req: FounderRequest, res) => 
       const receipt = createOverrideReceipt({ actor: req.founder?.email ?? 'founder', reason: text(body.reason), from: prospect.lifecycleState, to, evidenceIds: Array.isArray(body.evidenceIds) ? body.evidenceIds.filter((v): v is string => typeof v === 'string') : [] });
       advanceProspect(prospect, to, req.founder?.email ?? 'founder', receipt);
     } else {
+      assertUngatedQuickScanTransition(prospect.lifecycleState, to);
       advanceProspect(prospect, to, req.founder?.email ?? 'founder');
     }
     saveQuickScanProspect(prospect);
@@ -170,4 +173,17 @@ quickScanRouter.post('/prospects/:id/payment/manual', (req: FounderRequest, res)
     ...(trackedPaymentLinkUrl ? { trackedPaymentLinkUrl } : {}),
     prospect,
   });
+});
+
+quickScanRouter.post('/prospects/:id/delivery', (req: FounderRequest, res) => {
+  const prospect = getQuickScanProspect(req.params.id);
+  if (!prospect) return fail(res, 404, 'PROSPECT_NOT_FOUND', 'prospect not found');
+  const body = record(req.body);
+  try {
+    recordDelivery(prospect, text(body.loomUrl), req.founder?.email ?? 'founder');
+    saveQuickScanProspect(prospect);
+    return res.json({ ok: true, prospect });
+  } catch (error) {
+    return fail(res, 409, 'DELIVERY_BLOCKED', error instanceof Error ? error.message : 'delivery blocked');
+  }
 });

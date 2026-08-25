@@ -44,6 +44,20 @@ const OVERRIDEABLE = new Set<string>([
   'qualified:payment_link_ready',
 ]);
 
+/**
+ * Lifecycle states that must never be reached through the generic transition
+ * endpoint, because reaching them without their evidence requirement would
+ * let a bare state-machine walk assert a claim (a charge happened, a
+ * diagnostic was delivered) with nothing behind it. Each has its own
+ * dedicated, evidence-checked path: `paid` via `markPaidFromVerifiedStripeEvent`
+ * or the founder-evidence-gated manual payment route, `delivered` via
+ * `recordDelivery`.
+ */
+export const EVIDENCE_GATED_TRANSITIONS: Partial<Record<QuickScanLifecycleState, string>> = {
+  paid: 'paid requires a verified Stripe webhook event or POST /payment/manual with explicit evidence',
+  delivered: 'delivered requires POST /prospects/:id/delivery with a Loom delivery URL',
+};
+
 function now() { return new Date().toISOString(); }
 function id(prefix: string) { return `${prefix}_${randomUUID()}`; }
 
@@ -75,6 +89,18 @@ export function qualificationIsValid(value?: QuickScanQualification): boolean {
 
 export function assertQuickScanTransition(from: QuickScanLifecycleState, to: QuickScanLifecycleState): void {
   if (!NEXT[from].includes(to)) throw new Error(`Invalid QuickScan lifecycle transition: ${from} -> ${to}`);
+}
+
+/**
+ * Same rule as `assertQuickScanTransition`, plus a refusal of any target in
+ * `EVIDENCE_GATED_TRANSITIONS`. Callers that own a gated target's evidence
+ * requirement (the Stripe webhook, `/payment/manual`, `/delivery`) transition
+ * through `advanceProspect` directly instead, after checking that evidence.
+ */
+export function assertUngatedQuickScanTransition(from: QuickScanLifecycleState, to: QuickScanLifecycleState): void {
+  const gateReason = EVIDENCE_GATED_TRANSITIONS[to];
+  if (gateReason) throw new Error(`QuickScan transition to ${to} is evidence-gated: ${gateReason}`);
+  assertQuickScanTransition(from, to);
 }
 
 export function createOverrideReceipt(input: {
@@ -215,4 +241,23 @@ export function markPaidFromVerifiedStripeEvent(
     createdAt: verifiedAt,
   });
   return advanceProspect(prospect, 'paid', actor);
+}
+
+/**
+ * Records delivery evidence and is the only path that may transition a
+ * prospect to `delivered`. A prospect must not be able to reach the
+ * revenue-recognized terminal state of the funnel on a bare state-machine
+ * walk with nothing behind it, so this requires a Loom delivery URL and the
+ * prospect already being `delivery_due`.
+ */
+export function recordDelivery(prospect: QuickScanProspect, loomUrl: string, actor: string): QuickScanProspect {
+  const trimmedUrl = loomUrl.trim();
+  if (!trimmedUrl) throw new Error('QuickScan delivery requires a Loom delivery URL');
+  if (prospect.lifecycleState !== 'delivery_due') {
+    throw new Error(`QuickScan prospect ${prospect.id} is ${prospect.lifecycleState}, not delivery_due; refusing to record delivery`);
+  }
+  const deliveredAt = now();
+  prospect.delivery = { loomUrl: trimmedUrl, deliveredAt };
+  prospect.audit.push({ id: id('audit'), type: 'delivery.recorded', message: `delivered via ${trimmedUrl}`, actor, createdAt: deliveredAt });
+  return advanceProspect(prospect, 'delivered', actor);
 }

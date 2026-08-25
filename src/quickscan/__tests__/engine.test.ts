@@ -3,9 +3,11 @@ import {
   addEvidence,
   advanceProspect,
   assertQuickScanTransition,
+  assertUngatedQuickScanTransition,
   createOverrideReceipt,
   createProspect,
   markPaidFromVerifiedStripeEvent,
+  recordDelivery,
   setChiefRecommendation,
 } from '../engine.js';
 import type { PromptWorkflowReference } from '../contracts.js';
@@ -24,6 +26,15 @@ function scoredProspect() {
 function prospectAtPaymentLinkSent() {
   const prospect = scoredProspect();
   for (const state of ['researched', 'qualified_for_outreach', 'draft_ready', 'approved_to_contact', 'contacted', 'replied', 'fit_check_scheduled', 'qualified', 'payment_link_ready', 'payment_link_sent'] as const) {
+    advanceProspect(prospect, state, 'founder');
+  }
+  return prospect;
+}
+
+function prospectAtDeliveryDue() {
+  const prospect = prospectAtPaymentLinkSent();
+  markPaidFromVerifiedStripeEvent(prospect, verifiedEvent({ clientReferenceId: prospect.id }), 'stripe-webhook');
+  for (const state of ['diagnostic_scheduled', 'diagnostic_complete', 'delivery_due'] as const) {
     advanceProspect(prospect, state, 'founder');
   }
   return prospect;
@@ -109,5 +120,32 @@ describe('QuickScan engine', () => {
     const prospect = scoredProspect();
     expect(() => markPaidFromVerifiedStripeEvent(prospect, verifiedEvent(), 'stripe-webhook'))
       .toThrow('not payment_link_sent');
+  });
+
+  it('records delivery evidence and marks a delivery_due prospect delivered', () => {
+    const prospect = prospectAtDeliveryDue();
+    const result = recordDelivery(prospect, 'https://loom.com/share/example', 'founder');
+
+    expect(result.lifecycleState).toBe('delivered');
+    expect(result.delivery?.loomUrl).toBe('https://loom.com/share/example');
+    expect(result.delivery?.deliveredAt).toBeTruthy();
+    expect(result.audit.some((entry) => entry.type === 'delivery.recorded')).toBe(true);
+  });
+
+  it('refuses to record delivery without a Loom URL', () => {
+    const prospect = prospectAtDeliveryDue();
+    expect(() => recordDelivery(prospect, '  ', 'founder')).toThrow('Loom delivery URL');
+    expect(prospect.lifecycleState).toBe('delivery_due');
+  });
+
+  it('refuses to record delivery when the prospect is not delivery_due', () => {
+    const prospect = prospectAtPaymentLinkSent();
+    expect(() => recordDelivery(prospect, 'https://loom.com/share/example', 'founder')).toThrow('not delivery_due');
+  });
+
+  it('blocks the generic transition path from reaching evidence-gated states directly', () => {
+    expect(() => assertUngatedQuickScanTransition('payment_link_sent', 'paid')).toThrow('evidence-gated');
+    expect(() => assertUngatedQuickScanTransition('delivery_due', 'delivered')).toThrow('evidence-gated');
+    expect(() => assertUngatedQuickScanTransition('discovered', 'researched')).not.toThrow();
   });
 });
