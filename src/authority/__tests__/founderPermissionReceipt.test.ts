@@ -115,6 +115,23 @@ describe('FounderPermissionReceipt', () => {
       now: NOW,
     })).toEqual({ ok: false, reason: 'current_authority_rejected' });
 
+    await expect(consumeFounderPermissionReceipt({
+      receipt: candidate,
+      currentAuthority: {
+        readDecision: () => ({
+          decisionId: 'decision-1',
+          founderId: 'founder',
+          subject: null,
+          scope: ['merge:founder-control-room'],
+          action: null,
+          expiresAt: '2026-08-25T04:20:00.000Z',
+          decision: 'approved',
+        } as unknown as FounderPermissionDecisionSnapshot),
+      },
+      store,
+      now: NOW,
+    })).resolves.toEqual({ ok: false, reason: 'current_authority_rejected' });
+
     expect((await consumeFounderPermissionReceipt({
       receipt: candidate,
       currentAuthority: { readDecision: () => decision() },
