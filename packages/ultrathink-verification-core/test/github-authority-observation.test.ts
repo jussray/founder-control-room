@@ -11,7 +11,7 @@ describe('normalizeGitHubAuthorityObservationV0', () => {
       requiresReviewThreadResolution: true,
       strictRequiredStatusChecks: true,
       requiredStatusChecks: ['Control Room Test Ledger', 'Repository Truth Gate', 'Control Room Test Ledger'],
-      bypassPrincipals: [],
+      bypassActors: [],
     })).toEqual({
       requiresChangeRequest: true,
       minimumApprovals: 1,
@@ -32,13 +32,13 @@ describe('normalizeGitHubAuthorityObservationV0', () => {
       requiresReviewThreadResolution: true,
       strictRequiredStatusChecks: true,
       requiredStatusChecks: [],
-      bypassPrincipals: [],
+      bypassActors: [],
     });
     expect(observation.requiresFreshApproval).toBe(false);
   });
 
   it('preserves unknown provider state instead of inferring protection', () => {
-    const observation = normalizeGitHubAuthorityObservationV0({
+    expect(normalizeGitHubAuthorityObservationV0({
       requiresPullRequest: null,
       minimumApprovals: null,
       dismissStaleReviewsOnPush: null,
@@ -46,9 +46,8 @@ describe('normalizeGitHubAuthorityObservationV0', () => {
       requiresReviewThreadResolution: null,
       strictRequiredStatusChecks: null,
       requiredStatusChecks: null,
-      bypassPrincipals: null,
-    });
-    expect(observation).toEqual({
+      bypassActors: null,
+    })).toEqual({
       requiresChangeRequest: null,
       minimumApprovals: null,
       requiresFreshApproval: null,
@@ -59,7 +58,33 @@ describe('normalizeGitHubAuthorityObservationV0', () => {
     });
   });
 
-  it('normalizes bypass principals deterministically for receipt stability', () => {
+  it('preserves actor identity and bypass mode so widened authority becomes drift', () => {
+    const pullRequestMode = normalizeGitHubAuthorityObservationV0({
+      requiresPullRequest: true,
+      minimumApprovals: 1,
+      dismissStaleReviewsOnPush: true,
+      requireLastPushApproval: true,
+      requiresReviewThreadResolution: true,
+      strictRequiredStatusChecks: true,
+      requiredStatusChecks: [],
+      bypassActors: [{ actorType: 'Integration', actorId: '42', bypassMode: 'pull_request' }],
+    });
+    const alwaysMode = normalizeGitHubAuthorityObservationV0({
+      requiresPullRequest: true,
+      minimumApprovals: 1,
+      dismissStaleReviewsOnPush: true,
+      requireLastPushApproval: true,
+      requiresReviewThreadResolution: true,
+      strictRequiredStatusChecks: true,
+      requiredStatusChecks: [],
+      bypassActors: [{ actorType: 'Integration', actorId: '42', bypassMode: 'always' }],
+    });
+    expect(pullRequestMode.bypassPrincipals).toEqual(['Integration:42:pull_request']);
+    expect(alwaysMode.bypassPrincipals).toEqual(['Integration:42:always']);
+    expect(alwaysMode.bypassPrincipals).not.toEqual(pullRequestMode.bypassPrincipals);
+  });
+
+  it('normalizes bypass actors deterministically for receipt stability', () => {
     const observation = normalizeGitHubAuthorityObservationV0({
       requiresPullRequest: true,
       minimumApprovals: 1,
@@ -68,8 +93,12 @@ describe('normalizeGitHubAuthorityObservationV0', () => {
       requiresReviewThreadResolution: true,
       strictRequiredStatusChecks: true,
       requiredStatusChecks: [],
-      bypassPrincipals: ['app:42', 'owner', 'app:42'],
+      bypassActors: [
+        { actorType: 'Integration', actorId: '42', bypassMode: 'pull_request' },
+        { actorType: 'RepositoryRole', actorId: '5', bypassMode: 'pull_request' },
+        { actorType: 'Integration', actorId: '42', bypassMode: 'pull_request' },
+      ],
     });
-    expect(observation.bypassPrincipals).toEqual(['app:42', 'owner']);
+    expect(observation.bypassPrincipals).toEqual(['Integration:42:pull_request', 'RepositoryRole:5:pull_request']);
   });
 });
