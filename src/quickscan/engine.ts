@@ -253,16 +253,28 @@ export function markPaidFromVerifiedStripeEvent(
   return advanceProspect(prospect, 'paid', actor);
 }
 
+const APPROVED_DELIVERY_HOSTS = new Set(['loom.com', 'www.loom.com']);
+
+function isApprovedLoomUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && APPROVED_DELIVERY_HOSTS.has(url.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Records delivery evidence and is the only path that may transition a
  * prospect to `delivered`. A prospect must not be able to reach the
  * revenue-recognized terminal state of the funnel on a bare state-machine
- * walk with nothing behind it, so this requires a Loom delivery URL and the
- * prospect already being `delivery_due`.
+ * walk with nothing behind it, so this requires an actual `https://loom.com`
+ * URL — not just a non-empty string, which any caller could defeat with
+ * placeholder text — and the prospect already being `delivery_due`.
  */
 export function recordDelivery(prospect: QuickScanProspect, loomUrl: string, actor: string): QuickScanProspect {
   const trimmedUrl = loomUrl.trim();
-  if (!trimmedUrl) throw new Error('QuickScan delivery requires a Loom delivery URL');
+  if (!isApprovedLoomUrl(trimmedUrl)) throw new Error('QuickScan delivery requires an https://loom.com Loom delivery URL');
   if (prospect.lifecycleState !== 'delivery_due') {
     throw new Error(`QuickScan prospect ${prospect.id} is ${prospect.lifecycleState}, not delivery_due; refusing to record delivery`);
   }

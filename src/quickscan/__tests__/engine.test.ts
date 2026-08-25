@@ -158,6 +158,14 @@ describe('QuickScan engine', () => {
     expect(prospect.lifecycleState).toBe('delivery_due');
   });
 
+  it('refuses placeholder text or non-Loom URLs as delivery evidence', () => {
+    const prospect = prospectAtDeliveryDue();
+    expect(() => recordDelivery(prospect, 'not-delivered', 'founder')).toThrow('Loom delivery URL');
+    expect(() => recordDelivery(prospect, 'https://example.com/not-loom', 'founder')).toThrow('Loom delivery URL');
+    expect(() => recordDelivery(prospect, 'http://loom.com/share/example', 'founder')).toThrow('Loom delivery URL');
+    expect(prospect.lifecycleState).toBe('delivery_due');
+  });
+
   it('refuses to record delivery when the prospect is not delivery_due', () => {
     const prospect = prospectAtPaymentLinkSent();
     expect(() => recordDelivery(prospect, 'https://loom.com/share/example', 'founder')).toThrow('not delivery_due');
