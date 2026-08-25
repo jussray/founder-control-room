@@ -103,5 +103,66 @@ describe('QuickScan founder-gated API', () => {
     expect(response.body.externalMutation).toBe(false);
     expect(response.body.stripeWebhookVerified).toBe(false);
     expect(response.body.prospect.lifecycleState).toBe('paid');
+
+    for (const to of ['diagnostic_scheduled', 'diagnostic_complete', 'delivery_due']) {
+      response = await request(buildApp()).post(`/quickscan/prospects/${id}/transition`).set('Authorization', BEARER).send({ to });
+      expect(response.status).toBe(200);
+    }
+
+    response = await request(buildApp()).post(`/quickscan/prospects/${id}/delivery`).set('Authorization', BEARER).send({});
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('DELIVERY_BLOCKED');
+
+    response = await request(buildApp()).post(`/quickscan/prospects/${id}/delivery`).set('Authorization', BEARER).send({ loomUrl: 'https://loom.com/share/example' });
+    expect(response.status).toBe(200);
+    expect(response.body.prospect.lifecycleState).toBe('delivered');
+    expect(response.body.prospect.delivery.loomUrl).toBe('https://loom.com/share/example');
+  });
+
+  it('does not permit the generic transition route to reach evidence-gated states directly', async () => {
+    founderSession();
+    const created = await request(buildApp()).post('/quickscan/prospects').set('Authorization', BEARER).send({ businessName: 'Bypass Attempt Studio', segment: 'salon_studio_team_owner' });
+    const id = created.body.prospect.id;
+    for (const category of ['visible_friction','active_demand','owner_reachable','repeat_high_value_service','operational_complexity','urgency']) {
+      await request(buildApp()).post(`/quickscan/prospects/${id}/evidence`).set('Authorization', BEARER).send({ category, note: `Observed ${category}` });
+    }
+    for (const to of ['researched','qualified_for_outreach','draft_ready','approved_to_contact','contacted','replied','fit_check_scheduled']) {
+      await request(buildApp()).post(`/quickscan/prospects/${id}/transition`).set('Authorization', BEARER).send({ to });
+    }
+
+    const bypassQualified = await request(buildApp()).post(`/quickscan/prospects/${id}/transition`).set('Authorization', BEARER).send({ to: 'qualified' });
+    expect(bypassQualified.status).toBe(409);
+    expect(bypassQualified.body.code).toBe('TRANSITION_BLOCKED');
+    expect(bypassQualified.body.message).toContain('evidence-gated');
+
+    await request(buildApp()).post(`/quickscan/prospects/${id}/qualification`).set('Authorization', BEARER).send({ pain: 'Missed DMs', frequency: 'daily', economicImpact: 'one booking exceeds fee', authority: 'confirmed', urgency: 'now', decision: 'qualified' });
+
+    const bypassPaymentLinkReady = await request(buildApp()).post(`/quickscan/prospects/${id}/transition`).set('Authorization', BEARER).send({ to: 'payment_link_ready' });
+    expect(bypassPaymentLinkReady.status).toBe(409);
+    expect(bypassPaymentLinkReady.body.code).toBe('TRANSITION_BLOCKED');
+
+    // No qualification decision or approval yet: /payment/manual refuses too — the
+    // precursor gate does not just relocate the bypass to a different route.
+    const noApproval = await request(buildApp()).post(`/quickscan/prospects/${id}/payment/manual`).set('Authorization', BEARER).send({ status: 'link_ready', paymentLinkUrl: 'https://buy.stripe.com/example' });
+    expect(noApproval.status).toBe(409);
+    expect(noApproval.body.code).toBe('PAYMENT_APPROVAL_REQUIRED');
+
+    const approval = await request(buildApp()).post(`/quickscan/prospects/${id}/approvals`).set('Authorization', BEARER).send({ action: 'payment_link', proposedAction: 'Offer the $249 QuickScan payment link', reason: 'Qualified buyer requested next step', evidenceIds: [] });
+    await request(buildApp()).post(`/quickscan/prospects/${id}/approvals/${approval.body.approval.id}/decision`).set('Authorization', BEARER).send({ decision: 'APPROVE' });
+
+    let response = await request(buildApp()).post(`/quickscan/prospects/${id}/payment/manual`).set('Authorization', BEARER).send({ status: 'link_ready', paymentLinkUrl: 'https://buy.stripe.com/example' });
+    expect(response.status).toBe(200);
+
+    const bypassPaymentLinkSent = await request(buildApp()).post(`/quickscan/prospects/${id}/transition`).set('Authorization', BEARER).send({ to: 'payment_link_sent' });
+    expect(bypassPaymentLinkSent.status).toBe(409);
+    expect(bypassPaymentLinkSent.body.code).toBe('TRANSITION_BLOCKED');
+
+    response = await request(buildApp()).post(`/quickscan/prospects/${id}/payment/manual`).set('Authorization', BEARER).send({ status: 'link_sent' });
+    expect(response.status).toBe(200);
+
+    const bypassPaid = await request(buildApp()).post(`/quickscan/prospects/${id}/transition`).set('Authorization', BEARER).send({ to: 'paid' });
+    expect(bypassPaid.status).toBe(409);
+    expect(bypassPaid.body.code).toBe('TRANSITION_BLOCKED');
+    expect(bypassPaid.body.message).toContain('evidence-gated');
   });
 });

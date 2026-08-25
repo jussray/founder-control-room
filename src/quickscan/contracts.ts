@@ -1,5 +1,6 @@
 export const QUICKSCAN_CONTRACT = 'founder-control-room/quickscan@v1' as const;
 export const QUICKSCAN_PRICE_CENTS = 24900;
+export const QUICKSCAN_CURRENCY = 'usd';
 export const QUICKSCAN_HIGH_PRIORITY_SCORE = 6;
 
 export type QuickScanLifecycleState =

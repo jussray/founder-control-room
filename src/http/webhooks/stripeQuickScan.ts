@@ -4,7 +4,11 @@
  * Verifies the raw request against `STRIPE_QUICKSCAN_WEBHOOK_SECRET`, then
  * hands a `checkout.session.completed` event to the QuickScan engine as the
  * sole route that may mark a prospect paid without a founder-typed evidence
- * string. Every other outcome — wrong event type, unconfigured secret,
+ * string. When `STRIPE_QUICKSCAN_PAYMENT_LINK_ID` is configured, the engine
+ * also requires the session's own `payment_link` to match it, so a
+ * same-price checkout completed on an unrelated Stripe product cannot
+ * satisfy this prospect's payment truth. Every other outcome — wrong
+ * event type, unconfigured secret,
  * unmatched prospect, a business-rule refusal from the engine, a replayed
  * event id — is acknowledged with 200 so Stripe does not retry a delivery
  * this endpoint has already durably handled or intentionally ignored; only
@@ -63,7 +67,8 @@ export async function handleStripeQuickScanWebhook(req: Request, res: Response):
   }
 
   try {
-    markPaidFromVerifiedStripeEvent(prospect, event, 'stripe-webhook');
+    const expectedPaymentLinkId = process.env.STRIPE_QUICKSCAN_PAYMENT_LINK_ID?.trim() || undefined;
+    markPaidFromVerifiedStripeEvent(prospect, event, 'stripe-webhook', { expectedPaymentLinkId });
     saveQuickScanProspect(prospect);
     markStripeEventProcessed(event.eventId);
     res.status(200).json({
