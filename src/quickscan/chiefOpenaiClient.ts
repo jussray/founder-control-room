@@ -147,7 +147,12 @@ export function createOpenAiQuickScanChiefRunner(dependencies: OpenAiQuickScanCh
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs(env));
 
+    // The abort timer must stay armed through the full response body read,
+    // not just the initial fetch() call: a provider or proxy that returns
+    // headers promptly but then stalls mid-body would otherwise hang past
+    // QUICKSCAN_CHIEF_TIMEOUT_MS once the timer was cleared too early.
     let response: globalThis.Response;
+    let raw: string;
     try {
       response = await fetchFn(`${baseUrl(env)}/responses`, {
         method: 'POST',
@@ -180,7 +185,15 @@ export function createOpenAiQuickScanChiefRunner(dependencies: OpenAiQuickScanCh
         }),
         signal: controller.signal,
       });
+
+      const declaredLength = Number(response.headers.get('content-length'));
+      if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
+        throw new QuickScanChiefProviderError('OpenAI response exceeded the allowed size', 'OPENAI_RESPONSE_TOO_LARGE', response.status);
+      }
+
+      raw = await response.text();
     } catch (error) {
+      if (error instanceof QuickScanChiefProviderError) throw error;
       if (error instanceof Error && error.name === 'AbortError') {
         throw new QuickScanChiefProviderError('OpenAI QuickScan Chief request timed out', 'OPENAI_TIMEOUT');
       }
@@ -192,12 +205,6 @@ export function createOpenAiQuickScanChiefRunner(dependencies: OpenAiQuickScanCh
       clearTimeout(timer);
     }
 
-    const declaredLength = Number(response.headers.get('content-length'));
-    if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
-      throw new QuickScanChiefProviderError('OpenAI response exceeded the allowed size', 'OPENAI_RESPONSE_TOO_LARGE', response.status);
-    }
-
-    const raw = await response.text();
     if (Buffer.byteLength(raw, 'utf8') > MAX_RESPONSE_BYTES) {
       throw new QuickScanChiefProviderError('OpenAI response exceeded the allowed size', 'OPENAI_RESPONSE_TOO_LARGE', response.status);
     }

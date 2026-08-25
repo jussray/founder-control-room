@@ -234,21 +234,32 @@ quickScanRouter.post('/prospects/:id/delivery', (req: FounderRequest, res) => {
  * drafted a message, this also proposes a PENDING approval the founder
  * still has to APPROVE/EDIT/SKIP through the existing approval routes;
  * Chief never sends anything itself.
+ *
+ * Sending this prospect's evidence notes and qualification text to OpenAI
+ * is a real trust-boundary crossing ("founder-observed" is not by itself a
+ * privacy classification), so the request must explicitly acknowledge it
+ * via `acknowledgeDataSharing: true` — a UI confirm() alone is bypassable
+ * by any direct caller and proves nothing; this makes the gate structural.
  */
 quickScanRouter.post('/prospects/:id/chief-recommendation', async (req: FounderRequest, res) => {
-  const prospect = getQuickScanProspect(req.params.id);
-  if (!prospect) return fail(res, 404, 'PROSPECT_NOT_FOUND', 'prospect not found');
+  const initial = getQuickScanProspect(req.params.id);
+  if (!initial) return fail(res, 404, 'PROSPECT_NOT_FOUND', 'prospect not found');
+
+  const body = record(req.body);
+  if (body.acknowledgeDataSharing !== true) {
+    return fail(res, 400, 'DATA_SHARING_ACKNOWLEDGEMENT_REQUIRED', 'this prospect\'s business name, owner name, segment, evidence notes, and qualification text will be sent to the configured OpenAI-backed Chief provider; acknowledgeDataSharing: true is required to proceed');
+  }
 
   let result: QuickScanChiefResult;
   try {
     result = await runChief({
-      businessName: prospect.businessName,
-      ownerName: prospect.ownerName ?? null,
-      segment: prospect.segment,
-      lifecycleState: prospect.lifecycleState,
-      score: prospect.score,
-      evidence: prospect.evidence,
-      qualification: prospect.qualification ?? null,
+      businessName: initial.businessName,
+      ownerName: initial.ownerName ?? null,
+      segment: initial.segment,
+      lifecycleState: initial.lifecycleState,
+      score: initial.score,
+      evidence: initial.evidence,
+      qualification: initial.qualification ?? null,
     });
   } catch (error) {
     const code = providerErrorCode(error);
@@ -260,15 +271,39 @@ quickScanRouter.post('/prospects/:id/chief-recommendation', async (req: FounderR
     );
   }
 
+  // Re-read: the provider call above can take seconds, and another request
+  // (a Stripe webhook, an approval decision, new evidence) may have mutated
+  // this prospect while it was in flight. Applying Chief's result to the
+  // pre-await clone would silently overwrite that newer state on save.
+  const prospect = getQuickScanProspect(req.params.id);
+  if (!prospect) return fail(res, 404, 'PROSPECT_NOT_FOUND', 'prospect not found');
+
   try {
     setChiefRecommendation(prospect, result.recommendation, QUICKSCAN_CHIEF_WORKFLOW, 'chief');
   } catch (error) {
     return fail(res, 502, 'QUICKSCAN_CHIEF_PROVENANCE_MISMATCH', error instanceof Error ? error.message : 'Chief recommendation provenance mismatch');
   }
+  prospect.audit.push({
+    id: `audit_${Date.now()}`,
+    type: 'chief.recommendation.provenance',
+    message: `provider=${result.provenance.provider} model=${result.provenance.model} response=${result.provenance.responseId ?? 'none'} promptVersion=${result.provenance.promptVersion}`,
+    actor: 'chief',
+    createdAt: new Date().toISOString(),
+  });
 
   let approval: QuickScanApproval | null = null;
   const approvalAction = CHIEF_ACTION_TO_APPROVAL[result.recommendation.nextAction];
   if (approvalAction && result.recommendation.messageDraft) {
+    // A prior Chief-proposed approval could still be sitting PENDING (the
+    // founder never decided it, or triggered another recommendation before
+    // deciding the first). The console only ever shows one pending approval,
+    // so an undecided older one would become an invisible stale draft the
+    // founder could still act on later. Supersede it before proposing anew.
+    for (const existing of prospect.approvals) {
+      if (existing.decision === 'PENDING' && existing.recommendedBy === 'chief') {
+        decideApproval(prospect, existing.id, 'SKIP', 'chief');
+      }
+    }
     approval = proposeApproval(prospect, {
       action: approvalAction,
       proposedAction: result.recommendation.messageDraft,

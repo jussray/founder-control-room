@@ -137,4 +137,48 @@ describe('createOpenAiQuickScanChiefRunner', () => {
     const runner = createOpenAiQuickScanChiefRunner({ env: { OPENAI_API_KEY: 'sk-test' }, fetchFn });
     await expect(runner(promptInput())).rejects.toBeInstanceOf(QuickScanChiefProviderError);
   });
+
+  it('keeps the abort timer active until the response body has been fully read', async () => {
+    const events: string[] = [];
+    const originalClearTimeout = global.clearTimeout;
+    const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout').mockImplementation((id) => {
+      events.push('clearTimeout');
+      return originalClearTimeout(id);
+    });
+    try {
+      const fetchFn = vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        text: async () => {
+          events.push('text-start');
+          await Promise.resolve();
+          events.push('text-end');
+          return JSON.stringify(openAiPayload({ summary: 'x', next_action: 'capture_more_evidence', message_draft: null }));
+        },
+      } as unknown as Response));
+
+      const runner = createOpenAiQuickScanChiefRunner({ env: { OPENAI_API_KEY: 'sk-test' }, fetchFn });
+      await runner(promptInput());
+
+      expect(events).toEqual(['text-start', 'text-end', 'clearTimeout']);
+    } finally {
+      clearTimeoutSpy.mockRestore();
+    }
+  });
+
+  it('treats an abort that fires while reading the response body as a timeout error', async () => {
+    const fetchFn = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: async () => {
+        const abortError = new Error('aborted mid-body');
+        abortError.name = 'AbortError';
+        throw abortError;
+      },
+    } as unknown as Response));
+    const runner = createOpenAiQuickScanChiefRunner({ env: { OPENAI_API_KEY: 'sk-test' }, fetchFn });
+    await expect(runner(promptInput())).rejects.toMatchObject({ code: 'OPENAI_TIMEOUT' });
+  });
 });
