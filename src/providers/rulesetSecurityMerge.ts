@@ -56,6 +56,9 @@ function contextOf(entry: Record<string, unknown>): string {
  * parameters, integration-bound status contexts, etc.). Updating a named
  * ruleset must therefore be monotonic for those unmanaged protections.
  *
+ * Existing pull-request review protection is also monotonic: a narrower
+ * generic caller cannot silently remove an already-enforced review membrane.
+ *
  * The one deliberate replacement surface is the required-status context list:
  * callers may narrow or replace that list while matching existing contexts
  * retain provider metadata such as integration_id.
@@ -75,14 +78,14 @@ export function mergeExistingRulesetSecurity({
     .filter((rule) => !MANAGED_RULE_TYPES.has(String(rule.type ?? "")))
     .map((rule) => structuredClone(rule));
 
-  if (requirePullRequest) {
-    const existingRule = existingByType.get("pull_request");
+  const existingPullRequestRule = existingByType.get("pull_request");
+  if (requirePullRequest || existingPullRequestRule) {
     const requestedRule = requestedByType.get("pull_request") ?? { type: "pull_request", parameters: {} };
-    const existingParameters = asParameters(existingRule);
+    const existingParameters = asParameters(existingPullRequestRule);
     const requestedParameters = asParameters(requestedRule);
 
     nextRules.push({
-      ...structuredClone(existingRule ?? {}),
+      ...structuredClone(existingPullRequestRule ?? {}),
       ...structuredClone(requestedRule),
       type: "pull_request",
       parameters: {
