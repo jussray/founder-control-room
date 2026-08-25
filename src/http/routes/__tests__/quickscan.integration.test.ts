@@ -232,14 +232,16 @@ describe('QuickScan founder-gated API', () => {
     expect(runChief).not.toHaveBeenCalled();
   });
 
-  it('applies the Chief recommendation to state mutated while the provider call was in flight, without reverting it', async () => {
+  it('rejects the Chief recommendation without reverting a mutation that landed while the provider call was in flight', async () => {
     founderSession();
     const created = await request(buildApp()).post('/quickscan/prospects').set('Authorization', BEARER).send({ businessName: 'Race Condition Studio', segment: 'salon_studio_team_owner' });
     const id = created.body.prospect.id;
     const app = buildAppWithChief({
       runChief: vi.fn(async () => {
         // Simulate another request (e.g. the founder adding evidence) landing
-        // while this provider call is still in flight.
+        // while this provider call is still in flight. The recommendation
+        // below was reasoned out before that evidence existed, so applying
+        // it now would misattribute its basis.
         await request(app).post(`/quickscan/prospects/${id}/evidence`).set('Authorization', BEARER).send({ category: 'urgency', note: 'Mutated mid-flight.' });
         return { recommendation: chiefRecommendation({ nextAction: 'capture_more_evidence', messageDraft: undefined }), provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_race', promptVersion: 'quickscan-chief-v1-test' } };
       }),
@@ -247,15 +249,18 @@ describe('QuickScan founder-gated API', () => {
 
     const response = await request(app).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
 
-    expect(response.status).toBe(200);
-    expect(response.body.prospect.evidence).toHaveLength(1);
-    expect(response.body.prospect.evidence[0].note).toBe('Mutated mid-flight.');
-    expect(response.body.prospect.chiefRecommendation.nextAction).toBe('capture_more_evidence');
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('QUICKSCAN_CHIEF_INPUT_CHANGED');
 
+    // The concurrent mutation itself (saved by its own request) must survive
+    // untouched — this handler must neither revert it nor attach a stale
+    // recommendation to it.
     const after = await request(buildApp()).get('/quickscan').set('Authorization', BEARER);
     const stored = after.body.prospects.find((item: { id: string }) => item.id === id);
     expect(stored.evidence).toHaveLength(1);
-    expect(stored.chiefRecommendation.nextAction).toBe('capture_more_evidence');
+    expect(stored.evidence[0].note).toBe('Mutated mid-flight.');
+    expect(stored.chiefRecommendation).toBeUndefined();
+    expect(stored.approvals).toHaveLength(0);
   });
 
   it('supersedes an earlier pending Chief approval instead of piling up duplicates', async () => {
@@ -276,6 +281,47 @@ describe('QuickScan founder-gated API', () => {
     expect(priorApproval.decision).toBe('SKIP');
     expect(second.body.approval.decision).toBe('PENDING');
     expect(second.body.approval.proposedAction).toBe('Second draft.');
+  });
+
+  it('supersedes an earlier pending Chief approval even when the newer recommendation is not send-worthy', async () => {
+    founderSession();
+    const created = await request(buildApp()).post('/quickscan/prospects').set('Authorization', BEARER).send({ businessName: 'Cooling Off Studio', segment: 'salon_studio_team_owner' });
+    const id = created.body.prospect.id;
+
+    const first = await request(buildAppWithChief({ runChief: vi.fn(async () => ({ recommendation: chiefRecommendation({ messageDraft: 'First draft.' }), provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_first', promptVersion: 'quickscan-chief-v1-test' } })) }))
+      .post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+    const firstApprovalId = first.body.approval.id;
+
+    const second = await request(buildAppWithChief({ runChief: vi.fn(async () => ({ recommendation: chiefRecommendation({ nextAction: 'disqualify', messageDraft: undefined, summary: 'No longer a fit.' }), provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_second', promptVersion: 'quickscan-chief-v1-test' } })) }))
+      .post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+
+    expect(second.status).toBe(200);
+    expect(second.body.approval).toBeNull();
+    expect(second.body.prospect.approvals).toHaveLength(1);
+    const priorApproval = second.body.prospect.approvals.find((item: { id: string }) => item.id === firstApprovalId);
+    expect(priorApproval.decision).toBe('SKIP');
+  });
+
+  it('refuses to re-decide a Chief approval that supersession has already skipped', async () => {
+    founderSession();
+    const created = await request(buildApp()).post('/quickscan/prospects').set('Authorization', BEARER).send({ businessName: 'No Resurrection Studio', segment: 'salon_studio_team_owner' });
+    const id = created.body.prospect.id;
+
+    const first = await request(buildAppWithChief({ runChief: vi.fn(async () => ({ recommendation: chiefRecommendation({ messageDraft: 'First draft.' }), provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_first', promptVersion: 'quickscan-chief-v1-test' } })) }))
+      .post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+    const firstApprovalId = first.body.approval.id;
+
+    await request(buildAppWithChief({ runChief: vi.fn(async () => ({ recommendation: chiefRecommendation({ messageDraft: 'Second draft.' }), provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_second', promptVersion: 'quickscan-chief-v1-test' } })) }))
+      .post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+
+    const resurrect = await request(buildApp()).post(`/quickscan/prospects/${id}/approvals/${firstApprovalId}/decision`).set('Authorization', BEARER).send({ decision: 'APPROVE' });
+    expect(resurrect.status).toBe(409);
+    expect(resurrect.body.code).toBe('APPROVAL_BLOCKED');
+
+    const after = await request(buildApp()).get('/quickscan').set('Authorization', BEARER);
+    const stored = after.body.prospects.find((item: { id: string }) => item.id === id);
+    const priorApproval = stored.approvals.find((item: { id: string }) => item.id === firstApprovalId);
+    expect(priorApproval.decision).toBe('SKIP');
   });
 
   it('records a Chief recommendation without proposing an approval for an informational next action', async () => {

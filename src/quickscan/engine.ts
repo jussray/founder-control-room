@@ -186,6 +186,9 @@ export function proposeApproval(prospect: QuickScanProspect, input: Omit<QuickSc
 export function decideApproval(prospect: QuickScanProspect, approvalId: string, decision: 'APPROVE' | 'EDIT' | 'SKIP', actor: string, editedAction?: string): QuickScanProspect {
   const approval = prospect.approvals.find((item) => item.id === approvalId);
   if (!approval) throw new Error('QuickScan approval not found');
+  if (approval.decision !== 'PENDING') {
+    throw new Error(`QuickScan approval already decided (${approval.decision})`);
+  }
   approval.decision = decision;
   approval.decidedBy = actor;
   approval.decidedAt = now();

@@ -11,6 +11,7 @@ __pycache__/
 *.pyc
 playwright-report/
 test-results/
+artifacts/
 
 # HubSpot CLI local authentication and account context
 hubspot.config.yml

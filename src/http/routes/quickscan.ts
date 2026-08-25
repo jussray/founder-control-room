@@ -240,6 +240,14 @@ quickScanRouter.post('/prospects/:id/delivery', (req: FounderRequest, res) => {
  * privacy classification), so the request must explicitly acknowledge it
  * via `acknowledgeDataSharing: true` — a UI confirm() alone is bypassable
  * by any direct caller and proves nothing; this makes the gate structural.
+ *
+ * Refuses (409 QUICKSCAN_CHIEF_INPUT_CHANGED) rather than applying the
+ * recommendation if evidence, qualification, or lifecycle state changed
+ * while the provider call was in flight — the recommendation would
+ * otherwise be attached to input the model never actually reasoned about.
+ * A prior undecided Chief-proposed approval is always superseded (SKIP)
+ * before a new one is proposed, even when this recommendation is not
+ * itself send-worthy, so the founder never sees more than one live draft.
  */
 quickScanRouter.post('/prospects/:id/chief-recommendation', async (req: FounderRequest, res) => {
   const initial = getQuickScanProspect(req.params.id);
@@ -278,6 +286,21 @@ quickScanRouter.post('/prospects/:id/chief-recommendation', async (req: FounderR
   const prospect = getQuickScanProspect(req.params.id);
   if (!prospect) return fail(res, 404, 'PROSPECT_NOT_FOUND', 'prospect not found');
 
+  // The re-read above only stops us from reverting a concurrent mutation —
+  // it does not stop us from applying a recommendation Chief reasoned out
+  // against a snapshot that no longer matches. If evidence, qualification,
+  // or lifecycle state changed while the provider call was in flight, the
+  // recommendation (and any evidenceIds an approval would bind to) may
+  // reflect input the model never saw. Refuse and let the caller retry
+  // against current state rather than silently misattributing the basis.
+  const snapshotChanged =
+    prospect.lifecycleState !== initial.lifecycleState ||
+    JSON.stringify(prospect.evidence) !== JSON.stringify(initial.evidence) ||
+    JSON.stringify(prospect.qualification ?? null) !== JSON.stringify(initial.qualification ?? null);
+  if (snapshotChanged) {
+    return fail(res, 409, 'QUICKSCAN_CHIEF_INPUT_CHANGED', 'this prospect\'s evidence, qualification, or lifecycle state changed while Chief was reasoning about it; retry the recommendation against current state');
+  }
+
   try {
     setChiefRecommendation(prospect, result.recommendation, QUICKSCAN_CHIEF_WORKFLOW, 'chief');
   } catch (error) {
@@ -291,19 +314,22 @@ quickScanRouter.post('/prospects/:id/chief-recommendation', async (req: FounderR
     createdAt: new Date().toISOString(),
   });
 
+  // A prior Chief-proposed approval could still be sitting PENDING (the
+  // founder never decided it, or triggered another recommendation before
+  // deciding the first). The console only ever shows one pending approval,
+  // so an undecided older one would become an invisible stale draft the
+  // founder could still act on later — even when this newer recommendation
+  // isn't itself send-worthy (e.g. Chief now says capture_more_evidence).
+  // Supersede unconditionally, before deciding whether to propose anew.
+  for (const existing of prospect.approvals) {
+    if (existing.decision === 'PENDING' && existing.recommendedBy === 'chief') {
+      decideApproval(prospect, existing.id, 'SKIP', 'chief');
+    }
+  }
+
   let approval: QuickScanApproval | null = null;
   const approvalAction = CHIEF_ACTION_TO_APPROVAL[result.recommendation.nextAction];
   if (approvalAction && result.recommendation.messageDraft) {
-    // A prior Chief-proposed approval could still be sitting PENDING (the
-    // founder never decided it, or triggered another recommendation before
-    // deciding the first). The console only ever shows one pending approval,
-    // so an undecided older one would become an invisible stale draft the
-    // founder could still act on later. Supersede it before proposing anew.
-    for (const existing of prospect.approvals) {
-      if (existing.decision === 'PENDING' && existing.recommendedBy === 'chief') {
-        decideApproval(prospect, existing.id, 'SKIP', 'chief');
-      }
-    }
     approval = proposeApproval(prospect, {
       action: approvalAction,
       proposedAction: result.recommendation.messageDraft,
