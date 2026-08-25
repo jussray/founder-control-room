@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  computeCapabilityRequestAuthorityDigest,
   computeFounderDecisionReceiptId,
   createFounderDecisionReceipt,
   validateCapabilityRequestDecisionBinding,
@@ -53,6 +54,7 @@ function decision(req: CapabilityRequestV1) {
     action: 'merge-code',
     capabilityPlanHash: req.capabilityPlanHash,
     expectedHeadSha: req.expectedHeadSha,
+    requestDigest: computeCapabilityRequestAuthorityDigest(req),
     evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
     createdAt: '2026-08-24T23:55:00.000Z',
     expiresAt: '2026-08-25T00:25:00.000Z',
@@ -119,8 +121,8 @@ describe('merged founder-decision authority gaps', () => {
       args: { projectSlug: 'founder-control-room', destructive: true },
     };
 
-    expect(validateCapabilityRequestDecisionBinding(mutated, auth, NOW, FOUNDER).join(' ')).toMatch(
-      /request|capability|digest|binding/i,
+    expect(validateCapabilityRequestDecisionBinding(mutated, auth, NOW, FOUNDER)).toContain(
+      'capability request digest does not match founder decision receipt',
     );
   });
 
