@@ -28,7 +28,8 @@ export function mergeExistingRulesetEnforcement(
 }
 
 function normalizeBranchRef(ref: string): string {
-  return ref.startsWith("refs/heads/") ? ref : `refs/heads/${ref}`;
+  if (ref.startsWith("refs/") || ref.startsWith("~")) return ref;
+  return `refs/heads/${ref}`;
 }
 
 export function mergeExistingRulesetTargetRefs(existing: string[], requested: string[]): string[] {
