@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   mergeExistingRulesetEnforcement,
   mergeExistingRulesetTargetRefs,
+  requestedRefsRemainingExcluded,
 } from "../SecurityPreservingGitHubProvider.js";
 
 const sourcePath = fileURLToPath(new URL("../SecurityPreservingGitHubProvider.ts", import.meta.url));
@@ -29,9 +30,23 @@ describe("SecurityPreservingGitHubProvider top-level security contract", () => {
     ]);
   });
 
+  it("detects requested refs that remain explicitly excluded", () => {
+    expect(requestedRefsRemainingExcluded(
+      ["refs/heads/main", "refs/heads/legacy"],
+      ["main", "release"],
+    )).toEqual(["refs/heads/main"]);
+    expect(requestedRefsRemainingExcluded([], ["main"])).toEqual([]);
+  });
+
   it("does not let the narrow RulesetConfig bypass actor shape widen provider bypass authority", () => {
     expect(source).toContain("config.bypassActors && config.bypassActors.length > 0");
     expect(source).toContain("cannot replace existing bypass posture");
     expect(source).not.toContain('bypass_mode: "always" as const');
+  });
+
+  it("fails closed instead of performing a non-atomic existing-ruleset update", () => {
+    expect(source).toContain("requested target refs remain excluded");
+    expect(source).toContain("provider-supported atomic concurrency");
+    expect(source).not.toContain("repos.updateRepoRuleset({");
   });
 });
