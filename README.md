@@ -25,6 +25,7 @@ Exact SHAs belong in PRs, retained receipts, artifacts, incident records, and hi
 Current implementation includes:
 
 - provider-independent repository abstractions and guarded exact-head execution;
+- a security-preserving GitHub ruleset update membrane for existing non-FCR rulesets: FCR reads current provider rules before mutation, preserves unmanaged security rules and stronger review/bypass state, retains provider metadata on kept status contexts, and permits the requested status-context list itself to be deliberately replaced without claiming that source code or tests prove a live provider mutation;
 - an obligation-aware work supersession contract in which stale/similar branches are only candidates, provider inventory and required residue must be fully and singly accounted, replacement provenance must remain explicit and acyclic, runtime-sensitive closure proof must be current-head-bound, and historical evidence remains recoverable;
 - a canonical repository-provider deletion membrane: ambient `deleteBranch()` authority is intentionally absent until a future obligation-aware receipt reconciler exists and proves safe retirement before provider mutation;
 - founder proof, idempotency/reservation, and rollback boundaries;
