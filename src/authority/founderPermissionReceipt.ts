@@ -3,7 +3,6 @@ import {
   validateAuthorityReceiptV2,
   type AuthorityReceiptV2,
   type AuthorityReceiptV2ConsumptionStore,
-  type AuthorityReceiptV2CurrentAuthority,
   type AuthorityReceiptV2Validation,
 } from './authorityReceiptV2.js';
 
@@ -18,14 +17,56 @@ export type FounderPermissionReceipt = AuthorityReceiptV2 & Readonly<{
   }>;
 }>;
 
+export type FounderPermissionDecisionSnapshot = Readonly<{
+  decisionId: string;
+  founderId: typeof FOUNDER_PERMISSION_ISSUER_ID;
+  subject: FounderPermissionReceipt['subject'];
+  scope: readonly string[];
+  action: FounderPermissionReceipt['action'];
+  expiresAt: string;
+  decision: 'approved';
+}>;
+
+export interface FounderPermissionCurrentAuthority {
+  readDecision(receipt: FounderPermissionReceipt):
+    | Promise<FounderPermissionDecisionSnapshot | null>
+    | FounderPermissionDecisionSnapshot
+    | null;
+}
+
 export type FounderPermissionFailure =
   | 'invalid_permission_contract'
   | 'invalid_founder_issuer'
-  | 'missing_human_approval_evidence';
+  | 'missing_human_approval_evidence'
+  | 'current_authority_rejected';
 
 export type FounderPermissionValidation =
   | { ok: true; receipt: FounderPermissionReceipt }
   | { ok: false; reason: FounderPermissionFailure | Exclude<AuthorityReceiptV2Validation, { ok: true }>['reason'] };
+
+function canonicalScope(scope: readonly string[]): string[] {
+  return [...scope].map((value) => value.trim()).filter(Boolean).sort();
+}
+
+function decisionMatchesReceipt(
+  decision: FounderPermissionDecisionSnapshot,
+  receipt: FounderPermissionReceipt,
+): boolean {
+  return decision.decision === 'approved'
+    && decision.founderId === FOUNDER_PERMISSION_ISSUER_ID
+    && decision.subject.repo === receipt.subject.repo
+    && decision.subject.headSha.toLowerCase() === receipt.subject.headSha.toLowerCase()
+    && decision.subject.baseSha.toLowerCase() === receipt.subject.baseSha.toLowerCase()
+    && JSON.stringify(canonicalScope(decision.scope)) === JSON.stringify(canonicalScope(receipt.scope))
+    && decision.action.type === receipt.action.type
+    && decision.action.target === receipt.action.target
+    && decision.action.digest.toLowerCase() === receipt.action.digest.toLowerCase()
+    && decision.expiresAt === receipt.expiresAt
+    && receipt.evidence.some((item) =>
+      item.class === 'human-approval'
+      && item.ref === `fcr:founder-decision:${decision.decisionId}`
+    );
+}
 
 export function validateFounderPermissionReceipt(
   receipt: FounderPermissionReceipt,
@@ -51,7 +92,7 @@ export function validateFounderPermissionReceipt(
 
 export async function consumeFounderPermissionReceipt(input: {
   receipt: FounderPermissionReceipt;
-  currentAuthority: AuthorityReceiptV2CurrentAuthority;
+  currentAuthority: FounderPermissionCurrentAuthority;
   store: AuthorityReceiptV2ConsumptionStore;
   now?: Date;
 }): Promise<FounderPermissionValidation> {
@@ -59,9 +100,14 @@ export async function consumeFounderPermissionReceipt(input: {
   const permission = validateFounderPermissionReceipt(input.receipt, now);
   if (!permission.ok) return permission;
 
+  const decision = await input.currentAuthority.readDecision(input.receipt);
+  if (!decision || !decisionMatchesReceipt(decision, input.receipt)) {
+    return { ok: false, reason: 'current_authority_rejected' };
+  }
+
   const consumed = await consumeAuthorityReceiptV2({
     receipt: input.receipt,
-    currentAuthority: input.currentAuthority,
+    currentAuthority: { revalidate: () => true },
     store: input.store,
     now,
   });
