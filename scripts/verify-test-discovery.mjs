@@ -3,11 +3,11 @@
  * Test discovery ratchet.
  *
  * The default Vitest configuration currently runs colocated .test.ts files as
- * well as files under __tests__ directories via src/**/*.test.ts. Candidate
- * test files outside the configured include remain excluded from the default
- * npm test gate. They can still be run by a dedicated workflow, so this
- * verifier never calls them "never run in CI" without an exact workflow
- * receipt.
+ * well as files under __tests__ directories through the repository-wide
+ * TypeScript test include. Candidate test files outside that configured include
+ * remain excluded from the default npm test gate. They can still be run by a
+ * dedicated workflow, so this verifier never calls them "never run in CI"
+ * without an exact workflow receipt.
  *
  * The recorded debt is base-bound: a pull request may remove entries by
  * making a candidate discoverable or deleting it, but it cannot add a newly
