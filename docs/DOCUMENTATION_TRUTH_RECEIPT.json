@@ -34,9 +34,7 @@
     {
       "path": "src/providers/SecurityPreservingGitHubProvider.ts",
       "claims": [
-        "src/providers/SecurityPreservingGitHubProvider.ts: existing non-FCR ruleset reconciliation MUST preserve the stronger current enforcement level and MUST NOT demote an active or evaluate ruleset when a narrower caller requests weaker enforcement.",
-        "src/providers/SecurityPreservingGitHubProvider.ts: existing non-FCR ruleset reconciliation MUST union existing included branch refs with requested refs and MUST preserve existing excluded refs so a caller cannot silently narrow the provider-owned protected scope.",
-        "src/providers/SecurityPreservingGitHubProvider.ts: existing non-FCR ruleset reconciliation MUST preserve the current provider bypass posture by default and MUST reject explicit bypass replacement through the narrow RulesetConfig until a separately authorized provider-aware contract can represent bypass mode and prove the replacement is non-widening; this source contract does not itself prove live provider state."
+        "src/providers/SecurityPreservingGitHubProvider.ts must preserve stronger existing enforcement, included and excluded ref scope, and bypass posture; explicit bypass replacement must fail closed unless a provider-aware contract proves the replacement is non-widening."
       ]
     },
     {
