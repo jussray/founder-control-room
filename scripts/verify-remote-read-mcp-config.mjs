@@ -70,7 +70,8 @@ for (const requiredRouteFragment of [
   'externalMcpToolDefinitions',
   'isExternalMcpToolName',
   'timingSafeEqual',
-  'Remote read MCP token or project scope is not configured',
+  'Remote MCP project scope is not configured',
+  "authMode === 'oauth'",
 ]) {
   assert(
     route.includes(requiredRouteFragment),
