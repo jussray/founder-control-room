@@ -45,6 +45,12 @@ The source and provider attack matrix is maintained in `docs/PAIRED_MCP_ATTACK_T
 
 No migration, OAuth dashboard change, Worker secret/binding change, merge, or deployment is authorized merely by this document or by source tests.
 
+### GitHub Truth v0 classifier foundation
+
+The source-only [GitHub Truth MCP v0 contract](MCP_GITHUB_TRUTH_V0.md) adds a deterministic PR/CI evidence classifier without adding a seventh external tool or a new route. It fails closed on old-head passes, missing or non-success CI, stale/malformed/future observations, expected-head mismatch, head movement during collection, and contradictory current-head evidence.
+
+This is not a live GitHub integration or receipt path. GitHub App read permissions, repository allowlisting, bounded collection, durable receipt persistence, catalog/OAuth expansion, provider configuration, and deployed ChatGPT/Claude proof remain separate future gates.
+
 ## Connected repository-agent servers
 
 | Server | Purpose | Boundary |
