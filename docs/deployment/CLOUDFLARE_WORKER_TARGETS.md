@@ -151,6 +151,21 @@ For the served remote read MCP, `FCR_REMOTE_MCP_READ_TOKEN` is a required canoni
 
 Never copy secret values into repository files, logs, screenshots, issue comments, PR bodies, documentation, or public content. A secret name or presence check proves wiring only; provider acceptance/permission is a separate truth.
 
+## Pre-deploy rollback receipt
+
+The canonical manual `Deploy` workflow must capture provider-native rollback coordinates immediately after exact-head production authority validation and before any Supabase, Worker, or Pages mutation begins.
+
+The read-only snapshot records:
+
+- the currently active `founder-control-room` Worker deployment ID and complete version traffic distribution;
+- the live Worker `/version` Git SHA;
+- the current successful, non-skipped `founder-control-room` Pages production deployment on `main`, including its deployment ID and commit hash when available; and
+- the exact candidate SHA the release intends to deploy.
+
+The receipt is retained as `fcr-production-rollback-receipt@v1` in an exact-SHA Actions artifact. Missing or malformed Worker deployment/version identity, incomplete Worker traffic percentages, a missing eligible Pages production deployment, or an invalid runtime/candidate SHA blocks the release before production mutation instead of proceeding without a rollback target.
+
+This receipt is rollback **preparation evidence**, not rollback execution and not proof that a rollback succeeded. Any rollback remains a separately authorized provider mutation and must target the recorded provider-native identities, then produce fresh provider/runtime proof.
+
 ## Verification gate
 
 A merge or provider build does not prove activation. Production is verified only after the applicable authorized lane captures evidence against one exact current-main SHA.
@@ -173,16 +188,16 @@ Provider build/deploy comments, preview URLs, and successful uploads are useful 
 
 ## Documentation truth
 
-When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, remote MCP scope, hostname-inventory/Request Trace behavior, Worker build-authority behavior, or runtime proof requirements change, update this document in the same bounded repository change.
+When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, remote MCP scope, hostname-inventory/Request Trace behavior, Worker build-authority behavior, pre-deploy rollback capture, or runtime proof requirements change, update this document in the same bounded repository change.
 
 Current executable source and authoritative provider readback outrank an older version of this runbook. Preserve older deployment evidence as historical provenance rather than deleting it.
 
 ## Rollback
 
-- Pages: roll back to the prior verified Pages deployment.
-- API Worker: redeploy the prior exact Worker SHA through the authorized Worker release path.
+- Pages: use the retained pre-deploy Pages deployment ID as the first rollback candidate, then verify the restored production deployment and runtime path.
+- API Worker: use the retained pre-deploy Worker version distribution as the first rollback candidate through a separately authorized Worker version deployment, then verify service identity and exact runtime state.
 - Proxy: revert the focused `public/_worker.js` change and matching deployment contract together; do not silently point the browser at an unverified origin.
 - Service binding: revert only the affected Pages binding through separately authorized provider mutation; preserve unrelated bindings/configuration.
 - Access: remove only the bounded exemption/change that was separately authorized, preserving unrelated Access policy.
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
-- Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.
+- Preserve the pre-deploy rollback receipt, build logs, deployment IDs, provider readback, browser traces, and runtime receipts.
