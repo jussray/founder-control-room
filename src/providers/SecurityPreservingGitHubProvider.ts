@@ -36,6 +36,11 @@ export function mergeExistingRulesetTargetRefs(existing: string[], requested: st
   return [...new Set([...existing, ...requested].map(normalizeBranchRef))];
 }
 
+export function requestedRefsRemainingExcluded(requested: string[], excluded: string[]): string[] {
+  const excludedSet = new Set(excluded.map(normalizeBranchRef));
+  return requested.map(normalizeBranchRef).filter((ref) => excludedSet.has(ref));
+}
+
 export class SecurityPreservingGitHubProvider extends GitHubProvider {
   private readonly adminOctokit: Octokit;
   private readonly projectMapForRulesets: Record<string, string>;
@@ -86,40 +91,29 @@ export class SecurityPreservingGitHubProvider extends GitHubProvider {
     if (!existing) return super.applyBranchRuleset(projectId, config);
 
     const { data: current } = await this.adminOctokit.repos.getRepoRuleset({ owner, repo, ruleset_id: existing.id });
-    const mergedRules = mergeExistingRulesetSecurity({
-      existingRules: (current.rules ?? []) as RulesetRuleLike[],
-      requestedRules: this.requestedRules(config),
-      requiredStatusCheckNames: config.requiredStatusCheckNames,
-      requirePullRequest: config.requirePullRequest,
-      blockForcePushes: config.blockForcePushes,
-      blockDeletion: config.blockDeletion,
-    }) as UpdateRules;
 
     if (config.bypassActors && config.bypassActors.length > 0) {
       throw new Error(
         "SecurityPreservingGitHubProvider: existing ruleset updates cannot replace existing bypass posture without a separate bypass-authority contract",
       );
     }
-    const bypassActors = (current.bypass_actors ?? []) as UpdateBypassActors;
 
-    const currentEnforcement = current.enforcement as RulesetEnforcement;
-    const enforcement = mergeExistingRulesetEnforcement(currentEnforcement, config.enforcement);
-    const currentIncludes = current.conditions?.ref_name?.include ?? [];
-    const targetRefs = mergeExistingRulesetTargetRefs(currentIncludes, config.targetRefs);
     const currentExcludes = current.conditions?.ref_name?.exclude ?? [];
+    const conflictingRequestedRefs = requestedRefsRemainingExcluded(config.targetRefs, currentExcludes);
+    if (conflictingRequestedRefs.length > 0) {
+      throw new Error(
+        `SecurityPreservingGitHubProvider: requested target refs remain excluded by the existing ruleset: ${conflictingRequestedRefs.join(", ")}`,
+      );
+    }
 
-    const { data } = await this.adminOctokit.repos.updateRepoRuleset({
-      owner,
-      repo,
-      ruleset_id: existing.id,
-      name: config.name,
-      target: "branch",
-      enforcement,
-      bypass_actors: bypassActors,
-      conditions: { ref_name: { include: targetRefs, exclude: currentExcludes } },
-      rules: mergedRules,
-    });
-
-    return { id: String(data.id), name: data.name, enforcement: data.enforcement };
+    // GitHub's repository-ruleset update endpoint does not expose an atomic
+    // compare-and-swap/version precondition. Reconstructing a full PUT from a
+    // prior read can therefore overwrite provider hardening that lands between
+    // observation and mutation. Until a separately reviewed reconciliation
+    // contract can prove concurrency safety, existing non-FCR ruleset mutation
+    // must fail closed rather than submit a stale snapshot.
+    throw new Error(
+      "SecurityPreservingGitHubProvider: existing non-FCR ruleset updates are blocked until a concurrency-safe provider reconciliation contract exists",
+    );
   }
 }
