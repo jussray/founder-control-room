@@ -2,6 +2,7 @@ import { Router, type Response } from 'express';
 import {
   QUICKSCAN_CONTRACT,
   QUICKSCAN_PRICE_CENTS,
+  type QuickScanApproval,
   type QuickScanEvidenceCategory,
   type QuickScanLifecycleState,
   type QuickScanSegment,
@@ -17,13 +18,23 @@ import {
   qualificationIsValid,
   recordDelivery,
   recordQualification,
+  setChiefRecommendation,
 } from '../../quickscan/engine.js';
 import { getQuickScanProspect, listQuickScanProspects, saveQuickScanProspect } from '../../quickscan/store.js';
 import { buildTrackedStripePaymentLinkUrl } from '../../quickscan/stripeWebhook.js';
+import {
+  createOpenAiQuickScanChiefRunner,
+  QuickScanChiefProviderError,
+  type QuickScanChiefResult,
+} from '../../quickscan/chiefOpenaiClient.js';
+import { QUICKSCAN_CHIEF_WORKFLOW } from '../../quickscan/chiefPrompts.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
-export const quickScanRouter = Router();
-quickScanRouter.use(requireFounder);
+type RunQuickScanChief = ReturnType<typeof createOpenAiQuickScanChiefRunner>;
+
+export interface QuickScanRouteDependencies {
+  runChief?: RunQuickScanChief;
+}
 
 function text(value: unknown): string { return typeof value === 'string' ? value.trim() : ''; }
 function record(value: unknown): Record<string, unknown> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}; }
@@ -31,6 +42,29 @@ function fail(res: Response, status: number, code: string, message: string) { re
 
 const SEGMENTS = new Set<QuickScanSegment>(['high_volume_solo_operator','salon_studio_team_owner','beauty_educator','wig_custom_order_business','high_ticket_beauty_wellness_operator']);
 const EVIDENCE = new Set<QuickScanEvidenceCategory>(['visible_friction','active_demand','owner_reachable','repeat_high_value_service','operational_complexity','urgency']);
+
+/**
+ * Only these Chief next-action recommendations map onto an existing
+ * QuickScanApproval action a founder can APPROVE/EDIT/SKIP; the rest
+ * (capture_more_evidence, offer_fit_check, disqualify) have nothing to
+ * "send" and are surfaced as a recommendation only, with no approval
+ * auto-created.
+ */
+const CHIEF_ACTION_TO_APPROVAL: Partial<Record<string, QuickScanApproval['action']>> = {
+  approve_outreach: 'outreach',
+  send_payment_link: 'payment_link',
+  prepare_delivery: 'delivery',
+};
+
+function providerErrorCode(error: unknown): string {
+  return error instanceof QuickScanChiefProviderError ? error.code : 'QUICKSCAN_CHIEF_FAILED';
+}
+
+export function createQuickScanRouter(dependencies: QuickScanRouteDependencies = {}) {
+  const quickScanRouter = Router();
+  const runChief = dependencies.runChief ?? createOpenAiQuickScanChiefRunner();
+
+  quickScanRouter.use(requireFounder);
 
 quickScanRouter.get('/', (_req, res) => {
   const prospects = listQuickScanProspects();
@@ -45,6 +79,7 @@ quickScanRouter.get('/', (_req, res) => {
       scrape: false,
       executeN8n: false,
       stripeWebhookConfigured: Boolean(process.env.STRIPE_QUICKSCAN_WEBHOOK_SECRET?.trim()),
+      chiefConfigured: Boolean(process.env.OPENAI_API_KEY?.trim()),
     },
     architecture: { fcr: 'authority-evidence-ui', chief: 'replaceable-reasoning', promptos: 'versioned-workflow-provenance', ultrathink: 'domain-rules', n8n: 'orchestration-disabled-v1' },
     priceCents: QUICKSCAN_PRICE_CENTS,
@@ -187,3 +222,67 @@ quickScanRouter.post('/prospects/:id/delivery', (req: FounderRequest, res) => {
     return fail(res, 409, 'DELIVERY_BLOCKED', error instanceof Error ? error.message : 'delivery blocked');
   }
 });
+
+/**
+ * POST /prospects/:id/chief-recommendation
+ *
+ * Founder-triggered only: nothing calls Chief automatically. Reasons from
+ * this prospect's own recorded evidence/segment/qualification/stage — never
+ * anything the founder did not themselves observe and record — and returns
+ * exactly one next action. When that action is one a founder can approve to
+ * send (approve_outreach, send_payment_link, prepare_delivery) and Chief
+ * drafted a message, this also proposes a PENDING approval the founder
+ * still has to APPROVE/EDIT/SKIP through the existing approval routes;
+ * Chief never sends anything itself.
+ */
+quickScanRouter.post('/prospects/:id/chief-recommendation', async (req: FounderRequest, res) => {
+  const prospect = getQuickScanProspect(req.params.id);
+  if (!prospect) return fail(res, 404, 'PROSPECT_NOT_FOUND', 'prospect not found');
+
+  let result: QuickScanChiefResult;
+  try {
+    result = await runChief({
+      businessName: prospect.businessName,
+      ownerName: prospect.ownerName ?? null,
+      segment: prospect.segment,
+      lifecycleState: prospect.lifecycleState,
+      score: prospect.score,
+      evidence: prospect.evidence,
+      qualification: prospect.qualification ?? null,
+    });
+  } catch (error) {
+    const code = providerErrorCode(error);
+    return fail(
+      res,
+      code === 'OPENAI_NOT_CONFIGURED' ? 503 : 502,
+      code,
+      code === 'OPENAI_NOT_CONFIGURED' ? 'QuickScan Chief model provider is not configured' : 'QuickScan Chief model provider failed',
+    );
+  }
+
+  try {
+    setChiefRecommendation(prospect, result.recommendation, QUICKSCAN_CHIEF_WORKFLOW, 'chief');
+  } catch (error) {
+    return fail(res, 502, 'QUICKSCAN_CHIEF_PROVENANCE_MISMATCH', error instanceof Error ? error.message : 'Chief recommendation provenance mismatch');
+  }
+
+  let approval: QuickScanApproval | null = null;
+  const approvalAction = CHIEF_ACTION_TO_APPROVAL[result.recommendation.nextAction];
+  if (approvalAction && result.recommendation.messageDraft) {
+    approval = proposeApproval(prospect, {
+      action: approvalAction,
+      proposedAction: result.recommendation.messageDraft,
+      reason: result.recommendation.summary,
+      evidenceIds: prospect.evidence.map((item) => item.id),
+      recommendedBy: 'chief',
+    });
+  }
+
+  saveQuickScanProspect(prospect);
+  return res.json({ ok: true, prospect, approval });
+});
+
+  return quickScanRouter;
+}
+
+export const quickScanRouter = createQuickScanRouter();
