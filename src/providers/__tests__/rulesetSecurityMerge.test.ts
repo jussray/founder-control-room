@@ -106,6 +106,29 @@ describe("mergeExistingRulesetSecurity", () => {
     ]);
   });
 
+  it("preserves an existing pull-request membrane even when a generic caller requests none", () => {
+    const existingRules = [{
+      type: "pull_request",
+      parameters: {
+        required_approving_review_count: 2,
+        dismiss_stale_reviews_on_push: true,
+        require_last_push_approval: true,
+        required_review_thread_resolution: true,
+      },
+    }];
+
+    const merged = mergeExistingRulesetSecurity({
+      existingRules,
+      requestedRules: [],
+      requiredStatusCheckNames: [],
+      requirePullRequest: false,
+      blockForcePushes: false,
+      blockDeletion: false,
+    });
+
+    expect(merged).toEqual(existingRules);
+  });
+
   it("does not mutate its input rules", () => {
     const existingRules = [{
       type: "pull_request",
