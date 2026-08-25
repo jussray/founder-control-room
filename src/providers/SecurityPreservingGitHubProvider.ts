@@ -38,14 +38,16 @@ export function mergeExistingRulesetTargetRefs(existing: string[], requested: st
 
 export function requestedRefsRemainingExcluded(requested: string[], excluded: string[]): string[] {
   const normalizedRequested = requested.map(normalizeBranchRef);
-  const normalizedExcluded = excluded.map(normalizeBranchRef);
-  return normalizedRequested.filter((ref) => normalizedExcluded.some((excludedRef) => {
-    if (excludedRef === "~ALL" || excludedRef === "~DEFAULT_BRANCH") return true;
-    if (excludedRef === ref) return true;
-    if (!excludedRef.includes("*")) return false;
-    const escaped = excludedRef.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
-    return new RegExp(`^${escaped}$`).test(ref);
-  }));
+  const normalizedExcluded = new Set(excluded.map(normalizeBranchRef));
+
+  // This compatibility provider must not invent GitHub's ref-pattern or
+  // ~DEFAULT_BRANCH semantics locally. Exact refs and ~ALL are the only
+  // exclusions whose coverage can be proven from this receipt alone. Any
+  // other selector still reaches the generic existing-ruleset fail-closed
+  // boundary below, so uncertainty never becomes mutation authority or a
+  // misleading provider-state diagnosis.
+  if (normalizedExcluded.has("~ALL")) return normalizedRequested;
+  return normalizedRequested.filter((ref) => normalizedExcluded.has(ref));
 }
 
 export class SecurityPreservingGitHubProvider extends GitHubProvider {
@@ -140,7 +142,7 @@ export class SecurityPreservingGitHubProvider extends GitHubProvider {
     const conflictingRequestedRefs = requestedRefsRemainingExcluded(config.targetRefs, currentExcludes);
     if (conflictingRequestedRefs.length > 0) {
       throw new Error(
-        `SecurityPreservingGitHubProvider: requested target refs remain excluded by the existing ruleset: ${conflictingRequestedRefs.join(", ")}`,
+        `SecurityPreservingGitHubProvider: requested target refs remain explicitly excluded by the existing ruleset: ${conflictingRequestedRefs.join(", ")}`,
       );
     }
 
