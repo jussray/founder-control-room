@@ -1,17 +1,9 @@
 import { Octokit } from "@octokit/rest";
-import type { RestEndpointMethodTypes } from "@octokit/rest";
 import { GitHubProvider, type GitHubProviderConfig } from "./GitHubProvider.js";
 import type { RulesetConfig, RulesetResult } from "./RepositoryProvider.js";
-import { mergeExistingRulesetSecurity, type RulesetRuleLike } from "./rulesetSecurityMerge.js";
 
 const FOUNDER_CONTROL_ROOM_PROJECT_ID = "founder-control-room";
 
-type UpdateRules = NonNullable<
-  RestEndpointMethodTypes["repos"]["updateRepoRuleset"]["parameters"]
->["rules"];
-type UpdateBypassActors = NonNullable<
-  RestEndpointMethodTypes["repos"]["updateRepoRuleset"]["parameters"]
->["bypass_actors"];
 type RulesetEnforcement = RulesetConfig["enforcement"];
 
 const enforcementRank: Record<RulesetEnforcement, number> = {
@@ -57,29 +49,6 @@ export class SecurityPreservingGitHubProvider extends GitHubProvider {
     const [owner, repo] = locator.split("/");
     if (!owner || !repo) throw new Error(`SecurityPreservingGitHubProvider: malformed locator "${locator}"`);
     return { owner, repo };
-  }
-
-  private requestedRules(config: RulesetConfig): RulesetRuleLike[] {
-    const rules: RulesetRuleLike[] = [];
-    if (config.requirePullRequest) {
-      rules.push({ type: "pull_request", parameters: {
-        dismiss_stale_reviews_on_push: false,
-        require_code_owner_review: false,
-        require_last_push_approval: false,
-        required_approving_review_count: config.requiredApprovingReviewCount,
-        required_review_thread_resolution: true,
-      } });
-    }
-    if (config.requiredStatusCheckNames.length > 0) {
-      rules.push({ type: "required_status_checks", parameters: {
-        do_not_enforce_on_create: false,
-        required_status_checks: config.requiredStatusCheckNames.map((context) => ({ context })),
-        strict_required_status_checks_policy: true,
-      } });
-    }
-    if (config.blockForcePushes) rules.push({ type: "non_fast_forward" });
-    if (config.blockDeletion) rules.push({ type: "deletion" });
-    return rules;
   }
 
   override async applyBranchRuleset(projectId: string, config: RulesetConfig): Promise<RulesetResult> {
