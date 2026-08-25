@@ -6,7 +6,9 @@ import {
   assertUngatedQuickScanTransition,
   createOverrideReceipt,
   createProspect,
+  decideApproval,
   markPaidFromVerifiedStripeEvent,
+  proposeApproval,
   recordDelivery,
   setChiefRecommendation,
 } from '../engine.js';
@@ -192,6 +194,14 @@ describe('QuickScan engine', () => {
   it('refuses to record delivery when the prospect is not delivery_due', () => {
     const prospect = prospectAtPaymentLinkSent();
     expect(() => recordDelivery(prospect, 'https://loom.com/share/example', 'founder')).toThrow('not delivery_due');
+  });
+
+  it('refuses to decide an approval that has already been decided', () => {
+    const prospect = scoredProspect();
+    const approval = proposeApproval(prospect, { action: 'outreach', proposedAction: 'Draft', reason: 'Observed pain', evidenceIds: [], recommendedBy: 'human' });
+    decideApproval(prospect, approval.id, 'SKIP', 'founder');
+    expect(() => decideApproval(prospect, approval.id, 'APPROVE', 'founder')).toThrow('already decided');
+    expect(approval.decision).toBe('SKIP');
   });
 
   it('blocks the generic transition path from reaching evidence-gated states directly', () => {
