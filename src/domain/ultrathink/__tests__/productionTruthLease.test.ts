@@ -10,6 +10,16 @@ import {
 } from '../sourceAuthority.js';
 
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const EVIDENCE_HASH = `sha256:${'1'.repeat(64)}` as const;
+const WITNESS_OBSERVED_AT = '2026-08-23T05:14:00.000Z';
+
+function witnessEvidence(evidenceRef: string) {
+  return {
+    evidenceRef,
+    evidenceHash: EVIDENCE_HASH,
+    observedAt: WITNESS_OBSERVED_AT,
+  } as const;
+}
 
 function sourceAuthorityObservation(
   overrides: Partial<SourceAuthorityObservation> = {},
@@ -69,18 +79,18 @@ function lease(
     sourceAuthority: authorityRecord(),
     runtime: {
       result: 'pass',
-      evidenceRef: 'runtime:health-1',
+      ...witnessEvidence('runtime:health-1'),
     },
     dataAuth: {
       provider: 'supabase',
       projectRef: 'oojzfmmywbvficgybaxd',
       result: 'pass',
-      evidenceRef: 'supabase:posture-1',
+      ...witnessEvidence('supabase:posture-1'),
     },
     experience: {
       scenario: 'governance-critical journey',
       result: 'pass',
-      evidenceRef: 'playwright:report-1',
+      ...witnessEvidence('playwright:report-1'),
     },
     ...overrides,
   };
@@ -152,7 +162,10 @@ describe('ULTRATHINK production truth lease', () => {
 
   it('fails when runtime health fails', () => {
     expect(evaluateProductionTruthLease(lease({
-      runtime: { result: 'fail', evidenceRef: 'runtime:health-1' },
+      runtime: {
+        result: 'fail',
+        ...witnessEvidence('runtime:health-1'),
+      },
     })).result).toBe('fail');
   });
 
@@ -162,7 +175,7 @@ describe('ULTRATHINK production truth lease', () => {
         provider: 'supabase',
         projectRef: 'oojzfmmywbvficgybaxd',
         result: 'fail',
-        evidenceRef: 'supabase:posture-1',
+        ...witnessEvidence('supabase:posture-1'),
       },
     })).result).toBe('fail');
   });
@@ -172,7 +185,7 @@ describe('ULTRATHINK production truth lease', () => {
       experience: {
         scenario: 'governance-critical journey',
         result: 'fail',
-        evidenceRef: 'playwright:report-1',
+        ...witnessEvidence('playwright:report-1'),
       },
     })).result).toBe('fail');
   });
@@ -182,17 +195,49 @@ describe('ULTRATHINK production truth lease', () => {
       experience: {
         scenario: 'governance-critical journey',
         result: 'blocked',
-        evidenceRef: 'playwright:report-1',
+        ...witnessEvidence('playwright:report-1'),
       },
     })).result).toBe('blocked');
   });
 
   it('blocks when a required evidence reference is missing', () => {
     expect(evaluateProductionTruthLease(lease({
-      runtime: { result: 'pass', evidenceRef: '' },
+      runtime: {
+        result: 'pass',
+        ...witnessEvidence(''),
+      },
     }))).toEqual({
       result: 'blocked',
-      reason: 'required production witness evidence is missing',
+      reason: 'required production witness evidence is missing or invalid',
+    });
+  });
+
+  it('blocks when a witness evidence hash is malformed', () => {
+    expect(evaluateProductionTruthLease(lease({
+      runtime: {
+        result: 'pass',
+        evidenceRef: 'runtime:health-1',
+        evidenceHash: 'sha256:not-a-real-digest',
+        observedAt: WITNESS_OBSERVED_AT,
+      },
+    }))).toEqual({
+      result: 'blocked',
+      reason: 'required production witness evidence is missing or invalid',
+    });
+  });
+
+  it('blocks when a witness observation timestamp is invalid', () => {
+    expect(evaluateProductionTruthLease(lease({
+      experience: {
+        scenario: 'governance-critical journey',
+        result: 'pass',
+        evidenceRef: 'playwright:report-1',
+        evidenceHash: EVIDENCE_HASH,
+        observedAt: 'not-a-time',
+      },
+    }))).toEqual({
+      result: 'blocked',
+      reason: 'required production witness evidence is missing or invalid',
     });
   });
 });
