@@ -132,13 +132,47 @@ jobs:
             echo "- Proof-of-ship scheduled publication: enabled with 20-minute founder review"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  rollback-snapshot:
+    name: Capture Pre-Deploy Rollback Receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    needs: authority-gate
+    env:
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+    steps:
+      - name: Checkout exact approved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Capture provider-native rollback targets before mutation
+        run: node scripts/capture-production-rollback-receipt.mjs
+
+      - name: Upload pre-deploy rollback receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-rollback-receipt-${{ inputs.expected_head_sha }}
+          path: test-results/production-rollback-receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
   # ── 1. Supabase migrations ──────────────────────────────────────────────────────
   supabase-migrate:
     name: Supabase DB Push
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: production
-    needs: authority-gate
+    needs: rollback-snapshot
     steps:
       - uses: actions/checkout@v4
         with:
@@ -397,11 +431,11 @@ jobs:
           print(f'Grant enabled: {grant.get("enabled")}')
 
           if body.get('service') != 'founder-control-room':
-              raise SystemExit('service identity payload is missing or incorrect')
+            raise SystemExit('service identity payload is missing or incorrect')
           if deployed_sha != expected_sha:
-              raise SystemExit('exact deployment proof failed')
+            raise SystemExit('exact deployment proof failed')
           if grant != {'configured': True, 'enabled': False}:
-              raise SystemExit('broad Founder Signal automation grant fail-closed read-back failed')
+            raise SystemExit('broad Founder Signal automation grant fail-closed read-back failed')
           PY
         env:
           DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
@@ -417,9 +451,9 @@ jobs:
 
           body = json.loads(os.environ['BODY'])
           if body.get('sensitiveFieldsIncluded') is not False:
-              raise SystemExit('guardrail surface is not public-safe')
+            raise SystemExit('guardrail surface is not public-safe')
           if body.get('standingMergeAuthority') is not True:
-              raise SystemExit('standing merge authority is not active')
+            raise SystemExit('standing merge authority is not active')
           PY
         env:
           DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
@@ -442,7 +476,7 @@ jobs:
 
           body = json.loads(os.environ['HEALTH_BODY'])
           if body != {'ok': True}:
-              raise SystemExit(f'unexpected public health payload: {body!r}')
+            raise SystemExit(f'unexpected public health payload: {body!r}')
           PY
 
           VERSION_BODY=$(curl --fail --silent --show-error "$PUBLIC_URL/version")
@@ -452,9 +486,9 @@ jobs:
 
           body = json.loads(os.environ['VERSION_BODY'])
           if body.get('service') != 'founder-control-room':
-              raise SystemExit('public proxy reached the wrong service')
+            raise SystemExit('public proxy reached the wrong service')
           if body.get('gitSha') != os.environ['EXPECTED_SHA']:
-              raise SystemExit('public proxy exact deployment proof failed')
+            raise SystemExit('public proxy exact deployment proof failed')
           PY
         env:
           PUBLIC_URL: https://foundercontrolroom.org
