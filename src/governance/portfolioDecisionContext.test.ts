@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   decisionContextFromVerdict,
+  decisionContextHash,
   type ContextBoundGovernedActionRequest,
 } from './portfolioDecisionContext.js';
 import { evaluatePortfolioGovernedAction } from './portfolioGovernanceProfiles.js';
+import { createTruthLease } from '../lib/truthLease.js';
 
 const NOW = new Date('2026-08-17T03:30:00.000Z');
 const PROPOSAL_HASH = 'b'.repeat(64);
@@ -96,12 +98,51 @@ function bindCurrentContext(input: ContextBoundGovernedActionRequest): ContextBo
   expect(firstVerdict.reasonCodes).toEqual(['execution_authorization_binding']);
   expect(snapshot).not.toBeNull();
 
+  const contextHash = decisionContextHash(snapshot!);
+  const lease = createTruthLease({
+    claimHash: contextHash,
+    claimClass: 'fcr/governed-decision-context@v1',
+    verifiedAt: NOW.toISOString(),
+    validUntil: new Date(NOW.getTime() + 30 * 60 * 1000).toISOString(),
+    dependencies: [
+      {
+        key: 'memory:goal',
+        authority: 'human-outcome',
+        expectedDigest: '6'.repeat(64),
+        maxObservationAgeMs: 60 * 60 * 1000,
+      },
+      {
+        key: 'proof:intent',
+        authority: 'runtime',
+        expectedDigest: 'a'.repeat(64),
+        maxObservationAgeMs: 60 * 60 * 1000,
+      },
+    ],
+  });
+
   return {
     ...input,
     authorization: {
       ...input.authorization!,
       decisionContext: snapshot!,
+      truthLeaseHash: lease.leaseHash,
     },
+    truthLease: lease,
+    truthUseBoundary: 'merge',
+    truthObservations: [
+      {
+        key: 'memory:goal',
+        authority: 'human-outcome',
+        digest: '6'.repeat(64),
+        observedAt: NOW.toISOString(),
+      },
+      {
+        key: 'proof:intent',
+        authority: 'runtime',
+        digest: 'a'.repeat(64),
+        observedAt: NOW.toISOString(),
+      },
+    ],
   };
 }
 

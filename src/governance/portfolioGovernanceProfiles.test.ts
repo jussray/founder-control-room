@@ -5,6 +5,12 @@ import {
   portfolioGovernanceProfile,
   portfolioHardConstraintViolations,
 } from './portfolioGovernanceProfiles.js';
+import {
+  decisionContextFromVerdict,
+  decisionContextHash,
+  type ContextBoundGovernedActionRequest,
+} from './portfolioDecisionContext.js';
+import { createTruthLease } from '../lib/truthLease.js';
 import type {
   ExecutionAuthorization,
   GovernedActionRequest,
@@ -44,6 +50,47 @@ function request(scope: string, overrides: Partial<GovernedActionRequest> = {}):
     proposalHash: PROPOSAL_HASH, actionHash: ACTION_HASH, authorization: authorization(scope), authorizationReplayState: 'unused', now: NOW,
     ...overrides,
   };
+}
+
+function bindContextAndLease(input: GovernedActionRequest, repository: string): ContextBoundGovernedActionRequest {
+  const firstVerdict = evaluatePortfolioGovernedAction(repository, input.requiredScope, input);
+  const snapshot = decisionContextFromVerdict(input, firstVerdict);
+  if (!snapshot) return input as ContextBoundGovernedActionRequest;
+
+  const contextHash = decisionContextHash(snapshot);
+  const lease = createTruthLease({
+    claimHash: contextHash,
+    claimClass: 'fcr/governed-decision-context@v1',
+    verifiedAt: NOW.toISOString(),
+    validUntil: new Date(NOW.getTime() + 30 * 60 * 1000).toISOString(),
+    dependencies: [
+      {
+        key: 'proof:test',
+        authority: 'runtime',
+        expectedDigest: ARTIFACT_HASH,
+        maxObservationAgeMs: 60 * 60 * 1000,
+      },
+    ],
+  });
+
+  return {
+    ...input,
+    authorization: input.authorization ? {
+      ...input.authorization,
+      decisionContext: snapshot,
+      truthLeaseHash: lease.leaseHash,
+    } : null,
+    truthLease: lease,
+    truthUseBoundary: 'merge',
+    truthObservations: [
+      {
+        key: 'proof:test',
+        authority: 'runtime',
+        digest: ARTIFACT_HASH,
+        observedAt: NOW.toISOString(),
+      },
+    ],
+  } as ContextBoundGovernedActionRequest;
 }
 
 describe('active portfolio governance registry', () => {
@@ -128,7 +175,8 @@ describe('project-specific proof contracts', () => {
     const first = evaluatePortfolioGovernedAction('jussray/untold-stories-storefront', 'production_claim', request('production_claim', { proofs: [proof('exact_production_version_verified')] }));
     expect(first.decision).toBe('reconfirm');
     expect(first.reasons.join(' ')).toContain('commerce_path_verified');
-    const complete = evaluatePortfolioGovernedAction('jussray/untold-stories-storefront', 'production_claim', request('production_claim', { proofs: [proof('exact_production_version_verified'), proof('commerce_path_verified')] }));
+    const completeReq = bindContextAndLease(request('production_claim', { proofs: [proof('exact_production_version_verified'), proof('commerce_path_verified')] }), 'jussray/untold-stories-storefront');
+    const complete = evaluatePortfolioGovernedAction('jussray/untold-stories-storefront', 'production_claim', completeReq);
     expect(complete.decision).toBe('allow');
   });
 
@@ -136,7 +184,8 @@ describe('project-specific proof contracts', () => {
     const missing = evaluatePortfolioGovernedAction('jussray/jussbeautifulhair-site', 'commerce_completion', request('commerce_completion'));
     expect(missing.decision).toBe('reconfirm');
     expect(missing.reasons.join(' ')).toContain('commerce_provider_receipt_verified');
-    const complete = evaluatePortfolioGovernedAction('jussray/jussbeautifulhair-site', 'commerce_completion', request('commerce_completion', { proofs: [proof('commerce_provider_receipt_verified')] }));
+    const completeReq = bindContextAndLease(request('commerce_completion', { proofs: [proof('commerce_provider_receipt_verified')] }), 'jussray/jussbeautifulhair-site');
+    const complete = evaluatePortfolioGovernedAction('jussray/jussbeautifulhair-site', 'commerce_completion', completeReq);
     expect(complete.decision).toBe('allow');
   });
 
