@@ -36,6 +36,27 @@ export function mergeExistingRulesetTargetRefs(existing: string[], requested: st
   return [...new Set([...existing, ...requested].map(normalizeBranchRef))];
 }
 
+function refPatternMayExclude(pattern: string, target: string): boolean {
+  const normalizedPattern = normalizeBranchRef(pattern);
+  const normalizedTarget = normalizeBranchRef(target);
+  if (normalizedPattern === normalizedTarget || normalizedPattern === "~ALL") return true;
+  if (normalizedPattern.startsWith("~")) return true;
+
+  const escaped = normalizedPattern
+    .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*");
+  return new RegExp(`^${escaped}$`).test(normalizedTarget);
+}
+
+export function assertRequestedTargetRefsNotExcluded(requested: string[], existingExcludes: string[]): void {
+  const blocked = requested.find((target) => existingExcludes.some((pattern) => refPatternMayExclude(pattern, target)));
+  if (blocked) {
+    throw new Error(
+      `SecurityPreservingGitHubProvider: requested target ref "${normalizeBranchRef(blocked)}" remains excluded by the existing ruleset`,
+    );
+  }
+}
+
 export class SecurityPreservingGitHubProvider extends GitHubProvider {
   private readonly adminOctokit: Octokit;
   private readonly projectMapForRulesets: Record<string, string>;
@@ -107,6 +128,7 @@ export class SecurityPreservingGitHubProvider extends GitHubProvider {
     const currentIncludes = current.conditions?.ref_name?.include ?? [];
     const targetRefs = mergeExistingRulesetTargetRefs(currentIncludes, config.targetRefs);
     const currentExcludes = current.conditions?.ref_name?.exclude ?? [];
+    assertRequestedTargetRefsNotExcluded(config.targetRefs, currentExcludes);
 
     const { data } = await this.adminOctokit.repos.updateRepoRuleset({
       owner,
