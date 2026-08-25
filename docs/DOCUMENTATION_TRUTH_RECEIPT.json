@@ -33,6 +33,12 @@
       ]
     },
     {
+      "path": "scripts/verify-remote-read-mcp-config.mjs",
+      "claims": [
+        "scripts/verify-remote-read-mcp-config.mjs: the remote-read MCP verifier MUST validate the current registry-backed read-only tool surface through externalMcpToolDefinitions, isExternalMcpToolName, and the exact EXTERNAL_MCP_TOOL_NAMES allowlist instead of requiring retired hard-coded route constants; create_tool, write_tool, and merge_tool MUST remain forbidden."
+      ]
+    },
+    {
       "path": "src/providers/SecurityPreservingGitHubProvider.ts",
       "claims": [
         "src/providers/SecurityPreservingGitHubProvider.ts: existing non-FCR ruleset reconciliation MUST preserve the stronger current enforcement level and MUST NOT demote an active or evaluate ruleset when a narrower caller requests weaker enforcement.",
