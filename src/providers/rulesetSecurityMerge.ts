@@ -100,6 +100,11 @@ export function mergeExistingRulesetSecurity({
           requestedParameters,
           "dismiss_stale_reviews_on_push",
         ),
+        require_code_owner_review: securityBoolean(
+          existingParameters,
+          requestedParameters,
+          "require_code_owner_review",
+        ),
         require_last_push_approval: securityBoolean(
           existingParameters,
           requestedParameters,
@@ -150,7 +155,7 @@ export function mergeExistingRulesetSecurity({
     });
   }
 
-  if (blockForcePushes) {
+  if (blockForcePushes || existingByType.has("non_fast_forward")) {
     nextRules.push(structuredClone(
       existingByType.get("non_fast_forward")
       ?? requestedByType.get("non_fast_forward")
@@ -158,7 +163,7 @@ export function mergeExistingRulesetSecurity({
     ));
   }
 
-  if (blockDeletion) {
+  if (blockDeletion || existingByType.has("deletion")) {
     nextRules.push(structuredClone(
       existingByType.get("deletion")
       ?? requestedByType.get("deletion")
