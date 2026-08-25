@@ -6,6 +6,7 @@ import {
 
 const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const SHA_B = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+const ZERO_SHA = '0000000000000000000000000000000000000000';
 
 const witness: FreshnessWitness = {
   id: 'freshness-1',
@@ -42,6 +43,26 @@ describe('evaluateFreshnessWitness', () => {
   it('blocks observations captured for another repository even when the sha matches', () => {
     expect(evaluateFreshnessWitness(witness, { ...observation, repository: 'jussray/fork' }, evaluatedAt)).toEqual({
       status: 'BLOCKED', current: false, reasons: ['repository_drift'],
+    });
+  });
+
+  it('rejects Git zero sentinel as expected main identity', () => {
+    expect(evaluateFreshnessWitness(
+      { ...witness, expectedMainSha: ZERO_SHA },
+      { ...observation, currentMainSha: ZERO_SHA },
+      evaluatedAt,
+    )).toEqual({
+      status: 'BLOCKED', current: false, reasons: ['invalid_expected_sha', 'invalid_current_sha'],
+    });
+  });
+
+  it('rejects Git zero sentinel as current main identity', () => {
+    expect(evaluateFreshnessWitness(
+      witness,
+      { ...observation, currentMainSha: ZERO_SHA },
+      evaluatedAt,
+    )).toEqual({
+      status: 'BLOCKED', current: false, reasons: ['invalid_current_sha'],
     });
   });
 
