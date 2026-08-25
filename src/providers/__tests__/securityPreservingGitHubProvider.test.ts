@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockGetRepoRulesets, mockGetRepoRuleset, mockUpdateRepoRuleset } = vi.hoisted(() => ({
-  mockGetRepoRulesets: vi.fn(), mockGetRepoRuleset: vi.fn(), mockUpdateRepoRuleset: vi.fn(),
+const { mockGetRepoRulesets, mockGetRepoRuleset, mockUpdateRepoRuleset, mockCreateRepoRuleset } = vi.hoisted(() => ({
+  mockGetRepoRulesets: vi.fn(), mockGetRepoRuleset: vi.fn(), mockUpdateRepoRuleset: vi.fn(), mockCreateRepoRuleset: vi.fn(),
 }));
 
 vi.mock("@octokit/rest", () => ({
   Octokit: class MockOctokit {
-    repos = { getRepoRulesets: mockGetRepoRulesets, getRepoRuleset: mockGetRepoRuleset, updateRepoRuleset: mockUpdateRepoRuleset };
+    repos = {
+      getRepoRulesets: mockGetRepoRulesets,
+      getRepoRuleset: mockGetRepoRuleset,
+      updateRepoRuleset: mockUpdateRepoRuleset,
+      createRepoRuleset: mockCreateRepoRuleset,
+    };
   },
 }));
 
@@ -45,6 +50,7 @@ describe("SecurityPreservingGitHubProvider", () => {
         { type: "code_scanning", parameters: { code_scanning_tools: [{ tool: "CodeQL" }] } },
       ],
     } });
+    mockCreateRepoRuleset.mockResolvedValue({ data: { id: 31337, name: "governance boundary", enforcement: "active" } });
   });
 
   it("fails closed instead of PUT-updating an existing non-FCR ruleset from a stale provider snapshot", async () => {
@@ -83,6 +89,31 @@ describe("SecurityPreservingGitHubProvider", () => {
     await expect(provider().applyBranchRuleset(PROJECT_ID, config({ bypassActors: [{ kind: "app", id: "321" }] }))).rejects.toThrow(
       "cannot replace existing bypass posture",
     );
+    expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
+  });
+
+  it("creates a brand-new non-FCR ruleset without delegating to an update-capable path", async () => {
+    mockGetRepoRulesets.mockResolvedValueOnce({ data: [] });
+
+    await expect(provider().applyBranchRuleset(PROJECT_ID, config())).resolves.toEqual({
+      id: "31337",
+      name: "governance boundary",
+      enforcement: "active",
+    });
+
+    expect(mockCreateRepoRuleset).toHaveBeenCalledTimes(1);
+    expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when a create-only race produces a provider conflict and never falls back to PUT", async () => {
+    mockGetRepoRulesets.mockResolvedValueOnce({ data: [] });
+    mockCreateRepoRuleset.mockRejectedValueOnce(new Error("Validation Failed: name already exists"));
+
+    await expect(provider().applyBranchRuleset(PROJECT_ID, config())).rejects.toThrow(
+      "create-only ruleset creation failed; refusing update fallback",
+    );
+
+    expect(mockCreateRepoRuleset).toHaveBeenCalledTimes(1);
     expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
   });
 });
