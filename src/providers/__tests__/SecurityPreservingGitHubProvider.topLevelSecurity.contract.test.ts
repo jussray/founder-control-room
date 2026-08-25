@@ -1,16 +1,32 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import {
+  mergeExistingRulesetEnforcement,
+  mergeExistingRulesetTargetRefs,
+} from "../SecurityPreservingGitHubProvider.js";
 
 const sourcePath = fileURLToPath(new URL("../SecurityPreservingGitHubProvider.ts", import.meta.url));
 const source = readFileSync(sourcePath, "utf8");
 
 describe("SecurityPreservingGitHubProvider top-level security contract", () => {
-  it("preserves active enforcement and existing ref scope for an existing ruleset", () => {
-    expect(source).toContain("mergeExistingRulesetEnforcement");
-    expect(source).toContain("mergeExistingRulesetTargetRefs");
-    expect(source).not.toContain("enforcement: config.enforcement,");
-    expect(source).not.toContain("include: config.targetRefs.map");
+  it("never demotes existing enforcement", () => {
+    expect(mergeExistingRulesetEnforcement("active", "disabled")).toBe("active");
+    expect(mergeExistingRulesetEnforcement("active", "evaluate")).toBe("active");
+    expect(mergeExistingRulesetEnforcement("evaluate", "disabled")).toBe("evaluate");
+    expect(mergeExistingRulesetEnforcement("disabled", "active")).toBe("active");
+  });
+
+  it("preserves existing branch scope and GitHub special ref selectors", () => {
+    expect(mergeExistingRulesetTargetRefs(
+      ["~DEFAULT_BRANCH", "~ALL", "refs/heads/release/*"],
+      ["main", "refs/heads/release/*"],
+    )).toEqual([
+      "~DEFAULT_BRANCH",
+      "~ALL",
+      "refs/heads/release/*",
+      "refs/heads/main",
+    ]);
   });
 
   it("does not let the narrow RulesetConfig bypass actor shape widen provider bypass authority", () => {
