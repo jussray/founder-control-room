@@ -1,5 +1,7 @@
 {
-  "note": "All .test.ts files (colocated and __tests__/) are now discovered by the default Vitest include pattern 'src/**/*.test.ts'. The test-discovery ratchet is satisfied; no hidden test files remain.",
+  "note": "All .test.ts files (colocated and __tests__/) are discovered by the default Vitest include pattern 'src/**/*.test.ts'. One pre-existing JavaScript test remains outside that TypeScript-only default discovery and is explicitly tracked as base-bound debt.",
   "includePattern": "src/**/*.test.ts",
-  "undiscovered": []
+  "undiscovered": [
+    "src/lib/__tests__/founderSignalEngineConsole.test.js"
+  ]
 }
