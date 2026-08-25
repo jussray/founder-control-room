@@ -303,6 +303,8 @@ Read-only reasoning can assess desired commit, provider evidence, release marker
 
 The canonical capability declaration is `.control/capability.json`. Repository declarations are intent/configuration, not proof that a live external integration is installed, authenticated, healthy, or authorized for mutation.
 
+The canonical Worker also exposes a governed remote read-only MCP bridge at `POST https://api.foundercontrolroom.org/mcp/read`. Repository configuration binds that bridge to exactly `chief-ai-machine,founder-control-room` and requires a distinct `FCR_REMOTE_MCP_READ_TOKEN` secret interface. The route fails closed when its token or server-held scope is unavailable, exports only the two read tools, and remains behind FCR's MCP registry/policy boundary. Source configuration does not prove the secret is installed, the endpoint is live, or the deployed Worker matches this exact source; those require current provider/runtime proof.
+
 ### Constitutional skill routing
 
 Project skills are selected under repository authority, privacy, proof, runtime-discovery, commercial, provider, messaging, temporal-truth, and mutation constraints. A skill cannot expand its own authority ceiling.
