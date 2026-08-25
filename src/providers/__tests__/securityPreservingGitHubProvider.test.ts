@@ -64,7 +64,7 @@ describe("SecurityPreservingGitHubProvider", () => {
     expect(mockCreateRepoRuleset).not.toHaveBeenCalled();
   });
 
-  it("rejects a requested protected ref that remains explicitly excluded", async () => {
+  it("diagnoses an exact requested ref exclusion without any provider mutation", async () => {
     mockGetRepoRuleset.mockResolvedValueOnce({ data: {
       id: 21261587,
       name: "governance boundary",
@@ -75,13 +75,51 @@ describe("SecurityPreservingGitHubProvider", () => {
     } });
 
     await expect(provider().applyBranchRuleset(PROJECT_ID, config())).rejects.toThrow(
-      "requested target refs remain excluded by the existing ruleset: refs/heads/main",
+      "requested target refs remain explicitly excluded by the existing ruleset: refs/heads/main",
     );
     expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
   });
 
-  it("rejects wildcard and broad exclusions that can still cover the requested target", async () => {
-    for (const exclusion of ["refs/heads/*", "~ALL"] as const) {
+  it("diagnoses ~ALL as excluding every requested target", async () => {
+    mockGetRepoRuleset.mockResolvedValueOnce({ data: {
+      id: 21261587,
+      name: "governance boundary",
+      enforcement: "active",
+      bypass_actors: [],
+      conditions: { ref_name: { include: ["~ALL"], exclude: ["~ALL"] } },
+      rules: [],
+    } });
+
+    await expect(provider().applyBranchRuleset(
+      PROJECT_ID,
+      config({ targetRefs: ["main", "release/v1"] }),
+    )).rejects.toThrow(
+      "requested target refs remain explicitly excluded by the existing ruleset: refs/heads/main, refs/heads/release/v1",
+    );
+    expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
+  });
+
+  it("does not invent ~DEFAULT_BRANCH coverage for a non-default requested ref", async () => {
+    mockGetRepoRuleset.mockResolvedValueOnce({ data: {
+      id: 21261587,
+      name: "governance boundary",
+      enforcement: "active",
+      bypass_actors: [],
+      conditions: { ref_name: { include: ["~ALL"], exclude: ["~DEFAULT_BRANCH"] } },
+      rules: [],
+    } });
+
+    await expect(provider().applyBranchRuleset(
+      PROJECT_ID,
+      config({ targetRefs: ["release/v1"] }),
+    )).rejects.toThrow(
+      "existing non-FCR ruleset updates are blocked until a concurrency-safe provider reconciliation contract exists",
+    );
+    expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
+  });
+
+  it("does not approximate GitHub wildcard or character-class selectors locally", async () => {
+    for (const exclusion of ["refs/heads/release/*", "refs/heads/release/?", "refs/heads/release/[0-9]"] as const) {
       mockGetRepoRuleset.mockResolvedValueOnce({ data: {
         id: 21261587,
         name: "governance boundary",
@@ -90,8 +128,12 @@ describe("SecurityPreservingGitHubProvider", () => {
         conditions: { ref_name: { include: ["~ALL"], exclude: [exclusion] } },
         rules: [],
       } });
-      await expect(provider().applyBranchRuleset(PROJECT_ID, config())).rejects.toThrow(
-        "requested target refs remain excluded by the existing ruleset: refs/heads/main",
+
+      await expect(provider().applyBranchRuleset(
+        PROJECT_ID,
+        config({ targetRefs: ["release/1"] }),
+      )).rejects.toThrow(
+        "existing non-FCR ruleset updates are blocked until a concurrency-safe provider reconciliation contract exists",
       );
     }
     expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
