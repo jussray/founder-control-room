@@ -410,7 +410,7 @@ describe('Founder Control Room paired remote MCP', () => {
       arguments: { projectId: CHIEF, pullNumber: 123 },
     }));
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(400);
     expect(response.body.error.message).toContain('restricted to founder-control-room');
     expect(auditPullRequest).not.toHaveBeenCalled();
   });
