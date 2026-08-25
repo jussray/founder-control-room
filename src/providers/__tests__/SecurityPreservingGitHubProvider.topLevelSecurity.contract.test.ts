@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  assertRequestedTargetRefsNotExcluded,
   mergeExistingRulesetEnforcement,
   mergeExistingRulesetTargetRefs,
 } from "../SecurityPreservingGitHubProvider.js";
@@ -27,6 +28,17 @@ describe("SecurityPreservingGitHubProvider top-level security contract", () => {
       "refs/heads/release/*",
       "refs/heads/main",
     ]);
+  });
+
+  it("fails closed when a requested protected ref remains excluded", () => {
+    expect(() => assertRequestedTargetRefsNotExcluded(["main"], ["refs/heads/main"]))
+      .toThrow('requested target ref "refs/heads/main" remains excluded');
+    expect(() => assertRequestedTargetRefsNotExcluded(["release/v1"], ["refs/heads/release/*"]))
+      .toThrow('requested target ref "refs/heads/release/v1" remains excluded');
+    expect(() => assertRequestedTargetRefsNotExcluded(["main"], ["~ALL"]))
+      .toThrow('requested target ref "refs/heads/main" remains excluded');
+    expect(() => assertRequestedTargetRefsNotExcluded(["main"], []))
+      .not.toThrow();
   });
 
   it("does not let the narrow RulesetConfig bypass actor shape widen provider bypass authority", () => {
