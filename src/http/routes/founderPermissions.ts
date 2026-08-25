@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { readFounderSession } from '../../auth/founderSession.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import {
   createFounderPermissionRequest,
@@ -120,6 +121,17 @@ founderPermissionsRouter.post('/requests', async (req: FounderRequest, res) => {
 });
 
 founderPermissionsRouter.post('/requests/:requestId/decision', async (req: FounderRequest, res) => {
+  // Bearer-authenticated agents may ask, but may not convert their own request
+  // into founder authority. Until registered adapters can attest a distinct
+  // founder interaction, decision writes require the signed same-origin FCR
+  // browser session cookie.
+  if (!readFounderSession(req)) {
+    return res.status(403).json({
+      error: 'Interactive founder approval is required to decide a permission request.',
+      code: 'FOUNDER_INTERACTIVE_APPROVAL_REQUIRED',
+    });
+  }
+
   const requestId = text(req.params.requestId);
   const body = isRecord(req.body) ? req.body : null;
   const decision = decisionFrom(body?.decision);
