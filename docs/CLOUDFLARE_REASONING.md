@@ -203,6 +203,21 @@ For GitHub Actions, production promotion is recognized only for the manual `Depl
 
 This source membrane does not prove the current Cloudflare Workers Builds dashboard configuration, custom-domain routing, active deployment, or runtime SHA. Those remain separate provider/runtime readback gates.
 
+## Pre-deploy rollback receipt
+
+The canonical `Deploy` workflow now treats rollback preparation as a prerequisite to mutation, not a post-failure memory exercise.
+
+After exact-head production authority succeeds and before Supabase migration, Worker deployment, or Pages release may start, a read-only `rollback-snapshot` job must:
+
+- read the active `founder-control-room` Worker deployment and its complete provider version traffic distribution;
+- reread the live Worker `/version` Git SHA;
+- read the current successful, non-skipped `founder-control-room` Pages production deployment on `main`; and
+- retain those provider-native rollback coordinates in `fcr-production-rollback-receipt@v1`, bound to the intended exact release SHA.
+
+The receipt is uploaded as an exact-SHA Actions artifact. Missing or malformed rollback coordinates fail closed before mutation. The receipt contains no Cloudflare token or other credential and records `mutationPerformed: false`.
+
+A successful snapshot does **not** prove rollback succeeded and does not authorize rollback. It proves only that the previous provider state was observed and retained before the release changed production. A later rollback remains a separately authorized action that must target those recorded provider-native IDs and then earn fresh provider/runtime/browser proof.
+
 ## Verification
 
 ```bash
