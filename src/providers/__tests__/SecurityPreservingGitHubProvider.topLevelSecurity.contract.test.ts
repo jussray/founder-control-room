@@ -29,9 +29,11 @@ describe("SecurityPreservingGitHubProvider top-level security contract", () => {
     ]);
   });
 
-  it("does not let the narrow RulesetConfig bypass actor shape widen provider bypass authority", () => {
+  it("distinguishes omitted bypass posture from an explicit clear while rejecting replacement", () => {
     expect(source).toContain("config.bypassActors && config.bypassActors.length > 0");
     expect(source).toContain("cannot replace existing bypass posture");
+    expect(source).toContain("config.bypassActors === undefined");
+    expect(source).toContain("current.bypass_actors ?? []");
     expect(source).not.toContain('bypass_mode: "always" as const');
   });
 });
