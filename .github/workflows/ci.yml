@@ -37,6 +37,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Verify MCP boundaries
         run: npm run verify:mcp
+      - name: Verify served MCP endpoint contract
+        run: npm run verify:served-mcp
       - name: Type check
         run: npm run typecheck
 

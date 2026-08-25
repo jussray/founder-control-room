@@ -38,6 +38,22 @@ The in-app Hub uses `src/mcp/defaultRegistry.ts`, environment/connection-vault a
 
 This keeps Cloudflare provider proof useful without turning a generic code-execution tool into an accidentally privileged Control Room capability.
 
+## MCP endpoints Founder Control Room serves
+
+The two sections above describe MCP servers the Control Room **calls**. Founder Control Room is also an MCP **server**. `src/worker/cf-entry.ts` mounts the Express app behind Cloudflare's Node HTTP adapter, so these endpoints are served by the deployed Worker. Each implements stateless MCP JSON-RPC directly against protocol `2025-06-18`; there is no `@modelcontextprotocol/*` dependency.
+
+| Endpoint | Tools | Authority |
+| --- | --- | --- |
+| `POST /mcp/read` | `list_read_servers`, `invoke_read_tool` | Bearer compared with `timingSafeEqual`, server-held project scope, refuses any non-read policy result |
+| `POST /mcp/founder-signal-engine` | `invoke_founder_signal_engine` (write-capable) | Token middleware, review-only middleware, server-side standing-policy grant |
+| `POST /mcp/founder-signal-x-engagement` | X engagement signal read | Separate read token, distinct credential root |
+
+Being contract-capable is not the same as being configured. `/mcp/read` requires **both** `FCR_REMOTE_MCP_READ_TOKEN` and `FCR_REMOTE_MCP_READ_PROJECTS` (see `.env.example`); with either missing it returns `503` and serves nothing. The project scope is server-held — a caller cannot widen it, and a request naming a project outside the grant is refused. Neither this document nor a configured value proves the endpoint is reachable or authorized in a deployed environment; that needs its own readback.
+
+The remaining two endpoints have dedicated contracts in [`founder-signal-engine/remote-mcp-bridge.md`](founder-signal-engine/remote-mcp-bridge.md) and [`founder-signal-engine/x-engagement-signal-v1.md`](founder-signal-engine/x-engagement-signal-v1.md).
+
+Note that the read-only assertion in [`MCP_HUB_SECURITY_REVIEW.md`](MCP_HUB_SECURITY_REVIEW.md) describes the **outbound Hub**, not this served surface: `/mcp/founder-signal-engine` is write-capable behind its standing-policy grant.
+
 ## Deliberately excluded
 
 - DBHub and generic database MCP servers. The project-scoped read-only Supabase server covers the current schema-inspection need.
