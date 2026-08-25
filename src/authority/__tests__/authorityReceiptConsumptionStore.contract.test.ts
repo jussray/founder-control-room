@@ -26,6 +26,12 @@ describe('AuthorityReceipt consumption store contract', () => {
     expect(migration).toMatch(/consumed_at timestamptz not null/);
   });
 
+  it('accepts the v2 case-insensitive SHA contract but stores canonical lowercase', () => {
+    expect(migration).toMatch(/p_head_sha !~\* '\^\[0-9a-f\]\{40\}\$'/);
+    expect(migration).toMatch(/normalized_head_sha := lower\(p_head_sha\)/);
+    expect(migration).toMatch(/normalized_head_sha,/);
+  });
+
   it('keeps the table closed to browser roles', () => {
     expect(migration).toMatch(/enable row level security/);
     expect(migration).toMatch(/revoke all on table public\.authority_receipt_consumptions from anon/);
