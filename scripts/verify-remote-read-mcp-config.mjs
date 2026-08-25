@@ -44,7 +44,7 @@ assert(
 
 assert(
   docs.includes(REMOTE_ENDPOINT),
-  `MCP stack docs must identify the served endpoint as ${REMOTE_ENDPOINT}`,
+  `MCP stack docs must identify the compatibility endpoint as ${REMOTE_ENDPOINT}`,
 );
 assert(
   docs.includes(`FCR_REMOTE_MCP_READ_PROJECTS=${EXACT_REMOTE_SCOPE}`),
@@ -58,10 +58,15 @@ assert(
 for (const requiredRouteFragment of [
   'env.FCR_REMOTE_MCP_READ_TOKEN',
   'env.FCR_REMOTE_MCP_READ_PROJECTS',
-  "const READ_TOOL_NAME = 'invoke_read_tool'",
-  "const LIST_SERVERS_TOOL_NAME = 'list_read_servers'",
+  "const MODERN_PROTOCOL_VERSION = '2026-07-28'",
+  "const SERVER_NAME = 'founder-control-room-paired'",
+  'createExternalMcpToolExecutor',
+  'isExternalMcpToolName',
+  'verifyRemoteMcpOauthToken',
+  'assertNoSecretArguments(args)',
+  "createRemoteReadMcpHandler({ authMode: 'static' })",
+  "createRemoteReadMcpHandler({ authMode: 'oauth' })",
   'timingSafeEqual',
-  'Remote read MCP token or project scope is not configured',
 ]) {
   assert(
     route.includes(requiredRouteFragment),
@@ -71,9 +76,9 @@ for (const requiredRouteFragment of [
 
 assert(
   !route.includes("'create_tool'") && !route.includes("'write_tool'") && !route.includes("'merge_tool'"),
-  'served remote read route may not advertise write-shaped tools',
+  'served MCP route may not advertise write-shaped tools',
 );
 
 console.log(
-  '[verify:remote-read-mcp] endpoint, exact two-project scope, dedicated secret, fail-closed auth, and read-only tool surface are pinned.',
+  '[verify:remote-read-mcp] static compatibility auth, paired OAuth auth, exact project scope, secret rejection, and read/preview-only tool routing are pinned.',
 );
