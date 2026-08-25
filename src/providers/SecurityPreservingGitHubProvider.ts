@@ -12,6 +12,28 @@ type UpdateRules = NonNullable<
 type UpdateBypassActors = NonNullable<
   RestEndpointMethodTypes["repos"]["updateRepoRuleset"]["parameters"]
 >["bypass_actors"];
+type RulesetEnforcement = RulesetConfig["enforcement"];
+
+const enforcementRank: Record<RulesetEnforcement, number> = {
+  disabled: 0,
+  evaluate: 1,
+  active: 2,
+};
+
+export function mergeExistingRulesetEnforcement(
+  existing: RulesetEnforcement,
+  requested: RulesetEnforcement,
+): RulesetEnforcement {
+  return enforcementRank[existing] >= enforcementRank[requested] ? existing : requested;
+}
+
+function normalizeBranchRef(ref: string): string {
+  return ref.startsWith("refs/heads/") ? ref : `refs/heads/${ref}`;
+}
+
+export function mergeExistingRulesetTargetRefs(existing: string[], requested: string[]): string[] {
+  return [...new Set([...existing, ...requested].map(normalizeBranchRef))];
+}
 
 export class SecurityPreservingGitHubProvider extends GitHubProvider {
   private readonly adminOctokit: Octokit;
@@ -72,12 +94,18 @@ export class SecurityPreservingGitHubProvider extends GitHubProvider {
       blockDeletion: config.blockDeletion,
     }) as UpdateRules;
 
-    const bypassActors: UpdateBypassActors = !config.bypassActors || config.bypassActors.length === 0
-      ? (current.bypass_actors ?? []) as UpdateBypassActors
-      : config.bypassActors.map((actor) => {
-          if (actor.kind !== "app") throw new Error(`SecurityPreservingGitHubProvider: unsupported bypass actor kind "${actor.kind}"`);
-          return { actor_type: "Integration" as const, actor_id: Number(actor.id), bypass_mode: "always" as const };
-        });
+    if (config.bypassActors && config.bypassActors.length > 0) {
+      throw new Error(
+        "SecurityPreservingGitHubProvider: existing ruleset updates cannot replace existing bypass posture without a separate bypass-authority contract",
+      );
+    }
+    const bypassActors = (current.bypass_actors ?? []) as UpdateBypassActors;
+
+    const currentEnforcement = current.enforcement as RulesetEnforcement;
+    const enforcement = mergeExistingRulesetEnforcement(currentEnforcement, config.enforcement);
+    const currentIncludes = current.conditions?.ref_name?.include ?? [];
+    const targetRefs = mergeExistingRulesetTargetRefs(currentIncludes, config.targetRefs);
+    const currentExcludes = current.conditions?.ref_name?.exclude ?? [];
 
     const { data } = await this.adminOctokit.repos.updateRepoRuleset({
       owner,
@@ -85,9 +113,9 @@ export class SecurityPreservingGitHubProvider extends GitHubProvider {
       ruleset_id: existing.id,
       name: config.name,
       target: "branch",
-      enforcement: config.enforcement,
+      enforcement,
       bypass_actors: bypassActors,
-      conditions: { ref_name: { include: config.targetRefs.map((ref) => `refs/heads/${ref}`), exclude: [] } },
+      conditions: { ref_name: { include: targetRefs, exclude: currentExcludes } },
       rules: mergedRules,
     });
 
