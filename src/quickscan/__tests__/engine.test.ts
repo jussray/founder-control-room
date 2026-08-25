@@ -122,6 +122,26 @@ describe('QuickScan engine', () => {
       .toThrow('not payment_link_sent');
   });
 
+  it('refuses to mark paid when the checkout amount does not match the QuickScan price', () => {
+    const prospect = prospectAtPaymentLinkSent();
+    expect(() => markPaidFromVerifiedStripeEvent(prospect, verifiedEvent({ clientReferenceId: prospect.id, amountTotal: 100 }), 'stripe-webhook'))
+      .toThrow('amount_total=100');
+    expect(prospect.lifecycleState).toBe('payment_link_sent');
+  });
+
+  it('refuses to mark paid when the checkout amount is missing', () => {
+    const prospect = prospectAtPaymentLinkSent();
+    expect(() => markPaidFromVerifiedStripeEvent(prospect, verifiedEvent({ clientReferenceId: prospect.id, amountTotal: null }), 'stripe-webhook'))
+      .toThrow('amount_total=missing');
+  });
+
+  it('refuses to mark paid when the checkout currency does not match', () => {
+    const prospect = prospectAtPaymentLinkSent();
+    expect(() => markPaidFromVerifiedStripeEvent(prospect, verifiedEvent({ clientReferenceId: prospect.id, currency: 'eur' }), 'stripe-webhook'))
+      .toThrow('currency=eur');
+    expect(prospect.lifecycleState).toBe('payment_link_sent');
+  });
+
   it('records delivery evidence and marks a delivery_due prospect delivered', () => {
     const prospect = prospectAtDeliveryDue();
     const result = recordDelivery(prospect, 'https://loom.com/share/example', 'founder');

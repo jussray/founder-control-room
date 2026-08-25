@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  QUICKSCAN_CURRENCY,
   QUICKSCAN_HIGH_PRIORITY_SCORE,
   QUICKSCAN_PRICE_CENTS,
   type ChiefQuickScanRecommendation,
@@ -207,9 +208,12 @@ export function recordQualification(prospect: QuickScanProspect, qualification: 
  * checked against the Stripe Dashboard later.
  *
  * Refuses (rather than silently no-ops) when the event's payment_status is
- * not `paid`, or when the prospect is not in `payment_link_sent` — a real
- * webhook event is never enough on its own to skip founder-controlled
- * qualification and approval.
+ * not `paid`, when the checkout session's amount or currency does not match
+ * the QuickScan price exactly, or when the prospect is not in
+ * `payment_link_sent` — a real webhook event is never enough on its own to
+ * skip founder-controlled qualification and approval, and completing
+ * *some* checkout is never enough to skip verifying it was completed for
+ * the full, correct amount.
  */
 export function markPaidFromVerifiedStripeEvent(
   prospect: QuickScanProspect,
@@ -218,6 +222,12 @@ export function markPaidFromVerifiedStripeEvent(
 ): QuickScanProspect {
   if (event.paymentStatus !== 'paid') {
     throw new Error(`QuickScan Stripe event ${event.eventId} reports payment_status=${event.paymentStatus}, not paid`);
+  }
+  if (event.amountTotal !== prospect.payment.amountCents) {
+    throw new Error(`QuickScan Stripe event ${event.eventId} reports amount_total=${event.amountTotal ?? 'missing'}, expected ${prospect.payment.amountCents}; refusing to mark paid`);
+  }
+  if (event.currency?.toLowerCase() !== QUICKSCAN_CURRENCY) {
+    throw new Error(`QuickScan Stripe event ${event.eventId} reports currency=${event.currency ?? 'missing'}, expected ${QUICKSCAN_CURRENCY}; refusing to mark paid`);
   }
   if (prospect.lifecycleState !== 'payment_link_sent') {
     throw new Error(`QuickScan prospect ${prospect.id} is ${prospect.lifecycleState}, not payment_link_sent; refusing to mark paid`);
