@@ -48,22 +48,4 @@ describe("SecurityPreservingGitHubProvider", () => {
     await provider().applyBranchRuleset(PROJECT_ID, { name: "governance boundary", enforcement: "active", targetRefs: ["main"], requirePullRequest: false, requiredApprovingReviewCount: 0, requiredStatusCheckNames: [], blockForcePushes: false, blockDeletion: false, ...(bypassActors === undefined ? {} : { bypassActors }) });
     expect(mockUpdateRepoRuleset.mock.calls[0][0].bypass_actors).toEqual([{ actor_type: "Integration", actor_id: 321, bypass_mode: "pull_request" }]);
   });
-
-  it("constrains an explicitly requested app bypass to pull_request mode", async () => {
-    await provider().applyBranchRuleset(PROJECT_ID, {
-      name: "governance boundary",
-      enforcement: "active",
-      targetRefs: ["main"],
-      requirePullRequest: true,
-      requiredApprovingReviewCount: 1,
-      requiredStatusCheckNames: [],
-      blockForcePushes: true,
-      blockDeletion: true,
-      bypassActors: [{ kind: "app", id: "321" }],
-    });
-
-    expect(mockUpdateRepoRuleset.mock.calls[0][0].bypass_actors).toEqual([
-      { actor_type: "Integration", actor_id: 321, bypass_mode: "pull_request" },
-    ]);
-  });
 });
