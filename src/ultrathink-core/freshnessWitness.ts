@@ -13,11 +13,19 @@ export type FreshnessReason =
   | 'missing_subject'
   | 'missing_repository'
   | 'missing_expected_sha'
+  | 'missing_current_repository'
   | 'missing_current_sha'
+  | 'missing_observation_expiry'
   | 'invalid_expected_sha'
   | 'invalid_current_sha'
   | 'invalid_verified_at'
   | 'verification_from_future'
+  | 'invalid_observed_at'
+  | 'invalid_observation_expiry'
+  | 'invalid_evaluated_at'
+  | 'observation_from_future'
+  | 'repository_drift'
+  | 'stale_observation'
   | 'invalid_expiry'
   | 'expired'
   | 'sha_drift';
@@ -38,8 +46,10 @@ export interface FreshnessWitness {
 }
 
 export interface FreshnessObservation {
+  repository?: string;
   currentMainSha?: string;
   observedAt: string | Date;
+  expiresAt?: string;
 }
 
 export interface FreshnessEvaluation {
@@ -51,6 +61,10 @@ export interface FreshnessEvaluation {
 function normalized(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
+}
+
+function normalizedRepository(value: string | undefined): string | undefined {
+  return normalized(value)?.toLowerCase();
 }
 
 function normalizedSha(value: string | undefined): string | undefined {
@@ -69,7 +83,7 @@ function strictIsoTime(value: string | undefined): number | undefined {
   return parsed;
 }
 
-function observationTime(value: string | Date): number | undefined {
+function evaluationTime(value: string | Date): number | undefined {
   if (value instanceof Date) {
     const parsed = value.getTime();
     return Number.isFinite(parsed) ? parsed : undefined;
@@ -87,16 +101,19 @@ function observationTime(value: string | Date): number | undefined {
 export function evaluateFreshnessWitness(
   witness: FreshnessWitness,
   observation: FreshnessObservation,
+  evaluatedAt: string | Date,
 ): FreshnessEvaluation {
   const id = normalized(witness.id);
   const subject = normalized(witness.subject);
-  const repository = normalized(witness.repository);
+  const repository = normalizedRepository(witness.repository);
+  const observedRepository = normalizedRepository(observation.repository);
   const expectedRaw = normalized(witness.expectedMainSha);
   const currentRaw = normalized(observation.currentMainSha);
   const expectedMainSha = normalizedSha(expectedRaw);
   const currentMainSha = normalizedSha(currentRaw);
   const verifiedAt = normalized(witness.verifiedAt);
   const expiresAt = normalized(witness.expiresAt);
+  const observationExpiresAt = normalized(observation.expiresAt);
   const evidenceRefs = witness.evidenceRefs.filter((ref) => normalized(ref.id));
 
   if (evidenceRefs.length === 0) {
@@ -118,19 +135,38 @@ export function evaluateFreshnessWitness(
   if (!repository) blocked.push('missing_repository');
   if (!expectedRaw) blocked.push('missing_expected_sha');
   else if (!expectedMainSha) blocked.push('invalid_expected_sha');
+  if (!observedRepository) blocked.push('missing_current_repository');
   if (!currentRaw) blocked.push('missing_current_sha');
   else if (!currentMainSha) blocked.push('invalid_current_sha');
+  if (!observationExpiresAt) blocked.push('missing_observation_expiry');
   if (blocked.length > 0) {
     return { status: 'BLOCKED', current: false, reasons: blocked };
   }
 
   const verifiedTime = strictIsoTime(verifiedAt);
-  const observedNow = observationTime(observation.observedAt);
   if (verifiedTime === undefined) {
     return { status: 'NOT_EVALUATED', current: false, reasons: ['invalid_verified_at'] };
   }
-  if (observedNow === undefined || verifiedTime > observedNow) {
+
+  const observedTime = evaluationTime(observation.observedAt);
+  if (observedTime === undefined) {
+    return { status: 'NOT_EVALUATED', current: false, reasons: ['invalid_observed_at'] };
+  }
+  if (verifiedTime > observedTime) {
     return { status: 'NOT_EVALUATED', current: false, reasons: ['verification_from_future'] };
+  }
+
+  const now = evaluationTime(evaluatedAt);
+  if (now === undefined) {
+    return { status: 'NOT_EVALUATED', current: false, reasons: ['invalid_evaluated_at'] };
+  }
+  if (observedTime > now) {
+    return { status: 'NOT_EVALUATED', current: false, reasons: ['observation_from_future'] };
+  }
+
+  const observationExpiry = strictIsoTime(observationExpiresAt);
+  if (observationExpiry === undefined || observationExpiry <= observedTime) {
+    return { status: 'NOT_EVALUATED', current: false, reasons: ['invalid_observation_expiry'] };
   }
 
   const expiry = strictIsoTime(expiresAt);
@@ -138,10 +174,16 @@ export function evaluateFreshnessWitness(
     return { status: 'NOT_EVALUATED', current: false, reasons: ['invalid_expiry'] };
   }
 
+  if (repository !== observedRepository) {
+    return { status: 'BLOCKED', current: false, reasons: ['repository_drift'] };
+  }
   if (expectedMainSha !== currentMainSha) {
     return { status: 'BLOCKED', current: false, reasons: ['sha_drift'] };
   }
-  if (expiry <= observedNow) {
+  if (observationExpiry <= now) {
+    return { status: 'STALE', current: false, reasons: ['stale_observation'] };
+  }
+  if (expiry <= now) {
     return { status: 'STALE', current: false, reasons: ['expired'] };
   }
 
