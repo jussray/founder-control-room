@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded Evidence Trust Plane, Documentation Truth, repository-provider security-preservation, explicit bypass-intent semantics, and Cloudflare remote-read MCP operator invariants for this candidate without claiming durable receipt persistence, live provider mutation, merge authority, deployment authority, secret installation, or live production truth.",
+  "purpose": "Record the bounded Evidence Trust Plane, Documentation Truth, repository-provider security-preservation, explicit bypass-intent semantics, Cloudflare remote-read MCP operator invariants, and pre-deploy provider-native rollback receipt invariant for this candidate without claiming durable receipt persistence, live provider mutation, merge authority, deployment authority, rollback execution, secret installation, or live production truth.",
   "domains": [
     "evidence-authority",
     "truth-governance",
@@ -62,6 +62,18 @@
       "path": "wrangler.worker.toml",
       "claims": [
         "wrangler.worker.toml: the canonical Worker must bind FCR_REMOTE_MCP_READ_PROJECTS only to chief-ai-machine,founder-control-room and must require FCR_REMOTE_MCP_READ_TOKEN as a secret name without committing a secret value; this source wiring cannot prove the secret is installed or that the live /mcp/read endpoint is reachable."
+      ]
+    },
+    {
+      "path": ".github/workflows/deploy.yml",
+      "claims": [
+        ".github/workflows/deploy.yml: after exact-head production authority succeeds and before Supabase, Worker, or Pages mutation begins, the canonical Deploy workflow must require a read-only rollback-snapshot job that captures and retains provider-native Worker deployment/version coordinates plus the current successful Pages production deployment ID; failure to capture the exact rollback targets must block release rather than deploying without rollback preparation."
+      ]
+    },
+    {
+      "path": "scripts/capture-production-rollback-receipt.mjs",
+      "claims": [
+        "scripts/capture-production-rollback-receipt.mjs: the pre-deploy receipt must remain credential-free and mutation-free, bind the intended exact release SHA to the live Worker SHA, active Worker deployment/version traffic distribution, and eligible Pages production deployment, and fail closed when those rollback coordinates are absent or malformed; receipt creation is rollback preparation evidence, not rollback execution or rollback-success proof."
       ]
     }
   ]
