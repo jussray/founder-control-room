@@ -18,6 +18,7 @@ export interface FounderDecisionReceiptV0 {
   action: FounderOsLabAction;
   capabilityPlanHash: string;
   expectedHeadSha: string;
+  requestDigest?: string;
   evidenceUrls: string[];
   createdAt: string;
   expiresAt?: string;
@@ -55,6 +56,10 @@ function text(value: unknown, maxLength = 500): string {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 function sortJsonValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sortJsonValue);
   if (value === null || typeof value !== 'object') return value;
@@ -71,6 +76,11 @@ function canonicalReceiptWithoutId(receipt: FounderDecisionReceiptV0): string {
   return JSON.stringify(sortJsonValue(payload));
 }
 
+function canonicalCapabilityRequestSurface(request: CapabilityRequestV1): string {
+  const { policyDecisionId: _policyDecisionId, ...surface } = request;
+  return JSON.stringify(sortJsonValue(surface));
+}
+
 function validEvidenceUrl(value: string): boolean {
   try {
     const url = new URL(value);
@@ -84,12 +94,20 @@ function validEvidenceUrl(value: string): boolean {
 
 function validateAuthenticatedFounderContext(context: AuthenticatedFounderContextV0): string[] {
   const reasons: string[] = [];
+  if (!isRecord(context)) {
+    reasons.push('authenticated founder context must be an object');
+    return reasons;
+  }
   if (!text(context.founderId, 160)) reasons.push('authenticated founder id is required');
   if (context.source !== 'trusted-session' && context.source !== 'registered-adapter') {
     reasons.push('founder authority must come from a trusted session or registered adapter');
   }
   if (!text(context.sourceRef, 240)) reasons.push('trusted founder source reference is required');
   return reasons;
+}
+
+export function computeCapabilityRequestAuthorityDigest(request: CapabilityRequestV1): string {
+  return createHash('sha256').update(canonicalCapabilityRequestSurface(request), 'utf8').digest('hex');
 }
 
 export function computeFounderDecisionReceiptId(receipt: FounderDecisionReceiptV0): string {
@@ -99,15 +117,27 @@ export function computeFounderDecisionReceiptId(receipt: FounderDecisionReceiptV
 
 export function validateFounderDecisionReceipt(receipt: FounderDecisionReceiptV0, now: number): string[] {
   const reasons: string[] = [];
+  if (!isRecord(receipt)) return ['founder decision receipt must be an object'];
+
   if (receipt.contract !== FOUNDER_DECISION_RECEIPT_CONTRACT) reasons.push('unsupported founder decision receipt contract');
   if (!RECEIPT_ID.test(text(receipt.receiptId, 120))) reasons.push('receiptId must be a founder decision receipt id');
-  if (!text(receipt.actor.id, 160)) reasons.push('actor id is required');
-  if (receipt.actor.type !== 'founder' && receipt.actor.type !== 'automation') reasons.push('actor type must be founder or automation');
+
+  const actor = isRecord(receipt.actor) ? receipt.actor : null;
+  if (!actor) {
+    reasons.push('actor must be an object');
+  } else {
+    if (!text(actor.id, 160)) reasons.push('actor id is required');
+    if (actor.type !== 'founder' && actor.type !== 'automation') reasons.push('actor type must be founder or automation');
+    if (receipt.decision === 'authorize' && actor.type !== 'founder') reasons.push('only a founder actor can issue an execution authorization');
+  }
+
   if (receipt.decision !== 'approve' && receipt.decision !== 'authorize' && receipt.decision !== 'reject') reasons.push('unsupported decision');
-  if (receipt.decision === 'authorize' && receipt.actor.type !== 'founder') reasons.push('only a founder actor can issue an execution authorization');
   if (!ALLOWED_ACTIONS.has(text(receipt.action, 80))) reasons.push('unsupported founder action');
   if (!FULL_SHA.test(text(receipt.expectedHeadSha, 40))) reasons.push('expectedHeadSha must be a full Git SHA');
   if (!SHA256.test(text(receipt.capabilityPlanHash, 64))) reasons.push('capabilityPlanHash must be a sha256 hex digest');
+  if (receipt.decision === 'authorize' && !SHA256.test(text(receipt.requestDigest, 64))) {
+    reasons.push('execution authorization requires an exact capability request digest');
+  }
   if (!Number.isFinite(now)) reasons.push('now must be a finite timestamp');
 
   const createdAtText = text(receipt.createdAt, 80);
@@ -153,7 +183,7 @@ export function validateFounderDecisionReceipt(receipt: FounderDecisionReceiptV0
   ) {
     reasons.push('state-changing decisions require evidence URLs');
   }
-  if (RECEIPT_ID.test(receipt.receiptId) && receipt.receiptId !== computeFounderDecisionReceiptId(receipt)) {
+  if (RECEIPT_ID.test(text(receipt.receiptId, 120)) && receipt.receiptId !== computeFounderDecisionReceiptId(receipt)) {
     reasons.push('receiptId does not match canonical founder decision content');
   }
   return reasons;
@@ -169,6 +199,7 @@ export function createFounderDecisionReceipt(
     ...input,
     capabilityPlanHash: input.capabilityPlanHash.toLowerCase(),
     expectedHeadSha: input.expectedHeadSha.toLowerCase(),
+    ...(input.requestDigest === undefined ? {} : { requestDigest: input.requestDigest.toLowerCase() }),
     evidenceUrls: [...new Set(input.evidenceUrls.map((value) => value.trim()).filter(Boolean))].sort(),
   };
   candidate.receiptId = computeFounderDecisionReceiptId(candidate);
@@ -190,8 +221,12 @@ export function validateCapabilityRequestDecisionBinding(
   if (request.policyDecisionId !== decision.receiptId) reasons.push('capability request policyDecisionId does not match founder decision receipt');
   if (request.capabilityPlanHash !== decision.capabilityPlanHash) reasons.push('capability request plan hash does not match founder decision receipt');
   if (request.expectedHeadSha !== decision.expectedHeadSha) reasons.push('capability request head SHA does not match founder decision receipt');
-  if (decision.actor.type !== 'founder') reasons.push('capability execution requires a founder-authored decision receipt');
-  if (decision.actor.id !== founderContext.founderId) reasons.push('founder decision receipt does not match authenticated founder identity');
+  const requestDigest = computeCapabilityRequestAuthorityDigest(request);
+  if (decision.requestDigest !== requestDigest) reasons.push('capability request digest does not match founder decision receipt');
+
+  const actor = isRecord(decision.actor) ? decision.actor : null;
+  if (!actor || actor.type !== 'founder') reasons.push('capability execution requires a founder-authored decision receipt');
+  if (!actor || actor.id !== founderContext.founderId) reasons.push('founder decision receipt does not match authenticated founder identity');
   if (decision.decision !== 'authorize') reasons.push('capability execution requires an explicit founder authorization');
   return reasons;
 }

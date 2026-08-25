@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  computeCapabilityRequestAuthorityDigest,
   computeFounderDecisionReceiptId,
   createFounderDecisionReceipt,
   validateCapabilityRequestDecisionBinding,
@@ -22,19 +23,6 @@ const FOUNDER_CONTEXT: AuthenticatedFounderContextV0 = {
   sourceRef: 'chatgpt-adapter:v1:decision-1',
 };
 
-function decision() {
-  return createFounderDecisionReceipt({
-    actor: { type: 'founder', id: 'jussray' },
-    decision: 'authorize',
-    action: 'merge-code',
-    capabilityPlanHash: HASH,
-    expectedHeadSha: SHA,
-    evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
-    createdAt: '2026-08-24T22:55:00.000Z',
-    expiresAt: '2026-08-24T23:30:00.000Z',
-  }, NOW);
-}
-
 function request(policyDecisionId: string): CapabilityRequestV1 {
   return {
     contract: CAPABILITY_REQUEST_CONTRACT,
@@ -56,12 +44,27 @@ function request(policyDecisionId: string): CapabilityRequestV1 {
   };
 }
 
+function decision() {
+  return createFounderDecisionReceipt({
+    actor: { type: 'founder', id: 'jussray' },
+    decision: 'authorize',
+    action: 'merge-code',
+    capabilityPlanHash: HASH,
+    expectedHeadSha: SHA,
+    requestDigest: computeCapabilityRequestAuthorityDigest(request('pending-founder-decision')),
+    evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
+    createdAt: '2026-08-24T22:55:00.000Z',
+    expiresAt: '2026-08-24T23:30:00.000Z',
+  }, NOW);
+}
+
 describe('FounderDecisionReceiptV0', () => {
   it('creates a canonical founder authority receipt bound to exact state', () => {
     const receipt = decision();
     expect(receipt.actor).toEqual({ type: 'founder', id: 'jussray' });
     expect(receipt.expectedHeadSha).toBe(SHA);
     expect(receipt.capabilityPlanHash).toBe(HASH);
+    expect(receipt.requestDigest).toBe(computeCapabilityRequestAuthorityDigest(request('anything')));
     expect(receipt.receiptId).toMatch(/^fcr-founder-decision-v0:[0-9a-f]{64}$/);
     expect(validateFounderDecisionReceipt(receipt, NOW)).toEqual([]);
   });
@@ -73,6 +76,7 @@ describe('FounderDecisionReceiptV0', () => {
       action: 'deploy-code',
       capabilityPlanHash: HASH,
       expectedHeadSha: SHA,
+      requestDigest: computeCapabilityRequestAuthorityDigest(request('pending')),
       evidenceUrls: [],
       createdAt: '2026-08-24T22:55:00.000Z',
       expiresAt: '2026-08-24T23:30:00.000Z',
@@ -134,6 +138,7 @@ describe('FounderDecisionReceiptV0', () => {
       action: 'merge-code',
       capabilityPlanHash: HASH,
       expectedHeadSha: SHA,
+      requestDigest: computeCapabilityRequestAuthorityDigest(request('pending')),
       evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
       createdAt: '2026-08-24T22:55:00.000Z',
       expiresAt: '2026-08-24T23:30:00.000Z',
@@ -182,6 +187,7 @@ describe('FounderDecisionReceiptV0', () => {
       action: 'merge-code',
       capabilityPlanHash: HASH,
       expectedHeadSha: SHA,
+      requestDigest: computeCapabilityRequestAuthorityDigest(request('pending')),
       evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
       createdAt: '2026-08-24T22:55:00.000Z',
     }, NOW)).toThrow('execution authorization requires an explicit expiry');
@@ -192,6 +198,7 @@ describe('FounderDecisionReceiptV0', () => {
       action: 'merge-code',
       capabilityPlanHash: HASH,
       expectedHeadSha: SHA,
+      requestDigest: computeCapabilityRequestAuthorityDigest(request('pending')),
       evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
       createdAt: '2026-08-24T22:00:00.000Z',
       expiresAt: '2026-08-25T00:00:01.000Z',
@@ -205,6 +212,7 @@ describe('FounderDecisionReceiptV0', () => {
       action: 'merge-code',
       capabilityPlanHash: HASH,
       expectedHeadSha: SHA,
+      requestDigest: computeCapabilityRequestAuthorityDigest(request('pending')),
       evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
       createdAt: '2026-08-24T23:05:00.000Z',
       expiresAt: '2026-08-24T23:30:00.000Z',
@@ -247,6 +255,7 @@ describe('FounderDecisionReceiptV0', () => {
       action: 'merge-code',
       capabilityPlanHash: HASH,
       expectedHeadSha: SHA,
+      requestDigest: computeCapabilityRequestAuthorityDigest(request('pending')),
       evidenceUrls: ['https://github.com/jussray/founder-control-room/actions/runs/1'],
       createdAt: '2026-08-24T22:30:00.000Z',
       expiresAt: '2026-08-24T23:30:00.000Z',
