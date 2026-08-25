@@ -48,13 +48,17 @@ const OVERRIDEABLE = new Set<string>([
 /**
  * Lifecycle states that must never be reached through the generic transition
  * endpoint, because reaching them without their evidence requirement would
- * let a bare state-machine walk assert a claim (a charge happened, a
- * diagnostic was delivered) with nothing behind it. Each has its own
- * dedicated, evidence-checked path: `paid` via `markPaidFromVerifiedStripeEvent`
- * or the founder-evidence-gated manual payment route, `delivered` via
- * `recordDelivery`.
+ * let a bare state-machine walk assert a claim (qualification happened, a
+ * payment link was actually sent, a charge happened, a diagnostic was
+ * delivered) with nothing behind it. The raw NEXT map alone permits every
+ * one of these as an ordinary step-by-step transition; gating them here is
+ * what forces the whole qualification -> payment-link -> paid chain through
+ * its dedicated, evidence-checked routes instead of a bare `to` value.
  */
 export const EVIDENCE_GATED_TRANSITIONS: Partial<Record<QuickScanLifecycleState, string>> = {
+  qualified: 'qualified requires POST /prospects/:id/qualification with a valid qualification record',
+  payment_link_ready: 'payment_link_ready requires POST /prospects/:id/payment/manual with status=link_ready',
+  payment_link_sent: 'payment_link_sent requires POST /prospects/:id/payment/manual with status=link_sent',
   paid: 'paid requires a verified Stripe webhook event or POST /payment/manual with explicit evidence',
   delivered: 'delivered requires POST /prospects/:id/delivery with a Loom delivery URL',
 };
@@ -209,16 +213,21 @@ export function recordQualification(prospect: QuickScanProspect, qualification: 
  *
  * Refuses (rather than silently no-ops) when the event's payment_status is
  * not `paid`, when the checkout session's amount or currency does not match
- * the QuickScan price exactly, or when the prospect is not in
- * `payment_link_sent` — a real webhook event is never enough on its own to
- * skip founder-controlled qualification and approval, and completing
- * *some* checkout is never enough to skip verifying it was completed for
- * the full, correct amount.
+ * the QuickScan price exactly, when a configured expected Payment Link
+ * identity doesn't match the session's own `payment_link`, or when the
+ * prospect is not in `payment_link_sent` — a real webhook event is never
+ * enough on its own to skip founder-controlled qualification and approval;
+ * completing *some* checkout is never enough to skip verifying it was
+ * completed for the full, correct amount; and, when the founder has
+ * configured which Payment Link is the canonical QuickScan one, completing
+ * checkout on a *different* Stripe product at the same price is never
+ * enough either.
  */
 export function markPaidFromVerifiedStripeEvent(
   prospect: QuickScanProspect,
   event: VerifiedStripeCheckoutEvent,
   actor: string,
+  options: { expectedPaymentLinkId?: string } = {},
 ): QuickScanProspect {
   if (event.paymentStatus !== 'paid') {
     throw new Error(`QuickScan Stripe event ${event.eventId} reports payment_status=${event.paymentStatus}, not paid`);
@@ -228,6 +237,9 @@ export function markPaidFromVerifiedStripeEvent(
   }
   if (event.currency?.toLowerCase() !== QUICKSCAN_CURRENCY) {
     throw new Error(`QuickScan Stripe event ${event.eventId} reports currency=${event.currency ?? 'missing'}, expected ${QUICKSCAN_CURRENCY}; refusing to mark paid`);
+  }
+  if (options.expectedPaymentLinkId && event.paymentLinkId !== options.expectedPaymentLinkId) {
+    throw new Error(`QuickScan Stripe event ${event.eventId} reports payment_link=${event.paymentLinkId ?? 'missing'}, expected ${options.expectedPaymentLinkId}; refusing to mark paid`);
   }
   if (prospect.lifecycleState !== 'payment_link_sent') {
     throw new Error(`QuickScan prospect ${prospect.id} is ${prospect.lifecycleState}, not payment_link_sent; refusing to mark paid`);

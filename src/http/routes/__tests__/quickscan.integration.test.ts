@@ -129,11 +129,35 @@ describe('QuickScan founder-gated API', () => {
     for (const to of ['researched','qualified_for_outreach','draft_ready','approved_to_contact','contacted','replied','fit_check_scheduled']) {
       await request(buildApp()).post(`/quickscan/prospects/${id}/transition`).set('Authorization', BEARER).send({ to });
     }
+
+    const bypassQualified = await request(buildApp()).post(`/quickscan/prospects/${id}/transition`).set('Authorization', BEARER).send({ to: 'qualified' });
+    expect(bypassQualified.status).toBe(409);
+    expect(bypassQualified.body.code).toBe('TRANSITION_BLOCKED');
+    expect(bypassQualified.body.message).toContain('evidence-gated');
+
     await request(buildApp()).post(`/quickscan/prospects/${id}/qualification`).set('Authorization', BEARER).send({ pain: 'Missed DMs', frequency: 'daily', economicImpact: 'one booking exceeds fee', authority: 'confirmed', urgency: 'now', decision: 'qualified' });
 
-    let response = await request(buildApp()).post(`/quickscan/prospects/${id}/transition`).set('Authorization', BEARER).send({ to: 'payment_link_ready' });
+    const bypassPaymentLinkReady = await request(buildApp()).post(`/quickscan/prospects/${id}/transition`).set('Authorization', BEARER).send({ to: 'payment_link_ready' });
+    expect(bypassPaymentLinkReady.status).toBe(409);
+    expect(bypassPaymentLinkReady.body.code).toBe('TRANSITION_BLOCKED');
+
+    // No qualification decision or approval yet: /payment/manual refuses too — the
+    // precursor gate does not just relocate the bypass to a different route.
+    const noApproval = await request(buildApp()).post(`/quickscan/prospects/${id}/payment/manual`).set('Authorization', BEARER).send({ status: 'link_ready', paymentLinkUrl: 'https://buy.stripe.com/example' });
+    expect(noApproval.status).toBe(409);
+    expect(noApproval.body.code).toBe('PAYMENT_APPROVAL_REQUIRED');
+
+    const approval = await request(buildApp()).post(`/quickscan/prospects/${id}/approvals`).set('Authorization', BEARER).send({ action: 'payment_link', proposedAction: 'Offer the $249 QuickScan payment link', reason: 'Qualified buyer requested next step', evidenceIds: [] });
+    await request(buildApp()).post(`/quickscan/prospects/${id}/approvals/${approval.body.approval.id}/decision`).set('Authorization', BEARER).send({ decision: 'APPROVE' });
+
+    let response = await request(buildApp()).post(`/quickscan/prospects/${id}/payment/manual`).set('Authorization', BEARER).send({ status: 'link_ready', paymentLinkUrl: 'https://buy.stripe.com/example' });
     expect(response.status).toBe(200);
-    response = await request(buildApp()).post(`/quickscan/prospects/${id}/transition`).set('Authorization', BEARER).send({ to: 'payment_link_sent' });
+
+    const bypassPaymentLinkSent = await request(buildApp()).post(`/quickscan/prospects/${id}/transition`).set('Authorization', BEARER).send({ to: 'payment_link_sent' });
+    expect(bypassPaymentLinkSent.status).toBe(409);
+    expect(bypassPaymentLinkSent.body.code).toBe('TRANSITION_BLOCKED');
+
+    response = await request(buildApp()).post(`/quickscan/prospects/${id}/payment/manual`).set('Authorization', BEARER).send({ status: 'link_sent' });
     expect(response.status).toBe(200);
 
     const bypassPaid = await request(buildApp()).post(`/quickscan/prospects/${id}/transition`).set('Authorization', BEARER).send({ to: 'paid' });

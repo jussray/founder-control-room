@@ -7,6 +7,7 @@ import { handleStripeQuickScanWebhook } from '../stripeQuickScan.js';
 
 const SECRET = 'whsec_test_secret';
 const ORIGINAL_SECRET = process.env.STRIPE_QUICKSCAN_WEBHOOK_SECRET;
+const ORIGINAL_PAYMENT_LINK_ID = process.env.STRIPE_QUICKSCAN_PAYMENT_LINK_ID;
 
 function makeResponse() {
   const response = { status: vi.fn(), json: vi.fn() } as unknown as Response & { status: ReturnType<typeof vi.fn>; json: ReturnType<typeof vi.fn> };
@@ -57,12 +58,15 @@ function prospectAtPaymentLinkSent(id: string) {
 
 beforeEach(() => {
   process.env.STRIPE_QUICKSCAN_WEBHOOK_SECRET = SECRET;
+  delete process.env.STRIPE_QUICKSCAN_PAYMENT_LINK_ID;
   resetQuickScanStoreForTests();
 });
 
 afterEach(() => {
   if (ORIGINAL_SECRET === undefined) delete process.env.STRIPE_QUICKSCAN_WEBHOOK_SECRET;
   else process.env.STRIPE_QUICKSCAN_WEBHOOK_SECRET = ORIGINAL_SECRET;
+  if (ORIGINAL_PAYMENT_LINK_ID === undefined) delete process.env.STRIPE_QUICKSCAN_PAYMENT_LINK_ID;
+  else process.env.STRIPE_QUICKSCAN_PAYMENT_LINK_ID = ORIGINAL_PAYMENT_LINK_ID;
   resetQuickScanStoreForTests();
 });
 
@@ -148,6 +152,40 @@ describe('QuickScan Stripe webhook', () => {
       applied: false,
       code: 'TRANSITION_REFUSED',
       detail: expect.stringContaining('not payment_link_sent'),
+    });
+  });
+
+  it('marks paid when the checkout matches the configured canonical Payment Link', async () => {
+    process.env.STRIPE_QUICKSCAN_PAYMENT_LINK_ID = 'plink_quickscan_canonical';
+    prospectAtPaymentLinkSent('prospect_1');
+    const req = signedRequest(checkoutCompletedPayload({ payment_link: 'plink_quickscan_canonical' }));
+    const res = makeResponse();
+
+    await handleStripeQuickScanWebhook(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      ok: true,
+      applied: true,
+      prospectId: 'prospect_1',
+      lifecycleState: 'paid',
+    });
+  });
+
+  it('acknowledges but does not apply a same-price checkout from a different Payment Link once one is configured', async () => {
+    process.env.STRIPE_QUICKSCAN_PAYMENT_LINK_ID = 'plink_quickscan_canonical';
+    prospectAtPaymentLinkSent('prospect_1');
+    const req = signedRequest(checkoutCompletedPayload({ payment_link: 'plink_unrelated_product' }));
+    const res = makeResponse();
+
+    await handleStripeQuickScanWebhook(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      ok: true,
+      applied: false,
+      code: 'TRANSITION_REFUSED',
+      detail: expect.stringContaining('payment_link=plink_unrelated_product'),
     });
   });
 

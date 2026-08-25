@@ -49,6 +49,7 @@ function verifiedEvent(overrides: Partial<VerifiedStripeCheckoutEvent> = {}): Ve
     amountTotal: 24900,
     currency: 'usd',
     paymentStatus: 'paid',
+    paymentLinkId: 'plink_quickscan_canonical',
     ...overrides,
   };
 }
@@ -142,6 +143,28 @@ describe('QuickScan engine', () => {
     expect(prospect.lifecycleState).toBe('payment_link_sent');
   });
 
+  it('accepts a checkout on the configured canonical Payment Link', () => {
+    const prospect = prospectAtPaymentLinkSent();
+    const result = markPaidFromVerifiedStripeEvent(prospect, verifiedEvent({ clientReferenceId: prospect.id }), 'stripe-webhook', {
+      expectedPaymentLinkId: 'plink_quickscan_canonical',
+    });
+    expect(result.lifecycleState).toBe('paid');
+  });
+
+  it('refuses a same-price checkout completed on a different Payment Link when one is configured', () => {
+    const prospect = prospectAtPaymentLinkSent();
+    expect(() => markPaidFromVerifiedStripeEvent(prospect, verifiedEvent({ clientReferenceId: prospect.id, paymentLinkId: 'plink_unrelated_product' }), 'stripe-webhook', {
+      expectedPaymentLinkId: 'plink_quickscan_canonical',
+    })).toThrow('payment_link=plink_unrelated_product');
+    expect(prospect.lifecycleState).toBe('payment_link_sent');
+  });
+
+  it('does not require a matching Payment Link when none is configured', () => {
+    const prospect = prospectAtPaymentLinkSent();
+    const result = markPaidFromVerifiedStripeEvent(prospect, verifiedEvent({ clientReferenceId: prospect.id, paymentLinkId: 'plink_anything' }), 'stripe-webhook');
+    expect(result.lifecycleState).toBe('paid');
+  });
+
   it('records delivery evidence and marks a delivery_due prospect delivered', () => {
     const prospect = prospectAtDeliveryDue();
     const result = recordDelivery(prospect, 'https://loom.com/share/example', 'founder');
@@ -172,6 +195,9 @@ describe('QuickScan engine', () => {
   });
 
   it('blocks the generic transition path from reaching evidence-gated states directly', () => {
+    expect(() => assertUngatedQuickScanTransition('fit_check_scheduled', 'qualified')).toThrow('evidence-gated');
+    expect(() => assertUngatedQuickScanTransition('qualified', 'payment_link_ready')).toThrow('evidence-gated');
+    expect(() => assertUngatedQuickScanTransition('payment_link_ready', 'payment_link_sent')).toThrow('evidence-gated');
     expect(() => assertUngatedQuickScanTransition('payment_link_sent', 'paid')).toThrow('evidence-gated');
     expect(() => assertUngatedQuickScanTransition('delivery_due', 'delivered')).toThrow('evidence-gated');
     expect(() => assertUngatedQuickScanTransition('discovered', 'researched')).not.toThrow();
