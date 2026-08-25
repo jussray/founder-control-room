@@ -3,9 +3,8 @@
  * Test discovery ratchet.
  *
  * The repository has used two reviewed Vitest discovery contracts:
- *
- * - legacy: src/**/__tests__/**/*.test.ts
- * - current: src/**/*.test.ts
+ * - legacy: TypeScript test files nested under __tests__ directories;
+ * - current: every TypeScript .test.ts file under src.
  *
  * Candidate test files excluded by the recorded include pattern can still be
  * run by a dedicated workflow, so this verifier never calls them "never run in
