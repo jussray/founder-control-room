@@ -51,13 +51,102 @@ export class SecurityPreservingGitHubProvider extends GitHubProvider {
     return { owner, repo };
   }
 
+  private async createBranchRulesetOnly(
+    owner: string,
+    repo: string,
+    config: RulesetConfig,
+  ): Promise<RulesetResult> {
+    const rules: Array<
+      | {
+        type: "pull_request";
+        parameters: {
+          dismiss_stale_reviews_on_push: boolean;
+          require_code_owner_review: boolean;
+          require_last_push_approval: boolean;
+          required_approving_review_count: number;
+          required_review_thread_resolution: boolean;
+        };
+      }
+      | {
+        type: "required_status_checks";
+        parameters: {
+          do_not_enforce_on_create: boolean;
+          required_status_checks: Array<{ context: string }>;
+          strict_required_status_checks_policy: boolean;
+        };
+      }
+      | { type: "non_fast_forward" }
+      | { type: "deletion" }
+    > = [];
+
+    if (config.requirePullRequest) {
+      rules.push({
+        type: "pull_request",
+        parameters: {
+          dismiss_stale_reviews_on_push: false,
+          require_code_owner_review: false,
+          require_last_push_approval: false,
+          required_approving_review_count: config.requiredApprovingReviewCount,
+          required_review_thread_resolution: true,
+        },
+      });
+    }
+    if (config.requiredStatusCheckNames.length > 0) {
+      rules.push({
+        type: "required_status_checks",
+        parameters: {
+          do_not_enforce_on_create: false,
+          required_status_checks: config.requiredStatusCheckNames.map((context) => ({ context })),
+          strict_required_status_checks_policy: true,
+        },
+      });
+    }
+    if (config.blockForcePushes) rules.push({ type: "non_fast_forward" });
+    if (config.blockDeletion) rules.push({ type: "deletion" });
+
+    const bypassActors = (config.bypassActors ?? []).map((actor) => {
+      if (actor.kind !== "app") {
+        throw new Error(`SecurityPreservingGitHubProvider: unsupported bypass actor kind "${String(actor.kind)}"`);
+      }
+      return {
+        actor_type: "Integration" as const,
+        actor_id: Number(actor.id),
+        bypass_mode: "always" as const,
+      };
+    });
+
+    try {
+      const { data } = await this.adminOctokit.repos.createRepoRuleset({
+        owner,
+        repo,
+        name: config.name,
+        target: "branch",
+        enforcement: config.enforcement,
+        bypass_actors: bypassActors,
+        conditions: {
+          ref_name: {
+            include: config.targetRefs.map(normalizeBranchRef),
+            exclude: [],
+          },
+        },
+        rules,
+      });
+      return { id: String(data.id), name: data.name, enforcement: data.enforcement };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `SecurityPreservingGitHubProvider: create-only ruleset creation failed; refusing update fallback: ${message}`,
+      );
+    }
+  }
+
   override async applyBranchRuleset(projectId: string, config: RulesetConfig): Promise<RulesetResult> {
     if (projectId === FOUNDER_CONTROL_ROOM_PROJECT_ID) return super.applyBranchRuleset(projectId, config);
 
     const { owner, repo } = this.locateRulesetRepository(projectId);
     const { data: summaries } = await this.adminOctokit.repos.getRepoRulesets({ owner, repo, per_page: 100 });
     const existing = summaries.find((ruleset) => ruleset.name === config.name);
-    if (!existing) return super.applyBranchRuleset(projectId, config);
+    if (!existing) return this.createBranchRulesetOnly(owner, repo, config);
 
     const { data: current } = await this.adminOctokit.repos.getRepoRuleset({ owner, repo, ruleset_id: existing.id });
 
