@@ -43,9 +43,15 @@ describe("SecurityPreservingGitHubProvider", () => {
     expect(result).toEqual({ id: "21261587", name: "governance boundary", enforcement: "active" });
   });
 
-  it.each([undefined, []])("preserves existing bypass posture when caller supplies %s", async (bypassActors) => {
+  it("preserves existing bypass posture when caller omits bypassActors", async () => {
     mockGetRepoRuleset.mockResolvedValueOnce({ data: { id: 21261587, name: "governance boundary", enforcement: "active", bypass_actors: [{ actor_type: "Integration", actor_id: 321, bypass_mode: "pull_request" }], rules: [] } });
-    await provider().applyBranchRuleset(PROJECT_ID, { name: "governance boundary", enforcement: "active", targetRefs: ["main"], requirePullRequest: false, requiredApprovingReviewCount: 0, requiredStatusCheckNames: [], blockForcePushes: false, blockDeletion: false, ...(bypassActors === undefined ? {} : { bypassActors }) });
+    await provider().applyBranchRuleset(PROJECT_ID, { name: "governance boundary", enforcement: "active", targetRefs: ["main"], requirePullRequest: false, requiredApprovingReviewCount: 0, requiredStatusCheckNames: [], blockForcePushes: false, blockDeletion: false });
     expect(mockUpdateRepoRuleset.mock.calls[0][0].bypass_actors).toEqual([{ actor_type: "Integration", actor_id: 321, bypass_mode: "pull_request" }]);
+  });
+
+  it("clears existing bypass posture when caller explicitly supplies an empty list", async () => {
+    mockGetRepoRuleset.mockResolvedValueOnce({ data: { id: 21261587, name: "governance boundary", enforcement: "active", bypass_actors: [{ actor_type: "Integration", actor_id: 321, bypass_mode: "pull_request" }], rules: [] } });
+    await provider().applyBranchRuleset(PROJECT_ID, { name: "governance boundary", enforcement: "active", targetRefs: ["main"], requirePullRequest: false, requiredApprovingReviewCount: 0, requiredStatusCheckNames: [], blockForcePushes: false, blockDeletion: false, bypassActors: [] });
+    expect(mockUpdateRepoRuleset.mock.calls[0][0].bypass_actors).toEqual([]);
   });
 });
