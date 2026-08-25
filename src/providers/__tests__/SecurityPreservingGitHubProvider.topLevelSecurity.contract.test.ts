@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   mergeExistingRulesetEnforcement,
   mergeExistingRulesetTargetRefs,
+  requestedRefsRemainingExcluded,
 } from "../SecurityPreservingGitHubProvider.js";
 
 const sourcePath = fileURLToPath(new URL("../SecurityPreservingGitHubProvider.ts", import.meta.url));
@@ -29,9 +30,21 @@ describe("SecurityPreservingGitHubProvider top-level security contract", () => {
     ]);
   });
 
+  it("detects requested refs that remain explicitly excluded", () => {
+    expect(requestedRefsRemainingExcluded(
+      ["main", "release"],
+      ["refs/heads/main", "refs/heads/legacy"],
+    )).toEqual(["refs/heads/main"]);
+  });
+
   it("does not let the narrow RulesetConfig bypass actor shape widen provider bypass authority", () => {
     expect(source).toContain("config.bypassActors && config.bypassActors.length > 0");
     expect(source).toContain("cannot replace existing bypass posture");
     expect(source).not.toContain('bypass_mode: "always" as const');
+  });
+
+  it("does not issue an existing non-FCR ruleset PUT without a concurrency-safe reconciliation contract", () => {
+    expect(source).toContain("existing non-FCR ruleset updates are blocked until a concurrency-safe provider reconciliation contract exists");
+    expect(source).not.toContain("repos.updateRepoRuleset");
   });
 });
