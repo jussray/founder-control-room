@@ -2,6 +2,7 @@
   "contract": "fcr/documentation-truth-receipt@v1",
   "purpose": "Record the security-preserving GitHub ruleset update membrane for this candidate without claiming that repository source, tests, CI, or this receipt mutates or proves live GitHub provider state.",
   "domains": [
+    "repository-provider",
     "provider-governance",
     "repository-authority",
     "truth-governance"
@@ -10,43 +11,43 @@
     {
       "path": "src/providers/rulesetSecurityMerge.ts",
       "claims": [
-        "src/providers/rulesetSecurityMerge.ts: existing non-FCR GitHub ruleset updates must preserve unmanaged provider security rules and stronger review parameters while allowing the caller-requested required-status context list to be deliberately replaced; retained status contexts keep existing provider metadata such as integration_id."
+        "src/providers/rulesetSecurityMerge.ts: existing non-FCR GitHub ruleset updates must preserve unmanaged provider security rules and stronger review parameters while allowing the caller-requested required-status context list to be deliberately replaced; retained status contexts must keep existing provider metadata such as integration_id."
       ]
     },
     {
       "path": "src/providers/SecurityPreservingGitHubProvider.ts",
       "claims": [
-        "src/providers/SecurityPreservingGitHubProvider.ts: an existing named non-FCR ruleset is fully read back before update, current bypass posture is preserved when bypassActors is unspecified, the same ruleset ID is updated, and FCR-main plus brand-new ruleset paths delegate to the existing provider semantics unchanged."
+        "src/providers/SecurityPreservingGitHubProvider.ts: an existing named non-FCR ruleset must be fully read back before update, the current bypass posture must be preserved when bypassActors is unspecified, the same ruleset ID must be updated, and FCR-main plus brand-new ruleset paths must delegate to the existing provider semantics unchanged."
       ]
     },
     {
       "path": "src/providers/providerFactory.ts",
       "claims": [
-        "src/providers/providerFactory.ts: GitHub provider construction routes repository administration through the security-preserving compatibility membrane without changing the provider-neutral RepositoryProvider contract or GitLab construction."
+        "src/providers/providerFactory.ts: GitHub provider construction must route repository administration through the security-preserving compatibility membrane without changing the provider-neutral RepositoryProvider contract or GitLab construction."
       ]
     },
     {
       "path": "src/providers/__tests__/rulesetSecurityMerge.test.ts",
       "claims": [
-        "src/providers/__tests__/rulesetSecurityMerge.test.ts: regression coverage proves CodeQL, linear history, Copilot review, stronger approval/freshness parameters, and retained check integration identity survive a deliberate narrowing of required contexts."
+        "src/providers/__tests__/rulesetSecurityMerge.test.ts: regression coverage must prove CodeQL, linear history, Copilot review, stronger approval/freshness parameters, and retained check integration identity survive a deliberate narrowing of required contexts."
       ]
     },
     {
       "path": "src/providers/__tests__/securityPreservingGitHubProvider.test.ts",
       "claims": [
-        "src/providers/__tests__/securityPreservingGitHubProvider.test.ts: provider-level regression coverage proves an existing ruleset is updated in place and its stronger security and unspecified bypass posture are preserved."
+        "src/providers/__tests__/securityPreservingGitHubProvider.test.ts: provider-level regression coverage must prove an existing ruleset is updated in place and its stronger security and unspecified bypass posture are preserved."
       ]
     },
     {
       "path": "README.md",
       "claims": [
-        "README.md: current repository truth documents the security-preserving ruleset update membrane as repository capability only and explicitly keeps live GitHub mutation/readback as separate provider authority."
+        "README.md: current repository truth must document the security-preserving ruleset update membrane as repository capability only and must keep live GitHub mutation/readback as separate provider authority."
       ]
     },
     {
       "path": "docs/PROVIDERS.md",
       "claims": [
-        "docs/PROVIDERS.md: GitHub provider guidance records the existing-ruleset preservation semantics, deliberate status-context replacement boundary, unchanged new/FCR-main paths, and the requirement for separate live provider mutation plus readback proof."
+        "docs/PROVIDERS.md: GitHub provider guidance must record the existing-ruleset preservation semantics, deliberate status-context replacement boundary, unchanged new/FCR-main paths, and the requirement for separate live provider mutation plus readback proof."
       ]
     }
   ]
