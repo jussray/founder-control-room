@@ -6,6 +6,10 @@ const packageJson = JSON.parse(readFileSync(new URL('../../../package.json', imp
   scripts?: Record<string, string>;
 };
 const guardPath = new URL('../../../scripts/assert-production-deploy-authority.mjs', import.meta.url);
+const deployWorkflow = readFileSync(
+  new URL('../../../.github/workflows/deploy.yml', import.meta.url),
+  'utf8',
+);
 
 function currentHead(): string {
   return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
@@ -27,6 +31,26 @@ describe('production deploy authority membrane', () => {
     expect(packageJson.scripts?.deploy).toBe(
       'node scripts/assert-production-deploy-authority.mjs && wrangler deploy --config wrangler.worker.toml',
     );
+  });
+
+  it('makes provider rollback capture load-bearing before any production mutation', () => {
+    const snapshotIndex = deployWorkflow.indexOf('\n  rollback-snapshot:');
+    const migrationIndex = deployWorkflow.indexOf('\n  supabase-migrate:');
+    const workerIndex = deployWorkflow.indexOf('\n  worker-deploy:');
+    const pagesIndex = deployWorkflow.indexOf('\n  pages-release:');
+
+    expect(snapshotIndex).toBeGreaterThan(-1);
+    expect(migrationIndex).toBeGreaterThan(snapshotIndex);
+    expect(workerIndex).toBeGreaterThan(migrationIndex);
+    expect(pagesIndex).toBeGreaterThan(workerIndex);
+
+    expect(deployWorkflow).toMatch(
+      /rollback-snapshot:[\s\S]*?needs: authority-gate[\s\S]*?node scripts\/capture-production-rollback-receipt\.mjs/,
+    );
+    expect(deployWorkflow).toMatch(
+      /rollback-snapshot:[\s\S]*?production-rollback-receipt-\$\{\{ inputs\.expected_head_sha \}\}[\s\S]*?if-no-files-found: error/,
+    );
+    expect(deployWorkflow).toMatch(/supabase-migrate:[\s\S]*?needs: rollback-snapshot/);
   });
 
   it('blocks an ordinary or provider-native CI process', () => {
