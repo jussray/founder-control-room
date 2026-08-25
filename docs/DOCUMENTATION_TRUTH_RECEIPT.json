@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded Evidence Trust Plane, Documentation Truth, repository-provider security-preservation, explicit bypass-intent semantics, and Cloudflare remote-read MCP operator invariants for this candidate without claiming durable receipt persistence, live provider mutation, merge authority, deployment authority, secret installation, or live production truth.",
+  "purpose": "Record the bounded Evidence Trust Plane, Documentation Truth, repository-provider security-preservation, explicit bypass-intent semantics, Cloudflare remote-read MCP operator invariants, and read-only GitHub PR truth audit invariants for this candidate without claiming durable receipt persistence beyond existing external MCP evidence, live provider mutation, merge authority, deployment authority, secret installation, or live production truth.",
   "domains": [
     "evidence-authority",
     "truth-governance",
@@ -62,6 +62,13 @@
       "path": "wrangler.worker.toml",
       "claims": [
         "wrangler.worker.toml: the canonical Worker must bind FCR_REMOTE_MCP_READ_PROJECTS only to chief-ai-machine,founder-control-room and must require FCR_REMOTE_MCP_READ_TOKEN as a secret name without committing a secret value; this source wiring cannot prove the secret is installed or that the live /mcp/read endpoint is reachable."
+      ]
+    },
+    {
+      "path": "src/providers/GitHubPrTruthReader.ts",
+      "claims": [
+        "src/providers/GitHubPrTruthReader.ts: GitHub PR truth v0 must remain read-only and server-scoped to provider observations needed for one PR audit: PR state, checks, workflow runs filtered to the observed head SHA, reviews, and a metadata-only changed-file comparison capped at 100 entries; it must resolve GitHub credentials server-side through the existing GitHub App precedence and must not expose mutation methods or credential material.",
+        "src/providers/GitHubPrTruthReader.ts: the composite audit must bind CI evidence to the initially observed PR head and re-read PR state after evidence collection so stale CI or a moving head can never be promoted into current evidence or merge approval."
       ]
     }
   ]
