@@ -7,7 +7,11 @@ export default defineConfig({
     // bleed between test files.
     isolate: true,
     environment: 'node',
-    include: ['src/**/__tests__/**/*.test.ts'],
+    // Include both colocated .test.ts files and __tests__/**/*.test.ts files.
+    // Previously only discovered files under __tests__/ directories, leaving
+    // 38 colocated test files (97 tests) undiscovered. This pattern ensures
+    // all test files are discovered by npm test.
+    include: ['src/**/*.test.ts'],
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
