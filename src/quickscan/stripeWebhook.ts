@@ -24,6 +24,7 @@ export interface VerifiedStripeCheckoutEvent {
   amountTotal: number | null;
   currency: string | null;
   paymentStatus: string;
+  paymentLinkId: string | null;
 }
 
 const DEFAULT_TOLERANCE_SECONDS = 300;
@@ -127,6 +128,7 @@ export function parseStripeCheckoutCompletedEvent(rawBody: Buffer): VerifiedStri
     amountTotal,
     currency: stringField(sessionRecord, 'currency'),
     paymentStatus: stringField(sessionRecord, 'payment_status') ?? 'unknown',
+    paymentLinkId: stringField(sessionRecord, 'payment_link'),
   };
 }
 
