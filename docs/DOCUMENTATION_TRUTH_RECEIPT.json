@@ -40,7 +40,7 @@
     {
       "path": "src/providers/providerFactory.ts",
       "claims": [
-        "src/providers/providerFactory.ts: GitHub repository-provider construction routes through SecurityPreservingGitHubProvider while preserving the existing LazyRepositoryProvider, GitHub App credential preference, FCR constitutional governance checks, exact reviewed base/head freshness membrane, and GitLab provider behavior."
+        "src/providers/providerFactory.ts: GitHub repository-provider construction must route through SecurityPreservingGitHubProvider while preserving the existing LazyRepositoryProvider boundary, GitHub App credential preference, FCR constitutional governance checks, exact reviewed base/head freshness membrane, and unchanged GitLab provider behavior."
       ]
     },
     {
