@@ -207,7 +207,7 @@ describe('QuickScan founder-gated API', () => {
       recommendation: chiefRecommendation(),
       provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_1', promptVersion: 'quickscan-chief-v1-test' },
     }));
-    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({});
+    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
 
     expect(response.status).toBe(200);
     expect(runChief).toHaveBeenCalledTimes(1);
@@ -216,6 +216,66 @@ describe('QuickScan founder-gated API', () => {
     expect(response.body.approval).toMatchObject({ action: 'outreach', recommendedBy: 'chief', decision: 'PENDING', proposedAction: chiefRecommendation().messageDraft });
     expect(response.body.prospect.approvals).toHaveLength(1);
     expect(response.body.prospect.audit.some((entry: { type: string }) => entry.type === 'chief.recommendation')).toBe(true);
+    expect(response.body.prospect.audit.some((entry: { type: string; message: string }) => entry.type === 'chief.recommendation.provenance' && entry.message.includes('resp_1') && entry.message.includes('gpt-5-mini'))).toBe(true);
+  });
+
+  it('refuses to run Chief without an explicit data-sharing acknowledgement', async () => {
+    founderSession();
+    const created = await request(buildApp()).post('/quickscan/prospects').set('Authorization', BEARER).send({ businessName: 'No Ack Studio', segment: 'salon_studio_team_owner' });
+    const id = created.body.prospect.id;
+
+    const runChief = vi.fn();
+    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({});
+
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe('DATA_SHARING_ACKNOWLEDGEMENT_REQUIRED');
+    expect(runChief).not.toHaveBeenCalled();
+  });
+
+  it('applies the Chief recommendation to state mutated while the provider call was in flight, without reverting it', async () => {
+    founderSession();
+    const created = await request(buildApp()).post('/quickscan/prospects').set('Authorization', BEARER).send({ businessName: 'Race Condition Studio', segment: 'salon_studio_team_owner' });
+    const id = created.body.prospect.id;
+    const app = buildAppWithChief({
+      runChief: vi.fn(async () => {
+        // Simulate another request (e.g. the founder adding evidence) landing
+        // while this provider call is still in flight.
+        await request(app).post(`/quickscan/prospects/${id}/evidence`).set('Authorization', BEARER).send({ category: 'urgency', note: 'Mutated mid-flight.' });
+        return { recommendation: chiefRecommendation({ nextAction: 'capture_more_evidence', messageDraft: undefined }), provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_race', promptVersion: 'quickscan-chief-v1-test' } };
+      }),
+    });
+
+    const response = await request(app).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+
+    expect(response.status).toBe(200);
+    expect(response.body.prospect.evidence).toHaveLength(1);
+    expect(response.body.prospect.evidence[0].note).toBe('Mutated mid-flight.');
+    expect(response.body.prospect.chiefRecommendation.nextAction).toBe('capture_more_evidence');
+
+    const after = await request(buildApp()).get('/quickscan').set('Authorization', BEARER);
+    const stored = after.body.prospects.find((item: { id: string }) => item.id === id);
+    expect(stored.evidence).toHaveLength(1);
+    expect(stored.chiefRecommendation.nextAction).toBe('capture_more_evidence');
+  });
+
+  it('supersedes an earlier pending Chief approval instead of piling up duplicates', async () => {
+    founderSession();
+    const created = await request(buildApp()).post('/quickscan/prospects').set('Authorization', BEARER).send({ businessName: 'Repeat Ask Studio', segment: 'salon_studio_team_owner' });
+    const id = created.body.prospect.id;
+
+    const first = await request(buildAppWithChief({ runChief: vi.fn(async () => ({ recommendation: chiefRecommendation({ messageDraft: 'First draft.' }), provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_first', promptVersion: 'quickscan-chief-v1-test' } })) }))
+      .post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+    expect(first.body.prospect.approvals).toHaveLength(1);
+    const firstApprovalId = first.body.approval.id;
+
+    const second = await request(buildAppWithChief({ runChief: vi.fn(async () => ({ recommendation: chiefRecommendation({ messageDraft: 'Second draft.' }), provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_second', promptVersion: 'quickscan-chief-v1-test' } })) }))
+      .post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
+
+    expect(second.body.prospect.approvals).toHaveLength(2);
+    const priorApproval = second.body.prospect.approvals.find((item: { id: string }) => item.id === firstApprovalId);
+    expect(priorApproval.decision).toBe('SKIP');
+    expect(second.body.approval.decision).toBe('PENDING');
+    expect(second.body.approval.proposedAction).toBe('Second draft.');
   });
 
   it('records a Chief recommendation without proposing an approval for an informational next action', async () => {
@@ -227,7 +287,7 @@ describe('QuickScan founder-gated API', () => {
       recommendation: chiefRecommendation({ nextAction: 'capture_more_evidence', messageDraft: undefined, summary: 'Not enough evidence yet.' }),
       provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_2', promptVersion: 'quickscan-chief-v1-test' },
     }));
-    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({});
+    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
 
     expect(response.status).toBe(200);
     expect(response.body.prospect.chiefRecommendation.nextAction).toBe('capture_more_evidence');
@@ -248,7 +308,7 @@ describe('QuickScan founder-gated API', () => {
     const id = created.body.prospect.id;
 
     const runChief = vi.fn(async () => { throw new QuickScanChiefProviderError('not configured', 'OPENAI_NOT_CONFIGURED'); });
-    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({});
+    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
 
     expect(response.status).toBe(503);
     expect(response.body.code).toBe('OPENAI_NOT_CONFIGURED');
@@ -260,7 +320,7 @@ describe('QuickScan founder-gated API', () => {
     const id = created.body.prospect.id;
 
     const runChief = vi.fn(async () => { throw new QuickScanChiefProviderError('boom', 'OPENAI_HTTP_ERROR', 500); });
-    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({});
+    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({ acknowledgeDataSharing: true });
 
     expect(response.status).toBe(502);
     expect(response.body.code).toBe('OPENAI_HTTP_ERROR');
