@@ -468,7 +468,7 @@ projectsRouter.post("/:slug/connections/:connectionId/check", requireFounder, as
     .eq("slug", slug)
     .maybeSingle();
   if (projectError) return res.status(500).json({ error: projectError.message });
-  if (!project) return res.status(404).json({ error: "Connection not found for this project" });
+  if (!project) return res.status(404).json({ error: `No project registered with slug "${slug}"` });
 
   const { data: existing, error: existingError } = await supabase
     .from("project_connections")
