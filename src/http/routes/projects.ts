@@ -296,17 +296,19 @@ projectsRouter.post("/:slug/ruleset", requireFounder, async (req: FounderRequest
     Array.isArray(body["requiredStatusCheckNames"]) && body["requiredStatusCheckNames"].every((c) => typeof c === "string")
       ? body["requiredStatusCheckNames"] as string[]
       : [];
-  const bypassActorsInput = Array.isArray(body["bypassActors"]) ? body["bypassActors"] : [];
-  const bypassActors = bypassActorsInput.every(
-    (actor): actor is { kind: "app"; id: string } =>
-      typeof actor === "object" && actor !== null &&
-      (actor as Record<string, unknown>)["kind"] === "app" &&
-      typeof (actor as Record<string, unknown>)["id"] === "string",
-  )
-    ? bypassActorsInput
-    : null;
-  if (bypassActors === null) {
-    return res.status(400).json({ error: 'bypassActors entries must be {"kind":"app","id":"<github app id>"}' });
+
+  const bypassActorsInput = body["bypassActors"];
+  let bypassActors: Array<{ kind: "app"; id: string }> | undefined;
+  if (bypassActorsInput !== undefined) {
+    if (!Array.isArray(bypassActorsInput) || !bypassActorsInput.every(
+      (actor): actor is { kind: "app"; id: string } =>
+        typeof actor === "object" && actor !== null &&
+        (actor as Record<string, unknown>)["kind"] === "app" &&
+        typeof (actor as Record<string, unknown>)["id"] === "string",
+    )) {
+      return res.status(400).json({ error: 'bypassActors entries must be {"kind":"app","id":"<github app id>"}' });
+    }
+    bypassActors = bypassActorsInput;
   }
 
   const { data: project, error: projectError } = await supabase
@@ -367,7 +369,8 @@ projectsRouter.post("/:slug/ruleset", requireFounder, async (req: FounderRequest
     requirePullRequest: Boolean(body["requirePullRequest"]),
     requiredApprovingReviewCount: Number(body["requiredApprovingReviewCount"] ?? 0),
     requiredStatusCheckNames, blockForcePushes: Boolean(body["blockForcePushes"]),
-    blockDeletion: Boolean(body["blockDeletion"]), bypassActors,
+    blockDeletion: Boolean(body["blockDeletion"]),
+    ...(bypassActors !== undefined ? { bypassActors } : {}),
   };
 
   const { data: reservation, error: reservationError } = await supabase
@@ -465,7 +468,7 @@ projectsRouter.post("/:slug/connections/:connectionId/check", requireFounder, as
     .eq("slug", slug)
     .maybeSingle();
   if (projectError) return res.status(500).json({ error: projectError.message });
-  if (!project) return res.status(404).json({ error: `No project registered with slug "${slug}"` });
+  if (!project) return res.status(404).json({ error: "Connection not found for this project" });
 
   const { data: existing, error: existingError } = await supabase
     .from("project_connections")
