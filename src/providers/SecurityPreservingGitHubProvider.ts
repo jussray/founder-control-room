@@ -100,7 +100,11 @@ export class SecurityPreservingGitHubProvider extends GitHubProvider {
         "SecurityPreservingGitHubProvider: existing ruleset updates cannot replace existing bypass posture without a separate bypass-authority contract",
       );
     }
-    const bypassActors = (current.bypass_actors ?? []) as UpdateBypassActors;
+    const bypassActors = (
+      config.bypassActors === undefined
+        ? current.bypass_actors ?? []
+        : []
+    ) as UpdateBypassActors;
 
     const currentEnforcement = current.enforcement as RulesetEnforcement;
     const enforcement = mergeExistingRulesetEnforcement(currentEnforcement, config.enforcement);
