@@ -22,6 +22,7 @@ import { commandBridgeRouter } from './routes/commandBridge.js';
 import { designOsRouter } from './routes/designOs.js';
 import { cloudflareReasoningRouter } from './routes/cloudflareReasoning.js';
 import { mcpRouter } from './routes/mcp.js';
+import { handleRemoteMcpProtectedResourceMetadata } from './routes/remoteReadMcp.js';
 import { externalUseRouter } from './routes/externalUse.js';
 import { futureYouRouter } from './routes/futureYou.js';
 import { goalfixRouter } from './routes/goalfix.js';
@@ -221,6 +222,14 @@ export function createServer(options: CreateServerOptions = {}) {
     express.json({ type: 'application/json', limit: '16kb' }),
     requireFounderSignalReadMcpToken,
     handleXEngagementSignalMcp,
+  );
+  app.get(
+    '/.well-known/oauth-protected-resource',
+    handleRemoteMcpProtectedResourceMetadata,
+  );
+  app.get(
+    '/.well-known/oauth-protected-resource/mcp',
+    handleRemoteMcpProtectedResourceMetadata,
   );
 
   app.use(requireSameOriginBrowserMutation);
