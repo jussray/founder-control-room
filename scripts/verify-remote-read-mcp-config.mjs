@@ -6,6 +6,14 @@ import path from 'node:path';
 const root = process.cwd();
 const EXACT_REMOTE_SCOPE = 'chief-ai-machine,founder-control-room';
 const REMOTE_ENDPOINT = 'POST https://api.foundercontrolroom.org/mcp/read';
+const EXPECTED_READ_ONLY_TOOLS = [
+  'chief_audit_repository',
+  'chief_list_capabilities',
+  'chief_preview_capability_plan',
+  'fcr_list_projects',
+  'fcr_get_current_truth',
+  'fcr_preview_skill_route',
+];
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), 'utf8');
@@ -19,6 +27,7 @@ const envExample = read('.env.example');
 const wrangler = read('wrangler.worker.toml');
 const docs = read('docs/MCP_STACK.md');
 const route = read('src/http/routes/remoteReadMcp.ts');
+const externalTools = read('src/mcp/externalTools.ts');
 
 assert(
   envExample.includes('FCR_REMOTE_MCP_READ_TOKEN='),
@@ -58,10 +67,11 @@ assert(
 for (const requiredRouteFragment of [
   'env.FCR_REMOTE_MCP_READ_TOKEN',
   'env.FCR_REMOTE_MCP_READ_PROJECTS',
-  "const READ_TOOL_NAME = 'invoke_read_tool'",
-  "const LIST_SERVERS_TOOL_NAME = 'list_read_servers'",
+  'externalMcpToolDefinitions()',
+  'isExternalMcpToolName(name)',
+  'createExternalMcpToolExecutor',
   'timingSafeEqual',
-  'Remote read MCP token or project scope is not configured',
+  'Remote MCP project scope is not configured',
 ]) {
   assert(
     route.includes(requiredRouteFragment),
@@ -69,11 +79,31 @@ for (const requiredRouteFragment of [
   );
 }
 
+for (const toolName of EXPECTED_READ_ONLY_TOOLS) {
+  assert(
+    externalTools.includes(`'${toolName}'`),
+    `canonical paired-MCP read/preview tool set drifted: missing ${toolName}`,
+  );
+}
+
 assert(
-  !route.includes("'create_tool'") && !route.includes("'write_tool'") && !route.includes("'merge_tool'"),
-  'served remote read route may not advertise write-shaped tools',
+  externalTools.includes("const READ_ONLY_ROUTE_ACTIONS = new Set<FcrSkillRouterAction>(["),
+  'canonical external MCP executor must retain an explicit read-only skill-route action allowlist',
+);
+assert(
+  externalTools.includes("'inspect'")
+    && externalTools.includes("'plan'")
+    && externalTools.includes("'review'")
+    && externalTools.includes("'draft'"),
+  'canonical external MCP executor must keep skill-route preview actions read-only',
+);
+assert(
+  !externalTools.includes("'create_tool'")
+    && !externalTools.includes("'write_tool'")
+    && !externalTools.includes("'merge_tool'"),
+  'canonical external MCP tool surface may not advertise generic write-shaped tools',
 );
 
 console.log(
-  '[verify:remote-read-mcp] endpoint, exact two-project scope, dedicated secret, fail-closed auth, and read-only tool surface are pinned.',
+  '[verify:remote-read-mcp] endpoint, exact two-project scope, dedicated secret, fail-closed auth, and canonical paired read/preview tool surface are pinned.',
 );
