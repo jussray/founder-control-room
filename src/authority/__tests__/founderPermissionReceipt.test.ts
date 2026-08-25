@@ -5,6 +5,7 @@ import {
   FOUNDER_PERMISSION_RECEIPT_CONTRACT,
   consumeFounderPermissionReceipt,
   validateFounderPermissionReceipt,
+  type FounderPermissionDecisionSnapshot,
   type FounderPermissionReceipt,
 } from '../founderPermissionReceipt.js';
 
@@ -34,6 +35,19 @@ function receipt(overrides: Partial<FounderPermissionReceipt> = {}): FounderPerm
   };
 }
 
+function decision(overrides: Partial<FounderPermissionDecisionSnapshot> = {}): FounderPermissionDecisionSnapshot {
+  return {
+    decisionId: 'decision-1',
+    founderId: 'founder',
+    subject: { repo: 'jussray/founder-control-room', headSha: HEAD, baseSha: BASE },
+    scope: ['merge:founder-control-room'],
+    action: { type: 'merge', target: 'jussray/founder-control-room#999', digest: DIGEST },
+    expiresAt: '2026-08-25T04:20:00.000Z',
+    decision: 'approved',
+    ...overrides,
+  };
+}
+
 class MemoryStore implements AuthorityReceiptV2ConsumptionStore {
   private readonly consumed = new Set<string>();
   claim(receiptId: string): boolean {
@@ -58,27 +72,76 @@ describe('FounderPermissionReceipt', () => {
     expect(validateFounderPermissionReceipt(forged, NOW)).toEqual({ ok: false, reason: 'missing_human_approval_evidence' });
   });
 
-  it('requires authoritative revalidation before one-time consumption', async () => {
+  it('requires exact authoritative founder-decision readback before one-time consumption', async () => {
     const store = new MemoryStore();
     const candidate = receipt();
 
     expect(await consumeFounderPermissionReceipt({
       receipt: candidate,
-      currentAuthority: { revalidate: () => false },
+      currentAuthority: { readDecision: () => null },
       store,
       now: NOW,
     })).toEqual({ ok: false, reason: 'current_authority_rejected' });
 
+    expect(await consumeFounderPermissionReceipt({
+      receipt: candidate,
+      currentAuthority: { readDecision: () => decision({ decisionId: 'forged-decision' }) },
+      store,
+      now: NOW,
+    })).toEqual({ ok: false, reason: 'current_authority_rejected' });
+
+    expect(await consumeFounderPermissionReceipt({
+      receipt: candidate,
+      currentAuthority: { readDecision: () => decision({ scope: ['merge:other-project'] }) },
+      store,
+      now: NOW,
+    })).toEqual({ ok: false, reason: 'current_authority_rejected' });
+
+    expect(await consumeFounderPermissionReceipt({
+      receipt: candidate,
+      currentAuthority: { readDecision: () => decision({
+        subject: { repo: 'jussray/founder-control-room', headSha: '3'.repeat(40), baseSha: BASE },
+      }) },
+      store,
+      now: NOW,
+    })).toEqual({ ok: false, reason: 'current_authority_rejected' });
+
+    expect(await consumeFounderPermissionReceipt({
+      receipt: candidate,
+      currentAuthority: { readDecision: () => decision({
+        action: { type: 'merge', target: 'jussray/founder-control-room#999', digest: `sha256:${'b'.repeat(64)}` },
+      }) },
+      store,
+      now: NOW,
+    })).toEqual({ ok: false, reason: 'current_authority_rejected' });
+
+    await expect(consumeFounderPermissionReceipt({
+      receipt: candidate,
+      currentAuthority: {
+        readDecision: () => ({
+          decisionId: 'decision-1',
+          founderId: 'founder',
+          subject: null,
+          scope: ['merge:founder-control-room'],
+          action: null,
+          expiresAt: '2026-08-25T04:20:00.000Z',
+          decision: 'approved',
+        } as unknown as FounderPermissionDecisionSnapshot),
+      },
+      store,
+      now: NOW,
+    })).resolves.toEqual({ ok: false, reason: 'current_authority_rejected' });
+
     expect((await consumeFounderPermissionReceipt({
       receipt: candidate,
-      currentAuthority: { revalidate: () => true },
+      currentAuthority: { readDecision: () => decision() },
       store,
       now: NOW,
     })).ok).toBe(true);
 
     expect(await consumeFounderPermissionReceipt({
       receipt: candidate,
-      currentAuthority: { revalidate: () => true },
+      currentAuthority: { readDecision: () => decision() },
       store,
       now: NOW,
     })).toEqual({ ok: false, reason: 'already_consumed' });
