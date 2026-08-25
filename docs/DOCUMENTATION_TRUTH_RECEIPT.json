@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded Evidence Trust Plane, Documentation Truth, repository-provider security-preservation, explicit bypass-intent semantics, Cloudflare remote-read MCP operator invariants, and read-only GitHub PR truth audit invariants for this candidate without claiming durable receipt persistence beyond existing external MCP evidence, live provider mutation, merge authority, deployment authority, secret installation, or live production truth.",
+  "purpose": "Record the bounded Evidence Trust Plane, Documentation Truth, repository-provider security-preservation, explicit bypass-intent semantics, Cloudflare remote-read MCP operator invariants, current test-discovery ratchet, and read-only GitHub PR truth audit invariants for this candidate without claiming durable receipt persistence beyond existing external MCP evidence, live provider mutation, merge authority, deployment authority, secret installation, or live production truth.",
   "domains": [
     "evidence-authority",
     "truth-governance",
@@ -30,6 +30,12 @@
       "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
         "scripts/verify-documentation-truth.mjs: Documentation Truth must classify the Evidence Trust Plane source, founder-facing page, and Playwright authority workflow as evidence-authority truth-sensitive paths so architecture changes cannot false-green with zero truth-sensitive files; changing this verifier remains truth-governance and requires the corresponding current documentation refresh."
+      ]
+    },
+    {
+      "path": "scripts/verify-test-discovery.mjs",
+      "claims": [
+        "scripts/verify-test-discovery.mjs: the test-discovery ratchet must recognize both the reviewed legacy __tests__ pattern used by its adversarial fixtures and the current repository-wide src/**/*.test.ts pattern recorded by scripts/test-discovery-baseline.json; the current pattern treats every TypeScript .test.ts under src as default-discovered and must not permit a candidate PR to create new hidden-test debt."
       ]
     },
     {
