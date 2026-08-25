@@ -257,6 +257,7 @@ Founder Control Room keeps the useful properties:
 
 - versioned source;
 - exact refs and diffs;
+- review and CI evidence;
 - approval boundaries;
 - rollback;
 - audit trails;
