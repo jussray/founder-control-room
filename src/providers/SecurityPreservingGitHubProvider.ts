@@ -76,7 +76,11 @@ export class SecurityPreservingGitHubProvider extends GitHubProvider {
       ? (current.bypass_actors ?? []) as UpdateBypassActors
       : config.bypassActors.map((actor) => {
           if (actor.kind !== "app") throw new Error(`SecurityPreservingGitHubProvider: unsupported bypass actor kind "${actor.kind}"`);
-          return { actor_type: "Integration" as const, actor_id: Number(actor.id), bypass_mode: "always" as const };
+          return {
+            actor_type: "Integration" as const,
+            actor_id: Number(actor.id),
+            bypass_mode: "pull_request" as const,
+          };
         });
 
     const { data } = await this.adminOctokit.repos.updateRepoRuleset({
