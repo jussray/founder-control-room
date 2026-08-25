@@ -10,13 +10,26 @@ vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
 
 import express from 'express';
 import request from 'supertest';
-import { quickScanRouter } from '../quickscan.js';
+import { createQuickScanRouter, quickScanRouter, type QuickScanRouteDependencies } from '../quickscan.js';
 import { resetQuickScanStoreForTests } from '../../../quickscan/store.js';
+import { QuickScanChiefProviderError } from '../../../quickscan/chiefOpenaiClient.js';
+import { QUICKSCAN_CHIEF_WORKFLOW, type QuickScanChiefPromptInput } from '../../../quickscan/chiefPrompts.js';
+import type { ChiefQuickScanRecommendation } from '../../../quickscan/contracts.js';
 
 const BEARER = 'Bearer test-token';
 const FOUNDER_EMAIL = 'founder@example.com';
 
 function buildApp() { const app = express(); app.use(express.json()); app.use('/quickscan', quickScanRouter); return app; }
+function buildAppWithChief(dependencies: QuickScanRouteDependencies) { const app = express(); app.use(express.json()); app.use('/quickscan', createQuickScanRouter(dependencies)); return app; }
+function chiefRecommendation(overrides: Partial<ChiefQuickScanRecommendation> = {}): ChiefQuickScanRecommendation {
+  return {
+    summary: 'Clear evidence of missed booking requests.',
+    nextAction: 'approve_outreach',
+    messageDraft: 'Hey Maya — do booking requests in comments ever slip through?',
+    promptWorkflow: QUICKSCAN_CHIEF_WORKFLOW,
+    ...overrides,
+  };
+}
 function founderSession() { mockGetUser.mockResolvedValue({ data: { user: { id: 'founder-1', email: FOUNDER_EMAIL } }, error: null }); }
 function founderUsersRow() { return { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { email: FOUNDER_EMAIL }, error: null }) }) }) }; }
 
@@ -164,5 +177,92 @@ describe('QuickScan founder-gated API', () => {
     expect(bypassPaid.status).toBe(409);
     expect(bypassPaid.body.code).toBe('TRANSITION_BLOCKED');
     expect(bypassPaid.body.message).toContain('evidence-gated');
+  });
+
+  it('reports whether QuickScan Chief is configured, without leaking the key', async () => {
+    const original = process.env.OPENAI_API_KEY;
+    try {
+      delete process.env.OPENAI_API_KEY;
+      founderSession();
+      let response = await request(buildApp()).get('/quickscan').set('Authorization', BEARER);
+      expect(response.body.authority.chiefConfigured).toBe(false);
+
+      process.env.OPENAI_API_KEY = 'sk-test';
+      response = await request(buildApp()).get('/quickscan').set('Authorization', BEARER);
+      expect(response.body.authority.chiefConfigured).toBe(true);
+      expect(JSON.stringify(response.body)).not.toContain('sk-test');
+    } finally {
+      if (original === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = original;
+    }
+  });
+
+  it('records a Chief recommendation and auto-proposes the matching approval for a send-worthy next action', async () => {
+    founderSession();
+    const created = await request(buildApp()).post('/quickscan/prospects').set('Authorization', BEARER).send({ businessName: 'Glow Studio', ownerName: 'Maya', segment: 'salon_studio_team_owner' });
+    const id = created.body.prospect.id;
+    await request(buildApp()).post(`/quickscan/prospects/${id}/evidence`).set('Authorization', BEARER).send({ category: 'visible_friction', note: 'Customers ask about availability in comments.' });
+
+    const runChief = vi.fn(async (_input: QuickScanChiefPromptInput) => ({
+      recommendation: chiefRecommendation(),
+      provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_1', promptVersion: 'quickscan-chief-v1-test' },
+    }));
+    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({});
+
+    expect(response.status).toBe(200);
+    expect(runChief).toHaveBeenCalledTimes(1);
+    expect(runChief.mock.calls[0][0]).toMatchObject({ businessName: 'Glow Studio', ownerName: 'Maya', segment: 'salon_studio_team_owner' });
+    expect(response.body.prospect.chiefRecommendation).toMatchObject({ nextAction: 'approve_outreach', promptWorkflow: QUICKSCAN_CHIEF_WORKFLOW });
+    expect(response.body.approval).toMatchObject({ action: 'outreach', recommendedBy: 'chief', decision: 'PENDING', proposedAction: chiefRecommendation().messageDraft });
+    expect(response.body.prospect.approvals).toHaveLength(1);
+    expect(response.body.prospect.audit.some((entry: { type: string }) => entry.type === 'chief.recommendation')).toBe(true);
+  });
+
+  it('records a Chief recommendation without proposing an approval for an informational next action', async () => {
+    founderSession();
+    const created = await request(buildApp()).post('/quickscan/prospects').set('Authorization', BEARER).send({ businessName: 'Thin Evidence Studio', segment: 'salon_studio_team_owner' });
+    const id = created.body.prospect.id;
+
+    const runChief = vi.fn(async () => ({
+      recommendation: chiefRecommendation({ nextAction: 'capture_more_evidence', messageDraft: undefined, summary: 'Not enough evidence yet.' }),
+      provenance: { provider: 'openai' as const, model: 'gpt-5-mini', responseId: 'resp_2', promptVersion: 'quickscan-chief-v1-test' },
+    }));
+    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({});
+
+    expect(response.status).toBe(200);
+    expect(response.body.prospect.chiefRecommendation.nextAction).toBe('capture_more_evidence');
+    expect(response.body.approval).toBeNull();
+    expect(response.body.prospect.approvals).toHaveLength(0);
+  });
+
+  it('returns 404 for a Chief recommendation on a prospect that does not exist', async () => {
+    founderSession();
+    const response = await request(buildAppWithChief({ runChief: vi.fn() })).post('/quickscan/prospects/does-not-exist/chief-recommendation').set('Authorization', BEARER).send({});
+    expect(response.status).toBe(404);
+    expect(response.body.code).toBe('PROSPECT_NOT_FOUND');
+  });
+
+  it('returns 503 when the Chief model provider is not configured', async () => {
+    founderSession();
+    const created = await request(buildApp()).post('/quickscan/prospects').set('Authorization', BEARER).send({ businessName: 'Unconfigured Studio', segment: 'salon_studio_team_owner' });
+    const id = created.body.prospect.id;
+
+    const runChief = vi.fn(async () => { throw new QuickScanChiefProviderError('not configured', 'OPENAI_NOT_CONFIGURED'); });
+    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({});
+
+    expect(response.status).toBe(503);
+    expect(response.body.code).toBe('OPENAI_NOT_CONFIGURED');
+  });
+
+  it('returns 502 when the Chief model provider fails', async () => {
+    founderSession();
+    const created = await request(buildApp()).post('/quickscan/prospects').set('Authorization', BEARER).send({ businessName: 'Flaky Provider Studio', segment: 'salon_studio_team_owner' });
+    const id = created.body.prospect.id;
+
+    const runChief = vi.fn(async () => { throw new QuickScanChiefProviderError('boom', 'OPENAI_HTTP_ERROR', 500); });
+    const response = await request(buildAppWithChief({ runChief })).post(`/quickscan/prospects/${id}/chief-recommendation`).set('Authorization', BEARER).send({});
+
+    expect(response.status).toBe(502);
+    expect(response.body.code).toBe('OPENAI_HTTP_ERROR');
   });
 });
