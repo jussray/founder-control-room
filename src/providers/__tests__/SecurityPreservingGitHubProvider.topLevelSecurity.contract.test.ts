@@ -7,11 +7,16 @@ const sourcePath = fileURLToPath(new URL("../SecurityPreservingGitHubProvider.ts
 const source = readFileSync(sourcePath, "utf8");
 
 describe("SecurityPreservingGitHubProvider top-level security contract", () => {
-  it("fails closed when requested protection remains carved out by provider exclusions", () => {
+  it("fails closed only for exclusions whose coverage is locally provable", () => {
     expect(requestedRefsRemainingExcluded(["main"], ["refs/heads/main"])).toEqual(["refs/heads/main"]);
-    expect(requestedRefsRemainingExcluded(["main"], ["refs/heads/*"])).toEqual(["refs/heads/main"]);
     expect(requestedRefsRemainingExcluded(["main"], ["~ALL"])).toEqual(["refs/heads/main"]);
     expect(requestedRefsRemainingExcluded(["main"], [])).toEqual([]);
+  });
+
+  it("does not invent GitHub ref-pattern or default-branch semantics locally", () => {
+    expect(requestedRefsRemainingExcluded(["main"], ["refs/heads/*"])).toEqual([]);
+    expect(requestedRefsRemainingExcluded(["release/v1"], ["refs/heads/release/*"])).toEqual([]);
+    expect(requestedRefsRemainingExcluded(["release/v1"], ["~DEFAULT_BRANCH"])).toEqual([]);
   });
 
   it("keeps existing non-FCR mutation fail-closed", () => {
