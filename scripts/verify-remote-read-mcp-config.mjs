@@ -6,6 +6,14 @@ import path from 'node:path';
 const root = process.cwd();
 const EXACT_REMOTE_SCOPE = 'chief-ai-machine,founder-control-room';
 const REMOTE_ENDPOINT = 'POST https://api.foundercontrolroom.org/mcp/read';
+const EXPECTED_EXTERNAL_READ_TOOLS = [
+  'chief_audit_repository',
+  'chief_list_capabilities',
+  'chief_preview_capability_plan',
+  'fcr_list_projects',
+  'fcr_get_current_truth',
+  'fcr_preview_skill_route',
+].sort();
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), 'utf8');
@@ -19,6 +27,7 @@ const envExample = read('.env.example');
 const wrangler = read('wrangler.worker.toml');
 const docs = read('docs/MCP_STACK.md');
 const route = read('src/http/routes/remoteReadMcp.ts');
+const externalTools = read('src/mcp/externalTools.ts');
 
 assert(
   envExample.includes('FCR_REMOTE_MCP_READ_TOKEN='),
@@ -58,8 +67,8 @@ assert(
 for (const requiredRouteFragment of [
   'env.FCR_REMOTE_MCP_READ_TOKEN',
   'env.FCR_REMOTE_MCP_READ_PROJECTS',
-  "const READ_TOOL_NAME = 'invoke_read_tool'",
-  "const LIST_SERVERS_TOOL_NAME = 'list_read_servers'",
+  'externalMcpToolDefinitions',
+  'isExternalMcpToolName',
   'timingSafeEqual',
   'Remote read MCP token or project scope is not configured',
 ]) {
@@ -69,11 +78,25 @@ for (const requiredRouteFragment of [
   );
 }
 
+const toolRegistryMatch = externalTools.match(
+  /export const EXTERNAL_MCP_TOOL_NAMES = \[([\s\S]*?)\] as const;/m,
+);
+assert(toolRegistryMatch, 'external MCP tool registry declaration is missing');
+const registeredTools = [...toolRegistryMatch[1].matchAll(/'([^']+)'/g)]
+  .map((match) => match[1])
+  .sort();
 assert(
-  !route.includes("'create_tool'") && !route.includes("'write_tool'") && !route.includes("'merge_tool'"),
-  'served remote read route may not advertise write-shaped tools',
+  JSON.stringify(registeredTools) === JSON.stringify(EXPECTED_EXTERNAL_READ_TOOLS),
+  `external MCP read-only registry drifted: expected ${EXPECTED_EXTERNAL_READ_TOOLS.join(', ')}; got ${registeredTools.join(', ')}`,
 );
 
+for (const forbidden of ['create_tool', 'write_tool', 'merge_tool']) {
+  assert(
+    !route.includes(`'${forbidden}'`) && !externalTools.includes(`'${forbidden}'`),
+    `served remote read surface may not advertise write-shaped tool ${forbidden}`,
+  );
+}
+
 console.log(
-  '[verify:remote-read-mcp] endpoint, exact two-project scope, dedicated secret, fail-closed auth, and read-only tool surface are pinned.',
+  '[verify:remote-read-mcp] endpoint, exact two-project scope, dedicated secret, fail-closed auth, and registry-backed read-only tool surface are pinned.',
 );
