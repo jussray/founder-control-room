@@ -69,7 +69,7 @@ function normalizedRepository(value: string | undefined): string | undefined {
 
 function normalizedSha(value: string | undefined): string | undefined {
   const sha = normalized(value)?.toLowerCase();
-  return sha && /^[0-9a-f]{40}$/.test(sha) ? sha : undefined;
+  return sha && /^[0-9a-f]{40}$/.test(sha) && !/^0{40}$/.test(sha) ? sha : undefined;
 }
 
 function strictIsoTime(value: string | undefined): number | undefined {
