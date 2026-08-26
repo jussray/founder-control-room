@@ -2,11 +2,13 @@
 /**
  * Test discovery ratchet.
  *
- * The default Vitest configuration runs only
- * src/(glob)/__tests__/(glob)/.test.ts. Candidate test files outside that exact
- * pattern are excluded from the default npm test gate. They can still be run
- * by a dedicated workflow, so this verifier never calls them "never run in
- * CI" without an exact workflow receipt.
+ * The default Vitest configuration currently runs every .test.ts and .test.js
+ * file under src/. The verifier also understands the preceding TypeScript-only
+ * and __tests__-only patterns so the base-bound ratchet can validate an upgrade
+ * without inventing or erasing historical debt. Candidate files outside the
+ * recorded pattern are excluded from the default npm test gate. They can still
+ * be run by a dedicated workflow, so this verifier never calls them "never run
+ * in CI" without an exact workflow receipt.
  *
  * The recorded debt is base-bound: a pull request may remove entries by
  * making a candidate discoverable or deleting it, but it cannot add a newly
@@ -20,7 +22,9 @@ import { posix } from 'node:path';
 
 const BASELINE_PATH = 'scripts/test-discovery-baseline.json';
 const VITEST_CONFIG_PATH = 'vitest.config.ts';
-const DEFAULT_INCLUDE_PATTERN = 'src/**/__tests__/**/*.test.ts';
+const LEGACY_INCLUDE_PATTERN = 'src/**/__tests__/**/*.test.ts';
+const ALL_TYPESCRIPT_TESTS_PATTERN = 'src/**/*.test.ts';
+const ALL_JAVASCRIPT_AND_TYPESCRIPT_TESTS_PATTERN = 'src/**/*.test.{ts,js}';
 const CANDIDATE_TEST_FILE = /\.(?:test|spec)\.(?:[cm]?[jt]sx?)$/i;
 
 function fail(messages) {
@@ -52,14 +56,21 @@ async function collectTestFiles(dir) {
 }
 
 function isDefaultVitestTest(file, includePattern) {
-  if (includePattern !== DEFAULT_INCLUDE_PATTERN) {
-    fail([
-      `unsupported Vitest include pattern '${includePattern}'. Update this verifier and ${BASELINE_PATH} together.`,
-    ]);
+  if (includePattern === ALL_JAVASCRIPT_AND_TYPESCRIPT_TESTS_PATTERN) {
+    return file.startsWith('src/')
+      && (file.endsWith('.test.ts') || file.endsWith('.test.js'));
   }
-  return file.startsWith('src/')
-    && file.split('/').includes('__tests__')
-    && file.endsWith('.test.ts');
+  if (includePattern === ALL_TYPESCRIPT_TESTS_PATTERN) {
+    return file.startsWith('src/') && file.endsWith('.test.ts');
+  }
+  if (includePattern === LEGACY_INCLUDE_PATTERN) {
+    return file.startsWith('src/')
+      && file.split('/').includes('__tests__')
+      && file.endsWith('.test.ts');
+  }
+  fail([
+    `unsupported Vitest include pattern '${includePattern}'. Update this verifier and ${BASELINE_PATH} together.`,
+  ]);
 }
 
 function baseUndiscoveredTests(baseRef, includePattern) {

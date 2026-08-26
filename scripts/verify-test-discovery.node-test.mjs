@@ -62,6 +62,34 @@ test('permits the initial base-derived baseline, including a hidden JavaScript s
   assert.match(result.stdout, /excluded from default npm test discovery: 2/);
 });
 
+test('supports the transitional all-TypeScript-test include without hiding colocated tests', (t) => {
+  const { root, baseSha } = makeRepo(t);
+  write(root, 'vitest.config.ts', "export default { test: { include: ['src/**/*.test.ts'] } };\n");
+  write(root, 'scripts/test-discovery-baseline.json', JSON.stringify({
+    includePattern: 'src/**/*.test.ts',
+    undiscovered: ['src/lib/__tests__/legacyConsole.test.js'],
+  }, null, 2));
+
+  const result = verify(root, baseSha);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /matched by default npm test discovery: 2/);
+  assert.match(result.stdout, /excluded from default npm test discovery: 1/);
+});
+
+test('supports the JavaScript and TypeScript include with no hidden fixture tests', (t) => {
+  const { root, baseSha } = makeRepo(t);
+  write(root, 'vitest.config.ts', "export default { test: { include: ['src/**/*.test.{ts,js}'] } };\n");
+  write(root, 'scripts/test-discovery-baseline.json', JSON.stringify({
+    includePattern: 'src/**/*.test.{ts,js}',
+    undiscovered: [],
+  }, null, 2));
+
+  const result = verify(root, baseSha);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /matched by default npm test discovery: 3/);
+  assert.match(result.stdout, /excluded from default npm test discovery: 0/);
+});
+
 test('rejects a hidden test appended to the candidate baseline', (t) => {
   const { root, baseSha } = makeRepo(t);
   write(root, 'src/newHidden.test.ts', 'export {};\n');
