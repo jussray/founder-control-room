@@ -239,7 +239,7 @@ export function independentReviewHash(review: IndependentReviewReceipt): string 
 }
 
 export function expectedReviewSignalName(review: IndependentReviewReceipt): string {
-  return `Independent Review / ${text(review?.reviewer?.id)} / ${text(review?.reviewHash).slice(0, 12)}`;
+  return `Independent Review / ${lower(review?.reviewHash)}`;
 }
 
 function verdictFromFindings(findings: IndependentReviewFinding[]): ReviewVerdict {
