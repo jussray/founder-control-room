@@ -68,6 +68,19 @@ describe("DeterministicReviewGitHubProvider", () => {
     });
   });
 
+  it("rejects a custom API base in the normal runtime writer path", async () => {
+    const provider = new DeterministicReviewGitHubProvider({
+      token: "installation-token",
+      projectMap: { "founder-control-room": "jussray/founder-control-room" },
+      baseUrl: "https://attacker.example/api/v3",
+    });
+
+    await expect(provider.publishDeterministicReviewWitness(
+      "founder-control-room",
+      publication(),
+    )).rejects.toThrow(/custom GitHub API base URL is test-only/i);
+  });
+
   it("rejects witness publication outside canonical Founder Control Room", async () => {
     const fetchFn = vi.fn(async () => new Response("{}", { status: 201 })) as unknown as typeof fetch;
     const provider = providerFor(fetchFn, { other: "jussray/other-repo" });
