@@ -50,10 +50,31 @@ export const FOUNDER_CONTENT_ORCHESTRATION_STATES = [
   'enabled-misconfigured',
   'invalid-provider-configuration',
   'enabled-awaiting-proof',
+  'enabled-live-verified',
 ] as const;
 
 export type FounderContentOrchestrationState =
   (typeof FOUNDER_CONTENT_ORCHESTRATION_STATES)[number];
+
+export const FOUNDER_CONTENT_ORCHESTRATION_PROOF_STATES = [
+  'not-observed',
+  'verified',
+  'stale-head',
+  'runtime-sha-unavailable',
+  'provider-unverified',
+  'readback-unavailable',
+] as const;
+
+export type FounderContentOrchestrationProofState =
+  (typeof FOUNDER_CONTENT_ORCHESTRATION_PROOF_STATES)[number];
+
+export interface FounderContentOrchestrationProof {
+  state: FounderContentOrchestrationProofState;
+  provider: 'buffer' | null;
+  receiptId: string | null;
+  expectedHeadSha: string | null;
+  observedAt: string | null;
+}
 
 export interface FounderContentOrchestrationReadiness {
   state: FounderContentOrchestrationState;
@@ -65,14 +86,27 @@ export interface FounderContentOrchestrationReadiness {
   invalidProviders: string[];
   bufferEnabled: boolean;
   bufferReadyForProbe: boolean;
-  liveProbeRequired: true;
-  liveVerified: false;
+  liveProbeRequired: boolean;
+  liveVerified: boolean;
+  proof: FounderContentOrchestrationProof;
   secretValuesExposed: false;
 }
 
 function emptyProof(state: FounderConveyorProofState = 'not-observed'): FounderConveyorLiveProof {
   return {
     state,
+    receiptId: null,
+    expectedHeadSha: null,
+    observedAt: null,
+  };
+}
+
+function emptyFounderContentProof(
+  state: FounderContentOrchestrationProofState = 'not-observed',
+): FounderContentOrchestrationProof {
+  return {
+    state,
+    provider: null,
     receiptId: null,
     expectedHeadSha: null,
     observedAt: null,
@@ -151,6 +185,7 @@ export async function resolveFounderConveyorReadiness(
 
 export function founderContentOrchestrationReadiness(
   env: NodeJS.ProcessEnv = process.env,
+  proof: FounderContentOrchestrationProof = emptyFounderContentProof(),
 ): FounderContentOrchestrationReadiness {
   const transport = readN8nFounderContentConfig(env);
   const providers = readN8nFounderContentProviderConfig(env);
@@ -158,6 +193,20 @@ export function founderContentOrchestrationReadiness(
   const bearerTokenConfigured = Boolean(transport.bearerToken);
   const bufferEnabled = providers.enabledProviders.includes('buffer');
   const providerConfigurationValid = providers.invalidProviders.length === 0;
+  const runtimeSha = (env.GIT_SHA ?? '').trim().toLowerCase();
+  const proofHead = (proof.expectedHeadSha ?? '').trim().toLowerCase();
+  const exactRuntimeProof =
+    FULL_SHA.test(runtimeSha) &&
+    FULL_SHA.test(proofHead) &&
+    runtimeSha === proofHead;
+  const liveVerified =
+    transport.enabled &&
+    transport.configured &&
+    providerConfigurationValid &&
+    bufferEnabled &&
+    proof.state === 'verified' &&
+    proof.provider === 'buffer' &&
+    exactRuntimeProof;
 
   let state: FounderContentOrchestrationState;
   if (!providerConfigurationValid) {
@@ -168,6 +217,8 @@ export function founderContentOrchestrationReadiness(
     state = 'not-configured';
   } else if (!transport.enabled) {
     state = 'ready-for-probe';
+  } else if (liveVerified) {
+    state = 'enabled-live-verified';
   } else {
     state = 'enabled-awaiting-proof';
   }
@@ -185,9 +236,11 @@ export function founderContentOrchestrationReadiness(
       transport.enabled &&
       transport.configured &&
       providerConfigurationValid &&
-      bufferEnabled,
-    liveProbeRequired: true,
-    liveVerified: false,
+      bufferEnabled &&
+      !liveVerified,
+    liveProbeRequired: !liveVerified,
+    liveVerified,
+    proof,
     secretValuesExposed: false,
   };
 }
