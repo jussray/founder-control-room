@@ -27,12 +27,26 @@ export interface PullRequestAuditCheckObservation {
   detailsUrl?: string;
 }
 
+export interface PullRequestAuditCommitStatusObservation {
+  id: string;
+  name: string;
+  state: string;
+  headSha: string;
+  updatedAt?: string;
+  detailsUrl?: string;
+}
+
 export interface PullRequestAuditWorkflowObservation {
   id: string;
+  /** Stable provider context used to collapse superseded executions. */
+  contextId: string;
   name: string;
   status: string;
   conclusion?: string;
   headSha: string;
+  runNumber?: number;
+  runAttempt?: number;
+  createdAt?: string;
   updatedAt: string;
   detailsUrl?: string;
 }
@@ -64,6 +78,7 @@ export interface PullRequestAuditEvidence {
   initialPullRequest: PullRequestAuditObservation;
   finalPullRequest: PullRequestAuditObservation;
   checks: BoundedProviderEvidence<PullRequestAuditCheckObservation>;
+  commitStatuses: BoundedProviderEvidence<PullRequestAuditCommitStatusObservation>;
   workflows: BoundedProviderEvidence<PullRequestAuditWorkflowObservation>;
   reviews: BoundedProviderEvidence<PullRequestAuditReviewObservation>;
   changedFiles: BoundedProviderEvidence<PullRequestAuditChangedFile>;
