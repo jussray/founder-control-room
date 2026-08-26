@@ -29,6 +29,7 @@ const SUPPORTED_INCLUDE_PATTERNS = new Set([
   CURRENT_INCLUDE_PATTERN,
 ]);
 const CANDIDATE_TEST_FILE = /\.(?:test|spec)\.(?:[cm]?[jt]sx?)$/i;
+const DEFAULT_VITEST_TEST_FILE = /\.(?:test|spec)\.(?:[cm]?[jt]sx?)$/;
 
 function fail(messages) {
   console.error('\nTest discovery contract FAILED:');
@@ -66,7 +67,7 @@ function isDefaultVitestTest(file, includePattern) {
   }
 
   if (includePattern === CURRENT_INCLUDE_PATTERN) {
-    return file.startsWith('src/') && CANDIDATE_TEST_FILE.test(file);
+    return file.startsWith('src/') && DEFAULT_VITEST_TEST_FILE.test(file);
   }
 
   return file.startsWith('src/')
