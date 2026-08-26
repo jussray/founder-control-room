@@ -1,11 +1,18 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded Milestone B deterministic GitHub App witness-publication and full provider-fingerprint readback invariants layered on the hardened producer without claiming bootstrap authority, founder-final approval, merge authority, deployment authority, live provider enforcement, secret installation, or runtime trigger activation.",
+  "purpose": "Record the bounded Milestone B deterministic GitHub App witness-publication invariants plus the founder-gated runtime trigger candidate without claiming bootstrap authority, founder-final approval, merge authority, deployment authority, live provider enforcement, secret installation, or deployed runtime availability.",
   "domains": [
     "merge-authority",
     "repository-provider"
   ],
   "changes": [
+    {
+      "path": "src/http/server.ts",
+      "claims": [
+        "src/http/server.ts must keep POST /review/deterministic-witness/:pullRequestNumber inside the existing same-origin, authenticated-founder, fcr-privileged-execution-master, and repository-rate-limit membrane; the caller may supply only a positive pull-request number while repository/provider identity and all base/head/diff/verdict/hash/check/App authority fields remain server/provider derived, and a successful response must remain proposal-only with mergeAuthorized and executionAuthorized false rather than becoming merge or execution authority.",
+        "src/http/server.ts cannot make the deterministic witness trigger current production authority merely by existing in source: after lawful bootstrap integration, the exact merged release must still be deployed and re-observed before the trigger is treated as an available provider-mutation path."
+      ]
+    },
     {
       "path": "src/review/deterministicReviewProducer.ts",
       "claims": [
