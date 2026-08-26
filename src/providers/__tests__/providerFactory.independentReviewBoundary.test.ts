@@ -32,7 +32,7 @@ vi.mock("../GitLabProvider.js", () => ({
   },
 }));
 
-const { providerForProject } = await import("../providerFactory.js");
+const { providerConfigurationError, providerForProject } = await import("../providerFactory.js");
 
 const BASE_SHA = "a".repeat(40);
 const HEAD_SHA = "b".repeat(40);
@@ -105,6 +105,13 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
       reviewHash: "d".repeat(64),
       summary: "must not publish with fallback token authority",
     })).rejects.toThrow(/requires GitHub App authority/i);
+  });
+
+  it.each([
+    { GITHUB_TOKEN: "test-token", GITHUB_APP_ID: "12345", GITHUB_PRIVATE_KEY: "" },
+    { GITHUB_TOKEN: "test-token", GITHUB_APP_ID: "", GITHUB_PRIVATE_KEY: "private-key" },
+  ])("rejects partial GitHub App credentials even when a fallback token exists", (env) => {
+    expect(providerConfigurationError(FCR_PROJECT, env)).toMatch(/GitHub App authentication is incomplete/i);
   });
 
   it("canonicalizes an alias of the FCR repository before review and integration authority", async () => {
