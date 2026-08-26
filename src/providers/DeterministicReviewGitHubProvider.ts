@@ -14,7 +14,7 @@ const SHA256 = /^[0-9a-f]{64}$/i;
 const MAX_SUMMARY_LENGTH = 65_535;
 
 export interface DeterministicReviewGitHubProviderDependencies {
-  /** Explicit test transport. Supplying this is the only way a custom API base may exercise witness publication. */
+  /** Explicit test transport. Supplying this is the only way a custom API base may exercise witness publication/readback. */
   fetchFn?: typeof fetch;
 }
 
@@ -37,8 +37,9 @@ function mapCheckStatus(status: string, conclusion: string | null): Verification
   if (status !== "completed") return "unknown";
   switch (conclusion) {
     case "success":
-    case "neutral":
       return "passed";
+    case "neutral":
+      return "unknown";
     case "skipped":
       return "skipped";
     case "cancelled":
@@ -79,6 +80,17 @@ export class DeterministicReviewGitHubProvider extends SecurityPreservingGitHubP
     this.reviewUsesInjectedTestTransport = dependencies.fetchFn !== undefined;
   }
 
+  private assertTrustedReviewApiBase(): void {
+    if (
+      this.reviewApiBaseUrl.toLowerCase() !== DEFAULT_GITHUB_API_BASE_URL
+      && !this.reviewUsesInjectedTestTransport
+    ) {
+      throw new Error(
+        "DeterministicReviewGitHubProvider: custom GitHub API base URL is test-only for deterministic witness network access",
+      );
+    }
+  }
+
   private locateReviewRepository(projectId: string): { owner: string; repo: string } {
     const locator = this.reviewProjectMap[projectId]?.trim() ?? "";
     if (locator.toLowerCase() !== FCR_REPOSITORY) {
@@ -103,6 +115,7 @@ export class DeterministicReviewGitHubProvider extends SecurityPreservingGitHubP
   }
 
   override async listVerificationSignals(projectId: string, ref: string): Promise<VerificationSignal[]> {
+    this.assertTrustedReviewApiBase();
     const { owner, repo } = this.locateReviewRepository(projectId);
     const requestedRef = ref.trim();
     if (!requestedRef) {
@@ -148,14 +161,7 @@ export class DeterministicReviewGitHubProvider extends SecurityPreservingGitHubP
     projectId: string,
     publication: DeterministicReviewWitnessPublication,
   ): Promise<void> {
-    if (
-      this.reviewApiBaseUrl.toLowerCase() !== DEFAULT_GITHUB_API_BASE_URL
-      && !this.reviewUsesInjectedTestTransport
-    ) {
-      throw new Error(
-        "DeterministicReviewGitHubProvider: custom GitHub API base URL is test-only for deterministic witness publication",
-      );
-    }
+    this.assertTrustedReviewApiBase();
 
     const { owner, repo } = this.locateReviewRepository(projectId);
     const headSha = publication.headSha.trim().toLowerCase();
