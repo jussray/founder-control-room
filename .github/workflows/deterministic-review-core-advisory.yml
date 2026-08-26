@@ -11,7 +11,7 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.sha }}
-  DOC_TRUTH_BASE_SHA: 35817fe224cc953201e2fd6ed08edd33ef570ea2
+  DOC_TRUTH_BASE_SHA: 19682c6debfdf1be08a260ae02d6c393b5a6a881
 
 jobs:
   deterministic-review-witness:
