@@ -4,11 +4,13 @@ import type { DeterministicReviewWitnessPublication } from "./RepositoryProvider
 
 const FCR_REPOSITORY = "jussray/founder-control-room";
 const REVIEWER_ID = "fcr-deterministic-review-v1";
+const DEFAULT_GITHUB_API_BASE_URL = "https://api.github.com";
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
 const MAX_SUMMARY_LENGTH = 65_535;
 
 export interface DeterministicReviewGitHubProviderDependencies {
+  /** Explicit test transport. Supplying this is the only way a custom API base may exercise witness publication. */
   fetchFn?: typeof fetch;
 }
 
@@ -23,6 +25,7 @@ export class DeterministicReviewGitHubProvider extends SecurityPreservingGitHubP
   private readonly reviewProjectMap: Record<string, string>;
   private readonly reviewApiBaseUrl: string;
   private readonly reviewFetch: typeof fetch;
+  private readonly reviewUsesInjectedTestTransport: boolean;
 
   constructor(
     config: GitHubProviderConfig,
@@ -31,8 +34,9 @@ export class DeterministicReviewGitHubProvider extends SecurityPreservingGitHubP
     super(config);
     this.reviewToken = config.token;
     this.reviewProjectMap = config.projectMap;
-    this.reviewApiBaseUrl = (config.baseUrl?.trim() || "https://api.github.com").replace(/\/$/, "");
+    this.reviewApiBaseUrl = (config.baseUrl?.trim() || DEFAULT_GITHUB_API_BASE_URL).replace(/\/$/, "");
     this.reviewFetch = dependencies.fetchFn ?? fetch;
+    this.reviewUsesInjectedTestTransport = dependencies.fetchFn !== undefined;
   }
 
   private locateReviewRepository(projectId: string): { owner: string; repo: string } {
@@ -53,6 +57,15 @@ export class DeterministicReviewGitHubProvider extends SecurityPreservingGitHubP
     projectId: string,
     publication: DeterministicReviewWitnessPublication,
   ): Promise<void> {
+    if (
+      this.reviewApiBaseUrl.toLowerCase() !== DEFAULT_GITHUB_API_BASE_URL
+      && !this.reviewUsesInjectedTestTransport
+    ) {
+      throw new Error(
+        "DeterministicReviewGitHubProvider: custom GitHub API base URL is test-only for deterministic witness publication",
+      );
+    }
+
     const { owner, repo } = this.locateReviewRepository(projectId);
     const headSha = publication.headSha.trim().toLowerCase();
     const reviewHash = publication.reviewHash.trim().toLowerCase();
