@@ -9,6 +9,7 @@ on:
       - src/security/attack20V3.test.ts
       - src/goalfix/executionWorkflow.ts
       - src/goalfix/executionWorkflow.test.ts
+      - src/goalfix/executionWorkflow.redteam.test.ts
       - docs/GOALFIX_EXECUTION_WORKFLOW_V2.md
       - scripts/verify-attack-20-v3.mjs
       - .github/workflows/attack-20-v3.yml
@@ -30,6 +31,7 @@ on:
       - src/security/attack20V3.test.ts
       - src/goalfix/executionWorkflow.ts
       - src/goalfix/executionWorkflow.test.ts
+      - src/goalfix/executionWorkflow.redteam.test.ts
       - docs/GOALFIX_EXECUTION_WORKFLOW_V2.md
       - scripts/verify-attack-20-v3.mjs
       - .github/workflows/attack-20-v3.yml
@@ -90,13 +92,13 @@ jobs:
         run: npm run verify:cookies
 
       - name: Focused ATTACK-20 and Goalfix workflow tests
-        run: npx vitest run src/security/attack20V3.test.ts src/goalfix/executionWorkflow.test.ts
+        run: npx vitest run src/security/attack20V3.test.ts src/goalfix/executionWorkflow.test.ts src/goalfix/executionWorkflow.redteam.test.ts
 
       - name: Typecheck
         run: npm run typecheck
 
       - name: Lint touched TypeScript
-        run: npx eslint src/security/attack20V3.ts src/security/attack20V3.test.ts src/goalfix/executionWorkflow.ts src/goalfix/executionWorkflow.test.ts --max-warnings 0
+        run: npx eslint src/security/attack20V3.ts src/security/attack20V3.test.ts src/goalfix/executionWorkflow.ts src/goalfix/executionWorkflow.test.ts src/goalfix/executionWorkflow.redteam.test.ts --max-warnings 0
 
       - name: Upload exact-head source proofs
         uses: actions/upload-artifact@v4
