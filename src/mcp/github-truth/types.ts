@@ -36,12 +36,25 @@ export interface GitHubPrCheckObservation {
   detailsUrl?: string;
 }
 
+export interface GitHubPrCommitStatusObservation {
+  id: string;
+  name: string;
+  state: string;
+  headSha: string;
+  updatedAt?: string;
+  detailsUrl?: string;
+}
+
 export interface GitHubPrWorkflowObservation {
   id: string;
+  contextId: string;
   name: string;
   status: string;
   conclusion?: string;
   headSha: string;
+  runNumber?: number;
+  runAttempt?: number;
+  createdAt?: string;
   updatedAt: string;
   detailsUrl?: string;
 }
@@ -71,13 +84,14 @@ export interface GitHubPrBoundedEvidence<T> {
 
 export interface GitHubPrEvidenceCoverage {
   checksComplete: boolean;
+  commitStatusesComplete: boolean;
   workflowsComplete: boolean;
   reviewsComplete: boolean;
   changedFilesComplete: boolean;
 }
 
 export interface GitHubPrEvidenceRef {
-  kind: 'pull_request' | 'commit_comparison' | 'check_run' | 'workflow_run' | 'review_state';
+  kind: 'pull_request' | 'commit_comparison' | 'check_run' | 'commit_status' | 'workflow_run' | 'review_state';
   source: 'github';
   sourceUrl?: string;
   subjectSha?: string;
