@@ -1,21 +1,22 @@
 # Founder Control Room + Chief AI
 ## Perplexity MCP Master Build Research + Execution Specification
 
-Version: 1.2
-Date: 2026-08-11
+Version: 1.3
+Date: 2026-08-26
 Owner: Juss Ray
 Repository: `jussray/founder-control-room`
 Target branch: `perplexity/founder-control-room-master-build-spec-20260811`
 Canonical product contract: `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`
+Canonical execution contract: `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`
 Product Design companion: `docs/PRODUCT_DESIGN_PARALLEL_BUILD_SPEC.md`
 
 ---
 
 ## 0. Authority of this document
 
-Perplexity must treat `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md` as the single canonical product and architecture contract.
+Perplexity must treat `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md` as the single canonical product and architecture contract and `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md` as the canonical Goalfix execution-order contract.
 
-This file is a Perplexity MCP execution overlay. It does not fork, weaken, summarize away, or replace the canonical contract. If the two documents conflict, the canonical build specification wins unless Juss explicitly changes the source-of-truth document.
+This file is a Perplexity MCP research/execution overlay. It does not fork, weaken, summarize away, or replace either canonical contract. If this overlay conflicts with the canonical execution workflow, the canonical workflow wins for Builder/Verifier/Red Team separation, exact-head merge gating, Founder Final, expected-head merge protection, and post-merge truth.
 
 Perplexity must also obey `PERPLEXITY.md`, `AGENTS.md`, `GLOBAL_AI.md`, `docs/FOUNDER_MERGE_AUTHORITY.md`, `docs/PORTABLE_FOUNDER_APPROVALS.md`, and the repository's security, privacy, evidence, and rollback contracts.
 
@@ -38,10 +39,11 @@ Before any nontrivial task, first load `AGENTS.md` and obey every repository ent
 After the repository preflight, continue narrowly:
 
 1. `PERPLEXITY.md`
-2. `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`
-3. the exact repository files, issue, PR, CI, runtime evidence, or provider contract implicated by the goal
-4. primary external documentation required to resolve unstable or provider-specific facts
-5. the narrow governing authority/evidence docs for any proposed or executed write
+2. `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`
+3. `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`
+4. the exact repository files, issue, PR, CI, runtime evidence, or provider contract implicated by the goal
+5. primary external documentation required to resolve unstable or provider-specific facts
+6. the narrow governing authority/evidence docs for any proposed or executed write
 
 Before externally using factual claims, numbers, quotations, dates, or action guidance, read and apply `skills/fact-check-every-claim/SKILL.md`, including on research-only reports. Primary-source discovery alone does not waive the repository fact-check contract or its claim-ledger requirements.
 
@@ -53,38 +55,44 @@ Do not begin with broad web research when repository truth can answer the questi
 
 ## 3. Required operating loop
 
-For every material task:
+The canonical execution order is `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`:
 
 ```text
-Goal
--> Repository Reality
--> Unknowns
--> Primary-source research
--> Redteam I
--> Lindy
--> L99
--> Redteam II
--> OODA
--> Bill Gates
--> Elon Musk
--> Recommendation or bounded action
--> Proof
--> Rollback
--> Next Gate
+Founder Intent
+-> Observe
+-> Orient
+-> Decide
+-> Builder
+-> Independent Verifier
+-> Independent Red Team / Devil
+-> Exact-head Merge Gate
+-> Founder Final
+-> Merge With Expected Head
+-> Reacquire Main
+-> Post-merge / Runtime Truth
+-> Recover / Learn / Next Gate
 ```
+
+Perplexity's research work is supplemental inside that lane, not an alternative execution path. Repository reality and unresolved questions belong in Observe/Orient; primary-source research supports Orient/Decide; research-only validation may support Verifier or Red Team, but it cannot replace repository execution proof or founder authority.
+
+Within the canonical lane, apply the expanded reasoning semantics required by `AGENTS.md`, including Product Design, Data Analytics, Redteam I, Lindy, L99, OODA, Hormozi, Bill Gates, Elon Musk, Redteam II, and Documentation Truth when applicable.
+
+The checklist below is a Perplexity-specific aid only. It may not replace, reorder away, or omit the canonical Builder → Independent Verifier → Independent Red Team → exact-head merge gate → Founder Final → post-merge truth sequence.
 
 Translate `/goalfix` into this concrete loop:
 
 1. Identify authoritative repo, branch, target, and head.
-2. Separate VERIFIED, INFERRED, UNKNOWN, and BLOCKED.
+2. Separate VERIFIED, INFERRED, UNKNOWN, BLOCKED, and STALE.
 3. Search repository evidence before external sources.
 4. Use primary sources for unstable technical/provider facts.
 5. Find one causal blocker before collecting many possibilities.
 6. Choose the smallest reversible fix or implementation recommendation.
-7. If an authorized MCP action is available, patch only the focused cause.
-8. Verify the exact claim with the narrowest valid proof.
-9. Require Playwright evidence for user-facing UI/runtime claims.
-10. Stop when the uncertainty is resolved, the fix is proven, or the next gate requires founder authority.
+7. If Perplexity is the authorized Builder, patch only the focused cause and hand implementation evidence to an independent verifier rather than self-certifying.
+8. Verify the exact claim with the narrowest valid proof; require Playwright for user-facing UI/runtime claims.
+9. Run independent Red Team / Devil review on the unchanged exact candidate.
+10. Re-read exact base/head, CI/review/provider state before Founder Final and merge.
+11. Merge only under current authority with expected-head protection.
+12. Reacquire resulting `main` and obtain required post-merge/runtime proof.
 
 ---
 
@@ -156,7 +164,7 @@ ROLLBACK
 STOP CONDITION
 ```
 
-Clearly label every conclusion as VERIFIED, INFERRED, UNKNOWN, or BLOCKED. This packet is mandatory evidence for a material research-only handoff, not optional detail that may be dropped by the presentation format.
+Clearly label every conclusion as VERIFIED, INFERRED, UNKNOWN, BLOCKED, or STALE. This packet is mandatory evidence for a material research-only handoff, not optional detail that may be dropped by the presentation format.
 
 ---
 
@@ -236,7 +244,7 @@ Keep the founder-facing top-level report concise, but preserve the complete rese
 REALITY:
 - goal
 - authoritative repo / branch / exact SHA
-- VERIFIED / INFERRED / UNKNOWN / BLOCKED repository reality
+- VERIFIED / INFERRED / UNKNOWN / BLOCKED / STALE repository reality
 - external facts that matter, primary sources, dates/freshness, and claim/fact-check status
 - premise attack, Lindy choice, and L99 authority/state boundaries when material
 
@@ -287,7 +295,7 @@ Rules:
 - A screenshot-grounded audit requires actual flow captures and inspected screenshots. Web research, docs, or remembered UI state are `research only` without those captures.
 - Source-to-render QA is `blocked` when the source target or rendered implementation is missing, stale, or from a different state.
 - Research should focus on questions such as approval comprehension, evidence freshness, one-handed mobile use, accessibility patterns, and provider-state clarity only when the answer can change the product decision.
-- Never infer a backend or provider defect from a screenshot alone. Trace the visible symptom into repository/runtime evidence and label the causal claim VERIFIED, INFERRED, UNKNOWN, or BLOCKED.
+- Never infer a backend or provider defect from a screenshot alone. Trace the visible symptom into repository/runtime evidence and label the causal claim VERIFIED, INFERRED, UNKNOWN, BLOCKED, or STALE.
 - If Product Design produces an implementation recommendation, hand off the smallest patch plus exact Playwright acceptance criteria rather than a broad redesign brief.
 
 A scoped Product Design pass may be `passed`, `blocked`, or `research only`. Do not claim the full design gate passed when required screens, source visuals, or exact-head browser artifacts are missing.
