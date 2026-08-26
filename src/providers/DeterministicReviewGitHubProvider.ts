@@ -78,6 +78,12 @@ export class DeterministicReviewGitHubProvider extends SecurityPreservingGitHubP
     this.reviewApiBaseUrl = (config.baseUrl?.trim() || DEFAULT_GITHUB_API_BASE_URL).replace(/\/$/, "");
     this.reviewFetch = dependencies.fetchFn ?? fetch;
     this.reviewUsesInjectedTestTransport = dependencies.fetchFn !== undefined;
+
+    // Fail before any inherited GitHubProvider read can use the App token.
+    // The deterministic witness path invokes provider PR/ref/compare reads
+    // before Check Run publication, so guarding only the overridden GET/POST
+    // methods would still allow a custom runtime host to receive credentials.
+    this.assertTrustedReviewApiBase();
   }
 
   private assertTrustedReviewApiBase(): void {
