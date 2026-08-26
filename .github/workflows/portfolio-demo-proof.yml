@@ -17,6 +17,7 @@ on:
       - 'src/http/__tests__/portfolioDemoAssets.test.ts'
       - 'e2e/portfolio-demo-proof.mjs'
       - '.github/workflows/portfolio-demo-proof.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
