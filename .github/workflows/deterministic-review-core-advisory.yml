@@ -34,7 +34,7 @@ jobs:
           node-version: '24'
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Type check repository
         run: npm run typecheck
@@ -46,3 +46,4 @@ jobs:
           src/review/deterministicReviewProducer.boundary.test.ts
           src/review/deterministicReviewWitnessPublisher.test.ts
           src/providers/__tests__/deterministicReviewGitHubProvider.test.ts
+          src/providers/__tests__/providerFactory.independentReviewBoundary.test.ts
