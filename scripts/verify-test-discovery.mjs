@@ -4,7 +4,7 @@
  *
  * The repository has used two reviewed Vitest discovery contracts:
  * - legacy: TypeScript test files nested under __tests__ directories;
- * - current: every TypeScript .test.ts file under src.
+ * - current: supported JavaScript and TypeScript test/spec files under src.
  *
  * Candidate test files excluded by the recorded include pattern can still be
  * run by a dedicated workflow, so this verifier never calls them "never run in
@@ -23,7 +23,7 @@ import { posix } from 'node:path';
 const BASELINE_PATH = 'scripts/test-discovery-baseline.json';
 const VITEST_CONFIG_PATH = 'vitest.config.ts';
 const LEGACY_INCLUDE_PATTERN = 'src/**/__tests__/**/*.test.ts';
-const CURRENT_INCLUDE_PATTERN = 'src/**/*.test.ts';
+const CURRENT_INCLUDE_PATTERN = 'src/**/*.{test,spec}.{js,jsx,ts,tsx,mjs,cjs,mts,cts}';
 const SUPPORTED_INCLUDE_PATTERNS = new Set([
   LEGACY_INCLUDE_PATTERN,
   CURRENT_INCLUDE_PATTERN,
@@ -66,7 +66,7 @@ function isDefaultVitestTest(file, includePattern) {
   }
 
   if (includePattern === CURRENT_INCLUDE_PATTERN) {
-    return file.startsWith('src/') && file.endsWith('.test.ts');
+    return file.startsWith('src/') && CANDIDATE_TEST_FILE.test(file);
   }
 
   return file.startsWith('src/')
