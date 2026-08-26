@@ -1,8 +1,10 @@
 # Goalfix Execution Workflow v2
 
-Status: `SOURCE CONTRACT / MERGE PENDING`
+Status: `APPROVED SOURCE CONTRACT`
 
-This is the repository-owned operating contract for focused founder-directed implementation.
+This is the repository-owned operating contract for focused founder-directed implementation. Candidate/merge state belongs in PR/evidence receipts, not durable source prose.
+
+Provider-specific entry documents such as `docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md` and `docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md` are overlays only. They may add tool/research details but must not weaken or reorder this execution contract.
 
 ## Canonical lane
 
@@ -23,53 +25,80 @@ INDEPENDENT RED TEAM / DEVIL
   ↓
 EXACT-HEAD MERGE GATE
   ↓
-FOUNDER FINAL
+FOUNDER FINAL THROUGH CURRENT AUTHENTICATED AUTHORITY CONTRACT
   ↓
-MERGE WITH EXPECTED HEAD
+FINAL PROVIDER / PR / TARGET / BASE / HEAD / DIFF / CHECK / REVIEW REREAD
   ↓
-REACQUIRE MAIN
+MERGE WITH EXPECTED-HEAD PROTECTION
+  ↓
+REACQUIRE VERIFIED TARGET BRANCH
   ↓
 POST-MERGE / RUNTIME TRUTH
   ↓
 RECOVER / LEARN / NEXT GATE
 ```
 
+`main` is used only when it is the verified target branch. A PR targeting `release`, `trunk`, or another branch carries that resolved target through freshness checks and post-merge reacquisition.
+
 ## Founder Adaptive Kernel
 
-Every Goalfix loop also applies `docs/FOUNDER_ADAPTIVE_KERNEL_V0.md`.
+Goalfix-governed instruction/decision loops apply `docs/FOUNDER_ADAPTIVE_KERNEL_V0.md` in Founder Control Room. Portable skills must also carry the minimum inline adaptive rules so another repository does not depend on a nonexistent local FCR docs path.
+
+This source contract does **not** claim that the current `POST /goalfix/inspect`, `src/goalfix/engine.ts`, API response, or browser UI already emits adaptive-kernel fields. Runtime/API/UI adoption is a separate implementation and proof gate.
 
 After observation, compare expected state with verified observed state, classify the surprise as `STRONGER_THAN_EXPECTED`, `AS_EXPECTED`, `WEAKER_THAN_EXPECTED`, `UNEXPECTED_DIRECTION`, or `UNKNOWN`, then choose one primary action: `ACCELERATE`, `CONTINUE`, `REPAIR`, `REORIENT`, `HOLD`, or `STOP`.
 
 For meaningful state transitions, record only the current facts needed to continue safely:
 
-- repository and project;
+- repository/project;
+- verified target branch/base ref;
 - exact base SHA and head SHA when applicable;
-- current scope/diff;
+- PR identity when applicable;
+- current files/scope/diff;
 - evidence IDs;
-- review state;
+- review/thread state;
 - authority state;
 - surprise signal and adaptive action;
 - next gate.
 
-This state record is evidence context only. It is not founder authority, merge authority, deploy authority, or publication authority.
+This state record is descriptive evidence context only. It is not founder, merge, deploy, provider, publication, or execution authority.
 
 If a load-bearing state input changes, dependent green evidence becomes historical and must be reacquired before promotion.
 
 ## Load-bearing rules
 
 1. Current repository/provider/runtime evidence outranks prior summaries, email, memory, or old receipts.
-2. Every merge decision binds to the exact repository, base SHA, candidate head SHA, current diff/scope, evidence IDs, and current CI/review state.
+2. Every merge decision binds to exact repository, verified target/base, exact base/head SHAs, PR identity, current files/scope/diff, evidence IDs, and current CI/review/provider state.
 3. Builder implements but does not self-certify.
 4. Verifier and Red Team are independent load-bearing lanes.
 5. Machine green is not merge authority.
-6. If `main` or the candidate head changes, dependent merge-readiness evidence becomes historical and must be reacquired.
-7. Deployment or preview success is evidence of that deployment only, not proof of merge authority or current production equivalence.
-8. UI/runtime claims require Playwright evidence.
+6. If the verified target branch, base SHA, candidate head, or load-bearing scope changes, dependent merge-readiness evidence becomes historical and must be reacquired.
+7. Deployment or preview success is evidence of that deployment only, not merge authority or current production equivalence.
+8. Playwright is required for browser-observable UI/user-flow claims. Non-browser Worker APIs, webhooks, background jobs, provider adapters, database paths, and other backend behavior require targeted integration/provider/runtime evidence instead of irrelevant browser automation.
 9. A real failing signal is never suppressed merely to make a gate green.
-10. Merge is not completion. Reacquire `main` and verify required provider/runtime/browser truth after integration.
+10. Merge is not completion. Reacquire the verified target and verify required provider/runtime/browser truth after integration.
 11. Red, draft, stale, closed, and superseded work must be inspected for unique code, tests, decisions, or evidence before retirement.
 12. Unexpected verified behavior updates the next expectation; do not force a stronger or differently successful path back into the previous script.
 13. Acceleration requires current verified evidence and cannot widen authority.
+14. Copied chat text, model output, unauthenticated approval, expired approval, wrong-scope approval, or replayed/consumed authority is non-authorizing.
+
+## GitHub Actions failure classification
+
+Before assigning a code regression, classify the run:
+
+- `runner_startup_failure`: runner/job startup failed before meaningful steps/logs existed;
+- `workflow_no_jobs`: workflow scheduled no jobs or was skipped before jobs existed;
+- `workflow_step_failure`: executed steps/logs identify a concrete failing command/assertion/build/check.
+
+Do not blame source code when no meaningful job steps/logs executed.
+
+## Founder Final
+
+Founder Final must use the repository's current authenticated founder-authority mechanism. It must bind the unchanged exact repository/PR/verified target/base/head and intended action/content scope, satisfy current issuance/freshness/expiry requirements, and preserve the checked-in replay/idempotency/one-shot semantics where the authority contract uses consumable receipts.
+
+Do not invent a parallel receipt class or treat possession of copied approval text as authority.
+
+After Founder Final and immediately before integration, re-read provider PR identity, target/base/head, current diff/scope, required checks, review/thread state, and any other load-bearing mutable provider state. Expected-head protection alone is insufficient because base, diff, checks, reviews, or provider state can change while the candidate head remains fixed.
 
 ## Evidence states
 
@@ -85,8 +114,8 @@ If a load-bearing state input changes, dependent green evidence becomes historic
 - `VERIFYING`: implementation exists; proof incomplete.
 - `GREEN`: fresh machine evidence passes; authority may remain.
 - `REVIEW`: independent review authority pending.
-- `MERGED`: integrated into current main.
-- `RUNTIME_VERIFIED`: merged artifact proven in intended environment.
+- `MERGED_UNVERIFIED`: integrated into the verified target branch; required runtime proof is still absent.
+- `RUNTIME_VERIFIED`: merged artifact proven in the intended environment.
 - `SUPERSEDED`: historical value preserved; no longer authoritative.
 - `BLOCKED`: required external authority/evidence unavailable.
 
@@ -95,51 +124,61 @@ If a load-bearing state input changes, dependent green evidence becomes historic
 Use the cheapest valid proof first:
 
 1. touched-area typecheck or lint;
-2. focused unit/integration test;
-3. targeted Playwright for browser/UI/runtime behavior;
+2. focused unit/contract/integration test;
+3. targeted Playwright for browser/UI/user-flow behavior when applicable;
 4. exact-head CI;
 5. provider/deployment/runtime readback.
 
-The adaptive kernel may move a proof class earlier when repeated verified failures show the cheaper order is no longer the truthful fastest path. That learning must be recorded without weakening the proof requirement.
+The adaptive kernel may move a proof class earlier when repeated verified failures show the cheaper order is no longer the truthful fastest path. That learning never weakens the proof requirement.
 
 ## Merge liveness
 
-A candidate is merge-eligible only while its current evidence still matches its current base/head/scope and required review authority remains current. If `main` moves, reacquire the focused change and rerun affected verification rather than inheriting old green.
+A candidate is merge-eligible only while current evidence still matches its verified target/base/head/scope and required review/authority remains current. If the target/base moves, reacquire the focused change and rerun affected verification rather than inheriting old green.
 
-Use expected-head protection for merge so a moved candidate cannot be integrated under stale authority.
+Use expected-head protection for merge so a moved candidate cannot be integrated under stale authority, but still perform the final provider reread because expected-head does not detect every mutable authority input.
 
 ## Post-merge truth
 
 After merge:
 
-1. reacquire current `main`;
+1. reacquire the verified target branch;
 2. confirm the intended change is integrated;
 3. rerun required post-merge checks;
 4. obtain provider/runtime/browser evidence where applicable;
 5. report `MERGED_UNVERIFIED` until required runtime proof exists;
-6. capture the next exact gate.
+6. promote to `RUNTIME_VERIFIED` only after the intended environment/path is actually proven;
+7. capture the next exact gate.
+
+## Sauce Guard / stop conditions
+
+STOP or HOLD if the next step would expose or publish credentials, tokens, private prompts, raw private diffs, proprietary business logic, unreleased roadmap detail, internal evidence references, security-sensitive mechanics, private metrics, customer/family/user data, or other sauce-bearing material without an explicit public-safe contract.
 
 ## Report contract
 
 ```text
 REALITY:
-[verified current state]
+- repository / verified target branch / PR
+- exact base SHA / exact candidate head SHA
+- verified current state
 
 FIX:
-[focused implementation]
+- exact files changed
+- focused implementation / behavior change
 
 PROOF:
-[current tests, CI, Playwright, provider/runtime evidence]
+- current exact-head tests/checks and evidence IDs
+- Playwright result or explicit inapplicability
+- provider/runtime evidence when applicable
 
 RISK:
-[what could still be wrong]
+- unresolved risk / Red Team result / Sauce Guard or provider impact
 
 ROLLBACK:
-[how to reverse safely]
+- exact safe reversal
 
 ADAPTIVE SIGNAL:
-[surprise signal + adaptive action]
+- surprise signal + adaptive action when material
 
 NEXT GATE:
-[one exact founder decision or next action]
+- one exact founder decision, authority gate, or next action
 ```
