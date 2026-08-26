@@ -76,6 +76,7 @@ function matchingTrustedSignal(
     && signal.name === expectedName
     && signal.status === "passed"
     && lower(signal.commitSha) === lower(receipt.headSha)
+    && lower(signal.evidenceFingerprint) === lower(receipt.reviewHash)
     && signal.issuer?.kind === "app"
     && signal.issuer.id === expectedAppId,
   ) ?? null;
@@ -85,7 +86,8 @@ function matchingTrustedSignal(
  * Produces deterministic review from provider truth, publishes only a clear
  * receipt's derived exact-head witness through the repository provider's
  * narrow App-only capability, then accepts success only from provider readback
- * under the server-owned GitHub App identity.
+ * under the server-owned GitHub App identity and the full provider evidence
+ * fingerprint.
  *
  * This function never accepts a caller-supplied receipt, reviewer identity,
  * verdict, check name, conclusion, head SHA, publisher, or trusted App identity.
@@ -134,7 +136,7 @@ export async function publishDeterministicReviewWitness(
   const signal = matchingTrustedSignal(signals, receipt, input.provider.name, expectedAppId);
   if (!signal) {
     throw new Error(
-      `Deterministic review witness readback is missing exact passed signal '${name}' from trusted GitHub App ${expectedAppId}`,
+      `Deterministic review witness readback is missing exact passed signal '${name}' with full receipt fingerprint from trusted GitHub App ${expectedAppId}`,
     );
   }
 
