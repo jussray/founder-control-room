@@ -1,49 +1,15 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded Milestone B deterministic GitHub App witness-publication and full provider-fingerprint readback invariants layered on the hardened producer without claiming bootstrap authority, founder-final approval, merge authority, deployment authority, live provider enforcement, secret installation, or runtime trigger activation.",
+  "purpose": "Record the bounded Cloudflare Access front-door authority change that requires exact founder issue-comment approval and fails closed until both account-scoped and canonical-zone-scoped Access application coverage has been inspected, without claiming live credential configuration, provider mutation, browser recovery, deployment, or runtime proof.",
   "domains": [
-    "merge-authority",
-    "repository-provider"
+    "cloudflare-authority"
   ],
   "changes": [
     {
-      "path": "src/review/deterministicReviewProducer.ts",
+      "path": ".github/workflows/fcr-access-front-door-recovery.yml",
       "claims": [
-        "src/review/deterministicReviewProducer.ts must classify the executable FCR merge-authentication chain as deterministic trust root: founder authentication/session authority, portfolio-switch gating/state resolution, V10 privileged capability validation, V10 decision authority, founder-control decision binding, approvals execution, and the server mount; changes to those paths must produce P1 trust-root-self-modification instead of self-certification.",
-        "src/review/deterministicReviewProducer.ts must cover direct merge-authority decision modules as well as middleware wrappers, including founderSession, switchboard store, capabilityKernel, v10DecisionAuthorityGate, and founderControlDecision, while avoiding a transitive trust-root expansion into generic storage or transport clients.",
-        "src/review/deterministicReviewProducer.ts must treat the specialized proof-gate decision/persistence/classification chain as merge authority because ProofGateController, proof-gate/gate, proof-gate/persist, and proof-gate/types determine whether merge requires explicit founder approval and whether /approvals/:missionId/execute observes a fresh persisted passing proof; changes to those modules must produce P1 trust-root-self-modification.",
-        "src/review/deterministicReviewProducer.ts must treat the deployed Worker entry configuration, Worker cron/handler/reconciler owners, controller base, and every currently reconciler-registered controller as P1 autonomous execution trust root because those surfaces can schedule or dispatch consequential repository work. A new controller cannot become live through the reconciler without changing the protected registry, and the production Worker entry cannot change without modifying the protected Wrangler entry configuration.",
-        "src/review/deterministicReviewProducer.ts must also fail closed with P1 new-provider-integration-sink when a candidate introduces RepositoryProvider.integrate in previously unprotected non-test production source. This is a backstop against inventing a new merge executor outside today's path allowlist; ordinary read-only provider calls such as resolveRef remain non-P1 unless they touch an otherwise protected authority path."
-      ]
-    },
-    {
-      "path": "src/review/deterministicReviewWitnessPublisher.ts",
-      "claims": [
-        "src/review/deterministicReviewWitnessPublisher.ts may publish only a clear deterministic receipt produced from provider-observed PR/base/head/diff truth through the repository provider's narrow witness capability, must bind pre/post publication PR identity and exact head, and must reject success unless provider readback reports the exact derived signal, the full receipt reviewHash as evidenceFingerprint, and the server-owned numeric GITHUB_APP_ID."
-      ]
-    },
-    {
-      "path": "src/review/independentReviewGate.ts",
-      "claims": [
-        "src/review/independentReviewGate.ts must treat a founder-final deterministic witness as current only when exact head, receipt-derived signal name, passed status, trusted GitHub App issuer, and the provider-backed full evidenceFingerprint all match the exact deterministic review receipt; missing or same-prefix-but-different full fingerprints fail closed."
-      ]
-    },
-    {
-      "path": "src/providers/DeterministicReviewGitHubProvider.ts",
-      "claims": [
-        "src/providers/DeterministicReviewGitHubProvider.ts must reject a noncanonical runtime GitHub API base during construction before inherited provider PR/ref/compare reads can use the App installation token; custom bases are test-only with an explicit injected transport. It must also preserve success-only Check Run semantics and GitHub external_id as the full evidenceFingerprint on readback."
-      ]
-    },
-    {
-      "path": "src/providers/RepositoryProvider.ts",
-      "claims": [
-        "src/providers/RepositoryProvider.ts exposes only a narrow optional deterministic-review witness publication capability rather than ambient generic Check Run authority, carries an optional provider-backed evidenceFingerprint for exact evidence correlation, and requires consumers to fail closed when a load-bearing fingerprint or witness capability is unavailable."
-      ]
-    },
-    {
-      "path": "src/providers/providerFactory.ts",
-      "claims": [
-        "src/providers/providerFactory.ts must expose deterministic review witness publication for Founder Control Room only when GITHUB_APP_ID plus GITHUB_PRIVATE_KEY mint the repository-scoped GitHub App installation token; a local or development GITHUB_TOKEN fallback cannot mint deterministic review evidence, and a partial GitHub App credential pair must fail closed even when a fallback token is present."
+        ".github/workflows/fcr-access-front-door-recovery.yml must re-read and validate the exact founder issue-comment receipt before apply can continue, and the bounded recovery path cannot treat an account-only Access application inventory as sufficient proof for an organization-level foundercontrolroom.org exemption.",
+        ".github/workflows/fcr-access-front-door-recovery.yml requires the dedicated read or admin Access credential for its mode and must preserve exact-current-main binding, sanitized evidence publication, and post-apply browser/runtime proof before any recovered-front-door claim."
       ]
     }
   ]
