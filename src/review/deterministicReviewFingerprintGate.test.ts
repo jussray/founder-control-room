@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { RepositoryProvider } from "../providers/RepositoryProvider.js";
+import type {
+  RepositoryProvider,
+  VerificationSignalStatus,
+} from "../providers/RepositoryProvider.js";
 import {
   FCR_FOUNDER_FINAL_REVIEW_POLICY,
   INDEPENDENT_REVIEW_CONTRACT,
@@ -60,14 +63,18 @@ function context(receipt: IndependentReviewReceipt): IndependentReviewContext {
   };
 }
 
-function provider(receipt: IndependentReviewReceipt, evidenceFingerprint?: string): RepositoryProvider {
+function provider(
+  receipt: IndependentReviewReceipt,
+  evidenceFingerprint?: string,
+  status: VerificationSignalStatus = "passed",
+): RepositoryProvider {
   return {
     name: "github",
     getRef: async () => ({ name: HEAD, commitSha: HEAD }),
     listVerificationSignals: async () => [{
       id: "check-1",
       name: expectedReviewSignalName(receipt),
-      status: "passed",
+      status,
       commitSha: HEAD,
       provider: "github",
       evidenceFingerprint,
@@ -110,6 +117,25 @@ describe("deterministic review full-fingerprint gate", () => {
 
     expect(result.reviewGateSatisfied).toBe(false);
     expect(result.witnessedReviewHashes).toEqual([]);
+  });
+
+  it("rejects a neutral-derived non-authorizing witness even when exact identity matches", async () => {
+    const receipt = review();
+
+    const result = await evaluateIndependentReviewGate(
+      provider(receipt, receipt.reviewHash, "unknown"),
+      context(receipt),
+      [receipt],
+      FCR_FOUNDER_FINAL_REVIEW_POLICY,
+      { GITHUB_APP_ID: APP_ID },
+    );
+
+    expect(result.reviewGateSatisfied).toBe(false);
+    expect(result.deterministicClearCount).toBe(0);
+    expect(result.witnessedReviewHashes).toEqual([]);
+    expect(result.blockers).toEqual(expect.arrayContaining([
+      expect.stringMatching(/missing passed exact-head deterministic witness/i),
+    ]));
   });
 
   it("accepts deterministic witness evidence only when the full receipt fingerprint matches", async () => {
