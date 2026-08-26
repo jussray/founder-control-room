@@ -7,10 +7,14 @@ on:
       - security/portfolio-worker-security.json
       - src/security/attack20V3.ts
       - src/security/attack20V3.test.ts
+      - src/goalfix/executionWorkflow.ts
+      - src/goalfix/executionWorkflow.test.ts
+      - docs/GOALFIX_EXECUTION_WORKFLOW_V2.md
       - scripts/verify-attack-20-v3.mjs
       - .github/workflows/attack-20-v3.yml
       - security/firewall-v10.policy.json
       - scripts/verify-firewall-v10.mjs
+      - .github/workflows/firewall-v10.yml
       - .security/cookies.json
       - scripts/verify-cookie-contract.mjs
       - wrangler.worker.toml
@@ -24,10 +28,14 @@ on:
       - security/portfolio-worker-security.json
       - src/security/attack20V3.ts
       - src/security/attack20V3.test.ts
+      - src/goalfix/executionWorkflow.ts
+      - src/goalfix/executionWorkflow.test.ts
+      - docs/GOALFIX_EXECUTION_WORKFLOW_V2.md
       - scripts/verify-attack-20-v3.mjs
       - .github/workflows/attack-20-v3.yml
       - security/firewall-v10.policy.json
       - scripts/verify-firewall-v10.mjs
+      - .github/workflows/firewall-v10.yml
       - .security/cookies.json
       - scripts/verify-cookie-contract.mjs
       - wrangler.worker.toml
@@ -69,27 +77,33 @@ jobs:
         run: npm ci
 
       - name: Verify ATTACK-20 V3 source contract
+        env:
+          GITHUB_SHA: ${{ env.EXPECTED_SHA }}
         run: node scripts/verify-attack-20-v3.mjs
 
       - name: Preserve Firewall v10 parent proof
+        env:
+          GITHUB_SHA: ${{ env.EXPECTED_SHA }}
         run: node scripts/verify-firewall-v10.mjs
 
       - name: Preserve browser-cookie contract boundary
         run: npm run verify:cookies
 
-      - name: Focused ATTACK-20 tests
-        run: npx vitest run src/security/attack20V3.test.ts
+      - name: Focused ATTACK-20 and Goalfix workflow tests
+        run: npx vitest run src/security/attack20V3.test.ts src/goalfix/executionWorkflow.test.ts
 
       - name: Typecheck
         run: npm run typecheck
 
       - name: Lint touched TypeScript
-        run: npx eslint src/security/attack20V3.ts src/security/attack20V3.test.ts --max-warnings 0
+        run: npx eslint src/security/attack20V3.ts src/security/attack20V3.test.ts src/goalfix/executionWorkflow.ts src/goalfix/executionWorkflow.test.ts --max-warnings 0
 
-      - name: Upload exact-head source proof
+      - name: Upload exact-head source proofs
         uses: actions/upload-artifact@v4
         with:
           name: attack-20-v3-source-proof-${{ github.event.pull_request.head.sha || github.sha }}
-          path: artifacts/attack-20-v3-source-proof.json
+          path: |
+            artifacts/attack-20-v3-source-proof.json
+            artifacts/firewall-v10-proof.json
           if-no-files-found: error
           retention-days: 30
