@@ -202,6 +202,23 @@ describe("deterministic review producer", () => {
     ]));
   });
 
+  it.each([
+    "src/http/middleware/requireFounder.ts",
+    "src/http/middleware/requirePortfolioSwitchOn.ts",
+    "src/http/middleware/v10PrivilegedApprovalBinding.ts",
+    "src/http/middleware/v10DecisionFounderBinding.ts",
+    "src/http/server.ts",
+  ])("treats executable merge-authority path %s as a P1 trust root", (path) => {
+    const findings = evaluateDeterministicReviewRules([file(path)]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "trust-root-self-modification",
+        severity: "P1",
+        path,
+      }),
+    ]));
+  });
+
   it("requires discovery adversarial tests and runbook when discovery core changes", () => {
     const findings = evaluateDeterministicReviewRules([
       file("scripts/verify-test-discovery.mjs"),
