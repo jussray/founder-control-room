@@ -115,7 +115,7 @@ test('rejects a comment-spoofed canonical pattern when the effective include is 
 
   const result = verify(root, baseSha);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /test\.include must be exactly/);
+  assert.match(result.stderr, /must export one static defineConfig|test\.include must be exactly/);
 });
 
 test('rejects discovery-affecting test.exclude entries', (t) => {
