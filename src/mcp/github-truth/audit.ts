@@ -29,11 +29,13 @@ export async function auditGitHubPullRequest(
     initialPullRequest: evidence.initialPullRequest,
     finalPullRequest: evidence.finalPullRequest,
     checks: evidence.checks.items,
+    commitStatuses: evidence.commitStatuses.items,
     workflows: evidence.workflows.items,
     reviews: evidence.reviews.items,
     changedFiles: evidence.changedFiles.items,
     evidenceCoverage: {
       checksComplete: evidence.checks.complete,
+      commitStatusesComplete: evidence.commitStatuses.complete,
       workflowsComplete: evidence.workflows.complete,
       reviewsComplete: evidence.reviews.complete,
       changedFilesComplete: evidence.changedFiles.complete,
