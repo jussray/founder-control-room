@@ -13,7 +13,7 @@ on:
         type: boolean
         default: false
       approval_reference:
-        description: 'Auditable founder approval reference; required when apply=true'
+        description: 'Founder issue-comment receipt; required when apply=true'
         required: false
         type: string
 
@@ -49,6 +49,7 @@ jobs:
         env:
           APPLY: ${{ inputs.apply }}
           APPROVAL_REFERENCE: ${{ inputs.approval_reference }}
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -65,8 +66,20 @@ jobs:
 
           approval_reference_receipt='not-required-for-read-only'
           if [[ "$APPLY" == 'true' ]]; then
-            if [[ ! "$APPROVAL_REFERENCE" =~ ^[A-Za-z0-9._:-]{8,200}$ ]]; then
-              echo '::error title=Missing mutation approval::apply=true requires an auditable 8-200 character approval_reference.'
+            if [[ ! "$APPROVAL_REFERENCE" =~ ^issue-comment:([0-9]+)$ ]]; then
+              echo '::error title=Missing founder mutation receipt::apply=true requires the exact founder issue-comment receipt.'
+              exit 1
+            fi
+            comment_id="${BASH_REMATCH[1]}"
+            comment_json="$(gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}")"
+            expected_issue_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/485"
+            expected_body="/cloudflare-fcr-access apply ${EXPECTED_HEAD_SHA}"
+            if ! jq -e \
+              --arg issueUrl "$expected_issue_url" \
+              --arg expectedBody "$expected_body" \
+              '.user.login == "jussray" and .issue_url == $issueUrl and .body == $expectedBody' \
+              <<< "$comment_json" >/dev/null; then
+              echo '::error title=Invalid founder mutation receipt::approval comment does not match the founder-only issue, actor, action, and exact current main.'
               exit 1
             fi
             approval_reference_receipt="sha256:$(printf '%s' "$APPROVAL_REFERENCE" | sha256sum | awk '{print $1}')"
