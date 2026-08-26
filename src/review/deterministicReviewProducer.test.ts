@@ -240,6 +240,7 @@ describe("deterministic review producer", () => {
     "src/controllers/ProofGateController.ts",
     "src/proof-gate/gate.ts",
     "src/proof-gate/persist.ts",
+    "src/proof-gate/types.ts",
   ])("treats proof-gate merge-authority module %s as a P1 trust root", (path) => {
     const findings = evaluateDeterministicReviewRules([file(path)]);
     expect(findings).toEqual(expect.arrayContaining([
