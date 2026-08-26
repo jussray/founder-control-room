@@ -29,7 +29,7 @@
     {
       "path": "src/providers/DeterministicReviewGitHubProvider.ts",
       "claims": [
-        "src/providers/DeterministicReviewGitHubProvider.ts must restrict deterministic witness publication to the canonical Founder Control Room repository and exact success-only Check Run shape, must reject malformed or substituted head SHA, review hash, derived signal name, or bounded summary before provider mutation, must reject a noncanonical GitHub API base in the normal runtime writer path, and must preserve GitHub Check Run external_id as the full evidenceFingerprint on provider readback."
+        "src/providers/DeterministicReviewGitHubProvider.ts must reject a noncanonical runtime GitHub API base during construction before inherited provider PR/ref/compare reads can use the App installation token; custom bases are test-only with an explicit injected transport. It must also preserve success-only Check Run semantics and GitHub external_id as the full evidenceFingerprint on readback."
       ]
     },
     {
