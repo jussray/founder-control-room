@@ -141,9 +141,10 @@ describe('founder-content orchestration readiness', () => {
     expect(readiness.liveVerified).toBe(false);
     expect(readiness.liveProbeRequired).toBe(true);
     expect(readiness.bufferReadyForProbe).toBe(true);
+    expect(readiness.proof.state).toBe('stale-head');
   });
 
-  it('does not promote an unbound or unavailable provider proof', () => {
+  it('normalizes incomplete verified proof to provider-unverified', () => {
     const env = {
       N8N_FOUNDER_CONTENT_ENABLED: 'true',
       N8N_FOUNDER_CONTENT_WEBHOOK_URL: 'https://n8n.example/webhook/founder-content',
@@ -152,18 +153,33 @@ describe('founder-content orchestration readiness', () => {
       GIT_SHA: SHA_A,
     };
 
-    const providerUnverified = founderContentOrchestrationReadiness(env, {
+    for (const proof of [
+      { ...verifiedBufferProof, provider: null },
+      { ...verifiedBufferProof, receiptId: null },
+      { ...verifiedBufferProof, observedAt: null },
+      { ...verifiedBufferProof, observedAt: 'not-a-timestamp' },
+    ] as const) {
+      const readiness = founderContentOrchestrationReadiness(env, proof);
+      expect(readiness.liveVerified).toBe(false);
+      expect(readiness.state).toBe('enabled-awaiting-proof');
+      expect(readiness.proof.state).toBe('provider-unverified');
+    }
+  });
+
+  it('does not promote an explicitly unavailable provider proof', () => {
+    const readiness = founderContentOrchestrationReadiness({
+      N8N_FOUNDER_CONTENT_ENABLED: 'true',
+      N8N_FOUNDER_CONTENT_WEBHOOK_URL: 'https://n8n.example/webhook/founder-content',
+      N8N_FOUNDER_CONTENT_BEARER_TOKEN: 'provider-secret-token',
+      N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS: 'buffer',
+      GIT_SHA: SHA_A,
+    }, {
       ...verifiedBufferProof,
       state: 'provider-unverified',
     });
-    const noProviderBinding = founderContentOrchestrationReadiness(env, {
-      ...verifiedBufferProof,
-      provider: null,
-    });
 
-    expect(providerUnverified.liveVerified).toBe(false);
-    expect(providerUnverified.state).toBe('enabled-awaiting-proof');
-    expect(noProviderBinding.liveVerified).toBe(false);
-    expect(noProviderBinding.state).toBe('enabled-awaiting-proof');
+    expect(readiness.liveVerified).toBe(false);
+    expect(readiness.state).toBe('enabled-awaiting-proof');
+    expect(readiness.proof.state).toBe('provider-unverified');
   });
 });
