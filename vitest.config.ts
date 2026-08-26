@@ -7,11 +7,11 @@ export default defineConfig({
     // bleed between test files.
     isolate: true,
     environment: 'node',
-    // Include both colocated .test.ts files and __tests__/**/*.test.ts files.
-    // Previously only discovered files under __tests__/ directories, leaving
-    // 38 colocated test files (97 tests) undiscovered. This pattern ensures
-    // all test files are discovered by npm test.
-    include: ['src/**/*.test.ts'],
+    // Discover both TypeScript and JavaScript .test suites across src/.
+    // The JavaScript inclusion keeps historical suites such as the Founder
+    // Signal Engine operator-model tests inside normal `npm test` rather than
+    // hiding them behind baseline debt or a one-off runner.
+    include: ['src/**/*.test.{ts,js}'],
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
