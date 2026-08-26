@@ -11,6 +11,7 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.sha }}
+  DOC_TRUTH_BASE_SHA: ea2b75a45a890b291152bc89c08cecd8ef52706a
 
 jobs:
   deterministic-review-core:
@@ -21,13 +22,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
 
       - name: Verify exact head
         shell: bash
         run: |
+          set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          printf 'expected=%s\nactual=%s\nbase=%s\n' "$EXPECTED_HEAD_SHA" "$actual" "$DOC_TRUTH_BASE_SHA"
           test "$actual" = "$EXPECTED_HEAD_SHA"
+          git merge-base --is-ancestor "$DOC_TRUTH_BASE_SHA" "$EXPECTED_HEAD_SHA"
 
       - uses: actions/setup-node@v4
         with:
@@ -47,3 +51,6 @@ jobs:
           src/review/deterministicReviewWitnessPublisher.test.ts
           src/providers/__tests__/deterministicReviewGitHubProvider.test.ts
           src/providers/__tests__/providerFactory.independentReviewBoundary.test.ts
+
+      - name: Verify stacked documentation truth
+        run: node scripts/verify-documentation-truth.mjs
