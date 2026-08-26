@@ -6,8 +6,10 @@ const { join, resolve } = require('node:path');
 const {
   ATTACK_TEN_VERSION,
   VERIFIED_PUBLICATION_STATE,
+  PRODUCTION_BLOCK_REASON,
   appendPublicationEvent,
   validatePublicationEventChain,
+  deriveAdvisoryIdempotencyKey,
   evaluatePublicationAttackTen,
   productionPublicationAllowed,
 } = require('./buffer-attack-ten.cjs');
@@ -32,6 +34,9 @@ assert.equal(contract.authority.liveProviderMutationIncluded, false);
 const runId = '19f2f2df-66ca-45d5-8b0c-188128c3e9ac';
 const contentSha256 = 'a'.repeat(64);
 const authorityNonce = 'ba80d7c8-cc8a-4fbb-b1d2-7f6ad87fe40f';
+const authorityId = 'authority:verified-delegation-post-v1';
+const actionId = 'buffer-action-123';
+const channelId = 'juss_rayy_linkedin';
 const nowIso = '2026-08-25T22:20:00.000Z';
 const nowMs = Date.parse(nowIso);
 const evaluationOptions = {
@@ -64,6 +69,15 @@ sequence.forEach((state, index) => {
   });
 });
 
+const expectedIdempotencyKey = deriveAdvisoryIdempotencyKey({
+  publicationRunId: runId,
+  contentSha256,
+  authorityId,
+  authorityNonce,
+  channelId,
+});
+assert.ok(expectedIdempotencyKey.startsWith('buffer-attack-ten-v1:'));
+
 const validInput = {
   publicationRunId: runId,
   contentSha256,
@@ -74,6 +88,8 @@ const validInput = {
     publicationRunId: runId,
     contentSha256,
     immutable: true,
+    evidenceSource: 'fcr-authoritative-approval-store',
+    storeReadbackVerified: true,
   },
   reviewWindow: {
     state: 'REVIEW_WINDOW_MATURED',
@@ -81,39 +97,45 @@ const validInput = {
     providerOverrideAllowed: false,
   },
   authority: {
-    id: 'authority:verified-delegation-post-v1',
+    id: authorityId,
     nonce: authorityNonce,
     operation: 'schedule_linkedin_post',
     provider: 'buffer',
     recipient: 'founder-control-room',
-    channelId: 'juss_rayy_linkedin',
+    channelId,
     contentSha256,
     notBefore: '2026-08-25T22:03:00.000Z',
     expiresAt: '2026-08-26T00:30:00.000Z',
-    consumed: false,
+    consumed: true,
+    consumedAt: '2026-08-25T22:12:00.000Z',
+    consumedByActionId: actionId,
+    consumedPublicationRunId: runId,
   },
   providerCapability: {
     live: true,
     policyGatePassed: true,
     provider: 'buffer',
     accountId: 'buffer-account-ray',
-    channelId: 'juss_rayy_linkedin',
+    channelId,
   },
   execution: {
     publicationRunId: runId,
-    authorityId: 'authority:verified-delegation-post-v1',
+    authorityId,
     accountId: 'buffer-account-ray',
-    actionId: 'buffer-action-123',
-    idempotencyKey: `buffer:${runId}:${contentSha256}`,
+    actionId,
+    idempotencyKey: expectedIdempotencyKey,
     contentSha256,
     uniquenessConstraintVerified: true,
     duplicateAttemptBlocked: true,
+    reservationState: 'persisted',
+    reservationId: 'approval-execution-123',
   },
   providerReadback: {
     verified: true,
-    actionId: 'buffer-action-123',
+    platform: 'linkedin',
+    actionId,
     accountId: 'buffer-account-ray',
-    channelId: 'juss_rayy_linkedin',
+    channelId,
     observedPostId: 'linkedin-post-123',
     observedUrl: 'https://www.linkedin.com/feed/update/urn:li:activity:123',
     contentSha256,
@@ -122,20 +144,25 @@ const validInput = {
     capability: 'VERIFIED',
     authenticated: true,
     signatureVerified: true,
+    verificationSource: 'server-signature-verifier',
+    signatureEvidenceRef: 'receipt:signature:provider-event-123',
+    ledgerLookupVerified: true,
     signerId: 'fcr-ingress-signer-v1',
     deduplicated: true,
     durable: true,
     eventId: 'provider-event-123',
     publicationRunId: runId,
-    authorityId: 'authority:verified-delegation-post-v1',
+    authorityId,
     contentSha256,
-    actionId: 'buffer-action-123',
+    actionId,
     signedAt: '2026-08-25T22:19:30.000Z',
     receivedAt: nowIso,
     replayWindowMs: 60_000,
   },
   runtime: {
     observed: true,
+    platform: 'linkedin',
+    channelId,
     observedPostId: 'linkedin-post-123',
     observedUrl: 'https://www.linkedin.com/feed/update/urn:li:activity:123',
     contentSha256,
@@ -155,14 +182,25 @@ const validInput = {
 
 const validEvaluation = evaluatePublicationAttackTen(validInput, evaluationOptions);
 assert.equal(validEvaluation.attackTenVersion, ATTACK_TEN_VERSION);
-assert.equal(validEvaluation.allowed, true);
+assert.equal(validEvaluation.advisoryAllowed, true);
+assert.equal(validEvaluation.allowed, false);
+assert.equal(validEvaluation.productionAuthority, false);
+assert.equal(validEvaluation.productionBlockReason, PRODUCTION_BLOCK_REASON);
 assert.equal(validEvaluation.failures.length, 0);
 assert.equal(validEvaluation.state, VERIFIED_PUBLICATION_STATE);
-assert.equal(productionPublicationAllowed(validInput, evaluationOptions), true);
+assert.equal(productionPublicationAllowed(validInput, evaluationOptions), false);
 
 const chain = validatePublicationEventChain(events);
 assert.equal(chain.valid, true);
 assert.equal(chain.currentState, VERIFIED_PUBLICATION_STATE);
+
+assert.equal(evaluatePublicationAttackTen({
+  ...validInput,
+  founderApproval: {
+    ...validInput.founderApproval,
+    evidenceSource: 'caller-json',
+  },
+}, evaluationOptions).attackResults.find(({ id }) => id === 'A1').pass, false);
 
 assert.equal(evaluatePublicationAttackTen({
   ...validInput,
@@ -171,12 +209,17 @@ assert.equal(evaluatePublicationAttackTen({
 
 assert.equal(evaluatePublicationAttackTen({
   ...validInput,
-  authority: { ...validInput.authority, expiresAt: '2026-08-25T22:19:59.000Z' },
+  authority: { ...validInput.authority, expiresAt: '2026-08-25T22:11:59.000Z' },
 }, evaluationOptions).attackResults.find(({ id }) => id === 'A2').pass, false);
 
 assert.equal(evaluatePublicationAttackTen({
   ...validInput,
-  authority: { ...validInput.authority, consumed: true },
+  authority: { ...validInput.authority, consumed: false },
+}, evaluationOptions).attackResults.find(({ id }) => id === 'A2').pass, false);
+
+assert.equal(evaluatePublicationAttackTen({
+  ...validInput,
+  authority: { ...validInput.authority, consumedByActionId: 'other-action' },
 }, evaluationOptions).attackResults.find(({ id }) => id === 'A2').pass, false);
 
 assert.equal(evaluatePublicationAttackTen({
@@ -191,7 +234,12 @@ assert.equal(evaluatePublicationAttackTen({
 
 assert.equal(evaluatePublicationAttackTen({
   ...validInput,
-  execution: { ...validInput.execution, duplicateAttemptBlocked: false },
+  execution: { ...validInput.execution, idempotencyKey: `caller-chosen:${runId}` },
+}, evaluationOptions).attackResults.find(({ id }) => id === 'A6').pass, false);
+
+assert.equal(evaluatePublicationAttackTen({
+  ...validInput,
+  execution: { ...validInput.execution, reservationState: 'caller-asserted' },
 }, evaluationOptions).attackResults.find(({ id }) => id === 'A6').pass, false);
 
 assert.equal(evaluatePublicationAttackTen({
@@ -202,6 +250,20 @@ assert.equal(evaluatePublicationAttackTen({
 assert.equal(evaluatePublicationAttackTen({
   ...validInput,
   ingress: { ...validInput.ingress, signatureVerified: false },
+}, evaluationOptions).attackResults.find(({ id }) => id === 'A8').pass, false);
+
+assert.equal(evaluatePublicationAttackTen({
+  ...validInput,
+  ingress: {
+    ...validInput.ingress,
+    verificationSource: undefined,
+    signatureEvidenceRef: undefined,
+    ledgerLookupVerified: false,
+    signatureVerified: true,
+    authenticated: true,
+    deduplicated: true,
+    durable: true,
+  },
 }, evaluationOptions).attackResults.find(({ id }) => id === 'A8').pass, false);
 
 const otherRunIngress = {
@@ -217,7 +279,7 @@ const crossRunEvaluation = evaluatePublicationAttackTen({
   ingress: otherRunIngress,
 }, evaluationOptions);
 assert.equal(crossRunEvaluation.attackResults.find(({ id }) => id === 'A8').pass, false);
-assert.equal(crossRunEvaluation.allowed, false);
+assert.equal(crossRunEvaluation.advisoryAllowed, false);
 assert.equal(productionPublicationAllowed({ ...validInput, ingress: otherRunIngress }, evaluationOptions), false);
 
 const selfDeclaredTrust = evaluatePublicationAttackTen({
@@ -229,7 +291,7 @@ const selfDeclaredTrust = evaluatePublicationAttackTen({
   },
 }, evaluationOptions);
 assert.equal(selfDeclaredTrust.attackResults.find(({ id }) => id === 'A8').pass, false);
-assert.equal(selfDeclaredTrust.allowed, false);
+assert.equal(selfDeclaredTrust.advisoryAllowed, false);
 
 assert.equal(evaluatePublicationAttackTen(validInput, { nowMs }).attackResults.find(({ id }) => id === 'A8').pass, false);
 
@@ -248,6 +310,27 @@ assert.equal(evaluatePublicationAttackTen({
   runtime: { ...validInput.runtime, observed: false },
 }, evaluationOptions).attackResults.find(({ id }) => id === 'A9').pass, false);
 
+const wrongDestination = 'https://example.com/not-linkedin';
+const wrongDestinationEvaluation = evaluatePublicationAttackTen({
+  ...validInput,
+  providerReadback: {
+    ...validInput.providerReadback,
+    observedUrl: wrongDestination,
+  },
+  runtime: {
+    ...validInput.runtime,
+    observedUrl: wrongDestination,
+  },
+}, evaluationOptions);
+assert.equal(wrongDestinationEvaluation.attackResults.find(({ id }) => id === 'A7').pass, false);
+assert.equal(wrongDestinationEvaluation.attackResults.find(({ id }) => id === 'A9').pass, false);
+assert.equal(wrongDestinationEvaluation.advisoryAllowed, false);
+assert.equal(productionPublicationAllowed({
+  ...validInput,
+  providerReadback: { ...validInput.providerReadback, observedUrl: wrongDestination },
+  runtime: { ...validInput.runtime, observedUrl: wrongDestination },
+}, evaluationOptions), false);
+
 const tampered = events.map((event) => ({ ...event }));
 tampered[5].evidenceRef = 'tampered:evidence';
 const tamperedEvaluation = evaluatePublicationAttackTen({
@@ -255,6 +338,7 @@ const tamperedEvaluation = evaluatePublicationAttackTen({
   events: tampered,
 }, evaluationOptions);
 assert.equal(tamperedEvaluation.attackResults.find(({ id }) => id === 'A10').pass, false);
+assert.equal(tamperedEvaluation.advisoryAllowed, false);
 assert.equal(tamperedEvaluation.allowed, false);
 assert.equal(tamperedEvaluation.state, 'UNKNOWN');
 
@@ -276,4 +360,4 @@ const badEvents = appendPublicationEvent(invalidTransition, {
 });
 assert.equal(validatePublicationEventChain(badEvents).valid, false);
 
-console.log('Buffer Attack Ten verified: all ten assertions pass only for one exact hash-chained VERIFIED_PUBLISHED synthetic run; cross-run ingress substitution, caller-declared signer trust, missing signer policy, stale replay, invalid signatures, premature/expired/replayed/mismatched authority, non-live capability, duplicate execution, receipt mismatch, false runtime success, tampered chains, and invalid transitions fail closed.');
+console.log('Buffer Attack Ten verified: the pure evaluator can become advisory-green only for internally coherent evidence, but it never grants production authority; caller-supplied approval, unused/replayed authority, arbitrary idempotency, unverified ingress flags, wrong destinations, cross-run substitution, stale replay, false runtime success, tampered chains, and invalid transitions fail closed.');
