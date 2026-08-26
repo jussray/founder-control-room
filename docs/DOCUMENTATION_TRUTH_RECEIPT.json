@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded Evidence Trust Plane, Documentation Truth, repository-provider security-preservation, explicit bypass-intent semantics, and Cloudflare remote-read MCP operator invariants for this candidate without claiming durable receipt persistence, live provider mutation, merge authority, deployment authority, secret installation, or live production truth.",
+  "purpose": "Record the bounded Evidence Trust Plane, Documentation Truth, repository-provider fail-closed behavior, explicit bypass-intent semantics, and Cloudflare remote-read MCP operator invariants for this candidate without claiming durable receipt persistence, live provider mutation, merge authority, deployment authority, secret installation, or live production truth.",
   "domains": [
     "evidence-authority",
     "truth-governance",
@@ -35,15 +35,15 @@
     {
       "path": "src/providers/SecurityPreservingGitHubProvider.ts",
       "claims": [
-        "src/providers/SecurityPreservingGitHubProvider.ts: existing non-FCR ruleset reconciliation MUST preserve the stronger current enforcement level and MUST NOT demote an active or evaluate ruleset when a narrower caller requests weaker enforcement.",
-        "src/providers/SecurityPreservingGitHubProvider.ts: existing non-FCR ruleset reconciliation MUST union existing included branch refs with requested refs and MUST preserve existing excluded refs so a caller cannot silently narrow the provider-owned protected scope.",
-        "src/providers/SecurityPreservingGitHubProvider.ts: omitted bypassActors MUST preserve the current provider bypass posture, an explicit empty bypassActors list MUST clear all provider bypass actors, and a non-empty replacement MUST fail closed until a separately authorized provider-aware contract can represent bypass mode and prove the replacement is non-widening; this source contract does not itself prove live provider state."
+        "src/providers/SecurityPreservingGitHubProvider.ts: a requested non-FCR protected ref that remains explicitly excluded by the current provider ruleset MUST fail closed rather than report successful protection.",
+        "src/providers/SecurityPreservingGitHubProvider.ts: mutation of an existing non-FCR ruleset MUST remain blocked until a separately reviewed provider reconciliation contract can prove concurrency safety; the current source MUST NOT issue a reconstructed existing-ruleset PUT from a stale read snapshot.",
+        "src/providers/SecurityPreservingGitHubProvider.ts: non-empty bypass replacement MUST remain fail-closed; omitted and explicit-empty bypassActors remain distinct request intents, but neither may trigger an existing-ruleset provider PUT until concurrency-safe reconciliation exists."
       ]
     },
     {
       "path": "src/http/routes/projects.ts",
       "claims": [
-        "src/http/routes/projects.ts: the founder ruleset route MUST preserve the semantic difference between an omitted bypassActors field and an explicit empty array so non-FCR provider reconciliation can distinguish preserve-current from clear-all intent; the route remains founder-authenticated and reservation/idempotency guarded before provider mutation."
+        "src/http/routes/projects.ts: the founder ruleset route MUST preserve the semantic difference between an omitted bypassActors field and an explicit empty array so provider reconciliation can retain preserve-current versus clear-all intent even while the existing-ruleset mutation sink remains fail-closed; the route remains founder-authenticated and reservation/idempotency guarded before provider mutation."
       ]
     },
     {
