@@ -31,7 +31,7 @@ test('recovery workflow is production-gated and separates read from mutation aut
 
 test('authority gate never publishes a raw approval reference', () => {
   const authorityStep = recoveryWorkflow.match(
-    /- name: Verify exact current main and mutation approval([\s\S]*?)- name: Set up Node 24/,
+    /- name: Verify exact current main and claim mutation approval([\s\S]*?)- name: Set up Node 24/,
   )?.[1] ?? '';
 
   assert.match(authorityStep, /approval_reference_receipt='not-required-for-read-only'/);
@@ -40,6 +40,39 @@ test('authority gate never publishes a raw approval reference', () => {
   assert.match(authorityStep, /apply=false must not carry approval_reference/);
   assert.match(authorityStep, /Approval reference receipt: \\`\$approval_reference_receipt\\`/);
   assert.doesNotMatch(authorityStep, /Approval reference: \\`\$APPROVAL_REFERENCE\\`/);
+});
+
+test('founder apply receipt is single-use and revalidated immediately before provider mutation', () => {
+  const authorityStep = recoveryWorkflow.match(
+    /- name: Verify exact current main and claim mutation approval([\s\S]*?)- name: Set up Node 24/,
+  )?.[1] ?? '';
+  const revalidateStep = recoveryWorkflow.match(
+    /- name: Revalidate claimed founder mutation receipt immediately before apply([\s\S]*?)- name: Apply bounded Access exemption with dedicated admin authority/,
+  )?.[1] ?? '';
+  const revalidateIndex = recoveryWorkflow.indexOf(
+    '- name: Revalidate claimed founder mutation receipt immediately before apply',
+  );
+  const applyIndex = recoveryWorkflow.indexOf(
+    '- name: Apply bounded Access exemption with dedicated admin authority',
+  );
+
+  assert.match(recoveryWorkflow, /group:\s*fcr-access-front-door-recovery-production/);
+  assert.match(recoveryWorkflow, /cancel-in-progress:\s*false/);
+  assert.match(authorityStep, /\.created_at == \.updated_at/);
+  assert.match(authorityStep, /fcr-access-approval-claim:v1/);
+  assert.match(authorityStep, /gh api --paginate "repos\/\$\{GITHUB_REPOSITORY\}\/issues\/485\/comments\?per_page=100"/);
+  assert.match(authorityStep, /Consumed founder mutation receipt/);
+  assert.match(authorityStep, /gh api --method POST "repos\/\$\{GITHUB_REPOSITORY\}\/issues\/485\/comments"/);
+  assert.match(authorityStep, /claim_comment_id=/);
+  assert.match(authorityStep, /workflow-run-id:/);
+  assert.match(authorityStep, /workflow-run-attempt:/);
+  assert.match(revalidateStep, /CLAIM_COMMENT_ID/);
+  assert.match(revalidateStep, /\.created_at == \.updated_at/);
+  assert.match(revalidateStep, /Founder mutation approval revoked/);
+  assert.match(revalidateStep, /github-actions\[bot\]/);
+  assert.match(revalidateStep, /Mutation claim invalid/);
+  assert.match(revalidateStep, /test "\$current_main" = "\$EXPECTED_HEAD_SHA"/);
+  assert.ok(revalidateIndex >= 0 && applyIndex > revalidateIndex);
 });
 
 test('raw recovery receipts remain ephemeral and are suppressed from workflow logs', () => {
