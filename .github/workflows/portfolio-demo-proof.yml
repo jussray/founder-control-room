@@ -10,7 +10,6 @@ on:
       - 'e2e/portfolio-demo-proof.mjs'
       - '.github/workflows/portfolio-demo-proof.yml'
   push:
-    branches: [main]
     paths:
       - 'public/demo/**'
       - 'public/_headers'
