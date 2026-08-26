@@ -309,6 +309,8 @@ Do not call author approval “independent review.” For canonical FCR merges, 
 
 A deterministic witness must be produced from provider-observed PR/base/head/diff state, published only through the repository provider's narrow App-backed witness capability, and then read back from the exact head with the provider-recorded App issuer equal to server-owned `GITHUB_APP_ID`. The local/development `GITHUB_TOKEN` fallback may support ordinary bounded repository access but must not mint deterministic review evidence. The receipt and Check Run remain proposal/evidence only. A candidate that changes the deterministic producer, gate, merge consumer, or trusted witness provider boundary must fail its own deterministic self-review and requires a separately explicit bootstrap/constitutional authority path.
 
+The executable witness ignition must run from exact current `main` through a trusted default-branch/server surface, never from candidate-controlled pull-request workflow code. Its dispatch workflow, runner, and credential-bearing invocation surface are part of the deterministic witness trust root; changing any of them must P1-block normal self-certification and require the separately explicit bootstrap/constitutional path.
+
 ## Merge gate
 
 Standing founder intent allows a merge only when all repository merge-authority conditions are satisfied. It does not waive them.
