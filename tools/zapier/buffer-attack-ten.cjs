@@ -10,6 +10,7 @@ const ATTACK_TEN_VERSION = 1;
 const PUBLICATION_OPERATION = 'schedule_linkedin_post';
 const PUBLICATION_PROVIDER = 'buffer';
 const VERIFIED_PUBLICATION_STATE = 'VERIFIED_PUBLISHED';
+const MAX_INGRESS_REPLAY_WINDOW_MS = 5 * 60 * 1000;
 
 const PUBLICATION_STATES = Object.freeze([
   'DRAFT',
@@ -255,6 +256,9 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
   const authorityNotBefore = parseTime(authority.notBefore);
   const authorityExpiresAt = parseTime(authority.expiresAt);
   const reviewMaturedAt = parseTime(reviewWindow.maturedAt);
+  const ingressSignedAt = parseTime(ingress.signedAt);
+  const ingressReceivedAt = parseTime(ingress.receivedAt);
+  const ingressReplayWindowMs = Number(ingress.replayWindowMs);
 
   const results = [];
 
@@ -355,14 +359,29 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
 
   results.push(attack(
     'A8',
-    'ingress is authenticated, deduplicated, and durable',
+    'ingress is authenticated, correlated, deduplicated, durable, and replay-bounded',
     ingress.capability === 'VERIFIED'
       && ingress.authenticated === true
       && ingress.signatureVerified === true
+      && ingress.signerTrusted === true
+      && Boolean(asText(ingress.signerId))
       && ingress.deduplicated === true
       && ingress.durable === true
-      && Boolean(asText(ingress.eventId)),
-    'invalid, duplicate, or unauthenticated ingress cannot advance publication state',
+      && Boolean(asText(ingress.eventId))
+      && asText(ingress.publicationRunId) === publicationRunId
+      && asText(ingress.authorityId) === asText(authority.id)
+      && asText(ingress.contentSha256).toLowerCase() === contentSha256
+      && asText(ingress.actionId) === asText(execution.actionId)
+      && ingressSignedAt !== null
+      && ingressReceivedAt !== null
+      && ingressSignedAt <= ingressReceivedAt
+      && ingressReceivedAt <= nowMs
+      && Number.isInteger(ingressReplayWindowMs)
+      && ingressReplayWindowMs > 0
+      && ingressReplayWindowMs <= MAX_INGRESS_REPLAY_WINDOW_MS
+      && ingressReceivedAt - ingressSignedAt <= ingressReplayWindowMs
+      && nowMs - ingressReceivedAt <= ingressReplayWindowMs,
+    'ingress must be trusted-signer evidence bound to the same run/authority/content/action and received inside a bounded replay window',
   ));
 
   results.push(attack(
