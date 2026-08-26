@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   Diff,
   PullRequestReviewContext,
@@ -74,7 +74,13 @@ function publisherFor(provider: RepositoryProvider): DeterministicReviewCheckPub
   };
 }
 
-const env = { GITHUB_APP_ID: TRUSTED_APP_ID } as NodeJS.ProcessEnv;
+beforeEach(() => {
+  vi.stubEnv("GITHUB_APP_ID", TRUSTED_APP_ID);
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("deterministic review witness publisher", () => {
   it("publishes only the derived exact-head name and accepts trusted App readback", async () => {
@@ -86,7 +92,6 @@ describe("deterministic review witness publisher", () => {
       publisher,
       projectId: "founder-control-room",
       pullRequestNumber: 706,
-      env,
     });
 
     expect(publisher.publishPassedWitness).toHaveBeenCalledTimes(1);
@@ -120,13 +125,13 @@ describe("deterministic review witness publisher", () => {
       publisher,
       projectId: "founder-control-room",
       pullRequestNumber: 706,
-      env,
     })).rejects.toThrow(/not publishable/i);
     expect(publisher.publishPassedWitness).not.toHaveBeenCalled();
   });
 
-  it("fails closed before publication when trusted App identity is missing or malformed", async () => {
-    for (const badEnv of [{}, { GITHUB_APP_ID: "not-an-app" }]) {
+  it("fails closed before publication when server-owned App identity is missing or malformed", async () => {
+    for (const value of ["", "not-an-app"]) {
+      vi.stubEnv("GITHUB_APP_ID", value);
       const provider = providerFor();
       const publisher = publisherFor(provider);
       await expect(publishDeterministicReviewWitness({
@@ -134,7 +139,6 @@ describe("deterministic review witness publisher", () => {
         publisher,
         projectId: "founder-control-room",
         pullRequestNumber: 706,
-        env: badEnv as NodeJS.ProcessEnv,
       })).rejects.toThrow(/numeric server-owned GITHUB_APP_ID/i);
       expect(publisher.publishPassedWitness).not.toHaveBeenCalled();
     }
@@ -158,7 +162,6 @@ describe("deterministic review witness publisher", () => {
       publisher,
       projectId: "founder-control-room",
       pullRequestNumber: 706,
-      env,
     })).rejects.toThrow(/trusted GitHub App 12345/i);
   });
 
@@ -190,7 +193,6 @@ describe("deterministic review witness publisher", () => {
         publisher,
         projectId: "founder-control-room",
         pullRequestNumber: 706,
-        env,
       })).rejects.toThrow(/witness readback is missing/i);
     }
   });
@@ -205,7 +207,34 @@ describe("deterministic review witness publisher", () => {
       publisher,
       projectId: "founder-control-room",
       pullRequestNumber: 706,
-      env,
+    })).rejects.toThrow(/moved before witness publication/i);
+    expect(publisher.publishPassedWitness).not.toHaveBeenCalled();
+  });
+
+  it("withholds publication when the PR is retargeted away from main at the same base SHA", async () => {
+    const moved = { ...context, baseRef: "release" };
+    const provider = providerFor({ contexts: [context, moved] });
+    const publisher = publisherFor(provider);
+
+    await expect(publishDeterministicReviewWitness({
+      provider,
+      publisher,
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    })).rejects.toThrow(/moved before witness publication/i);
+    expect(publisher.publishPassedWitness).not.toHaveBeenCalled();
+  });
+
+  it("withholds publication when provider-backed author identity changes", async () => {
+    const moved = { ...context, authorIdentity: "other-founder" };
+    const provider = providerFor({ contexts: [context, moved] });
+    const publisher = publisherFor(provider);
+
+    await expect(publishDeterministicReviewWitness({
+      provider,
+      publisher,
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
     })).rejects.toThrow(/moved before witness publication/i);
     expect(publisher.publishPassedWitness).not.toHaveBeenCalled();
   });
@@ -220,7 +249,6 @@ describe("deterministic review witness publisher", () => {
       publisher,
       projectId: "founder-control-room",
       pullRequestNumber: 706,
-      env,
     })).rejects.toThrow(/moved after witness publication/i);
     expect(publisher.publishPassedWitness).toHaveBeenCalledTimes(1);
   });
