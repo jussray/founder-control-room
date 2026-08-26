@@ -1,0 +1,215 @@
+{
+  "schema": "founder-control-room/portfolio-worker-security@v1",
+  "suiteVersion": "attack-20-v3",
+  "repository": "jussray/founder-control-room",
+  "declaredFromMainSha": "6601086e67006184cafd990f7e466e1e7af82303",
+  "overallState": "UNVERIFIED",
+  "aggregation": {
+    "passRequiresEveryProductionWorkerPass": true,
+    "anyFailedMeansFailed": true,
+    "anyUnknownMeansUnverified": true,
+    "noAveraging": true
+  },
+  "workers": [
+    {
+      "project": "fcr",
+      "worker": "founder-control-room",
+      "environment": "production",
+      "configPath": "wrangler.worker.toml",
+      "owner": "founder-control-room",
+      "canonicalIngress": {
+        "hostname": "api.foundercontrolroom.org",
+        "route": "api.foundercontrolroom.org",
+        "classification": "public"
+      },
+      "sourceIntent": {
+        "workersDev": "enabled",
+        "previewUrls": "enabled",
+        "serviceBindings": [],
+        "relatedPagesSurface": "foundercontrolroom.org"
+      },
+      "alternateIngress": {
+        "workersDev": "unknown",
+        "previewUrls": "unknown",
+        "pagesDev": "unknown",
+        "pagesPreviews": "unknown",
+        "customDomains": ["api.foundercontrolroom.org"],
+        "legacyDns": [],
+        "directOrigin": "unknown"
+      },
+      "requiredProtection": {
+        "access": "mixed-by-route",
+        "waf": true,
+        "rateLimitProfile": "firewall-v10-baseline",
+        "allowedMethods": [],
+        "allowedPathPatterns": [],
+        "webhookVerification": true,
+        "schemaEnforcement": "unknown-until-discovery"
+      },
+      "capabilities": {
+        "publicHttp": true,
+        "authenticatedUser": true,
+        "serviceOnlyBoundaries": true,
+        "providerWebhook": true,
+        "tenantOwnedData": "unknown",
+        "mutableProtectedFields": true,
+        "businessStateMachine": true,
+        "supabaseData": true,
+        "consequentialActions": true,
+        "providerMutation": true,
+        "runtimeOutcomeClaims": true
+      },
+      "capabilityAbsenceEvidence": {},
+      "observedProtection": {
+        "observedAt": null,
+        "canonicalSourceSha": null,
+        "workerVersionId": null,
+        "state": "UNVERIFIED",
+        "evidenceReceiptIds": []
+      },
+      "attackTest": {
+        "suiteVersion": "attack-20-v3",
+        "executedAt": null,
+        "result": "UNVERIFIED",
+        "failedControls": []
+      }
+    },
+    {
+      "project": "fcr",
+      "worker": "founder-control-room-review-email",
+      "environment": "production",
+      "configPath": "wrangler.email.toml",
+      "owner": "founder-control-room",
+      "canonicalIngress": {
+        "hostname": null,
+        "route": null,
+        "classification": "no-public-ingress"
+      },
+      "sourceIntent": {
+        "workersDev": "disabled",
+        "previewUrls": "disabled",
+        "serviceBindings": ["FOUNDER_CONTROL_ROOM_API->founder-control-room"],
+        "relatedPagesSurface": null
+      },
+      "alternateIngress": {
+        "workersDev": "unknown",
+        "previewUrls": "unknown",
+        "pagesDev": "disabled",
+        "pagesPreviews": "disabled",
+        "customDomains": [],
+        "legacyDns": [],
+        "directOrigin": "unknown"
+      },
+      "requiredProtection": {
+        "access": "service-binding-or-provider-event",
+        "waf": false,
+        "rateLimitProfile": null,
+        "allowedMethods": [],
+        "allowedPathPatterns": [],
+        "webhookVerification": false,
+        "schemaEnforcement": "none"
+      },
+      "capabilities": {
+        "publicHttp": false,
+        "authenticatedUser": false,
+        "serviceOnlyBoundaries": true,
+        "providerWebhook": false,
+        "tenantOwnedData": false,
+        "mutableProtectedFields": false,
+        "businessStateMachine": true,
+        "supabaseData": false,
+        "consequentialActions": true,
+        "providerMutation": "unknown",
+        "runtimeOutcomeClaims": true
+      },
+      "capabilityAbsenceEvidence": {
+        "A01": ["wrangler.email.toml declares no public route and disables workers.dev/preview URLs"],
+        "A08": ["worker has no browser/user HTTP ingress"],
+        "A10": ["worker receives Cloudflare Email Routing events rather than an HTTP provider webhook"],
+        "A11": ["worker does not expose tenant-owned object access"],
+        "A12": ["worker does not expose user-mutable object properties"],
+        "A14": ["worker does not directly expose Supabase data access"]
+      },
+      "observedProtection": {
+        "observedAt": null,
+        "canonicalSourceSha": null,
+        "workerVersionId": null,
+        "state": "UNVERIFIED",
+        "evidenceReceiptIds": []
+      },
+      "attackTest": {
+        "suiteVersion": "attack-20-v3",
+        "executedAt": null,
+        "result": "UNVERIFIED",
+        "failedControls": []
+      }
+    },
+    {
+      "project": "fcr",
+      "worker": "founder-control-room-deletion-queue",
+      "environment": "production",
+      "configPath": "wrangler.deletion-queue.toml",
+      "owner": "founder-control-room",
+      "canonicalIngress": {
+        "hostname": null,
+        "route": null,
+        "classification": "no-public-ingress"
+      },
+      "sourceIntent": {
+        "workersDev": "disabled",
+        "previewUrls": "disabled",
+        "serviceBindings": [],
+        "relatedPagesSurface": null
+      },
+      "alternateIngress": {
+        "workersDev": "unknown",
+        "previewUrls": "unknown",
+        "pagesDev": "disabled",
+        "pagesPreviews": "disabled",
+        "customDomains": [],
+        "legacyDns": [],
+        "directOrigin": "unknown"
+      },
+      "requiredProtection": {
+        "access": "scheduled-runtime-only",
+        "waf": false,
+        "rateLimitProfile": null,
+        "allowedMethods": [],
+        "allowedPathPatterns": [],
+        "webhookVerification": false,
+        "schemaEnforcement": "none"
+      },
+      "capabilities": {
+        "publicHttp": false,
+        "authenticatedUser": false,
+        "serviceOnlyBoundaries": false,
+        "providerWebhook": false,
+        "tenantOwnedData": true,
+        "mutableProtectedFields": true,
+        "businessStateMachine": true,
+        "supabaseData": true,
+        "consequentialActions": true,
+        "providerMutation": true,
+        "runtimeOutcomeClaims": true
+      },
+      "capabilityAbsenceEvidence": {
+        "A01": ["wrangler.deletion-queue.toml declares a scheduled Worker with no public route and disables workers.dev/preview URLs"],
+        "A08": ["scheduled Worker has no browser/user HTTP ingress"],
+        "A10": ["scheduled Worker has no provider webhook route"]
+      },
+      "observedProtection": {
+        "observedAt": null,
+        "canonicalSourceSha": null,
+        "workerVersionId": null,
+        "state": "UNVERIFIED",
+        "evidenceReceiptIds": []
+      },
+      "attackTest": {
+        "suiteVersion": "attack-20-v3",
+        "executedAt": null,
+        "result": "UNVERIFIED",
+        "failedControls": []
+      }
+    }
+  ]
+}
