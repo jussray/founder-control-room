@@ -34,6 +34,21 @@ POST-MERGE / RUNTIME TRUTH
 RECOVER / LEARN / NEXT GATE
 ```
 
+## Founder Adaptive Kernel
+
+Every Goalfix loop also applies `docs/FOUNDER_ADAPTIVE_KERNEL_V0.md`.
+
+After observation, compare expected state with verified observed state, classify the surprise as `STRONGER_THAN_EXPECTED`, `AS_EXPECTED`, `WEAKER_THAN_EXPECTED`, `UNEXPECTED_DIRECTION`, or `UNKNOWN`, then choose one primary action: `ACCELERATE`, `CONTINUE`, `REPAIR`, `REORIENT`, `HOLD`, or `STOP`.
+
+For meaningful state transitions, preserve:
+
+- a deterministic continuity fingerprint bound to the current intent/state/evidence and exact base/head/scope when applicable;
+- a bounded continuity cookie containing non-secret lineage, surprise, decision, evidence references, truth state, and next gate.
+
+Fingerprints and continuity cookies are provenance/learning receipts only. They are not browser cookies, credentials, tracking IDs, founder authority, merge authority, deploy authority, or publication authority.
+
+If a load-bearing fingerprint input changes, dependent green evidence becomes historical and must be reacquired before promotion.
+
 ## Load-bearing rules
 
 1. Current repository/provider/runtime evidence outranks prior summaries, email, memory, or old receipts.
@@ -47,6 +62,8 @@ RECOVER / LEARN / NEXT GATE
 9. A real failing signal is never suppressed merely to make a gate green.
 10. Merge is not completion. Reacquire `main` and verify required provider/runtime/browser truth after integration.
 11. Red, draft, stale, closed, and superseded work must be inspected for unique code, tests, decisions, or evidence before retirement.
+12. Unexpected verified behavior updates the next expectation; do not force a stronger or differently successful path back into the previous script.
+13. Acceleration requires current verified evidence and cannot widen authority.
 
 ## Evidence states
 
@@ -76,6 +93,8 @@ Use the cheapest valid proof first:
 3. targeted Playwright for browser/UI/runtime behavior;
 4. exact-head CI;
 5. provider/deployment/runtime readback.
+
+The adaptive kernel may move a proof class earlier when repeated verified failures show the cheaper order is no longer the truthful fastest path. That learning must be recorded without weakening the proof requirement.
 
 ## Merge liveness
 
@@ -111,6 +130,9 @@ RISK:
 
 ROLLBACK:
 [how to reverse safely]
+
+ADAPTIVE SIGNAL:
+[surprise signal + adaptive action + fingerprint/cookie lineage when material]
 
 NEXT GATE:
 [one exact founder decision or next action]
