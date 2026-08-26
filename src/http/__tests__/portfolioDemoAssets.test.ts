@@ -27,8 +27,12 @@ describe('public portfolio demo boundary', () => {
     expect(html).toContain('no privileged writes');
     expect(html).toContain('no browser cookie required');
     expect(html).toContain('data-testid="open-sekret-demo" aria-disabled="true"');
+    expect(html).toContain('data-testid="sekret-genesis-withheld" aria-disabled="true"');
+    expect(html).toContain('data-testid="fcr-genesis-withheld" aria-disabled="true"');
     expect(html).not.toContain('href="https://app.sekretbip.net/?bipDevAudience=teen"');
-    expect(html).toContain('live entry stays withheld');
+    expect(html).not.toContain('href="/control-room/genesis.html"');
+    expect(html).not.toMatch(/href="https?:\/\/[^\"]*sekretbip\.net/i);
+    expect(html).toContain('direct live entry and Genesis navigation stay withheld');
     expect(html).toContain('current production runtime equals current repository main');
     expect(html).not.toMatch(/<script\b/i);
     expect(html).not.toMatch(/<form\b/i);
