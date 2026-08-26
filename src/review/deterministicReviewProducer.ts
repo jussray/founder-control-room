@@ -22,9 +22,50 @@ const TRUST_ROOT_PATHS = new Set([
   "src/review/deterministicReviewWitnessPublisher.ts",
   "src/review/independentReviewGate.ts",
   "src/http/routes/approvals.ts",
+  "src/controllers/ProofGateController.ts",
+  "src/proof-gate/gate.ts",
+  "src/proof-gate/persist.ts",
+  "src/proof-gate/types.ts",
+  "src/http/middleware/requireFounder.ts",
+  "src/http/middleware/requirePortfolioSwitchOn.ts",
+  "src/http/middleware/v10PrivilegedApprovalBinding.ts",
+  "src/http/middleware/v10DecisionFounderBinding.ts",
+  "src/http/server.ts",
+  "src/auth/founderSession.ts",
+  "src/switchboard/store.ts",
+  "src/founder-os-lab/capabilityKernel.ts",
+  "src/lib/v10DecisionAuthorityGate.ts",
+  "src/lib/founderControlDecision.ts",
+  "src/providers/DeterministicReviewGitHubProvider.ts",
   "src/providers/RepositoryProvider.ts",
   "src/providers/GitHubProvider.ts",
+  "src/providers/SecurityPreservingGitHubProvider.ts",
+  "src/providers/githubAppAuth.ts",
   "src/providers/providerFactory.ts",
+]);
+
+/**
+ * Current production/autonomous execution owners. A new controller cannot
+ * become runnable through reconciliation without modifying the protected
+ * reconciler registry, and a new Worker entry cannot become production without
+ * modifying the protected Wrangler entry configuration.
+ */
+const AUTONOMOUS_EXECUTION_PATHS = new Set([
+  "wrangler.worker.toml",
+  "src/worker/cf-entry.ts",
+  "src/worker/handler.ts",
+  "src/worker/reconciler.ts",
+  "src/worker/scheduler.ts",
+  "src/controllers/base.ts",
+  "src/controllers/CheckRunController.ts",
+  "src/controllers/ChangeProposalController.ts",
+  "src/controllers/ManifestController.ts",
+  "src/controllers/MergeIntentController.ts",
+  "src/controllers/MissionController.ts",
+  "src/controllers/ProjectController.ts",
+  "src/controllers/ReleaseController.ts",
+  "src/controllers/ProofGateController.ts",
+  "src/controllers/StripeSyncWitnessController.ts",
 ]);
 
 const MERGE_AUTHORITY_DOCS = [
@@ -112,6 +153,29 @@ function isProviderAuthoritySource(path: string): boolean {
     && !path.endsWith(".test.ts");
 }
 
+function isTestSource(path: string): boolean {
+  return path.includes("/__tests__/") || /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(path);
+}
+
+function addedPatchText(file: DiffFile): string {
+  return (file.patch ?? "")
+    .split("\n")
+    .filter((line) => line.startsWith("+") && !line.startsWith("+++"))
+    .map((line) => line.slice(1))
+    .join("\n");
+}
+
+/**
+ * Backstop for a new provider merge sink outside today's known execution
+ * graph. `integrate` is a deliberately reserved consequential provider method;
+ * newly added production-source use fails closed and requires bootstrap review.
+ */
+function introducesProviderIntegrationSink(file: DiffFile): boolean {
+  if (!file.path.startsWith("src/") || isTestSource(file.path)) return false;
+  if (TRUST_ROOT_PATHS.has(file.path) || AUTONOMOUS_EXECUTION_PATHS.has(file.path)) return false;
+  return /\bintegrate\b/.test(addedPatchText(file));
+}
+
 function missingPaths(changed: Set<string>, required: readonly string[]): string[] {
   return required.filter((path) => !changed.has(path));
 }
@@ -135,15 +199,33 @@ export function evaluateDeterministicReviewRules(files: DiffFile[]): Independent
     ));
   }
 
-  const changedTrustRoots = [...TRUST_ROOT_PATHS].filter((path) => changed.has(path));
+  const changedTrustRoots = [...new Set([
+    ...[...TRUST_ROOT_PATHS].filter((path) => changed.has(path)),
+    ...[...AUTONOMOUS_EXECUTION_PATHS].filter((path) => changed.has(path)),
+  ])].sort();
   if (changedTrustRoots.length > 0) {
     findings.push(finding(
       "trust-root-self-modification",
       "P1",
       "Deterministic review trust root changed",
       changedTrustRoots[0]!,
-      `Candidate changes deterministic review trust-root paths: ${changedTrustRoots.sort().join(", ")}. A candidate cannot use the normal deterministic producer to certify changes to the producer, its consumer, or its trusted provider witness boundary.`,
+      `Candidate changes deterministic review trust-root paths: ${changedTrustRoots.join(", ")}. A candidate cannot use the normal deterministic producer to certify changes to the producer, its consumer, its autonomous execution owners, or its trusted provider witness boundary.`,
       "Use a separately explicit bootstrap or constitutional authority path for this trust-root change, then reacquire normal deterministic review on later candidates.",
+    ));
+  }
+
+  const newIntegrationSinks = files
+    .filter((file) => introducesProviderIntegrationSink(file))
+    .map((file) => file.path)
+    .sort();
+  if (newIntegrationSinks.length > 0) {
+    findings.push(finding(
+      "new-provider-integration-sink",
+      "P1",
+      "New provider integration sink is outside the known execution trust root",
+      newIntegrationSinks[0]!,
+      `Candidate introduces the consequential repository-provider integrate sink in production source outside the protected execution graph: ${newIntegrationSinks.join(", ")}. Path-only trust-root coverage must not allow a newly invented merge executor to self-certify.`,
+      "Treat the new execution owner as a constitutional trust-root change or remove the direct provider integration sink; do not certify it through the normal deterministic producer.",
     ));
   }
 

@@ -230,7 +230,7 @@ For every truth-sensitive change to architecture, authority, publishing, provide
 7. run the same verifier on the merged-main transition; and
 8. if provider/runtime reality changes after merge, re-observe and repair the affected current-state doc before reusing its present-tense claim.
 
-A docs-only truth-sync merge closes an existing drift cycle. The post-merge verifier closes that transition; it does not create an infinite requirement to rewrite itself again.
+A docs-only truth-sync merge closes an existing drift cycle. The post-merge verifier closes the transition; it does not create an infinite requirement to rewrite itself again.
 
 Do not hard-code a durable “current main SHA” into prose. Exact SHAs belong in evidence/provenance; resolve current identity at use time.
 
@@ -307,9 +307,7 @@ For pull-request Quality Gate evidence, every job must checkout `github.event.pu
 
 Do not call author approval “independent review.” For canonical FCR merges, independent deterministic review attacks the patch first; the authenticated founder-final receipt supplies the separate final human authority for that exact candidate.
 
-The deterministic review producer is a read-only proposal generator. It must resolve the exact provider PR/base/head and complete diff, bind server-owned policy and versioned rule identity, emit only non-authorizing receipts, fail closed on incomplete or moved evidence, and block self-certification of its own trust root. A producer receipt is not the provider witness.
-
-The trusted witness is separately published against the exact reviewed head by the repository-scoped server-owned GitHub App and must be read back with App issuer identity equal to trusted `GITHUB_APP_ID`. Until that witness exists, the deterministic receipt does not satisfy the founder-final review membrane. Neither receipt nor witness grants founder-final or merge authority.
+A deterministic witness must be produced from provider-observed PR/base/head/diff state, published only through the repository provider's narrow App-backed witness capability, and then read back from the exact head with the provider-recorded App issuer equal to server-owned `GITHUB_APP_ID`. The local/development `GITHUB_TOKEN` fallback may support ordinary bounded repository access but must not mint deterministic review evidence. The receipt and Check Run remain proposal/evidence only. A candidate that changes the deterministic producer, gate, merge consumer, or trusted witness provider boundary must fail its own deterministic self-review and requires a separately explicit bootstrap/constitutional authority path.
 
 ## Merge gate
 

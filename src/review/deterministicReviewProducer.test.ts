@@ -178,6 +178,141 @@ describe("deterministic review producer", () => {
     ]));
   });
 
+  it("treats the deterministic witness publisher as a P1 trust root", () => {
+    const findings = evaluateDeterministicReviewRules([
+      file("src/review/deterministicReviewWitnessPublisher.ts"),
+    ]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "trust-root-self-modification", severity: "P1" }),
+    ]));
+  });
+
+  it.each([
+    "src/providers/DeterministicReviewGitHubProvider.ts",
+    "src/providers/SecurityPreservingGitHubProvider.ts",
+    "src/providers/githubAppAuth.ts",
+  ])("treats %s as deterministic witness trust root", (path) => {
+    const findings = evaluateDeterministicReviewRules([file(path)]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "trust-root-self-modification",
+        severity: "P1",
+        path,
+      }),
+    ]));
+  });
+
+  it.each([
+    "src/http/middleware/requireFounder.ts",
+    "src/http/middleware/requirePortfolioSwitchOn.ts",
+    "src/http/middleware/v10PrivilegedApprovalBinding.ts",
+    "src/http/middleware/v10DecisionFounderBinding.ts",
+    "src/http/server.ts",
+  ])("treats executable merge-authority path %s as a P1 trust root", (path) => {
+    const findings = evaluateDeterministicReviewRules([file(path)]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "trust-root-self-modification",
+        severity: "P1",
+        path,
+      }),
+    ]));
+  });
+
+  it.each([
+    "src/auth/founderSession.ts",
+    "src/switchboard/store.ts",
+    "src/founder-os-lab/capabilityKernel.ts",
+    "src/lib/v10DecisionAuthorityGate.ts",
+    "src/lib/founderControlDecision.ts",
+  ])("treats direct merge-authority decision module %s as a P1 trust root", (path) => {
+    const findings = evaluateDeterministicReviewRules([file(path)]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "trust-root-self-modification",
+        severity: "P1",
+        path,
+      }),
+    ]));
+  });
+
+  it.each([
+    "src/controllers/ProofGateController.ts",
+    "src/proof-gate/gate.ts",
+    "src/proof-gate/persist.ts",
+    "src/proof-gate/types.ts",
+  ])("treats proof-gate merge-authority module %s as a P1 trust root", (path) => {
+    const findings = evaluateDeterministicReviewRules([file(path)]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "trust-root-self-modification",
+        severity: "P1",
+        path,
+      }),
+    ]));
+  });
+
+  it.each([
+    "wrangler.worker.toml",
+    "src/worker/cf-entry.ts",
+    "src/worker/handler.ts",
+    "src/worker/reconciler.ts",
+    "src/worker/scheduler.ts",
+    "src/controllers/base.ts",
+    "src/controllers/CheckRunController.ts",
+    "src/controllers/ChangeProposalController.ts",
+    "src/controllers/ManifestController.ts",
+    "src/controllers/MergeIntentController.ts",
+    "src/controllers/MissionController.ts",
+    "src/controllers/ProjectController.ts",
+    "src/controllers/ReleaseController.ts",
+    "src/controllers/StripeSyncWitnessController.ts",
+  ])("treats autonomous execution owner %s as a P1 trust root", (path) => {
+    const findings = evaluateDeterministicReviewRules([file(path)]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "trust-root-self-modification",
+        severity: "P1",
+        path,
+      }),
+    ]));
+  });
+
+  it.each([
+    '+await provider.integrate(projectId, "main", head);',
+    '+await provider["integrate"](projectId, "main", head);',
+    '+const { integrate: mergeNow } = provider;\n+await mergeNow(projectId, "main", head);',
+  ])("blocks a newly introduced provider integration sink: %s", (addedLines) => {
+    const findings = evaluateDeterministicReviewRules([{
+      path: "src/experimental/unsafeMergeWorker.ts",
+      status: "added",
+      additions: addedLines.split("\n").length,
+      deletions: 0,
+      patch: `@@ -0,0 +1 @@\n${addedLines}`,
+    }]);
+
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "new-provider-integration-sink",
+        severity: "P1",
+        path: "src/experimental/unsafeMergeWorker.ts",
+      }),
+    ]));
+  });
+
+  it("does not classify a new read-only provider source as an integration sink", () => {
+    const findings = evaluateDeterministicReviewRules([{
+      path: "src/experimental/readOnlyWorker.ts",
+      status: "added",
+      additions: 1,
+      deletions: 0,
+      patch: '@@ -0,0 +1 @@\n+await provider.resolveRef(projectId, "main");',
+    }]);
+
+    expect(findings.some((item) => item.id === "new-provider-integration-sink")).toBe(false);
+    expect(findings.some((item) => item.severity === "P1")).toBe(false);
+  });
+
   it("requires discovery adversarial tests and runbook when discovery core changes", () => {
     const findings = evaluateDeterministicReviewRules([
       file("scripts/verify-test-discovery.mjs"),
@@ -188,6 +323,22 @@ describe("deterministic review producer", () => {
 
     const repaired = evaluateDeterministicReviewRules([
       file("scripts/verify-test-discovery.mjs"),
+      file("scripts/verify-test-discovery.node-test.mjs"),
+      file("docs/TEST_DISCOVERY_DEBT.md"),
+    ]);
+    expect(repaired.some((item) => item.id === "test-discovery-proof-coupling")).toBe(false);
+  });
+
+  it("treats discovery baseline changes as discovery-core changes", () => {
+    const findings = evaluateDeterministicReviewRules([
+      file("scripts/test-discovery-baseline.json"),
+    ]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "test-discovery-proof-coupling", severity: "P2" }),
+    ]));
+
+    const repaired = evaluateDeterministicReviewRules([
+      file("scripts/test-discovery-baseline.json"),
       file("scripts/verify-test-discovery.node-test.mjs"),
       file("docs/TEST_DISCOVERY_DEBT.md"),
     ]);
