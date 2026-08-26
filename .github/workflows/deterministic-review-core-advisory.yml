@@ -45,3 +45,4 @@ jobs:
           src/review/deterministicReviewProducer.test.ts
           src/review/deterministicReviewProducer.boundary.test.ts
           src/review/deterministicReviewWitnessPublisher.test.ts
+          src/providers/__tests__/deterministicReviewGitHubProvider.test.ts
