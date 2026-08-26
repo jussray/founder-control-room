@@ -7,7 +7,7 @@ description: >
   by inspecting the authoritative source, choosing one reversible action,
   patching only the focused cause, and reporting evidence without burning
   unnecessary context.
-version: 1.0
+version: 2.0
 visibility: private
 owner: Juss
 triggers:
@@ -58,6 +58,7 @@ Use the shared founder stack:
 - L99: map authority, lifecycle, provenance, evidence, rollback, and compounding value.
 - Redteam II: attack the selected fix and its blast radius.
 - OODA: observe, orient, decide, act minimally, verify, and loop.
+- Art of War: know the ground before movement, win before fighting, avoid unnecessary siege, reuse verified asymmetry, and preserve future options.
 
 ## Authority order
 
@@ -113,7 +114,8 @@ Classify all important statements as:
 - VERIFIED;
 - INFERRED;
 - UNKNOWN;
-- BLOCKED.
+- BLOCKED;
+- STALE when previously valid evidence no longer matches current state.
 
 ### 2. Orient
 
@@ -125,6 +127,10 @@ Map the goal through 5W1H:
 - When should this run, stop, rerun, merge, deploy, or roll back?
 - Why does this serve the product, user, brand, business, or safety objective?
 - How will it be implemented, tested, observed, and reversed?
+
+Before mutation, satisfy the win-before-fighting preflight: authoritative repository,
+target branch, exact base SHA, founder outcome, suspected failure area, first evidence
+targets, stop condition, smallest reversible change, rollback, proof plan, and unrelated-work preservation.
 
 ### 3. Decide
 
@@ -140,7 +146,7 @@ Rules:
 - no merge unless intended scope, checks, real-path verification, and rollback are understood;
 - no public claim without proof.
 
-### 4. Act
+### 4. Builder
 
 Patch only the needed files.
 
@@ -148,9 +154,11 @@ For code:
 
 - preserve unrelated work;
 - keep diffs small;
+- use a branch rather than unreviewed direct-main mutation;
 - add or update the narrowest useful test;
 - do not suppress failing signals;
-- do not fake green with mocks, fallbacks, swallowed errors, or hidden skips.
+- do not fake green with mocks, fallbacks, swallowed errors, or hidden skips;
+- emit Builder evidence, but never self-certify the fix.
 
 For Product Design:
 
@@ -160,7 +168,7 @@ For Product Design:
   empty/loading/error states, and teen-facing privacy/safety copy when relevant;
 - compare the coded result against the source visual before handoff.
 
-### 5. Verify
+### 5. Independent Verifier
 
 Run the cheapest valid verification first, then escalate only as needed:
 
@@ -170,6 +178,9 @@ Run the cheapest valid verification first, then escalate only as needed:
 4. CI or deployment check;
 5. artifact/log/screenshot/trace inspection.
 
+Verifier must be independent from Builder for load-bearing certification. Exact-head
+receipts must bind to the actual candidate head, not GitHub's synthetic PR merge SHA.
+
 For Se’kret Bip UI, auth, routing, onboarding, splash, preview, waitlist, or runtime
 work, Playwright evidence is required before calling the path done.
 
@@ -177,7 +188,72 @@ If GitHub Actions fails with zero useful steps or no product logs, classify it a
 infrastructure until job evidence proves a code regression. Do not merge from a
 monitoring-only workflow.
 
-### 6. Report
+### 6. Red Team / Devil
+
+Attack the exact verified candidate rather than a remembered design.
+
+Check for:
+
+- authority bypass;
+- stale or mismatched head/diff proof;
+- hidden alternate ingress or provider path;
+- error suppression or false-success state;
+- scope expansion and unrelated blast radius;
+- rollback failure;
+- evidence produced only by the component being tested;
+- proof-cookie lineage that is expired, revoked, cyclic, detached, or unknown-parent.
+
+Red Team must be independent from both Builder and Verifier.
+
+### 7. Exact-head merge gate
+
+The executable workflow is `src/goalfix/executionWorkflow.ts`; the human-readable
+contract is `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`.
+
+Every load-bearing checkpoint carries:
+
+```text
+repository
+exact base SHA
+exact candidate head SHA
+diff fingerprint
+evidence IDs
+technical fingerprints
+proof-cookie provenance
+```
+
+Proof cookies are internal provenance metadata only. They are not HTTP/browser
+cookies, auth tokens, bearer credentials, secrets, or tracking identifiers.
+
+If `main` moved after proof, prior green becomes historical provenance:
+
+```text
+main moved
+→ REVERIFY_REQUIRED
+→ reacquire focused change on current main
+→ recompute diff fingerprint
+→ rerun Verifier
+→ rerun Red Team
+```
+
+Machine green is not merge authority. Founder merge approval must bind to the exact
+candidate head and exact diff fingerprint. Merge using expected-head protection.
+
+### 8. Post-merge truth
+
+Merge is not completion.
+
+After merge:
+
+1. reacquire current `main`;
+2. verify merged identity;
+3. obtain provider/runtime/browser proof required by the change;
+4. correlate receipts to current fingerprints and provenance;
+5. mark complete only when the real path is current.
+
+When runtime proof is required but absent, state is `MERGED_UNVERIFIED`, not done.
+
+### 9. Report
 
 Return this exact compact report:
 
@@ -201,6 +277,22 @@ NEXT GATE:
 [one exact founder decision or next action]
 ```
 
+## Fingerprints and proof cookies
+
+The workflow reuses ATTACK-20 V3 `ProofBinding` semantics:
+
+```text
+technical fingerprint
++
+declared continuity/provenance cookie
+=
+load-bearing proof binding
+```
+
+A fingerprint says what exact state was observed. A proof cookie says which declared
+founder/builder/verification/provider context owns that observation. Either stale or
+broken dimension makes the affected proof `UNVERIFIED`.
+
 ## Stop conditions
 
 Stop before acting when:
@@ -217,7 +309,7 @@ evidence or approval required.
 
 ## Agent-specific notes
 
-- Claude: use this as a project skill or reusable command.
+- Claude: use this as a project skill or reusable command and honor execution workflow v2 after mutation approval.
 - Codex: use it as the execution contract before editing files; verify with tests and Playwright where relevant.
 - ChatGPT: use it as the chat-to-action frame and GitHub/Product Design handoff spec.
 - Perplexity: use it for fast source discovery, docs verification, and citation-backed blocker research before code edits.
