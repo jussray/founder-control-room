@@ -68,6 +68,58 @@ describe("DeterministicReviewGitHubProvider", () => {
     });
   });
 
+  it("carries GitHub Check Run external_id into the full evidence fingerprint", async () => {
+    const fetchFn = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(init?.method).toBe("GET");
+      return new Response(JSON.stringify({
+        check_runs: [{
+          id: 77,
+          name: NAME,
+          status: "completed",
+          conclusion: "success",
+          head_sha: HEAD,
+          external_id: HASH.toUpperCase(),
+          app: { id: 12345, slug: "fcr-review" },
+          started_at: "2026-08-26T00:00:00Z",
+          completed_at: "2026-08-26T00:00:01Z",
+        }],
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }) as unknown as typeof fetch;
+    const provider = providerFor(fetchFn);
+
+    const signals = await provider.listVerificationSignals("founder-control-room", HEAD);
+
+    expect(signals).toEqual([
+      expect.objectContaining({
+        id: "77",
+        name: NAME,
+        status: "passed",
+        commitSha: HEAD,
+        provider: "github",
+        evidenceFingerprint: HASH,
+        issuer: { kind: "app", id: "12345", name: "fcr-review" },
+      }),
+    ]);
+  });
+
+  it("keeps missing external_id visibly unbound instead of manufacturing a fingerprint", async () => {
+    const fetchFn = vi.fn(async () => new Response(JSON.stringify({
+      check_runs: [{
+        id: 78,
+        name: NAME,
+        status: "completed",
+        conclusion: "success",
+        head_sha: HEAD,
+        app: { id: 12345, slug: "fcr-review" },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } })) as unknown as typeof fetch;
+    const provider = providerFor(fetchFn);
+
+    const signals = await provider.listVerificationSignals("founder-control-room", HEAD);
+
+    expect(signals[0]?.evidenceFingerprint).toBeUndefined();
+  });
+
   it("rejects a custom API base in the normal runtime writer path", async () => {
     const provider = new DeterministicReviewGitHubProvider({
       token: "installation-token",
