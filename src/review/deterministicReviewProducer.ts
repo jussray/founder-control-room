@@ -182,6 +182,7 @@ function assertProviderContext(
   repository: string,
   headRepository: string,
   baseRef: string,
+  headRef: string,
   baseSha: string,
   headSha: string,
   authorIdentity: string,
@@ -191,6 +192,9 @@ function assertProviderContext(
   }
   if (baseRef !== FCR_BASE_REF) {
     throw new Error(`Deterministic review is pinned to base ref ${FCR_BASE_REF}`);
+  }
+  if (!text(headRef)) {
+    throw new Error("Deterministic review requires a provider-backed PR head ref");
   }
   if (!FULL_SHA.test(baseSha) || !FULL_SHA.test(headSha) || lower(baseSha) === lower(headSha)) {
     throw new Error("Deterministic review requires distinct full provider base/head SHAs");
@@ -222,10 +226,14 @@ export async function produceDeterministicReview(
   }
 
   const context = await input.provider.getPullRequestReviewContext(input.projectId, input.pullRequestNumber);
+  if (context.number !== input.pullRequestNumber) {
+    throw new Error(`Deterministic review provider returned PR #${context.number} for requested PR #${input.pullRequestNumber}`);
+  }
   assertProviderContext(
     context.repository,
     context.headRepository,
     context.baseRef,
+    context.headRef,
     context.baseSha,
     context.headSha,
     context.authorIdentity,
