@@ -69,11 +69,9 @@ STOP
 
 Accelerate only from current verified evidence. If the user, system, test, runtime, or product behaves in a useful unexpected way, update the expectation and plan rather than forcing the old script.
 
-For meaningful loops, bind a continuity fingerprint to project/repository identity, intent, expected state, observed state, evidence identities, and exact base/head/scope when applicable. A load-bearing change invalidates prior green for the affected claim.
+For meaningful loops, record the current repository/project, base/head when applicable, scope, evidence IDs, review state, authority state, surprise signal, action, and next gate. If any load-bearing state changes, prior green for the affected claim becomes STALE and must be reacquired.
 
-Maintain a bounded continuity cookie containing non-secret resumability metadata such as kernel version, project ID, fingerprint, parent fingerprint, surprise signal, adaptive action, evidence references, truth state, and next gate. This is a proof/learning receipt only. It is not an HTTP/browser cookie, credential, tracking ID, or authority object.
-
-Never put secrets, tokens, raw private data, chain-of-thought, or unnecessary user content into a continuity cookie. Fingerprints and cookies preserve lineage but never authorize merge, deploy, publish, provider mutation, or founder decisions.
+Never put secrets, tokens, raw private data, chain-of-thought, or unnecessary user content into the state record. The state record preserves context but never authorizes merge, deploy, publish, provider mutation, or founder decisions.
 
 After a meaningful surprise, retain the smallest durable learning patch that changes future expectations without rewriting historical evidence.
 
