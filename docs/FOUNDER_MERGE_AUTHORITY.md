@@ -68,6 +68,14 @@ founderFinalApprovalRequired: true
 
 A caller cannot turn deterministic review off, weaken P2 handling, substitute model output for founder authority, redefine the policy, or reuse a founder approval against another PR/base/head. The deterministic review receipt itself remains proposal-only and non-authorizing. The authenticated founder-final receipt supplies the final human authority after the independent proof layer passes.
 
+### Deterministic witness production and bootstrap truth
+
+The deterministic-review producer must derive repository, pull request, base/head identity, author, complete diff identity, rule version, findings, verdict, and receipt hash from provider-observed state. A caller cannot supply a trusted reviewer identity, verdict, policy, check conclusion, witness name, or trusted App identity and have that become review authority.
+
+A clear proposal-only receipt may be published as the exact derived `Independent Review / ...` GitHub Check Run only through the repository provider's narrow deterministic-review witness capability. For Founder Control Room production construction, that capability requires the repository-scoped installation credential minted from server-owned `GITHUB_APP_ID` plus `GITHUB_PRIVATE_KEY`; the bounded `GITHUB_TOKEN` local/development fallback must fail closed for deterministic witness publication. After publication, FCR must read the exact-head signal back from GitHub and require the provider-recorded Check Run App issuer to equal the trusted numeric `GITHUB_APP_ID` before treating the witness as current evidence.
+
+Receipt production, Check Run creation, and readback remain non-authorizing on their own. They never supply founder-final, merge, deploy, secret, provider-policy, database, billing, publication, or destructive-action authority. A candidate that changes the deterministic producer, independent-review gate, merge consumer, or trusted witness publication boundary is a trust-root self-modification and must not certify itself through that same producer. Current source therefore does not create a hidden bootstrap exception; an initial trust-root integration remains blocked until a separately explicit, auditable constitutional authority path exists and is invoked for the exact candidate.
+
 ### Legacy pinned semantic-review missions
 
 Missions already approved under the earlier server-owned semantic-review policy may continue to validate that pinned policy for compatibility. In that historical mode, `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` remains the server-owned trusted semantic reviewer set and author self-review still cannot satisfy independent semantic review.
