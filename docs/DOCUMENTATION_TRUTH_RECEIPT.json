@@ -35,7 +35,7 @@
     {
       "path": "scripts/verify-test-discovery.mjs",
       "claims": [
-        "scripts/verify-test-discovery.mjs: the test-discovery ratchet must recognize both the reviewed legacy __tests__ pattern used by its adversarial fixtures and the current repository-wide src/**/*.test.ts pattern recorded by scripts/test-discovery-baseline.json; the current pattern treats every TypeScript .test.ts under src as default-discovered and must not permit a candidate PR to create new hidden-test debt."
+        "scripts/verify-test-discovery.mjs: the test-discovery ratchet must recognize both the reviewed legacy __tests__ pattern used by its adversarial fixtures and the current repository-wide supported JavaScript/TypeScript test-and-spec pattern recorded by scripts/test-discovery-baseline.json; the current pattern treats every supported candidate test under src as default-discovered, keeps the baseline at zero hidden tests, and must not permit a candidate PR to create new hidden-test debt."
       ]
     },
     {
