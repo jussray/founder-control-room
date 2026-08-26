@@ -174,6 +174,26 @@ describe("deterministic review witness publisher", () => {
     })).rejects.toThrow(/trusted GitHub App 12345/i);
   });
 
+  it("rejects a neutral-derived non-authorizing witness even when identity otherwise matches", async () => {
+    const { provider } = providerFor({
+      signalFactory: (name, evidenceFingerprint) => [{
+        id: "check-neutral",
+        name,
+        status: "unknown",
+        commitSha: HEAD,
+        provider: "github",
+        evidenceFingerprint,
+        issuer: { kind: "app", id: TRUSTED_APP_ID, name: "fcr-review" },
+      }],
+    });
+
+    await expect(publishDeterministicReviewWitness({
+      provider,
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    })).rejects.toThrow(/witness readback is missing/i);
+  });
+
   it("rejects a same-name trusted-App witness with a different full review fingerprint", async () => {
     const { provider } = providerFor({
       signalFactory: (name, evidenceFingerprint) => [{
