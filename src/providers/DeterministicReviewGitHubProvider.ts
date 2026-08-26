@@ -1,6 +1,10 @@
 import { SecurityPreservingGitHubProvider } from "./SecurityPreservingGitHubProvider.js";
 import type { GitHubProviderConfig } from "./GitHubProvider.js";
-import type { DeterministicReviewWitnessPublication } from "./RepositoryProvider.js";
+import type {
+  DeterministicReviewWitnessPublication,
+  VerificationSignal,
+  VerificationSignalStatus,
+} from "./RepositoryProvider.js";
 
 const FCR_REPOSITORY = "jussray/founder-control-room";
 const REVIEWER_ID = "fcr-deterministic-review-v1";
@@ -12,6 +16,42 @@ const MAX_SUMMARY_LENGTH = 65_535;
 export interface DeterministicReviewGitHubProviderDependencies {
   /** Explicit test transport. Supplying this is the only way a custom API base may exercise witness publication. */
   fetchFn?: typeof fetch;
+}
+
+interface CheckRunReadback {
+  id?: number | string;
+  name?: string;
+  status?: string;
+  conclusion?: string | null;
+  head_sha?: string;
+  external_id?: string | null;
+  app?: { id?: number | string | null; slug?: string | null } | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  details_url?: string | null;
+}
+
+function mapCheckStatus(status: string, conclusion: string | null): VerificationSignalStatus {
+  if (status === "queued" || status === "requested" || status === "waiting") return "queued";
+  if (status === "in_progress" || status === "pending") return "running";
+  if (status !== "completed") return "unknown";
+  switch (conclusion) {
+    case "success":
+    case "neutral":
+      return "passed";
+    case "skipped":
+      return "skipped";
+    case "cancelled":
+    case "stale":
+      return "cancelled";
+    case "failure":
+    case "timed_out":
+    case "action_required":
+    case "startup_failure":
+      return "failed";
+    default:
+      return "unknown";
+  }
 }
 
 /**
@@ -53,6 +93,57 @@ export class DeterministicReviewGitHubProvider extends SecurityPreservingGitHubP
     return { owner, repo };
   }
 
+  private reviewHeaders(): Record<string, string> {
+    return {
+      authorization: `Bearer ${this.reviewToken}`,
+      accept: "application/vnd.github+json",
+      "content-type": "application/json",
+      "x-github-api-version": "2022-11-28",
+    };
+  }
+
+  override async listVerificationSignals(projectId: string, ref: string): Promise<VerificationSignal[]> {
+    const { owner, repo } = this.locateReviewRepository(projectId);
+    const requestedRef = ref.trim();
+    if (!requestedRef) {
+      throw new Error("DeterministicReviewGitHubProvider: verification-signal ref is required");
+    }
+
+    const response = await this.reviewFetch(
+      `${this.reviewApiBaseUrl}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits/${encodeURIComponent(requestedRef)}/check-runs?per_page=100&filter=latest`,
+      { method: "GET", headers: this.reviewHeaders() },
+    );
+    if (!response.ok) {
+      const detail = (await response.text()).slice(0, 4_096).trim();
+      throw new Error(
+        `DeterministicReviewGitHubProvider: GitHub Check Run readback failed with ${response.status}${detail ? `: ${detail}` : ""}`,
+      );
+    }
+
+    const payload = await response.json() as { check_runs?: CheckRunReadback[] };
+    const runs = Array.isArray(payload.check_runs) ? payload.check_runs : [];
+    return runs.map((run) => ({
+      id: String(run.id ?? ""),
+      name: String(run.name ?? ""),
+      status: mapCheckStatus(String(run.status ?? ""), run.conclusion ?? null),
+      commitSha: String(run.head_sha ?? ""),
+      provider: this.name,
+      evidenceFingerprint: typeof run.external_id === "string" && run.external_id.trim()
+        ? run.external_id.trim().toLowerCase()
+        : undefined,
+      issuer: run.app?.id != null
+        ? {
+            kind: "app" as const,
+            id: String(run.app.id),
+            name: run.app.slug ?? undefined,
+          }
+        : undefined,
+      startedAt: run.started_at ?? undefined,
+      completedAt: run.completed_at ?? undefined,
+      detailsUrl: run.details_url ?? undefined,
+    }));
+  }
+
   async publishDeterministicReviewWitness(
     projectId: string,
     publication: DeterministicReviewWitnessPublication,
@@ -89,12 +180,7 @@ export class DeterministicReviewGitHubProvider extends SecurityPreservingGitHubP
       `${this.reviewApiBaseUrl}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/check-runs`,
       {
         method: "POST",
-        headers: {
-          authorization: `Bearer ${this.reviewToken}`,
-          accept: "application/vnd.github+json",
-          "content-type": "application/json",
-          "x-github-api-version": "2022-11-28",
-        },
+        headers: this.reviewHeaders(),
         body: JSON.stringify({
           name: expectedName,
           head_sha: headSha,
