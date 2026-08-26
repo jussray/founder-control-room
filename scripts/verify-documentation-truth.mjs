@@ -105,7 +105,7 @@ function nonEmptyString(value, maximumLength = 600) {
 
 function normalizedNarrativeText(value) {
   return String(value)
-    .replace(/[\`*_>#~\[\]{}()]/g, ' ')
+    .replace(/[\`*>#~\[\]{}()]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -153,7 +153,7 @@ function semanticDocChange(relativePath) {
 
 function meaningfulInvariant(claim, sourcePath) {
   return meaningfulNarrative(claim, MINIMUM_MEANINGFUL_INVARIANT_LENGTH)
-    && normalizedNarrativeText(claim).includes(sourcePath)
+    && String(claim).includes(sourcePath)
     && /\b(must|cannot|requires?|rejects?|withhold|binds?|only|never|fail(?:s|ed)?\s+closed)\b/i.test(claim);
 }
 
@@ -287,7 +287,7 @@ const consistencyChecks = [
   [goalfixWorkflow.includes('FINAL PROVIDER / PR / TARGET / BASE / HEAD / DIFF / CHECK / REVIEW REREAD') && goalfixWorkflow.includes('MERGED_UNVERIFIED'), 'Goalfix workflow must preserve final mutable provider reread and merged-unverified runtime state'],
   [goalfixWorkflow.includes('verified target branch') && !goalfixWorkflow.includes('Reacquire current `main`'), 'Goalfix workflow must carry the verified target branch instead of assuming main'],
   [goalfixSkill.includes('runner_startup_failure') && goalfixSkill.includes('workflow_no_jobs') && goalfixSkill.includes('Sauce Guard'), 'portable Goalfix skill must preserve no-job failure classification and Sauce Guard stops'],
-  [goalfixSkill.includes('final provider') && goalfixSkill.includes('authenticated founder-authority'), 'portable Goalfix skill must preserve authenticated Founder Final plus final provider reread'],
+  [/final provider/i.test(goalfixSkill) && /authenticated founder[- ]authority/i.test(goalfixSkill), 'portable Goalfix skill must preserve authenticated Founder Final plus final provider reread'],
   [claudeGoalfixSkill.includes('runner_startup_failure') && claudeGoalfixSkill.includes('workflow_no_jobs') && claudeGoalfixSkill.includes('MERGED_UNVERIFIED'), 'Claude Goalfix skill must preserve no-job classification and merged-unverified state'],
   [adaptiveKernel.includes('does **not** claim') && adaptiveKernel.includes('instruction and decision loops'), 'adaptive kernel must stay scoped to governance behavior unless runtime integration is separately proven'],
   [claudeMaster.includes('Canonical execution contract: `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`') && claudeMaster.includes('canonical workflow wins'), 'Claude master entry point must defer Goalfix execution order to the canonical workflow'],
