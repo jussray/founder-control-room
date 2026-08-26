@@ -22,8 +22,11 @@ const TRUST_ROOT_PATHS = new Set([
   "src/review/deterministicReviewWitnessPublisher.ts",
   "src/review/independentReviewGate.ts",
   "src/http/routes/approvals.ts",
+  "src/providers/DeterministicReviewGitHubProvider.ts",
   "src/providers/RepositoryProvider.ts",
   "src/providers/GitHubProvider.ts",
+  "src/providers/SecurityPreservingGitHubProvider.ts",
+  "src/providers/githubAppAuth.ts",
   "src/providers/providerFactory.ts",
 ]);
 
