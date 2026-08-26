@@ -114,10 +114,13 @@ if (failures.length) {
   process.exit(1);
 }
 
-const headSha = process.env.GITHUB_SHA?.trim() || null;
+const expectedSha = process.env.EXPECTED_SHA?.trim() || null;
+const githubSha = process.env.GITHUB_SHA?.trim() || null;
+const headSha = expectedSha || githubSha;
+const receiptShaSource = expectedSha ? 'EXPECTED_SHA' : githubSha ? 'GITHUB_SHA' : 'none';
 if (process.env.GITHUB_ACTIONS === 'true' && !FULL_SHA.test(headSha ?? '')) {
   console.error('ATTACK-20 V3 source verification failed:');
-  console.error('- GITHUB_SHA must be an exact 40-character commit SHA in CI');
+  console.error('- EXPECTED_SHA or GITHUB_SHA must provide an exact 40-character commit SHA in CI');
   process.exit(1);
 }
 
@@ -127,6 +130,7 @@ writeFileSync('artifacts/attack-20-v3-source-proof.json', `${JSON.stringify({
   suiteVersion: policy.suiteVersion,
   repository: registry.repository,
   headSha,
+  receiptShaSource,
   lineage: policy.lineage,
   workerCount: registry.workers.length,
   workers: registry.workers.map((worker) => ({
