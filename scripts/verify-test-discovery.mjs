@@ -2,25 +2,22 @@
 /**
  * Test discovery ratchet.
  *
- * The default Vitest configuration runs only
- * src/(glob)/__tests__/(glob)/.test.ts. Candidate test files outside that exact
- * pattern are excluded from the default npm test gate. They can still be run
- * by a dedicated workflow, so this verifier never calls them "never run in
- * CI" without an exact workflow receipt.
- *
- * The recorded debt is base-bound: a pull request may remove entries by
- * making a candidate discoverable or deleting it, but it cannot add a newly
- * excluded test to its own baseline.
+ * This verifier treats the active Vitest test.include contract as a static,
+ * fail-closed source of discovery semantics and treats the baseline only as
+ * base-bound historical debt. A candidate may pay debt down, but it may not
+ * grow the allowlist or hide tests by changing include/exclude semantics.
  */
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { posix } from 'node:path';
+import { Script } from 'node:vm';
 
 const BASELINE_PATH = 'scripts/test-discovery-baseline.json';
 const VITEST_CONFIG_PATH = 'vitest.config.ts';
-const DEFAULT_INCLUDE_PATTERN = 'src/**/__tests__/**/*.test.ts';
+const CURRENT_INCLUDE_PATTERN = 'src/**/*.test.{ts,js}';
+const LEGACY_BASE_INCLUDE_PATTERN = 'src/**/*.test.ts';
 const CANDIDATE_TEST_FILE = /\.(?:test|spec)\.(?:[cm]?[jt]sx?)$/i;
 
 function fail(messages) {
@@ -51,77 +48,127 @@ async function collectTestFiles(dir) {
   return found;
 }
 
-function isDefaultVitestTest(file, includePattern) {
-  if (includePattern !== DEFAULT_INCLUDE_PATTERN) {
+function parseBaseline(text, source, { allowedIncludePatterns = [CURRENT_INCLUDE_PATTERN] } = {}) {
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    fail([`${source} is not valid JSON`, error instanceof Error ? error.message : String(error)]);
+  }
+
+  if (!allowedIncludePatterns.includes(parsed.includePattern)) {
     fail([
-      `unsupported Vitest include pattern '${includePattern}'. Update this verifier and ${BASELINE_PATH} together.`,
+      `${source} must record an approved includePattern (${allowedIncludePatterns.map((pattern) => `'${pattern}'`).join(' or ')})`,
     ]);
   }
-  return file.startsWith('src/')
-    && file.split('/').includes('__tests__')
-    && file.endsWith('.test.ts');
+  if (!Array.isArray(parsed.undiscovered)) {
+    fail([`${source} must contain an undiscovered array`]);
+  }
+  if (new Set(parsed.undiscovered).size !== parsed.undiscovered.length) {
+    fail([`${source} must not contain duplicate entries`]);
+  }
+  if (parsed.undiscovered.some((file) => typeof file !== 'string' || !CANDIDATE_TEST_FILE.test(file))) {
+    fail([`${source} contains a path that is not a supported test-file suffix`]);
+  }
+  return parsed;
 }
 
-function baseUndiscoveredTests(baseRef, includePattern) {
+function readEffectiveTestConfig() {
+  const source = readFileSync(VITEST_CONFIG_PATH, 'utf8');
+  const importPattern = /^\s*import\s+\{\s*defineConfig\s*\}\s+from\s+['"]vitest\/config['"]\s*;\s*/;
+  const importMatch = source.match(importPattern);
+  if (!importMatch) {
+    fail([`${VITEST_CONFIG_PATH} must start with the canonical defineConfig import`]);
+  }
+
+  const remainder = source.slice(importMatch[0].length).trim();
+  const prefix = 'export default defineConfig(';
+  if (!remainder.startsWith(prefix) || !remainder.endsWith(');')) {
+    fail([`${VITEST_CONFIG_PATH} must export one static defineConfig(...) expression`]);
+  }
+
+  const expression = remainder.slice(prefix.length, -2);
+  const context = Object.create(null);
   try {
-    return execFileSync('git', ['ls-tree', '-r', '--name-only', baseRef, '--', 'src'], {
-      encoding: 'utf8',
-    })
-      .split('\n')
-      .filter(Boolean)
-      .filter((file) => CANDIDATE_TEST_FILE.test(file))
-      .filter((file) => !isDefaultVitestTest(file, includePattern));
+    new Script(`globalThis.__vitestConfig = (${expression});`, {
+      filename: VITEST_CONFIG_PATH,
+    }).runInNewContext(context, { timeout: 1000 });
   } catch (error) {
     fail([
-      `could not read base test inventory at ${baseRef}; CI must fetch and retain TEST_DISCOVERY_BASE_SHA`,
+      `${VITEST_CONFIG_PATH} could not be evaluated as a static configuration`,
+      error instanceof Error ? error.message : String(error),
+    ]);
+  }
+
+  const testConfig = context.__vitestConfig?.test;
+  if (!testConfig || typeof testConfig !== 'object' || Array.isArray(testConfig)) {
+    fail([`${VITEST_CONFIG_PATH} must define a static test object`]);
+  }
+
+  const include = testConfig.include;
+  if (!Array.isArray(include) || include.length !== 1 || include[0] !== CURRENT_INCLUDE_PATTERN) {
+    fail([`${VITEST_CONFIG_PATH} test.include must be exactly ['${CURRENT_INCLUDE_PATTERN}']`]);
+  }
+
+  if ('exclude' in testConfig) {
+    const exclude = testConfig.exclude;
+    if (!Array.isArray(exclude) || exclude.length !== 0) {
+      fail([`${VITEST_CONFIG_PATH} test.exclude may not hide files from the discovery contract`]);
+    }
+  }
+
+  return testConfig;
+}
+
+function isDefaultVitestTest(file) {
+  return file.startsWith('src/')
+    && (file.endsWith('.test.ts') || file.endsWith('.test.js'));
+}
+
+function readBaseBaseline(baseRef) {
+  try {
+    const text = execFileSync('git', ['show', `${baseRef}:${BASELINE_PATH}`], {
+      encoding: 'utf8',
+    });
+    return parseBaseline(text, `${BASELINE_PATH} at base ${baseRef}`, {
+      // The only approved bootstrap transition is the repository's existing
+      // TypeScript-only contract to the canonical TypeScript + JavaScript one.
+      // Candidate state itself is still required to use CURRENT_INCLUDE_PATTERN.
+      allowedIncludePatterns: [CURRENT_INCLUDE_PATTERN, LEGACY_BASE_INCLUDE_PATTERN],
+    });
+  } catch (error) {
+    fail([
+      `could not read base discovery baseline at ${baseRef}; CI must fetch and retain TEST_DISCOVERY_BASE_SHA`,
       error instanceof Error ? error.message : String(error),
     ]);
   }
 }
 
-if (!existsSync(BASELINE_PATH)) {
-  fail([`missing baseline file ${BASELINE_PATH}`]);
-}
+if (!existsSync(BASELINE_PATH)) fail([`missing baseline file ${BASELINE_PATH}`]);
+if (!existsSync(VITEST_CONFIG_PATH)) fail([`missing Vitest config ${VITEST_CONFIG_PATH}`]);
 
-const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
-const baselineEntries = baseline.undiscovered;
-if (!Array.isArray(baselineEntries)) {
-  fail([`${BASELINE_PATH} must contain an undiscovered array`]);
-}
-if (new Set(baselineEntries).size !== baselineEntries.length) {
-  fail([`${BASELINE_PATH} must not contain duplicate entries`]);
-}
-if (baselineEntries.some((file) => typeof file !== 'string' || !CANDIDATE_TEST_FILE.test(file))) {
-  fail([`${BASELINE_PATH} contains a path that is not a supported test-file suffix`]);
-}
-
-const includePattern = baseline.includePattern;
-const vitestConfig = readFileSync(VITEST_CONFIG_PATH, 'utf8');
-if (typeof includePattern !== 'string' || !vitestConfig.includes(includePattern)) {
-  fail([
-    `${VITEST_CONFIG_PATH} no longer contains the recorded include pattern. Update ${BASELINE_PATH} and this verifier together.`,
-  ]);
-}
-
+readEffectiveTestConfig();
+const baseline = parseBaseline(readFileSync(BASELINE_PATH, 'utf8'), BASELINE_PATH);
 const allTests = (await collectTestFiles('src')).sort();
-const undiscovered = allTests.filter((file) => !isDefaultVitestTest(file, includePattern));
-const recorded = new Set(baselineEntries);
+const undiscovered = allTests.filter((file) => !isDefaultVitestTest(file));
+const recorded = new Set(baseline.undiscovered);
 const failures = [];
 const baseRef = process.env.TEST_DISCOVERY_BASE_SHA?.trim();
 
 if (baseRef && !/^0+$/.test(baseRef)) {
-  const baseUndiscovered = new Set(baseUndiscoveredTests(baseRef, includePattern));
-  const introducedBaselineEntries = baselineEntries.filter((file) => !baseUndiscovered.has(file));
+  const baseBaseline = readBaseBaseline(baseRef);
+  const baseRecorded = new Set(baseBaseline.undiscovered);
+  const introducedBaselineEntries = baseline.undiscovered.filter((file) => !baseRecorded.has(file));
   if (introducedBaselineEntries.length > 0) {
     failures.push(
-      `baseline records test files absent from the base's default-discovery debt: ${introducedBaselineEntries.join(', ')}`,
+      `baseline records test files absent from the base's recorded discovery debt: ${introducedBaselineEntries.join(', ')}`,
     );
   }
 } else {
   console.log('Base debt comparison skipped locally; CI must set TEST_DISCOVERY_BASE_SHA.');
 }
 
-const stale = baselineEntries.filter((file) => !undiscovered.includes(file)).sort();
+const stale = baseline.undiscovered.filter((file) => !undiscovered.includes(file)).sort();
 if (stale.length > 0) {
   failures.push(
     `baseline still lists tests no longer excluded from default discovery: ${stale.join(', ')}. Remove paid-down entries from ${BASELINE_PATH}.`,
@@ -131,7 +178,7 @@ if (stale.length > 0) {
 const added = undiscovered.filter((file) => !recorded.has(file));
 if (added.length > 0) {
   failures.push(
-    `new tests are excluded from default npm test discovery: ${added.join(', ')}. Move them into a matching __tests__/*.test.ts path or record pre-existing base debt only.`,
+    `new tests are excluded from default npm test discovery: ${added.join(', ')}. Rename or move them into the approved .test.ts/.test.js contract, or repair the discovery contract in a separately reviewed change.`,
   );
 }
 
