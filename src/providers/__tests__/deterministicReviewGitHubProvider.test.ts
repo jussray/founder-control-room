@@ -69,7 +69,10 @@ describe("DeterministicReviewGitHubProvider", () => {
   });
 
   it("carries GitHub Check Run external_id into the full evidence fingerprint", async () => {
-    const fetchFn = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchFn = vi.fn(async (
+      _input: Parameters<typeof fetch>[0],
+      init?: Parameters<typeof fetch>[1],
+    ) => {
       expect(init?.method).toBe("GET");
       return new Response(JSON.stringify({
         check_runs: [{
