@@ -27,7 +27,11 @@ export async function auditGitHubPullRequest(
     reader.listChecks(initialPullRequest.headSha),
     reader.listWorkflowRuns(initialPullRequest.headSha),
     reader.listReviews(input.pullNumber),
-    reader.listChangedFiles(initialPullRequest.baseSha, initialPullRequest.headSha),
+    reader.listChangedFiles(
+      initialPullRequest.baseSha,
+      initialPullRequest.headSha,
+      initialPullRequest.changedFiles,
+    ),
   ]);
   const finalPullRequest = await reader.getPullRequest(input.pullNumber);
 
@@ -35,10 +39,16 @@ export async function auditGitHubPullRequest(
     repository: input.repository,
     initialPullRequest,
     finalPullRequest,
-    checks,
-    workflows,
-    reviews,
-    changedFiles,
+    checks: checks.items,
+    workflows: workflows.items,
+    reviews: reviews.items,
+    changedFiles: changedFiles.items,
+    evidenceCoverage: {
+      checksComplete: checks.complete,
+      workflowsComplete: workflows.complete,
+      reviewsComplete: reviews.complete,
+      changedFilesComplete: changedFiles.complete,
+    },
     ...(input.expectedHeadSha ? { expectedHeadSha: input.expectedHeadSha } : {}),
     checkedAt: now().toISOString(),
   });
