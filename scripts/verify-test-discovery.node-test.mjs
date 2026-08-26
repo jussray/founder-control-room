@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const script = fileURLToPath(new URL('./verify-test-discovery.mjs', import.meta.url));
+const INCLUDE = 'src/**/*.test.{ts,js}';
 
 function run(command, args, cwd) {
   return execFileSync(command, args, { cwd, encoding: 'utf8' }).trim();
@@ -18,31 +19,32 @@ function write(root, path, content) {
   writeFileSync(target, content, 'utf8');
 }
 
-function makeRepo(t) {
+function config({ include = INCLUDE, exclude } = {}) {
+  const excludeLine = exclude === undefined ? '' : `, exclude: ${JSON.stringify(exclude)}`;
+  return `import { defineConfig } from 'vitest/config';\n\nexport default defineConfig({ test: { include: ['${include}']${excludeLine} } });\n`;
+}
+
+function baseline(undiscovered = []) {
+  return JSON.stringify({ includePattern: INCLUDE, undiscovered }, null, 2) + '\n';
+}
+
+function makeRepo(t, { baseHidden = [] } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'fcr-test-discovery-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   run('git', ['init', '-q'], root);
   run('git', ['config', 'user.email', 'test@example.com'], root);
   run('git', ['config', 'user.name', 'Test'], root);
 
-  write(root, 'vitest.config.ts', "export default { test: { include: ['src/**/__tests__/**/*.test.ts'] } };\n");
+  write(root, 'vitest.config.ts', config());
   write(root, 'scripts/verify-test-discovery.mjs', readFileSync(script, 'utf8'));
-  write(root, 'src/visible/__tests__/visible.test.ts', 'export {};\n');
-  write(root, 'src/legacy.test.ts', 'export {};\n');
-  write(root, 'src/lib/__tests__/legacyConsole.test.js', 'export {};\n');
+  write(root, 'scripts/test-discovery-baseline.json', baseline(baseHidden));
+  write(root, 'src/visible/visible.test.ts', 'export {};\n');
+  write(root, 'src/lib/__tests__/visibleConsole.test.js', 'export {};\n');
+  for (const path of baseHidden) write(root, path, 'export {};\n');
+
   run('git', ['add', '.'], root);
   run('git', ['commit', '-qm', 'base'], root);
   const baseSha = run('git', ['rev-parse', 'HEAD'], root);
-
-  write(root, 'scripts/test-discovery-baseline.json', JSON.stringify({
-    includePattern: 'src/**/__tests__/**/*.test.ts',
-    undiscovered: [
-      'src/legacy.test.ts',
-      'src/lib/__tests__/legacyConsole.test.js',
-    ],
-  }, null, 2));
-  run('git', ['add', '.'], root);
-  run('git', ['commit', '-qm', 'candidate'], root);
   return { root, baseSha };
 }
 
@@ -54,52 +56,73 @@ function verify(root, baseSha) {
   });
 }
 
-test('permits the initial base-derived baseline, including a hidden JavaScript suite', (t) => {
+test('accepts the canonical TypeScript and JavaScript discovery contract', (t) => {
   const { root, baseSha } = makeRepo(t);
   const result = verify(root, baseSha);
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Candidate test files under src\/: 3/);
-  assert.match(result.stdout, /excluded from default npm test discovery: 2/);
+  assert.match(result.stdout, /Candidate test files under src\/: 2/);
+  assert.match(result.stdout, /matched by default npm test discovery: 2/);
+  assert.match(result.stdout, /excluded from default npm test discovery: 0/);
 });
 
-test('rejects a hidden test appended to the candidate baseline', (t) => {
+test('rejects candidate baseline laundering for newly hidden tests', (t) => {
   const { root, baseSha } = makeRepo(t);
-  write(root, 'src/newHidden.test.ts', 'export {};\n');
-  write(root, 'scripts/test-discovery-baseline.json', JSON.stringify({
-    includePattern: 'src/**/__tests__/**/*.test.ts',
-    undiscovered: [
-      'src/legacy.test.ts',
-      'src/lib/__tests__/legacyConsole.test.js',
-      'src/newHidden.test.ts',
-    ],
-  }, null, 2));
+  write(root, 'src/newHidden.spec.ts', 'export {};\n');
+  write(root, 'scripts/test-discovery-baseline.json', baseline(['src/newHidden.spec.ts']));
 
   const result = verify(root, baseSha);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /absent from the base's default-discovery debt/);
-  assert.match(result.stderr, /src\/newHidden\.test\.ts/);
+  assert.match(result.stderr, /absent from the base's recorded discovery debt/);
+  assert.match(result.stderr, /src\/newHidden\.spec\.ts/);
 });
 
-test('rejects a stale baseline entry after a hidden test is paid down', (t) => {
+test('rejects an unrecorded test outside the approved discovery contract', (t) => {
   const { root, baseSha } = makeRepo(t);
-  write(root, 'src/legacy.test.ts', 'export {};\n');
-  rmSync(join(root, 'src/legacy.test.ts'));
-
-  const result = verify(root, baseSha);
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /no longer excluded from default discovery/);
-  assert.match(result.stderr, /src\/legacy\.test\.ts/);
-});
-
-test('detects an unrecorded JavaScript test excluded by the default TypeScript-only include', (t) => {
-  const { root, baseSha } = makeRepo(t);
-  write(root, 'scripts/test-discovery-baseline.json', JSON.stringify({
-    includePattern: 'src/**/__tests__/**/*.test.ts',
-    undiscovered: ['src/legacy.test.ts'],
-  }, null, 2));
+  write(root, 'src/newHidden.spec.ts', 'export {};\n');
 
   const result = verify(root, baseSha);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /new tests are excluded from default npm test discovery/);
-  assert.match(result.stderr, /src\/lib\/__tests__\/legacyConsole\.test\.js/);
+  assert.match(result.stderr, /src\/newHidden\.spec\.ts/);
+});
+
+test('rejects stale debt after a hidden test is paid down', (t) => {
+  const { root, baseSha } = makeRepo(t, { baseHidden: ['src/legacy.spec.ts'] });
+  renameSync(join(root, 'src/legacy.spec.ts'), join(root, 'src/legacy.test.ts'));
+
+  const result = verify(root, baseSha);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /no longer excluded from default discovery/);
+  assert.match(result.stderr, /src\/legacy\.spec\.ts/);
+});
+
+test('rejects a regression to a narrower include pattern', (t) => {
+  const { root, baseSha } = makeRepo(t);
+  write(root, 'vitest.config.ts', config({ include: 'src/**/*.test.ts' }));
+
+  const result = verify(root, baseSha);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /test\.include must be exactly/);
+});
+
+test('rejects a comment-spoofed canonical pattern when the effective include is narrower', (t) => {
+  const { root, baseSha } = makeRepo(t);
+  write(
+    root,
+    'vitest.config.ts',
+    `import { defineConfig } from 'vitest/config';\n\n// ${INCLUDE}\nexport default defineConfig({ test: { include: ['src/**/*.test.ts'] } });\n`,
+  );
+
+  const result = verify(root, baseSha);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /test\.include must be exactly/);
+});
+
+test('rejects discovery-affecting test.exclude entries', (t) => {
+  const { root, baseSha } = makeRepo(t);
+  write(root, 'vitest.config.ts', config({ exclude: ['src/visible/visible.test.ts'] }));
+
+  const result = verify(root, baseSha);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /test\.exclude may not hide files/);
 });
