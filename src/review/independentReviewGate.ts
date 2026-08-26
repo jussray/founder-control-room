@@ -120,8 +120,6 @@ export function independentReviewPolicyHash(policy: IndependentReviewPolicy): st
     policy?.blockOnP2 === true,
     trustedReviewerIds,
   ];
-  // Preserve legacy policy hashes. Founder-final is an explicit new authority
-  // mode and therefore gets a distinct policy identity.
   if (policy?.founderFinalApprovalRequired === true) seed.push("founder-final");
   return hash("sha256", JSON.stringify(seed), "hex");
 }
@@ -160,8 +158,6 @@ function fcrServerPolicyBlockers(
     return blockers;
   }
 
-  // Compatibility path for already-approved missions that were pinned under
-  // the earlier trusted-human semantic-review policy.
   const serverPolicy = fcrServerOwnedSemanticPolicy(env);
   if (!serverPolicy) {
     return [`FCR legacy semantic-review mode requires valid server-owned ${FCR_TRUSTED_REVIEWERS_ENV} configuration`];
@@ -174,10 +170,6 @@ function fcrServerPolicyBlockers(
 
 export function independentReviewDiffHash(diff: Diff): string {
   const files = Array.isArray(diff?.files) ? [...diff.files] : [];
-  // GitHub's compare endpoint exposes at most 300 changed files. Seeing 300
-  // therefore cannot prove whether the comparison is complete. FCR prefers a
-  // false negative over reviewing a silently truncated file set; split the PR
-  // or use a future provider primitive that attests the full changed-file set.
   if (files.length > MAX_COMPLETE_COMPARE_FILES) {
     throw new Error(
       `Independent review diff completeness is unproven for ${files.length} files; provider comparisons must contain at most ${MAX_COMPLETE_COMPARE_FILES} files`,
@@ -304,6 +296,7 @@ function isMatchingDeterministicWitness(
     && signal.name === expectedReviewSignalName(review)
     && signal.status === "passed"
     && lower(signal.commitSha) === lower(review.headSha)
+    && lower(signal.evidenceFingerprint) === lower(review.reviewHash)
     && (expectedIssuerId === undefined
       || (signal.issuer?.kind === "app" && signal.issuer.id === expectedIssuerId));
 }
