@@ -3,6 +3,7 @@ import type {
   GitHubPrCheckObservation,
   GitHubPrChangedFile,
   GitHubPrCiConclusion,
+  GitHubPrCommitStatusObservation,
   GitHubPrEvidenceCoverage,
   GitHubPrEvidenceRef,
   GitHubPrFinding,
@@ -16,6 +17,7 @@ export interface EvaluateGitHubPrAuditInput {
   initialPullRequest: GitHubPrObservation;
   finalPullRequest: GitHubPrObservation;
   checks: GitHubPrCheckObservation[];
+  commitStatuses: GitHubPrCommitStatusObservation[];
   workflows: GitHubPrWorkflowObservation[];
   reviews: GitHubPrReviewObservation[];
   changedFiles: GitHubPrChangedFile[];
@@ -30,14 +32,16 @@ function normalized(value: string | undefined): string {
 
 function ciConclusion(
   checks: readonly GitHubPrCheckObservation[],
+  commitStatuses: readonly GitHubPrCommitStatusObservation[],
   workflows: readonly GitHubPrWorkflowObservation[],
 ): GitHubPrCiConclusion {
   const items = [
     ...checks.map((item) => ({ status: normalized(item.status), conclusion: normalized(item.conclusion) })),
+    ...commitStatuses.map((item) => ({ status: normalized(item.state), conclusion: normalized(item.state) })),
     ...workflows.map((item) => ({ status: normalized(item.status), conclusion: normalized(item.conclusion) })),
   ];
   if (items.length === 0) return 'unknown';
-  if (items.some((item) => ['failure', 'failed', 'cancelled', 'timed_out', 'action_required', 'startup_failure'].includes(item.conclusion))) {
+  if (items.some((item) => ['failure', 'failed', 'error', 'cancelled', 'timed_out', 'action_required', 'startup_failure'].includes(item.conclusion))) {
     return 'fail';
   }
   if (items.some((item) => ['queued', 'in_progress', 'requested', 'waiting', 'pending'].includes(item.status))) {
@@ -117,6 +121,13 @@ function evidenceRefs(input: EvaluateGitHubPrAuditInput): GitHubPrEvidenceRef[] 
       subjectSha: check.headSha,
       observedAt,
     })),
+    ...input.commitStatuses.map((status) => ({
+      kind: 'commit_status' as const,
+      source: 'github' as const,
+      sourceUrl: status.detailsUrl,
+      subjectSha: status.headSha,
+      observedAt,
+    })),
     ...input.workflows.map((workflow) => ({
       kind: 'workflow_run' as const,
       source: 'github' as const,
@@ -165,8 +176,9 @@ export function evaluateGitHubPrAuditEvidence(input: EvaluateGitHubPrAuditInput)
   }
 
   const staleChecks = input.checks.filter((check) => normalized(check.headSha) !== initialHead);
+  const staleStatuses = input.commitStatuses.filter((status) => normalized(status.headSha) !== initialHead);
   const staleWorkflows = input.workflows.filter((workflow) => normalized(workflow.headSha) !== initialHead);
-  const ciBoundToHeadSha = staleChecks.length === 0 && staleWorkflows.length === 0;
+  const ciBoundToHeadSha = staleChecks.length === 0 && staleStatuses.length === 0 && staleWorkflows.length === 0;
   if (!ciBoundToHeadSha) {
     findings.push({
       severity: 'blocker',
@@ -186,7 +198,7 @@ export function evaluateGitHubPrAuditEvidence(input: EvaluateGitHubPrAuditInput)
     });
   }
 
-  const ci = ciConclusion(input.checks, input.workflows);
+  const ci = ciConclusion(input.checks, input.commitStatuses, input.workflows);
   if (ci === 'unknown') {
     findings.push({
       severity: 'warning',
