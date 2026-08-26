@@ -12,7 +12,7 @@ Adversarial source tests: [`tools/zapier/test-buffer-attack-ten.cjs`](../../tool
 
 ## Release invariant
 
-A provider `200`, a Buffer schedule, provider acknowledgement, or a caller-assembled JSON object is not publication authority.
+A provider `200`, a Buffer schedule, provider acknowledgement, a synthetically valid event chain, or a caller-assembled JSON object is not publication authority.
 
 The standalone Attack Ten evaluator is intentionally **advisory only**:
 
@@ -22,6 +22,14 @@ evaluatePublicationAttackTen(...)
 
 productionPublicationAllowed(...)
   -> false
+```
+
+The machine-readable Attack Ten contract records the same boundary:
+
+```text
+scope = advisory-evidence-only
+standaloneEvaluatorAuthorizesProduction = false
+requiresAuthoritativeProductionAdapter = true
 ```
 
 That fail-closed boundary remains until a separately integrated production adapter owns the authoritative actions that a pure function cannot prove:
@@ -48,7 +56,7 @@ Current `main` already contains founder-content orchestration primitives that de
 | A7 | Provider acknowledgement is independently read back on LinkedIn | Submission success or a wrong destination becomes provider truth |
 | A8 | Ingress evidence names a server-side cryptographic verifier and durable ledger readback | Signature/dedupe/durability booleans self-certify forged ingress |
 | A9 | Runtime outcome is observed on the exact approved LinkedIn destination | Matching wrong URLs become `VERIFIED_PUBLISHED` |
-| A10 | Failure, expiry, denial, and rollback stay visible and safe | Missing evidence or a red path silently resolves to green |
+| A10 | The hash chain is valid **and each transition is bound to its exact evidence artifact** | A valid state-name chain is reused with unrelated approval, authority, action, readback, or runtime evidence |
 
 ## Canonical evidence state machine
 
@@ -81,7 +89,28 @@ ROLLBACK_PENDING
 ROLLED_BACK
 ```
 
+`INGRESS_INVALID` is intentionally reachable from the live ingress-processing portion of the advisory state machine. A signature or ingress-correlation failure after `ACTION_SUBMITTED`, `PROVIDER_ACKNOWLEDGED`, or `READBACK_CONFIRMED` can therefore remain an explicit red state rather than collapsing into an invalid transition and generic `UNKNOWN`.
+
 The synthetic ledger is append-only and hash-chained. Current state is derived from history. A later event cannot overwrite an earlier event.
+
+### Exact evidence-reference binding
+
+A valid hash chain proves that the event records have not been edited after construction. By itself, it does **not** prove that those events refer to the same evidence evaluated by A1–A9.
+
+For an advisory-green `VERIFIED_PUBLISHED` chain, every transition therefore has a deterministic `evidenceRef` derived from the same exact evidence packet. The refs bind, as applicable, the:
+
+- publication run and content hash;
+- founder approval ID;
+- review-window maturity evidence;
+- authority ID and nonce;
+- provider account and channel;
+- execution action and persisted reservation;
+- provider acknowledgement/action;
+- provider readback post ID and LinkedIn URL;
+- runtime-observed post ID and LinkedIn URL; and
+- final verified run/content/post identity.
+
+A cryptographically valid chain whose `evidenceRef` values are merely non-empty but do not match those exact artifacts fails A10.
 
 ## Controlled synthetic proof
 
@@ -94,22 +123,30 @@ productionAuthority == false
 productionPublicationAllowed(...) == false
 ```
 
+The controlled synthetic run exists to prove the classifier and its negative controls. It is **not** a production-authority source.
+
 This distinction is load-bearing. Synthetic evidence can test the classifier; it cannot create approval, consume authority, reserve an execution, verify a real signature, perform provider readback, or observe public runtime state.
 
 Negative controls include:
 
 1. non-authoritative founder-approval evidence is rejected;
 2. premature execution is denied;
-3. expired or unconsumed authority is rejected;
-4. action/run authority consumption mismatch is rejected;
-5. mismatched content hash is rejected;
-6. arbitrary caller-chosen idempotency keys are rejected;
-7. missing persisted-reservation evidence is rejected;
-8. cross-run ingress substitution is rejected;
-9. caller-declared signer trust is rejected;
-10. missing server-verifier/ledger evidence is rejected;
-11. stale replay evidence is rejected; and
-12. correlated but non-LinkedIn runtime URLs are rejected.
+3. expired authority is rejected;
+4. terminal evidence with unconsumed authority is rejected;
+5. action/run authority-consumption mismatch is rejected;
+6. mismatched content hash is rejected;
+7. arbitrary caller-chosen idempotency keys are rejected;
+8. missing persisted-reservation evidence is rejected;
+9. cross-run ingress substitution is rejected;
+10. caller-declared signer trust is rejected;
+11. missing server-verifier or durable-ledger evidence is rejected;
+12. missing ingress signer policy fails closed;
+13. stale replay evidence is rejected;
+14. correlated but non-LinkedIn runtime URLs are rejected;
+15. a valid hash chain with mismatched transition evidence references is rejected; and
+16. an ingress failure after action submission can be retained explicitly as `INGRESS_INVALID`.
+
+The production wrapper is also regression-tested against a caller-supplied historical evaluation clock. Because `productionPublicationAllowed()` ignores caller input and remains false by construction, a forged test clock cannot turn stale evidence into production authority.
 
 ## Evidence required from a future authoritative adapter
 
@@ -130,6 +167,7 @@ trusted signer policy identity
 durable ingress ledger readback
 provider-native LinkedIn post readback
 public LinkedIn runtime observation
+exact per-transition evidence-reference bindings
 hash-chained publication events
 ```
 
@@ -142,6 +180,8 @@ This branch may prove:
 - deterministic Attack Ten advisory evaluation;
 - hash-chain tamper detection;
 - state-transition validation;
+- exact per-transition evidence-reference binding;
+- explicit `INGRESS_INVALID` transition behavior during ingress processing;
 - exact content/run/action correlation;
 - derived advisory idempotency;
 - explicit terminal authority-consumption evidence shape;
