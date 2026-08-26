@@ -186,6 +186,10 @@ The canonical in-app FCR merge path uses **deterministic independent review foll
 
 The deterministic review receipt remains proposal-only and cannot authorize the merge. Founder final approval is the separate human authority layer and must never be described as independent review. New founder-final approvals use a server-owned policy with zero required semantic humans and cannot be weakened by caller-supplied policy.
 
+The deterministic review producer is itself non-authorizing and read-only. It must derive repository, PR, base/head, complete diff, canonical diff/policy hashes, rule-version identity, findings, verdict, and receipt hash from provider/server-owned facts rather than caller claims. It fails closed when those facts move or cannot be proven, and it must not self-certify changes to its own trust root. A producer receipt is not a provider witness.
+
+The provider witness is a separate step: the expected receipt-derived Check Run name must be published against the exact reviewed head by the repository-scoped server-owned GitHub App and read back with an App issuer matching trusted `GITHUB_APP_ID`. Until that publisher/readback path exists and succeeds, a deterministic receipt cannot satisfy the founder-final review gate. Neither the producer nor its witness grants founder-final, merge, deploy, provider-policy, or secret authority.
+
 The older `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` policy is compatibility-only for missions already pinned under the prior non-author semantic-review model. It is not a prerequisite for new canonical founder-final approvals.
 
 This source/runtime membrane does **not** prove the live GitHub repository ruleset independently enforces the same protections. Required approvals, stale-review dismissal, last-push approval, review-thread requirements, strict status freshness, and bypass actor/mode configuration are separate live-provider facts requiring current GitHub readback.

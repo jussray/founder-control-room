@@ -68,6 +68,27 @@ founderFinalApprovalRequired: true
 
 A caller cannot turn deterministic review off, weaken P2 handling, substitute model output for founder authority, redefine the policy, or reuse a founder approval against another PR/base/head. The deterministic review receipt itself remains proposal-only and non-authorizing. The authenticated founder-final receipt supplies the final human authority after the independent proof layer passes.
 
+### Deterministic review producer boundary
+
+The deterministic exact-head review producer is a read-only proof primitive, not merge authority. It must resolve repository and pull-request identity from the repository provider, bind the exact current base/head and complete diff, derive the canonical diff and founder-final policy hashes, execute only explicitly versioned deterministic rules, and emit a `proposalOnly: true`, `mergeAuthorized: false`, `executionAuthorized: false` review receipt.
+
+The producer fails closed when provider identity, base/head freshness, diff completeness, rule evaluation, or required companion truth cannot be established. It must also block self-certification of changes to its own producer trust root. A producer receipt alone is not a provider witness and cannot satisfy the founder-final gate merely because it exists.
+
+Provider witness publication is a separate capability. The canonical gate requires the exact `expectedReviewSignalName(receipt)` to be published against the reviewed head by the repository-scoped server-owned GitHub App and then read back with App issuer identity equal to trusted `GITHUB_APP_ID`. Milestone A does not publish that Check Run, use a GitHub App credential, approve the founder, merge, deploy, or mutate provider state.
+
+The authority sequence therefore remains:
+
+```text
+deterministic producer receipt
+-> trusted provider witness on the same exact head
+-> independent-review gate evaluation
+-> authenticated founder-final approval
+-> final mutable provider readback
+-> merge
+```
+
+No step may silently stand in for another.
+
 ### Legacy pinned semantic-review missions
 
 Missions already approved under the earlier server-owned semantic-review policy may continue to validate that pinned policy for compatibility. In that historical mode, `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` remains the server-owned trusted semantic reviewer set and author self-review still cannot satisfy independent semantic review.
