@@ -1,11 +1,12 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded Evidence Trust Plane, Documentation Truth, repository-provider security-preservation, explicit bypass-intent semantics, and Cloudflare remote-read MCP operator invariants for this candidate without claiming durable receipt persistence, live provider mutation, merge authority, deployment authority, secret installation, or live production truth.",
+  "purpose": "Record the bounded Evidence Trust Plane, Documentation Truth, repository-provider security-preservation, explicit bypass-intent semantics, Cloudflare remote-read MCP operator invariants, and deterministic exact-head review producer boundary for this candidate without claiming durable receipt persistence, provider witness publication, live provider mutation, merge authority, deployment authority, secret installation, or live production truth.",
   "domains": [
     "evidence-authority",
     "truth-governance",
     "repository-provider",
-    "cloudflare-authority"
+    "cloudflare-authority",
+    "merge-authority"
   ],
   "changes": [
     {
@@ -30,6 +31,12 @@
       "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
         "scripts/verify-documentation-truth.mjs: Documentation Truth must classify the Evidence Trust Plane source, founder-facing page, and Playwright authority workflow as evidence-authority truth-sensitive paths so architecture changes cannot false-green with zero truth-sensitive files; changing this verifier remains truth-governance and requires the corresponding current documentation refresh."
+      ]
+    },
+    {
+      "path": "src/review/deterministicReviewProducer.ts",
+      "claims": [
+        "src/review/deterministicReviewProducer.ts: the deterministic review producer must derive repository, PR, base/head, complete diff, founder-final policy identity, versioned machine findings, verdict, and canonical review hash from provider/server-owned inputs; it emits proposal-only non-authorizing receipts, fails closed on moved or incomplete review state, and cannot self-certify changes to its own trust root. This Milestone A source path does not publish the provider Check Run witness, use a GitHub App credential, create founder-final authority, merge, deploy, or mutate provider state."
       ]
     },
     {

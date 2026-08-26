@@ -307,6 +307,10 @@ For pull-request Quality Gate evidence, every job must checkout `github.event.pu
 
 Do not call author approval “independent review.” For canonical FCR merges, independent deterministic review attacks the patch first; the authenticated founder-final receipt supplies the separate final human authority for that exact candidate.
 
+The deterministic review producer is a read-only proposal generator. It must resolve the exact provider PR/base/head and complete diff, bind server-owned policy and versioned rule identity, emit only non-authorizing receipts, fail closed on incomplete or moved evidence, and block self-certification of its own trust root. A producer receipt is not the provider witness.
+
+The trusted witness is separately published against the exact reviewed head by the repository-scoped server-owned GitHub App and must be read back with App issuer identity equal to trusted `GITHUB_APP_ID`. Until that witness exists, the deterministic receipt does not satisfy the founder-final review membrane. Neither receipt nor witness grants founder-final or merge authority.
+
 ## Merge gate
 
 Standing founder intent allows a merge only when all repository merge-authority conditions are satisfied. It does not waive them.
