@@ -105,7 +105,7 @@
       { "id": "A5", "name": "provider_capability_live_policy_gated" },
       { "id": "A6", "name": "execution_idempotent_receipt_correlated" },
       { "id": "A7", "name": "provider_acknowledgement_independently_read_back" },
-      { "id": "A8", "name": "ingress_authenticated_correlated_deduplicated_durable_replay_bounded" },
+      { "id": "A8", "name": "ingress_authenticated_correlated_deduplicated_durable_control_plane_trusted_replay_bounded" },
       { "id": "A9", "name": "runtime_outcome_observed" },
       { "id": "A10", "name": "red_states_and_rollback_visible_safe" }
     ],
@@ -137,7 +137,8 @@
       "replayed_nonce_blocked",
       "mismatched_content_rejected",
       "cross_run_ingress_substitution_rejected",
-      "untrusted_ingress_signer_rejected",
+      "caller_declared_ingress_signer_trust_rejected",
+      "missing_ingress_signer_policy_rejected",
       "stale_ingress_replay_rejected"
     ],
     "redStates": [
@@ -160,7 +161,7 @@
       "requiresAuthenticatedIngress": true,
       "requiresSignatureVerification": true,
       "requiresIngressEvidenceChainCorrelation": true,
-      "requiresTrustedIngressSigner": true,
+      "requiresServerOwnedIngressSignerAllowlist": true,
       "requiresBoundedIngressReplayWindow": true,
       "requiresUnconsumedAuthority": true,
       "requiresLiveProviderCapability": true,
