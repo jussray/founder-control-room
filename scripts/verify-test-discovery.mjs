@@ -2,11 +2,12 @@
 /**
  * Test discovery ratchet.
  *
- * The default Vitest configuration runs only
- * src/(glob)/__tests__/(glob)/.test.ts. Candidate test files outside that exact
- * pattern are excluded from the default npm test gate. They can still be run
- * by a dedicated workflow, so this verifier never calls them "never run in
- * CI" without an exact workflow receipt.
+ * The default Vitest configuration determines which candidate test files are
+ * part of normal `npm test`. This verifier supports the repository's reviewed
+ * historical __tests__-only pattern and the current all-.test.ts pattern.
+ * Candidate files outside the active pattern can still be run by a dedicated
+ * workflow, so this verifier never calls them "never run in CI" without an
+ * exact workflow receipt.
  *
  * The recorded debt is base-bound: a pull request may remove entries by
  * making a candidate discoverable or deleting it, but it cannot add a newly
@@ -20,7 +21,12 @@ import { posix } from 'node:path';
 
 const BASELINE_PATH = 'scripts/test-discovery-baseline.json';
 const VITEST_CONFIG_PATH = 'vitest.config.ts';
-const DEFAULT_INCLUDE_PATTERN = 'src/**/__tests__/**/*.test.ts';
+const LEGACY_INCLUDE_PATTERN = 'src/**/__tests__/**/*.test.ts';
+const CURRENT_INCLUDE_PATTERN = 'src/**/*.test.ts';
+const SUPPORTED_INCLUDE_PATTERNS = new Set([
+  LEGACY_INCLUDE_PATTERN,
+  CURRENT_INCLUDE_PATTERN,
+]);
 const CANDIDATE_TEST_FILE = /\.(?:test|spec)\.(?:[cm]?[jt]sx?)$/i;
 
 function fail(messages) {
@@ -52,14 +58,15 @@ async function collectTestFiles(dir) {
 }
 
 function isDefaultVitestTest(file, includePattern) {
-  if (includePattern !== DEFAULT_INCLUDE_PATTERN) {
+  if (!SUPPORTED_INCLUDE_PATTERNS.has(includePattern)) {
     fail([
       `unsupported Vitest include pattern '${includePattern}'. Update this verifier and ${BASELINE_PATH} together.`,
     ]);
   }
-  return file.startsWith('src/')
-    && file.split('/').includes('__tests__')
-    && file.endsWith('.test.ts');
+
+  if (!file.startsWith('src/') || !file.endsWith('.test.ts')) return false;
+  if (includePattern === CURRENT_INCLUDE_PATTERN) return true;
+  return file.split('/').includes('__tests__');
 }
 
 function baseUndiscoveredTests(baseRef, includePattern) {
@@ -131,7 +138,7 @@ if (stale.length > 0) {
 const added = undiscovered.filter((file) => !recorded.has(file));
 if (added.length > 0) {
   failures.push(
-    `new tests are excluded from default npm test discovery: ${added.join(', ')}. Move them into a matching __tests__/*.test.ts path or record pre-existing base debt only.`,
+    `new tests are excluded from default npm test discovery: ${added.join(', ')}. Move them into the active default include pattern or record pre-existing base debt only.`,
   );
 }
 
