@@ -45,13 +45,15 @@ interface ProviderFixture {
 function providerFor(options: {
   diff?: Diff;
   contexts?: PullRequestReviewContext[];
-  signalFactory?: (name: string) => VerificationSignal[];
+  signalFactory?: (name: string, evidenceFingerprint: string) => VerificationSignal[];
   publicationAvailable?: boolean;
 } = {}): ProviderFixture {
   const contexts = [...(options.contexts ?? [context, context, context])];
   let expectedName = "";
-  const publish = vi.fn(async (_projectId: string, publication: { name: string }) => {
+  let expectedFingerprint = "";
+  const publish = vi.fn(async (_projectId: string, publication: { name: string; reviewHash: string }) => {
     expectedName = publication.name;
+    expectedFingerprint = publication.reviewHash;
   });
 
   const provider = {
@@ -59,12 +61,13 @@ function providerFor(options: {
     getPullRequestReviewContext: async () => contexts.shift() ?? context,
     resolveRef: async (_projectId: string, ref: string) => ref === "main" ? BASE : HEAD,
     compare: async () => options.diff ?? clearDiff,
-    listVerificationSignals: async () => options.signalFactory?.(expectedName) ?? [{
+    listVerificationSignals: async () => options.signalFactory?.(expectedName, expectedFingerprint) ?? [{
       id: "check-1",
       name: expectedName,
       status: "passed",
       commitSha: HEAD,
       provider: "github",
+      evidenceFingerprint: expectedFingerprint,
       issuer: { kind: "app", id: TRUSTED_APP_ID, name: "fcr-review" },
     }],
     getRef: async () => ({ name: HEAD, commitSha: HEAD }),
@@ -99,6 +102,7 @@ describe("deterministic review witness publisher", () => {
     expect(publication.name).toBe(expectedReviewSignalName(result.production.receipt));
     expect(publication.reviewHash).toBe(result.production.receipt.reviewHash);
     expect(publication.summary).toBe(result.production.receipt.summary);
+    expect(result.signal.evidenceFingerprint).toBe(result.production.receipt.reviewHash);
     expect(result.signal.issuer?.id).toBe(TRUSTED_APP_ID);
     expect(result.production.receipt.mergeAuthorized).toBe(false);
     expect(result.production.receipt.executionAuthorized).toBe(false);
@@ -152,12 +156,13 @@ describe("deterministic review witness publisher", () => {
 
   it("rejects a same-name green witness from the wrong App issuer", async () => {
     const { provider } = providerFor({
-      signalFactory: (name) => [{
+      signalFactory: (name, evidenceFingerprint) => [{
         id: "check-wrong-app",
         name,
         status: "passed",
         commitSha: HEAD,
         provider: "github",
+        evidenceFingerprint,
         issuer: { kind: "app", id: "99999", name: "other-app" },
       }],
     });
@@ -169,7 +174,46 @@ describe("deterministic review witness publisher", () => {
     })).rejects.toThrow(/trusted GitHub App 12345/i);
   });
 
-  it("rejects stale or failed provider readback even when the name matches", async () => {
+  it("rejects a same-name trusted-App witness with a different full review fingerprint", async () => {
+    const { provider } = providerFor({
+      signalFactory: (name, evidenceFingerprint) => [{
+        id: "check-collision",
+        name,
+        status: "passed",
+        commitSha: HEAD,
+        provider: "github",
+        evidenceFingerprint: `${evidenceFingerprint.slice(0, 12)}${"f".repeat(52)}`,
+        issuer: { kind: "app", id: TRUSTED_APP_ID, name: "fcr-review" },
+      }],
+    });
+
+    await expect(publishDeterministicReviewWitness({
+      provider,
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    })).rejects.toThrow(/full receipt fingerprint/i);
+  });
+
+  it("rejects a trusted-App witness when full fingerprint readback is missing", async () => {
+    const { provider } = providerFor({
+      signalFactory: (name) => [{
+        id: "check-no-fingerprint",
+        name,
+        status: "passed",
+        commitSha: HEAD,
+        provider: "github",
+        issuer: { kind: "app", id: TRUSTED_APP_ID, name: "fcr-review" },
+      }],
+    });
+
+    await expect(publishDeterministicReviewWitness({
+      provider,
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    })).rejects.toThrow(/full receipt fingerprint/i);
+  });
+
+  it("rejects stale or failed provider readback even when the name and fingerprint match", async () => {
     for (const signal of [
       {
         id: "failed",
@@ -183,10 +227,11 @@ describe("deterministic review witness publisher", () => {
       },
     ]) {
       const { provider } = providerFor({
-        signalFactory: (name) => [{
+        signalFactory: (name, evidenceFingerprint) => [{
           ...signal,
           name,
           provider: "github",
+          evidenceFingerprint,
           issuer: { kind: "app", id: TRUSTED_APP_ID, name: "fcr-review" },
         }],
       });
