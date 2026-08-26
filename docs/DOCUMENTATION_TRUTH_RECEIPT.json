@@ -1,41 +1,49 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded n8n readiness invariant added by this source-only repair; receipt-aware status is repository behavior and must not be presented as proof that a persistent external n8n provider is already live.",
+  "purpose": "Record the bounded Milestone B deterministic GitHub App witness-publication and full provider-fingerprint readback invariants layered on the hardened producer without claiming bootstrap authority, founder-final approval, merge authority, deployment authority, live provider enforcement, secret installation, or runtime trigger activation.",
   "domains": [
-    "repository-provider",
-    "truth-governance",
-    "cloudflare-authority",
-    "publishing"
+    "merge-authority",
+    "repository-provider"
   ],
   "changes": [
     {
-      "path": ".github/workflows/cloudflare-build-diagnostic.yml",
+      "path": "src/review/deterministicReviewProducer.ts",
       "claims": [
-        ".github/workflows/cloudflare-build-diagnostic.yml: the exact-current-main Worker Git authority audit must require the dedicated read-only Workers Builds user token for its primary provider readback; request-trace and DNS-inventory remain optional evidence lanes, and whether they are missing, malformed, or provider-rejected they may retain their own bounded evidence/error but cannot downgrade or upgrade the snapshotted core authority ok/error verdict; absence of a core receipt must never manufacture authority, and the workflow remains read-only and cannot authorize provider mutation."
+        "src/review/deterministicReviewProducer.ts must classify the executable FCR merge-authentication chain as deterministic trust root: founder authentication/session authority, portfolio-switch gating/state resolution, V10 privileged capability validation, V10 decision authority, founder-control decision binding, approvals execution, and the server mount; changes to those paths must produce P1 trust-root-self-modification instead of self-certification.",
+        "src/review/deterministicReviewProducer.ts must cover direct merge-authority decision modules as well as middleware wrappers, including founderSession, switchboard store, capabilityKernel, v10DecisionAuthorityGate, and founderControlDecision, while avoiding a transitive trust-root expansion into generic storage or transport clients.",
+        "src/review/deterministicReviewProducer.ts must treat the specialized proof-gate decision/persistence/classification chain as merge authority because ProofGateController, proof-gate/gate, proof-gate/persist, and proof-gate/types determine whether merge requires explicit founder approval and whether /approvals/:missionId/execute observes a fresh persisted passing proof; changes to those modules must produce P1 trust-root-self-modification.",
+        "src/review/deterministicReviewProducer.ts must treat the deployed Worker entry configuration, Worker cron/handler/reconciler owners, controller base, and every currently reconciler-registered controller as P1 autonomous execution trust root because those surfaces can schedule or dispatch consequential repository work. A new controller cannot become live through the reconciler without changing the protected registry, and the production Worker entry cannot change without modifying the protected Wrangler entry configuration.",
+        "src/review/deterministicReviewProducer.ts must also fail closed with P1 new-provider-integration-sink when a candidate introduces RepositoryProvider.integrate in previously unprotected non-test production source. This is a backstop against inventing a new merge executor outside today's path allowlist; ordinary read-only provider calls such as resolveRef remain non-P1 unless they touch an otherwise protected authority path."
       ]
     },
     {
-      "path": ".github/workflows/n8n-runtime-integration-proof.yml",
+      "path": "src/review/deterministicReviewWitnessPublisher.ts",
       "claims": [
-        ".github/workflows/n8n-runtime-integration-proof.yml: CI-only n8n runtime proof must mask generated bearer and encryption credentials before exporting them to later steps, while keeping the runtime ephemeral and non-production-authorizing."
+        "src/review/deterministicReviewWitnessPublisher.ts may publish only a clear deterministic receipt produced from provider-observed PR/base/head/diff truth through the repository provider's narrow witness capability, must bind pre/post publication PR identity and exact head, and must reject success unless provider readback reports the exact derived signal, the full receipt reviewHash as evidenceFingerprint, and the server-owned numeric GITHUB_APP_ID."
       ]
     },
     {
-      "path": "src/buildEvents/buildEvent.ts",
+      "path": "src/review/independentReviewGate.ts",
       "claims": [
-        "src/http/routes/n8nConveyor.ts: founder-authenticated conveyor readiness must resolve retained activation proof against the deployed exact GIT_SHA and must fail closed instead of claiming live verification when proof is missing, stale, or unreadable."
+        "src/review/independentReviewGate.ts must treat a founder-final deterministic witness as current only when exact head, receipt-derived signal name, passed status, trusted GitHub App issuer, and the provider-backed full evidenceFingerprint all match the exact deterministic review receipt; missing or same-prefix-but-different full fingerprints fail closed."
       ]
     },
     {
-      "path": "wrangler.worker.toml",
+      "path": "src/providers/DeterministicReviewGitHubProvider.ts",
       "claims": [
-        "wrangler.worker.toml: every canonical Worker build must execute the repository build-authority membrane; native Cloudflare Workers Builds may proceed only through non-promoting versions upload while production promotion remains bounded to the exact manual GitHub authority path."
+        "src/providers/DeterministicReviewGitHubProvider.ts must reject a noncanonical runtime GitHub API base during construction before inherited provider PR/ref/compare reads can use the App installation token; custom bases are test-only with an explicit injected transport. It must also preserve success-only Check Run semantics and GitHub external_id as the full evidenceFingerprint on readback."
       ]
     },
     {
-      "path": "src/http/routes/n8nConveyor.ts",
+      "path": "src/providers/RepositoryProvider.ts",
       "claims": [
-        "src/http/routes/n8nConveyor.ts: authenticated conveyor readiness must resolve retained activation proof at request time and may report live only when the persisted activation receipt is bound to the deployed exact GIT_SHA; stale, missing, or unreadable proof must remain non-live, and no credential value may be exposed."
+        "src/providers/RepositoryProvider.ts exposes only a narrow optional deterministic-review witness publication capability rather than ambient generic Check Run authority, carries an optional provider-backed evidenceFingerprint for exact evidence correlation, and requires consumers to fail closed when a load-bearing fingerprint or witness capability is unavailable."
+      ]
+    },
+    {
+      "path": "src/providers/providerFactory.ts",
+      "claims": [
+        "src/providers/providerFactory.ts must expose deterministic review witness publication for Founder Control Room only when GITHUB_APP_ID plus GITHUB_PRIVATE_KEY mint the repository-scoped GitHub App installation token; a local or development GITHUB_TOKEN fallback cannot mint deterministic review evidence, and a partial GitHub App credential pair must fail closed even when a fallback token is present."
       ]
     }
   ]

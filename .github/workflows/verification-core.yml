@@ -1,0 +1,47 @@
+name: Verification Core
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  verification-core:
+    name: Verification Core exact-head proof
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install root toolchain
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck Verification Core
+        run: npm --prefix packages/ultrathink-verification-core run typecheck
+
+      - name: Run Verification Core refusal suite
+        run: npm --prefix packages/ultrathink-verification-core test
+        env:
+          NODE_ENV: test

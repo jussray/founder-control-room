@@ -44,7 +44,7 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
       - name: Focused domain and route tests
-        run: npx vitest run src/quickscan/__tests__/engine.test.ts src/quickscan/__tests__/stripeWebhook.test.ts src/http/routes/__tests__/quickscan.integration.test.ts src/http/webhooks/__tests__/stripeQuickScan.test.ts
+        run: npx vitest run src/quickscan/__tests__/engine.test.ts src/quickscan/__tests__/stripeWebhook.test.ts src/quickscan/__tests__/chiefOpenaiClient.test.ts src/http/routes/__tests__/quickscan.integration.test.ts src/http/webhooks/__tests__/stripeQuickScan.test.ts
       - name: Build Pages assets
         run: npm run build:pages
       - name: Install Chromium

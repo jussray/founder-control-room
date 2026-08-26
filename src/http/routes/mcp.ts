@@ -4,7 +4,10 @@ import { McpHub, advertisedToolNames } from "../../mcp/hub.js";
 import type { McpInvocationRequest } from "../../mcp/types.js";
 import { hubForMcpProject } from "../../mcp/vaultHub.js";
 import { connectionVaultRouter } from "./connectionVault.js";
-import { handleRemoteReadMcp } from "./remoteReadMcp.js";
+import {
+  handlePairedRemoteMcp,
+  handleRemoteReadMcp,
+} from "./remoteReadMcp.js";
 
 export const mcpRouter = Router();
 const registryHub = new McpHub();
@@ -37,9 +40,12 @@ function invocationFromRequest(
   };
 }
 
-// Dedicated remote MCP read lane. Bearer-authenticated API clients pass the
-// global browser CSRF middleware, while this handler applies its own token and
-// exposes no mission/approval or mutation authority.
+// Canonical ChatGPT/Claude connector lane. Supabase OAuth, token-bound project
+// scope, narrow named tools, and evidence persistence all fail closed.
+mcpRouter.post("/", handlePairedRemoteMcp);
+
+// Temporary compatibility lane for existing server-held static-token clients.
+// It exposes the same six narrow tools as /mcp and no generic nested invocation.
 mcpRouter.post("/read", handleRemoteReadMcp);
 
 // Connection Vault is part of the MCP/connection authority surface. Its

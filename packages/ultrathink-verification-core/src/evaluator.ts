@@ -27,21 +27,27 @@ function validTime(value: string | undefined): number | null {
 }
 
 function sortWitnesses(results: readonly WitnessResultV0[]): WitnessResultV0[] {
-  return [...results].sort((a, b) => a.witnessId.localeCompare(b.witnessId));
+  return [...results].sort((a, b) => {
+    const id = a.witnessId.localeCompare(b.witnessId);
+    if (id !== 0) return id;
+    return a.correlationId.localeCompare(b.correlationId);
+  });
 }
 
-function resultFor(requirement: WitnessRequirementV0, results: readonly WitnessResultV0[]): WitnessResultV0 | undefined {
-  return results.find((result) => result.witnessId === requirement.id);
+function resultsFor(requirement: WitnessRequirementV0, results: readonly WitnessResultV0[]): WitnessResultV0[] {
+  return results.filter((result) => result.witnessId === requirement.id);
 }
 
 function classifyRequirement(params: {
   requirement: WitnessRequirementV0;
   result?: WitnessResultV0;
+  duplicate: boolean;
   authority: SourceAuthorityV0;
   policy: WitnessPolicyV0;
   nowMs: number;
 }): { state: MainEvidenceStateV0; reason: MainEvidenceReasonV0 } | null {
-  const { requirement, result, authority, policy, nowMs } = params;
+  const { requirement, result, duplicate, authority, policy, nowMs } = params;
+  if (duplicate) return { state: 'UNKNOWN', reason: 'INVALID_WITNESS_EVIDENCE' };
   if (!result || result.state === 'MISSING') return { state: 'UNKNOWN', reason: 'REQUIRED_WITNESS_MISSING' };
   if (result.state === 'FAIL') return { state: 'BLOCKED', reason: 'WITNESS_FAILED' };
   if (result.state === 'UNRESOLVABLE') return { state: 'BLOCKED', reason: 'WITNESS_UNRESOLVABLE' };
@@ -121,7 +127,13 @@ export function evaluateMainEvidenceV0(input: EvaluateMainEvidenceInputV0): Eval
   let state: MainEvidenceStateV0 = 'VERIFIED';
   let reason: MainEvidenceReasonV0 = 'RECOVERY_COMPLETE';
 
-  if (!authority || authority.kind !== 'source-authority.v0' || authority.branch !== 'main' || !authority.repo || !authority.authoritativeSha || validTime(authority.observedAt) === null) {
+  const requirementIds = input.policy.requiredWitnesses.map((requirement) => requirement.id);
+  const uniqueRequirementIds = new Set(requirementIds);
+
+  if (requirementIds.length !== uniqueRequirementIds.size || requirementIds.some((id) => !id.trim())) {
+    state = 'BLOCKED';
+    reason = 'INVALID_WITNESS_POLICY';
+  } else if (!authority || authority.kind !== 'source-authority.v0' || authority.branch !== 'main' || !authority.repo || !authority.authoritativeSha || validTime(authority.observedAt) === null) {
     state = 'BLOCKED';
     reason = 'SOURCE_AUTHORITY_UNRESOLVED';
   } else if (authority.repo !== input.policy.repo) {
@@ -130,9 +142,17 @@ export function evaluateMainEvidenceV0(input: EvaluateMainEvidenceInputV0): Eval
   } else {
     const sorted = sortWitnesses(input.witnesses);
     for (const requirement of [...input.policy.requiredWitnesses].sort((a, b) => a.id.localeCompare(b.id))) {
-      const result = resultFor(requirement, sorted);
-      if (!result || result.state === 'MISSING') missingWitnessIds.push(requirement.id);
-      const classification = classifyRequirement({ requirement, result, authority, policy: input.policy, nowMs });
+      const matches = resultsFor(requirement, sorted);
+      const result = matches.length === 1 ? matches[0] : undefined;
+      if (matches.length === 0 || result?.state === 'MISSING') missingWitnessIds.push(requirement.id);
+      const classification = classifyRequirement({
+        requirement,
+        result,
+        duplicate: matches.length > 1,
+        authority,
+        policy: input.policy,
+        nowMs,
+      });
       if (classification && precedence[classification.state] > precedence[state]) {
         state = classification.state;
         reason = classification.reason;

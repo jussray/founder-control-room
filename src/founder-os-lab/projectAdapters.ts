@@ -61,7 +61,7 @@ const SEKRET_BIP_AUDITED_CONTRACT_BLOBS = {
   'test/dual-front-door-contract.test.mjs': '1ceb267d7d20136d38fce95f2418fe22b6a1468e',
 } as const;
 const CHIEF_AI_REPOSITORY = 'jussray/chief-ai-machine';
-const CHIEF_AI_AUDITED_HEAD = 'fad147d1fbcc1cafbdf6e4d570a2a565c8335ce0';
+const CHIEF_AI_AUDITED_HEAD = '2fd4fda0cab12e52ab5096e723884d98bcfe7d10';
 const CHIEF_AI_AUDITED_CONTRACT_BLOBS = {
   'src/domain/capability-plan.js': '7b0c2e8d2bbbfce6a0b053134cc79ee3e0a17ec5',
   'src/domain/capability-registry.js': 'abb2daf0ee7ce85442cd4b04588b4881cc4b9b53',

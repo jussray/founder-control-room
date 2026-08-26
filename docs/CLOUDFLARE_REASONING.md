@@ -179,6 +179,14 @@ The workflow intentionally requires its requested SHA to equal current `main` be
 
 The receipt preserves `requestSimulation: true`, `runtimeShaVerified: false`, and `canAuthorizeProviderMutation: false`. It therefore cannot authorize or prove a DNS mutation, Access change, route change, Worker deployment, credential change, or production release. The workflow may restore the top-level core `ok`/`error` verdict after optional enrichment, but it may not create a successful core verdict when the core receipt is absent or failed.
 
+## Served remote read MCP boundary
+
+The canonical `founder-control-room` Worker serves a bounded remote read-only MCP endpoint at `POST https://api.foundercontrolroom.org/mcp/read`. Repository configuration binds its project scope to exactly `chief-ai-machine,founder-control-room` through `FCR_REMOTE_MCP_READ_PROJECTS` and names `FCR_REMOTE_MCP_READ_TOKEN` as the dedicated bearer-secret interface.
+
+This source configuration is deliberately non-authorizing: it cannot prove that the secret has been installed, that the deployed Worker is running this exact source, or that the endpoint is reachable. The route must fail closed when its required token or server-held project scope is unavailable, and its two exported tools remain read-only (`list_read_servers` and `invoke_read_tool`) behind the existing MCP registry/policy boundary. A secret value must never be committed to Wrangler, documentation, logs, screenshots, issues, or retained proof.
+
+Expanding this remote grant beyond Chief AI + Founder Control Room is a separate authority change; it must not be inferred from the broader portfolio registry or from another MCP credential.
+
 ## Project-scoped outbound email
 
 Cloudflare outbound email is a capability boundary, not a global portfolio transport. Founder Control Room's canonical Worker uses the `FCR_EMAIL` send binding and pins the sender identity to `welcome@api.foundercontrolroom.org`; the application wrapper does not accept caller-controlled `from`. Other projects do not inherit that binding merely because they share the same founder or Cloudflare account.

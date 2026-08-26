@@ -19,11 +19,10 @@ jobs:
         id: parse
         env:
           COMMENT_BODY: ${{ github.event.comment.body }}
-          COMMENT_ID: ${{ github.event.comment.id }}
         shell: bash
         run: |
           set -euo pipefail
-          read -r command action sha extra <<< "$COMMENT_BODY"
+          read -r command action sha approval extra <<< "$COMMENT_BODY"
 
           if [[ "$command" != '/cloudflare-fcr-access' ]]; then
             echo 'Not a Cloudflare FCR Access command; exiting without dispatch.'
@@ -40,21 +39,25 @@ jobs:
             exit 1
           fi
 
-          if [[ -n "${extra:-}" || "$COMMENT_BODY" != "/cloudflare-fcr-access $action $sha" ]]; then
-            echo '::error title=Unexpected arguments::command must contain only action and exact SHA.'
+          if [[ -n "${extra:-}" ]]; then
+            echo '::error title=Unexpected arguments::command contains extra fields.'
             exit 1
           fi
 
           if [[ "$action" == 'inspect' ]]; then
+            if [[ -n "${approval:-}" ]]; then
+              echo '::error title=Unexpected approval::inspect accepts only the exact SHA.'
+              exit 1
+            fi
             apply='false'
             approval_reference=''
           else
-            if [[ ! "$COMMENT_ID" =~ ^[0-9]+$ ]]; then
-              echo '::error title=Missing founder comment identity::apply requires the exact GitHub issue comment id.'
+            if [[ ! "${approval:-}" =~ ^[A-Za-z0-9._:-]{8,200}$ ]]; then
+              echo '::error title=Missing mutation approval::apply requires an auditable 8-200 character approval reference.'
               exit 1
             fi
             apply='true'
-            approval_reference="issue-comment:$COMMENT_ID"
+            approval_reference="$approval"
           fi
 
           echo "sha=$sha" >> "$GITHUB_OUTPUT"

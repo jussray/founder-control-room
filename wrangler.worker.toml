@@ -49,6 +49,7 @@ SUPABASE_PROJECT_REF = "oojzfmmywbvficgybaxd"
 FOUNDER_ALLOWED_ORIGINS = "https://foundercontrolroom.org"
 FOUNDER_API_URL = "https://foundercontrolroom.org"
 FCR_EMAIL_FROM = "welcome@api.foundercontrolroom.org"
+FCR_REMOTE_MCP_READ_PROJECTS = "chief-ai-machine,founder-control-room"
 FCR_V10_CAPABILITY_PLAN_CONTRACT = "juss-v10/capability-plan@v1"
 FCR_V10_CONVEYOR_CONTRACT = "founder-control-room/n8n-conveyor@v3"
 FCR_V10_MAX_RUNTIME_AUTHORITY = "draft"
@@ -64,6 +65,7 @@ required = [
   "GITHUB_WEBHOOK_SECRET",
   "GITHUB_APP_ID",
   "GITHUB_PRIVATE_KEY",
+  "FCR_REMOTE_MCP_READ_TOKEN",
   "FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON",
   "FOUNDER_SIGNAL_ENGINE_MCP_TOKEN",
   "ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL",

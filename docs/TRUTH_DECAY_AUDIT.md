@@ -165,6 +165,12 @@ A docs-only truth-sync merge closes an earlier drift cycle. It still receives a 
 
 A durable README should not hard-code a “current SHA” and pretend that value automatically renews after every merge. Exact SHAs belong in receipts/provenance; current identity is resolved at use time only by separately authorized provider revalidation.
 
+### Evidence-authority registration
+
+The Evidence Trust Plane is now explicitly part of Documentation Truth. Changes under `src/evidence/`, the founder-facing `public/control-room/evidence-trust.html`, or its exact-head Playwright workflow are truth-sensitive because they can change what future operators believe evidence may unlock. The documentation gate must therefore fail if those paths move without current documentation and a path-bound receipt.
+
+That registration does not mean durable evidence persistence exists. The current Evidence Trust Plane slice defines receipt, validity, and action-ceiling contracts only; `ledgerState` is supplied state until a separately reviewed persistence writer/store exists. Current receipt use must also re-evaluate expiration and bind merge-review preparation to GitHub API evidence for an exact repository, full SHA, workflow, and run identity. Rejected or non-GitHub evidence cannot be relabeled as merge-review-ready merely because readback completed.
+
 ### Release-coverage at-use gate
 
 A signed rollout-coverage receipt is still sender-supplied observation. For a `passed` coverage claim, Founder Control Room must re-read current repository `main` and independently read a fresh production deployment witness from the Cloudflare provider-observation lane. The witness must be tied to a processed provider event and must not reuse `project_events`, where the receipt itself is stored.
@@ -306,6 +312,8 @@ The strongest optimization is not faster claiming. It is shortening the distance
 22. Preserve history. Supersede stale authority explicitly instead of deleting evidence simply because the current answer changed.
 23. An unchanged approved decision-context object is not proof that its external dependencies are still current; evidence-dependent consequential use must revalidate the bound Truth Lease at the use boundary.
 24. Independent green receipts do not compose into production truth unless they bind the same exact candidate and remain current together at the declared use boundary.
+25. A stored `validity: current` flag does not outrank an elapsed `expiresAt`; evidence authority must re-evaluate expiration when the receipt is used.
+26. Readback completion is not the same as a verified verdict, and an unscoped or wrong-authority receipt cannot prepare merge review.
 
 ## Rollback
 

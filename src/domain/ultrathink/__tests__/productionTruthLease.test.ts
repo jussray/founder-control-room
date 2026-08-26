@@ -10,6 +10,16 @@ import {
 } from '../sourceAuthority.js';
 
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const EVIDENCE_HASH = `sha256:${'1'.repeat(64)}` as const;
+const WITNESS_OBSERVED_AT = '2026-08-23T05:14:00.000Z';
+
+function witnessEvidence(evidenceRef: string) {
+  return {
+    evidenceRef,
+    evidenceHash: EVIDENCE_HASH,
+    observedAt: WITNESS_OBSERVED_AT,
+  } as const;
+}
 
 function sourceAuthorityObservation(
   overrides: Partial<SourceAuthorityObservation> = {},
@@ -69,18 +79,18 @@ function lease(
     sourceAuthority: authorityRecord(),
     runtime: {
       result: 'pass',
-      evidenceRef: 'runtime:health-1',
+      ...witnessEvidence('runtime:health-1'),
     },
     dataAuth: {
       provider: 'supabase',
       projectRef: 'oojzfmmywbvficgybaxd',
       result: 'pass',
-      evidenceRef: 'supabase:posture-1',
+      ...witnessEvidence('supabase:posture-1'),
     },
     experience: {
       scenario: 'governance-critical journey',
       result: 'pass',
-      evidenceRef: 'playwright:report-1',
+      ...witnessEvidence('playwright:report-1'),
     },
     ...overrides,
   };
@@ -104,6 +114,68 @@ describe('ULTRATHINK production truth lease', () => {
     });
 
     expect(evaluateProductionTruthLease(lease({ sourceAuthority })).result).toBe('fail');
+  });
+
+  it('fails when source SHA differs from the production artifact source SHA', () => {
+    const sourceAuthority = authorityRecord({
+      deployment: {
+        providerProject: 'founder-control-room',
+        deploymentId: 'deployment-mismatch-source-artifact',
+        artifactSourceSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        evidenceRef: 'cloudflare:deployment-mismatch-source-artifact',
+      },
+    });
+
+    expect(evaluateProductionTruthLease(lease({ sourceAuthority })).result).toBe('fail');
+  });
+
+  it('fails when the production artifact source SHA differs from the runtime release identity', () => {
+    const sourceAuthority = authorityRecord({
+      deployment: {
+        providerProject: 'founder-control-room',
+        deploymentId: 'deployment-mismatch-artifact-runtime',
+        artifactSourceSha: SHA,
+        evidenceRef: 'cloudflare:deployment-mismatch-artifact-runtime',
+      },
+      runtime: {
+        canonicalUrl: 'https://foundercontrolroom.org',
+        releaseIdentity: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        evidenceRef: 'runtime:mismatch-artifact-runtime',
+      },
+    });
+
+    expect(evaluateProductionTruthLease(lease({ sourceAuthority })).result).toBe('fail');
+  });
+
+  it('blocks when production artifact source SHA is missing', () => {
+    const sourceAuthority = authorityRecord({
+      deployment: {
+        providerProject: 'founder-control-room',
+        deploymentId: 'deployment-missing-artifact-source',
+        artifactSourceSha: '',
+        evidenceRef: 'cloudflare:deployment-missing-artifact-source',
+      },
+    });
+
+    expect(evaluateProductionTruthLease(lease({ sourceAuthority }))).toEqual({
+      result: 'blocked',
+      reason: 'source authority is not canonical',
+    });
+  });
+
+  it('blocks when canonical runtime release identity is missing', () => {
+    const sourceAuthority = authorityRecord({
+      runtime: {
+        canonicalUrl: 'https://foundercontrolroom.org',
+        releaseIdentity: '',
+        evidenceRef: 'runtime:missing-release-identity',
+      },
+    });
+
+    expect(evaluateProductionTruthLease(lease({ sourceAuthority }))).toEqual({
+      result: 'blocked',
+      reason: 'source authority is not canonical',
+    });
   });
 
   it('blocks when source authority is unknown', () => {
@@ -152,7 +224,10 @@ describe('ULTRATHINK production truth lease', () => {
 
   it('fails when runtime health fails', () => {
     expect(evaluateProductionTruthLease(lease({
-      runtime: { result: 'fail', evidenceRef: 'runtime:health-1' },
+      runtime: {
+        result: 'fail',
+        ...witnessEvidence('runtime:health-1'),
+      },
     })).result).toBe('fail');
   });
 
@@ -162,7 +237,7 @@ describe('ULTRATHINK production truth lease', () => {
         provider: 'supabase',
         projectRef: 'oojzfmmywbvficgybaxd',
         result: 'fail',
-        evidenceRef: 'supabase:posture-1',
+        ...witnessEvidence('supabase:posture-1'),
       },
     })).result).toBe('fail');
   });
@@ -172,7 +247,7 @@ describe('ULTRATHINK production truth lease', () => {
       experience: {
         scenario: 'governance-critical journey',
         result: 'fail',
-        evidenceRef: 'playwright:report-1',
+        ...witnessEvidence('playwright:report-1'),
       },
     })).result).toBe('fail');
   });
@@ -182,17 +257,49 @@ describe('ULTRATHINK production truth lease', () => {
       experience: {
         scenario: 'governance-critical journey',
         result: 'blocked',
-        evidenceRef: 'playwright:report-1',
+        ...witnessEvidence('playwright:report-1'),
       },
     })).result).toBe('blocked');
   });
 
   it('blocks when a required evidence reference is missing', () => {
     expect(evaluateProductionTruthLease(lease({
-      runtime: { result: 'pass', evidenceRef: '' },
+      runtime: {
+        result: 'pass',
+        ...witnessEvidence(''),
+      },
     }))).toEqual({
       result: 'blocked',
-      reason: 'required production witness evidence is missing',
+      reason: 'required production witness evidence is missing or invalid',
+    });
+  });
+
+  it('blocks when a witness evidence hash is malformed', () => {
+    expect(evaluateProductionTruthLease(lease({
+      runtime: {
+        result: 'pass',
+        evidenceRef: 'runtime:health-1',
+        evidenceHash: 'sha256:not-a-real-digest',
+        observedAt: WITNESS_OBSERVED_AT,
+      },
+    }))).toEqual({
+      result: 'blocked',
+      reason: 'required production witness evidence is missing or invalid',
+    });
+  });
+
+  it('blocks when a witness observation timestamp is invalid', () => {
+    expect(evaluateProductionTruthLease(lease({
+      experience: {
+        scenario: 'governance-critical journey',
+        result: 'pass',
+        evidenceRef: 'playwright:report-1',
+        evidenceHash: EVIDENCE_HASH,
+        observedAt: 'not-a-time',
+      },
+    }))).toEqual({
+      result: 'blocked',
+      reason: 'required production witness evidence is missing or invalid',
     });
   });
 });

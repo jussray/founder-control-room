@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-pages/
 .env
 .env.local
 *.log
@@ -10,6 +11,11 @@ __pycache__/
 *.pyc
 playwright-report/
 test-results/
+
+# Generated locally by scripts/verify-documentation-truth.mjs; CI uploads it
+# as a workflow artifact instead of committing it. Scoped to this exact file
+# so other artifacts/ content (decision records, provenance) stays tracked.
+artifacts/documentation-truth-report.json
 
 # HubSpot CLI local authentication and account context
 hubspot.config.yml

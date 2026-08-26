@@ -5,23 +5,27 @@ import {
 } from './sourceAuthority.js';
 
 export type ProductionTruthStatus = 'pass' | 'fail' | 'blocked';
+export type WitnessEvidenceHash = `sha256:${string}`;
 
-export interface RuntimeHealthWitness {
-  result: ProductionTruthStatus;
+export interface WitnessEvidenceIdentity {
   evidenceRef: string;
+  evidenceHash: WitnessEvidenceHash;
+  observedAt: string;
 }
 
-export interface DataAuthWitness {
+export interface RuntimeHealthWitness extends WitnessEvidenceIdentity {
+  result: ProductionTruthStatus;
+}
+
+export interface DataAuthWitness extends WitnessEvidenceIdentity {
   provider: 'supabase' | 'other';
   projectRef: string;
   result: ProductionTruthStatus;
-  evidenceRef: string;
 }
 
-export interface ExperienceWitness {
+export interface ExperienceWitness extends WitnessEvidenceIdentity {
   scenario: string;
   result: ProductionTruthStatus;
-  evidenceRef: string;
 }
 
 export interface ProductionTruthLeaseObservation {
@@ -42,6 +46,16 @@ export type ProductionTruthLease = ProductionTruthLeaseObservation & ProductionT
 
 function isPresent(value: string | undefined): value is string {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isSha256(value: string | undefined): value is WitnessEvidenceHash {
+  return typeof value === 'string' && /^sha256:[a-f0-9]{64}$/i.test(value);
+}
+
+function hasValidWitnessEvidence(witness: WitnessEvidenceIdentity): boolean {
+  return isPresent(witness.evidenceRef)
+    && isSha256(witness.evidenceHash)
+    && Number.isFinite(Date.parse(witness.observedAt));
 }
 
 function sameSurface(left: ProductionSurface, right: ProductionSurface): boolean {
@@ -98,15 +112,15 @@ export function evaluateProductionTruthLease(
   }
 
   if (
-    !isPresent(observation.runtime.evidenceRef)
+    !hasValidWitnessEvidence(observation.runtime)
     || !isPresent(observation.dataAuth.projectRef)
-    || !isPresent(observation.dataAuth.evidenceRef)
+    || !hasValidWitnessEvidence(observation.dataAuth)
     || !isPresent(observation.experience.scenario)
-    || !isPresent(observation.experience.evidenceRef)
+    || !hasValidWitnessEvidence(observation.experience)
   ) {
     return {
       result: 'blocked',
-      reason: 'required production witness evidence is missing',
+      reason: 'required production witness evidence is missing or invalid',
     };
   }
 

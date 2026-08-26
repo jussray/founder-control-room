@@ -15,6 +15,7 @@ const BASE = "a".repeat(40);
 const HEAD = "b".repeat(40);
 const DIFF = "1".repeat(64);
 const AUTHOR = "jussray";
+const TRUSTED_APP_ID = "12345";
 
 function deterministicReceipt(): IndependentReviewReceipt {
   const policyHash = independentReviewPolicyHash(FCR_FOUNDER_FINAL_REVIEW_POLICY);
@@ -57,7 +58,11 @@ function context(policyHash: string): IndependentReviewContext {
   };
 }
 
-function providerFor(review: IndependentReviewReceipt, signalStatus: VerificationSignal["status"] = "passed") {
+function providerFor(
+  review: IndependentReviewReceipt,
+  signalStatus: VerificationSignal["status"] = "passed",
+  issuerId: string | null = TRUSTED_APP_ID,
+) {
   return {
     name: "github",
     getRef: async () => ({ name: HEAD, commitSha: HEAD }),
@@ -67,19 +72,23 @@ function providerFor(review: IndependentReviewReceipt, signalStatus: Verificatio
       status: signalStatus,
       commitSha: HEAD,
       provider: "github",
+      evidenceFingerprint: review.reviewHash,
+      ...(issuerId === null ? {} : { issuer: { kind: "app" as const, id: issuerId, name: "fcr-review" } }),
     }],
   } as unknown as RepositoryProvider;
 }
 
+const trustedEnv = { GITHUB_APP_ID: TRUSTED_APP_ID };
+
 describe("FCR founder-final review policy", () => {
-  it("accepts exact-head deterministic review without requiring a second human reviewer", async () => {
+  it("accepts exact-head deterministic review only from the server-owned GitHub App issuer", async () => {
     const review = deterministicReceipt();
     const result = await evaluateIndependentReviewGate(
       providerFor(review),
       context(review.policyHash),
       [review],
       FCR_FOUNDER_FINAL_REVIEW_POLICY,
-      {},
+      trustedEnv,
     );
 
     expect(result.reviewGateSatisfied).toBe(true);
@@ -89,6 +98,48 @@ describe("FCR founder-final review policy", () => {
     expect(result.executionAuthorized).toBe(false);
   });
 
+  it("fails closed when server-owned trusted App identity is not configured", async () => {
+    const review = deterministicReceipt();
+    const result = await evaluateIndependentReviewGate(
+      providerFor(review),
+      context(review.policyHash),
+      [review],
+      FCR_FOUNDER_FINAL_REVIEW_POLICY,
+      {},
+    );
+
+    expect(result.reviewGateSatisfied).toBe(false);
+    expect(result.blockers.join(" ")).toMatch(/GITHUB_APP_ID|server-owned/i);
+  });
+
+  it("rejects a same-name exact-head green check from a different GitHub App issuer", async () => {
+    const review = deterministicReceipt();
+    const result = await evaluateIndependentReviewGate(
+      providerFor(review, "passed", "99999"),
+      context(review.policyHash),
+      [review],
+      FCR_FOUNDER_FINAL_REVIEW_POLICY,
+      trustedEnv,
+    );
+
+    expect(result.reviewGateSatisfied).toBe(false);
+    expect(result.blockers.join(" ")).toMatch(/trusted GitHub App issuer|deterministic witness/i);
+  });
+
+  it("rejects a deterministic check whose provider omits issuer identity", async () => {
+    const review = deterministicReceipt();
+    const result = await evaluateIndependentReviewGate(
+      providerFor(review, "passed", null),
+      context(review.policyHash),
+      [review],
+      FCR_FOUNDER_FINAL_REVIEW_POLICY,
+      trustedEnv,
+    );
+
+    expect(result.reviewGateSatisfied).toBe(false);
+    expect(result.blockers.join(" ")).toMatch(/trusted GitHub App issuer|deterministic witness/i);
+  });
+
   it("still fails closed when the deterministic exact-head witness is missing", async () => {
     const review = deterministicReceipt();
     const result = await evaluateIndependentReviewGate(
@@ -96,7 +147,7 @@ describe("FCR founder-final review policy", () => {
       context(review.policyHash),
       [review],
       FCR_FOUNDER_FINAL_REVIEW_POLICY,
-      {},
+      trustedEnv,
     );
 
     expect(result.reviewGateSatisfied).toBe(false);
@@ -114,7 +165,7 @@ describe("FCR founder-final review policy", () => {
       context(review.policyHash),
       [review],
       weakened,
-      {},
+      trustedEnv,
     );
 
     expect(result.reviewGateSatisfied).toBe(false);

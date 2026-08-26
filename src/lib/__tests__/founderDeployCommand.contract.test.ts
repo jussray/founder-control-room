@@ -117,6 +117,7 @@ describe('Founder deploy command authority contract', () => {
       'GITHUB_WEBHOOK_SECRET',
       'GITHUB_APP_ID',
       'GITHUB_PRIVATE_KEY',
+      'FCR_REMOTE_MCP_READ_TOKEN',
       'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
       'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
       'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',

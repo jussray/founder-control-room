@@ -25,6 +25,7 @@ function checkoutCompletedPayload(overrides: Record<string, unknown> = {}) {
         amount_total: 24900,
         currency: 'usd',
         payment_status: 'paid',
+        payment_link: 'plink_test_1',
         ...overrides,
       },
     },
@@ -86,7 +87,13 @@ describe('parseStripeCheckoutCompletedEvent', () => {
       amountTotal: 24900,
       currency: 'usd',
       paymentStatus: 'paid',
+      paymentLinkId: 'plink_test_1',
     });
+  });
+
+  it('carries a missing payment_link through as null rather than guessing', () => {
+    const event = parseStripeCheckoutCompletedEvent(checkoutCompletedPayload({ payment_link: undefined }));
+    expect(event?.paymentLinkId).toBeNull();
   });
 
   it('returns null for an event type other than checkout.session.completed', () => {
