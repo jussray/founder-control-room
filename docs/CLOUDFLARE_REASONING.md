@@ -162,6 +162,14 @@ Observe the contradiction
 → automate only repeated read-only evidence refresh
 ```
 
+## Access front-door recovery proof
+
+The FCR Access recovery lane must not infer safety from an account-scoped application list alone. Before it proposes or applies an organization-level exemption for `foundercontrolroom.org`, `scripts/reconcile-cloudflare-access-public-zone.mjs` must resolve that exact canonical zone inside the pinned FCR account and read both the account-scoped and zone-scoped Access application inventories with the dedicated credential for that mode.
+
+Any unresolved or ambiguous zone, provider-read failure, or explicit matching Access application in either scope must fail closed before organization mutation. Read-only inspection requires `CLOUDFLARE_ACCESS_API_TOKEN`; mutation requires the separate `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN`. Those credentials therefore need the provider read permissions required for canonical Zone lookup and Access application inventory, while the admin credential alone owns the bounded organization exemption write. The workflow source and secret names do not prove those live permissions are configured.
+
+An apply request also requires an exact founder issue comment on issue #485. The command bridge derives the comment ID from the GitHub event, and the recovery workflow re-reads that comment and verifies founder identity, issue identity, exact command, and exact current-main SHA before mutation can continue. A caller-supplied free-form approval string is not mutation authority.
+
 ## Read-only hostname inventory and Request Trace
 
 The manual `Cloudflare Worker Git Authority Audit` has a bounded provider-observation lane for FCR hostnames. Its primary Worker Git authority readback depends only on the dedicated read-only Workers Builds user token. DNS inventory and Request Trace credentials are optional enrichment: when either is unavailable, hostname/trace enrichment is skipped and remains `UNKNOWN`, but that absence must not suppress the core Worker Git authority receipt. If optional enrichment is attempted and then fails because credentials are malformed, provider reads are rejected, the request method is unsafe, or the returned provider evidence is invalid, that failure remains visible inside the bounded `requestTrace` evidence lane but cannot downgrade or upgrade the snapshotted core Worker Git authority verdict.
