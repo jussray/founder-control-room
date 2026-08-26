@@ -1,6 +1,7 @@
 import { getGitHubInstallationToken } from "./githubAppAuth.js";
-import { SecurityPreservingGitHubProvider } from "./SecurityPreservingGitHubProvider.js";
+import { GitHubAuditRepositoryProvider } from "./GitHubAuditRepositoryProvider.js";
 import { GitLabProvider } from "./GitLabProvider.js";
+import type { PullRequestAuditEvidence } from "./PullRequestAuditEvidence.js";
 import type {
   Diff,
   FileEntry,
@@ -197,6 +198,17 @@ class LazyRepositoryProvider implements RepositoryProvider {
     return context;
   }
 
+  async auditPullRequestEvidence(
+    projectId: string,
+    pullRequestNumber: number,
+  ): Promise<PullRequestAuditEvidence> {
+    const delegate = await this.delegate();
+    if (!delegate.auditPullRequestEvidence) {
+      throw new Error(`${delegate.name}: does not support bounded pull-request audit evidence`);
+    }
+    return delegate.auditPullRequestEvidence(this.governanceProjectId(projectId), pullRequestNumber);
+  }
+
   async createBranch(projectId: string, baseRef: string, name: string): Promise<string> {
     return (await this.delegate()).createBranch(projectId, baseRef, name);
   }
@@ -307,7 +319,7 @@ async function githubProvider(project: ProviderProjectConfig): Promise<Repositor
     projectMap[FOUNDER_CONTROL_ROOM_PROJECT_ID] = project.repo_identifier;
   }
 
-  return new SecurityPreservingGitHubProvider({
+  return new GitHubAuditRepositoryProvider({
     token,
     projectMap,
     baseUrl: process.env.GITHUB_API_BASE_URL,
