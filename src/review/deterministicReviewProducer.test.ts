@@ -40,7 +40,7 @@ function file(path: string, patch = "@@ -1 +1 @@\n-old\n+new") {
   };
 }
 
-function diff(files = [file("src/goalfix/engine.ts")], overrides: Partial<Diff> = {}): Diff {
+function diff(files: Diff["files"] = [file("src/goalfix/engine.ts")], overrides: Partial<Diff> = {}): Diff {
   return {
     base: BASE,
     head: HEAD,
