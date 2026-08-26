@@ -105,6 +105,33 @@ describe("DeterministicReviewGitHubProvider", () => {
     ]);
   });
 
+  it("keeps a neutral Check Run non-authorizing", async () => {
+    const fetchFn = vi.fn(async () => new Response(JSON.stringify({
+      check_runs: [{
+        id: 79,
+        name: NAME,
+        status: "completed",
+        conclusion: "neutral",
+        head_sha: HEAD,
+        external_id: HASH,
+        app: { id: 12345, slug: "fcr-review" },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } })) as unknown as typeof fetch;
+    const provider = providerFor(fetchFn);
+
+    const signals = await provider.listVerificationSignals("founder-control-room", HEAD);
+
+    expect(signals).toEqual([
+      expect.objectContaining({
+        id: "79",
+        status: "unknown",
+        commitSha: HEAD,
+        evidenceFingerprint: HASH,
+        issuer: { kind: "app", id: "12345", name: "fcr-review" },
+      }),
+    ]);
+  });
+
   it("keeps missing external_id visibly unbound instead of manufacturing a fingerprint", async () => {
     const fetchFn = vi.fn(async () => new Response(JSON.stringify({
       check_runs: [{
@@ -134,6 +161,27 @@ describe("DeterministicReviewGitHubProvider", () => {
       "founder-control-room",
       publication(),
     )).rejects.toThrow(/custom GitHub API base URL is test-only/i);
+  });
+
+  it("rejects a custom API base in normal runtime readback before any network call", async () => {
+    const fetchFn = vi.fn(async () => new Response(JSON.stringify({ check_runs: [] }), { status: 200 })) as unknown as typeof fetch;
+    const originalFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", fetchFn);
+    try {
+      const provider = new DeterministicReviewGitHubProvider({
+        token: "installation-token",
+        projectMap: { "founder-control-room": "jussray/founder-control-room" },
+        baseUrl: "https://attacker.example/api/v3",
+      });
+
+      await expect(provider.listVerificationSignals(
+        "founder-control-room",
+        HEAD,
+      )).rejects.toThrow(/custom GitHub API base URL is test-only/i);
+      expect(fetchFn).not.toHaveBeenCalled();
+    } finally {
+      vi.stubGlobal("fetch", originalFetch);
+    }
   });
 
   it("rejects witness publication outside canonical Founder Control Room", async () => {
