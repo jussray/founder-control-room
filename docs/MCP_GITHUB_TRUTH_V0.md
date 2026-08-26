@@ -47,11 +47,14 @@ The audit performs bounded provider-backed reads for:
 - base and head SHA;
 - changed-file count and a capped changed-file summary;
 - check runs bound to the observed head SHA;
-- workflow runs filtered to the observed head SHA;
+- GitHub Commit Status API contexts bound to the observed head SHA;
+- workflow runs filtered to the observed head SHA and reduced to the newest execution per workflow/event context;
 - review events and their recorded commit SHA;
 - a second pull-request read to detect load-bearing PR changes during the audit.
 
-Checks, workflow runs, reviews, and changed-file observations are capped at 100 returned observations per collection. The provider carries explicit completeness metadata for each collection. If the provider reports or implies more evidence than the bounded observation contains, the audit returns `evidence_incomplete` with `evidence_collection_truncated`; it never promotes a partial page into complete evidence.
+Checks, commit statuses, raw workflow runs, reviews, and changed-file observations are capped at 100 returned/observed provider records per collection. The provider carries explicit completeness metadata for each collection. If the provider reports or implies more evidence than the bounded observation contains, the audit returns `evidence_incomplete` with `evidence_collection_truncated`; it never promotes a partial page into complete evidence.
+
+Workflow currentness is evaluated before the MCP classifier sees the evidence. If the same workflow/event context has an older failed execution and a newer successful replacement on the same head, only the newest execution represents the current workflow context. Raw workflow truncation still marks the lane incomplete even if this reduction leaves a small current set.
 
 For review history over the cap, the GitHub provider uses bounded first-plus-newest-page reads rather than fetching the entire history or preserving only the oldest page. The result remains incomplete because omitted history exists, but recent review state is not replaced by stale early approvals merely because the collection exceeded 100 events.
 
@@ -70,7 +73,9 @@ These values describe evidence quality, not code quality.
 Examples:
 
 - Current CI can fail while the verdict is still `evidence_complete`: the system has complete evidence of failure.
+- A failing or pending legacy GitHub commit-status context is part of CI truth and cannot be hidden by green check runs or Actions workflows.
 - A known current CI failure outranks another current pending signal and remains `ciConclusion: fail`.
+- An older failed workflow execution does not remain authoritative after a newer execution for the same workflow/event context supersedes it.
 - Passing CI from an old SHA is `evidence_incomplete` with `ci_stale_for_head_sha`.
 - An approval recorded against an older commit SHA is not counted as current approval and produces `review_approval_stale_for_head_sha`.
 - A PR head that changes during the audit is `evidence_conflicted`.
@@ -126,9 +131,9 @@ Before merge:
 
 1. Typecheck passes.
 2. Lint passes.
-3. Unit tests pass, including stale-head, stale-approval, moving-PR-state, missing-CI, failure-plus-pending, and truncated-evidence attacks.
+3. Unit tests pass, including stale-head, stale-approval, moving-PR-state, missing-CI, commit-status failure/pending, failure-plus-pending, superseded-workflow, and truncated-evidence attacks.
 4. Test discovery reports zero default-excluded supported tests and case-mismatched test-like files cannot false-green.
 5. Existing remote MCP tests advertise exactly seven narrow tools.
-6. Review confirms no repository-host SDK or credential construction occurs in the MCP subsystem, no GitHub mutation method is reachable through this tool, and no bounded collection can false-green when truncated.
+6. Review confirms no repository-host SDK or credential construction occurs in the MCP subsystem, no GitHub mutation method is reachable through this tool, and no bounded CI collection can false-green or preserve superseded workflow failure.
 
 After merge, production activation still requires the repository's normal Worker deployment authority and one authenticated read-only smoke audit. Merge approval does not carry forward into deployment approval.
