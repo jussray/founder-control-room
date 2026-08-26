@@ -85,4 +85,32 @@ describe("deterministic review producer hard boundaries", () => {
       pullRequestNumber: 706,
     })).rejects.toThrow(/canonical Founder Control Room repository/i);
   });
+
+  it("fails closed on renamed paths when previous-path provenance is unavailable", async () => {
+    const renamedDiff: Diff = {
+      base: BASE,
+      head: HEAD,
+      aheadBy: 1,
+      behindBy: 0,
+      files: [{
+        path: "src/authority/reviewGate.ts",
+        status: "renamed",
+        additions: 1,
+        deletions: 1,
+        patch: "@@ -1 +1 @@\n-old trust root\n+renamed trust root",
+      }],
+    };
+
+    const result = await produceDeterministicReview({
+      provider: providerFor({ diff: renamedDiff }),
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    });
+
+    expect(result.receipt.verdict).toBe("blocked");
+    expect(result.publishable).toBe(false);
+    expect(result.receipt.findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "rename-provenance-unavailable", severity: "P1" }),
+    ]));
+  });
 });
