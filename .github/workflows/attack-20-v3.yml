@@ -1,0 +1,95 @@
+name: Attack-20 V3
+
+on:
+  pull_request:
+    paths:
+      - security/attack-20-v3.policy.json
+      - security/portfolio-worker-security.json
+      - src/security/attack20V3.ts
+      - src/security/attack20V3.test.ts
+      - scripts/verify-attack-20-v3.mjs
+      - .github/workflows/attack-20-v3.yml
+      - security/firewall-v10.policy.json
+      - scripts/verify-firewall-v10.mjs
+      - .security/cookies.json
+      - scripts/verify-cookie-contract.mjs
+      - wrangler.worker.toml
+      - wrangler.email.toml
+      - wrangler.deletion-queue.toml
+  push:
+    branches:
+      - main
+    paths:
+      - security/attack-20-v3.policy.json
+      - security/portfolio-worker-security.json
+      - src/security/attack20V3.ts
+      - src/security/attack20V3.test.ts
+      - scripts/verify-attack-20-v3.mjs
+      - .github/workflows/attack-20-v3.yml
+      - security/firewall-v10.policy.json
+      - scripts/verify-firewall-v10.mjs
+      - .security/cookies.json
+      - scripts/verify-cookie-contract.mjs
+      - wrangler.worker.toml
+      - wrangler.email.toml
+      - wrangler.deletion-queue.toml
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  source-contract:
+    name: Source contract and proof bindings
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact target
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify immutable target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify ATTACK-20 V3 source contract
+        run: node scripts/verify-attack-20-v3.mjs
+
+      - name: Preserve Firewall v10 parent proof
+        run: node scripts/verify-firewall-v10.mjs
+
+      - name: Preserve browser-cookie contract boundary
+        run: npm run verify:cookies
+
+      - name: Focused ATTACK-20 tests
+        run: npx vitest run src/security/attack20V3.test.ts
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint touched TypeScript
+        run: npx eslint src/security/attack20V3.ts src/security/attack20V3.test.ts --max-warnings 0
+
+      - name: Upload exact-head source proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: attack-20-v3-source-proof-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/attack-20-v3-source-proof.json
+          if-no-files-found: error
+          retention-days: 30
