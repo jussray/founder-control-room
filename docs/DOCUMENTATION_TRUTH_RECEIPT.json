@@ -7,6 +7,12 @@
   ],
   "changes": [
     {
+      "path": "src/review/deterministicReviewProducer.ts",
+      "claims": [
+        "src/review/deterministicReviewProducer.ts must classify the executable FCR merge-authentication chain as deterministic trust root, including founder authentication, portfolio-switch gating, V10 privileged-plan binding, V10 founder-decision binding, the approvals execution route, and its server mount; changes to those paths must produce the P1 trust-root-self-modification finding instead of self-certification."
+      ]
+    },
+    {
       "path": "src/review/deterministicReviewWitnessPublisher.ts",
       "claims": [
         "src/review/deterministicReviewWitnessPublisher.ts may publish only a clear deterministic receipt produced from provider-observed PR/base/head/diff truth through the repository provider's narrow witness capability, must bind pre/post publication PR identity and exact head, and must reject success unless provider readback reports the exact derived signal, the full receipt reviewHash as evidenceFingerprint, and the server-owned numeric GITHUB_APP_ID."
