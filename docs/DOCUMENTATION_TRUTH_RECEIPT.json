@@ -20,13 +20,13 @@
     {
       "path": "src/providers/PullRequestAuditEvidence.ts",
       "claims": [
-        "src/providers/PullRequestAuditEvidence.ts must keep initial and final PR observations separate and requires bounded collections to carry explicit completeness metadata so truncation cannot be treated as complete evidence."
+        "src/providers/PullRequestAuditEvidence.ts must keep initial/final PR truth separate and model bounded checks, commit statuses, current workflow contexts, reviews, and changed files with completeness metadata so omitted or truncated CI evidence cannot be treated as complete."
       ]
     },
     {
       "path": "src/providers/GitHubAuditRepositoryProvider.ts",
       "claims": [
-        "src/providers/GitHubAuditRepositoryProvider.ts must keep GitHub-specific API access inside the repository-provider family, bound returned observations to at most 100 per collection, preserve newest review evidence when capped, and never add GitHub mutation authority."
+        "src/providers/GitHubAuditRepositoryProvider.ts must observe exact-head check runs and combined commit statuses, collapse superseded workflow executions to the newest run per workflow/event context, preserve newest review evidence when capped, propagate raw provider truncation, and never add GitHub mutation authority."
       ]
     },
     {
