@@ -42,8 +42,43 @@ Founder intent
 9. **Post-merge truth:** reacquire main and prove merged identity plus required provider/runtime/browser evidence. Merge is not completion. UI/runtime claims require Playwright.
 10. **Loop:** use new evidence to continue, reverify, roll back, or stop. Report one exact next gate.
 
+## Founder Adaptive Kernel V0
+
+Apply `docs/FOUNDER_ADAPTIVE_KERNEL_V0.md` to every Goalfix loop across every Juss-owned project.
+
+Compare expected state with verified observed state and classify the surprise:
+
+```text
+STRONGER_THAN_EXPECTED
+AS_EXPECTED
+WEAKER_THAN_EXPECTED
+UNEXPECTED_DIRECTION
+UNKNOWN
+```
+
+Then choose exactly one primary adaptive action:
+
+```text
+ACCELERATE
+CONTINUE
+REPAIR
+REORIENT
+HOLD
+STOP
+```
+
+Accelerate only from current verified evidence. If the user, system, test, runtime, or product behaves in a useful unexpected way, update the expectation and plan rather than forcing the old script.
+
+For meaningful loops, bind a continuity fingerprint to project/repository identity, intent, expected state, observed state, evidence identities, and exact base/head/scope when applicable. A load-bearing change invalidates prior green for the affected claim.
+
+Maintain a bounded continuity cookie containing non-secret resumability metadata such as kernel version, project ID, fingerprint, parent fingerprint, surprise signal, adaptive action, evidence references, truth state, and next gate. This is a proof/learning receipt only. It is not an HTTP/browser cookie, credential, tracking ID, or authority object.
+
+Never put secrets, tokens, raw private data, chain-of-thought, or unnecessary user content into a continuity cookie. Fingerprints and cookies preserve lineage but never authorize merge, deploy, publish, provider mutation, or founder decisions.
+
+After a meaningful surprise, retain the smallest durable learning patch that changes future expectations without rewriting historical evidence.
+
 Treat `ULTRATHINK/steal` as deeper reasoning, not a larger patch. Extract causal mechanisms and synthesize an original solution. Do not copy protected expression, branding, private material, secrets, or incompatible code. Score candidates by founder value, durability, reversibility, authority, evidence, rollback, and compounding value.
 
 Do not merge unless the user requested it or checked-in repository policy grants standing merge authority. Required checks, required review authority, and real-path evidence must be current. Never turn a deployment preview or historical green into merge/runtime proof.
 
-Return `REALITY`, `FIX`, `PROOF`, `RISK`, `ROLLBACK`, and one `NEXT GATE`.
+Return `REALITY`, `FIX`, `PROOF`, `RISK`, `ROLLBACK`, `ADAPTIVE SIGNAL`, and `NEXT GATE`.
