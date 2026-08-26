@@ -3,6 +3,7 @@ import type {
   GitHubPrCheckObservation,
   GitHubPrChangedFile,
   GitHubPrCiConclusion,
+  GitHubPrEvidenceCoverage,
   GitHubPrEvidenceRef,
   GitHubPrFinding,
   GitHubPrObservation,
@@ -18,6 +19,7 @@ export interface EvaluateGitHubPrAuditInput {
   workflows: GitHubPrWorkflowObservation[];
   reviews: GitHubPrReviewObservation[];
   changedFiles: GitHubPrChangedFile[];
+  evidenceCoverage: GitHubPrEvidenceCoverage;
   expectedHeadSha?: string;
   checkedAt: string;
 }
@@ -35,11 +37,11 @@ function ciConclusion(
     ...workflows.map((item) => ({ status: normalized(item.status), conclusion: normalized(item.conclusion) })),
   ];
   if (items.length === 0) return 'unknown';
-  if (items.some((item) => ['queued', 'in_progress', 'requested', 'waiting', 'pending'].includes(item.status))) {
-    return 'pending';
-  }
   if (items.some((item) => ['failure', 'failed', 'cancelled', 'timed_out', 'action_required', 'startup_failure'].includes(item.conclusion))) {
     return 'fail';
+  }
+  if (items.some((item) => ['queued', 'in_progress', 'requested', 'waiting', 'pending'].includes(item.status))) {
+    return 'pending';
   }
   if (items.some((item) => !item.conclusion && item.status !== 'completed')) return 'pending';
   if (items.every((item) => ['success', 'neutral', 'skipped'].includes(item.conclusion))) return 'pass';
@@ -59,6 +61,25 @@ function reviewDecision(reviews: readonly GitHubPrReviewObservation[]): 'approve
   return 'unknown';
 }
 
+function samePrTruth(
+  initial: GitHubPrObservation,
+  final: GitHubPrObservation,
+): boolean {
+  return initial.number === final.number
+    && initial.state === final.state
+    && initial.draft === final.draft
+    && normalized(initial.baseRef) === normalized(final.baseRef)
+    && normalized(initial.headRef) === normalized(final.headRef)
+    && normalized(initial.baseSha) === normalized(final.baseSha)
+    && normalized(initial.headSha) === normalized(final.headSha)
+    && normalized(initial.mergeCommitSha) === normalized(final.mergeCommitSha)
+    && initial.mergeable === final.mergeable
+    && initial.changedFiles === final.changedFiles
+    && initial.additions === final.additions
+    && initial.deletions === final.deletions
+    && initial.commits === final.commits;
+}
+
 function evidenceRefs(input: EvaluateGitHubPrAuditInput): GitHubPrEvidenceRef[] {
   const observedAt = input.checkedAt;
   return [
@@ -67,6 +88,13 @@ function evidenceRefs(input: EvaluateGitHubPrAuditInput): GitHubPrEvidenceRef[] 
       source: 'github' as const,
       sourceUrl: input.initialPullRequest.url,
       subjectSha: input.initialPullRequest.headSha,
+      observedAt,
+    },
+    {
+      kind: 'pull_request' as const,
+      source: 'github' as const,
+      sourceUrl: input.finalPullRequest.url,
+      subjectSha: input.finalPullRequest.headSha,
       observedAt,
     },
     {
@@ -105,6 +133,7 @@ export function evaluateGitHubPrAuditEvidence(input: EvaluateGitHubPrAuditInput)
   const finalHead = normalized(input.finalPullRequest.headSha);
   const expectedHead = normalized(input.expectedHeadSha);
   const headStable = Boolean(initialHead) && initialHead === finalHead;
+  const prTruthStable = samePrTruth(input.initialPullRequest, input.finalPullRequest);
   const expectedHeadMatches = !expectedHead || expectedHead === initialHead;
 
   if (!headStable) {
@@ -112,6 +141,12 @@ export function evaluateGitHubPrAuditEvidence(input: EvaluateGitHubPrAuditInput)
       severity: 'blocker',
       code: 'head_sha_changed_during_audit',
       message: `PR head changed during the audit (${input.initialPullRequest.headSha} -> ${input.finalPullRequest.headSha}).`,
+    });
+  } else if (!prTruthStable) {
+    findings.push({
+      severity: 'blocker',
+      code: 'pr_truth_changed_during_audit',
+      message: 'Load-bearing PR state changed during evidence collection; the audit must be repeated against a stable PR observation.',
     });
   }
   if (!expectedHeadMatches) {
@@ -130,6 +165,17 @@ export function evaluateGitHubPrAuditEvidence(input: EvaluateGitHubPrAuditInput)
       severity: 'blocker',
       code: 'ci_stale_for_head_sha',
       message: 'At least one CI observation belongs to a commit other than the current PR head SHA.',
+    });
+  }
+
+  const incompleteCoverage = Object.entries(input.evidenceCoverage)
+    .filter(([, complete]) => !complete)
+    .map(([name]) => name.replace(/Complete$/, ''));
+  if (incompleteCoverage.length > 0) {
+    findings.push({
+      severity: 'blocker',
+      code: 'evidence_collection_truncated',
+      message: `GitHub evidence was truncated for: ${incompleteCoverage.join(', ')}. The audit cannot claim complete evidence.`,
     });
   }
 
@@ -162,7 +208,7 @@ export function evaluateGitHubPrAuditEvidence(input: EvaluateGitHubPrAuditInput)
       message: 'GitHub review evidence currently includes changes requested.',
     });
   }
-  if (input.initialPullRequest.mergeable === null || input.initialPullRequest.mergeable === undefined) {
+  if (input.finalPullRequest.mergeable === null || input.finalPullRequest.mergeable === undefined) {
     findings.push({
       severity: 'info',
       code: 'mergeability_unknown',
@@ -170,8 +216,9 @@ export function evaluateGitHubPrAuditEvidence(input: EvaluateGitHubPrAuditInput)
     });
   }
 
-  const conflicted = !headStable || !expectedHeadMatches;
-  const incomplete = !ciBoundToHeadSha || ci === 'unknown' || ci === 'pending';
+  const coverageComplete = incompleteCoverage.length === 0;
+  const conflicted = !prTruthStable || !expectedHeadMatches;
+  const incomplete = !ciBoundToHeadSha || !coverageComplete || ci === 'unknown' || ci === 'pending';
   const verdict = conflicted
     ? 'evidence_conflicted'
     : incomplete
@@ -183,19 +230,19 @@ export function evaluateGitHubPrAuditEvidence(input: EvaluateGitHubPrAuditInput)
     repository: input.repository,
     verdict,
     summary: {
-      prNumber: input.initialPullRequest.number,
-      title: input.initialPullRequest.title,
-      baseSha: input.initialPullRequest.baseSha,
-      headSha: input.initialPullRequest.headSha,
-      prState: input.initialPullRequest.state,
-      draft: input.initialPullRequest.draft,
-      mergeable: input.initialPullRequest.mergeable,
+      prNumber: input.finalPullRequest.number,
+      title: input.finalPullRequest.title,
+      baseSha: input.finalPullRequest.baseSha,
+      headSha: input.finalPullRequest.headSha,
+      prState: input.finalPullRequest.state,
+      draft: input.finalPullRequest.draft,
+      mergeable: input.finalPullRequest.mergeable,
       ciConclusion: ci,
       reviewDecision: review,
-      changedFiles: input.initialPullRequest.changedFiles,
-      additions: input.initialPullRequest.additions,
-      deletions: input.initialPullRequest.deletions,
-      commits: input.initialPullRequest.commits,
+      changedFiles: input.finalPullRequest.changedFiles,
+      additions: input.finalPullRequest.additions,
+      deletions: input.finalPullRequest.deletions,
+      commits: input.finalPullRequest.commits,
     },
     changedFiles: input.changedFiles,
     findings,
@@ -205,7 +252,12 @@ export function evaluateGitHubPrAuditEvidence(input: EvaluateGitHubPrAuditInput)
       ...(input.expectedHeadSha ? { expectedHeadSha: input.expectedHeadSha } : {}),
       headShaBound: headStable && expectedHeadMatches,
       ciBoundToHeadSha,
-      freshness: conflicted || !ciBoundToHeadSha ? 'stale' : 'current',
+      evidenceCoverage: input.evidenceCoverage,
+      freshness: conflicted || !ciBoundToHeadSha
+        ? 'stale'
+        : coverageComplete
+          ? 'current'
+          : 'unknown',
     },
     boundary: {
       evidenceAuditOnly: true,
