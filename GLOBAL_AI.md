@@ -220,3 +220,45 @@ Never use a GitHub merge that occurred outside the in-app FCR path as proof that
 - Merge only under `docs/FOUNDER_MERGE_AUTHORITY.md`; merge authority never silently authorizes a separately gated action.
 - For nontrivial code changes, run `npm run typecheck` and `npm test` before claiming readiness, or explicitly report why they could not run.
 - Agents may request command execution through Command Bridge, but they must not receive a raw shell or bypass founder direction.
+- Repository edits from Control Room must go through guarded workspace/approval paths and mission branches unless the exact merge authority is satisfied.
+- Never delete founder material, repository history, or evidence merely because current truth changed.
+
+## Approval gates
+
+Require the applicable exact founder/provider authority before:
+
+- creating operational branches or sandboxes when current policy requires it;
+- force-pushing, production deploying, or rolling back;
+- changing founder identity, auth, authorization, allowlists, sessions, or RLS;
+- adding, rotating, deleting, or exposing credentials;
+- changing repository providers, domains, DNS, production environments, provider bindings, or billing;
+- destructive database/event-history changes;
+- publication, sending, or external communication unless a current narrower contract explicitly authorizes that exact route/class.
+
+Repository merges are governed by `docs/FOUNDER_MERGE_AUTHORITY.md` and the applicable deterministic-review, founder-final, and provider gates.
+
+An audit authorizes inspection, not mutation.
+
+## Required report
+
+For material work report:
+
+1. Goal
+2. Reality
+3. ULTRATHINK decomposition
+4. Product Design review
+5. Data Analytics/truth review
+6. Redteam I premise risk
+7. Lindy screen
+8. L99 system view
+9. OODA decision/action
+10. Hormozi value pass
+11. Bill Gates bottleneck/leverage pass
+12. Elon Musk requirement/deletion/simplification/feedback/automation pass
+13. Redteam II selected-solution risk
+14. Proof
+15. Truth age / Documentation truth
+16. Rollback
+17. Next approval gate
+
+The Control Room exists to preserve founder authority, not automate it out of existence because a workflow diagram got overexcited.
