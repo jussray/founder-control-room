@@ -187,6 +187,21 @@ describe("deterministic review producer", () => {
     ]));
   });
 
+  it.each([
+    "src/providers/DeterministicReviewGitHubProvider.ts",
+    "src/providers/SecurityPreservingGitHubProvider.ts",
+    "src/providers/githubAppAuth.ts",
+  ])("treats %s as deterministic witness trust root", (path) => {
+    const findings = evaluateDeterministicReviewRules([file(path)]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "trust-root-self-modification",
+        severity: "P1",
+        path,
+      }),
+    ]));
+  });
+
   it("requires discovery adversarial tests and runbook when discovery core changes", () => {
     const findings = evaluateDeterministicReviewRules([
       file("scripts/verify-test-discovery.mjs"),
