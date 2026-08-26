@@ -13,7 +13,7 @@ on:
         type: boolean
         default: false
       approval_reference:
-        description: 'Founder issue-comment receipt; required when apply=true'
+        description: 'Single-use founder issue-comment receipt; required when apply=true'
         required: false
         type: string
 
@@ -45,7 +45,8 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Verify exact current main and mutation approval
+      - name: Verify exact current main and claim mutation approval
+        id: authority
         env:
           APPLY: ${{ inputs.apply }}
           APPROVAL_REFERENCE: ${{ inputs.approval_reference }}
@@ -65,6 +66,7 @@ jobs:
           test "$current_main" = "$EXPECTED_HEAD_SHA"
 
           approval_reference_receipt='not-required-for-read-only'
+          claim_comment_id=''
           if [[ "$APPLY" == 'true' ]]; then
             if [[ ! "$APPROVAL_REFERENCE" =~ ^issue-comment:([0-9]+)$ ]]; then
               echo '::error title=Missing founder mutation receipt::apply=true requires the exact founder issue-comment receipt.'
@@ -77,16 +79,35 @@ jobs:
             if ! jq -e \
               --arg issueUrl "$expected_issue_url" \
               --arg expectedBody "$expected_body" \
-              '.user.login == "jussray" and .issue_url == $issueUrl and .body == $expectedBody' \
+              '.user.login == "jussray" and .issue_url == $issueUrl and .body == $expectedBody and .created_at == .updated_at' \
               <<< "$comment_json" >/dev/null; then
-              echo '::error title=Invalid founder mutation receipt::approval comment does not match the founder-only issue, actor, action, and exact current main.'
+              echo '::error title=Invalid founder mutation receipt::approval comment must be an unedited exact founder command for this issue and current main.'
               exit 1
             fi
+
+            claim_marker="<!-- fcr-access-approval-claim:v1 comment=${comment_id} -->"
+            if gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/485/comments?per_page=100" --jq '.[].body' \
+              | grep -F -- "$claim_marker" >/dev/null; then
+              echo '::error title=Consumed founder mutation receipt::this founder approval comment has already been claimed by an earlier recovery run.'
+              exit 1
+            fi
+
+            claim_body="$(printf '%s\napproval-comment-id: %s\nworkflow-run-id: %s\nworkflow-run-attempt: %s\nexpected-head-sha: %s\n' \
+              "$claim_marker" "$comment_id" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$EXPECTED_HEAD_SHA")"
+            claim_json="$(gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/485/comments" -f body="$claim_body")"
+            claim_comment_id="$(jq -r '.id // empty' <<< "$claim_json")"
+            if [[ ! "$claim_comment_id" =~ ^[0-9]+$ ]]; then
+              echo '::error title=Founder mutation claim failed::GitHub did not return a durable claim comment id.'
+              exit 1
+            fi
+
             approval_reference_receipt="sha256:$(printf '%s' "$APPROVAL_REFERENCE" | sha256sum | awk '{print $1}')"
           elif [[ -n "${APPROVAL_REFERENCE:-}" ]]; then
             echo '::error title=Unexpected mutation approval::apply=false must not carry approval_reference.'
             exit 1
           fi
+
+          echo "claim_comment_id=$claim_comment_id" >> "$GITHUB_OUTPUT"
 
           {
             echo '## FCR Access front-door authority gate'
@@ -94,6 +115,7 @@ jobs:
             echo "- Exact current main: \`$EXPECTED_HEAD_SHA\`"
             echo "- Apply requested: \`$APPLY\`"
             echo "- Approval reference receipt: \`$approval_reference_receipt\`"
+            echo '- Apply approval is single-use and must remain unedited until the last pre-mutation revalidation'
             echo '- Mutation scope: add foundercontrolroom.org to the existing Access organization exemption list only'
             echo '- Explicit matching Access application: blocks automatic mutation'
             echo '- DNS mutation: none'
@@ -120,6 +142,54 @@ jobs:
         env:
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
         run: node scripts/reconcile-cloudflare-access-public-zone.mjs >/dev/null 2>&1
+
+      - name: Revalidate claimed founder mutation receipt immediately before apply
+        if: inputs.apply == true
+        env:
+          APPROVAL_REFERENCE: ${{ inputs.approval_reference }}
+          CLAIM_COMMENT_ID: ${{ steps.authority.outputs.claim_comment_id }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$APPROVAL_REFERENCE" =~ ^issue-comment:([0-9]+)$ ]]; then
+            echo '::error title=Invalid founder mutation receipt::approval reference changed after the initial authority gate.'
+            exit 1
+          fi
+          comment_id="${BASH_REMATCH[1]}"
+          if [[ ! "$CLAIM_COMMENT_ID" =~ ^[0-9]+$ ]]; then
+            echo '::error title=Missing mutation claim::single-use founder approval was not durably claimed.'
+            exit 1
+          fi
+
+          expected_issue_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/485"
+          expected_body="/cloudflare-fcr-access apply ${EXPECTED_HEAD_SHA}"
+          comment_json="$(gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}")"
+          if ! jq -e \
+            --arg issueUrl "$expected_issue_url" \
+            --arg expectedBody "$expected_body" \
+            '.user.login == "jussray" and .issue_url == $issueUrl and .body == $expectedBody and .created_at == .updated_at' \
+            <<< "$comment_json" >/dev/null; then
+            echo '::error title=Founder mutation approval revoked::approval comment changed or disappeared after inspection; provider mutation is blocked.'
+            exit 1
+          fi
+
+          claim_marker="<!-- fcr-access-approval-claim:v1 comment=${comment_id} -->"
+          expected_claim_body="$(printf '%s\napproval-comment-id: %s\nworkflow-run-id: %s\nworkflow-run-attempt: %s\nexpected-head-sha: %s\n' \
+            "$claim_marker" "$comment_id" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$EXPECTED_HEAD_SHA")"
+          claim_json="$(gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${CLAIM_COMMENT_ID}")"
+          if ! jq -e \
+            --arg issueUrl "$expected_issue_url" \
+            --arg expectedBody "$expected_claim_body" \
+            '.user.login == "github-actions[bot]" and .issue_url == $issueUrl and .body == $expectedBody' \
+            <<< "$claim_json" >/dev/null; then
+            echo '::error title=Mutation claim invalid::the durable single-use claim no longer matches this exact workflow run and head.'
+            exit 1
+          fi
+
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          current_main="$(git rev-parse refs/remotes/origin/main)"
+          test "$current_main" = "$EXPECTED_HEAD_SHA"
 
       - name: Apply bounded Access exemption with dedicated admin authority
         if: inputs.apply == true
