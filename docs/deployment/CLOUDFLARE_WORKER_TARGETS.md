@@ -124,6 +124,12 @@ source capability
 -> deployed browser/runtime proof
 ```
 
+The inspection/recovery source must resolve `foundercontrolroom.org` uniquely inside the pinned FCR Cloudflare account and read both account-scoped and zone-scoped Access application inventories before it may report that an organization-level exemption is safe to propose. A zero-match account inventory alone is insufficient. Any unresolved zone, provider-read failure, or explicit matching Access application in either scope blocks automatic mutation.
+
+Read-only inspection uses only `CLOUDFLARE_ACCESS_API_TOKEN`; bounded mutation uses only `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN`. Because both modes must resolve the canonical zone and inspect Access applications before a decision, the effective credential for that mode must have the necessary Cloudflare Zone Read plus Access Apps and Policies read permission. Only the admin credential may carry the separately reviewed organization write permission.
+
+For apply, the GitHub workflow must also re-read the exact founder issue comment that requested `/cloudflare-fcr-access apply <exact-main-sha>` on issue #485. The issue-comment identity, founder actor, issue, exact command, and exact still-current main must all match before provider mutation can continue. A free-form caller approval string does not satisfy this boundary.
+
 Do not infer live provider configuration from a workflow file, secret name, token display label, or successful unrelated Cloudflare build.
 
 ## Read-only hostname inventory boundary
