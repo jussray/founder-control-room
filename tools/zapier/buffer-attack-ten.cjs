@@ -11,6 +11,8 @@ const PUBLICATION_OPERATION = 'schedule_linkedin_post';
 const PUBLICATION_PROVIDER = 'buffer';
 const VERIFIED_PUBLICATION_STATE = 'VERIFIED_PUBLISHED';
 const MAX_INGRESS_REPLAY_WINDOW_MS = 5 * 60 * 1000;
+const PRODUCTION_BLOCK_REASON = 'AUTHORITATIVE_PRODUCTION_ADAPTER_REQUIRED';
+const LINKEDIN_HOSTS = new Set(['linkedin.com', 'www.linkedin.com']);
 
 const PUBLICATION_STATES = Object.freeze([
   'DRAFT',
@@ -109,6 +111,43 @@ function requireState(value) {
     throw new Error(`PUBLICATION_LEDGER_REJECTED: unsupported state ${state || '<empty>'}`);
   }
   return state;
+}
+
+function isLinkedInUrl(value) {
+  const raw = asText(value);
+  if (!HTTPS_URL.test(raw)) return false;
+  try {
+    const parsed = new URL(raw);
+    return parsed.protocol === 'https:' && LINKEDIN_HOSTS.has(parsed.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+function deriveAdvisoryIdempotencyKey(input = {}) {
+  const publicationRunId = asText(input.publicationRunId);
+  const contentSha256 = asText(input.contentSha256).toLowerCase();
+  const authorityId = asText(input.authorityId);
+  const authorityNonce = asText(input.authorityNonce);
+  const channelId = asText(input.channelId);
+
+  if (!UUID.test(publicationRunId)
+    || !SHA256.test(contentSha256)
+    || !authorityId
+    || !UUID.test(authorityNonce)
+    || !channelId) {
+    return '';
+  }
+
+  return `buffer-attack-ten-v1:${sha256(stableJson({
+    publicationRunId,
+    contentSha256,
+    authorityId,
+    authorityNonce,
+    channelId,
+    provider: PUBLICATION_PROVIDER,
+    operation: PUBLICATION_OPERATION,
+  }))}`;
 }
 
 function appendPublicationEvent(events = [], input = {}) {
@@ -242,6 +281,15 @@ function trustedSignerSet(options = {}) {
   return new Set(options.trustedIngressSignerIds.map(asText).filter(Boolean));
 }
 
+/**
+ * Pure source/advisory evaluator only.
+ *
+ * This function intentionally cannot mint production publication authority:
+ * it does not own the authenticated FCR approval store, atomic execution
+ * reservation, cryptographic ingress verifier, provider credentials, provider
+ * readback client, or public runtime observer. `allowed` therefore remains
+ * false even when every advisory assertion is internally coherent.
+ */
 function evaluatePublicationAttackTen(input = {}, options = {}) {
   const nowMs = Number.isFinite(options.nowMs) ? options.nowMs : Date.now();
   const trustedIngressSignerIds = trustedSignerSet(options);
@@ -261,29 +309,39 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
 
   const authorityNotBefore = parseTime(authority.notBefore);
   const authorityExpiresAt = parseTime(authority.expiresAt);
+  const authorityConsumedAt = parseTime(authority.consumedAt);
   const reviewMaturedAt = parseTime(reviewWindow.maturedAt);
   const ingressSignedAt = parseTime(ingress.signedAt);
   const ingressReceivedAt = parseTime(ingress.receivedAt);
   const ingressReplayWindowMs = Number(ingress.replayWindowMs);
   const ingressSignerId = asText(ingress.signerId);
+  const expectedIdempotencyKey = deriveAdvisoryIdempotencyKey({
+    publicationRunId,
+    contentSha256,
+    authorityId: authority.id,
+    authorityNonce: authority.nonce,
+    channelId: authority.channelId,
+  });
 
   const results = [];
 
   results.push(attack(
     'A1',
-    'founder intent is explicit and immutable',
+    'founder intent evidence is exact and store-bound',
     UUID.test(publicationRunId)
       && SHA256.test(contentSha256)
       && Boolean(asText(founderApproval.id))
       && founderApproval.immutable === true
+      && founderApproval.evidenceSource === 'fcr-authoritative-approval-store'
+      && founderApproval.storeReadbackVerified === true
       && asText(founderApproval.publicationRunId) === publicationRunId
       && asText(founderApproval.contentSha256).toLowerCase() === contentSha256,
-    'founder approval must bind the exact run and canonical content hash',
+    'advisory founder-approval evidence must identify the authoritative FCR store and bind the exact run/content hash; the pure evaluator cannot perform that read itself',
   ));
 
   results.push(attack(
     'A2',
-    'authority is scoped, expiring, one-use, and non-transferable',
+    'authority evidence is scoped, expiring, and consumed exactly once by this action',
     Boolean(asText(authority.id))
       && UUID.test(asText(authority.nonce))
       && authority.operation === PUBLICATION_OPERATION
@@ -293,10 +351,14 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
       && asText(authority.recipient) === asText(input.executorIdentity)
       && authorityNotBefore !== null
       && authorityExpiresAt !== null
-      && authorityNotBefore <= nowMs
-      && nowMs < authorityExpiresAt
-      && authority.consumed === false,
-    'authority must be exact-scope, time-bounded, recipient-bound, and unused',
+      && authorityNotBefore <= authorityConsumedAt
+      && authorityConsumedAt !== null
+      && authorityConsumedAt <= nowMs
+      && authorityConsumedAt < authorityExpiresAt
+      && authority.consumed === true
+      && asText(authority.consumedByActionId) === asText(execution.actionId)
+      && asText(authority.consumedPublicationRunId) === publicationRunId,
+    'terminal advisory evidence must show the exact authority was consumed once for this run/action, never merely caller-declared unused',
   ));
 
   results.push(attack(
@@ -330,7 +392,7 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
 
   results.push(attack(
     'A5',
-    'provider capability is live and policy-gated',
+    'provider capability evidence is live and policy-gated',
     providerCapability.live === true
       && providerCapability.policyGatePassed === true
       && providerCapability.provider === PUBLICATION_PROVIDER
@@ -342,34 +404,41 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
 
   results.push(attack(
     'A6',
-    'execution is idempotent and receipt-correlated',
-    Boolean(asText(execution.idempotencyKey))
+    'execution evidence is deterministically idempotent and reservation-correlated',
+    Boolean(expectedIdempotencyKey)
+      && asText(execution.idempotencyKey) === expectedIdempotencyKey
       && execution.uniquenessConstraintVerified === true
       && execution.duplicateAttemptBlocked === true
+      && execution.reservationState === 'persisted'
+      && Boolean(asText(execution.reservationId))
       && Boolean(asText(execution.actionId))
       && asText(execution.publicationRunId) === publicationRunId
       && asText(execution.authorityId) === asText(authority.id),
-    'retry safety requires deterministic idempotency plus run/authority correlation',
+    'advisory retry-safety evidence must use the derived key and identify a persisted exact-scope reservation',
   ));
 
   results.push(attack(
     'A7',
     'provider acknowledgement is independently read back',
     providerReadback.verified === true
+      && providerReadback.platform === 'linkedin'
       && Boolean(asText(providerReadback.observedPostId))
-      && HTTPS_URL.test(asText(providerReadback.observedUrl))
+      && isLinkedInUrl(providerReadback.observedUrl)
       && asText(providerReadback.actionId) === asText(execution.actionId)
       && asText(providerReadback.accountId) === asText(execution.accountId)
       && asText(providerReadback.channelId) === asText(authority.channelId),
-    'provider submission is insufficient without independent provider readback',
+    'provider submission is insufficient without exact LinkedIn provider readback',
   ));
 
   results.push(attack(
     'A8',
-    'ingress is authenticated, correlated, deduplicated, durable, trusted by control-plane policy, and replay-bounded',
+    'ingress evidence is cryptographically verified, correlated, durable, deduplicated, and replay-bounded',
     ingress.capability === 'VERIFIED'
       && ingress.authenticated === true
       && ingress.signatureVerified === true
+      && ingress.verificationSource === 'server-signature-verifier'
+      && Boolean(asText(ingress.signatureEvidenceRef))
+      && ingress.ledgerLookupVerified === true
       && Boolean(ingressSignerId)
       && trustedIngressSignerIds.has(ingressSignerId)
       && ingress.deduplicated === true
@@ -388,18 +457,20 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
       && ingressReplayWindowMs <= MAX_INGRESS_REPLAY_WINDOW_MS
       && ingressReceivedAt - ingressSignedAt <= ingressReplayWindowMs
       && nowMs - ingressReceivedAt <= ingressReplayWindowMs,
-    'ingress must be exact-chain evidence whose signer is trusted by control-plane configuration and whose signed receipt is inside the bounded replay window',
+    'advisory ingress evidence must identify a server-side cryptographic verifier plus durable ledger readback; booleans alone are never production authority',
   ));
 
   results.push(attack(
     'A9',
-    'runtime outcome is observed rather than inferred',
+    'runtime outcome is observed on the exact approved LinkedIn destination',
     runtime.observed === true
+      && runtime.platform === 'linkedin'
+      && asText(runtime.channelId) === asText(authority.channelId)
       && Boolean(asText(runtime.observedPostId))
-      && HTTPS_URL.test(asText(runtime.observedUrl))
+      && isLinkedInUrl(runtime.observedUrl)
       && asText(runtime.observedPostId) === asText(providerReadback.observedPostId)
       && asText(runtime.observedUrl) === asText(providerReadback.observedUrl),
-    'verified publication requires the destination state to be observed',
+    'runtime evidence must bind the same LinkedIn destination, channel, post identity, and URL as provider readback',
   ));
 
   results.push(attack(
@@ -414,9 +485,10 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
       && negativeControls.expiredAuthorityRejected === true
       && negativeControls.replayedNonceBlocked === true
       && negativeControls.mismatchedContentRejected === true,
-    'only a valid hash-chained VERIFIED_PUBLISHED run with passing negative controls can satisfy the release gate',
+    'only a valid hash-chained VERIFIED_PUBLISHED evidence chain with passing negative controls may be advisory-green',
   ));
 
+  const advisoryAllowed = results.every((result) => result.pass);
   return {
     attackTenVersion: ATTACK_TEN_VERSION,
     publicationRunId,
@@ -425,16 +497,25 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
     attackResults: results,
     failures: results.filter((result) => !result.pass),
     exactReceiptCorrelation: results.slice(0, 9).every((result) => result.pass),
-    allowed: results.every((result) => result.pass),
+    advisoryAllowed,
+    allowed: false,
+    productionAuthority: false,
+    productionBlockReason: PRODUCTION_BLOCK_REASON,
     eventChain,
   };
 }
 
-function productionPublicationAllowed(input = {}, options = {}) {
-  const evaluation = evaluatePublicationAttackTen(input, options);
-  return evaluation.allowed === true
-    && evaluation.state === VERIFIED_PUBLICATION_STATE
-    && evaluation.exactReceiptCorrelation === true;
+/**
+ * Fail closed by construction.
+ *
+ * The pure Attack Ten evaluator is intentionally incapable of authorizing a
+ * provider mutation. A future production adapter must own the authenticated
+ * approval read/claim, atomic reservation/nonce consumption, cryptographic
+ * ingress verification, provider readback, and runtime observation before it
+ * can expose a separate production-authority decision.
+ */
+function productionPublicationAllowed() {
+  return false;
 }
 
 module.exports = {
@@ -442,10 +523,12 @@ module.exports = {
   PUBLICATION_OPERATION,
   PUBLICATION_PROVIDER,
   VERIFIED_PUBLICATION_STATE,
+  PRODUCTION_BLOCK_REASON,
   PUBLICATION_STATES,
   RED_STATES,
   appendPublicationEvent,
   validatePublicationEventChain,
+  deriveAdvisoryIdempotencyKey,
   evaluatePublicationAttackTen,
   productionPublicationAllowed,
 };
