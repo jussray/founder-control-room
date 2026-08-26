@@ -113,6 +113,35 @@ function emptyFounderContentProof(
   };
 }
 
+function normalizeFounderContentProof(
+  env: NodeJS.ProcessEnv,
+  proof: FounderContentOrchestrationProof,
+): FounderContentOrchestrationProof {
+  if (proof.state !== 'verified') return proof;
+
+  const runtimeSha = (env.GIT_SHA ?? '').trim().toLowerCase();
+  const proofHead = (proof.expectedHeadSha ?? '').trim().toLowerCase();
+  const receiptId = (proof.receiptId ?? '').trim();
+  const observedAtMs = Date.parse(proof.observedAt ?? '');
+
+  if (!FULL_SHA.test(runtimeSha)) {
+    return { ...proof, state: 'runtime-sha-unavailable' };
+  }
+  if (!FULL_SHA.test(proofHead) || proofHead !== runtimeSha) {
+    return { ...proof, state: 'stale-head', expectedHeadSha: proofHead || proof.expectedHeadSha };
+  }
+  if (proof.provider !== 'buffer' || !receiptId || !Number.isFinite(observedAtMs)) {
+    return { ...proof, state: 'provider-unverified' };
+  }
+
+  return {
+    ...proof,
+    receiptId,
+    expectedHeadSha: proofHead,
+    observedAt: new Date(observedAtMs).toISOString(),
+  };
+}
+
 export function founderConveyorReadiness(
   config: FounderConveyorConfig = readFounderConveyorConfig(),
   proof: FounderConveyorLiveProof = emptyProof(),
@@ -193,20 +222,13 @@ export function founderContentOrchestrationReadiness(
   const bearerTokenConfigured = Boolean(transport.bearerToken);
   const bufferEnabled = providers.enabledProviders.includes('buffer');
   const providerConfigurationValid = providers.invalidProviders.length === 0;
-  const runtimeSha = (env.GIT_SHA ?? '').trim().toLowerCase();
-  const proofHead = (proof.expectedHeadSha ?? '').trim().toLowerCase();
-  const exactRuntimeProof =
-    FULL_SHA.test(runtimeSha) &&
-    FULL_SHA.test(proofHead) &&
-    runtimeSha === proofHead;
+  const normalizedProof = normalizeFounderContentProof(env, proof);
   const liveVerified =
     transport.enabled &&
     transport.configured &&
     providerConfigurationValid &&
     bufferEnabled &&
-    proof.state === 'verified' &&
-    proof.provider === 'buffer' &&
-    exactRuntimeProof;
+    normalizedProof.state === 'verified';
 
   let state: FounderContentOrchestrationState;
   if (!providerConfigurationValid) {
@@ -240,7 +262,7 @@ export function founderContentOrchestrationReadiness(
       !liveVerified,
     liveProbeRequired: !liveVerified,
     liveVerified,
-    proof,
+    proof: normalizedProof,
     secretValuesExposed: false,
   };
 }
