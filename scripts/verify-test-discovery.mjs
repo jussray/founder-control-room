@@ -12,7 +12,6 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { posix } from 'node:path';
-import { Script } from 'node:vm';
 
 const BASELINE_PATH = 'scripts/test-discovery-baseline.json';
 const VITEST_CONFIG_PATH = 'vitest.config.ts';
@@ -73,6 +72,173 @@ function parseBaseline(text, source, { allowedIncludePatterns = [CURRENT_INCLUDE
   return parsed;
 }
 
+function parseStaticConfigExpression(source) {
+  let index = 0;
+
+  function reject(message) {
+    throw new Error(`${message} at offset ${index}`);
+  }
+
+  function skipTrivia() {
+    while (index < source.length) {
+      if (/\s/.test(source[index])) {
+        index += 1;
+        continue;
+      }
+      if (source.startsWith('//', index)) {
+        const newline = source.indexOf('\n', index + 2);
+        index = newline === -1 ? source.length : newline + 1;
+        continue;
+      }
+      if (source.startsWith('/*', index)) {
+        const end = source.indexOf('*/', index + 2);
+        if (end === -1) reject('unterminated block comment');
+        index = end + 2;
+        continue;
+      }
+      break;
+    }
+  }
+
+  function parseString() {
+    skipTrivia();
+    const quote = source[index];
+    if (quote !== "'" && quote !== '"') reject('expected a quoted string');
+    index += 1;
+    let value = '';
+    while (index < source.length) {
+      const character = source[index];
+      if (character === quote) {
+        index += 1;
+        return value;
+      }
+      if (character === '\\') {
+        reject('escaped strings are not allowed in the static Vitest contract');
+      }
+      if (character === '\n' || character === '\r') {
+        reject('multiline strings are not allowed in the static Vitest contract');
+      }
+      value += character;
+      index += 1;
+    }
+    reject('unterminated string');
+  }
+
+  function parseIdentifier() {
+    skipTrivia();
+    const match = source.slice(index).match(/^[A-Za-z_$][A-Za-z0-9_$]*/);
+    if (!match) reject('expected an identifier');
+    index += match[0].length;
+    return match[0];
+  }
+
+  function parseNumber() {
+    skipTrivia();
+    const match = source.slice(index).match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/);
+    if (!match) reject('invalid numeric literal');
+    index += match[0].length;
+    const value = Number(match[0]);
+    if (!Number.isFinite(value)) reject('numeric literal must be finite');
+    return value;
+  }
+
+  function consume(character) {
+    skipTrivia();
+    if (source[index] !== character) reject(`expected '${character}'`);
+    index += 1;
+  }
+
+  function parseArray() {
+    consume('[');
+    const values = [];
+    skipTrivia();
+    if (source[index] === ']') {
+      index += 1;
+      return values;
+    }
+    while (index < source.length) {
+      values.push(parseValue());
+      skipTrivia();
+      if (source[index] === ']') {
+        index += 1;
+        return values;
+      }
+      consume(',');
+      skipTrivia();
+      if (source[index] === ']') {
+        index += 1;
+        return values;
+      }
+    }
+    reject('unterminated array');
+  }
+
+  function parseObject() {
+    consume('{');
+    const value = Object.create(null);
+    skipTrivia();
+    if (source[index] === '}') {
+      index += 1;
+      return value;
+    }
+    while (index < source.length) {
+      skipTrivia();
+      const key = source[index] === "'" || source[index] === '"'
+        ? parseString()
+        : parseIdentifier();
+      if (key === '__proto__' || key === 'prototype' || key === 'constructor') {
+        reject(`unsafe property '${key}' is not allowed`);
+      }
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
+        reject(`duplicate property '${key}' is not allowed`);
+      }
+      consume(':');
+      value[key] = parseValue();
+      skipTrivia();
+      if (source[index] === '}') {
+        index += 1;
+        return value;
+      }
+      consume(',');
+      skipTrivia();
+      if (source[index] === '}') {
+        index += 1;
+        return value;
+      }
+    }
+    reject('unterminated object');
+  }
+
+  function parseValue() {
+    skipTrivia();
+    const character = source[index];
+    if (character === '{') return parseObject();
+    if (character === '[') return parseArray();
+    if (character === "'" || character === '"') return parseString();
+    if (character === '-' || /[0-9]/.test(character || '')) return parseNumber();
+    if (source.startsWith('true', index) && !/[A-Za-z0-9_$]/.test(source[index + 4] || '')) {
+      index += 4;
+      return true;
+    }
+    if (source.startsWith('false', index) && !/[A-Za-z0-9_$]/.test(source[index + 5] || '')) {
+      index += 5;
+      return false;
+    }
+    if (source.startsWith('null', index) && !/[A-Za-z0-9_$]/.test(source[index + 4] || '')) {
+      index += 4;
+      return null;
+    }
+    reject('only static literal values are allowed in the Vitest config');
+  }
+
+  const parsed = parseValue();
+  skipTrivia();
+  if (index !== source.length) {
+    reject('unexpected executable or dynamic syntax after the static config');
+  }
+  return parsed;
+}
+
 function readEffectiveTestConfig() {
   const source = readFileSync(VITEST_CONFIG_PATH, 'utf8');
   const importPattern = /^\s*import\s+\{\s*defineConfig\s*\}\s+from\s+['"]vitest\/config['"]\s*;\s*/;
@@ -88,19 +254,17 @@ function readEffectiveTestConfig() {
   }
 
   const expression = remainder.slice(prefix.length, -2);
-  const context = Object.create(null);
+  let config;
   try {
-    new Script(`globalThis.__vitestConfig = (${expression});`, {
-      filename: VITEST_CONFIG_PATH,
-    }).runInNewContext(context, { timeout: 1000 });
+    config = parseStaticConfigExpression(expression);
   } catch (error) {
     fail([
-      `${VITEST_CONFIG_PATH} could not be evaluated as a static configuration`,
+      `${VITEST_CONFIG_PATH} is outside the non-executing static configuration grammar`,
       error instanceof Error ? error.message : String(error),
     ]);
   }
 
-  const testConfig = context.__vitestConfig?.test;
+  const testConfig = config?.test;
   if (!testConfig || typeof testConfig !== 'object' || Array.isArray(testConfig)) {
     fail([`${VITEST_CONFIG_PATH} must define a static test object`]);
   }
