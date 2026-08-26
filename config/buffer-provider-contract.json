@@ -95,6 +95,9 @@
   "attackTen": {
     "version": 1,
     "status": "implemented-awaiting-controlled-live-proof",
+    "scope": "advisory-evidence-only",
+    "standaloneEvaluatorAuthorizesProduction": false,
+    "requiresAuthoritativeProductionAdapter": true,
     "releaseState": "VERIFIED_PUBLISHED",
     "verifiedLeverageCountState": "VERIFIED_PUBLISHED",
     "assertions": [
@@ -113,8 +116,11 @@
       "publication_run_id",
       "canonical_payload_sha256",
       "founder_approval_id",
+      "founder_approval_store_readback",
       "authority_id",
       "authority_nonce",
+      "authority_consumed_at",
+      "execution_reservation_id",
       "provider_action_id",
       "provider_post_id",
       "ingress_publication_run_id",
@@ -122,24 +128,35 @@
       "ingress_content_sha256",
       "ingress_provider_action_id",
       "ingress_signer_id",
-      "runtime_post_id"
+      "ingress_signature_evidence_ref",
+      "runtime_post_id",
+      "runtime_url"
     ],
     "eventLedger": {
       "appendOnly": true,
       "hashChained": true,
       "deriveCurrentStateFromHistory": true,
       "stateOverwriteAllowed": false,
+      "exactEvidenceRefBindingRequired": true,
+      "ingressInvalidReachableFromProcessingStates": true,
       "missingEvidenceState": "UNKNOWN"
     },
     "negativeControls": [
+      "caller_approval_not_authoritative_rejected",
       "premature_execution_denied",
       "expired_authority_rejected",
+      "unconsumed_terminal_authority_rejected",
       "replayed_nonce_blocked",
       "mismatched_content_rejected",
+      "arbitrary_idempotency_rejected",
+      "missing_persisted_reservation_rejected",
       "cross_run_ingress_substitution_rejected",
       "caller_declared_ingress_signer_trust_rejected",
+      "missing_server_verifier_or_ledger_evidence_rejected",
       "missing_ingress_signer_policy_rejected",
-      "stale_ingress_replay_rejected"
+      "stale_ingress_replay_rejected",
+      "wrong_destination_rejected",
+      "mismatched_ledger_evidence_rejected"
     ],
     "redStates": [
       "DENIED",
@@ -154,16 +171,20 @@
       "ROLLED_BACK"
     ],
     "releaseGate": {
+      "standaloneEvaluatorAuthorizesProduction": false,
+      "requiresAuthoritativeProductionAdapter": true,
       "requiresLiveProviderMutation": true,
       "requiresControlledSyntheticRun": true,
+      "controlledSyntheticRunPurpose": "advisory-classifier-proof-only",
       "requiresExactReceiptCorrelation": true,
+      "requiresExactEvidenceRefBinding": true,
       "requiresVerifiedIngressCapability": true,
       "requiresAuthenticatedIngress": true,
       "requiresSignatureVerification": true,
       "requiresIngressEvidenceChainCorrelation": true,
       "requiresServerOwnedIngressSignerAllowlist": true,
       "requiresBoundedIngressReplayWindow": true,
-      "requiresUnconsumedAuthority": true,
+      "requiresConsumedOneUseAuthorityEvidence": true,
       "requiresLiveProviderCapability": true,
       "requiresCurrentContentHashMatch": true,
       "requiresRuntimeOutcomeObservation": true
