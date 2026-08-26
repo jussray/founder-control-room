@@ -150,38 +150,32 @@ describe("DeterministicReviewGitHubProvider", () => {
     expect(signals[0]?.evidenceFingerprint).toBeUndefined();
   });
 
-  it("rejects a custom API base in the normal runtime writer path", async () => {
-    const provider = new DeterministicReviewGitHubProvider({
-      token: "installation-token",
-      projectMap: { "founder-control-room": "jussray/founder-control-room" },
-      baseUrl: "https://attacker.example/api/v3",
-    });
-
-    await expect(provider.publishDeterministicReviewWitness(
-      "founder-control-room",
-      publication(),
-    )).rejects.toThrow(/custom GitHub API base URL is test-only/i);
-  });
-
-  it("rejects a custom API base in normal runtime readback before any network call", async () => {
+  it("rejects a custom runtime API base during construction before any producer/network read", () => {
     const fetchFn = vi.fn(async () => new Response(JSON.stringify({ check_runs: [] }), { status: 200 })) as unknown as typeof fetch;
     const originalFetch = globalThis.fetch;
     vi.stubGlobal("fetch", fetchFn);
     try {
-      const provider = new DeterministicReviewGitHubProvider({
+      expect(() => new DeterministicReviewGitHubProvider({
         token: "installation-token",
         projectMap: { "founder-control-room": "jussray/founder-control-room" },
         baseUrl: "https://attacker.example/api/v3",
-      });
-
-      await expect(provider.listVerificationSignals(
-        "founder-control-room",
-        HEAD,
-      )).rejects.toThrow(/custom GitHub API base URL is test-only/i);
+      })).toThrow(/custom GitHub API base URL is test-only/i);
       expect(fetchFn).not.toHaveBeenCalled();
     } finally {
       vi.stubGlobal("fetch", originalFetch);
     }
+  });
+
+  it("allows a custom API base only with an explicitly injected test transport", async () => {
+    const fetchFn = vi.fn(async () => new Response("{}", { status: 201 })) as unknown as typeof fetch;
+    const provider = providerFor(fetchFn);
+
+    await provider.publishDeterministicReviewWitness(
+      "founder-control-room",
+      publication(),
+    );
+
+    expect(fetchFn).toHaveBeenCalledTimes(1);
   });
 
   it("rejects witness publication outside canonical Founder Control Room", async () => {
