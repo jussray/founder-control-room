@@ -7,7 +7,7 @@ description: >
   by inspecting the authoritative source, choosing one reversible action,
   patching only the focused cause, and reporting evidence without burning
   unnecessary context.
-version: 1.0
+version: 2.0
 visibility: private
 owner: Juss
 triggers:
@@ -27,7 +27,7 @@ Use `/goalfix` when Juss gives a goal, bug, product-design target, GitHub task,
 failed check, repo drift, launch blocker, or unclear workflow and wants fast,
 truthful progress without wasting tokens.
 
-The skill exists to prevent AI agents from wandering, over-reading, over-building,
+The skill exists to prevent agents from wandering, over-reading, over-building,
 rewriting unrelated files, or claiming success before proof exists.
 
 ## Core command
@@ -49,14 +49,13 @@ Report Reality / Fix / Proof / Risk / Rollback / Next Gate.
 Use the shared founder stack:
 
 ```text
-/garyvee lindymode redteam l99 redteam ooda
+lindymode → redteam → l99 → ooda
 ```
 
 - Founder value: identify the user/business outcome and fastest truthful proof.
-- Lindy: prefer durable, portable, reversible fixes over clever temporary tricks.
-- Redteam I: attack the premise before changing anything.
-- L99: map authority, lifecycle, provenance, evidence, rollback, and compounding value.
-- Redteam II: attack the selected fix and its blast radius.
+- Lindy: prefer durable, portable, reversible fixes over temporary tricks.
+- Red Team / Devil: attack assumptions before and after the implementation.
+- L99: map authority, lifecycle, evidence, ownership, rollback, and compounding value.
 - OODA: observe, orient, decide, act minimally, verify, and loop.
 
 ## Authority order
@@ -65,131 +64,174 @@ When sources conflict, trust this order:
 
 1. Repository, branch, PR, deployed configuration, and runtime actually inspected.
 2. Current CI logs, Playwright artifacts, screenshots, traces, schemas, and API responses.
-3. Explicit Juss decisions and approved project records.
+3. Explicit founder decisions and approved project records.
 4. Current official provider documentation.
-5. Prior summaries, generated plans, chat memory, and assumptions.
+5. Prior summaries, generated plans, email, chat memory, and assumptions.
 
-Never claim a file, feature, check, deployment, merge, account state, or provider
-action exists without evidence.
+Historical evidence is useful provenance, but it never outranks a newer exact SHA,
+provider readback, runtime observation, or changed PR head.
 
-## Token budget rules
+## Token preflight
 
-Before reading broadly, state the token preflight:
+Before reading broadly, state:
 
 ```text
-AUTHORITATIVE SOURCE:
-TARGET:
-LIKELY FAILURE AREA:
-FIRST FILES/LOGS NEEDED:
+AUTHORITATIVE REPO:
+TARGET BRANCH / PR:
+CURRENT GOAL:
+SUSPECTED FAILURE AREA:
+FIRST FILES / LOGS:
 STOP CONDITION:
 ```
 
-Then work narrow-first:
+Work narrow-first. Prefer exact errors, failing test names, route/config names, recent
+diffs, and current provider evidence over whole-repository scanning.
 
-- Search exact errors, failing test names, route names, config names, component names,
-  workflow names, and recent diffs before scanning whole repos.
-- Read only files that can affect the target path.
-- Summarize relevant lines instead of pasting huge files.
-- Ask for one missing artifact at a time.
-- Stop when the next action requires approval, credentials, private data, or irreversible change.
-- Do not run a full-context audit when a focused file, log, or test can answer the question.
+## Canonical workflow
 
-## Workflow
+```text
+FOUNDER INTENT
+  ↓
+OBSERVE
+  ↓
+ORIENT
+  ↓
+DECIDE
+  ↓
+BUILDER
+  ↓
+INDEPENDENT VERIFIER
+  ↓
+INDEPENDENT RED TEAM / DEVIL
+  ↓
+EXACT-HEAD MERGE GATE
+  ↓
+FOUNDER FINAL
+  ↓
+MERGE WITH EXPECTED HEAD
+  ↓
+REACQUIRE MAIN
+  ↓
+POST-MERGE / RUNTIME TRUTH
+  ↓
+RECOVER / LEARN / NEXT GATE
+```
 
 ### 1. Observe
 
-Inspect the real source of truth:
+Inspect repository, branch, PR, exact base/head SHAs, diff, CI, provider/deployment
+state, runtime behavior, and Playwright evidence where applicable.
 
-- repository and branch;
-- PR and diff when applicable;
-- CI status, job logs, and artifacts;
-- deployment/provider logs when relevant;
-- app runtime behavior;
-- Playwright screenshots/traces for UI and browser flows;
-- Product Design source image, Figma frame, screenshot, URL, or coded implementation when design is involved.
-
-Classify all important statements as:
+Classify material statements as:
 
 - VERIFIED;
 - INFERRED;
 - UNKNOWN;
-- BLOCKED.
+- BLOCKED;
+- STALE when previously valid evidence no longer matches current state.
 
 ### 2. Orient
 
-Map the goal through 5W1H:
+Map 5W1H: who owns the decision, what changes, where truth lives, when to stop or
+rerun, why the change matters, and how it will be tested and reversed.
 
-- Who owns the decision, performs the work, and is affected?
-- What must change, and what must stay untouched?
-- Where is the authoritative source, environment, and proof?
-- When should this run, stop, rerun, merge, deploy, or roll back?
-- Why does this serve the product, user, brand, business, or safety objective?
-- How will it be implemented, tested, observed, and reversed?
+Before mutation, establish exact repository/base/head scope, founder outcome,
+smallest reversible change, proof plan, rollback, and unrelated-work preservation.
 
 ### 3. Decide
 
-Pick one focused fix.
+Choose one root cause before many symptoms.
 
-Rules:
-
-- one root cause before many symptoms;
 - smallest reversible patch;
-- no unrelated refactors;
-- no mass rewrites unless explicitly authorized;
-- no deletion without specific approval;
-- no merge unless intended scope, checks, real-path verification, and rollback are understood;
-- no public claim without proof.
+- no unrelated refactor;
+- no deletion without explicit approval;
+- preserve valuable red/draft/superseded work until unique residue is reconciled;
+- no public or production claim without proof.
 
-### 4. Act
+### 4. Builder
 
-Patch only the needed files.
+Patch only the required files on a branch. Preserve unrelated work. Add the narrowest
+useful test. Never suppress failing signals, hide errors, or fake green. Builder may
+produce implementation evidence but cannot certify its own load-bearing work.
 
-For code:
+### 5. Independent Verifier
 
-- preserve unrelated work;
-- keep diffs small;
-- add or update the narrowest useful test;
-- do not suppress failing signals;
-- do not fake green with mocks, fallbacks, swallowed errors, or hidden skips.
+Run the cheapest valid proof first, escalating only as needed:
 
-For Product Design:
+1. touched-area typecheck/lint;
+2. focused unit/integration test;
+3. targeted Playwright for real UI/browser paths;
+4. exact-head CI;
+5. provider/deployment/runtime readback.
 
-- preserve the selected visual target and user outcome;
-- do not redesign adjacent UI unless requested;
-- check responsive states, keyboard/focus behavior, reduced motion, readable contrast,
-  empty/loading/error states, and teen-facing privacy/safety copy when relevant;
-- compare the coded result against the source visual before handoff.
+Verification must bind to the actual candidate head SHA and current base. Synthetic
+merge refs and old candidate heads do not satisfy exact-head proof.
 
-### 5. Verify
+### 6. Independent Red Team / Devil
 
-Run the cheapest valid verification first, then escalate only as needed:
+Attack the exact verified candidate for authority bypass, stale evidence, alternate
+provider/ingress paths, false success, scope expansion, rollback failure, hidden
+errors, and self-produced evidence. Builder, Verifier, and Red Team remain separate
+for load-bearing certification.
 
-1. static check for touched area;
-2. focused unit or integration test;
-3. targeted Playwright test for real UI/browser flow;
-4. CI or deployment check;
-5. artifact/log/screenshot/trace inspection.
+### 7. Exact-head merge gate
 
-For Se’kret Bip UI, auth, routing, onboarding, splash, preview, waitlist, or runtime
-work, Playwright evidence is required before calling the path done.
+Require:
 
-If GitHub Actions fails with zero useful steps or no product logs, classify it as
-infrastructure until job evidence proves a code regression. Do not merge from a
-monitoring-only workflow.
+```text
+repository
+exact base SHA
+exact candidate head SHA
+current diff/scope
+current evidence IDs
+current CI/review state
+rollback
+```
 
-### 6. Report
+Machine green is not merge authority. If `main` moves, prior merge-readiness becomes
+historical. Reacquire the focused change on current main and rerun dependent proof.
 
-Return this exact compact report:
+Founder-final approval must apply to the unchanged exact candidate. Merge with
+expected-head protection only after required checks and review authority are current.
+
+### 8. Post-merge truth
+
+Merge is not completion. Reacquire current `main`, prove merged identity, then obtain
+required provider/runtime/browser evidence. UI/runtime claims require Playwright.
+When runtime proof is required but absent, report `MERGED_UNVERIFIED`, not done.
+
+### 9. Recover and learn
+
+Before closing red, draft, stale, or superseded work, inspect it for unique code,
+tests, decisions, evidence, or unresolved intent. Preserve useful residue and retire
+only what current authority has actually replaced.
+
+## Status board
+
+```text
+RED               real failure or unresolved material blocker
+VERIFYING         implementation exists; proof incomplete
+GREEN             fresh machine evidence passes; authority may remain
+REVIEW             independent review authority pending
+MERGED             integrated into current main
+RUNTIME_VERIFIED   merged artifact proven in intended environment
+SUPERSEDED         historical value preserved; no longer authoritative
+BLOCKED            required external authority/evidence unavailable
+```
+
+## Report
+
+Return exactly:
 
 ```text
 REALITY:
 [verified current state]
 
 FIX:
-[files changed, commit/PR if applicable]
+[focused implementation]
 
 PROOF:
-[tests, logs, screenshots, traces, CI, runtime evidence]
+[current exact-head tests, CI, Playwright, provider/runtime evidence]
 
 RISK:
 [what could still be wrong]
@@ -203,17 +245,10 @@ NEXT GATE:
 
 ## Stop conditions
 
-Stop before acting when:
-
-- repo, branch, PR, environment, or source-of-truth authority is unclear;
-- credentials, private prompts, sensitive teen data, user records, or private business logic may be exposed;
-- deletion or irreversible exposure lacks explicit approval;
-- merge or release lacks required evidence;
-- the requested action would move away from Juss’s stated objective;
-- Product Design lacks a visual target or intended user outcome and building would invent too much.
-
-When stopped, give the exact blocker, safest useful action still available, and the
-evidence or approval required.
+Stop or hold merge when authority is unclear, exact-head evidence is stale, required
+review is absent, a real failing gate remains, runtime proof is required but missing,
+or the next step would expose secrets/private data or create an irreversible change
+without explicit founder authority.
 
 ## Agent-specific notes
 
@@ -224,4 +259,4 @@ evidence or approval required.
 
 ## One-line mantra
 
-Seek the real blocker. Patch the smallest cause. Verify the real path. Preserve the founder’s options.
+Seek the real blocker. Build the smallest fix. Verify the exact path. Preserve the founder's options.
