@@ -5,193 +5,222 @@ import type {
   RepositoryProvider,
 } from "../providers/RepositoryProvider.js";
 import {
-  DeterministicReviewProductionError,
-  FCR_DETERMINISTIC_REVIEW_RULE_VERSION,
-  FCR_DETERMINISTIC_REVIEWER_ID,
-  produceFcrDeterministicReview,
+  FCR_FOUNDER_FINAL_REVIEW_POLICY,
+  independentReviewPolicyHash,
+} from "./independentReviewGate.js";
+import {
+  DETERMINISTIC_REVIEWER_ID,
+  DETERMINISTIC_REVIEW_RULESET,
+  evaluateDeterministicReviewRules,
+  produceDeterministicReview,
 } from "./deterministicReviewProducer.js";
 
 const BASE = "a".repeat(40);
 const HEAD = "b".repeat(40);
-const OTHER_HEAD = "c".repeat(40);
-const REPOSITORY = "jussray/founder-control-room";
 
-function context(overrides: Partial<PullRequestReviewContext> = {}): PullRequestReviewContext {
+const defaultContext: PullRequestReviewContext = {
+  number: 706,
+  repository: "jussray/founder-control-room",
+  headRepository: "jussray/founder-control-room",
+  baseRef: "main",
+  headRef: "fix/test-discovery",
+  baseSha: BASE,
+  headSha: HEAD,
+  authorIdentity: "jussray",
+};
+
+const defaultDiff: Diff = {
+  base: BASE,
+  head: HEAD,
+  aheadBy: 1,
+  behindBy: 0,
+  files: [{
+    path: "src/example.ts",
+    status: "modified",
+    additions: 1,
+    deletions: 1,
+    patch: "@@ -1 +1 @@\n-old\n+new",
+  }],
+};
+
+function providerFor({
+  context = defaultContext,
+  diff = defaultDiff,
+  currentBase = BASE,
+  currentHead = HEAD,
+}: {
+  context?: PullRequestReviewContext;
+  diff?: Diff;
+  currentBase?: string;
+  currentHead?: string;
+} = {}): RepositoryProvider {
   return {
-    number: 706,
-    repository: REPOSITORY,
-    headRepository: REPOSITORY,
-    baseRef: "main",
-    headRef: "fix/test-discovery-runner-truth-6601086",
-    baseSha: BASE,
-    headSha: HEAD,
-    authorIdentity: "jussray",
-    ...overrides,
-  };
+    name: "github",
+    getPullRequestReviewContext: async () => context,
+    resolveRef: async (_projectId: string, ref: string) => ref === context.baseRef ? currentBase : currentHead,
+    compare: async () => diff,
+  } as unknown as RepositoryProvider;
 }
 
-function file(path: string, patch = "@@ -1 +1 @@\n-old\n+new") {
+function file(path: string) {
   return {
     path,
     status: "modified" as const,
     additions: 1,
     deletions: 1,
-    patch,
+    patch: `@@ -1 +1 @@\n-old ${path}\n+new ${path}`,
   };
 }
 
-function diff(files: Diff["files"] = [file("src/goalfix/engine.ts")], overrides: Partial<Diff> = {}): Diff {
-  return {
-    base: BASE,
-    head: HEAD,
-    files,
-    aheadBy: 1,
-    behindBy: 0,
-    ...overrides,
-  };
-}
-
-function provider({
-  reviewContext = context(),
-  reviewedDiff = diff(),
-  resolvedBase = reviewContext.baseSha,
-  resolvedHead = reviewContext.headSha,
-}: {
-  reviewContext?: PullRequestReviewContext;
-  reviewedDiff?: Diff;
-  resolvedBase?: string;
-  resolvedHead?: string;
-} = {}): RepositoryProvider {
-  return {
-    name: "github",
-    getPullRequestReviewContext: async () => reviewContext,
-    resolveRef: async (_projectId: string, ref: string) =>
-      ref === reviewContext.baseRef ? resolvedBase : resolvedHead,
-    compare: async () => reviewedDiff,
-  } as unknown as RepositoryProvider;
-}
-
-describe("FCR deterministic review producer v1", () => {
-  it("produces the same receipt hash for the same exact provider inputs", async () => {
-    const first = await produceFcrDeterministicReview(provider(), 706);
-    const second = await produceFcrDeterministicReview(provider(), 706);
+describe("deterministic review producer", () => {
+  it("produces the same canonical receipt hash for the same provider truth", async () => {
+    const provider = providerFor();
+    const first = await produceDeterministicReview({ provider, projectId: "founder-control-room", pullRequestNumber: 706 });
+    const second = await produceDeterministicReview({ provider, projectId: "founder-control-room", pullRequestNumber: 706 });
 
     expect(first.receipt).toEqual(second.receipt);
-    expect(first.receipt.verdict).toBe("clear");
-    expect(first.receipt.findings).toEqual([]);
+    expect(first.receipt.reviewHash).toMatch(/^[0-9a-f]{64}$/);
     expect(first.receipt.reviewer).toEqual({
-      id: FCR_DETERMINISTIC_REVIEWER_ID,
+      id: DETERMINISTIC_REVIEWER_ID,
       kind: "deterministic",
       provider: "github",
-      runtime: FCR_DETERMINISTIC_REVIEW_RULE_VERSION,
+      runtime: DETERMINISTIC_REVIEW_RULESET,
     });
+    expect(first.receipt.policyHash).toBe(independentReviewPolicyHash(FCR_FOUNDER_FINAL_REVIEW_POLICY));
     expect(first.receipt.proposalOnly).toBe(true);
     expect(first.receipt.mergeAuthorized).toBe(false);
     expect(first.receipt.executionAuthorized).toBe(false);
-    expect(first.receipt.reviewHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(first.receipt.verdict).toBe("clear");
+    expect(first.publishable).toBe(true);
   });
 
-  it("changes receipt identity when the exact reviewed head changes", async () => {
-    const first = await produceFcrDeterministicReview(provider(), 706);
-    const changedContext = context({ headSha: OTHER_HEAD });
-    const changed = await produceFcrDeterministicReview(provider({
-      reviewContext: changedContext,
-      resolvedHead: OTHER_HEAD,
-      reviewedDiff: diff([file("src/goalfix/engine.ts")], { head: OTHER_HEAD }),
-    }), 706);
+  it("changes the receipt identity when the exact diff changes", async () => {
+    const first = await produceDeterministicReview({
+      provider: providerFor(),
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    });
+    const changedDiff = {
+      ...defaultDiff,
+      files: [file("src/another.ts")],
+    };
+    const second = await produceDeterministicReview({
+      provider: providerFor({ diff: changedDiff }),
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    });
 
-    expect(changed.receipt.headSha).toBe(OTHER_HEAD);
-    expect(changed.receipt.reviewHash).not.toBe(first.receipt.reviewHash);
+    expect(second.receipt.diffHash).not.toBe(first.receipt.diffHash);
+    expect(second.receipt.reviewHash).not.toBe(first.receipt.reviewHash);
   });
 
-  it("rejects fork substitution before producing a receipt", async () => {
-    const reviewContext = context({ headRepository: "attacker/fork" });
-    await expect(produceFcrDeterministicReview(provider({ reviewContext }), 706))
-      .rejects.toThrow(/fork substitution/i);
+  it("fails closed when the provider base or head moves after PR context read", async () => {
+    await expect(produceDeterministicReview({
+      provider: providerFor({ currentBase: "c".repeat(40) }),
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    })).rejects.toThrow(/base moved/i);
+
+    await expect(produceDeterministicReview({
+      provider: providerFor({ currentHead: "c".repeat(40) }),
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    })).rejects.toThrow(/head moved/i);
   });
 
-  it("rejects a head that moves after provider review context is read", async () => {
-    await expect(produceFcrDeterministicReview(provider({ resolvedHead: OTHER_HEAD }), 706))
-      .rejects.toThrow(/Head moved/i);
+  it("fails closed when provider diff content is incomplete", async () => {
+    const incomplete: Diff = {
+      ...defaultDiff,
+      files: [{
+        path: "src/incomplete.ts",
+        status: "modified",
+        additions: 1,
+        deletions: 1,
+      }],
+    };
+    await expect(produceDeterministicReview({
+      provider: providerFor({ diff: incomplete }),
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    })).rejects.toThrow(/diff content is incomplete/i);
   });
 
-  it("rejects stale candidates that are behind the reviewed base", async () => {
-    await expect(produceFcrDeterministicReview(provider({
-      reviewedDiff: diff([file("src/goalfix/engine.ts")], { behindBy: 1 }),
-    }), 706)).rejects.toThrow(/current with its base/i);
+  it("fails closed when the candidate is behind its provider base", async () => {
+    await expect(produceDeterministicReview({
+      provider: providerFor({ diff: { ...defaultDiff, behindBy: 1 } }),
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    })).rejects.toThrow(/fresh candidate/i);
   });
 
-  it("rejects incomplete diff content instead of hashing an unreviewed file", async () => {
-    const incomplete = diff([{ ...file("src/goalfix/engine.ts"), patch: undefined }]);
-    await expect(produceFcrDeterministicReview(provider({ reviewedDiff: incomplete }), 706))
-      .rejects.toThrow(DeterministicReviewProductionError);
-  });
-
-  it("blocks trust-root self-modification and never returns authority", async () => {
-    const reviewedDiff = diff([
-      file("src/review/independentReviewGate.ts"),
-      file("docs/FOUNDER_MERGE_AUTHORITY.md"),
-    ]);
-    const result = await produceFcrDeterministicReview(provider({ reviewedDiff }), 706);
+  it("blocks trust-root self-modification instead of self-certifying it", async () => {
+    const diff: Diff = {
+      ...defaultDiff,
+      files: [
+        file("src/review/deterministicReviewProducer.ts"),
+        file("README.md"),
+        file("docs/FOUNDER_MERGE_AUTHORITY.md"),
+        file("GLOBAL_AI.md"),
+        file(".ai/skills/juss-flow-launch-loop/SKILL.md"),
+        file("docs/DOCUMENTATION_TRUTH_RECEIPT.json"),
+      ],
+    };
+    const result = await produceDeterministicReview({
+      provider: providerFor({ diff }),
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    });
 
     expect(result.receipt.verdict).toBe("blocked");
+    expect(result.publishable).toBe(false);
     expect(result.receipt.findings).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        id: "trust-root-self-modification",
-        severity: "P1",
-      }),
+      expect.objectContaining({ id: "trust-root-self-modification", severity: "P1" }),
     ]));
-    expect(result.receipt.mergeAuthorized).toBe(false);
-    expect(result.receipt.executionAuthorized).toBe(false);
   });
 
-  it("accepts the #706-style discovery authority coupling when both companions move", async () => {
-    const reviewedDiff = diff([
-      file("vitest.config.ts"),
+  it("requires discovery adversarial tests and runbook when discovery core changes", () => {
+    const findings = evaluateDeterministicReviewRules([
       file("scripts/verify-test-discovery.mjs"),
-      file("scripts/test-discovery-baseline.json"),
+    ]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "test-discovery-proof-coupling", severity: "P2" }),
+    ]));
+
+    const repaired = evaluateDeterministicReviewRules([
+      file("scripts/verify-test-discovery.mjs"),
       file("scripts/verify-test-discovery.node-test.mjs"),
       file("docs/TEST_DISCOVERY_DEBT.md"),
     ]);
-    const result = await produceFcrDeterministicReview(provider({ reviewedDiff }), 706);
-
-    expect(result.receipt.verdict).toBe("clear");
-    expect(result.receipt.findings).toEqual([]);
+    expect(repaired.some((item) => item.id === "test-discovery-proof-coupling")).toBe(false);
   });
 
-  it("returns needs_review when discovery authority changes without both companions", async () => {
-    const reviewedDiff = diff([
-      file("vitest.config.ts"),
-      file("scripts/verify-test-discovery.mjs"),
-    ]);
-    const result = await produceFcrDeterministicReview(provider({ reviewedDiff }), 706);
+  it("requires canonical truth companions for merge-authority and provider source", () => {
+    const mergeFindings = evaluateDeterministicReviewRules([file("src/review/exampleAuthority.ts")]);
+    expect(mergeFindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "merge-authority-truth-coupling", severity: "P2" }),
+    ]));
 
-    expect(result.receipt.verdict).toBe("needs_review");
-    expect(result.receipt.findings).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        id: "test-discovery-companion-missing",
-        severity: "P2",
+    const providerFindings = evaluateDeterministicReviewRules([file("src/providers/exampleProvider.ts")]);
+    expect(providerFindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "provider-authority-truth-coupling", severity: "P2" }),
+    ]));
+  });
+
+  it("rejects caller attempts to redirect the producer to another repository/provider", async () => {
+    await expect(produceDeterministicReview({
+      provider: providerFor({
+        context: { ...defaultContext, repository: "attacker/repo", headRepository: "attacker/repo" },
       }),
-    ]));
-  });
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    })).rejects.toThrow(/canonical Founder Control Room repository/i);
 
-  it("requires founder merge-authority truth when non-test review authority source changes", async () => {
-    const reviewedDiff = diff([file("src/review/reviewerFailoverBroker.ts")]);
-    const result = await produceFcrDeterministicReview(provider({ reviewedDiff }), 706);
-
-    expect(result.receipt.verdict).toBe("needs_review");
-    expect(result.receipt.findings).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "merge-authority-truth-companion-missing", severity: "P2" }),
-    ]));
-  });
-
-  it("requires provider truth documentation when non-test provider source changes", async () => {
-    const reviewedDiff = diff([file("src/providers/providerFactory.ts")]);
-    const result = await produceFcrDeterministicReview(provider({ reviewedDiff }), 706);
-
-    expect(result.receipt.verdict).toBe("needs_review");
-    expect(result.receipt.findings).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "provider-truth-companion-missing", severity: "P2" }),
-    ]));
+    const nonGitHub = providerFor();
+    Object.defineProperty(nonGitHub, "name", { value: "gitlab" });
+    await expect(produceDeterministicReview({
+      provider: nonGitHub,
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    })).rejects.toThrow(/GitHub repository provider/i);
   });
 });

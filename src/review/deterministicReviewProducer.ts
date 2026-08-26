@@ -1,8 +1,4 @@
-import type {
-  Diff,
-  PullRequestReviewContext,
-  RepositoryProvider,
-} from "../providers/RepositoryProvider.js";
+import type { DiffFile, RepositoryProvider } from "../providers/RepositoryProvider.js";
 import {
   FCR_FOUNDER_FINAL_REVIEW_POLICY,
   INDEPENDENT_REVIEW_CONTRACT,
@@ -14,10 +10,9 @@ import {
   type ReviewVerdict,
 } from "./independentReviewGate.js";
 
-export const FCR_DETERMINISTIC_REVIEW_RULE_VERSION = "fcr-deterministic-rules@v1" as const;
-export const FCR_DETERMINISTIC_REVIEWER_ID = "fcr-deterministic-review-v1" as const;
+export const DETERMINISTIC_REVIEW_RULESET = "fcr/deterministic-review-rules@v1" as const;
+export const DETERMINISTIC_REVIEWER_ID = "fcr-deterministic-review-v1" as const;
 
-const FCR_PROJECT_ID = "founder-control-room";
 const FCR_REPOSITORY = "jussray/founder-control-room";
 const FCR_BASE_REF = "main";
 const FULL_SHA = /^[0-9a-f]{40}$/i;
@@ -29,54 +24,67 @@ const TRUST_ROOT_PATHS = new Set([
   "src/http/routes/approvals.ts",
   "src/providers/RepositoryProvider.ts",
   "src/providers/GitHubProvider.ts",
+  "src/providers/providerFactory.ts",
 ]);
 
-const TEST_DISCOVERY_TRIGGER_PATHS = new Set([
+const MERGE_AUTHORITY_DOCS = [
+  "README.md",
+  "docs/FOUNDER_MERGE_AUTHORITY.md",
+  "GLOBAL_AI.md",
+  ".ai/skills/juss-flow-launch-loop/SKILL.md",
+  "docs/DOCUMENTATION_TRUTH_RECEIPT.json",
+] as const;
+
+const PROVIDER_DOCS = [
+  "README.md",
+  "docs/PROVIDERS.md",
+  "docs/DOCUMENTATION_TRUTH_RECEIPT.json",
+] as const;
+
+const TEST_DISCOVERY_CORE_PATHS = new Set([
   "vitest.config.ts",
   "scripts/verify-test-discovery.mjs",
   "scripts/test-discovery-baseline.json",
 ]);
 
-const TEST_DISCOVERY_COMPANION_PATHS = [
+const TEST_DISCOVERY_COMPANIONS = [
   "scripts/verify-test-discovery.node-test.mjs",
   "docs/TEST_DISCOVERY_DEBT.md",
 ] as const;
 
-const FCR_MERGE_TRUTH_DOC = "docs/FOUNDER_MERGE_AUTHORITY.md";
-const PROVIDER_TRUTH_DOC = "docs/PROVIDERS.md";
+export interface DeterministicReviewProducerInput {
+  provider: RepositoryProvider;
+  projectId: string;
+  pullRequestNumber: number;
+}
 
-export interface FcrDeterministicReviewProduction {
-  context: PullRequestReviewContext;
-  diff: Diff;
+export interface DeterministicReviewProduction {
   receipt: IndependentReviewReceipt;
-  ruleVersion: typeof FCR_DETERMINISTIC_REVIEW_RULE_VERSION;
+  ruleSet: typeof DETERMINISTIC_REVIEW_RULESET;
+  publishable: boolean;
 }
 
-export class DeterministicReviewProductionError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "DeterministicReviewProductionError";
-  }
+function text(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }
 
-const lower = (value: string): string => value.trim().toLowerCase();
-const sortedUnique = (values: string[]): string[] => [...new Set(values)].sort();
-const isTestPath = (path: string): boolean => /(?:^|\/)(?:__tests__\/.*|[^/]+\.(?:test|spec)\.[cm]?[jt]sx?)$/i.test(path);
+function lower(value: unknown): string {
+  return text(value).toLowerCase();
+}
 
 function finding(
   id: string,
-  severity: "P1" | "P2",
+  severity: IndependentReviewFinding["severity"],
   title: string,
-  paths: string[],
+  path: string,
   evidence: string,
   recommendation: string,
 ): IndependentReviewFinding {
-  const orderedPaths = sortedUnique(paths);
   return {
     id,
     severity,
     title,
-    path: orderedPaths[0] ?? "",
+    path,
     line: null,
     evidence,
     recommendation,
@@ -89,177 +97,212 @@ function verdictFromFindings(findings: IndependentReviewFinding[]): ReviewVerdic
   return "clear";
 }
 
-function summaryFor(verdict: ReviewVerdict, findings: IndependentReviewFinding[]): string {
-  if (verdict === "clear") {
-    return `Deterministic review ${FCR_DETERMINISTIC_REVIEW_RULE_VERSION} satisfied all mechanical rules.`;
-  }
-  const severities = findings.map((item) => `${item.severity}:${item.id}`).join(",");
-  return `Deterministic review ${FCR_DETERMINISTIC_REVIEW_RULE_VERSION} returned ${verdict}: ${severities}.`;
+function changedPathSet(files: DiffFile[]): Set<string> {
+  return new Set(files.map((file) => file.path));
 }
 
-function requireExactProviderIdentity(context: PullRequestReviewContext): void {
-  if (context.number <= 0 || !Number.isInteger(context.number)) {
-    throw new DeterministicReviewProductionError("Provider PR number is invalid");
-  }
-  if (lower(context.repository) !== FCR_REPOSITORY || lower(context.headRepository) !== FCR_REPOSITORY) {
-    throw new DeterministicReviewProductionError("Deterministic review rejects repository or fork substitution");
-  }
-  if (context.baseRef !== FCR_BASE_REF || !context.headRef.trim()) {
-    throw new DeterministicReviewProductionError("Deterministic review requires the canonical main base and a named head ref");
-  }
-  if (!FULL_SHA.test(context.baseSha) || !FULL_SHA.test(context.headSha)) {
-    throw new DeterministicReviewProductionError("Deterministic review requires exact full base/head SHAs");
-  }
-  if (!context.authorIdentity.trim()) {
-    throw new DeterministicReviewProductionError("Deterministic review requires provider-backed author identity");
-  }
+function isReviewAuthoritySource(path: string): boolean {
+  return path === "src/http/routes/approvals.ts"
+    || (path.startsWith("src/review/") && !path.endsWith(".test.ts"));
 }
 
-function requireCurrentProviderRefs(
-  context: PullRequestReviewContext,
-  currentBaseSha: string,
-  currentHeadSha: string,
-): void {
-  if (!FULL_SHA.test(currentBaseSha) || lower(currentBaseSha) !== lower(context.baseSha)) {
-    throw new DeterministicReviewProductionError("Base moved after provider review context was read");
-  }
-  if (!FULL_SHA.test(currentHeadSha) || lower(currentHeadSha) !== lower(context.headSha)) {
-    throw new DeterministicReviewProductionError("Head moved after provider review context was read");
-  }
+function isProviderAuthoritySource(path: string): boolean {
+  return path.startsWith("src/providers/")
+    && !path.startsWith("src/providers/__tests__/")
+    && !path.endsWith(".test.ts");
 }
 
-function requireFreshCompleteDiff(context: PullRequestReviewContext, diff: Diff): string {
-  if (lower(diff.base) !== lower(context.baseSha) || lower(diff.head) !== lower(context.headSha)) {
-    throw new DeterministicReviewProductionError("Provider diff is not bound to the exact reviewed base/head");
-  }
-  if (diff.behindBy !== 0 || diff.aheadBy < 1) {
-    throw new DeterministicReviewProductionError(
-      `Reviewed candidate must be current with its base and ahead by at least one commit; observed ahead=${diff.aheadBy} behind=${diff.behindBy}`,
-    );
-  }
-  try {
-    return independentReviewDiffHash(diff);
-  } catch (error) {
-    throw new DeterministicReviewProductionError(
-      `Provider diff completeness is unproven: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
+function missingPaths(changed: Set<string>, required: readonly string[]): string[] {
+  return required.filter((path) => !changed.has(path));
 }
 
-function evaluateMechanicalRules(diff: Diff): IndependentReviewFinding[] {
-  const paths = sortedUnique(diff.files.map((file) => file.path));
-  const pathSet = new Set(paths);
+export function evaluateDeterministicReviewRules(files: DiffFile[]): IndependentReviewFinding[] {
+  const changed = changedPathSet(files);
   const findings: IndependentReviewFinding[] = [];
 
-  const touchedTrustRoots = paths.filter((path) => TRUST_ROOT_PATHS.has(path));
-  if (touchedTrustRoots.length > 0) {
+  const renamedPaths = files
+    .filter((file) => file.status === "renamed")
+    .map((file) => file.path)
+    .sort();
+  if (renamedPaths.length > 0) {
     findings.push(finding(
-      "trust-root-self-modification",
+      "rename-provenance-unavailable",
       "P1",
-      "Candidate modifies deterministic-review trust roots",
-      touchedTrustRoots,
-      `Trust-root paths changed: ${touchedTrustRoots.join(", ")}`,
-      "Use a separately explicit bootstrap/constitutional authority path; the normal deterministic producer cannot self-certify its own trust roots.",
+      "Rename provenance is unavailable to deterministic review V1",
+      renamedPaths[0]!,
+      `Candidate contains renamed paths (${renamedPaths.join(", ")}), but the provider-neutral DiffFile contract does not retain each previous path. V1 cannot prove that a protected trust-root path was not renamed behind a new path identity.`,
+      "Fail closed for renames in V1. A later provider-contract revision may carry previousPath, hash it, and evaluate both old and new path identities before allowing renamed candidates.",
     ));
   }
 
-  const touchesDiscoveryAuthority = paths.some((path) => TEST_DISCOVERY_TRIGGER_PATHS.has(path));
-  if (touchesDiscoveryAuthority) {
-    const missing = TEST_DISCOVERY_COMPANION_PATHS.filter((path) => !pathSet.has(path));
+  const changedTrustRoots = [...TRUST_ROOT_PATHS].filter((path) => changed.has(path));
+  if (changedTrustRoots.length > 0) {
+    findings.push(finding(
+      "trust-root-self-modification",
+      "P1",
+      "Deterministic review trust root changed",
+      changedTrustRoots[0]!,
+      `Candidate changes deterministic review trust-root paths: ${changedTrustRoots.sort().join(", ")}. A candidate cannot use the normal deterministic producer to certify changes to the producer, its consumer, or its trusted provider witness boundary.`,
+      "Use a separately explicit bootstrap or constitutional authority path for this trust-root change, then reacquire normal deterministic review on later candidates.",
+    ));
+  }
+
+  const changesReviewAuthority = files.some((file) => isReviewAuthoritySource(file.path));
+  if (changesReviewAuthority) {
+    const missing = missingPaths(changed, MERGE_AUTHORITY_DOCS);
     if (missing.length > 0) {
       findings.push(finding(
-        "test-discovery-companion-missing",
+        "merge-authority-truth-coupling",
         "P2",
-        "Test-discovery authority change is missing required companion surfaces",
-        [...paths.filter((path) => TEST_DISCOVERY_TRIGGER_PATHS.has(path)), ...missing],
-        `Missing required companion paths: ${missing.join(", ")}`,
-        "Change the adversarial discovery verifier tests and TEST_DISCOVERY_DEBT documentation in the same candidate.",
+        "Merge-authority truth companions are incomplete",
+        "docs/FOUNDER_MERGE_AUTHORITY.md",
+        `Candidate changes non-test merge-authority source but omits required truth companions: ${missing.join(", ")}.`,
+        "Refresh every canonical merge-authority truth surface and the Documentation Truth receipt in the same candidate.",
       ));
     }
   }
 
-  const touchesMergeAuthority = paths.some((path) =>
-    !isTestPath(path)
-    && (path.startsWith("src/review/")
-      || path === "src/http/routes/approvals.ts"
-      || path === "src/security/repositoryActionAuthority.ts"));
-  if (touchesMergeAuthority && !pathSet.has(FCR_MERGE_TRUTH_DOC)) {
-    findings.push(finding(
-      "merge-authority-truth-companion-missing",
-      "P2",
-      "Merge-authority source changed without founder authority documentation",
-      [FCR_MERGE_TRUTH_DOC],
-      `${FCR_MERGE_TRUTH_DOC} is absent while non-test merge/review authority source changed.`,
-      "Update the founder merge-authority truth surface in the same candidate.",
-    ));
+  const changesProviderAuthority = files.some((file) => isProviderAuthoritySource(file.path));
+  if (changesProviderAuthority) {
+    const missing = missingPaths(changed, PROVIDER_DOCS);
+    if (missing.length > 0) {
+      findings.push(finding(
+        "provider-authority-truth-coupling",
+        "P2",
+        "Repository-provider truth companions are incomplete",
+        "docs/PROVIDERS.md",
+        `Candidate changes non-test repository-provider source but omits required truth companions: ${missing.join(", ")}.`,
+        "Refresh provider documentation, README truth, and the Documentation Truth receipt in the same candidate.",
+      ));
+    }
   }
 
-  const touchesProviderAuthority = paths.some((path) =>
-    !isTestPath(path) && path.startsWith("src/providers/") && !path.endsWith("RepositoryProvider.ts"));
-  if (touchesProviderAuthority && !pathSet.has(PROVIDER_TRUTH_DOC)) {
-    findings.push(finding(
-      "provider-truth-companion-missing",
-      "P2",
-      "Repository-provider source changed without provider documentation",
-      [PROVIDER_TRUTH_DOC],
-      `${PROVIDER_TRUTH_DOC} is absent while non-test repository-provider source changed.`,
-      "Update provider truth documentation in the same candidate.",
-    ));
+  const changesTestDiscoveryCore = files.some((file) => TEST_DISCOVERY_CORE_PATHS.has(file.path));
+  if (changesTestDiscoveryCore) {
+    const missing = missingPaths(changed, TEST_DISCOVERY_COMPANIONS);
+    if (missing.length > 0) {
+      findings.push(finding(
+        "test-discovery-proof-coupling",
+        "P2",
+        "Test-discovery authority changed without its adversarial proof companions",
+        "scripts/verify-test-discovery.mjs",
+        `Candidate changes the default test-discovery contract but omits required companion paths: ${missing.join(", ")}.`,
+        "Change the adversarial discovery tests and current discovery runbook with the discovery contract.",
+      ));
+    }
   }
 
-  return findings;
+  return findings.sort((left, right) => left.id.localeCompare(right.id));
 }
 
-export async function produceFcrDeterministicReview(
-  provider: RepositoryProvider,
-  pullRequestNumber: number,
-): Promise<FcrDeterministicReviewProduction> {
-  if (provider.name.toLowerCase() !== "github") {
-    throw new DeterministicReviewProductionError("FCR deterministic review v1 requires the GitHub repository provider");
+function assertProviderContext(
+  repository: string,
+  headRepository: string,
+  baseRef: string,
+  headRef: string,
+  baseSha: string,
+  headSha: string,
+  authorIdentity: string,
+): void {
+  if (lower(repository) !== FCR_REPOSITORY || lower(headRepository) !== FCR_REPOSITORY) {
+    throw new Error("Deterministic review requires the canonical Founder Control Room repository on both PR sides");
   }
-  if (!provider.getPullRequestReviewContext) {
-    throw new DeterministicReviewProductionError("Repository provider cannot supply pull-request review context");
+  if (baseRef !== FCR_BASE_REF) {
+    throw new Error(`Deterministic review is pinned to base ref ${FCR_BASE_REF}`);
   }
-  if (!Number.isInteger(pullRequestNumber) || pullRequestNumber <= 0) {
-    throw new DeterministicReviewProductionError("pullRequestNumber must be a positive integer");
+  if (!text(headRef)) {
+    throw new Error("Deterministic review requires a provider-backed PR head ref");
+  }
+  if (!FULL_SHA.test(baseSha) || !FULL_SHA.test(headSha) || lower(baseSha) === lower(headSha)) {
+    throw new Error("Deterministic review requires distinct full provider base/head SHAs");
+  }
+  if (!text(authorIdentity)) {
+    throw new Error("Deterministic review requires provider-backed PR author identity");
+  }
+}
+
+function deterministicSummary(verdict: ReviewVerdict, findings: IndependentReviewFinding[]): string {
+  if (verdict === "clear") {
+    return `${DETERMINISTIC_REVIEW_RULESET} completed with no V1 deterministic findings.`;
+  }
+  const severities = findings.map((item) => item.severity).sort().join(",");
+  return `${DETERMINISTIC_REVIEW_RULESET} produced ${findings.length} finding(s) with severities ${severities}.`;
+}
+
+export async function produceDeterministicReview(
+  input: DeterministicReviewProducerInput,
+): Promise<DeterministicReviewProduction> {
+  if (!Number.isInteger(input.pullRequestNumber) || input.pullRequestNumber <= 0) {
+    throw new Error("Deterministic review requires a positive pull request number");
+  }
+  if (!input.provider.getPullRequestReviewContext) {
+    throw new Error("Repository provider cannot supply pull-request review context");
+  }
+  if (lower(input.provider.name) !== "github") {
+    throw new Error("Founder Control Room deterministic review currently requires the GitHub repository provider");
   }
 
-  const context = await provider.getPullRequestReviewContext(FCR_PROJECT_ID, pullRequestNumber);
-  requireExactProviderIdentity(context);
+  const context = await input.provider.getPullRequestReviewContext(input.projectId, input.pullRequestNumber);
+  if (context.number !== input.pullRequestNumber) {
+    throw new Error(`Deterministic review provider returned PR #${context.number} for requested PR #${input.pullRequestNumber}`);
+  }
+  assertProviderContext(
+    context.repository,
+    context.headRepository,
+    context.baseRef,
+    context.headRef,
+    context.baseSha,
+    context.headSha,
+    context.authorIdentity,
+  );
 
-  const currentBaseSha = await provider.resolveRef(FCR_PROJECT_ID, context.baseRef);
-  const currentHeadSha = await provider.resolveRef(FCR_PROJECT_ID, context.headRef);
-  requireCurrentProviderRefs(context, currentBaseSha, currentHeadSha);
+  const [currentBaseSha, currentHeadSha] = await Promise.all([
+    input.provider.resolveRef(input.projectId, context.baseRef),
+    input.provider.resolveRef(input.projectId, context.headRef),
+  ]);
+  if (lower(currentBaseSha) !== lower(context.baseSha)) {
+    throw new Error(`Deterministic review base moved: current ${currentBaseSha}, provider PR ${context.baseSha}`);
+  }
+  if (lower(currentHeadSha) !== lower(context.headSha)) {
+    throw new Error(`Deterministic review head moved: current ${currentHeadSha}, provider PR ${context.headSha}`);
+  }
 
-  const diff = await provider.compare(FCR_PROJECT_ID, context.baseSha, context.headSha);
-  const diffHash = requireFreshCompleteDiff(context, diff);
-  const findings = evaluateMechanicalRules(diff);
-  const verdict = verdictFromFindings(findings);
+  const diff = await input.provider.compare(input.projectId, context.baseSha, context.headSha);
+  if (lower(diff.base) !== lower(context.baseSha) || lower(diff.head) !== lower(context.headSha)) {
+    throw new Error("Deterministic review provider diff is not bound to the exact PR base/head");
+  }
+  if (diff.behindBy !== 0 || diff.aheadBy < 1) {
+    throw new Error(`Deterministic review requires a fresh candidate (ahead=${diff.aheadBy}, behind=${diff.behindBy})`);
+  }
+
+  const diffHash = independentReviewDiffHash(diff);
   const policyHash = independentReviewPolicyHash(FCR_FOUNDER_FINAL_REVIEW_POLICY);
+  const findings = evaluateDeterministicReviewRules(diff.files);
+  const verdict = verdictFromFindings(findings);
 
-  const draft: IndependentReviewReceipt = {
+  const draft = {
     contract: INDEPENDENT_REVIEW_CONTRACT,
-    repository: context.repository,
+    repository: FCR_REPOSITORY,
     pullRequestNumber: context.number,
-    baseSha: context.baseSha,
-    headSha: context.headSha,
+    baseSha: lower(context.baseSha),
+    headSha: lower(context.headSha),
     diffHash,
     policyHash,
     reviewer: {
-      id: FCR_DETERMINISTIC_REVIEWER_ID,
-      kind: "deterministic",
-      provider: provider.name,
-      runtime: FCR_DETERMINISTIC_REVIEW_RULE_VERSION,
+      id: DETERMINISTIC_REVIEWER_ID,
+      kind: "deterministic" as const,
+      provider: input.provider.name,
+      runtime: DETERMINISTIC_REVIEW_RULESET,
     },
-    authorIdentity: context.authorIdentity,
+    authorIdentity: text(context.authorIdentity),
     findings,
     verdict,
-    summary: summaryFor(verdict, findings),
-    proposalOnly: true,
-    mergeAuthorized: false,
-    executionAuthorized: false,
+    summary: deterministicSummary(verdict, findings),
+    proposalOnly: true as const,
+    mergeAuthorized: false as const,
+    executionAuthorized: false as const,
     reviewHash: "",
-  };
+  } satisfies IndependentReviewReceipt;
 
   const receipt: IndependentReviewReceipt = {
     ...draft,
@@ -267,9 +310,8 @@ export async function produceFcrDeterministicReview(
   };
 
   return {
-    context,
-    diff,
     receipt,
-    ruleVersion: FCR_DETERMINISTIC_REVIEW_RULE_VERSION,
+    ruleSet: DETERMINISTIC_REVIEW_RULESET,
+    publishable: verdict === "clear",
   };
 }
