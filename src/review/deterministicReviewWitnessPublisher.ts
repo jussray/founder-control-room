@@ -1,14 +1,13 @@
 import type {
-  PullRequestReviewContext,
   RepositoryProvider,
   VerificationSignal,
 } from "../providers/RepositoryProvider.js";
 import {
   INDEPENDENT_REVIEW_CONTRACT,
   expectedReviewSignalName,
-  independentReviewHash,
   type IndependentReviewReceipt,
 } from "./independentReviewGate.js";
+import { produceDeterministicReview } from "./deterministicReviewProducer.js";
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const NUMERIC_ID = /^\d+$/;
@@ -40,7 +39,8 @@ export interface DeterministicReviewWitnessPublisherInput {
   provider: VerificationSignalPublishingProvider;
   projectId: string;
   receipt: IndependentReviewReceipt;
-  trustedGitHubAppId: string;
+  /** Test injection only. Production callers must use the server-owned process environment. */
+  env?: NodeJS.ProcessEnv;
 }
 
 function text(value: unknown): string {
@@ -51,7 +51,7 @@ function lower(value: unknown): string {
   return text(value).toLowerCase();
 }
 
-function assertPublishableReceipt(receipt: IndependentReviewReceipt): void {
+function assertCallerReceiptEnvelope(receipt: IndependentReviewReceipt): void {
   if (receipt?.contract !== INDEPENDENT_REVIEW_CONTRACT) {
     throw new Error("Deterministic review witness requires the canonical independent-review receipt contract");
   }
@@ -61,39 +61,12 @@ function assertPublishableReceipt(receipt: IndependentReviewReceipt): void {
   if (!FULL_SHA.test(text(receipt?.baseSha)) || !FULL_SHA.test(text(receipt?.headSha))) {
     throw new Error("Deterministic review witness requires full base/head SHAs");
   }
-  if (receipt?.verdict !== "clear" || (receipt?.findings?.length ?? 0) !== 0) {
-    throw new Error("Blocked or unresolved deterministic review must not publish a passed witness");
-  }
   if (
     receipt?.proposalOnly !== true
     || receipt?.mergeAuthorized !== false
     || receipt?.executionAuthorized !== false
   ) {
     throw new Error("Deterministic review witness accepts proposal-only non-authorizing receipts only");
-  }
-  if (independentReviewHash(receipt) !== lower(receipt?.reviewHash)) {
-    throw new Error("Deterministic review witness receipt hash does not match receipt content");
-  }
-}
-
-function assertContextMatchesReceipt(
-  context: PullRequestReviewContext,
-  receipt: IndependentReviewReceipt,
-): void {
-  if (context.number !== receipt.pullRequestNumber) {
-    throw new Error("Deterministic review witness provider returned the wrong pull request");
-  }
-  if (lower(context.repository) !== lower(receipt.repository)) {
-    throw new Error("Deterministic review witness repository changed after review");
-  }
-  if (lower(context.baseSha) !== lower(receipt.baseSha)) {
-    throw new Error("Deterministic review witness base changed after review");
-  }
-  if (lower(context.headSha) !== lower(receipt.headSha)) {
-    throw new Error("Deterministic review witness head changed after review");
-  }
-  if (lower(context.authorIdentity) !== lower(receipt.authorIdentity)) {
-    throw new Error("Deterministic review witness author identity changed after review");
   }
 }
 
@@ -117,46 +90,46 @@ export async function publishDeterministicReviewWitness(
   if (lower(input.provider?.name) !== "github") {
     throw new Error("Deterministic review witness publisher currently requires the GitHub repository provider");
   }
-  const trustedGitHubAppId = text(input.trustedGitHubAppId);
+  const env = input.env ?? process.env;
+  const trustedGitHubAppId = text(env.GITHUB_APP_ID);
   if (!NUMERIC_ID.test(trustedGitHubAppId)) {
-    throw new Error("Deterministic review witness publisher requires a numeric trusted GitHub App id");
+    throw new Error("Deterministic review witness publisher requires numeric server-owned GITHUB_APP_ID");
   }
-  assertPublishableReceipt(input.receipt);
+  assertCallerReceiptEnvelope(input.receipt);
 
-  if (!input.provider.getPullRequestReviewContext) {
-    throw new Error("Repository provider cannot supply pull-request review context for witness publication");
+  // Receipt hashes are identities, not authentication. Re-run the trusted
+  // deterministic producer against fresh provider truth immediately before
+  // publication so a caller cannot choose reviewer identity, runtime, policy,
+  // diff hash, findings, verdict, or stale base/head and simply recompute a hash.
+  const production = await produceDeterministicReview({
+    provider: input.provider,
+    projectId: input.projectId,
+    pullRequestNumber: input.receipt.pullRequestNumber,
+  });
+  if (!production.publishable) {
+    throw new Error("Blocked or unresolved deterministic review must not publish a passed witness");
   }
-  const context = await input.provider.getPullRequestReviewContext(
-    input.projectId,
-    input.receipt.pullRequestNumber,
-  );
-  assertContextMatchesReceipt(context, input.receipt);
-
-  const [currentBaseSha, currentHeadSha] = await Promise.all([
-    input.provider.resolveRef(input.projectId, context.baseRef),
-    input.provider.resolveRef(input.projectId, context.headRef),
-  ]);
-  if (lower(currentBaseSha) !== lower(input.receipt.baseSha)) {
-    throw new Error("Deterministic review witness base moved before publication");
-  }
-  if (lower(currentHeadSha) !== lower(input.receipt.headSha)) {
-    throw new Error("Deterministic review witness head moved before publication");
+  if (lower(production.receipt.reviewHash) !== lower(input.receipt.reviewHash)) {
+    throw new Error(
+      "Deterministic review witness receipt is stale or was not derived from current trusted producer truth",
+    );
   }
 
-  const signalName = expectedReviewSignalName(input.receipt);
+  const receipt = production.receipt;
+  const signalName = expectedReviewSignalName(receipt);
   await input.provider.publishVerificationSignal(input.projectId, {
     name: signalName,
-    commitSha: lower(input.receipt.headSha),
+    commitSha: lower(receipt.headSha),
     status: "passed",
-    summary: `${input.receipt.reviewer.runtime}: clear deterministic review receipt ${input.receipt.reviewHash}`,
+    summary: `${receipt.reviewer.runtime}: clear deterministic review receipt ${receipt.reviewHash}`,
   });
 
   const signals = await input.provider.listVerificationSignals(
     input.projectId,
-    input.receipt.headSha,
+    receipt.headSha,
   );
   const signal = signals.find((candidate) =>
-    matchingWitness(candidate, signalName, input.receipt, trustedGitHubAppId));
+    matchingWitness(candidate, signalName, receipt, trustedGitHubAppId));
   if (!signal) {
     throw new Error(
       "Deterministic review witness publication could not be verified with the exact head, signal name, passed state, and trusted GitHub App issuer",
@@ -164,7 +137,7 @@ export async function publishDeterministicReviewWitness(
   }
 
   return {
-    receipt: input.receipt,
+    receipt,
     signal,
     signalName,
     issuerAppId: trustedGitHubAppId,
