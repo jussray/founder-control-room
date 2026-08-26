@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { evaluateGitHubPrAuditEvidence } from './verification.js';
 import type {
   GitHubPrCheckObservation,
+  GitHubPrCommitStatusObservation,
   GitHubPrObservation,
   GitHubPrWorkflowObservation,
 } from './types.js';
@@ -44,13 +45,28 @@ function passingCheck(headSha = HEAD): GitHubPrCheckObservation {
   };
 }
 
+function commitStatus(state: string, headSha = HEAD): GitHubPrCommitStatusObservation {
+  return {
+    id: `status-${state}`,
+    name: 'legacy-ci',
+    state,
+    headSha,
+    updatedAt: CHECKED_AT,
+    detailsUrl: 'https://github.com/example/status/1',
+  };
+}
+
 function passingWorkflow(headSha = HEAD): GitHubPrWorkflowObservation {
   return {
     id: 'run-1',
+    contextId: '10:pull_request',
     name: 'Quality Gate',
     status: 'completed',
     conclusion: 'success',
     headSha,
+    runNumber: 10,
+    runAttempt: 1,
+    createdAt: CHECKED_AT,
     updatedAt: CHECKED_AT,
     detailsUrl: 'https://github.com/example/actions/runs/1',
   };
@@ -62,11 +78,13 @@ function evaluate(overrides: Partial<Parameters<typeof evaluateGitHubPrAuditEvid
     initialPullRequest: pull(),
     finalPullRequest: pull(),
     checks: [passingCheck()],
+    commitStatuses: [],
     workflows: [passingWorkflow()],
     reviews: [],
     changedFiles: [{ path: 'src/example.ts', status: 'modified', additions: 10, deletions: 2 }],
     evidenceCoverage: {
       checksComplete: true,
+      commitStatusesComplete: true,
       workflowsComplete: true,
       reviewsComplete: true,
       changedFilesComplete: true,
@@ -86,6 +104,7 @@ describe('evaluateGitHubPrAuditEvidence', () => {
       ciBoundToHeadSha: true,
       evidenceCoverage: {
         checksComplete: true,
+        commitStatusesComplete: true,
         workflowsComplete: true,
         reviewsComplete: true,
         changedFilesComplete: true,
@@ -104,6 +123,15 @@ describe('evaluateGitHubPrAuditEvidence', () => {
       checks: [passingCheck(OLD_HEAD)],
       workflows: [passingWorkflow(OLD_HEAD)],
     });
+    expect(result.verdict).toBe('evidence_incomplete');
+    expect(result.verification.ciBoundToHeadSha).toBe(false);
+    expect(result.findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'ci_stale_for_head_sha', severity: 'blocker' }),
+    ]));
+  });
+
+  it('rejects a commit status observed on a different head SHA', () => {
+    const result = evaluate({ commitStatuses: [commitStatus('success', OLD_HEAD)] });
     expect(result.verdict).toBe('evidence_incomplete');
     expect(result.verification.ciBoundToHeadSha).toBe(false);
     expect(result.findings).toEqual(expect.arrayContaining([
@@ -143,7 +171,7 @@ describe('evaluateGitHubPrAuditEvidence', () => {
   });
 
   it('treats missing CI as incomplete rather than passing', () => {
-    const result = evaluate({ checks: [], workflows: [] });
+    const result = evaluate({ checks: [], commitStatuses: [], workflows: [] });
     expect(result.verdict).toBe('evidence_incomplete');
     expect(result.summary.ciConclusion).toBe('unknown');
     expect(result.findings).toEqual(expect.arrayContaining([
@@ -160,6 +188,23 @@ describe('evaluateGitHubPrAuditEvidence', () => {
     expect(result.summary.ciConclusion).toBe('fail');
     expect(result.findings).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'ci_failed', severity: 'blocker' }),
+    ]));
+  });
+
+  it('treats a failing GitHub commit status as current CI failure', () => {
+    const result = evaluate({ commitStatuses: [commitStatus('failure')] });
+    expect(result.summary.ciConclusion).toBe('fail');
+    expect(result.findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'ci_failed', severity: 'blocker' }),
+    ]));
+  });
+
+  it('treats a pending GitHub commit status as pending CI when no failure exists', () => {
+    const result = evaluate({ commitStatuses: [commitStatus('pending')] });
+    expect(result.verdict).toBe('evidence_incomplete');
+    expect(result.summary.ciConclusion).toBe('pending');
+    expect(result.findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'ci_pending', severity: 'warning' }),
     ]));
   });
 
@@ -181,6 +226,7 @@ describe('evaluateGitHubPrAuditEvidence', () => {
     const result = evaluate({
       evidenceCoverage: {
         checksComplete: false,
+        commitStatusesComplete: true,
         workflowsComplete: true,
         reviewsComplete: true,
         changedFilesComplete: true,
@@ -188,6 +234,22 @@ describe('evaluateGitHubPrAuditEvidence', () => {
     });
     expect(result.verdict).toBe('evidence_incomplete');
     expect(result.verification.freshness).toBe('unknown');
+    expect(result.findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'evidence_collection_truncated', severity: 'blocker' }),
+    ]));
+  });
+
+  it('never claims complete evidence when commit-status observations are truncated', () => {
+    const result = evaluate({
+      evidenceCoverage: {
+        checksComplete: true,
+        commitStatusesComplete: false,
+        workflowsComplete: true,
+        reviewsComplete: true,
+        changedFilesComplete: true,
+      },
+    });
+    expect(result.verdict).toBe('evidence_incomplete');
     expect(result.findings).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'evidence_collection_truncated', severity: 'blocker' }),
     ]));
