@@ -9,6 +9,7 @@ const STATIC_FILE_PATTERN = /\.(?:avif|css|gif|html|ico|jpe?g|js|map|png|svg|txt
 const STATIC_DIRECTORY_PREFIXES = [
   '/control-room',
   '/portable-founder-console',
+  '/demo',
 ];
 const CLOUDFLARE_UPSTREAM_FAILURES = new Set([520, 521, 522, 523, 524, 525, 526, 527, 530]);
 
