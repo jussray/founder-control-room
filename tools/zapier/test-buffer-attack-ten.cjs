@@ -10,6 +10,7 @@ const {
   appendPublicationEvent,
   validatePublicationEventChain,
   deriveAdvisoryIdempotencyKey,
+  expectedPublicationEvidenceRef,
   evaluatePublicationAttackTen,
   productionPublicationAllowed,
 } = require('./buffer-attack-ten.cjs');
@@ -57,17 +58,6 @@ const sequence = [
   'RUNTIME_OUTCOME_OBSERVED',
   VERIFIED_PUBLICATION_STATE,
 ];
-
-let events = [];
-sequence.forEach((state, index) => {
-  events = appendPublicationEvent(events, {
-    publicationRunId: runId,
-    eventId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
-    occurredAt: new Date(Date.parse('2026-08-25T22:00:00.000Z') + (index * 60_000)).toISOString(),
-    state,
-    evidenceRef: `synthetic:${state.toLowerCase()}`,
-  });
-});
 
 const expectedIdempotencyKey = deriveAdvisoryIdempotencyKey({
   publicationRunId: runId,
@@ -177,8 +167,20 @@ const validInput = {
     missingEvidenceResolvesTo: 'UNKNOWN',
     rollbackSafe: true,
   },
-  events,
+  events: [],
 };
+
+let events = [];
+sequence.forEach((state, index) => {
+  events = appendPublicationEvent(events, {
+    publicationRunId: runId,
+    eventId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+    occurredAt: new Date(Date.parse('2026-08-25T22:00:00.000Z') + (index * 60_000)).toISOString(),
+    state,
+    evidenceRef: expectedPublicationEvidenceRef(state, validInput),
+  });
+});
+validInput.events = events;
 
 const validEvaluation = evaluatePublicationAttackTen(validInput, evaluationOptions);
 assert.equal(validEvaluation.attackTenVersion, ATTACK_TEN_VERSION);
@@ -189,6 +191,7 @@ assert.equal(validEvaluation.productionBlockReason, PRODUCTION_BLOCK_REASON);
 assert.equal(validEvaluation.failures.length, 0);
 assert.equal(validEvaluation.state, VERIFIED_PUBLICATION_STATE);
 assert.equal(productionPublicationAllowed(validInput, evaluationOptions), false);
+assert.equal(productionPublicationAllowed(validInput, { nowMs: Date.parse('2020-01-01T00:00:00.000Z') }), false);
 
 const chain = validatePublicationEventChain(events);
 assert.equal(chain.valid, true);
@@ -331,6 +334,36 @@ assert.equal(productionPublicationAllowed({
   runtime: { ...validInput.runtime, observedUrl: wrongDestination },
 }, evaluationOptions), false);
 
+let wrongEvidenceEvents = [];
+sequence.forEach((state, index) => {
+  wrongEvidenceEvents = appendPublicationEvent(wrongEvidenceEvents, {
+    publicationRunId: runId,
+    eventId: `20000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+    occurredAt: new Date(Date.parse('2026-08-25T22:00:00.000Z') + (index * 60_000)).toISOString(),
+    state,
+    evidenceRef: `wrong-but-valid:${state.toLowerCase()}`,
+  });
+});
+const wrongEvidenceEvaluation = evaluatePublicationAttackTen({
+  ...validInput,
+  events: wrongEvidenceEvents,
+}, evaluationOptions);
+assert.equal(validatePublicationEventChain(wrongEvidenceEvents).valid, true);
+assert.equal(wrongEvidenceEvaluation.attackResults.find(({ id }) => id === 'A10').pass, false);
+assert.equal(wrongEvidenceEvaluation.advisoryAllowed, false);
+
+const actionSubmittedPrefix = events.slice(0, sequence.indexOf('ACTION_SUBMITTED') + 1);
+const ingressInvalidEvents = appendPublicationEvent(actionSubmittedPrefix, {
+  publicationRunId: runId,
+  eventId: '30000000-0000-4000-8000-000000000001',
+  occurredAt: '2026-08-25T22:07:30.000Z',
+  state: 'INGRESS_INVALID',
+  evidenceRef: expectedPublicationEvidenceRef('INGRESS_INVALID', validInput),
+});
+const ingressInvalidChain = validatePublicationEventChain(ingressInvalidEvents);
+assert.equal(ingressInvalidChain.valid, true);
+assert.equal(ingressInvalidChain.currentState, 'INGRESS_INVALID');
+
 const tampered = events.map((event) => ({ ...event }));
 tampered[5].evidenceRef = 'tampered:evidence';
 const tamperedEvaluation = evaluatePublicationAttackTen({
@@ -360,4 +393,4 @@ const badEvents = appendPublicationEvent(invalidTransition, {
 });
 assert.equal(validatePublicationEventChain(badEvents).valid, false);
 
-console.log('Buffer Attack Ten verified: the pure evaluator can become advisory-green only for internally coherent evidence, but it never grants production authority; caller-supplied approval, unused/replayed authority, arbitrary idempotency, unverified ingress flags, wrong destinations, cross-run substitution, stale replay, false runtime success, tampered chains, and invalid transitions fail closed.');
+console.log('Buffer Attack Ten verified: the pure evaluator can become advisory-green only for internally coherent evidence, but it never grants production authority; caller-supplied approval, unused/replayed authority, arbitrary idempotency, unverified ingress flags, wrong destinations, cross-run substitution, stale replay, false runtime success, mismatched ledger evidence, explicit ingress-invalid transitions, tampered chains, and invalid transitions fail closed.');
