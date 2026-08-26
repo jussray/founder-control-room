@@ -22,32 +22,21 @@ export async function auditGitHubPullRequest(
     throw new Error('expectedHeadSha must be a full 40-character commit SHA');
   }
 
-  const initialPullRequest = await reader.getPullRequest(input.pullNumber);
-  const [checks, workflows, reviews, changedFiles] = await Promise.all([
-    reader.listChecks(initialPullRequest.headSha),
-    reader.listWorkflowRuns(initialPullRequest.headSha),
-    reader.listReviews(input.pullNumber),
-    reader.listChangedFiles(
-      initialPullRequest.baseSha,
-      initialPullRequest.headSha,
-      initialPullRequest.changedFiles,
-    ),
-  ]);
-  const finalPullRequest = await reader.getPullRequest(input.pullNumber);
+  const evidence = await reader.readAuditEvidence(input.pullNumber);
 
   return evaluateGitHubPrAuditEvidence({
     repository: input.repository,
-    initialPullRequest,
-    finalPullRequest,
-    checks: checks.items,
-    workflows: workflows.items,
-    reviews: reviews.items,
-    changedFiles: changedFiles.items,
+    initialPullRequest: evidence.initialPullRequest,
+    finalPullRequest: evidence.finalPullRequest,
+    checks: evidence.checks.items,
+    workflows: evidence.workflows.items,
+    reviews: evidence.reviews.items,
+    changedFiles: evidence.changedFiles.items,
     evidenceCoverage: {
-      checksComplete: checks.complete,
-      workflowsComplete: workflows.complete,
-      reviewsComplete: reviews.complete,
-      changedFilesComplete: changedFiles.complete,
+      checksComplete: evidence.checks.complete,
+      workflowsComplete: evidence.workflows.complete,
+      reviewsComplete: evidence.reviews.complete,
+      changedFilesComplete: evidence.changedFiles.complete,
     },
     ...(input.expectedHeadSha ? { expectedHeadSha: input.expectedHeadSha } : {}),
     checkedAt: now().toISOString(),
