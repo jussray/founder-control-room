@@ -252,6 +252,67 @@ describe("deterministic review producer", () => {
     ]));
   });
 
+  it.each([
+    "wrangler.worker.toml",
+    "src/worker/cf-entry.ts",
+    "src/worker/handler.ts",
+    "src/worker/reconciler.ts",
+    "src/worker/scheduler.ts",
+    "src/controllers/base.ts",
+    "src/controllers/CheckRunController.ts",
+    "src/controllers/ChangeProposalController.ts",
+    "src/controllers/ManifestController.ts",
+    "src/controllers/MergeIntentController.ts",
+    "src/controllers/MissionController.ts",
+    "src/controllers/ProjectController.ts",
+    "src/controllers/ReleaseController.ts",
+    "src/controllers/StripeSyncWitnessController.ts",
+  ])("treats autonomous execution owner %s as a P1 trust root", (path) => {
+    const findings = evaluateDeterministicReviewRules([file(path)]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "trust-root-self-modification",
+        severity: "P1",
+        path,
+      }),
+    ]));
+  });
+
+  it.each([
+    '+await provider.integrate(projectId, "main", head);',
+    '+await provider["integrate"](projectId, "main", head);',
+    '+const { integrate: mergeNow } = provider;\n+await mergeNow(projectId, "main", head);',
+  ])("blocks a newly introduced provider integration sink: %s", (addedLines) => {
+    const findings = evaluateDeterministicReviewRules([{
+      path: "src/experimental/unsafeMergeWorker.ts",
+      status: "added",
+      additions: addedLines.split("\n").length,
+      deletions: 0,
+      patch: `@@ -0,0 +1 @@\n${addedLines}`,
+    }]);
+
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "new-provider-integration-sink",
+        severity: "P1",
+        path: "src/experimental/unsafeMergeWorker.ts",
+      }),
+    ]));
+  });
+
+  it("does not classify a new read-only provider source as an integration sink", () => {
+    const findings = evaluateDeterministicReviewRules([{
+      path: "src/experimental/readOnlyWorker.ts",
+      status: "added",
+      additions: 1,
+      deletions: 0,
+      patch: '@@ -0,0 +1 @@\n+await provider.resolveRef(projectId, "main");',
+    }]);
+
+    expect(findings.some((item) => item.id === "new-provider-integration-sink")).toBe(false);
+    expect(findings.some((item) => item.severity === "P1")).toBe(false);
+  });
+
   it("requires discovery adversarial tests and runbook when discovery core changes", () => {
     const findings = evaluateDeterministicReviewRules([
       file("scripts/verify-test-discovery.mjs"),
