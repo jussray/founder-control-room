@@ -288,7 +288,12 @@ export function providerConfigurationError(
     const fallbackToken = env.GITHUB_TOKEN?.trim();
     const appId = env.GITHUB_APP_ID?.trim();
     const privateKey = env.GITHUB_PRIVATE_KEY?.trim();
-    return fallbackToken || (appId && privateKey)
+    const hasAppId = Boolean(appId);
+    const hasPrivateKey = Boolean(privateKey);
+    if (hasAppId !== hasPrivateKey) {
+      return "GitHub App authentication is incomplete; set both GITHUB_APP_ID and GITHUB_PRIVATE_KEY or neither";
+    }
+    return fallbackToken || (hasAppId && hasPrivateKey)
       ? null
       : "GitHub authentication is not configured; set GITHUB_APP_ID and GITHUB_PRIVATE_KEY or a local GITHUB_TOKEN fallback";
   }
