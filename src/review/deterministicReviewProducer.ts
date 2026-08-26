@@ -120,6 +120,21 @@ export function evaluateDeterministicReviewRules(files: DiffFile[]): Independent
   const changed = changedPathSet(files);
   const findings: IndependentReviewFinding[] = [];
 
+  const renamedPaths = files
+    .filter((file) => file.status === "renamed")
+    .map((file) => file.path)
+    .sort();
+  if (renamedPaths.length > 0) {
+    findings.push(finding(
+      "rename-provenance-unavailable",
+      "P1",
+      "Rename provenance is unavailable to deterministic review V1",
+      renamedPaths[0]!,
+      `Candidate contains renamed paths (${renamedPaths.join(", ")}), but the provider-neutral DiffFile contract does not retain each previous path. V1 cannot prove that a protected trust-root path was not renamed behind a new path identity.`,
+      "Fail closed for renames in V1. A later provider-contract revision may carry previousPath, hash it, and evaluate both old and new path identities before allowing renamed candidates.",
+    ));
+  }
+
   const changedTrustRoots = [...TRUST_ROOT_PATHS].filter((path) => changed.has(path));
   if (changedTrustRoots.length > 0) {
     findings.push(finding(
