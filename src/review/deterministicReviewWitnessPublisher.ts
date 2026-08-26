@@ -76,6 +76,7 @@ function matchingTrustedSignal(
     && signal.name === expectedName
     && signal.status === "passed"
     && lower(signal.commitSha) === lower(receipt.headSha)
+    && lower(signal.evidenceFingerprint) === lower(receipt.reviewHash)
     && signal.issuer?.kind === "app"
     && signal.issuer.id === expectedAppId,
   ) ?? null;
@@ -134,7 +135,7 @@ export async function publishDeterministicReviewWitness(
   const signal = matchingTrustedSignal(signals, receipt, input.provider.name, expectedAppId);
   if (!signal) {
     throw new Error(
-      `Deterministic review witness readback is missing exact passed signal '${name}' from trusted GitHub App ${expectedAppId}`,
+      `Deterministic review witness readback is missing exact passed signal '${name}' with full receipt fingerprint from trusted GitHub App ${expectedAppId}`,
     );
   }
 
