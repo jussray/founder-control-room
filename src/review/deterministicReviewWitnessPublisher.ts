@@ -16,23 +16,8 @@ const FCR_REPOSITORY = "jussray/founder-control-room";
 const FCR_BASE_REF = "main";
 const TRUSTED_APP_ENV = "GITHUB_APP_ID";
 
-export interface DeterministicReviewCheckPublisher {
-  /**
-   * Publish exactly one passed provider witness for the supplied immutable
-   * review identity. Callers do not choose the name, status, or head SHA.
-   */
-  publishPassedWitness(input: {
-    repository: string;
-    headSha: string;
-    name: string;
-    reviewHash: string;
-    summary: string;
-  }): Promise<void>;
-}
-
 export interface DeterministicReviewWitnessInput {
   provider: RepositoryProvider;
-  publisher: DeterministicReviewCheckPublisher;
   projectId: string;
   pullRequestNumber: number;
 }
@@ -98,12 +83,13 @@ function matchingTrustedSignal(
 
 /**
  * Produces deterministic review from provider truth, publishes only a clear
- * receipt's derived exact-head witness, then accepts success only from provider
- * readback under the server-owned GitHub App identity.
+ * receipt's derived exact-head witness through the repository provider's
+ * narrow App-only capability, then accepts success only from provider readback
+ * under the server-owned GitHub App identity.
  *
  * This function never accepts a caller-supplied receipt, reviewer identity,
- * verdict, check name, conclusion, head SHA, or trusted App identity. It
- * remains proposal-only and does not grant merge, execution, deployment, or
+ * verdict, check name, conclusion, head SHA, publisher, or trusted App identity.
+ * It remains proposal-only and does not grant merge, execution, deployment, or
  * founder authority.
  */
 export async function publishDeterministicReviewWitness(
@@ -111,6 +97,9 @@ export async function publishDeterministicReviewWitness(
 ): Promise<DeterministicReviewWitnessResult> {
   if (!input.provider.getPullRequestReviewContext) {
     throw new Error("Deterministic review witness publishing requires provider-backed PR context");
+  }
+  if (!input.provider.publishDeterministicReviewWitness) {
+    throw new Error("Deterministic review witness publishing requires server-owned GitHub App provider authority");
   }
 
   const expectedAppId = trustedAppId();
@@ -134,8 +123,7 @@ export async function publishDeterministicReviewWitness(
   assertContextStillMatches(beforePublish, receipt, "before");
 
   const name = expectedReviewSignalName(receipt);
-  await input.publisher.publishPassedWitness({
-    repository: receipt.repository,
+  await input.provider.publishDeterministicReviewWitness(input.projectId, {
     headSha: receipt.headSha,
     name,
     reviewHash: receipt.reviewHash,
