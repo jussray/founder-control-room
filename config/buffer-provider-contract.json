@@ -105,7 +105,7 @@
       { "id": "A5", "name": "provider_capability_live_policy_gated" },
       { "id": "A6", "name": "execution_idempotent_receipt_correlated" },
       { "id": "A7", "name": "provider_acknowledgement_independently_read_back" },
-      { "id": "A8", "name": "ingress_authenticated_deduplicated_durable" },
+      { "id": "A8", "name": "ingress_authenticated_correlated_deduplicated_durable_replay_bounded" },
       { "id": "A9", "name": "runtime_outcome_observed" },
       { "id": "A10", "name": "red_states_and_rollback_visible_safe" }
     ],
@@ -117,6 +117,11 @@
       "authority_nonce",
       "provider_action_id",
       "provider_post_id",
+      "ingress_publication_run_id",
+      "ingress_authority_id",
+      "ingress_content_sha256",
+      "ingress_provider_action_id",
+      "ingress_signer_id",
       "runtime_post_id"
     ],
     "eventLedger": {
@@ -130,7 +135,10 @@
       "premature_execution_denied",
       "expired_authority_rejected",
       "replayed_nonce_blocked",
-      "mismatched_content_rejected"
+      "mismatched_content_rejected",
+      "cross_run_ingress_substitution_rejected",
+      "untrusted_ingress_signer_rejected",
+      "stale_ingress_replay_rejected"
     ],
     "redStates": [
       "DENIED",
@@ -151,6 +159,9 @@
       "requiresVerifiedIngressCapability": true,
       "requiresAuthenticatedIngress": true,
       "requiresSignatureVerification": true,
+      "requiresIngressEvidenceChainCorrelation": true,
+      "requiresTrustedIngressSigner": true,
+      "requiresBoundedIngressReplayWindow": true,
       "requiresUnconsumedAuthority": true,
       "requiresLiveProviderCapability": true,
       "requiresCurrentContentHashMatch": true,
