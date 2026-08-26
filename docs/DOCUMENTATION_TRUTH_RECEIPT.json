@@ -27,7 +27,7 @@
     {
       "path": "src/providers/providerFactory.ts",
       "claims": [
-        "src/providers/providerFactory.ts must expose deterministic review witness publication for Founder Control Room only when GITHUB_APP_ID plus GITHUB_PRIVATE_KEY mint the repository-scoped GitHub App installation token; a local or development GITHUB_TOKEN fallback cannot mint deterministic review evidence."
+        "src/providers/providerFactory.ts must expose deterministic review witness publication for Founder Control Room only when GITHUB_APP_ID plus GITHUB_PRIVATE_KEY mint the repository-scoped GitHub App installation token; a local or development GITHUB_TOKEN fallback cannot mint deterministic review evidence, and a partial GitHub App credential pair must fail closed even when a fallback token is present."
       ]
     }
   ]
