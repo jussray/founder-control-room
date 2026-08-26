@@ -92,6 +92,83 @@
     "requiresHttpsProof": true,
     "liveProviderMutationIncluded": false
   },
+  "attackTen": {
+    "version": 1,
+    "status": "implemented-awaiting-controlled-live-proof",
+    "releaseState": "VERIFIED_PUBLISHED",
+    "verifiedLeverageCountState": "VERIFIED_PUBLISHED",
+    "assertions": [
+      { "id": "A1", "name": "founder_intent_immutable" },
+      { "id": "A2", "name": "authority_scoped_expiring_one_use_non_transferable" },
+      { "id": "A3", "name": "review_window_control_plane_enforced" },
+      { "id": "A4", "name": "content_identity_frozen_integrity_bound" },
+      { "id": "A5", "name": "provider_capability_live_policy_gated" },
+      { "id": "A6", "name": "execution_idempotent_receipt_correlated" },
+      { "id": "A7", "name": "provider_acknowledgement_independently_read_back" },
+      { "id": "A8", "name": "ingress_authenticated_correlated_deduplicated_durable_control_plane_trusted_replay_bounded" },
+      { "id": "A9", "name": "runtime_outcome_observed" },
+      { "id": "A10", "name": "red_states_and_rollback_visible_safe" }
+    ],
+    "identityBindings": [
+      "publication_run_id",
+      "canonical_payload_sha256",
+      "founder_approval_id",
+      "authority_id",
+      "authority_nonce",
+      "provider_action_id",
+      "provider_post_id",
+      "ingress_publication_run_id",
+      "ingress_authority_id",
+      "ingress_content_sha256",
+      "ingress_provider_action_id",
+      "ingress_signer_id",
+      "runtime_post_id"
+    ],
+    "eventLedger": {
+      "appendOnly": true,
+      "hashChained": true,
+      "deriveCurrentStateFromHistory": true,
+      "stateOverwriteAllowed": false,
+      "missingEvidenceState": "UNKNOWN"
+    },
+    "negativeControls": [
+      "premature_execution_denied",
+      "expired_authority_rejected",
+      "replayed_nonce_blocked",
+      "mismatched_content_rejected",
+      "cross_run_ingress_substitution_rejected",
+      "caller_declared_ingress_signer_trust_rejected",
+      "missing_ingress_signer_policy_rejected",
+      "stale_ingress_replay_rejected"
+    ],
+    "redStates": [
+      "DENIED",
+      "EXPIRED",
+      "REVOKED",
+      "FAILED",
+      "UNKNOWN",
+      "CORRELATION_FAILED",
+      "INGRESS_INVALID",
+      "DUPLICATE_BLOCKED",
+      "ROLLBACK_PENDING",
+      "ROLLED_BACK"
+    ],
+    "releaseGate": {
+      "requiresLiveProviderMutation": true,
+      "requiresControlledSyntheticRun": true,
+      "requiresExactReceiptCorrelation": true,
+      "requiresVerifiedIngressCapability": true,
+      "requiresAuthenticatedIngress": true,
+      "requiresSignatureVerification": true,
+      "requiresIngressEvidenceChainCorrelation": true,
+      "requiresServerOwnedIngressSignerAllowlist": true,
+      "requiresBoundedIngressReplayWindow": true,
+      "requiresUnconsumedAuthority": true,
+      "requiresLiveProviderCapability": true,
+      "requiresCurrentContentHashMatch": true,
+      "requiresRuntimeOutcomeObservation": true
+    }
+  },
   "activationGates": {
     "requiredSecrets": [
       "FOUNDER_SIGNAL_ENGINE_MCP_TOKEN",
