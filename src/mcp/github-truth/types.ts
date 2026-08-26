@@ -62,6 +62,20 @@ export interface GitHubPrChangedFile {
   deletions: number;
 }
 
+export interface GitHubPrBoundedEvidence<T> {
+  items: T[];
+  complete: boolean;
+  observedCount: number;
+  totalCount?: number;
+}
+
+export interface GitHubPrEvidenceCoverage {
+  checksComplete: boolean;
+  workflowsComplete: boolean;
+  reviewsComplete: boolean;
+  changedFilesComplete: boolean;
+}
+
 export interface GitHubPrEvidenceRef {
   kind: 'pull_request' | 'commit_comparison' | 'check_run' | 'workflow_run' | 'review_state';
   source: 'github';
@@ -103,6 +117,7 @@ export interface GitHubPrAuditResult {
     expectedHeadSha?: string;
     headShaBound: boolean;
     ciBoundToHeadSha: boolean;
+    evidenceCoverage: GitHubPrEvidenceCoverage;
     freshness: GitHubPrFreshness;
   };
   boundary: {
