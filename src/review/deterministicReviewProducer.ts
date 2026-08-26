@@ -19,6 +19,7 @@ const FULL_SHA = /^[0-9a-f]{40}$/i;
 
 const TRUST_ROOT_PATHS = new Set([
   "src/review/deterministicReviewProducer.ts",
+  "src/review/deterministicReviewWitnessPublisher.ts",
   "src/review/independentReviewGate.ts",
   "src/http/routes/approvals.ts",
   "src/providers/RepositoryProvider.ts",
@@ -43,6 +44,7 @@ const PROVIDER_DOCS = [
 const TEST_DISCOVERY_CORE_PATHS = new Set([
   "vitest.config.ts",
   "scripts/verify-test-discovery.mjs",
+  "scripts/test-discovery-baseline.json",
 ]);
 
 const TEST_DISCOVERY_COMPANIONS = [
