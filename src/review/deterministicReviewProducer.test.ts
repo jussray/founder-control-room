@@ -236,6 +236,21 @@ describe("deterministic review producer", () => {
     ]));
   });
 
+  it.each([
+    "src/controllers/ProofGateController.ts",
+    "src/proof-gate/gate.ts",
+    "src/proof-gate/persist.ts",
+  ])("treats proof-gate merge-authority module %s as a P1 trust root", (path) => {
+    const findings = evaluateDeterministicReviewRules([file(path)]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "trust-root-self-modification",
+        severity: "P1",
+        path,
+      }),
+    ]));
+  });
+
   it("requires discovery adversarial tests and runbook when discovery core changes", () => {
     const findings = evaluateDeterministicReviewRules([
       file("scripts/verify-test-discovery.mjs"),
