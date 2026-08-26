@@ -206,6 +206,68 @@ Before closing red, draft, stale, or superseded work, inspect it for unique code
 tests, decisions, evidence, or unresolved intent. Preserve useful residue and retire
 only what current authority has actually replaced.
 
+## Founder Adaptive Kernel V0
+
+Apply `docs/FOUNDER_ADAPTIVE_KERNEL_V0.md` to every Goalfix loop, regardless of project.
+The kernel is global behavior, while repository/provider authority remains local to the
+real project being changed.
+
+After observation, compare the expected state with the verified observed state and emit
+one surprise signal:
+
+```text
+STRONGER_THAN_EXPECTED
+AS_EXPECTED
+WEAKER_THAN_EXPECTED
+UNEXPECTED_DIRECTION
+UNKNOWN
+```
+
+Then choose one adaptive action:
+
+```text
+ACCELERATE
+CONTINUE
+REPAIR
+REORIENT
+HOLD
+STOP
+```
+
+Do not accelerate merely because a plan says to. Increase challenge, scope depth,
+autonomy, or cadence only when current evidence supports the stronger state and no
+authority/safety gate blocks it. Unexpected-but-useful behavior should update the plan
+rather than be forced back into the old script.
+
+### Fingerprints
+
+For meaningful loops, maintain a deterministic continuity fingerprint bound to the
+current project/repository, intent, expected state, observed state, evidence identities,
+and exact base/head/scope when applicable. A load-bearing change to those fields makes
+the prior fingerprint historical for the affected claim.
+
+A fingerprint is provenance only. It never grants merge, deploy, publish, provider,
+founder, or execution authority.
+
+### Continuity cookies
+
+Maintain a compact continuity cookie for resumability and learning. This is a proof /
+learning receipt, NOT an HTTP/browser cookie, auth token, credential, or tracking ID.
+
+A continuity cookie may carry bounded non-secret metadata such as kernel version,
+project ID, current fingerprint, parent fingerprint, surprise signal, adaptive decision,
+evidence references, truth state, and next gate. Never store secrets, private raw data,
+access tokens, chain-of-thought, or unnecessary user content in it.
+
+If the fingerprint no longer matches the current load-bearing state, fail closed and
+reacquire evidence instead of inheriting prior green.
+
+### Learning patch
+
+After a meaningful surprise, retain the smallest durable lesson that changes future
+expectations. Learning may alter the next challenge or proof order, but it must never
+rewrite historical evidence or manufacture authority.
+
 ## Status board
 
 ```text
@@ -239,6 +301,9 @@ RISK:
 ROLLBACK:
 [how to reverse safely]
 
+ADAPTIVE SIGNAL:
+[signal + action + fingerprint/cookie lineage when material]
+
 NEXT GATE:
 [one exact founder decision or next action]
 ```
@@ -259,4 +324,4 @@ without explicit founder authority.
 
 ## One-line mantra
 
-Seek the real blocker. Build the smallest fix. Verify the exact path. Preserve the founder's options.
+Seek the real blocker. Observe the surprise. Adapt from proof. Preserve lineage. Verify the exact path.
