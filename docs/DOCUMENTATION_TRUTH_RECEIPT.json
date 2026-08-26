@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded deterministic GitHub App witness-publication trust chain, the trusted default-branch ignition candidate, and current pull-request Playwright stale-base containment without claiming bootstrap authority, founder-final approval, merge authority, live provider-governance reconciliation, deployment authority, database authority, or successful witness execution before the ignition is lawfully integrated on main.",
+  "purpose": "Record the bounded deterministic GitHub App witness-publication trust chain and trusted default-branch ignition candidate without claiming bootstrap authority, founder-final approval, merge authority, live provider-governance reconciliation, deployment authority, database authority, or successful witness execution before the ignition is lawfully integrated on main.",
   "domains": [
     "merge-authority",
     "repository-provider",
@@ -64,12 +64,6 @@
       "path": "src/providers/providerFactory.ts",
       "claims": [
         "src/providers/providerFactory.ts must expose deterministic review witness publication for Founder Control Room only when GITHUB_APP_ID plus GITHUB_PRIVATE_KEY mint the repository-scoped GitHub App installation token; a local or development GITHUB_TOKEN fallback cannot mint deterministic review evidence, and a partial GitHub App credential pair must fail closed even when a fallback token is present."
-      ]
-    },
-    {
-      "path": ".github/workflows/playwright.yml",
-      "claims": [
-        ".github/workflows/playwright.yml must bind pull-request Playwright proof to the exact candidate head and the base SHA carried by the same pull-request event, require that base to be an ancestor of the head before dependency installation or candidate-dependent proof, fail closed with STALE_BASE when ancestry does not hold, and never treat rerunning a historical workflow event as renewed current-base evidence."
       ]
     }
   ]
