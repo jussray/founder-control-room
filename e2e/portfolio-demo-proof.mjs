@@ -24,7 +24,7 @@ const mimeTypes = new Map([
 const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url || '/', 'http://127.0.0.1');
-    const pathname = url.pathname === '/demo' || url.pathname === '/demo/' ? '/demo/index.html' : decodeURIComponent(url.pathname);
+    const pathname = decodeURIComponent(url.pathname === '/' ? '/demo/index.html' : url.pathname);
     const requested = resolve(pagesRoot, `.${pathname}`);
     if (!requested.startsWith(`${pagesRoot}/`) && requested !== pagesRoot) {
       response.writeHead(403).end('forbidden');
@@ -61,7 +61,7 @@ async function proveViewport(name, width, height, isMobile = false) {
   page.on('pageerror', (error) => pageErrors.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
 
-  const response = await page.goto(`${origin}/demo/`, { waitUntil: 'networkidle' });
+  const response = await page.goto(`${origin}/demo/index.html`, { waitUntil: 'networkidle' });
   assert.equal(response?.status(), 200, `${name}: demo page returns 200`);
   await page.getByTestId('portfolio-demo').waitFor({ state: 'visible' });
 

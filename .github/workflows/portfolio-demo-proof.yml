@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths:
       - 'public/demo/**'
-      - 'public/_worker.js'
       - 'public/_headers'
       - 'src/http/__tests__/portfolioDemoAssets.test.ts'
       - 'e2e/portfolio-demo-proof.mjs'
@@ -14,7 +13,6 @@ on:
     branches: [main]
     paths:
       - 'public/demo/**'
-      - 'public/_worker.js'
       - 'public/_headers'
       - 'src/http/__tests__/portfolioDemoAssets.test.ts'
       - 'e2e/portfolio-demo-proof.mjs'

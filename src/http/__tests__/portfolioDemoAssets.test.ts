@@ -7,13 +7,15 @@ const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
 const read = (path: string) => readFileSync(resolve(repoRoot, path), 'utf8');
 
 describe('public portfolio demo boundary', () => {
-  it('serves /demo from Pages with no-store caching', () => {
+  it('serves the static demo through the existing Pages asset boundary with no-store caching', () => {
     const proxy = read('public/_worker.js');
     const headers = read('public/_headers');
 
-    expect(proxy).toContain("'/demo'");
+    expect(proxy).toContain('STATIC_FILE_PATTERN');
+    expect(proxy).toContain('html');
     expect(headers).toContain('/demo/*');
     expect(headers).toContain('Cache-Control: no-store');
+    expect(existsSync(resolve(repoRoot, 'public/demo/index.html'))).toBe(true);
   });
 
   it('keeps the public demo static, inspect-only, and bounded', () => {
