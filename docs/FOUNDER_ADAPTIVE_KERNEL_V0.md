@@ -19,8 +19,7 @@ INTENT
   → BIND EVIDENCE
   → DETECT SURPRISE
   → ADAPT PACE / ACTION
-  → WRITE FINGERPRINT
-  → WRITE CONTINUITY COOKIE
+  → RECORD CURRENT STATE
   → NEXT GATE
 ```
 
@@ -28,7 +27,7 @@ Approval, implementation, verification, integration, deployment, and runtime tru
 
 ## Universal input
 
-A kernel evaluation SHOULD bind:
+A kernel evaluation SHOULD record:
 
 - project/repository identity;
 - founder intent;
@@ -37,8 +36,8 @@ A kernel evaluation SHOULD bind:
 - evidence references;
 - authority state;
 - current base SHA and candidate/head SHA when Git is involved;
-- current scope/diff fingerprint when applicable;
-- predecessor fingerprint/cookie when continuing prior work.
+- current scope/diff when applicable;
+- prior relevant evidence only when it still matches current state.
 
 Unknown fields remain `UNKNOWN`; they are never fabricated merely to complete the record.
 
@@ -79,54 +78,31 @@ Use the existing Goalfix truth vocabulary:
 
 Only `VERIFIED` evidence may support a load-bearing acceleration, merge-readiness claim, deployment claim, or runtime-success claim.
 
-## Fingerprint
+## Current-state record
 
-A fingerprint is deterministic continuity identity for the evaluated state. It is evidence/provenance, never authority.
-
-At minimum it binds:
+For a meaningful loop, keep the minimum current state needed to continue truthfully:
 
 ```text
 project/repository
-intent identity
-expected-state identity
-observed-state identity
+intent
+expected state
+observed state
 base SHA (when applicable)
 head SHA (when applicable)
-scope/diff identity (when applicable)
-evidence identities
-kernel version
+scope/diff (when applicable)
+evidence IDs
+review state
+authority state
+surprise signal
+adaptive decision
+next gate
 ```
 
-A load-bearing change to intent, expected state, base, head, scope, or evidence invalidates the prior fingerprint for the affected claim. Historical fingerprints remain provenance only.
+This record is descriptive only. It never grants merge, deploy, publish, provider, founder, or execution authority.
 
-## Continuity cookie
+If intent, base, head, scope, evidence, review state, or authority changes in a load-bearing way, dependent prior green becomes `STALE` for that claim. Re-observe and reacquire evidence rather than inheriting old proof.
 
-A continuity cookie is a compact proof/learning receipt that lets the next run resume without laundering stale state.
-
-It is NOT:
-
-- an HTTP/browser cookie;
-- an authentication token;
-- a credential;
-- a tracking identifier;
-- merge, deploy, publish, provider, or founder authority.
-
-A continuity cookie SHOULD contain only bounded non-secret metadata such as:
-
-```text
-kernelVersion
-projectId
-fingerprint
-parentFingerprint
-surpriseSignal
-adaptiveDecision
-evidenceRefs
-truthState
-nextGate
-createdAt
-```
-
-The cookie MUST fail closed if its fingerprint no longer matches the current load-bearing state. Never store secrets, raw private data, access tokens, chain-of-thought, or unnecessary user content in a continuity cookie.
+Never store secrets, raw private data, access tokens, chain-of-thought, or unnecessary user content in the current-state record.
 
 ## Learning patch
 
@@ -145,7 +121,7 @@ Learning changes expectations. It does not rewrite historical evidence.
 
 For repository work, the adaptive kernel composes with Goalfix and does not replace its authority gates.
 
-A repository continuity record MUST distinguish:
+A repository state record MUST distinguish:
 
 ```text
 repo
@@ -157,13 +133,12 @@ review state
 authority state
 surprise signal
 adaptive decision
-fingerprint
-parent fingerprint/cookie
+next gate
 ```
 
 If `main`, the candidate head, or load-bearing scope moves, dependent proof becomes historical. Reacquire evidence before accelerating, merging, launching, or claiming completion.
 
-No fingerprint or continuity cookie can authorize merge. Merge still requires the repository's current review/check/authority contract plus founder-final authority where required.
+Merge still requires the repository's current review/check/authority contract plus founder-final authority where required.
 
 ## Cross-project rule
 
@@ -194,7 +169,6 @@ ROLLBACK:
 ADAPTIVE SIGNAL:
 [STRONGER_THAN_EXPECTED | AS_EXPECTED | WEAKER_THAN_EXPECTED | UNEXPECTED_DIRECTION | UNKNOWN]
 [action: ACCELERATE | CONTINUE | REPAIR | REORIENT | HOLD | STOP]
-[fingerprint + continuity-cookie lineage when applicable]
 
 NEXT GATE:
 [one exact next action or founder decision]
@@ -202,6 +176,6 @@ NEXT GATE:
 
 ## Stop condition
 
-The kernel is functioning correctly when a surprising observation changes future expectations while preserving evidence lineage and authority boundaries.
+The kernel is functioning correctly when a surprising observation changes future expectations while preserving evidence and authority boundaries.
 
-No evidence, no promotion. No current fingerprint, no inherited green. No authority, no privileged action.
+No evidence, no promotion. No current exact state, no inherited green. No authority, no privileged action.
