@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const script = fileURLToPath(new URL('./verify-test-discovery.mjs', import.meta.url));
 const CURRENT_INCLUDE_PATTERN = 'src/**/*.test.ts';
+const LEGACY_INCLUDE_PATTERN = 'src/**/__tests__/**/*.test.ts';
 
 function run(command, args, cwd) {
   return execFileSync(command, args, { cwd, encoding: 'utf8' }).trim();
@@ -112,4 +113,44 @@ test('rejects an unsupported include pattern rather than guessing discovery sema
   const result = verify(root, baseSha);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /unsupported Vitest include pattern/);
+});
+
+test('rejects regression to the legacy include instead of redefining base debt', (t) => {
+  const { root, baseSha } = makeRepo(t);
+  write(root, 'vitest.config.ts', `export default { test: { include: ['${LEGACY_INCLUDE_PATTERN}'] } };\n`);
+  write(root, 'scripts/test-discovery-baseline.json', JSON.stringify({
+    includePattern: LEGACY_INCLUDE_PATTERN,
+    undiscovered: [
+      'src/lib/__tests__/legacyConsole.test.js',
+      'src/visible/colocated.test.ts',
+    ],
+  }, null, 2));
+
+  const result = verify(root, baseSha);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /absent from the base's default-discovery debt|changes default test\.include/);
+  assert.match(result.stderr, /colocated\.test\.ts|legacy/);
+});
+
+test('rejects a commented trusted pattern when the effective include is narrower', (t) => {
+  const { root, baseSha } = makeRepo(t);
+  write(root, 'vitest.config.ts', `// include: ['${CURRENT_INCLUDE_PATTERN}']\nexport default { test: { include: ['${LEGACY_INCLUDE_PATTERN}'] } };\n`);
+
+  const result = verify(root, baseSha);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /includePattern must exactly match the effective top-level test\.include/);
+});
+
+test('fails closed when top-level test.exclude can hide a matching test', (t) => {
+  const { root, baseSha } = makeRepo(t);
+  write(
+    root,
+    'vitest.config.ts',
+    `export default { test: { include: ['${CURRENT_INCLUDE_PATTERN}'], exclude: ['src/visible/colocated.test.ts'] } };\n`,
+  );
+
+  const result = verify(root, baseSha);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /top-level test\.exclude/);
+  assert.match(result.stderr, /fail closed/);
 });
