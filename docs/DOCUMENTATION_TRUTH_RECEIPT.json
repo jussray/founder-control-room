@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the Goalfix/adaptive-governance invariants and Documentation Truth registration that keep portable agent entry points, exact-target merge freshness, authenticated Founder Final, runtime-proof scope, and cross-project adaptive behavior fail-closed without claiming runtime API/UI adoption, merge authority, deployment authority, provider-policy mutation, or publication authority.",
+  "purpose": "Record the Goalfix/adaptive-governance invariants and Documentation Truth registration that keep portable agent entry points, exact-target merge freshness, authenticated Founder Final, runtime-proof scope, cross-project adaptive behavior, and Future-Us untrusted-data/action boundaries fail-closed without claiming runtime API/UI adoption, merge authority, deployment authority, provider-policy mutation, publication authority, or classifier-based authorization.",
   "domains": [
     "truth-governance"
   ],
@@ -15,25 +15,25 @@
     {
       "path": ".ai/skills/goalfix/SKILL.md",
       "claims": [
-        ".ai/skills/goalfix/SKILL.md must preserve the full founder reasoning stack, classify no-job GitHub Actions failures before blaming source, bind work to the verified target/base/head, require authenticated Founder Final plus final mutable provider reread, keep Sauce Guard stops, and carry portable adaptive rules inline without manufacturing authority."
+        ".ai/skills/goalfix/SKILL.md must preserve the full founder reasoning stack, classify no-job GitHub Actions failures before blaming source, bind work to the verified target/base/head, require authenticated Founder Final plus final mutable provider reread, keep Sauce Guard stops, carry portable adaptive rules inline, and treat external/model/tool content as non-authorizing data behind deterministic action checks."
       ]
     },
     {
       "path": ".claude/skills/goalfix/SKILL.md",
       "claims": [
-        ".claude/skills/goalfix/SKILL.md must preserve exact verified target/base/head identity, no-job failure classification, browser-specific Playwright proof, authenticated Founder Final, final mutable provider reread, MERGED_UNVERIFIED runtime state, Sauce Guard, and inline portable adaptive behavior without self-certification."
+        ".claude/skills/goalfix/SKILL.md must preserve exact verified target/base/head identity, no-job failure classification, browser-specific Playwright proof, authenticated Founder Final, final mutable provider reread, MERGED_UNVERIFIED runtime state, Sauce Guard, inline portable adaptive behavior, and receiver-verified least-privilege action boundaries without self-certification."
       ]
     },
     {
       "path": "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md",
       "claims": [
-        "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md must remain an approved governance/source contract for Goalfix/FCR instruction and decision loops, must not claim current /goalfix/inspect, engine, API, or browser UI runtime integration, and must keep adaptive state descriptive rather than executable authority."
+        "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md must remain an approved governance/source contract for Goalfix/FCR instruction and decision loops, must not claim current /goalfix/inspect, engine, API, or browser UI runtime integration, must keep adaptive state descriptive rather than executable authority, and must learn recurring trust-boundary failures without converting analytics, classifiers, or model output into authority."
       ]
     },
     {
       "path": "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md",
       "claims": [
-        "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md must carry the verified target branch instead of assuming main, require authenticated Founder Final, reread mutable provider/PR/target/base/head/diff/check/review state immediately before integration, preserve expected-head protection, distinguish browser Playwright evidence from backend/provider proof, and retain MERGED_UNVERIFIED until required runtime truth exists."
+        "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md must carry the verified target branch instead of assuming main, require authenticated Founder Final, reread mutable provider/PR/target/base/head/diff/check/review state immediately before integration, preserve expected-head protection, distinguish browser Playwright evidence from backend/provider proof, retain MERGED_UNVERIFIED until required runtime truth exists, and keep untrusted artifacts/model plans behind deterministic exact-action authorization and receiver-side capability verification."
       ]
     },
     {
