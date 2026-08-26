@@ -60,6 +60,8 @@ export interface VerificationSignal {
   status: VerificationSignalStatus;
   commitSha: string;
   provider: string;
+  /** Full provider-backed evidence identity when the host exposes one (GitHub Check Run external_id). */
+  evidenceFingerprint?: string;
   /** Optional because not every provider exposes an issuer. Authority gates must fail closed when issuer identity is required. */
   issuer?: VerificationSignalIssuer;
   startedAt?: string;
