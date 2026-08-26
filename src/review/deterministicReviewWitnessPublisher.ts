@@ -1,4 +1,5 @@
 import type {
+  PullRequestReviewContext,
   RepositoryProvider,
   VerificationSignal,
 } from "../providers/RepositoryProvider.js";
@@ -70,6 +71,27 @@ function assertCallerReceiptEnvelope(receipt: IndependentReviewReceipt): void {
   }
 }
 
+function assertContextMatchesReceipt(
+  context: PullRequestReviewContext,
+  receipt: IndependentReviewReceipt,
+): void {
+  if (context.number !== receipt.pullRequestNumber) {
+    throw new Error("Deterministic review witness provider returned the wrong pull request");
+  }
+  if (lower(context.repository) !== lower(receipt.repository)) {
+    throw new Error("Deterministic review witness repository changed after trusted review");
+  }
+  if (lower(context.baseSha) !== lower(receipt.baseSha)) {
+    throw new Error("Deterministic review witness base changed after trusted review");
+  }
+  if (lower(context.headSha) !== lower(receipt.headSha)) {
+    throw new Error("Deterministic review witness head changed after trusted review");
+  }
+  if (lower(context.authorIdentity) !== lower(receipt.authorIdentity)) {
+    throw new Error("Deterministic review witness author identity changed after trusted review");
+  }
+}
+
 function matchingWitness(
   signal: VerificationSignal,
   name: string,
@@ -116,6 +138,30 @@ export async function publishDeterministicReviewWitness(
   }
 
   const receipt = production.receipt;
+  if (!input.provider.getPullRequestReviewContext) {
+    throw new Error("Repository provider cannot supply pull-request review context for witness publication");
+  }
+
+  // Last-moment TOCTOU membrane. The trusted producer performed its own exact
+  // readback, but a mutable base/head can still move between that review and
+  // the provider write. Re-read PR identity and both refs immediately before
+  // publishing the passed Check Run.
+  const context = await input.provider.getPullRequestReviewContext(
+    input.projectId,
+    receipt.pullRequestNumber,
+  );
+  assertContextMatchesReceipt(context, receipt);
+  const [currentBaseSha, currentHeadSha] = await Promise.all([
+    input.provider.resolveRef(input.projectId, context.baseRef),
+    input.provider.resolveRef(input.projectId, context.headRef),
+  ]);
+  if (lower(currentBaseSha) !== lower(receipt.baseSha)) {
+    throw new Error("Deterministic review witness base moved after trusted review and before publication");
+  }
+  if (lower(currentHeadSha) !== lower(receipt.headSha)) {
+    throw new Error("Deterministic review witness head moved after trusted review and before publication");
+  }
+
   const signalName = expectedReviewSignalName(receipt);
   await input.provider.publishVerificationSignal(input.projectId, {
     name: signalName,
