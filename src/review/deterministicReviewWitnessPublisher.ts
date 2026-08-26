@@ -13,6 +13,7 @@ import {
 } from "./deterministicReviewProducer.js";
 
 const FCR_REPOSITORY = "jussray/founder-control-room";
+const FCR_BASE_REF = "main";
 const TRUSTED_APP_ENV = "GITHUB_APP_ID";
 
 export interface DeterministicReviewCheckPublisher {
@@ -34,7 +35,6 @@ export interface DeterministicReviewWitnessInput {
   publisher: DeterministicReviewCheckPublisher;
   projectId: string;
   pullRequestNumber: number;
-  env?: NodeJS.ProcessEnv;
 }
 
 export interface DeterministicReviewWitnessResult {
@@ -50,8 +50,8 @@ function lower(value: unknown): string {
   return text(value).toLowerCase();
 }
 
-function trustedAppId(env: NodeJS.ProcessEnv): string {
-  const value = text(env[TRUSTED_APP_ENV]);
+function trustedAppId(): string {
+  const value = text(process.env[TRUSTED_APP_ENV]);
   if (!/^\d+$/.test(value)) {
     throw new Error(`Deterministic review witness publishing requires numeric server-owned ${TRUSTED_APP_ENV}`);
   }
@@ -66,8 +66,11 @@ function assertContextStillMatches(
   const matches = context.number === receipt.pullRequestNumber
     && lower(context.repository) === FCR_REPOSITORY
     && lower(context.headRepository) === FCR_REPOSITORY
+    && context.baseRef === FCR_BASE_REF
+    && text(context.headRef).length > 0
     && lower(context.baseSha) === lower(receipt.baseSha)
-    && lower(context.headSha) === lower(receipt.headSha);
+    && lower(context.headSha) === lower(receipt.headSha)
+    && lower(context.authorIdentity) === lower(receipt.authorIdentity);
 
   if (!matches) {
     throw new Error(
@@ -99,8 +102,9 @@ function matchingTrustedSignal(
  * readback under the server-owned GitHub App identity.
  *
  * This function never accepts a caller-supplied receipt, reviewer identity,
- * verdict, check name, conclusion, or head SHA. It remains proposal-only and
- * does not grant merge, execution, deployment, or founder authority.
+ * verdict, check name, conclusion, head SHA, or trusted App identity. It
+ * remains proposal-only and does not grant merge, execution, deployment, or
+ * founder authority.
  */
 export async function publishDeterministicReviewWitness(
   input: DeterministicReviewWitnessInput,
@@ -109,7 +113,7 @@ export async function publishDeterministicReviewWitness(
     throw new Error("Deterministic review witness publishing requires provider-backed PR context");
   }
 
-  const expectedAppId = trustedAppId(input.env ?? process.env);
+  const expectedAppId = trustedAppId();
   const production = await produceDeterministicReview({
     provider: input.provider,
     projectId: input.projectId,
