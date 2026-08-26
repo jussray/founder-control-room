@@ -9,6 +9,7 @@ import type {
 const HEAD = 'a'.repeat(40);
 const OLD_HEAD = 'b'.repeat(40);
 const BASE = 'c'.repeat(40);
+const OTHER_BASE = 'd'.repeat(40);
 const CHECKED_AT = '2026-08-25T23:00:00.000Z';
 
 function pull(headSha = HEAD): GitHubPrObservation {
@@ -64,6 +65,12 @@ function evaluate(overrides: Partial<Parameters<typeof evaluateGitHubPrAuditEvid
     workflows: [passingWorkflow()],
     reviews: [],
     changedFiles: [{ path: 'src/example.ts', status: 'modified', additions: 10, deletions: 2 }],
+    evidenceCoverage: {
+      checksComplete: true,
+      workflowsComplete: true,
+      reviewsComplete: true,
+      changedFilesComplete: true,
+    },
     checkedAt: CHECKED_AT,
     ...overrides,
   });
@@ -77,6 +84,12 @@ describe('evaluateGitHubPrAuditEvidence', () => {
     expect(result.verification).toMatchObject({
       headShaBound: true,
       ciBoundToHeadSha: true,
+      evidenceCoverage: {
+        checksComplete: true,
+        workflowsComplete: true,
+        reviewsComplete: true,
+        changedFilesComplete: true,
+      },
       freshness: 'current',
     });
     expect(result.boundary).toEqual({
@@ -107,6 +120,28 @@ describe('evaluateGitHubPrAuditEvidence', () => {
     ]));
   });
 
+  it('returns evidence_conflicted when load-bearing PR state changes without a head change', () => {
+    const result = evaluate({
+      finalPullRequest: {
+        ...pull(),
+        state: 'closed',
+        draft: true,
+        baseSha: OTHER_BASE,
+        mergeable: false,
+      },
+    });
+    expect(result.verdict).toBe('evidence_conflicted');
+    expect(result.summary).toMatchObject({
+      prState: 'closed',
+      draft: true,
+      baseSha: OTHER_BASE,
+      mergeable: false,
+    });
+    expect(result.findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'pr_truth_changed_during_audit', severity: 'blocker' }),
+    ]));
+  });
+
   it('treats missing CI as incomplete rather than passing', () => {
     const result = evaluate({ checks: [], workflows: [] });
     expect(result.verdict).toBe('evidence_incomplete');
@@ -125,6 +160,61 @@ describe('evaluateGitHubPrAuditEvidence', () => {
     expect(result.summary.ciConclusion).toBe('fail');
     expect(result.findings).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'ci_failed', severity: 'blocker' }),
+    ]));
+  });
+
+  it('preserves a known CI failure even while another current signal is pending', () => {
+    const result = evaluate({
+      checks: [{ ...passingCheck(), conclusion: 'failure' }],
+      workflows: [{ ...passingWorkflow(), status: 'in_progress', conclusion: undefined }],
+    });
+    expect(result.summary.ciConclusion).toBe('fail');
+    expect(result.findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'ci_failed', severity: 'blocker' }),
+    ]));
+    expect(result.findings).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'ci_pending' }),
+    ]));
+  });
+
+  it('never claims complete evidence when a bounded GitHub collection is truncated', () => {
+    const result = evaluate({
+      evidenceCoverage: {
+        checksComplete: false,
+        workflowsComplete: true,
+        reviewsComplete: true,
+        changedFilesComplete: true,
+      },
+    });
+    expect(result.verdict).toBe('evidence_incomplete');
+    expect(result.verification.freshness).toBe('unknown');
+    expect(result.findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'evidence_collection_truncated', severity: 'blocker' }),
+    ]));
+  });
+
+  it('uses the latest review event per reviewer so a later change request supersedes approval', () => {
+    const result = evaluate({
+      reviews: [
+        {
+          id: 'review-1',
+          reviewer: 'reviewer-a',
+          state: 'approved',
+          commitSha: HEAD,
+          submittedAt: '2026-08-25T22:00:00.000Z',
+        },
+        {
+          id: 'review-2',
+          reviewer: 'reviewer-a',
+          state: 'changes_requested',
+          commitSha: HEAD,
+          submittedAt: '2026-08-25T22:30:00.000Z',
+        },
+      ],
+    });
+    expect(result.summary.reviewDecision).toBe('changes_requested');
+    expect(result.findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'review_changes_requested', severity: 'blocker' }),
     ]));
   });
 });
