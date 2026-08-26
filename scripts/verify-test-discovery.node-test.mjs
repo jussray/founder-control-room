@@ -147,3 +147,29 @@ test('rejects discovery-affecting test.exclude entries', (t) => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /test\.exclude may not hide files/);
 });
+
+test('rejects environment-dependent IIFE config that can diverge between verifier and Vitest', (t) => {
+  const { root, baseSha } = makeRepo(t);
+  write(
+    root,
+    'vitest.config.ts',
+    `import { defineConfig } from 'vitest/config';\n\nexport default defineConfig({ test: (() => typeof process === 'undefined' ? { include: ['${INCLUDE}'] } : { include: ['src/**/*.test.ts'] })() });\n`,
+  );
+
+  const result = verify(root, baseSha);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /non-executing static configuration grammar|only static literal values/);
+});
+
+test('rejects spread-based config composition instead of executing or interpreting it', (t) => {
+  const { root, baseSha } = makeRepo(t);
+  write(
+    root,
+    'vitest.config.ts',
+    `import { defineConfig } from 'vitest/config';\n\nexport default defineConfig({ test: { include: ['${INCLUDE}'], ...globalThis.hiddenConfig } });\n`,
+  );
+
+  const result = verify(root, baseSha);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /non-executing static configuration grammar|expected an identifier/);
+});
