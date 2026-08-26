@@ -71,6 +71,8 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("GITHUB_TOKEN", "test-token");
+    vi.stubEnv("GITHUB_APP_ID", "");
+    vi.stubEnv("GITHUB_PRIVATE_KEY", "");
     mockGetPullRequestReviewContext.mockResolvedValue(reviewContext);
     mockListReviewSignals.mockResolvedValue([{ id: "review-1" }]);
     mockResolveRef.mockImplementation(async (_projectId: string, ref: string) =>
@@ -92,6 +94,17 @@ describe("LazyRepositoryProvider independent-review boundary", () => {
 
     expect(mockGetPullRequestReviewContext).toHaveBeenCalledWith("founder-control-room", 474);
     expect(mockListReviewSignals).toHaveBeenCalledWith("founder-control-room", 474);
+  });
+
+  it("does not expose deterministic witness authority through the GITHUB_TOKEN fallback", async () => {
+    const provider = providerForProject(FCR_PROJECT);
+
+    await expect(provider.publishDeterministicReviewWitness!("founder-control-room", {
+      headSha: HEAD_SHA,
+      name: "Independent Review / fcr-deterministic-review-v1 / abcdef123456",
+      reviewHash: "d".repeat(64),
+      summary: "must not publish with fallback token authority",
+    })).rejects.toThrow(/requires GitHub App authority/i);
   });
 
   it("canonicalizes an alias of the FCR repository before review and integration authority", async () => {
