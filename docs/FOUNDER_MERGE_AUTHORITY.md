@@ -68,26 +68,13 @@ founderFinalApprovalRequired: true
 
 A caller cannot turn deterministic review off, weaken P2 handling, substitute model output for founder authority, redefine the policy, or reuse a founder approval against another PR/base/head. The deterministic review receipt itself remains proposal-only and non-authorizing. The authenticated founder-final receipt supplies the final human authority after the independent proof layer passes.
 
-### Deterministic review producer boundary
+### Deterministic witness production and bootstrap truth
 
-The deterministic exact-head review producer is a read-only proof primitive, not merge authority. It must resolve repository and pull-request identity from the repository provider, bind the exact current base/head and complete diff, derive the canonical diff and founder-final policy hashes, execute only explicitly versioned deterministic rules, and emit a `proposalOnly: true`, `mergeAuthorized: false`, `executionAuthorized: false` review receipt.
+The deterministic-review producer must derive repository, pull request, base/head identity, author, complete diff identity, rule version, findings, verdict, and receipt hash from provider-observed state. A caller cannot supply a trusted reviewer identity, verdict, policy, check conclusion, witness name, or trusted App identity and have that become review authority.
 
-The producer fails closed when provider identity, base/head freshness, diff completeness, rule evaluation, or required companion truth cannot be established. It must also block self-certification of changes to its own producer trust root. A producer receipt alone is not a provider witness and cannot satisfy the founder-final gate merely because it exists.
+A clear proposal-only receipt may be published as the exact derived `Independent Review / ...` GitHub Check Run only through the repository provider's narrow deterministic-review witness capability. For Founder Control Room production construction, that capability requires the repository-scoped installation credential minted from server-owned `GITHUB_APP_ID` plus `GITHUB_PRIVATE_KEY`; the bounded `GITHUB_TOKEN` local/development fallback must fail closed for deterministic witness publication. After publication, FCR must read the exact-head signal back from GitHub and require the provider-recorded Check Run App issuer to equal the trusted numeric `GITHUB_APP_ID` before treating the witness as current evidence.
 
-Provider witness publication is a separate capability. The canonical gate requires the exact `expectedReviewSignalName(receipt)` to be published against the reviewed head by the repository-scoped server-owned GitHub App and then read back with App issuer identity equal to trusted `GITHUB_APP_ID`. Milestone A does not publish that Check Run, use a GitHub App credential, approve the founder, merge, deploy, or mutate provider state.
-
-The authority sequence therefore remains:
-
-```text
-deterministic producer receipt
--> trusted provider witness on the same exact head
--> independent-review gate evaluation
--> authenticated founder-final approval
--> final mutable provider readback
--> merge
-```
-
-No step may silently stand in for another.
+Receipt production, Check Run creation, and readback remain non-authorizing on their own. They never supply founder-final, merge, deploy, secret, provider-policy, database, billing, publication, or destructive-action authority. A candidate that changes the deterministic producer, independent-review gate, merge consumer, or trusted witness publication boundary is a trust-root self-modification and must not certify itself through that same producer. Current source therefore does not create a hidden bootstrap exception; an initial trust-root integration remains blocked until a separately explicit, auditable constitutional authority path exists and is invoked for the exact candidate.
 
 ### Legacy pinned semantic-review missions
 
