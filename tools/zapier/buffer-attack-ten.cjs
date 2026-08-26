@@ -58,9 +58,9 @@ const ALLOWED_TRANSITIONS = Object.freeze({
   REVIEW_WINDOW_MATURED: new Set(['AUTHORITY_MINTED', 'REVOKED', 'EXPIRED', 'DENIED']),
   AUTHORITY_MINTED: new Set(['PROVIDER_CAPABILITY_VERIFIED', 'REVOKED', 'EXPIRED', 'DENIED', 'DUPLICATE_BLOCKED', 'CORRELATION_FAILED']),
   PROVIDER_CAPABILITY_VERIFIED: new Set(['ACTION_SUBMITTED', 'REVOKED', 'EXPIRED', 'DENIED', 'FAILED', 'DUPLICATE_BLOCKED', 'CORRELATION_FAILED']),
-  ACTION_SUBMITTED: new Set(['PROVIDER_ACKNOWLEDGED', 'FAILED', 'UNKNOWN', 'DUPLICATE_BLOCKED', 'CORRELATION_FAILED']),
-  PROVIDER_ACKNOWLEDGED: new Set(['READBACK_CONFIRMED', 'FAILED', 'UNKNOWN', 'CORRELATION_FAILED']),
-  READBACK_CONFIRMED: new Set(['RUNTIME_OUTCOME_OBSERVED', 'FAILED', 'UNKNOWN', 'CORRELATION_FAILED']),
+  ACTION_SUBMITTED: new Set(['PROVIDER_ACKNOWLEDGED', 'FAILED', 'UNKNOWN', 'DUPLICATE_BLOCKED', 'CORRELATION_FAILED', 'INGRESS_INVALID']),
+  PROVIDER_ACKNOWLEDGED: new Set(['READBACK_CONFIRMED', 'FAILED', 'UNKNOWN', 'CORRELATION_FAILED', 'INGRESS_INVALID']),
+  READBACK_CONFIRMED: new Set(['RUNTIME_OUTCOME_OBSERVED', 'FAILED', 'UNKNOWN', 'CORRELATION_FAILED', 'INGRESS_INVALID']),
   RUNTIME_OUTCOME_OBSERVED: new Set([VERIFIED_PUBLICATION_STATE, 'FAILED', 'UNKNOWN', 'CORRELATION_FAILED', 'ROLLBACK_PENDING']),
   VERIFIED_PUBLISHED: new Set(['ROLLBACK_PENDING']),
   ROLLBACK_PENDING: new Set(['ROLLED_BACK', 'FAILED', 'UNKNOWN']),
@@ -148,6 +148,56 @@ function deriveAdvisoryIdempotencyKey(input = {}) {
     provider: PUBLICATION_PROVIDER,
     operation: PUBLICATION_OPERATION,
   }))}`;
+}
+
+function expectedPublicationEvidenceRef(state, input = {}) {
+  const publicationRunId = asText(input.publicationRunId);
+  const contentSha256 = asText(input.contentSha256).toLowerCase();
+  const founderApproval = input.founderApproval || {};
+  const reviewWindow = input.reviewWindow || {};
+  const authority = input.authority || {};
+  const providerCapability = input.providerCapability || {};
+  const execution = input.execution || {};
+  const providerReadback = input.providerReadback || {};
+  const ingress = input.ingress || {};
+  const runtime = input.runtime || {};
+
+  switch (state) {
+    case 'DRAFT':
+      return `draft:${publicationRunId}:${contentSha256}`;
+    case 'FOUNDER_APPROVED':
+      return `approval:${asText(founderApproval.id)}:${contentSha256}`;
+    case 'REVIEW_WINDOW_OPEN':
+      return `review-window-open:${publicationRunId}:${contentSha256}`;
+    case 'REVIEW_WINDOW_MATURED':
+      return `review-window-matured:${publicationRunId}:${asText(reviewWindow.maturedAt)}`;
+    case 'AUTHORITY_MINTED':
+      return `authority:${asText(authority.id)}:${asText(authority.nonce)}`;
+    case 'PROVIDER_CAPABILITY_VERIFIED':
+      return `provider-capability:${asText(providerCapability.accountId)}:${asText(providerCapability.channelId)}`;
+    case 'ACTION_SUBMITTED':
+      return `execution:${asText(execution.actionId)}:${asText(execution.reservationId)}`;
+    case 'PROVIDER_ACKNOWLEDGED':
+      return `provider-ack:${asText(execution.actionId)}`;
+    case 'READBACK_CONFIRMED':
+      return `provider-readback:${asText(providerReadback.observedPostId)}:${asText(providerReadback.observedUrl)}`;
+    case 'RUNTIME_OUTCOME_OBSERVED':
+      return `runtime:${asText(runtime.observedPostId)}:${asText(runtime.observedUrl)}`;
+    case VERIFIED_PUBLICATION_STATE:
+      return `verified:${publicationRunId}:${contentSha256}:${asText(runtime.observedPostId)}`;
+    case 'INGRESS_INVALID':
+      return `ingress-invalid:${asText(ingress.eventId)}:${asText(ingress.signatureEvidenceRef)}`;
+    default:
+      return '';
+  }
+}
+
+function publicationEventEvidenceMatches(events, input = {}) {
+  if (!Array.isArray(events) || events.length === 0) return false;
+  return events.every((event) => {
+    const expected = expectedPublicationEvidenceRef(asText(event?.state), input);
+    return Boolean(expected) && asText(event?.evidenceRef) === expected;
+  });
 }
 
 function appendPublicationEvent(events = [], input = {}) {
@@ -479,6 +529,7 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
     eventChain.valid === true
       && eventChain.publicationRunId === publicationRunId
       && eventChain.currentState === VERIFIED_PUBLICATION_STATE
+      && publicationEventEvidenceMatches(input.events, input) === true
       && redStatePolicy.missingEvidenceResolvesTo === 'UNKNOWN'
       && redStatePolicy.rollbackSafe === true
       && negativeControls.prematureExecutionDenied === true
@@ -529,6 +580,7 @@ module.exports = {
   appendPublicationEvent,
   validatePublicationEventChain,
   deriveAdvisoryIdempotencyKey,
+  expectedPublicationEvidenceRef,
   evaluatePublicationAttackTen,
   productionPublicationAllowed,
 };
