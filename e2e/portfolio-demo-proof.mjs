@@ -75,8 +75,10 @@ async function proveViewport(name, width, height, isMobile = false) {
   assert.equal(await page.getByTestId('demo-sekret-bip').count(), 1, `${name}: Se’kret Bip demo is present`);
   assert.equal(await page.getByTestId('demo-fcr').count(), 1, `${name}: FCR demo is present`);
 
-  const sekretHref = await page.getByTestId('open-sekret-demo').getAttribute('href');
-  assert.equal(sekretHref, 'https://app.sekretbip.net/?bipDevAudience=teen', `${name}: Se’kret Bip link matches the bounded live-demo entry`);
+  const sekretDemo = page.getByTestId('open-sekret-demo');
+  assert.equal(await sekretDemo.getAttribute('href'), null, `${name}: unverified Se’kret Bip live entry is not clickable`);
+  assert.equal(await sekretDemo.getAttribute('aria-disabled'), 'true', `${name}: unverified Se’kret Bip entry is explicitly disabled`);
+  assert.match(await sekretDemo.innerText(), /witness pending/i, `${name}: withheld live entry explains the proof gate`);
   const claimBoundary = await page.getByTestId('claim-boundary').innerText();
   assert.match(claimBoundary, /does not prove/i, `${name}: overclaim boundary is visible`);
   assert.match(claimBoundary, /current production runtime equals current repository main/i, `${name}: runtime/source equivalence is not invented`);

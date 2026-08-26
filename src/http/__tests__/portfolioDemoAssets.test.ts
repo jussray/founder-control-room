@@ -18,7 +18,7 @@ describe('public portfolio demo boundary', () => {
     expect(existsSync(resolve(repoRoot, 'public/demo/index.html'))).toBe(true);
   });
 
-  it('keeps the public demo static, inspect-only, and bounded', () => {
+  it('keeps the public demo static, inspect-only, and fail-closed for unverified live entries', () => {
     const html = read('public/demo/index.html');
 
     expect(existsSync(resolve(repoRoot, 'public/demo/styles.css'))).toBe(true);
@@ -26,7 +26,9 @@ describe('public portfolio demo boundary', () => {
     expect(html).toContain('public-demo · inspect-only');
     expect(html).toContain('no privileged writes');
     expect(html).toContain('no browser cookie required');
-    expect(html).toContain('https://app.sekretbip.net/?bipDevAudience=teen');
+    expect(html).toContain('data-testid="open-sekret-demo" aria-disabled="true"');
+    expect(html).not.toContain('href="https://app.sekretbip.net/?bipDevAudience=teen"');
+    expect(html).toContain('live entry stays withheld');
     expect(html).toContain('current production runtime equals current repository main');
     expect(html).not.toMatch(/<script\b/i);
     expect(html).not.toMatch(/<form\b/i);
