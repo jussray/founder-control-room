@@ -54,20 +54,29 @@ function file(path: string) {
   };
 }
 
+type ProviderState = {
+  currentBase: string;
+  currentHead: string;
+  publication: VerificationSignalPublication | undefined;
+};
+
 function provider({
   reviewContext = defaultContext,
   diff = defaultDiff,
   issuerId = APP_ID,
+  onContextRead,
 }: {
   reviewContext?: PullRequestReviewContext;
   diff?: Diff;
   issuerId?: string | undefined;
+  onContextRead?: (count: number, state: ProviderState) => void;
 } = {}) {
-  const state = {
+  const state: ProviderState = {
     currentBase: reviewContext.baseSha,
     currentHead: reviewContext.headSha,
-    publication: undefined as VerificationSignalPublication | undefined,
+    publication: undefined,
   };
+  let contextReadCount = 0;
   const publishVerificationSignal = vi.fn().mockImplementation(async (
     _projectId: string,
     publication: VerificationSignalPublication,
@@ -76,7 +85,11 @@ function provider({
   });
   const implementation = {
     name: "github",
-    getPullRequestReviewContext: vi.fn().mockResolvedValue(reviewContext),
+    getPullRequestReviewContext: vi.fn().mockImplementation(async () => {
+      contextReadCount += 1;
+      onContextRead?.(contextReadCount, state);
+      return reviewContext;
+    }),
     resolveRef: vi.fn().mockImplementation(async (_projectId: string, ref: string) =>
       ref === reviewContext.baseRef ? state.currentBase : state.currentHead),
     compare: vi.fn().mockResolvedValue(diff),
@@ -172,8 +185,8 @@ describe("deterministic review witness publisher", () => {
 
   it("fails before publication when base or head moves after receipt production", async () => {
     for (const mutate of [
-      (state: { currentBase: string; currentHead: string }) => { state.currentBase = "e".repeat(40); },
-      (state: { currentBase: string; currentHead: string }) => { state.currentHead = "f".repeat(40); },
+      (state: ProviderState) => { state.currentBase = "e".repeat(40); },
+      (state: ProviderState) => { state.currentHead = "f".repeat(40); },
     ]) {
       const { implementation, publishVerificationSignal, state } = provider();
       const review = await freshReceipt(implementation);
@@ -187,6 +200,25 @@ describe("deterministic review witness publisher", () => {
       })).rejects.toThrow(/base moved|head moved/i);
       expect(publishVerificationSignal).not.toHaveBeenCalled();
     }
+  });
+
+  it("fails if the head moves after trusted re-derivation but before the provider write", async () => {
+    const { implementation, publishVerificationSignal } = provider({
+      // First read produces the caller receipt. Second read is the publisher's
+      // trusted re-derivation. Third read is its last-moment publication check.
+      onContextRead: (count, state) => {
+        if (count === 3) state.currentHead = "f".repeat(40);
+      },
+    });
+    const review = await freshReceipt(implementation);
+
+    await expect(publishDeterministicReviewWitness({
+      provider: implementation,
+      projectId: "founder-control-room",
+      receipt: review,
+      env: { GITHUB_APP_ID: APP_ID },
+    })).rejects.toThrow(/head moved after trusted review and before publication/i);
+    expect(publishVerificationSignal).not.toHaveBeenCalled();
   });
 
   it("rejects a caller-modified receipt even when the caller recomputes its plain hash", async () => {
@@ -225,11 +257,8 @@ describe("deterministic review witness publisher", () => {
 
   it("rejects non-GitHub providers before publication", async () => {
     const { implementation, publishVerificationSignal } = provider();
+    const review = await freshReceipt(implementation);
     Object.defineProperty(implementation, "name", { value: "gitlab" });
-    const review = await freshReceipt({
-      ...implementation,
-      name: "github",
-    } as VerificationSignalPublishingProvider);
 
     await expect(publishDeterministicReviewWitness({
       provider: implementation,
