@@ -178,6 +178,15 @@ describe("deterministic review producer", () => {
     ]));
   });
 
+  it("treats the deterministic witness publisher as a P1 trust root", () => {
+    const findings = evaluateDeterministicReviewRules([
+      file("src/review/deterministicReviewWitnessPublisher.ts"),
+    ]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "trust-root-self-modification", severity: "P1" }),
+    ]));
+  });
+
   it("requires discovery adversarial tests and runbook when discovery core changes", () => {
     const findings = evaluateDeterministicReviewRules([
       file("scripts/verify-test-discovery.mjs"),
@@ -188,6 +197,22 @@ describe("deterministic review producer", () => {
 
     const repaired = evaluateDeterministicReviewRules([
       file("scripts/verify-test-discovery.mjs"),
+      file("scripts/verify-test-discovery.node-test.mjs"),
+      file("docs/TEST_DISCOVERY_DEBT.md"),
+    ]);
+    expect(repaired.some((item) => item.id === "test-discovery-proof-coupling")).toBe(false);
+  });
+
+  it("treats discovery baseline changes as discovery-core changes", () => {
+    const findings = evaluateDeterministicReviewRules([
+      file("scripts/test-discovery-baseline.json"),
+    ]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "test-discovery-proof-coupling", severity: "P2" }),
+    ]));
+
+    const repaired = evaluateDeterministicReviewRules([
+      file("scripts/test-discovery-baseline.json"),
       file("scripts/verify-test-discovery.node-test.mjs"),
       file("docs/TEST_DISCOVERY_DEBT.md"),
     ]);
