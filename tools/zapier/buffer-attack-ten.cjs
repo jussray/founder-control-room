@@ -11,6 +11,7 @@ const PUBLICATION_OPERATION = 'schedule_linkedin_post';
 const PUBLICATION_PROVIDER = 'buffer';
 const VERIFIED_PUBLICATION_STATE = 'VERIFIED_PUBLISHED';
 const MAX_INGRESS_REPLAY_WINDOW_MS = 5 * 60 * 1000;
+const REVIEW_WINDOW_MS = 20 * 60 * 1000;
 const PRODUCTION_BLOCK_REASON = 'AUTHORITATIVE_PRODUCTION_ADAPTER_REQUIRED';
 const LINKEDIN_HOSTS = new Set(['linkedin.com', 'www.linkedin.com']);
 
@@ -124,6 +125,20 @@ function isLinkedInUrl(value) {
   }
 }
 
+function normalizeCanonicalPublicationPayload(payload = {}) {
+  const platform = asText(payload.platform).toLowerCase();
+  const channelId = asText(payload.channelId);
+  const text = typeof payload.text === 'string' ? payload.text : '';
+
+  if (platform !== 'linkedin' || !channelId || !text.trim()) return null;
+  return { platform, channelId, text };
+}
+
+function deriveCanonicalPayloadSha256(payload = {}) {
+  const canonical = normalizeCanonicalPublicationPayload(payload);
+  return canonical ? sha256(stableJson(canonical)) : '';
+}
+
 function deriveAdvisoryIdempotencyKey(input = {}) {
   const publicationRunId = asText(input.publicationRunId);
   const contentSha256 = asText(input.contentSha256).toLowerCase();
@@ -168,7 +183,7 @@ function expectedPublicationEvidenceRef(state, input = {}) {
     case 'FOUNDER_APPROVED':
       return `approval:${asText(founderApproval.id)}:${contentSha256}`;
     case 'REVIEW_WINDOW_OPEN':
-      return `review-window-open:${publicationRunId}:${contentSha256}`;
+      return `review-window-open:${publicationRunId}:${asText(reviewWindow.generatedAt)}`;
     case 'REVIEW_WINDOW_MATURED':
       return `review-window-matured:${publicationRunId}:${asText(reviewWindow.maturedAt)}`;
     case 'AUTHORITY_MINTED':
@@ -197,6 +212,14 @@ function publicationEventEvidenceMatches(events, input = {}) {
   return events.every((event) => {
     const expected = expectedPublicationEvidenceRef(asText(event?.state), input);
     return Boolean(expected) && asText(event?.evidenceRef) === expected;
+  });
+}
+
+function publicationEventsAtOrBefore(events, nowMs) {
+  if (!Array.isArray(events) || !Number.isFinite(nowMs)) return false;
+  return events.every((event) => {
+    const occurredAtMs = parseTime(event?.occurredAt);
+    return occurredAtMs !== null && occurredAtMs <= nowMs;
   });
 }
 
@@ -334,17 +357,19 @@ function trustedSignerSet(options = {}) {
 /**
  * Pure source/advisory evaluator only.
  *
- * This function intentionally cannot mint production publication authority:
- * it does not own the authenticated FCR approval store, atomic execution
- * reservation, cryptographic ingress verifier, provider credentials, provider
- * readback client, or public runtime observer. `allowed` therefore remains
- * false even when every advisory assertion is internally coherent.
+ * This function checks internal evidence correlation. It does not own or prove
+ * the authoritative FCR approval store, atomic execution reservation,
+ * cryptographic ingress verifier, provider credentials/readback client, or
+ * public runtime observer. `allowed` therefore remains false even when all
+ * advisory assertions are internally coherent.
  */
 function evaluatePublicationAttackTen(input = {}, options = {}) {
   const nowMs = Number.isFinite(options.nowMs) ? options.nowMs : Date.now();
   const trustedIngressSignerIds = trustedSignerSet(options);
   const publicationRunId = asText(input.publicationRunId);
   const contentSha256 = asText(input.contentSha256).toLowerCase();
+  const canonicalPayload = normalizeCanonicalPublicationPayload(input.canonicalPayload);
+  const canonicalPayloadSha256 = deriveCanonicalPayloadSha256(input.canonicalPayload);
   const founderApproval = input.founderApproval || {};
   const authority = input.authority || {};
   const reviewWindow = input.reviewWindow || {};
@@ -360,6 +385,7 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
   const authorityNotBefore = parseTime(authority.notBefore);
   const authorityExpiresAt = parseTime(authority.expiresAt);
   const authorityConsumedAt = parseTime(authority.consumedAt);
+  const reviewGeneratedAt = parseTime(reviewWindow.generatedAt);
   const reviewMaturedAt = parseTime(reviewWindow.maturedAt);
   const ingressSignedAt = parseTime(ingress.signedAt);
   const ingressReceivedAt = parseTime(ingress.receivedAt);
@@ -377,7 +403,7 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
 
   results.push(attack(
     'A1',
-    'founder intent evidence is exact and store-bound',
+    'founder approval evidence claim is internally correlated',
     UUID.test(publicationRunId)
       && SHA256.test(contentSha256)
       && Boolean(asText(founderApproval.id))
@@ -386,12 +412,12 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
       && founderApproval.storeReadbackVerified === true
       && asText(founderApproval.publicationRunId) === publicationRunId
       && asText(founderApproval.contentSha256).toLowerCase() === contentSha256,
-    'advisory founder-approval evidence must identify the authoritative FCR store and bind the exact run/content hash; the pure evaluator cannot perform that read itself',
+    'these fields are advisory provenance claims only; the future authoritative adapter must perform and retain the actual FCR store read/claim',
   ));
 
   results.push(attack(
     'A2',
-    'authority evidence is scoped, expiring, and consumed exactly once by this action',
+    'authority evidence claim is scoped, expiring, and consumed exactly once by this action',
     Boolean(asText(authority.id))
       && UUID.test(asText(authority.nonce))
       && authority.operation === PUBLICATION_OPERATION
@@ -401,26 +427,29 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
       && asText(authority.recipient) === asText(input.executorIdentity)
       && authorityNotBefore !== null
       && authorityExpiresAt !== null
-      && authorityNotBefore <= authorityConsumedAt
       && authorityConsumedAt !== null
+      && authorityNotBefore <= authorityConsumedAt
       && authorityConsumedAt <= nowMs
       && authorityConsumedAt < authorityExpiresAt
       && authority.consumed === true
       && asText(authority.consumedByActionId) === asText(execution.actionId)
       && asText(authority.consumedPublicationRunId) === publicationRunId,
-    'terminal advisory evidence must show the exact authority was consumed once for this run/action, never merely caller-declared unused',
+    'terminal advisory evidence must correlate exact one-use consumption to this run/action; the pure evaluator does not perform the atomic claim itself',
   ));
 
   results.push(attack(
     'A3',
-    'review-window rules are control-plane enforced',
-    reviewWindow.state === 'REVIEW_WINDOW_MATURED'
+    'full twenty-minute review-window evidence is internally coherent',
+    reviewGeneratedAt !== null
       && reviewMaturedAt !== null
+      && reviewMaturedAt - reviewGeneratedAt >= REVIEW_WINDOW_MS
       && reviewMaturedAt <= nowMs
+      && reviewWindow.state === 'REVIEW_WINDOW_MATURED'
+      && reviewWindow.policyId === 'buffer-20-minute-review-v1'
       && authorityNotBefore !== null
       && authorityNotBefore >= reviewMaturedAt
       && reviewWindow.providerOverrideAllowed === false,
-    'authority cannot become valid before the review window matures',
+    'maturedAt must be at least twenty minutes after generatedAt before authority becomes valid',
   ));
 
   const exactContentCorrelation = [
@@ -433,28 +462,31 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
 
   results.push(attack(
     'A4',
-    'content identity is frozen and integrity-bound',
+    'actual canonical publication payload is hashed and correlated',
     input.contentFrozen === true
-      && SHA256.test(contentSha256)
+      && canonicalPayload !== null
+      && SHA256.test(canonicalPayloadSha256)
+      && canonicalPayloadSha256 === contentSha256
+      && canonicalPayload.channelId === asText(authority.channelId)
       && exactContentCorrelation,
-    'approved, authorized, executed, read-back, and runtime-observed content hashes must match',
+    'the evaluator hashes the exact canonical LinkedIn platform/channel/text payload and requires every metadata hash to match it',
   ));
 
   results.push(attack(
     'A5',
-    'provider capability evidence is live and policy-gated',
+    'provider capability evidence claim is internally correlated',
     providerCapability.live === true
       && providerCapability.policyGatePassed === true
       && providerCapability.provider === PUBLICATION_PROVIDER
       && Boolean(asText(providerCapability.accountId))
       && asText(providerCapability.channelId) === asText(authority.channelId)
       && asText(providerCapability.accountId) === asText(execution.accountId),
-    'a configured credential or mock is not live capability proof',
+    'configured/live booleans remain advisory claims; a production adapter must perform provider-owned capability readback',
   ));
 
   results.push(attack(
     'A6',
-    'execution evidence is deterministically idempotent and reservation-correlated',
+    'execution reservation evidence claim matches the derived idempotency identity',
     Boolean(expectedIdempotencyKey)
       && asText(execution.idempotencyKey) === expectedIdempotencyKey
       && execution.uniquenessConstraintVerified === true
@@ -464,12 +496,12 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
       && Boolean(asText(execution.actionId))
       && asText(execution.publicationRunId) === publicationRunId
       && asText(execution.authorityId) === asText(authority.id),
-    'advisory retry-safety evidence must use the derived key and identify a persisted exact-scope reservation',
+    'the key is derived here, but production retry safety still requires the authoritative execution ledger to create/read the reservation',
   ));
 
   results.push(attack(
     'A7',
-    'provider acknowledgement is independently read back',
+    'provider acknowledgement evidence claim is independently correlated',
     providerReadback.verified === true
       && providerReadback.platform === 'linkedin'
       && Boolean(asText(providerReadback.observedPostId))
@@ -477,12 +509,12 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
       && asText(providerReadback.actionId) === asText(execution.actionId)
       && asText(providerReadback.accountId) === asText(execution.accountId)
       && asText(providerReadback.channelId) === asText(authority.channelId),
-    'provider submission is insufficient without exact LinkedIn provider readback',
+    'submission metadata is insufficient; the production adapter must supply provider-owned exact LinkedIn readback evidence',
   ));
 
   results.push(attack(
     'A8',
-    'ingress evidence is cryptographically verified, correlated, durable, deduplicated, and replay-bounded',
+    'ingress verification evidence claim is correlated, durable, deduplicated, and replay-bounded',
     ingress.capability === 'VERIFIED'
       && ingress.authenticated === true
       && ingress.signatureVerified === true
@@ -507,12 +539,12 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
       && ingressReplayWindowMs <= MAX_INGRESS_REPLAY_WINDOW_MS
       && ingressReceivedAt - ingressSignedAt <= ingressReplayWindowMs
       && nowMs - ingressReceivedAt <= ingressReplayWindowMs,
-    'advisory ingress evidence must identify a server-side cryptographic verifier plus durable ledger readback; booleans alone are never production authority',
+    'these are advisory evidence claims; production requires a server-owned cryptographic verifier and durable ledger readback outside this pure evaluator',
   ));
 
   results.push(attack(
     'A9',
-    'runtime outcome is observed on the exact approved LinkedIn destination',
+    'runtime outcome evidence claim is correlated to the exact LinkedIn destination',
     runtime.observed === true
       && runtime.platform === 'linkedin'
       && asText(runtime.channelId) === asText(authority.channelId)
@@ -520,15 +552,16 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
       && isLinkedInUrl(runtime.observedUrl)
       && asText(runtime.observedPostId) === asText(providerReadback.observedPostId)
       && asText(runtime.observedUrl) === asText(providerReadback.observedUrl),
-    'runtime evidence must bind the same LinkedIn destination, channel, post identity, and URL as provider readback',
+    'runtime evidence must bind the same LinkedIn destination/channel/post as provider readback; public observation itself remains outside this evaluator',
   ));
 
   results.push(attack(
     'A10',
-    'failure, expiry, denial, and rollback stay visible and safe',
+    'event history is current, hash-valid, and bound to the exact advisory evidence packet',
     eventChain.valid === true
       && eventChain.publicationRunId === publicationRunId
       && eventChain.currentState === VERIFIED_PUBLICATION_STATE
+      && publicationEventsAtOrBefore(input.events, nowMs) === true
       && publicationEventEvidenceMatches(input.events, input) === true
       && redStatePolicy.missingEvidenceResolvesTo === 'UNKNOWN'
       && redStatePolicy.rollbackSafe === true
@@ -536,7 +569,7 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
       && negativeControls.expiredAuthorityRejected === true
       && negativeControls.replayedNonceBlocked === true
       && negativeControls.mismatchedContentRejected === true,
-    'only a valid hash-chained VERIFIED_PUBLISHED evidence chain with passing negative controls may be advisory-green',
+    'advisory green requires a non-future hash chain whose deterministic refs match this exact evidence packet; production authority still remains false',
   ));
 
   const advisoryAllowed = results.every((result) => result.pass);
@@ -544,6 +577,7 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
     attackTenVersion: ATTACK_TEN_VERSION,
     publicationRunId,
     contentSha256,
+    canonicalPayloadSha256,
     state: eventChain.currentState,
     attackResults: results,
     failures: results.filter((result) => !result.pass),
@@ -575,10 +609,12 @@ module.exports = {
   PUBLICATION_PROVIDER,
   VERIFIED_PUBLICATION_STATE,
   PRODUCTION_BLOCK_REASON,
+  REVIEW_WINDOW_MS,
   PUBLICATION_STATES,
   RED_STATES,
   appendPublicationEvent,
   validatePublicationEventChain,
+  deriveCanonicalPayloadSha256,
   deriveAdvisoryIdempotencyKey,
   expectedPublicationEvidenceRef,
   evaluatePublicationAttackTen,
