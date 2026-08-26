@@ -217,4 +217,22 @@ describe('evaluateGitHubPrAuditEvidence', () => {
       expect.objectContaining({ code: 'review_changes_requested', severity: 'blocker' }),
     ]));
   });
+
+  it('does not count approval recorded against an older head as current approval', () => {
+    const result = evaluate({
+      reviews: [
+        {
+          id: 'review-old',
+          reviewer: 'reviewer-a',
+          state: 'approved',
+          commitSha: OLD_HEAD,
+          submittedAt: '2026-08-25T22:00:00.000Z',
+        },
+      ],
+    });
+    expect(result.summary.reviewDecision).toBe('none');
+    expect(result.findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'review_approval_stale_for_head_sha', severity: 'warning' }),
+    ]));
+  });
 });
