@@ -9,17 +9,41 @@ Treat `$ARGUMENTS` as the finish line. Seek, build, fix, and verify without wand
 
 ## Establish the boundary
 
-State the authoritative repo, target branch, current goal, suspected failure area, first files or logs, and stop condition. Resolve unknowns with narrow inspection.
+State the authoritative repo, target branch or PR, current goal, exact base/head when available, suspected failure area, first files or logs, and stop condition. Resolve unknowns with narrow inspection.
+
+## Canonical execution lane
+
+```text
+Founder intent
+→ Observe
+→ Orient
+→ Decide
+→ Builder
+→ independent Verifier
+→ independent Red Team / Devil
+→ exact-head merge gate
+→ Founder Final
+→ merge with expected-head protection
+→ reacquire main
+→ post-merge/runtime truth
+→ recover / learn / next gate
+```
 
 ## Execute OODA
 
-1. **Observe:** inspect exact errors, failing tests, routes, configs, recent diffs, runtime logs, and live behavior.
-2. **Orient:** map who decides, what changes, where truth lives, when to stop or roll back, why it matters, and how it will be tested.
-3. **Decide:** choose one cause and the smallest reversible patch. Red-team whether it should exist and how it could fail.
-4. **Act:** touch only required files, preserve unrelated work, and add the narrowest useful test. Never suppress a signal or fake green.
-5. **Verify:** run touched-area lint/typecheck, focused test, targeted integration test, then real browser flow as applicable. Invoke `/playwright-proof` for UI/runtime work.
-6. **Loop:** use new evidence to repeat only within the focused cause. Stop when the condition is met or new authority is required.
+1. **Observe:** inspect exact errors, failing tests, routes, configs, recent diffs, current CI, provider state, runtime logs, and live behavior. Classify material claims as VERIFIED, INFERRED, UNKNOWN, BLOCKED, or STALE.
+2. **Orient:** map who decides, what changes, where truth lives, when to stop or roll back, why it matters, and how it will be tested. Establish the smallest reversible change, rollback, proof plan, and unrelated-work boundary before mutation.
+3. **Decide:** choose one cause and the smallest reversible patch. Preserve valuable red/draft/superseded work until unique residue is reconciled.
+4. **Builder:** touch only required files on a branch, preserve unrelated work, and add the narrowest useful test. Never suppress a signal or fake green. Builder does not self-certify.
+5. **Independent Verifier:** run touched-area lint/typecheck, focused tests, targeted integration tests, and `/playwright-proof` for UI/runtime work. Bind proof to the actual candidate head and current base.
+6. **Independent Red Team / Devil:** attack authority bypass, stale evidence, alternate provider/ingress paths, false-success states, scope expansion, rollback failure, and self-produced evidence.
+7. **Exact-head merge gate:** require current repository, exact base SHA, exact candidate head SHA, current diff/scope, evidence IDs, CI/review state, and rollback. Machine green alone is not merge authority. If main moves, reacquire and reverify.
+8. **Founder Final:** founder approval applies only to the unchanged exact candidate after required checks and review authority are current.
+9. **Post-merge truth:** reacquire main and prove merged identity plus required provider/runtime/browser evidence. Merge is not completion. UI/runtime claims require Playwright.
+10. **Loop:** use new evidence to continue, reverify, roll back, or stop. Report one exact next gate.
 
 Treat `ULTRATHINK/steal` as deeper reasoning, not a larger patch. Extract causal mechanisms and synthesize an original solution. Do not copy protected expression, branding, private material, secrets, or incompatible code. Score candidates by founder value, durability, reversibility, authority, evidence, rollback, and compounding value.
 
-Do not merge unless the user requested it or checked-in repository policy grants standing merge authority. Required checks plus real-path evidence must be green, except when `/review-verify-merge` verifies a checked-in repository policy that explicitly permits a classified infrastructure-outage exception with sufficient alternative evidence and no protection bypass. Return `REALITY`, `FIX`, `PROOF`, `RISK`, `ROLLBACK`, and one `NEXT GATE`.
+Do not merge unless the user requested it or checked-in repository policy grants standing merge authority. Required checks, required review authority, and real-path evidence must be current. Never turn a deployment preview or historical green into merge/runtime proof.
+
+Return `REALITY`, `FIX`, `PROOF`, `RISK`, `ROLLBACK`, and one `NEXT GATE`.
