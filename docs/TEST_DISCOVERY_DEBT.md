@@ -14,9 +14,11 @@ That contract includes colocated and `__tests__/` suites written as `.test.ts` o
 
 ## Discovery authority
 
-`scripts/verify-test-discovery.mjs` does not trust a substring match or a candidate-selected legacy pattern. It evaluates the repository's static `defineConfig(...)` test configuration in a sandbox and requires the approved `test.include` contract exactly.
+`scripts/verify-test-discovery.mjs` does not trust a substring match, execute candidate-controlled configuration, or accept a candidate-selected legacy pattern. It parses the `defineConfig(...)` payload with a deliberately narrow non-executing static-literal grammar and requires the approved `test.include` contract exactly.
 
-A non-empty `test.exclude` is rejected because it can hide a file that the include pattern would otherwise discover. More complex or dynamic test configuration is fail-closed and requires a separately reviewed discovery-contract change.
+The grammar permits only static objects, arrays, quoted strings, finite numbers, booleans, and `null`. Executable or ambiguous forms such as environment-dependent branching, IIFEs, spreads, getters, computed/dynamic properties, duplicate keys, and other unsupported syntax fail closed and require a separately reviewed discovery-contract change.
+
+A non-empty `test.exclude` is rejected because it can hide a file that the include pattern would otherwise discover.
 
 The verifier then inventories candidate `.test` and `.spec` files across supported JavaScript and TypeScript suffixes and compares them with the approved discovery contract and the exact base's recorded debt.
 
@@ -30,6 +32,8 @@ The CI ratchet enforces all of the following:
 - a narrower include pattern is rejected;
 - comment/inactive-text copies of the approved pattern cannot satisfy the effective config check;
 - discovery-affecting `test.exclude` entries are rejected;
+- candidate configuration is never executed by the verifier;
+- dynamic or unsupported configuration syntax fails closed;
 - the verifier is bound to `TEST_DISCOVERY_BASE_SHA` in CI.
 
 ## Why this is scoped proof
