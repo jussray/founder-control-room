@@ -1,6 +1,8 @@
 # Goalfix Execution Workflow v2
 
-Status: `APPROVED SOURCE CONTRACT`
+Status: `SOURCE CONTRACT`
+
+Authority and approval state are resolved from current repository receipts, authenticated founder authority, review evidence, and provider state. This lifecycle-neutral source label does not grant approval or merge authority.
 
 This is the repository-owned operating contract for focused founder-directed implementation. Candidate/merge state belongs in PR/evidence receipts, not durable source prose.
 

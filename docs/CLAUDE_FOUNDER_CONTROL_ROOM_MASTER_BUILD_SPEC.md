@@ -72,31 +72,34 @@ Founder Intent
 -> Independent Verifier
 -> Independent Red Team / Devil
 -> Exact-head Merge Gate
--> Founder Final
+-> Founder Final through current authenticated founder authority
+-> Final Provider / PR / Target / Base / Head / Diff / Check / Review Reread
 -> Merge With Expected Head
--> Reacquire Main
+-> Reacquire Verified Target Branch
 -> Post-merge / Runtime Truth
 -> Recover / Learn / Next Gate
 ```
 
 Within that lane, Claude must apply the expanded reasoning semantics required by `AGENTS.md`, including Product Design, Data Analytics, Redteam I, Lindy, L99, OODA, Hormozi, Bill Gates, Elon Musk, Redteam II, and Documentation Truth when applicable.
 
-The checklist below is a Claude-specific implementation aid only. It may not replace, reorder away, or omit the canonical Builder → Independent Verifier → Independent Red Team → exact-head merge gate → Founder Final → post-merge truth sequence.
+The checklist below is a Claude-specific implementation aid only. It may not replace, reorder away, or omit the canonical Builder → Independent Verifier → Independent Red Team → exact-head merge gate → Founder Final → final mutable reread → post-merge truth sequence.
 
 Translate `/goalfix` into this concrete loop:
 
-1. Identify the authoritative repo, branch, target, and current head.
+1. Identify the authoritative repo, branch, verified target branch, current base, and current head.
 2. Separate VERIFIED, INFERRED, UNKNOWN, BLOCKED, and STALE.
-3. Find one causal blocker before treating symptoms.
-4. Choose the smallest reversible patch.
-5. Preserve unrelated work.
+3. For GitHub Actions, classify `runner_startup_failure`, `workflow_no_jobs`, or `workflow_step_failure` from executed-job evidence before assigning source blame.
+4. Find one causal blocker before treating symptoms.
+5. Choose the smallest reversible patch while preserving unrelated work and Sauce Guard boundaries.
 6. Add or update the narrowest useful test.
 7. Hand implementation evidence to an independent verifier rather than self-certifying.
-8. Escalate to Playwright for every user-facing UI/runtime claim.
+8. Use targeted Playwright for browser-observable UI/user-flow claims; use focused integration/provider/runtime evidence for non-browser Worker APIs, webhooks, background jobs, provider adapters, database paths, and other backend claims.
 9. Run independent Red Team / Devil review on the unchanged exact candidate.
-10. Re-read exact base/head, CI/review/provider state before Founder Final and merge.
-11. Merge only with expected-head protection under current authority.
-12. Reacquire resulting `main` and obtain required post-merge/runtime proof.
+10. Re-read the verified target/base/head, diff/scope, CI, reviews/threads, and mutable provider/PR state before Founder Final.
+11. Accept Founder Final only through the repository's current authenticated founder-authority mechanism bound to the unchanged candidate and intended action/scope.
+12. After Founder Final and immediately before integration, re-read provider PR identity, verified target/base/head, diff/scope, required checks, review/thread state, and other load-bearing mutable provider state. Any change invalidates the prior approval for merge-readiness and returns the lane to revalidation.
+13. Merge only with expected-head protection under current authority.
+14. Reacquire the resulting verified target branch and obtain required post-merge/runtime proof. Report `MERGED_UNVERIFIED` until required runtime truth exists; use `RUNTIME_VERIFIED` only after the intended environment/path is proven.
 
 ---
 

@@ -1,8 +1,10 @@
 # Founder Adaptive Kernel V0
 
-Status: `APPROVED SOURCE CONTRACT`
+Status: `SOURCE CONTRACT`
 
 Owner: Founder
+
+Authority and approval state are resolved from current repository receipts, authenticated founder authority, review evidence, and provider state. This lifecycle-neutral source label does not grant approval, merge, deploy, publication, or provider authority.
 
 Scope: Goalfix/FCR-governed instruction and decision loops across Juss-owned projects, agents, language-learning work, product work, repository repair, content experiments, and operating-system decisions.
 

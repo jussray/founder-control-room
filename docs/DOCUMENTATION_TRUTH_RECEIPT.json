@@ -9,7 +9,7 @@
       "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
         "scripts/verify-documentation-truth.mjs must classify the canonical Goalfix workflow, adaptive kernel, portable Goalfix skills, and Claude/Perplexity master entry specifications as truth-governance so changes to those authority-influencing files cannot receive a zero-truth-sensitive false green.",
-        "scripts/verify-documentation-truth.mjs must keep cross-document checks that require final mutable provider reread, verified target-branch handling, authenticated Founder Final semantics, no-job failure classification, Sauce Guard, bounded runtime claims, and canonical provider-entry deferral."
+        "scripts/verify-documentation-truth.mjs must validate no-job failure classification, browser-versus-backend proof separation, Sauce Guard, verified-target handling, authenticated Founder Final, the post-Founder-Final mutable provider reread, and MERGED_UNVERIFIED semantics across every applicable Goalfix execution entry point rather than relying on uneven path-specific substring checks."
       ]
     },
     {
@@ -27,25 +27,25 @@
     {
       "path": "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md",
       "claims": [
-        "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md must remain an approved governance/source contract for Goalfix/FCR instruction and decision loops, must not claim current /goalfix/inspect, engine, API, or browser UI runtime integration, must keep adaptive state descriptive rather than executable authority, and must learn recurring trust-boundary failures without converting analytics, classifiers, or model output into authority."
+        "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md must remain a lifecycle-neutral governance source contract for Goalfix/FCR instruction and decision loops, must not claim current /goalfix/inspect, engine, API, or browser UI runtime integration, must keep adaptive state descriptive rather than executable authority, and must learn recurring trust-boundary failures without converting analytics, classifiers, or model output into authority."
       ]
     },
     {
       "path": "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md",
       "claims": [
-        "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md must carry the verified target branch instead of assuming main, require authenticated Founder Final, reread mutable provider/PR/target/base/head/diff/check/review state immediately before integration, preserve expected-head protection, distinguish browser Playwright evidence from backend/provider proof, retain MERGED_UNVERIFIED until required runtime truth exists, and keep untrusted artifacts/model plans behind deterministic exact-action authorization and receiver-side capability verification."
+        "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md must remain lifecycle-neutral, carry the verified target branch instead of assuming main, require authenticated Founder Final, reread mutable provider/PR/target/base/head/diff/check/review state immediately before integration, preserve expected-head protection, distinguish browser Playwright evidence from backend/provider proof, retain MERGED_UNVERIFIED until required runtime truth exists, and keep untrusted artifacts/model plans behind deterministic exact-action authorization and receiver-side capability verification."
       ]
     },
     {
       "path": "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md",
       "claims": [
-        "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md must treat docs/GOALFIX_EXECUTION_WORKFLOW_V2.md as the canonical Goalfix execution-order contract so Claude-specific tooling cannot omit Builder, independent Verifier, independent Red Team, exact-head merge gate, Founder Final, or post-merge truth boundaries."
+        "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md must defer to the canonical Goalfix workflow while also carrying the verified target branch, no-job failure classification, browser-versus-backend proof separation, Sauce Guard, authenticated Founder Final followed by a final mutable provider reread, and MERGED_UNVERIFIED post-integration truth so the Claude overlay cannot become a weaker execution path."
       ]
     },
     {
       "path": "docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md",
       "claims": [
-        "docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md must treat docs/GOALFIX_EXECUTION_WORKFLOW_V2.md as the canonical Goalfix execution-order contract so research and MCP overlays cannot become a parallel weaker merge or authority path."
+        "docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md must defer to the canonical Goalfix workflow while also carrying the verified target branch, no-job failure classification, browser-versus-backend proof separation, Sauce Guard, authenticated Founder Final followed by a final mutable provider reread, and MERGED_UNVERIFIED post-integration truth so research and MCP tooling cannot become a weaker execution path."
       ]
     }
   ]

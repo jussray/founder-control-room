@@ -16,7 +16,7 @@ Product Design companion: `docs/PRODUCT_DESIGN_PARALLEL_BUILD_SPEC.md`
 
 Perplexity must treat `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md` as the single canonical product and architecture contract and `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md` as the canonical Goalfix execution-order contract.
 
-This file is a Perplexity MCP research/execution overlay. It does not fork, weaken, summarize away, or replace either canonical contract. If this overlay conflicts with the canonical execution workflow, the canonical workflow wins for Builder/Verifier/Red Team separation, exact-head merge gating, Founder Final, expected-head merge protection, and post-merge truth.
+This file is a Perplexity MCP research/execution overlay. It does not fork, weaken, summarize away, or replace either canonical contract. If this overlay conflicts with the canonical execution workflow, the canonical workflow wins for Builder/Verifier/Red Team separation, exact-head merge gating, Founder Final, final mutable provider reread, expected-head merge protection, and post-merge truth.
 
 Perplexity must also obey `PERPLEXITY.md`, `AGENTS.md`, `GLOBAL_AI.md`, `docs/FOUNDER_MERGE_AUTHORITY.md`, `docs/PORTABLE_FOUNDER_APPROVALS.md`, and the repository's security, privacy, evidence, and rollback contracts.
 
@@ -66,9 +66,10 @@ Founder Intent
 -> Independent Verifier
 -> Independent Red Team / Devil
 -> Exact-head Merge Gate
--> Founder Final
+-> Founder Final through current authenticated founder authority
+-> Final Provider / PR / Target / Base / Head / Diff / Check / Review Reread
 -> Merge With Expected Head
--> Reacquire Main
+-> Reacquire Verified Target Branch
 -> Post-merge / Runtime Truth
 -> Recover / Learn / Next Gate
 ```
@@ -77,22 +78,25 @@ Perplexity's research work is supplemental inside that lane, not an alternative 
 
 Within the canonical lane, apply the expanded reasoning semantics required by `AGENTS.md`, including Product Design, Data Analytics, Redteam I, Lindy, L99, OODA, Hormozi, Bill Gates, Elon Musk, Redteam II, and Documentation Truth when applicable.
 
-The checklist below is a Perplexity-specific aid only. It may not replace, reorder away, or omit the canonical Builder → Independent Verifier → Independent Red Team → exact-head merge gate → Founder Final → post-merge truth sequence.
+The checklist below is a Perplexity-specific aid only. It may not replace, reorder away, or omit the canonical Builder → Independent Verifier → Independent Red Team → exact-head merge gate → Founder Final → final mutable reread → post-merge truth sequence.
 
 Translate `/goalfix` into this concrete loop:
 
-1. Identify authoritative repo, branch, target, and head.
+1. Identify authoritative repo, branch, verified target branch, current base, and head.
 2. Separate VERIFIED, INFERRED, UNKNOWN, BLOCKED, and STALE.
-3. Search repository evidence before external sources.
-4. Use primary sources for unstable technical/provider facts.
-5. Find one causal blocker before collecting many possibilities.
-6. Choose the smallest reversible fix or implementation recommendation.
-7. If Perplexity is the authorized Builder, patch only the focused cause and hand implementation evidence to an independent verifier rather than self-certifying.
-8. Verify the exact claim with the narrowest valid proof; require Playwright for user-facing UI/runtime claims.
-9. Run independent Red Team / Devil review on the unchanged exact candidate.
-10. Re-read exact base/head, CI/review/provider state before Founder Final and merge.
-11. Merge only under current authority with expected-head protection.
-12. Reacquire resulting `main` and obtain required post-merge/runtime proof.
+3. For GitHub Actions, classify `runner_startup_failure`, `workflow_no_jobs`, or `workflow_step_failure` from executed-job evidence before assigning source blame.
+4. Search repository evidence before external sources.
+5. Use primary sources for unstable technical/provider facts.
+6. Find one causal blocker before collecting many possibilities.
+7. Choose the smallest reversible fix or implementation recommendation while preserving unrelated work and Sauce Guard boundaries.
+8. If Perplexity is the authorized Builder, patch only the focused cause and hand implementation evidence to an independent verifier rather than self-certifying.
+9. Verify the exact claim with the narrowest valid proof. Use targeted Playwright for browser-observable UI/user-flow claims and focused integration/provider/runtime evidence for non-browser Worker APIs, webhooks, background jobs, provider adapters, database paths, and other backend claims.
+10. Run independent Red Team / Devil review on the unchanged exact candidate.
+11. Re-read the verified target/base/head, diff/scope, CI, reviews/threads, and mutable provider/PR state before Founder Final.
+12. Accept Founder Final only through the repository's current authenticated founder-authority mechanism bound to the unchanged candidate and intended action/scope.
+13. After Founder Final and immediately before integration, re-read provider PR identity, verified target/base/head, diff/scope, required checks, review/thread state, and other load-bearing mutable provider state. Any change invalidates the prior approval for merge-readiness and returns the lane to revalidation.
+14. Merge only under current authority with expected-head protection.
+15. Reacquire the resulting verified target branch and obtain required post-merge/runtime proof. Report `MERGED_UNVERIFIED` until required runtime truth exists; use `RUNTIME_VERIFIED` only after the intended environment/path is proven.
 
 ---
 
@@ -150,7 +154,7 @@ When Perplexity is not the implementation operator, return a packet Claude, Code
 ```text
 GOAL
 AUTHORITATIVE REPO/BRANCH/SHA
-VERIFIED REPOSITORY REALITY
+VERIFIED REALITY
 EXTERNAL FACTS THAT MATTER
 PRIMARY SOURCES
 CLAIM / FACT-CHECK STATUS

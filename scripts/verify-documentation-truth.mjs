@@ -256,6 +256,24 @@ const perplexityMaster = read('docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_B
 const ci = read('.github/workflows/ci.yml');
 const documentationWorkflow = read('.github/workflows/documentation-truth.yml');
 
+const goalfixExecutionPaths = [
+  ['portable Goalfix skill', goalfixSkill],
+  ['Claude Goalfix skill', claudeGoalfixSkill],
+  ['canonical Goalfix workflow', goalfixWorkflow],
+  ['Claude master Goalfix entry point', claudeMaster],
+  ['Perplexity master Goalfix entry point', perplexityMaster],
+];
+
+const goalfixInvariantChecks = goalfixExecutionPaths.flatMap(([label, content]) => [
+  [content.includes('runner_startup_failure') && content.includes('workflow_no_jobs'), `${label} must preserve runner-startup/no-job CI classification before source blame`],
+  [/Sauce Guard/i.test(content), `${label} must preserve Sauce Guard stop boundaries`],
+  [/Playwright/i.test(content) && /(non-browser|backend)/i.test(content), `${label} must distinguish browser Playwright proof from non-browser/backend proof`],
+  [/verified target/i.test(content), `${label} must carry the verified target branch instead of assuming main`],
+  [/Founder Final/i.test(content) && /authenticated founder/i.test(content), `${label} must require Founder Final through current authenticated founder authority`],
+  [/after Founder Final/i.test(content) && /(?:re-?read|reread)/i.test(content) && /provider/i.test(content), `${label} must reread mutable provider/PR state after Founder Final and immediately before integration`],
+  [content.includes('MERGED_UNVERIFIED'), `${label} must preserve MERGED_UNVERIFIED until required runtime truth exists`],
+]);
+
 const consistencyChecks = [
   [!readme.includes('**Last refreshed:**'), 'README must not present a manually refreshed date as durable current repository authority'],
   [readme.includes('Current identity is resolved at use time'), 'README must resolve current repository identity at use time'],
@@ -290,8 +308,10 @@ const consistencyChecks = [
   [/final provider/i.test(goalfixSkill) && /authenticated founder[- ]authority/i.test(goalfixSkill), 'portable Goalfix skill must preserve authenticated Founder Final plus final provider reread'],
   [claudeGoalfixSkill.includes('runner_startup_failure') && claudeGoalfixSkill.includes('workflow_no_jobs') && claudeGoalfixSkill.includes('MERGED_UNVERIFIED'), 'Claude Goalfix skill must preserve no-job classification and merged-unverified state'],
   [adaptiveKernel.includes('does **not** claim') && adaptiveKernel.includes('instruction and decision loops'), 'adaptive kernel must stay scoped to governance behavior unless runtime integration is separately proven'],
+  [!goalfixWorkflow.includes('APPROVED SOURCE CONTRACT') && !adaptiveKernel.includes('APPROVED SOURCE CONTRACT'), 'Goalfix durable contracts must use lifecycle-neutral source status rather than manufacturing approved authority'],
   [claudeMaster.includes('Canonical execution contract: `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`') && claudeMaster.includes('canonical workflow wins'), 'Claude master entry point must defer Goalfix execution order to the canonical workflow'],
   [perplexityMaster.includes('Canonical execution contract: `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`') && perplexityMaster.includes('canonical workflow wins'), 'Perplexity master entry point must defer Goalfix execution order to the canonical workflow'],
+  ...goalfixInvariantChecks,
   [ci.includes('documentation-truth:') && ci.includes('- documentation-truth'), 'CI Required Gate must depend on Documentation Truth'],
   [documentationWorkflow.includes('Documentation truth gate') && documentationWorkflow.includes('scripts/verify-documentation-truth.mjs'), 'standalone Documentation Truth workflow must execute the verifier'],
 ];
