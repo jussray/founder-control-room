@@ -79,6 +79,16 @@ async function proveViewport(name, width, height, isMobile = false) {
   assert.equal(await sekretDemo.getAttribute('href'), null, `${name}: unverified Se’kret Bip live entry is not clickable`);
   assert.equal(await sekretDemo.getAttribute('aria-disabled'), 'true', `${name}: unverified Se’kret Bip entry is explicitly disabled`);
   assert.match(await sekretDemo.innerText(), /witness pending/i, `${name}: withheld live entry explains the proof gate`);
+
+  for (const testId of ['sekret-genesis-withheld', 'fcr-genesis-withheld']) {
+    const withheld = page.getByTestId(testId);
+    assert.equal(await withheld.getAttribute('href'), null, `${name}: ${testId} cannot route around the Se’kret witness gate`);
+    assert.equal(await withheld.getAttribute('aria-disabled'), 'true', `${name}: ${testId} is explicitly disabled`);
+    assert.match(await withheld.innerText(), /witness pending/i, `${name}: ${testId} explains why provenance navigation is withheld`);
+  }
+  assert.equal(await page.locator('a[href="/control-room/genesis.html"]').count(), 0, `${name}: demo exposes no Genesis navigation while Se’kret witness is pending`);
+  assert.equal(await page.locator('a[href*="sekretbip.net"]').count(), 0, `${name}: demo exposes no direct Se’kret production-domain link while witness is pending`);
+
   const claimBoundary = await page.getByTestId('claim-boundary').innerText();
   assert.match(claimBoundary, /does not prove/i, `${name}: overclaim boundary is visible`);
   assert.match(claimBoundary, /current production runtime equals current repository main/i, `${name}: runtime/source equivalence is not invented`);
