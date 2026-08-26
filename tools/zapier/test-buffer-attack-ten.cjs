@@ -7,8 +7,10 @@ const {
   ATTACK_TEN_VERSION,
   VERIFIED_PUBLICATION_STATE,
   PRODUCTION_BLOCK_REASON,
+  REVIEW_WINDOW_MS,
   appendPublicationEvent,
   validatePublicationEventChain,
+  deriveCanonicalPayloadSha256,
   deriveAdvisoryIdempotencyKey,
   expectedPublicationEvidenceRef,
   evaluatePublicationAttackTen,
@@ -20,6 +22,9 @@ const contract = JSON.parse(readFileSync(join(ROOT, 'config', 'buffer-provider-c
 
 assert.equal(contract.attackTen.version, ATTACK_TEN_VERSION);
 assert.equal(contract.attackTen.status, 'implemented-awaiting-controlled-live-proof');
+assert.equal(contract.attackTen.scope, 'advisory-evidence-only');
+assert.equal(contract.attackTen.standaloneEvaluatorAuthorizesProduction, false);
+assert.equal(contract.attackTen.requiresAuthoritativeProductionAdapter, true);
 assert.equal(contract.attackTen.releaseState, VERIFIED_PUBLICATION_STATE);
 assert.equal(contract.attackTen.verifiedLeverageCountState, VERIFIED_PUBLICATION_STATE);
 assert.deepEqual(contract.attackTen.assertions.map(({ id }) => id), [
@@ -28,16 +33,29 @@ assert.deepEqual(contract.attackTen.assertions.map(({ id }) => id), [
 assert.equal(contract.attackTen.eventLedger.appendOnly, true);
 assert.equal(contract.attackTen.eventLedger.hashChained, true);
 assert.equal(contract.attackTen.eventLedger.stateOverwriteAllowed, false);
+assert.equal(contract.attackTen.eventLedger.exactEvidenceRefBindingRequired, true);
+assert.equal(contract.attackTen.eventLedger.ingressInvalidReachableFromProcessingStates, true);
 assert.equal(contract.attackTen.eventLedger.missingEvidenceState, 'UNKNOWN');
+assert.equal(contract.attackTen.releaseGate.standaloneEvaluatorAuthorizesProduction, false);
+assert.equal(contract.attackTen.releaseGate.requiresAuthoritativeProductionAdapter, true);
+assert.equal(contract.attackTen.releaseGate.requiresConsumedOneUseAuthorityEvidence, true);
 assert.equal(contract.attackTen.releaseGate.requiresRuntimeOutcomeObservation, true);
 assert.equal(contract.authority.liveProviderMutationIncluded, false);
+assert.equal(REVIEW_WINDOW_MS, 20 * 60 * 1000);
 
 const runId = '19f2f2df-66ca-45d5-8b0c-188128c3e9ac';
-const contentSha256 = 'a'.repeat(64);
 const authorityNonce = 'ba80d7c8-cc8a-4fbb-b1d2-7f6ad87fe40f';
 const authorityId = 'authority:verified-delegation-post-v1';
 const actionId = 'buffer-action-123';
 const channelId = 'juss_rayy_linkedin';
+const canonicalPayload = {
+  platform: 'linkedin',
+  channelId,
+  text: 'Synthetic approved post for the Buffer Attack Ten advisory proof.',
+};
+const contentSha256 = deriveCanonicalPayloadSha256(canonicalPayload);
+assert.match(contentSha256, /^[0-9a-f]{64}$/);
+
 const nowIso = '2026-08-25T22:20:00.000Z';
 const nowMs = Date.parse(nowIso);
 const evaluationOptions = {
@@ -70,6 +88,7 @@ assert.ok(expectedIdempotencyKey.startsWith('buffer-attack-ten-v1:'));
 
 const validInput = {
   publicationRunId: runId,
+  canonicalPayload,
   contentSha256,
   contentFrozen: true,
   executorIdentity: 'founder-control-room',
@@ -83,6 +102,8 @@ const validInput = {
   },
   reviewWindow: {
     state: 'REVIEW_WINDOW_MATURED',
+    policyId: 'buffer-20-minute-review-v1',
+    generatedAt: '2026-08-25T21:43:00.000Z',
     maturedAt: '2026-08-25T22:03:00.000Z',
     providerOverrideAllowed: false,
   },
@@ -184,6 +205,7 @@ validInput.events = events;
 
 const validEvaluation = evaluatePublicationAttackTen(validInput, evaluationOptions);
 assert.equal(validEvaluation.attackTenVersion, ATTACK_TEN_VERSION);
+assert.equal(validEvaluation.canonicalPayloadSha256, contentSha256);
 assert.equal(validEvaluation.advisoryAllowed, true);
 assert.equal(validEvaluation.allowed, false);
 assert.equal(validEvaluation.productionAuthority, false);
@@ -212,6 +234,19 @@ assert.equal(evaluatePublicationAttackTen({
 
 assert.equal(evaluatePublicationAttackTen({
   ...validInput,
+  reviewWindow: {
+    ...validInput.reviewWindow,
+    generatedAt: '2026-08-25T21:59:00.000Z',
+  },
+}, evaluationOptions).attackResults.find(({ id }) => id === 'A3').pass, false);
+
+assert.equal(evaluatePublicationAttackTen({
+  ...validInput,
+  reviewWindow: { ...validInput.reviewWindow, policyId: 'caller-short-window' },
+}, evaluationOptions).attackResults.find(({ id }) => id === 'A3').pass, false);
+
+assert.equal(evaluatePublicationAttackTen({
+  ...validInput,
   authority: { ...validInput.authority, expiresAt: '2026-08-25T22:11:59.000Z' },
 }, evaluationOptions).attackResults.find(({ id }) => id === 'A2').pass, false);
 
@@ -228,6 +263,22 @@ assert.equal(evaluatePublicationAttackTen({
 assert.equal(evaluatePublicationAttackTen({
   ...validInput,
   execution: { ...validInput.execution, contentSha256: 'b'.repeat(64) },
+}, evaluationOptions).attackResults.find(({ id }) => id === 'A4').pass, false);
+
+assert.equal(evaluatePublicationAttackTen({
+  ...validInput,
+  canonicalPayload: {
+    ...validInput.canonicalPayload,
+    text: `${validInput.canonicalPayload.text} MUTATED`,
+  },
+}, evaluationOptions).attackResults.find(({ id }) => id === 'A4').pass, false);
+
+assert.equal(evaluatePublicationAttackTen({
+  ...validInput,
+  canonicalPayload: {
+    ...validInput.canonicalPayload,
+    channelId: 'wrong-linkedin-channel',
+  },
 }, evaluationOptions).attackResults.find(({ id }) => id === 'A4').pass, false);
 
 assert.equal(evaluatePublicationAttackTen({
@@ -352,6 +403,24 @@ assert.equal(validatePublicationEventChain(wrongEvidenceEvents).valid, true);
 assert.equal(wrongEvidenceEvaluation.attackResults.find(({ id }) => id === 'A10').pass, false);
 assert.equal(wrongEvidenceEvaluation.advisoryAllowed, false);
 
+let futureEvents = [];
+sequence.forEach((state, index) => {
+  futureEvents = appendPublicationEvent(futureEvents, {
+    publicationRunId: runId,
+    eventId: `40000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+    occurredAt: new Date(nowMs + ((index + 1) * 60_000)).toISOString(),
+    state,
+    evidenceRef: expectedPublicationEvidenceRef(state, validInput),
+  });
+});
+const futureEvaluation = evaluatePublicationAttackTen({
+  ...validInput,
+  events: futureEvents,
+}, evaluationOptions);
+assert.equal(validatePublicationEventChain(futureEvents).valid, true);
+assert.equal(futureEvaluation.attackResults.find(({ id }) => id === 'A10').pass, false);
+assert.equal(futureEvaluation.advisoryAllowed, false);
+
 const actionSubmittedPrefix = events.slice(0, sequence.indexOf('ACTION_SUBMITTED') + 1);
 const ingressInvalidEvents = appendPublicationEvent(actionSubmittedPrefix, {
   publicationRunId: runId,
@@ -393,4 +462,4 @@ const badEvents = appendPublicationEvent(invalidTransition, {
 });
 assert.equal(validatePublicationEventChain(badEvents).valid, false);
 
-console.log('Buffer Attack Ten verified: the pure evaluator can become advisory-green only for internally coherent evidence, but it never grants production authority; caller-supplied approval, unused/replayed authority, arbitrary idempotency, unverified ingress flags, wrong destinations, cross-run substitution, stale replay, false runtime success, mismatched ledger evidence, explicit ingress-invalid transitions, tampered chains, and invalid transitions fail closed.');
+console.log('Buffer Attack Ten verified: the pure evaluator remains non-authorizing; actual canonical payload mutation, short review windows, future-dated evidence, caller approval claims, unused/replayed authority, arbitrary idempotency, unverified ingress flags, wrong destinations, cross-run substitution, stale replay, false runtime success, mismatched ledger evidence, explicit ingress-invalid transitions, tampered chains, and invalid transitions fail closed.');
