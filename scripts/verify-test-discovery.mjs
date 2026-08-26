@@ -17,6 +17,7 @@ import { Script } from 'node:vm';
 const BASELINE_PATH = 'scripts/test-discovery-baseline.json';
 const VITEST_CONFIG_PATH = 'vitest.config.ts';
 const CURRENT_INCLUDE_PATTERN = 'src/**/*.test.{ts,js}';
+const LEGACY_BASE_INCLUDE_PATTERN = 'src/**/*.test.ts';
 const CANDIDATE_TEST_FILE = /\.(?:test|spec)\.(?:[cm]?[jt]sx?)$/i;
 
 function fail(messages) {
@@ -47,7 +48,7 @@ async function collectTestFiles(dir) {
   return found;
 }
 
-function parseBaseline(text, source) {
+function parseBaseline(text, source, { allowedIncludePatterns = [CURRENT_INCLUDE_PATTERN] } = {}) {
   let parsed;
   try {
     parsed = JSON.parse(text);
@@ -55,8 +56,10 @@ function parseBaseline(text, source) {
     fail([`${source} is not valid JSON`, error instanceof Error ? error.message : String(error)]);
   }
 
-  if (parsed.includePattern !== CURRENT_INCLUDE_PATTERN) {
-    fail([`${source} must record includePattern '${CURRENT_INCLUDE_PATTERN}'`]);
+  if (!allowedIncludePatterns.includes(parsed.includePattern)) {
+    fail([
+      `${source} must record an approved includePattern (${allowedIncludePatterns.map((pattern) => `'${pattern}'`).join(' or ')})`,
+    ]);
   }
   if (!Array.isArray(parsed.undiscovered)) {
     fail([`${source} must contain an undiscovered array`]);
@@ -127,7 +130,12 @@ function readBaseBaseline(baseRef) {
     const text = execFileSync('git', ['show', `${baseRef}:${BASELINE_PATH}`], {
       encoding: 'utf8',
     });
-    return parseBaseline(text, `${BASELINE_PATH} at base ${baseRef}`);
+    return parseBaseline(text, `${BASELINE_PATH} at base ${baseRef}`, {
+      // The only approved bootstrap transition is the repository's existing
+      // TypeScript-only contract to the canonical TypeScript + JavaScript one.
+      // Candidate state itself is still required to use CURRENT_INCLUDE_PATTERN.
+      allowedIncludePatterns: [CURRENT_INCLUDE_PATTERN, LEGACY_BASE_INCLUDE_PATTERN],
+    });
   } catch (error) {
     fail([
       `could not read base discovery baseline at ${baseRef}; CI must fetch and retain TEST_DISCOVERY_BASE_SHA`,
