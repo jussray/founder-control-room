@@ -219,6 +219,23 @@ describe("deterministic review producer", () => {
     ]));
   });
 
+  it.each([
+    "src/auth/founderSession.ts",
+    "src/switchboard/store.ts",
+    "src/founder-os-lab/capabilityKernel.ts",
+    "src/lib/v10DecisionAuthorityGate.ts",
+    "src/lib/founderControlDecision.ts",
+  ])("treats direct merge-authority decision module %s as a P1 trust root", (path) => {
+    const findings = evaluateDeterministicReviewRules([file(path)]);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "trust-root-self-modification",
+        severity: "P1",
+        path,
+      }),
+    ]));
+  });
+
   it("requires discovery adversarial tests and runbook when discovery core changes", () => {
     const findings = evaluateDeterministicReviewRules([
       file("scripts/verify-test-discovery.mjs"),
