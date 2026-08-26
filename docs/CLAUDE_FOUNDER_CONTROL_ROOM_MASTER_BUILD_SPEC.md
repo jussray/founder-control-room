@@ -1,21 +1,22 @@
 # Founder Control Room + Chief AI
 ## Claude Master Build Execution Specification
 
-Version: 1.2
-Date: 2026-08-11
+Version: 1.3
+Date: 2026-08-26
 Owner: Juss Ray
 Repository: `jussray/founder-control-room`
 Target branch: `claude/founder-control-room-master-build-spec-20260811`
 Canonical product contract: `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`
+Canonical execution contract: `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`
 Product Design companion: `docs/PRODUCT_DESIGN_PARALLEL_BUILD_SPEC.md`
 
 ---
 
 ## 0. Authority of this document
 
-Claude must treat `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md` as the single canonical product and architecture contract.
+Claude must treat `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md` as the single canonical product and architecture contract and `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md` as the canonical Goalfix execution-order contract.
 
-This file is a Claude execution overlay. It does not fork, weaken, summarize away, or replace the canonical contract. If the two documents conflict, the canonical build specification wins unless Juss explicitly changes the source-of-truth document.
+This file is a Claude execution overlay. It does not fork, weaken, summarize away, or replace either canonical contract. If this overlay conflicts with the canonical execution workflow, the canonical workflow wins for execution order, verification separation, exact-head merge gating, founder-final authority, and post-merge truth.
 
 Claude must also obey `CLAUDE.md`, `AGENTS.md`, `GLOBAL_AI.md`, `docs/FOUNDER_MERGE_AUTHORITY.md`, `docs/PORTABLE_FOUNDER_APPROVALS.md`, and the repository's existing security, privacy, evidence, and rollback contracts.
 
@@ -46,10 +47,11 @@ Before any nontrivial implementation, first load the repository entry contract i
 After that repository preflight, continue narrowly in this order:
 
 1. `CLAUDE.md`
-2. `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`
-3. the exact code, tests, migration, route, provider adapter, or UI path implicated by the goal
-4. the narrow governing authority/evidence docs for the action
-5. recent diff, CI, runtime, or Playwright evidence when relevant
+2. `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`
+3. `docs/FOUNDER_CONTROL_ROOM_AND_CHIEF_AI_MASTER_BUILD_SPEC.md`
+4. the exact code, tests, migration, route, provider adapter, or UI path implicated by the goal
+5. the narrow governing authority/evidence docs for the action
+6. recent diff, CI, runtime, or Playwright evidence when relevant
 
 For Product Design, UX, visual QA, Figma, dashboard, onboarding, or user-flow work, also read `skills/product-design-gate/SKILL.md` and `docs/PRODUCT_DESIGN_PARALLEL_BUILD_SPEC.md` before implementation or design claims. Apply any additional Figma/design contracts required by `AGENTS.md`.
 
@@ -59,36 +61,42 @@ Do not scan the entire repository unless narrow inspection cannot resolve the bl
 
 ## 3. Required operating loop
 
-For every material task:
+The canonical execution order is `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`:
 
 ```text
-Goal
--> Reality
--> Redteam I
--> Lindy
--> L99
--> Redteam II
--> OODA
--> Bill Gates
--> Elon Musk
--> Act
--> Proof
--> Rollback
--> Next Gate
+Founder Intent
+-> Observe
+-> Orient
+-> Decide
+-> Builder
+-> Independent Verifier
+-> Independent Red Team / Devil
+-> Exact-head Merge Gate
+-> Founder Final
+-> Merge With Expected Head
+-> Reacquire Main
+-> Post-merge / Runtime Truth
+-> Recover / Learn / Next Gate
 ```
+
+Within that lane, Claude must apply the expanded reasoning semantics required by `AGENTS.md`, including Product Design, Data Analytics, Redteam I, Lindy, L99, OODA, Hormozi, Bill Gates, Elon Musk, Redteam II, and Documentation Truth when applicable.
+
+The checklist below is a Claude-specific implementation aid only. It may not replace, reorder away, or omit the canonical Builder → Independent Verifier → Independent Red Team → exact-head merge gate → Founder Final → post-merge truth sequence.
 
 Translate `/goalfix` into this concrete loop:
 
 1. Identify the authoritative repo, branch, target, and current head.
-2. Separate VERIFIED, INFERRED, UNKNOWN, and BLOCKED.
+2. Separate VERIFIED, INFERRED, UNKNOWN, BLOCKED, and STALE.
 3. Find one causal blocker before treating symptoms.
 4. Choose the smallest reversible patch.
 5. Preserve unrelated work.
 6. Add or update the narrowest useful test.
-7. Run the cheapest valid verification first.
+7. Hand implementation evidence to an independent verifier rather than self-certifying.
 8. Escalate to Playwright for every user-facing UI/runtime claim.
-9. Re-observe after the change.
-10. Stop when the requested outcome is proven or the next gate requires founder authority.
+9. Run independent Red Team / Devil review on the unchanged exact candidate.
+10. Re-read exact base/head, CI/review/provider state before Founder Final and merge.
+11. Merge only with expected-head protection under current authority.
+12. Reacquire resulting `main` and obtain required post-merge/runtime proof.
 
 ---
 
