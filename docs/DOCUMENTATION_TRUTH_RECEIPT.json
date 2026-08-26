@@ -1,67 +1,39 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded Evidence Trust Plane, Documentation Truth, repository-provider security-preservation, explicit bypass-intent semantics, and Cloudflare remote-read MCP operator invariants for this candidate without claiming durable receipt persistence, live provider mutation, merge authority, deployment authority, secret installation, or live production truth.",
+  "purpose": "Record the bounded deterministic independent-review producer and GitHub App witness-publication invariants for this candidate without claiming bootstrap authority, founder-final approval, merge authority, deployment authority, live provider enforcement, or runtime trigger activation.",
   "domains": [
-    "evidence-authority",
-    "truth-governance",
-    "repository-provider",
-    "cloudflare-authority"
+    "merge-authority",
+    "repository-provider"
   ],
   "changes": [
     {
-      "path": "src/evidence/evidenceLifecycle.ts",
+      "path": "src/review/deterministicReviewProducer.ts",
       "claims": [
-        "src/evidence/evidenceLifecycle.ts: evidence authority must fail closed at use time when a receipt is expired, stale, superseded, unledgered, rejected, or not bound through GitHub API readback to an exact repository, full SHA, workflow, and run identity; a receipt may prepare review but can never authorize merge, deploy, production promotion, secret changes, policy changes, or deletion by itself."
+        "src/review/deterministicReviewProducer.ts must derive the exact repository, pull request, base/head identity, author, complete diff hash, server-owned policy hash, deterministic findings, verdict, and proposal-only receipt from provider-observed state; trust-root self-modification and unavailable rename provenance must fail closed instead of certifying the candidate."
       ]
     },
     {
-      "path": "public/control-room/evidence-trust.html",
+      "path": "src/review/deterministicReviewWitnessPublisher.ts",
       "claims": [
-        "public/control-room/evidence-trust.html: the founder-facing Evidence Trust Plane must describe durable receipt storage as not wired by this slice, preserve observation versus verification versus authority boundaries, and keep evidence-state, may-unlock, and still-blocked labels available on mobile instead of presenting contract-only capability as implemented persistence."
+        "src/review/deterministicReviewWitnessPublisher.ts may publish only a clear deterministic receipt through the repository provider's narrow witness capability, must bind pre/post publication PR identity and exact head, and must reject success unless provider readback reports the exact derived signal from the server-owned numeric GITHUB_APP_ID."
       ]
     },
     {
-      "path": ".github/workflows/playwright.yml",
+      "path": "src/providers/DeterministicReviewGitHubProvider.ts",
       "claims": [
-        ".github/workflows/playwright.yml: the exact-head Playwright lane must execute the Evidence Trust Plane desktop and mobile proof when this authority surface changes; browser rendering proof remains non-authorizing and cannot prove provider mutation, durable persistence, merge authority, deployment authority, or production truth."
+        "src/providers/DeterministicReviewGitHubProvider.ts must restrict deterministic witness publication to the canonical Founder Control Room repository and exact success-only Check Run shape, and must reject malformed or substituted head SHA, review hash, derived signal name, or bounded summary before any provider mutation."
       ]
     },
     {
-      "path": "scripts/verify-documentation-truth.mjs",
+      "path": "src/providers/RepositoryProvider.ts",
       "claims": [
-        "scripts/verify-documentation-truth.mjs: Documentation Truth must classify the Evidence Trust Plane source, founder-facing page, and Playwright authority workflow as evidence-authority truth-sensitive paths so architecture changes cannot false-green with zero truth-sensitive files; changing this verifier remains truth-governance and requires the corresponding current documentation refresh."
-      ]
-    },
-    {
-      "path": "src/providers/SecurityPreservingGitHubProvider.ts",
-      "claims": [
-        "src/providers/SecurityPreservingGitHubProvider.ts: existing non-FCR ruleset reconciliation MUST preserve the stronger current enforcement level and MUST NOT demote an active or evaluate ruleset when a narrower caller requests weaker enforcement.",
-        "src/providers/SecurityPreservingGitHubProvider.ts: existing non-FCR ruleset reconciliation MUST union existing included branch refs with requested refs and MUST preserve existing excluded refs so a caller cannot silently narrow the provider-owned protected scope.",
-        "src/providers/SecurityPreservingGitHubProvider.ts: omitted bypassActors MUST preserve the current provider bypass posture, an explicit empty bypassActors list MUST clear all provider bypass actors, and a non-empty replacement MUST fail closed until a separately authorized provider-aware contract can represent bypass mode and prove the replacement is non-widening; this source contract does not itself prove live provider state."
-      ]
-    },
-    {
-      "path": "src/http/routes/projects.ts",
-      "claims": [
-        "src/http/routes/projects.ts: the founder ruleset route MUST preserve the semantic difference between an omitted bypassActors field and an explicit empty array so non-FCR provider reconciliation can distinguish preserve-current from clear-all intent; the route remains founder-authenticated and reservation/idempotency guarded before provider mutation."
+        "src/providers/RepositoryProvider.ts exposes only a narrow optional deterministic-review witness publication capability rather than ambient generic Check Run authority, and consumers must fail closed when that capability is unavailable."
       ]
     },
     {
       "path": "src/providers/providerFactory.ts",
       "claims": [
-        "src/providers/providerFactory.ts: GitHub repository-provider construction must route through SecurityPreservingGitHubProvider while preserving the existing LazyRepositoryProvider boundary, GitHub App credential preference, FCR constitutional governance checks, exact reviewed base/head freshness membrane, and unchanged GitLab provider behavior."
-      ]
-    },
-    {
-      "path": "src/providers/rulesetSecurityMerge.ts",
-      "claims": [
-        "src/providers/rulesetSecurityMerge.ts: narrowing requested required-status contexts may remove unrequested check contexts but must not silently weaken stronger existing pull-request protections, deletion/non-fast-forward rules, unmanaged provider security rules, or retained status-check provider metadata for contexts that remain requested."
-      ]
-    },
-    {
-      "path": "wrangler.worker.toml",
-      "claims": [
-        "wrangler.worker.toml: the canonical Worker must bind FCR_REMOTE_MCP_READ_PROJECTS only to chief-ai-machine,founder-control-room and must require FCR_REMOTE_MCP_READ_TOKEN as a secret name without committing a secret value; this source wiring cannot prove the secret is installed or that the live /mcp/read endpoint is reachable."
+        "src/providers/providerFactory.ts must expose deterministic review witness publication for Founder Control Room only when GITHUB_APP_ID plus GITHUB_PRIVATE_KEY mint the repository-scoped GitHub App installation token; a local or development GITHUB_TOKEN fallback cannot mint deterministic review evidence."
       ]
     }
   ]
