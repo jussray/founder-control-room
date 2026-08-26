@@ -1,9 +1,10 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded Milestone B deterministic GitHub App witness-publication and full provider-fingerprint readback invariants layered on the hardened producer without claiming bootstrap authority, founder-final approval, merge authority, deployment authority, live provider enforcement, secret installation, or runtime trigger activation.",
+  "purpose": "Record the bounded deterministic GitHub App witness-publication trust chain, the trusted default-branch ignition candidate, and current pull-request Playwright stale-base containment without claiming bootstrap authority, founder-final approval, merge authority, live provider-governance reconciliation, deployment authority, database authority, or successful witness execution before the ignition is lawfully integrated on main.",
   "domains": [
     "merge-authority",
-    "repository-provider"
+    "repository-provider",
+    "evidence-authority"
   ],
   "changes": [
     {
@@ -13,13 +14,32 @@
         "src/review/deterministicReviewProducer.ts must cover direct merge-authority decision modules as well as middleware wrappers, including founderSession, switchboard store, capabilityKernel, v10DecisionAuthorityGate, and founderControlDecision, while avoiding a transitive trust-root expansion into generic storage or transport clients.",
         "src/review/deterministicReviewProducer.ts must treat the specialized proof-gate decision/persistence/classification chain as merge authority because ProofGateController, proof-gate/gate, proof-gate/persist, and proof-gate/types determine whether merge requires explicit founder approval and whether /approvals/:missionId/execute observes a fresh persisted passing proof; changes to those modules must produce P1 trust-root-self-modification.",
         "src/review/deterministicReviewProducer.ts must treat the deployed Worker entry configuration, Worker cron/handler/reconciler owners, controller base, and every currently reconciler-registered controller as P1 autonomous execution trust root because those surfaces can schedule or dispatch consequential repository work. A new controller cannot become live through the reconciler without changing the protected registry, and the production Worker entry cannot change without modifying the protected Wrangler entry configuration.",
-        "src/review/deterministicReviewProducer.ts must also fail closed with P1 new-provider-integration-sink when a candidate introduces RepositoryProvider.integrate in previously unprotected non-test production source. This is a backstop against inventing a new merge executor outside today's path allowlist; ordinary read-only provider calls such as resolveRef remain non-P1 unless they touch an otherwise protected authority path."
+        "src/review/deterministicReviewProducer.ts must also fail closed with P1 new-provider-integration-sink when a candidate introduces RepositoryProvider.integrate in previously unprotected non-test production source. This is a backstop against inventing a new merge executor outside today's path allowlist; ordinary read-only provider calls such as resolveRef remain non-P1 unless they touch an otherwise protected authority path.",
+        "The trusted deterministic witness dispatch workflow and scripts/publish-deterministic-review-witness.mjs are themselves P1 deterministic-review trust roots. A candidate that changes either must not be able to certify that change through the normal deterministic producer."
       ]
     },
     {
       "path": "src/review/deterministicReviewWitnessPublisher.ts",
       "claims": [
         "src/review/deterministicReviewWitnessPublisher.ts may publish only a clear deterministic receipt produced from provider-observed PR/base/head/diff truth through the repository provider's narrow witness capability, must bind pre/post publication PR identity and exact head, and must reject success unless provider readback reports the exact derived signal, the full receipt reviewHash as evidenceFingerprint, and the server-owned numeric GITHUB_APP_ID."
+      ]
+    },
+    {
+      "path": "scripts/publish-deterministic-review-witness.mjs",
+      "claims": [
+        "scripts/publish-deterministic-review-witness.mjs is a narrow runner for trusted-main execution. It accepts only the pull-request number plus the trusted-main SHA from its environment, constructs the canonical Founder Control Room repository provider, invokes the integrated deterministic producer/publisher, and retains the resulting proposal-only receipt and provider signal without accepting caller-selected repository, verdict, reviewer, check name, head SHA, or trusted App identity."
+      ]
+    },
+    {
+      "path": ".github/workflows/deterministic-review-core-advisory.yml",
+      "claims": [
+        "The deterministic review workflow may publish a constitutional witness only from a workflow_dispatch execution whose checked-out implementation is exact current main, using the production GitHub App credential boundary. It must re-read main before and after publication, run the focused trust-root tests from that trusted checkout, retain the receipt/provider readback artifact, and never expose the production App private key to a pull-request-controlled execution path."
+      ]
+    },
+    {
+      "path": "src/review/deterministicReviewWitnessExecutionTrustRoot.test.ts",
+      "claims": [
+        "The focused execution-trust-root regression must prove that changes to either the trusted dispatch workflow or its runner yield a P1 trust-root-self-modification finding."
       ]
     },
     {
@@ -44,6 +64,12 @@
       "path": "src/providers/providerFactory.ts",
       "claims": [
         "src/providers/providerFactory.ts must expose deterministic review witness publication for Founder Control Room only when GITHUB_APP_ID plus GITHUB_PRIVATE_KEY mint the repository-scoped GitHub App installation token; a local or development GITHUB_TOKEN fallback cannot mint deterministic review evidence, and a partial GitHub App credential pair must fail closed even when a fallback token is present."
+      ]
+    },
+    {
+      "path": ".github/workflows/playwright.yml",
+      "claims": [
+        ".github/workflows/playwright.yml must bind pull-request Playwright proof to the exact candidate head and the base SHA carried by the same pull-request event, require that base to be an ancestor of the head before dependency installation or candidate-dependent proof, fail closed with STALE_BASE when ancestry does not hold, and never treat rerunning a historical workflow event as renewed current-base evidence."
       ]
     }
   ]
