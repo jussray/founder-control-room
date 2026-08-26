@@ -1,49 +1,51 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded Milestone B deterministic GitHub App witness-publication and full provider-fingerprint readback invariants layered on the hardened producer without claiming bootstrap authority, founder-final approval, merge authority, deployment authority, live provider enforcement, secret installation, or runtime trigger activation.",
+  "purpose": "Record the Goalfix/adaptive-governance invariants and Documentation Truth registration that keep portable agent entry points, exact-target merge freshness, authenticated Founder Final, runtime-proof scope, and cross-project adaptive behavior fail-closed without claiming runtime API/UI adoption, merge authority, deployment authority, provider-policy mutation, or publication authority.",
   "domains": [
-    "merge-authority",
-    "repository-provider"
+    "truth-governance"
   ],
   "changes": [
     {
-      "path": "src/review/deterministicReviewProducer.ts",
+      "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
-        "src/review/deterministicReviewProducer.ts must classify the executable FCR merge-authentication chain as deterministic trust root: founder authentication/session authority, portfolio-switch gating/state resolution, V10 privileged capability validation, V10 decision authority, founder-control decision binding, approvals execution, and the server mount; changes to those paths must produce P1 trust-root-self-modification instead of self-certification.",
-        "src/review/deterministicReviewProducer.ts must cover direct merge-authority decision modules as well as middleware wrappers, including founderSession, switchboard store, capabilityKernel, v10DecisionAuthorityGate, and founderControlDecision, while avoiding a transitive trust-root expansion into generic storage or transport clients.",
-        "src/review/deterministicReviewProducer.ts must treat the specialized proof-gate decision/persistence/classification chain as merge authority because ProofGateController, proof-gate/gate, proof-gate/persist, and proof-gate/types determine whether merge requires explicit founder approval and whether /approvals/:missionId/execute observes a fresh persisted passing proof; changes to those modules must produce P1 trust-root-self-modification.",
-        "src/review/deterministicReviewProducer.ts must treat the deployed Worker entry configuration, Worker cron/handler/reconciler owners, controller base, and every currently reconciler-registered controller as P1 autonomous execution trust root because those surfaces can schedule or dispatch consequential repository work. A new controller cannot become live through the reconciler without changing the protected registry, and the production Worker entry cannot change without modifying the protected Wrangler entry configuration.",
-        "src/review/deterministicReviewProducer.ts must also fail closed with P1 new-provider-integration-sink when a candidate introduces RepositoryProvider.integrate in previously unprotected non-test production source. This is a backstop against inventing a new merge executor outside today's path allowlist; ordinary read-only provider calls such as resolveRef remain non-P1 unless they touch an otherwise protected authority path."
+        "scripts/verify-documentation-truth.mjs must classify the canonical Goalfix workflow, adaptive kernel, portable Goalfix skills, and Claude/Perplexity master entry specifications as truth-governance so changes to those authority-influencing files cannot receive a zero-truth-sensitive false green.",
+        "scripts/verify-documentation-truth.mjs must keep cross-document checks that require final mutable provider reread, verified target-branch handling, authenticated Founder Final semantics, no-job failure classification, Sauce Guard, bounded runtime claims, and canonical provider-entry deferral."
       ]
     },
     {
-      "path": "src/review/deterministicReviewWitnessPublisher.ts",
+      "path": ".ai/skills/goalfix/SKILL.md",
       "claims": [
-        "src/review/deterministicReviewWitnessPublisher.ts may publish only a clear deterministic receipt produced from provider-observed PR/base/head/diff truth through the repository provider's narrow witness capability, must bind pre/post publication PR identity and exact head, and must reject success unless provider readback reports the exact derived signal, the full receipt reviewHash as evidenceFingerprint, and the server-owned numeric GITHUB_APP_ID."
+        ".ai/skills/goalfix/SKILL.md must preserve the full founder reasoning stack, classify no-job GitHub Actions failures before blaming source, bind work to the verified target/base/head, require authenticated Founder Final plus final mutable provider reread, keep Sauce Guard stops, and carry portable adaptive rules inline without manufacturing authority."
       ]
     },
     {
-      "path": "src/review/independentReviewGate.ts",
+      "path": ".claude/skills/goalfix/SKILL.md",
       "claims": [
-        "src/review/independentReviewGate.ts must treat a founder-final deterministic witness as current only when exact head, receipt-derived signal name, passed status, trusted GitHub App issuer, and the provider-backed full evidenceFingerprint all match the exact deterministic review receipt; missing or same-prefix-but-different full fingerprints fail closed."
+        ".claude/skills/goalfix/SKILL.md must preserve exact verified target/base/head identity, no-job failure classification, browser-specific Playwright proof, authenticated Founder Final, final mutable provider reread, MERGED_UNVERIFIED runtime state, Sauce Guard, and inline portable adaptive behavior without self-certification."
       ]
     },
     {
-      "path": "src/providers/DeterministicReviewGitHubProvider.ts",
+      "path": "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md",
       "claims": [
-        "src/providers/DeterministicReviewGitHubProvider.ts must reject a noncanonical runtime GitHub API base during construction before inherited provider PR/ref/compare reads can use the App installation token; custom bases are test-only with an explicit injected transport. It must also preserve success-only Check Run semantics and GitHub external_id as the full evidenceFingerprint on readback."
+        "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md must remain an approved governance/source contract for Goalfix/FCR instruction and decision loops, must not claim current /goalfix/inspect, engine, API, or browser UI runtime integration, and must keep adaptive state descriptive rather than executable authority."
       ]
     },
     {
-      "path": "src/providers/RepositoryProvider.ts",
+      "path": "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md",
       "claims": [
-        "src/providers/RepositoryProvider.ts exposes only a narrow optional deterministic-review witness publication capability rather than ambient generic Check Run authority, carries an optional provider-backed evidenceFingerprint for exact evidence correlation, and requires consumers to fail closed when a load-bearing fingerprint or witness capability is unavailable."
+        "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md must carry the verified target branch instead of assuming main, require authenticated Founder Final, reread mutable provider/PR/target/base/head/diff/check/review state immediately before integration, preserve expected-head protection, distinguish browser Playwright evidence from backend/provider proof, and retain MERGED_UNVERIFIED until required runtime truth exists."
       ]
     },
     {
-      "path": "src/providers/providerFactory.ts",
+      "path": "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md",
       "claims": [
-        "src/providers/providerFactory.ts must expose deterministic review witness publication for Founder Control Room only when GITHUB_APP_ID plus GITHUB_PRIVATE_KEY mint the repository-scoped GitHub App installation token; a local or development GITHUB_TOKEN fallback cannot mint deterministic review evidence, and a partial GitHub App credential pair must fail closed even when a fallback token is present."
+        "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md must treat docs/GOALFIX_EXECUTION_WORKFLOW_V2.md as the canonical Goalfix execution-order contract so Claude-specific tooling cannot omit Builder, independent Verifier, independent Red Team, exact-head merge gate, Founder Final, or post-merge truth boundaries."
+      ]
+    },
+    {
+      "path": "docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md",
+      "claims": [
+        "docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md must treat docs/GOALFIX_EXECUTION_WORKFLOW_V2.md as the canonical Goalfix execution-order contract so research and MCP overlays cannot become a parallel weaker merge or authority path."
       ]
     }
   ]
