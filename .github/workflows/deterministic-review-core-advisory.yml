@@ -1,0 +1,48 @@
+name: Deterministic Review Core Advisory
+
+on:
+  push:
+    branches:
+      - feat/deterministic-review-witness-v1-35817fe
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.sha }}
+
+jobs:
+  deterministic-review-core:
+    name: Advisory deterministic review core
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact pushed head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Type check repository
+        run: npm run typecheck
+
+      - name: Run deterministic review core attacks
+        run: >-
+          npx vitest run
+          src/review/deterministicReviewProducer.test.ts
+          src/review/deterministicReviewProducer.boundary.test.ts
+          src/review/deterministicReviewWitnessPublisher.test.ts
+          src/providers/__tests__/deterministicReviewGitHubProvider.test.ts
