@@ -4,7 +4,8 @@
  *
  * The default Vitest configuration determines which candidate test files are
  * part of normal `npm test`. This verifier supports the repository's reviewed
- * historical __tests__-only pattern and the current all-.test.ts pattern.
+ * historical __tests__-only pattern, the all-.test.ts pattern, and the current
+ * all-.test.{ts,js} pattern.
  * Candidate files outside the active pattern can still be run by a dedicated
  * workflow, so this verifier never calls them "never run in CI" without an
  * exact workflow receipt.
@@ -22,10 +23,12 @@ import { posix } from 'node:path';
 const BASELINE_PATH = 'scripts/test-discovery-baseline.json';
 const VITEST_CONFIG_PATH = 'vitest.config.ts';
 const LEGACY_INCLUDE_PATTERN = 'src/**/__tests__/**/*.test.ts';
-const CURRENT_INCLUDE_PATTERN = 'src/**/*.test.ts';
+const CURRENT_TS_INCLUDE_PATTERN = 'src/**/*.test.ts';
+const CURRENT_TS_JS_INCLUDE_PATTERN = 'src/**/*.test.{ts,js}';
 const SUPPORTED_INCLUDE_PATTERNS = new Set([
   LEGACY_INCLUDE_PATTERN,
-  CURRENT_INCLUDE_PATTERN,
+  CURRENT_TS_INCLUDE_PATTERN,
+  CURRENT_TS_JS_INCLUDE_PATTERN,
 ]);
 const CANDIDATE_TEST_FILE = /\.(?:test|spec)\.(?:[cm]?[jt]sx?)$/i;
 
@@ -64,8 +67,14 @@ function isDefaultVitestTest(file, includePattern) {
     ]);
   }
 
-  if (!file.startsWith('src/') || !file.endsWith('.test.ts')) return false;
-  if (includePattern === CURRENT_INCLUDE_PATTERN) return true;
+  if (!file.startsWith('src/')) return false;
+
+  if (includePattern === CURRENT_TS_JS_INCLUDE_PATTERN) {
+    return file.endsWith('.test.ts') || file.endsWith('.test.js');
+  }
+
+  if (!file.endsWith('.test.ts')) return false;
+  if (includePattern === CURRENT_TS_INCLUDE_PATTERN) return true;
   return file.split('/').includes('__tests__');
 }
 
