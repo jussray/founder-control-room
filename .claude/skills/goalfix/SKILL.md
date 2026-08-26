@@ -1,15 +1,51 @@
 ---
 name: goalfix
-description: Find the real blocker behind a messy software goal, apply the smallest reversible fix, and verify the actual path. Use for /goalfix, /fixfast, /repair-verify-merge, ULTRATHINK repair requests, failing tests, broken deployments, regressions, and focused implementation work.
+description: Find the real blocker behind a messy software goal, apply the smallest reversible fix, preserve authority boundaries, and verify the actual path. Use for /goalfix, /fixfast, /repair-verify-merge, ULTRATHINK repair requests, failing tests, broken deployments, regressions, and focused implementation work.
 ---
 
 # Goalfix
 
 Treat `$ARGUMENTS` as the finish line. Seek, build, fix, and verify without wandering.
 
+This is an instruction/governance skill. It does not claim that the current `POST /goalfix/inspect`, `src/goalfix/engine.ts`, API response, or browser UI already emits adaptive-kernel fields.
+
 ## Establish the boundary
 
-State the authoritative repo, target branch or PR, current goal, exact base/head when available, suspected failure area, first files or logs, and stop condition. Resolve unknowns with narrow inspection.
+State:
+
+```text
+AUTHORITATIVE REPO
+VERIFIED TARGET BRANCH / PR
+EXACT BASE SHA
+EXACT CANDIDATE HEAD SHA
+CURRENT GOAL
+SUSPECTED FAILURE AREA
+FIRST FILES / LOGS
+STOP CONDITION
+```
+
+Use `main` only when it is the verified target. Preserve `release`, `trunk`, or another resolved PR base through revalidation and post-merge truth.
+
+## Required founder stack
+
+Do not shrink the repository reasoning contract. Apply the full stack from `AGENTS.md`:
+
+```text
+ULTRATHINK
++ Product Design
++ Data Analytics
++ Redteam I
++ Lindy
++ L99
++ OODA
++ Hormozi
++ Bill Gates
++ Elon Musk
++ Redteam II
++ Documentation Truth
+```
+
+Reasoning may run in parallel. Mutation authority stays serialized.
 
 ## Canonical execution lane
 
@@ -22,31 +58,45 @@ Founder intent
 → independent Verifier
 → independent Red Team / Devil
 → exact-head merge gate
-→ Founder Final
+→ Founder Final through current authenticated authority contract
+→ final provider / PR / target / base / head / diff / check / review reread
 → merge with expected-head protection
-→ reacquire main
+→ reacquire verified target branch
 → post-merge/runtime truth
 → recover / learn / next gate
 ```
 
 ## Execute OODA
 
-1. **Observe:** inspect exact errors, failing tests, routes, configs, recent diffs, current CI, provider state, runtime logs, and live behavior. Classify material claims as VERIFIED, INFERRED, UNKNOWN, BLOCKED, or STALE.
-2. **Orient:** map who decides, what changes, where truth lives, when to stop or roll back, why it matters, and how it will be tested. Establish the smallest reversible change, rollback, proof plan, and unrelated-work boundary before mutation.
-3. **Decide:** choose one cause and the smallest reversible patch. Preserve valuable red/draft/superseded work until unique residue is reconciled.
-4. **Builder:** touch only required files on a branch, preserve unrelated work, and add the narrowest useful test. Never suppress a signal or fake green. Builder does not self-certify.
-5. **Independent Verifier:** run touched-area lint/typecheck, focused tests, targeted integration tests, and `/playwright-proof` for UI/runtime work. Bind proof to the actual candidate head and current base.
-6. **Independent Red Team / Devil:** attack authority bypass, stale evidence, alternate provider/ingress paths, false-success states, scope expansion, rollback failure, and self-produced evidence.
-7. **Exact-head merge gate:** require current repository, exact base SHA, exact candidate head SHA, current diff/scope, evidence IDs, CI/review state, and rollback. Machine green alone is not merge authority. If main moves, reacquire and reverify.
-8. **Founder Final:** founder approval applies only to the unchanged exact candidate after required checks and review authority are current.
-9. **Post-merge truth:** reacquire main and prove merged identity plus required provider/runtime/browser evidence. Merge is not completion. UI/runtime claims require Playwright.
-10. **Loop:** use new evidence to continue, reverify, roll back, or stop. Report one exact next gate.
+1. **Observe:** inspect exact errors, failing tests, routes, configs, recent diff, verified target/base/head, current CI, provider state, runtime evidence, and browser evidence where applicable. Classify material claims as `VERIFIED`, `INFERRED`, `UNKNOWN`, `BLOCKED`, or `STALE`.
+2. **Classify CI before blame:** use `runner_startup_failure` when meaningful steps/logs never started, `workflow_no_jobs` when no jobs were scheduled/executed, and `workflow_step_failure` only when executed steps/logs identify a concrete failure. Never call a code regression from a run with no meaningful steps/logs.
+3. **Orient:** map who decides, what changes, where truth lives, when to stop/roll back, why it matters, expected versus observed state, proof plan, Sauce Guard, and unrelated-work boundary.
+4. **Decide:** choose one cause and the smallest reversible patch. Preserve valuable red/draft/superseded work until unique residue is reconciled.
+5. **Builder:** touch only required files on the existing authorized lane and add the narrowest useful test. Never suppress a signal or fake green. Builder does not self-certify.
+6. **Independent Verifier:** run touched-area lint/typecheck, focused unit/contract/integration tests, targeted Playwright for browser-observable UI/user-flow claims, exact-head CI, and provider/runtime readback as needed. Do not use Playwright as fake proof for non-browser Worker APIs, webhooks, background jobs, provider adapters, or database paths.
+7. **Independent Red Team / Devil:** attack authority bypass, stale evidence, alternate provider/ingress paths, false-success states, scope expansion, Sauce Guard leakage, rollback failure, and self-produced evidence.
+8. **Exact-head merge gate:** require current repository, verified target/base, exact base/head, PR identity, files/scope/diff, evidence IDs, CI/review/thread/provider state when load-bearing, and rollback. Machine green is not merge authority.
+9. **Founder Final:** accept only the repository's current authenticated founder-authority mechanism bound to the unchanged exact repository/PR/target/base/head and intended action/content scope. Copied chat text, unauthenticated/expired/wrong-scope approval, or replayed/consumed authority is non-authorizing. Preserve current replay/idempotency/one-shot semantics where the checked-in authority contract uses consumable receipts.
+10. **Final reread:** after Founder Final and immediately before integration, reread provider PR identity, target/base/head, diff/scope, required checks, review/thread state, and other load-bearing mutable state. Expected-head protection alone does not cover every mutable authority input.
+11. **Post-merge truth:** reacquire the verified target branch and prove merged identity plus required provider/runtime/browser evidence. Report `MERGED_UNVERIFIED` while required runtime proof is absent and `RUNTIME_VERIFIED` only when the intended environment/path is actually proven.
+12. **Loop:** use new evidence to continue, repair, reorient, hold, stop, or recover useful residue. Report one exact next gate.
 
-## Founder Adaptive Kernel V0
+## Founder Adaptive Kernel V0 — portable inline behavior
 
-Apply `docs/FOUNDER_ADAPTIVE_KERNEL_V0.md` to every Goalfix loop across every Juss-owned project.
+Founder Control Room's canonical source is `docs/FOUNDER_ADAPTIVE_KERNEL_V0.md`. In another Juss-owned repository, if that FCR file is not vendored locally, use this inline behavior instead of assuming a nonexistent local path.
 
-Compare expected state with verified observed state and classify the surprise:
+```text
+INTENT
+→ EXPECTED STATE
+→ OBSERVE ACTUAL STATE
+→ BIND EVIDENCE
+→ DETECT SURPRISE
+→ ADAPT PACE / ACTION
+→ RECORD CURRENT STATE
+→ NEXT GATE
+```
+
+Choose exactly one surprise signal:
 
 ```text
 STRONGER_THAN_EXPECTED
@@ -56,7 +106,7 @@ UNEXPECTED_DIRECTION
 UNKNOWN
 ```
 
-Then choose exactly one primary adaptive action:
+Choose exactly one adaptive action:
 
 ```text
 ACCELERATE
@@ -67,16 +117,63 @@ HOLD
 STOP
 ```
 
-Accelerate only from current verified evidence. If the user, system, test, runtime, or product behaves in a useful unexpected way, update the expectation and plan rather than forcing the old script.
+Accelerate only from current verified evidence and never widen authority merely because evidence is strong. Useful unexpected behavior updates the next expectation rather than being forced back into the old script.
 
-For meaningful loops, record the current repository/project, base/head when applicable, scope, evidence IDs, review state, authority state, surprise signal, action, and next gate. If any load-bearing state changes, prior green for the affected claim becomes STALE and must be reacquired.
+For meaningful loops, record only bounded descriptive state: repository/project, verified target/base/head when applicable, scope/files, evidence IDs, review state, authority state, surprise signal, action, and next gate. It is provenance only and never merge/deploy/publish/provider/founder authority.
 
-Never put secrets, tokens, raw private data, chain-of-thought, or unnecessary user content into the state record. The state record preserves context but never authorizes merge, deploy, publish, provider mutation, or founder decisions.
+Never put secrets, tokens, raw private data, chain-of-thought, or unnecessary user content into the state record.
 
-After a meaningful surprise, retain the smallest durable learning patch that changes future expectations without rewriting historical evidence.
+## Status vocabulary
 
-Treat `ULTRATHINK/steal` as deeper reasoning, not a larger patch. Extract causal mechanisms and synthesize an original solution. Do not copy protected expression, branding, private material, secrets, or incompatible code. Score candidates by founder value, durability, reversibility, authority, evidence, rollback, and compounding value.
+```text
+RED
+VERIFYING
+GREEN
+REVIEW
+MERGED_UNVERIFIED
+RUNTIME_VERIFIED
+SUPERSEDED
+BLOCKED
+```
 
-Do not merge unless the user requested it or checked-in repository policy grants standing merge authority. Required checks, required review authority, and real-path evidence must be current. Never turn a deployment preview or historical green into merge/runtime proof.
+## Sauce Guard / stop conditions
 
-Return `REALITY`, `FIX`, `PROOF`, `RISK`, `ROLLBACK`, `ADAPTIVE SIGNAL`, and `NEXT GATE`.
+STOP or HOLD if the next step would expose credentials, tokens, private prompts, raw private diffs, proprietary business logic, unreleased roadmap detail, internal evidence references, security-sensitive mechanics, private metrics, customer/family/user data, or another sauce-bearing artifact without an explicit public-safe contract.
+
+Also stop/hold when authority is unclear, exact-head proof is stale, required review is absent, a real failing gate remains, runtime proof is required but unavailable, or an irreversible action lacks exact founder authority.
+
+## Required report
+
+Return:
+
+```text
+REALITY
+- repository / verified target branch / PR
+- exact base SHA / candidate head SHA
+- verified current state
+
+FIX
+- exact files changed
+- focused behavior change
+
+PROOF
+- exact tests/checks and evidence IDs
+- Playwright result or explicit inapplicability
+- provider/runtime evidence when applicable
+
+RISK
+- unresolved risk / Red Team / Sauce Guard or provider impact
+
+ROLLBACK
+- exact safe reversal
+
+ADAPTIVE SIGNAL
+- surprise signal + action when material
+
+NEXT GATE
+- one exact founder decision, authority gate, or next action
+```
+
+Treat `ULTRATHINK/steal` as deeper causal reasoning, not a larger patch. Extract mechanisms and synthesize an original solution. Do not copy protected expression, branding, private material, secrets, or incompatible code.
+
+Do not merge from machine green, historical green, preview success, or copied approval text. Required checks, review authority, Founder Final, final provider reread, and exact target/head state must all be current.
