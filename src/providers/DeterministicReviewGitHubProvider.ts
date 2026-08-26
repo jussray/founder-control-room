@@ -3,7 +3,6 @@ import type { GitHubProviderConfig } from "./GitHubProvider.js";
 import type { DeterministicReviewWitnessPublication } from "./RepositoryProvider.js";
 
 const FCR_REPOSITORY = "jussray/founder-control-room";
-const REVIEWER_ID = "fcr-deterministic-review-v1";
 const DEFAULT_GITHUB_API_BASE_URL = "https://api.github.com";
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
@@ -77,7 +76,7 @@ export class DeterministicReviewGitHubProvider extends SecurityPreservingGitHubP
     if (!SHA256.test(reviewHash)) {
       throw new Error("DeterministicReviewGitHubProvider: witness reviewHash must be sha256");
     }
-    const expectedName = `Independent Review / ${REVIEWER_ID} / ${reviewHash.slice(0, 12)}`;
+    const expectedName = `Independent Review / ${reviewHash}`;
     if (publication.name !== expectedName) {
       throw new Error("DeterministicReviewGitHubProvider: witness name is not bound to the full review hash");
     }
