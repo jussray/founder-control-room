@@ -77,7 +77,7 @@
       "path": ".github/workflows/fcr-access-front-door-recovery.yml",
       "claims": [
         ".github/workflows/fcr-access-front-door-recovery.yml must re-read and validate the exact founder issue-comment receipt before apply can continue, and the bounded recovery path cannot treat an account-only Access application inventory as sufficient proof for an organization-level foundercontrolroom.org exemption.",
-        ".github/workflows/fcr-access-front-door-recovery.yml requires the dedicated read or admin Access credential for its mode and must preserve exact-current-main binding, sanitized evidence publication, and post-apply browser/runtime proof before any recovered-front-door claim."
+        ".github/workflows/fcr-access-front-door-recovery.yml requires the dedicated read or admin Access credential for its mode; before any exemption action the invoked reconciler must resolve the canonical foundercontrolroom.org zone and inspect both account- and zone-scoped Access applications, while preserving exact-current-main binding, sanitized evidence publication, and post-apply browser/runtime proof before any recovered-front-door claim."
       ]
     }
   ]
