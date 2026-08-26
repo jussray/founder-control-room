@@ -271,13 +271,15 @@ function validatePostMergeTruth(
   if (!truth.runtimeProofRequired && !['PASS', 'NOT_REQUIRED'].includes(truth.runtimeVerdict)) errors.push('post-merge truth must be PASS or NOT_REQUIRED when runtime proof is not required');
   errors.push(...validateProofBinding(truth.proofBinding, ['sourceSha'], now).map((error) => `post-merge: ${error}`));
   errors.push(...validateCookieLineage(truth.proofBinding.cookieContract, input.cookieIndex, now).map((error) => `post-merge: ${error}`));
+  if (truth.proofBinding.fingerprints.sourceSha !== goalfixSourceFingerprint(input.repository, truth.mergedSha)) {
+    errors.push('post-merge sourceSha proof fingerprint does not match merged/current-main SHA');
+  }
   return errors;
 }
 
 export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixExecutionDecision {
   const now = input.now ?? new Date();
   const reasons: string[] = [];
-  const requiredNextEvidence: string[] = [];
 
   if (!input.repository.includes('/') || !input.branch.trim() || !input.goal.trim()) reasons.push('authoritative repository, branch, and founder goal are required');
   if (!exactSha(input.baseSha) || !exactSha(input.candidateHeadSha) || !exactSha(input.currentMainSha)) reasons.push('base, candidate head, and current main must be exact 40-character SHAs');
@@ -311,6 +313,20 @@ export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixE
       reasons: [...new Set(checkpointErrors)],
       requiredNextEvidence: ['Repair the broken fingerprint/cookie/role binding and rerun only the affected proof lane.'],
     };
+  }
+
+  for (const phase of ['observe', 'orient', 'decide'] as const) {
+    const checkpoint = latestCheckpoint(input.checkpoints, phase);
+    if (!checkpoint || checkpoint.verdict !== 'PASS') {
+      return {
+        contract: GOALFIX_EXECUTION_CONTRACT,
+        state: 'UNVERIFIED',
+        currentPhase: phase,
+        mayMerge: false,
+        reasons: [`${phase} must have a current PASS checkpoint before Builder work can become merge-eligible.`],
+        requiredNextEvidence: [`Produce fresh ${phase} evidence bound to the exact candidate head and diff.`],
+      };
+    }
   }
 
   const failed = input.checkpoints.find((checkpoint) => checkpoint.verdict === 'FAILED' || checkpoint.verdict === 'BLOCKED');
