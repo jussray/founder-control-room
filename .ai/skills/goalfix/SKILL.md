@@ -46,17 +46,36 @@ Report Reality / Fix / Proof / Risk / Rollback / Next Gate.
 
 ## Operating stack
 
-Use the shared founder stack:
+Use the repository-required founder reasoning stack from `AGENTS.md`:
 
 ```text
-lindymode → redteam → l99 → ooda
+ULTRATHINK
++ Product Design
++ Data Analytics
++ Redteam I
++ Lindy
++ L99
++ OODA
++ Hormozi
++ Bill Gates
++ Elon Musk
++ Redteam II
++ Documentation Truth
 ```
 
-- Founder value: identify the user/business outcome and fastest truthful proof.
+Reasoning may run in parallel. Mutation authority stays serialized.
+
+- Product Design: prove the actual user-facing path when product experience is implicated.
+- Data Analytics: use current evidence and measurable state rather than intuition alone.
+- Redteam I: attack the premise before selecting the implementation.
 - Lindy: prefer durable, portable, reversible fixes over temporary tricks.
-- Red Team / Devil: attack assumptions before and after implementation.
 - L99: map authority, lifecycle, evidence, ownership, rollback, and compounding value.
 - OODA: observe, orient, decide, act minimally, verify, and loop.
+- Hormozi: increase useful outcome and proof while reducing delay, effort, cognitive load, and maintenance burden without inventing demand or traction.
+- Bill Gates: identify the bottleneck, highest-leverage correction, reusable standard, and what must not be scaled yet.
+- Elon Musk: question requirements, delete unnecessary complexity, simplify the remaining system, shorten the proof loop, and automate last without removing safety, authority, or evidence boundaries.
+- Redteam II: attack the selected implementation for false greens, stale truth, privilege expansion, provider drift, stale-branch overwrite, and rollback gaps.
+- Documentation Truth: keep current-state docs aligned with the actual repository/provider/runtime state.
 
 ## Authority order
 
