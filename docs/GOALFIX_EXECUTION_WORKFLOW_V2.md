@@ -40,14 +40,20 @@ Every Goalfix loop also applies `docs/FOUNDER_ADAPTIVE_KERNEL_V0.md`.
 
 After observation, compare expected state with verified observed state, classify the surprise as `STRONGER_THAN_EXPECTED`, `AS_EXPECTED`, `WEAKER_THAN_EXPECTED`, `UNEXPECTED_DIRECTION`, or `UNKNOWN`, then choose one primary action: `ACCELERATE`, `CONTINUE`, `REPAIR`, `REORIENT`, `HOLD`, or `STOP`.
 
-For meaningful state transitions, preserve:
+For meaningful state transitions, record only the current facts needed to continue safely:
 
-- a deterministic continuity fingerprint bound to the current intent/state/evidence and exact base/head/scope when applicable;
-- a bounded continuity cookie containing non-secret lineage, surprise, decision, evidence references, truth state, and next gate.
+- repository and project;
+- exact base SHA and head SHA when applicable;
+- current scope/diff;
+- evidence IDs;
+- review state;
+- authority state;
+- surprise signal and adaptive action;
+- next gate.
 
-Fingerprints and continuity cookies are provenance/learning receipts only. They are not browser cookies, credentials, tracking IDs, founder authority, merge authority, deploy authority, or publication authority.
+This state record is evidence context only. It is not founder authority, merge authority, deploy authority, or publication authority.
 
-If a load-bearing fingerprint input changes, dependent green evidence becomes historical and must be reacquired before promotion.
+If a load-bearing state input changes, dependent green evidence becomes historical and must be reacquired before promotion.
 
 ## Load-bearing rules
 
@@ -132,7 +138,7 @@ ROLLBACK:
 [how to reverse safely]
 
 ADAPTIVE SIGNAL:
-[surprise signal + adaptive action + fingerprint/cookie lineage when material]
+[surprise signal + adaptive action]
 
 NEXT GATE:
 [one exact founder decision or next action]
