@@ -161,6 +161,8 @@ contract-capable
 
 The founder-authenticated conveyor status may report `not-configured`, `ready-for-probe`, `enabled-misconfigured`, `invalid-provider-configuration`, `enabled-awaiting-proof`, or `enabled-live-verified`, including whether Buffer is ready for one controlled probe. The canonical conveyor reaches `enabled-live-verified` only when a retained activation-probe receipt matches the deployed exact `GIT_SHA`. If the runtime SHA changes, that receipt remains valid historical evidence but no longer authorizes a present-tense live claim; stale-head, missing runtime SHA, or unavailable receipt readback must remain non-live. Conveyor live readiness still does not prove Buffer scheduling, LinkedIn publication, or any terminal provider outcome.
 
+Founder-content orchestration readiness is a separate provider-proof surface from canonical n8n conveyor activation. It may report `enabled-live-verified` only when the transport is enabled and configured, the provider allowlist is valid, Buffer is enabled, and a proof explicitly bound to `buffer` carries a non-empty receipt ID, a valid observation timestamp, and `expectedHeadSha` exactly equal to deployed `GIT_SHA`. Missing, stale, unbound, incomplete, or provider-unverified proof remains non-live. A generic n8n activation-probe receipt does not satisfy this Buffer-specific boundary, and repository source does not claim that a live Buffer proof reader is wired yet.
+
 A platform-native draft is not proof that the provider adapter is live. n8n acceptance is not publication truth. Provider readback remains terminal external-state evidence.
 
 Investor email is a separate authority class and must never auto-send without the applicable standing policy **and recipient-specific qualification**.
