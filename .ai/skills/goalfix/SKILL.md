@@ -54,7 +54,7 @@ lindymode → redteam → l99 → ooda
 
 - Founder value: identify the user/business outcome and fastest truthful proof.
 - Lindy: prefer durable, portable, reversible fixes over temporary tricks.
-- Red Team / Devil: attack assumptions before and after the implementation.
+- Red Team / Devil: attack assumptions before and after implementation.
 - L99: map authority, lifecycle, evidence, ownership, rollback, and compounding value.
 - OODA: observe, orient, decide, act minimally, verify, and loop.
 
@@ -68,7 +68,7 @@ When sources conflict, trust this order:
 4. Current official provider documentation.
 5. Prior summaries, generated plans, email, chat memory, and assumptions.
 
-Historical evidence is useful provenance, but it never outranks a newer exact SHA,
+Historical evidence is useful context, but it never outranks a newer exact SHA,
 provider readback, runtime observation, or changed PR head.
 
 ## Token preflight
@@ -239,28 +239,32 @@ autonomy, or cadence only when current evidence supports the stronger state and 
 authority/safety gate blocks it. Unexpected-but-useful behavior should update the plan
 rather than be forced back into the old script.
 
-### Fingerprints
+### Current-state record
 
-For meaningful loops, maintain a deterministic continuity fingerprint bound to the
-current project/repository, intent, expected state, observed state, evidence identities,
-and exact base/head/scope when applicable. A load-bearing change to those fields makes
-the prior fingerprint historical for the affected claim.
+For meaningful loops, record only the current facts needed to continue safely:
 
-A fingerprint is provenance only. It never grants merge, deploy, publish, provider,
+```text
+project/repository
+intent
+expected state
+observed state
+base SHA (when applicable)
+head SHA (when applicable)
+scope/diff (when applicable)
+evidence IDs
+review state
+authority state
+surprise signal
+adaptive action
+next gate
+```
+
+The record is descriptive only and never grants merge, deploy, publish, provider,
 founder, or execution authority.
 
-### Continuity cookies
-
-Maintain a compact continuity cookie for resumability and learning. This is a proof /
-learning receipt, NOT an HTTP/browser cookie, auth token, credential, or tracking ID.
-
-A continuity cookie may carry bounded non-secret metadata such as kernel version,
-project ID, current fingerprint, parent fingerprint, surprise signal, adaptive decision,
-evidence references, truth state, and next gate. Never store secrets, private raw data,
-access tokens, chain-of-thought, or unnecessary user content in it.
-
-If the fingerprint no longer matches the current load-bearing state, fail closed and
-reacquire evidence instead of inheriting prior green.
+If a load-bearing state changes, dependent prior green becomes STALE for that claim.
+Re-observe and reacquire evidence. Never store secrets, tokens, raw private data,
+chain-of-thought, or unnecessary user content in the record.
 
 ### Learning patch
 
@@ -274,11 +278,11 @@ rewrite historical evidence or manufacture authority.
 RED               real failure or unresolved material blocker
 VERIFYING         implementation exists; proof incomplete
 GREEN             fresh machine evidence passes; authority may remain
-REVIEW             independent review authority pending
-MERGED             integrated into current main
-RUNTIME_VERIFIED   merged artifact proven in intended environment
-SUPERSEDED         historical value preserved; no longer authoritative
-BLOCKED            required external authority/evidence unavailable
+REVIEW            independent review authority pending
+MERGED            integrated into current main
+RUNTIME_VERIFIED  merged artifact proven in intended environment
+SUPERSEDED        historical value preserved; no longer authoritative
+BLOCKED           required external authority/evidence unavailable
 ```
 
 ## Report
@@ -302,7 +306,7 @@ ROLLBACK:
 [how to reverse safely]
 
 ADAPTIVE SIGNAL:
-[signal + action + fingerprint/cookie lineage when material]
+[signal + action when material]
 
 NEXT GATE:
 [one exact founder decision or next action]
@@ -324,4 +328,4 @@ without explicit founder authority.
 
 ## One-line mantra
 
-Seek the real blocker. Observe the surprise. Adapt from proof. Preserve lineage. Verify the exact path.
+Seek the real blocker. Observe the surprise. Adapt from proof. Verify the exact path.
