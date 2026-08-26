@@ -181,6 +181,48 @@ async function selectCredential({ env, accountId, fetchImpl, apply }) {
   throw error;
 }
 
+async function resolveCanonicalZone({ token, fetchImpl }, accountId, zone) {
+  const zones = await cloudflareJson(
+    { token, fetchImpl },
+    'GET',
+    `/zones?name=${encodeURIComponent(zone)}&match=all&per_page=50`,
+  );
+  const matches = (Array.isArray(zones) ? zones : [])
+    .filter((candidate) => clean(candidate?.name).toLowerCase() === zone.toLowerCase())
+    .filter((candidate) => clean(candidate?.account?.id) === accountId);
+
+  if (matches.length !== 1) {
+    const error = new Error(
+      'Canonical Founder Control Room Cloudflare zone could not be resolved uniquely inside the pinned account; Access mutation is blocked.',
+    );
+    error.classification = 'provider-recovery-failed';
+    error.nextAction = 'grant Zone Read to the dedicated Access credential and verify foundercontrolroom.org resolves once inside the canonical account';
+    throw error;
+  }
+
+  const zoneId = clean(matches[0]?.id).toLowerCase();
+  if (!/^[0-9a-f]{32}$/.test(zoneId)) {
+    const error = new Error(
+      'Canonical Founder Control Room Cloudflare zone returned an invalid provider identifier; Access mutation is blocked.',
+    );
+    error.classification = 'provider-recovery-failed';
+    error.nextAction = 'verify Cloudflare Zone Read returns the canonical foundercontrolroom.org zone with a valid zone identifier';
+    throw error;
+  }
+  return zoneId;
+}
+
+function scopedMatches(applications, scope, zone) {
+  return (Array.isArray(applications) ? applications : [])
+    .map((application) => ({
+      scope,
+      id: clean(application?.id) || null,
+      name: clean(application?.name) || null,
+      reasons: matchingAccessReasons(application, zone),
+    }))
+    .filter((application) => application.reasons.length > 0);
+}
+
 function receiptBase({ apply, accountId, zone }) {
   return {
     schemaVersion: 2,
@@ -219,22 +261,42 @@ export async function reconcileFcrPublicAccessZone({
     fetchImpl,
     apply,
   });
-  const applications = await cloudflareJson(
-    { token: credential.token, fetchImpl },
-    'GET',
-    `/accounts/${canonicalAccountId}/access/apps?per_page=1000`,
-  );
-  const matchingApplications = (Array.isArray(applications) ? applications : [])
-    .map((application) => ({
-      id: clean(application?.id) || null,
-      name: clean(application?.name) || null,
-      reasons: matchingAccessReasons(application, zone),
-    }))
-    .filter((application) => application.reasons.length > 0);
+
+  let zoneId;
+  let accountApplications;
+  let zoneApplications;
+  try {
+    zoneId = await resolveCanonicalZone(
+      { token: credential.token, fetchImpl },
+      canonicalAccountId,
+      zone,
+    );
+    [accountApplications, zoneApplications] = await Promise.all([
+      cloudflareJson(
+        { token: credential.token, fetchImpl },
+        'GET',
+        `/accounts/${canonicalAccountId}/access/apps?per_page=1000`,
+      ),
+      cloudflareJson(
+        { token: credential.token, fetchImpl },
+        'GET',
+        `/zones/${zoneId}/access/apps?per_page=1000`,
+      ),
+    ]);
+  } catch (error) {
+    error.credentialSource = credential.source;
+    error.credentialFailures = credential.failures;
+    throw error;
+  }
+
+  const matchingApplications = [
+    ...scopedMatches(accountApplications, 'account', zone),
+    ...scopedMatches(zoneApplications, 'zone', zone),
+  ];
 
   if (matchingApplications.length > 0) {
     const error = new Error(
-      'Explicit Cloudflare Access application coverage matches Founder Control Room; refusing zone exemption until that application is reviewed.',
+      'Explicit Cloudflare Access application coverage matches Founder Control Room at account or zone scope; refusing zone exemption until that application is reviewed.',
     );
     error.classification = 'explicit-access-application-match';
     error.matchingApplications = matchingApplications;
@@ -284,7 +346,7 @@ export async function reconcileFcrPublicAccessZone({
       ...receipt,
       state: 'attention',
       action: 'would-add-zone-exemption',
-      blocker: 'deny-unmatched Access protection currently covers the public FCR zone without a matching explicit app',
+      blocker: 'deny-unmatched Access protection currently covers the public FCR zone after both account- and zone-scoped Access application inventories returned no matching explicit app',
       nextAction: 'founder-approved run may add only foundercontrolroom.org to the existing exemption list',
     };
   }
