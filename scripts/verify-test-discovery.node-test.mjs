@@ -103,3 +103,18 @@ test('detects an unrecorded JavaScript test excluded by the default TypeScript-o
   assert.match(result.stderr, /new tests are excluded from default npm test discovery/);
   assert.match(result.stderr, /src\/lib\/__tests__\/legacyConsole\.test\.js/);
 });
+
+test('pays down JavaScript discovery debt when normal Vitest includes .test.ts and .test.js', (t) => {
+  const { root, baseSha } = makeRepo(t);
+  write(root, 'vitest.config.ts', "export default { test: { include: ['src/**/*.test.{ts,js}'] } };\n");
+  write(root, 'scripts/test-discovery-baseline.json', JSON.stringify({
+    includePattern: 'src/**/*.test.{ts,js}',
+    undiscovered: [],
+  }, null, 2));
+
+  const result = verify(root, baseSha);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Candidate test files under src\/: 3/);
+  assert.match(result.stdout, /matched by default npm test discovery: 3/);
+  assert.match(result.stdout, /excluded from default npm test discovery: 0/);
+});
