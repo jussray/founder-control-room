@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded Evidence Trust Plane, Documentation Truth, repository-provider security-preservation, explicit bypass-intent semantics, Cloudflare remote-read MCP operator invariants, and deterministic exact-head review producer boundary for this candidate without claiming durable receipt persistence, provider witness publication, live provider mutation, merge authority, deployment authority, secret installation, or live production truth.",
+  "purpose": "Record the bounded Evidence Trust Plane and current pull-request Playwright stale-base containment invariant for this candidate without treating a historical workflow event, browser proof, Neon preview lifecycle result, provider build, or green check as merge, deployment, database, secret, or production authority.",
   "domains": [
     "evidence-authority",
     "truth-governance",
@@ -24,7 +24,7 @@
     {
       "path": ".github/workflows/playwright.yml",
       "claims": [
-        ".github/workflows/playwright.yml: the exact-head Playwright lane must execute the Evidence Trust Plane desktop and mobile proof when this authority surface changes; browser rendering proof remains non-authorizing and cannot prove provider mutation, durable persistence, merge authority, deployment authority, or production truth."
+        ".github/workflows/playwright.yml: pull-request Playwright proof must bind the exact candidate head to the pull-request base from the same current event and must fail closed with STALE_BASE before dependency installation or candidate-dependent browser proof when that base is not an ancestor of the head; rerunning an older workflow event cannot renew a historical base into current evidence."
       ]
     },
     {

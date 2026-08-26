@@ -314,6 +314,14 @@ The strongest optimization is not faster claiming. It is shortening the distance
 24. Independent green receipts do not compose into production truth unless they bind the same exact candidate and remain current together at the declared use boundary.
 25. A stored `validity: current` flag does not outrank an elapsed `expiresAt`; evidence authority must re-evaluate expiration when the receipt is used.
 26. Readback completion is not the same as a verified verdict, and an unscoped or wrong-authority receipt cannot prepare merge review.
+27. A workflow rerun retains the historical event payload that created it; rerunning cannot promote an old pull-request base SHA into current evidence after the PR base has moved.
+28. Pull-request browser proof is current only when the event's exact base is an ancestor of the exact candidate head before candidate-dependent proof begins; otherwise the lane must fail closed and wait for a fresh current-base event.
+
+## Pull-request event freshness correction
+
+A pull-request workflow event is an evidence envelope, not a renewable pointer to current PR state. When the PR base changes after a run was created, rerunning that old run can correctly execute the old payload and still be stale for the present candidate relationship. For Playwright proof, the event-supplied base SHA and exact candidate head are therefore load-bearing together: full history is fetched, ancestry is checked before dependency installation, and a non-ancestor relationship fails with `STALE_BASE` before browser or candidate-dependent proof can run.
+
+The recovery rule is to create fresh evidence from the current PR event state, not to reinterpret a historical run as current. A successful old-head or old-base check remains historical provenance and cannot satisfy the current exact-base merge gate merely because the code bytes are unchanged.
 
 ## Rollback
 
