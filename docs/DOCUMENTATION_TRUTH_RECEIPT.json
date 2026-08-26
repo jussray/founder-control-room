@@ -73,8 +73,15 @@
     {
       "path": "src/providers/GitHubPrTruthReader.ts",
       "claims": [
-        "src/providers/GitHubPrTruthReader.ts: GitHub PR truth v0 must remain read-only and server-scoped to provider observations needed for one PR audit: PR state, checks, workflow runs filtered to the observed head SHA, reviews, and a metadata-only changed-file comparison capped at 100 entries; it must resolve GitHub credentials server-side through the existing GitHub App precedence and must not expose mutation methods or credential material.",
-        "src/providers/GitHubPrTruthReader.ts: the composite audit must bind CI evidence to the initially observed PR head and re-read PR state after evidence collection so stale CI or a moving head can never be promoted into current evidence or merge approval."
+        "src/providers/GitHubPrTruthReader.ts: GitHub PR truth v0 must remain read-only and server-scoped to provider observations needed for one PR audit: PR state, checks, workflow runs filtered to the observed head SHA, reviews, and a metadata-only changed-file comparison capped at 100 returned observations; it must resolve GitHub credentials server-side through the existing GitHub App precedence and must not expose mutation methods or credential material.",
+        "src/providers/GitHubPrTruthReader.ts: every bounded evidence collection must carry completeness metadata; check/workflow provider counts and the PR changed-file count must expose truncation, and review pagination beyond 100 must retain the newest page rather than stale oldest events while still marking the review collection incomplete."
+      ]
+    },
+    {
+      "path": "src/mcp/github-truth/verification.ts",
+      "claims": [
+        "src/mcp/github-truth/verification.ts: the composite audit must bind CI evidence to the initially observed PR head, treat any bounded-collection truncation as evidence_incomplete, and re-read all load-bearing PR truth after evidence collection so a moving head, base, state, draft, mergeability, or equivalent authority-bearing change can never be promoted into current evidence or merge approval.",
+        "src/mcp/github-truth/verification.ts: a current known CI failure must outrank simultaneous pending CI signals, while evidence_complete remains a completeness classification only and never means safe-to-merge; the summary must use the final PR observation when the two reads differ."
       ]
     }
   ]
