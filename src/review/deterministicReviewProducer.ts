@@ -25,6 +25,7 @@ const TRUST_ROOT_PATHS = new Set([
   "src/controllers/ProofGateController.ts",
   "src/proof-gate/gate.ts",
   "src/proof-gate/persist.ts",
+  "src/proof-gate/types.ts",
   "src/http/middleware/requireFounder.ts",
   "src/http/middleware/requirePortfolioSwitchOn.ts",
   "src/http/middleware/v10PrivilegedApprovalBinding.ts",
