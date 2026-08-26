@@ -1,3 +1,5 @@
+import type { PullRequestAuditEvidence } from "./PullRequestAuditEvidence.js";
+
 /**
  * Provider-agnostic repository interface.
  *
@@ -239,6 +241,18 @@ export interface RepositoryProvider {
     projectId: string,
     pullRequestNumber: number,
   ): Promise<PullRequestReviewContext>;
+
+  /**
+   * Returns a bounded, provider-neutral evidence snapshot for one PR/MR audit.
+   * Optional because some repository providers do not expose equivalent
+   * pull-request evidence. Callers must fail closed when this capability is
+   * required but absent. This is read authority only and carries no merge or
+   * approval semantics.
+   */
+  auditPullRequestEvidence?(
+    projectId: string,
+    pullRequestNumber: number,
+  ): Promise<PullRequestAuditEvidence>;
 
   /** Creates a new branch from `baseRef`. Returns the created branch name. */
   createBranch(projectId: string, baseRef: string, name: string): Promise<string>;
