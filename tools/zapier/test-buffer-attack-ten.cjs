@@ -32,6 +32,8 @@ assert.equal(contract.authority.liveProviderMutationIncluded, false);
 const runId = '19f2f2df-66ca-45d5-8b0c-188128c3e9ac';
 const contentSha256 = 'a'.repeat(64);
 const authorityNonce = 'ba80d7c8-cc8a-4fbb-b1d2-7f6ad87fe40f';
+const nowIso = '2026-08-25T22:20:00.000Z';
+const nowMs = Date.parse(nowIso);
 
 const sequence = [
   'DRAFT',
@@ -116,9 +118,18 @@ const validInput = {
     capability: 'VERIFIED',
     authenticated: true,
     signatureVerified: true,
+    signerTrusted: true,
+    signerId: 'fcr-ingress-signer-v1',
     deduplicated: true,
     durable: true,
     eventId: 'provider-event-123',
+    publicationRunId: runId,
+    authorityId: 'authority:verified-delegation-post-v1',
+    contentSha256,
+    actionId: 'buffer-action-123',
+    signedAt: '2026-08-25T22:19:30.000Z',
+    receivedAt: nowIso,
+    replayWindowMs: 60_000,
   },
   runtime: {
     observed: true,
@@ -139,16 +150,12 @@ const validInput = {
   events,
 };
 
-const validEvaluation = evaluatePublicationAttackTen(validInput, {
-  nowMs: Date.parse('2026-08-25T22:20:00.000Z'),
-});
+const validEvaluation = evaluatePublicationAttackTen(validInput, { nowMs });
 assert.equal(validEvaluation.attackTenVersion, ATTACK_TEN_VERSION);
 assert.equal(validEvaluation.allowed, true);
 assert.equal(validEvaluation.failures.length, 0);
 assert.equal(validEvaluation.state, VERIFIED_PUBLICATION_STATE);
-assert.equal(productionPublicationAllowed(validInput, {
-  nowMs: Date.parse('2026-08-25T22:20:00.000Z'),
-}), true);
+assert.equal(productionPublicationAllowed(validInput, { nowMs }), true);
 
 const chain = validatePublicationEventChain(events);
 assert.equal(chain.valid, true);
@@ -157,54 +164,85 @@ assert.equal(chain.currentState, VERIFIED_PUBLICATION_STATE);
 assert.equal(evaluatePublicationAttackTen({
   ...validInput,
   reviewWindow: { ...validInput.reviewWindow, state: 'REVIEW_WINDOW_OPEN' },
-}, { nowMs: Date.parse('2026-08-25T22:20:00.000Z') }).attackResults.find(({ id }) => id === 'A3').pass, false);
+}, { nowMs }).attackResults.find(({ id }) => id === 'A3').pass, false);
 
 assert.equal(evaluatePublicationAttackTen({
   ...validInput,
   authority: { ...validInput.authority, expiresAt: '2026-08-25T22:19:59.000Z' },
-}, { nowMs: Date.parse('2026-08-25T22:20:00.000Z') }).attackResults.find(({ id }) => id === 'A2').pass, false);
+}, { nowMs }).attackResults.find(({ id }) => id === 'A2').pass, false);
 
 assert.equal(evaluatePublicationAttackTen({
   ...validInput,
   authority: { ...validInput.authority, consumed: true },
-}, { nowMs: Date.parse('2026-08-25T22:20:00.000Z') }).attackResults.find(({ id }) => id === 'A2').pass, false);
+}, { nowMs }).attackResults.find(({ id }) => id === 'A2').pass, false);
 
 assert.equal(evaluatePublicationAttackTen({
   ...validInput,
   execution: { ...validInput.execution, contentSha256: 'b'.repeat(64) },
-}, { nowMs: Date.parse('2026-08-25T22:20:00.000Z') }).attackResults.find(({ id }) => id === 'A4').pass, false);
+}, { nowMs }).attackResults.find(({ id }) => id === 'A4').pass, false);
 
 assert.equal(evaluatePublicationAttackTen({
   ...validInput,
   providerCapability: { ...validInput.providerCapability, live: false },
-}, { nowMs: Date.parse('2026-08-25T22:20:00.000Z') }).attackResults.find(({ id }) => id === 'A5').pass, false);
+}, { nowMs }).attackResults.find(({ id }) => id === 'A5').pass, false);
 
 assert.equal(evaluatePublicationAttackTen({
   ...validInput,
   execution: { ...validInput.execution, duplicateAttemptBlocked: false },
-}, { nowMs: Date.parse('2026-08-25T22:20:00.000Z') }).attackResults.find(({ id }) => id === 'A6').pass, false);
+}, { nowMs }).attackResults.find(({ id }) => id === 'A6').pass, false);
 
 assert.equal(evaluatePublicationAttackTen({
   ...validInput,
   providerReadback: { ...validInput.providerReadback, actionId: 'wrong-action' },
-}, { nowMs: Date.parse('2026-08-25T22:20:00.000Z') }).attackResults.find(({ id }) => id === 'A7').pass, false);
+}, { nowMs }).attackResults.find(({ id }) => id === 'A7').pass, false);
 
 assert.equal(evaluatePublicationAttackTen({
   ...validInput,
   ingress: { ...validInput.ingress, signatureVerified: false },
-}, { nowMs: Date.parse('2026-08-25T22:20:00.000Z') }).attackResults.find(({ id }) => id === 'A8').pass, false);
+}, { nowMs }).attackResults.find(({ id }) => id === 'A8').pass, false);
+
+const otherRunIngress = {
+  ...validInput.ingress,
+  eventId: 'provider-event-other-run',
+  publicationRunId: '29f2f2df-66ca-45d5-8b0c-188128c3e9ac',
+  authorityId: 'authority:other-publication',
+  contentSha256: 'b'.repeat(64),
+  actionId: 'buffer-action-other',
+};
+const crossRunEvaluation = evaluatePublicationAttackTen({
+  ...validInput,
+  ingress: otherRunIngress,
+}, { nowMs });
+assert.equal(crossRunEvaluation.attackResults.find(({ id }) => id === 'A8').pass, false);
+assert.equal(crossRunEvaluation.allowed, false);
+assert.equal(productionPublicationAllowed({ ...validInput, ingress: otherRunIngress }, { nowMs }), false);
+
+assert.equal(evaluatePublicationAttackTen({
+  ...validInput,
+  ingress: { ...validInput.ingress, signerTrusted: false },
+}, { nowMs }).attackResults.find(({ id }) => id === 'A8').pass, false);
+
+assert.equal(evaluatePublicationAttackTen({
+  ...validInput,
+  ingress: {
+    ...validInput.ingress,
+    signedAt: '2026-08-25T22:10:00.000Z',
+    receivedAt: '2026-08-25T22:10:30.000Z',
+    replayWindowMs: 60_000,
+  },
+}, { nowMs }).attackResults.find(({ id }) => id === 'A8').pass, false);
 
 assert.equal(evaluatePublicationAttackTen({
   ...validInput,
   runtime: { ...validInput.runtime, observed: false },
-}, { nowMs: Date.parse('2026-08-25T22:20:00.000Z') }).attackResults.find(({ id }) => id === 'A9').pass, false);
+}, { nowMs }).attackResults.find(({ id }) => id === 'A9').pass, false);
 
 const tampered = events.map((event) => ({ ...event }));
 tampered[5].evidenceRef = 'tampered:evidence';
 const tamperedEvaluation = evaluatePublicationAttackTen({
   ...validInput,
   events: tampered,
-}, { nowMs: Date.parse('2026-08-25T22:20:00.000Z') });
+}, { nowMs });
 assert.equal(tamperedEvaluation.attackResults.find(({ id }) => id === 'A10').pass, false);
 assert.equal(tamperedEvaluation.allowed, false);
 assert.equal(tamperedEvaluation.state, 'UNKNOWN');
@@ -227,4 +265,4 @@ const badEvents = appendPublicationEvent(invalidTransition, {
 });
 assert.equal(validatePublicationEventChain(badEvents).valid, false);
 
-console.log('Buffer Attack Ten verified: all ten assertions pass only for one exact hash-chained VERIFIED_PUBLISHED synthetic run, while premature, expired, replayed, mismatched, non-live, duplicate, receipt-mismatch, invalid-ingress, false-success, tampered-chain, and invalid-transition cases fail closed.');
+console.log('Buffer Attack Ten verified: all ten assertions pass only for one exact hash-chained VERIFIED_PUBLISHED synthetic run; cross-run ingress substitution, untrusted signers, stale replay, invalid signatures, premature/expired/replayed/mismatched authority, non-live capability, duplicate execution, receipt mismatch, false runtime success, tampered chains, and invalid transitions fail closed.');
