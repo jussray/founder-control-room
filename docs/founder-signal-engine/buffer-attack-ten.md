@@ -33,7 +33,7 @@ and only after all ten assertions pass for the same publication run ID, canonica
 | A5 | Provider capability is live and policy-gated | Configured credentials or a mock are promoted into live capability |
 | A6 | Execution is idempotent and receipt-correlated | Retry creates a duplicate or loses run/authority identity |
 | A7 | Provider acknowledgement is independently read back | Submission success is treated as provider-state proof |
-| A8 | Ingress is authenticated, deduplicated, and durable | Forged, delayed, or duplicate ingress changes state |
+| A8 | Ingress is authenticated, exact-chain correlated, deduplicated, durable, trusted-signer bound, and replay-bounded | A valid event from another run, an untrusted signer, a stale signed event, or a duplicate advances state |
 | A9 | Runtime outcome is observed | Provider success is treated as proof the public destination is correct |
 | A10 | Failure, expiry, denial, and rollback remain visible and safe | Missing evidence or a red path silently resolves to green |
 
@@ -72,12 +72,15 @@ The ledger is append-only and hash-chained. Current state is derived from histor
 
 ## Controlled synthetic run
 
-Production publication remains blocked until one bounded synthetic run proves the valid path and these negative controls:
+Production publication remains blocked until one bounded synthetic run proves the valid path and negative controls including:
 
 1. premature execution is denied;
 2. expired authority is rejected;
 3. authority nonce replay is blocked;
-4. mismatched content hash is rejected.
+4. mismatched content hash is rejected;
+5. a fully authenticated and signed ingress event from another publication run is rejected;
+6. an untrusted ingress signer is rejected;
+7. a signed ingress event outside its bounded replay window is rejected.
 
 The source test simulates those controls deterministically. That is **source proof only**. It is not provider proof.
 
@@ -92,11 +95,20 @@ authority_nonce
 provider account + channel identity
 deterministic idempotency key
 provider action ID
-authenticated/deduplicated/durable ingress event
+ingress event ID
+ingress publication_run_id
+ingress authority_id
+ingress content_sha256
+ingress provider action ID
+ingress signer/issuer identity + trust decision
+ingress signed_at + received_at + replay-window proof
+authenticated/signature-verified/deduplicated/durable ingress evidence
 provider readback post identity
 runtime-observed post identity
 hash-chained publication events
 ```
+
+A8 is not satisfied by `signatureVerified: true` in isolation. The signed ingress evidence must belong to the same publication run, authority, content hash, and provider action as the rest of the release chain. Its signer must be explicitly trusted, and receipt freshness must fall within the declared bounded replay window.
 
 ## Release gate
 
@@ -108,6 +120,9 @@ AND controlled synthetic run == VERIFIED_PUBLISHED
 AND exact receipt correlation == true
 AND ingress capability == VERIFIED
 AND ingress authentication/signature proof == true
+AND ingress run/authority/content/action correlation == true
+AND ingress trusted-signer proof == true
+AND ingress replay-window proof == true
 AND authority is active and unused
 AND provider capability is live
 AND current content hash == authorized content hash
@@ -123,7 +138,7 @@ This branch may prove:
 - deterministic Attack Ten evaluation;
 - hash-chain tamper detection;
 - state-transition validation;
-- the four required negative controls;
+- required negative controls including cross-run ingress substitution, untrusted signer, and stale replay rejection;
 - release denial when provider, ingress, correlation, or runtime evidence is missing;
 - `VERIFIED_PUBLISHED` as the only state that may count toward Verified Leverage.
 
@@ -133,6 +148,7 @@ It does not prove:
 - the actual Buffer account/channel mapping;
 - live Buffer mutation;
 - live private ingress delivery;
+- the actual live ingress signer/origin contract;
 - live ingress signature/origin proof;
 - LinkedIn publication;
 - public runtime rendering;
