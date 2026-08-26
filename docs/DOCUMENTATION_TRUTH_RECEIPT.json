@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded Milestone B deterministic GitHub App witness-publication and readback invariants layered on the hardened producer without claiming bootstrap authority, founder-final approval, merge authority, deployment authority, live provider enforcement, secret installation, or runtime trigger activation.",
+  "purpose": "Record the bounded Milestone B deterministic GitHub App witness-publication and full provider-fingerprint readback invariants layered on the hardened producer without claiming bootstrap authority, founder-final approval, merge authority, deployment authority, live provider enforcement, secret installation, or runtime trigger activation.",
   "domains": [
     "merge-authority",
     "repository-provider"
@@ -9,19 +9,25 @@
     {
       "path": "src/review/deterministicReviewWitnessPublisher.ts",
       "claims": [
-        "src/review/deterministicReviewWitnessPublisher.ts may publish only a clear deterministic receipt produced from provider-observed PR/base/head/diff truth through the repository provider's narrow witness capability, must bind pre/post publication PR identity and exact head, and must reject success unless provider readback reports the exact derived signal from the server-owned numeric GITHUB_APP_ID."
+        "src/review/deterministicReviewWitnessPublisher.ts may publish only a clear deterministic receipt produced from provider-observed PR/base/head/diff truth through the repository provider's narrow witness capability, must bind pre/post publication PR identity and exact head, and must reject success unless provider readback reports the exact derived signal, the full receipt reviewHash as evidenceFingerprint, and the server-owned numeric GITHUB_APP_ID."
+      ]
+    },
+    {
+      "path": "src/review/independentReviewGate.ts",
+      "claims": [
+        "src/review/independentReviewGate.ts must treat a founder-final deterministic witness as current only when exact head, receipt-derived signal name, passed status, trusted GitHub App issuer, and the provider-backed full evidenceFingerprint all match the exact deterministic review receipt; missing or same-prefix-but-different full fingerprints fail closed."
       ]
     },
     {
       "path": "src/providers/DeterministicReviewGitHubProvider.ts",
       "claims": [
-        "src/providers/DeterministicReviewGitHubProvider.ts must restrict deterministic witness publication to the canonical Founder Control Room repository and exact success-only Check Run shape, must reject malformed or substituted head SHA, review hash, derived signal name, or bounded summary before provider mutation, and must reject a noncanonical GitHub API base in the normal runtime writer path so custom hosts remain test-transport-only."
+        "src/providers/DeterministicReviewGitHubProvider.ts must restrict deterministic witness publication to the canonical Founder Control Room repository and exact success-only Check Run shape, must reject malformed or substituted head SHA, review hash, derived signal name, or bounded summary before provider mutation, must reject a noncanonical GitHub API base in the normal runtime writer path, and must preserve GitHub Check Run external_id as the full evidenceFingerprint on provider readback."
       ]
     },
     {
       "path": "src/providers/RepositoryProvider.ts",
       "claims": [
-        "src/providers/RepositoryProvider.ts exposes only a narrow optional deterministic-review witness publication capability rather than ambient generic Check Run authority, and consumers must fail closed when that capability is unavailable."
+        "src/providers/RepositoryProvider.ts exposes only a narrow optional deterministic-review witness publication capability rather than ambient generic Check Run authority, carries an optional provider-backed evidenceFingerprint for exact evidence correlation, and requires consumers to fail closed when a load-bearing fingerprint or witness capability is unavailable."
       ]
     },
     {
