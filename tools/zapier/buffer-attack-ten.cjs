@@ -237,8 +237,14 @@ function attack(id, name, pass, detail) {
   return { id, name, pass: pass === true, detail };
 }
 
+function trustedSignerSet(options = {}) {
+  if (!Array.isArray(options.trustedIngressSignerIds)) return new Set();
+  return new Set(options.trustedIngressSignerIds.map(asText).filter(Boolean));
+}
+
 function evaluatePublicationAttackTen(input = {}, options = {}) {
   const nowMs = Number.isFinite(options.nowMs) ? options.nowMs : Date.now();
+  const trustedIngressSignerIds = trustedSignerSet(options);
   const publicationRunId = asText(input.publicationRunId);
   const contentSha256 = asText(input.contentSha256).toLowerCase();
   const founderApproval = input.founderApproval || {};
@@ -259,6 +265,7 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
   const ingressSignedAt = parseTime(ingress.signedAt);
   const ingressReceivedAt = parseTime(ingress.receivedAt);
   const ingressReplayWindowMs = Number(ingress.replayWindowMs);
+  const ingressSignerId = asText(ingress.signerId);
 
   const results = [];
 
@@ -359,12 +366,12 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
 
   results.push(attack(
     'A8',
-    'ingress is authenticated, correlated, deduplicated, durable, and replay-bounded',
+    'ingress is authenticated, correlated, deduplicated, durable, trusted by control-plane policy, and replay-bounded',
     ingress.capability === 'VERIFIED'
       && ingress.authenticated === true
       && ingress.signatureVerified === true
-      && ingress.signerTrusted === true
-      && Boolean(asText(ingress.signerId))
+      && Boolean(ingressSignerId)
+      && trustedIngressSignerIds.has(ingressSignerId)
       && ingress.deduplicated === true
       && ingress.durable === true
       && Boolean(asText(ingress.eventId))
@@ -381,7 +388,7 @@ function evaluatePublicationAttackTen(input = {}, options = {}) {
       && ingressReplayWindowMs <= MAX_INGRESS_REPLAY_WINDOW_MS
       && ingressReceivedAt - ingressSignedAt <= ingressReplayWindowMs
       && nowMs - ingressReceivedAt <= ingressReplayWindowMs,
-    'ingress must be trusted-signer evidence bound to the same run/authority/content/action and received inside a bounded replay window',
+    'ingress must be exact-chain evidence whose signer is trusted by control-plane configuration and whose signed receipt is inside the bounded replay window',
   ));
 
   results.push(attack(
