@@ -103,3 +103,19 @@ test('detects an unrecorded JavaScript test excluded by the default TypeScript-o
   assert.match(result.stderr, /new tests are excluded from default npm test discovery/);
   assert.match(result.stderr, /src\/lib\/__tests__\/legacyConsole\.test\.js/);
 });
+
+test('detects a case-mismatched test-like file that the current Vitest glob will not execute', (t) => {
+  const { root, baseSha } = makeRepo(t);
+  const currentPattern = 'src/**/*.{test,spec}.{js,jsx,ts,tsx,mjs,cjs,mts,cts}';
+  write(root, 'vitest.config.ts', `export default { test: { include: ['${currentPattern}'] } };\n`);
+  write(root, 'scripts/test-discovery-baseline.json', JSON.stringify({
+    includePattern: currentPattern,
+    undiscovered: [],
+  }, null, 2));
+  write(root, 'src/example.TEST.ts', 'export {};\n');
+
+  const result = verify(root, baseSha);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /new tests are excluded from default npm test discovery/);
+  assert.match(result.stderr, /src\/example\.TEST\.ts/);
+});
