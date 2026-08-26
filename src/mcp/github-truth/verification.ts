@@ -48,10 +48,17 @@ function ciConclusion(
   return 'unknown';
 }
 
-function reviewDecision(reviews: readonly GitHubPrReviewObservation[]): 'approved' | 'changes_requested' | 'none' | 'unknown' {
-  if (reviews.length === 0) return 'none';
+function reviewDecision(
+  reviews: readonly GitHubPrReviewObservation[],
+  headSha: string,
+): 'approved' | 'changes_requested' | 'none' | 'unknown' {
+  const currentHeadReviews = reviews.filter((review) => {
+    const commitSha = normalized(review.commitSha);
+    return !commitSha || commitSha === headSha;
+  });
+  if (currentHeadReviews.length === 0) return 'none';
   const latestByReviewer = new Map<string, GitHubPrReviewObservation>();
-  for (const review of [...reviews].sort((a, b) => (a.submittedAt ?? '').localeCompare(b.submittedAt ?? ''))) {
+  for (const review of [...currentHeadReviews].sort((a, b) => (a.submittedAt ?? '').localeCompare(b.submittedAt ?? ''))) {
     latestByReviewer.set(review.reviewer, review);
   }
   const states = [...latestByReviewer.values()].map((review) => normalized(review.state));
@@ -200,12 +207,25 @@ export function evaluateGitHubPrAuditEvidence(input: EvaluateGitHubPrAuditInput)
     });
   }
 
-  const review = reviewDecision(input.reviews);
+  const staleApprovals = input.reviews.filter((review) => (
+    normalized(review.state) === 'approved'
+    && Boolean(normalized(review.commitSha))
+    && normalized(review.commitSha) !== initialHead
+  ));
+  if (staleApprovals.length > 0) {
+    findings.push({
+      severity: 'warning',
+      code: 'review_approval_stale_for_head_sha',
+      message: 'At least one approval was recorded against an older commit and is not counted as approval for the current PR head.',
+    });
+  }
+
+  const review = reviewDecision(input.reviews, initialHead);
   if (review === 'changes_requested') {
     findings.push({
       severity: 'blocker',
       code: 'review_changes_requested',
-      message: 'GitHub review evidence currently includes changes requested.',
+      message: 'GitHub review evidence currently includes changes requested for the observed PR head.',
     });
   }
   if (input.finalPullRequest.mergeable === null || input.finalPullRequest.mergeable === undefined) {
