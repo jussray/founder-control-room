@@ -11,6 +11,7 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.sha }}
+  DOC_TRUTH_BASE_SHA: 35817fe224cc953201e2fd6ed08edd33ef570ea2
 
 jobs:
   deterministic-review-witness:
@@ -22,15 +23,17 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify exact head
+      - name: Verify exact head and stacked base
         shell: bash
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          printf 'expected=%s\nactual=%s\nbase=%s\n' "$EXPECTED_HEAD_SHA" "$actual" "$DOC_TRUTH_BASE_SHA"
           test "$actual" = "$EXPECTED_HEAD_SHA"
+          git merge-base --is-ancestor "$DOC_TRUTH_BASE_SHA" "$EXPECTED_HEAD_SHA"
 
       - name: Set up Node 24
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -52,3 +55,6 @@ jobs:
           src/review/deterministicReviewWitnessPublisher.test.ts
           src/providers/__tests__/deterministicReviewGitHubProvider.test.ts
           src/providers/__tests__/providerFactory.independentReviewBoundary.test.ts
+
+      - name: Verify stacked documentation truth
+        run: node scripts/verify-documentation-truth.mjs
