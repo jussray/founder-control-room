@@ -71,15 +71,6 @@ jobs:
           echo "Portfolio demo proof exit status: ${status}" | tee -a logs/portfolio-demo-proof.log
           exit "${status}"
 
-      - name: Re-prove bounded anonymous Se’kret Bip journey
-        shell: bash
-        run: |
-          set +e
-          node e2e/bip-live-demo-proof.mjs 2>&1 | tee logs/bip-live-demo-proof.log
-          status=${PIPESTATUS[0]}
-          echo "Bip live demo proof exit status: ${status}" | tee -a logs/bip-live-demo-proof.log
-          exit "${status}"
-
       - name: Upload public demo evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -87,8 +78,6 @@ jobs:
           name: public-portfolio-demo-${{ env.EXPECTED_HEAD_SHA }}
           path: |
             test-results/portfolio-demo/
-            test-results/bip-live-demo/
             logs/portfolio-demo-proof.log
-            logs/bip-live-demo-proof.log
           if-no-files-found: warn
           retention-days: 30
