@@ -5,6 +5,7 @@ import type {
   BoundedProviderEvidence,
   PullRequestAuditChangedFile,
   PullRequestAuditCheckObservation,
+  PullRequestAuditCommitStatusObservation,
   PullRequestAuditEvidence,
   PullRequestAuditObservation,
   PullRequestAuditReviewObservation,
@@ -21,6 +22,32 @@ function lastPageFromLink(link: string | undefined): number | null {
     return Number.isInteger(page) && page > 0 ? page : null;
   }
   return null;
+}
+
+function workflowRecency(item: PullRequestAuditWorkflowObservation): [number, number, string] {
+  return [item.runNumber ?? 0, item.runAttempt ?? 0, item.updatedAt];
+}
+
+function isNewerWorkflow(
+  candidate: PullRequestAuditWorkflowObservation,
+  current: PullRequestAuditWorkflowObservation,
+): boolean {
+  const a = workflowRecency(candidate);
+  const b = workflowRecency(current);
+  if (a[0] !== b[0]) return a[0] > b[0];
+  if (a[1] !== b[1]) return a[1] > b[1];
+  return a[2] > b[2];
+}
+
+export function latestWorkflowObservations(
+  items: readonly PullRequestAuditWorkflowObservation[],
+): PullRequestAuditWorkflowObservation[] {
+  const latest = new Map<string, PullRequestAuditWorkflowObservation>();
+  for (const item of items) {
+    const current = latest.get(item.contextId);
+    if (!current || isNewerWorkflow(item, current)) latest.set(item.contextId, item);
+  }
+  return [...latest.values()].sort((a, b) => a.contextId.localeCompare(b.contextId));
 }
 
 export class GitHubAuditRepositoryProvider extends SecurityPreservingGitHubProvider {
@@ -108,6 +135,33 @@ export class GitHubAuditRepositoryProvider extends SecurityPreservingGitHubProvi
     };
   }
 
+  private async commitStatuses(
+    owner: string,
+    repo: string,
+    headSha: string,
+  ): Promise<BoundedProviderEvidence<PullRequestAuditCommitStatusObservation>> {
+    const { data } = await this.auditOctokit.repos.getCombinedStatusForRef({
+      owner,
+      repo,
+      ref: headSha,
+      per_page: 100,
+    });
+    const items = data.statuses.slice(0, 100).map((status) => ({
+      id: String(status.id),
+      name: status.context,
+      state: status.state,
+      headSha: data.sha,
+      ...(status.updated_at ? { updatedAt: status.updated_at } : {}),
+      ...(status.target_url ? { detailsUrl: status.target_url } : {}),
+    }));
+    return {
+      items,
+      complete: data.total_count <= items.length,
+      observedCount: items.length,
+      totalCount: data.total_count,
+    };
+  }
+
   private async workflows(
     owner: string,
     repo: string,
@@ -119,19 +173,23 @@ export class GitHubAuditRepositoryProvider extends SecurityPreservingGitHubProvi
       head_sha: headSha,
       per_page: 100,
     });
-    const items = data.workflow_runs.slice(0, 100).map((run) => ({
+    const observed = data.workflow_runs.slice(0, 100).map((run) => ({
       id: String(run.id),
+      contextId: `${run.workflow_id}:${run.event}`,
       name: run.name ?? run.display_title ?? `workflow-${run.id}`,
       status: run.status ?? 'unknown',
       ...(run.conclusion ? { conclusion: run.conclusion } : {}),
       headSha: run.head_sha,
+      runNumber: run.run_number,
+      runAttempt: run.run_attempt,
+      createdAt: run.created_at,
       updatedAt: run.updated_at,
       detailsUrl: run.html_url,
     }));
     return {
-      items,
-      complete: data.total_count <= items.length,
-      observedCount: items.length,
+      items: latestWorkflowObservations(observed),
+      complete: data.total_count <= observed.length,
+      observedCount: observed.length,
       totalCount: data.total_count,
     };
   }
@@ -221,8 +279,9 @@ export class GitHubAuditRepositoryProvider extends SecurityPreservingGitHubProvi
     }
     const { owner, repo } = this.locateAuditRepository(projectId);
     const initialPullRequest = await this.pullRequest(owner, repo, pullRequestNumber);
-    const [checks, workflows, reviews, changedFiles] = await Promise.all([
+    const [checks, commitStatuses, workflows, reviews, changedFiles] = await Promise.all([
       this.checks(owner, repo, initialPullRequest.headSha),
+      this.commitStatuses(owner, repo, initialPullRequest.headSha),
       this.workflows(owner, repo, initialPullRequest.headSha),
       this.reviews(owner, repo, pullRequestNumber),
       this.changedFiles(
@@ -239,6 +298,7 @@ export class GitHubAuditRepositoryProvider extends SecurityPreservingGitHubProvi
       initialPullRequest,
       finalPullRequest,
       checks,
+      commitStatuses,
       workflows,
       reviews,
       changedFiles,
