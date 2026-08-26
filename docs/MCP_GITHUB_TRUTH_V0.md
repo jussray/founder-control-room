@@ -18,10 +18,13 @@ The implementation deliberately reuses current Founder Control Room primitives:
 
 - existing `/mcp` remote MCP transport and OAuth/static compatibility boundary;
 - existing server-held project grant;
+- canonical `RepositoryProvider` / `providerForProject` construction boundary;
 - existing GitHub App installation authentication, with local `GITHUB_TOKEN` fallback only where the repository already permits it;
 - existing `mcp_tool_calls` redacted receipt ledger;
 - existing Cloudflare Worker deployment authority;
 - existing Vitest and remote MCP contract tests.
+
+The MCP subsystem does not import Octokit, mint GitHub credentials, or construct a GitHub client for this audit. It asks the configured `RepositoryProvider` for the optional provider-neutral `auditPullRequestEvidence` capability. GitHub-specific bounded reads live inside the GitHub provider family and therefore inherit the same project mapping, credential construction, and provider governance boundary as other repository operations.
 
 No new database migration, Worker identity, auth model, or generalized MCP platform is introduced.
 
@@ -34,23 +37,23 @@ projectId: founder-control-room
 repository: jussray/founder-control-room
 ```
 
-The caller cannot provide an arbitrary owner or repository. Expanding this allowlist is a separate reviewed change.
+The caller cannot provide an arbitrary owner or repository. Expanding this allowlist is a separate reviewed change. A configured repository provider that does not support bounded PR/MR evidence fails closed rather than falling back to a host-specific client in the MCP layer.
 
 ## Evidence gathered
 
-The audit performs bounded GitHub-native reads for:
+The audit performs bounded provider-backed reads for:
 
 - pull-request identity and state;
 - base and head SHA;
 - changed-file count and a capped changed-file summary;
 - check runs bound to the observed head SHA;
 - workflow runs filtered to the observed head SHA;
-- review events;
+- review events and their recorded commit SHA;
 - a second pull-request read to detect load-bearing PR changes during the audit.
 
-Checks, workflow runs, reviews, and changed-file observations are capped at 100 returned observations per collection. The reader carries explicit completeness metadata for each collection. If GitHub reports or implies more evidence than the bounded observation contains, the audit returns `evidence_incomplete` with `evidence_collection_truncated`; it never promotes a partial page into complete evidence.
+Checks, workflow runs, reviews, and changed-file observations are capped at 100 returned observations per collection. The provider carries explicit completeness metadata for each collection. If the provider reports or implies more evidence than the bounded observation contains, the audit returns `evidence_incomplete` with `evidence_collection_truncated`; it never promotes a partial page into complete evidence.
 
-For review history over the cap, the reader fetches the newest review page rather than preserving only the oldest page. The result is still marked incomplete because omitted history exists, but recent `CHANGES_REQUESTED` or dismissal events cannot be replaced by stale early approvals merely because the collection exceeded 100 events.
+For review history over the cap, the GitHub provider uses bounded first-plus-newest-page reads rather than fetching the entire history or preserving only the oldest page. The result remains incomplete because omitted history exists, but recent review state is not replaced by stale early approvals merely because the collection exceeded 100 events.
 
 The audit never requests patch contents by default.
 
@@ -69,17 +72,18 @@ Examples:
 - Current CI can fail while the verdict is still `evidence_complete`: the system has complete evidence of failure.
 - A known current CI failure outranks another current pending signal and remains `ciConclusion: fail`.
 - Passing CI from an old SHA is `evidence_incomplete` with `ci_stale_for_head_sha`.
+- An approval recorded against an older commit SHA is not counted as current approval and produces `review_approval_stale_for_head_sha`.
 - A PR head that changes during the audit is `evidence_conflicted`.
 - A base, state, draft, mergeability, or other load-bearing PR truth change during the audit is also `evidence_conflicted`, even if the head SHA stays the same.
 - Missing CI is never treated as passing.
 - Truncated bounded evidence is never treated as complete.
 - `mergeable: null` is informationally unknown, never proof of safety.
 
-The summary is built from the final PR observation. This prevents the audit from reporting an initial state as current after the second GitHub read has already observed a different load-bearing PR state.
+The summary is built from the final PR observation. This prevents the audit from reporting an initial state as current after the second provider read has already observed a different load-bearing PR state.
 
 ## Receipt boundary
 
-The existing external MCP receipt writer stores hashes and structural summaries only. It does not store raw arguments or raw GitHub results.
+The existing external MCP receipt writer stores hashes and structural summaries only. It does not store raw arguments or raw provider results.
 
 Every successful tool call returns the existing governance boundary:
 
@@ -110,7 +114,7 @@ v0 does not expose or perform:
 - merge or approval;
 - comments, labels, issues, branch writes, or workflow dispatch;
 - repository settings changes;
-- GitHub token passthrough;
+- provider token passthrough;
 - generic HTTP proxying;
 - arbitrary repository access;
 - production deployment;
@@ -122,9 +126,9 @@ Before merge:
 
 1. Typecheck passes.
 2. Lint passes.
-3. Unit tests pass, including stale-head, moving-PR-state, missing-CI, failure-plus-pending, and truncated-evidence attacks.
-4. Test discovery reports zero default-excluded supported tests.
+3. Unit tests pass, including stale-head, stale-approval, moving-PR-state, missing-CI, failure-plus-pending, and truncated-evidence attacks.
+4. Test discovery reports zero default-excluded supported tests and case-mismatched test-like files cannot false-green.
 5. Existing remote MCP tests advertise exactly seven narrow tools.
-6. Review confirms no GitHub mutation method is reachable through this tool and no bounded collection can false-green when truncated.
+6. Review confirms no repository-host SDK or credential construction occurs in the MCP subsystem, no GitHub mutation method is reachable through this tool, and no bounded collection can false-green when truncated.
 
 After merge, production activation still requires the repository's normal Worker deployment authority and one authenticated read-only smoke audit. Merge approval does not carry forward into deployment approval.
