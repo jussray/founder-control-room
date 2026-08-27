@@ -1,11 +1,12 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the Goalfix/adaptive-governance, Cloudflare Workflow, and founder-content readiness invariants that keep lifecycle-neutral source status, portable agent entry points, exact-target merge freshness, authenticated Founder Final, runtime-proof scope, cross-project adaptive behavior, Future-Us untrusted-data/action boundaries, durable release-proof orchestration, and Buffer draft-only truth fail-closed without claiming runtime API/UI adoption, merge authority, deployment authority, provider-policy mutation, live Buffer draft delivery, publication authority, or classifier-based authorization.",
+  "purpose": "Bind current Goalfix, Cloudflare, founder-content, and repository-provider documentation to reviewed source invariants while keeping Buffer outcome truth and existing non-FCR ruleset mutation fail-closed. This receipt does not grant merge, deploy, provider-policy, publication, database, secret, or runtime authority.",
   "domains": [
     "truth-governance",
     "cloudflare-authority",
     "founder-content-truth",
-    "publishing"
+    "publishing",
+    "repository-provider"
   ],
   "changes": [
     {
@@ -88,6 +89,12 @@
       "claims": [
         "The current Buffer milestone is draft-only: the checked-in provider handoff requires explicit method draft, saveToDraft true, publish_allowed false, no scheduled fire time, and share-now denial; schedule/publication behavior is historical or deferred and non-authorizing.",
         "Live Buffer draft delivery remains unknown until a controlled exact-source provider probe returns readback proving the object landed in Buffer Drafts without queue, schedule, share, or publication side effects."
+      ]
+    },
+    {
+      "path": "src/providers/SecurityPreservingGitHubProvider.ts",
+      "claims": [
+        "src/providers/SecurityPreservingGitHubProvider.ts must fail closed instead of PUT-updating an existing non-FCR named ruleset from a stale provider snapshot; exact normalized requested-ref exclusions and ~ALL may be diagnosed without mutation, wildcard and ~DEFAULT_BRANCH semantics must not be invented locally, missing rulesets may use the direct create-only path, non-empty bypass replacement remains fail-closed, and Founder Control Room constitutional governance remains delegated to the canonical provider path."
       ]
     }
   ]
