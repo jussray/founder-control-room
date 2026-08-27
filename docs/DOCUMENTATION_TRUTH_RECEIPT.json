@@ -1,13 +1,34 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the Goalfix/adaptive-governance, Cloudflare Workflow, and founder-content readiness invariants that keep lifecycle-neutral source status, portable agent entry points, exact-target merge freshness, authenticated Founder Final, runtime-proof scope, cross-project adaptive behavior, Future-Us untrusted-data/action boundaries, durable release-proof orchestration, and Buffer draft-only truth fail-closed without claiming runtime API/UI adoption, merge authority, deployment authority, provider-policy mutation, live Buffer draft delivery, publication authority, or classifier-based authorization.",
+  "purpose": "Record the deterministic-review trusted-ignition, Goalfix/adaptive-governance, Cloudflare Workflow, and founder-content readiness invariants that keep exact-current-main witness production, lifecycle-neutral source status, portable agent entry points, exact-target merge freshness, authenticated Founder Final, runtime-proof scope, cross-project adaptive behavior, Future-Us untrusted-data/action boundaries, durable release-proof orchestration, and Buffer draft-only truth fail-closed without claiming bootstrap authority, runtime deployment, merge authority, provider-policy mutation, live Buffer draft delivery, publication authority, or classifier-based authorization.",
   "domains": [
+    "merge-authority",
+    "repository-provider",
     "truth-governance",
     "cloudflare-authority",
     "founder-content-truth",
     "publishing"
   ],
   "changes": [
+    {
+      "path": "src/http/server.ts",
+      "claims": [
+        "src/http/server.ts may expose POST /review/deterministic-witness/:pullRequestNumber only inside the existing same-origin, repository-rate-limit, authenticated-founder, and fcr-privileged-execution-master membrane; caller input is limited to a positive pull-request number while repository/provider identity and PR/base/head/diff/verdict/hash/check/App authority remain server/provider derived.",
+        "The deterministic witness trigger must fail closed unless the running release has a full GIT_SHA equal to provider-resolved GitHub main before publication, must re-read main after publication and reject movement away from that same runtime SHA, and must remain proposal-only with mergeAuthorized and executionAuthorized false so candidate previews and stale deployed runtimes cannot bootstrap or mint current authority."
+      ]
+    },
+    {
+      "path": "src/http/__tests__/deterministicReviewWitnessTrigger.contract.test.ts",
+      "claims": [
+        "src/http/__tests__/deterministicReviewWitnessTrigger.contract.test.ts must lock founder/master-switch gating, fixed FCR repository/provider identity, PR-number-only caller input, exact-current-main GIT_SHA/provider revalidation before and after witness publication, and non-authorizing response semantics."
+      ]
+    },
+    {
+      "path": "docs/DETERMINISTIC_REVIEW_WITNESS.md",
+      "claims": [
+        "docs/DETERMINISTIC_REVIEW_WITNESS.md must keep trusted ignition separate from bootstrap authority and require witness production to run only from exact current-main integrated code, with candidate previews and stale releases rejected, provider-derived witness identity preserved, and exact merged runtime deployment re-observed before the founder trigger is treated as available authority."
+      ]
+    },
     {
       "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
