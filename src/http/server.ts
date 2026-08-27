@@ -54,6 +54,8 @@ import { debugRouter } from './routes/debug.js';
 import { publicGuardrailSnapshot, renderGuardrailStatusPage } from '../guardrails.js';
 import { V10_CAPABILITY_PLAN_CONTRACT } from '../founder-os-lab/capabilityKernel.js';
 import { FOUNDER_CONVEYOR_CONTRACT } from '../lib/founderConveyorReceipt.js';
+import { providerForProject } from '../providers/providerFactory.js';
+import { publishDeterministicReviewWitness } from '../review/deterministicReviewWitnessPublisher.js';
 import {
   corsMiddleware,
   helmetMiddleware,
@@ -76,6 +78,11 @@ import { requireFounderSignalEngineReviewOnly } from './middleware/founderSignal
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SUPABASE_PROJECT_REF = /^[a-z0-9]{20}$/;
 const SERVICE_IDENTITY = 'founder-control-room';
+const FCR_REVIEW_PROJECT = {
+  repo_provider: 'github',
+  slug: 'founder-control-room',
+  repo_identifier: 'jussray/founder-control-room',
+} as const;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -270,6 +277,51 @@ export function createServer(options: CreateServerOptions = {}) {
   });
 
   app.use(rateLimitGeneral);
+
+  app.post(
+    '/review/deterministic-witness/:pullRequestNumber',
+    requireFounder,
+    requirePortfolioSwitchOn('fcr-privileged-execution-master'),
+    async (req, res, next) => {
+      const pullRequestNumber = Number(req.params.pullRequestNumber);
+      if (!Number.isInteger(pullRequestNumber) || pullRequestNumber <= 0) {
+        return res.status(400).json({ error: 'pullRequestNumber must be a positive integer' });
+      }
+
+      try {
+        const provider = providerForProject(FCR_REVIEW_PROJECT);
+        const { production, signal } = await publishDeterministicReviewWitness({
+          provider,
+          projectId: FCR_REVIEW_PROJECT.slug,
+          pullRequestNumber,
+        });
+
+        res.setHeader('Cache-Control', 'no-store');
+        return res.status(200).json({
+          contract: 'fcr/deterministic-review-witness-trigger@v1',
+          witnessPublished: true,
+          proposalOnly: true,
+          mergeAuthorized: false,
+          executionAuthorized: false,
+          pullRequestNumber: production.receipt.pullRequestNumber,
+          baseSha: production.receipt.baseSha,
+          headSha: production.receipt.headSha,
+          reviewHash: production.receipt.reviewHash,
+          verdict: production.receipt.verdict,
+          findingCount: production.receipt.findings.length,
+          signal: {
+            name: signal.name,
+            status: signal.status,
+            commitSha: signal.commitSha,
+            evidenceFingerprint: signal.evidenceFingerprint ?? null,
+            issuer: signal.issuer ?? null,
+          },
+        });
+      } catch (error) {
+        return next(error);
+      }
+    },
+  );
 
   app.use('/', onboardingRouter);
   app.use('/auth', authRouter);
