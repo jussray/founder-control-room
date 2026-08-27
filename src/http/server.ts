@@ -289,12 +289,27 @@ export function createServer(options: CreateServerOptions = {}) {
       }
 
       try {
+        const runtimeSha = process.env.GIT_SHA?.trim() ?? '';
+        if (!EXACT_COMMIT_SHA.test(runtimeSha)) {
+          return res.status(503).json({ error: 'deterministic review witness requires the exact current main runtime' });
+        }
+
         const provider = providerForProject(FCR_REVIEW_PROJECT);
+        const currentMainSha = await provider.resolveRef(FCR_REVIEW_PROJECT.slug, 'main');
+        if (currentMainSha.toLowerCase() !== runtimeSha.toLowerCase()) {
+          return res.status(409).json({ error: 'deterministic review witness requires the exact current main runtime' });
+        }
+
         const { production, signal } = await publishDeterministicReviewWitness({
           provider,
           projectId: FCR_REVIEW_PROJECT.slug,
           pullRequestNumber,
         });
+
+        const currentMainAfter = await provider.resolveRef(FCR_REVIEW_PROJECT.slug, 'main');
+        if (currentMainAfter.toLowerCase() !== runtimeSha.toLowerCase()) {
+          throw new Error('Deterministic review witness main moved during publication; emitted signal is historical');
+        }
 
         res.setHeader('Cache-Control', 'no-store');
         return res.status(200).json({
