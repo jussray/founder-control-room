@@ -52,6 +52,8 @@ A publication claim requires an observable platform artifact. A draft, scheduler
 
 Founder-content orchestration readiness is a separate preflight truth layer. An authenticated status surface may report whether n8n founder-content orchestration is enabled, whether required webhook/token configuration is present, which bounded providers are allowlisted, and whether Buffer is ready for one controlled probe. It must expose presence/state only, never secret values. Configuration alone does not prove a webhook executed, Buffer accepted a schedule, a post published, or provider readback succeeded. For the canonical conveyor, `enabled-live-verified` is allowed only when a retained activation-probe receipt matches the deployed exact `GIT_SHA`; if the runtime SHA moves, the receipt remains historical evidence but its live authority expires and readiness returns to a non-live proof-needed state. Missing runtime identity or receipt readback also fails closed.
 
+Founder-content orchestration must not reuse the generic conveyor activation receipt as Buffer proof. A founder-content `enabled-live-verified` state requires enabled/configured transport, a valid provider allowlist, Buffer enabled, and proof explicitly bound to `buffer` with a non-empty receipt ID, a valid observation timestamp, and `expectedHeadSha` exactly equal to deployed `GIT_SHA`. Missing, stale, unbound, incomplete, or provider-unverified proof remains non-live. This source contract does not claim the live route currently has a Buffer proof reader.
+
 ## /confess
 
 Before release, state internally and, when material to the audience, publicly:
@@ -185,6 +187,7 @@ Hold the post when:
 - a current-state claim is being sent through a deferred queue that cannot revalidate it at publication time;
 - configuration/readiness evidence is being used as proof that n8n, Buffer, or another provider actually executed or published;
 - a generic n8n stage-conveyor receipt is being used as proof that a founder-content provider write or publication occurred;
+- a founder-content `verified` proof label is missing Buffer provider binding, receipt identity, observation time, or exact deployed-SHA binding;
 - the post falls outside the approved automated publishing class or a stricter exact Current You gate is unsatisfied;
 - the active first-party route cannot read and atomically claim an exact matching FCR-owned approval;
 - the post depends on a workflow that failed before executing steps;

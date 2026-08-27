@@ -1,9 +1,11 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the Goalfix/adaptive-governance and Cloudflare Workflow invariants that keep lifecycle-neutral source status, portable agent entry points, exact-target merge freshness, authenticated Founder Final, runtime-proof scope, cross-project adaptive behavior, Future-Us untrusted-data/action boundaries, and durable release-proof orchestration fail-closed without claiming runtime API/UI adoption, merge authority, deployment authority, provider-policy mutation, publication authority, or classifier-based authorization.",
+  "purpose": "Record the Goalfix/adaptive-governance, Cloudflare Workflow, and founder-content readiness invariants that keep lifecycle-neutral source status, portable agent entry points, exact-target merge freshness, authenticated Founder Final, runtime-proof scope, cross-project adaptive behavior, Future-Us untrusted-data/action boundaries, durable release-proof orchestration, and Buffer draft-only truth fail-closed without claiming runtime API/UI adoption, merge authority, deployment authority, provider-policy mutation, live Buffer draft delivery, publication authority, or classifier-based authorization.",
   "domains": [
     "truth-governance",
-    "cloudflare-authority"
+    "cloudflare-authority",
+    "founder-content-truth",
+    "publishing"
   ],
   "changes": [
     {
@@ -59,6 +61,33 @@
       "path": "src/workflows/releaseProofWorkflow.ts",
       "claims": [
         "ReleaseProofWorkflowV0 must bind exact repository/target/base/head identity, correlate evidence and founder-approval observations to the same candidate fingerprint, fail closed on mismatch or blocker state, and stop at READY_FOR_FINAL_REREAD with mergeAuthorized, deploymentAuthorized, and providerMutationAuthorized all false."
+      ]
+    },
+    {
+      "path": "src/lib/n8nConveyorReadiness.ts",
+      "claims": [
+        "Founder-content readiness may become enabled-live-verified only when enabled/configured transport, a valid provider allowlist, Buffer enablement, a non-empty provider receipt identity, a valid observation timestamp, and exact deployed GIT_SHA binding all agree; generic conveyor proof, stale head proof, missing runtime identity, incomplete proof, or wrong-provider proof must remain non-live.",
+        "Readiness output must expose provider/configuration state without exposing webhook, bearer-token, or other secret values and must never convert source configuration into proof that Buffer accepted a live draft."
+      ]
+    },
+    {
+      "path": "src/lib/n8nFounderContentReadiness.test.ts",
+      "claims": [
+        "src/lib/n8nFounderContentReadiness.test.ts must prove fail-closed behavior for disabled, misconfigured, invalid-provider, missing-proof, stale-head, incomplete-proof, and provider-unverified states, and may accept enabled-live-verified only for explicit Buffer proof bound to the deployed exact GIT_SHA with receipt identity and valid observation time."
+      ]
+    },
+    {
+      "path": "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md",
+      "claims": [
+        "Public communication must keep founder-content readiness separate from provider outcome truth: configuration or a verified label cannot prove Buffer execution without exact provider binding, receipt identity, observation time, and deployed-SHA correlation.",
+        "A Buffer draft, scheduler acceptance, approval, or workflow trigger is not publication truth; only observable external outcome evidence may support a publication claim."
+      ]
+    },
+    {
+      "path": "docs/founder-signal-engine/day3-buffer-content-boundary.md",
+      "claims": [
+        "The current Buffer milestone is draft-only: the checked-in provider handoff requires explicit method draft, saveToDraft true, publish_allowed false, no scheduled fire time, and share-now denial; schedule/publication behavior is historical or deferred and non-authorizing.",
+        "Live Buffer draft delivery remains unknown until a controlled exact-source provider probe returns readback proving the object landed in Buffer Drafts without queue, schedule, share, or publication side effects."
       ]
     }
   ]
