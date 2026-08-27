@@ -72,6 +72,8 @@ change the operational truth
 -> re-observe provider/runtime facts before reusing present-tense claims
 ```
 
+Goalfix/adaptive operating contracts are part of that truth surface. Changes to the canonical Goalfix workflow, adaptive kernel, portable `.ai`/`.claude` Goalfix skills, or Claude/Perplexity master execution overlays are classified as truth-governance and must update the structured Documentation Truth receipt plus applicable current-state documentation. Those contracts must preserve the verified target branch rather than assume `main`, authenticated Founder Final through checked-in authority, a final mutable provider/PR/base/head/diff/check/review reread before integration, browser-specific Playwright evidence, backend/provider-specific proof for non-browser paths, `MERGED_UNVERIFIED` until required runtime truth exists, and explicit separation between governance behavior and unimplemented `/goalfix/inspect` runtime/API/UI adoption.
+
 Default-suite test discovery has a bounded evidence claim: a baseline entry means the file is excluded from the default `npm test` suite, not that it never ran in every CI workflow. The base-bound ratchet cannot accept newly excluded candidate tests and requires stale debt entries to be removed.
 
 Historical material stays available as provenance. When it no longer describes current authority, mark it `HISTORICAL`, `SUPERSEDED`, `STALE`, `REVALIDATION_REQUIRED`, or point it to the current authority instead of deleting the record or letting it compete silently with fresh truth.
@@ -276,6 +278,10 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full architecture.
 - [`CLAUDE.md`](CLAUDE.md) — Claude / Claude Code overlay
 - [`PERPLEXITY.md`](PERPLEXITY.md) — Perplexity overlay
 - [`.ai/skills/juss-flow-launch-loop/SKILL.md`](.ai/skills/juss-flow-launch-loop/SKILL.md) — bounded implementation/review/merge loop
+- [`.ai/skills/goalfix/SKILL.md`](.ai/skills/goalfix/SKILL.md) — portable Goalfix execution/governance contract
+- [`.claude/skills/goalfix/SKILL.md`](.claude/skills/goalfix/SKILL.md) — Claude Goalfix execution overlay
+- [`docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`](docs/GOALFIX_EXECUTION_WORKFLOW_V2.md) — canonical Goalfix execution order and merge-freshness contract
+- [`docs/FOUNDER_ADAPTIVE_KERNEL_V0.md`](docs/FOUNDER_ADAPTIVE_KERNEL_V0.md) — adaptive governance/source contract; not a claim of runtime `/goalfix/inspect` integration
 - [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md) — current repository integration authority
 - [`docs/TRUTH_DECAY_AUDIT.md`](docs/TRUTH_DECAY_AUDIT.md) — truth-aging / FutureYou-ME failure contract
 - [`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md`](docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md) — public truth and Sauce Guard boundary
@@ -370,7 +376,3 @@ No approval silently carries forward to another authority class.
 The Evidence Trust Plane keeps observation, provider readback, evidence validity, and operational authority separate. In this slice, `src/evidence/evidenceLifecycle.ts` is a contract/evaluator foundation: a current ledgered receipt can reach `prepare_merge_review` only when GitHub API readback is bound to an exact repository, full SHA, workflow, and run identity, and expiration is re-evaluated at the use boundary. Rejected, stale, superseded, expired, unledgered, unscoped, or non-GitHub receipts fail closed for merge-review preparation.
 
 This foundation **does not wire durable receipt persistence**. `ledgerState` is supplied contract state until a separately reviewed store/writer exists and is proven. The founder-facing Evidence Trust Plane must therefore say persistence is required rather than implying it is already active. Even a properly scoped current receipt cannot authorize merge, deploy, production promotion, issue closure, secret mutation, policy mutation, or data deletion by itself.
-
-## Pull-request Playwright proof freshness
-
-Pull-request Playwright evidence binds both the exact candidate head and the base SHA carried by the same current pull-request event. The workflow must fail closed with `STALE_BASE` before dependency installation or candidate-dependent browser proof when that base is not an ancestor of the exact head. Rerunning a historical workflow attempt does not renew its old event payload into current evidence; after the PR base moves, a fresh pull-request event must establish the new base/head relationship before downstream proof can be treated as current.

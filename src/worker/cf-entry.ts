@@ -20,6 +20,8 @@ import {
   type ControlRoomWorkerEnv,
 } from './handler.js';
 
+export { ReleaseProofWorkflowV0 } from '../workflows/releaseProofWorkflow.js';
+
 validateWorkerEnv(env);
 
 const { createServer: createExpressApp } = await import('../http/server.js');
