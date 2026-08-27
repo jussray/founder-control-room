@@ -1,0 +1,212 @@
+name: Supabase Migration Dry Run Proof
+
+on:
+  push:
+    branches:
+      - fix/proof-of-ship-migration-identity-main-20260809
+    paths:
+      - '.github/workflows/supabase-migration-dry-run-proof.yml'
+      - 'supabase/migrations/**'
+      - 'scripts/verify-production-migration-ledger.mjs'
+      - 'src/lib/__tests__/productionMigrationLedger.contract.test.ts'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-migration-dry-run-proof-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_MAIN_SHA: b2b0c3d84a7cabc0ff664806e28d8919156627c7
+  EXPECTED_BRANCH: fix/proof-of-ship-migration-identity-main-20260809
+
+jobs:
+  dry-run-proof:
+    name: Supabase exact-head dry run
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Check out exact pushed head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact candidate and unchanged main
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          test "$GITHUB_REF" = "refs/heads/$EXPECTED_BRANCH"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+          git fetch --no-tags origin \
+            "refs/heads/main:refs/remotes/origin/main" \
+            "refs/heads/$EXPECTED_BRANCH:refs/remotes/origin/$EXPECTED_BRANCH"
+
+          CURRENT_MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
+          CURRENT_BRANCH_SHA="$(git rev-parse "refs/remotes/origin/$EXPECTED_BRANCH")"
+
+          printf 'expected_main=%s\ncurrent_main=%s\nexpected_head=%s\ncurrent_branch=%s\n' \
+            "$EXPECTED_MAIN_SHA" "$CURRENT_MAIN_SHA" "$EXPECTED_HEAD_SHA" "$CURRENT_BRANCH_SHA"
+
+          test "$CURRENT_MAIN_SHA" = "$EXPECTED_MAIN_SHA"
+          test "$CURRENT_BRANCH_SHA" = "$EXPECTED_HEAD_SHA"
+          git merge-base --is-ancestor "$EXPECTED_MAIN_SHA" "$EXPECTED_HEAD_SHA"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify migration ledger regression contract
+        run: npx vitest run src/lib/__tests__/productionMigrationLedger.contract.test.ts
+
+      - uses: supabase/setup-cli@v2
+        with:
+          version: 2.101.0
+
+      - name: Validate dry-run configuration
+        shell: bash
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${SUPABASE_DB_URL:-}" ]]; then
+            echo "::error title=Missing Supabase database URL::Set SUPABASE_DB_URL in the GitHub production environment before running migration proof."
+            exit 1
+          fi
+
+          SUPABASE_DB_URL="$SUPABASE_DB_URL" python3 - <<'PY'
+          import os
+          from urllib.parse import urlparse
+
+          raw = os.environ['SUPABASE_DB_URL']
+          errors = []
+
+          # Fail closed on documentation/template placeholders without printing
+          # the credential or any of its components.
+          if '<' in raw or '>' in raw:
+              errors.append('SUPABASE_DB_URL still contains a placeholder token; replace it with the real connection-string value')
+
+          try:
+              parsed = urlparse(raw)
+          except ValueError:
+              parsed = None
+              errors.append('SUPABASE_DB_URL is not a parseable Postgres URL')
+
+          if parsed is not None:
+              if parsed.scheme not in {'postgres', 'postgresql'}:
+                  errors.append('SUPABASE_DB_URL must use the postgres or postgresql scheme')
+              if not parsed.hostname:
+                  errors.append('SUPABASE_DB_URL must include a database hostname')
+              if not parsed.username:
+                  errors.append('SUPABASE_DB_URL must include a database username')
+              if parsed.password is None or parsed.password == '':
+                  errors.append('SUPABASE_DB_URL must include the database password')
+              if parsed.path.rstrip('/') != '/postgres':
+                  errors.append('SUPABASE_DB_URL must target the postgres database')
+
+              try:
+                  port = parsed.port
+              except ValueError:
+                  errors.append('SUPABASE_DB_URL contains an invalid port')
+                  port = None
+
+              if port != 5432:
+                  errors.append('SUPABASE_DB_URL must use port 5432 for migration sessions')
+
+              if parsed.hostname and parsed.hostname.startswith('db.') and parsed.hostname.endswith('.supabase.co'):
+                  print(
+                      '::warning title=Direct Supabase endpoint detected::'
+                      'GitHub-hosted runners may require IPv4 support. Prefer the project Session Pooler connection string unless direct connectivity is known to work.'
+                  )
+
+          if errors:
+              for error in dict.fromkeys(errors):
+                  print(f'::error title=Invalid Supabase database URL::{error}')
+              raise SystemExit(1)
+
+          print('Supabase dry-run configuration is present and structurally valid.')
+          PY
+
+          supabase --version
+
+      - name: Capture preflight migration ledger
+        shell: bash
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          REMOTE_MIGRATION_LIST_PATH: test-results/migration-dry-run-ledger.txt
+          MIGRATION_LEDGER_RECEIPT_PATH: test-results/migration-dry-run-ledger.json
+          MIGRATION_LEDGER_PHASE: preflight
+          REQUIRED_MIGRATION_VERSIONS: 20260723000000,20260803011000
+        run: |
+          set -euo pipefail
+          mkdir -p test-results
+          supabase migration list --db-url "$SUPABASE_DB_URL" | tee "$REMOTE_MIGRATION_LIST_PATH"
+          node scripts/verify-production-migration-ledger.mjs
+
+      - name: Run non-mutating Supabase migration dry run
+        shell: bash
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          supabase db push \
+            --dry-run \
+            --include-all \
+            --db-url "$SUPABASE_DB_URL" \
+            | tee test-results/supabase-db-push-dry-run.txt
+
+      - name: Reverify exact candidate and unchanged main
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            "refs/heads/main:refs/remotes/origin/main" \
+            "refs/heads/$EXPECTED_BRANCH:refs/remotes/origin/$EXPECTED_BRANCH"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$EXPECTED_MAIN_SHA"
+          test "$(git rev-parse "refs/remotes/origin/$EXPECTED_BRANCH")" = "$EXPECTED_HEAD_SHA"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Record proof summary
+        if: always()
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        run: |
+          {
+            echo "## Supabase migration dry-run proof"
+            echo
+            echo "- Candidate head: \`$EXPECTED_HEAD_SHA\`"
+            echo "- Required base main: \`$EXPECTED_MAIN_SHA\`"
+            echo "- CLI: \`supabase/setup-cli@v2\` pinned to \`2.101.0\`"
+            echo "- Command: \`supabase db push --dry-run --include-all\`"
+            echo "- Mutation command present: no"
+            echo "- Cloudflare deploy present: no"
+            echo "- Production environment used only to read the existing database URL for dry-run proof."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload dry-run receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-migration-dry-run-${{ github.sha }}
+          path: |
+            test-results/migration-dry-run-ledger.txt
+            test-results/migration-dry-run-ledger.json
+            test-results/supabase-db-push-dry-run.txt
+          if-no-files-found: warn
+          retention-days: 30
