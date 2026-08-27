@@ -31,6 +31,7 @@ Current implementation includes:
 - founder proof, idempotency/reservation, and rollback boundaries;
 - an FCR-specific provider-grounded independent-review membrane before in-app provider integration;
 - a canonical FCR founder-final merge policy that keeps deterministic independent review load-bearing, binds authenticated founder approval to the exact PR/base/head, and preserves the older server-owned semantic-review policy only for already-pinned compatibility paths;
+- a deterministic-review V1 producer and witness path that derives proposal-only review receipts from provider-observed exact PR/base/head/diff state, blocks trust-root self-certification and unprovable rename provenance, permits the exact success Check Run only through the FCR repository provider when a repository-scoped GitHub App installation credential is present, rejects PAT-only witness authority, and requires exact-head provider readback from the trusted numeric `GITHUB_APP_ID` before treating the witness as current evidence; this path does not itself provide bootstrap, founder-final, merge, deploy, secret, database, policy, billing, publication, or destructive-action authority;
 - canonical capability governance through `.control/capability.json`;
 - deterministic Cloudflare reasoning, request-trace/source contracts, and founder-gated Access recovery tooling whose source existence does not itself prove live provider configuration;
 - a read-only Cloudflare hostname-inventory witness that discovers the reviewed zone's HTTP-relevant DNS names, classifies inventory/proxy drift, and simulates Request Trace per eligible proxied hostname without granting provider-mutation authority or persisting DNS targets/origin IPs;
@@ -70,6 +71,8 @@ change the operational truth
 -> run Documentation Truth again on the merged main transition
 -> re-observe provider/runtime facts before reusing present-tense claims
 ```
+
+Goalfix/adaptive operating contracts are part of that truth surface. Changes to the canonical Goalfix workflow, adaptive kernel, portable `.ai`/`.claude` Goalfix skills, or Claude/Perplexity master execution overlays are classified as truth-governance and must update the structured Documentation Truth receipt plus applicable current-state documentation. Those contracts must preserve the verified target branch rather than assume `main`, authenticated Founder Final through checked-in authority, a final mutable provider/PR/base/head/diff/check/review reread before integration, browser-specific Playwright evidence, backend/provider-specific proof for non-browser paths, `MERGED_UNVERIFIED` until required runtime truth exists, and explicit separation between governance behavior and unimplemented `/goalfix/inspect` runtime/API/UI adoption.
 
 Default-suite test discovery has a bounded evidence claim: a baseline entry means the file is excluded from the default `npm test` suite, not that it never ran in every CI workflow. The base-bound ratchet cannot accept newly excluded candidate tests and requires stale debt entries to be removed.
 
@@ -160,8 +163,6 @@ contract-capable
 ```
 
 The founder-authenticated conveyor status may report `not-configured`, `ready-for-probe`, `enabled-misconfigured`, `invalid-provider-configuration`, `enabled-awaiting-proof`, or `enabled-live-verified`, including whether Buffer is ready for one controlled probe. The canonical conveyor reaches `enabled-live-verified` only when a retained activation-probe receipt matches the deployed exact `GIT_SHA`. If the runtime SHA changes, that receipt remains valid historical evidence but no longer authorizes a present-tense live claim; stale-head, missing runtime SHA, or unavailable receipt readback must remain non-live. Conveyor live readiness still does not prove Buffer scheduling, LinkedIn publication, or any terminal provider outcome.
-
-Founder-content orchestration readiness is a separate provider-proof surface from canonical n8n conveyor activation. It may report `enabled-live-verified` only when the transport is enabled and configured, the provider allowlist is valid, Buffer is enabled, and a proof explicitly bound to `buffer` carries a non-empty receipt ID, a valid observation timestamp, and `expectedHeadSha` exactly equal to deployed `GIT_SHA`. Missing, stale, unbound, incomplete, or provider-unverified proof remains non-live. A generic n8n activation-probe receipt does not satisfy this Buffer-specific boundary, and repository source does not claim that a live Buffer proof reader is wired yet.
 
 A platform-native draft is not proof that the provider adapter is live. n8n acceptance is not publication truth. Provider readback remains terminal external-state evidence.
 
@@ -277,6 +278,10 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full architecture.
 - [`CLAUDE.md`](CLAUDE.md) — Claude / Claude Code overlay
 - [`PERPLEXITY.md`](PERPLEXITY.md) — Perplexity overlay
 - [`.ai/skills/juss-flow-launch-loop/SKILL.md`](.ai/skills/juss-flow-launch-loop/SKILL.md) — bounded implementation/review/merge loop
+- [`.ai/skills/goalfix/SKILL.md`](.ai/skills/goalfix/SKILL.md) — portable Goalfix execution/governance contract
+- [`.claude/skills/goalfix/SKILL.md`](.claude/skills/goalfix/SKILL.md) — Claude Goalfix execution overlay
+- [`docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`](docs/GOALFIX_EXECUTION_WORKFLOW_V2.md) — canonical Goalfix execution order and merge-freshness contract
+- [`docs/FOUNDER_ADAPTIVE_KERNEL_V0.md`](docs/FOUNDER_ADAPTIVE_KERNEL_V0.md) — adaptive governance/source contract; not a claim of runtime `/goalfix/inspect` integration
 - [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md) — current repository integration authority
 - [`docs/TRUTH_DECAY_AUDIT.md`](docs/TRUTH_DECAY_AUDIT.md) — truth-aging / FutureYou-ME failure contract
 - [`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md`](docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md) — public truth and Sauce Guard boundary

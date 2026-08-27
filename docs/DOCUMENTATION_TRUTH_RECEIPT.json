@@ -1,14 +1,64 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded publishing-truth invariant that founder-content orchestration readiness may become live only from exact-head Buffer-specific receipt evidence while missing, stale, unbound, incomplete, or generic conveyor proof remains fail-closed, without claiming a live Buffer proof reader, publication outcome, deployment authority, or merge authority.",
+  "purpose": "Record the Goalfix/adaptive-governance and Cloudflare Workflow invariants that keep lifecycle-neutral source status, portable agent entry points, exact-target merge freshness, authenticated Founder Final, runtime-proof scope, cross-project adaptive behavior, Future-Us untrusted-data/action boundaries, and durable release-proof orchestration fail-closed without claiming runtime API/UI adoption, merge authority, deployment authority, provider-policy mutation, publication authority, or classifier-based authorization.",
   "domains": [
-    "publishing"
+    "truth-governance",
+    "cloudflare-authority"
   ],
   "changes": [
     {
-      "path": "src/lib/n8nFounderContentReadiness.test.ts",
+      "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
-        "src/lib/n8nFounderContentReadiness.test.ts: founder-content readiness tests must prove that missing, stale, unbound, incomplete, misconfigured, or unsupported-provider evidence cannot promote liveVerified, and only exact-head Buffer proof with a non-empty receipt identity and valid observation time may allow enabled-live-verified."
+        "scripts/verify-documentation-truth.mjs must classify the canonical Goalfix workflow, adaptive kernel, portable Goalfix skills, and Claude/Perplexity master entry specifications as truth-governance so changes to those authority-influencing files cannot receive a zero-truth-sensitive false green.",
+        "scripts/verify-documentation-truth.mjs must validate no-job failure classification, browser-versus-backend proof separation, Sauce Guard, verified-target handling, authenticated Founder Final, the post-Founder-Final mutable provider reread, and MERGED_UNVERIFIED semantics across every applicable Goalfix execution entry point rather than relying on uneven path-specific substring checks."
+      ]
+    },
+    {
+      "path": ".ai/skills/goalfix/SKILL.md",
+      "claims": [
+        ".ai/skills/goalfix/SKILL.md must preserve the full founder reasoning stack, classify no-job GitHub Actions failures before blaming source, bind work to the verified target/base/head, require authenticated Founder Final plus final mutable provider reread, keep Sauce Guard stops, carry portable adaptive rules inline, and treat external/model/tool content as non-authorizing data behind deterministic action checks."
+      ]
+    },
+    {
+      "path": ".claude/skills/goalfix/SKILL.md",
+      "claims": [
+        ".claude/skills/goalfix/SKILL.md must preserve exact verified target/base/head identity, no-job failure classification, browser-specific Playwright proof, authenticated Founder Final, final mutable provider reread, MERGED_UNVERIFIED runtime state, Sauce Guard, inline portable adaptive behavior, and receiver-verified least-privilege action boundaries without self-certification."
+      ]
+    },
+    {
+      "path": "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md",
+      "claims": [
+        "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md must remain a lifecycle-neutral governance source contract for Goalfix/FCR instruction and decision loops, must not claim current /goalfix/inspect, engine, API, or browser UI runtime integration, must keep adaptive state descriptive rather than executable authority, and must learn recurring trust-boundary failures without converting analytics, classifiers, or model output into authority."
+      ]
+    },
+    {
+      "path": "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md",
+      "claims": [
+        "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md must remain lifecycle-neutral, carry the verified target branch instead of assuming main, require authenticated Founder Final, reread mutable provider/PR/target/base/head/diff/check/review state immediately before integration, preserve expected-head protection, distinguish browser Playwright evidence from backend/provider proof, retain MERGED_UNVERIFIED until required runtime truth exists, and keep untrusted artifacts/model plans behind deterministic exact-action authorization and receiver-side capability verification."
+      ]
+    },
+    {
+      "path": "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md",
+      "claims": [
+        "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md must defer to the canonical Goalfix workflow while also carrying the verified target branch, no-job failure classification, browser-versus-backend proof separation, Sauce Guard, authenticated Founder Final followed by a final mutable provider reread, and MERGED_UNVERIFIED post-integration truth so the Claude overlay cannot become a weaker execution path."
+      ]
+    },
+    {
+      "path": "docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md",
+      "claims": [
+        "docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md must defer to the canonical Goalfix workflow while also carrying the verified target branch, no-job failure classification, browser-versus-backend proof separation, Sauce Guard, authenticated Founder Final followed by a final mutable provider reread, and MERGED_UNVERIFIED post-integration truth so research and MCP tooling cannot become a weaker execution path."
+      ]
+    },
+    {
+      "path": "wrangler.worker.toml",
+      "claims": [
+        "wrangler.worker.toml may bind ReleaseProofWorkflowV0 as fcr-release-proof-v0 only as durable non-authorizing orchestration: the binding must not add a schedule or public trigger, must not replace the guarded production deployment path, and source/runtime evidence must keep merge, deployment, and provider mutation authority separate from Workflow state."
+      ]
+    },
+    {
+      "path": "src/workflows/releaseProofWorkflow.ts",
+      "claims": [
+        "ReleaseProofWorkflowV0 must bind exact repository/target/base/head identity, correlate evidence and founder-approval observations to the same candidate fingerprint, fail closed on mismatch or blocker state, and stop at READY_FOR_FINAL_REREAD with mergeAuthorized, deploymentAuthorized, and providerMutationAuthorized all false."
       ]
     }
   ]

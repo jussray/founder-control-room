@@ -7,11 +7,10 @@ export default defineConfig({
     // bleed between test files.
     isolate: true,
     environment: 'node',
-    // Include both colocated .test.ts files and __tests__/**/*.test.ts files.
-    // Previously only discovered files under __tests__/ directories, leaving
-    // 38 colocated test files (97 tests) undiscovered. This pattern ensures
-    // all test files are discovered by npm test.
-    include: ['src/**/*.test.ts'],
+    // Include colocated and __tests__/ suites written in TypeScript or
+    // JavaScript. The discovery ratchet separately rejects other candidate
+    // test/spec suffixes unless they are exact-base debt.
+    include: ['src/**/*.test.{ts,js}'],
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],

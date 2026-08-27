@@ -230,7 +230,7 @@ For every truth-sensitive change to architecture, authority, publishing, provide
 7. run the same verifier on the merged-main transition; and
 8. if provider/runtime reality changes after merge, re-observe and repair the affected current-state doc before reusing its present-tense claim.
 
-A docs-only truth-sync merge closes an existing drift cycle. The post-merge verifier closes that transition; it does not create an infinite requirement to rewrite itself again.
+A docs-only truth-sync merge closes an existing drift cycle. The post-merge verifier closes the transition; it does not create an infinite requirement to rewrite itself again.
 
 Do not hard-code a durable “current main SHA” into prose. Exact SHAs belong in evidence/provenance; resolve current identity at use time.
 
@@ -306,6 +306,10 @@ Review is a fresh attack, not self-congratulation.
 For pull-request Quality Gate evidence, every job must checkout `github.event.pull_request.head.sha` and verify `git rev-parse HEAD` equals that expected head before running tests. A green workflow against GitHub's synthetic merge commit is useful merge-simulation evidence only and cannot be promoted to exact-head proof.
 
 Do not call author approval “independent review.” For canonical FCR merges, independent deterministic review attacks the patch first; the authenticated founder-final receipt supplies the separate final human authority for that exact candidate.
+
+A deterministic witness must be produced from provider-observed PR/base/head/diff state, published only through the repository provider's narrow App-backed witness capability, and then read back from the exact head with the provider-recorded App issuer equal to server-owned `GITHUB_APP_ID`. The local/development `GITHUB_TOKEN` fallback may support ordinary bounded repository access but must not mint deterministic review evidence. The receipt and Check Run remain proposal/evidence only. A candidate that changes the deterministic producer, gate, merge consumer, or trusted witness provider boundary must fail its own deterministic self-review and requires a separately explicit bootstrap/constitutional authority path.
+
+The executable witness ignition must run from exact current `main` through a trusted default-branch/server surface, never from candidate-controlled pull-request workflow code. Its dispatch workflow, runner, and credential-bearing invocation surface are part of the deterministic witness trust root; changing any of them must P1-block normal self-certification and require the separately explicit bootstrap/constitutional path.
 
 ## Merge gate
 
