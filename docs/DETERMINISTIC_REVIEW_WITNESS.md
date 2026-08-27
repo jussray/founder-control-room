@@ -28,6 +28,8 @@ The full review hash is load-bearing on readback, not audit decoration. `Determi
 
 Provider construction exposes witness publication only when `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` produce a repository-scoped GitHub App installation token. The local/development `GITHUB_TOKEN` fallback retains ordinary repository capability but cannot mint deterministic review evidence.
 
+Witness publication is retry-safe by **reconcile-before-create**. After rederiving the exact receipt and revalidating PR identity, the publisher reads exact-head verification signals before any provider write. If the trusted App already emitted the exact passed signal with the same full receipt fingerprint, that signal is re-used and no new Check Run is created. If the reconciliation read fails, no provider mutation occurs. This allows a retry after a previous post-write/readback interruption to converge on the already-created witness instead of blindly duplicating it.
+
 ## Trusted ignition
 
 Trusted ignition must execute from code that is already integrated and running as exact current FCR `main`. Candidate-controlled PR workflows, candidate preview deployments, stale production releases, and PAT-only environments are not trusted witness issuers.
@@ -40,13 +42,16 @@ The current founder-runtime ignition candidate adds `POST /review/deterministic-
 4. the caller supplies only a positive pull-request number;
 5. repository and provider identity are fixed in server-owned source;
 6. the running release must expose a full `GIT_SHA` and provider-resolved GitHub `main` must equal that exact SHA before publication;
-7. the existing producer/publisher derives PR/base/head/diff/verdict/hash/check/App identity and performs exact-head witness publication/readback;
-8. GitHub `main` is re-read after publication and must still equal the running `GIT_SHA`; and
-9. the response remains proposal-only with `mergeAuthorized: false` and `executionAuthorized: false`.
+7. the existing producer/publisher derives PR/base/head/diff/verdict/hash/check/App identity, reconciles an already-existing exact trusted witness before any create, and otherwise performs exact-head witness publication/readback;
+8. GitHub `main` is re-read after publication or reconciliation and must still equal the running `GIT_SHA`;
+9. the authenticated response returns the complete deterministic `IndependentReviewReceipt` needed by the canonical Founder Final consumer, plus bounded provider signal metadata; and
+10. the response and receipt remain proposal-only with `mergeAuthorized: false` and `executionAuthorized: false`.
 
-This exact-current-main check is load-bearing. It prevents a pull-request preview from using its candidate SHA to bootstrap its own trust-root change, and prevents an older deployed FCR release from minting current witness evidence with stale reviewer logic.
+Returning the complete receipt is a handoff, not an authority upgrade. Founder Final must still validate the receipt contents, exact policy/diff/base/head/author binding, the trusted App witness and full fingerprint, current provider state, and the founder's exact-candidate approval. A receipt or route response alone cannot authorize merge.
 
-A default-branch workflow could provide another trusted ignition surface only if it preserves the same invariants: exact current-main checkout, server-owned App credentials, PR-number-only selection, provider-derived identity, before/after mutable-main revalidation, retained evidence, and no merge authority.
+The exact-current-main check is load-bearing. It prevents a pull-request preview from using its candidate SHA to bootstrap its own trust-root change, and prevents an older deployed FCR release from minting current witness evidence with stale reviewer logic.
+
+A default-branch workflow could provide another trusted ignition surface only if it preserves the same invariants: exact current-main checkout, server-owned App credentials, PR-number-only selection, provider-derived identity, before/after mutable-main revalidation, retry-safe witness reconciliation, complete receipt retention, and no merge authority.
 
 A successful advisory test workflow or successful route source test proves source execution only. It does not itself emit the constitutional independent-review witness, satisfy founder-final authority, authorize merge, or prove that the exact merged release and GitHub App credentials are live in production.
 
