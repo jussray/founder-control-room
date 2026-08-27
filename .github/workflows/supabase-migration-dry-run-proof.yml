@@ -19,7 +19,7 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  EXPECTED_MAIN_SHA: b2b0c3d84a7cabc0ff664806e28d8919156627c7
+  EXPECTED_MAIN_SHA: 31f0fe133c23ed6decf70f0cba16e0364112227c
   EXPECTED_BRANCH: fix/proof-of-ship-migration-identity-main-20260809
 
 jobs:
