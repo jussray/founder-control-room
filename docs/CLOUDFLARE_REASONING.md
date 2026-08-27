@@ -203,6 +203,20 @@ For GitHub Actions, production promotion is recognized only for the manual `Depl
 
 This source membrane does not prove the current Cloudflare Workers Builds dashboard configuration, custom-domain routing, active deployment, or runtime SHA. Those remain separate provider/runtime readback gates.
 
+## Durable release-proof Workflow boundary
+
+`wrangler.worker.toml` declares one Cloudflare Workflows binding for the exported `ReleaseProofWorkflowV0` class:
+
+```text
+binding: RELEASE_PROOF_WORKFLOW
+name: fcr-release-proof-v0
+class: ReleaseProofWorkflowV0
+```
+
+This is durable orchestration, not release authority. No HTTP route, cron schedule, or other application trigger creates Workflow instances in this slice. The Workflow binds repository, target branch, exact base/head SHAs, optional PR identity, and a deterministic candidate fingerprint; waits for separately supplied exact evidence and founder-approval observations; rejects mismatched or blocked observations; and stops at `READY_FOR_FINAL_REREAD`.
+
+Its final receipt deliberately keeps `mergeAuthorized`, `deploymentAuthorized`, and `providerMutationAuthorized` false. A Workflow event or completed instance cannot replace authenticated Founder Final, the final mutable provider/PR reread, expected-head protection, or the existing guarded deployment path. Repository source proves only the intended class/binding contract. Cloudflare provider configuration, instance state, and runtime behavior require their own readback evidence.
+
 ## Verification
 
 ```bash

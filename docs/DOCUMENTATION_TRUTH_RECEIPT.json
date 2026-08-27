@@ -1,8 +1,9 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the Goalfix/adaptive-governance invariants and Documentation Truth registration that keep lifecycle-neutral source status, portable agent entry points, exact-target merge freshness, authenticated Founder Final, runtime-proof scope, cross-project adaptive behavior, and Future-Us untrusted-data/action boundaries fail-closed without claiming runtime API/UI adoption, merge authority, deployment authority, provider-policy mutation, publication authority, or classifier-based authorization.",
+  "purpose": "Record the Goalfix/adaptive-governance and Cloudflare Workflow invariants that keep lifecycle-neutral source status, portable agent entry points, exact-target merge freshness, authenticated Founder Final, runtime-proof scope, cross-project adaptive behavior, Future-Us untrusted-data/action boundaries, and durable release-proof orchestration fail-closed without claiming runtime API/UI adoption, merge authority, deployment authority, provider-policy mutation, publication authority, or classifier-based authorization.",
   "domains": [
-    "truth-governance"
+    "truth-governance",
+    "cloudflare-authority"
   ],
   "changes": [
     {
@@ -46,6 +47,18 @@
       "path": "docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md",
       "claims": [
         "docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md must defer to the canonical Goalfix workflow while also carrying the verified target branch, no-job failure classification, browser-versus-backend proof separation, Sauce Guard, authenticated Founder Final followed by a final mutable provider reread, and MERGED_UNVERIFIED post-integration truth so research and MCP tooling cannot become a weaker execution path."
+      ]
+    },
+    {
+      "path": "wrangler.worker.toml",
+      "claims": [
+        "wrangler.worker.toml may bind ReleaseProofWorkflowV0 as fcr-release-proof-v0 only as durable non-authorizing orchestration: the binding must not add a schedule or public trigger, must not replace the guarded production deployment path, and source/runtime evidence must keep merge, deployment, and provider mutation authority separate from Workflow state."
+      ]
+    },
+    {
+      "path": "src/workflows/releaseProofWorkflow.ts",
+      "claims": [
+        "ReleaseProofWorkflowV0 must bind exact repository/target/base/head identity, correlate evidence and founder-approval observations to the same candidate fingerprint, fail closed on mismatch or blocker state, and stop at READY_FOR_FINAL_REREAD with mergeAuthorized, deploymentAuthorized, and providerMutationAuthorized all false."
       ]
     }
   ]
