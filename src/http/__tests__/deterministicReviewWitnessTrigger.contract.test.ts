@@ -34,13 +34,14 @@ describe('deterministic review witness trigger contract', () => {
     expect(routeSource).toContain('requires the exact current main runtime');
   });
 
-  it('accepts only a positive PR number and returns non-authorizing witness metadata', () => {
+  it('returns the complete deterministic receipt plus non-authorizing witness metadata', () => {
     expect(routeSource).toContain('Number(req.params.pullRequestNumber)');
     expect(routeSource).toContain('Number.isInteger(pullRequestNumber)');
     expect(routeSource).toContain('pullRequestNumber <= 0');
     expect(routeSource).toContain('proposalOnly: true');
     expect(routeSource).toContain('mergeAuthorized: false');
     expect(routeSource).toContain('executionAuthorized: false');
+    expect(routeSource).toContain('receipt: production.receipt');
     expect(routeSource).toContain('reviewHash: production.receipt.reviewHash');
     expect(routeSource).toContain('evidenceFingerprint: signal.evidenceFingerprint ?? null');
     expect(routeSource).toContain('issuer: signal.issuer ?? null');
