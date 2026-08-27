@@ -24,6 +24,10 @@ export interface FounderMergePermissionSource {
   expiresAt: string;
 }
 
+function canonicalText(value: string): string {
+  return value.trim();
+}
+
 export function founderMergeActionDigest(input: {
   repo: string;
   pullRequestNumber: number;
@@ -32,10 +36,10 @@ export function founderMergeActionDigest(input: {
 }): `sha256:${string}` {
   const payload = JSON.stringify({
     action: 'merge',
-    repo: input.repo.toLowerCase(),
+    repo: canonicalText(input.repo).toLowerCase(),
     pullRequestNumber: input.pullRequestNumber,
-    headSha: input.headSha.toLowerCase(),
-    baseSha: input.baseSha.toLowerCase(),
+    headSha: canonicalText(input.headSha).toLowerCase(),
+    baseSha: canonicalText(input.baseSha).toLowerCase(),
   });
   return `sha256:${createHash('sha256').update(payload, 'utf8').digest('hex')}`;
 }
@@ -44,13 +48,19 @@ export function issueFounderMergePermissionReceipt(
   source: FounderMergePermissionSource,
   checkedAt = new Date().toISOString(),
 ): FounderPermissionReceipt {
-  if (!source.permissionId.trim()) throw new Error('permission id is required');
-  if (!source.decisionId.trim()) throw new Error('founder decision id is required');
-  if (!OWNED_REPO.test(source.repo)) throw new Error('owned repository identity is required');
+  const permissionId = canonicalText(source.permissionId);
+  const decisionId = canonicalText(source.decisionId);
+  const repo = canonicalText(source.repo).toLowerCase();
+  const headSha = canonicalText(source.headSha).toLowerCase();
+  const baseSha = canonicalText(source.baseSha).toLowerCase();
+
+  if (!permissionId) throw new Error('permission id is required');
+  if (!decisionId) throw new Error('founder decision id is required');
+  if (!OWNED_REPO.test(repo)) throw new Error('owned repository identity is required');
   if (!Number.isInteger(source.pullRequestNumber) || source.pullRequestNumber <= 0) {
     throw new Error('pull request number must be a positive integer');
   }
-  if (!FULL_SHA.test(source.headSha) || !FULL_SHA.test(source.baseSha)) {
+  if (!FULL_SHA.test(headSha) || !FULL_SHA.test(baseSha)) {
     throw new Error('exact head and base SHAs are required');
   }
 
@@ -61,15 +71,15 @@ export function issueFounderMergePermissionReceipt(
     throw new Error('permission timestamps must be valid');
   }
   if (expiresAtMs <= approvedAtMs) throw new Error('permission expiry must follow approval time');
+  if (checkedAtMs < approvedAtMs || checkedAtMs >= expiresAtMs) {
+    throw new Error('permission check time must be within the approval window');
+  }
 
-  const repo = source.repo.toLowerCase();
-  const headSha = source.headSha.toLowerCase();
-  const baseSha = source.baseSha.toLowerCase();
   const actionTarget = `${repo}#${source.pullRequestNumber}`;
   const receipt: AuthorityReceiptV2 & FounderPermissionReceipt = {
     contract: AUTHORITY_RECEIPT_V2_CONTRACT,
     permissionContract: FOUNDER_PERMISSION_RECEIPT_CONTRACT,
-    id: source.permissionId,
+    id: permissionId,
     subject: {
       repo,
       headSha,
@@ -88,13 +98,13 @@ export function issueFounderMergePermissionReceipt(
       }),
     },
     evidence: [
-      { ref: `fcr:founder-decision:${source.decisionId}`, class: 'human-approval' },
+      { ref: `fcr:founder-decision:${decisionId}`, class: 'human-approval' },
       { ref: `github:commit:${headSha}`, class: 'repository' },
       { ref: `github:pull-request:${repo}#${source.pullRequestNumber}`, class: 'provider' },
     ],
-    issuedAt: source.approvedAt,
-    checkedAt,
-    expiresAt: source.expiresAt,
+    issuedAt: new Date(approvedAtMs).toISOString(),
+    checkedAt: new Date(checkedAtMs).toISOString(),
+    expiresAt: new Date(expiresAtMs).toISOString(),
     status: 'active',
   };
 

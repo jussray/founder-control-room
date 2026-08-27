@@ -17,6 +17,8 @@ export type FounderMergeExecutionTarget = Readonly<{
 export type FounderPermissionExecutionBinding = Readonly<{
   receiptId: string;
   founderDecisionRef: string;
+  repositoryEvidenceRef: string;
+  providerEvidenceRef: string;
   repo: string;
   pullRequestNumber: number;
   headSha: string;
@@ -34,7 +36,7 @@ export type FounderPermissionExecutionBindingFailure =
   | 'scope_mismatch'
   | 'action_target_mismatch'
   | 'action_digest_mismatch'
-  | 'founder_decision_evidence_missing';
+  | 'evidence_set_mismatch';
 
 export type FounderPermissionExecutionBindingResult =
   | { ok: true; binding: FounderPermissionExecutionBinding }
@@ -103,17 +105,33 @@ export function bindFounderPermissionToMergeExecution(
     return { ok: false, reason: 'action_digest_mismatch' };
   }
 
-  const founderDecisionEvidence = receipt.evidence.find((item) =>
-    item.class === 'human-approval' && item.ref.startsWith('fcr:founder-decision:'));
-  if (!founderDecisionEvidence) {
-    return { ok: false, reason: 'founder_decision_evidence_missing' };
+  const expectedDecisionPrefix = 'fcr:founder-decision:';
+  const expectedRepositoryEvidence = `github:commit:${expected.headSha}`;
+  const expectedProviderEvidence = `github:pull-request:${expected.repo}#${expected.pullRequestNumber}`;
+  const humanEvidence = receipt.evidence.filter((item) => item.class === 'human-approval');
+  const repositoryEvidence = receipt.evidence.filter((item) => item.class === 'repository');
+  const providerEvidence = receipt.evidence.filter((item) => item.class === 'provider');
+
+  if (
+    receipt.evidence.length !== 3
+    || humanEvidence.length !== 1
+    || repositoryEvidence.length !== 1
+    || providerEvidence.length !== 1
+    || !humanEvidence[0]!.ref.startsWith(expectedDecisionPrefix)
+    || humanEvidence[0]!.ref.length <= expectedDecisionPrefix.length
+    || repositoryEvidence[0]!.ref.toLowerCase() !== expectedRepositoryEvidence
+    || providerEvidence[0]!.ref.toLowerCase() !== expectedProviderEvidence
+  ) {
+    return { ok: false, reason: 'evidence_set_mismatch' };
   }
 
   return {
     ok: true,
     binding: Object.freeze({
       receiptId: receipt.id,
-      founderDecisionRef: founderDecisionEvidence.ref,
+      founderDecisionRef: humanEvidence[0]!.ref,
+      repositoryEvidenceRef: repositoryEvidence[0]!.ref,
+      providerEvidenceRef: providerEvidence[0]!.ref,
       repo: expected.repo,
       pullRequestNumber: expected.pullRequestNumber,
       headSha: expected.headSha,

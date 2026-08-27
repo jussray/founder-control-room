@@ -33,13 +33,15 @@ function receipt() {
 const NOW = new Date('2026-08-26T23:02:00.000Z');
 
 describe('founder permission execution binding', () => {
-  it('binds one founder decision to exactly one merge candidate', () => {
+  it('binds one founder decision and exact provenance set to one merge candidate', () => {
     const result = bindFounderPermissionToMergeExecution(receipt(), target(), NOW);
     expect(result).toEqual({
       ok: true,
       binding: expect.objectContaining({
         receiptId: 'founder-permission:proof-1',
         founderDecisionRef: 'fcr:founder-decision:proof-1',
+        repositoryEvidenceRef: `github:commit:${HEAD}`,
+        providerEvidenceRef: `github:pull-request:${REPO}#${PR}`,
         repo: REPO,
         pullRequestNumber: PR,
         headSha: HEAD,
@@ -89,26 +91,57 @@ describe('founder permission execution binding', () => {
       .toMatchObject({ ok: false, reason: 'scope_mismatch' });
   });
 
-  it('rejects action digest mutation and missing founder-decision provenance', () => {
+  it('rejects action digest mutation', () => {
+    const original = receipt();
     const changedDigest = {
-      ...receipt(),
+      ...original,
       action: {
-        ...receipt().action,
+        ...original.action,
         digest: `sha256:${'0'.repeat(64)}` as `sha256:${string}`,
       },
     };
     expect(bindFounderPermissionToMergeExecution(changedDigest, target(), NOW))
       .toMatchObject({ ok: false, reason: 'action_digest_mismatch' });
+  });
+
+  it('rejects stale, extra, missing, or relabeled provenance evidence', () => {
+    const original = receipt();
+    const staleCommit = {
+      ...original,
+      evidence: original.evidence.map((item) =>
+        item.class === 'repository'
+          ? { ...item, ref: `github:commit:${'c'.repeat(40)}` }
+          : item),
+    };
+    expect(bindFounderPermissionToMergeExecution(staleCommit, target(), NOW))
+      .toMatchObject({ ok: false, reason: 'evidence_set_mismatch' });
+
+    const stalePr = {
+      ...original,
+      evidence: original.evidence.map((item) =>
+        item.class === 'provider'
+          ? { ...item, ref: `github:pull-request:${REPO}#${PR + 1}` }
+          : item),
+    };
+    expect(bindFounderPermissionToMergeExecution(stalePr, target(), NOW))
+      .toMatchObject({ ok: false, reason: 'evidence_set_mismatch' });
+
+    const extraEvidence = {
+      ...original,
+      evidence: [...original.evidence, { class: 'ci' as const, ref: `github:check:${HEAD}` }],
+    };
+    expect(bindFounderPermissionToMergeExecution(extraEvidence, target(), NOW))
+      .toMatchObject({ ok: false, reason: 'evidence_set_mismatch' });
 
     const missingDecision = {
-      ...receipt(),
-      evidence: receipt().evidence.map((item) =>
+      ...original,
+      evidence: original.evidence.map((item) =>
         item.class === 'human-approval'
           ? { ...item, ref: 'human:approval:unbound' }
           : item),
     };
     expect(bindFounderPermissionToMergeExecution(missingDecision, target(), NOW))
-      .toMatchObject({ ok: false, reason: 'founder_decision_evidence_missing' });
+      .toMatchObject({ ok: false, reason: 'evidence_set_mismatch' });
   });
 
   it('rejects malformed execution targets before reading them as authority', () => {

@@ -36,10 +36,11 @@ describe('FounderPermissionReceipt issuer', () => {
     expect(receipt.action.type).toBe('merge');
     expect(receipt.action.target).toBe('jussray/founder-control-room#999');
     expect(receipt.action.digest).toBe(founderMergeActionDigest(source()));
-    expect(receipt.evidence).toContainEqual({
-      ref: 'fcr:founder-decision:decision-1',
-      class: 'human-approval',
-    });
+    expect(receipt.evidence).toEqual([
+      { ref: 'fcr:founder-decision:decision-1', class: 'human-approval' },
+      { ref: `github:commit:${HEAD}`, class: 'repository' },
+      { ref: 'github:pull-request:jussray/founder-control-room#999', class: 'provider' },
+    ]);
     expect(validateFounderPermissionReceipt(receipt, new Date('2026-08-26T23:02:00.000Z')).ok).toBe(true);
   });
 
@@ -53,15 +54,28 @@ describe('FounderPermissionReceipt issuer', () => {
     expect(first.action.digest).not.toBe(second.action.digest);
   });
 
-  it('canonicalizes repository and SHA casing into the receipt digest', () => {
-    const canonical = founderMergeActionDigest(source());
-    const mixed = founderMergeActionDigest({
+  it('canonicalizes caller representation without changing authority identity', () => {
+    const receipt = issueFounderMergePermissionReceipt({
       ...source(),
-      repo: 'JUSSRAY/FOUNDER-CONTROL-ROOM'.toLowerCase(),
-      headSha: HEAD.toUpperCase(),
-      baseSha: BASE.toUpperCase(),
+      permissionId: ' permission-1 ',
+      decisionId: ' decision-1 ',
+      repo: ' JUSSRAY/FOUNDER-CONTROL-ROOM ',
+      headSha: ` ${HEAD.toUpperCase()} `,
+      baseSha: ` ${BASE.toUpperCase()} `,
+      approvedAt: '2026-08-26T19:00:00-04:00',
+      expiresAt: '2026-08-26T19:15:00-04:00',
+    }, '2026-08-26T19:01:00-04:00');
+
+    expect(receipt.id).toBe('permission-1');
+    expect(receipt.subject).toEqual({
+      repo: 'jussray/founder-control-room',
+      headSha: HEAD,
+      baseSha: BASE,
     });
-    expect(mixed).toBe(canonical);
+    expect(receipt.issuedAt).toBe('2026-08-26T23:00:00.000Z');
+    expect(receipt.checkedAt).toBe('2026-08-26T23:01:00.000Z');
+    expect(receipt.expiresAt).toBe('2026-08-26T23:15:00.000Z');
+    expect(receipt.action.digest).toBe(founderMergeActionDigest(source()));
   });
 
   it('rejects identities outside the owned exact merge boundary', () => {
@@ -73,7 +87,7 @@ describe('FounderPermissionReceipt issuer', () => {
       .toThrow('pull request number must be a positive integer');
   });
 
-  it('rejects malformed or inverted time bounds', () => {
+  it('rejects malformed, inverted, early, or expired check times', () => {
     expect(() => issueFounderMergePermissionReceipt({ ...source(), approvedAt: 'nope' }))
       .toThrow('permission timestamps must be valid');
     expect(() => issueFounderMergePermissionReceipt({
@@ -81,5 +95,9 @@ describe('FounderPermissionReceipt issuer', () => {
       expiresAt: '2026-08-26T22:59:59.000Z',
     }))
       .toThrow('permission expiry must follow approval time');
+    expect(() => issueFounderMergePermissionReceipt(source(), '2026-08-26T22:59:59.000Z'))
+      .toThrow('permission check time must be within the approval window');
+    expect(() => issueFounderMergePermissionReceipt(source(), '2026-08-26T23:15:00.000Z'))
+      .toThrow('permission check time must be within the approval window');
   });
 });
