@@ -1,4 +1,4 @@
-name: Supabase Migration Dry Run Proof
+name: Supabase Migration Candidate Proof
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: supabase-migration-dry-run-proof-${{ github.ref }}
+  group: supabase-migration-candidate-proof-${{ github.ref }}
   cancel-in-progress: false
 
 env:
@@ -18,11 +18,10 @@ env:
   EXPECTED_BRANCH: fix/proof-of-ship-migration-identity-main-20260809
 
 jobs:
-  dry-run-proof:
-    name: Supabase exact-head dry run
+  candidate-proof:
+    name: Supabase secretless exact-head candidate proof
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: production
+    timeout-minutes: 10
     steps:
       - name: Check out exact pushed head
         uses: actions/checkout@v4
@@ -64,104 +63,25 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Verify migration ledger regression contract
-        run: npx vitest run src/lib/__tests__/productionMigrationLedger.contract.test.ts
+        run: npx vitest run src/lib/__tests__/productionMigrationLedger.contract.test.ts src/lib/__tests__/migrationSecurityReconciliation.contract.test.ts
 
-      - uses: supabase/setup-cli@v2
-        with:
-          version: 2.101.0
-
-      - name: Validate dry-run configuration
+      - name: Record immutable local migration manifest
         shell: bash
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: |
-          set -euo pipefail
-
-          if [[ -z "${SUPABASE_DB_URL:-}" ]]; then
-            echo "::error title=Missing Supabase database URL::Set SUPABASE_DB_URL in the GitHub production environment before running migration proof."
-            exit 1
-          fi
-
-          SUPABASE_DB_URL="$SUPABASE_DB_URL" python3 - <<'PY'
-          import os
-          from urllib.parse import urlparse
-
-          raw = os.environ['SUPABASE_DB_URL']
-          errors = []
-
-          # Fail closed on documentation/template placeholders without printing
-          # the credential or any of its components.
-          if '<' in raw or '>' in raw:
-              errors.append('SUPABASE_DB_URL still contains a placeholder token; replace it with the real connection-string value')
-
-          try:
-              parsed = urlparse(raw)
-          except ValueError:
-              parsed = None
-              errors.append('SUPABASE_DB_URL is not a parseable Postgres URL')
-
-          if parsed is not None:
-              if parsed.scheme not in {'postgres', 'postgresql'}:
-                  errors.append('SUPABASE_DB_URL must use the postgres or postgresql scheme')
-              if not parsed.hostname:
-                  errors.append('SUPABASE_DB_URL must include a database hostname')
-              if not parsed.username:
-                  errors.append('SUPABASE_DB_URL must include a database username')
-              if parsed.password is None or parsed.password == '':
-                  errors.append('SUPABASE_DB_URL must include the database password')
-              if parsed.path.rstrip('/') != '/postgres':
-                  errors.append('SUPABASE_DB_URL must target the postgres database')
-
-              try:
-                  port = parsed.port
-              except ValueError:
-                  errors.append('SUPABASE_DB_URL contains an invalid port')
-                  port = None
-
-              if port != 5432:
-                  errors.append('SUPABASE_DB_URL must use port 5432 for migration sessions')
-
-              if parsed.hostname and parsed.hostname.startswith('db.') and parsed.hostname.endswith('.supabase.co'):
-                  print(
-                      '::warning title=Direct Supabase endpoint detected::'
-                      'GitHub-hosted runners may require IPv4 support. Prefer the project Session Pooler connection string unless direct connectivity is known to work.'
-                  )
-
-          if errors:
-              for error in dict.fromkeys(errors):
-                  print(f'::error title=Invalid Supabase database URL::{error}')
-              raise SystemExit(1)
-
-          print('Supabase dry-run configuration is present and structurally valid.')
-          PY
-
-          supabase --version
-
-      - name: Capture preflight migration ledger
-        shell: bash
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-          REMOTE_MIGRATION_LIST_PATH: test-results/migration-dry-run-ledger.txt
-          MIGRATION_LEDGER_RECEIPT_PATH: test-results/migration-dry-run-ledger.json
-          MIGRATION_LEDGER_PHASE: preflight
-          REQUIRED_MIGRATION_VERSIONS: 20260723000000,20260803011000
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           mkdir -p test-results
-          supabase migration list --db-url "$SUPABASE_DB_URL" | tee "$REMOTE_MIGRATION_LIST_PATH"
-          node scripts/verify-production-migration-ledger.mjs
-
-      - name: Run non-mutating Supabase migration dry run
-        shell: bash
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: |
-          set -euo pipefail
-          supabase db push \
-            --dry-run \
-            --include-all \
-            --db-url "$SUPABASE_DB_URL" \
-            | tee test-results/supabase-db-push-dry-run.txt
+          find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print0 \
+            | sort -z \
+            | xargs -0 sha256sum \
+            > test-results/supabase-migration-candidate-sha256.txt
+          {
+            echo "candidate_head=$EXPECTED_HEAD_SHA"
+            echo "base_main=$EXPECTED_MAIN_SHA"
+            echo "credentialed_database_query=false"
+            echo "production_secret_access=false"
+          } > test-results/supabase-migration-candidate-receipt.txt
 
       - name: Reverify exact candidate and unchanged main
         shell: bash
@@ -183,25 +103,23 @@ jobs:
           EXPECTED_HEAD_SHA: ${{ github.sha }}
         run: |
           {
-            echo "## Supabase migration dry-run proof"
+            echo "## Supabase migration candidate proof"
             echo
             echo "- Candidate head: \`$EXPECTED_HEAD_SHA\`"
             echo "- Required base main: \`$EXPECTED_MAIN_SHA\`"
-            echo "- CLI: \`supabase/setup-cli@v2\` pinned to \`2.101.0\`"
-            echo "- Command: \`supabase db push --dry-run --include-all\`"
-            echo "- Mutation command present: no"
-            echo "- Cloudflare deploy present: no"
-            echo "- Production environment used only to read the existing database URL for dry-run proof."
+            echo "- Production environment requested: no"
+            echo "- Production secrets requested: no"
+            echo "- Database query or mutation command present: no"
+            echo "- Credentialed migration list/dry-run remains a trusted default-branch/deployment authority step, not branch-controlled proof."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload dry-run receipts
+      - name: Upload candidate receipts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: supabase-migration-dry-run-${{ github.sha }}
+          name: supabase-migration-candidate-${{ github.sha }}
           path: |
-            test-results/migration-dry-run-ledger.txt
-            test-results/migration-dry-run-ledger.json
-            test-results/supabase-db-push-dry-run.txt
-          if-no-files-found: warn
+            test-results/supabase-migration-candidate-sha256.txt
+            test-results/supabase-migration-candidate-receipt.txt
+          if-no-files-found: error
           retention-days: 30
