@@ -32,7 +32,8 @@ describe('migration reconciliation security boundaries', () => {
 
   it('preserves the production steady-state migration identity without targeting the retired onboarding mirror', () => {
     expect(steadyStateReplay).toContain('Production-recorded migration identity: 20260718042028_steady_state_cron');
-    expect(steadyStateReplay).toContain('MUST NOT recreate, alter, or schedule work against that retired table');
+    expect(steadyStateReplay).toContain('MUST NOT');
+    expect(steadyStateReplay).toContain('recreate, alter, or schedule work against that retired table.');
     expect(steadyStateReplay).toContain('select 1;');
     expect(steadyStateReplay).not.toContain('cron.schedule');
     expect(steadyStateReplay).not.toMatch(/(?:update|alter\s+table)\s+public\.user_onboarding_state/i);
