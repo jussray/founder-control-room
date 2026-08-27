@@ -27,6 +27,15 @@ command = "node scripts/verify-worker-build-authority.mjs"
 [observability]
 enabled = true
 
+# Durable release-proof orchestration only. No route creates instances yet,
+# and the Workflow receipt explicitly grants no merge, deploy, or provider
+# mutation authority. A later trigger must use the existing FCR authority
+# membrane and preserve exact candidate/evidence fingerprints.
+[[workflows]]
+binding = "RELEASE_PROOF_WORKFLOW"
+name = "fcr-release-proof-v0"
+class_name = "ReleaseProofWorkflowV0"
+
 # Outbound transactional email capability. This binding alone sends nothing;
 # application code must explicitly invoke it. Keep the provider boundary
 # project-scoped: FCR code uses FCR_EMAIL and may send only from the checked-in
