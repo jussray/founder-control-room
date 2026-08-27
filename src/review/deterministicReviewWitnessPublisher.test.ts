@@ -108,6 +108,26 @@ describe("deterministic review witness publisher", () => {
     expect(result.production.receipt.executionAuthorized).toBe(false);
   });
 
+  it("reconciles an existing trusted exact witness before creating another Check Run", async () => {
+    const { provider, publish } = providerFor();
+
+    const first = await publishDeterministicReviewWitness({
+      provider,
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    });
+    const second = await publishDeterministicReviewWitness({
+      provider,
+      projectId: "founder-control-room",
+      pullRequestNumber: 706,
+    });
+
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(second.production.receipt.reviewHash).toBe(first.production.receipt.reviewHash);
+    expect(second.signal.evidenceFingerprint).toBe(first.production.receipt.reviewHash);
+    expect(second.signal.issuer?.id).toBe(TRUSTED_APP_ID);
+  });
+
   it("fails closed when the repository provider has no App witness capability", async () => {
     const { provider, publish } = providerFor({ publicationAvailable: false });
 
