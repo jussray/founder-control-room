@@ -1,47 +1,46 @@
 {
-  "version": 2,
-  "status": "implemented-awaiting-live-provider-and-ingress-proof",
+  "version": 3,
+  "status": "draft-only-source-enforced-awaiting-live-drafts-proof",
   "provider": "buffer",
   "zapier": {
     "action": "buffer_add_to_queue",
-    "requiredMethod": "schedule",
+    "requiredMethod": "draft",
     "allowedMethods": [
-      "schedule"
+      "draft"
     ],
     "rejectedMethods": [
-      "draft",
       "queue",
+      "schedule",
       "publish",
       "share_next",
       "share_now",
       "schedule_draft"
     ],
-    "mappingComment": "method: schedule # exact live option and date-field mapping must be captured in the controlled Zap proof"
+    "mappingComment": "method: draft # required; never rely on Buffer default"
   },
   "api": {
     "mutation": "createPost",
     "required": {
-      "sharingMode": "customScheduled",
-      "dueAtSource": "scheduled_at",
-      "saveToDraft": false
+      "sharingMode": "addToQueue",
+      "dueAtSource": null,
+      "saveToDraft": true
     }
   },
   "reviewWindow": {
-    "minutes": 20,
+    "minutes": 0,
     "startsFrom": "generated_at",
     "generatedAtMaximumAgeMinutes": 5,
-    "fireTimeOwnedByFirewall": true,
-    "noReplyBehavior": "publish_by_existing_buffer_schedule",
+    "fireTimeOwnedByFirewall": false,
+    "noReplyBehavior": "remain_draft_until_explicit_founder_action",
     "shareNowAllowed": false
   },
   "notification": {
     "provider": "gmail",
-    "required": true,
-    "mode": "one_campaign_digest_for_up_to_three_posts",
+    "required": false,
+    "mode": "optional_review_digest",
     "requiredFields": [
       "caption",
       "channel",
-      "fire_time",
       "buffer_post_id",
       "review_token",
       "reply_context_id",
@@ -49,7 +48,7 @@
       "reply_to",
       "gmail_thread_id"
     ],
-    "failurePolicy": "cancel_scheduled_batch",
+    "failurePolicy": "retain_draft",
     "replyCommands": [
       "cancel all",
       "<channel>: cancel",
@@ -59,28 +58,26 @@
       "founder_sender",
       "reply_to",
       "reply_context_id",
-      "review_token",
-      "review_deadline"
+      "review_token"
     ],
     "evidenceOnlyFields": [
       "gmail_thread_id"
     ],
     "replyIdentityPolicy": "exact_founder_sender_private_recipient_and_uuid_review_context",
     "replyParsingPolicy": "exactly_one_unquoted_command_on_first_nonempty_line",
-    "quotedHistoryPolicy": "ignore_only_after_valid_command_boundary",
     "ambiguousReplyPolicy": "reject_multiple_unquoted_command_lines",
     "editPolicy": "regenerate_and_revalidate_before_buffer_update",
     "replyIngress": {
-      "requiredLatencyClass": "instant_private_ingress",
+      "requiredLatencyClass": "not_required_for_draft_only",
       "gmailPollingAllowed": false,
-      "preferredImplementation": "cloudflare_email_routing_worker",
-      "replyToMode": "private_domain_address_bound_to_uuid_review_context",
-      "reason": "a 15-minute polling trigger cannot reliably honor commands throughout a 20-minute review window"
+      "preferredImplementation": "buffer_drafts_human_review",
+      "replyToMode": "optional_private_review_context",
+      "reason": "draft-only mode has no automatic publication deadline"
     }
   },
   "authority": {
-    "publishAllowed": true,
-    "schedulePolicyId": "buffer-20-minute-review-v1",
+    "publishAllowed": false,
+    "schedulePolicyId": "buffer-draft-review-v1",
     "requiredAuthorizationMode": "standing-policy",
     "requiresRuntimeMintedReceipt": true,
     "receiptFormat": "standing-policy:<grantId>:<invocationId>",
@@ -209,8 +206,7 @@
     ],
     "requiredCapabilities": [
       "webhook_trigger",
-      "multi_step_workflow_or_backend_orchestration",
-      "instant_private_reply_ingress"
+      "multi_step_workflow_or_backend_orchestration"
     ],
     "freeTwoStepZapAloneSufficient": false,
     "gmailPollingTriggerAcceptedForDeadlineCommands": false,
