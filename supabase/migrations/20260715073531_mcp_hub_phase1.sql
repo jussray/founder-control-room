@@ -4,8 +4,8 @@
 -- provider secrets are stored in these tables.
 
 -- Register only active portfolio repositories. Slugs match the existing live
--- Control Room project registry so this migration updates canonical rows rather
--- than creating duplicate project identities and splitting evidence provenance.
+-- Control Room project registry. Existing rows are preserved exactly because
+-- this migration can be applied late after newer production identity repairs.
 insert into projects (
   slug, name, repo_provider, repo_identifier, stack, status, risk_level
 )
@@ -18,14 +18,7 @@ values
   ('untold-stories', 'Untold Stories Storefront', 'github', 'jussray/untold-stories-storefront', 'shopify hydrogen', 'active', 'high'),
   ('founder-control-room', 'Founder Control Room', 'github', 'jussray/founder-control-room', 'typescript + express + cloudflare + supabase', 'active', 'high'),
   ('promptos', 'PromptOS', 'github', 'jussray/promptos', 'provider-neutral prompt registry', 'active', 'medium')
-on conflict (slug) do update set
-  name = excluded.name,
-  repo_provider = excluded.repo_provider,
-  repo_identifier = excluded.repo_identifier,
-  stack = excluded.stack,
-  status = excluded.status,
-  risk_level = excluded.risk_level,
-  updated_at = now();
+on conflict (slug) do nothing;
 
 create table if not exists mcp_servers (
   id text primary key,
