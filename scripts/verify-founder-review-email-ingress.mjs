@@ -31,8 +31,8 @@ const [
   read('src/founderSignalEmailIngress/reviewExecution.ts'),
   read('src/http/routes/founderSignalReviewEmailIngress.ts'),
   read('src/http/routes/founderSignalReviewContexts.ts'),
-  read('supabase/migrations/20260802224500_founder_signal_review_email_receipts.sql'),
-  read('supabase/migrations/20260803030000_harden_founder_signal_review_email_receipts.sql'),
+  read('supabase/migrations/20260811004830_founder_signal_review_email_receipts.sql'),
+  read('supabase/migrations/20260811004844_harden_founder_signal_review_email_receipts.sql'),
   read('supabase/migrations/20260812004000_founder_signal_review_execution_bridge.sql'),
   read('wrangler.email.toml'),
   read('wrangler.worker.toml'),
@@ -293,7 +293,7 @@ if (!apiManifest.includes('"FOUNDER_REVIEW_EMAIL_INGRESS_SECRET"')) {
 if (/FOUNDER_REVIEW_EMAIL_INGRESS_SECRET\s*=/.test(apiManifest)) {
   fail('api Worker manifest must not contain the ingress secret value');
 }
-if (!workflow.includes('20260803030000_harden_founder_signal_review_email_receipts.sql')) {
+if (!workflow.includes('20260811004844_harden_founder_signal_review_email_receipts.sql')) {
   fail('focused workflow must run when the forward hardening migration changes');
 }
 if (!workflow.includes('20260812004000_founder_signal_review_execution_bridge.sql')) {

@@ -6,15 +6,18 @@ on:
       - 'config/buffer-provider-contract.json'
       - 'config/zapier-task-budget.json'
       - 'docs/founder-signal-engine/day3-buffer-content-boundary.md'
+      - 'docs/founder-signal-engine/buffer-attack-ten.md'
       - 'docs/founder-signal-engine/auto-distribution-grant-v1.md'
       - 'docs/founder-signal-engine/claude-zapier-operator.md'
       - 'docs/founder-signal-engine/remote-mcp-bridge.md'
       - '.ai/skills/claude-zapier-founder-operator/SKILL.md'
       - 'scripts/verify-zapier-task-budget.mjs'
       - 'test/ai-company-parity.test.ts'
+      - 'tools/zapier/buffer-attack-ten.cjs'
       - 'tools/zapier/buffer-content-firewall.cjs'
       - 'tools/zapier/buffer-review-window.cjs'
       - 'tools/zapier/social-attribution-readback.cjs'
+      - 'tools/zapier/test-buffer-attack-ten.cjs'
       - 'tools/zapier/test-buffer-content-firewall.cjs'
       - 'tools/zapier/test-buffer-review-window.cjs'
       - 'tools/zapier/test-buffer-provider-contract.cjs'
@@ -55,6 +58,9 @@ jobs:
 
       - name: Verify executable Buffer review-window contract
         run: npm run verify:buffer-content
+
+      - name: Verify Buffer Attack Ten release contract
+        run: node tools/zapier/test-buffer-attack-ten.cjs
 
       - name: Verify social attribution readback truth boundary
         run: node tools/zapier/test-social-attribution-readback.cjs
