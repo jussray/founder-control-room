@@ -16,6 +16,7 @@ describe('migration reconciliation security boundaries', () => {
     expect(mcpHubPhase1).toContain("('juss-beautiful-hair-private', 'Juss Beautiful Hair Private Operations', 'github', 'jussray/jbh-private'");
     expect(mcpHubPhase1).not.toContain("('jbh-private',");
     expect((mcpHubPhase1.match(/'juss-beautiful-hair-private'/g) ?? []).length).toBeGreaterThanOrEqual(3);
+    expect(mcpHubPhase1).toContain('on conflict (slug) do nothing;');
   });
 
   it('preserves the production onboarding migration identity without recreating the cross-project mirror', () => {
