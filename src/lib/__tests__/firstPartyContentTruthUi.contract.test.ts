@@ -5,57 +5,66 @@ const source = readFileSync('public/control-room/content-manager.html', 'utf8');
 const playwrightWorkflow = readFileSync('.github/workflows/playwright.yml', 'utf8');
 
 describe('first-party founder content truth UI contract', () => {
-  it('shows Buffer as the only active transport without pretending publication happened', () => {
+  it('separates implemented capability from evidence, temporal, provider, and outcome truth', () => {
     expect(source).toContain('data-founder-engine-state="contract-ready"');
-    expect(source).toContain('data-buffer-transport="active"');
-    expect(source).toContain('data-direct-linkedin-state="inactive"');
+    expect(source).toContain('data-first-party-linkedin-capability="implemented"');
     expect(source).toContain('data-founder-evidence-state="unknown"');
     expect(source).toContain('data-founder-sauce-state="unknown"');
     expect(source).toContain('data-temporal-truth-state="unknown"');
     expect(source).toContain('data-provider-state="unknown"');
     expect(source).toContain('data-outcome-state="unknown"');
-    expect(source).toContain('Buffer transport active');
-    expect(source).toContain('Direct LinkedIn inactive');
-    expect(source).toContain('Buffer is transport, not authority.');
-    expect(source).not.toContain('First-party LinkedIn publish capability implemented');
+    expect(source).toContain('First-party LinkedIn publish capability implemented');
+    expect(source).toContain('Temporal truth UNKNOWN until execution');
+    expect(source).toContain('Provider state UNKNOWN');
+    expect(source).toContain('Outcome UNKNOWN');
+    expect(source).toContain('Capability is not publication proof.');
   });
 
-  it('keeps Current You and publication outcome fail-closed', () => {
+  it('keeps Current You and publication outcome fail-closed while allowing the implemented direct path', () => {
     expect(source).toContain('data-current-you-state="not-requested"');
-    expect(source).toContain('data-provider-write-state="buffer-only"');
+    expect(source).toContain('data-provider-write-state="capability-implemented"');
     expect(source).toContain('data-review-window-state="not-handed-off"');
     expect(source).toContain('Exact-copy + temporal approval required');
-    expect(source).toContain('Buffer preflight happens before the one-shot approval is consumed');
-    expect(source).toContain('Cambiante and direct LinkedIn are not active fallback paths');
-    expect(source).toContain('publication state remains UNKNOWN');
+    expect(source).toContain('publish_founder_content');
+    expect(source).toContain('temporal truth revalidation');
+    expect(source).toContain('one-shot reservation');
+    expect(source).toContain('provider readback');
+    expect(source).toContain('provider and publication state remain UNKNOWN');
+    expect(source).not.toContain('first-party founder-progress lane above remains review-window only');
+    expect(source).not.toContain('Live provider writes remain a separate server-side authorization and credential gate');
   });
 
-  it('keeps public proof editorial and private evidence mandatory', () => {
+  it('keeps sauce, analytics, and external platform authority bounded', () => {
     expect(source).toContain('data-public-proof-state="optional-off"');
-    expect(source).toContain('Public proof link only when it improves the story');
-    expect(source).toContain('Internal proof remains mandatory even when no public link is shown.');
-    expect(source).toContain('Private implementation and prompts');
+    expect(source).toContain('data-analytics-authority="observation-only"');
     expect(source).toContain('FutureYou is advisory only');
+    expect(source).toContain('Missing metrics stay UNKNOWN; analytics can improve later drafts, never authorize them');
+    expect(source).toContain('Private implementation and prompts');
+    expect(source).toContain('External platform owns');
+    expect(source).toContain('Terminal platform state');
+    expect(source).not.toContain('Cambiante, Buffer, or another approved actuator owns');
   });
 
-  it('keeps analytics observation-only and UNKNOWN-safe', () => {
+  it('turns private analytics into draft learning without turning it into claim authority', () => {
     expect(source).toContain('data-content-learning-loop');
-    expect(source).toContain('data-analytics-authority="observation-only"');
     expect(source).toContain('data-private-metrics-state="withheld"');
     expect(source).toContain('data-metric-claim-state="fresh-verifier-required"');
-    expect(source).toContain('Missing metrics stay UNKNOWN; analytics can improve later drafts, never authorize them');
+    expect(source).toContain('data-learning-axis="distribution"');
+    expect(source).toContain('data-learning-axis="resonance"');
+    expect(source).toContain('data-learning-axis="compounding"');
+    expect(source).toContain('data-story-archetype="founder-thesis"');
+    expect(source).toContain('data-story-archetype="build-correct"');
+    expect(source).toContain('data-story-archetype="proof-lesson"');
+    expect(source).toContain('data-story-archetype="human-product-stake"');
+    expect(source).toContain('Metrics stay private by default');
     expect(source).toContain('repository proof may support repository claims, not analytics claims');
-    expect(source).toContain('that claim stays BLOCKED for first-party publication');
+    expect(source).toContain('those claims stay BLOCKED for first-party publication');
   });
 
-  it('states the Buffer-only lifecycle and no-lie readback boundary', () => {
-    expect(source).toContain('Proof → draft → review → approval → schedule → Buffer → metrics');
-    expect(source).toContain('Buffer handoff');
-    expect(source).toContain('Buffer receives only the exact FCR-approved payload.');
-    expect(source).toContain('An accepted schedule is not treated as a published LinkedIn post.');
-    expect(source).toContain('Chief proposes. FCR authorizes. Buffer transports. Publication truth still requires readback.');
-    expect(source).toContain('Publication requires terminal readback bound to the authorized execution.');
-    expect(source).not.toContain('Cambiante, Buffer, or another approved actuator owns');
+  it('states the no-lie boundary between capability, authorization, dispatch, and publication', () => {
+    expect(source).toContain('Capability, authorization, dispatch, and publication remain separate truths.');
+    expect(source).toContain('FCR must never translate capability, approval, dispatch, a provider request, or missing provider evidence into “published.”');
+    expect(source).toContain('Publication requires terminal provider readback bound to the authorized execution.');
   });
 
   it('binds browser proof to the exact reviewed head', () => {

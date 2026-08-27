@@ -20,25 +20,34 @@ function assess(overrides: Partial<Parameters<typeof assessProjectAdapterFreshne
 }
 
 describe('project adapter freshness', () => {
-  it('verifies only when current main and every required contract blob match the audit', () => {
-    const result = assess();
+  it('verifies every checked-in adapter only when current main and every required contract blob match', () => {
+    for (const adapter of FOUNDER_OS_LAB_PROJECT_ADAPTERS) {
+      const result = assessProjectAdapterFreshness({
+        repository: adapter.repository,
+        auditedHead: adapter.auditedSourceHead,
+        currentHead: adapter.auditedSourceHead,
+        auditedContractBlobs: adapter.auditedContractBlobs,
+        observedContractBlobs: { ...adapter.auditedContractBlobs },
+      });
 
-    expect(result).toMatchObject({
-      state: 'verified',
-      freshness: 'fresh',
-      recommendation: 'hold',
-      sourceHeadMatchesAudited: true,
-      contractPathsMissing: [],
-      contractPathsDrifted: [],
-      founderReviewRequired: true,
-      promotionAllowed: false,
-      mutationAuthorized: false,
-      blocker: null,
-    });
-    expect(result.contractPathsRequired).toEqual(Object.keys(ADAPTER.auditedContractBlobs));
+      expect(result).toMatchObject({
+        state: 'verified',
+        freshness: 'fresh',
+        recommendation: 'hold',
+        sourceHeadMatchesAudited: true,
+        contractPathsMissing: [],
+        contractPathsDrifted: [],
+        founderReviewRequired: true,
+        promotionAllowed: false,
+        mutationAuthorized: false,
+        blocker: null,
+      });
+      expect(result.contractPathsRequired).toEqual(Object.keys(adapter.auditedContractBlobs));
+      expect(result.nextAction).not.toContain('Se’kret Bip');
+    }
   });
 
-  it('stays verified when authoritative main advances but required contract blobs are unchanged', () => {
+  it('stays verified when authoritative main advances but required project contracts are unchanged', () => {
     const result = assess({
       currentHead: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     });
@@ -50,11 +59,11 @@ describe('project adapter freshness', () => {
     expect(result.contractPathsDrifted).toEqual([]);
     expect(result.blocker).toBeNull();
     expect(result.reasons).toContain(
-      'Repository main advanced, but every required canon blob still matches the audited adapter snapshot.',
+      'Repository main advanced, but every required project contract blob still matches the audited adapter snapshot.',
     );
   });
 
-  it('requires review when authoritative main advances and a required contract blob drifts', () => {
+  it('requires review when authoritative main advances and a required project contract drifts', () => {
     const observed = {
       ...ADAPTER.auditedContractBlobs,
       'app/index.tsx': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
@@ -69,7 +78,7 @@ describe('project adapter freshness', () => {
     expect(result.recommendation).toBe('review');
     expect(result.sourceHeadMatchesAudited).toBe(false);
     expect(result.contractPathsDrifted).toEqual(['app/index.tsx']);
-    expect(result.blocker).toContain('Repository main advanced and required canon contract blobs drifted');
+    expect(result.blocker).toContain('Repository main advanced and required project contract blobs drifted');
     expect(result.mutationAuthorized).toBe(false);
   });
 

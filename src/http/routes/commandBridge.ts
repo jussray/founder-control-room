@@ -35,6 +35,7 @@ interface MissionLookup {
 
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const SECRETISH_PATTERN = /(github_pat_|gh[pousr]_[A-Za-z0-9_]{12,}|Bearer\s+[A-Za-z0-9._-]{12,}|TOKEN|SECRET|PASSWORD|SERVICE_ROLE|API_KEY|ACCESS_KEY)/i;
+const TERMINAL_FINISHED_STATUSES = new Set(['passed', 'failed', 'timed_out', 'cancelled']);
 
 function stringOrNull(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
@@ -94,6 +95,19 @@ function normalizeRequest(row: DbRecord): CommandBridgeRequestSnapshot {
     createdAt: stringOrNull(row.created_at) ?? '',
     updatedAt: stringOrNull(row.updated_at) ?? '',
   };
+}
+
+function terminalRunMatchesRequest(run: DbRecord, request: CommandBridgeRequestSnapshot): boolean {
+  const expectedSha = request.expectedCommitSha.toLowerCase();
+  const status = stringOrNull(run.status);
+  return stringOrNull(run.project_id) === request.projectId
+    && stringOrNull(run.mission_id) === request.missionId
+    && stringOrNull(run.command_id) === request.commandId
+    && stringOrNull(run.expected_commit_sha)?.toLowerCase() === expectedSha
+    && stringOrNull(run.observed_commit_sha)?.toLowerCase() === expectedSha
+    && status !== null
+    && TERMINAL_FINISHED_STATUSES.has(status)
+    && stringOrNull(run.finished_at) !== null;
 }
 
 function secretLike(...values: Array<string | null>): boolean {
@@ -373,6 +387,33 @@ commandBridgeRouter.post('/requests/:requestId/mark-executed', async (req: Found
   const terminalRunId = stringOrNull(body.terminalRunId);
   if (!terminalRunId) return res.status(400).json({ error: 'terminalRunId is required.' });
 
+  const { data: approvedData, error: approvedError } = await supabase
+    .from('command_bridge_requests')
+    .select('id, project_id, mission_id, command_id, expected_commit_sha, requesting_agent, requested_by, reason, rollback_plan, risk, status, expires_at, approved_by, approved_at, approval_note, terminal_run_id, created_at, updated_at, projects(id, slug, name), missions(id, title, status)')
+    .eq('id', requestId)
+    .eq('status', 'approved')
+    .maybeSingle();
+
+  if (approvedError) return res.status(500).json({ error: approvedError.message });
+  const approvedRow = recordOrNull(approvedData);
+  if (!approvedRow) return res.status(404).json({ error: 'Approved command card not found.' });
+  const approved = normalizeRequest(approvedRow);
+
+  const { data: terminalData, error: terminalError } = await supabase
+    .from('terminal_runs')
+    .select('id, project_id, mission_id, command_id, expected_commit_sha, observed_commit_sha, status, finished_at')
+    .eq('id', terminalRunId)
+    .maybeSingle();
+
+  if (terminalError) return res.status(500).json({ error: terminalError.message });
+  const terminalRun = recordOrNull(terminalData);
+  if (!terminalRun || !terminalRunMatchesRequest(terminalRun, approved)) {
+    return res.status(409).json({
+      error: 'terminalRunId must reference a completed terminal run bound to the approved command card and exact observed commit.',
+      code: 'TERMINAL_RUN_RECEIPT_MISMATCH',
+    });
+  }
+
   const updatedAt = new Date().toISOString();
   const { data, error } = await supabase
     .from('command_bridge_requests')
@@ -384,12 +425,18 @@ commandBridgeRouter.post('/requests/:requestId/mark-executed', async (req: Found
 
   if (error) return res.status(500).json({ error: error.message });
   const row = recordOrNull(data);
-  if (!row) return res.status(404).json({ error: 'Approved command card not found.' });
+  if (!row) {
+    return res.status(409).json({
+      error: 'Command card changed before the terminal receipt could be attached.',
+      code: 'COMMAND_CARD_STATE_CHANGED',
+    });
+  }
   const executed = normalizeRequest(row);
   const auditError = await audit(executed.projectId, 'command_bridge_request_executed', commandBridgeSeverityForRisk(executed.risk), {
     route: `POST /command-bridge/requests/${requestId}/mark-executed`,
     requestId,
     terminalRunId,
+    terminalStatus: stringOrNull(terminalRun.status),
     marked_by: req.founder?.email,
   });
   if (auditError) return res.status(500).json({ error: 'COMMAND_BRIDGE_EXECUTION_AUDIT_INCOMPLETE', detail: auditError });

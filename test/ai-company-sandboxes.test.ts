@@ -14,6 +14,7 @@ import {
 
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const PROOF_URL = 'https://proof.example.test/sandbox-parity';
+const SHA256_HEX = /^[0-9a-f]{64}$/;
 
 function founderRequest(): FounderOsLabRequest {
   return {
@@ -90,7 +91,7 @@ describe('Founder OS and AI Company sandbox parity', () => {
     expect(company.result?.liveSideEffects).toBe(false);
   });
 
-  it('produces deterministic sealed results for identical synthetic input', () => {
+  it('produces deterministic SHA-256 sealed results for identical synthetic input', () => {
     const founderOne = runFounderOsSandbox(founderRequest());
     const founderTwo = runFounderOsSandbox(founderRequest());
     const companyOne = runCompanySandbox(companyInput());
@@ -98,14 +99,38 @@ describe('Founder OS and AI Company sandbox parity', () => {
 
     expect(founderOne.sandbox.inputFingerprint).toBe(founderTwo.sandbox.inputFingerprint);
     expect(founderOne.sandbox.outputFingerprint).toBe(founderTwo.sandbox.outputFingerprint);
+    expect(founderOne.sandbox.inputFingerprint).toMatch(SHA256_HEX);
+    expect(founderOne.sandbox.outputFingerprint).toMatch(SHA256_HEX);
+    expect(founderOne.sandbox.id).toBe(`founder-os-${founderOne.sandbox.inputFingerprint}`);
     expect(founderOne.plan).toEqual(founderTwo.plan);
     expect(companyOne.sandbox.inputFingerprint).toBe(companyTwo.sandbox.inputFingerprint);
     expect(companyOne.sandbox.outputFingerprint).toBe(companyTwo.sandbox.outputFingerprint);
+    expect(companyOne.sandbox.inputFingerprint).toMatch(SHA256_HEX);
+    expect(companyOne.sandbox.outputFingerprint).toMatch(SHA256_HEX);
+    expect(companyOne.sandbox.id).toBe(`ai-company-${companyOne.sandbox.inputFingerprint}`);
     expect(companyOne.result).toEqual(companyTwo.result);
     expect(Object.isFrozen(founderOne)).toBe(true);
     expect(Object.isFrozen(founderOne.plan)).toBe(true);
     expect(Object.isFrozen(companyOne)).toBe(true);
     expect(Object.isFrozen(companyOne.result)).toBe(true);
+  });
+
+  it('fails closed when either sandbox is pinned to a stale or substituted fingerprint', () => {
+    const founder = runFounderOsSandbox(founderRequest(), { expectedInputFingerprint: '0'.repeat(64) });
+    const company = runCompanySandbox(companyInput(), { expectedInputFingerprint: '0'.repeat(64) });
+
+    expect(founder).toMatchObject({
+      status: 'blocked',
+      plannerInvoked: false,
+      violations: ['input_fingerprint_mismatch'],
+      plan: null,
+    });
+    expect(company).toMatchObject({
+      status: 'blocked',
+      simulatorInvoked: false,
+      violations: ['input_fingerprint_mismatch'],
+      result: null,
+    });
   });
 
   it('honors the kill switch before either planner or simulator runs', () => {

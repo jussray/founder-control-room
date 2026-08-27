@@ -1,0 +1,43 @@
+name: Cloudflare Sandbox Lab
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'labs/ai-company/cloudflare-sandbox/**'
+      - '.github/workflows/cloudflare-sandbox-lab.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'labs/ai-company/cloudflare-sandbox/**'
+      - '.github/workflows/cloudflare-sandbox-lab.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Sandbox source contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Record and verify exact head
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+      - name: Install isolated Worker dependencies without lifecycle scripts
+        run: npm --prefix labs/ai-company/cloudflare-sandbox ci --ignore-scripts --no-audit --no-fund
+      - name: Type-check and attack the source boundary
+        run: npm --prefix labs/ai-company/cloudflare-sandbox run verify

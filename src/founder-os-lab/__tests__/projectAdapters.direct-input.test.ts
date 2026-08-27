@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { FounderOsLabProjectContext } from '../contracts.js';
 import { planFounderOsLab } from '../engine.js';
 
-const VALID_HEAD = '90d350a22cbdde1f1d5aa2ced1453a62fa298193';
+const VALID_HEAD = '467da149bad1720f87885a991a924aa143eb2ddd';
 
 describe('Se’kret Bip direct planner input hardening', () => {
   it('returns a blocked plan instead of throwing for malformed casted project fields', () => {
@@ -34,7 +34,7 @@ describe('Se’kret Bip direct planner input hardening', () => {
     expect(blocked).toContain('sourceRepository must be exactly jussray/Sekret-Bip');
     expect(blocked).toContain('sourceCommitSha must be an exact 40-character hexadecimal SHA');
     expect(blocked).toContain('contractUrls must contain 1 to 20 unique bounded HTTPS URL strings');
-    expect(blocked).toContain('audience must be teen or bip-jr when supplied');
+    expect(blocked).toContain('audience must be one of: teen, bip-jr');
     expect(plan.authority.executionAllowed).toBe(false);
   });
 

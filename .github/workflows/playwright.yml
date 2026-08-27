@@ -20,6 +20,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
 
 jobs:
   playwright:
@@ -33,15 +34,22 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: Record and verify exact head
+      - name: Record and verify exact head and base ancestry
         shell: bash
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          printf 'expected=%s\nactual=%s\nbase=%s\n' "$EXPECTED_HEAD_SHA" "$actual" "$PR_BASE_SHA"
           test "$actual" = "$EXPECTED_HEAD_SHA"
+          if [ -n "$PR_BASE_SHA" ]; then
+            if ! git merge-base --is-ancestor "$PR_BASE_SHA" "$EXPECTED_HEAD_SHA"; then
+              echo "STALE_BASE: $PR_BASE_SHA is not an ancestor of $EXPECTED_HEAD_SHA" >&2
+              exit 1
+            fi
+          fi
 
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -111,6 +119,24 @@ jobs:
         run: |
           set -euo pipefail
           node e2e/control-room-truth-receipt-proof.mjs 2>&1 | tee logs/control-room-truth-receipt-proof.log
+
+      - name: Prove Evidence Trust Plane
+        shell: bash
+        run: |
+          set -euo pipefail
+          node e2e/evidence-trust-plane-proof.mjs 2>&1 | tee logs/evidence-trust-plane-proof.log
+
+      - name: Prove evidence-aware mission board
+        shell: bash
+        run: |
+          set -euo pipefail
+          node e2e/mission-board-proof.mjs 2>&1 | tee logs/mission-board-proof.log
+
+      - name: Prove Bip Genesis demo provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          node e2e/genesis-demo-proof.mjs 2>&1 | tee logs/genesis-demo-proof.log
 
       - name: Prove Founder Switchboard controls
         shell: bash

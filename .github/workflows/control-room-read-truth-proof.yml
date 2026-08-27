@@ -1,0 +1,46 @@
+name: Control Room Read Truth Proof
+
+on:
+  pull_request:
+    paths:
+      - 'public/control-room/index.html'
+      - 'public/control-room/read-truth-membrane.js'
+      - 'e2e/control-room-read-truth-proof.mjs'
+      - '.github/workflows/control-room-read-truth-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  playwright-read-truth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact target
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium without OS package mutation
+        run: npx playwright install chromium
+
+      - name: Prove failed read stays UNKNOWN
+        run: node e2e/control-room-read-truth-proof.mjs
+
+      - name: Upload Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: control-room-read-truth-proof-${{ github.event.pull_request.head.sha || github.sha }}
+          path: test-results/control-room-projects-*.png
+          if-no-files-found: warn

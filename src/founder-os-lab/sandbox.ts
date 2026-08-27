@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { FounderOsLabPlan, FounderOsLabRequest } from './contracts.js';
 import { planFounderOsLab } from './engine.js';
 import {
@@ -123,13 +124,7 @@ function stableStringify(value: unknown): string {
 }
 
 function fingerprint(value: unknown): string {
-  const input = stableStringify(value);
-  let hash = 2166136261;
-  for (let index = 0; index < input.length; index += 1) {
-    hash ^= input.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0');
+  return createHash('sha256').update(stableStringify(value), 'utf8').digest('hex');
 }
 
 export function inspectFounderOsSandboxPlan(plan: FounderOsLabPlan): string[] {

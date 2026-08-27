@@ -1,8 +1,12 @@
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { Request, Response } from 'express';
 import type { Session } from '@supabase/supabase-js';
 
 const COOKIE_NAME = 'fcr_session';
 const COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
+const COOKIE_FORMAT_VERSION = 'v1';
+const MIN_SIGNING_SECRET_BYTES = 32;
+const EPHEMERAL_NON_PROD_SIGNING_SECRET = randomBytes(32);
 
 export interface FounderCookieSession {
   accessToken: string;
@@ -10,13 +14,56 @@ export interface FounderCookieSession {
   expiresAt?: number;
 }
 
-function encodeSession(session: FounderCookieSession): string {
+function productionLikeRuntime(): boolean {
+  return process.env.NODE_ENV === 'production'
+    || process.env.FOUNDER_API_URL?.startsWith('https://') === true;
+}
+
+function founderSessionSigningSecret(): Buffer | null {
+  const configured = process.env.FOUNDER_SESSION_SIGNING_SECRET?.trim() ?? '';
+  if (configured) {
+    if (Buffer.byteLength(configured, 'utf8') < MIN_SIGNING_SECRET_BYTES) return null;
+    return Buffer.from(configured, 'utf8');
+  }
+  return productionLikeRuntime() ? null : EPHEMERAL_NON_PROD_SIGNING_SECRET;
+}
+
+function sessionPayload(session: FounderCookieSession): string {
   return Buffer.from(JSON.stringify(session), 'utf8').toString('base64url');
+}
+
+function sessionSignature(payload: string, secret: Buffer): string {
+  return createHmac('sha256', secret)
+    .update(`${COOKIE_FORMAT_VERSION}.${payload}`)
+    .digest('base64url');
+}
+
+function encodeSession(session: FounderCookieSession): string {
+  const secret = founderSessionSigningSecret();
+  if (!secret) {
+    throw new Error(
+      'FOUNDER_SESSION_SIGNING_SECRET must be configured with at least 32 bytes before founder browser sessions can be issued in production',
+    );
+  }
+  const payload = sessionPayload(session);
+  return `${COOKIE_FORMAT_VERSION}.${payload}.${sessionSignature(payload, secret)}`;
 }
 
 function decodeSession(value: string): FounderCookieSession | null {
   try {
-    const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as Partial<FounderCookieSession>;
+    const [version, payload, signature, ...rest] = value.split('.');
+    if (rest.length > 0 || version !== COOKIE_FORMAT_VERSION || !payload || !signature) return null;
+
+    const secret = founderSessionSigningSecret();
+    if (!secret) return null;
+
+    const expected = Buffer.from(sessionSignature(payload, secret), 'base64url');
+    const actual = Buffer.from(signature, 'base64url');
+    if (expected.length === 0 || actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+      return null;
+    }
+
+    const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Partial<FounderCookieSession>;
     if (typeof parsed.accessToken !== 'string' || typeof parsed.refreshToken !== 'string') return null;
     if (!parsed.accessToken || !parsed.refreshToken) return null;
     return {

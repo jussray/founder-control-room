@@ -5,7 +5,7 @@ import {
   v10CapabilityPlanHash,
   type V10CapabilityPlan,
 } from '../../founder-os-lab/capabilityKernel.js';
-import { routeFcrSkills } from '../fcrSkillRouter.js';
+import { FCR_REQUIRED_PARALLEL_LENSES, routeFcrSkills } from '../fcrSkillRouter.js';
 
 const HEAD = 'a'.repeat(40);
 const REGISTRY_HASH = 'b'.repeat(64);
@@ -19,7 +19,7 @@ function plan(goal: string, capabilityIds: string[]): V10CapabilityPlan {
     expectedHeadSha: HEAD,
     registryHash: REGISTRY_HASH,
     requestedAuthority: 'reason',
-    strategicLenses: ['futureyou', 'truthmode', 'redteam'],
+    strategicLenses: ['futureyou', 'truthmode', 'redteam', ...FCR_REQUIRED_PARALLEL_LENSES],
     routingReason: 'Chief selected only the explicit truth-decay inspection capability.',
     capabilities: capabilityIds.map((id) => ({
       id,
@@ -62,6 +62,7 @@ describe('FCR truth-decay skill routing', () => {
 
     expect(decision.policyRequiredCapabilityIds).toContain('truth-decay-audit');
     expect(decision.missingPolicyCapabilityIds).toEqual([]);
+    expect(decision.missingParallelLenses).toEqual([]);
     expect(decision.status).toBe('ready_for_runtime_discovery');
     expect(decision.runtimeDiscoveryRequired).toBe(true);
     expect(decision.executionAllowed).toBe(false);

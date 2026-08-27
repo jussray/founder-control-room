@@ -7,6 +7,12 @@ on:
       - '.github/workflows/github-governance-preflight.yml'
       - 'scripts/audit-github-governance-preflight.mjs'
       - 'scripts/audit-github-governance-preflight.node-test.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/github-governance-preflight.yml'
+      - 'scripts/audit-github-governance-preflight.mjs'
+      - 'scripts/audit-github-governance-preflight.node-test.mjs'
   workflow_dispatch:
 
 permissions:
@@ -14,10 +20,10 @@ permissions:
   pull-requests: read
 
 jobs:
-  governance-preflight:
-    name: GitHub Governance Preflight
+  governance-contract:
+    name: GitHub Governance Preflight Contract
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - name: Check out exact candidate
         uses: actions/checkout@v4
@@ -30,9 +36,30 @@ jobs:
           node-version: '24'
       - name: Verify preflight contract
         run: node --test scripts/audit-github-governance-preflight.node-test.mjs
+
+  governance-provider-read:
+    name: GitHub Governance Preflight Provider Read
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    needs: governance-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Check out trusted main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
       - name: Read live GitHub governance state
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
           FCR_GOVERNANCE_TARGET_REF: main
         run: node scripts/audit-github-governance-preflight.mjs
       - name: Publish sanitized governance receipt

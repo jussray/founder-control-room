@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
-import express from 'express';
+import express, { type Response } from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FounderRequest } from '../requireFounder.js';
@@ -25,7 +25,10 @@ vi.mock('../../../lib/supabaseClient.js', () => ({
   supabase: { from: mocks.from },
 }));
 
+import { writeFounderSession } from '../../../auth/founderSession.js';
 import { requireFounder } from '../requireFounder.js';
+
+const TEST_SIGNING_SECRET = 'founder-session-test-signing-secret-0123456789abcdef';
 
 const allowlistChain = {
   select: mocks.select,
@@ -37,11 +40,29 @@ function founderCookie(
   accessToken = 'cookie-access-token',
   refreshToken = 'cookie-refresh-token',
 ): string {
-  const encoded = Buffer.from(
-    JSON.stringify({ accessToken, refreshToken }),
-    'utf8',
-  ).toString('base64url');
-  return `fcr_session=${encoded}`;
+  let setCookie = '';
+  const res = {
+    setHeader(name: string, value: unknown) {
+      if (name.toLowerCase() === 'set-cookie') setCookie = String(value);
+      return res;
+    },
+  } as unknown as Response;
+  writeFounderSession(res, {
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    expires_in: 3_600,
+    expires_at: Math.floor(Date.now() / 1_000) + 3_600,
+    token_type: 'bearer',
+    user: {
+      id: 'founder-user-1',
+      app_metadata: {},
+      user_metadata: {},
+      aud: 'authenticated',
+      created_at: '2026-07-23T00:00:00.000Z',
+      email: 'founder@example.com',
+    },
+  });
+  return setCookie.split(';', 1)[0] ?? '';
 }
 
 function refreshedSession(): Session {
@@ -72,6 +93,8 @@ function createProbeApp() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv('NODE_ENV', 'test');
+  vi.stubEnv('FOUNDER_SESSION_SIGNING_SECRET', TEST_SIGNING_SECRET);
 
   mocks.from.mockImplementation((table: string) => {
     if (table !== 'founder_users') throw new Error(`Unexpected table ${table}`);

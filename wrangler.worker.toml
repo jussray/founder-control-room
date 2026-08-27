@@ -10,6 +10,13 @@ compatibility_flags = [
 workers_dev = true
 preview_urls = true
 
+# Every Wrangler build passes through the repository-owned authority membrane.
+# Native Cloudflare Workers Builds may verify/upload versions, but they may not
+# promote production. Canonical production promotion remains the exact-main,
+# founder-approved GitHub Deploy / Worker Reconcile workflows.
+[build]
+command = "node scripts/verify-worker-build-authority.mjs"
+
 # Cloudflare Pages owns foundercontrolroom.org and serves ./public.
 # This single surviving Worker owns backend, auth, MCP, and reconciliation
 # traffic at api.foundercontrolroom.org. The deleted founder-control-room2
@@ -19,6 +26,15 @@ preview_urls = true
 
 [observability]
 enabled = true
+
+# Durable release-proof orchestration only. No route creates instances yet,
+# and the Workflow receipt explicitly grants no merge, deploy, or provider
+# mutation authority. A later trigger must use the existing FCR authority
+# membrane and preserve exact candidate/evidence fingerprints.
+[[workflows]]
+binding = "RELEASE_PROOF_WORKFLOW"
+name = "fcr-release-proof-v0"
+class_name = "ReleaseProofWorkflowV0"
 
 # Outbound transactional email capability. This binding alone sends nothing;
 # application code must explicitly invoke it. Keep the provider boundary
@@ -42,6 +58,7 @@ SUPABASE_PROJECT_REF = "oojzfmmywbvficgybaxd"
 FOUNDER_ALLOWED_ORIGINS = "https://foundercontrolroom.org"
 FOUNDER_API_URL = "https://foundercontrolroom.org"
 FCR_EMAIL_FROM = "welcome@api.foundercontrolroom.org"
+FCR_REMOTE_MCP_READ_PROJECTS = "chief-ai-machine,founder-control-room"
 FCR_V10_CAPABILITY_PLAN_CONTRACT = "juss-v10/capability-plan@v1"
 FCR_V10_CONVEYOR_CONTRACT = "founder-control-room/n8n-conveyor@v3"
 FCR_V10_MAX_RUNTIME_AUTHORITY = "draft"
@@ -57,6 +74,7 @@ required = [
   "GITHUB_WEBHOOK_SECRET",
   "GITHUB_APP_ID",
   "GITHUB_PRIVATE_KEY",
+  "FCR_REMOTE_MCP_READ_TOKEN",
   "FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON",
   "FOUNDER_SIGNAL_ENGINE_MCP_TOKEN",
   "ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL",

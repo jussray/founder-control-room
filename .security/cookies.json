@@ -8,7 +8,7 @@
     {
       "name": "fcr_session",
       "classification": "strictly_necessary",
-      "purpose": "Maintain the allowlisted founder's Supabase Auth browser session.",
+      "purpose": "Maintain the allowlisted founder's Supabase Auth browser session and provide a server-issued interactive founder-session witness for privileged merge authority.",
       "owner": "backend",
       "providers": ["supabase", "cloudflare"],
       "sensitive": true,
@@ -18,8 +18,10 @@
       "path": "/",
       "maxAgeSeconds": 2592000,
       "cacheControl": "private, no-store",
+      "integrity": "HMAC-SHA256 signed by Founder Control Room; unsigned or tampered payloads are rejected.",
+      "signingSecretEnv": "FOUNDER_SESSION_SIGNING_SECRET",
       "csrf": "Exact FOUNDER_API_URL origin is required for browser mutations; explicit Bearer clients are not cookie-authenticated.",
-      "deletion": "Cleared by POST /auth/logout and by failed or disallowed session verification."
+      "deletion": "Cleared by POST /auth/logout and by failed or disallowed session verification. Existing unsigned cookies are intentionally invalid after the signed-session contract is enabled."
     }
   ],
   "nonCookieState": [],
@@ -27,6 +29,7 @@
   "prohibited": [
     "analytics or advertising cookies",
     "client-readable founder auth tokens",
+    "unsigned or client-forgeable founder session cookies",
     "cross-project Se'kret Bip session reuse",
     "caching any response that writes or refreshes the founder session"
   ]

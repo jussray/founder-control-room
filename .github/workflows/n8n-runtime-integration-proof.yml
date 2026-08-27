@@ -75,6 +75,8 @@ jobs:
           mkdir -p .tmp
           bearer="$(openssl rand -hex 32)"
           encryption_key="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$bearer"
+          printf '::add-mask::%s\n' "$encryption_key"
           printf 'N8N_RUNTIME_PROOF_BEARER=%s\n' "$bearer" >> "$GITHUB_ENV"
           printf 'N8N_ENCRYPTION_KEY=%s\n' "$encryption_key" >> "$GITHUB_ENV"
           jq -n \

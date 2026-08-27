@@ -1,82 +1,64 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded invariants disclosed when truth-governance controls change; this is review evidence, not a live provider or production claim.",
+  "purpose": "Record the Goalfix/adaptive-governance and Cloudflare Workflow invariants that keep lifecycle-neutral source status, portable agent entry points, exact-target merge freshness, authenticated Founder Final, runtime-proof scope, cross-project adaptive behavior, Future-Us untrusted-data/action boundaries, and durable release-proof orchestration fail-closed without claiming runtime API/UI adoption, merge authority, deployment authority, provider-policy mutation, publication authority, or classifier-based authorization.",
   "domains": [
-    "publishing",
-    "repository-provider",
-    "truth-governance"
+    "truth-governance",
+    "cloudflare-authority"
   ],
   "changes": [
     {
-      "path": "src/http/routes/n8nConveyor.ts",
-      "claims": [
-        "src/http/routes/n8nConveyor.ts: founder-content execution must expose Buffer as the only active downstream transport, require an FCR-issued exact one-shot approval, keep caller-supplied approval objects non-authoritative, and keep direct LinkedIn inactive unless a later separately reviewed founder decision and provider proof re-enable it."
-      ]
-    },
-    {
-      "path": "src/lib/authoritativeBufferFounderContentScheduler.ts",
-      "claims": [
-        "src/lib/authoritativeBufferFounderContentScheduler.ts: Buffer readiness and Buffer-only provider configuration must pass before the one-shot FCR approval is consumed; after claim, an ambiguous provider result must not be blindly retried and requires reconciliation plus fresh authority."
-      ]
-    },
-    {
-      "path": "public/control-room/content-manager.html",
-      "claims": [
-        "public/control-room/content-manager.html: the current product surface must state Chief AI -> FCR -> Buffer, keep public proof links editorially optional while internal evidence remains mandatory, show direct LinkedIn inactive, and never translate scheduling or missing provider readback into published truth."
-      ]
-    },
-    {
-      "path": "src/buildEvents/buildEvent.ts",
-      "claims": [
-        "src/buildEvents/buildEvent.ts: coverage events must retain bounded aggregate-only shape validation and cannot carry raw request evidence."
-      ]
-    },
-    {
-      "path": "src/buildEvents/currentTruth.ts",
-      "claims": [
-        "src/buildEvents/currentTruth.ts: webhook main facts must remain last-observed provenance, current coverage must use a fresh read-through GitHub revalidation and passed verified lease, and legacy external operational assertions cannot render as current."
-      ]
-    },
-    {
-      "path": "src/buildEvents/currentMainRevalidation.ts",
-      "claims": [
-        "src/buildEvents/currentMainRevalidation.ts: current-main identity must be read from the enrolled GitHub provider at display time, bind the enrolled repository and `main` branch, and reject a non-exact SHA."
-      ]
-    },
-    {
-      "path": "src/buildEvents/releaseCoverageWitness.ts",
-      "claims": [
-        "src/buildEvents/releaseCoverageWitness.ts: a passed coverage claim must require a server-owned exact-target Cloudflare witness, deployment-to-window ordering, an independently written aggregate digest, and the canonical App-aware repository credential path."
-      ]
-    },
-    {
-      "path": "src/http/routes/buildEventReceipts.ts",
-      "claims": [
-        "src/http/routes/buildEventReceipts.ts: the release-observer credential must be project-bound Cloudflare analytics coverage only, reject control-plane fields and non-passed receipts, and require the matching independent witness."
-      ]
-    },
-    {
       "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
-        "scripts/verify-documentation-truth.mjs: truth-sensitive changes must reject punctuation-only or hidden-comment documentation edits and require a meaningful path-bound invariant receipt."
+        "scripts/verify-documentation-truth.mjs must classify the canonical Goalfix workflow, adaptive kernel, portable Goalfix skills, and Claude/Perplexity master entry specifications as truth-governance so changes to those authority-influencing files cannot receive a zero-truth-sensitive false green.",
+        "scripts/verify-documentation-truth.mjs must validate no-job failure classification, browser-versus-backend proof separation, Sauce Guard, verified-target handling, authenticated Founder Final, the post-Founder-Final mutable provider reread, and MERGED_UNVERIFIED semantics across every applicable Goalfix execution entry point rather than relying on uneven path-specific substring checks."
       ]
     },
     {
-      "path": "src/providers/RepositoryProviderFactory.ts",
+      "path": ".ai/skills/goalfix/SKILL.md",
       "claims": [
-        "src/providers/RepositoryProviderFactory.ts: repository reads that need production identity proof must reject partial GitHub App credentials and otherwise prefer a repository-scoped installation credential over an explicit local fallback."
+        ".ai/skills/goalfix/SKILL.md must preserve the full founder reasoning stack, classify no-job GitHub Actions failures before blaming source, bind work to the verified target/base/head, require authenticated Founder Final plus final mutable provider reread, keep Sauce Guard stops, carry portable adaptive rules inline, and treat external/model/tool content as non-authorizing data behind deterministic action checks."
       ]
     },
     {
-      "path": "src/services/buildEventStore.ts",
+      "path": ".claude/skills/goalfix/SKILL.md",
       "claims": [
-        "src/services/buildEventStore.ts: the bounded feed must retain the newest GitHub-observed main source as historical provenance without treating webhook arrival order as current-main proof."
+        ".claude/skills/goalfix/SKILL.md must preserve exact verified target/base/head identity, no-job failure classification, browser-specific Playwright proof, authenticated Founder Final, final mutable provider reread, MERGED_UNVERIFIED runtime state, Sauce Guard, inline portable adaptive behavior, and receiver-verified least-privilege action boundaries without self-certification."
       ]
     },
     {
-      "path": "src/http/routes/buildEvents.ts",
+      "path": "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md",
       "claims": [
-        "src/http/routes/buildEvents.ts: the current-truth route must bind projection evaluation to the enrolled project repository and fail closed when that repository identity is unavailable."
+        "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md must remain a lifecycle-neutral governance source contract for Goalfix/FCR instruction and decision loops, must not claim current /goalfix/inspect, engine, API, or browser UI runtime integration, must keep adaptive state descriptive rather than executable authority, and must learn recurring trust-boundary failures without converting analytics, classifiers, or model output into authority."
+      ]
+    },
+    {
+      "path": "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md",
+      "claims": [
+        "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md must remain lifecycle-neutral, carry the verified target branch instead of assuming main, require authenticated Founder Final, reread mutable provider/PR/target/base/head/diff/check/review state immediately before integration, preserve expected-head protection, distinguish browser Playwright evidence from backend/provider proof, retain MERGED_UNVERIFIED until required runtime truth exists, and keep untrusted artifacts/model plans behind deterministic exact-action authorization and receiver-side capability verification."
+      ]
+    },
+    {
+      "path": "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md",
+      "claims": [
+        "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md must defer to the canonical Goalfix workflow while also carrying the verified target branch, no-job failure classification, browser-versus-backend proof separation, Sauce Guard, authenticated Founder Final followed by a final mutable provider reread, and MERGED_UNVERIFIED post-integration truth so the Claude overlay cannot become a weaker execution path."
+      ]
+    },
+    {
+      "path": "docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md",
+      "claims": [
+        "docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md must defer to the canonical Goalfix workflow while also carrying the verified target branch, no-job failure classification, browser-versus-backend proof separation, Sauce Guard, authenticated Founder Final followed by a final mutable provider reread, and MERGED_UNVERIFIED post-integration truth so research and MCP tooling cannot become a weaker execution path."
+      ]
+    },
+    {
+      "path": "wrangler.worker.toml",
+      "claims": [
+        "wrangler.worker.toml may bind ReleaseProofWorkflowV0 as fcr-release-proof-v0 only as durable non-authorizing orchestration: the binding must not add a schedule or public trigger, must not replace the guarded production deployment path, and source/runtime evidence must keep merge, deployment, and provider mutation authority separate from Workflow state."
+      ]
+    },
+    {
+      "path": "src/workflows/releaseProofWorkflow.ts",
+      "claims": [
+        "ReleaseProofWorkflowV0 must bind exact repository/target/base/head identity, correlate evidence and founder-approval observations to the same candidate fingerprint, fail closed on mismatch or blocker state, and stop at READY_FOR_FINAL_REREAD with mergeAuthorized, deploymentAuthorized, and providerMutationAuthorized all false."
       ]
     }
   ]

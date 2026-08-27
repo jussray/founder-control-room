@@ -89,6 +89,7 @@ const SEVERITIES = new Set<ReviewSeverity>(["P0", "P1", "P2", "P3"]);
 const VERDICTS = new Set<ReviewVerdict>(["clear", "needs_review", "blocked"]);
 const FCR_REPOSITORY = "jussray/founder-control-room";
 const FCR_TRUSTED_REVIEWERS_ENV = "FCR_TRUSTED_SEMANTIC_REVIEWER_IDS";
+const FCR_TRUSTED_REVIEW_APP_ENV = "GITHUB_APP_ID";
 
 export const FCR_FOUNDER_FINAL_REVIEW_POLICY: IndependentReviewPolicy = Object.freeze({
   requiredSemanticReviews: 0,
@@ -103,6 +104,11 @@ const lower = (value: unknown): string => text(value).toLowerCase();
 const isGitHubAppBotIdentity = (value: unknown): boolean => /\[bot\]$/i.test(text(value));
 const isFounderFinalPolicy = (policy: IndependentReviewPolicy): boolean =>
   policy?.founderFinalApprovalRequired === true;
+
+function trustedFcrReviewAppId(env: NodeJS.ProcessEnv): string | null {
+  const value = text(env[FCR_TRUSTED_REVIEW_APP_ENV]);
+  return /^\d+$/.test(value) ? value : null;
+}
 
 export function independentReviewPolicyHash(policy: IndependentReviewPolicy): string {
   const trustedReviewerIds = Array.isArray(policy?.trustedSemanticReviewerIds)
@@ -144,10 +150,14 @@ function fcrServerPolicyBlockers(
   if (lower(context.repository) !== FCR_REPOSITORY) return [];
 
   if (isFounderFinalPolicy(policy)) {
+    const blockers: string[] = [];
     if (independentReviewPolicyHash(policy) !== independentReviewPolicyHash(FCR_FOUNDER_FINAL_REVIEW_POLICY)) {
-      return ["FCR founder-final review policy must match the server-owned deterministic-review policy"];
+      blockers.push("FCR founder-final review policy must match the server-owned deterministic-review policy");
     }
-    return [];
+    if (!trustedFcrReviewAppId(env)) {
+      blockers.push(`FCR founder-final deterministic review requires numeric server-owned ${FCR_TRUSTED_REVIEW_APP_ENV}`);
+    }
+    return blockers;
   }
 
   // Compatibility path for already-approved missions that were pinned under
@@ -288,11 +298,18 @@ function isMatchingDeterministicWitness(
   signal: VerificationSignal,
   review: IndependentReviewReceipt,
   expectedProvider: string,
+  expectedIssuerId?: string,
 ): boolean {
   return lower(signal.provider) === lower(expectedProvider)
     && signal.name === expectedReviewSignalName(review)
     && signal.status === "passed"
-    && lower(signal.commitSha) === lower(review.headSha);
+    && lower(signal.commitSha) === lower(review.headSha)
+    && (expectedIssuerId === undefined
+      || (
+        signal.issuer?.kind === "app"
+        && signal.issuer.id === expectedIssuerId
+        && lower(signal.evidenceFingerprint) === lower(review.reviewHash)
+      ));
 }
 
 function expectedSemanticReviewState(review: IndependentReviewReceipt): ReviewSignal["state"] {
@@ -407,6 +424,9 @@ export async function evaluateIndependentReviewGate(
   const verificationSignals = deterministicReviews.length > 0
     ? await provider.listVerificationSignals(context.projectId, context.headSha)
     : [];
+  const expectedDeterministicIssuerId = founderFinalMode && lower(context.repository) === FCR_REPOSITORY
+    ? trustedFcrReviewAppId(env) ?? undefined
+    : undefined;
 
   if (semanticReviews.length > 0 && typeof provider.listReviewSignals !== "function") {
     blockers.push("Repository provider cannot supply provider-backed semantic review witnesses");
@@ -426,13 +446,20 @@ export async function evaluateIndependentReviewGate(
           const latest = latestReviewSignalForReviewer(reviewSignals, review.reviewer.id);
           return latest ? isMatchingSemanticWitness(latest, review, provider.name) : false;
         })()
-      : verificationSignals.some((signal) => isMatchingDeterministicWitness(signal, review, provider.name));
+      : verificationSignals.some((signal) => isMatchingDeterministicWitness(
+          signal,
+          review,
+          provider.name,
+          expectedDeterministicIssuerId,
+        ));
 
     if (!witnessed) {
       blockers.push(
         review.reviewer.kind === "semantic"
           ? `Missing current exact-head provider PR-review witness for ${review.reviewer.id}`
-          : `Missing passed exact-head deterministic witness for ${review.reviewer.id}`,
+          : founderFinalMode && lower(context.repository) === FCR_REPOSITORY
+            ? `Missing passed exact-head deterministic witness with full receipt fingerprint from trusted GitHub App issuer for ${review.reviewer.id}`
+            : `Missing passed exact-head deterministic witness for ${review.reviewer.id}`,
       );
       continue;
     }

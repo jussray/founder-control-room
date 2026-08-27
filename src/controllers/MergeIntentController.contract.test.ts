@@ -85,7 +85,7 @@ describe('merge intent liveness contract', () => {
 
   it('uses truthful vocabulary: identity freshness is REVALIDATED, READY is reserved for full policy proof', () => {
     expect(readinessVocabulary).toMatch(/'revalidated'/);
-    expect(readinessVocabulary).toMatch(/READY remains reserved for a future projection/);
+    expect(readinessVocabulary).toMatch(/READY remains reserved for a future\s+(?:--\s*)?projection/);
     expect(readinessVocabulary).toMatch(/REVALIDATED means exact approved PR\/base\/head\/diff identity is fresh enough/);
     expect(controller).toMatch(/state: 'revalidated'/);
     expect(controller).toMatch(/Merge intent identity is REVALIDATED/);
@@ -163,7 +163,7 @@ describe('merge intent liveness contract', () => {
     expect(reapprovalLoop).toMatch(/v_repository = 'jussray\/founder-control-room'/);
     expect(reapprovalLoop).toMatch(/new\.status = 'in_review'/);
     expect(reapprovalLoop).toMatch(/v_intent_state in \('needs_review', 'stale', 'expired', 'blocked'\)/);
-    expect(reapprovalLoop).toMatch(/preserve the sticky revocation state/);
+    expect(reapprovalLoop).toMatch(/preserves? the sticky revocation state/);
     expect(reapprovalLoop).toMatch(/lower\(mi\.repository\) = 'jussray\/founder-control-room'/);
     expect(reapprovalLoop).toMatch(/Merge-intent reapproval-loop postcondition failed/);
   });
@@ -175,7 +175,7 @@ describe('merge intent liveness contract', () => {
     expect(scheduler).toMatch(/mission\.status === 'approved' && mergeIntentMissionIds\.has\(mission\.id\)/);
     expect(scheduler).toMatch(/controller: 'MergeIntentController'/);
     expect(reconciler).toMatch(/import \{ MergeIntentController \}/);
-    expect(reconciler).toMatch(/\['MergeIntentController', new MergeIntentController\(\)\]/);
+    expect(reconciler).toMatch(/\[["']MergeIntentController["'], new MergeIntentController\(\)\]/);
   });
 
   it('keeps merge-intent storage service-role-only', () => {

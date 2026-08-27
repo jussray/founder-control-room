@@ -3,13 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
   mockGetRepoRulesets,
   mockGetRepoRuleset,
-  mockListCollaborators,
   mockCreateRepoRuleset,
   mockUpdateRepoRuleset,
 } = vi.hoisted(() => ({
   mockGetRepoRulesets: vi.fn(),
   mockGetRepoRuleset: vi.fn(),
-  mockListCollaborators: vi.fn(),
   mockCreateRepoRuleset: vi.fn(),
   mockUpdateRepoRuleset: vi.fn(),
 }));
@@ -19,7 +17,6 @@ vi.mock("@octokit/rest", () => ({
     repos = {
       getRepoRulesets: mockGetRepoRulesets,
       getRepoRuleset: mockGetRepoRuleset,
-      listCollaborators: mockListCollaborators,
       createRepoRuleset: mockCreateRepoRuleset,
       updateRepoRuleset: mockUpdateRepoRuleset,
     };
@@ -37,13 +34,16 @@ const config = {
   requiredStatusCheckNames: ["Required Gate", "Verify test-ledger contract"],
   blockForcePushes: true,
   blockDeletion: true,
+  bypassActors: [{ kind: "app" as const, id: "123" }],
 };
 
-type TestConfig = typeof config & {
-  bypassActors?: Array<{ kind: "app"; id: string }>;
-};
+type TestConfig = typeof config;
 
-function strongReadback(request: TestConfig = config) {
+function freshnessName(request: TestConfig = config) {
+  return `${request.name} [strict freshness]`;
+}
+
+function reviewReadback(request: TestConfig = config) {
   const rules: Array<{ type: string; parameters?: Record<string, unknown> }> = [
     {
       type: "pull_request",
@@ -55,16 +55,6 @@ function strongReadback(request: TestConfig = config) {
       },
     },
   ];
-
-  if (request.requiredStatusCheckNames.length > 0) {
-    rules.push({
-      type: "required_status_checks",
-      parameters: {
-        strict_required_status_checks_policy: true,
-        required_status_checks: request.requiredStatusCheckNames.map((context) => ({ context })),
-      },
-    });
-  }
   if (request.blockForcePushes) rules.push({ type: "non_fast_forward" });
   if (request.blockDeletion) rules.push({ type: "deletion" });
 
@@ -72,10 +62,10 @@ function strongReadback(request: TestConfig = config) {
     id: 1,
     name: request.name,
     enforcement: request.enforcement,
-    bypass_actors: (request.bypassActors ?? []).map((actor) => ({
+    bypass_actors: request.bypassActors.map((actor) => ({
       actor_type: "Integration",
       actor_id: Number(actor.id),
-      bypass_mode: "always",
+      bypass_mode: "pull_request",
     })),
     conditions: {
       ref_name: {
@@ -84,6 +74,34 @@ function strongReadback(request: TestConfig = config) {
       },
     },
     rules,
+  };
+}
+
+function freshnessReadback(request: TestConfig = config) {
+  return {
+    id: 2,
+    name: freshnessName(request),
+    enforcement: request.enforcement,
+    bypass_actors: [] as Array<{
+      actor_type: string;
+      actor_id: number;
+      bypass_mode: string;
+    }>,
+    conditions: {
+      ref_name: {
+        include: request.targetRefs.map((ref) => `refs/heads/${ref}`),
+        exclude: [],
+      },
+    },
+    rules: [
+      {
+        type: "required_status_checks",
+        parameters: {
+          strict_required_status_checks_policy: true,
+          required_status_checks: request.requiredStatusCheckNames.map((context) => ({ context })),
+        },
+      },
+    ],
   };
 }
 
@@ -97,68 +115,77 @@ function buildProvider() {
   });
 }
 
-function pullRequestRuleFromLastCreate() {
-  const payload = mockCreateRepoRuleset.mock.calls.at(-1)?.[0];
-  return payload.rules.find((rule: { type: string }) => rule.type === "pull_request");
-}
-
-function statusRuleFromLastCreate() {
-  const payload = mockCreateRepoRuleset.mock.calls.at(-1)?.[0];
-  return payload.rules.find((rule: { type: string }) => rule.type === "required_status_checks");
+function installStrongProviderMocks(request: TestConfig = config) {
+  mockCreateRepoRuleset.mockImplementation(async (payload: { name: string; enforcement: string }) => ({
+    data: {
+      id: payload.name === freshnessName(request) ? 2 : 1,
+      name: payload.name,
+      enforcement: payload.enforcement,
+    },
+  }));
+  mockUpdateRepoRuleset.mockImplementation(async (payload: { name: string; enforcement: string }) => ({
+    data: {
+      id: payload.name === freshnessName(request) ? 2 : 1,
+      name: payload.name,
+      enforcement: payload.enforcement,
+    },
+  }));
+  mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+    data: ruleset_id === 2 ? freshnessReadback(request) : reviewReadback(request),
+  }));
 }
 
 describe("GitHubProvider FCR main ruleset hardening", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetRepoRulesets.mockResolvedValue({ data: [] });
-    mockGetRepoRuleset.mockResolvedValue({ data: strongReadback() });
-    mockListCollaborators.mockResolvedValue({
-      data: [
-        { login: "jussray", permissions: { push: true } },
-        { login: "independent-reviewer", permissions: { push: true } },
-      ],
-    });
-    mockCreateRepoRuleset.mockResolvedValue({
-      data: { id: 1, name: config.name, enforcement: "active" },
-    });
-    mockUpdateRepoRuleset.mockResolvedValue({
-      data: { id: 1, name: config.name, enforcement: "active" },
-    });
+    installStrongProviderMocks();
   });
 
-  it("maps active FCR main review policy to stale-review and last-push protections", async () => {
+  it("separates no-bypass strict freshness from the pull-request-only review membrane", async () => {
     const provider = buildProvider();
-    await provider.applyBranchRuleset("founder-control-room", config);
+    const result = await provider.applyBranchRuleset("founder-control-room", config);
 
-    expect(mockListCollaborators).toHaveBeenCalledWith({
-      owner: "jussray",
-      repo: "founder-control-room",
-      affiliation: "all",
-      per_page: 100,
-    });
-
-    const pullRequestRule = pullRequestRuleFromLastCreate();
-    expect(pullRequestRule.parameters).toMatchObject({
-      required_approving_review_count: 1,
-      dismiss_stale_reviews_on_push: true,
-      require_last_push_approval: true,
-      required_review_thread_resolution: true,
-    });
-
-    const statusRule = statusRuleFromLastCreate();
-    expect(statusRule.parameters.strict_required_status_checks_policy).toBe(true);
-    expect(statusRule.parameters.required_status_checks).toEqual([
-      { context: "Required Gate" },
-      { context: "Verify test-ledger contract" },
+    expect(result.components).toEqual([
+      { purpose: "review", id: "1", name: config.name, enforcement: "active" },
+      { purpose: "strict_freshness", id: "2", name: freshnessName(), enforcement: "active" },
     ]);
-    expect(mockGetRepoRuleset).toHaveBeenCalledWith({
-      owner: "jussray",
-      repo: "founder-control-room",
-      ruleset_id: 1,
-    });
+    expect(mockCreateRepoRuleset).toHaveBeenCalledTimes(2);
+    const freshnessPayload = mockCreateRepoRuleset.mock.calls[0]?.[0];
+    const reviewPayload = mockCreateRepoRuleset.mock.calls[1]?.[0];
+
+    expect(freshnessPayload.name).toBe(freshnessName());
+    expect(freshnessPayload.bypass_actors).toEqual([]);
+    expect(freshnessPayload.rules).toEqual([
+      {
+        type: "required_status_checks",
+        parameters: {
+          do_not_enforce_on_create: false,
+          required_status_checks: [
+            { context: "Required Gate" },
+            { context: "Verify test-ledger contract" },
+          ],
+          strict_required_status_checks_policy: true,
+        },
+      },
+    ]);
+
+    expect(reviewPayload.bypass_actors).toEqual([
+      { actor_type: "Integration", actor_id: 123, bypass_mode: "pull_request" },
+    ]);
+    expect(reviewPayload.rules.some((rule: { type: string }) => rule.type === "required_status_checks")).toBe(false);
+    expect(reviewPayload.rules.find((rule: { type: string }) => rule.type === "pull_request")?.parameters)
+      .toMatchObject({
+        required_approving_review_count: 1,
+        dismiss_stale_reviews_on_push: true,
+        require_last_push_approval: true,
+        required_review_thread_resolution: true,
+      });
+
+    expect(mockGetRepoRuleset.mock.calls.map((call) => call[0].ruleset_id)).toEqual([2, 1]);
   });
 
-  it("rejects a weak FCR main policy before provider mutation", async () => {
+  it("rejects weak FCR main policy before any provider mutation", async () => {
     const provider = buildProvider();
 
     await expect(provider.applyBranchRuleset("founder-control-room", {
@@ -166,69 +193,55 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
       requiredApprovingReviewCount: 0,
     })).rejects.toThrow("at least one approving review is required");
 
-    expect(mockListCollaborators).not.toHaveBeenCalled();
-    expect(mockCreateRepoRuleset).not.toHaveBeenCalled();
-    expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
-    expect(mockGetRepoRuleset).not.toHaveBeenCalled();
-  });
-
-  it("rejects an independent-review policy when no non-owner writer can satisfy it", async () => {
-    mockListCollaborators.mockResolvedValue({
-      data: [{ login: "jussray", permissions: { push: true } }],
-    });
-
-    const provider = buildProvider();
-    await expect(provider.applyBranchRuleset("founder-control-room", config))
-      .rejects.toThrow("non-owner collaborator with write authority");
-
-    expect(mockCreateRepoRuleset).not.toHaveBeenCalled();
-    expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
-    expect(mockGetRepoRuleset).not.toHaveBeenCalled();
-  });
-
-  it("does not count a non-owner read-only collaborator as independent-review capability", async () => {
-    mockListCollaborators.mockResolvedValue({
-      data: [
-        { login: "jussray", permissions: { push: true } },
-        { login: "reader", permissions: { push: false } },
-      ],
-    });
-
-    const provider = buildProvider();
-    await expect(provider.applyBranchRuleset("founder-control-room", config))
-      .rejects.toThrow("non-owner collaborator with write authority");
-  });
-
-  it("accepts renamed policy and additional protected refs when semantics round-trip", async () => {
-    const flexible = {
+    await expect(provider.applyBranchRuleset("founder-control-room", {
       ...config,
-      name: "FCR main governance v2",
-      targetRefs: ["main", "release"],
-    };
-    mockCreateRepoRuleset.mockResolvedValue({
-      data: { id: 1, name: flexible.name, enforcement: "active" },
-    });
-    mockGetRepoRuleset.mockResolvedValue({ data: strongReadback(flexible) });
+      requiredStatusCheckNames: [],
+    })).rejects.toThrow("at least one required status check is required");
 
-    const provider = buildProvider();
-    await expect(provider.applyBranchRuleset("founder-control-room", flexible)).resolves.toMatchObject({
-      name: flexible.name,
-      enforcement: "active",
-    });
+    expect(mockCreateRepoRuleset).not.toHaveBeenCalled();
+    expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
+    expect(mockGetRepoRuleset).not.toHaveBeenCalled();
   });
 
-  it("fails closed when provider read-back does not match the hardened FCR policy", async () => {
-    const weak = strongReadback();
+  it("rejects FCR main hardening without exactly one numeric GitHub App bypass identity", async () => {
+    const provider = buildProvider();
+
+    await expect(provider.applyBranchRuleset("founder-control-room", {
+      ...config,
+      bypassActors: [],
+    })).rejects.toThrow("exactly one numeric GitHub App bypass actor is required");
+
+    await expect(provider.applyBranchRuleset("founder-control-room", {
+      ...config,
+      bypassActors: [{ kind: "app", id: "not-numeric" }],
+    })).rejects.toThrow("exactly one numeric GitHub App bypass actor is required");
+
+    expect(mockCreateRepoRuleset).not.toHaveBeenCalled();
+    expect(mockUpdateRepoRuleset).not.toHaveBeenCalled();
+  });
+
+  it("fails before touching the review membrane when freshness readback exposes a bypass actor", async () => {
+    const compromised = freshnessReadback();
+    compromised.bypass_actors = [{
+      actor_type: "Integration",
+      actor_id: 123,
+      bypass_mode: "pull_request",
+    }];
+    mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+      data: ruleset_id === 2 ? compromised : reviewReadback(),
+    }));
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", config))
+      .rejects.toThrow("strict freshness ruleset must have zero bypass actors");
+
+    expect(mockCreateRepoRuleset).toHaveBeenCalledTimes(1);
+    expect(mockCreateRepoRuleset.mock.calls[0]?.[0].name).toBe(freshnessName());
+  });
+
+  it("fails before touching the review membrane when freshness is not strict or exact", async () => {
+    const weak = freshnessReadback();
     weak.rules = [
-      {
-        type: "pull_request",
-        parameters: {
-          required_approving_review_count: 0,
-          dismiss_stale_reviews_on_push: false,
-          require_last_push_approval: false,
-          required_review_thread_resolution: false,
-        },
-      },
       {
         type: "required_status_checks",
         parameters: {
@@ -237,54 +250,108 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
         },
       },
     ];
-    mockGetRepoRuleset.mockResolvedValue({ data: weak });
+    mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+      data: ruleset_id === 2 ? weak : reviewReadback(),
+    }));
 
     const provider = buildProvider();
     await expect(provider.applyBranchRuleset("founder-control-room", config))
-      .rejects.toThrow("FCR main ruleset read-back mismatch");
+      .rejects.toThrow(/FCR strict-freshness ruleset 2 read-back mismatch/);
+
+    expect(mockCreateRepoRuleset).toHaveBeenCalledTimes(1);
   });
 
-  it("fails closed when provider read-back widens bypass authority", async () => {
-    const widened = strongReadback();
+  it("fails closed when review readback widens the trusted app bypass", async () => {
+    const widened = reviewReadback();
     widened.bypass_actors = [{
       actor_type: "Integration",
-      actor_id: 999,
+      actor_id: 123,
       bypass_mode: "always",
     }];
-    mockGetRepoRuleset.mockResolvedValue({ data: widened });
+    mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+      data: ruleset_id === 2 ? freshnessReadback() : widened,
+    }));
 
     const provider = buildProvider();
     await expect(provider.applyBranchRuleset("founder-control-room", config))
       .rejects.toThrow("bypass actors do not match the requested policy");
   });
 
-  it("fails closed when provider read-back changes bypass mode for the same actor", async () => {
-    const configWithBypass: TestConfig = {
-      ...config,
-      bypassActors: [{ kind: "app", id: "123" }],
-    };
-    const wrongMode = strongReadback(configWithBypass);
-    wrongMode.bypass_actors = [{
-      actor_type: "Integration",
-      actor_id: 123,
-      bypass_mode: "pull_request",
-    }];
-    mockGetRepoRuleset.mockResolvedValue({ data: wrongMode });
+  it("surfaces the verified freshness identity when the review mutation fails", async () => {
+    mockCreateRepoRuleset.mockImplementation(async (payload: { name: string; enforcement: string }) => {
+      if (payload.name === freshnessName()) {
+        return { data: { id: 2, name: payload.name, enforcement: payload.enforcement } };
+      }
+      throw new Error("review write failed");
+    });
 
     const provider = buildProvider();
-    await expect(provider.applyBranchRuleset("founder-control-room", configWithBypass))
-      .rejects.toThrow("bypass actors do not match the requested policy");
+    await expect(provider.applyBranchRuleset("founder-control-room", config))
+      .rejects.toThrow(/strict-freshness ruleset .* \(2\).*review write failed/);
+
+    expect(mockCreateRepoRuleset.mock.calls.map((call) => call[0].name))
+      .toEqual([freshnessName(), config.name]);
   });
 
-  it("does not impose FCR-specific stale-review semantics on another project", async () => {
+  it("updates both stable ruleset identities when they already exist", async () => {
+    mockGetRepoRulesets.mockResolvedValue({
+      data: [
+        { id: 11, name: config.name },
+        { id: 22, name: freshnessName() },
+      ],
+    });
+    mockUpdateRepoRuleset.mockImplementation(async (payload: { name: string; enforcement: string; ruleset_id: number }) => ({
+      data: {
+        id: payload.ruleset_id,
+        name: payload.name,
+        enforcement: payload.enforcement,
+      },
+    }));
+    mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+      data: ruleset_id === 22 ? { ...freshnessReadback(), id: 22 } : { ...reviewReadback(), id: 11 },
+    }));
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", config)).resolves.toMatchObject({
+      name: config.name,
+      enforcement: "active",
+    });
+
+    expect(mockCreateRepoRuleset).not.toHaveBeenCalled();
+    expect(mockUpdateRepoRuleset.mock.calls.map((call) => call[0].ruleset_id)).toEqual([22, 11]);
+  });
+
+  it("accepts renamed policy and additional protected refs when both membranes round-trip", async () => {
+    const flexible = {
+      ...config,
+      name: "FCR main governance v2",
+      targetRefs: ["main", "release"],
+    };
+    installStrongProviderMocks(flexible);
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", flexible)).resolves.toMatchObject({
+      name: flexible.name,
+      enforcement: "active",
+    });
+  });
+
+  it("keeps generic repositories on their existing single-ruleset always-bypass behavior", async () => {
     const provider = buildProvider();
     await provider.applyBranchRuleset("sekret-bip", config);
 
-    const pullRequestRule = pullRequestRuleFromLastCreate();
-    expect(pullRequestRule.parameters.dismiss_stale_reviews_on_push).toBe(false);
-    expect(pullRequestRule.parameters.require_last_push_approval).toBe(false);
-    expect(pullRequestRule.parameters.required_review_thread_resolution).toBe(true);
-    expect(mockListCollaborators).not.toHaveBeenCalled();
+    expect(mockCreateRepoRuleset).toHaveBeenCalledTimes(1);
+    const payload = mockCreateRepoRuleset.mock.calls[0]?.[0];
+    expect(payload.rules.find((rule: { type: string }) => rule.type === "pull_request")?.parameters)
+      .toMatchObject({
+        dismiss_stale_reviews_on_push: false,
+        require_last_push_approval: false,
+        required_review_thread_resolution: true,
+      });
+    expect(payload.rules.find((rule: { type: string }) => rule.type === "required_status_checks")).toBeTruthy();
+    expect(payload.bypass_actors).toEqual([
+      { actor_type: "Integration", actor_id: 123, bypass_mode: "always" },
+    ]);
     expect(mockGetRepoRuleset).not.toHaveBeenCalled();
   });
 });

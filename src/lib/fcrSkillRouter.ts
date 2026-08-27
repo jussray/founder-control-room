@@ -4,6 +4,11 @@ import {
 } from '../founder-os-lab/capabilityKernel.js';
 
 export const FCR_SKILL_ROUTER_CONTRACT = 'juss/fcr-skill-router@v1' as const;
+export const FCR_REQUIRED_PARALLEL_LENSES = [
+  'product-design',
+  'data-analytics',
+  'deep-research',
+] as const;
 
 export type FcrSkillRouterAction =
   | 'inspect'
@@ -43,6 +48,8 @@ export interface FcrSkillRoutingDecision {
   plannedCapabilityIds: string[];
   policyRequiredCapabilityIds: string[];
   missingPolicyCapabilityIds: string[];
+  requiredParallelLenses: string[];
+  missingParallelLenses: string[];
   requiredTools: string[];
   requiredProof: string[];
   mutationRequested: boolean;
@@ -124,12 +131,17 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const requiredTools: string[] = [];
   const requiredProof: string[] = [];
   const policyRequiredCapabilityIds = explicitSkillsFromGoal(goal);
+  const requiredParallelLenses = [...FCR_REQUIRED_PARALLEL_LENSES];
   const mutationRequested = MUTATING_ACTIONS.has(input.action);
   const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository);
   const uiGoal = isUiGoal(goal);
   const messagingGoal = isMessagingGoal(goal);
   const commercialGoal = isCommercialGoal(goal);
   const mergeReviewGoal = repositoryGoal && (input.action === 'merge' || input.action === 'review');
+
+  pushUnique(requiredProof, 'Product Design disposition recorded for the selected path; UI/runtime claims still require rendered browser evidence');
+  pushUnique(requiredProof, 'Data Analytics outcome signals declared before execution and treated as observation-only evidence');
+  pushUnique(requiredProof, 'Deep Research uses authoritative primary sources when research can change the decision; research never grants execution authority');
 
   if (commercialGoal) {
     pushUnique(policyRequiredCapabilityIds, 'sales');
@@ -184,15 +196,20 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
     : [];
   const planned = new Set(plannedCapabilityIds);
   const missingPolicyCapabilityIds = policyRequiredCapabilityIds.filter((id) => !planned.has(canonicalCapabilityId(id)));
+  const plannedLenses = new Set((input.capabilityPlan?.strategicLenses ?? []).map(normalize));
+  const missingParallelLenses = requiredParallelLenses.filter((lens) => !plannedLenses.has(lens));
 
   for (const missing of missingPolicyCapabilityIds) {
     errors.push(`Chief AI capability plan is missing repository-required capability: ${missing}`);
+  }
+  for (const missing of missingParallelLenses) {
+    errors.push(`Chief AI capability plan is missing required RayOS parallel lens: ${missing}`);
   }
 
   const status = errors.length === 0 ? 'ready_for_runtime_discovery' : 'blocked';
   const nextGate = status === 'blocked'
     ? 'Return the policy failures to Chief AI and require a corrected hash-bound capability plan before runtime discovery or mutation.'
-    : 'Discover runtime availability for only the capabilities in the validated Chief AI plan; preserve provider, proof, approval, and execution boundaries.';
+    : 'Discover runtime availability for only the capabilities in the validated Chief AI plan; preserve Product Design, Data Analytics, Deep Research, provider, proof, approval, and execution boundaries.';
 
   return {
     contract: FCR_SKILL_ROUTER_CONTRACT,
@@ -203,6 +220,8 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
     plannedCapabilityIds,
     policyRequiredCapabilityIds,
     missingPolicyCapabilityIds,
+    requiredParallelLenses,
+    missingParallelLenses,
     requiredTools,
     requiredProof,
     mutationRequested,

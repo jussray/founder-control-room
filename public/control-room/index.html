@@ -25,6 +25,10 @@
 .conveyor-readiness[data-state='not-configured']::before,.conveyor-readiness[data-state='enabled-awaiting-proof']::before{background:#ffd166}
 .conveyor-readiness[data-state='error']{border-color:rgba(255,125,139,.48)}
 .conveyor-readiness[data-state='error']::before{background:#ff7d8b}
+.genesis-evidence-link{display:inline-flex;align-items:center;gap:.35rem;width:max-content;max-width:100%;margin-top:.5rem;margin-right:.7rem;color:#c4b5fd;text-decoration:none;font:750 .7rem/1.25 system-ui,sans-serif}
+.genesis-evidence-link::before{content:'↗';flex:0 0 auto;color:#a78bfa;font-size:.76rem;line-height:1}
+.genesis-evidence-link:hover{text-decoration:underline;text-underline-offset:.2em}
+.genesis-evidence-link:focus-visible{outline:2px solid #ddd6fe;outline-offset:3px;border-radius:.2rem}
 .loop-mark{flex:0 0 auto;color:#f8fafc;font-size:1.5rem;line-height:1}
 .stack-lane{--lane:#7dd3fc;display:grid;grid-template-columns:8rem minmax(0,1fr);gap:.75rem;align-items:center;padding:.72rem;border:1px solid color-mix(in srgb,var(--lane) 42%,transparent);border-radius:1rem;background:linear-gradient(90deg,color-mix(in srgb,var(--lane) 10%,transparent),rgba(15,23,42,.7));box-shadow:inset 0 0 28px color-mix(in srgb,var(--lane) 5%,transparent)}
 .stack-lane[data-lane='chat']{--lane:#67e8f9}
@@ -70,6 +74,8 @@ a.stage:focus-visible,.launch-dock summary:focus-visible{outline:3px solid #f8fa
         <span class="conveyor-readiness" data-conveyor-readiness data-state="checking" role="status" aria-live="polite" aria-atomic="true">
           <span data-conveyor-readiness-label>Checking n8n readiness…</span>
         </span>
+        <a class="genesis-evidence-link" data-genesis-evidence href="/control-room/genesis.html" aria-label="View Bip Genesis provenance evidence">Genesis evidence · view origin record</a>
+        <a class="genesis-evidence-link" data-evidence-trust-link href="/control-room/evidence-trust.html" aria-label="View the Evidence Trust Plane">Evidence trust plane · observation → authority</a>
       </div>
       <span class="loop-mark" aria-hidden="true">🔁</span>
     </header>
@@ -139,6 +145,7 @@ a.stage:focus-visible,.launch-dock summary:focus-visible{outline:3px solid #f8fa
     <p class="loop-footer"><span aria-hidden="true">♾️</span><span>A continuous system. <strong>Consistent output becomes the next Chat prompt.</strong></span></p>
   </div>
 </details>
+<script src="/control-room/read-truth-membrane.js"></script>
 <script src="/control-room/v10-plan-bridge.js"></script>
 <script type="module" src="/control-room/app.js"></script>
 <script type="module" src="/control-room/stack-router.js"></script>

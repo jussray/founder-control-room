@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Session } from '@supabase/supabase-js';
+import type { Response } from 'express';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockSignInWithOAuth,
@@ -39,12 +41,14 @@ vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
 
 import express from 'express';
 import request from 'supertest';
+import { writeFounderSession } from '../../../auth/founderSession.js';
 import { authRouter } from '../auth.js';
 import { onboardingRouter } from '../onboarding.js';
 
 const EMAIL = 'sekretbip@gmail.com';
 const ACCESS_TOKEN = 'access-token-value';
 const REFRESH_TOKEN = 'refresh-token-value';
+const TEST_SIGNING_SECRET = 'founder-session-test-signing-secret-0123456789abcdef';
 
 function app() {
   const instance = express();
@@ -82,19 +86,23 @@ function validSession() {
 }
 
 function browserCookie() {
-  const value = Buffer.from(JSON.stringify({
-    accessToken: ACCESS_TOKEN,
-    refreshToken: REFRESH_TOKEN,
-    expiresAt: 2_000_000_000,
-  })).toString('base64url');
-  return `fcr_session=${encodeURIComponent(value)}`;
+  let setCookie = '';
+  const res = {
+    setHeader(name: string, value: unknown) {
+      if (name.toLowerCase() === 'set-cookie') setCookie = String(value);
+      return res;
+    },
+  } as unknown as Response;
+  writeFounderSession(res, validSession() as unknown as Session);
+  return setCookie.split(';', 1)[0] ?? '';
 }
 
 describe('founder browser onboarding', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.NODE_ENV = 'test';
-    process.env.FOUNDER_API_URL = 'https://control.example.com';
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('FOUNDER_API_URL', 'https://control.example.com');
+    vi.stubEnv('FOUNDER_SESSION_SIGNING_SECRET', TEST_SIGNING_SECRET);
     setAllowlist(true);
     mockSignInWithOAuth.mockResolvedValue({
       data: { provider: 'google', url: 'https://supabase.example/authorize/google' },
@@ -105,6 +113,10 @@ describe('founder browser onboarding', () => {
       data: { user: { id: 'founder-user', email: EMAIL } },
       error: null,
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('serves Google login and the full founder workspace onboarding surface without embedding the founder email', async () => {

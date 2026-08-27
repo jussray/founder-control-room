@@ -22,12 +22,14 @@ import { commandBridgeRouter } from './routes/commandBridge.js';
 import { designOsRouter } from './routes/designOs.js';
 import { cloudflareReasoningRouter } from './routes/cloudflareReasoning.js';
 import { mcpRouter } from './routes/mcp.js';
+import { handleRemoteMcpProtectedResourceMetadata } from './routes/remoteReadMcp.js';
 import { externalUseRouter } from './routes/externalUse.js';
 import { futureYouRouter } from './routes/futureYou.js';
 import { goalfixRouter } from './routes/goalfix.js';
 import { founderOsSkillsRouter } from './routes/founderOsSkills.js';
 import { mirrorRouter } from './routes/mirror.js';
 import { n8nConveyorRouter } from './routes/n8nConveyor.js';
+import { quickScanRouter } from './routes/quickscan.js';
 import { switchboardRouter } from './routes/switchboard.js';
 import { securityPostureRouter } from './routes/securityPosture.js';
 import { handleFounderSignalEngineMcp } from './routes/founderSignalEngineMcp.js';
@@ -47,6 +49,7 @@ import {
 } from './routes/repositoryVerification.js';
 import { economicIntelligenceRouter } from './routes/economicIntelligence.js';
 import { handleGitHubWebhook } from './webhooks/github.js';
+import { handleStripeQuickScanWebhook } from './webhooks/stripeQuickScan.js';
 import { debugRouter } from './routes/debug.js';
 import { publicGuardrailSnapshot, renderGuardrailStatusPage } from '../guardrails.js';
 import { V10_CAPABILITY_PLAN_CONTRACT } from '../founder-os-lab/capabilityKernel.js';
@@ -156,6 +159,11 @@ export function createServer(options: CreateServerOptions = {}) {
     handleGitHubWebhook,
   );
   app.post(
+    '/webhooks/stripe-quickscan',
+    express.raw({ type: 'application/json', limit: '64kb' }),
+    handleStripeQuickScanWebhook,
+  );
+  app.post(
     '/ingest/repository-verification',
     express.raw({ type: 'application/json', limit: '512kb' }),
     handleRepositoryVerificationIngest,
@@ -214,6 +222,14 @@ export function createServer(options: CreateServerOptions = {}) {
     express.json({ type: 'application/json', limit: '16kb' }),
     requireFounderSignalReadMcpToken,
     handleXEngagementSignalMcp,
+  );
+  app.get(
+    '/.well-known/oauth-protected-resource',
+    handleRemoteMcpProtectedResourceMetadata,
+  );
+  app.get(
+    '/.well-known/oauth-protected-resource/mcp',
+    handleRemoteMcpProtectedResourceMetadata,
   );
 
   app.use(requireSameOriginBrowserMutation);
@@ -292,6 +308,7 @@ export function createServer(options: CreateServerOptions = {}) {
   app.use('/plugin-center', pluginCenterRouter);
   app.use('/command-bridge', commandBridgeRouter);
   app.use('/automation/conveyor', n8nConveyorRouter);
+  app.use('/quickscan', quickScanRouter);
   app.use('/design-os', designOsRouter);
   app.use('/cloudflare', cloudflareReasoningRouter);
   app.use('/mcp', mcpRouter);

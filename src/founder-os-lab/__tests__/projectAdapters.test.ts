@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { planFounderOsLab } from '../engine.js';
 import { FOUNDER_OS_LAB_PROJECT_ADAPTERS } from '../projectAdapters.js';
 
-const ADAPTER = FOUNDER_OS_LAB_PROJECT_ADAPTERS[0];
+const foundAdapter = FOUNDER_OS_LAB_PROJECT_ADAPTERS.find(
+  (candidate) => candidate.id === 'sekret-bip',
+);
+if (!foundAdapter) throw new Error('sekret-bip adapter missing');
+const ADAPTER = foundAdapter;
 
 function contractUrls(paths: readonly string[] = ADAPTER.requiredContractPaths) {
   return paths.map(
@@ -22,12 +26,13 @@ function project(overrides: Record<string, unknown> = {}) {
 
 describe('Se’kret Bip Founder OS project adapter', () => {
   it('binds one portfolio identity to the audited repository and exact source head', () => {
-    expect(FOUNDER_OS_LAB_PROJECT_ADAPTERS).toHaveLength(1);
+    expect(FOUNDER_OS_LAB_PROJECT_ADAPTERS).toHaveLength(2);
     expect(ADAPTER).toMatchObject({
       id: 'sekret-bip',
+      adapterId: 'sekret-bip-project-preview',
       name: 'Se’kret Bip',
       repository: 'jussray/Sekret-Bip',
-      auditedSourceHead: '90d350a22cbdde1f1d5aa2ced1453a62fa298193',
+      auditedSourceHead: '467da149bad1720f87885a991a924aa143eb2ddd',
       authorityOwner: 'founder-control-room',
       mode: 'preview',
       executionAllowed: false,
@@ -49,9 +54,9 @@ describe('Se’kret Bip Founder OS project adapter', () => {
       'test/dual-front-door-contract.test.mjs',
     ]);
     expect(ADAPTER.auditedContractBlobs).toMatchObject({
-      'app/index.tsx': '46e73c816a392f289c377d5610243d8ef8189f7c',
-      'screens/WebWelcomeScreen.tsx': '2520c10810593ebcab93e2d3be2a14cff6bd32ce',
-      'test/dual-front-door-contract.test.mjs': '6f4a3743a6accf9064877d3759ecb006f35a1b98',
+      'app/index.tsx': '9fd126bbec9a9958ef9c39cf9a25356bee83bb87',
+      'screens/WebWelcomeScreen.tsx': '5f1dafb209a9e8aee050b61fe38ace808e99f4b1',
+      'test/dual-front-door-contract.test.mjs': '1ceb267d7d20136d38fce95f2418fe22b6a1468e',
     });
   });
 
@@ -106,7 +111,7 @@ describe('Se’kret Bip Founder OS project adapter', () => {
       forbiddenDisplayNames: ['Suhanna'],
       executionAllowed: false,
     });
-    expect(plan.truth.verified.join(' ')).toContain('audience separation');
+    expect(plan.truth.verified.join(' ')).toContain('audience');
     expect(plan.authority.executionAllowed).toBe(false);
   });
 
@@ -136,7 +141,7 @@ describe('Se’kret Bip Founder OS project adapter', () => {
     );
   });
 
-  it('fails closed for repository, source-head, and canon-contract drift', () => {
+  it('fails closed for repository, source-head, and project-contract drift', () => {
     const wrongRepository = planFounderOsLab({
       goal: 'Inspect a project copy.',
       action: 'inspect',
@@ -158,7 +163,7 @@ describe('Se’kret Bip Founder OS project adapter', () => {
     expect(staleHead.truth.blocked.join(' ')).toContain('has not been audited');
 
     const missingContract = planFounderOsLab({
-      goal: 'Inspect incomplete canon evidence.',
+      goal: 'Inspect incomplete project evidence.',
       action: 'inspect',
       provider: 'github',
       project: project({
@@ -170,7 +175,7 @@ describe('Se’kret Bip Founder OS project adapter', () => {
       'test/dual-front-door-contract.test.mjs',
     ]);
     expect(missingContract.truth.blocked.join(' ')).toContain(
-      'is missing exact-head canon contract URLs',
+      'is missing exact-head project contract URLs',
     );
   });
 

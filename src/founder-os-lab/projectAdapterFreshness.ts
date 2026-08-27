@@ -122,7 +122,7 @@ export function assessProjectAdapterFreshness(
         contractPathsDrifted: [],
         blocker: `Contract blob evidence is invalid for ${path}.`,
         nextAction: 'Re-read the exact contract blob and repair the adapter manifest if required.',
-        reasons: ['Malformed blob evidence cannot establish canon freshness.'],
+        reasons: ['Malformed blob evidence cannot establish project-contract freshness.'],
       };
     }
     if (expected.toLowerCase() !== observed.toLowerCase()) drifted.push(path);
@@ -137,9 +137,9 @@ export function assessProjectAdapterFreshness(
       sourceHeadMatchesAudited,
       contractPathsMissing: missing,
       contractPathsDrifted: [],
-      blocker: `Current-head canon evidence is missing for: ${missing.join(', ')}.`,
+      blocker: `Current-head project-contract evidence is missing for: ${missing.join(', ')}.`,
       nextAction: 'Read every required contract blob from the exact current head before using the adapter.',
-      reasons: ['Incomplete canon evidence cannot establish project adapter freshness.'],
+      reasons: ['Incomplete contract evidence cannot establish project adapter freshness.'],
     };
   }
 
@@ -153,13 +153,13 @@ export function assessProjectAdapterFreshness(
       contractPathsMissing: [],
       contractPathsDrifted: drifted,
       blocker: sourceHeadMatchesAudited
-        ? `Required canon contract blobs drifted at the audited head: ${drifted.join(', ')}.`
-        : `Repository main advanced and required canon contract blobs drifted: ${drifted.join(', ')}.`,
-      nextAction: 'Perform a semantic canon review before updating the checked-in adapter evidence.',
+        ? `Required project contract blobs drifted at the audited head: ${drifted.join(', ')}.`
+        : `Repository main advanced and required project contract blobs drifted: ${drifted.join(', ')}.`,
+      nextAction: 'Perform a semantic project-contract review before updating the checked-in adapter evidence.',
       reasons: [
         sourceHeadMatchesAudited
-          ? 'Exact-head identity alone is insufficient when a required canon blob differs from the audited manifest.'
-          : 'Repository main advanced and at least one required canon blob no longer matches the audited manifest.',
+          ? 'Exact-head identity alone is insufficient when a required project contract blob differs from the audited manifest.'
+          : 'Repository main advanced and at least one required project contract blob no longer matches the audited manifest.',
       ],
     };
   }
@@ -175,7 +175,7 @@ export function assessProjectAdapterFreshness(
       contractPathsDrifted: [],
       blocker: null,
       nextAction: 'Keep the adapter read-only and refresh the audited head only when intentionally updating the provenance snapshot.',
-      reasons: ['Repository main advanced, but every required canon blob still matches the audited adapter snapshot.'],
+      reasons: ['Repository main advanced, but every required project contract blob still matches the audited adapter snapshot.'],
     };
   }
 
@@ -188,7 +188,7 @@ export function assessProjectAdapterFreshness(
     contractPathsMissing: [],
     contractPathsDrifted: [],
     blocker: null,
-    nextAction: 'Keep the adapter read-only and repeat this check whenever Se’kret Bip main or a required canon contract changes.',
-    reasons: ['Authoritative main and every required canon blob match the checked-in audited adapter snapshot.'],
+    nextAction: 'Keep the adapter read-only and repeat this check whenever authoritative main or a required project contract changes.',
+    reasons: ['Authoritative main and every required project contract blob match the checked-in audited adapter snapshot.'],
   };
 }
