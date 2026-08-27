@@ -4,8 +4,10 @@ import { describe, expect, it } from 'vitest';
 
 const read = (path: string): string => readFileSync(resolve(process.cwd(), path), 'utf8');
 
+const founderHelper = read('supabase/migrations/20260713034026_harden_founder_helper_server_only.sql');
 const mcpHubPhase1 = read('supabase/migrations/20260715073531_mcp_hub_phase1.sql');
 const onboardingReplay = read('supabase/migrations/20260718041243_onboarding_state_mirror.sql');
+const steadyStateReplay = read('supabase/migrations/20260718042028_steady_state_cron.sql');
 const linkedinHardening = read('supabase/migrations/20260827180000_harden_linkedin_experiment_access.sql');
 const candidateProof = read('.github/workflows/supabase-migration-dry-run-proof.yml');
 
@@ -28,16 +30,28 @@ describe('migration reconciliation security boundaries', () => {
     expect(onboardingReplay).not.toContain('age_bucket');
   });
 
-  it('hardens LinkedIn experiments through the existing founder allowlist and caller-RLS view semantics', () => {
+  it('preserves the production steady-state migration identity without targeting the retired onboarding mirror', () => {
+    expect(steadyStateReplay).toContain('Production-recorded migration identity: 20260718042028_steady_state_cron');
+    expect(steadyStateReplay).toContain('MUST NOT recreate, alter, or schedule work against that retired table');
+    expect(steadyStateReplay).toContain('select 1;');
+    expect(steadyStateReplay).not.toContain('cron.schedule');
+    expect(steadyStateReplay).not.toContain('user_onboarding_state');
+    expect(steadyStateReplay).not.toMatch(/alter\s+table/i);
+  });
+
+  it('keeps LinkedIn experiments behind the existing server-owned founder boundary', () => {
+    expect(founderHelper).toContain('revoke all on function public.is_founder() from public, anon, authenticated');
+    expect(founderHelper).toContain('grant execute on function public.is_founder() to service_role');
     expect(linkedinHardening).toContain('drop policy if exists founder_full_access');
-    expect(linkedinHardening).toContain('to authenticated');
-    expect(linkedinHardening).toContain('using (public.is_founder())');
-    expect(linkedinHardening).toContain('with check (public.is_founder())');
+    expect(linkedinHardening).not.toContain('using (public.is_founder())');
+    expect(linkedinHardening).not.toContain('with check (public.is_founder())');
     expect(linkedinHardening).toContain('revoke all privileges on table public.linkedin_experiments from anon, authenticated');
-    expect(linkedinHardening).toContain('grant select, insert, update, delete on table public.linkedin_experiments to authenticated');
+    expect(linkedinHardening).not.toContain('grant select, insert, update, delete on table public.linkedin_experiments to authenticated');
+    expect(linkedinHardening).toContain('grant all privileges on table public.linkedin_experiments to service_role');
     expect(linkedinHardening).toContain('alter view public.linkedin_winning_patterns set (security_invoker = true)');
     expect(linkedinHardening).toContain('revoke all privileges on table public.linkedin_winning_patterns from anon, authenticated');
-    expect(linkedinHardening).toContain('grant select on table public.linkedin_winning_patterns to authenticated');
+    expect(linkedinHardening).not.toContain('grant select on table public.linkedin_winning_patterns to authenticated');
+    expect(linkedinHardening).toContain('grant select on table public.linkedin_winning_patterns to service_role');
   });
 
   it('keeps branch-controlled Supabase candidate proof secretless and non-mutating', () => {
