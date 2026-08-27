@@ -107,6 +107,98 @@ jobs:
             echo '- Direct Cloudflare/Supabase/secret mutation in this bridge: none'
           } >> "$GITHUB_STEP_SUMMARY"
 
+  dispatch-production:
+    name: Dispatch canonical exact-head production release
+    if: >-
+      github.event.issue.number == 247 &&
+      github.event.comment.user.login == 'jussray' &&
+      startsWith(github.event.comment.body, '/deploy-fcr-production ')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Parse founder production command
+        id: command
+        env:
+          COMMAND_BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+
+          body = os.environ.get('COMMAND_BODY', '').strip()
+          parts = body.split()
+          if len(parts) != 3 or parts[0] != '/deploy-fcr-production':
+              raise SystemExit('Expected exactly: /deploy-fcr-production <40-char-main-sha> <approval-reference>')
+
+          sha, approval = parts[1], parts[2]
+          if not re.fullmatch(r'[0-9a-f]{40}', sha):
+              raise SystemExit('Production deploy SHA must be a lowercase 40-character commit SHA.')
+          if not re.fullmatch(r'[A-Za-z0-9._:-]{8,200}', approval):
+              raise SystemExit('Approval reference must use 8-200 auditable characters: A-Z a-z 0-9 . _ : -')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'expected_head_sha={sha}\n')
+              output.write(f'deployment_approval_id={approval}\n')
+          PY
+
+      - name: Verify requested production SHA is current main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ steps.command.outputs.expected_head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          CURRENT_MAIN_SHA="$(curl --fail --silent --show-error \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/git/ref/heads/main" \
+            | jq -r '.object.sha')"
+
+          echo "Requested exact head: $EXPECTED_HEAD_SHA"
+          echo "Current main:         $CURRENT_MAIN_SHA"
+          test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"
+
+      - name: Dispatch canonical production Deploy workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ steps.command.outputs.expected_head_sha }}
+          DEPLOYMENT_APPROVAL_ID: ${{ steps.command.outputs.deployment_approval_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(jq -n \
+            --arg sha "$EXPECTED_HEAD_SHA" \
+            --arg approval "$DEPLOYMENT_APPROVAL_ID" \
+            '{
+              ref: "main",
+              inputs: {
+                expected_head_sha: $sha,
+                deployment_approval_id: $approval,
+                deployment_reason: "Reconcile the canonical Founder Control Room production migration ledger and release for incident #247"
+              }
+            }')"
+
+          curl --fail --silent --show-error \
+            -X POST \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/deploy.yml/dispatches" \
+            --data "$payload"
+
+          {
+            echo '## Founder production Deploy command accepted'
+            echo
+            echo "- Exact head: \`$EXPECTED_HEAD_SHA\`"
+            echo "- Approval reference: \`$DEPLOYMENT_APPROVAL_ID\`"
+            echo '- Mutation authority: canonical `.github/workflows/deploy.yml` only'
+            echo '- Direct Cloudflare/Supabase/secret mutation in this bridge: none'
+            echo '- Existing Worker-only `/deploy-fcr` authority remains unchanged'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   dispatch-review-email:
     name: Dispatch bounded review-email Worker reconcile
     if: >-
