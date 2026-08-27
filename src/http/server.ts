@@ -318,6 +318,7 @@ export function createServer(options: CreateServerOptions = {}) {
           proposalOnly: true,
           mergeAuthorized: false,
           executionAuthorized: false,
+          receipt: production.receipt,
           pullRequestNumber: production.receipt.pullRequestNumber,
           baseSha: production.receipt.baseSha,
           headSha: production.receipt.headSha,
