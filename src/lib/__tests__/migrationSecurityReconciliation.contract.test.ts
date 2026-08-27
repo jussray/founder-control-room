@@ -9,6 +9,7 @@ const mcpHubPhase1 = read('supabase/migrations/20260715073531_mcp_hub_phase1.sql
 const onboardingReplay = read('supabase/migrations/20260718041243_onboarding_state_mirror.sql');
 const steadyStateReplay = read('supabase/migrations/20260718042028_steady_state_cron.sql');
 const linkedinHardening = read('supabase/migrations/20260827180000_harden_linkedin_experiment_access.sql');
+const liveReconciliation = read('supabase/migrations/20260827180100_reconcile_retired_onboarding_and_linkedin_access.sql');
 const candidateProof = read('.github/workflows/supabase-migration-dry-run-proof.yml');
 
 describe('migration reconciliation security boundaries', () => {
@@ -52,6 +53,23 @@ describe('migration reconciliation security boundaries', () => {
     expect(linkedinHardening).toContain('revoke all privileges on table public.linkedin_winning_patterns from anon, authenticated');
     expect(linkedinHardening).not.toContain('grant select on table public.linkedin_winning_patterns to authenticated');
     expect(linkedinHardening).toContain('grant select on table public.linkedin_winning_patterns to service_role');
+  });
+
+  it('reconciles already-recorded production state forward without deleting onboarding data', () => {
+    expect(liveReconciliation).toContain("'advance-to-steady-state'");
+    expect(liveReconciliation).toContain("'flag-stuck-users'");
+    expect(liveReconciliation).toContain("command ilike '%public.user_onboarding_state%'");
+    expect(liveReconciliation).toContain('perform cron.unschedule(retired_job.jobid);');
+    expect(liveReconciliation).not.toMatch(/drop\s+table\s+(?:if\s+exists\s+)?(?:public\.)?user_onboarding_state/i);
+    expect(liveReconciliation).not.toMatch(/truncate\s+(?:table\s+)?(?:public\.)?user_onboarding_state/i);
+    expect(liveReconciliation).not.toMatch(/delete\s+from\s+(?:public\.)?user_onboarding_state/i);
+    expect(liveReconciliation).not.toMatch(/update\s+(?:public\.)?user_onboarding_state/i);
+    expect(liveReconciliation).toContain('drop policy if exists founder_full_access');
+    expect(liveReconciliation).toContain('revoke all privileges on table public.linkedin_experiments from anon, authenticated');
+    expect(liveReconciliation).toContain('grant all privileges on table public.linkedin_experiments to service_role');
+    expect(liveReconciliation).toContain('alter view public.linkedin_winning_patterns set (security_invoker = true)');
+    expect(liveReconciliation).toContain('revoke all privileges on table public.linkedin_winning_patterns from anon, authenticated');
+    expect(liveReconciliation).toContain('grant select on table public.linkedin_winning_patterns to service_role');
   });
 
   it('keeps branch-controlled Supabase candidate proof secretless and non-mutating', () => {
