@@ -73,7 +73,7 @@
     {
       "path": "src/lib/n8nFounderContentReadiness.test.ts",
       "claims": [
-        "Founder-content readiness tests must prove fail-closed behavior for disabled, misconfigured, invalid-provider, missing-proof, stale-head, incomplete-proof, and provider-unverified states, and may accept enabled-live-verified only for explicit Buffer proof bound to the deployed exact GIT_SHA with receipt identity and valid observation time."
+        "src/lib/n8nFounderContentReadiness.test.ts must prove fail-closed behavior for disabled, misconfigured, invalid-provider, missing-proof, stale-head, incomplete-proof, and provider-unverified states, and may accept enabled-live-verified only for explicit Buffer proof bound to the deployed exact GIT_SHA with receipt identity and valid observation time."
       ]
     },
     {
