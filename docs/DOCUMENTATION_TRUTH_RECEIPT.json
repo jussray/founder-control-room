@@ -4,7 +4,8 @@
   "domains": [
     "truth-governance",
     "cloudflare-authority",
-    "founder-content-truth"
+    "founder-content-truth",
+    "publishing"
   ],
   "changes": [
     {
@@ -67,6 +68,12 @@
       "claims": [
         "Founder-content readiness may become enabled-live-verified only when enabled/configured transport, a valid provider allowlist, Buffer enablement, a non-empty provider receipt identity, a valid observation timestamp, and exact deployed GIT_SHA binding all agree; generic conveyor proof, stale head proof, missing runtime identity, incomplete proof, or wrong-provider proof must remain non-live.",
         "Readiness output must expose provider/configuration state without exposing webhook, bearer-token, or other secret values and must never convert source configuration into proof that Buffer accepted a live draft."
+      ]
+    },
+    {
+      "path": "src/lib/n8nFounderContentReadiness.test.ts",
+      "claims": [
+        "Founder-content readiness tests must prove fail-closed behavior for disabled, misconfigured, invalid-provider, missing-proof, stale-head, incomplete-proof, and provider-unverified states, and may accept enabled-live-verified only for explicit Buffer proof bound to the deployed exact GIT_SHA with receipt identity and valid observation time."
       ]
     },
     {
