@@ -25,6 +25,15 @@ describe('deterministic review witness trigger contract', () => {
     expect(routeSource).not.toContain('req.query');
   });
 
+  it('fails closed unless the running release is the exact current main SHA', () => {
+    expect(routeSource).toContain('process.env.GIT_SHA');
+    expect(routeSource).toContain('EXACT_COMMIT_SHA.test(runtimeSha)');
+    expect(routeSource).toContain("provider.resolveRef(FCR_REVIEW_PROJECT.slug, 'main')");
+    expect(routeSource).toContain('currentMainSha.toLowerCase() !== runtimeSha.toLowerCase()');
+    expect(routeSource).toContain('currentMainAfter.toLowerCase() !== runtimeSha.toLowerCase()');
+    expect(routeSource).toContain('requires the exact current main runtime');
+  });
+
   it('accepts only a positive PR number and returns non-authorizing witness metadata', () => {
     expect(routeSource).toContain('Number(req.params.pullRequestNumber)');
     expect(routeSource).toContain('Number.isInteger(pullRequestNumber)');
