@@ -5,9 +5,9 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "npm run generate:worker-types && tsc -p tsconfig.json",
     "build:pages": "node scripts/build-pages.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "npm run generate:worker-types && tsc -p tsconfig.json --noEmit",
     "typecheck:design-os": "tsc -p tsconfig.design-os.json",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
@@ -60,7 +60,8 @@
     "verify:mirror": "vitest run src/http/routes/__tests__/mirror.integration.test.ts",
     "verify:mirror-contract": "node scripts/verify-mirror-and-fact-check-contract.mjs",
     "proof:goalfix": "npm run build && node e2e/goalfix-proof.mjs && node e2e/goalfix-same-sha-proof.mjs",
-    "verify:test-discovery": "node scripts/verify-test-discovery.mjs"
+    "verify:test-discovery": "node scripts/verify-test-discovery.mjs",
+    "generate:worker-types": "node -e \"require('node:fs').mkdirSync('.wrangler/types',{recursive:true})\" && wrangler types .wrangler/types/worker-configuration.d.ts --config wrangler.worker.toml --env-interface FcrWorkerEnv --include-env=false"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
