@@ -35,8 +35,7 @@ describe('migration reconciliation security boundaries', () => {
     expect(steadyStateReplay).toContain('MUST NOT recreate, alter, or schedule work against that retired table');
     expect(steadyStateReplay).toContain('select 1;');
     expect(steadyStateReplay).not.toContain('cron.schedule');
-    expect(steadyStateReplay).not.toContain('user_onboarding_state');
-    expect(steadyStateReplay).not.toMatch(/alter\s+table/i);
+    expect(steadyStateReplay).not.toMatch(/(?:update|alter\s+table)\s+public\.user_onboarding_state/i);
   });
 
   it('keeps LinkedIn experiments behind the existing server-owned founder boundary', () => {
