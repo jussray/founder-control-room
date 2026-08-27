@@ -1,5 +1,4 @@
--- Persist caller-reported and gate-detected failures without rewriting
--- the original proof_gate_results migration.
+-- Production-applied migration fossil restored from supabase_migrations.schema_migrations.
 
 alter table public.proof_gate_results
   add column if not exists all_failures text[] not null default array[]::text[];

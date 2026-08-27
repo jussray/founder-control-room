@@ -1,7 +1,5 @@
--- Federated repository verification.
--- Each product repo remains authoritative for its own code, checks, runtime,
--- and rollback. The Founder Control Room stores only sanitized evidence and
--- drift findings; it never stores raw product/user content.
+-- Production-applied migration fossil restored from supabase_migrations.schema_migrations.
+-- Each product repository remains authoritative for its own code, checks, runtime, and rollback.
 
 alter table public.project_manifests
   add column if not exists default_branch text,
@@ -29,10 +27,12 @@ create table if not exists public.repository_verification_runs (
   runner jsonb not null default '{}'::jsonb,
   signature_verified boolean not null default false,
   scanned_at timestamptz not null,
-  received_at timestamptz not null default now(),
-  constraint repository_verification_runs_delivery_key
-    unique(project_id, source, delivery_id)
+  received_at timestamptz not null default now()
 );
+
+create unique index if not exists repository_verification_delivery_dedupe
+  on public.repository_verification_runs(project_id, source, delivery_id)
+  where delivery_id is not null;
 
 create index if not exists repository_verification_project_received_idx
   on public.repository_verification_runs(project_id, received_at desc);
@@ -84,8 +84,6 @@ alter table public.repository_verification_runs enable row level security;
 alter table public.repository_capability_evidence enable row level security;
 alter table public.repository_findings enable row level security;
 
--- Backend/service-role only. The founder UI reaches these through the
--- founder-authenticated API, not by receiving direct table grants.
 revoke all on table public.repository_verification_runs from anon, authenticated;
 revoke all on table public.repository_capability_evidence from anon, authenticated;
 revoke all on table public.repository_findings from anon, authenticated;

@@ -1,8 +1,8 @@
 # Deterministic Review Witness V1
 
-Status: **BUILT / FOUNDER-TRIGGER-CANDIDATE / BOOTSTRAP-REQUIRED / RUNTIME-NOT-YET-PROVEN / NOT MERGE AUTHORITY**
+Status: **CORE INTEGRATED ON MAIN / TRUSTED DEFAULT-BRANCH IGNITION CANDIDATE / BOOTSTRAP REQUIRED / NOT MERGE AUTHORITY**
 
-Milestone B added the provider-backed witness path that consumes the deterministic review producer introduced by Milestone A. The current #719 successor candidate adds the deliberately narrow founder-trigger seam needed to invoke that already-built path from the Founder Control Room runtime without putting the GitHub App private key into candidate-controlled Actions.
+Milestones A and B are integrated on `main`: the deterministic producer, narrow GitHub-App witness provider, publication/readback logic, and founder-final consumer exist in the trusted source tree. The remaining execution gap is the trusted invocation surface that runs those integrated components from exact current `main` rather than from candidate-controlled pull-request workflow code.
 
 ## Authority chain
 
@@ -28,12 +28,26 @@ The full review hash is load-bearing on readback, not audit decoration. `Determi
 
 Provider construction exposes witness publication only when `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` produce a repository-scoped GitHub App installation token. The local/development `GITHUB_TOKEN` fallback retains ordinary repository capability but cannot mint deterministic review evidence.
 
-## Founder trigger candidate
+## Trusted ignition
 
-The current candidate adds `POST /review/deterministic-witness/:pullRequestNumber` directly inside the protected FCR server trust root. The route is behind the existing same-origin mutation membrane, founder authentication, the `fcr-privileged-execution-master` switch, and the repository-wide rate limiter. The caller supplies only a positive pull-request number. Repository identity, provider identity, trusted App identity, base/head identity, diff, verdict, review hash, Check Run name, conclusion, and provider publication capability remain server/provider derived.
+The executable ignition must run from the trusted default branch. A manual dispatch may accept only a pull-request number as selection input; repository identity, PR/base/head identity, author, diff, verdict, receipt hash, Check Run name, and trusted App identity remain derived by server-owned code.
 
-A successful trigger response is intentionally non-authorizing. It returns bounded receipt/signal metadata together with `proposalOnly: true`, `mergeAuthorized: false`, and `executionAuthorized: false`. It does not merge, approve, deploy, mutate repository policy, change secrets, or turn the founder into the independent reviewer.
+The trusted job must:
 
-The trigger source intentionally lives in `src/http/server.ts`, which is already part of the deterministic trust root. Therefore this candidate must produce `trust-root-self-modification` under normal deterministic review and **cannot certify its own bootstrap**. It requires a separately explicit founder bootstrap decision bound to the final unchanged base/head after exact-head machine proof and review. After lawful merge, the merged runtime must be deployed and its exact release identity re-observed before this route can be treated as an available witness-production path.
+1. check out the exact workflow `main` SHA;
+2. re-read GitHub `main` and require the checked-out SHA to still be current before publication;
+3. use the production `GITHUB_APP_ID` + `GITHUB_PRIVATE_KEY` boundary;
+4. run the integrated producer/publisher and its focused adversarial tests from that trusted checkout;
+5. publish and read back the exact-head witness;
+6. re-read `main` after publication and fail if it moved; and
+7. retain the deterministic receipt plus provider readback as an evidence artifact.
+
+The default-branch dispatch workflow and its runner are themselves deterministic-review trust roots. A candidate that changes either must receive the normal producer's P1 self-modification finding and cannot certify itself through the same deterministic path.
 
 A successful advisory test workflow proves source execution only. It does not itself emit the constitutional independent-review witness, satisfy founder-final authority, authorize merge, or prove live GitHub App permissions/configuration.
+
+## Bootstrap boundary
+
+The candidate that first installs the trusted ignition necessarily changes the deterministic-review trust root, so it is expected to be P1-blocked by the normal producer. That is the correct fail-closed result, not a defect to suppress.
+
+Its integration therefore requires the separately explicit, exact-candidate, durable founder manual-merge override class defined by issue #418 after fresh machine proof and live provider/readback evidence are captured. Ordinary `approved`, `cont`, mergeability, machine green, or model review do not invoke that exception. Once the ignition is lawfully integrated on `main`, later non-trust-root candidates can use the normal deterministic receipt + trusted witness + founder-final path without this bootstrap exception.

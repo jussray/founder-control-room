@@ -1,3 +1,5 @@
+-- Production-applied migration fossil restored from supabase_migrations.schema_migrations.
+
 alter table public.repository_capability_evidence
   add column if not exists usage_assertion_ids text[] not null default array[]::text[],
   add column if not exists failed_usage_assertion_ids text[] not null default array[]::text[];

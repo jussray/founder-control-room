@@ -20,6 +20,8 @@ const FULL_SHA = /^[0-9a-f]{40}$/i;
 const TRUST_ROOT_PATHS = new Set([
   "src/review/deterministicReviewProducer.ts",
   "src/review/deterministicReviewWitnessPublisher.ts",
+  ".github/workflows/deterministic-review-core-advisory.yml",
+  "scripts/publish-deterministic-review-witness.mjs",
   "src/review/independentReviewGate.ts",
   "src/http/routes/approvals.ts",
   "src/controllers/ProofGateController.ts",
