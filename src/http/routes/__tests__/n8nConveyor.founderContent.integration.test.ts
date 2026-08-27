@@ -122,7 +122,6 @@ describe('n8n founder-content route', () => {
     expect(mockIssueApproval).not.toHaveBeenCalled();
   });
 
-  it('exposes bounded provider contracts and secret-safe activation readiness separately from live proof', async () => {
   it('advertises route implementation without pretending direct publication is runtime-ready', async () => {
     const res = await request(buildApp())
       .get('/automation/conveyor')
@@ -136,20 +135,6 @@ describe('n8n founder-content route', () => {
       blockedBy: 'L99_PROVIDER_NEUTRAL_AUTHORITATIVE_APPROVAL_ADAPTER_REQUIRED',
       providerSelection: 'founder-authenticated-bounded-platform-compatible',
       providerContractRoutes: N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
-      providerRuntimeConfiguration: {
-        env: 'N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS',
-        defaultEnabled: ['buffer'],
-        rule: 'contract-capable-does-not-imply-runtime-enabled',
-      },
-      readiness: expect.objectContaining({
-        liveProbeRequired: true,
-        liveVerified: false,
-        secretValuesExposed: false,
-      }),
-      finalPublishedTruth: 'fcr-provider-readback-only',
-      authority: {
-        orchestrate: true,
-        requestProviderWrite: true,
       authority: expect.objectContaining({
         orchestrate: false,
         requestProviderWrite: false,

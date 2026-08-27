@@ -1,5 +1,6 @@
 export const QUICKSCAN_CONTRACT = 'founder-control-room/quickscan@v1' as const;
 export const QUICKSCAN_PRICE_CENTS = 24900;
+export const QUICKSCAN_CURRENCY = 'usd';
 export const QUICKSCAN_HIGH_PRIORITY_SCORE = 6;
 
 export type QuickScanLifecycleState =
@@ -110,7 +111,17 @@ export interface QuickScanProspect {
   chiefRecommendation?: ChiefQuickScanRecommendation;
   approvals: QuickScanApproval[];
   overrideReceipts: QuickScanOverrideReceipt[];
-  payment: { status: 'unpaid' | 'link_ready' | 'link_sent' | 'paid' | 'refunded'; amountCents: number; paymentLinkUrl?: string };
+  payment: {
+    status: 'unpaid' | 'link_ready' | 'link_sent' | 'paid' | 'refunded';
+    amountCents: number;
+    paymentLinkUrl?: string;
+    /** Present only once a Stripe webhook event has verified this prospect paid. */
+    verifiedBy?: 'stripe_webhook' | 'manual';
+    verifiedAt?: string;
+    stripeEventId?: string;
+    stripeSessionId?: string;
+    stripePaymentIntentId?: string;
+  };
   flow?: QuickScanFlow;
   delivery?: { loomUrl?: string; deliveredAt?: string };
   audit: Array<{ id: string; type: string; message: string; actor: string; createdAt: string }>;

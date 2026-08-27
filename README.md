@@ -25,17 +25,19 @@ Exact SHAs belong in PRs, retained receipts, artifacts, incident records, and hi
 Current implementation includes:
 
 - provider-independent repository abstractions and guarded exact-head execution;
+- a security-preserving GitHub ruleset update membrane for existing non-FCR named rulesets that reads current provider state before update and preserves top-level security monotonically: enforcement cannot be demoted, existing included branch refs cannot be narrowed away, existing excluded refs remain preserved, omitting `bypassActors` preserves the provider's existing bypass posture, an explicit `bypassActors: []` clears all bypass actors, and a non-empty bypass replacement fails closed until a provider-aware bypass-authority contract can prove it is non-widening; requested required-status contexts may still narrow without silently dropping stronger provider-owned review, code-scanning, history, Copilot, deletion, force-push, retained bypass posture when preserve was requested, or retained check-integration protections; new rulesets and FCR's constitutional `main` path retain their existing canonical semantics, and source logic does not itself prove live provider configuration;
 - an obligation-aware work supersession contract in which stale/similar branches are only candidates, provider inventory and required residue must be fully and singly accounted, replacement provenance must remain explicit and acyclic, runtime-sensitive closure proof must be current-head-bound, and historical evidence remains recoverable;
 - a canonical repository-provider deletion membrane: ambient `deleteBranch()` authority is intentionally absent until a future obligation-aware receipt reconciler exists and proves safe retirement before provider mutation;
 - founder proof, idempotency/reservation, and rollback boundaries;
 - an FCR-specific provider-grounded independent-review membrane before in-app provider integration;
 - a canonical FCR founder-final merge policy that keeps deterministic independent review load-bearing, binds authenticated founder approval to the exact PR/base/head, and preserves the older server-owned semantic-review policy only for already-pinned compatibility paths;
+- a deterministic-review V1 producer and witness path that derives proposal-only review receipts from provider-observed exact PR/base/head/diff state, blocks trust-root self-certification and unprovable rename provenance, permits the exact success Check Run only through the FCR repository provider when a repository-scoped GitHub App installation credential is present, rejects PAT-only witness authority, and requires exact-head provider readback from the trusted numeric `GITHUB_APP_ID` before treating the witness as current evidence; this path does not itself provide bootstrap, founder-final, merge, deploy, secret, database, policy, billing, publication, or destructive-action authority;
 - canonical capability governance through `.control/capability.json`;
 - deterministic Cloudflare reasoning, request-trace/source contracts, and founder-gated Access recovery tooling whose source existence does not itself prove live provider configuration;
 - a read-only Cloudflare hostname-inventory witness that discovers the reviewed zone's HTTP-relevant DNS names, classifies inventory/proxy drift, and simulates Request Trace per eligible proxied hostname without granting provider-mutation authority or persisting DNS targets/origin IPs;
 - a secret-free exact-head Cloudflare bridge authority contract that is load-bearing inside CI / `Required Gate`, while live Cloudflare and GitHub provider state remain separate authority facts;
 - a repository-owned Worker build authority membrane that binds native Workers Builds to the checked-out source SHA, permits only non-promoting native version uploads, and reserves production promotion for exact manual GitHub release authority without claiming live provider configuration;
-- freshness-aware federated truth receipts and a bounded Truth Lease contract for claims that can decay;
+- freshness-aware federated truth receipts and a bounded Truth Lease contract for claims that can decay; see the canonical [Freshness Witness contract](docs/FRESHNESS_WITNESS.md), which requires separately supplied at-use repository/main observation, independently bounded witness and observation lifetimes, and keeps `VALID` as evidence state only while Truth Lease / the applicable authority contract remains the consequential-action boundary;
 - evidence-dependent consequential portfolio execution that binds founder authorization to the exact approved decision context and Truth Lease, then re-observes the lease dependencies at the declared use boundary so changed, stale, missing, or invalidated truth forces reconfirmation instead of execution;
 - a production-specific Truth Lease composer that can bind one exact repository head to matching Cloudflare Worker/Pages runtime identity, Supabase production-state evidence, exact-runtime Playwright proof, and exact-head independent review, while failing closed when any required dependency is changed, stale, missing, or mismatched at use time;
 - a typed [release-identity / rollout-coverage contract](docs/RELEASE_IDENTITY_AND_COVERAGE.md) that keeps binary version identity separate from privacy-safe aggregate traffic observation, with predeclared thresholds and no merge, deploy, or authorization effect;
@@ -45,9 +47,10 @@ Current implementation includes:
 - first-party LinkedIn founder-content execution with exact Current You authority, FCR-owned one-shot approval storage/claim, temporal revalidation, and provider readback requirements;
 - provider-neutral n8n founder-content orchestration contracts that keep contract capability separate from runtime configuration and final provider outcome;
 - provider-neutral founder-content contracts under `tools/founder-content-contracts/`, with core approval storage, first-party execution, and temporal revalidation importing the canonical provider-neutral authorization contract directly while `tools/zapier/` remains a compatibility export surface for bounded connector and scheduling callers;
-- founder-authenticated n8n/Buffer activation readiness that exposes configuration presence and provider allowlist state without returning webhook/token values, and promotes the canonical conveyor to `enabled-live-verified` only when a retained activation-probe receipt matches the deployed exact `GIT_SHA`; stale, missing, or unreadable proof remains non-live and fail-closed;
+- founder-authenticated n8n/Buffer activation readiness that exposes configuration presence and provider allowlist state without returning webhook/token values; founder-content readiness reaches `enabled-live-verified` only from explicit Buffer-bound proof with a non-empty receipt identity, valid observation time, and exact deployed `GIT_SHA` match, while generic conveyor activation receipts, stale-head proof, incomplete proof, wrong-provider proof, or missing runtime identity remain non-live and fail-closed; source readiness does not itself prove a Buffer draft was created;
 - bounded Zapier/Buffer integration where it still adds connector, scheduling, or fallback value without becoming publication authority;
 - HubSpot integration boundaries that keep CRM metadata and external communication separate from repository truth and founder authority;
+- a QuickScan v1 founder-gated prospect pipeline (evidence -> qualification -> founder-approved outreach action -> payment truth -> delivery) where a founder-pasted Stripe Payment Link's completion is trusted only through a signature-verified `checkout.session.completed` webhook (`POST /webhooks/stripe-quickscan`) with bounded replay-window and duplicate-event rejection; FCR never calls the Stripe API to create checkout and holds no Stripe secret key, only the webhook signing secret, and a manual payment record still requires founder-typed evidence text rather than being trusted on its own. A founder-triggered `POST /prospects/:id/chief-recommendation` runs a dedicated QuickScan Chief reasoner (own OpenAI-backed module, sharing `OPENAI_API_KEY`/`OPENAI_API_BASE_URL` with Mirror Engine as a second consumer, not a separate key) that reasons only from a prospect's own recorded evidence/segment/qualification/stage, returns one next action plus a PromptOS-stamped `chiefRecommendation`, and — only for a send-worthy action with a drafted message — auto-proposes a `PENDING` approval the founder still has to APPROVE/EDIT/SKIP through the existing approval routes; nothing calls it automatically and it never sends anything itself. Because sending that evidence/qualification text to OpenAI is itself a real trust-boundary crossing, the route refuses (400 `DATA_SHARING_ACKNOWLEDGEMENT_REQUIRED`) without an explicit `acknowledgeDataSharing: true` on the request, re-reads the prospect after the provider call before saving so a payment webhook or new evidence recorded while Chief was reasoning is never silently overwritten, and refuses (409 `QUICKSCAN_CHIEF_INPUT_CHANGED`) to apply the recommendation at all if that re-read shows evidence, qualification, or lifecycle state changed while Chief was reasoning, rather than attaching a recommendation — and the evidence IDs an approval would bind to — to input the model never actually saw. It unconditionally supersedes any still-`PENDING` Chief-proposed approval before evaluating a new recommendation, even one that isn't itself send-worthy, and a superseded (or any other already-decided) approval can never be re-decided through the decision route — so the founder can never act on a stale draft. The revenue-recognized terminal state is evidence-gated the same way: `delivered` is reachable only through `POST /prospects/:id/delivery` with a Loom delivery URL, and the generic transition endpoint refuses to enter `qualified`, `payment_link_ready`, `payment_link_sent`, `paid`, or `delivered` directly, forcing the whole qualification -> payment-link -> paid -> delivered chain through its dedicated, evidence-checked routes instead of a bare `to` value. The webhook additionally checks the checkout session's amount and currency against the QuickScan price, and, when the founder configures `STRIPE_QUICKSCAN_PAYMENT_LINK_ID`, binds payment truth to that exact Payment Link so a same-price checkout completed on an unrelated Stripe product cannot satisfy it;
 - desktop/mobile Playwright proof for scoped Control Room behavior; and
 - bounded production/recovery workflows that do not silently inherit unrelated database, credential, publication, or provider-mutation authority.
 
@@ -68,6 +71,8 @@ change the operational truth
 -> run Documentation Truth again on the merged main transition
 -> re-observe provider/runtime facts before reusing present-tense claims
 ```
+
+Goalfix/adaptive operating contracts are part of that truth surface. Changes to the canonical Goalfix workflow, adaptive kernel, portable `.ai`/`.claude` Goalfix skills, or Claude/Perplexity master execution overlays are classified as truth-governance and must update the structured Documentation Truth receipt plus applicable current-state documentation. Those contracts must preserve the verified target branch rather than assume `main`, authenticated Founder Final through checked-in authority, a final mutable provider/PR/base/head/diff/check/review reread before integration, browser-specific Playwright evidence, backend/provider-specific proof for non-browser paths, `MERGED_UNVERIFIED` until required runtime truth exists, and explicit separation between governance behavior and unimplemented `/goalfix/inspect` runtime/API/UI adoption.
 
 Default-suite test discovery has a bounded evidence claim: a baseline entry means the file is excluded from the default `npm test` suite, not that it never ran in every CI workflow. The base-bound ratchet cannot accept newly excluded candidate tests and requires stale debt entries to be removed.
 
@@ -99,7 +104,9 @@ The mutable capability ledger itself does not prove current-head CI, deployment,
 
 Founder Control Room's canonical in-app merge path requires exact provider PR identity, exact-head machine evidence, canonical diff/policy hashes, a passed exact-head deterministic independent-review witness, P2 blocking, an authenticated founder-final approval bound to the exact PR/base/head, and a last-moment head re-read before provider integration.
 
-The deterministic review remains proposal-only and non-authorizing. The authenticated founder-final receipt supplies the final human authority only after independent proof is current. Founder self-approval is therefore **not** relabeled as independent review.
+The deterministic review remains proposal-only and non-authorizing. For the canonical founder-final path, a deterministic GitHub Check Run witness is valid only when its exact head SHA, expected check identity, successful conclusion, and provider-backed Check Run App issuer all agree, and that issuer equals the server-owned numeric `GITHUB_APP_ID`; a missing or mismatched issuer fails closed. This source rule authenticates who produced the witness but does not prove that the live GitHub ruleset currently enforces the intended merge membrane.
+
+The authenticated founder-final receipt supplies the final human authority only after independent proof is current. Founder self-approval is therefore **not** relabeled as independent review.
 
 New founder-final approvals use a server-owned policy with zero required semantic humans, deterministic review required, P2 blocking, and `founderFinalApprovalRequired: true`. The older `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` policy remains compatibility-only for missions already pinned under the earlier human-semantic-review model.
 
@@ -155,7 +162,7 @@ contract-capable
 -> provider-outcome-proven
 ```
 
-The founder-authenticated conveyor status may report `not-configured`, `ready-for-probe`, `enabled-misconfigured`, `invalid-provider-configuration`, `enabled-awaiting-proof`, or `enabled-live-verified`, including whether Buffer is ready for one controlled probe. The canonical conveyor reaches `enabled-live-verified` only when a retained activation-probe receipt matches the deployed exact `GIT_SHA`. If the runtime SHA changes, that receipt remains valid historical evidence but no longer authorizes a present-tense live claim; stale-head, missing runtime SHA, or unavailable receipt readback must remain non-live. Conveyor live readiness still does not prove Buffer scheduling, LinkedIn publication, or any terminal provider outcome.
+The founder-authenticated conveyor status may report `not-configured`, `ready-for-probe`, `enabled-misconfigured`, `invalid-provider-configuration`, `enabled-awaiting-proof`, or `enabled-live-verified`, including whether Buffer is ready for one controlled probe. Founder-content readiness may reach `enabled-live-verified` only when proof is explicitly bound to `buffer`, carries a non-empty receipt ID and valid observation time, and its `expectedHeadSha` exactly matches the deployed `GIT_SHA`. Generic conveyor activation receipts, missing or wrong-provider proof, stale-head proof, missing runtime SHA, or incomplete provider evidence remain non-live. This source state does not prove the live route currently has a Buffer proof reader or that a draft landed in Buffer.
 
 A platform-native draft is not proof that the provider adapter is live. n8n acceptance is not publication truth. Provider readback remains terminal external-state evidence.
 
@@ -271,6 +278,10 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full architecture.
 - [`CLAUDE.md`](CLAUDE.md) — Claude / Claude Code overlay
 - [`PERPLEXITY.md`](PERPLEXITY.md) — Perplexity overlay
 - [`.ai/skills/juss-flow-launch-loop/SKILL.md`](.ai/skills/juss-flow-launch-loop/SKILL.md) — bounded implementation/review/merge loop
+- [`.ai/skills/goalfix/SKILL.md`](.ai/skills/goalfix/SKILL.md) — portable Goalfix execution/governance contract
+- [`.claude/skills/goalfix/SKILL.md`](.claude/skills/goalfix/SKILL.md) — Claude Goalfix execution overlay
+- [`docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`](docs/GOALFIX_EXECUTION_WORKFLOW_V2.md) — canonical Goalfix execution order and merge-freshness contract
+- [`docs/FOUNDER_ADAPTIVE_KERNEL_V0.md`](docs/FOUNDER_ADAPTIVE_KERNEL_V0.md) — adaptive governance/source contract; not a claim of runtime `/goalfix/inspect` integration
 - [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md) — current repository integration authority
 - [`docs/TRUTH_DECAY_AUDIT.md`](docs/TRUTH_DECAY_AUDIT.md) — truth-aging / FutureYou-ME failure contract
 - [`docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md`](docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md) — public truth and Sauce Guard boundary
@@ -298,6 +309,8 @@ Read-only reasoning can assess desired commit, provider evidence, release marker
 ### MCP and capability governance
 
 The canonical capability declaration is `.control/capability.json`. Repository declarations are intent/configuration, not proof that a live external integration is installed, authenticated, healthy, or authorized for mutation.
+
+The canonical Worker also exposes a governed remote read-only MCP bridge at `POST https://api.foundercontrolroom.org/mcp/read`. Repository configuration binds that bridge to exactly `chief-ai-machine,founder-control-room` and requires a distinct `FCR_REMOTE_MCP_READ_TOKEN` secret interface. The route fails closed when its token or server-held scope is unavailable, exports only the two read tools, and remains behind FCR's MCP registry/policy boundary. Source configuration does not prove the secret is installed, the endpoint is live, or the deployed Worker matches this exact source; those require current provider/runtime proof.
 
 ### Constitutional skill routing
 
@@ -358,14 +371,8 @@ Approved branch/merge actions use reservation/idempotency controls before provid
 
 No approval silently carries forward to another authority class.
 
-## Documentation rule
+## Evidence Trust Plane foundation
 
-Current `main`, executable implementation, exact-head verification, current founder intent, and authoritative provider/runtime receipts outrank stale Markdown.
+The Evidence Trust Plane keeps observation, provider readback, evidence validity, and operational authority separate. In this slice, `src/evidence/evidenceLifecycle.ts` is a contract/evaluator foundation: a current ledgered receipt can reach `prepare_merge_review` only when GitHub API readback is bound to an exact repository, full SHA, workflow, and run identity, and expiration is re-evaluated at the use boundary. Rejected, stale, superseded, expired, unledgered, unscoped, or non-GitHub receipts fail closed for merge-review preparation.
 
-Markdown must be repaired when it materially drifts from verified truth. Do **not** change implementation merely to make stale prose true. Historical documents may remain historical as long as they cannot masquerade as present-state authority.
-
-The `Documentation Truth` verifier makes this rule load-bearing for truth-sensitive changes and rechecks the merged transition on `main`.
-
-## License
-
-Copyright © 2024–2026 Juss Ray. All rights reserved. Proprietary software — see [LICENSE](LICENSE).
+This foundation **does not wire durable receipt persistence**. `ledgerState` is supplied contract state until a separately reviewed store/writer exists and is proven. The founder-facing Evidence Trust Plane must therefore say persistence is required rather than implying it is already active. Even a properly scoped current receipt cannot authorize merge, deploy, production promotion, issue closure, secret mutation, policy mutation, or data deletion by itself.

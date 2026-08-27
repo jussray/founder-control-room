@@ -16,12 +16,6 @@ import {
 import { FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT } from '../../lib/firstPartyFounderContentExecutor.js';
 import { dispatchAuthoritativeFounderContentPublishNow } from '../../lib/authoritativeFounderContentPublisher.js';
 import {
-  dispatchTemporallyGovernedFounderContentPublishNow,
-  type TemporallyGovernedFounderPublishInput,
-} from '../../lib/temporallyGovernedFounderContentExecutor.js';
-import {
-  founderContentOrchestrationReadiness,
-  founderConveyorReadiness,
   FOUNDER_CONTENT_APPROVAL_STORE_CONTRACT,
   issueFounderContentApproval,
 } from '../../lib/founderContentApprovalStore.js';
@@ -70,8 +64,6 @@ function capabilityPlan(value: unknown): V10CapabilityPlan | null {
   return isV10CapabilityPlan(value) ? value : null;
 }
 
-n8nConveyorRouter.get('/', (_req: FounderRequest, res) => {
-  const readiness = founderConveyorReadiness();
 function providerNeutralAuthorityRequired(
   req: FounderRequest,
   res: Response,

@@ -102,7 +102,11 @@ forbidText('Terminal registry', files.registry, "'powershell'");
 
 requireText('GitHub provider', files.githubProvider, 'resolvedRefs');
 requireText('GitHub provider', files.githubProvider, 'head: exactHeadSha');
-requireText('GitHub provider', files.githubProvider, 'this.resolvedRefs.delete(key)');
+requireText('GitHub provider', files.githubProvider, 'this.resolvedRefs.delete(headKey)');
+requireText('GitHub provider', files.githubProvider, 'this.resolvedRefs.delete(baseKey)');
+requireText('GitHub provider', files.githubProvider, 'this.pullRequestContextByProject.delete(projectId)');
+requireText('GitHub provider', files.githubProvider, 'this.octokit.pulls.merge');
+requireText('GitHub provider', files.githubProvider, 'this.octokit.repos.merge');
 requireText('GitHub provider', files.githubProvider, 'requires resolveRef');
 
 requireText('Evidence types', files.evidenceTypes, "'browser_test'");

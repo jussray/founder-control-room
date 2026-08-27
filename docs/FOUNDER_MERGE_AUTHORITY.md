@@ -26,6 +26,7 @@ A merge is appropriate only when:
 - the intended scope is understood and no unrelated work is being smuggled into the change;
 - code, configuration, docs, schemas, generated artifacts, and release-impacting changes have been reviewed;
 - required checks have genuinely executed and passed, or a documented infrastructure failure has been classified and distinguished from code-test evidence;
+- **Quality Gate jobs on pull requests must checkout and verify the exact `github.event.pull_request.head.sha`; GitHub's synthetic PR merge ref is merge-simulation evidence and cannot satisfy exact-head proof for the candidate;**
 - FCR `Required Gate` includes the secret-free exact-head Cloudflare bridge authority contract, and that dependency must succeed whenever the required gate is used; live Cloudflare/GitHub provider state remains separate evidence;
 - zero-step/no-log GitHub Actions failures are classified as `runner_startup_failure` or `workflow_no_jobs`, not as code regressions;
 - a `workflow_step_failure` is not waved away as infrastructure when logs show a real failing command, assertion, build, type, lint, or Playwright step;
@@ -66,6 +67,16 @@ founderFinalApprovalRequired: true
 ```
 
 A caller cannot turn deterministic review off, weaken P2 handling, substitute model output for founder authority, redefine the policy, or reuse a founder approval against another PR/base/head. The deterministic review receipt itself remains proposal-only and non-authorizing. The authenticated founder-final receipt supplies the final human authority after the independent proof layer passes.
+
+### Deterministic witness production and bootstrap truth
+
+The deterministic-review producer must derive repository, pull request, base/head identity, author, complete diff identity, rule version, findings, verdict, and receipt hash from provider-observed state. A caller cannot supply a trusted reviewer identity, verdict, policy, check conclusion, witness name, or trusted App identity and have that become review authority.
+
+A clear proposal-only receipt may be published as the exact derived `Independent Review / ...` GitHub Check Run only through the repository provider's narrow deterministic-review witness capability. For Founder Control Room production construction, that capability requires the repository-scoped installation credential minted from server-owned `GITHUB_APP_ID` plus `GITHUB_PRIVATE_KEY`; the bounded `GITHUB_TOKEN` local/development fallback must fail closed for deterministic witness publication. After publication, FCR must read the exact-head signal back from GitHub and require the provider-recorded Check Run App issuer to equal the trusted numeric `GITHUB_APP_ID` before treating the witness as current evidence.
+
+The executable witness ignition is a trusted-default-branch operation, not a pull-request workflow authority. Its workflow must execute only from exact current `main`, use the production GitHub App credential boundary, run the deterministic producer/publisher from that trusted checkout, retain the receipt plus provider readback as an artifact, and fail closed if `main` moves. The workflow and its runner are themselves deterministic-review trust roots: a candidate that changes either must be classified as P1 self-modification and cannot certify itself through the normal path.
+
+Receipt production, Check Run creation, and readback remain non-authorizing on their own. They never supply founder-final, merge, deploy, secret, provider-policy, database, billing, publication, or destructive-action authority. A candidate that changes the deterministic producer, independent-review gate, merge consumer, or trusted witness publication boundary is a trust-root self-modification and must not certify itself through that same producer. Current source therefore does not create a hidden bootstrap exception; an initial trust-root integration remains blocked until a separately explicit, auditable constitutional authority path exists and is invoked for the exact candidate.
 
 ### Legacy pinned semantic-review missions
 

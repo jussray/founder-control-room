@@ -1,0 +1,10 @@
+{
+  "name": "@jussray/ultrathink-verification-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --config vitest.config.ts"
+  }
+}

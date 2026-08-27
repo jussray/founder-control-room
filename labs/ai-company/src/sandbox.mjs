@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { runCompanySimulation } from './company.mjs';
 import { sha256Hex } from './sha256.mjs';
 
@@ -92,7 +91,6 @@ function stableStringify(value) {
 }
 
 function fingerprint(value) {
-  return createHash('sha256').update(stableStringify(value), 'utf8').digest('hex');
   return sha256Hex(stableStringify(value));
 }
 

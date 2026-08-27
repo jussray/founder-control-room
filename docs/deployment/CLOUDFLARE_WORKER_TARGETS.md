@@ -71,6 +71,36 @@ FOUNDER_ALLOWED_ORIGINS: https://foundercontrolroom.org
 
 The canonical Worker owns the reconciliation cron because no duplicate HTTP Worker should exist.
 
+### Durable release-proof Workflow binding
+
+The canonical Worker also exports `ReleaseProofWorkflowV0` and declares the same-Worker Cloudflare Workflows binding:
+
+```text
+binding: RELEASE_PROOF_WORKFLOW
+name: fcr-release-proof-v0
+class_name: ReleaseProofWorkflowV0
+```
+
+This binding is intentionally inert from application code in this slice: no public HTTP route, cron schedule, or other runtime path creates Workflow instances. It exists so later FCR-controlled orchestration can use Cloudflare's durable step/event state without creating a parallel release authority.
+
+`ReleaseProofWorkflowV0` binds exact repository, target branch, base SHA, head SHA, optional PR identity, and a deterministic candidate fingerprint. It may correlate separately supplied evidence and founder-approval observations, but even a fully correlated run stops at `READY_FOR_FINAL_REREAD` with merge, deployment, and provider-mutation authority explicitly false. The final mutable provider/PR reread and any consequential action remain owned by the existing FCR authority membrane.
+
+Repository configuration proves only the desired Workflow class/binding contract. It does not prove that Cloudflare has accepted the binding, that an instance exists or completed, or that any release/provider action occurred. Those are separate provider/runtime evidence gates.
+
+### Remote read MCP operator boundary
+
+The canonical Worker also owns the served remote read-only MCP endpoint at:
+
+```text
+POST https://api.foundercontrolroom.org/mcp/read
+```
+
+Repository configuration binds `FCR_REMOTE_MCP_READ_PROJECTS` to exactly `chief-ai-machine,founder-control-room` and requires the dedicated secret name `FCR_REMOTE_MCP_READ_TOKEN`. The scope is server-held; an MCP caller cannot widen it by supplying another project identifier or by reusing another FCR credential.
+
+The secret value belongs only in the canonical Worker secret store. Never place it in Wrangler source, `.env.example`, GitHub issues, PR bodies, screenshots, logs, browser code, or proof artifacts. Repository source proves the intended secret interface and project scope only; it does not prove that the secret is installed, the deployed runtime matches this source, or the live endpoint is reachable.
+
+The route must fail closed if the token or project scope is unavailable. Its advertised surface remains limited to `list_read_servers` and `invoke_read_tool`, and the underlying FCR MCP registry/policy remains authoritative for provider/tool reads. Expanding the scope beyond Chief AI + Founder Control Room requires a separate reviewed authority change.
+
 ### Worker build authority invariant
 
 The canonical Worker configuration owns a custom Wrangler `[build]` hook:
@@ -133,6 +163,8 @@ A failing or unavailable enrichment read is `UNKNOWN`/blocked evidence in that e
 
 Configure applicable secrets in the canonical Worker secret store and, where named by guarded workflows, in the GitHub `production` environment.
 
+For the served remote read MCP, `FCR_REMOTE_MCP_READ_TOKEN` is a required canonical Worker secret and must be distinct from write-capable MCP/provider credentials. `FCR_REMOTE_MCP_READ_PROJECTS` is a public-safe server-held scope variable, not a secret.
+
 Never copy secret values into repository files, logs, screenshots, issue comments, PR bodies, documentation, or public content. A secret name or presence check proves wiring only; provider acceptance/permission is a separate truth.
 
 ## Verification gate
@@ -157,7 +189,7 @@ Provider build/deploy comments, preview URLs, and successful uploads are useful 
 
 ## Documentation truth
 
-When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, hostname-inventory/Request Trace behavior, Worker build-authority behavior, or runtime proof requirements change, update this document in the same bounded repository change.
+When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, remote MCP scope, hostname-inventory/Request Trace behavior, Worker build-authority behavior, Cloudflare Workflow bindings/orchestration authority, or runtime proof requirements change, update this document in the same bounded repository change.
 
 Current executable source and authoritative provider readback outrank an older version of this runbook. Preserve older deployment evidence as historical provenance rather than deleting it.
 

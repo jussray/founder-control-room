@@ -179,6 +179,14 @@ The workflow intentionally requires its requested SHA to equal current `main` be
 
 The receipt preserves `requestSimulation: true`, `runtimeShaVerified: false`, and `canAuthorizeProviderMutation: false`. It therefore cannot authorize or prove a DNS mutation, Access change, route change, Worker deployment, credential change, or production release. The workflow may restore the top-level core `ok`/`error` verdict after optional enrichment, but it may not create a successful core verdict when the core receipt is absent or failed.
 
+## Served remote read MCP boundary
+
+The canonical `founder-control-room` Worker serves a bounded remote read-only MCP endpoint at `POST https://api.foundercontrolroom.org/mcp/read`. Repository configuration binds its project scope to exactly `chief-ai-machine,founder-control-room` through `FCR_REMOTE_MCP_READ_PROJECTS` and names `FCR_REMOTE_MCP_READ_TOKEN` as the dedicated bearer-secret interface.
+
+This source configuration is deliberately non-authorizing: it cannot prove that the secret has been installed, that the deployed Worker is running this exact source, or that the endpoint is reachable. The route must fail closed when its required token or server-held project scope is unavailable, and its two exported tools remain read-only (`list_read_servers` and `invoke_read_tool`) behind the existing MCP registry/policy boundary. A secret value must never be committed to Wrangler, documentation, logs, screenshots, issues, or retained proof.
+
+Expanding this remote grant beyond Chief AI + Founder Control Room is a separate authority change; it must not be inferred from the broader portfolio registry or from another MCP credential.
+
 ## Project-scoped outbound email
 
 Cloudflare outbound email is a capability boundary, not a global portfolio transport. Founder Control Room's canonical Worker uses the `FCR_EMAIL` send binding and pins the sender identity to `welcome@api.foundercontrolroom.org`; the application wrapper does not accept caller-controlled `from`. Other projects do not inherit that binding merely because they share the same founder or Cloudflare account.
@@ -194,6 +202,20 @@ For native Cloudflare Workers Builds, the membrane requires the provider-reporte
 For GitHub Actions, production promotion is recognized only for the manual `Deploy` or `FCR Worker Reconcile` workflow-dispatch lanes when the checked-out SHA equals the exact GitHub workflow SHA. Ordinary CI remains verification-only. The emitted `fcr/worker-build-authority-receipt@v1` is redacted build evidence and explicitly cannot authorize provider mutation.
 
 This source membrane does not prove the current Cloudflare Workers Builds dashboard configuration, custom-domain routing, active deployment, or runtime SHA. Those remain separate provider/runtime readback gates.
+
+## Durable release-proof Workflow boundary
+
+`wrangler.worker.toml` declares one Cloudflare Workflows binding for the exported `ReleaseProofWorkflowV0` class:
+
+```text
+binding: RELEASE_PROOF_WORKFLOW
+name: fcr-release-proof-v0
+class: ReleaseProofWorkflowV0
+```
+
+This is durable orchestration, not release authority. No HTTP route, cron schedule, or other application trigger creates Workflow instances in this slice. The Workflow binds repository, target branch, exact base/head SHAs, optional PR identity, and a deterministic candidate fingerprint; waits for separately supplied exact evidence and founder-approval observations; rejects mismatched or blocked observations; and stops at `READY_FOR_FINAL_REREAD`.
+
+Its final receipt deliberately keeps `mergeAuthorized`, `deploymentAuthorized`, and `providerMutationAuthorized` false. A Workflow event or completed instance cannot replace authenticated Founder Final, the final mutable provider/PR reread, expected-head protection, or the existing guarded deployment path. Repository source proves only the intended class/binding contract. Cloudflare provider configuration, instance state, and runtime behavior require their own readback evidence.
 
 ## Verification
 

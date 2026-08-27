@@ -90,6 +90,7 @@ Implementation rules:
 - Re-observe after every meaningful edit, test result, review, merge, provider write, or documentation transition.
 - Map code paths to explicit guardrails, evidence sources, temporal validity, and approval boundaries.
 - Treat compilation as syntax evidence, tests as behavioral evidence, CI as repository workflow evidence, provider readback as provider evidence, and runtime observation as deployment evidence. None substitutes for all the others.
+- A pull-request Quality Gate must checkout and verify `github.event.pull_request.head.sha` in every job; a successful synthetic PR merge-ref run is merge-simulation evidence, never exact-head candidate proof.
 - FCR CI must keep the secret-free exact-head Cloudflare bridge authority contract load-bearing inside `Required Gate`; that repository check does not substitute for live Cloudflare or GitHub provider readback.
 - Never code around an unknown provider state, schema state, credential state, review state, or failed workflow merely to make a patch appear complete.
 - Delete duplicate authority and dead workflow paths before adding another abstraction, credential, retry, or dashboard.
@@ -184,6 +185,10 @@ Investor email remains separate. Never auto-send without both the applicable sta
 The canonical in-app FCR merge path uses **deterministic independent review followed by authenticated founder-final approval**. It requires exact provider PR identity, exact-head machine proof, canonical diff/policy hashes, a passed deterministic exact-head review witness, P2 blocking, an authenticated founder-final receipt pinned to the exact PR/base/head, and a final mutable-head re-read before provider integration.
 
 The deterministic review receipt remains proposal-only and cannot authorize the merge. Founder final approval is the separate human authority layer and must never be described as independent review. New founder-final approvals use a server-owned policy with zero required semantic humans and cannot be weakened by caller-supplied policy.
+
+Deterministic witness production is itself a narrow server-owned provider operation. `src/review/deterministicReviewProducer.ts` must derive review identity and verdict from provider-observed state; `src/review/deterministicReviewWitnessPublisher.ts` may publish only a clear derived receipt through `RepositoryProvider.publishDeterministicReviewWitness(...)`; and Founder Control Room production construction may expose that write only from a repository-scoped installation token minted by server-owned `GITHUB_APP_ID` plus `GITHUB_PRIVATE_KEY`. A PAT-only `GITHUB_TOKEN` fallback cannot mint deterministic review evidence. After publication, the exact-head signal must be read back and its provider-recorded App issuer must equal the trusted numeric `GITHUB_APP_ID`. None of these operations supplies founder-final or merge authority, and a candidate that changes this trust root cannot certify itself through the same producer.
+
+The live ignition for this path must run from exact current `main`, never from candidate-controlled pull-request workflow code. The trusted default-branch dispatch and its runner use the production GitHub App boundary, retain the deterministic receipt plus provider readback as evidence, and are themselves P1 trust roots. If either changes, the normal deterministic producer must block self-certification and require the separately explicit bootstrap/constitutional path.
 
 The older `FCR_TRUSTED_SEMANTIC_REVIEWER_IDS` policy is compatibility-only for missions already pinned under the prior non-author semantic-review model. It is not a prerequisite for new canonical founder-final approvals.
 

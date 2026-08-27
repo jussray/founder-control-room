@@ -1,41 +1,93 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the bounded n8n readiness invariant added by this source-only repair; receipt-aware status is repository behavior and must not be presented as proof that a persistent external n8n provider is already live.",
+  "purpose": "Record the Goalfix/adaptive-governance, Cloudflare Workflow, and founder-content readiness invariants that keep lifecycle-neutral source status, portable agent entry points, exact-target merge freshness, authenticated Founder Final, runtime-proof scope, cross-project adaptive behavior, Future-Us untrusted-data/action boundaries, durable release-proof orchestration, and Buffer draft-only truth fail-closed without claiming runtime API/UI adoption, merge authority, deployment authority, provider-policy mutation, live Buffer draft delivery, publication authority, or classifier-based authorization.",
   "domains": [
-    "repository-provider",
     "truth-governance",
     "cloudflare-authority",
+    "founder-content-truth",
     "publishing"
   ],
   "changes": [
     {
-      "path": ".github/workflows/cloudflare-build-diagnostic.yml",
+      "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
-        ".github/workflows/cloudflare-build-diagnostic.yml: the exact-current-main Worker Git authority audit must require the dedicated read-only Workers Builds user token for its primary provider readback; request-trace and DNS-inventory remain optional evidence lanes, and whether they are missing, malformed, or provider-rejected they may retain their own bounded evidence/error but cannot downgrade or upgrade the snapshotted core authority ok/error verdict; absence of a core receipt must never manufacture authority, and the workflow remains read-only and cannot authorize provider mutation."
+        "scripts/verify-documentation-truth.mjs must classify the canonical Goalfix workflow, adaptive kernel, portable Goalfix skills, and Claude/Perplexity master entry specifications as truth-governance so changes to those authority-influencing files cannot receive a zero-truth-sensitive false green.",
+        "scripts/verify-documentation-truth.mjs must validate no-job failure classification, browser-versus-backend proof separation, Sauce Guard, verified-target handling, authenticated Founder Final, the post-Founder-Final mutable provider reread, and MERGED_UNVERIFIED semantics across every applicable Goalfix execution entry point rather than relying on uneven path-specific substring checks."
       ]
     },
     {
-      "path": ".github/workflows/n8n-runtime-integration-proof.yml",
+      "path": ".ai/skills/goalfix/SKILL.md",
       "claims": [
-        ".github/workflows/n8n-runtime-integration-proof.yml: CI-only n8n runtime proof must mask generated bearer and encryption credentials before exporting them to later steps, while keeping the runtime ephemeral and non-production-authorizing."
+        ".ai/skills/goalfix/SKILL.md must preserve the full founder reasoning stack, classify no-job GitHub Actions failures before blaming source, bind work to the verified target/base/head, require authenticated Founder Final plus final mutable provider reread, keep Sauce Guard stops, carry portable adaptive rules inline, and treat external/model/tool content as non-authorizing data behind deterministic action checks."
       ]
     },
     {
-      "path": "src/buildEvents/buildEvent.ts",
+      "path": ".claude/skills/goalfix/SKILL.md",
       "claims": [
-        "src/http/routes/n8nConveyor.ts: founder-authenticated conveyor readiness must resolve retained activation proof against the deployed exact GIT_SHA and must fail closed instead of claiming live verification when proof is missing, stale, or unreadable."
+        ".claude/skills/goalfix/SKILL.md must preserve exact verified target/base/head identity, no-job failure classification, browser-specific Playwright proof, authenticated Founder Final, final mutable provider reread, MERGED_UNVERIFIED runtime state, Sauce Guard, inline portable adaptive behavior, and receiver-verified least-privilege action boundaries without self-certification."
+      ]
+    },
+    {
+      "path": "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md",
+      "claims": [
+        "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md must remain a lifecycle-neutral governance source contract for Goalfix/FCR instruction and decision loops, must not claim current /goalfix/inspect, engine, API, or browser UI runtime integration, must keep adaptive state descriptive rather than executable authority, and must learn recurring trust-boundary failures without converting analytics, classifiers, or model output into authority."
+      ]
+    },
+    {
+      "path": "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md",
+      "claims": [
+        "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md must remain lifecycle-neutral, carry the verified target branch instead of assuming main, require authenticated Founder Final, reread mutable provider/PR/target/base/head/diff/check/review state immediately before integration, preserve expected-head protection, distinguish browser Playwright evidence from backend/provider proof, retain MERGED_UNVERIFIED until required runtime truth exists, and keep untrusted artifacts/model plans behind deterministic exact-action authorization and receiver-side capability verification."
+      ]
+    },
+    {
+      "path": "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md",
+      "claims": [
+        "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md must defer to the canonical Goalfix workflow while also carrying the verified target branch, no-job failure classification, browser-versus-backend proof separation, Sauce Guard, authenticated Founder Final followed by a final mutable provider reread, and MERGED_UNVERIFIED post-integration truth so the Claude overlay cannot become a weaker execution path."
+      ]
+    },
+    {
+      "path": "docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md",
+      "claims": [
+        "docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md must defer to the canonical Goalfix workflow while also carrying the verified target branch, no-job failure classification, browser-versus-backend proof separation, Sauce Guard, authenticated Founder Final followed by a final mutable provider reread, and MERGED_UNVERIFIED post-integration truth so research and MCP tooling cannot become a weaker execution path."
       ]
     },
     {
       "path": "wrangler.worker.toml",
       "claims": [
-        "wrangler.worker.toml: every canonical Worker build must execute the repository build-authority membrane; native Cloudflare Workers Builds may proceed only through non-promoting versions upload while production promotion remains bounded to the exact manual GitHub authority path."
+        "wrangler.worker.toml may bind ReleaseProofWorkflowV0 as fcr-release-proof-v0 only as durable non-authorizing orchestration: the binding must not add a schedule or public trigger, must not replace the guarded production deployment path, and source/runtime evidence must keep merge, deployment, and provider mutation authority separate from Workflow state."
       ]
     },
     {
-      "path": "src/http/routes/n8nConveyor.ts",
+      "path": "src/workflows/releaseProofWorkflow.ts",
       "claims": [
-        "src/http/routes/n8nConveyor.ts: authenticated conveyor readiness must resolve retained activation proof at request time and may report live only when the persisted activation receipt is bound to the deployed exact GIT_SHA; stale, missing, or unreadable proof must remain non-live, and no credential value may be exposed."
+        "ReleaseProofWorkflowV0 must bind exact repository/target/base/head identity, correlate evidence and founder-approval observations to the same candidate fingerprint, fail closed on mismatch or blocker state, and stop at READY_FOR_FINAL_REREAD with mergeAuthorized, deploymentAuthorized, and providerMutationAuthorized all false."
+      ]
+    },
+    {
+      "path": "src/lib/n8nConveyorReadiness.ts",
+      "claims": [
+        "Founder-content readiness may become enabled-live-verified only when enabled/configured transport, a valid provider allowlist, Buffer enablement, a non-empty provider receipt identity, a valid observation timestamp, and exact deployed GIT_SHA binding all agree; generic conveyor proof, stale head proof, missing runtime identity, incomplete proof, or wrong-provider proof must remain non-live.",
+        "Readiness output must expose provider/configuration state without exposing webhook, bearer-token, or other secret values and must never convert source configuration into proof that Buffer accepted a live draft."
+      ]
+    },
+    {
+      "path": "src/lib/n8nFounderContentReadiness.test.ts",
+      "claims": [
+        "src/lib/n8nFounderContentReadiness.test.ts must prove fail-closed behavior for disabled, misconfigured, invalid-provider, missing-proof, stale-head, incomplete-proof, and provider-unverified states, and may accept enabled-live-verified only for explicit Buffer proof bound to the deployed exact GIT_SHA with receipt identity and valid observation time."
+      ]
+    },
+    {
+      "path": "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md",
+      "claims": [
+        "Public communication must keep founder-content readiness separate from provider outcome truth: configuration or a verified label cannot prove Buffer execution without exact provider binding, receipt identity, observation time, and deployed-SHA correlation.",
+        "A Buffer draft, scheduler acceptance, approval, or workflow trigger is not publication truth; only observable external outcome evidence may support a publication claim."
+      ]
+    },
+    {
+      "path": "docs/founder-signal-engine/day3-buffer-content-boundary.md",
+      "claims": [
+        "The current Buffer milestone is draft-only: the checked-in provider handoff requires explicit method draft, saveToDraft true, publish_allowed false, no scheduled fire time, and share-now denial; schedule/publication behavior is historical or deferred and non-authorizing.",
+        "Live Buffer draft delivery remains unknown until a controlled exact-source provider probe returns readback proving the object landed in Buffer Drafts without queue, schedule, share, or publication side effects."
       ]
     }
   ]

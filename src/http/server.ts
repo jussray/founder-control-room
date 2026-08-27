@@ -22,6 +22,7 @@ import { commandBridgeRouter } from './routes/commandBridge.js';
 import { designOsRouter } from './routes/designOs.js';
 import { cloudflareReasoningRouter } from './routes/cloudflareReasoning.js';
 import { mcpRouter } from './routes/mcp.js';
+import { handleRemoteMcpProtectedResourceMetadata } from './routes/remoteReadMcp.js';
 import { externalUseRouter } from './routes/externalUse.js';
 import { futureYouRouter } from './routes/futureYou.js';
 import { goalfixRouter } from './routes/goalfix.js';
@@ -48,6 +49,7 @@ import {
 } from './routes/repositoryVerification.js';
 import { economicIntelligenceRouter } from './routes/economicIntelligence.js';
 import { handleGitHubWebhook } from './webhooks/github.js';
+import { handleStripeQuickScanWebhook } from './webhooks/stripeQuickScan.js';
 import { debugRouter } from './routes/debug.js';
 import { publicGuardrailSnapshot, renderGuardrailStatusPage } from '../guardrails.js';
 import { V10_CAPABILITY_PLAN_CONTRACT } from '../founder-os-lab/capabilityKernel.js';
@@ -157,6 +159,11 @@ export function createServer(options: CreateServerOptions = {}) {
     handleGitHubWebhook,
   );
   app.post(
+    '/webhooks/stripe-quickscan',
+    express.raw({ type: 'application/json', limit: '64kb' }),
+    handleStripeQuickScanWebhook,
+  );
+  app.post(
     '/ingest/repository-verification',
     express.raw({ type: 'application/json', limit: '512kb' }),
     handleRepositoryVerificationIngest,
@@ -215,6 +222,14 @@ export function createServer(options: CreateServerOptions = {}) {
     express.json({ type: 'application/json', limit: '16kb' }),
     requireFounderSignalReadMcpToken,
     handleXEngagementSignalMcp,
+  );
+  app.get(
+    '/.well-known/oauth-protected-resource',
+    handleRemoteMcpProtectedResourceMetadata,
+  );
+  app.get(
+    '/.well-known/oauth-protected-resource/mcp',
+    handleRemoteMcpProtectedResourceMetadata,
   );
 
   app.use(requireSameOriginBrowserMutation);

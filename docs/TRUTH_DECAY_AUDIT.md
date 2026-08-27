@@ -18,6 +18,8 @@ Even a correctly accepted coverage receipt is not permanent truth. Current Truth
 
 The Documentation Truth gate had a parallel weakness: it treated a touched document path as a refresh. It now rejects punctuation-only and hidden-comment edits, and requires a meaningful structured receipt that maps every changed truth-sensitive source path to a path-bound invariant. That receipt establishes review traceability, not a claim that a provider, deployment, public outcome, or source change has been independently proven semantically true.
 
+Goalfix governance exposed another false-green class: canonical execution/adaptive documents and their portable Claude/Perplexity entry points could change while the verifier reported zero truth-sensitive files. Those paths are now registered as `truth-governance`. The gate must therefore require a current README/truth-decay refresh and path-bound receipt whenever the canonical Goalfix workflow, adaptive kernel, portable Goalfix skills, or Claude/Perplexity master execution overlays move. Registration is documentation consistency evidence only; it does not prove `/goalfix/inspect` runtime adoption, independent review, Founder Final, merge authority, provider configuration, deployment, or publication.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -149,12 +151,17 @@ truth-sensitive implementation / authority / provider change
 
 The verifier classifies truth-sensitive changed files by domain and requires the relevant current-state docs rather than forcing documentation edits for every test-only change.
 
+Goalfix governance is explicitly part of that classification. Changes to `.ai/skills/goalfix/SKILL.md`, `.claude/skills/goalfix/SKILL.md`, `docs/FOUNDER_ADAPTIVE_KERNEL_V0.md`, `docs/GOALFIX_EXECUTION_WORKFLOW_V2.md`, `docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md`, or `docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md` must be treated as truth-sensitive because those files can change how future operators select targets, interpret proof, consume founder authority, or report post-merge state.
+
 It also checks cross-document invariants that are easy to regress during fast-moving work, including:
 
 - README does not freeze a manual “Last refreshed” date as current authority;
 - current repository identity is resolved at use time only by separately authorized provider revalidation, while webhook facts remain historical last-observed provenance;
 - FCR merge docs describe the independent-review membrane and server-owned reviewer trust;
 - live GitHub ruleset enforcement stays a separate provider truth;
+- Goalfix carries the verified target branch rather than assuming `main`, authenticates Founder Final through the checked-in authority contract, rereads mutable provider/PR/base/head/diff/check/review state immediately before integration, distinguishes browser Playwright proof from backend/provider evidence, and reports `MERGED_UNVERIFIED` until required runtime proof exists;
+- Claude and Perplexity master execution overlays defer Goalfix execution order to the canonical workflow rather than maintaining weaker parallel loops;
+- the adaptive kernel remains a governance/source contract until runtime/API/UI integration is separately implemented and proven;
 - the founder-content story keeps first-party LinkedIn, provider-neutral n8n, exact Current You authority, provider readback, and Sauce Guard distinct;
 - `.control/capability.json` remains the canonical capability authority while YAML remains a compatibility pointer; and
 - post-merge truth/documentation re-observation exists in the shared AI workflow.
@@ -164,6 +171,12 @@ The verifier emits a sanitized `fcr/documentation-truth@v1` receipt with counts,
 A docs-only truth-sync merge closes an earlier drift cycle. It still receives a post-merge verification receipt, but the merge commit changing identity does not require a second self-referential docs edit.
 
 A durable README should not hard-code a “current SHA” and pretend that value automatically renews after every merge. Exact SHAs belong in receipts/provenance; current identity is resolved at use time only by separately authorized provider revalidation.
+
+### Evidence-authority registration
+
+The Evidence Trust Plane is now explicitly part of Documentation Truth. Changes under `src/evidence/`, the founder-facing `public/control-room/evidence-trust.html`, or its exact-head Playwright workflow are truth-sensitive because they can change what future operators believe evidence may unlock. The documentation gate must therefore fail if those paths move without current documentation and a path-bound receipt.
+
+That registration does not mean durable evidence persistence exists. The current Evidence Trust Plane slice defines receipt, validity, and action-ceiling contracts only; `ledgerState` is supplied state until a separately reviewed persistence writer/store exists. Current receipt use must also re-evaluate expiration and bind merge-review preparation to GitHub API evidence for an exact repository, full SHA, workflow, and run identity. Rejected or non-GitHub evidence cannot be relabeled as merge-review-ready merely because readback completed.
 
 ### Release-coverage at-use gate
 
@@ -306,6 +319,9 @@ The strongest optimization is not faster claiming. It is shortening the distance
 22. Preserve history. Supersede stale authority explicitly instead of deleting evidence simply because the current answer changed.
 23. An unchanged approved decision-context object is not proof that its external dependencies are still current; evidence-dependent consequential use must revalidate the bound Truth Lease at the use boundary.
 24. Independent green receipts do not compose into production truth unless they bind the same exact candidate and remain current together at the declared use boundary.
+25. A stored `validity: current` flag does not outrank an elapsed `expiresAt`; evidence authority must re-evaluate expiration when the receipt is used.
+26. Readback completion is not the same as a verified verdict, and an unscoped or wrong-authority receipt cannot prepare merge review.
+27. A governance document that changes future agent execution order is truth-sensitive even when no runtime source changes; failing to register it with Documentation Truth is a false green, not a harmless docs-only omission.
 
 ## Rollback
 

@@ -27,6 +27,7 @@ const requiredAssets = [
   'control-room/quickscan.css',
   'control-room/genesis.html',
   'control-room/genesis.css',
+  'control-room/evidence-trust.html',
   'portable-founder-console/index.html',
 ];
 
