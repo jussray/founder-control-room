@@ -4,11 +4,6 @@ on:
   push:
     branches:
       - fix/proof-of-ship-migration-identity-main-20260809
-    paths:
-      - '.github/workflows/supabase-migration-dry-run-proof.yml'
-      - 'supabase/migrations/**'
-      - 'scripts/verify-production-migration-ledger.mjs'
-      - 'src/lib/__tests__/productionMigrationLedger.contract.test.ts'
 
 permissions:
   contents: read
