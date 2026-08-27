@@ -12,8 +12,8 @@ insert into projects (
 values
   ('sekret-bip', 'Se''kret Bip', 'github', 'jussray/Sekret-Bip', 'expo/react-native + cloudflare + supabase', 'active', 'high'),
   ('juss-beautiful-hair', 'Juss Beautiful Hair Storefront', 'github', 'jussray/jussbeautifulhair-site', 'react + vite + stripe', 'active', 'high'),
-  ('jbh-private', 'Juss Beautiful Hair Private Operations', 'github', 'jussray/jbh-private', 'private commerce operations', 'active', 'high'),
-  ('l99', 'L99 StoryEngine', 'github', 'jussray/l99-StoryEngine', 'python story runtime + provenance', 'active', 'high'),
+  ('juss-beautiful-hair-private', 'Juss Beautiful Hair Private Operations', 'github', 'jussray/jbh-private', 'private commerce operations', 'active', 'high'),
+  ('l99', 'L99 StoryEngine', 'github', 'jussray/StoryEngine', 'python story runtime + provenance', 'active', 'high'),
   ('chief-ai-machine', 'Chief AI Prompt Machine', 'github', 'jussray/chief-ai-machine', 'prompt operations prototype', 'active', 'medium'),
   ('untold-stories', 'Untold Stories Storefront', 'github', 'jussray/untold-stories-storefront', 'shopify hydrogen', 'active', 'high'),
   ('founder-control-room', 'Founder Control Room', 'github', 'jussray/founder-control-room', 'typescript + express + cloudflare + supabase', 'active', 'high'),
@@ -147,10 +147,10 @@ select
 from projects p
 join (
   values
-    ('github', array['get_*','list_*','search_*','read_*','fetch_*','view_*','show_*','inspect_*','status_*']::text[], array['*create*','*update*','*delete*','*merge*','*push*','*dispatch*','*write*','*commit*','*approve*']::text[], array['sekret-bip','juss-beautiful-hair','jbh-private','l99','chief-ai-machine','untold-stories','founder-control-room','promptos']::text[]),
+    ('github', array['get_*','list_*','search_*','read_*','fetch_*','view_*','show_*','inspect_*','status_*']::text[], array['*create*','*update*','*delete*','*merge*','*push*','*dispatch*','*write*','*commit*','*approve*']::text[], array['sekret-bip','juss-beautiful-hair','juss-beautiful-hair-private','l99','chief-ai-machine','untold-stories','founder-control-room','promptos']::text[]),
     ('playwright', array['browser_snapshot','browser_console_messages','browser_network_requests','browser_take_screenshot','browser_tabs']::text[], array['browser_*click*','browser_*type*','browser_*fill*','browser_*upload*','browser_*navigate*']::text[], array['sekret-bip','juss-beautiful-hair','untold-stories','founder-control-room']::text[]),
     ('figma', array['get_*','list_*','read_*','inspect_*','view_*']::text[], array['*create*','*update*','*delete*','*write*','*publish*','*apply*']::text[], array['sekret-bip','untold-stories','founder-control-room']::text[]),
-    ('supabase-dev', array['list_*','get_*','read_*','inspect_*','generate_typescript_types']::text[], array['*execute*','*apply*','*create*','*update*','*delete*','*deploy*','*write*','*branch*','*merge*','*restore*']::text[], array['sekret-bip','juss-beautiful-hair','jbh-private','l99','chief-ai-machine','untold-stories','founder-control-room','promptos']::text[])
+    ('supabase-dev', array['list_*','get_*','read_*','inspect_*','generate_typescript_types']::text[], array['*execute*','*apply*','*create*','*update*','*delete*','*deploy*','*write*','*branch*','*merge*','*restore*']::text[], array['sekret-bip','juss-beautiful-hair','juss-beautiful-hair-private','l99','chief-ai-machine','untold-stories','founder-control-room','promptos']::text[])
 ) as policy(server_id, allowed_patterns, denied_patterns, project_slugs)
   on p.slug = any(policy.project_slugs)
 on conflict (project_id, server_id) do update set
