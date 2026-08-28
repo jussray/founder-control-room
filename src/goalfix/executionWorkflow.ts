@@ -280,6 +280,7 @@ function checkpointTimestampErrors(
   now: Date,
 ): string[] {
   const errors: string[] = [];
+  const checkpointByPhaseAndTime = new Map<string, GoalfixExecutionCheckpoint>();
   for (const checkpoint of checkpoints) {
     if (!isIsoTimestamp(checkpoint.observedAt)) {
       errors.push(`${checkpoint.phase}: observedAt must be an ISO timestamp`);
@@ -287,6 +288,14 @@ function checkpointTimestampErrors(
     }
     if (Date.parse(checkpoint.observedAt) > now.getTime()) {
       errors.push(`${checkpoint.phase}: observedAt cannot be in the future`);
+    }
+
+    const key = `${checkpoint.phase}:${checkpoint.observedAt}`;
+    const existing = checkpointByPhaseAndTime.get(key);
+    if (existing && fingerprintNormalized(existing) !== fingerprintNormalized(checkpoint)) {
+      errors.push(`${checkpoint.phase}: conflicting checkpoints share observedAt ${checkpoint.observedAt}`);
+    } else if (!existing) {
+      checkpointByPhaseAndTime.set(key, checkpoint);
     }
   }
   return errors;
@@ -460,13 +469,18 @@ function validateRuntimeReceipt(
   receipt: GoalfixRuntimeReceipt,
   input: GoalfixExecutionInput,
   mergedSha: string,
+  mergedAt: string,
   expectedRuntimeFingerprint: string,
   now: Date,
 ): string[] {
   const errors: string[] = [];
   if (!receipt.receiptId.trim()) errors.push('runtime receipt ID is required');
   if (receipt.mergedSha.toLowerCase() !== mergedSha.toLowerCase()) errors.push(`${receipt.receiptId}: runtime receipt merged SHA is mismatched`);
-  if (!isIsoTimestamp(receipt.observedAt) || Date.parse(receipt.observedAt) > now.getTime()) errors.push(`${receipt.receiptId}: runtime receipt observedAt is invalid`);
+  const observedAtMs = isIsoTimestamp(receipt.observedAt) ? Date.parse(receipt.observedAt) : null;
+  if (observedAtMs === null || observedAtMs > now.getTime()) errors.push(`${receipt.receiptId}: runtime receipt observedAt is invalid`);
+  if (observedAtMs !== null && isIsoTimestamp(mergedAt) && observedAtMs < Date.parse(mergedAt)) {
+    errors.push(`${receipt.receiptId}: runtime receipt predates provider merge`);
+  }
   errors.push(...validateProofBinding(receipt.proofBinding, ['sourceSha', 'runtime', 'evidenceBundle'], now).map((error) => `${receipt.receiptId}: ${error}`));
   errors.push(...validateCookieLineage(receipt.proofBinding.cookieContract, input.cookieIndex, now).map((error) => `${receipt.receiptId}: ${error}`));
   if (receipt.proofBinding.cookieContract.contextType !== 'provider-run') errors.push(`${receipt.receiptId}: runtime receipt proof cookie context must be provider-run`);
@@ -502,7 +516,16 @@ function validatePostMergeTruth(
     errors.push('runtime receipt IDs must resolve to the loaded runtime receipt set');
   }
   const expectedRuntimeFingerprint = truth.proofBinding.fingerprints.runtime ?? '';
-  for (const receipt of truth.runtimeReceipts) errors.push(...validateRuntimeReceipt(receipt, input, truth.mergedSha, expectedRuntimeFingerprint, now));
+  for (const receipt of truth.runtimeReceipts) {
+    errors.push(...validateRuntimeReceipt(
+      receipt,
+      input,
+      truth.mergedSha,
+      truth.mergeAncestryReceipt.mergedAt,
+      expectedRuntimeFingerprint,
+      now,
+    ));
+  }
   if (truth.runtimeProofRequired !== true) errors.push('post-merge runtime proof cannot be caller-disabled');
   if (truth.runtimeReceipts.length === 0) errors.push('post-merge runtime proof is required but no runtime receipt exists');
   if (truth.runtimeReceipts.some((receipt) => receipt.verdict !== 'PASS')) errors.push('post-merge runtime truth is not PASS');
