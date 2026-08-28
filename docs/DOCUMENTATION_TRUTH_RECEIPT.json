@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the repository-provider boundary for the read-only PR truth audit without claiming merge, deployment, provider mutation, credential installation, or live production authority.",
+  "purpose": "Record the repository-provider and evidence-freshness boundaries for the read-only PR truth audit without claiming merge, deployment, provider mutation, credential installation, or live production authority.",
   "domains": [
     "repository-provider"
   ],
@@ -26,13 +26,19 @@
     {
       "path": "src/providers/GitHubAuditRepositoryProvider.ts",
       "claims": [
-        "src/providers/GitHubAuditRepositoryProvider.ts must observe exact-head check runs and combined commit statuses, collapse superseded workflow executions to the newest run per workflow/event context, preserve newest review evidence when capped, propagate raw provider truncation, and never add GitHub mutation authority."
+        "src/providers/GitHubAuditRepositoryProvider.ts must observe exact-head check runs and combined commit statuses, collapse superseded workflow executions to the newest run per workflow/event context, preserve bounded recent review evidence, propagate raw provider truncation, and never add GitHub mutation authority."
       ]
     },
     {
       "path": "src/providers/GitHubPrTruthReader.ts",
       "claims": [
         "src/providers/GitHubPrTruthReader.ts must remain a provider-backed MCP adapter only; it cannot import the GitHub SDK, mint or return provider credentials, or bypass the canonical RepositoryProvider project boundary."
+      ]
+    },
+    {
+      "path": "src/mcp/github-truth/verification.ts",
+      "claims": [
+        "src/mcp/github-truth/verification.ts must conflict the audit when the second PR observation changes GitHub's update cursor, preserve outstanding change requests across head pushes, count approvals only when current for the observed head, and report reviewDecision=unknown whenever bounded review history is incomplete."
       ]
     }
   ]
