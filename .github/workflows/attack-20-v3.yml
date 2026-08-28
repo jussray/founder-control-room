@@ -4,8 +4,10 @@ on:
   pull_request:
     paths:
       - .gitignore
-      - .env.example
-      - .env.local.example
+      - '.env*'
+      - '**/.env*'
+      - '.dev.vars*'
+      - '**/.dev.vars*'
       - security/attack-20-v3.policy.json
       - security/portfolio-worker-security.json
       - src/security/attack20V3.ts
@@ -18,11 +20,12 @@ on:
       - docs/SECRETS.md
       - scripts/verify-env-contract.mjs
       - scripts/verify-attack-20-v3.mjs
-      - .github/workflows/attack-20-v3.yml
-      - .github/workflows/deploy.yml
+      - '.github/workflows/*.yml'
+      - '.github/workflows/*.yaml'
+      - '.github/workflows/**/*.yml'
+      - '.github/workflows/**/*.yaml'
       - security/firewall-v10.policy.json
       - scripts/verify-firewall-v10.mjs
-      - .github/workflows/firewall-v10.yml
       - .security/cookies.json
       - scripts/verify-cookie-contract.mjs
       - wrangler.worker.toml
@@ -33,8 +36,10 @@ on:
       - main
     paths:
       - .gitignore
-      - .env.example
-      - .env.local.example
+      - '.env*'
+      - '**/.env*'
+      - '.dev.vars*'
+      - '**/.dev.vars*'
       - security/attack-20-v3.policy.json
       - security/portfolio-worker-security.json
       - src/security/attack20V3.ts
@@ -47,11 +52,12 @@ on:
       - docs/SECRETS.md
       - scripts/verify-env-contract.mjs
       - scripts/verify-attack-20-v3.mjs
-      - .github/workflows/attack-20-v3.yml
-      - .github/workflows/deploy.yml
+      - '.github/workflows/*.yml'
+      - '.github/workflows/*.yaml'
+      - '.github/workflows/**/*.yml'
+      - '.github/workflows/**/*.yaml'
       - security/firewall-v10.policy.json
       - scripts/verify-firewall-v10.mjs
-      - .github/workflows/firewall-v10.yml
       - .security/cookies.json
       - scripts/verify-cookie-contract.mjs
       - wrangler.worker.toml
