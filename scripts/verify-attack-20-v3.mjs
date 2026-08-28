@@ -9,6 +9,9 @@ const failures = [];
 const ATTACK_IDS = Array.from({ length: 20 }, (_, index) => `A${String(index + 1).padStart(2, '0')}`);
 const ALLOWED_WORKER_STATES = new Set(['PASS', 'FAILED', 'UNVERIFIED']);
 const ALLOWED_ALT_STATES = new Set(['disabled', 'protected', 'public', 'unknown']);
+const ALT_SCALAR_SURFACES = ['workersDev', 'previewUrls', 'pagesDev', 'pagesPreviews', 'directOrigin'];
+const ALT_ARRAY_SURFACES = ['customDomains', 'legacyDns'];
+const ALLOWED_ALT_SURFACES = new Set([...ALT_SCALAR_SURFACES, ...ALT_ARRAY_SURFACES]);
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 
 function fail(message) {
@@ -80,9 +83,30 @@ for (const worker of registry.workers ?? []) {
   requireValue(ALLOWED_WORKER_STATES.has(worker.attackTest?.result), `${worker.worker}: attackTest.result is invalid`);
   requireValue(worker.attackTest?.suiteVersion === 'attack-20-v3', `${worker.worker}: attack suite version drifted`);
 
-  for (const [surface, state] of Object.entries(worker.alternateIngress ?? {})) {
-    if (['customDomains', 'legacyDns'].includes(surface)) continue;
-    if (typeof state === 'string') requireValue(ALLOWED_ALT_STATES.has(state), `${worker.worker}: invalid alternate ingress state ${surface}=${state}`);
+  const alternateIngress = worker.alternateIngress;
+  requireValue(
+    alternateIngress !== null && typeof alternateIngress === 'object' && !Array.isArray(alternateIngress),
+    `${worker.worker}: alternateIngress must be an object`,
+  );
+  const alternateIngressRecord = alternateIngress !== null && typeof alternateIngress === 'object' && !Array.isArray(alternateIngress)
+    ? alternateIngress
+    : {};
+  for (const surface of Object.keys(alternateIngressRecord)) {
+    requireValue(ALLOWED_ALT_SURFACES.has(surface), `${worker.worker}: unknown alternate ingress surface ${surface}`);
+  }
+  for (const surface of ALT_SCALAR_SURFACES) {
+    const state = alternateIngressRecord[surface];
+    requireValue(
+      typeof state === 'string' && ALLOWED_ALT_STATES.has(state),
+      `${worker.worker}: alternate ingress ${surface} must be one of ${[...ALLOWED_ALT_STATES].join(', ')}`,
+    );
+  }
+  for (const surface of ALT_ARRAY_SURFACES) {
+    const values = alternateIngressRecord[surface];
+    requireValue(
+      Array.isArray(values) && values.every((value) => typeof value === 'string' && value.trim().length > 0),
+      `${worker.worker}: alternate ingress ${surface} must be an array of non-empty strings`,
+    );
   }
 
   const source = readFileSync(worker.configPath, 'utf8');
