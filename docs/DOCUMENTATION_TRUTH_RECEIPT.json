@@ -1,13 +1,48 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Record the Goalfix/adaptive-governance, Cloudflare Workflow, and founder-content readiness invariants that keep lifecycle-neutral source status, portable agent entry points, exact-target merge freshness, authenticated Founder Final, runtime-proof scope, cross-project adaptive behavior, Future-Us untrusted-data/action boundaries, durable release-proof orchestration, and Buffer draft-only truth fail-closed without claiming runtime API/UI adoption, merge authority, deployment authority, provider-policy mutation, live Buffer draft delivery, publication authority, or classifier-based authorization.",
+  "purpose": "Bind this deterministic-review trust-root change to exact-current-main founder-runtime witness ignition, complete Founder Final receipt handoff, retry-safe reconcile-before-create, and non-authorizing bootstrap semantics.",
   "domains": [
+    "merge-authority",
+    "repository-provider",
     "truth-governance",
     "cloudflare-authority",
     "founder-content-truth",
     "publishing"
   ],
   "changes": [
+    {
+      "path": "src/http/server.ts",
+      "claims": [
+        "src/http/server.ts may expose POST /review/deterministic-witness/:pullRequestNumber only inside the existing same-origin, repository-rate-limit, authenticated-founder, and fcr-privileged-execution-master membrane; caller input is limited to a positive pull-request number while repository/provider identity and PR/base/head/diff/verdict/hash/check/App authority remain server/provider derived.",
+        "The deterministic witness trigger must fail closed unless the running release has a full GIT_SHA equal to provider-resolved GitHub main before publication, must re-read main after publication or reconciliation and reject movement away from that same runtime SHA, and must remain proposal-only with mergeAuthorized and executionAuthorized false so candidate previews and stale deployed runtimes cannot bootstrap or mint current authority.",
+        "The authenticated deterministic-witness response must return the complete producer-derived IndependentReviewReceipt required by the canonical Founder Final consumer in addition to bounded provider signal metadata; returning the receipt is a handoff only and does not bypass receipt validation, trusted-App witness validation, Founder Final, or the final mutable readback."
+      ]
+    },
+    {
+      "path": "src/http/__tests__/deterministicReviewWitnessTrigger.contract.test.ts",
+      "claims": [
+        "src/http/__tests__/deterministicReviewWitnessTrigger.contract.test.ts must lock founder/master-switch gating, fixed FCR repository/provider identity, PR-number-only caller input, exact-current-main GIT_SHA/provider revalidation before and after witness publication, complete IndependentReviewReceipt handoff, and non-authorizing response semantics."
+      ]
+    },
+    {
+      "path": "src/review/deterministicReviewWitnessPublisher.ts",
+      "claims": [
+        "src/review/deterministicReviewWitnessPublisher.ts must rederive the exact deterministic receipt and reconcile exact-head verification signals before any Check Run create; an existing passed signal is reusable only when provider, derived signal name, exact head, full receipt fingerprint, and trusted numeric GitHub App issuer all match.",
+        "If pre-publication reconciliation fails, no provider mutation may occur; if a prior request created the exact witness but failed during later readback, a retry must converge on the existing trusted signal instead of blindly creating another Check Run."
+      ]
+    },
+    {
+      "path": "src/review/deterministicReviewWitnessPublisher.test.ts",
+      "claims": [
+        "src/review/deterministicReviewWitnessPublisher.test.ts must prove that repeated publication of the same unchanged exact candidate reuses the trusted full-fingerprint witness and invokes the provider create capability only once while retaining the existing wrong-App, wrong-fingerprint, stale-head, moved-PR, and non-publishable fail-closed coverage."
+      ]
+    },
+    {
+      "path": "docs/DETERMINISTIC_REVIEW_WITNESS.md",
+      "claims": [
+        "docs/DETERMINISTIC_REVIEW_WITNESS.md must keep trusted ignition separate from bootstrap authority; require witness production to run only from exact current-main integrated code; reject candidate previews and stale releases; require reconcile-before-create retry safety; retain the complete deterministic receipt for Founder Final; preserve provider-derived witness identity; and require exact merged runtime deployment to be re-observed before the founder trigger is treated as available authority."
+      ]
+    },
     {
       "path": "scripts/verify-documentation-truth.mjs",
       "claims": [
