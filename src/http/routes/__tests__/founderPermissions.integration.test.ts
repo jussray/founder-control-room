@@ -147,4 +147,26 @@ describe('founder permission broker HTTP contract', () => {
     expect(overwrite.status).toBe(409);
     expect(overwrite.body.code).toBe('FOUNDER_PERMISSION_ALREADY_DECIDED');
   });
+
+  it('rate limits repeated broker requests before founder authorization work can be abused', async () => {
+    const app = createServer();
+    const sourceIp = '203.0.113.77';
+
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const response = await request(app)
+        .get('/mcp/founder-permissions/requests')
+        .set('Authorization', bearer)
+        .set('X-Forwarded-For', sourceIp);
+      expect(response.status).toBe(200);
+    }
+
+    const limited = await request(app)
+      .get('/mcp/founder-permissions/requests')
+      .set('Authorization', bearer)
+      .set('X-Forwarded-For', sourceIp);
+
+    expect(limited.status).toBe(429);
+    expect(limited.body).toEqual({ error: 'Rate limit exceeded.' });
+    expect(limited.headers['retry-after']).toBeDefined();
+  });
 });
