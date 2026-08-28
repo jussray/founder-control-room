@@ -16,6 +16,7 @@ import {
   type FounderControlSurface,
 } from '../../lib/founderControlDecision.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
+import { rateLimitGeneral } from '../middleware/security.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -66,7 +67,7 @@ function projection(row: JsonRecord) {
 }
 
 export const founderPermissionsRouter = Router();
-founderPermissionsRouter.use(requireFounder);
+founderPermissionsRouter.use(rateLimitGeneral, requireFounder);
 
 founderPermissionsRouter.get('/requests', async (req: FounderRequest, res) => {
   const requestedStatus = req.query.status === undefined ? null : statusFrom(req.query.status);
