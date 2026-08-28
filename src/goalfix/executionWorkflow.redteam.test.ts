@@ -26,11 +26,16 @@ const FOUNDER_PRINCIPAL = 'principal:founder';
 const DIFF = goalfixDiffFingerprint({ base: BASE, head: HEAD, scope: 'goalfix-v2' });
 const NOW = new Date('2026-08-26T12:00:00.000Z');
 
-function cookie(id: string, contextType: ProofCookieContract['contextType'], parentCookieId: string | null = null): ProofCookieContract {
+function cookie(
+  id: string,
+  contextType: ProofCookieContract['contextType'],
+  parentCookieId: string | null = null,
+  owner?: string,
+): ProofCookieContract {
   return {
     cookieId: id,
     contextType,
-    owner: contextType === 'founder-session' ? FOUNDER_PRINCIPAL : `principal:${contextType}`,
+    owner: owner ?? (contextType === 'founder-session' ? FOUNDER_PRINCIPAL : `principal:${contextType}`),
     createdAt: '2026-08-26T10:00:00.000Z',
     expiresAt: '2026-08-27T10:00:00.000Z',
     parentCookieId,
@@ -39,10 +44,10 @@ function cookie(id: string, contextType: ProofCookieContract['contextType'], par
 }
 
 const founder = cookie('cookie_founder_red001', 'founder-session');
-const builder = cookie('cookie_builder_red001', 'builder-run', founder.cookieId);
-const verifier = cookie('cookie_verify_red0001', 'verification-run', builder.cookieId);
-const redteam = cookie('cookie_redteam_red001', 'verification-run', builder.cookieId);
-const provider = cookie('cookie_provider_red01', 'provider-run', verifier.cookieId);
+const builder = cookie('cookie_builder_red001', 'builder-run', founder.cookieId, 'builder');
+const verifier = cookie('cookie_verify_red0001', 'verification-run', builder.cookieId, 'verifier');
+const redteam = cookie('cookie_redteam_red001', 'verification-run', builder.cookieId, 'redteam');
+const provider = cookie('cookie_provider_red01', 'provider-run', verifier.cookieId, 'provider');
 
 function checkpoint(
   phase: GoalfixExecutionCheckpoint['phase'],
@@ -111,7 +116,8 @@ function ancestry(overrides: Partial<GoalfixMergeAncestryReceipt> = {}): Goalfix
     mergedSha: MERGED,
     currentMainSha: MERGED,
     containsCandidate: true,
-    observedAt: '2026-08-26T11:45:00.000Z',
+    mergedAt: '2026-08-26T11:47:00.000Z',
+    observedAt: '2026-08-26T11:48:00.000Z',
     ...Object.fromEntries(Object.entries(overrides).filter(([key]) => key !== 'proofBinding')),
   } as Omit<GoalfixMergeAncestryReceipt, 'proofBinding'>;
   return {
