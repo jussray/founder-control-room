@@ -113,6 +113,12 @@ export const ATTACK20_DEPENDENCIES: Readonly<Record<Attack20Id, readonly Fingerp
   A20: ['sourceSha', 'runtime', 'ingress', 'routes', 'access', 'waf', 'rateLimit', 'schema', 'bindings', 'rls', 'authority', 'provider'],
 });
 
+export const REQUIRED_FCR_PRODUCTION_WORKERS = [
+  'founder-control-room',
+  'founder-control-room-review-email',
+  'founder-control-room-deletion-queue',
+] as const;
+
 export type CapabilityValue = boolean | 'unknown';
 
 export interface WorkerAttackCapabilities {
@@ -192,6 +198,12 @@ export interface FreshnessDecision {
   reason: string | null;
 }
 
+export interface WorkerPortfolioSecurityState {
+  worker: string;
+  environment: 'production';
+  state: AggregateSecurityState;
+}
+
 function isIsoDate(value: string | null | undefined): boolean {
   return typeof value === 'string' && Number.isFinite(Date.parse(value));
 }
@@ -206,6 +218,29 @@ function sortNormalized(value: unknown): unknown {
     );
   }
   return value;
+}
+
+function sameStringSet(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length
+    && left.every((value) => right.includes(value))
+    && right.every((value) => left.includes(value));
+}
+
+function sameTarget(receipt: Attack20ReceiptV3, target: WorkerApplicabilityInput): boolean {
+  return target.environment !== 'development'
+    && receipt.target.project === target.project
+    && receipt.target.worker === target.worker
+    && receipt.target.environment === target.environment;
+}
+
+function evidenceReferenceCount(receipt: Attack20ReceiptV3): number {
+  return (receipt.evidence.cloudflareRayId ? 1 : 0)
+    + receipt.evidence.edgeRuleIds.length
+    + receipt.evidence.accessPolicyIds.length
+    + receipt.evidence.applicationEventIds.length
+    + receipt.evidence.authorityReceiptIds.length
+    + receipt.evidence.providerActionIds.length
+    + receipt.evidence.runtimeReadbackIds.length;
 }
 
 export function fingerprintNormalized(value: unknown): string {
@@ -329,6 +364,14 @@ export function generateAttack20ApplicabilityPlan(
   return plan;
 }
 
+const ALLOWED_PARENT_CONTEXTS: Readonly<Record<CookieContextType, readonly CookieContextType[]>> = Object.freeze({
+  'founder-session': [],
+  'builder-run': ['founder-session'],
+  'verification-run': ['builder-run', 'verification-run'],
+  'provider-run': ['verification-run'],
+  'exception-review': ['founder-session'],
+});
+
 export function validateCookieLineage(
   cookie: ProofCookieContract,
   cookieIndex: ReadonlyMap<string, ProofCookieContract>,
@@ -337,6 +380,13 @@ export function validateCookieLineage(
   const errors = validateProofCookieContract(cookie, now);
   const seen = new Set<string>([cookie.cookieId]);
   let current = cookie;
+
+  if (current.contextType === 'founder-session' && current.parentCookieId !== null) {
+    errors.push('founder-session proof cookie must be a lineage root');
+  }
+  if (current.contextType !== 'founder-session' && current.parentCookieId === null) {
+    errors.push(`${current.contextType} proof cookie requires a parent proof cookie`);
+  }
 
   while (current.parentCookieId) {
     const parent = cookieIndex.get(current.parentCookieId);
@@ -350,13 +400,64 @@ export function validateCookieLineage(
     }
     seen.add(parent.cookieId);
     errors.push(...validateProofCookieContract(parent, now));
+    if (!ALLOWED_PARENT_CONTEXTS[current.contextType].includes(parent.contextType)) {
+      errors.push(`invalid proof cookie lineage transition: ${parent.contextType} -> ${current.contextType}`);
+    }
     if (isIsoDate(parent.createdAt) && isIsoDate(current.createdAt) && Date.parse(parent.createdAt) > Date.parse(current.createdAt)) {
       errors.push('parent proof cookie cannot be newer than child proof cookie');
     }
     current = parent;
   }
 
+  if (current.contextType !== 'founder-session') {
+    errors.push('proof cookie lineage must terminate at a founder-session root');
+  }
   return [...new Set(errors)];
+}
+
+export function validateAttack20Receipt(
+  receipt: Attack20ReceiptV3,
+  expectedTarget: WorkerApplicabilityInput,
+  now = new Date(),
+): string[] {
+  const errors: string[] = [];
+  if (!receipt.receiptId.trim()) errors.push('receiptId is required');
+  if (!receipt.runId.trim()) errors.push('runId is required');
+  if (receipt.suiteVersion !== 'attack-20-v3') errors.push('receipt suiteVersion must be attack-20-v3');
+  if (!sameTarget(receipt, expectedTarget)) errors.push('receipt target does not match the Worker under evaluation');
+  if (!receipt.test.fixtureId.trim()) errors.push('receipt fixtureId is required');
+  if (receipt.test.requestFingerprint.length < 16) errors.push('receipt request fingerprint is missing or invalid');
+  if (!receipt.target.ingressSurface.trim()) errors.push('receipt ingress surface is required');
+  if (!isIsoDate(receipt.test.executedAt)) {
+    errors.push('receipt executedAt must be an ISO timestamp');
+  } else if (Date.parse(receipt.test.executedAt) > now.getTime()) {
+    errors.push('receipt executedAt cannot be in the future');
+  }
+
+  const canonicalDependencies = ATTACK20_DEPENDENCIES[receipt.attackId];
+  if (!sameStringSet(receipt.dependsOn, canonicalDependencies)) {
+    errors.push(`receipt dependency set does not match canonical ${receipt.attackId} dependencies`);
+  }
+
+  if (receipt.verdict === 'PASS') {
+    if (receipt.test.expectedOutcome === 'UNKNOWN' || receipt.test.observedOutcome !== receipt.test.expectedOutcome) {
+      errors.push('PASS receipt observed outcome does not match its expected defensive outcome');
+    }
+    if (receipt.test.sideEffectObserved !== false) {
+      errors.push('PASS receipt must prove no prohibited side effect was observed');
+    }
+    if (evidenceReferenceCount(receipt) === 0) {
+      errors.push('PASS receipt requires at least one correlated evidence reference');
+    }
+    if (receipt.attackId === 'A19' && receipt.evidence.runtimeReadbackIds.length === 0) {
+      errors.push('A19 PASS requires an independent runtime readback witness');
+    }
+  }
+
+  if (receipt.verdict === 'FAILED' && !receipt.reason?.trim()) {
+    errors.push('FAILED receipt requires a reason');
+  }
+  return errors;
 }
 
 export function evaluateReceiptFreshness(
@@ -367,7 +468,11 @@ export function evaluateReceiptFreshness(
 ): FreshnessDecision {
   const invalidatedBy: (FingerprintClass | CookieContextType)[] = [];
   const reasons: string[] = [];
+  const canonicalDependencies = ATTACK20_DEPENDENCIES[receipt.attackId];
 
+  if (!sameStringSet(receipt.dependsOn, canonicalDependencies)) {
+    reasons.push(`receipt dependency set does not match canonical ${receipt.attackId} dependencies`);
+  }
   if (receipt.expiresAt !== null && (!isIsoDate(receipt.expiresAt) || Date.parse(receipt.expiresAt) <= now.getTime())) {
     reasons.push('receipt expired');
   }
@@ -378,7 +483,7 @@ export function evaluateReceiptFreshness(
     reasons.push(...lineageErrors);
   }
 
-  for (const dependency of receipt.dependsOn) {
+  for (const dependency of canonicalDependencies) {
     const observed = receipt.proofBinding.fingerprints[dependency];
     const current = currentFingerprints[dependency];
     if (!observed || !current) {
@@ -404,7 +509,26 @@ export function evaluateReceiptFreshness(
   return { receiptId: receipt.receiptId, verdict: 'FRESH', invalidatedBy: [], reason: null };
 }
 
+function latestReceiptsByFixture(receipts: readonly Attack20ReceiptV3[]): Attack20ReceiptV3[] {
+  const latest = new Map<string, Attack20ReceiptV3>();
+  for (const receipt of receipts) {
+    const key = `${receipt.test.fixtureId}\u0000${receipt.target.ingressSurface}`;
+    const current = latest.get(key);
+    if (!current) {
+      latest.set(key, receipt);
+      continue;
+    }
+    const currentTime = Date.parse(current.test.executedAt);
+    const candidateTime = Date.parse(receipt.test.executedAt);
+    if (Number.isFinite(candidateTime) && (!Number.isFinite(currentTime) || candidateTime >= currentTime)) {
+      latest.set(key, receipt);
+    }
+  }
+  return [...latest.values()];
+}
+
 export function aggregateWorkerAttack20Status(input: {
+  applicabilityInput: WorkerApplicabilityInput;
   plan: readonly AttackApplicabilityDecision[];
   receipts: readonly Attack20ReceiptV3[];
   currentFingerprints: Partial<Record<FingerprintClass, string>>;
@@ -413,13 +537,32 @@ export function aggregateWorkerAttack20Status(input: {
 }): AggregateSecurityState {
   const now = input.now ?? new Date();
   const planIds = input.plan.map((item) => item.attackId);
-  if (planIds.length !== ATTACK20_IDS.length || new Set(planIds).size !== ATTACK20_IDS.length || ATTACK20_IDS.some((id) => !planIds.includes(id))) {
+  if (
+    input.applicabilityInput.environment === 'development'
+    || planIds.length !== ATTACK20_IDS.length
+    || new Set(planIds).size !== ATTACK20_IDS.length
+    || ATTACK20_IDS.some((id) => !planIds.includes(id))
+  ) {
     return 'UNVERIFIED';
   }
 
+  const canonicalPlan = generateAttack20ApplicabilityPlan(
+    input.applicabilityInput,
+    input.plan[0].proofBinding,
+  );
   let sawUnverified = false;
 
   for (const decision of input.plan) {
+    const expectedDecision = canonicalPlan.find((item) => item.attackId === decision.attackId);
+    if (
+      !expectedDecision
+      || decision.decision !== expectedDecision.decision
+      || !sameStringSet(decision.capabilityAbsenceEvidence, expectedDecision.capabilityAbsenceEvidence)
+    ) {
+      sawUnverified = true;
+      continue;
+    }
+
     if (decision.decision === 'BLOCKED_BY_DISCOVERY') {
       sawUnverified = true;
       continue;
@@ -433,33 +576,56 @@ export function aggregateWorkerAttack20Status(input: {
     }
 
     const candidates = input.receipts.filter((receipt) => receipt.attackId === decision.attackId);
-    const receipt = candidates.at(-1);
-    if (!receipt) {
+    const targetCandidates = candidates.filter((receipt) => sameTarget(receipt, input.applicabilityInput));
+    if (targetCandidates.length !== candidates.length) sawUnverified = true;
+    if (targetCandidates.length === 0) {
       sawUnverified = true;
       continue;
     }
 
-    const requiredDependencies = ATTACK20_DEPENDENCIES[decision.attackId];
-    if (validateProofBinding(receipt.proofBinding, requiredDependencies, now).length > 0) {
-      sawUnverified = true;
-      continue;
-    }
+    const currentReceipts = latestReceiptsByFixture(targetCandidates);
+    for (const receipt of currentReceipts) {
+      if (validateAttack20Receipt(receipt, input.applicabilityInput, now).length > 0) {
+        sawUnverified = true;
+        continue;
+      }
 
-    const freshness = evaluateReceiptFreshness(receipt, input.currentFingerprints, input.cookieIndex, now);
-    if (freshness.verdict !== 'FRESH') {
-      sawUnverified = true;
-      continue;
-    }
+      const requiredDependencies = ATTACK20_DEPENDENCIES[decision.attackId];
+      if (validateProofBinding(receipt.proofBinding, requiredDependencies, now).length > 0) {
+        sawUnverified = true;
+        continue;
+      }
 
-    if (receipt.verdict === 'FAILED') return 'FAILED';
-    if (receipt.verdict !== 'PASS') sawUnverified = true;
+      const freshness = evaluateReceiptFreshness(receipt, input.currentFingerprints, input.cookieIndex, now);
+      if (freshness.verdict !== 'FRESH') {
+        sawUnverified = true;
+        continue;
+      }
+
+      if (receipt.verdict === 'FAILED') return 'FAILED';
+      if (receipt.verdict !== 'PASS') sawUnverified = true;
+    }
   }
 
   return sawUnverified ? 'UNVERIFIED' : 'PASS';
 }
 
-export function aggregateSecurityStates(states: readonly AggregateSecurityState[]): AggregateSecurityState {
-  if (states.some((state) => state === 'FAILED')) return 'FAILED';
-  if (states.length === 0 || states.some((state) => state === 'UNVERIFIED')) return 'UNVERIFIED';
+export function aggregateSecurityStates(states: readonly WorkerPortfolioSecurityState[]): AggregateSecurityState {
+  const byWorker = new Map<string, AggregateSecurityState>();
+  for (const entry of states) {
+    if (
+      entry.environment !== 'production'
+      || !REQUIRED_FCR_PRODUCTION_WORKERS.includes(entry.worker as (typeof REQUIRED_FCR_PRODUCTION_WORKERS)[number])
+      || byWorker.has(entry.worker)
+    ) {
+      return 'UNVERIFIED';
+    }
+    byWorker.set(entry.worker, entry.state);
+  }
+
+  if (REQUIRED_FCR_PRODUCTION_WORKERS.some((worker) => !byWorker.has(worker))) return 'UNVERIFIED';
+  const requiredStates = REQUIRED_FCR_PRODUCTION_WORKERS.map((worker) => byWorker.get(worker)!);
+  if (requiredStates.some((state) => state === 'FAILED')) return 'FAILED';
+  if (requiredStates.some((state) => state === 'UNVERIFIED')) return 'UNVERIFIED';
   return 'PASS';
 }
