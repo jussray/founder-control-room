@@ -50,13 +50,15 @@ The audit performs bounded provider-backed reads for:
 - GitHub Commit Status API contexts bound to the observed head SHA;
 - workflow runs filtered to the observed head SHA and reduced to the newest execution per workflow/event context;
 - review events and their recorded commit SHA;
-- a second pull-request read to detect load-bearing PR changes during the audit.
+- a second pull-request read to detect load-bearing PR changes and GitHub update-cursor movement during the audit.
 
 Checks, commit statuses, raw workflow runs, reviews, and changed-file observations are capped at 100 returned/observed provider records per collection. The provider carries explicit completeness metadata for each collection. If the provider reports or implies more evidence than the bounded observation contains, the audit returns `evidence_incomplete` with `evidence_collection_truncated`; it never promotes a partial page into complete evidence.
 
 Workflow currentness is evaluated before the MCP classifier sees the evidence. If the same workflow/event context has an older failed execution and a newer successful replacement on the same head, only the newest execution represents the current workflow context. Raw workflow truncation still marks the lane incomplete even if this reduction leaves a small current set.
 
-For review history over the cap, the GitHub provider uses bounded first-plus-newest-page reads rather than fetching the entire history or preserving only the oldest page. The result remains incomplete because omitted history exists, but recent review state is not replaced by stale early approvals merely because the collection exceeded 100 events.
+For review history over the cap, bounded provider reads may retain recent evidence, but omitted history means the reducer cannot prove that no earlier unresolved blocker exists. Therefore incomplete review history always produces `reviewDecision: unknown`; it can never publish `approved` or `none` from a truncated history.
+
+Review state is reduced per reviewer. An outstanding `changes_requested` remains blocking across later head pushes and ordinary comments. An approval or dismissal clears that reviewer's blocker, but only an approval bound to the observed head counts as current approval. The second PR observation also compares GitHub's `updatedAt` cursor; if GitHub reports activity during evidence collection, the audit conflicts and must be repeated rather than claiming current review truth from an earlier snapshot.
 
 The audit never requests patch contents by default.
 
@@ -78,13 +80,15 @@ Examples:
 - An older failed workflow execution does not remain authoritative after a newer execution for the same workflow/event context supersedes it.
 - Passing CI from an old SHA is `evidence_incomplete` with `ci_stale_for_head_sha`.
 - An approval recorded against an older commit SHA is not counted as current approval and produces `review_approval_stale_for_head_sha`.
+- An outstanding change request recorded on an older head remains blocking until that reviewer approves or the review is dismissed.
 - A PR head that changes during the audit is `evidence_conflicted`.
-- A base, state, draft, mergeability, or other load-bearing PR truth change during the audit is also `evidence_conflicted`, even if the head SHA stays the same.
+- A base, state, draft, mergeability, or GitHub update-cursor change during the audit is also `evidence_conflicted`, even if the head SHA stays the same.
+- Truncated review history produces `reviewDecision: unknown` and cannot assert approval or no blockers.
 - Missing CI is never treated as passing.
 - Truncated bounded evidence is never treated as complete.
 - `mergeable: null` is informationally unknown, never proof of safety.
 
-The summary is built from the final PR observation. This prevents the audit from reporting an initial state as current after the second provider read has already observed a different load-bearing PR state.
+The summary is built from the final PR observation. This prevents the audit from reporting an initial state as current after the second provider read has already observed a different load-bearing PR state or update cursor.
 
 ## Receipt boundary
 
@@ -131,9 +135,9 @@ Before merge:
 
 1. Typecheck passes.
 2. Lint passes.
-3. Unit tests pass, including stale-head, stale-approval, moving-PR-state, missing-CI, commit-status failure/pending, failure-plus-pending, superseded-workflow, and truncated-evidence attacks.
+3. Unit tests pass, including stale-head, stale-approval, persistent-change-request, moving-PR-state/update-cursor, missing-CI, commit-status failure/pending, failure-plus-pending, superseded-workflow, and truncated-review/evidence attacks.
 4. Test discovery reports zero default-excluded supported tests and case-mismatched test-like files cannot false-green.
 5. Existing remote MCP tests advertise exactly seven narrow tools.
-6. Review confirms no repository-host SDK or credential construction occurs in the MCP subsystem, no GitHub mutation method is reachable through this tool, and no bounded CI collection can false-green or preserve superseded workflow failure.
+6. Review confirms no repository-host SDK or credential construction occurs in the MCP subsystem, no GitHub mutation method is reachable through this tool, and incomplete review history cannot publish approval/no-blocker state.
 
 After merge, production activation still requires the repository's normal Worker deployment authority and one authenticated read-only smoke audit. Merge approval does not carry forward into deployment approval.
