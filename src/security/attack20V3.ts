@@ -378,6 +378,13 @@ export function validateCookieLineage(
   now = new Date(),
 ): string[] {
   const errors = validateProofCookieContract(cookie, now);
+  const authenticatedLeaf = cookieIndex.get(cookie.cookieId);
+  if (!authenticatedLeaf) {
+    errors.push(`unknown proof cookie: ${cookie.cookieId}`);
+  } else if (fingerprintNormalized(authenticatedLeaf) !== fingerprintNormalized(cookie)) {
+    errors.push(`proof cookie ${cookie.cookieId} does not match authenticated cookie index`);
+  }
+
   const seen = new Set<string>([cookie.cookieId]);
   let current = cookie;
 
@@ -517,21 +524,26 @@ export function evaluateReceiptFreshness(
 }
 
 function latestReceiptsByFixture(receipts: readonly Attack20ReceiptV3[]): Attack20ReceiptV3[] {
-  const latest = new Map<string, Attack20ReceiptV3>();
+  const latest = new Map<string, Attack20ReceiptV3[]>();
   for (const receipt of receipts) {
     const key = `${receipt.test.fixtureId}\u0000${receipt.target.ingressSurface}`;
     const current = latest.get(key);
-    if (!current) {
-      latest.set(key, receipt);
+    if (!current || current.length === 0) {
+      latest.set(key, [receipt]);
       continue;
     }
-    const currentTime = Date.parse(current.test.executedAt);
+    const currentTime = Date.parse(current[0]!.test.executedAt);
     const candidateTime = Date.parse(receipt.test.executedAt);
-    if (Number.isFinite(candidateTime) && (!Number.isFinite(currentTime) || candidateTime >= currentTime)) {
-      latest.set(key, receipt);
+    if (!Number.isFinite(candidateTime)) continue;
+    if (!Number.isFinite(currentTime) || candidateTime > currentTime) {
+      latest.set(key, [receipt]);
+      continue;
+    }
+    if (candidateTime === currentTime) {
+      current.push(receipt);
     }
   }
-  return [...latest.values()];
+  return [...latest.values()].flat();
 }
 
 export function aggregateWorkerAttack20Status(input: {
