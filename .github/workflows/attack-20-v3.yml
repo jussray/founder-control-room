@@ -3,6 +3,9 @@ name: Attack-20 V3
 on:
   pull_request:
     paths:
+      - .gitignore
+      - .env.example
+      - .env.local.example
       - security/attack-20-v3.policy.json
       - security/portfolio-worker-security.json
       - src/security/attack20V3.ts
@@ -10,9 +13,13 @@ on:
       - src/goalfix/executionWorkflow.ts
       - src/goalfix/executionWorkflow.test.ts
       - src/goalfix/executionWorkflow.redteam.test.ts
+      - src/worker/handler.ts
       - docs/GOALFIX_EXECUTION_WORKFLOW_V2.md
+      - docs/SECRETS.md
+      - scripts/verify-env-contract.mjs
       - scripts/verify-attack-20-v3.mjs
       - .github/workflows/attack-20-v3.yml
+      - .github/workflows/deploy.yml
       - security/firewall-v10.policy.json
       - scripts/verify-firewall-v10.mjs
       - .github/workflows/firewall-v10.yml
@@ -25,6 +32,9 @@ on:
     branches:
       - main
     paths:
+      - .gitignore
+      - .env.example
+      - .env.local.example
       - security/attack-20-v3.policy.json
       - security/portfolio-worker-security.json
       - src/security/attack20V3.ts
@@ -32,9 +42,13 @@ on:
       - src/goalfix/executionWorkflow.ts
       - src/goalfix/executionWorkflow.test.ts
       - src/goalfix/executionWorkflow.redteam.test.ts
+      - src/worker/handler.ts
       - docs/GOALFIX_EXECUTION_WORKFLOW_V2.md
+      - docs/SECRETS.md
+      - scripts/verify-env-contract.mjs
       - scripts/verify-attack-20-v3.mjs
       - .github/workflows/attack-20-v3.yml
+      - .github/workflows/deploy.yml
       - security/firewall-v10.policy.json
       - scripts/verify-firewall-v10.mjs
       - .github/workflows/firewall-v10.yml
@@ -78,6 +92,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Verify environment contract
+        run: node scripts/verify-env-contract.mjs
 
       - name: Verify ATTACK-20 V3 source contract
         env:
