@@ -135,6 +135,17 @@ function exactDocumentedIdentifiers(source) {
   return new Set([...source.matchAll(/\b([A-Z][A-Z0-9_]*)\b/g)].map((match) => match[1]));
 }
 
+function staticWorkflowSecretNames(source) {
+  const names = new Set();
+  for (const match of source.matchAll(/\bsecrets\.([A-Z][A-Z0-9_]*)/g)) {
+    names.add(match[1]);
+  }
+  for (const match of source.matchAll(/\bsecrets\s*\[\s*["']([A-Z][A-Z0-9_]*)["']\s*\]/g)) {
+    names.add(match[1]);
+  }
+  return names;
+}
+
 for (const requiredFile of [
   '.gitignore',
   '.env.example',
@@ -247,6 +258,11 @@ for (const configPath of productionConfigPaths) {
     ...commentOnlySecretNames(configSource),
     ...(configPath === 'wrangler.worker.toml' ? workerRequiredSecrets : []),
   ]);
+  for (const assignedName of assignmentKeys) {
+    if (isSensitiveTemplateKey(assignedName)) {
+      fail(`${configPath} must not assign secret-shaped production binding ${assignedName}`);
+    }
+  }
   for (const secretName of configRequiredSecretNames) {
     requireValue(
       !assignmentKeys.has(secretName),
@@ -301,9 +317,7 @@ requireValue(handler.includes('FCR_EMAIL'), 'Worker handler must retain the FCR_
 requireValue(/\[\[send_email\]\][\s\S]*?name\s*=\s*["']FCR_EMAIL["']/m.test(wrangler), 'Wrangler must bind FCR_EMAIL as the project email capability');
 
 const deployWorkflow = read('.github/workflows/deploy.yml');
-const deploySecretNames = [...new Set(
-  [...deployWorkflow.matchAll(/\bsecrets\.([A-Z][A-Z0-9_]*)/g)].map((match) => match[1]),
-)].sort();
+const deploySecretNames = [...staticWorkflowSecretNames(deployWorkflow)].sort();
 requireValue(deploySecretNames.length > 0, 'canonical deploy workflow must reference named GitHub secrets');
 for (const secretName of deploySecretNames) {
   requireValue(
@@ -318,8 +332,8 @@ const workflowFiles = readdirSync('.github/workflows')
 const workflowSecretNames = new Set();
 for (const workflowFile of workflowFiles) {
   const source = read(path.join('.github/workflows', workflowFile));
-  for (const match of source.matchAll(/\bsecrets\.([A-Z][A-Z0-9_]*)/g)) {
-    workflowSecretNames.add(match[1]);
+  for (const secretName of staticWorkflowSecretNames(source)) {
+    workflowSecretNames.add(secretName);
   }
 }
 const undocumentedWorkflowSecrets = [...workflowSecretNames]
