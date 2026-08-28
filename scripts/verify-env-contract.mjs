@@ -69,7 +69,7 @@ function stripQuotes(value) {
 }
 
 function isSensitiveTemplateKey(key) {
-  return /(?:^|_)(?:SECRET|TOKEN|PASSWORD|PRIVATE_KEY|SERVICE_ROLE_KEY|API_KEY)$/.test(key)
+  return /(?:^|_)(?:SECRET|TOKEN|PASSWORD|PRIVATE_KEY|SERVICE_ROLE_KEY|API_KEY|ENCRYPTION_KEY)$/.test(key)
     || /_HOOK_URL$/.test(key)
     || /_GRANT_JSON$/.test(key)
     || key === 'DATABASE_URL';
@@ -78,7 +78,7 @@ function isSensitiveTemplateKey(key) {
 function isExplicitPlaceholder(key, value) {
   const normalized = stripQuotes(value.trim());
   if (!normalized) return true;
-  if (/^(?:your[-_][A-Za-z0-9_.-]*|<[^>]+>|\[YOUR-[^\]]+\])$/i.test(normalized)) return true;
+  if (/^(?:your[-_][A-Za-z0-9_.-]*|replace-with-[A-Za-z0-9_.-]+|<[^>]+>|\[YOUR-[^\]]+\])$/i.test(normalized)) return true;
   if (key === 'DATABASE_URL') {
     return /^postgres(?:ql)?:\/\/[^:\s]+:\[YOUR-PASSWORD\]@db\.YOUR_[A-Z0-9_]+\.supabase\.co:\d+\/postgres(?:\?.*)?$/i.test(normalized);
   }
