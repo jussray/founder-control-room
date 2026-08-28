@@ -13,7 +13,7 @@ import {
   type GoalfixMergeAncestryReceipt,
   type GoalfixRuntimeReceipt,
 } from './executionWorkflow.js';
-import { fingerprintNormalized, type ProofBinding, type ProofCookieContract } from '../security/attack20V3.js';
+import { fingerprintNormalized, type ProofCookieContract } from '../security/attack20V3.js';
 
 const REPOSITORY = 'jussray/founder-control-room';
 const BASE = 'a'.repeat(40);
