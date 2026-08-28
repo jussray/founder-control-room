@@ -452,6 +452,11 @@ export function validateAttack20Receipt(
     if (receipt.attackId === 'A19' && receipt.evidence.runtimeReadbackIds.length === 0) {
       errors.push('A19 PASS requires an independent runtime readback witness');
     }
+    if (!isIsoDate(receipt.expiresAt)) {
+      errors.push('PASS receipt requires a finite expiresAt timestamp');
+    } else if (isIsoDate(receipt.test.executedAt) && Date.parse(receipt.expiresAt!) <= Date.parse(receipt.test.executedAt)) {
+      errors.push('PASS receipt expiresAt must be after executedAt');
+    }
   }
 
   if (receipt.verdict === 'FAILED' && !receipt.reason?.trim()) {
@@ -473,7 +478,9 @@ export function evaluateReceiptFreshness(
   if (!sameStringSet(receipt.dependsOn, canonicalDependencies)) {
     reasons.push(`receipt dependency set does not match canonical ${receipt.attackId} dependencies`);
   }
-  if (receipt.expiresAt !== null && (!isIsoDate(receipt.expiresAt) || Date.parse(receipt.expiresAt) <= now.getTime())) {
+  if (receipt.verdict === 'PASS' && !isIsoDate(receipt.expiresAt)) {
+    reasons.push('PASS receipt requires a finite expiry');
+  } else if (receipt.expiresAt !== null && (!isIsoDate(receipt.expiresAt) || Date.parse(receipt.expiresAt) <= now.getTime())) {
     reasons.push('receipt expired');
   }
 
