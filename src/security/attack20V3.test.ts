@@ -201,6 +201,24 @@ describe('ATTACK-20 V3', () => {
     expect(decision.reason).toContain('canonical A11 dependencies');
   });
 
+  it('requires every PASS receipt to carry a finite freshness bound', () => {
+    const current = fingerprints();
+    const a11 = receipt('A11');
+    a11.expiresAt = null;
+
+    expect(validateAttack20Receipt(a11, allCapabilities(), NOW)).toContain(
+      'PASS receipt requires a finite expiresAt timestamp',
+    );
+    const decision = evaluateReceiptFreshness(
+      a11,
+      current,
+      new Map([[a11.proofBinding.cookieContract.cookieId, a11.proofBinding.cookieContract]]),
+      NOW,
+    );
+    expect(decision.verdict).toBe('UNVERIFIED');
+    expect(decision.reason).toContain('PASS receipt requires a finite expiry');
+  });
+
   it('invalidates receipt dependencies whose current fingerprint changed', () => {
     const current = fingerprints();
     const a11 = receipt('A11');
