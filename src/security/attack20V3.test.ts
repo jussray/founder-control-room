@@ -150,7 +150,7 @@ describe('ATTACK-20 V3', () => {
     expect(fingerprintNormalized({ a: 1 })).not.toBe(fingerprintNormalized({ a: 2 }));
   });
 
-  it('treats proof cookies as expiring provenance and rejects detached or broken lineage', () => {
+  it('treats proof cookies as authenticated expiring provenance and rejects detached or broken lineage', () => {
     const parent = cookie({ cookieId: 'pc_founder_parent_001' });
     const child = cookie({
       cookieId: 'pc_builder_child_0001',
@@ -162,6 +162,12 @@ describe('ATTACK-20 V3', () => {
     const index = new Map([[parent.cookieId, parent], [child.cookieId, child]]);
 
     expect(validateCookieLineage(child, index, NOW)).toEqual([]);
+    expect(validateCookieLineage({ ...child, owner: 'principal:forged' }, index, NOW)).toContain(
+      `proof cookie ${child.cookieId} does not match authenticated cookie index`,
+    );
+    expect(validateCookieLineage(child, new Map([[parent.cookieId, parent]]), NOW)).toContain(
+      `unknown proof cookie: ${child.cookieId}`,
+    );
     expect(validateCookieLineage({ ...child, parentCookieId: 'pc_missing_parent_001' }, index, NOW)).toContain(
       'unknown parent proof cookie: pc_missing_parent_001',
     );
@@ -278,6 +284,15 @@ describe('ATTACK-20 V3', () => {
     receipts.push(failedSurface);
 
     expect(aggregate([...receipts].reverse())).toBe('FAILED');
+  });
+
+  it('fails closed on equal-time conflicting receipts regardless of caller array order', () => {
+    const receipts = ATTACK20_IDS.map((id) => receipt(id));
+    const tiedFailure = receipt('A07', 'FAILED');
+    tiedFailure.receiptId = 'receipt-A07-tied-failure';
+
+    expect(aggregate([...receipts, tiedFailure])).toBe('FAILED');
+    expect(aggregate([tiedFailure, ...receipts].reverse())).toBe('FAILED');
   });
 
   it('allows a newer retry for the same fixture and surface to supersede its historical result', () => {
