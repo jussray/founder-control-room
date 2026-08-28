@@ -56,20 +56,51 @@ function reviewDecision(
   reviews: readonly GitHubPrReviewObservation[],
   headSha: string,
 ): 'approved' | 'changes_requested' | 'none' | 'unknown' {
-  const currentHeadReviews = reviews.filter((review) => {
+  const reviewerState = new Map<string, {
+    changesRequested: boolean;
+    currentApproval: boolean;
+    unknown: boolean;
+  }>();
+
+  for (const review of [...reviews].sort((a, b) => (a.submittedAt ?? '').localeCompare(b.submittedAt ?? ''))) {
+    const state = normalized(review.state);
     const commitSha = normalized(review.commitSha);
-    return !commitSha || commitSha === headSha;
-  });
-  if (currentHeadReviews.length === 0) return 'none';
-  const latestByReviewer = new Map<string, GitHubPrReviewObservation>();
-  for (const review of [...currentHeadReviews].sort((a, b) => (a.submittedAt ?? '').localeCompare(b.submittedAt ?? ''))) {
-    latestByReviewer.set(review.reviewer, review);
+    const current = reviewerState.get(review.reviewer) ?? {
+      changesRequested: false,
+      currentApproval: false,
+      unknown: false,
+    };
+
+    if (state === 'changes_requested') {
+      current.changesRequested = true;
+      current.currentApproval = false;
+      current.unknown = false;
+    } else if (state === 'approved') {
+      // An approval clears that reviewer's outstanding change request, but only
+      // counts as current approval when it is bound to the observed head.
+      current.changesRequested = false;
+      current.currentApproval = !commitSha || commitSha === headSha;
+      current.unknown = false;
+    } else if (state === 'dismissed') {
+      // GitHub dismissal explicitly clears the reviewer's blocking review state.
+      current.changesRequested = false;
+      current.currentApproval = false;
+      current.unknown = false;
+    } else if (state === 'commented' || state === 'pending' || !state) {
+      // Comments and pending reviews do not clear an existing change request or
+      // transform a stale approval into a current one.
+    } else {
+      current.unknown = true;
+    }
+
+    reviewerState.set(review.reviewer, current);
   }
-  const states = [...latestByReviewer.values()].map((review) => normalized(review.state));
-  if (states.includes('changes_requested')) return 'changes_requested';
-  if (states.includes('approved')) return 'approved';
-  if (states.every((state) => ['commented', 'dismissed', 'pending'].includes(state))) return 'none';
-  return 'unknown';
+
+  const states = [...reviewerState.values()];
+  if (states.some((state) => state.changesRequested)) return 'changes_requested';
+  if (states.some((state) => state.currentApproval)) return 'approved';
+  if (states.some((state) => state.unknown)) return 'unknown';
+  return 'none';
 }
 
 function samePrTruth(
