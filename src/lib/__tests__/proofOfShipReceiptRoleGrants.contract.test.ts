@@ -27,7 +27,7 @@ import { proofOfShipReceiptRepository } from '../../http/routes/proofOfShipRecei
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const migrationsDir = resolve(repositoryRoot, 'supabase/migrations');
 const migration = readFileSync(
-  resolve(migrationsDir, '20260824152200_harden_proof_of_ship_receipt_role_grants.sql'),
+  resolve(migrationsDir, '20260824210706_harden_proof_of_ship_receipt_role_grants.sql'),
   'utf8',
 );
 

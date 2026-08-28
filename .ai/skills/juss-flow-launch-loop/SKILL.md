@@ -222,13 +222,14 @@ Documentation is part of the control plane when humans or agents use it to make 
 For every truth-sensitive change to architecture, authority, publishing, provider ownership, capability, deployment, workflow, or launch semantics:
 
 1. update `README.md` and applicable current-state docs in the same bounded change;
-2. mark older contradictory material `HISTORICAL`, `SUPERSEDED`, `STALE`, or point it to newer authority;
-3. preserve provenance explaining why an older statement was once valid;
-4. run `Documentation Truth` on the exact PR head;
-5. require Documentation Truth in CI / Required Gate;
-6. for default test discovery, bind existing excluded-test debt to the exact base and reject both candidate-added and stale ledger entries;
-7. run the same verifier on the merged-main transition; and
-8. if provider/runtime reality changes after merge, re-observe and repair the affected current-state doc before reusing its present-tense claim.
+2. when a freshly verified fingerprint proves that a current-state assertion is superseded, delete or replace the stale assertion in the same bounded change rather than leaving competing present-tense instructions;
+3. preserve historical commits, receipts, exact SHAs, and evidence as provenance; mint a bounded continuity cookie that names predecessor fingerprint, replacement base/head/scope, proof, and next gate without treating the cookie as approval or permanent truth;
+4. mark older contradictory material `HISTORICAL`, `SUPERSEDED`, `STALE`, or point it to newer authority when it remains useful for provenance;
+5. run `Documentation Truth` on the exact PR head;
+6. require Documentation Truth in CI / Required Gate;
+7. for default test discovery, bind existing excluded-test debt to the exact base and reject both candidate-added and stale ledger entries;
+8. run the same verifier on the merged-main transition; and
+9. if provider/runtime reality changes after merge, re-observe and repair the affected current-state doc before reusing its present-tense claim.
 
 A docs-only truth-sync merge closes an existing drift cycle. The post-merge verifier closes the transition; it does not create an infinite requirement to rewrite itself again.
 
@@ -309,7 +310,7 @@ Do not call author approval “independent review.” For canonical FCR merges, 
 
 A deterministic witness must be produced from provider-observed PR/base/head/diff state, published only through the repository provider's narrow App-backed witness capability, and then read back from the exact head with the provider-recorded App issuer equal to server-owned `GITHUB_APP_ID`. The local/development `GITHUB_TOKEN` fallback may support ordinary bounded repository access but must not mint deterministic review evidence. The receipt and Check Run remain proposal/evidence only. A candidate that changes the deterministic producer, gate, merge consumer, or trusted witness provider boundary must fail its own deterministic self-review and requires a separately explicit bootstrap/constitutional authority path.
 
-The executable witness ignition must run from exact current `main` through a trusted default-branch/server surface, never from candidate-controlled pull-request workflow code. Its dispatch workflow, runner, and credential-bearing invocation surface are part of the deterministic witness trust root; changing any of them must P1-block normal self-certification and require the separately explicit bootstrap/constitutional path.
+Trusted witness ignition must execute from code already integrated and deployed as exact current FCR `main`, never from candidate-controlled pull-request workflows, candidate previews, stale releases, or PAT-only environments. The founder-runtime `POST /review/deterministic-witness/:pullRequestNumber` surface is the canonical ignition shape once integrated and exact-release-proven: it accepts only a positive PR number behind same-origin, rate-limit, authenticated-founder, and privileged-execution membranes; derives repository/provider/PR/base/head/diff/verdict/hash/App identity from server/provider state; requires full runtime `GIT_SHA` to equal provider-resolved current `main` before and after witness publication or reconciliation; performs reconcile-before-create; and returns the complete deterministic receipt without granting merge authority. A default-branch dispatch is only an equivalent ignition surface when it preserves the same invariants. Any ignition surface, its credential boundary, producer/publisher, workflow, or runner is a deterministic-review trust root; changing it must P1-block normal self-certification and require the separately explicit exact-candidate bootstrap/constitutional path.
 
 ## Merge gate
 
