@@ -49,10 +49,10 @@ function cookie(
 }
 
 const founderCookie = cookie('cookie_founder_000001', 'founder-session');
-const builderCookie = cookie('cookie_builder_000001', 'builder-run', founderCookie.cookieId);
-const verifierCookie = cookie('cookie_verify_000001', 'verification-run', builderCookie.cookieId);
-const redteamCookie = cookie('cookie_redteam_000001', 'verification-run', builderCookie.cookieId);
-const providerCookie = cookie('cookie_provider_00001', 'provider-run', verifierCookie.cookieId);
+const builderCookie = cookie('cookie_builder_000001', 'builder-run', founderCookie.cookieId, { owner: 'actor-builder' });
+const verifierCookie = cookie('cookie_verify_000001', 'verification-run', builderCookie.cookieId, { owner: 'actor-verifier' });
+const redteamCookie = cookie('cookie_redteam_000001', 'verification-run', builderCookie.cookieId, { owner: 'actor-redteam' });
+const providerCookie = cookie('cookie_provider_00001', 'provider-run', verifierCookie.cookieId, { owner: 'actor-provider' });
 
 function checkpoint(
   phase: GoalfixExecutionPhase,
@@ -145,7 +145,8 @@ function ancestryReceipt(overrides: Partial<GoalfixMergeAncestryReceipt> = {}): 
     mergedSha: MERGED,
     currentMainSha: MERGED,
     containsCandidate: true,
-    observedAt: '2026-08-26T11:45:00.000Z',
+    mergedAt: '2026-08-26T11:52:00.000Z',
+    observedAt: '2026-08-26T11:53:00.000Z',
     ...Object.fromEntries(Object.entries(overrides).filter(([key]) => key !== 'proofBinding')),
   } as Omit<GoalfixMergeAncestryReceipt, 'proofBinding'>;
   return {
@@ -165,7 +166,7 @@ function runtimeReceipt(overrides: Partial<GoalfixRuntimeReceipt> = {}): Goalfix
     receiptId: 'runtime-receipt-001',
     mergedSha: MERGED,
     verdict: 'PASS',
-    observedAt: '2026-08-26T11:50:00.000Z',
+    observedAt: '2026-08-26T11:54:00.000Z',
     ...Object.fromEntries(Object.entries(overrides).filter(([key]) => key !== 'proofBinding')),
   } as Omit<GoalfixRuntimeReceipt, 'proofBinding'>;
   return {
@@ -242,14 +243,14 @@ describe('Goalfix execution workflow v2', () => {
     expect(evaluateGoalfixExecution(candidate).state).toBe('BLOCKED_PRECONDITION');
   });
 
-  it('refuses Builder self-certification', () => {
+  it('rejects caller actor labels that do not match authenticated proof ownership', () => {
     const candidate = input();
     candidate.checkpoints = candidate.checkpoints.map((item) => item.phase === 'verify'
       ? { ...item, actorId: 'actor-builder' }
       : item);
     const result = evaluateGoalfixExecution(candidate);
     expect(result.state).toBe('UNVERIFIED');
-    expect(result.reasons).toContain('Builder cannot self-certify as Verifier');
+    expect(result.reasons).toContain('verify: actorId must match the authenticated proof-cookie owner');
   });
 
   it('requires every checkpoint to bind non-empty evidence to the exact diff', () => {
@@ -268,6 +269,16 @@ describe('Goalfix execution workflow v2', () => {
     candidate.checkpoints = [...candidate.checkpoints, oldFailure, retry];
     const result = evaluateGoalfixExecution(candidate);
     expect(result.state).toBe('READY_FOR_FOUNDER_MERGE_DECISION');
+  });
+
+  it('rejects a future-dated retry before it can supersede a current failure', () => {
+    const candidate = input();
+    const failed = checkpoint('verify', 'verifier', 'actor-verifier', verifierCookie, 'FAILED', { observedAt: '2026-08-26T11:15:00.000Z' });
+    const futurePass = checkpoint('verify', 'verifier', 'actor-verifier', verifierCookie, 'PASS', { observedAt: '2026-08-26T12:00:01.000Z', evidenceIds: ['evidence:verify:future'] });
+    candidate.checkpoints = [...candidate.checkpoints, failed, futurePass];
+    const result = evaluateGoalfixExecution(candidate);
+    expect(result.state).toBe('UNVERIFIED');
+    expect(result.reasons).toContain('verify: observedAt cannot be in the future');
   });
 
   it('blocks on the current verifier failure instead of letting later green checks average it away', () => {
@@ -300,7 +311,13 @@ describe('Goalfix execution workflow v2', () => {
     expect(wrongIdentity.reasons).toContain('founder decision identity is not the trusted authenticated founder principal');
   });
 
-  it('rejects future and stale founder approval outside the canonical 15-minute proof window', () => {
+  it('rejects Founder Final that predates the latest load-bearing proof lane', () => {
+    const result = evaluateGoalfixExecution(input({ founderDecision: founderDecision({ approvedAt: '2026-08-26T11:15:00.000Z' }) }));
+    expect(result.state).toBe('UNVERIFIED');
+    expect(result.reasons).toContain('founder decision must follow the latest load-bearing pre-merge checkpoint');
+  });
+
+  it('rejects future and stale founder approval outside the canonical 15-minute proof window before merge', () => {
     const future = evaluateGoalfixExecution(input({ founderDecision: founderDecision({ approvedAt: '2026-08-26T12:00:01.000Z' }) }));
     expect(future.reasons).toContain('founder decision approval cannot be in the future');
 
@@ -322,11 +339,49 @@ describe('Goalfix execution workflow v2', () => {
     expect(result.reasons).toContain('merge ancestry does not prove merged main contains the approved candidate');
   });
 
+  it('requires provider-run provenance for merge ancestry proof', () => {
+    const badAncestry = ancestryReceipt();
+    badAncestry.proofBinding = { ...badAncestry.proofBinding, cookieContract: verifierCookie };
+    const truth = postMergeTruth({ mergeAncestryReceipt: badAncestry });
+    const result = evaluateGoalfixExecution(input({ founderDecision: founderDecision(), postMergeTruth: truth }));
+    expect(result.state).toBe('MERGED_UNVERIFIED');
+    expect(result.reasons).toContain('merge ancestry proof cookie context must be provider-run');
+  });
+
+  it('rejects provider merge time that predates Founder Final authorization', () => {
+    const truth = postMergeTruth({
+      mergeAncestryReceipt: ancestryReceipt({ mergedAt: '2026-08-26T11:40:00.000Z' }),
+    });
+    const result = evaluateGoalfixExecution(input({ founderDecision: founderDecision(), postMergeTruth: truth }));
+    expect(result.state).toBe('MERGED_UNVERIFIED');
+    expect(result.reasons).toContain('merge ancestry provider merge time predates Founder Final authorization');
+  });
+
   it('keeps a merge unverified until runtime receipt IDs resolve to loaded PASS receipts', () => {
     const truth = postMergeTruth({ runtimeReceiptIds: ['runtime-receipt-missing'], runtimeReceipts: [] });
     const result = evaluateGoalfixExecution(input({ founderDecision: founderDecision(), postMergeTruth: truth }));
     expect(result.state).toBe('MERGED_UNVERIFIED');
     expect(result.reasons).toContain('runtime receipt IDs must resolve to the loaded runtime receipt set');
+  });
+
+  it('fails closed when a caller attempts to disable post-merge runtime proof', () => {
+    const truth = postMergeTruth();
+    (truth as unknown as { runtimeProofRequired: boolean }).runtimeProofRequired = false;
+    truth.runtimeReceiptIds = [];
+    truth.runtimeReceipts = [];
+    const result = evaluateGoalfixExecution(input({ founderDecision: founderDecision(), postMergeTruth: truth }));
+    expect(result.state).toBe('MERGED_UNVERIFIED');
+    expect(result.reasons).toContain('post-merge runtime proof cannot be caller-disabled');
+    expect(result.reasons).toContain('post-merge runtime proof is required but no runtime receipt exists');
+  });
+
+  it('does not reapply pre-merge authority TTL after provider-bound merge execution is proven', () => {
+    const result = evaluateGoalfixExecution(input({
+      founderDecision: founderDecision(),
+      postMergeTruth: postMergeTruth(),
+      now: new Date('2026-08-26T12:30:00.000Z'),
+    }));
+    expect(result.state).toBe('COMPLETE');
   });
 
   it('completes only after candidate ancestry and loaded post-merge runtime truth are current', () => {
@@ -337,6 +392,7 @@ describe('Goalfix execution workflow v2', () => {
 
   it('invalidates expired proof-cookie provenance even when the checkpoint says PASS', () => {
     const expiredVerifier = cookie('cookie_verify_expired1', 'verification-run', builderCookie.cookieId, {
+      owner: 'actor-verifier',
       expiresAt: '2026-08-26T11:59:59.000Z',
     });
     const candidate = input();
