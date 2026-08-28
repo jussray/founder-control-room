@@ -7,10 +7,9 @@ export default defineConfig({
     // bleed between test files.
     isolate: true,
     environment: 'node',
-    // Discover both TypeScript and JavaScript .test suites across src/.
-    // The JavaScript inclusion keeps historical suites such as the Founder
-    // Signal Engine operator-model tests inside normal `npm test` rather than
-    // hiding them behind baseline debt or a one-off runner.
+    // Include colocated and __tests__/ suites written in TypeScript or
+    // JavaScript. The discovery ratchet separately rejects other candidate
+    // test/spec suffixes unless they are exact-base debt.
     include: ['src/**/*.test.{ts,js}'],
     coverage: {
       provider: 'v8',

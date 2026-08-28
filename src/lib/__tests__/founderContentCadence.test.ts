@@ -168,7 +168,7 @@ describe('founder-content hourly cadence', () => {
 
   it('locks atomic rolling-hour semantics and service-role-only storage in the migration', () => {
     const migration = readFileSync(
-      'supabase/migrations/20260817155500_founder_content_hourly_cadence.sql',
+      'supabase/migrations/20260817160605_founder_content_hourly_cadence.sql',
       'utf8',
     );
 

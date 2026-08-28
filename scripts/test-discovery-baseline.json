@@ -1,5 +1,5 @@
 {
-  "note": "All .test.ts and .test.js files under src/ are discovered by the default Vitest include pattern 'src/**/*.test.{ts,js}'. The test-discovery ratchet is satisfied; no hidden test files remain.",
+  "note": "All .test.ts and .test.js files under src/ are discovered by the default Vitest include pattern 'src/**/*.test.{ts,js}'. The base-bound ratchet checks every supported test/spec suffix and currently records no excluded debt.",
   "includePattern": "src/**/*.test.{ts,js}",
   "undiscovered": []
 }

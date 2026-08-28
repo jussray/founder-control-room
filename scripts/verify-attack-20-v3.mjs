@@ -57,6 +57,14 @@ requireValue(registry.schema === 'founder-control-room/portfolio-worker-security
 requireValue(registry.suiteVersion === 'attack-20-v3', 'registry suiteVersion must be attack-20-v3');
 requireValue(registry.repository === 'jussray/founder-control-room', 'registry repository must be jussray/founder-control-room');
 requireValue(FULL_SHA.test(registry.declaredFromMainSha ?? ''), 'registry must name the exact main SHA it was discovered from');
+const expectedBaseSha = process.env.EXPECTED_BASE_SHA?.trim() || null;
+if (expectedBaseSha !== null) {
+  requireValue(FULL_SHA.test(expectedBaseSha), 'EXPECTED_BASE_SHA must be an exact 40-character commit SHA when provided');
+  requireValue(
+    registry.declaredFromMainSha === expectedBaseSha,
+    `registry declaredFromMainSha must match exact verified base ${expectedBaseSha}`,
+  );
+}
 requireValue(registry.aggregation?.noAveraging === true, 'registry must prohibit averaging');
 requireValue(Array.isArray(registry.workers) && registry.workers.length >= 3, 'registry must contain every known production FCR Worker');
 
@@ -129,6 +137,7 @@ writeFileSync('artifacts/attack-20-v3-source-proof.json', `${JSON.stringify({
   schema: 'founder-control-room/attack-20-v3-source-proof@v1',
   suiteVersion: policy.suiteVersion,
   repository: registry.repository,
+  declaredFromMainSha: registry.declaredFromMainSha,
   headSha,
   receiptShaSource,
   lineage: policy.lineage,
