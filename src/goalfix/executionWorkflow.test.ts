@@ -184,6 +184,7 @@ function runtimeReceipt(overrides: Partial<GoalfixRuntimeReceipt> = {}): Goalfix
 
 function postMergeTruth(overrides: Partial<GoalfixPostMergeTruth> = {}): GoalfixPostMergeTruth {
   const runtime = runtimeReceipt();
+  const runtimeFingerprint = runtime.proofBinding.fingerprints.runtime!;
   return {
     mergedSha: MERGED,
     currentMainSha: MERGED,
@@ -193,7 +194,10 @@ function postMergeTruth(overrides: Partial<GoalfixPostMergeTruth> = {}): Goalfix
     mergeAncestryReceipt: ancestryReceipt(),
     observedAt: '2026-08-26T11:55:00.000Z',
     proofBinding: {
-      fingerprints: { sourceSha: goalfixSourceFingerprint(REPOSITORY, MERGED) },
+      fingerprints: {
+        sourceSha: goalfixSourceFingerprint(REPOSITORY, MERGED),
+        runtime: runtimeFingerprint,
+      },
       cookieContract: providerCookie,
     },
     ...overrides,
@@ -251,6 +255,19 @@ describe('Goalfix execution workflow v2', () => {
     const result = evaluateGoalfixExecution(candidate);
     expect(result.state).toBe('UNVERIFIED');
     expect(result.reasons).toContain('verify: actorId must match the authenticated proof-cookie owner');
+  });
+
+  it('rejects a self-declared checkpoint leaf owner even when the caller actor label matches it', () => {
+    const candidate = input();
+    const forgedVerifier = { ...verifierCookie, owner: 'actor-forged' };
+    candidate.checkpoints = candidate.checkpoints.map((item) => item.phase === 'verify'
+      ? checkpoint('verify', 'verifier', 'actor-forged', forgedVerifier, 'PASS', { observedAt: item.observedAt })
+      : item);
+    const result = evaluateGoalfixExecution(candidate);
+    expect(result.state).toBe('UNVERIFIED');
+    expect(result.reasons).toContain(
+      `verify: proof cookie ${verifierCookie.cookieId} does not match authenticated cookie index`,
+    );
   });
 
   it('requires every checkpoint to bind non-empty evidence to the exact diff', () => {
@@ -364,6 +381,26 @@ describe('Goalfix execution workflow v2', () => {
     expect(result.reasons).toContain('runtime receipt IDs must resolve to the loaded runtime receipt set');
   });
 
+  it('binds every runtime PASS receipt to the canonical authenticated provider witness', () => {
+    const forgedRuntime = runtimeReceipt();
+    forgedRuntime.proofBinding = {
+      ...forgedRuntime.proofBinding,
+      fingerprints: {
+        ...forgedRuntime.proofBinding.fingerprints,
+        runtime: fingerprintNormalized({ mergedSha: MERGED, runtime: 'forged' }),
+      },
+    };
+    const truth = postMergeTruth({
+      runtimeReceiptIds: [forgedRuntime.receiptId],
+      runtimeReceipts: [forgedRuntime],
+    });
+    const result = evaluateGoalfixExecution(input({ founderDecision: founderDecision(), postMergeTruth: truth }));
+    expect(result.state).toBe('MERGED_UNVERIFIED');
+    expect(result.reasons).toContain(
+      `${forgedRuntime.receiptId}: runtime receipt fingerprint does not match canonical provider witness`,
+    );
+  });
+
   it('fails closed when a caller attempts to disable post-merge runtime proof', () => {
     const truth = postMergeTruth();
     (truth as unknown as { runtimeProofRequired: boolean }).runtimeProofRequired = false;
@@ -382,6 +419,40 @@ describe('Goalfix execution workflow v2', () => {
       now: new Date('2026-08-26T12:30:00.000Z'),
     }));
     expect(result.state).toBe('COMPLETE');
+  });
+
+  it('preserves already-consumed Builder, Verifier, and Red Team cookies as historical proof after merge', () => {
+    const historicalBuilder = cookie('cookie_builder_history1', 'builder-run', founderCookie.cookieId, {
+      owner: 'actor-builder',
+      expiresAt: '2026-08-26T11:30:00.000Z',
+    });
+    const historicalVerifier = cookie('cookie_verify_history01', 'verification-run', historicalBuilder.cookieId, {
+      owner: 'actor-verifier',
+      expiresAt: '2026-08-26T11:30:00.000Z',
+    });
+    const historicalRedteam = cookie('cookie_redteam_history1', 'verification-run', historicalBuilder.cookieId, {
+      owner: 'actor-redteam',
+      expiresAt: '2026-08-26T11:30:00.000Z',
+    });
+    const candidate = input({
+      founderDecision: founderDecision(),
+      postMergeTruth: postMergeTruth(),
+      now: new Date('2026-08-26T12:30:00.000Z'),
+    });
+    candidate.cookieIndex = new Map([
+      ...candidate.cookieIndex,
+      [historicalBuilder.cookieId, historicalBuilder],
+      [historicalVerifier.cookieId, historicalVerifier],
+      [historicalRedteam.cookieId, historicalRedteam],
+    ]);
+    candidate.checkpoints = candidate.checkpoints.map((item) => {
+      if (item.phase === 'builder') return checkpoint('builder', 'builder', 'actor-builder', historicalBuilder, 'PASS', { observedAt: '2026-08-26T11:00:00.000Z' });
+      if (item.phase === 'verify') return checkpoint('verify', 'verifier', 'actor-verifier', historicalVerifier, 'PASS', { observedAt: '2026-08-26T11:10:00.000Z' });
+      if (item.phase === 'redteam') return checkpoint('redteam', 'redteam', 'actor-redteam', historicalRedteam, 'PASS', { observedAt: '2026-08-26T11:20:00.000Z' });
+      return item;
+    });
+
+    expect(evaluateGoalfixExecution(candidate).state).toBe('COMPLETE');
   });
 
   it('completes only after candidate ancestry and loaded post-merge runtime truth are current', () => {
