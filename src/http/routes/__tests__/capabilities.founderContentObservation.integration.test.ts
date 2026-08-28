@@ -80,7 +80,7 @@ beforeEach(() => {
 });
 
 describe('FCR manual LinkedIn founder-content observations', () => {
-  it('records external publication as user-attested while refusing provider or metric authority', async () => {
+  it('records external publication as founder-bound user-attested truth while refusing provider or metric authority', async () => {
     authorizeFounder();
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'founder_users') return founderAllowlistBuilder();
@@ -134,6 +134,10 @@ describe('FCR manual LinkedIn founder-content observations', () => {
         metrics: { state: 'UNKNOWN' },
         contentHash: 'a'.repeat(64),
         source: 'manual_founder_attestation',
+        attestation: expect.objectContaining({
+          founderUserId: 'u1',
+          observedAt: expect.any(String),
+        }),
         authority: {
           publication: false,
           analyticsClaim: false,
@@ -142,6 +146,7 @@ describe('FCR manual LinkedIn founder-content observations', () => {
       }),
     }));
     expect(JSON.stringify(row)).not.toContain('999999');
+    expect(JSON.stringify(row)).not.toContain(FOUNDER_EMAIL);
   });
 
   it('requires an explicit founder publication attestation and never persists an unasserted post', async () => {
@@ -158,6 +163,28 @@ describe('FCR manual LinkedIn founder-content observations', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toContain('publicationAttested=true');
+    expect(observationUpsert).not.toHaveBeenCalled();
+  });
+
+  it('rejects materially future-dated publication attestations', async () => {
+    authorizeFounder();
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderAllowlistBuilder();
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
+    const res = await request(buildApp())
+      .post('/capabilities/founder-content/linkedin-observations')
+      .set('Authorization', BEARER)
+      .send({
+        projectSlug: 'founder-control-room',
+        post: LINKEDIN_URL,
+        publicationAttested: true,
+        publishedAt: '2099-01-01T00:00:00.000Z',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('future-dated');
     expect(observationUpsert).not.toHaveBeenCalled();
   });
 
