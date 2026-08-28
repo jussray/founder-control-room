@@ -259,6 +259,22 @@ function allPreflightSatisfied(preflight: GoalfixStrategicPreflight): boolean {
   return Object.values(preflight).every(Boolean);
 }
 
+function checkpointTruthFingerprint(checkpoint: GoalfixExecutionCheckpoint): string {
+  return fingerprintNormalized({
+    phase: checkpoint.phase,
+    role: checkpoint.role,
+    actorId: checkpoint.actorId,
+    verdict: checkpoint.verdict,
+    repository: checkpoint.repository,
+    baseSha: checkpoint.baseSha.toLowerCase(),
+    headSha: checkpoint.headSha.toLowerCase(),
+    diffFingerprint: checkpoint.diffFingerprint,
+    evidenceIds: [...checkpoint.evidenceIds].map((value) => value.trim()).sort(),
+    observedAt: checkpoint.observedAt,
+    proofBinding: checkpoint.proofBinding,
+  });
+}
+
 function latestCheckpoint(
   checkpoints: readonly GoalfixExecutionCheckpoint[],
   phase: GoalfixExecutionPhase,
@@ -280,7 +296,6 @@ function checkpointTimestampErrors(
   now: Date,
 ): string[] {
   const errors: string[] = [];
-  const checkpointByPhaseAndTime = new Map<string, GoalfixExecutionCheckpoint>();
   for (const checkpoint of checkpoints) {
     if (!isIsoTimestamp(checkpoint.observedAt)) {
       errors.push(`${checkpoint.phase}: observedAt must be an ISO timestamp`);
@@ -289,13 +304,15 @@ function checkpointTimestampErrors(
     if (Date.parse(checkpoint.observedAt) > now.getTime()) {
       errors.push(`${checkpoint.phase}: observedAt cannot be in the future`);
     }
+  }
 
-    const key = `${checkpoint.phase}:${checkpoint.observedAt}`;
-    const existing = checkpointByPhaseAndTime.get(key);
-    if (existing && fingerprintNormalized(existing) !== fingerprintNormalized(checkpoint)) {
-      errors.push(`${checkpoint.phase}: conflicting checkpoints share observedAt ${checkpoint.observedAt}`);
-    } else if (!existing) {
-      checkpointByPhaseAndTime.set(key, checkpoint);
+  for (const phase of GOALFIX_EXECUTION_PHASES) {
+    const valid = checkpoints.filter((checkpoint) => checkpoint.phase === phase && isIsoTimestamp(checkpoint.observedAt));
+    if (valid.length < 2) continue;
+    const latestObservedAt = Math.max(...valid.map((checkpoint) => Date.parse(checkpoint.observedAt)));
+    const tiedLatest = valid.filter((checkpoint) => Date.parse(checkpoint.observedAt) === latestObservedAt);
+    if (new Set(tiedLatest.map(checkpointTruthFingerprint)).size > 1) {
+      errors.push(`${phase}: conflicting checkpoints share the latest observedAt timestamp`);
     }
   }
   return errors;
