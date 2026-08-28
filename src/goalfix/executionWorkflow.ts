@@ -7,6 +7,7 @@ import {
 } from '../security/attack20V3.js';
 
 export const GOALFIX_EXECUTION_CONTRACT = 'founder-control-room/goalfix-execution@v2' as const;
+export const GOALFIX_MERGE_PROOF_TTL_MS = 15 * 60 * 1_000;
 
 export const GOALFIX_EXECUTION_PHASES = [
   'observe',
@@ -93,7 +94,7 @@ export interface GoalfixExecutionCheckpoint {
   repository: string;
   baseSha: string;
   headSha: string;
-  diffFingerprint: string | null;
+  diffFingerprint: string;
   evidenceIds: readonly string[];
   observedAt: string;
   proofBinding: ProofBinding;
@@ -103,9 +104,36 @@ export interface GoalfixFounderDecision {
   decisionId: string;
   action: 'MERGE' | 'CONTINUE' | 'STOP';
   approvedBy: string;
+  pullRequestNumber: number;
+  sourceBranch: string;
+  targetBranch: string;
+  approvedBaseSha: string;
   approvedHeadSha: string;
   approvedDiffFingerprint: string;
   approvedAt: string;
+  proofBinding: ProofBinding;
+}
+
+export interface GoalfixMergeAncestryReceipt {
+  receiptId: string;
+  repository: string;
+  pullRequestNumber: number;
+  sourceBranch: string;
+  targetBranch: string;
+  candidateHeadSha: string;
+  candidateDiffFingerprint: string;
+  mergedSha: string;
+  currentMainSha: string;
+  containsCandidate: boolean;
+  observedAt: string;
+  proofBinding: ProofBinding;
+}
+
+export interface GoalfixRuntimeReceipt {
+  receiptId: string;
+  mergedSha: string;
+  verdict: 'PASS' | 'FAILED' | 'UNVERIFIED';
+  observedAt: string;
   proofBinding: ProofBinding;
 }
 
@@ -114,14 +142,18 @@ export interface GoalfixPostMergeTruth {
   currentMainSha: string;
   runtimeProofRequired: boolean;
   runtimeReceiptIds: readonly string[];
-  runtimeVerdict: 'PASS' | 'FAILED' | 'UNVERIFIED' | 'NOT_REQUIRED';
+  runtimeReceipts: readonly GoalfixRuntimeReceipt[];
+  mergeAncestryReceipt: GoalfixMergeAncestryReceipt;
   observedAt: string;
   proofBinding: ProofBinding;
 }
 
 export interface GoalfixExecutionInput {
   repository: string;
+  pullRequestNumber: number;
   branch: string;
+  targetBranch: string;
+  trustedFounderPrincipalId: string;
   baseSha: string;
   candidateHeadSha: string;
   currentMainSha: string;
@@ -156,12 +188,70 @@ function exactSha(value: string): boolean {
   return FULL_SHA.test(value.trim());
 }
 
+function isIsoTimestamp(value: string): boolean {
+  return Number.isFinite(Date.parse(value));
+}
+
+function uniqueNonEmpty(values: readonly string[]): boolean {
+  const normalized = values.map((value) => value.trim()).filter(Boolean);
+  return normalized.length === values.length && new Set(normalized).size === values.length;
+}
+
 export function goalfixSourceFingerprint(repository: string, headSha: string): string {
   return fingerprintNormalized({ repository, headSha: headSha.toLowerCase() });
 }
 
 export function goalfixDiffFingerprint(input: unknown): string {
   return fingerprintNormalized(input);
+}
+
+export function goalfixCheckpointEvidenceFingerprint(input: Pick<
+  GoalfixExecutionCheckpoint,
+  'phase' | 'repository' | 'baseSha' | 'headSha' | 'diffFingerprint' | 'evidenceIds'
+>): string {
+  return fingerprintNormalized({
+    phase: input.phase,
+    repository: input.repository,
+    baseSha: input.baseSha.toLowerCase(),
+    headSha: input.headSha.toLowerCase(),
+    diffFingerprint: input.diffFingerprint,
+    evidenceIds: [...input.evidenceIds].map((value) => value.trim()).sort(),
+  });
+}
+
+export function goalfixFounderDecisionFingerprint(
+  decision: Omit<GoalfixFounderDecision, 'proofBinding'>,
+  repository: string,
+): string {
+  return fingerprintNormalized({
+    repository,
+    decisionId: decision.decisionId,
+    action: decision.action,
+    approvedBy: decision.approvedBy,
+    pullRequestNumber: decision.pullRequestNumber,
+    sourceBranch: decision.sourceBranch,
+    targetBranch: decision.targetBranch,
+    approvedBaseSha: decision.approvedBaseSha.toLowerCase(),
+    approvedHeadSha: decision.approvedHeadSha.toLowerCase(),
+    approvedDiffFingerprint: decision.approvedDiffFingerprint,
+    approvedAt: decision.approvedAt,
+  });
+}
+
+export function goalfixMergeAncestryFingerprint(receipt: Omit<GoalfixMergeAncestryReceipt, 'proofBinding'>): string {
+  return fingerprintNormalized({
+    ...receipt,
+    candidateHeadSha: receipt.candidateHeadSha.toLowerCase(),
+    mergedSha: receipt.mergedSha.toLowerCase(),
+    currentMainSha: receipt.currentMainSha.toLowerCase(),
+  });
+}
+
+export function goalfixRuntimeReceiptFingerprint(receipt: Omit<GoalfixRuntimeReceipt, 'proofBinding'>): string {
+  return fingerprintNormalized({
+    ...receipt,
+    mergedSha: receipt.mergedSha.toLowerCase(),
+  });
 }
 
 function allPreflightSatisfied(preflight: GoalfixStrategicPreflight): boolean {
@@ -172,7 +262,16 @@ function latestCheckpoint(
   checkpoints: readonly GoalfixExecutionCheckpoint[],
   phase: GoalfixExecutionPhase,
 ): GoalfixExecutionCheckpoint | undefined {
-  return checkpoints.filter((checkpoint) => checkpoint.phase === phase).at(-1);
+  return checkpoints
+    .filter((checkpoint) => checkpoint.phase === phase)
+    .sort((left, right) => Date.parse(left.observedAt) - Date.parse(right.observedAt))
+    .at(-1);
+}
+
+function currentCheckpoints(checkpoints: readonly GoalfixExecutionCheckpoint[]): GoalfixExecutionCheckpoint[] {
+  return GOALFIX_EXECUTION_PHASES
+    .map((phase) => latestCheckpoint(checkpoints, phase))
+    .filter((checkpoint): checkpoint is GoalfixExecutionCheckpoint => Boolean(checkpoint));
 }
 
 function validateCheckpoint(
@@ -184,15 +283,20 @@ function validateCheckpoint(
   if (checkpoint.repository !== input.repository) errors.push(`${checkpoint.phase}: repository binding mismatch`);
   if (checkpoint.baseSha.toLowerCase() !== input.baseSha.toLowerCase()) errors.push(`${checkpoint.phase}: base SHA binding mismatch`);
   if (checkpoint.headSha.toLowerCase() !== input.candidateHeadSha.toLowerCase()) errors.push(`${checkpoint.phase}: candidate head SHA binding mismatch`);
-  if (checkpoint.diffFingerprint !== null && checkpoint.diffFingerprint !== input.diffFingerprint) errors.push(`${checkpoint.phase}: diff fingerprint mismatch`);
+  if (!checkpoint.diffFingerprint || checkpoint.diffFingerprint !== input.diffFingerprint) errors.push(`${checkpoint.phase}: diff fingerprint mismatch`);
   if (!checkpoint.actorId.trim()) errors.push(`${checkpoint.phase}: actorId is required`);
-  if (!Number.isFinite(Date.parse(checkpoint.observedAt))) errors.push(`${checkpoint.phase}: observedAt must be an ISO timestamp`);
+  if (!isIsoTimestamp(checkpoint.observedAt)) errors.push(`${checkpoint.phase}: observedAt must be an ISO timestamp`);
+  if (!uniqueNonEmpty(checkpoint.evidenceIds) || checkpoint.evidenceIds.length === 0) errors.push(`${checkpoint.phase}: at least one unique evidence ID is required`);
 
   const expectedSourceFingerprint = goalfixSourceFingerprint(input.repository, input.candidateHeadSha);
-  const bindingErrors = validateProofBinding(checkpoint.proofBinding, ['sourceSha'], now);
+  const expectedEvidenceFingerprint = goalfixCheckpointEvidenceFingerprint(checkpoint);
+  const bindingErrors = validateProofBinding(checkpoint.proofBinding, ['sourceSha', 'evidenceBundle'], now);
   errors.push(...bindingErrors.map((error) => `${checkpoint.phase}: ${error}`));
   if (checkpoint.proofBinding.fingerprints.sourceSha !== expectedSourceFingerprint) {
     errors.push(`${checkpoint.phase}: sourceSha proof fingerprint does not match candidate head`);
+  }
+  if (checkpoint.proofBinding.fingerprints.evidenceBundle !== expectedEvidenceFingerprint) {
+    errors.push(`${checkpoint.phase}: evidenceBundle proof fingerprint does not match checkpoint evidence IDs`);
   }
 
   const lineageErrors = validateCookieLineage(checkpoint.proofBinding.cookieContract, input.cookieIndex, now);
@@ -210,13 +314,19 @@ function validateCheckpoint(
   return errors;
 }
 
-function orderedCheckpoints(checkpoints: readonly GoalfixExecutionCheckpoint[]): string[] {
+function checkpointSequenceErrors(checkpoints: readonly GoalfixExecutionCheckpoint[]): string[] {
   const errors: string[] = [];
-  let highest = -1;
-  for (const checkpoint of checkpoints) {
-    const index = phaseIndex(checkpoint.phase);
-    if (index < highest) errors.push(`checkpoint order regressed at ${checkpoint.phase}`);
-    highest = Math.max(highest, index);
+  const current = currentCheckpoints(checkpoints);
+  for (let index = 1; index < current.length; index += 1) {
+    const previous = current[index - 1];
+    const checkpoint = current[index];
+    if (!previous || !checkpoint) continue;
+    if (phaseIndex(checkpoint.phase) <= phaseIndex(previous.phase)) continue;
+    if (isIsoTimestamp(previous.observedAt)
+      && isIsoTimestamp(checkpoint.observedAt)
+      && Date.parse(checkpoint.observedAt) < Date.parse(previous.observedAt)) {
+      errors.push(`${checkpoint.phase}: current checkpoint predates current ${previous.phase} checkpoint`);
+    }
   }
   return errors;
 }
@@ -244,16 +354,71 @@ function validateFounderDecision(
 ): string[] {
   const errors: string[] = [];
   if (!decision.decisionId.trim()) errors.push('founder decision ID is required');
-  if (!decision.approvedBy.trim()) errors.push('founder decision owner is required');
+  if (decision.approvedBy !== input.trustedFounderPrincipalId) errors.push('founder decision identity is not the trusted authenticated founder principal');
+  if (!Number.isInteger(decision.pullRequestNumber) || decision.pullRequestNumber !== input.pullRequestNumber) errors.push('founder decision PR number is stale or mismatched');
+  if (decision.sourceBranch !== input.branch) errors.push('founder decision source branch is stale or mismatched');
+  if (decision.targetBranch !== input.targetBranch) errors.push('founder decision target branch is stale or mismatched');
+  if (decision.approvedBaseSha.toLowerCase() !== input.baseSha.toLowerCase()) errors.push('founder decision base SHA is stale or mismatched');
   if (decision.approvedHeadSha.toLowerCase() !== input.candidateHeadSha.toLowerCase()) errors.push('founder decision head SHA is stale or mismatched');
   if (decision.approvedDiffFingerprint !== input.diffFingerprint) errors.push('founder decision diff fingerprint is stale or mismatched');
-  if (!Number.isFinite(Date.parse(decision.approvedAt))) errors.push('founder decision approvedAt must be an ISO timestamp');
-  errors.push(...validateProofBinding(decision.proofBinding, ['sourceSha'], now).map((error) => `founder decision: ${error}`));
+  if (!isIsoTimestamp(decision.approvedAt)) {
+    errors.push('founder decision approvedAt must be an ISO timestamp');
+  } else {
+    const approvedAt = Date.parse(decision.approvedAt);
+    if (approvedAt > now.getTime()) errors.push('founder decision approval cannot be in the future');
+    if (approvedAt < now.getTime() - GOALFIX_MERGE_PROOF_TTL_MS) errors.push('founder decision approval is outside the merge proof freshness window');
+  }
+  errors.push(...validateProofBinding(decision.proofBinding, ['sourceSha', 'evidenceBundle'], now).map((error) => `founder decision: ${error}`));
   errors.push(...validateCookieLineage(decision.proofBinding.cookieContract, input.cookieIndex, now).map((error) => `founder decision: ${error}`));
   if (decision.proofBinding.cookieContract.contextType !== 'founder-session') errors.push('founder decision proof cookie context must be founder-session');
+  if (decision.proofBinding.cookieContract.owner !== input.trustedFounderPrincipalId) errors.push('founder decision proof cookie owner is not the trusted authenticated founder principal');
   if (decision.proofBinding.fingerprints.sourceSha !== goalfixSourceFingerprint(input.repository, input.candidateHeadSha)) {
     errors.push('founder decision sourceSha proof fingerprint does not match candidate head');
   }
+  if (decision.proofBinding.fingerprints.evidenceBundle !== goalfixFounderDecisionFingerprint({ ...decision, proofBinding: undefined } as never, input.repository)) {
+    errors.push('founder decision evidenceBundle does not bind exact PR/base/head/branches/diff/approval');
+  }
+  return errors;
+}
+
+function validateMergeAncestryReceipt(
+  receipt: GoalfixMergeAncestryReceipt,
+  input: GoalfixExecutionInput,
+  mergedSha: string,
+  now: Date,
+): string[] {
+  const errors: string[] = [];
+  if (!receipt.receiptId.trim()) errors.push('merge ancestry receipt ID is required');
+  if (receipt.repository !== input.repository) errors.push('merge ancestry repository is mismatched');
+  if (receipt.pullRequestNumber !== input.pullRequestNumber) errors.push('merge ancestry PR number is mismatched');
+  if (receipt.sourceBranch !== input.branch || receipt.targetBranch !== input.targetBranch) errors.push('merge ancestry branch binding is mismatched');
+  if (receipt.candidateHeadSha.toLowerCase() !== input.candidateHeadSha.toLowerCase()) errors.push('merge ancestry candidate head is mismatched');
+  if (receipt.candidateDiffFingerprint !== input.diffFingerprint) errors.push('merge ancestry candidate diff is mismatched');
+  if (receipt.mergedSha.toLowerCase() !== mergedSha.toLowerCase() || receipt.currentMainSha.toLowerCase() !== mergedSha.toLowerCase()) errors.push('merge ancestry merged/current-main SHA is mismatched');
+  if (receipt.containsCandidate !== true) errors.push('merge ancestry does not prove merged main contains the approved candidate');
+  if (!isIsoTimestamp(receipt.observedAt) || Date.parse(receipt.observedAt) > now.getTime()) errors.push('merge ancestry observedAt is invalid');
+  errors.push(...validateProofBinding(receipt.proofBinding, ['sourceSha', 'evidenceBundle'], now).map((error) => `merge ancestry: ${error}`));
+  errors.push(...validateCookieLineage(receipt.proofBinding.cookieContract, input.cookieIndex, now).map((error) => `merge ancestry: ${error}`));
+  if (receipt.proofBinding.fingerprints.sourceSha !== goalfixSourceFingerprint(input.repository, mergedSha)) errors.push('merge ancestry sourceSha proof fingerprint does not match merged main');
+  if (receipt.proofBinding.fingerprints.evidenceBundle !== goalfixMergeAncestryFingerprint({ ...receipt, proofBinding: undefined } as never)) errors.push('merge ancestry evidenceBundle does not bind candidate-to-merged proof');
+  return errors;
+}
+
+function validateRuntimeReceipt(
+  receipt: GoalfixRuntimeReceipt,
+  input: GoalfixExecutionInput,
+  mergedSha: string,
+  now: Date,
+): string[] {
+  const errors: string[] = [];
+  if (!receipt.receiptId.trim()) errors.push('runtime receipt ID is required');
+  if (receipt.mergedSha.toLowerCase() !== mergedSha.toLowerCase()) errors.push(`${receipt.receiptId}: runtime receipt merged SHA is mismatched`);
+  if (!isIsoTimestamp(receipt.observedAt) || Date.parse(receipt.observedAt) > now.getTime()) errors.push(`${receipt.receiptId}: runtime receipt observedAt is invalid`);
+  errors.push(...validateProofBinding(receipt.proofBinding, ['sourceSha', 'runtime', 'evidenceBundle'], now).map((error) => `${receipt.receiptId}: ${error}`));
+  errors.push(...validateCookieLineage(receipt.proofBinding.cookieContract, input.cookieIndex, now).map((error) => `${receipt.receiptId}: ${error}`));
+  if (receipt.proofBinding.cookieContract.contextType !== 'provider-run') errors.push(`${receipt.receiptId}: runtime receipt proof cookie context must be provider-run`);
+  if (receipt.proofBinding.fingerprints.sourceSha !== goalfixSourceFingerprint(input.repository, mergedSha)) errors.push(`${receipt.receiptId}: runtime receipt sourceSha does not match merged main`);
+  if (receipt.proofBinding.fingerprints.evidenceBundle !== goalfixRuntimeReceiptFingerprint({ ...receipt, proofBinding: undefined } as never)) errors.push(`${receipt.receiptId}: runtime receipt evidenceBundle does not bind the receipt`);
   return errors;
 }
 
@@ -265,23 +430,36 @@ function validatePostMergeTruth(
   const errors: string[] = [];
   if (!exactSha(truth.mergedSha) || !exactSha(truth.currentMainSha)) errors.push('post-merge truth requires exact merged and current-main SHAs');
   if (truth.mergedSha.toLowerCase() !== truth.currentMainSha.toLowerCase()) errors.push('post-merge current main does not equal merged SHA');
-  if (!Number.isFinite(Date.parse(truth.observedAt))) errors.push('post-merge observedAt must be an ISO timestamp');
-  if (truth.runtimeProofRequired && truth.runtimeReceiptIds.length === 0) errors.push('post-merge runtime proof is required but no runtime receipt exists');
-  if (truth.runtimeProofRequired && truth.runtimeVerdict !== 'PASS') errors.push('post-merge runtime truth is not PASS');
-  if (!truth.runtimeProofRequired && !['PASS', 'NOT_REQUIRED'].includes(truth.runtimeVerdict)) errors.push('post-merge truth must be PASS or NOT_REQUIRED when runtime proof is not required');
+  if (!isIsoTimestamp(truth.observedAt) || Date.parse(truth.observedAt) > now.getTime()) errors.push('post-merge observedAt must be a current ISO timestamp');
   errors.push(...validateProofBinding(truth.proofBinding, ['sourceSha'], now).map((error) => `post-merge: ${error}`));
   errors.push(...validateCookieLineage(truth.proofBinding.cookieContract, input.cookieIndex, now).map((error) => `post-merge: ${error}`));
   if (truth.proofBinding.fingerprints.sourceSha !== goalfixSourceFingerprint(input.repository, truth.mergedSha)) {
     errors.push('post-merge sourceSha proof fingerprint does not match merged/current-main SHA');
   }
-  return errors;
+
+  errors.push(...validateMergeAncestryReceipt(truth.mergeAncestryReceipt, input, truth.mergedSha, now));
+
+  const runtimeIds = truth.runtimeReceiptIds.map((value) => value.trim());
+  if (!uniqueNonEmpty(runtimeIds)) errors.push('runtime receipt IDs must be unique non-empty IDs');
+  const loadedIds = truth.runtimeReceipts.map((receipt) => receipt.receiptId);
+  if (runtimeIds.length !== loadedIds.length || runtimeIds.some((id) => !loadedIds.includes(id)) || loadedIds.some((id) => !runtimeIds.includes(id))) {
+    errors.push('runtime receipt IDs must resolve to the loaded runtime receipt set');
+  }
+  for (const receipt of truth.runtimeReceipts) errors.push(...validateRuntimeReceipt(receipt, input, truth.mergedSha, now));
+  if (truth.runtimeProofRequired) {
+    if (truth.runtimeReceipts.length === 0) errors.push('post-merge runtime proof is required but no runtime receipt exists');
+    if (truth.runtimeReceipts.some((receipt) => receipt.verdict !== 'PASS')) errors.push('post-merge runtime truth is not PASS');
+  }
+  return [...new Set(errors)];
 }
 
 export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixExecutionDecision {
   const now = input.now ?? new Date();
   const reasons: string[] = [];
 
-  if (!input.repository.includes('/') || !input.branch.trim() || !input.goal.trim()) reasons.push('authoritative repository, branch, and founder goal are required');
+  if (!input.repository.includes('/') || !input.branch.trim() || !input.targetBranch.trim() || !input.goal.trim()) reasons.push('authoritative repository, source/target branches, and founder goal are required');
+  if (!Number.isInteger(input.pullRequestNumber) || input.pullRequestNumber <= 0) reasons.push('positive pull request number is required');
+  if (!input.trustedFounderPrincipalId.trim()) reasons.push('trusted authenticated founder principal is required');
   if (!exactSha(input.baseSha) || !exactSha(input.candidateHeadSha) || !exactSha(input.currentMainSha)) reasons.push('base, candidate head, and current main must be exact 40-character SHAs');
   if (!input.diffFingerprint.trim()) reasons.push('diff fingerprint is required');
   if (!input.stopCondition.trim()) reasons.push('stop condition is required');
@@ -299,19 +477,20 @@ export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixE
     };
   }
 
+  const current = currentCheckpoints(input.checkpoints);
   const checkpointErrors = [
-    ...orderedCheckpoints(input.checkpoints),
+    ...checkpointSequenceErrors(input.checkpoints),
     ...roleSeparationErrors(input.checkpoints),
-    ...input.checkpoints.flatMap((checkpoint) => validateCheckpoint(checkpoint, input, now)),
+    ...current.flatMap((checkpoint) => validateCheckpoint(checkpoint, input, now)),
   ];
   if (checkpointErrors.length > 0) {
     return {
       contract: GOALFIX_EXECUTION_CONTRACT,
       state: 'UNVERIFIED',
-      currentPhase: input.checkpoints.at(-1)?.phase ?? 'observe',
+      currentPhase: current.at(-1)?.phase ?? 'observe',
       mayMerge: false,
       reasons: [...new Set(checkpointErrors)],
-      requiredNextEvidence: ['Repair the broken fingerprint/cookie/role binding and rerun only the affected proof lane.'],
+      requiredNextEvidence: ['Repair the broken fingerprint/cookie/evidence/role binding and rerun only the affected proof lane.'],
     };
   }
 
@@ -329,27 +508,27 @@ export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixE
     }
   }
 
-  const failed = input.checkpoints.find((checkpoint) => checkpoint.verdict === 'FAILED' || checkpoint.verdict === 'BLOCKED');
-  if (failed) {
+  const currentFailed = current.find((checkpoint) => checkpoint.verdict === 'FAILED' || checkpoint.verdict === 'BLOCKED');
+  if (currentFailed) {
     return {
       contract: GOALFIX_EXECUTION_CONTRACT,
       state: 'BLOCKED',
-      currentPhase: failed.phase,
+      currentPhase: currentFailed.phase,
       mayMerge: false,
-      reasons: [`${failed.phase} is ${failed.verdict}.`],
-      requiredNextEvidence: [`Repair the verified cause at ${failed.phase}, then rerun that lane and every dependent later lane.`],
+      reasons: [`${currentFailed.phase} is ${currentFailed.verdict}.`],
+      requiredNextEvidence: [`Repair the verified cause at ${currentFailed.phase}, then rerun that lane and every dependent later lane.`],
     };
   }
 
-  const unverified = input.checkpoints.find((checkpoint) => checkpoint.verdict === 'UNVERIFIED');
-  if (unverified) {
+  const currentUnverified = current.find((checkpoint) => checkpoint.verdict === 'UNVERIFIED');
+  if (currentUnverified) {
     return {
       contract: GOALFIX_EXECUTION_CONTRACT,
       state: 'UNVERIFIED',
-      currentPhase: unverified.phase,
+      currentPhase: currentUnverified.phase,
       mayMerge: false,
-      reasons: [`${unverified.phase} lacks current proof.`],
-      requiredNextEvidence: [`Obtain fresh evidence for ${unverified.phase}.`],
+      reasons: [`${currentUnverified.phase} lacks current proof.`],
+      requiredNextEvidence: [`Obtain fresh evidence for ${currentUnverified.phase}.`],
     };
   }
 
@@ -379,13 +558,13 @@ export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixE
     };
   }
 
-  if (!redteam || redteam.verdict !== 'PASS') {
+  if (!redteam || redteam.verdict !== 'PASS' || Date.parse(redteam.observedAt) < Date.parse(verifier.observedAt)) {
     return {
       contract: GOALFIX_EXECUTION_CONTRACT,
       state: 'WAITING_FOR_REDTEAM',
       currentPhase: 'redteam',
       mayMerge: false,
-      reasons: ['Independent Red Team PASS is required after verification.'],
+      reasons: ['Independent Red Team PASS is required after the latest verification checkpoint.'],
       requiredNextEvidence: ['Adversarial review against the exact verified candidate head and diff.'],
     };
   }
@@ -407,8 +586,8 @@ export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixE
       state: 'READY_FOR_FOUNDER_MERGE_DECISION',
       currentPhase: 'merge-gate',
       mayMerge: false,
-      reasons: ['Builder, Verifier, and Red Team are current; founder merge authority has not yet been supplied.'],
-      requiredNextEvidence: ['Founder decision bound to the exact candidate head and diff fingerprint.'],
+      reasons: ['Builder, Verifier, and Red Team are current; authenticated founder merge authority has not yet been supplied.'],
+      requiredNextEvidence: ['Fresh authenticated founder-final decision bound to exact PR/base/head/branches/diff.'],
     };
   }
 
@@ -420,7 +599,7 @@ export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixE
       currentPhase: 'merge-gate',
       mayMerge: false,
       reasons: founderDecisionErrors.length > 0 ? founderDecisionErrors : [`Founder decision is ${input.founderDecision.action}, not MERGE.`],
-      requiredNextEvidence: ['A current founder MERGE decision bound to this exact head and diff is required.'],
+      requiredNextEvidence: ['A fresh authenticated founder MERGE decision bound to this exact PR/base/head/branches/diff is required.'],
     };
   }
 
@@ -430,8 +609,8 @@ export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixE
       state: 'READY_TO_MERGE',
       currentPhase: 'merge-gate',
       mayMerge: true,
-      reasons: ['All pre-merge gates are current and founder merge authority is exact-head bound.'],
-      requiredNextEvidence: ['Merge using expected-head protection, then reacquire main and verify post-merge/runtime truth.'],
+      reasons: ['All pre-merge gates are current and founder merge authority is exact-candidate bound.'],
+      requiredNextEvidence: ['Merge using expected-head protection, then reacquire main and verify ancestry plus post-merge/runtime truth.'],
     };
   }
 
@@ -443,7 +622,7 @@ export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixE
       currentPhase: 'post-merge-verify',
       mayMerge: false,
       reasons: postMergeErrors,
-      requiredNextEvidence: ['Reacquire merged main and obtain the required runtime/provider/browser receipts before declaring completion.'],
+      requiredNextEvidence: ['Reacquire merged main and obtain candidate ancestry plus correlated runtime/provider/browser receipts before declaring completion.'],
     };
   }
 
@@ -452,7 +631,7 @@ export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixE
     state: 'COMPLETE',
     currentPhase: 'complete',
     mayMerge: false,
-    reasons: ['Focused change is merged and post-merge truth is current.'],
+    reasons: ['Focused change is merged, candidate ancestry is proven, and post-merge truth is current.'],
     requiredNextEvidence: [],
   };
 }
