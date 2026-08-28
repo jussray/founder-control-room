@@ -122,6 +122,19 @@ function tomlAssignmentKeys(source) {
   return keys;
 }
 
+function commentOnlySecretNames(source) {
+  const names = [];
+  for (const rawLine of source.split(/\r?\n/)) {
+    const match = rawLine.match(/^\s*#\s+([A-Z][A-Z0-9_]*)\s*$/);
+    if (match) names.push(match[1]);
+  }
+  return names;
+}
+
+function exactDocumentedIdentifiers(source) {
+  return new Set([...source.matchAll(/\b([A-Z][A-Z0-9_]*)\b/g)].map((match) => match[1]));
+}
+
 for (const requiredFile of [
   '.gitignore',
   '.env.example',
@@ -130,6 +143,7 @@ for (const requiredFile of [
   'src/worker/handler.ts',
   'docs/SECRETS.md',
   '.github/workflows/deploy.yml',
+  'security/portfolio-worker-security.json',
 ]) {
   requireValue(existsSync(requiredFile), `missing environment-contract source: ${requiredFile}`);
 }
@@ -215,6 +229,32 @@ for (const duplicate of duplicates(workerRequiredSecrets)) {
 }
 
 const docs = read('docs/SECRETS.md');
+const documentedIdentifiers = exactDocumentedIdentifiers(docs);
+const portfolioRegistry = JSON.parse(read('security/portfolio-worker-security.json'));
+const productionConfigPaths = [...new Set(
+  (portfolioRegistry.workers ?? [])
+    .filter((worker) => worker?.environment === 'production' && typeof worker?.configPath === 'string')
+    .map((worker) => worker.configPath.trim())
+    .filter(Boolean),
+)].sort();
+requireValue(productionConfigPaths.length > 0, 'portfolio security registry must declare at least one production Wrangler config');
+for (const configPath of productionConfigPaths) {
+  requireValue(existsSync(configPath), `registered production Wrangler config is missing: ${configPath}`);
+  if (!existsSync(configPath)) continue;
+  const configSource = read(configPath);
+  const assignmentKeys = new Set(tomlAssignmentKeys(configSource));
+  const configRequiredSecretNames = new Set([
+    ...commentOnlySecretNames(configSource),
+    ...(configPath === 'wrangler.worker.toml' ? workerRequiredSecrets : []),
+  ]);
+  for (const secretName of configRequiredSecretNames) {
+    requireValue(
+      !assignmentKeys.has(secretName),
+      `${configPath} must not assign plaintext value for required secret ${secretName}`,
+    );
+  }
+}
+
 const wranglerAssignments = new Set(tomlAssignmentKeys(wrangler));
 if (canonicalEnv) {
   for (const secretName of workerRequiredSecrets) {
@@ -223,7 +263,7 @@ if (canonicalEnv) {
       `.env.example must declare Worker-required secret name ${secretName}`,
     );
     requireValue(
-      docs.includes(secretName),
+      documentedIdentifiers.has(secretName),
       `docs/SECRETS.md must document Worker-required secret ${secretName}`,
     );
     requireValue(
@@ -267,7 +307,7 @@ const deploySecretNames = [...new Set(
 requireValue(deploySecretNames.length > 0, 'canonical deploy workflow must reference named GitHub secrets');
 for (const secretName of deploySecretNames) {
   requireValue(
-    docs.includes(secretName),
+    documentedIdentifiers.has(secretName),
     `docs/SECRETS.md must document canonical deploy workflow secret ${secretName}`,
   );
 }
@@ -283,13 +323,14 @@ for (const workflowFile of workflowFiles) {
   }
 }
 const undocumentedWorkflowSecrets = [...workflowSecretNames]
-  .filter((name) => !docs.includes(name))
+  .filter((name) => !documentedIdentifiers.has(name))
   .sort();
 for (const secretName of undocumentedWorkflowSecrets) {
   fail(`docs/SECRETS.md must document workflow secret ${secretName}`);
 }
 
 notes.push(`safe env templates=${safeTemplatePaths.length}`);
+notes.push(`registered production Wrangler configs=${productionConfigPaths.length}`);
 notes.push(`Worker required secrets=${workerRequiredSecrets.length}`);
 notes.push(`central boot string bindings=${centralRequiredBindings.length}`);
 notes.push(`canonical deploy secret names=${deploySecretNames.length}`);
