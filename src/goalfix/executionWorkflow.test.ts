@@ -17,7 +17,7 @@ import {
   type GoalfixPostMergeTruth,
   type GoalfixRuntimeReceipt,
 } from './executionWorkflow.js';
-import { fingerprintNormalized, type ProofBinding, type ProofCookieContract } from '../security/attack20V3.js';
+import { fingerprintNormalized, type ProofCookieContract } from '../security/attack20V3.js';
 
 const BASE = 'a'.repeat(40);
 const HEAD = 'b'.repeat(40);
