@@ -151,20 +151,26 @@ describe('founder permission broker HTTP contract', () => {
   it('rate limits repeated broker requests before founder authorization work can be abused', async () => {
     const app = createServer();
     const sourceIp = '203.0.113.77';
-
-    for (let attempt = 0; attempt < 60; attempt += 1) {
-      const response = await request(app)
-        .get('/mcp/founder-permissions/requests')
-        .set('Authorization', bearer)
-        .set('X-Forwarded-For', sourceIp);
-      expect(response.status).toBe(200);
-    }
-
-    const limited = await request(app)
+    const makeRequest = () => request(app)
       .get('/mcp/founder-permissions/requests')
       .set('Authorization', bearer)
       .set('X-Forwarded-For', sourceIp);
 
+    const first = await makeRequest();
+    expect(first.status).toBe(200);
+    expect(first.headers['ratelimit-limit']).toBe('60');
+
+    const remaining = Number(first.headers['ratelimit-remaining']);
+    expect(Number.isInteger(remaining)).toBe(true);
+    expect(remaining).toBeGreaterThan(0);
+    expect(remaining).toBeLessThan(60);
+
+    const withinLimit = await Promise.all(
+      Array.from({ length: remaining }, () => makeRequest()),
+    );
+    expect(withinLimit.every((response) => response.status === 200)).toBe(true);
+
+    const limited = await makeRequest();
     expect(limited.status).toBe(429);
     expect(limited.body).toEqual({ error: 'Rate limit exceeded.' });
     expect(limited.headers['retry-after']).toBeDefined();
