@@ -85,7 +85,7 @@ function founderDecision(): GoalfixFounderDecision {
     approvedBaseSha: BASE,
     approvedHeadSha: HEAD,
     approvedDiffFingerprint: DIFF,
-    approvedAt: '2026-08-26T11:30:00.000Z',
+    approvedAt: '2026-08-26T11:45:00.000Z',
   };
   return {
     ...base,
