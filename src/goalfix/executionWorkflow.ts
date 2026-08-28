@@ -460,6 +460,7 @@ function validateRuntimeReceipt(
   receipt: GoalfixRuntimeReceipt,
   input: GoalfixExecutionInput,
   mergedSha: string,
+  expectedRuntimeFingerprint: string,
   now: Date,
 ): string[] {
   const errors: string[] = [];
@@ -470,6 +471,7 @@ function validateRuntimeReceipt(
   errors.push(...validateCookieLineage(receipt.proofBinding.cookieContract, input.cookieIndex, now).map((error) => `${receipt.receiptId}: ${error}`));
   if (receipt.proofBinding.cookieContract.contextType !== 'provider-run') errors.push(`${receipt.receiptId}: runtime receipt proof cookie context must be provider-run`);
   if (receipt.proofBinding.fingerprints.sourceSha !== goalfixSourceFingerprint(input.repository, mergedSha)) errors.push(`${receipt.receiptId}: runtime receipt sourceSha does not match merged main`);
+  if (receipt.proofBinding.fingerprints.runtime !== expectedRuntimeFingerprint) errors.push(`${receipt.receiptId}: runtime receipt fingerprint does not match canonical provider witness`);
   if (receipt.proofBinding.fingerprints.evidenceBundle !== goalfixRuntimeReceiptFingerprint({ ...receipt, proofBinding: undefined } as never)) errors.push(`${receipt.receiptId}: runtime receipt evidenceBundle does not bind the receipt`);
   return errors;
 }
@@ -484,8 +486,9 @@ function validatePostMergeTruth(
   if (!exactSha(truth.mergedSha) || !exactSha(truth.currentMainSha)) errors.push('post-merge truth requires exact merged and current-main SHAs');
   if (truth.mergedSha.toLowerCase() !== truth.currentMainSha.toLowerCase()) errors.push('post-merge current main does not equal merged SHA');
   if (!isIsoTimestamp(truth.observedAt) || Date.parse(truth.observedAt) > now.getTime()) errors.push('post-merge observedAt must be a current ISO timestamp');
-  errors.push(...validateProofBinding(truth.proofBinding, ['sourceSha'], now).map((error) => `post-merge: ${error}`));
+  errors.push(...validateProofBinding(truth.proofBinding, ['sourceSha', 'runtime'], now).map((error) => `post-merge: ${error}`));
   errors.push(...validateCookieLineage(truth.proofBinding.cookieContract, input.cookieIndex, now).map((error) => `post-merge: ${error}`));
+  if (truth.proofBinding.cookieContract.contextType !== 'provider-run') errors.push('post-merge proof cookie context must be provider-run');
   if (truth.proofBinding.fingerprints.sourceSha !== goalfixSourceFingerprint(input.repository, truth.mergedSha)) {
     errors.push('post-merge sourceSha proof fingerprint does not match merged/current-main SHA');
   }
@@ -498,11 +501,26 @@ function validatePostMergeTruth(
   if (runtimeIds.length !== loadedIds.length || runtimeIds.some((id) => !loadedIds.includes(id)) || loadedIds.some((id) => !runtimeIds.includes(id))) {
     errors.push('runtime receipt IDs must resolve to the loaded runtime receipt set');
   }
-  for (const receipt of truth.runtimeReceipts) errors.push(...validateRuntimeReceipt(receipt, input, truth.mergedSha, now));
+  const expectedRuntimeFingerprint = truth.proofBinding.fingerprints.runtime ?? '';
+  for (const receipt of truth.runtimeReceipts) errors.push(...validateRuntimeReceipt(receipt, input, truth.mergedSha, expectedRuntimeFingerprint, now));
   if (truth.runtimeProofRequired !== true) errors.push('post-merge runtime proof cannot be caller-disabled');
   if (truth.runtimeReceipts.length === 0) errors.push('post-merge runtime proof is required but no runtime receipt exists');
   if (truth.runtimeReceipts.some((receipt) => receipt.verdict !== 'PASS')) errors.push('post-merge runtime truth is not PASS');
   return [...new Set(errors)];
+}
+
+function hasProviderBoundMergeExecution(input: GoalfixExecutionInput, now: Date): boolean {
+  if (!input.founderDecision || input.founderDecision.action !== 'MERGE' || !input.postMergeTruth) return false;
+  const truth = input.postMergeTruth;
+  if (!exactSha(truth.mergedSha)) return false;
+  if (validateFounderDecision(input.founderDecision, input, now, false).length > 0) return false;
+  return validateMergeAncestryReceipt(
+    truth.mergeAncestryReceipt,
+    input,
+    input.founderDecision,
+    truth.mergedSha,
+    now,
+  ).length === 0;
 }
 
 export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixExecutionDecision {
@@ -530,11 +548,18 @@ export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixE
   }
 
   const current = currentCheckpoints(input.checkpoints);
+  const historicalMergeExecutionProven = hasProviderBoundMergeExecution(input, now);
   const checkpointErrors = [
     ...checkpointTimestampErrors(input.checkpoints, now),
     ...checkpointSequenceErrors(input.checkpoints),
     ...roleSeparationErrors(input.checkpoints),
-    ...current.flatMap((checkpoint) => validateCheckpoint(checkpoint, input, now)),
+    ...current.flatMap((checkpoint) => validateCheckpoint(
+      checkpoint,
+      input,
+      historicalMergeExecutionProven && isIsoTimestamp(checkpoint.observedAt)
+        ? new Date(checkpoint.observedAt)
+        : now,
+    )),
   ];
   if (checkpointErrors.length > 0) {
     return {
