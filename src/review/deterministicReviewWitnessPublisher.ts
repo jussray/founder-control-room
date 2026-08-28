@@ -83,11 +83,17 @@ function matchingTrustedSignal(
 }
 
 /**
- * Produces deterministic review from provider truth, publishes only a clear
- * receipt's derived exact-head witness through the repository provider's
- * narrow App-only capability, then accepts success only from provider readback
- * under the server-owned GitHub App identity and the full provider evidence
- * fingerprint.
+ * Produces deterministic review from provider truth, reconciles any already
+ * published exact receipt/hash witness before creating another provider object,
+ * publishes only a clear receipt's derived exact-head witness through the
+ * repository provider's narrow App-only capability when needed, then accepts
+ * success only from provider readback under the server-owned GitHub App
+ * identity and the full provider evidence fingerprint.
+ *
+ * Reconcile-before-create is load-bearing for retry safety: if a prior request
+ * created the Check Run but failed during later readback, a retry rederives the
+ * same receipt and reuses the trusted exact witness instead of posting a
+ * duplicate. A failed pre-publication readback performs no provider mutation.
  *
  * This function never accepts a caller-supplied receipt, reviewer identity,
  * verdict, check name, conclusion, head SHA, publisher, or trusted App identity.
@@ -125,6 +131,22 @@ export async function publishDeterministicReviewWitness(
   assertContextStillMatches(beforePublish, receipt, "before");
 
   const name = expectedReviewSignalName(receipt);
+  const existingSignals = await input.provider.listVerificationSignals(input.projectId, receipt.headSha);
+  const existingSignal = matchingTrustedSignal(
+    existingSignals,
+    receipt,
+    input.provider.name,
+    expectedAppId,
+  );
+  if (existingSignal) {
+    const afterReconcile = await input.provider.getPullRequestReviewContext(
+      input.projectId,
+      input.pullRequestNumber,
+    );
+    assertContextStillMatches(afterReconcile, receipt, "after");
+    return { production, signal: existingSignal };
+  }
+
   await input.provider.publishDeterministicReviewWitness(input.projectId, {
     headSha: receipt.headSha,
     name,
