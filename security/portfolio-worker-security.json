@@ -2,7 +2,7 @@
   "schema": "founder-control-room/portfolio-worker-security@v1",
   "suiteVersion": "attack-20-v3",
   "repository": "jussray/founder-control-room",
-  "declaredFromMainSha": "449afe5eb3f6b85c7ec5b5a11468eddbf0d9f3b8",
+  "declaredFromMainSha": "0d11182d610fafd5eef67d5bcfae59db03c86aee",
   "overallState": "UNVERIFIED",
   "aggregation": {
     "passRequiresEveryProductionWorkerPass": true,
@@ -28,50 +28,37 @@
         "serviceBindings": [],
         "relatedPagesSurface": "foundercontrolroom.org"
       },
-      "alternateIngress": {
-        "workersDev": "unknown",
-        "previewUrls": "unknown",
-        "pagesDev": "unknown",
-        "pagesPreviews": "unknown",
-        "customDomains": ["api.foundercontrolroom.org"],
-        "legacyDns": [],
-        "directOrigin": "unknown"
-      },
-      "requiredProtection": {
-        "access": "mixed-by-route",
-        "waf": true,
-        "rateLimitProfile": "firewall-v10-baseline",
-        "allowedMethods": [],
-        "allowedPathPatterns": [],
-        "webhookVerification": true,
-        "schemaEnforcement": "unknown-until-discovery"
-      },
       "capabilities": {
         "publicHttp": true,
         "authenticatedUser": true,
         "serviceOnlyBoundaries": true,
         "providerWebhook": true,
-        "tenantOwnedData": "unknown",
+        "tenantOwnedData": true,
         "mutableProtectedFields": true,
         "businessStateMachine": true,
         "supabaseData": true,
         "consequentialActions": true,
         "providerMutation": true,
-        "runtimeOutcomeClaims": true
+        "runtimeOutcomeClaims": true,
+        "schemaGoverned": true
       },
       "capabilityAbsenceEvidence": {},
-      "observedProtection": {
-        "observedAt": null,
-        "canonicalSourceSha": null,
-        "workerVersionId": null,
-        "state": "UNVERIFIED",
-        "evidenceReceiptIds": []
+      "discovery": {
+        "workersDev": "enabled",
+        "previewUrls": "enabled",
+        "customDomains": [
+          "api.foundercontrolroom.org"
+        ],
+        "routes": [
+          "api.foundercontrolroom.org"
+        ],
+        "serviceBindings": [],
+        "relatedPagesSurface": "foundercontrolroom.org"
       },
-      "attackTest": {
-        "suiteVersion": "attack-20-v3",
-        "executedAt": null,
-        "result": "UNVERIFIED",
-        "failedControls": []
+      "attack20": {
+        "applicability": "PENDING_RUNTIME_DISCOVERY",
+        "receiptSet": [],
+        "state": "UNVERIFIED"
       }
     },
     {
@@ -83,65 +70,66 @@
       "canonicalIngress": {
         "hostname": null,
         "route": null,
-        "classification": "no-public-ingress"
+        "classification": "email-event"
       },
       "sourceIntent": {
-        "workersDev": "disabled",
-        "previewUrls": "disabled",
-        "serviceBindings": ["FOUNDER_CONTROL_ROOM_API->founder-control-room"],
+        "workersDev": "enabled",
+        "previewUrls": "enabled",
+        "serviceBindings": [],
         "relatedPagesSurface": null
-      },
-      "alternateIngress": {
-        "workersDev": "unknown",
-        "previewUrls": "unknown",
-        "pagesDev": "disabled",
-        "pagesPreviews": "disabled",
-        "customDomains": [],
-        "legacyDns": [],
-        "directOrigin": "unknown"
-      },
-      "requiredProtection": {
-        "access": "service-binding-or-provider-event",
-        "waf": false,
-        "rateLimitProfile": null,
-        "allowedMethods": [],
-        "allowedPathPatterns": [],
-        "webhookVerification": false,
-        "schemaEnforcement": "none"
       },
       "capabilities": {
         "publicHttp": false,
         "authenticatedUser": false,
-        "serviceOnlyBoundaries": true,
-        "providerWebhook": false,
+        "serviceOnlyBoundaries": false,
+        "providerWebhook": true,
         "tenantOwnedData": false,
         "mutableProtectedFields": false,
-        "businessStateMachine": true,
-        "supabaseData": false,
+        "businessStateMachine": false,
+        "supabaseData": true,
         "consequentialActions": true,
-        "providerMutation": "unknown",
-        "runtimeOutcomeClaims": true
+        "providerMutation": true,
+        "runtimeOutcomeClaims": true,
+        "schemaGoverned": false
       },
       "capabilityAbsenceEvidence": {
-        "A01": ["wrangler.email.toml declares no public route and disables workers.dev/preview URLs"],
-        "A08": ["worker has no browser/user HTTP ingress"],
-        "A10": ["worker receives Cloudflare Email Routing events rather than an HTTP provider webhook"],
-        "A11": ["worker does not expose tenant-owned object access"],
-        "A12": ["worker does not expose user-mutable object properties"],
-        "A14": ["worker does not directly expose Supabase data access"]
+        "A01": [
+          "src/worker/email-review.ts is event-only; no fetch handler is exported from this Worker entrypoint."
+        ],
+        "A05": [
+          "src/worker/email-review.ts exposes no HTTP ingress to rate-limit directly."
+        ],
+        "A06": [
+          "src/worker/email-review.ts exposes no HTTP ingress for scanner/protocol anomaly traffic."
+        ],
+        "A08": [
+          "src/worker/email-review.ts has no end-user bearer/session authentication surface."
+        ],
+        "A09": [
+          "src/worker/email-review.ts has no service-token authenticated request boundary."
+        ],
+        "A11": [
+          "src/worker/email-review.ts does not expose caller-selected tenant/object fetch semantics."
+        ],
+        "A12": [
+          "src/worker/email-review.ts does not accept caller-controlled protected-field mutation payloads."
+        ],
+        "A13": [
+          "src/worker/email-review.ts emits a bounded review action and has no caller-addressable business-state transition API."
+        ]
       },
-      "observedProtection": {
-        "observedAt": null,
-        "canonicalSourceSha": null,
-        "workerVersionId": null,
-        "state": "UNVERIFIED",
-        "evidenceReceiptIds": []
+      "discovery": {
+        "workersDev": "enabled",
+        "previewUrls": "enabled",
+        "customDomains": [],
+        "routes": [],
+        "serviceBindings": [],
+        "relatedPagesSurface": null
       },
-      "attackTest": {
-        "suiteVersion": "attack-20-v3",
-        "executedAt": null,
-        "result": "UNVERIFIED",
-        "failedControls": []
+      "attack20": {
+        "applicability": "PENDING_RUNTIME_DISCOVERY",
+        "receiptSet": [],
+        "state": "UNVERIFIED"
       }
     },
     {
@@ -153,62 +141,69 @@
       "canonicalIngress": {
         "hostname": null,
         "route": null,
-        "classification": "no-public-ingress"
+        "classification": "queue-event"
       },
       "sourceIntent": {
-        "workersDev": "disabled",
-        "previewUrls": "disabled",
+        "workersDev": "enabled",
+        "previewUrls": "enabled",
         "serviceBindings": [],
         "relatedPagesSurface": null
-      },
-      "alternateIngress": {
-        "workersDev": "unknown",
-        "previewUrls": "unknown",
-        "pagesDev": "disabled",
-        "pagesPreviews": "disabled",
-        "customDomains": [],
-        "legacyDns": [],
-        "directOrigin": "unknown"
-      },
-      "requiredProtection": {
-        "access": "scheduled-runtime-only",
-        "waf": false,
-        "rateLimitProfile": null,
-        "allowedMethods": [],
-        "allowedPathPatterns": [],
-        "webhookVerification": false,
-        "schemaEnforcement": "none"
       },
       "capabilities": {
         "publicHttp": false,
         "authenticatedUser": false,
         "serviceOnlyBoundaries": false,
         "providerWebhook": false,
-        "tenantOwnedData": true,
-        "mutableProtectedFields": true,
+        "tenantOwnedData": false,
+        "mutableProtectedFields": false,
         "businessStateMachine": true,
         "supabaseData": true,
         "consequentialActions": true,
-        "providerMutation": true,
-        "runtimeOutcomeClaims": true
+        "providerMutation": false,
+        "runtimeOutcomeClaims": true,
+        "schemaGoverned": false
       },
       "capabilityAbsenceEvidence": {
-        "A01": ["wrangler.deletion-queue.toml declares a scheduled Worker with no public route and disables workers.dev/preview URLs"],
-        "A08": ["scheduled Worker has no browser/user HTTP ingress"],
-        "A10": ["scheduled Worker has no provider webhook route"]
+        "A01": [
+          "src/worker/deletion-queue.ts exports queue(batch, env) only; no HTTP fetch handler is present."
+        ],
+        "A05": [
+          "src/worker/deletion-queue.ts exposes no HTTP ingress to rate-limit directly."
+        ],
+        "A06": [
+          "src/worker/deletion-queue.ts exposes no HTTP ingress for scanner/protocol anomaly traffic."
+        ],
+        "A08": [
+          "src/worker/deletion-queue.ts has no end-user authentication request boundary."
+        ],
+        "A09": [
+          "src/worker/deletion-queue.ts has no service-token authenticated request boundary."
+        ],
+        "A10": [
+          "src/worker/deletion-queue.ts consumes an internal Cloudflare Queue, not an external webhook request."
+        ],
+        "A11": [
+          "src/worker/deletion-queue.ts does not expose caller-selected object retrieval."
+        ],
+        "A12": [
+          "src/worker/deletion-queue.ts accepts the typed queue envelope and does not expose protected-field mutation to a caller."
+        ],
+        "A18": [
+          "src/worker/deletion-queue.ts performs no direct third-party provider mutation."
+        ]
       },
-      "observedProtection": {
-        "observedAt": null,
-        "canonicalSourceSha": null,
-        "workerVersionId": null,
-        "state": "UNVERIFIED",
-        "evidenceReceiptIds": []
+      "discovery": {
+        "workersDev": "enabled",
+        "previewUrls": "enabled",
+        "customDomains": [],
+        "routes": [],
+        "serviceBindings": [],
+        "relatedPagesSurface": null
       },
-      "attackTest": {
-        "suiteVersion": "attack-20-v3",
-        "executedAt": null,
-        "result": "UNVERIFIED",
-        "failedControls": []
+      "attack20": {
+        "applicability": "PENDING_RUNTIME_DISCOVERY",
+        "receiptSet": [],
+        "state": "UNVERIFIED"
       }
     }
   ]
