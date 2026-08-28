@@ -225,6 +225,21 @@ export const rateLimitGeneral = createRateLimiter(
   { error: 'Rate limit exceeded.' },
 );
 
+/**
+ * 60 founder-permission requests per minute per process/IP.
+ *
+ * This intentionally owns a bucket separate from rateLimitGeneral. The server
+ * already applies rateLimitGeneral globally, while the founder-permission
+ * router also needs an explicit route-local limiter for its authorization
+ * surface. Reusing the same limiter instance at both layers would count every
+ * broker request twice and halve the effective limit.
+ */
+export const rateLimitFounderPermissions = createRateLimiter(
+  60 * 1_000,
+  60,
+  { error: 'Rate limit exceeded.' },
+);
+
 // ---------------------------------------------------------------------------
 // Request audit log
 // ---------------------------------------------------------------------------
