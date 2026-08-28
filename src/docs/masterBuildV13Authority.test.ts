@@ -11,7 +11,7 @@ describe('Founder Control Room + Chief AI master build v1.3 authority', () => {
     ]);
 
     expect(base).toContain('Version: 1.2');
-    expect(addendum).toContain('Effective approved version: **v1.3**');
+    expect(addendum).toContain('**Effective approved version:** **v1.3**');
     expect(addendum).toContain('v1.2 base');
     expect(addendum).toContain('effective master specification v1.3');
     expect(addendum).toContain('does not manufacture implementation, deployment, provider, database, runtime, review, or launch evidence');
