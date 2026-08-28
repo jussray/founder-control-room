@@ -125,6 +125,7 @@ export interface GoalfixMergeAncestryReceipt {
   mergedSha: string;
   currentMainSha: string;
   containsCandidate: boolean;
+  mergedAt: string;
   observedAt: string;
   proofBinding: ProofBinding;
 }
@@ -140,7 +141,7 @@ export interface GoalfixRuntimeReceipt {
 export interface GoalfixPostMergeTruth {
   mergedSha: string;
   currentMainSha: string;
-  runtimeProofRequired: boolean;
+  runtimeProofRequired: true;
   runtimeReceiptIds: readonly string[];
   runtimeReceipts: readonly GoalfixRuntimeReceipt[];
   mergeAncestryReceipt: GoalfixMergeAncestryReceipt;
@@ -274,6 +275,23 @@ function currentCheckpoints(checkpoints: readonly GoalfixExecutionCheckpoint[]):
     .filter((checkpoint): checkpoint is GoalfixExecutionCheckpoint => Boolean(checkpoint));
 }
 
+function checkpointTimestampErrors(
+  checkpoints: readonly GoalfixExecutionCheckpoint[],
+  now: Date,
+): string[] {
+  const errors: string[] = [];
+  for (const checkpoint of checkpoints) {
+    if (!isIsoTimestamp(checkpoint.observedAt)) {
+      errors.push(`${checkpoint.phase}: observedAt must be an ISO timestamp`);
+      continue;
+    }
+    if (Date.parse(checkpoint.observedAt) > now.getTime()) {
+      errors.push(`${checkpoint.phase}: observedAt cannot be in the future`);
+    }
+  }
+  return errors;
+}
+
 function validateCheckpoint(
   checkpoint: GoalfixExecutionCheckpoint,
   input: GoalfixExecutionInput,
@@ -310,6 +328,9 @@ function validateCheckpoint(
   if (expectedCookieContext && checkpoint.proofBinding.cookieContract.contextType !== expectedCookieContext) {
     errors.push(`${checkpoint.phase}: proof cookie context must be ${expectedCookieContext}`);
   }
+  if (expectedCookieContext && checkpoint.proofBinding.cookieContract.owner !== checkpoint.actorId) {
+    errors.push(`${checkpoint.phase}: actorId must match the authenticated proof-cookie owner`);
+  }
 
   return errors;
 }
@@ -341,9 +362,12 @@ function roleSeparationErrors(checkpoints: readonly GoalfixExecutionCheckpoint[]
   if (verifier && verifier.role !== 'verifier') errors.push('verify checkpoint must be owned by Verifier role');
   if (redteam && redteam.role !== 'redteam') errors.push('redteam checkpoint must be owned by Red Team role');
 
-  if (builder && verifier && builder.actorId === verifier.actorId) errors.push('Builder cannot self-certify as Verifier');
-  if (builder && redteam && builder.actorId === redteam.actorId) errors.push('Builder cannot self-certify as Red Team');
-  if (verifier && redteam && verifier.actorId === redteam.actorId) errors.push('Verifier and Red Team must be independent actors');
+  const builderPrincipal = builder?.proofBinding.cookieContract.owner;
+  const verifierPrincipal = verifier?.proofBinding.cookieContract.owner;
+  const redteamPrincipal = redteam?.proofBinding.cookieContract.owner;
+  if (builderPrincipal && verifierPrincipal && builderPrincipal === verifierPrincipal) errors.push('Builder cannot self-certify as Verifier');
+  if (builderPrincipal && redteamPrincipal && builderPrincipal === redteamPrincipal) errors.push('Builder cannot self-certify as Red Team');
+  if (verifierPrincipal && redteamPrincipal && verifierPrincipal === redteamPrincipal) errors.push('Verifier and Red Team must be independent actors');
   return errors;
 }
 
@@ -351,6 +375,7 @@ function validateFounderDecision(
   decision: GoalfixFounderDecision,
   input: GoalfixExecutionInput,
   now: Date,
+  enforceFreshness: boolean,
 ): string[] {
   const errors: string[] = [];
   if (!decision.decisionId.trim()) errors.push('founder decision ID is required');
@@ -361,15 +386,31 @@ function validateFounderDecision(
   if (decision.approvedBaseSha.toLowerCase() !== input.baseSha.toLowerCase()) errors.push('founder decision base SHA is stale or mismatched');
   if (decision.approvedHeadSha.toLowerCase() !== input.candidateHeadSha.toLowerCase()) errors.push('founder decision head SHA is stale or mismatched');
   if (decision.approvedDiffFingerprint !== input.diffFingerprint) errors.push('founder decision diff fingerprint is stale or mismatched');
+
+  let approvedAtMs: number | null = null;
   if (!isIsoTimestamp(decision.approvedAt)) {
     errors.push('founder decision approvedAt must be an ISO timestamp');
   } else {
-    const approvedAt = Date.parse(decision.approvedAt);
-    if (approvedAt > now.getTime()) errors.push('founder decision approval cannot be in the future');
-    if (approvedAt < now.getTime() - GOALFIX_MERGE_PROOF_TTL_MS) errors.push('founder decision approval is outside the merge proof freshness window');
+    approvedAtMs = Date.parse(decision.approvedAt);
+    if (approvedAtMs > now.getTime()) errors.push('founder decision approval cannot be in the future');
+    if (enforceFreshness && approvedAtMs < now.getTime() - GOALFIX_MERGE_PROOF_TTL_MS) {
+      errors.push('founder decision approval is outside the merge proof freshness window');
+    }
+
+    const latestPreMergeObservation = currentCheckpoints(input.checkpoints)
+      .filter((checkpoint) => phaseIndex(checkpoint.phase) <= phaseIndex('redteam') && isIsoTimestamp(checkpoint.observedAt))
+      .map((checkpoint) => Date.parse(checkpoint.observedAt))
+      .reduce<number | null>((latest, observedAt) => latest === null || observedAt > latest ? observedAt : latest, null);
+    if (latestPreMergeObservation !== null && approvedAtMs < latestPreMergeObservation) {
+      errors.push('founder decision must follow the latest load-bearing pre-merge checkpoint');
+    }
   }
-  errors.push(...validateProofBinding(decision.proofBinding, ['sourceSha', 'evidenceBundle'], now).map((error) => `founder decision: ${error}`));
-  errors.push(...validateCookieLineage(decision.proofBinding.cookieContract, input.cookieIndex, now).map((error) => `founder decision: ${error}`));
+
+  const bindingValidationTime = !enforceFreshness && approvedAtMs !== null
+    ? new Date(approvedAtMs)
+    : now;
+  errors.push(...validateProofBinding(decision.proofBinding, ['sourceSha', 'evidenceBundle'], bindingValidationTime).map((error) => `founder decision: ${error}`));
+  errors.push(...validateCookieLineage(decision.proofBinding.cookieContract, input.cookieIndex, bindingValidationTime).map((error) => `founder decision: ${error}`));
   if (decision.proofBinding.cookieContract.contextType !== 'founder-session') errors.push('founder decision proof cookie context must be founder-session');
   if (decision.proofBinding.cookieContract.owner !== input.trustedFounderPrincipalId) errors.push('founder decision proof cookie owner is not the trusted authenticated founder principal');
   if (decision.proofBinding.fingerprints.sourceSha !== goalfixSourceFingerprint(input.repository, input.candidateHeadSha)) {
@@ -384,6 +425,7 @@ function validateFounderDecision(
 function validateMergeAncestryReceipt(
   receipt: GoalfixMergeAncestryReceipt,
   input: GoalfixExecutionInput,
+  founderDecision: GoalfixFounderDecision,
   mergedSha: string,
   now: Date,
 ): string[] {
@@ -396,9 +438,19 @@ function validateMergeAncestryReceipt(
   if (receipt.candidateDiffFingerprint !== input.diffFingerprint) errors.push('merge ancestry candidate diff is mismatched');
   if (receipt.mergedSha.toLowerCase() !== mergedSha.toLowerCase() || receipt.currentMainSha.toLowerCase() !== mergedSha.toLowerCase()) errors.push('merge ancestry merged/current-main SHA is mismatched');
   if (receipt.containsCandidate !== true) errors.push('merge ancestry does not prove merged main contains the approved candidate');
-  if (!isIsoTimestamp(receipt.observedAt) || Date.parse(receipt.observedAt) > now.getTime()) errors.push('merge ancestry observedAt is invalid');
+
+  const mergedAtMs = isIsoTimestamp(receipt.mergedAt) ? Date.parse(receipt.mergedAt) : null;
+  const observedAtMs = isIsoTimestamp(receipt.observedAt) ? Date.parse(receipt.observedAt) : null;
+  if (mergedAtMs === null) errors.push('merge ancestry mergedAt must be an ISO timestamp');
+  if (observedAtMs === null || observedAtMs > now.getTime()) errors.push('merge ancestry observedAt is invalid');
+  if (mergedAtMs !== null && observedAtMs !== null && mergedAtMs > observedAtMs) errors.push('merge ancestry cannot be observed before the provider merge time');
+  if (mergedAtMs !== null && isIsoTimestamp(founderDecision.approvedAt) && mergedAtMs < Date.parse(founderDecision.approvedAt)) {
+    errors.push('merge ancestry provider merge time predates Founder Final authorization');
+  }
+
   errors.push(...validateProofBinding(receipt.proofBinding, ['sourceSha', 'evidenceBundle'], now).map((error) => `merge ancestry: ${error}`));
   errors.push(...validateCookieLineage(receipt.proofBinding.cookieContract, input.cookieIndex, now).map((error) => `merge ancestry: ${error}`));
+  if (receipt.proofBinding.cookieContract.contextType !== 'provider-run') errors.push('merge ancestry proof cookie context must be provider-run');
   if (receipt.proofBinding.fingerprints.sourceSha !== goalfixSourceFingerprint(input.repository, mergedSha)) errors.push('merge ancestry sourceSha proof fingerprint does not match merged main');
   if (receipt.proofBinding.fingerprints.evidenceBundle !== goalfixMergeAncestryFingerprint({ ...receipt, proofBinding: undefined } as never)) errors.push('merge ancestry evidenceBundle does not bind candidate-to-merged proof');
   return errors;
@@ -425,6 +477,7 @@ function validateRuntimeReceipt(
 function validatePostMergeTruth(
   truth: GoalfixPostMergeTruth,
   input: GoalfixExecutionInput,
+  founderDecision: GoalfixFounderDecision,
   now: Date,
 ): string[] {
   const errors: string[] = [];
@@ -437,7 +490,7 @@ function validatePostMergeTruth(
     errors.push('post-merge sourceSha proof fingerprint does not match merged/current-main SHA');
   }
 
-  errors.push(...validateMergeAncestryReceipt(truth.mergeAncestryReceipt, input, truth.mergedSha, now));
+  errors.push(...validateMergeAncestryReceipt(truth.mergeAncestryReceipt, input, founderDecision, truth.mergedSha, now));
 
   const runtimeIds = truth.runtimeReceiptIds.map((value) => value.trim());
   if (!uniqueNonEmpty(runtimeIds)) errors.push('runtime receipt IDs must be unique non-empty IDs');
@@ -446,10 +499,9 @@ function validatePostMergeTruth(
     errors.push('runtime receipt IDs must resolve to the loaded runtime receipt set');
   }
   for (const receipt of truth.runtimeReceipts) errors.push(...validateRuntimeReceipt(receipt, input, truth.mergedSha, now));
-  if (truth.runtimeProofRequired) {
-    if (truth.runtimeReceipts.length === 0) errors.push('post-merge runtime proof is required but no runtime receipt exists');
-    if (truth.runtimeReceipts.some((receipt) => receipt.verdict !== 'PASS')) errors.push('post-merge runtime truth is not PASS');
-  }
+  if (truth.runtimeProofRequired !== true) errors.push('post-merge runtime proof cannot be caller-disabled');
+  if (truth.runtimeReceipts.length === 0) errors.push('post-merge runtime proof is required but no runtime receipt exists');
+  if (truth.runtimeReceipts.some((receipt) => receipt.verdict !== 'PASS')) errors.push('post-merge runtime truth is not PASS');
   return [...new Set(errors)];
 }
 
@@ -479,6 +531,7 @@ export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixE
 
   const current = currentCheckpoints(input.checkpoints);
   const checkpointErrors = [
+    ...checkpointTimestampErrors(input.checkpoints, now),
     ...checkpointSequenceErrors(input.checkpoints),
     ...roleSeparationErrors(input.checkpoints),
     ...current.flatMap((checkpoint) => validateCheckpoint(checkpoint, input, now)),
@@ -591,7 +644,7 @@ export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixE
     };
   }
 
-  const founderDecisionErrors = validateFounderDecision(input.founderDecision, input, now);
+  const founderDecisionErrors = validateFounderDecision(input.founderDecision, input, now, !input.postMergeTruth);
   if (founderDecisionErrors.length > 0 || input.founderDecision.action !== 'MERGE') {
     return {
       contract: GOALFIX_EXECUTION_CONTRACT,
@@ -614,7 +667,7 @@ export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixE
     };
   }
 
-  const postMergeErrors = validatePostMergeTruth(input.postMergeTruth, input, now);
+  const postMergeErrors = validatePostMergeTruth(input.postMergeTruth, input, input.founderDecision, now);
   if (postMergeErrors.length > 0) {
     return {
       contract: GOALFIX_EXECUTION_CONTRACT,
