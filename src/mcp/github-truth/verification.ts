@@ -119,7 +119,8 @@ function samePrTruth(
     && initial.changedFiles === final.changedFiles
     && initial.additions === final.additions
     && initial.deletions === final.deletions
-    && initial.commits === final.commits;
+    && initial.commits === final.commits
+    && normalized(initial.updatedAt) === normalized(final.updatedAt);
 }
 
 function evidenceRefs(input: EvaluateGitHubPrAuditInput): GitHubPrEvidenceRef[] {
@@ -195,7 +196,7 @@ export function evaluateGitHubPrAuditEvidence(input: EvaluateGitHubPrAuditInput)
     findings.push({
       severity: 'blocker',
       code: 'pr_truth_changed_during_audit',
-      message: 'Load-bearing PR state changed during evidence collection; the audit must be repeated against a stable PR observation.',
+      message: 'Load-bearing PR state or its GitHub update cursor changed during evidence collection; the audit must be repeated against a stable PR observation.',
     });
   }
   if (!expectedHeadMatches) {
@@ -263,12 +264,21 @@ export function evaluateGitHubPrAuditEvidence(input: EvaluateGitHubPrAuditInput)
     });
   }
 
-  const review = reviewDecision(input.reviews, initialHead);
+  const review = input.evidenceCoverage.reviewsComplete
+    ? reviewDecision(input.reviews, initialHead)
+    : 'unknown';
   if (review === 'changes_requested') {
     findings.push({
       severity: 'blocker',
       code: 'review_changes_requested',
       message: 'GitHub review evidence currently includes changes requested for the observed PR head.',
+    });
+  }
+  if (!input.evidenceCoverage.reviewsComplete) {
+    findings.push({
+      severity: 'warning',
+      code: 'review_decision_unknown_due_to_truncation',
+      message: 'Review history is truncated, so the audit refuses to publish an approval or no-blocker review decision.',
     });
   }
   if (input.finalPullRequest.mergeable === null || input.finalPullRequest.mergeable === undefined) {
