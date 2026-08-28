@@ -292,7 +292,7 @@ describe('ATTACK-20 V3', () => {
     tiedFailure.receiptId = 'receipt-A07-tied-failure';
 
     expect(aggregate([...receipts, tiedFailure])).toBe('FAILED');
-    expect(aggregate([tiedFailure, ...receipts].reverse())).toBe('FAILED');
+    expect(aggregate([tiedFailure, ...receipts])).toBe('FAILED');
   });
 
   it('allows a newer retry for the same fixture and surface to supersede its historical result', () => {
