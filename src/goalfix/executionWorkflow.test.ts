@@ -118,7 +118,7 @@ function founderDecision(overrides: Partial<GoalfixFounderDecision> = {}): Goalf
     approvedBaseSha: BASE,
     approvedHeadSha: HEAD,
     approvedDiffFingerprint: DIFF,
-    approvedAt: '2026-08-26T11:30:00.000Z',
+    approvedAt: '2026-08-26T11:50:00.000Z',
     ...Object.fromEntries(Object.entries(overrides).filter(([key]) => key !== 'proofBinding')),
   } as Omit<GoalfixFounderDecision, 'proofBinding'>;
   return {
@@ -261,18 +261,18 @@ describe('Goalfix execution workflow v2', () => {
     expect(result.reasons).toContain('verify: at least one unique evidence ID is required');
   });
 
-  it('lets a later successful retry supersede the historical failure but requires dependent red-team rerun', () => {
+  it('lets a later successful retry supersede the historical failure', () => {
     const candidate = input();
     const oldFailure = checkpoint('verify', 'verifier', 'actor-verifier', verifierCookie, 'FAILED', { observedAt: '2026-08-26T11:05:00.000Z' });
-    const retry = checkpoint('verify', 'verifier', 'actor-verifier', verifierCookie, 'PASS', { observedAt: '2026-08-26T11:25:00.000Z', evidenceIds: ['evidence:verify:retry'] });
+    const retry = checkpoint('verify', 'verifier', 'actor-verifier', verifierCookie, 'PASS', { observedAt: '2026-08-26T11:15:00.000Z', evidenceIds: ['evidence:verify:retry'] });
     candidate.checkpoints = [...candidate.checkpoints, oldFailure, retry];
     const result = evaluateGoalfixExecution(candidate);
-    expect(result.state).toBe('WAITING_FOR_REDTEAM');
+    expect(result.state).toBe('READY_FOR_FOUNDER_MERGE_DECISION');
   });
 
   it('blocks on the current verifier failure instead of letting later green checks average it away', () => {
     const candidate = input();
-    const failed = checkpoint('verify', 'verifier', 'actor-verifier', verifierCookie, 'FAILED', { observedAt: '2026-08-26T11:25:00.000Z' });
+    const failed = checkpoint('verify', 'verifier', 'actor-verifier', verifierCookie, 'FAILED', { observedAt: '2026-08-26T11:15:00.000Z' });
     candidate.checkpoints = [...candidate.checkpoints, failed];
     const result = evaluateGoalfixExecution(candidate);
     expect(result.state).toBe('BLOCKED');
