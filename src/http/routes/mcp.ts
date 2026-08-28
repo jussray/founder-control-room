@@ -4,6 +4,7 @@ import { McpHub, advertisedToolNames } from "../../mcp/hub.js";
 import type { McpInvocationRequest } from "../../mcp/types.js";
 import { hubForMcpProject } from "../../mcp/vaultHub.js";
 import { connectionVaultRouter } from "./connectionVault.js";
+import { founderPermissionsRouter } from "./founderPermissions.js";
 import {
   handlePairedRemoteMcp,
   handleRemoteReadMcp,
@@ -52,6 +53,11 @@ mcpRouter.post("/read", handleRemoteReadMcp);
 // workflow-facing resolver uses short-lived hashed FCR bearer tokens; founder
 // administration routes remain protected by requireFounder inside the router.
 mcpRouter.use("/vault", connectionVaultRouter);
+
+// Portable Ask-Founder broker. Requests carry zero execution authority. A
+// separate interactive founder decision persists exact-scope decision state;
+// independent review remains outside this router.
+mcpRouter.use("/founder-permissions", founderPermissionsRouter);
 
 mcpRouter.get("/servers", requireFounder, (_req, res) => {
   return res.json({ servers: registryHub.listServers() });
