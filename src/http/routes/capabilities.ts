@@ -15,6 +15,7 @@ const FOUNDER_CONTENT_OBSERVATION_KIND = 'fcr/founder-content-provider-observati
 const FOUNDER_CONTENT_RESOURCE_TYPE = 'founder_content_post';
 const LINKEDIN_POST_URN = /^urn:li:(share|ugcPost):[A-Za-z0-9_-]+$/;
 const SHA256 = /^[0-9a-f]{64}$/i;
+const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 const DYNAMIC_CAPABILITIES = new Map([
   [PROJECT_HEALTH_CAPABILITY_ID, { controller: 'ProjectController', resourcePrefix: PROJECT_HEALTH_RESOURCE_PREFIX }],
 ]);
@@ -60,7 +61,7 @@ function linkedinPostIdentity(value: unknown): { postUrn: string; permalink: str
   }
 }
 
-async function resolveActiveProject(projectSlug: string) {
+async function resolveActiveProject(projectSlug: string, activeUse = 'dynamic capability runs') {
   const { data: project, error } = await supabase
     .from('projects')
     .select('id, slug, status')
@@ -72,7 +73,7 @@ async function resolveActiveProject(projectSlug: string) {
   if (project.status !== 'active') {
     return {
       project: null,
-      error: `Project "${projectSlug}" is ${project.status}; observations require an active project.`,
+      error: `Project "${projectSlug}" is ${project.status}; ${activeUse} require an active project.`,
       status: 409,
     } as const;
   }
@@ -96,6 +97,8 @@ capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: Fo
   const publicationAttested = body.publicationAttested === true;
   const publishedAtRaw = asText(body.publishedAt);
   const contentHashRaw = asText(body.contentHash).toLowerCase();
+  const publishedAtMs = publishedAtRaw ? Date.parse(publishedAtRaw) : null;
+  const observedAtMs = Date.now();
 
   if (!projectSlug) return res.status(400).json({ error: 'projectSlug is required' });
   if (!identity) {
@@ -108,17 +111,23 @@ capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: Fo
       error: 'publicationAttested=true is required for a manual publication observation',
     });
   }
-  if (publishedAtRaw && Number.isNaN(Date.parse(publishedAtRaw))) {
+  if (publishedAtRaw && (publishedAtMs === null || Number.isNaN(publishedAtMs))) {
     return res.status(400).json({ error: 'publishedAt must be an RFC3339 timestamp when provided' });
+  }
+  if (publishedAtMs !== null && publishedAtMs > observedAtMs + MAX_CLOCK_SKEW_MS) {
+    return res.status(400).json({ error: 'publishedAt cannot be materially future-dated' });
   }
   if (contentHashRaw && !SHA256.test(contentHashRaw)) {
     return res.status(400).json({ error: 'contentHash must be a SHA-256 hex digest when provided' });
   }
 
-  const resolved = await resolveActiveProject(projectSlug);
+  const resolved = await resolveActiveProject(projectSlug, 'founder-content observations');
   if (!resolved.project) return res.status(resolved.status).json({ error: resolved.error });
+  if (!req.founder) {
+    return res.status(500).json({ error: 'Founder identity binding unavailable' });
+  }
 
-  const observedAt = new Date().toISOString();
+  const observedAt = new Date(observedAtMs).toISOString();
   const observedState = {
     kind: FOUNDER_CONTENT_OBSERVATION_KIND,
     platform: 'linkedin',
@@ -127,13 +136,17 @@ capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: Fo
     publication: {
       state: 'USER_ATTESTED',
       providerVerified: false,
-      publishedAt: publishedAtRaw ? new Date(publishedAtRaw).toISOString() : null,
+      publishedAt: publishedAtMs === null ? null : new Date(publishedAtMs).toISOString(),
     },
     metrics: {
       state: 'UNKNOWN',
     },
     contentHash: contentHashRaw || null,
     source: 'manual_founder_attestation',
+    attestation: {
+      founderUserId: req.founder.userId,
+      observedAt,
+    },
     authority: {
       publication: false,
       analyticsClaim: false,
@@ -182,7 +195,7 @@ capabilitiesRouter.get('/founder-content/linkedin-observations', async (req: Fou
     });
   }
 
-  const resolved = await resolveActiveProject(projectSlug);
+  const resolved = await resolveActiveProject(projectSlug, 'founder-content observations');
   if (!resolved.project) return res.status(resolved.status).json({ error: resolved.error });
 
   const { data: observation, error: observationError } = await supabase
