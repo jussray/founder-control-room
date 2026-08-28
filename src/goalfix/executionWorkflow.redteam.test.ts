@@ -253,7 +253,7 @@ describe('Goalfix execution workflow v2 red team', () => {
     expect(result.reasons).toContain('merge ancestry does not prove merged main contains the approved candidate');
   });
 
-  it('fails closed when conflicting checkpoints share the same observation timestamp', () => {
+  it('fails closed when conflicting checkpoints share the same latest observation timestamp', () => {
     const candidate = validInput();
     const currentBuilder = candidate.checkpoints.find((item) => item.phase === 'builder');
     expect(currentBuilder).toBeDefined();
@@ -265,7 +265,22 @@ describe('Goalfix execution workflow v2 red team', () => {
 
     const result = evaluateGoalfixExecution(candidate);
     expect(result.state).toBe('UNVERIFIED');
-    expect(result.reasons).toContain('builder: conflicting checkpoints share observedAt 2026-08-26T11:00:00.000Z');
+    expect(result.reasons).toContain('builder: conflicting checkpoints share the latest observedAt timestamp');
+  });
+
+  it('allows a later clean retry to supersede a historical tied checkpoint conflict', () => {
+    const candidate = validInput();
+    const currentBuilder = candidate.checkpoints.find((item) => item.phase === 'builder');
+    expect(currentBuilder).toBeDefined();
+    const tiedFailure: GoalfixExecutionCheckpoint = {
+      ...currentBuilder!,
+      verdict: 'FAILED',
+    };
+    const retry = checkpoint('builder', 'builder', 'builder', builder, '2026-08-26T11:05:00.000Z');
+    candidate.checkpoints = [...candidate.checkpoints, tiedFailure, retry];
+
+    const result = evaluateGoalfixExecution(candidate);
+    expect(result.state).toBe('READY_TO_MERGE');
   });
 
   it('rejects runtime PASS evidence observed before the provider merge time', () => {
