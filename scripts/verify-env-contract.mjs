@@ -68,6 +68,23 @@ function stripQuotes(value) {
   return value;
 }
 
+function isSensitiveTemplateKey(key) {
+  return /(?:^|_)(?:SECRET|TOKEN|PASSWORD|PRIVATE_KEY|SERVICE_ROLE_KEY|API_KEY)$/.test(key)
+    || /_HOOK_URL$/.test(key)
+    || /_GRANT_JSON$/.test(key)
+    || key === 'DATABASE_URL';
+}
+
+function isExplicitPlaceholder(key, value) {
+  const normalized = stripQuotes(value.trim());
+  if (!normalized) return true;
+  if (/^(?:your[-_][A-Za-z0-9_.-]*|<[^>]+>|\[YOUR-[^\]]+\])$/i.test(normalized)) return true;
+  if (key === 'DATABASE_URL') {
+    return /^postgres(?:ql)?:\/\/[^:\s]+:\[YOUR-PASSWORD\]@db\.YOUR_[A-Z0-9_]+\.supabase\.co:\d+\/postgres(?:\?.*)?$/i.test(normalized);
+  }
+  return false;
+}
+
 function looksLikeCommittedCredential(value) {
   const normalized = stripQuotes(value.trim());
   if (!normalized) return false;
@@ -75,7 +92,7 @@ function looksLikeCommittedCredential(value) {
   if (/^(?:your[-_]|example(?:\.|$)|<[^>]+>$)/i.test(normalized)) return false;
 
   return /-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(normalized)
-    || /^(?:sk-(?:proj-)?|ghp_|github_pat_|re_)[A-Za-z0-9_-]{8,}$/.test(normalized)
+    || /^(?:sk-(?:proj-)?|ghp_|github_pat_|re_|whsec_)[A-Za-z0-9_-]{8,}$/.test(normalized)
     || /^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(normalized);
 }
 
@@ -91,6 +108,18 @@ function duplicates(values) {
     seen.add(value);
   }
   return [...repeated];
+}
+
+function tomlAssignmentKeys(source) {
+  const keys = [];
+  for (const rawLine of source.split(/\r?\n/)) {
+    const line = rawLine.trimStart();
+    if (!line || line.startsWith('#') || line.startsWith('[')) continue;
+    const match = line.match(/^(?:(?:[A-Za-z0-9_-]+)\.)*(?:"([A-Z][A-Z0-9_]*)"|'([A-Z][A-Z0-9_]*)'|([A-Z][A-Z0-9_]*))\s*=/);
+    const key = match?.[1] ?? match?.[2] ?? match?.[3] ?? null;
+    if (key) keys.push(key);
+  }
+  return keys;
 }
 
 for (const requiredFile of [
@@ -140,6 +169,10 @@ for (const templatePath of safeTemplatePaths) {
   const parsed = parseEnvTemplate(templatePath);
   templates.set(templatePath, parsed);
   for (const [key, value] of parsed.entries) {
+    if (isSensitiveTemplateKey(key) && !isExplicitPlaceholder(key, value)) {
+      fail(`${templatePath} must leave sensitive ${key} empty or use an explicit placeholder`);
+      continue;
+    }
     if (looksLikeCommittedCredential(value)) {
       fail(`${templatePath} contains a credential-shaped value for ${key}`);
     }
@@ -182,6 +215,7 @@ for (const duplicate of duplicates(workerRequiredSecrets)) {
 }
 
 const docs = read('docs/SECRETS.md');
+const wranglerAssignments = new Set(tomlAssignmentKeys(wrangler));
 if (canonicalEnv) {
   for (const secretName of workerRequiredSecrets) {
     requireValue(
@@ -192,18 +226,16 @@ if (canonicalEnv) {
       docs.includes(secretName),
       `docs/SECRETS.md must document Worker-required secret ${secretName}`,
     );
-
-    const escaped = secretName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     requireValue(
-      !new RegExp(`^\\s*${escaped}\\s*=\\s*["'][^"']+["']\\s*$`, 'm').test(wrangler),
-      `wrangler.worker.toml must not commit a value for required secret ${secretName}`,
+      !wranglerAssignments.has(secretName),
+      `wrangler.worker.toml must not assign plaintext value for required secret ${secretName}`,
     );
   }
 }
 
 const wranglerDeclaredNames = new Set([
   ...workerRequiredSecrets,
-  ...[...wrangler.matchAll(/^\s*([A-Z][A-Z0-9_]*)\s*=/gm)].map((match) => match[1]),
+  ...tomlAssignmentKeys(wrangler),
 ]);
 
 const handler = read('src/worker/handler.ts');
@@ -253,15 +285,16 @@ for (const workflowFile of workflowFiles) {
 const undocumentedWorkflowSecrets = [...workflowSecretNames]
   .filter((name) => !docs.includes(name))
   .sort();
+for (const secretName of undocumentedWorkflowSecrets) {
+  fail(`docs/SECRETS.md must document workflow secret ${secretName}`);
+}
+
 notes.push(`safe env templates=${safeTemplatePaths.length}`);
 notes.push(`Worker required secrets=${workerRequiredSecrets.length}`);
 notes.push(`central boot string bindings=${centralRequiredBindings.length}`);
 notes.push(`canonical deploy secret names=${deploySecretNames.length}`);
 notes.push(`all workflow secret-name references=${workflowSecretNames.size}`);
-notes.push(`workflow-only names not covered by canonical secrets registry=${undocumentedWorkflowSecrets.length}`);
-if (undocumentedWorkflowSecrets.length) {
-  notes.push(`workflow-only registry candidates=${undocumentedWorkflowSecrets.join(',')}`);
-}
+notes.push(`undocumented workflow secret names=${undocumentedWorkflowSecrets.length}`);
 
 if (failures.length) {
   console.error('[verify:env-contract] failed:');
