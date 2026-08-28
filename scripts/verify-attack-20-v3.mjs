@@ -7,6 +7,36 @@ const registry = JSON.parse(readFileSync(registryPath, 'utf8'));
 const failures = [];
 
 const ATTACK_IDS = Array.from({ length: 20 }, (_, index) => `A${String(index + 1).padStart(2, '0')}`);
+const CANONICAL_LAYERS = Object.freeze({
+  'A01-A07': 'NETWORK_INGRESS',
+  'A08-A09': 'IDENTITY',
+  'A10-A14': 'APPLICATION_DATA',
+  'A15-A17': 'AUTHORITY_EXECUTION',
+  'A18-A19': 'RUNTIME_TRUTH',
+  A20: 'FRESHNESS',
+});
+const CANONICAL_ATTACKS = Object.freeze([
+  { id: 'A01', layer: 'NETWORK_INGRESS', name: 'unknown-route-enumeration' },
+  { id: 'A02', layer: 'NETWORK_INGRESS', name: 'method-confusion' },
+  { id: 'A03', layer: 'NETWORK_INGRESS', name: 'payload-abuse' },
+  { id: 'A04', layer: 'NETWORK_INGRESS', name: 'schema-enforcement' },
+  { id: 'A05', layer: 'NETWORK_INGRESS', name: 'rate-resource-pressure' },
+  { id: 'A06', layer: 'NETWORK_INGRESS', name: 'bot-scanner-protocol-anomaly' },
+  { id: 'A07', layer: 'NETWORK_INGRESS', name: 'alternate-ingress-bypass' },
+  { id: 'A08', layer: 'IDENTITY', name: 'invalid-user-credential' },
+  { id: 'A09', layer: 'IDENTITY', name: 'invalid-service-identity' },
+  { id: 'A10', layer: 'APPLICATION_DATA', name: 'webhook-forgery-replay' },
+  { id: 'A11', layer: 'APPLICATION_DATA', name: 'bola' },
+  { id: 'A12', layer: 'APPLICATION_DATA', name: 'bopla-mass-assignment' },
+  { id: 'A13', layer: 'APPLICATION_DATA', name: 'business-flow-abuse' },
+  { id: 'A14', layer: 'APPLICATION_DATA', name: 'supabase-rls-bypass' },
+  { id: 'A15', layer: 'AUTHORITY_EXECUTION', name: 'self-approval-scope-escalation' },
+  { id: 'A16', layer: 'AUTHORITY_EXECUTION', name: 'stale-authority-replay' },
+  { id: 'A17', layer: 'AUTHORITY_EXECUTION', name: 'duplicate-reordered-execution' },
+  { id: 'A18', layer: 'RUNTIME_TRUTH', name: 'provider-runtime-false-success' },
+  { id: 'A19', layer: 'RUNTIME_TRUTH', name: 'observability-failure' },
+  { id: 'A20', layer: 'FRESHNESS', name: 'dependency-fingerprint-freshness' },
+]);
 const ALLOWED_WORKER_STATES = new Set(['PASS', 'FAILED', 'UNVERIFIED']);
 const ALLOWED_ALT_STATES = new Set(['disabled', 'protected', 'public', 'unknown']);
 const ALT_SCALAR_SURFACES = ['workersDev', 'previewUrls', 'pagesDev', 'pagesPreviews', 'directOrigin'];
@@ -32,6 +62,10 @@ function parseTomlString(source, key) {
   return match?.[1] ?? null;
 }
 
+function stableObjectEntries(value) {
+  return Object.entries(value ?? {}).sort(([left], [right]) => left.localeCompare(right));
+}
+
 requireValue(policy.schema === 'founder-control-room/attack-20-v3-policy@v1', 'policy schema must be attack-20-v3-policy@v1');
 requireValue(policy.suiteVersion === 'attack-20-v3', 'suiteVersion must be attack-20-v3');
 requireValue(policy.status === 'DESIGNED_UNVERIFIED', 'source policy status must remain DESIGNED_UNVERIFIED until live proof exists');
@@ -40,6 +74,14 @@ requireValue(policy.lineage?.parentPolicy === 'security/firewall-v10.policy.json
 requireValue(existsSync(policy.lineage?.parentPolicy ?? ''), 'Firewall v10 parent policy must exist');
 requireValue(Array.isArray(policy.attacks) && policy.attacks.length === 20, 'policy must define exactly 20 attacks');
 requireValue(JSON.stringify(policy.attacks?.map((attack) => attack.id)) === JSON.stringify(ATTACK_IDS), 'policy attack IDs must be canonical A01-A20 order');
+requireValue(
+  JSON.stringify(stableObjectEntries(policy.layers)) === JSON.stringify(stableObjectEntries(CANONICAL_LAYERS)),
+  'policy attack layer ranges drifted from canonical Attack-20 V3',
+);
+requireValue(
+  JSON.stringify(policy.attacks?.map(({ id, layer, name }) => ({ id, layer, name }))) === JSON.stringify(CANONICAL_ATTACKS),
+  'policy attack id/layer/name definitions drifted from canonical Attack-20 V3',
+);
 requireValue(policy.anchors?.A07 === 'alternate-ingress-bypass', 'A07 anchor drifted');
 requireValue(policy.anchors?.A10 === 'webhook-forgery-replay', 'A10 anchor drifted');
 requireValue(policy.anchors?.A11 === 'bola', 'A11 anchor drifted');
