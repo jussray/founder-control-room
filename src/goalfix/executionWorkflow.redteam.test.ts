@@ -132,12 +132,12 @@ function ancestry(overrides: Partial<GoalfixMergeAncestryReceipt> = {}): Goalfix
   };
 }
 
-function runtimeReceipt(): GoalfixRuntimeReceipt {
+function runtimeReceipt(observedAt = '2026-08-26T11:50:00.000Z'): GoalfixRuntimeReceipt {
   const base: Omit<GoalfixRuntimeReceipt, 'proofBinding'> = {
     receiptId: 'runtime-receipt-red001',
     mergedSha: MERGED,
     verdict: 'PASS',
-    observedAt: '2026-08-26T11:50:00.000Z',
+    observedAt,
   };
   return {
     ...base,
@@ -251,5 +251,46 @@ describe('Goalfix execution workflow v2 red team', () => {
     const result = evaluateGoalfixExecution(candidate);
     expect(result.state).toBe('MERGED_UNVERIFIED');
     expect(result.reasons).toContain('merge ancestry does not prove merged main contains the approved candidate');
+  });
+
+  it('fails closed when conflicting checkpoints share the same observation timestamp', () => {
+    const candidate = validInput();
+    const currentBuilder = candidate.checkpoints.find((item) => item.phase === 'builder');
+    expect(currentBuilder).toBeDefined();
+    const failedBuilder: GoalfixExecutionCheckpoint = {
+      ...currentBuilder!,
+      verdict: 'FAILED',
+    };
+    candidate.checkpoints = [...candidate.checkpoints, failedBuilder];
+
+    const result = evaluateGoalfixExecution(candidate);
+    expect(result.state).toBe('UNVERIFIED');
+    expect(result.reasons).toContain('builder: conflicting checkpoints share observedAt 2026-08-26T11:00:00.000Z');
+  });
+
+  it('rejects runtime PASS evidence observed before the provider merge time', () => {
+    const candidate = validInput();
+    const runtime = runtimeReceipt('2026-08-26T11:46:00.000Z');
+    const runtimeFingerprint = runtime.proofBinding.fingerprints.runtime;
+    candidate.postMergeTruth = {
+      mergedSha: MERGED,
+      currentMainSha: MERGED,
+      runtimeProofRequired: true,
+      runtimeReceiptIds: [runtime.receiptId],
+      runtimeReceipts: [runtime],
+      mergeAncestryReceipt: ancestry(),
+      observedAt: '2026-08-26T11:55:00.000Z',
+      proofBinding: {
+        fingerprints: {
+          sourceSha: goalfixSourceFingerprint(REPOSITORY, MERGED),
+          runtime: runtimeFingerprint,
+        },
+        cookieContract: provider,
+      },
+    };
+
+    const result = evaluateGoalfixExecution(candidate);
+    expect(result.state).toBe('MERGED_UNVERIFIED');
+    expect(result.reasons).toContain('runtime-receipt-red001: runtime receipt predates provider merge');
   });
 });
