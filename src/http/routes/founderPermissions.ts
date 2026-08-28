@@ -67,9 +67,8 @@ function projection(row: JsonRecord) {
 }
 
 export const founderPermissionsRouter = Router();
-founderPermissionsRouter.use(rateLimitFounderPermissions, requireFounder);
 
-founderPermissionsRouter.get('/requests', async (req: FounderRequest, res) => {
+founderPermissionsRouter.get('/requests', rateLimitFounderPermissions, requireFounder, async (req: FounderRequest, res) => {
   const requestedStatus = req.query.status === undefined ? null : statusFrom(req.query.status);
   if (req.query.status !== undefined && !requestedStatus) return res.status(400).json({ error: 'unsupported founder permission status' });
   let query = supabase.from('founder_permission_requests')
@@ -81,7 +80,7 @@ founderPermissionsRouter.get('/requests', async (req: FounderRequest, res) => {
   return res.json({ requests: (data ?? []).map((row) => projection(row as JsonRecord)) });
 });
 
-founderPermissionsRouter.get('/requests/:requestId', async (req: FounderRequest, res) => {
+founderPermissionsRouter.get('/requests/:requestId', rateLimitFounderPermissions, requireFounder, async (req: FounderRequest, res) => {
   const requestId = text(req.params.requestId);
   if (!requestId) return res.status(400).json({ error: 'requestId is required' });
   const { data, error } = await supabase.from('founder_permission_requests')
@@ -92,7 +91,7 @@ founderPermissionsRouter.get('/requests/:requestId', async (req: FounderRequest,
   return res.json(projection(data as JsonRecord));
 });
 
-founderPermissionsRouter.post('/requests', async (req: FounderRequest, res) => {
+founderPermissionsRouter.post('/requests', rateLimitFounderPermissions, requireFounder, async (req: FounderRequest, res) => {
   const body = isRecord(req.body) ? req.body : null;
   const requestedBySurface = surfaceFrom(body?.requestedBySurface);
   const proposal = proposalFrom(body?.proposal);
@@ -121,7 +120,7 @@ founderPermissionsRouter.post('/requests', async (req: FounderRequest, res) => {
   return res.status(201).json(projection(data as JsonRecord));
 });
 
-founderPermissionsRouter.post('/requests/:requestId/decision', async (req: FounderRequest, res) => {
+founderPermissionsRouter.post('/requests/:requestId/decision', rateLimitFounderPermissions, requireFounder, async (req: FounderRequest, res) => {
   // Bearer-authenticated agents may ask, but may not convert their own request
   // into founder authority. Until registered adapters can attest a distinct
   // founder interaction, decision writes require the signed same-origin FCR
