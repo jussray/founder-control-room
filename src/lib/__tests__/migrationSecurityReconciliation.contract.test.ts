@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 const read = (path: string): string => readFileSync(resolve(process.cwd(), path), 'utf8');
 const normalizeSql = (sql: string): string => sql.replace(/\s+/g, ' ').trim();
 const destructiveOnboardingMutation = /(?:create\s+table|drop\s+table|truncate(?:\s+table)?|delete\s+from|update|alter\s+table)\s+(?:if\s+(?:not\s+)?exists\s+)?(?:public\.)?user_onboarding_state\b/i;
-const authenticatedLinkedInGrant = /grant\s+[\s\S]*?\s+on\s+(?:table|view)\s+public\.(?:linkedin_experiments|linkedin_winning_patterns)\s+to\s+authenticated\b/i;
+const authenticatedLinkedInGrant = /grant\s+[^;]+?\s+on\s+(?:(?:table|view)\s+)?public\.(?:linkedin_experiments|linkedin_winning_patterns)\s+to\s+authenticated\b/i;
 
 const founderHelper = read('supabase/migrations/20260713034026_harden_founder_helper_server_only.sql');
 const mcpHubPhase1 = read('supabase/migrations/20260715073531_mcp_hub_phase1.sql');
