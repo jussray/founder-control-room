@@ -47,7 +47,8 @@ describe('trusted review witness command contract', () => {
       '/actions/workflows/deterministic-review-core-advisory.yml/dispatches',
     );
     expect(reviewWorkflow).toContain('--arg ref main');
-    expect(reviewWorkflow).toContain('--argjson pr "$PR_NUMBER"');
+    expect(reviewWorkflow).toContain('--arg pr "$PR_NUMBER"');
+    expect(reviewWorkflow).not.toContain('--argjson pr "$PR_NUMBER"');
     expect(reviewWorkflow).toContain('--arg expected_main_sha "$EXPECTED_MAIN_SHA"');
     expect(reviewWorkflow).toContain(
       "'{ref:$ref, inputs:{pull_request_number:$pr, expected_main_sha:$expected_main_sha}}'",
