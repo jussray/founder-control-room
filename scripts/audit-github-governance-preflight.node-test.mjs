@@ -341,3 +341,9 @@ test('workflow keeps production App identity outside the pull-request execution 
   assert.match(providerSide, /GITHUB_APP_ID:\s*\$\{\{ secrets\.GITHUB_APP_ID \}\}/);
   assert.match(providerSide, /ref:\s*\$\{\{ github\.sha \}\}/);
 });
+
+test('provider CLI fails closed for every non-READY governance state', () => {
+  const source = readFileSync(new URL('./audit-github-governance-preflight.mjs', import.meta.url), 'utf8');
+  assert.match(source, /blocked = report\.status !== 'READY';/);
+  assert.doesNotMatch(source, /blocked = report\.status === 'BLOCKED';/);
+});
