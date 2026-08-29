@@ -2,7 +2,7 @@
   "schema": "founder-control-room/portfolio-worker-security@v1",
   "suiteVersion": "attack-20-v3",
   "repository": "jussray/founder-control-room",
-  "declaredFromMainSha": "1857b0740a3fac647bbd5cf4ffb7cf51dd964e8a",
+  "declaredFromMainSha": "4d956dd84c4318382ce1de9b50b76d6c39dcd27f",
   "overallState": "UNVERIFIED",
   "aggregation": {
     "passRequiresEveryProductionWorkerPass": true,
@@ -81,54 +81,50 @@
       "configPath": "wrangler.email.toml",
       "owner": "founder-control-room",
       "canonicalIngress": {
-        "hostname": null,
+        "hostname": "founder-control-room-review-email.workers.dev",
         "route": null,
-        "classification": "no-public-ingress"
+        "classification": "public-provider-ingress"
       },
       "sourceIntent": {
-        "workersDev": "disabled",
-        "previewUrls": "disabled",
-        "serviceBindings": ["FOUNDER_CONTROL_ROOM_API->founder-control-room"],
+        "workersDev": "enabled",
+        "previewUrls": "enabled",
+        "serviceBindings": ["FOUNDER_CONTROL_ROOM_API"],
         "relatedPagesSurface": null
       },
       "alternateIngress": {
         "workersDev": "unknown",
         "previewUrls": "unknown",
-        "pagesDev": "disabled",
-        "pagesPreviews": "disabled",
+        "pagesDev": "not-applicable",
+        "pagesPreviews": "not-applicable",
         "customDomains": [],
         "legacyDns": [],
         "directOrigin": "unknown"
       },
       "requiredProtection": {
-        "access": "service-binding-or-provider-event",
+        "access": "provider-webhook-signature",
         "waf": false,
-        "rateLimitProfile": null,
-        "allowedMethods": [],
-        "allowedPathPatterns": [],
-        "webhookVerification": false,
-        "schemaEnforcement": "none"
+        "rateLimitProfile": "provider-webhook",
+        "allowedMethods": ["POST"],
+        "allowedPathPatterns": ["/email"],
+        "webhookVerification": true,
+        "schemaEnforcement": "required"
       },
       "capabilities": {
-        "publicHttp": false,
+        "publicHttp": true,
         "authenticatedUser": false,
         "serviceOnlyBoundaries": true,
-        "providerWebhook": false,
+        "providerWebhook": true,
         "tenantOwnedData": false,
-        "mutableProtectedFields": false,
+        "mutableProtectedFields": true,
         "businessStateMachine": true,
         "supabaseData": false,
         "consequentialActions": true,
-        "providerMutation": "unknown",
+        "providerMutation": false,
         "runtimeOutcomeClaims": true
       },
       "capabilityAbsenceEvidence": {
-        "A01": ["wrangler.email.toml declares no public route and disables workers.dev/preview URLs"],
-        "A08": ["worker has no browser/user HTTP ingress"],
-        "A10": ["worker receives Cloudflare Email Routing events rather than an HTTP provider webhook"],
-        "A11": ["worker does not expose tenant-owned object access"],
-        "A12": ["worker does not expose user-mutable object properties"],
-        "A14": ["worker does not directly expose Supabase data access"]
+        "tenantOwnedData": "No direct Supabase/database binding is declared in wrangler.email.toml; persistence is delegated to the canonical FCR API service binding.",
+        "providerMutation": "The email ingress Worker forwards bounded review-email payloads to the canonical FCR API; it does not hold repository-provider mutation credentials."
       },
       "observedProtection": {
         "observedAt": null,
@@ -153,7 +149,7 @@
       "canonicalIngress": {
         "hostname": null,
         "route": null,
-        "classification": "no-public-ingress"
+        "classification": "queue-consumer"
       },
       "sourceIntent": {
         "workersDev": "disabled",
@@ -162,22 +158,22 @@
         "relatedPagesSurface": null
       },
       "alternateIngress": {
-        "workersDev": "unknown",
-        "previewUrls": "unknown",
-        "pagesDev": "disabled",
-        "pagesPreviews": "disabled",
+        "workersDev": "source-disabled",
+        "previewUrls": "source-disabled",
+        "pagesDev": "not-applicable",
+        "pagesPreviews": "not-applicable",
         "customDomains": [],
         "legacyDns": [],
-        "directOrigin": "unknown"
+        "directOrigin": "not-applicable"
       },
       "requiredProtection": {
-        "access": "scheduled-runtime-only",
+        "access": "queue-only",
         "waf": false,
-        "rateLimitProfile": null,
+        "rateLimitProfile": "queue-consumer",
         "allowedMethods": [],
         "allowedPathPatterns": [],
         "webhookVerification": false,
-        "schemaEnforcement": "none"
+        "schemaEnforcement": "required"
       },
       "capabilities": {
         "publicHttp": false,
@@ -189,14 +185,268 @@
         "businessStateMachine": true,
         "supabaseData": true,
         "consequentialActions": true,
-        "providerMutation": true,
+        "providerMutation": false,
         "runtimeOutcomeClaims": true
       },
       "capabilityAbsenceEvidence": {
-        "A01": ["wrangler.deletion-queue.toml declares a scheduled Worker with no public route and disables workers.dev/preview URLs"],
-        "A08": ["scheduled Worker has no browser/user HTTP ingress"],
-        "A10": ["scheduled Worker has no provider webhook route"]
+        "publicHttp": "wrangler.deletion-queue.toml declares workers_dev=false, preview_urls=false, no routes, and only a queue consumer.",
+        "authenticatedUser": "The deletion queue Worker is queue-triggered and has no public HTTP/user-authentication path.",
+        "serviceOnlyBoundaries": "wrangler.deletion-queue.toml declares no service bindings.",
+        "providerWebhook": "The deletion queue Worker consumes Cloudflare Queues rather than provider webhooks.",
+        "providerMutation": "The deletion queue Worker has Supabase service authority but no repository-provider token or GitHub App credential binding."
       },
+      "observedProtection": {
+        "observedAt": null,
+        "canonicalSourceSha": null,
+        "workerVersionId": null,
+        "state": "UNVERIFIED",
+        "evidenceReceiptIds": []
+      },
+      "attackTest": {
+        "suiteVersion": "attack-20-v3",
+        "executedAt": null,
+        "result": "UNVERIFIED",
+        "failedControls": []
+      }
+    },
+    {
+      "project": "storyengine",
+      "worker": "storyengine-worker",
+      "environment": "production",
+      "configPath": null,
+      "owner": "storyengine",
+      "canonicalIngress": {
+        "hostname": null,
+        "route": null,
+        "classification": "unknown-until-discovery"
+      },
+      "sourceIntent": {
+        "workersDev": "unknown",
+        "previewUrls": "unknown",
+        "serviceBindings": [],
+        "relatedPagesSurface": null
+      },
+      "alternateIngress": {
+        "workersDev": "unknown",
+        "previewUrls": "unknown",
+        "pagesDev": "unknown",
+        "pagesPreviews": "unknown",
+        "customDomains": [],
+        "legacyDns": [],
+        "directOrigin": "unknown"
+      },
+      "requiredProtection": {
+        "access": "unknown-until-discovery",
+        "waf": true,
+        "rateLimitProfile": "unknown-until-discovery",
+        "allowedMethods": [],
+        "allowedPathPatterns": [],
+        "webhookVerification": "unknown-until-discovery",
+        "schemaEnforcement": "unknown-until-discovery"
+      },
+      "capabilities": {
+        "publicHttp": "unknown",
+        "authenticatedUser": "unknown",
+        "serviceOnlyBoundaries": "unknown",
+        "providerWebhook": "unknown",
+        "tenantOwnedData": "unknown",
+        "mutableProtectedFields": "unknown",
+        "businessStateMachine": "unknown",
+        "supabaseData": "unknown",
+        "consequentialActions": "unknown",
+        "providerMutation": "unknown",
+        "runtimeOutcomeClaims": "unknown"
+      },
+      "capabilityAbsenceEvidence": {},
+      "observedProtection": {
+        "observedAt": null,
+        "canonicalSourceSha": null,
+        "workerVersionId": null,
+        "state": "UNVERIFIED",
+        "evidenceReceiptIds": []
+      },
+      "attackTest": {
+        "suiteVersion": "attack-20-v3",
+        "executedAt": null,
+        "result": "UNVERIFIED",
+        "failedControls": []
+      }
+    },
+    {
+      "project": "chief-ai-machine",
+      "worker": "chief-ai-machine-worker",
+      "environment": "production",
+      "configPath": null,
+      "owner": "chief-ai-machine",
+      "canonicalIngress": {
+        "hostname": null,
+        "route": null,
+        "classification": "unknown-until-discovery"
+      },
+      "sourceIntent": {
+        "workersDev": "unknown",
+        "previewUrls": "unknown",
+        "serviceBindings": [],
+        "relatedPagesSurface": null
+      },
+      "alternateIngress": {
+        "workersDev": "unknown",
+        "previewUrls": "unknown",
+        "pagesDev": "unknown",
+        "pagesPreviews": "unknown",
+        "customDomains": [],
+        "legacyDns": [],
+        "directOrigin": "unknown"
+      },
+      "requiredProtection": {
+        "access": "unknown-until-discovery",
+        "waf": true,
+        "rateLimitProfile": "unknown-until-discovery",
+        "allowedMethods": [],
+        "allowedPathPatterns": [],
+        "webhookVerification": "unknown-until-discovery",
+        "schemaEnforcement": "unknown-until-discovery"
+      },
+      "capabilities": {
+        "publicHttp": "unknown",
+        "authenticatedUser": "unknown",
+        "serviceOnlyBoundaries": "unknown",
+        "providerWebhook": "unknown",
+        "tenantOwnedData": "unknown",
+        "mutableProtectedFields": "unknown",
+        "businessStateMachine": "unknown",
+        "supabaseData": "unknown",
+        "consequentialActions": "unknown",
+        "providerMutation": "unknown",
+        "runtimeOutcomeClaims": "unknown"
+      },
+      "capabilityAbsenceEvidence": {},
+      "observedProtection": {
+        "observedAt": null,
+        "canonicalSourceSha": null,
+        "workerVersionId": null,
+        "state": "UNVERIFIED",
+        "evidenceReceiptIds": []
+      },
+      "attackTest": {
+        "suiteVersion": "attack-20-v3",
+        "executedAt": null,
+        "result": "UNVERIFIED",
+        "failedControls": []
+      }
+    },
+    {
+      "project": "sekret-bip",
+      "worker": "sekret-backend",
+      "environment": "production",
+      "configPath": null,
+      "owner": "sekret-bip",
+      "canonicalIngress": {
+        "hostname": null,
+        "route": null,
+        "classification": "unknown-until-discovery"
+      },
+      "sourceIntent": {
+        "workersDev": "unknown",
+        "previewUrls": "unknown",
+        "serviceBindings": [],
+        "relatedPagesSurface": null
+      },
+      "alternateIngress": {
+        "workersDev": "unknown",
+        "previewUrls": "unknown",
+        "pagesDev": "unknown",
+        "pagesPreviews": "unknown",
+        "customDomains": [],
+        "legacyDns": [],
+        "directOrigin": "unknown"
+      },
+      "requiredProtection": {
+        "access": "unknown-until-discovery",
+        "waf": true,
+        "rateLimitProfile": "unknown-until-discovery",
+        "allowedMethods": [],
+        "allowedPathPatterns": [],
+        "webhookVerification": "unknown-until-discovery",
+        "schemaEnforcement": "unknown-until-discovery"
+      },
+      "capabilities": {
+        "publicHttp": "unknown",
+        "authenticatedUser": "unknown",
+        "serviceOnlyBoundaries": "unknown",
+        "providerWebhook": "unknown",
+        "tenantOwnedData": "unknown",
+        "mutableProtectedFields": "unknown",
+        "businessStateMachine": "unknown",
+        "supabaseData": "unknown",
+        "consequentialActions": "unknown",
+        "providerMutation": "unknown",
+        "runtimeOutcomeClaims": "unknown"
+      },
+      "capabilityAbsenceEvidence": {},
+      "observedProtection": {
+        "observedAt": null,
+        "canonicalSourceSha": null,
+        "workerVersionId": null,
+        "state": "UNVERIFIED",
+        "evidenceReceiptIds": []
+      },
+      "attackTest": {
+        "suiteVersion": "attack-20-v3",
+        "executedAt": null,
+        "result": "UNVERIFIED",
+        "failedControls": []
+      }
+    },
+    {
+      "project": "jbh",
+      "worker": "jussbeautifulhair-site",
+      "environment": "production",
+      "configPath": null,
+      "owner": "jbh",
+      "canonicalIngress": {
+        "hostname": null,
+        "route": null,
+        "classification": "unknown-until-discovery"
+      },
+      "sourceIntent": {
+        "workersDev": "unknown",
+        "previewUrls": "unknown",
+        "serviceBindings": [],
+        "relatedPagesSurface": null
+      },
+      "alternateIngress": {
+        "workersDev": "unknown",
+        "previewUrls": "unknown",
+        "pagesDev": "unknown",
+        "pagesPreviews": "unknown",
+        "customDomains": [],
+        "legacyDns": [],
+        "directOrigin": "unknown"
+      },
+      "requiredProtection": {
+        "access": "unknown-until-discovery",
+        "waf": true,
+        "rateLimitProfile": "unknown-until-discovery",
+        "allowedMethods": [],
+        "allowedPathPatterns": [],
+        "webhookVerification": "unknown-until-discovery",
+        "schemaEnforcement": "unknown-until-discovery"
+      },
+      "capabilities": {
+        "publicHttp": "unknown",
+        "authenticatedUser": "unknown",
+        "serviceOnlyBoundaries": "unknown",
+        "providerWebhook": "unknown",
+        "tenantOwnedData": "unknown",
+        "mutableProtectedFields": "unknown",
+        "businessStateMachine": "unknown",
+        "supabaseData": "unknown",
+        "consequentialActions": "unknown",
+        "providerMutation": "unknown",
+        "runtimeOutcomeClaims": "unknown"
+      },
+      "capabilityAbsenceEvidence": {},
       "observedProtection": {
         "observedAt": null,
         "canonicalSourceSha": null,
