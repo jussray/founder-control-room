@@ -137,7 +137,7 @@ describe('founder permission broker HTTP contract', () => {
     mockGetUser.mockResolvedValue(founderUser());
   });
 
-  it('lets an agent ask but requires an independently authenticated same-origin browser to decide', async () => {
+  it('lets an agent ask but requires an independently authenticated browser session to decide', async () => {
     const app = createServer();
     const created = await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)
       .send({ requestId: 'permission:ask-founder-001', requestedBySurface: 'chatgpt', proposal, actionTarget, note: 'Approve this exact candidate?' });
@@ -188,18 +188,17 @@ describe('founder permission broker HTTP contract', () => {
       .toBe('22222222-2222-4222-8222-222222222222');
   });
 
-  it('requires same-origin browser context even when a bearer header is present', async () => {
+  it('requires a browser Origin even when a bearer header is present', async () => {
     const app = createServer();
     await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)
       .send({ requestId: 'permission:origin-001', requestedBySurface: 'chatgpt', proposal, actionTarget });
     interactiveSession.enabled = true;
-    const crossOrigin = await request(app)
+    const noBrowserOrigin = await request(app)
       .post('/mcp/founder-permissions/requests/permission:origin-001/decision')
       .set('Authorization', bearer)
-      .set('Origin', 'http://localhost:3000')
       .send({ decision: 'approved' });
-    expect(crossOrigin.status).toBe(403);
-    expect(crossOrigin.body.code).toBe('FOUNDER_INTERACTIVE_APPROVAL_REQUIRED');
+    expect(noBrowserOrigin.status).toBe(403);
+    expect(noBrowserOrigin.body.code).toBe('FOUNDER_INTERACTIVE_APPROVAL_REQUIRED');
   });
 
   it('consumes a fresh approval exactly once and removes satisfied state', async () => {
