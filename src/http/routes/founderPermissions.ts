@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { supabase } from '../../lib/supabaseClient.js';
 import {
   createFounderPermissionRequest,
-  FOUNDER_PERMISSION_REQUEST_CONTRACT,
   FOUNDER_PERMISSION_STATUSES,
   resolveFounderPermissionRequest,
   type FounderPermissionActionTarget,
@@ -48,6 +47,9 @@ const REQUEST_SELECT = [
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+function asJsonRecord(value: unknown): JsonRecord {
+  return value as JsonRecord;
 }
 function text(value: unknown): string { return typeof value === 'string' ? value.trim() : ''; }
 function proposalFrom(value: unknown): FounderControlProposalBinding | null {
@@ -144,7 +146,7 @@ async function readRequestRow(requestId: string): Promise<{ row: JsonRecord | nu
   const { data, error } = await supabase.from('founder_permission_requests')
     .select(REQUEST_SELECT)
     .eq('request_id', requestId).maybeSingle();
-  return { row: data ? data as JsonRecord : null, error };
+  return { row: data ? asJsonRecord(data) : null, error };
 }
 
 export const founderPermissionsRouter = Router();
@@ -158,7 +160,7 @@ founderPermissionsRouter.get('/requests', rateLimitFounderPermissions, requireFo
   if (requestedStatus) query = query.eq('status', requestedStatus);
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: 'Unable to list founder permission requests.' });
-  return res.json({ requests: (data ?? []).map((row) => projection(row as JsonRecord)) });
+  return res.json({ requests: (data ?? []).map((row) => projection(asJsonRecord(row))) });
 });
 
 founderPermissionsRouter.get('/requests/:requestId', rateLimitFounderPermissions, requireFounder, async (req: FounderRequest, res) => {
@@ -210,7 +212,7 @@ founderPermissionsRouter.post('/requests', rateLimitFounderPermissions, requireF
     }
     return res.status(500).json({ error: 'Unable to persist founder permission request.' });
   }
-  return res.status(201).json(projection(data as JsonRecord));
+  return res.status(201).json(projection(asJsonRecord(data)));
 });
 
 founderPermissionsRouter.post('/requests/:requestId/decision', rateLimitFounderPermissions, requireInteractiveFounder, async (req: FounderRequest, res) => {
@@ -260,7 +262,7 @@ founderPermissionsRouter.post('/requests/:requestId/decision', rateLimitFounderP
     .select(REQUEST_SELECT).maybeSingle();
   if (error) return res.status(500).json({ error: 'Unable to persist founder decision.' });
   if (!data) return res.status(409).json({ error: 'Founder permission request changed before decision could be recorded.', code: 'FOUNDER_PERMISSION_DECISION_RACE' });
-  return res.json(projection(data as JsonRecord));
+  return res.json(projection(asJsonRecord(data)));
 });
 
 founderPermissionsRouter.post('/requests/:requestId/consume', rateLimitFounderPermissions, requireFounder, async (req: FounderRequest, res) => {
@@ -295,7 +297,7 @@ founderPermissionsRouter.post('/requests/:requestId/consume', rateLimitFounderPe
     .select(REQUEST_SELECT).maybeSingle();
   if (error) return res.status(500).json({ error: 'Unable to consume founder permission.' });
   if (!data) return res.status(409).json({ error: 'Founder permission changed before it could be consumed.', code: 'FOUNDER_PERMISSION_CONSUMPTION_RACE' });
-  return res.json({ consumed: true, ...projection(data as JsonRecord) });
+  return res.json({ consumed: true, ...projection(asJsonRecord(data)) });
 });
 
 founderPermissionsRouter.post('/requests/:requestId/revoke', rateLimitFounderPermissions, requireInteractiveFounder, async (req: FounderRequest, res) => {
@@ -315,5 +317,5 @@ founderPermissionsRouter.post('/requests/:requestId/revoke', rateLimitFounderPer
     .select(REQUEST_SELECT).maybeSingle();
   if (error) return res.status(500).json({ error: 'Unable to revoke founder permission.' });
   if (!data) return res.status(409).json({ error: 'Founder permission is already consumed, revoked, or unavailable.', code: 'FOUNDER_PERMISSION_NOT_REVOCABLE' });
-  return res.json({ revoked: true, ...projection(data as JsonRecord) });
+  return res.json({ revoked: true, ...projection(asJsonRecord(data)) });
 });
