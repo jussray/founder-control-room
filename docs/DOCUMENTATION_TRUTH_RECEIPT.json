@@ -128,7 +128,9 @@
     {
       "path": "src/providers/SecurityPreservingGitHubProvider.ts",
       "claims": [
-        "src/providers/SecurityPreservingGitHubProvider.ts must fail closed instead of PUT-updating an existing non-FCR named ruleset from a stale provider snapshot; exact normalized requested-ref exclusions and ~ALL may be diagnosed without mutation; wildcard selectors, character classes, ~DEFAULT_BRANCH, and other GitHub pattern semantics must not be invented locally; missing rulesets may use the direct create-only path; non-empty bypass replacement remains fail-closed; Founder Control Room constitutional governance remains delegated to the canonical provider path; and this source contract is not proof of live provider configuration."
+        "src/providers/SecurityPreservingGitHubProvider.ts must fail closed for any existing non-FCR named ruleset instead of PUT-updating provider state from an earlier snapshot; missing non-FCR rulesets may use only the create-only path.",
+        "src/providers/SecurityPreservingGitHubProvider.ts may diagnose requested-ref exclusion only from exact normalized ref equality or ~ALL; it must never invent wildcard, character-class, ~DEFAULT_BRANCH, or other GitHub pattern semantics locally.",
+        "src/providers/SecurityPreservingGitHubProvider.ts must reject non-empty bypass replacement, keep FCR constitutional governance delegated to the canonical provider path, and cannot treat source state as proof of live provider configuration."
       ]
     }
   ]
