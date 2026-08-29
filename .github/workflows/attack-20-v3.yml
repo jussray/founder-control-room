@@ -73,18 +73,29 @@ jobs:
     timeout-minutes: 10
     env:
       EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
     steps:
       - name: Checkout exact target
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
 
       - name: Verify immutable target
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Resolve exact live main merge base
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          live_main="$(git rev-parse refs/remotes/origin/main)"
+          merge_base="$(git merge-base "$EXPECTED_SHA" "$live_main")"
+          printf 'candidate=%s\nlive_main=%s\nmerge_base=%s\n' "$EXPECTED_SHA" "$live_main" "$merge_base"
+          test "$merge_base" = "$live_main"
+          echo "EXPECTED_BASE_SHA=$live_main" >> "$GITHUB_ENV"
 
       - name: Set up Node
         uses: actions/setup-node@v4
