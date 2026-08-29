@@ -1,5 +1,6 @@
 import {
   N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
+  buildProviderNeutralN8nFounderContentEnvelope,
   dispatchProviderNeutralN8nFounderContent,
   readN8nFounderContentProviderConfig,
   resolveN8nFounderContentProvider,
@@ -11,6 +12,7 @@ import {
 } from './n8nFounderContentOrchestrator.js';
 import {
   claimFounderContentApproval,
+  readCurrentFounderContentApproval,
   type FounderContentApprovalRepository,
 } from './founderContentApprovalStore.js';
 
@@ -35,6 +37,7 @@ export interface AuthoritativeN8nFounderContentOptions {
   fetchImpl?: typeof fetch;
   approvalRepository?: FounderContentApprovalRepository;
   dispatch?: typeof dispatchProviderNeutralN8nFounderContent;
+  buildEnvelope?: typeof buildProviderNeutralN8nFounderContentEnvelope;
 }
 
 export type AuthoritativeN8nFounderContentResult = N8nFounderContentDispatchResult | {
@@ -76,10 +79,11 @@ function preflightFailure(
 /**
  * FCR-owned authority membrane for provider-neutral founder-content orchestration.
  *
- * Transport/provider readiness is checked before consuming one-shot authority.
- * The caller may reference an approval id and exact-copy hashes, but the actual
- * approval object is loaded and atomically claimed from FCR storage before n8n
- * receives any provider-write request.
+ * Transport/provider readiness and the complete server-owned provider envelope
+ * are validated before consuming one-shot authority. The caller may reference
+ * an approval id and exact-copy hashes, but the actual approval object is read
+ * from FCR storage, validated non-destructively, and only then atomically claimed
+ * before n8n receives any provider-write request.
  */
 export async function dispatchAuthoritativeN8nFounderContent(
   input: AuthoritativeN8nFounderContentInput,
@@ -144,6 +148,53 @@ export async function dispatchAuthoritativeN8nFounderContent(
   } catch (error) {
     return preflightFailure('INVALID_ENVELOPE', 400, [
       error instanceof Error ? error.message : 'provider/platform preflight failed',
+      'FCR did not consume the one-shot approval',
+    ]);
+  }
+
+  let preview;
+  try {
+    preview = await readCurrentFounderContentApproval({
+      proposal: input.proposal,
+      founderUserId,
+      approvalId,
+      authorizationHash,
+      expectedPublicPayloadHash: publicPayloadHash,
+      now,
+      repository: options.approvalRepository,
+    });
+  } catch (error) {
+    return blocked([
+      'provider orchestration stopped because FCR could not read current approval authority',
+      error instanceof Error ? error.message : 'authoritative approval readback failed',
+    ]);
+  }
+
+  if (!preview.ok) {
+    return blocked([
+      'provider orchestration stopped because FCR could not read a current authoritative ApprovalReceipt',
+      preview.reason,
+    ]);
+  }
+  if (
+    preview.approvalId !== approvalId
+    || preview.publicPayloadHash !== publicPayloadHash
+    || preview.authorizationHash !== authorizationHash
+  ) {
+    return blocked(['current authoritative approval does not match the exact founder confirmation']);
+  }
+
+  const buildEnvelope = options.buildEnvelope ?? buildProviderNeutralN8nFounderContentEnvelope;
+  try {
+    buildEnvelope({
+      n8n_provider: requestedProvider,
+      proposal: input.proposal,
+      approval: preview.approval,
+      now,
+    });
+  } catch (error) {
+    return preflightFailure('INVALID_ENVELOPE', 400, [
+      error instanceof Error ? error.message : 'server-owned provider envelope validation failed',
       'FCR did not consume the one-shot approval',
     ]);
   }
