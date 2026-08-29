@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { getPortfolioProject } from '../config/portfolio.js';
+import { getKnownProject } from '../config/portfolio.js';
 
 export type UnifiedMemoryKind =
   | 'working'
@@ -151,9 +151,14 @@ export const UNIFIED_MEMORY_SOURCE_POLICIES = {
 
 export type UnifiedMemorySourceSystem = keyof typeof UNIFIED_MEMORY_SOURCE_POLICIES;
 
+/**
+ * Raw native observations intentionally carry no authentication classification.
+ * Data is not allowed to authenticate itself. This normalizer therefore emits
+ * untrusted-import records only. A future transport adapter may introduce an
+ * authenticated path after it proves source identity outside the payload.
+ */
 export interface NativeMemoryObservation {
   sourceSystem: UnifiedMemorySourceSystem;
-  sourceVerification: UnifiedMemorySourceVerification;
   projectSlug: string;
   repository: string;
   nativeKind: string;
@@ -247,10 +252,6 @@ const VALID_TRUST = new Set<UnifiedMemoryTrust>([
   'unknown',
   'revoked',
 ]);
-const VALID_SOURCE_VERIFICATION = new Set<UnifiedMemorySourceVerification>([
-  'authenticated-source',
-  'untrusted-import',
-]);
 
 function safeTime(value: string): number | null {
   const parsed = Date.parse(value);
@@ -295,9 +296,6 @@ function normalizedSummary(value: string | null | undefined): string | null | un
 }
 
 function nonAuthorizingFingerprint(parts: readonly unknown[]): string {
-  // This fingerprint is a continuity/provenance convenience only. It never
-  // grants authority and conflict detection also compares the full normalized
-  // logical observation, not only this digest.
   const digest = createHash('sha256').update(JSON.stringify(parts)).digest('hex');
   return `memfp:sha256:${digest}`;
 }
@@ -350,6 +348,7 @@ export function normalizeUnifiedMemoryObservation(
     return { ok: false, errors: [`Unknown memory source system: ${String(input.sourceSystem)}.`] };
   }
 
+  const sourceVerification: UnifiedMemorySourceVerification = 'untrusted-import';
   const projectSlug = typeof input.projectSlug === 'string' ? input.projectSlug.trim() : '';
   const repository = typeof input.repository === 'string' ? input.repository.trim() : '';
   const nativeId = typeof input.nativeId === 'string' ? input.nativeId.trim() : '';
@@ -360,8 +359,8 @@ export function normalizeUnifiedMemoryObservation(
   const summary = normalizedSummary(input.summary);
   const categories = boundedUniqueStrings(input.categoryKeys, SAFE_CATEGORY_KEY, 40);
   const provenanceRefs = boundedProvenanceRefs(input.provenanceRefs);
-  const registeredProject = getPortfolioProject(projectSlug);
-  const projectRegistration: UnifiedMemoryProjectRegistration = registeredProject?.status === 'active'
+  const knownProject = getKnownProject(projectSlug);
+  const projectRegistration: UnifiedMemoryProjectRegistration = knownProject?.status === 'active'
     ? 'registered'
     : 'external';
 
@@ -375,8 +374,8 @@ export function normalizeUnifiedMemoryObservation(
   if (policy.projectScope === 'portfolio' && projectRegistration !== 'registered') {
     errors.push(`${input.sourceSystem} requires a registered FCR portfolio project.`);
   }
-  if (policy.projectScope === 'external' && projectRegistration === 'registered') {
-    errors.push(`${input.sourceSystem} is still classified external and cannot silently inherit portfolio authority.`);
+  if (policy.projectScope === 'external' && knownProject?.status !== 'external') {
+    errors.push(`${input.sourceSystem} requires an explicitly indexed external project identity.`);
   }
 
   const nativeKinds = policy.nativeKinds as Readonly<Record<string, NativeKindPolicy>>;
@@ -384,9 +383,6 @@ export function normalizeUnifiedMemoryObservation(
   if (!nativeKindPolicy) errors.push(`nativeKind ${nativeKind || '(empty)'} is not allowed for ${input.sourceSystem}.`);
 
   if (!VALID_TRUST.has(input.trust)) errors.push('trust classification is invalid.');
-  if (!VALID_SOURCE_VERIFICATION.has(input.sourceVerification)) {
-    errors.push('sourceVerification classification is invalid.');
-  }
 
   if (observedAt === null) errors.push('observedAt must be a valid timestamp.');
   if (input.expiresAt && expiresAt === null) errors.push('expiresAt must be a valid timestamp when supplied.');
@@ -432,7 +428,7 @@ export function normalizeUnifiedMemoryObservation(
   const normalizedCategories = categories;
   const fingerprint = nonAuthorizingFingerprint([
     identityKey,
-    input.sourceVerification,
+    sourceVerification,
     projectRegistration,
     repository,
     nativeKindPolicy.kind,
@@ -452,10 +448,10 @@ export function normalizeUnifiedMemoryObservation(
     && state !== 'future'
     && state !== 'revoked'
     && input.trust !== 'unknown';
-  const decisionSupportUsable = state === 'fresh'
-    && input.trust === 'verified'
-    && input.sourceVerification === 'authenticated-source'
-    && projectRegistration === 'registered';
+
+  // Raw normalization is deliberately continuity-only. Decision support must
+  // be promoted by a future adapter that authenticates the source out-of-band.
+  const decisionSupportUsable = false;
 
   return {
     ok: true,
@@ -464,7 +460,7 @@ export function normalizeUnifiedMemoryObservation(
       identityKey,
       continuityFingerprint: fingerprint,
       sourceSystem: input.sourceSystem,
-      sourceVerification: input.sourceVerification,
+      sourceVerification,
       projectSlug,
       projectRegistration,
       repository,
