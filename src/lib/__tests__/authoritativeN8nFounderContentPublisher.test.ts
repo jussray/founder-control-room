@@ -5,31 +5,122 @@ import type { N8nFounderContentDispatchResult } from '../n8nFounderContentOrches
 import { dispatchAuthoritativeN8nFounderContent } from '../authoritativeN8nFounderContentPublisher.js';
 
 const require = createRequire(import.meta.url);
-const { canonicalChiefIdentity, hashPublicPayload } = require('../../../tools/zapier/founder-content-authorization-contract.cjs') as {
+const {
+  authorizeFounderContentPublication,
+  canonicalChiefIdentity,
+  hashPublicPayload,
+} = require('../../../tools/zapier/founder-content-authorization-contract.cjs') as {
+  authorizeFounderContentPublication: (input: Record<string, unknown>) => Record<string, unknown>;
   canonicalChiefIdentity: (proposal: Record<string, unknown>) => Record<string, any>;
   hashPublicPayload: (value: unknown) => string;
 };
 
-const PROPOSAL_HASH = 'a'.repeat(64);
-const AUTHORIZATION_HASH = 'c'.repeat(64);
-const TEST_PROPOSAL = {
-  proposal_hash: PROPOSAL_HASH,
-  public_payload: { platform: 'linkedin', draft_text: 'Exact approved Buffer test copy.' },
-};
-const PUBLIC_PAYLOAD_HASH = hashPublicPayload(canonicalChiefIdentity(TEST_PROPOSAL).public_payload);
-const STORED_APPROVAL = {
-  approval_id: 'fca:buffer-test-1',
-  proposal_hash: PROPOSAL_HASH,
-  public_payload_hash: PUBLIC_PAYLOAD_HASH,
-  current_you: {
-    authenticated: true,
-    source: 'current_authenticated_founder',
-    intent_id: 'intent-buffer-test',
-    intent_version: 4,
-    observed_at: '2026-08-28T23:50:00.000Z',
-    supersedes_stale_content_intent: true,
-  },
-};
+const SOURCE_SHA = 'd'.repeat(40);
+const EVIDENCE_REF = `github:founder-control-room@${SOURCE_SHA}#quality-gate`;
+const NOW = '2026-08-18T01:30:00.000Z';
+
+function proposal(): Record<string, unknown> {
+  const value: Record<string, unknown> = {
+    version: 1,
+    kind: 'chief-ai/founder-content-proposal',
+    source: { repo: 'jussray/founder-control-room', commit_sha: SOURCE_SHA },
+    freshness: {
+      issued_at: '2026-08-18T01:00:00.000Z',
+      expires_at: '2026-08-18T02:30:00.000Z',
+    },
+    public_payload: {
+      platform: 'linkedin',
+      story_type: 'founder-progress',
+      draft_text: 'Verified founder progress from an exact historical repository version without exposing private implementation details.',
+      public_claims: [{
+        claim_id: 'linkedin-proof-bound',
+        text: 'The LinkedIn founder update was bound to a verified historical repository version.',
+        truth_state: 'verified',
+        public_safe: true,
+        evidence_ref: EVIDENCE_REF,
+        evidence_scope: 'provider-neutral-social-contract',
+        temporal_class: 'historical_version',
+        temporal_version: SOURCE_SHA,
+      }],
+      proof_link: null,
+      proof_link_policy: 'editorial_optional',
+    },
+    internal_evidence: {
+      verified: true,
+      ref: EVIDENCE_REF,
+      kind: 'github-exact-head-contract',
+      digest: 'e'.repeat(64),
+      not_for_publication: true,
+      source_repo: 'jussray/founder-control-room',
+      source_commit_sha: SOURCE_SHA,
+      proves: ['provider-neutral-social-contract'],
+      does_not_prove: ['provider-runtime', 'publication', 'traction'],
+    },
+    sauce_guard: {
+      scanner_version: 'sauce-guard-v1',
+      private_implementation_removed: true,
+      secret_material_removed: true,
+      raw_diff_removed: true,
+      private_metrics_removed: true,
+      unreleased_roadmap_removed: true,
+      customer_private_data_removed: true,
+      security_sensitive_details_removed: true,
+      public_claims_only: true,
+      independent_scan_passed: true,
+      blocked_categories: [],
+      withheld_categories: ['private-implementation'],
+    },
+    authority: {
+      proposal_only: true,
+      publish_authorized: false,
+      current_you_source: 'current_authenticated_founder',
+      current_you_intent_id: 'founder-content-current',
+      current_you_intent_version: 9,
+      current_you_observed_at: '2026-08-18T01:05:00.000Z',
+      proposal_evaluated_at: '2026-08-18T01:10:00.000Z',
+      future_you_advisory_only: true,
+      historical_content_intent_authoritative: false,
+      analytics_feedback_authority: 'observation-only',
+      analytics_can_authorize_publish: false,
+      external_feedback_trusted_for_authority: false,
+    },
+  };
+  value.proposal_hash = hashPublicPayload(canonicalChiefIdentity(value));
+  return value;
+}
+
+function approval(proposed: Record<string, unknown>) {
+  const publicPayload = proposed.public_payload as Record<string, unknown>;
+  return {
+    approval_id: 'fca:buffer-test-1',
+    proposal_hash: proposed.proposal_hash,
+    public_payload_hash: hashPublicPayload(publicPayload),
+    channels: ['linkedin'],
+    approved_at: '2026-08-18T01:20:00.000Z',
+    expires_at: '2026-08-18T02:10:00.000Z',
+    revoked: false,
+    used: false,
+    current_you: {
+      authenticated: true,
+      source: 'current_authenticated_founder',
+      intent_id: 'publish-linkedin-current',
+      intent_version: 10,
+      observed_at: '2026-08-18T01:19:00.000Z',
+      supersedes_stale_content_intent: true,
+    },
+  };
+}
+
+const TEST_PROPOSAL = proposal();
+const STORED_APPROVAL = approval(TEST_PROPOSAL);
+const CANONICAL_AUTHORIZATION = authorizeFounderContentPublication({
+  proposal: TEST_PROPOSAL,
+  approval: STORED_APPROVAL,
+  now: NOW,
+});
+const PROPOSAL_HASH = String(TEST_PROPOSAL.proposal_hash);
+const PUBLIC_PAYLOAD_HASH = String(STORED_APPROVAL.public_payload_hash);
+const AUTHORIZATION_HASH = String(CANONICAL_AUTHORIZATION.authorization_hash);
 
 const READY_ENV = {
   N8N_FOUNDER_CONTENT_ENABLED: 'true',
@@ -83,18 +174,16 @@ function dispatched(): N8nFounderContentDispatchResult {
 }
 
 describe('authoritative n8n founder-content publisher', () => {
-  it('pre-reads current approval, validates the server-owned envelope, then atomically claims before provider dispatch', async () => {
+  it('builds a real server-owned Buffer envelope before atomically claiming approval and dispatching', async () => {
     const store = repository(currentApproval());
     const dispatch = vi.fn(async () => dispatched());
-    const buildEnvelope = vi.fn(() => ({} as any));
 
     const result = await dispatchAuthoritativeN8nFounderContent(request(), {
       founderUserId: 'founder-user-1',
       founderIdentity: 'founder@example.com',
-      now: '2026-08-28T23:55:00.000Z',
+      now: NOW,
       env: READY_ENV,
       approvalRepository: store,
-      buildEnvelope,
       dispatch,
     });
 
@@ -105,15 +194,10 @@ describe('authoritative n8n founder-content publisher', () => {
       authorizationHash: AUTHORIZATION_HASH,
       publicPayloadHash: PUBLIC_PAYLOAD_HASH,
     }));
-    expect(buildEnvelope).toHaveBeenCalledWith({
-      n8n_provider: 'buffer',
-      proposal: TEST_PROPOSAL,
-      approval: STORED_APPROVAL,
-      now: '2026-08-28T23:55:00.000Z',
-    });
     expect(store.claim).toHaveBeenCalledWith(expect.objectContaining({
       founderUserId: 'founder-user-1',
       approvalId: 'fca:buffer-test-1',
+      proposalHash: PROPOSAL_HASH,
       authorizationHash: AUTHORIZATION_HASH,
       publicPayloadHash: PUBLIC_PAYLOAD_HASH,
       consumedBy: 'founder@example.com',
@@ -122,7 +206,7 @@ describe('authoritative n8n founder-content publisher', () => {
       n8n_provider: 'buffer',
       proposal: TEST_PROPOSAL,
       approval: STORED_APPROVAL,
-      now: '2026-08-28T23:55:00.000Z',
+      now: NOW,
     }, expect.objectContaining({
       env: READY_ENV,
       executedBy: 'founder@example.com',
@@ -133,13 +217,13 @@ describe('authoritative n8n founder-content publisher', () => {
     const store = repository(currentApproval());
     const dispatch = vi.fn(async () => dispatched());
     const buildEnvelope = vi.fn(() => {
-      throw new Error('N8N_FOUNDER_CONTENT_PROVIDER_ENVELOPE_REJECTED: missing firewall_output');
+      throw new Error('N8N_FOUNDER_CONTENT_PROVIDER_ENVELOPE_REJECTED: invalid server-owned envelope');
     });
 
     const result = await dispatchAuthoritativeN8nFounderContent(request(), {
       founderUserId: 'founder-user-1',
       founderIdentity: 'founder@example.com',
-      now: '2026-08-28T23:55:00.000Z',
+      now: NOW,
       env: READY_ENV,
       approvalRepository: store,
       buildEnvelope,
@@ -219,21 +303,20 @@ describe('authoritative n8n founder-content publisher', () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 
-  it('rechecks atomically after preflight and stops before n8n when approval changes or is consumed', async () => {
+  it('rechecks atomically after real Buffer preflight and stops before n8n when approval changes or is consumed', async () => {
     const store = repository({
       ok: false,
       code: 'APPROVAL_NOT_CURRENT',
       reason: 'authoritative approval is expired, revoked, or already consumed',
     }, currentApproval());
     const dispatch = vi.fn(async () => dispatched());
-    const buildEnvelope = vi.fn(() => ({} as any));
 
     const result = await dispatchAuthoritativeN8nFounderContent(request(), {
       founderUserId: 'founder-user-1',
       founderIdentity: 'founder@example.com',
+      now: NOW,
       env: READY_ENV,
       approvalRepository: store,
-      buildEnvelope,
       dispatch,
     });
 
