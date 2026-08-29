@@ -15,7 +15,6 @@ const HASH_B = `sha256:${'b'.repeat(64)}`;
 function chief(overrides: Partial<NativeMemoryObservation> = {}): NativeMemoryObservation {
   return {
     sourceSystem: 'chief-ai-machine',
-    sourceVerification: 'authenticated-source',
     projectSlug: 'chief-ai-machine',
     repository: 'jussray/chief-ai-machine',
     nativeKind: 'company-brain',
@@ -33,7 +32,7 @@ function chief(overrides: Partial<NativeMemoryObservation> = {}): NativeMemoryOb
 }
 
 describe('unified portfolio memory spine', () => {
-  it('normalizes Chief Company Brain into registered semantic memory without execution authority', () => {
+  it('normalizes raw Chief Company Brain into registered continuity memory without execution or decision authority', () => {
     const result = normalizeUnifiedMemoryObservation(chief(), NOW);
 
     expect(result.ok).toBe(true);
@@ -42,28 +41,31 @@ describe('unified portfolio memory spine', () => {
     expect(result.record).toMatchObject({
       version: 'fcr-unified-memory@v1',
       sourceSystem: 'chief-ai-machine',
-      sourceVerification: 'authenticated-source',
+      sourceVerification: 'untrusted-import',
       projectRegistration: 'registered',
       kind: 'semantic',
       durable: true,
       observationState: 'fresh',
       continuityUsable: true,
-      decisionSupportUsable: true,
+      decisionSupportUsable: false,
       executionAuthority: false,
     });
     expect(result.record.summary).toBe('Approved founder operating principle.');
     expect(result.record.continuityFingerprint).toMatch(/^memfp:sha256:[0-9a-f]{64}$/);
   });
 
-  it('does not let an untrusted import become decision support even when it labels itself verified', () => {
-    const result = normalizeUnifiedMemoryObservation(chief({
-      sourceVerification: 'untrusted-import',
-    }), NOW);
+  it('ignores a forged payload authentication claim instead of laundering it into decision support', () => {
+    const forged = {
+      ...chief(),
+      sourceVerification: 'authenticated-source' as const,
+    };
+    const result = normalizeUnifiedMemoryObservation(forged, NOW);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
     expect(result.record).toMatchObject({
+      sourceVerification: 'untrusted-import',
       projectRegistration: 'registered',
       observationState: 'fresh',
       trust: 'verified',
@@ -71,9 +73,7 @@ describe('unified portfolio memory spine', () => {
       decisionSupportUsable: false,
       executionAuthority: false,
     });
-    expect(memoryRecordsForDecisionSupport(buildUnifiedMemoryView([
-      chief({ sourceVerification: 'untrusted-import' }),
-    ], NOW))).toHaveLength(0);
+    expect(memoryRecordsForDecisionSupport(buildUnifiedMemoryView([forged], NOW))).toHaveLength(0);
   });
 
   it('rejects a registered source trying to claim another project identity', () => {
@@ -87,10 +87,9 @@ describe('unified portfolio memory spine', () => {
     }
   });
 
-  it('allows FCR itself to project sanitized evidence into another registered portfolio project', () => {
+  it('allows FCR itself to project sanitized continuity evidence into another registered portfolio project', () => {
     const result = normalizeUnifiedMemoryObservation({
       sourceSystem: 'founder-control-room',
-      sourceVerification: 'authenticated-source',
       projectSlug: 'sekret-bip',
       repository: 'jussray/founder-control-room',
       nativeKind: 'evidence',
@@ -106,7 +105,8 @@ describe('unified portfolio memory spine', () => {
     if (result.ok) {
       expect(result.record.projectRegistration).toBe('registered');
       expect(result.record.projectSlug).toBe('sekret-bip');
-      expect(result.record.decisionSupportUsable).toBe(true);
+      expect(result.record.sourceVerification).toBe('untrusted-import');
+      expect(result.record.decisionSupportUsable).toBe(false);
       expect(result.record.executionAuthority).toBe(false);
     }
   });
@@ -114,7 +114,6 @@ describe('unified portfolio memory spine', () => {
   it('keeps Se’kret Bip memory metadata-only and rejects private content crossing into FCR', () => {
     const safe = normalizeUnifiedMemoryObservation({
       sourceSystem: 'sekret-bip',
-      sourceVerification: 'authenticated-source',
       projectSlug: 'sekret-bip',
       repository: 'jussray/Sekret-Bip',
       nativeKind: 'memory-category',
@@ -132,12 +131,12 @@ describe('unified portfolio memory spine', () => {
       expect(safe.record.summary).toBeNull();
       expect(safe.record.categoryKeys).toEqual(['mood', 'journalTags']);
       expect(safe.record.projectRegistration).toBe('registered');
+      expect(safe.record.decisionSupportUsable).toBe(false);
       expect(safe.record.executionAuthority).toBe(false);
     }
 
     const leaked = normalizeUnifiedMemoryObservation({
       sourceSystem: 'sekret-bip',
-      sourceVerification: 'authenticated-source',
       projectSlug: 'sekret-bip',
       repository: 'jussray/Sekret-Bip',
       nativeKind: 'memory-category',
@@ -154,10 +153,9 @@ describe('unified portfolio memory spine', () => {
     if (!leaked.ok) expect(leaked.errors.join(' ')).toContain('metadata-only');
   });
 
-  it('keeps unregistered product memory continuity-only instead of granting portfolio authority', () => {
+  it('keeps explicitly indexed external product memory continuity-only instead of granting portfolio authority', () => {
     const result = normalizeUnifiedMemoryObservation({
       sourceSystem: 'solcontinuity',
-      sourceVerification: 'authenticated-source',
       projectSlug: 'solcontinuity',
       repository: 'jussray/solcontinuity',
       nativeKind: 'evidence-history',
@@ -173,6 +171,7 @@ describe('unified portfolio memory spine', () => {
     if (result.ok) {
       expect(result.record).toMatchObject({
         projectRegistration: 'external',
+        sourceVerification: 'untrusted-import',
         continuityUsable: true,
         decisionSupportUsable: false,
         executionAuthority: false,
@@ -180,10 +179,9 @@ describe('unified portfolio memory spine', () => {
     }
   });
 
-  it('keeps finance-shaped agent memory metadata-only and continuity-only while unregistered', () => {
+  it('keeps finance-shaped external agent memory metadata-only and continuity-only', () => {
     const result = normalizeUnifiedMemoryObservation({
       sourceSystem: 'sleepwealth-agent',
-      sourceVerification: 'authenticated-source',
       projectSlug: 'sleepwealth-agent',
       repository: 'jussray/SleepWealth-Agent',
       nativeKind: 'audit-entry',
@@ -296,34 +294,34 @@ describe('unified portfolio memory spine', () => {
     expect(spoofed.rejected[1]?.errors.join(' ')).toContain('provenanceRefs');
   });
 
-  it('maps the memory organs found across the portfolio into one canonical vocabulary without promoting external projects', () => {
+  it('maps the memory organs found across the portfolio into one canonical continuity vocabulary without granting decision authority', () => {
     const inputs: NativeMemoryObservation[] = [
       {
-        sourceSystem: 'founder-control-room', sourceVerification: 'authenticated-source',
+        sourceSystem: 'founder-control-room',
         projectSlug: 'founder-control-room', repository: 'jussray/founder-control-room',
         nativeKind: 'decision', nativeId: 'decision-1', observedAt: '2026-08-29T19:00:00.000Z', trust: 'verified', privacy: 'internal',
         summary: 'Founder decision receipt.', provenanceRefs: ['fcr:decision:1'],
       },
       {
-        sourceSystem: 'storyengine', sourceVerification: 'authenticated-source',
+        sourceSystem: 'storyengine',
         projectSlug: 'l99', repository: 'jussray/StoryEngine',
         nativeKind: 'canon', nativeId: 'canon-1', observedAt: '2026-08-29T19:00:00.000Z', trust: 'verified', privacy: 'internal',
         summary: 'Approved narrative canon.', provenanceRefs: ['l99:canon:1'],
       },
       {
-        sourceSystem: 'promptos', sourceVerification: 'authenticated-source',
+        sourceSystem: 'promptos',
         projectSlug: 'promptos', repository: 'jussray/promptos',
         nativeKind: 'prompt-asset', nativeId: 'prompt-1', observedAt: '2026-08-29T19:00:00.000Z', trust: 'verified', privacy: 'internal',
         summary: 'Portable prompt asset.', provenanceRefs: ['promptos:asset:1'],
       },
       {
-        sourceSystem: 'think-tank', sourceVerification: 'untrusted-import',
+        sourceSystem: 'think-tank',
         projectSlug: 'think-tank', repository: 'jussray/THINK-TANK',
         nativeKind: 'idea-record', nativeId: 'idea-1', observedAt: '2026-08-29T19:00:00.000Z', trust: 'submitted-unverified', privacy: 'private',
         summary: 'Founder idea record.', provenanceRefs: ['think-tank:idea:1'],
       },
       {
-        sourceSystem: 'solcontinuity', sourceVerification: 'authenticated-source',
+        sourceSystem: 'solcontinuity',
         projectSlug: 'solcontinuity', repository: 'jussray/solcontinuity',
         nativeKind: 'evidence-history', nativeId: 'evidence-1', observedAt: '2026-08-29T19:00:00.000Z', trust: 'verified', privacy: 'internal',
         summary: 'Sanitized provider evidence history.', provenanceRefs: ['solcontinuity:evidence:1'],
@@ -337,8 +335,9 @@ describe('unified portfolio memory spine', () => {
     expect(view.records.map((record) => record.kind).sort()).toEqual([
       'decision', 'evidence', 'narrative', 'semantic', 'semantic',
     ]);
+    expect(view.records.every((record) => record.sourceVerification === 'untrusted-import')).toBe(true);
     expect(view.records.every((record) => record.executionAuthority === false)).toBe(true);
-    expect(view.summary.verifiedForDecisionSupport).toBe(3);
+    expect(view.summary.verifiedForDecisionSupport).toBe(0);
     expect(view.summary.externalContinuityOnly).toBe(2);
   });
 });
