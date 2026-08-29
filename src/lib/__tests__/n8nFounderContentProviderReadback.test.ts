@@ -172,7 +172,7 @@ describe('n8n founder-content provider-native readback', () => {
   it('cannot close a receipt that was already claimed as verified', () => {
     expect(() => verifyN8nFounderContentProviderReadback(
       request(),
-      receipt({ requiresProviderReadback: false } as Partial<VerifiedN8nFounderContentReceipt>),
+      receipt({ requiresProviderReadback: false } as unknown as Partial<VerifiedN8nFounderContentReceipt>),
       readback(),
     )).toThrow(/may only close a pending provider-readback receipt/);
   });
