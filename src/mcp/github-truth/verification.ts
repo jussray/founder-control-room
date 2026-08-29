@@ -21,6 +21,8 @@ type Outcome =
   | 'pending'
   | 'unknown';
 
+type Freshness = 'fresh' | 'stale' | 'unknown';
+
 function normalizedSha(value: string | null): string | null {
   const sha = value?.trim().toLowerCase() ?? '';
   return FULL_SHA.test(sha) ? sha : null;
@@ -28,6 +30,10 @@ function normalizedSha(value: string | null): string | null {
 
 function normalizedContext(value: string): string {
   return value.trim();
+}
+
+function validPrNumber(value: number): boolean {
+  return Number.isInteger(value) && value > 0;
 }
 
 function sortedUnique(findings: readonly AuditFinding[]): AuditFinding[] {
@@ -40,8 +46,6 @@ export function isSameRequiredIdentity(
 ): boolean {
   if (requirement.kind !== observation.kind) return false;
   if (normalizedContext(requirement.context) !== normalizedContext(observation.context)) return false;
-  // appId omission is intentionally app-agnostic for v0. When a requirement
-  // specifies appId, the observation must carry that exact app identity.
   if (requirement.appId !== undefined) return requirement.appId === observation.appId;
   return true;
 }
@@ -51,9 +55,6 @@ function outcomeOf(observation: NormalizedCheck): Outcome {
   const conclusion = observation.conclusion?.trim().toLowerCase() ?? '';
 
   if (PENDING.has(status)) return 'pending';
-
-  // Commit statuses are normalized by providers into status values such as
-  // success/failure/error and do not require a separate completed marker.
   if (observation.kind === 'commit_status') {
     if (status === 'success') return 'success';
     if (status === 'failure' || status === 'error') return 'failed';
@@ -94,8 +95,8 @@ function freshnessOf(
   observedAt: string | null,
   auditedAtMs: number,
   freshnessWindowMs: number,
-): 'fresh' | 'stale' | 'unknown' {
-  if (!observedAt) return 'unknown';
+): Freshness {
+  if (!observedAt || Number.isNaN(auditedAtMs)) return 'unknown';
   const observedAtMs = Date.parse(observedAt);
   if (Number.isNaN(observedAtMs) || observedAtMs > auditedAtMs) return 'unknown';
   return auditedAtMs - observedAtMs <= freshnessWindowMs ? 'fresh' : 'stale';
@@ -121,6 +122,18 @@ function pushFreshnessFinding(
   if (freshness === 'unknown') findings.push('ci_observation_time_unknown');
 }
 
+function pushPrFreshnessFinding(
+  observedAt: string | null,
+  findings: AuditFinding[],
+  auditedAtMs: number,
+  freshnessWindowMs: number,
+): Freshness {
+  const freshness = freshnessOf(observedAt, auditedAtMs, freshnessWindowMs);
+  if (freshness === 'stale') findings.push('pr_observation_stale');
+  if (freshness === 'unknown') findings.push('pr_observation_time_unknown');
+  return freshness;
+}
+
 export function evaluatePrAuditEvidence(input: EvaluatePrAuditEvidenceInput): PrAuditEvaluation {
   const findings: AuditFinding[] = [...(input.findings ?? [])];
   const auditedAtMs = Date.parse(input.auditedAt);
@@ -140,6 +153,11 @@ export function evaluatePrAuditEvidence(input: EvaluatePrAuditEvidenceInput): Pr
   if (!initialHeadSha || !finalHeadSha) findings.push('pr_head_sha_malformed');
   if (input.initialPr.state !== 'open' || input.finalPr.state !== 'open') findings.push('pr_not_open');
 
+  const prIdentityStable = validPrNumber(input.initialPr.number)
+    && validPrNumber(input.finalPr.number)
+    && input.initialPr.number === input.finalPr.number;
+  if (!prIdentityStable) findings.push('pr_identity_changed_during_collection');
+
   const headsConflict = Boolean(
     initialHeadSha
     && finalHeadSha
@@ -147,8 +165,30 @@ export function evaluatePrAuditEvidence(input: EvaluatePrAuditEvidenceInput): Pr
   );
   if (headsConflict) findings.push('pr_head_changed_during_collection');
 
-  const discoveryComplete = input.requiredChecks.state === 'complete';
-  if (!discoveryComplete) {
+  const initialPrFreshness = pushPrFreshnessFinding(
+    input.initialPr.observedAt,
+    findings,
+    auditedAtMs,
+    freshnessWindowMs,
+  );
+  const finalPrFreshness = pushPrFreshnessFinding(
+    input.finalPr.observedAt,
+    findings,
+    auditedAtMs,
+    freshnessWindowMs,
+  );
+
+  const discoveryFreshness = freshnessOf(
+    input.requiredChecks.observedAt,
+    auditedAtMs,
+    freshnessWindowMs,
+  );
+  if (discoveryFreshness === 'stale') findings.push('required_check_discovery_stale');
+  if (discoveryFreshness === 'unknown') findings.push('required_check_discovery_time_unknown');
+
+  const discoveryComplete = input.requiredChecks.state === 'complete'
+    && discoveryFreshness === 'fresh';
+  if (input.requiredChecks.state !== 'complete') {
     findings.push('required_check_visibility_incomplete');
     findings.push(...input.requiredChecks.findings);
   }
@@ -160,15 +200,15 @@ export function evaluatePrAuditEvidence(input: EvaluatePrAuditEvidenceInput): Pr
     && initialHeadSha
     && finalHeadSha
     && !headsConflict
+    && prIdentityStable
+    && initialPrFreshness === 'fresh'
+    && finalPrFreshness === 'fresh'
     && discoveryComplete,
   );
 
   if (canEvaluateChecks && currentHeadSha) {
     const required = input.requiredChecks.requiredChecks;
 
-    // In v0, an explicitly empty required set does not establish complete
-    // evidence unless the caller opts into the separate future 'allow' policy.
-    // Unrelated checks are never a substitute for an explicitly modeled witness.
     if (
       required.length === 0
       && (input.emptyRequiredSetPolicy ?? 'require_observation') !== 'allow'
@@ -218,8 +258,6 @@ export function evaluatePrAuditEvidence(input: EvaluatePrAuditEvidenceInput): Pr
         }
       }
 
-      // Every relevant current-head observation must be resolved. A successful
-      // duplicate cannot hide another pending or unknown observation.
       if (sawPending) findings.push('required_check_pending');
       if (sawUnknown) findings.push('required_check_unknown');
       if (!sawSuccess && !sawPending && !sawUnknown && current.length > 0) {
@@ -231,6 +269,7 @@ export function evaluatePrAuditEvidence(input: EvaluatePrAuditEvidenceInput): Pr
 
   const normalizedFindings = sortedUnique(findings);
   const conflicted = normalizedFindings.includes('pr_head_changed_during_collection')
+    || normalizedFindings.includes('pr_identity_changed_during_collection')
     || normalizedFindings.includes('duplicate_current_head_check_conflict');
 
   return {

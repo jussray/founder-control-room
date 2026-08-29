@@ -59,14 +59,19 @@ export type NormalizedCheck = {
 
 export type AuditFinding =
   | 'pr_not_open'
+  | 'pr_identity_changed_during_collection'
   | 'pr_head_changed_during_collection'
   | 'pr_head_sha_malformed'
+  | 'pr_observation_stale'
+  | 'pr_observation_time_unknown'
   | 'required_check_visibility_incomplete'
   | 'required_check_discovery_truncated'
   | 'required_check_discovery_access_denied'
   | 'required_check_discovery_rate_limited'
   | 'required_check_discovery_timeout'
   | 'required_check_discovery_response_malformed'
+  | 'required_check_discovery_stale'
+  | 'required_check_discovery_time_unknown'
   | 'required_check_missing'
   | 'required_check_failed'
   | 'required_check_cancelled'
@@ -154,8 +159,12 @@ export type EvaluateParallelFixAuditInput = {
 
 export type ParallelFixAuditEvaluation = {
   state: EvidenceState;
+  currentRepository: string | null;
+  currentTargetBranch: string | null;
   currentBaseSha: string | null;
   currentHeadSha: string | null;
+  currentPrNumber: number | null;
+  currentDiffFingerprint: string | null;
   dependentProof: 'current' | 'stale';
   findings: ParallelFixAuditFinding[];
 };
@@ -200,12 +209,19 @@ export type SupersessionProofCookie = {
 
 export type StaleTruthDeletionFinding =
   | 'stale_deletion_parallel_truth_not_current'
+  | 'stale_deletion_parallel_identity_mismatch'
   | 'stale_deletion_current_snapshot_malformed'
   | 'stale_deletion_current_evidence_not_complete'
   | 'stale_deletion_current_actor_unverified'
+  | 'stale_deletion_current_observation_stale'
+  | 'stale_deletion_current_observation_time_unknown'
+  | 'stale_deletion_artifact_not_trusted'
+  | 'stale_deletion_artifact_integrity_mismatch'
   | 'stale_deletion_artifact_not_deletable'
   | 'stale_deletion_artifact_fingerprint_malformed'
   | 'stale_deletion_cookie_id_malformed'
+  | 'stale_deletion_cookie_not_trusted'
+  | 'stale_deletion_cookie_integrity_mismatch'
   | 'stale_deletion_cookie_identity_malformed'
   | 'stale_deletion_cookie_not_proven'
   | 'stale_deletion_cookie_actor_unverified'
@@ -228,8 +244,12 @@ export type EvaluateStaleTruthDeletionInput = {
   parallelAudit: ParallelFixAuditEvaluation;
   /** Fresh independent auditor snapshot that represents what is true now. */
   current: ParallelFixAuditSnapshot;
+  /** Caller proposal. Authority is derived only after exact lookup in trustedArtifactIndex. */
   staleArtifact: StaleTruthArtifact;
+  /** Caller proposal. Authority is derived only after exact lookup in trustedProofCookieIndex. */
   proofCookie: SupersessionProofCookie;
+  trustedArtifactIndex: ReadonlyMap<string, StaleTruthArtifact>;
+  trustedProofCookieIndex: ReadonlyMap<string, SupersessionProofCookie>;
   auditedAt: string;
   freshnessWindowMs?: number;
 };
