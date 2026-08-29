@@ -19,10 +19,7 @@ import {
   requireInteractiveFounder,
   type FounderRequest,
 } from '../middleware/requireFounder.js';
-import {
-  FOUNDER_API_URL,
-  rateLimitFounderPermissions,
-} from '../middleware/security.js';
+import { rateLimitFounderPermissions } from '../middleware/security.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -86,10 +83,12 @@ function actionTargetFrom(value: unknown): FounderPermissionActionTarget {
 function errorCode(value: unknown): string {
   return isRecord(value) ? text(value.code) : '';
 }
-function sameOriginInteractiveBrowser(req: FounderRequest): boolean {
-  const origin = req.get('Origin');
-  const fetchSite = req.get('Sec-Fetch-Site');
-  return origin === FOUNDER_API_URL && (!fetchSite || fetchSite === 'same-origin');
+function interactiveBrowserContextPresent(req: FounderRequest): boolean {
+  // `corsMiddleware` runs before this router and rejects any Origin outside
+  // FOUNDER_ALLOWED_ORIGINS. Requiring an Origin here prevents bearer-auth
+  // requests from borrowing a founder cookie while preserving split-origin
+  // deployments where the approved frontend origin differs from the API URL.
+  return Boolean(req.get('Origin'));
 }
 function rowRequest(row: JsonRecord): FounderPermissionRequest | null {
   const requestedBySurface = surfaceFrom(row.requested_by_surface);
@@ -216,9 +215,9 @@ founderPermissionsRouter.post('/requests', rateLimitFounderPermissions, requireF
 });
 
 founderPermissionsRouter.post('/requests/:requestId/decision', rateLimitFounderPermissions, requireInteractiveFounder, async (req: FounderRequest, res) => {
-  if (!sameOriginInteractiveBrowser(req)) {
+  if (!interactiveBrowserContextPresent(req)) {
     return res.status(403).json({
-      error: 'Same-origin interactive founder approval is required to decide a permission request.',
+      error: 'An approved browser Origin and interactive founder session are required to decide a permission request.',
       code: 'FOUNDER_INTERACTIVE_APPROVAL_REQUIRED',
     });
   }
@@ -301,9 +300,9 @@ founderPermissionsRouter.post('/requests/:requestId/consume', rateLimitFounderPe
 });
 
 founderPermissionsRouter.post('/requests/:requestId/revoke', rateLimitFounderPermissions, requireInteractiveFounder, async (req: FounderRequest, res) => {
-  if (!sameOriginInteractiveBrowser(req)) {
+  if (!interactiveBrowserContextPresent(req)) {
     return res.status(403).json({
-      error: 'Same-origin interactive founder approval is required to revoke a permission request.',
+      error: 'An approved browser Origin and interactive founder session are required to revoke a permission request.',
       code: 'FOUNDER_INTERACTIVE_APPROVAL_REQUIRED',
     });
   }
