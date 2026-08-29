@@ -42,7 +42,6 @@ const BRIDGE_FILE = new URL('./.auth-bridge.json', import.meta.url).pathname;
 const GITHUB_OWNER = 'jussray';
 const GITHUB_REPO = 'demo-project';
 const GITHUB_WEBHOOK_SECRET = 'e2e-webhook-secret';
-const E2E_FOUNDER_SESSION_ENCRYPTION_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const E2E_SCENARIO = process.env.FCR_E2E_SCENARIO ?? 'full';
 
 if (!['full', 'capability-workbench', 'guarded-terminal'].includes(E2E_SCENARIO)) {
@@ -217,7 +216,6 @@ const server = spawn(
       SUPABASE_SERVICE_ROLE_KEY: 'fake-service-role-key',
       SUPABASE_PUBLISHABLE_KEY: 'fake-publishable-key',
       FOUNDER_EMAIL,
-      FOUNDER_SESSION_ENCRYPTION_KEY: E2E_FOUNDER_SESSION_ENCRYPTION_KEY,
       E2E_SEED_FOUNDER_EMAIL: FOUNDER_EMAIL,
       E2E_AUTH_BRIDGE_FILE: BRIDGE_FILE,
       PORT: String(PORT),
@@ -431,24 +429,218 @@ async function main() {
         const box = element.getBoundingClientRect();
         return box.left >= 0 && box.right <= window.innerWidth;
       }),
-      'mobile category filters remain fully visible',
+      'mobile category filters keep Integrations fully visible without sideways scrolling',
     );
-    await anonymousContext.close().catch(() => {});
+    assert(
+      await page.locator('.keyboard-help').evaluate((element) => {
+        const helper = element.getBoundingClientRect();
+        const results = document.querySelector('.results')?.getBoundingClientRect();
+        return Boolean(results) && helper.top >= results.top && helper.bottom <= results.bottom;
+      }),
+      'mobile results reserve visible space for keyboard guidance',
+    );
+    mkdirSync(join(REPO_ROOT, 'test-results'), { recursive: true });
+    await page.screenshot({
+      path: join(REPO_ROOT, 'test-results', 'capabilities-workbench-mobile.png'),
+      fullPage: true,
+    });
+    assert(jsExceptions.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(jsExceptions)})`);
+    if (networkDiagnostics.length) console.log(`  (${networkDiagnostics.length} expected network diagnostic message(s), not counted as failures: ${JSON.stringify(networkDiagnostics)})`);
+    await browser.close();
+    return;
   }
 
-  // ... remainder of the existing exact-head browser proof is intentionally unchanged ...
+  if (E2E_SCENARIO === 'guarded-terminal') {
+    await runGuardedTerminalProof(page);
+    assert(jsExceptions.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(jsExceptions)})`);
+    if (networkDiagnostics.length) console.log(`  (${networkDiagnostics.length} expected network diagnostic message(s), not counted as failures: ${JSON.stringify(networkDiagnostics)})`);
+    await browser.close();
+    return;
+  }
+
+  await page.goto(`${BASE_URL}/control-room/`);
+  await page.waitForSelector('#new-project-form');
+
+  console.log('\n[4] Register a project (with a real repo identifier) through the real UI');
+  await page.fill('#new-project-form input[name="slug"]', 'demo-project');
+  await page.fill('#new-project-form input[name="name"]', 'Demo Project');
+  await page.fill('#new-project-form input[name="repoIdentifier"]', `${GITHUB_OWNER}/${GITHUB_REPO}`);
+  await page.click('#new-project-form button[type=submit]');
+  await waitForCount(page, '#project-list .card', 1);
+  assert((await page.locator('#project-list .card').innerText()).includes('Demo Project'), 'project appears in the real list after registering');
+
+  console.log('\n[4b] Bind the project to the repo via a git connection, so the webhook can route to it');
+  {
+    // Registered through the API directly here (not the connections form,
+    // which doesn't expose a raw `config` field) — this is the same
+    // resolveProject() lookup src/http/webhooks/github.ts performs for
+    // real, against the real project_connections table.
+    const founderToken = await page.evaluate(() => JSON.parse(sessionStorage.getItem('fcr_session')).access_token);
+    const res = await fetch(`${BASE_URL}/projects/demo-project/connections`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${founderToken}` },
+      body: JSON.stringify({ connectionType: 'git', config: { repository: `${GITHUB_OWNER}/${GITHUB_REPO}` } }),
+    });
+    assert(res.ok, `git connection registered for webhook routing (status ${res.status})`);
+  }
+
+  console.log('\n[5] Open the project and create a mission with an assigned agent and a required check');
+  await page.click('#project-list .card');
+  await page.waitForSelector('#new-mission-form');
+  await page.fill('#new-mission-form input[name="title"]', 'Ship the onboarding flow');
+  await page.fill('#new-mission-form input[name="builderAgent"]', 'claude-code');
+  await page.fill('#new-mission-form input[name="reviewerAgent"]', 'codex');
+  await page.fill('#new-mission-form input[name="requiredChecks"]', 'unit_test');
+  await page.click('#new-mission-form button[type=submit]');
+  await page.waitForSelector('.notice');
+
+  console.log('\n[6] Confirm the mission shows up on the real task board with its agent assignment');
+  await page.click('.tabs button[data-tab=missions]');
+  await page.click('#refresh-missions');
+  await waitForCount(page, '.lane .card', 1);
+  const boardText = await page.locator('#mission-lanes').innerText();
+  assert(boardText.includes('Ship the onboarding flow'), 'mission appears on the real task board');
+
+  await page.click('.lane .card');
+  await page.waitForSelector('#assign-agents-form');
+  const detailText = await page.locator('#mission-detail').innerText();
+  assert(detailText.includes('Builder:') && detailText.includes('claude-code') && detailText.includes('codex'), 'multitool assignment (builder=claude-code, reviewer=codex) round-tripped through the real API');
+
+  console.log('\n[6b] Create the real sandbox branch on the (fake) GitHub repo, leaving name/base blank to exercise the default-fallback fix');
+  // create_branch is ALSO a proof-gated action (PROOF_GATED_ACTIONS in
+  // approvals.ts) — it 403s without a fresh passing gate result first, same
+  // as merge below.
+  await page.selectOption('#proof-gate-form select[name=gateId]', 'create_branch');
+  await page.fill('#proof-gate-form input[name=filesChanged]', 'mission-plan');
+  await page.fill('#proof-gate-form input[name=checksRun]', 'plan_reviewed');
+  await page.fill('#proof-gate-form input[name=behaviorChanged]', 'No behavior change yet — opening the sandbox.');
+  await page.fill('#proof-gate-form input[name=securityImpact]', 'none');
+  await page.fill('#proof-gate-form input[name=deploymentImpact]', 'none');
+  await page.fill('#proof-gate-form input[name=rollbackPath]', 'Delete the sandbox branch.');
+  await page.click('#proof-gate-form button[type=submit]');
+  await page.waitForSelector('.notice');
+
+  await page.click('#create-branch-form button[type=submit]');
+  const sandboxedText = await waitForText(page, '#mission-detail', 'sandboxed');
+  assert(sandboxedText.toLowerCase().includes('sandboxed'), 'mission moved to sandboxed after real branch creation');
+  const createdBranches = [...fakeGitHubBranches.keys()].filter((name) => name !== 'main');
+  assert(
+    createdBranches.length === 1 && createdBranches[0].startsWith('mission/'),
+    `exactly one sandbox branch was created using the backend's default mission/<id> name, not an empty string (created: ${JSON.stringify(createdBranches)})`,
+  );
+  const branchName = createdBranches[0];
+
+  console.log('\n[6c] Edit a file on the real sandbox branch through the real UI (real GitHub git-object calls: blob/tree/commit/updateRef)');
+  await page.fill('#mission-file-path', 'src/index.ts');
+  await page.click('#mission-file-load');
+  await waitForValue(page, '#mission-file-editor', 'hello');
+  await page.fill('#mission-file-editor', 'console.log("edited by e2e");\n');
+  await page.fill('#mission-commit-message', 'E2E: edit index.ts');
+  await page.click('#mission-commit-btn');
+  await waitForText(page, '.notice', 'Committed');
+  const branchTreeSha = fakeGitHubBranches.get(branchName)?.treeSha;
+  const branchFileContent = fakeGitHubTrees.get(branchTreeSha)?.get('src/index.ts');
+  assert(branchFileContent === 'console.log("edited by e2e");\n', 'the fake GitHub branch tree was actually updated by a real commitPatch call');
+
+  console.log('\n[6d] Deliver a real signed CI webhook (check_run success) — should advance the mission to in_review via the real background reconciler');
+  const branchHeadSha = fakeGitHubBranches.get(branchName)?.sha;
+  await sendCheckRunWebhook({ headSha: branchHeadSha, conclusion: 'success' });
+  const inReviewText = await waitForMissionStatusByPolling(page, 'in_review', 25000);
+  assert(inReviewText.toLowerCase().includes('in_review'), 'a real signed webhook drove CheckRunController -> evidence -> MissionController -> in_review, through the real background reconciler (2s poll) — the frontend itself has no live refresh, so the test polls the way a founder would (Refresh, reopen)');
+
+  console.log('\n[6e] Run the merge proof gate through the real UI — pins policy_snapshot.expectedHeadSha and approves');
+  // This app re-renders the WHOLE shell on every guarded() action, and a
+  // DOM click handler's async chain (fetch -> render) isn't awaited by
+  // Playwright's page.click() — it can resolve and re-render at any later
+  // point, including mid-fill of an unrelated form. Rather than chase every
+  // individual race, retry the whole fill+submit sequence as one unit: by
+  // the time a retry runs, any straggling render has long since settled.
+  let approvedText = '';
+  for (let attempt = 1; attempt <= 5 && !approvedText.toLowerCase().includes('approved'); attempt += 1) {
+    await page.selectOption('#proof-gate-form select[name=gateId]', 'merge');
+    await page.fill('#proof-gate-form input[name=filesChanged]', 'src/index.ts');
+    await page.fill('#proof-gate-form input[name=checksRun]', 'unit_test');
+    await page.fill('#proof-gate-form input[name=behaviorChanged]', 'index.ts now logs a different message');
+    await page.fill('#proof-gate-form input[name=securityImpact]', 'none');
+    await page.fill('#proof-gate-form input[name=deploymentImpact]', 'none');
+    await page.fill('#proof-gate-form input[name=rollbackPath]', 'git revert the merge commit');
+    if ((await page.locator('#proof-gate-form select[name=gateId]').inputValue()) !== 'merge') {
+      console.log(`  (attempt ${attempt}: gateId select got reset by a late re-render before submit — retrying the whole fill)`);
+      await sleep(500);
+      continue;
+    }
+    await page.click('#proof-gate-form button[type=submit]');
+    try {
+      approvedText = await waitForText(page, '#mission-detail', 'approved', 5000);
+    } catch {
+      console.log(`  (attempt ${attempt}: mission not yet approved — retrying)`);
+    }
+  }
+  assert(approvedText.toLowerCase().includes('approved'), 'proof gate passed and mission moved to approved');
+
+  console.log('\n[6f] Execute the real merge through the real UI');
+  const resolvedHeadSha = fakeGitHubBranches.get(branchName)?.sha;
+  await page.fill('#execute-merge-form input[name=expectedHeadSha]', resolvedHeadSha);
+  await page.click('#execute-merge-form button[type=submit]');
+  const integratedText = await waitForText(page, '#mission-detail', 'integrated');
+  assert(integratedText.toLowerCase().includes('integrated'), 'mission moved to integrated after a real merge execution');
+  const mainTreeSha = fakeGitHubBranches.get('main')?.treeSha;
+  const mainFileContent = fakeGitHubTrees.get(mainTreeSha)?.get('src/index.ts');
+  assert(mainFileContent === 'console.log("edited by e2e");\n', "the (fake) repo's real default branch actually contains the merged edit");
+
+  console.log('\n[7] Log an Agent Council round and a cost entry through the real UI');
+  await page.fill('#log-council-form input[name="participants"]', 'claude-code, codex, redteam');
+  await page.fill('#log-council-form input[name="outcome"]', 'approved');
+  await page.click('#log-council-form button[type=submit]');
+  const councilText = await waitForText(page, '#mission-detail', 'redteam');
+  assert(councilText.includes('approved'), 'council round appears in the real UI after logging it');
+
+  await page.fill('#log-cost-form input[name="agentName"]', 'perplexity');
+  await page.fill('#log-cost-form input[name="costUsd"]', '0.05');
+  await page.click('#log-cost-form button[type=submit]');
+  const costText = await waitForText(page, '#mission-detail', 'Total: $');
+  assert(costText.includes('0.0500'), 'cost entry round-tripped and totals correctly');
+
+  console.log('\n[8] Register an MCP connector and record a health check');
+  // The project detail panel is already showing from step 5's selection
+  // (state.selectedProjectSlug persists across tabs) — re-clicking the
+  // card here would trigger a redundant re-fetch mid-fill and wipe the
+  // form the test is actively filling in, a real timing hazard worth not
+  // repeating in the app's own click handlers either.
+  await page.click('.tabs button[data-tab=projects]');
+  await page.waitForSelector('#new-connection-form');
+  await page.selectOption('#new-connection-form select[name=connectionType]', 'figma');
+  await page.fill('#new-connection-form input[name=label]', 'design-system');
+  await page.selectOption('#new-connection-form select[name=authorityLevel]', 'L2');
+  await page.fill('#new-connection-form input[name=capabilities]', 'inspect_designs, compare_design_vs_implementation');
+  await page.click('#new-connection-form button[type=submit]');
+  await waitForText(page, '[data-connection-id]', 'figma');
+  assert(true, 'figma connector registered with authority level L2 and capabilities');
+
+  // There are two connections by now (the git one from step 4b, and this
+  // figma one) — target the figma card specifically rather than assume order.
+  const figmaCard = page.locator('[data-connection-id]', { hasText: 'figma' });
+  await figmaCard.locator('.connection-check-btn').click();
+  const connectionText = await waitForText(page, '[data-connection-id]:has-text("figma")', 'last checked');
+  assert(connectionText.toLowerCase().includes('last checked'), 'connector health check recorded a real last_checked_at');
+
+  console.log('\n[10] No uncaught JS exceptions during the whole run');
+  assert(jsExceptions.length === 0, `no uncaught JS exceptions (saw: ${JSON.stringify(jsExceptions)})`);
+  if (networkDiagnostics.length) console.log(`  (${networkDiagnostics.length} expected network diagnostic message(s), not counted as failures: ${JSON.stringify(networkDiagnostics)})`);
+
+  await browser.close();
 }
 
-main().catch((error) => {
-  console.error('E2E RUN THREW:', error);
-  failures += 1;
-}).finally(async () => {
-  server.kill('SIGTERM');
-  fakeGitHubServer.close();
-  if (failures) {
-    console.error(`\nE2E RESULT: FAIL (${failures} assertion(s) failed)`);
-    process.exitCode = 1;
-  } else {
-    console.log('\nE2E RESULT: PASS');
-  }
-});
+main()
+  .catch((err) => {
+    failures += 1;
+    console.error('E2E RUN THREW:', err);
+  })
+  .finally(() => {
+    server.kill();
+    fakeGitHubServer.close();
+    console.log('\n--- server log (tail) ---');
+    console.log(serverLog.split('\n').slice(-25).join('\n'));
+    console.log(failures === 0 ? '\nE2E RESULT: PASS' : `\nE2E RESULT: FAIL (${failures} assertion(s) failed)`);
+    process.exit(failures === 0 ? 0 : 1);
+  });
