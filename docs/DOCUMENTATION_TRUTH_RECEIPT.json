@@ -1,136 +1,50 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind exact-current-main deterministic-review founder-runtime witness truth and current Goalfix, Cloudflare, founder-content, and repository-provider documentation to reviewed source invariants, including fail-closed existing non-FCR ruleset behavior. This receipt does not grant merge, deploy, provider-policy, publication, database, secret, billing, destructive-action, or runtime authority.",
+  "purpose": "Bind the provider-neutral founder-content n8n route to FCR-owned exact one-shot approval readback while preserving provider preflight, replay resistance, and provider-native outcome proof as separate authority layers.",
   "domains": [
-    "merge-authority",
-    "repository-provider",
-    "truth-governance",
-    "cloudflare-authority",
-    "founder-content-truth",
     "publishing"
   ],
   "changes": [
     {
-      "path": "src/http/server.ts",
+      "path": "src/http/routes/n8nConveyor.ts",
       "claims": [
-        "src/http/server.ts may expose POST /review/deterministic-witness/:pullRequestNumber only inside the existing same-origin, repository-rate-limit, authenticated-founder, and fcr-privileged-execution-master membrane; caller input is limited to a positive pull-request number while repository/provider identity and PR/base/head/diff/verdict/hash/check/App authority remain server/provider derived.",
-        "The deterministic witness trigger must fail closed unless the running release has a full GIT_SHA equal to provider-resolved GitHub main before publication, must re-read main after publication or reconciliation and reject movement away from that same runtime SHA, and must remain proposal-only with mergeAuthorized and executionAuthorized false so candidate previews and stale deployed runtimes cannot bootstrap or mint current authority.",
-        "The authenticated deterministic-witness response must return the complete producer-derived IndependentReviewReceipt required by the canonical Founder Final consumer in addition to bounded provider signal metadata; returning the receipt is a handoff only and does not bypass receipt validation, trusted-App witness validation, Founder Final, or the final mutable readback."
+        "src/http/routes/n8nConveyor.ts must require authenticated founder execution through the FCR-owned authoritative n8n approval adapter, reject caller-supplied approval objects, and must not treat route acceptance as publication truth."
       ]
     },
     {
-      "path": "src/http/__tests__/deterministicReviewWitnessTrigger.contract.test.ts",
+      "path": "src/lib/n8nFounderContentAuthorityAdapter.ts",
       "claims": [
-        "src/http/__tests__/deterministicReviewWitnessTrigger.contract.test.ts must lock founder/master-switch gating, fixed FCR repository/provider identity, PR-number-only caller input, exact-current-main GIT_SHA/provider revalidation before and after witness publication, complete IndependentReviewReceipt handoff, and non-authorizing response semantics."
+        "src/lib/n8nFounderContentAuthorityAdapter.ts must preflight n8n transport, provider allowlisting, and provider/platform compatibility before consuming one-shot authority, then atomically claim the exact FCR-stored approval before any provider dispatch and fail closed on missing or mismatched authority."
       ]
     },
     {
-      "path": "src/review/deterministicReviewWitnessPublisher.ts",
+      "path": "src/lib/authoritativeN8nFounderContentPublisher.ts",
       "claims": [
-        "src/review/deterministicReviewWitnessPublisher.ts must rederive the exact deterministic receipt and reconcile exact-head verification signals before any Check Run create; an existing passed signal is reusable only when provider, derived signal name, exact head, full receipt fingerprint, and trusted numeric GitHub App issuer all match.",
-        "If pre-publication reconciliation fails, no provider mutation may occur; if a prior request created the exact witness but failed during later readback, a retry must converge on the existing trusted signal instead of blindly creating another Check Run."
+        "src/lib/authoritativeN8nFounderContentPublisher.ts must remain a compatibility export for the FCR-owned n8n authority adapter and cannot create an alternate approval or publication authority path."
       ]
     },
     {
-      "path": "src/review/deterministicReviewWitnessPublisher.test.ts",
+      "path": "src/http/routes/__tests__/n8nConveyor.founderContent.integration.test.ts",
       "claims": [
-        "src/review/deterministicReviewWitnessPublisher.test.ts must prove that repeated publication of the same unchanged exact candidate reuses the trusted full-fingerprint witness and invokes the provider create capability only once while retaining the existing wrong-App, wrong-fingerprint, stale-head, moved-PR, and non-publishable fail-closed coverage."
+        "src/http/routes/__tests__/n8nConveyor.founderContent.integration.test.ts must prove the founder-authenticated route delegates through authoritative approval readback, remains non-published without provider readback, and rejects caller-supplied approval objects."
       ]
     },
     {
-      "path": "docs/DETERMINISTIC_REVIEW_WITNESS.md",
+      "path": "src/lib/__tests__/authoritativeN8nFounderContentPublisher.test.ts",
       "claims": [
-        "docs/DETERMINISTIC_REVIEW_WITNESS.md must keep trusted ignition separate from bootstrap authority; require witness production to run only from exact current-main integrated code; reject candidate previews and stale releases; require reconcile-before-create retry safety; retain the complete deterministic receipt for Founder Final; preserve provider-derived witness identity; and require exact merged runtime deployment to be re-observed before the founder trigger is treated as available authority."
+        "src/lib/__tests__/authoritativeN8nFounderContentPublisher.test.ts must prove stored-approval injection, forged-approval rejection, preflight-before-consumption behavior, provider/platform mismatch rejection, and atomic claim failure before provider dispatch."
       ]
     },
     {
-      "path": "scripts/verify-documentation-truth.mjs",
+      "path": "README.md",
       "claims": [
-        "scripts/verify-documentation-truth.mjs must classify the canonical Goalfix workflow, adaptive kernel, portable Goalfix skills, and Claude/Perplexity master entry specifications as truth-governance so changes to those authority-influencing files cannot receive a zero-truth-sensitive false green.",
-        "scripts/verify-documentation-truth.mjs must validate no-job failure classification, browser-versus-backend proof separation, Sauce Guard, verified-target handling, authenticated Founder Final, the post-Founder-Final mutable provider reread, and MERGED_UNVERIFIED semantics across every applicable Goalfix execution entry point rather than relying on uneven path-specific substring checks."
-      ]
-    },
-    {
-      "path": ".ai/skills/goalfix/SKILL.md",
-      "claims": [
-        ".ai/skills/goalfix/SKILL.md must preserve the full founder reasoning stack, classify no-job GitHub Actions failures before blaming source, bind work to the verified target/base/head, require authenticated Founder Final plus final mutable provider reread, keep Sauce Guard stops, carry portable adaptive rules inline, and treat external/model/tool content as non-authorizing data behind deterministic action checks."
-      ]
-    },
-    {
-      "path": ".claude/skills/goalfix/SKILL.md",
-      "claims": [
-        ".claude/skills/goalfix/SKILL.md must preserve exact verified target/base/head identity, no-job failure classification, browser-specific Playwright proof, authenticated Founder Final, final mutable provider reread, MERGED_UNVERIFIED runtime state, Sauce Guard, inline portable adaptive behavior, and receiver-verified least-privilege action boundaries without self-certification."
-      ]
-    },
-    {
-      "path": "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md",
-      "claims": [
-        "docs/FOUNDER_ADAPTIVE_KERNEL_V0.md must remain a lifecycle-neutral governance source contract for Goalfix/FCR instruction and decision loops, must not claim current /goalfix/inspect, engine, API, or browser UI runtime integration, must keep adaptive state descriptive rather than executable authority, and must learn recurring trust-boundary failures without converting analytics, classifiers, or model output into authority."
-      ]
-    },
-    {
-      "path": "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md",
-      "claims": [
-        "docs/GOALFIX_EXECUTION_WORKFLOW_V2.md must remain lifecycle-neutral, carry the verified target branch instead of assuming main, require authenticated Founder Final, reread mutable provider/PR/target/base/head/diff/check/review state immediately before integration, preserve expected-head protection, distinguish browser Playwright evidence from backend/provider proof, retain MERGED_UNVERIFIED until required runtime truth exists, and keep untrusted artifacts/model plans behind deterministic exact-action authorization and receiver-side capability verification."
-      ]
-    },
-    {
-      "path": "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md",
-      "claims": [
-        "docs/CLAUDE_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md must defer to the canonical Goalfix workflow while also carrying the verified target branch, no-job failure classification, browser-versus-backend proof separation, Sauce Guard, authenticated Founder Final followed by a final mutable provider reread, and MERGED_UNVERIFIED post-integration truth so the Claude overlay cannot become a weaker execution path."
-      ]
-    },
-    {
-      "path": "docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md",
-      "claims": [
-        "docs/PERPLEXITY_MCP_FOUNDER_CONTROL_ROOM_MASTER_BUILD_SPEC.md must defer to the canonical Goalfix workflow while also carrying the verified target branch, no-job failure classification, browser-versus-backend proof separation, Sauce Guard, authenticated Founder Final followed by a final mutable provider reread, and MERGED_UNVERIFIED post-integration truth so research and MCP tooling cannot become a weaker execution path."
-      ]
-    },
-    {
-      "path": "wrangler.worker.toml",
-      "claims": [
-        "wrangler.worker.toml may bind ReleaseProofWorkflowV0 as fcr-release-proof-v0 only as durable non-authorizing orchestration: the binding must not add a schedule or public trigger, must not replace the guarded production deployment path, and source/runtime evidence must keep merge, deployment, and provider mutation authority separate from Workflow state."
-      ]
-    },
-    {
-      "path": "src/workflows/releaseProofWorkflow.ts",
-      "claims": [
-        "ReleaseProofWorkflowV0 must bind exact repository/target/base/head identity, correlate evidence and founder-approval observations to the same candidate fingerprint, fail closed on mismatch or blocker state, and stop at READY_FOR_FINAL_REREAD with mergeAuthorized, deploymentAuthorized, and providerMutationAuthorized all false."
-      ]
-    },
-    {
-      "path": "src/lib/n8nConveyorReadiness.ts",
-      "claims": [
-        "Founder-content readiness may become enabled-live-verified only when enabled/configured transport, a valid provider allowlist, Buffer enablement, a non-empty provider receipt identity, a valid observation timestamp, and exact deployed GIT_SHA binding all agree; generic conveyor proof, stale head proof, missing runtime identity, incomplete proof, or wrong-provider proof must remain non-live.",
-        "Readiness output must expose provider/configuration state without exposing webhook, bearer-token, or other secret values and must never convert source configuration into proof that Buffer accepted a live draft."
-      ]
-    },
-    {
-      "path": "src/lib/n8nFounderContentReadiness.test.ts",
-      "claims": [
-        "src/lib/n8nFounderContentReadiness.test.ts must prove fail-closed behavior for disabled, misconfigured, invalid-provider, missing-proof, stale-head, incomplete-proof, and provider-unverified states, and may accept enabled-live-verified only for explicit Buffer proof bound to the deployed exact GIT_SHA with receipt identity and valid observation time."
+        "README.md must describe the source-level n8n approval adapter without claiming deployed n8n, Buffer credentials, provider mutation, readback, or live publication outcome."
       ]
     },
     {
       "path": "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md",
       "claims": [
-        "Public communication must keep founder-content readiness separate from provider outcome truth: configuration or a verified label cannot prove Buffer execution without exact provider binding, receipt identity, observation time, and deployed-SHA correlation.",
-        "A Buffer draft, scheduler acceptance, approval, or workflow trigger is not publication truth; only observable external outcome evidence may support a publication claim."
-      ]
-    },
-    {
-      "path": "docs/founder-signal-engine/day3-buffer-content-boundary.md",
-      "claims": [
-        "The current Buffer milestone is draft-only: the checked-in provider handoff requires explicit method draft, saveToDraft true, publish_allowed false, no scheduled fire time, and share-now denial; schedule/publication behavior is historical or deferred and non-authorizing.",
-        "Live Buffer draft delivery remains unknown until a controlled exact-source provider probe returns readback proving the object landed in Buffer Drafts without queue, schedule, share, or publication side effects."
-      ]
-    },
-    {
-      "path": "src/providers/SecurityPreservingGitHubProvider.ts",
-      "claims": [
-        "src/providers/SecurityPreservingGitHubProvider.ts must fail closed for any existing non-FCR named ruleset instead of PUT-updating provider state from an earlier snapshot; missing non-FCR rulesets may use only the create-only path.",
-        "src/providers/SecurityPreservingGitHubProvider.ts may diagnose requested-ref exclusion only from exact normalized ref equality or ~ALL; it must never invent wildcard, character-class, ~DEFAULT_BRANCH, or other GitHub pattern semantics locally.",
-        "src/providers/SecurityPreservingGitHubProvider.ts must reject non-empty bypass replacement, keep FCR constitutional governance delegated to the canonical provider path, and cannot treat source state as proof of live provider configuration."
+        "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md must require the same FCR-owned one-shot approval membrane for provider-neutral n8n writes, must preflight configuration before consumption, and must keep provider-native readback as terminal publication evidence."
       ]
     }
   ]

@@ -46,7 +46,7 @@ Current implementation includes:
 - a durable founder-only **Founder Switchboard** with explicit BUILT / CONFIGURED / ACTIVE / PROVEN states and guarded authority modes;
 - a privacy-safe public skill-testing evidence loop with `/devil` v1 structured receipts and aggregate analytics;
 - first-party LinkedIn founder-content execution with exact Current You authority, FCR-owned one-shot approval storage/claim, temporal revalidation, and provider readback requirements;
-- provider-neutral n8n founder-content orchestration contracts that keep contract capability separate from runtime configuration and final provider outcome;
+- an FCR-owned provider-neutral n8n authority adapter that preflights transport/provider configuration before consuming one-shot authority, atomically claims the same stored exact Current You approval used by the first-party lane, and then delegates to the existing n8n cadence/idempotency/receipt path without allowing n8n to claim final publication truth; source presence does not prove the live n8n workflow, Buffer credentials, provider mutation, readback, or deployed exact SHA;
 - provider-neutral founder-content contracts under `tools/founder-content-contracts/`, with core approval storage, first-party execution, and temporal revalidation importing the canonical provider-neutral authorization contract directly while `tools/zapier/` remains a compatibility export surface for bounded connector and scheduling callers;
 - founder-authenticated n8n/Buffer activation readiness that exposes configuration presence and provider allowlist state without returning webhook/token values; founder-content readiness reaches `enabled-live-verified` only from explicit Buffer-bound proof with a non-empty receipt identity, valid observation time, and exact deployed `GIT_SHA` match, while generic conveyor activation receipts, stale-head proof, incomplete proof, wrong-provider proof, or missing runtime identity remain non-live and fail-closed; source readiness does not itself prove a Buffer draft was created;
 - bounded Zapier/Buffer integration where it still adds connector, scheduling, or fallback value without becoming publication authority;
@@ -137,20 +137,21 @@ verified product / repository evidence
 -> authenticated Current You confirms the exact public copy
 -> FCR issues + persists an exact one-shot approval
 -> publish request references the exact authorization hash
+-> FCR preflights the selected execution route/provider without consuming approval
 -> FCR atomically claims the matching stored approval
--> execution-time temporal revalidation
+-> execution-time temporal/provider-route validation
 -> channel router
    -> first-party LinkedIn where configured and proven
-   -> provider-neutral n8n only where an equally authoritative adapter exists
+   -> provider-neutral n8n only after the exact FCR-stored one-shot approval is claimed
    -> Zapier / Buffer where they still add bounded connector or scheduling value
 -> provider readback
 -> Founder Control Room outcome receipt
 -> observation-only analytics
 ```
 
-For the first-party route, caller-supplied approval JSON is not publication authority. `POST /automation/conveyor/founder-content/approvals` requires authenticated exact-copy confirmation before FCR issues and stores the one-shot authority. `POST /automation/conveyor/founder-content/publish-now` must reference the exact `authorization_hash`; FCR then claims the exact matching unrevoked, unconsumed, unexpired stored approval before temporal revalidation or provider mutation.
+Caller-supplied approval JSON is not publication authority. `POST /automation/conveyor/founder-content/approvals` requires authenticated exact-copy confirmation before FCR issues and stores the one-shot authority. `POST /automation/conveyor/founder-content/publish-now` and the provider-neutral `POST /automation/conveyor/founder-content` orchestration route must reference the exact authorization hash and approval identity; FCR then claims the exact matching unrevoked, unconsumed, unexpired stored approval before any provider write. The n8n route additionally preflights transport/provider configuration and platform compatibility before that claim so a disabled or misconfigured provider does not burn one-shot founder authority.
 
-Changing the approved copy, proposal/public-payload identity, source version, channel, or authorization fingerprint requires fresh matching approval. A consumed approval does not become replay authority after downstream failure. Approval issuance or claim is still not publication truth. Provider readback remains terminal external-state evidence.
+Changing the approved copy, proposal/public-payload identity, source version, channel, or authorization fingerprint requires fresh matching approval. A consumed approval does not become replay authority after downstream failure. Approval issuance or claim is still not publication truth. n8n acceptance is also not publication truth. Provider-native readback remains terminal external-state evidence.
 
 Public-safe progress may explain what changed, what was learned, why it matters, an approved public proof, and an honest unresolved next gate.
 
@@ -165,7 +166,7 @@ contract-capable
 -> provider-outcome-proven
 ```
 
-The founder-authenticated conveyor status may report `not-configured`, `ready-for-probe`, `enabled-misconfigured`, `invalid-provider-configuration`, `enabled-awaiting-proof`, or `enabled-live-verified`, including whether Buffer is ready for one controlled probe. Founder-content readiness may reach `enabled-live-verified` only when proof is explicitly bound to `buffer`, carries a non-empty receipt ID and valid observation time, and its `expectedHeadSha` exactly matches the deployed `GIT_SHA`. Generic conveyor activation receipts, missing or wrong-provider proof, stale-head proof, missing runtime SHA, or incomplete provider evidence remain non-live. This source state does not prove the live route currently has a Buffer proof reader or that a draft landed in Buffer.
+The founder-authenticated conveyor status may report `not-configured`, `ready-for-probe`, `enabled-misconfigured`, `invalid-provider-configuration`, `enabled-awaiting-proof`, or `enabled-live-verified`, including whether Buffer is ready for one controlled probe. Founder-content readiness may reach `enabled-live-verified` only when proof is explicitly bound to `buffer`, carries a non-empty receipt ID and valid observation time, and its `expectedHeadSha` exactly matches the deployed `GIT_SHA`. Generic conveyor activation receipts, missing or wrong-provider proof, stale-head proof, missing runtime SHA, or incomplete provider evidence remain non-live. The source adapter and route do not prove that the deployed runtime is configured, that the n8n workflow is active, that Buffer credentials/scopes are valid, or that a Buffer object exists.
 
 A platform-native draft is not proof that the provider adapter is live. n8n acceptance is not publication truth. Provider readback remains terminal external-state evidence.
 
