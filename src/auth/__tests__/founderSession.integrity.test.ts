@@ -142,14 +142,25 @@ describe('opaque founder browser session integrity', () => {
     expect(row?.refresh_token).toBe(REFRESH_TOKEN);
     expect(row?.founder_user_id).toBe(USER_ID);
     expect(row?.founder_email).toBe(EMAIL);
+    expect(row?.continuity_fingerprint).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('resolves a valid opaque capability only through active server-side state', async () => {
+  it('resolves a valid opaque capability only through active fingerprint-bound server-side state', async () => {
     const { res, headers } = mockResponse();
     await writeFounderSession(res, session());
     const resolved = await readFounderSession(requestWithCookie(primaryCookiePair(headers)));
     expect(resolved).toEqual(expect.objectContaining({ accessToken: ACCESS_TOKEN, refreshToken: REFRESH_TOKEN, expiresAt: 2_000_000_000, founderUserId: USER_ID, founderEmail: EMAIL, sessionVersion: 1 }));
     expect(resolved?.sessionIdHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(resolved?.continuityFingerprint).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('fails closed when server-side session state no longer matches its continuity fingerprint', async () => {
+    const { res, headers } = mockResponse();
+    await writeFounderSession(res, session());
+    const [hash, row] = [...rows.entries()][0] ?? [];
+    expect(hash).toBeTruthy();
+    rows.set(String(hash), { ...row, founder_email: 'tampered@example.com' });
+    expect(await readFounderSession(requestWithCookie(primaryCookiePair(headers)))).toBeNull();
   });
 
   it('rejects the historical self-contained signed-cookie shape without consulting it as authority', async () => {
@@ -166,18 +177,22 @@ describe('opaque founder browser session integrity', () => {
     expect([...rows.values()][0]?.revoke_reason).toBe('logout');
   });
 
-  it('rotates the opaque capability and leaves the prior capability revoked', async () => {
+  it('rotates both the opaque capability and its continuity fingerprint', async () => {
     const first = mockResponse();
     await writeFounderSession(first.res, session());
     const oldPair = primaryCookiePair(first.headers);
-    const oldHash = [...rows.keys()][0] ?? '';
+    const [oldHash, oldRow] = [...rows.entries()][0] ?? [];
+    const oldFingerprint = String(oldRow?.continuity_fingerprint ?? '');
     const second = mockResponse();
     await rotateFounderSession(requestWithCookie(oldPair), second.res, session());
     const newPair = primaryCookiePair(second.headers);
     expect(newPair).not.toBe(oldPair);
-    expect(rows.get(oldHash)?.revoked_at).toEqual(expect.any(String));
+    expect(rows.get(String(oldHash))?.revoked_at).toEqual(expect.any(String));
     expect(await readFounderSession(requestWithCookie(oldPair))).toBeNull();
-    expect(await readFounderSession(requestWithCookie(newPair))).toEqual(expect.objectContaining({ accessToken: ACCESS_TOKEN, sessionVersion: 1 }));
+    const resolved = await readFounderSession(requestWithCookie(newPair));
+    expect(resolved).toEqual(expect.objectContaining({ accessToken: ACCESS_TOKEN, sessionVersion: 1 }));
+    expect(resolved?.continuityFingerprint).toMatch(/^[0-9a-f]{64}$/);
+    expect(resolved?.continuityFingerprint).not.toBe(oldFingerprint);
   });
 
   it('does not issue a browser cookie when authoritative session persistence fails', async () => {
