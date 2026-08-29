@@ -129,6 +129,18 @@ function duplicates(values) {
   return [...repeated];
 }
 
+function inlineVarsAssignmentKeys(source) {
+  const keys = [];
+  for (const tableMatch of source.matchAll(/(?:^|\n)\s*vars\s*=\s*\{([\s\S]*?)\}/g)) {
+    const body = tableMatch[1] ?? '';
+    for (const assignment of body.matchAll(/(?:^|,)\s*(?:"([A-Z][A-Z0-9_]*)"|'([A-Z][A-Z0-9_]*)'|([A-Z][A-Z0-9_]*))\s*=/g)) {
+      const key = assignment[1] ?? assignment[2] ?? assignment[3] ?? null;
+      if (key) keys.push(key);
+    }
+  }
+  return keys;
+}
+
 function tomlAssignmentKeys(source) {
   const keys = [];
   for (const rawLine of source.split(/\r?\n/)) {
@@ -138,7 +150,20 @@ function tomlAssignmentKeys(source) {
     const key = match?.[1] ?? match?.[2] ?? match?.[3] ?? null;
     if (key) keys.push(key);
   }
+  keys.push(...inlineVarsAssignmentKeys(source));
   return keys;
+}
+
+for (const fixture of [
+  'vars = { AWS_SECRET_ACCESS_KEY = "plaintext" }',
+  "vars = { 'STRIPE_SECRET_KEY' = 'plaintext', PUBLIC_VALUE = 'ok' }",
+  'vars = {\n  GITHUB_PRIVATE_KEY = "plaintext",\n  SAFE_VALUE = "ok"\n}',
+]) {
+  const detected = tomlAssignmentKeys(fixture);
+  requireValue(
+    detected.some((key) => isSensitiveTemplateKey(key)),
+    `inline Wrangler vars parser must surface sensitive assignment in ${fixture.replace(/\s+/g, ' ')}`,
+  );
 }
 
 function commentOnlySecretNames(source) {
