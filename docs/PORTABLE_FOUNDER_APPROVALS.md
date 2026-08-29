@@ -17,6 +17,22 @@ Juss decides in an approved console
 
 This contract removes manual-only approval bottlenecks without turning model output, copied chat text, or a provider session into unlimited authority.
 
+## Ask-Founder broker boundary
+
+The `/mcp/founder-permissions` Ask-Founder broker is an interim decision-capture boundary, not a substitute for the portable approval packet above.
+
+- Bearer-authenticated agents may create an exact pending request, but a decision write requires an independently authenticated current `fcr_session` browser identity plus same-origin browser context.
+- `requestedBySurface` records where the request came from. It is audit metadata only and cannot authenticate the founder or name the authoritative decision surface.
+- Until a registered console adapter supplies the attestation required by this document, the authoritative broker decision surface is derived server-side as `fcr`. A caller cannot label an FCR-browser decision as `chatgpt`, `claude`, or `perplexity`.
+- A merge request must bind the exact owned repository, pull-request number, base SHA, and head SHA. The target is included in the request hash and the proposal `expectedHeadSha` must equal the target head.
+- A recorded broker decision is deliberately non-authorizing: its decision record carries `executionAuthorized: false`. Exact action authority is still issued by the separately scoped FounderPermissionReceipt / execution-binding layer.
+- Approved broker rows receive a bounded 20-minute decision window. Expired, revoked, or already-consumed rows do not satisfy founder permission.
+- Consumption is an atomic one-time ledger transition bound to both the exact request hash and exact decision hash. Consuming a broker decision does not itself perform the external action.
+- Founder revocation is a separate same-origin interactive transition. Revoked decisions cannot become satisfiable again.
+- Founder permission and Independent Review remain separate gates. Neither one implies the other.
+
+This distinction is load-bearing: the Ask-Founder broker records a current founder decision; it does not let a model, bearer token, browser cookie, or stored `approved` row manufacture reusable execution authority.
+
 ## Approved source consoles
 
 Initial source-console identifiers:
