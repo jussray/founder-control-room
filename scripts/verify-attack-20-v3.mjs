@@ -66,22 +66,17 @@ function stableObjectEntries(value) {
   return Object.entries(value ?? {}).sort(([left], [right]) => left.localeCompare(right));
 }
 
-function validExecutionProof(attackTest) {
-  return typeof attackTest?.executedAt === 'string'
-    && Number.isFinite(Date.parse(attackTest.executedAt))
-    && Array.isArray(attackTest?.evidenceReceiptIds)
-    && attackTest.evidenceReceiptIds.length > 0
-    && attackTest.evidenceReceiptIds.every((value) => typeof value === 'string' && value.trim().length > 0)
-    && new Set(attackTest.evidenceReceiptIds).size === attackTest.evidenceReceiptIds.length;
+function staticRegistryAttackStateAllowed(attackTest) {
+  return attackTest?.result !== 'PASS';
 }
 
 requireValue(
-  !validExecutionProof({ result: 'PASS', executedAt: null, evidenceReceiptIds: [] }),
-  'Attack-20 execution proof guard must reject unexecuted PASS state',
-);
-requireValue(
-  validExecutionProof({ result: 'PASS', executedAt: '2026-08-26T12:00:00.000Z', evidenceReceiptIds: ['receipt-a20-001'] }),
-  'Attack-20 execution proof guard must accept executed PASS state with receipt IDs',
+  !staticRegistryAttackStateAllowed({
+    result: 'PASS',
+    executedAt: '2099-01-01T00:00:00.000Z',
+    evidenceReceiptIds: ['invented-receipt-id'],
+  }),
+  'static Attack-20 registry must reject PASS even when caller metadata looks execution-shaped',
 );
 
 requireValue(policy.schema === 'founder-control-room/attack-20-v3-policy@v1', 'policy schema must be attack-20-v3-policy@v1');
@@ -130,6 +125,10 @@ if (expectedBaseSha !== null) {
 }
 requireValue(registry.aggregation?.noAveraging === true, 'registry must prohibit averaging');
 requireValue(Array.isArray(registry.workers) && registry.workers.length >= 3, 'registry must contain every known production FCR Worker');
+requireValue(
+  registry.overallState !== 'PASS',
+  'static source registry cannot declare portfolio PASS; resolved live Attack-20 receipts belong to the runtime/security evidence plane',
+);
 
 const workerNames = new Set();
 for (const worker of registry.workers ?? []) {
@@ -142,9 +141,10 @@ for (const worker of registry.workers ?? []) {
   requireValue(ALLOWED_WORKER_STATES.has(worker.observedProtection?.state), `${worker.worker}: observedProtection.state is invalid`);
   requireValue(ALLOWED_WORKER_STATES.has(worker.attackTest?.result), `${worker.worker}: attackTest.result is invalid`);
   requireValue(worker.attackTest?.suiteVersion === 'attack-20-v3', `${worker.worker}: attack suite version drifted`);
-  if (worker.attackTest?.result === 'PASS') {
-    requireValue(validExecutionProof(worker.attackTest), `${worker.worker}: Attack-20 PASS requires executedAt plus unique non-empty evidenceReceiptIds`);
-  }
+  requireValue(
+    staticRegistryAttackStateAllowed(worker.attackTest),
+    `${worker.worker}: static source registry cannot declare Attack-20 PASS without resolved trusted live execution receipts`,
+  );
 
   const alternateIngress = worker.alternateIngress;
   requireValue(
@@ -199,10 +199,6 @@ for (const requiredWorker of ['founder-control-room', 'founder-control-room-revi
   requireValue(workerNames.has(requiredWorker), `missing canonical FCR Worker: ${requiredWorker}`);
 }
 
-if (registry.overallState === 'PASS') {
-  requireValue((registry.workers ?? []).every((worker) => worker.observedProtection?.state === 'PASS' && worker.attackTest?.result === 'PASS' && validExecutionProof(worker.attackTest)), 'portfolio registry cannot PASS unless every production Worker has executed Attack-20 proof');
-}
-
 if (failures.length) {
   console.error('ATTACK-20 V3 source verification failed:');
   for (const failure of failures) console.error(`- ${failure}`);
@@ -240,7 +236,7 @@ writeFileSync('artifacts/attack-20-v3-source-proof.json', `${JSON.stringify({
   liveSecurityState: registry.overallState,
   providerEvidence: 'not-observed-by-this-verifier',
   databaseEvidence: 'not-observed-by-this-verifier',
-  note: 'Source verification is not live ATTACK-20 proof. Provider and runtime evidence remain independently required.',
+  note: 'Source verification is not live ATTACK-20 proof. Static registry PASS is prohibited; resolved provider/runtime receipts remain independently required.',
 }, null, 2)}\n`);
 
 console.log(`ATTACK-20 V3 source contract verified for ${registry.repository}${headSha ? ` at ${headSha}` : ''}.`);
