@@ -40,7 +40,7 @@ async function founderIdentityFromOpaqueSession() {
 function installCookieBackedSignOut() {
   // app.js historically cleared only sessionStorage. Capture the click before
   // its legacy handler and revoke the server-side opaque session instead.
-  document.addEventListener('click', (event) => {
+  document.addEventListener('click', async (event) => {
     const target = event.target instanceof Element ? event.target.closest('#sign-out') : null;
     if (!target) return;
 
@@ -48,14 +48,27 @@ function installCookieBackedSignOut() {
     event.stopImmediatePropagation();
     target.disabled = true;
 
-    void fetch('/auth/logout', {
-      method: 'POST',
-      credentials: 'same-origin',
-      cache: 'no-store',
-    }).finally(() => {
+    try {
+      const response = await fetch('/auth/logout', {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      if (!response.ok && response.status !== 401) {
+        throw new Error(`Founder sign-out failed (${response.status})`);
+      }
       sessionStorage.removeItem(LEGACY_SESSION_KEY);
-      location.replace('/');
-    });
+      location.replace('/control-room/');
+    } catch (error) {
+      // Do not lie about revocation. If server-side logout fails, keep the
+      // compatibility marker and current page intact so the browser remains
+      // visibly authenticated until the session can actually be revoked.
+      target.disabled = false;
+      target.textContent = 'Sign out failed';
+      console.error(error instanceof Error ? error.message : String(error));
+    }
   }, true);
 }
 
