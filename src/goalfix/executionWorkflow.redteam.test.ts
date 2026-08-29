@@ -25,6 +25,7 @@ const TARGET_BRANCH = 'main';
 const FOUNDER_PRINCIPAL = 'principal:founder';
 const DIFF = goalfixDiffFingerprint({ base: BASE, head: HEAD, scope: 'goalfix-v2' });
 const NOW = new Date('2026-08-26T12:00:00.000Z');
+const RUNTIME_FINGERPRINT = fingerprintNormalized({ mergedSha: MERGED, state: 'runtime-readback' });
 
 function cookie(
   id: string,
@@ -144,7 +145,7 @@ function runtimeReceipt(observedAt = '2026-08-26T11:50:00.000Z'): GoalfixRuntime
     proofBinding: {
       fingerprints: {
         sourceSha: goalfixSourceFingerprint(REPOSITORY, MERGED),
-        runtime: fingerprintNormalized({ mergedSha: MERGED, state: 'runtime-readback' }),
+        runtime: RUNTIME_FINGERPRINT,
         evidenceBundle: goalfixRuntimeReceiptFingerprint(base),
       },
       cookieContract: provider,
@@ -159,6 +160,7 @@ function validInput(): GoalfixExecutionInput {
     branch: SOURCE_BRANCH,
     targetBranch: TARGET_BRANCH,
     trustedFounderPrincipalId: FOUNDER_PRINCIPAL,
+    trustedRuntimeFingerprint: RUNTIME_FINGERPRINT,
     baseSha: BASE,
     candidateHeadSha: HEAD,
     currentMainSha: BASE,
@@ -211,6 +213,7 @@ describe('Goalfix execution workflow v2 red team', () => {
 
   it('rejects post-merge truth carrying a fingerprint for the pre-merge head', () => {
     const candidate = validInput();
+    candidate.currentMainSha = MERGED;
     const runtime = runtimeReceipt();
     candidate.postMergeTruth = {
       mergedSha: MERGED,
@@ -221,7 +224,10 @@ describe('Goalfix execution workflow v2 red team', () => {
       mergeAncestryReceipt: ancestry(),
       observedAt: '2026-08-26T11:55:00.000Z',
       proofBinding: {
-        fingerprints: { sourceSha: goalfixSourceFingerprint(REPOSITORY, HEAD) },
+        fingerprints: {
+          sourceSha: goalfixSourceFingerprint(REPOSITORY, HEAD),
+          runtime: RUNTIME_FINGERPRINT,
+        },
         cookieContract: provider,
       },
     };
@@ -233,6 +239,7 @@ describe('Goalfix execution workflow v2 red team', () => {
 
   it('rejects a caller claiming merged main without candidate ancestry', () => {
     const candidate = validInput();
+    candidate.currentMainSha = MERGED;
     const runtime = runtimeReceipt();
     candidate.postMergeTruth = {
       mergedSha: MERGED,
@@ -243,7 +250,10 @@ describe('Goalfix execution workflow v2 red team', () => {
       mergeAncestryReceipt: ancestry({ containsCandidate: false }),
       observedAt: '2026-08-26T11:55:00.000Z',
       proofBinding: {
-        fingerprints: { sourceSha: goalfixSourceFingerprint(REPOSITORY, MERGED) },
+        fingerprints: {
+          sourceSha: goalfixSourceFingerprint(REPOSITORY, MERGED),
+          runtime: RUNTIME_FINGERPRINT,
+        },
         cookieContract: provider,
       },
     };
@@ -285,8 +295,8 @@ describe('Goalfix execution workflow v2 red team', () => {
 
   it('rejects runtime PASS evidence observed before the provider merge time', () => {
     const candidate = validInput();
+    candidate.currentMainSha = MERGED;
     const runtime = runtimeReceipt('2026-08-26T11:46:00.000Z');
-    const runtimeFingerprint = runtime.proofBinding.fingerprints.runtime;
     candidate.postMergeTruth = {
       mergedSha: MERGED,
       currentMainSha: MERGED,
@@ -298,7 +308,7 @@ describe('Goalfix execution workflow v2 red team', () => {
       proofBinding: {
         fingerprints: {
           sourceSha: goalfixSourceFingerprint(REPOSITORY, MERGED),
-          runtime: runtimeFingerprint,
+          runtime: RUNTIME_FINGERPRINT,
         },
         cookieContract: provider,
       },
