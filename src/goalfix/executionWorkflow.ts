@@ -596,8 +596,8 @@ export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixE
     ...current.flatMap((checkpoint) => validateCheckpoint(
       checkpoint,
       input,
-      historicalMergeExecutionProven && isIsoTimestamp(checkpoint.observedAt)
-        ? new Date(checkpoint.observedAt)
+      historicalMergeExecutionProven
+        ? new Date(input.postMergeTruth!.mergeAncestryReceipt.mergedAt)
         : now,
     )),
   ];
