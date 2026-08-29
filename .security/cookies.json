@@ -6,31 +6,49 @@
   "allowedCookieWriters": ["src/auth/founderSession.ts"],
   "cookies": [
     {
-      "name": "fcr_session",
+      "name": "__Host-fcr_session",
       "classification": "strictly_necessary",
-      "purpose": "Maintain the allowlisted founder's Supabase Auth browser session and provide a server-issued interactive founder-session witness for privileged merge authority.",
+      "purpose": "Carry a high-entropy opaque Founder Control Room browser-session capability whose authoritative credentials, expiry, rotation, and revocation state remain server-side.",
       "owner": "backend",
       "providers": ["supabase", "cloudflare"],
       "sensitive": true,
       "httpOnly": true,
-      "secure": "production",
+      "secure": "always",
       "sameSite": "strict",
       "path": "/",
-      "maxAgeSeconds": 2592000,
+      "maxAgeSeconds": 28800,
       "cacheControl": "private, no-store",
-      "integrity": "HMAC-SHA256 signed by Founder Control Room; unsigned or tampered payloads are rejected.",
-      "signingSecretEnv": "FOUNDER_SESSION_SIGNING_SECRET",
-      "csrf": "Exact FOUNDER_API_URL origin is required for browser mutations; explicit Bearer clients are not cookie-authenticated.",
-      "deletion": "Cleared by POST /auth/logout and by failed or disallowed session verification. Existing unsigned cookies are intentionally invalid after the signed-session contract is enabled."
+      "integrity": "256-bit server-issued random capability; only its SHA-256 lookup hash is persisted and the cookie grants no authority without active server-side session state.",
+      "csrf": "Approved same-origin browser context is required for privileged mutations; founder authority remains separately gated by FCR policy.",
+      "deletion": "Cleared by POST /auth/logout, session rotation failure, and failed or disallowed browser-session verification. Server-side logout also records revocation."
+    },
+    {
+      "name": "fcr_session",
+      "classification": "strictly_necessary",
+      "purpose": "Legacy founder-session cookie name retained only as an explicit deletion target during migration to the __Host-fcr_session opaque capability.",
+      "owner": "backend",
+      "providers": ["supabase", "cloudflare"],
+      "sensitive": true,
+      "httpOnly": true,
+      "secure": "always",
+      "sameSite": "strict",
+      "path": "/",
+      "maxAgeSeconds": 0,
+      "cacheControl": "private, no-store",
+      "integrity": "Never accepted for authentication after opaque-session cutover; emitted only with Max-Age=0 to remove historical self-contained token cookies.",
+      "csrf": "Not accepted as an authentication or authorization input.",
+      "deletion": "Expired whenever a new opaque session is issued or any founder browser session is cleared."
     }
   ],
-  "nonCookieState": [],
+  "nonCookieState": [
+    "founder_browser_sessions: service-role-only server-side session state keyed by a SHA-256 hash of the opaque browser capability"
+  ],
   "externalCookieProviders": [],
   "prohibited": [
     "analytics or advertising cookies",
-    "client-readable founder auth tokens",
-    "unsigned or client-forgeable founder session cookies",
+    "client-readable founder auth tokens in the FCR browser-session cookie",
+    "self-contained access or refresh token payloads in founder session cookies",
     "cross-project Se'kret Bip session reuse",
-    "caching any response that writes or refreshes the founder session"
+    "caching any response that writes, rotates, or clears the founder session"
   ]
 }

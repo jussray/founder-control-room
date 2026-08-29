@@ -33,10 +33,12 @@ import request from 'supertest';
 import { authRouter } from '../auth.js';
 
 const FOUNDER_EMAIL = 'founder@example.com';
+const FOUNDER_USER_ID = '11111111-1111-4111-8111-111111111111';
 const SESSION = {
   access_token: 'at',
   refresh_token: 'rt',
   expires_at: 123,
+  user: { id: FOUNDER_USER_ID, email: FOUNDER_EMAIL },
 };
 
 type ResponseWithHeaders = {
@@ -60,6 +62,20 @@ function founderUsersRow(match: boolean) {
   };
 }
 
+function browserSessionTable() {
+  return {
+    insert: () => Promise.resolve({ data: null, error: null }),
+  };
+}
+
+function setAllowlist(match: boolean) {
+  supabaseMock.from.mockImplementation((table: string) => {
+    if (table === 'founder_users') return founderUsersRow(match);
+    if (table === 'founder_browser_sessions') return browserSessionTable();
+    throw new Error(`unexpected table: ${table}`);
+  });
+}
+
 function setCookieHeader(res: ResponseWithHeaders): string {
   const cookie = res.headers['set-cookie'];
   expect(cookie).toBeDefined();
@@ -68,13 +84,17 @@ function setCookieHeader(res: ResponseWithHeaders): string {
 
 function expectSessionCookie(res: ResponseWithHeaders) {
   const cookie = setCookieHeader(res);
-  expect(cookie).toContain('fcr_session=');
+  expect(cookie).toContain('__Host-fcr_session=');
   expect(cookie).toContain('HttpOnly');
+  expect(cookie).toContain('Secure');
   expect(cookie).toContain('SameSite=Strict');
+  expect(cookie).not.toContain(SESSION.access_token);
+  expect(cookie).not.toContain(SESSION.refresh_token);
 }
 
 function expectClearedSessionCookie(res: ResponseWithHeaders) {
   const cookie = setCookieHeader(res);
+  expect(cookie).toContain('__Host-fcr_session=;');
   expect(cookie).toContain('fcr_session=;');
   expect(cookie).toContain('Max-Age=0');
   expect(cookie).toContain('HttpOnly');
@@ -102,7 +122,7 @@ describe('POST /auth/magic-link', () => {
   });
 
   it('sends the same generic response for a non-allowlisted email without sending an OTP', async () => {
-    supabaseMock.from.mockImplementation(() => founderUsersRow(false));
+    setAllowlist(false);
     const res = await request(buildApp()).post('/auth/magic-link').send({ email: 'stranger@example.com' });
     expect(res.status).toBe(202);
     expect(res.body).toEqual({
@@ -116,7 +136,7 @@ describe('POST /auth/magic-link', () => {
   });
 
   it('sends an OTP for an allowlisted email with the same generic response', async () => {
-    supabaseMock.from.mockImplementation(() => founderUsersRow(true));
+    setAllowlist(true);
     const res = await request(buildApp()).post('/auth/magic-link').send({ email: FOUNDER_EMAIL });
     expect(res.status).toBe(202);
     expect(res.body.success).toBe(true);
@@ -151,22 +171,22 @@ describe('GET /auth/callback', () => {
 
   it('clears any session and rejects a verified user who is not on the allowlist', async () => {
     mockVerifyOtp.mockResolvedValue({
-      data: { session: SESSION, user: { email: 'stranger@example.com' } },
+      data: { session: SESSION, user: { id: FOUNDER_USER_ID, email: 'stranger@example.com' } },
       error: null,
     });
-    supabaseMock.from.mockImplementation(() => founderUsersRow(false));
+    setAllowlist(false);
 
     const res = await request(buildApp()).get('/auth/callback').query({ token_hash: 'good' });
     expect(res.status).toBe(401);
     expectClearedSessionCookie(res);
   });
 
-  it('sets an HttpOnly session cookie and redirects to the Control Room dashboard with a session handoff', async () => {
+  it('sets an opaque HttpOnly session cookie and redirects to the Control Room dashboard with a session handoff', async () => {
     mockVerifyOtp.mockResolvedValue({
-      data: { session: SESSION, user: { email: FOUNDER_EMAIL } },
+      data: { session: SESSION, user: { id: FOUNDER_USER_ID, email: FOUNDER_EMAIL } },
       error: null,
     });
-    supabaseMock.from.mockImplementation(() => founderUsersRow(true));
+    setAllowlist(true);
 
     const res = await request(buildApp())
       .get('/auth/callback')
@@ -208,12 +228,12 @@ describe('POST /auth/session', () => {
     expectClearedSessionCookie(res);
   });
 
-  it('converts valid implicit-flow credentials into an HttpOnly founder session', async () => {
+  it('converts valid implicit-flow credentials into an opaque founder browser capability', async () => {
     mockSetSession.mockResolvedValue({
-      data: { session: SESSION, user: { email: FOUNDER_EMAIL } },
+      data: { session: SESSION, user: { id: FOUNDER_USER_ID, email: FOUNDER_EMAIL } },
       error: null,
     });
-    supabaseMock.from.mockImplementation(() => founderUsersRow(true));
+    setAllowlist(true);
 
     const res = await request(buildApp())
       .post('/auth/session')

@@ -9,6 +9,7 @@ const {
   mockUpdateUser,
   mockGetSession,
   supabaseMock,
+  browserSessions,
 } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockRefreshSession: vi.fn(),
@@ -16,6 +17,7 @@ const {
   mockUpdateUser: vi.fn(),
   mockGetSession: vi.fn(),
   supabaseMock: { from: vi.fn() },
+  browserSessions: new Map<string, Record<string, unknown>>(),
 }));
 
 vi.mock('../../../lib/supabaseAuthClient.js', () => ({
@@ -44,12 +46,11 @@ import { authRouter } from '../auth.js';
 const EMAIL = 'founder@example.com';
 const ACCESS_TOKEN = 'access-token-value';
 const REFRESH_TOKEN = 'refresh-token-value';
-const TEST_SIGNING_SECRET = 'founder-session-test-signing-secret-0123456789abcdef';
 const SESSION = {
   access_token: ACCESS_TOKEN,
   refresh_token: REFRESH_TOKEN,
   expires_at: 2_000_000_000,
-  user: { id: 'founder-user', email: EMAIL },
+  user: { id: '11111111-1111-4111-8111-111111111111', email: EMAIL },
 };
 
 function app() {
@@ -59,34 +60,84 @@ function app() {
   return instance;
 }
 
-function browserCookie() {
-  let setCookie = '';
+function browserSessionTable() {
+  let operation: 'read' | 'update' = 'read';
+  let updatePayload: Record<string, unknown> = {};
+  let sessionHash = '';
+  let requireUnrevoked = false;
+  let expiresAfter = '';
+  const chain: any = {
+    select: () => chain,
+    eq: (field: string, value: unknown) => {
+      if (field === 'session_id_hash') sessionHash = String(value);
+      return chain;
+    },
+    is: (field: string, value: unknown) => {
+      if (field === 'revoked_at' && value === null) requireUnrevoked = true;
+      return chain;
+    },
+    gt: (field: string, value: unknown) => {
+      if (field === 'expires_at') expiresAfter = String(value);
+      return chain;
+    },
+    insert: async (value: Record<string, unknown>) => {
+      browserSessions.set(String(value.session_id_hash), { ...value, revoked_at: null, revoke_reason: null });
+      return { data: null, error: null };
+    },
+    update: (value: Record<string, unknown>) => {
+      operation = 'update';
+      updatePayload = value;
+      return chain;
+    },
+    maybeSingle: async () => {
+      const row = browserSessions.get(sessionHash) ?? null;
+      if (!row) return { data: null, error: null };
+      if (requireUnrevoked && row.revoked_at != null) return { data: null, error: null };
+      if (expiresAfter && String(row.expires_at ?? '') <= expiresAfter) return { data: null, error: null };
+      return { data: row, error: null };
+    },
+    then: (resolve: (value: unknown) => void, reject: (reason: unknown) => void) => {
+      if (operation === 'update') {
+        const row = browserSessions.get(sessionHash);
+        if (row && (!requireUnrevoked || row.revoked_at == null)) browserSessions.set(sessionHash, { ...row, ...updatePayload });
+      }
+      return Promise.resolve({ data: null, error: null }).then(resolve, reject);
+    },
+  };
+  return chain;
+}
+
+async function browserCookie() {
+  let setCookie: unknown = '';
   const res = {
     setHeader(name: string, value: unknown) {
-      if (name.toLowerCase() === 'set-cookie') setCookie = String(value);
+      if (name.toLowerCase() === 'set-cookie') setCookie = value;
       return res;
     },
   } as unknown as Response;
-  writeFounderSession(res, SESSION as unknown as Session);
-  return setCookie.split(';', 1)[0] ?? '';
+  await writeFounderSession(res, SESSION as unknown as Session);
+  const cookies = Array.isArray(setCookie) ? setCookie.map(String) : [String(setCookie)];
+  return (cookies[0] ?? '').split(';', 1)[0] ?? '';
 }
 
 describe('POST /auth/password provider failure', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    browserSessions.clear();
     vi.stubEnv('NODE_ENV', 'test');
-    vi.stubEnv('FOUNDER_SESSION_SIGNING_SECRET', TEST_SIGNING_SECRET);
+    vi.stubEnv('FOUNDER_API_URL', 'https://control.example.com');
     mockGetUser.mockResolvedValue({
-      data: { user: { id: 'founder-user', email: EMAIL } },
+      data: { user: { id: SESSION.user.id, email: EMAIL } },
       error: null,
     });
     mockSetSession.mockResolvedValue({
-      data: { session: SESSION, user: { id: 'founder-user', email: EMAIL } },
+      data: { session: SESSION, user: { id: SESSION.user.id, email: EMAIL } },
       error: null,
     });
     mockGetSession.mockResolvedValue({ data: { session: SESSION }, error: null });
     supabaseMock.from.mockImplementation((table: string) => {
-      if (table !== 'founder_users') return {};
+      if (table === 'founder_browser_sessions') return browserSessionTable();
+      if (table !== 'founder_users') throw new Error(`unexpected table: ${table}`);
       return {
         select: () => ({
           eq: () => ({
@@ -108,7 +159,7 @@ describe('POST /auth/password provider failure', () => {
 
     const response = await request(app())
       .post('/auth/password')
-      .set('Cookie', browserCookie())
+      .set('Cookie', await browserCookie())
       .send({
         password: 'correct horse battery staple',
         confirmPassword: 'correct horse battery staple',

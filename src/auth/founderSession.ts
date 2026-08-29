@@ -1,79 +1,26 @@
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import type { Request, Response } from 'express';
 import type { Session } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabaseClient.js';
 
-const COOKIE_NAME = 'fcr_session';
-const COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
+const COOKIE_NAME = '__Host-fcr_session';
+const LEGACY_COOKIE_NAME = 'fcr_session';
+const COOKIE_MAX_AGE_SECONDS = 8 * 60 * 60;
 const COOKIE_FORMAT_VERSION = 'v1';
-const MIN_SIGNING_SECRET_BYTES = 32;
-const EPHEMERAL_NON_PROD_SIGNING_SECRET = randomBytes(32);
+const SESSION_TABLE = 'founder_browser_sessions';
+const SESSION_VERSION = 1;
+const OPAQUE_TOKEN_BYTES = 32;
+const OPAQUE_COOKIE_PATTERN = /^v1\.[A-Za-z0-9_-]{43}$/;
 
 export interface FounderCookieSession {
   accessToken: string;
   refreshToken: string;
   expiresAt?: number;
-}
-
-function productionLikeRuntime(): boolean {
-  return process.env.NODE_ENV === 'production'
-    || process.env.FOUNDER_API_URL?.startsWith('https://') === true;
-}
-
-function founderSessionSigningSecret(): Buffer | null {
-  const configured = process.env.FOUNDER_SESSION_SIGNING_SECRET?.trim() ?? '';
-  if (configured) {
-    if (Buffer.byteLength(configured, 'utf8') < MIN_SIGNING_SECRET_BYTES) return null;
-    return Buffer.from(configured, 'utf8');
-  }
-  return productionLikeRuntime() ? null : EPHEMERAL_NON_PROD_SIGNING_SECRET;
-}
-
-function sessionPayload(session: FounderCookieSession): string {
-  return Buffer.from(JSON.stringify(session), 'utf8').toString('base64url');
-}
-
-function sessionSignature(payload: string, secret: Buffer): string {
-  return createHmac('sha256', secret)
-    .update(`${COOKIE_FORMAT_VERSION}.${payload}`)
-    .digest('base64url');
-}
-
-function encodeSession(session: FounderCookieSession): string {
-  const secret = founderSessionSigningSecret();
-  if (!secret) {
-    throw new Error(
-      'FOUNDER_SESSION_SIGNING_SECRET must be configured with at least 32 bytes before founder browser sessions can be issued in production',
-    );
-  }
-  const payload = sessionPayload(session);
-  return `${COOKIE_FORMAT_VERSION}.${payload}.${sessionSignature(payload, secret)}`;
-}
-
-function decodeSession(value: string): FounderCookieSession | null {
-  try {
-    const [version, payload, signature, ...rest] = value.split('.');
-    if (rest.length > 0 || version !== COOKIE_FORMAT_VERSION || !payload || !signature) return null;
-
-    const secret = founderSessionSigningSecret();
-    if (!secret) return null;
-
-    const expected = Buffer.from(sessionSignature(payload, secret), 'base64url');
-    const actual = Buffer.from(signature, 'base64url');
-    if (expected.length === 0 || actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
-      return null;
-    }
-
-    const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Partial<FounderCookieSession>;
-    if (typeof parsed.accessToken !== 'string' || typeof parsed.refreshToken !== 'string') return null;
-    if (!parsed.accessToken || !parsed.refreshToken) return null;
-    return {
-      accessToken: parsed.accessToken,
-      refreshToken: parsed.refreshToken,
-      ...(typeof parsed.expiresAt === 'number' ? { expiresAt: parsed.expiresAt } : {}),
-    };
-  } catch {
-    return null;
-  }
+  founderUserId: string;
+  founderEmail: string;
+  sessionIdHash: string;
+  sessionVersion: number;
+  sessionExpiresAt: string;
 }
 
 function parseCookieHeader(header: string | undefined): Map<string, string> {
@@ -93,10 +40,28 @@ function parseCookieHeader(header: string | undefined): Map<string, string> {
   return cookies;
 }
 
+function opaqueCookieValue(req: Request): string | null {
+  const value = parseCookieHeader(req.headers.cookie).get(COOKIE_NAME) ?? '';
+  return OPAQUE_COOKIE_PATTERN.test(value) ? value : null;
+}
+
+function sessionIdHash(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+function newOpaqueCookieValue(): string {
+  return `${COOKIE_FORMAT_VERSION}.${randomBytes(OPAQUE_TOKEN_BYTES).toString('base64url')}`;
+}
+
+function assertSecureCookieDeployment(): void {
+  const configuredUrl = process.env.FOUNDER_API_URL?.trim() ?? '';
+  if (process.env.NODE_ENV === 'production' && configuredUrl && !configuredUrl.startsWith('https://')) {
+    throw new Error('FOUNDER_API_URL must use https:// before __Host-fcr_session can be issued in production');
+  }
+}
+
 function cookieAttributes(maxAgeSeconds: number): string {
-  const httpsDeployment = process.env.FOUNDER_API_URL?.startsWith('https://') === true;
-  const secure = process.env.NODE_ENV === 'production' || httpsDeployment ? '; Secure' : '';
-  return `Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAgeSeconds}${secure}`;
+  return `Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${maxAgeSeconds}`;
 }
 
 function preventSessionCaching(res: Response): void {
@@ -105,24 +70,125 @@ function preventSessionCaching(res: Response): void {
   res.setHeader('Expires', '0');
 }
 
-export function readFounderSession(req: Request): FounderCookieSession | null {
-  const encoded = parseCookieHeader(req.headers.cookie).get(COOKIE_NAME);
-  return encoded ? decodeSession(encoded) : null;
+function setSessionCookie(res: Response, value: string): void {
+  preventSessionCaching(res);
+  res.setHeader('Set-Cookie', [
+    `${COOKIE_NAME}=${encodeURIComponent(value)}; ${cookieAttributes(COOKIE_MAX_AGE_SECONDS)}`,
+    `${LEGACY_COOKIE_NAME}=; ${cookieAttributes(0)}`,
+  ]);
 }
 
-export function writeFounderSession(res: Response, session: Session): void {
-  const value = encodeSession({
-    accessToken: session.access_token,
-    refreshToken: session.refresh_token,
-    ...(typeof session.expires_at === 'number' ? { expiresAt: session.expires_at } : {}),
+function normalizedSessionIdentity(session: Session): { userId: string; email: string } {
+  const userId = session.user?.id?.trim() ?? '';
+  const email = session.user?.email?.trim().toLowerCase() ?? '';
+  if (!userId || !email) {
+    throw new Error('Founder browser session requires a verified Supabase user identity');
+  }
+  return { userId, email };
+}
+
+export async function readFounderSession(req: Request): Promise<FounderCookieSession | null> {
+  const value = opaqueCookieValue(req);
+  if (!value) return null;
+
+  const hash = sessionIdHash(value);
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from(SESSION_TABLE)
+    .select('session_id_hash,founder_user_id,founder_email,access_token,refresh_token,auth_expires_at,expires_at,session_version,revoked_at')
+    .eq('session_id_hash', hash)
+    .is('revoked_at', null)
+    .gt('expires_at', now)
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  const row = data as Record<string, unknown>;
+  const accessToken = typeof row.access_token === 'string' ? row.access_token : '';
+  const refreshToken = typeof row.refresh_token === 'string' ? row.refresh_token : '';
+  const founderUserId = typeof row.founder_user_id === 'string' ? row.founder_user_id : '';
+  const founderEmail = typeof row.founder_email === 'string' ? row.founder_email.toLowerCase() : '';
+  const sessionExpiresAt = typeof row.expires_at === 'string' ? row.expires_at : '';
+  const sessionVersion = typeof row.session_version === 'number' ? row.session_version : 0;
+  const authExpiresAt = typeof row.auth_expires_at === 'number' ? row.auth_expires_at : undefined;
+
+  if (!accessToken || !refreshToken || !founderUserId || !founderEmail || !sessionExpiresAt) return null;
+  if (sessionVersion !== SESSION_VERSION) return null;
+
+  return {
+    accessToken,
+    refreshToken,
+    ...(authExpiresAt !== undefined ? { expiresAt: authExpiresAt } : {}),
+    founderUserId,
+    founderEmail,
+    sessionIdHash: hash,
+    sessionVersion,
+    sessionExpiresAt,
+  };
+}
+
+export async function writeFounderSession(res: Response, session: Session): Promise<void> {
+  assertSecureCookieDeployment();
+  const identity = normalizedSessionIdentity(session);
+  const value = newOpaqueCookieValue();
+  const hash = sessionIdHash(value);
+  const issuedAt = new Date();
+  const expiresAt = new Date(issuedAt.getTime() + COOKIE_MAX_AGE_SECONDS * 1000);
+
+  const { error } = await supabase.from(SESSION_TABLE).insert({
+    session_id_hash: hash,
+    founder_user_id: identity.userId,
+    founder_email: identity.email,
+    access_token: session.access_token,
+    refresh_token: session.refresh_token,
+    auth_expires_at: typeof session.expires_at === 'number' ? session.expires_at : null,
+    issued_at: issuedAt.toISOString(),
+    expires_at: expiresAt.toISOString(),
+    session_version: SESSION_VERSION,
   });
-  preventSessionCaching(res);
-  res.setHeader('Set-Cookie', `${COOKIE_NAME}=${encodeURIComponent(value)}; ${cookieAttributes(COOKIE_MAX_AGE_SECONDS)}`);
+
+  if (error) {
+    throw new Error('Unable to persist founder browser session');
+  }
+
+  setSessionCookie(res, value);
+}
+
+export async function revokeFounderSession(req: Request, reason = 'logout'): Promise<boolean> {
+  const value = opaqueCookieValue(req);
+  if (!value) return true;
+
+  const revokedAt = new Date().toISOString();
+  const { error } = await supabase
+    .from(SESSION_TABLE)
+    .update({ revoked_at: revokedAt, revoke_reason: reason })
+    .eq('session_id_hash', sessionIdHash(value))
+    .is('revoked_at', null);
+
+  return !error;
+}
+
+export async function rotateFounderSession(req: Request, res: Response, session: Session): Promise<void> {
+  const revoked = await revokeFounderSession(req, 'rotated');
+  if (!revoked) {
+    clearFounderSession(res);
+    throw new Error('Unable to revoke prior founder browser session');
+  }
+
+  try {
+    await writeFounderSession(res, session);
+  } catch (error) {
+    clearFounderSession(res);
+    throw error;
+  }
 }
 
 export function clearFounderSession(res: Response): void {
   preventSessionCaching(res);
-  res.setHeader('Set-Cookie', `${COOKIE_NAME}=; ${cookieAttributes(0)}`);
+  res.setHeader('Set-Cookie', [
+    `${COOKIE_NAME}=; ${cookieAttributes(0)}`,
+    `${LEGACY_COOKIE_NAME}=; ${cookieAttributes(0)}`,
+  ]);
 }
 
 export function bearerToken(req: Request): string | null {

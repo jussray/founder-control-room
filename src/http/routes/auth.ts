@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
+import type { Session } from '@supabase/supabase-js';
 import {
   createSupabaseAuthClient,
   supabaseAuth,
@@ -7,6 +8,8 @@ import { supabase } from '../../lib/supabaseClient.js';
 import {
   clearFounderSession,
   readFounderSession,
+  revokeFounderSession,
+  rotateFounderSession,
   writeFounderSession,
 } from '../../auth/founderSession.js';
 import { respondError, respondSuccess } from '../apiResponse.js';
@@ -38,6 +41,20 @@ async function isAllowlisted(email: string): Promise<boolean> {
 
   if (error) throw new Error('Founder allowlist check failed');
   return Boolean(data);
+}
+
+async function establishFounderSession(req: Request, res: Response, session: Session): Promise<boolean> {
+  try {
+    await rotateFounderSession(req, res, session);
+    return true;
+  } catch (error) {
+    console.error(
+      'Founder browser session persistence failed:',
+      error instanceof Error ? error.message : String(error),
+    );
+    clearFounderSession(res);
+    return false;
+  }
 }
 
 /**
@@ -143,15 +160,28 @@ authRouter.get('/callback', async (req, res) => {
     return res.status(401).type('html').send(founderCallbackHtml());
   }
 
-  writeFounderSession(res, data.session);
+  const replaced = await revokeFounderSession(req, 'replaced');
+  if (!replaced) {
+    clearFounderSession(res);
+    return res.status(503).type('html').send(founderCallbackHtml());
+  }
+  try {
+    await writeFounderSession(res, data.session);
+  } catch (sessionError) {
+    console.error(
+      'Founder browser session persistence failed:',
+      sessionError instanceof Error ? sessionError.message : String(sessionError),
+    );
+    clearFounderSession(res);
+    return res.status(503).type('html').send(founderCallbackHtml());
+  }
 
   // The founder dashboard SPA (public/control-room/app.js) keeps its own
   // Bearer-token session in sessionStorage, read from this redirect's URL
   // *fragment* (consumeHashSession()) — fragments never reach the server,
-  // so this is the standard implicit-flow handoff, not a leak. The
-  // HttpOnly cookie written above is a separate, same-origin session used
-  // by the lightweight onboarding shell at '/'; both are kept in sync from
-  // this one verified Supabase session.
+  // so this is the standard implicit-flow handoff, not a leak. The opaque
+  // HttpOnly cookie written above is a separate, same-origin capability whose
+  // Supabase credentials live only in server-controlled session state.
   const fragment = new URLSearchParams({
     access_token: data.session.access_token,
     refresh_token: data.session.refresh_token ?? '',
@@ -163,8 +193,9 @@ authRouter.get('/callback', async (req, res) => {
 });
 
 /**
- * Exchanges the implicit-flow access and refresh tokens for one HttpOnly
- * browser session. Tokens are never returned to page JavaScript after this.
+ * Exchanges the implicit-flow access and refresh tokens for one opaque HttpOnly
+ * browser capability. The capability contains no Supabase credential material;
+ * the authoritative session record remains server-side.
  */
 authRouter.post('/session', async (req, res) => {
   const accessToken = typeof req.body?.access_token === 'string' ? req.body.access_token : '';
@@ -202,7 +233,14 @@ authRouter.post('/session', async (req, res) => {
     return respondError(res, 403, 'FORBIDDEN', 'Not on the founder allowlist.');
   }
 
-  writeFounderSession(res, data.session);
+  if (!(await establishFounderSession(req, res, data.session))) {
+    return respondError(
+      res,
+      503,
+      'SESSION_UNAVAILABLE',
+      'Founder browser session storage is temporarily unavailable.',
+    );
+  }
   return respondSuccess(res, { founder: { email } }, 201);
 });
 
@@ -232,7 +270,7 @@ authRouter.post('/password', requireFounder, async (req: FounderRequest, res) =>
     return respondError(res, 400, 'BAD_REQUEST', 'Passwords do not match.');
   }
 
-  const cookieSession = readFounderSession(req);
+  const cookieSession = await readFounderSession(req);
   if (!cookieSession) {
     clearFounderSession(res);
     return respondError(res, 401, 'UNAUTHENTICATED', 'Browser founder session required.');
@@ -271,12 +309,28 @@ authRouter.post('/password', requireFounder, async (req: FounderRequest, res) =>
   }
 
   const { data: refreshed } = await requestAuth.auth.getSession();
-  if (refreshed.session) writeFounderSession(res, refreshed.session);
+  if (refreshed.session && !(await establishFounderSession(req, res, refreshed.session))) {
+    return respondError(
+      res,
+      503,
+      'SESSION_UNAVAILABLE',
+      'Founder browser session storage is temporarily unavailable.',
+    );
+  }
 
   return respondSuccess(res, { message: 'Founder password updated.' });
 });
 
-authRouter.post('/logout', (_req, res) => {
+authRouter.post('/logout', async (req, res) => {
+  const revoked = await revokeFounderSession(req, 'logout');
   clearFounderSession(res);
+  if (!revoked) {
+    return respondError(
+      res,
+      503,
+      'SESSION_REVOCATION_FAILED',
+      'Founder browser session could not be revoked.',
+    );
+  }
   return res.status(204).end();
 });
