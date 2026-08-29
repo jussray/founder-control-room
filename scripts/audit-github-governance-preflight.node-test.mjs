@@ -21,7 +21,7 @@ function canonicalRuleset(overrides = {}) {
     name: CANONICAL_RULESET_NAME,
     target: 'branch',
     enforcement: 'active',
-    bypass_actors: [{ actor_type: 'Integration', actor_id: Number(TRUSTED_APP_ID), bypass_mode: 'always' }],
+    bypass_actors: [{ actor_type: 'Integration', actor_id: Number(TRUSTED_APP_ID), bypass_mode: 'pull_request' }],
     conditions: { ref_name: { include: ['~DEFAULT_BRANCH'], exclude: [] } },
     rules: [
       {
@@ -65,7 +65,7 @@ function readyReport(overrides = {}) {
   });
 }
 
-test('canonical hardened FCR default-branch ruleset satisfies the floor including trusted bypass identity', () => {
+test('canonical hardened FCR default-branch ruleset satisfies the floor with PR-only trusted bypass identity', () => {
   const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
   const snapshot = rulesetSnapshot(canonicalRuleset(), 'main', 'main');
   assert.equal(snapshot.targetsRequestedRef, true);
@@ -150,10 +150,10 @@ test('omitted bypass_actors blocks because bypass policy was not observable', ()
   assert.equal(report.bypassPolicySatisfied, false);
 });
 
-test('fully observed wrong bypass identity or mode is NOT_READY', () => {
+test('fully observed wrong bypass identity or always-bypass mode is NOT_READY', () => {
   const wrongId = readyReport({
     fullRulesets: [canonicalRuleset({
-      bypass_actors: [{ actor_type: 'Integration', actor_id: 999999, bypass_mode: 'always' }],
+      bypass_actors: [{ actor_type: 'Integration', actor_id: 999999, bypass_mode: 'pull_request' }],
     })],
   });
   assert.equal(wrongId.status, 'NOT_READY');
@@ -162,14 +162,15 @@ test('fully observed wrong bypass identity or mode is NOT_READY', () => {
   assert.equal(wrongId.bypassPolicySatisfied, false);
   assert.equal(wrongId.canonicalFloorSatisfied, false);
 
-  const wrongMode = readyReport({
+  const alwaysBypass = readyReport({
     fullRulesets: [canonicalRuleset({
-      bypass_actors: [{ actor_type: 'Integration', actor_id: Number(TRUSTED_APP_ID), bypass_mode: 'pull_request' }],
+      bypass_actors: [{ actor_type: 'Integration', actor_id: Number(TRUSTED_APP_ID), bypass_mode: 'always' }],
     })],
   });
-  assert.equal(wrongMode.status, 'NOT_READY');
-  assert.equal(wrongMode.observationComplete, true);
-  assert.equal(wrongMode.bypassPolicySatisfied, false);
+  assert.equal(alwaysBypass.status, 'NOT_READY');
+  assert.equal(alwaysBypass.observationComplete, true);
+  assert.equal(alwaysBypass.bypassPolicySatisfied, false);
+  assert.equal(alwaysBypass.canonicalFloorSatisfied, false);
 });
 
 test('provider-read failure produces a sanitized blocked receipt instead of fake not-ready state', () => {
