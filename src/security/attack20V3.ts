@@ -191,6 +191,17 @@ export interface Attack20ReceiptV3 {
   expiresAt: string | null;
 }
 
+export interface RuntimeReadbackWitness {
+  witnessId: string;
+  target: {
+    project: string;
+    worker: string;
+    environment: 'production' | 'staging' | 'preview';
+  };
+  observedAt: string;
+  proofBinding: ProofBinding;
+}
+
 export interface FreshnessDecision {
   receiptId: string;
   verdict: 'FRESH' | 'STALE' | 'UNVERIFIED';
@@ -456,8 +467,15 @@ export function validateAttack20Receipt(
     if (evidenceReferenceCount(receipt) === 0) {
       errors.push('PASS receipt requires at least one correlated evidence reference');
     }
-    if (receipt.attackId === 'A19' && receipt.evidence.runtimeReadbackIds.length === 0) {
-      errors.push('A19 PASS requires an independent runtime readback witness');
+    if (receipt.attackId === 'A19') {
+      if (receipt.evidence.runtimeReadbackIds.length === 0) {
+        errors.push('A19 PASS requires an independent runtime readback witness');
+      } else if (
+        receipt.evidence.runtimeReadbackIds.some((value) => !value.trim())
+        || new Set(receipt.evidence.runtimeReadbackIds).size !== receipt.evidence.runtimeReadbackIds.length
+      ) {
+        errors.push('A19 runtime readback witness IDs must be unique non-empty IDs');
+      }
     }
     if (!isIsoDate(receipt.expiresAt)) {
       errors.push('PASS receipt requires a finite expiresAt timestamp');
@@ -470,6 +488,60 @@ export function validateAttack20Receipt(
     errors.push('FAILED receipt requires a reason');
   }
   return errors;
+}
+
+function validateRuntimeReadbackWitness(
+  witness: RuntimeReadbackWitness,
+  witnessId: string,
+  receipt: Attack20ReceiptV3,
+  currentFingerprints: Partial<Record<FingerprintClass, string>>,
+  cookieIndex: ReadonlyMap<string, ProofCookieContract>,
+  now: Date,
+): string[] {
+  const errors: string[] = [];
+  if (witness.witnessId !== witnessId || !witness.witnessId.trim()) {
+    errors.push('runtime readback witness ID does not match authenticated index key');
+  }
+  if (
+    witness.target.project !== receipt.target.project
+    || witness.target.worker !== receipt.target.worker
+    || witness.target.environment !== receipt.target.environment
+  ) {
+    errors.push(`${witnessId}: runtime readback witness target does not match receipt target`);
+  }
+  if (!isIsoDate(witness.observedAt)) {
+    errors.push(`${witnessId}: runtime readback witness observedAt must be an ISO timestamp`);
+  } else {
+    const observedAt = Date.parse(witness.observedAt);
+    if (observedAt > now.getTime()) errors.push(`${witnessId}: runtime readback witness cannot be observed in the future`);
+    if (isIsoDate(receipt.test.executedAt) && observedAt < Date.parse(receipt.test.executedAt)) {
+      errors.push(`${witnessId}: runtime readback witness predates the attack execution`);
+    }
+  }
+
+  errors.push(...validateProofBinding(witness.proofBinding, ['runtime', 'provider'], now)
+    .map((error) => `${witnessId}: ${error}`));
+  errors.push(...validateCookieLineage(witness.proofBinding.cookieContract, cookieIndex, now)
+    .map((error) => `${witnessId}: ${error}`));
+  if (witness.proofBinding.cookieContract.contextType !== 'provider-run') {
+    errors.push(`${witnessId}: runtime readback witness proof cookie context must be provider-run`);
+  }
+
+  for (const fingerprintClass of ['runtime', 'provider'] as const) {
+    const witnessFingerprint = witness.proofBinding.fingerprints[fingerprintClass];
+    const receiptFingerprint = receipt.proofBinding.fingerprints[fingerprintClass];
+    const currentFingerprint = currentFingerprints[fingerprintClass];
+    if (
+      typeof witnessFingerprint !== 'string'
+      || typeof receiptFingerprint !== 'string'
+      || typeof currentFingerprint !== 'string'
+      || witnessFingerprint !== receiptFingerprint
+      || witnessFingerprint !== currentFingerprint
+    ) {
+      errors.push(`${witnessId}: runtime readback witness ${fingerprintClass} fingerprint is not current and receipt-bound`);
+    }
+  }
+  return [...new Set(errors)];
 }
 
 export function evaluateReceiptFreshness(
@@ -532,10 +604,14 @@ function latestReceiptsByFixture(receipts: readonly Attack20ReceiptV3[]): Attack
       latest.set(key, [receipt]);
       continue;
     }
-    const currentTime = Date.parse(current[0]!.test.executedAt);
+    const currentTimes = current.map((item) => Date.parse(item.test.executedAt));
     const candidateTime = Date.parse(receipt.test.executedAt);
-    if (!Number.isFinite(candidateTime)) continue;
-    if (!Number.isFinite(currentTime) || candidateTime > currentTime) {
+    if (!Number.isFinite(candidateTime) || currentTimes.some((value) => !Number.isFinite(value))) {
+      current.push(receipt);
+      continue;
+    }
+    const currentTime = currentTimes[0]!;
+    if (candidateTime > currentTime) {
       latest.set(key, [receipt]);
       continue;
     }
@@ -552,6 +628,7 @@ export function aggregateWorkerAttack20Status(input: {
   receipts: readonly Attack20ReceiptV3[];
   currentFingerprints: Partial<Record<FingerprintClass, string>>;
   cookieIndex: ReadonlyMap<string, ProofCookieContract>;
+  runtimeReadbackIndex: ReadonlyMap<string, RuntimeReadbackWitness>;
   now?: Date;
 }): AggregateSecurityState {
   const now = input.now ?? new Date();
@@ -607,6 +684,28 @@ export function aggregateWorkerAttack20Status(input: {
       if (validateAttack20Receipt(receipt, input.applicabilityInput, now).length > 0) {
         sawUnverified = true;
         continue;
+      }
+
+      if (receipt.attackId === 'A19' && receipt.verdict === 'PASS') {
+        let invalidWitness = false;
+        for (const witnessId of receipt.evidence.runtimeReadbackIds) {
+          const witness = input.runtimeReadbackIndex.get(witnessId);
+          if (!witness || validateRuntimeReadbackWitness(
+            witness,
+            witnessId,
+            receipt,
+            input.currentFingerprints,
+            input.cookieIndex,
+            now,
+          ).length > 0) {
+            invalidWitness = true;
+            break;
+          }
+        }
+        if (invalidWitness) {
+          sawUnverified = true;
+          continue;
+        }
       }
 
       const requiredDependencies = ATTACK20_DEPENDENCIES[decision.attackId];

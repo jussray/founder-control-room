@@ -17,6 +17,7 @@ import {
   type FingerprintClass,
   type ProofBinding,
   type ProofCookieContract,
+  type RuntimeReadbackWitness,
   type WorkerApplicabilityInput,
 } from './attack20V3.js';
 
@@ -117,14 +118,75 @@ function receipt(attackId: Attack20Id, verdict: 'PASS' | 'FAILED' | 'UNVERIFIED'
   };
 }
 
-function aggregate(receipts: readonly Attack20ReceiptV3[], plan = generateAttack20ApplicabilityPlan(allCapabilities(), binding())) {
-  const proofCookie = cookie();
+function runtimeWitnessLineage() {
+  const founder = cookie();
+  const builder = cookie({
+    cookieId: 'pc_builder_witness_0001',
+    contextType: 'builder-run',
+    owner: 'principal:builder',
+    createdAt: '2026-08-26T10:30:00.000Z',
+    parentCookieId: founder.cookieId,
+  });
+  const verifier = cookie({
+    cookieId: 'pc_verify_witness_00001',
+    contextType: 'verification-run',
+    owner: 'principal:verifier',
+    createdAt: '2026-08-26T10:45:00.000Z',
+    parentCookieId: builder.cookieId,
+  });
+  const provider = cookie({
+    cookieId: 'pc_provider_witness_0001',
+    contextType: 'provider-run',
+    owner: 'principal:provider',
+    createdAt: '2026-08-26T11:00:00.000Z',
+    parentCookieId: verifier.cookieId,
+  });
+  return { founder, builder, verifier, provider };
+}
+
+function runtimeWitness(receiptValue: Attack20ReceiptV3, proofCookie: ProofCookieContract): RuntimeReadbackWitness {
+  return {
+    witnessId: receiptValue.evidence.runtimeReadbackIds[0]!,
+    target: {
+      project: receiptValue.target.project,
+      worker: receiptValue.target.worker,
+      environment: receiptValue.target.environment,
+    },
+    observedAt: '2026-08-26T11:31:00.000Z',
+    proofBinding: {
+      fingerprints: {
+        runtime: receiptValue.proofBinding.fingerprints.runtime,
+        provider: receiptValue.proofBinding.fingerprints.provider,
+      },
+      cookieContract: proofCookie,
+    },
+  };
+}
+
+function aggregate(
+  receipts: readonly Attack20ReceiptV3[],
+  plan = generateAttack20ApplicabilityPlan(allCapabilities(), binding()),
+  runtimeReadbackIndex?: ReadonlyMap<string, RuntimeReadbackWitness>,
+) {
+  const lineage = runtimeWitnessLineage();
+  const a19 = receipts.find((item) => item.attackId === 'A19');
+  const defaultWitnesses = new Map<string, RuntimeReadbackWitness>();
+  if (a19?.evidence.runtimeReadbackIds[0]) {
+    const witness = runtimeWitness(a19, lineage.provider);
+    defaultWitnesses.set(witness.witnessId, witness);
+  }
   return aggregateWorkerAttack20Status({
     applicabilityInput: allCapabilities(),
     plan,
     receipts,
     currentFingerprints: fingerprints(),
-    cookieIndex: new Map([[proofCookie.cookieId, proofCookie]]),
+    cookieIndex: new Map([
+      [lineage.founder.cookieId, lineage.founder],
+      [lineage.builder.cookieId, lineage.builder],
+      [lineage.verifier.cookieId, lineage.verifier],
+      [lineage.provider.cookieId, lineage.provider],
+    ]),
+    runtimeReadbackIndex: runtimeReadbackIndex ?? defaultWitnesses,
     now: NOW,
   });
 }
@@ -264,6 +326,15 @@ describe('ATTACK-20 V3', () => {
     );
   });
 
+  it('requires A19 witness IDs to resolve through the authenticated runtime-readback index', () => {
+    const receipts = ATTACK20_IDS.map((id) => receipt(id));
+    const a19 = receipts[ATTACK20_IDS.indexOf('A19')]!;
+    a19.evidence.runtimeReadbackIds = ['runtime-readback-untrusted'];
+    const plan = generateAttack20ApplicabilityPlan(allCapabilities(), binding());
+
+    expect(aggregate(receipts, plan, new Map())).toBe('UNVERIFIED');
+  });
+
   it('does not preserve a stale red or stale green as current truth', () => {
     const receipts = ATTACK20_IDS.map((id) => receipt(id));
     const staleFailure = receipt('A11', 'FAILED');
@@ -293,6 +364,16 @@ describe('ATTACK-20 V3', () => {
 
     expect(aggregate([...receipts, tiedFailure])).toBe('FAILED');
     expect(aggregate([tiedFailure, ...receipts])).toBe('FAILED');
+  });
+
+  it('keeps malformed receipt chronology load-bearing instead of silently dropping it', () => {
+    const receipts = ATTACK20_IDS.map((id) => receipt(id));
+    const malformedFailure = receipt('A07', 'FAILED');
+    malformedFailure.receiptId = 'receipt-A07-malformed-time';
+    malformedFailure.test.executedAt = 'not-a-date';
+    receipts.push(malformedFailure);
+
+    expect(aggregate(receipts)).toBe('UNVERIFIED');
   });
 
   it('allows a newer retry for the same fixture and surface to supersede its historical result', () => {

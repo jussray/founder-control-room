@@ -69,10 +69,29 @@ function stripQuotes(value) {
 }
 
 function isSensitiveTemplateKey(key) {
-  return /(?:^|_)(?:SECRET|TOKEN|PASSWORD|PRIVATE_KEY|SERVICE_ROLE_KEY|API_KEY|ENCRYPTION_KEY)$/.test(key)
-    || /_HOOK_URL$/.test(key)
-    || /_GRANT_JSON$/.test(key)
-    || key === 'DATABASE_URL';
+  const normalized = key.toUpperCase();
+  return /(?:^|_)(?:SECRET|TOKEN|PASSWORD)(?:_|$)/.test(normalized)
+    || /(?:^|_)(?:PRIVATE|SERVICE_ROLE|API|ENCRYPTION|SIGNING|ACCESS)_KEY(?:_|$)/.test(normalized)
+    || /_HOOK_URL$/.test(normalized)
+    || /_GRANT_JSON$/.test(normalized)
+    || normalized === 'DATABASE_URL';
+}
+
+for (const sensitiveKey of [
+  'NEW_API_TOKEN',
+  'AWS_SECRET_ACCESS_KEY',
+  'STRIPE_SECRET_KEY',
+  'GITHUB_PRIVATE_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+]) {
+  requireValue(isSensitiveTemplateKey(sensitiveKey), `sensitive key classifier must reject ${sensitiveKey}`);
+}
+for (const publicKey of [
+  'SUPABASE_PUBLISHABLE_KEY',
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'CLOUDFLARE_ACCOUNT_ID',
+]) {
+  requireValue(!isSensitiveTemplateKey(publicKey), `sensitive key classifier must not over-classify ${publicKey}`);
 }
 
 function isExplicitPlaceholder(key, value) {
