@@ -314,7 +314,8 @@ export function normalizeUnifiedMemoryObservation(
   if (input.trust === 'revoked' && revokedAt === null) errors.push('revoked memory requires revokedAt.');
   if (input.trust !== 'revoked' && revokedAt !== null) errors.push('revokedAt is only valid for revoked memory.');
 
-  if (!policy.allowedPrivacy.includes(input.privacy)) {
+  const allowedPrivacy = policy.allowedPrivacy as readonly UnifiedMemoryPrivacy[];
+  if (!allowedPrivacy.includes(input.privacy)) {
     errors.push(`${input.sourceSystem} does not allow privacy class ${input.privacy}.`);
   }
 
@@ -385,10 +386,6 @@ export function normalizeUnifiedMemoryObservation(
       executionAuthority: false,
     },
   };
-}
-
-function sameLogicalObservation(a: UnifiedMemoryRecord, b: UnifiedMemoryRecord): boolean {
-  return a.continuityFingerprint === b.continuityFingerprint;
 }
 
 export function buildUnifiedMemoryView(
