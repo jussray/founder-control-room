@@ -47,6 +47,9 @@ export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = tar
         .map((entry) => text(entry?.context))
         .filter(Boolean)
     : [];
+  const ruleTypes = Array.isArray(ruleset?.rules)
+    ? ruleset.rules.map((rule) => text(rule?.type)).filter(Boolean).sort()
+    : [];
   const bypassObservationComplete = Array.isArray(ruleset?.bypass_actors);
   const bypassActors = bypassObservationComplete
     ? ruleset.bypass_actors.map((actor) => ({
@@ -66,6 +69,7 @@ export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = tar
     target: text(ruleset?.target),
     targetRefs: targets,
     targetsRequestedRef: targets.some((target) => targetTokens.has(target)),
+    ruleTypes,
     requirePullRequest: Boolean(pull),
     requiredApprovingReviewCount: Number(pull?.parameters?.required_approving_review_count ?? 0),
     dismissStaleReviewsOnPush: pull?.parameters?.dismiss_stale_reviews_on_push === true,
@@ -102,12 +106,19 @@ function exactRequiredChecksMatch(snapshot) {
   return JSON.stringify(observed) === JSON.stringify(expected);
 }
 
+function exactRuleTypesMatch(snapshot, expectedRuleTypes) {
+  const observed = Array.isArray(snapshot?.ruleTypes) ? [...snapshot.ruleTypes].sort() : [];
+  const expected = [...expectedRuleTypes].sort();
+  return JSON.stringify(observed) === JSON.stringify(expected);
+}
+
 export function canonicalFloorSatisfied(snapshot, expectedBypassActors) {
   if (!snapshot) return false;
   return snapshot.name === CANONICAL_RULESET_NAME
     && snapshot.enforcement === 'active'
     && snapshot.target === 'branch'
     && snapshot.targetsRequestedRef === true
+    && exactRuleTypesMatch(snapshot, ['pull_request', 'non_fast_forward', 'deletion'])
     && snapshot.requirePullRequest === true
     && snapshot.requiredApprovingReviewCount >= 1
     && snapshot.dismissStaleReviewsOnPush === true
@@ -126,6 +137,7 @@ export function freshnessFloorSatisfied(snapshot, expectedName = canonicalFreshn
     && snapshot.enforcement === 'active'
     && snapshot.target === 'branch'
     && snapshot.targetsRequestedRef === true
+    && exactRuleTypesMatch(snapshot, ['required_status_checks'])
     && snapshot.requirePullRequest === false
     && snapshot.strictRequiredStatusChecks === true
     && exactRequiredChecksMatch(snapshot)
