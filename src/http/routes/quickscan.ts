@@ -28,6 +28,10 @@ import {
   type QuickScanChiefResult,
 } from '../../quickscan/chiefOpenaiClient.js';
 import { QUICKSCAN_CHIEF_WORKFLOW } from '../../quickscan/chiefPrompts.js';
+import {
+  assertReasoningStateStillCurrent,
+  ReasoningStateChangedError,
+} from '../../lib/reasoningStateRevalidation.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
 type RunQuickScanChief = ReturnType<typeof createOpenAiQuickScanChiefRunner>;
@@ -245,6 +249,9 @@ quickScanRouter.post('/prospects/:id/delivery', (req: FounderRequest, res) => {
  * recommendation if evidence, qualification, or lifecycle state changed
  * while the provider call was in flight — the recommendation would
  * otherwise be attached to input the model never actually reasoned about.
+ * The comparison is delegated to the repository-level reasoning-state
+ * revalidation guard so other consequential reasoners can adopt the same
+ * fail-closed invariant without duplicating QuickScan-specific logic.
  * A prior undecided Chief-proposed approval is always superseded (SKIP)
  * before a new one is proposed, even when this recommendation is not
  * itself send-worthy, so the founder never sees more than one live draft.
@@ -279,26 +286,27 @@ quickScanRouter.post('/prospects/:id/chief-recommendation', async (req: FounderR
     );
   }
 
-  // Re-read: the provider call above can take seconds, and another request
-  // (a Stripe webhook, an approval decision, new evidence) may have mutated
-  // this prospect while it was in flight. Applying Chief's result to the
-  // pre-await clone would silently overwrite that newer state on save.
+  // Re-read after reasoning. Another request may have changed the exact
+  // evidence, qualification, or lifecycle state Chief actually reasoned on.
   const prospect = getQuickScanProspect(req.params.id);
   if (!prospect) return fail(res, 404, 'PROSPECT_NOT_FOUND', 'prospect not found');
 
-  // The re-read above only stops us from reverting a concurrent mutation —
-  // it does not stop us from applying a recommendation Chief reasoned out
-  // against a snapshot that no longer matches. If evidence, qualification,
-  // or lifecycle state changed while the provider call was in flight, the
-  // recommendation (and any evidenceIds an approval would bind to) may
-  // reflect input the model never saw. Refuse and let the caller retry
-  // against current state rather than silently misattributing the basis.
-  const snapshotChanged =
-    prospect.lifecycleState !== initial.lifecycleState ||
-    JSON.stringify(prospect.evidence) !== JSON.stringify(initial.evidence) ||
-    JSON.stringify(prospect.qualification ?? null) !== JSON.stringify(initial.qualification ?? null);
-  if (snapshotChanged) {
-    return fail(res, 409, 'QUICKSCAN_CHIEF_INPUT_CHANGED', 'this prospect\'s evidence, qualification, or lifecycle state changed while Chief was reasoning about it; retry the recommendation against current state');
+  try {
+    assertReasoningStateStillCurrent({
+      before: initial,
+      after: prospect,
+      label: 'QuickScan Chief input',
+      fingerprint: (state) => JSON.stringify({
+        lifecycleState: state.lifecycleState,
+        evidence: state.evidence,
+        qualification: state.qualification ?? null,
+      }),
+    });
+  } catch (error) {
+    if (error instanceof ReasoningStateChangedError) {
+      return fail(res, 409, 'QUICKSCAN_CHIEF_INPUT_CHANGED', 'this prospect\'s evidence, qualification, or lifecycle state changed while Chief was reasoning about it; retry the recommendation against current state');
+    }
+    throw error;
   }
 
   try {
