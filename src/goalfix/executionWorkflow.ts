@@ -115,6 +115,23 @@ export interface GoalfixFounderDecision {
   proofBinding: ProofBinding;
 }
 
+export interface GoalfixProviderMergeGateReadback {
+  receiptId: string;
+  repository: string;
+  pullRequestNumber: number;
+  sourceBranch: string;
+  targetBranch: string;
+  baseSha: string;
+  headSha: string;
+  diffFingerprint: string;
+  pullRequestState: 'OPEN' | 'CLOSED' | 'MERGED';
+  requiredChecksState: 'PASS' | 'FAILED' | 'PENDING';
+  reviewState: 'APPROVED' | 'CHANGES_REQUESTED' | 'PENDING';
+  unresolvedMaterialThreads: number;
+  observedAt: string;
+  proofBinding: ProofBinding;
+}
+
 export interface GoalfixMergeAncestryReceipt {
   receiptId: string;
   repository: string;
@@ -157,6 +174,8 @@ export interface GoalfixExecutionInput {
   targetBranch: string;
   trustedFounderPrincipalId: string;
   trustedRuntimeFingerprint: string;
+  trustedProviderMergeGateFingerprint?: string;
+  providerMergeGateReadback?: GoalfixProviderMergeGateReadback | null;
   baseSha: string;
   candidateHeadSha: string;
   currentMainSha: string;
@@ -238,6 +257,16 @@ export function goalfixFounderDecisionFingerprint(
     approvedHeadSha: decision.approvedHeadSha.toLowerCase(),
     approvedDiffFingerprint: decision.approvedDiffFingerprint,
     approvedAt: decision.approvedAt,
+  });
+}
+
+export function goalfixProviderMergeGateFingerprint(
+  readback: Omit<GoalfixProviderMergeGateReadback, 'proofBinding'>,
+): string {
+  return fingerprintNormalized({
+    ...readback,
+    baseSha: readback.baseSha.toLowerCase(),
+    headSha: readback.headSha.toLowerCase(),
   });
 }
 
@@ -450,6 +479,61 @@ function validateFounderDecision(
   return errors;
 }
 
+function validateProviderMergeGateReadback(
+  readback: GoalfixProviderMergeGateReadback,
+  input: GoalfixExecutionInput,
+  founderDecision: GoalfixFounderDecision,
+  now: Date,
+): string[] {
+  const errors: string[] = [];
+  if (!readback.receiptId.trim()) errors.push('provider merge-gate receipt ID is required');
+  if (readback.repository !== input.repository) errors.push('provider merge-gate repository is mismatched');
+  if (readback.pullRequestNumber !== input.pullRequestNumber) errors.push('provider merge-gate PR number is mismatched');
+  if (readback.sourceBranch !== input.branch || readback.targetBranch !== input.targetBranch) errors.push('provider merge-gate branch binding is mismatched');
+  if (readback.baseSha.toLowerCase() !== input.baseSha.toLowerCase()) errors.push('provider merge-gate base SHA is mismatched');
+  if (readback.headSha.toLowerCase() !== input.candidateHeadSha.toLowerCase()) errors.push('provider merge-gate head SHA is mismatched');
+  if (readback.diffFingerprint !== input.diffFingerprint) errors.push('provider merge-gate diff fingerprint is mismatched');
+  if (readback.pullRequestState !== 'OPEN') errors.push('provider merge-gate PR is not open');
+  if (readback.requiredChecksState !== 'PASS') errors.push('provider merge-gate required checks are not PASS');
+  if (readback.reviewState !== 'APPROVED') errors.push('provider merge-gate review state is not APPROVED');
+  if (!Number.isInteger(readback.unresolvedMaterialThreads) || readback.unresolvedMaterialThreads !== 0) {
+    errors.push('provider merge-gate has unresolved material review threads');
+  }
+
+  const observedAtMs = isIsoTimestamp(readback.observedAt) ? Date.parse(readback.observedAt) : null;
+  if (observedAtMs === null || observedAtMs > now.getTime()) {
+    errors.push('provider merge-gate observedAt is invalid');
+  } else {
+    if (observedAtMs < now.getTime() - GOALFIX_MERGE_PROOF_TTL_MS) {
+      errors.push('provider merge-gate readback is outside the merge proof freshness window');
+    }
+    if (isIsoTimestamp(founderDecision.approvedAt) && observedAtMs < Date.parse(founderDecision.approvedAt)) {
+      errors.push('provider merge-gate readback predates Founder Final authorization');
+    }
+  }
+
+  if (!input.trustedProviderMergeGateFingerprint || input.trustedProviderMergeGateFingerprint.trim().length < 16) {
+    errors.push('trusted provider merge-gate fingerprint is required');
+  }
+  errors.push(...validateProofBinding(readback.proofBinding, ['sourceSha', 'provider', 'evidenceBundle'], now)
+    .map((error) => `provider merge-gate: ${error}`));
+  errors.push(...validateCookieLineage(readback.proofBinding.cookieContract, input.cookieIndex, now)
+    .map((error) => `provider merge-gate: ${error}`));
+  if (readback.proofBinding.cookieContract.contextType !== 'provider-run') {
+    errors.push('provider merge-gate proof cookie context must be provider-run');
+  }
+  if (readback.proofBinding.fingerprints.sourceSha !== goalfixSourceFingerprint(input.repository, input.candidateHeadSha)) {
+    errors.push('provider merge-gate sourceSha proof fingerprint does not match candidate head');
+  }
+  if (readback.proofBinding.fingerprints.provider !== input.trustedProviderMergeGateFingerprint) {
+    errors.push('provider merge-gate fingerprint does not match trusted provider readback');
+  }
+  if (readback.proofBinding.fingerprints.evidenceBundle !== goalfixProviderMergeGateFingerprint({ ...readback, proofBinding: undefined } as never)) {
+    errors.push('provider merge-gate evidenceBundle does not bind current PR/check/review truth');
+  }
+  return [...new Set(errors)];
+}
+
 function validateMergeAncestryReceipt(
   receipt: GoalfixMergeAncestryReceipt,
   input: GoalfixExecutionInput,
@@ -472,8 +556,16 @@ function validateMergeAncestryReceipt(
   if (mergedAtMs === null) errors.push('merge ancestry mergedAt must be an ISO timestamp');
   if (observedAtMs === null || observedAtMs > now.getTime()) errors.push('merge ancestry observedAt is invalid');
   if (mergedAtMs !== null && observedAtMs !== null && mergedAtMs > observedAtMs) errors.push('merge ancestry cannot be observed before the provider merge time');
-  if (mergedAtMs !== null && isIsoTimestamp(founderDecision.approvedAt) && mergedAtMs < Date.parse(founderDecision.approvedAt)) {
-    errors.push('merge ancestry provider merge time predates Founder Final authorization');
+  if (mergedAtMs !== null && isIsoTimestamp(founderDecision.approvedAt)) {
+    const approvedAtMs = Date.parse(founderDecision.approvedAt);
+    if (mergedAtMs < approvedAtMs) {
+      errors.push('merge ancestry provider merge time predates Founder Final authorization');
+    }
+    if (mergedAtMs > approvedAtMs + GOALFIX_MERGE_PROOF_TTL_MS) {
+      errors.push('merge ancestry provider merge time is outside the Founder Final merge lease');
+    }
+    errors.push(...validateFounderDecision(founderDecision, input, new Date(mergedAtMs), true)
+      .map((error) => `merge ancestry founder lease: ${error}`));
   }
 
   errors.push(...validateProofBinding(receipt.proofBinding, ['sourceSha', 'evidenceBundle'], now).map((error) => `merge ancestry: ${error}`));
@@ -481,7 +573,7 @@ function validateMergeAncestryReceipt(
   if (receipt.proofBinding.cookieContract.contextType !== 'provider-run') errors.push('merge ancestry proof cookie context must be provider-run');
   if (receipt.proofBinding.fingerprints.sourceSha !== goalfixSourceFingerprint(input.repository, mergedSha)) errors.push('merge ancestry sourceSha proof fingerprint does not match merged main');
   if (receipt.proofBinding.fingerprints.evidenceBundle !== goalfixMergeAncestryFingerprint({ ...receipt, proofBinding: undefined } as never)) errors.push('merge ancestry evidenceBundle does not bind candidate-to-merged proof');
-  return errors;
+  return [...new Set(errors)];
 }
 
 function validateRuntimeReceipt(
@@ -559,7 +651,6 @@ function hasProviderBoundMergeExecution(input: GoalfixExecutionInput, now: Date)
   if (!input.founderDecision || input.founderDecision.action !== 'MERGE' || !input.postMergeTruth) return false;
   const truth = input.postMergeTruth;
   if (!exactSha(truth.mergedSha)) return false;
-  if (validateFounderDecision(input.founderDecision, input, now, false).length > 0) return false;
   return validateMergeAncestryReceipt(
     truth.mergeAncestryReceipt,
     input,
@@ -729,12 +820,38 @@ export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixE
   }
 
   if (!input.postMergeTruth) {
+    if (!input.providerMergeGateReadback) {
+      return {
+        contract: GOALFIX_EXECUTION_CONTRACT,
+        state: 'UNVERIFIED',
+        currentPhase: 'merge-gate',
+        mayMerge: false,
+        reasons: ['fresh authenticated provider PR/check/review readback is required immediately before merge'],
+        requiredNextEvidence: ['Re-read the exact current PR, diff, required checks, review state, and unresolved material threads from the provider.'],
+      };
+    }
+    const providerGateErrors = validateProviderMergeGateReadback(
+      input.providerMergeGateReadback,
+      input,
+      input.founderDecision,
+      now,
+    );
+    if (providerGateErrors.length > 0) {
+      return {
+        contract: GOALFIX_EXECUTION_CONTRACT,
+        state: 'UNVERIFIED',
+        currentPhase: 'merge-gate',
+        mayMerge: false,
+        reasons: providerGateErrors,
+        requiredNextEvidence: ['Refresh provider PR/check/review truth on the exact current candidate before merge.'],
+      };
+    }
     return {
       contract: GOALFIX_EXECUTION_CONTRACT,
       state: 'READY_TO_MERGE',
       currentPhase: 'merge-gate',
       mayMerge: true,
-      reasons: ['All pre-merge gates are current and founder merge authority is exact-candidate bound.'],
+      reasons: ['All pre-merge gates are current, founder authority is exact-candidate bound, and provider PR/check/review truth is freshly authenticated.'],
       requiredNextEvidence: ['Merge using expected-head protection, then reacquire main and verify ancestry plus post-merge/runtime truth.'],
     };
   }
