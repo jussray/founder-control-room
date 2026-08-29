@@ -137,44 +137,64 @@ function chiefDecisionReceipt(projectSlug, expectedHeadSha) {
 
 let activeBrowserPage = null;
 
-async function replaceLegacyBearerWithOpaqueCookie(url, init) {
+async function runLegacyBearerCallThroughOpaqueBrowser(url, init) {
   const headers = new Headers(init.headers ?? {});
   const authorization = headers.get('authorization');
-  if (!authorization) return init;
+  if (!authorization) return null;
 
   if (!/^Bearer (?:undefined|null)?$/i.test(authorization.trim())) {
     throw new Error('E2E_BROWSER_BEARER_REGRESSION: browser-readable bearer credentials must not cross the opaque-session boundary');
   }
   if (!activeBrowserPage) {
-    throw new Error('E2E_OPAQUE_COOKIE_UNAVAILABLE: no authenticated browser page is bound to the direct request');
+    throw new Error('E2E_OPAQUE_BROWSER_UNAVAILABLE: no authenticated browser page is bound to the direct request');
+  }
+  if (init.body !== undefined && typeof init.body !== 'string') {
+    throw new Error('E2E_OPAQUE_BROWSER_BODY_UNSUPPORTED: legacy compatibility calls must use a string body');
   }
 
-  // Do not URL-filter the jar here. The real E2E origin is local HTTP while
-  // the production cookie intentionally carries Secure + __Host semantics.
-  // Chromium already proved the cookie-backed browser path against /auth/me;
-  // this bridge only needs the exact HttpOnly capability for the legacy
-  // Node-side provider-boundary calls in run.mjs.
-  const cookies = await activeBrowserPage.context().cookies();
-  const founderCookie = cookies.find((cookie) => cookie.name === '__Host-fcr_session');
-  if (!founderCookie || !founderCookie.value || founderCookie.httpOnly !== true) {
-    throw new Error('E2E_OPAQUE_COOKIE_UNAVAILABLE: expected an HttpOnly __Host-fcr_session cookie');
-  }
-
+  // The stale long-form harness still constructs a few Node-side requests as
+  // `Bearer undefined` after the browser credential cutover. Do not extract
+  // or replay the HttpOnly capability from Node. Execute only that exact stale
+  // request shape inside the already-authenticated Chromium page instead, so
+  // the real same-origin cookie, Origin semantics, and browser transport are
+  // exercised exactly as the product uses them.
   headers.delete('authorization');
-  headers.set('cookie', `${founderCookie.name}=${founderCookie.value}`);
-  return { ...init, headers };
+  const request = {
+    url,
+    method: init.method ?? 'GET',
+    headers: Object.fromEntries(headers.entries()),
+    body: init.body ?? null,
+  };
+  const result = await activeBrowserPage.evaluate(async (browserRequest) => {
+    const response = await fetch(browserRequest.url, {
+      method: browserRequest.method,
+      headers: browserRequest.headers,
+      body: browserRequest.body,
+      credentials: 'same-origin',
+    });
+    return {
+      status: response.status,
+      statusText: response.statusText,
+      headers: [...response.headers.entries()],
+      body: await response.text(),
+    };
+  }, request);
+
+  return new Response(result.body, {
+    status: result.status,
+    statusText: result.statusText,
+    headers: result.headers,
+  });
 }
 
-// run.mjs performs a few provider-boundary calls with Node fetch. Its legacy
-// code still asks sessionStorage for an access token. After the opaque-session
-// cutover that value must be absent. Translate only that explicit stale test
-// shape into the real HttpOnly browser cookie, and fail if a readable bearer
-// token ever reappears. This keeps the browser UI itself cookie-native while
-// preserving the existing long-form E2E journey.
+// run.mjs still contains a few provider-boundary calls whose historical code
+// asks sessionStorage for an access token. After the opaque-session cutover
+// that value must be absent. Route only that explicit stale test shape through
+// the authenticated Chromium page and fail if a readable bearer token ever
+// reappears. No browser cookie is exposed to Node by this compatibility bridge.
 const originalFetch = globalThis.fetch.bind(globalThis);
 globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-  init = await replaceLegacyBearerWithOpaqueCookie(url, init);
 
   if (url.includes('/approvals/') && url.endsWith('/execute') && typeof init.body === 'string') {
     try {
@@ -187,6 +207,9 @@ globalThis.fetch = async (input, init = {}) => {
       // Preserve malformed requests unchanged so the real route can reject them.
     }
   }
+
+  const browserResponse = await runLegacyBearerCallThroughOpaqueBrowser(url, init);
+  if (browserResponse) return browserResponse;
   return originalFetch(input, init);
 };
 
