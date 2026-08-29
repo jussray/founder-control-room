@@ -17,6 +17,10 @@ import type {
   RulesetResult,
 } from "./RepositoryProvider.js";
 
+const FCR_CODE_SCANNING_TOOL = "CodeQL";
+const FCR_CODE_SCANNING_SECURITY_THRESHOLD = "high_or_higher";
+const FCR_CODE_SCANNING_ALERTS_THRESHOLD = "errors";
+
 export interface GitHubProviderConfig {
   token: string;
   /** Maps Control Room projectId -> "owner/repo". */
@@ -460,10 +464,22 @@ export class GitHubProvider implements RepositoryProvider {
         type: "pull_request",
         parameters: {
           dismiss_stale_reviews_on_push: hardenFounderControlRoomMainReview,
-          require_code_owner_review: false,
+          require_code_owner_review: hardenFounderControlRoomMainReview,
           require_last_push_approval: hardenFounderControlRoomMainReview,
           required_approving_review_count: config.requiredApprovingReviewCount,
           required_review_thread_resolution: true,
+        },
+      });
+    }
+    if (hardenFounderControlRoomMainReview) {
+      reviewRules.push({
+        type: "code_scanning",
+        parameters: {
+          code_scanning_tools: [{
+            tool: FCR_CODE_SCANNING_TOOL,
+            security_alerts_threshold: FCR_CODE_SCANNING_SECURITY_THRESHOLD,
+            alerts_threshold: FCR_CODE_SCANNING_ALERTS_THRESHOLD,
+          }],
         },
       });
     }
@@ -735,10 +751,29 @@ function fcrMainReviewRulesetReadbackErrors(config: RulesetConfig, value: unknow
     errors.push("approving review count does not match requested policy");
   }
   if (pullParameters.dismiss_stale_reviews_on_push !== true) errors.push("stale approvals are not dismissed on push");
+  if (pullParameters.require_code_owner_review !== true) errors.push("Code Owner review is not required");
   if (pullParameters.require_last_push_approval !== true) errors.push("last-push approval is not required");
   if (pullParameters.required_review_thread_resolution !== true) errors.push("review-thread resolution is not required");
   if (rules.some((rule) => rule.type === "required_status_checks")) {
     errors.push("review membrane must not own bypassable required-status freshness");
+  }
+
+  const codeScanningRules = rules.filter((rule) => rule.type === "code_scanning");
+  if (codeScanningRules.length !== 1) {
+    errors.push("review membrane must contain exactly one CodeQL code-scanning rule");
+  } else {
+    const codeScanningTools = Array.isArray(codeScanningRules[0]?.parameters?.code_scanning_tools)
+      ? codeScanningRules[0].parameters.code_scanning_tools
+      : [];
+    const exactCodeQL = codeScanningTools.length === 1
+      && codeScanningTools[0]
+      && typeof codeScanningTools[0] === "object"
+      && (codeScanningTools[0] as { tool?: unknown }).tool === FCR_CODE_SCANNING_TOOL
+      && (codeScanningTools[0] as { security_alerts_threshold?: unknown }).security_alerts_threshold
+        === FCR_CODE_SCANNING_SECURITY_THRESHOLD
+      && (codeScanningTools[0] as { alerts_threshold?: unknown }).alerts_threshold
+        === FCR_CODE_SCANNING_ALERTS_THRESHOLD;
+    if (!exactCodeQL) errors.push("CodeQL code-scanning thresholds do not match the constitutional floor");
   }
 
   if (config.blockForcePushes && !rules.some((rule) => rule.type === "non_fast_forward")) {
@@ -746,6 +781,17 @@ function fcrMainReviewRulesetReadbackErrors(config: RulesetConfig, value: unknow
   }
   if (config.blockDeletion && !rules.some((rule) => rule.type === "deletion")) {
     errors.push("deletion protection is missing");
+  }
+
+  const expectedRuleTypes = [
+    "pull_request",
+    "code_scanning",
+    ...(config.blockForcePushes ? ["non_fast_forward"] : []),
+    ...(config.blockDeletion ? ["deletion"] : []),
+  ].sort();
+  const observedRuleTypes = rules.map((rule) => String(rule.type ?? "")).filter(Boolean).sort();
+  if (JSON.stringify(observedRuleTypes) !== JSON.stringify(expectedRuleTypes)) {
+    errors.push("review membrane contains unexpected or missing rule types");
   }
   return errors;
 }
