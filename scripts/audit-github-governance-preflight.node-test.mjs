@@ -87,6 +87,7 @@ test('canonical FCR governance requires separate review and zero-bypass freshnes
   const freshness = rulesetSnapshot(freshnessRuleset(), 'main', 'main');
 
   assert.equal(review.targetsRequestedRef, true);
+  assert.deepEqual(review.ruleTypes, ['deletion', 'non_fast_forward', 'pull_request']);
   assert.equal(review.requiredApprovingReviewCount, 1);
   assert.equal(review.dismissStaleReviewsOnPush, true);
   assert.equal(review.requireLastPushApproval, true);
@@ -99,6 +100,7 @@ test('canonical FCR governance requires separate review and zero-bypass freshnes
   assert.equal(canonicalFloorSatisfied(review, expectedBypass), true);
 
   assert.equal(freshness.name, `${CANONICAL_RULESET_NAME} [strict freshness]`);
+  assert.deepEqual(freshness.ruleTypes, ['required_status_checks']);
   assert.equal(freshness.requirePullRequest, false);
   assert.equal(freshness.strictRequiredStatusChecks, true);
   assert.deepEqual(freshness.requiredStatusCheckNames, ['Required Gate', 'Verify test-ledger contract']);
@@ -211,11 +213,25 @@ test('freshness companion must have zero bypass actors and only exact strict che
   assert.equal(unexpectedReport.status, 'NOT_READY');
   assert.equal(unexpectedReport.freshnessFloorSatisfied, false);
 
+  const hiddenUnexpectedRule = freshnessRuleset();
+  hiddenUnexpectedRule.rules.push({ type: 'code_scanning' });
+  const hiddenUnexpectedReport = readyReport({ fullRulesets: [canonicalRuleset(), hiddenUnexpectedRule] });
+  assert.equal(hiddenUnexpectedReport.status, 'NOT_READY');
+  assert.equal(hiddenUnexpectedReport.freshnessFloorSatisfied, false);
+
   const wrongChecks = freshnessRuleset();
   wrongChecks.rules[0].parameters.required_status_checks = [{ context: 'Required Gate' }];
   const wrongChecksReport = readyReport({ fullRulesets: [canonicalRuleset(), wrongChecks] });
   assert.equal(wrongChecksReport.status, 'NOT_READY');
   assert.equal(wrongChecksReport.freshnessFloorSatisfied, false);
+});
+
+test('review membrane rejects unmodeled extra provider rules', () => {
+  const extraRule = canonicalRuleset();
+  extraRule.rules.push({ type: 'copilot_code_review' });
+  const report = readyReport({ fullRulesets: [extraRule, freshnessRuleset()] });
+  assert.equal(report.status, 'NOT_READY');
+  assert.equal(report.canonicalFloorSatisfied, false);
 });
 
 test('missing trusted GitHub App identity blocks instead of manufacturing provider truth', () => {
