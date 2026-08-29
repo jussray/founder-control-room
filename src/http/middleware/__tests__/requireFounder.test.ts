@@ -29,6 +29,8 @@ vi.mock('../../../lib/supabaseClient.js', () => ({
 import { writeFounderSession } from '../../../auth/founderSession.js';
 import { requireFounder } from '../requireFounder.js';
 
+const FOUNDER_SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64url');
+
 const allowlistChain = {
   select: mocks.select,
   eq: mocks.eq,
@@ -143,6 +145,7 @@ beforeEach(() => {
   mocks.browserSessions.clear();
   vi.stubEnv('NODE_ENV', 'test');
   vi.stubEnv('FOUNDER_API_URL', 'https://foundercontrolroom.org');
+  vi.stubEnv('FOUNDER_SESSION_ENCRYPTION_KEY', FOUNDER_SESSION_ENCRYPTION_KEY);
 
   mocks.from.mockImplementation((table: string) => {
     if (table === 'founder_browser_sessions') return browserSessionTable();
