@@ -38,10 +38,23 @@ const READY_ENV = {
   N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS: 'buffer',
 };
 
-function repository(result: Awaited<ReturnType<FounderContentApprovalRepository['claim']>>): FounderContentApprovalRepository {
+type ApprovalResult = Awaited<ReturnType<FounderContentApprovalRepository['claim']>>;
+
+function repository(claimResult: ApprovalResult, readResult: ApprovalResult = claimResult): FounderContentApprovalRepository {
   return {
     issue: vi.fn(async () => true),
-    claim: vi.fn(async () => result),
+    readCurrent: vi.fn(async () => readResult),
+    claim: vi.fn(async () => claimResult),
+  };
+}
+
+function currentApproval(): ApprovalResult {
+  return {
+    ok: true,
+    approval: STORED_APPROVAL,
+    approvalId: 'fca:buffer-test-1',
+    authorizationHash: AUTHORIZATION_HASH,
+    publicPayloadHash: PUBLIC_PAYLOAD_HASH,
   };
 }
 
@@ -70,15 +83,10 @@ function dispatched(): N8nFounderContentDispatchResult {
 }
 
 describe('authoritative n8n founder-content publisher', () => {
-  it('injects only the one-shot approval claimed from FCR storage before provider dispatch', async () => {
-    const store = repository({
-      ok: true,
-      approval: STORED_APPROVAL,
-      approvalId: 'fca:buffer-test-1',
-      authorizationHash: AUTHORIZATION_HASH,
-      publicPayloadHash: PUBLIC_PAYLOAD_HASH,
-    });
+  it('pre-reads current approval, validates the server-owned envelope, then atomically claims before provider dispatch', async () => {
+    const store = repository(currentApproval());
     const dispatch = vi.fn(async () => dispatched());
+    const buildEnvelope = vi.fn(() => ({} as any));
 
     const result = await dispatchAuthoritativeN8nFounderContent(request(), {
       founderUserId: 'founder-user-1',
@@ -86,10 +94,23 @@ describe('authoritative n8n founder-content publisher', () => {
       now: '2026-08-28T23:55:00.000Z',
       env: READY_ENV,
       approvalRepository: store,
+      buildEnvelope,
       dispatch,
     });
 
     expect(result.ok).toBe(true);
+    expect(store.readCurrent).toHaveBeenCalledWith(expect.objectContaining({
+      founderUserId: 'founder-user-1',
+      approvalId: 'fca:buffer-test-1',
+      authorizationHash: AUTHORIZATION_HASH,
+      publicPayloadHash: PUBLIC_PAYLOAD_HASH,
+    }));
+    expect(buildEnvelope).toHaveBeenCalledWith({
+      n8n_provider: 'buffer',
+      proposal: TEST_PROPOSAL,
+      approval: STORED_APPROVAL,
+      now: '2026-08-28T23:55:00.000Z',
+    });
     expect(store.claim).toHaveBeenCalledWith(expect.objectContaining({
       founderUserId: 'founder-user-1',
       approvalId: 'fca:buffer-test-1',
@@ -108,14 +129,33 @@ describe('authoritative n8n founder-content publisher', () => {
     }));
   });
 
-  it('rejects caller-supplied approval JSON before the authority store is touched', async () => {
-    const store = repository({
-      ok: true,
-      approval: STORED_APPROVAL,
-      approvalId: 'fca:buffer-test-1',
-      authorizationHash: AUTHORIZATION_HASH,
-      publicPayloadHash: PUBLIC_PAYLOAD_HASH,
+  it('fails an invalid server-owned Buffer envelope without consuming one-shot approval', async () => {
+    const store = repository(currentApproval());
+    const dispatch = vi.fn(async () => dispatched());
+    const buildEnvelope = vi.fn(() => {
+      throw new Error('N8N_FOUNDER_CONTENT_PROVIDER_ENVELOPE_REJECTED: missing firewall_output');
     });
+
+    const result = await dispatchAuthoritativeN8nFounderContent(request(), {
+      founderUserId: 'founder-user-1',
+      founderIdentity: 'founder@example.com',
+      now: '2026-08-28T23:55:00.000Z',
+      env: READY_ENV,
+      approvalRepository: store,
+      buildEnvelope,
+      dispatch,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe('INVALID_ENVELOPE');
+    expect(result.reasons.join(' ')).toContain('did not consume the one-shot approval');
+    expect(store.readCurrent).toHaveBeenCalledTimes(1);
+    expect(store.claim).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('rejects caller-supplied approval JSON before the authority store is touched', async () => {
+    const store = repository(currentApproval());
     const dispatch = vi.fn(async () => dispatched());
     const forged = {
       ...request(),
@@ -132,18 +172,13 @@ describe('authoritative n8n founder-content publisher', () => {
 
     expect(result.ok).toBe(false);
     expect(result.reasons.join(' ')).toContain('caller-supplied approval objects are forbidden');
+    expect(store.readCurrent).not.toHaveBeenCalled();
     expect(store.claim).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
   });
 
   it('does not burn one-shot authority when n8n transport is disabled', async () => {
-    const store = repository({
-      ok: true,
-      approval: STORED_APPROVAL,
-      approvalId: 'fca:buffer-test-1',
-      authorizationHash: AUTHORIZATION_HASH,
-      publicPayloadHash: PUBLIC_PAYLOAD_HASH,
-    });
+    const store = repository(currentApproval());
     const dispatch = vi.fn(async () => dispatched());
 
     const result = await dispatchAuthoritativeN8nFounderContent(request(), {
@@ -157,18 +192,13 @@ describe('authoritative n8n founder-content publisher', () => {
     expect(result.ok).toBe(false);
     expect(result.code).toBe('ORCHESTRATION_DISABLED');
     expect(result.reasons.join(' ')).toContain('did not consume the one-shot approval');
+    expect(store.readCurrent).not.toHaveBeenCalled();
     expect(store.claim).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
   });
 
   it('does not consume approval for a provider/platform mismatch', async () => {
-    const store = repository({
-      ok: true,
-      approval: STORED_APPROVAL,
-      approvalId: 'fca:buffer-test-1',
-      authorizationHash: AUTHORIZATION_HASH,
-      publicPayloadHash: PUBLIC_PAYLOAD_HASH,
-    });
+    const store = repository(currentApproval());
     const dispatch = vi.fn(async () => dispatched());
 
     const result = await dispatchAuthoritativeN8nFounderContent({
@@ -184,28 +214,33 @@ describe('authoritative n8n founder-content publisher', () => {
 
     expect(result.ok).toBe(false);
     expect(result.code).toBe('INVALID_ENVELOPE');
+    expect(store.readCurrent).not.toHaveBeenCalled();
     expect(store.claim).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
   });
 
-  it('stops before n8n when FCR cannot atomically claim current approval authority', async () => {
+  it('rechecks atomically after preflight and stops before n8n when approval changes or is consumed', async () => {
     const store = repository({
       ok: false,
       code: 'APPROVAL_NOT_CURRENT',
       reason: 'authoritative approval is expired, revoked, or already consumed',
-    });
+    }, currentApproval());
     const dispatch = vi.fn(async () => dispatched());
+    const buildEnvelope = vi.fn(() => ({} as any));
 
     const result = await dispatchAuthoritativeN8nFounderContent(request(), {
       founderUserId: 'founder-user-1',
       founderIdentity: 'founder@example.com',
       env: READY_ENV,
       approvalRepository: store,
+      buildEnvelope,
       dispatch,
     });
 
     expect(result.ok).toBe(false);
     expect(result.code).toBe('INVALID_AUTHORIZATION');
+    expect(store.readCurrent).toHaveBeenCalledTimes(1);
+    expect(store.claim).toHaveBeenCalledTimes(1);
     expect(dispatch).not.toHaveBeenCalled();
   });
 });
