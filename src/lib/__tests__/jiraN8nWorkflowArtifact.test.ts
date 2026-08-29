@@ -56,9 +56,11 @@ describe('n8n Jira work automation artifact', () => {
     expect(node('Return Receipt').type).toBe('n8n-nodes-base.respondToWebhook');
   });
 
-  it('validates the exact contract, transport idempotency binding, runtime head, and authority ceiling', () => {
+  it('validates the exact contract, one-action limit, transport binding, runtime head, and authority ceiling', () => {
     const validation = serializedParameters('Validate FCR Plan');
     expect(validation).toContain('founder-control-room/jira-work-automation@v1');
+    expect(validation).toContain('plan.actions.length !== 1');
+    expect(validation).toContain('exactly one bounded action is required per observation');
     expect(validation).toContain('idempotency-key');
     expect(validation).toContain('x-fcr-jira-automation-contract');
     expect(validation).toContain('runtimeHeadSha');
@@ -92,7 +94,7 @@ describe('n8n Jira work automation artifact', () => {
     expect(guard).toContain('stale threshold no longer satisfied');
   });
 
-  it('can emit only Jira assignment PUTs or comment POSTs', () => {
+  it('can emit only one Jira assignment PUT or one comment POST', () => {
     const guard = serializedParameters('Guard State and Expand Actions');
     expect(guard).toContain("method: 'PUT'");
     expect(guard).toContain("method: 'POST'");
@@ -111,10 +113,11 @@ describe('n8n Jira work automation artifact', () => {
     expect(rawArtifact).not.toContain('/rest/api/3/project/');
   });
 
-  it('returns only a receipt recomputed from the exact FCR plan after all bounded mutations complete', () => {
+  it('returns only a receipt recomputed from the exact FCR plan after the single bounded mutation completes', () => {
     const receipt = serializedParameters('Build Exact Receipt');
     expect(receipt).toContain('expectedReceiptId');
-    expect(receipt).toContain('results.length !== plan.actions.length');
+    expect(receipt).toContain('results.length !== 1');
+    expect(receipt).toContain('plan.actions.length !== 1');
     expect(receipt).toContain('runtimeHeadSha');
     expect(receipt).toContain('issueKey');
     expect(receipt).toContain('mutatedActions');
