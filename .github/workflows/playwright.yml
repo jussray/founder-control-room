@@ -1,9 +1,11 @@
 name: Playwright E2E
 
+# Pull-request browser authority is carried by CI -> Required Gate. This
+# standalone workflow remains the post-merge/main regression plane and the
+# production exact-SHA witness, so PRs do not pay for the same full browser
+# journey twice.
 on:
   push:
-    branches: [main]
-  pull_request:
     branches: [main]
   workflow_run:
     workflows: [Deploy]
@@ -13,14 +15,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: playwright-e2e-${{ github.event.pull_request.number || github.event.workflow_run.id || github.ref }}
+  group: playwright-e2e-${{ github.event.workflow_run.id || github.ref }}
   cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
-  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-  PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+  EXPECTED_HEAD_SHA: ${{ github.sha }}
+  PR_BASE_SHA: ''
 
 jobs:
   playwright:
@@ -55,9 +57,10 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci --no-audit --no-fund
 
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
@@ -211,7 +214,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
       - name: Install Chromium
         run: npx playwright install chromium --with-deps
