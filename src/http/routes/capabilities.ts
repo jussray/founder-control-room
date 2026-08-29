@@ -14,6 +14,7 @@ const PROJECT_HEALTH_RESOURCE_PREFIX = `capability:${PROJECT_HEALTH_CAPABILITY_I
 const FOUNDER_CONTENT_OBSERVATION_KIND = 'fcr/founder-content-provider-observation@v1';
 const FOUNDER_CONTENT_RESOURCE_TYPE = 'founder_content_post';
 const LINKEDIN_POST_URN = /^urn:li:(share|ugcPost):[A-Za-z0-9_-]+$/;
+const RFC3339_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
 const SHA256 = /^[0-9a-f]{64}$/i;
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 const DYNAMIC_CAPABILITIES = new Map([
@@ -97,7 +98,7 @@ capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: Fo
   const publicationAttested = body.publicationAttested === true;
   const publishedAtRaw = asText(body.publishedAt);
   const contentHashRaw = asText(body.contentHash).toLowerCase();
-  const publishedAtMs = publishedAtRaw ? Date.parse(publishedAtRaw) : null;
+  const publishedAtMs = publishedAtRaw && RFC3339_TIMESTAMP.test(publishedAtRaw) ? Date.parse(publishedAtRaw) : null;
   const observedAtMs = Date.now();
 
   if (!projectSlug) return res.status(400).json({ error: 'projectSlug is required' });
@@ -111,8 +112,8 @@ capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: Fo
       error: 'publicationAttested=true is required for a manual publication observation',
     });
   }
-  if (publishedAtRaw && (publishedAtMs === null || Number.isNaN(publishedAtMs))) {
-    return res.status(400).json({ error: 'publishedAt must be an RFC3339 timestamp when provided' });
+  if (publishedAtRaw && (!RFC3339_TIMESTAMP.test(publishedAtRaw) || publishedAtMs === null || Number.isNaN(publishedAtMs))) {
+    return res.status(400).json({ error: 'publishedAt must be an RFC3339 timestamp with an explicit timezone when provided' });
   }
   if (publishedAtMs !== null && publishedAtMs > observedAtMs + MAX_CLOCK_SKEW_MS) {
     return res.status(400).json({ error: 'publishedAt cannot be materially future-dated' });
@@ -155,6 +156,26 @@ capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: Fo
     observedAt,
   };
 
+  const sourceEventId = `fcae:${randomUUID()}`;
+  const { error: attestationEventError } = await supabase
+    .from('founder_content_attestation_events')
+    .insert({
+      event_id: sourceEventId,
+      project_id: resolved.project.id,
+      founder_user_id: req.founder.userId,
+      provider: 'linkedin',
+      resource_type: FOUNDER_CONTENT_RESOURCE_TYPE,
+      resource_id: identity.postUrn,
+      observed_state: observedState,
+      observed_at: observedAt,
+    });
+
+  if (attestationEventError) {
+    return res.status(500).json({
+      error: `LinkedIn attestation event persistence failed: ${attestationEventError.message}`,
+    });
+  }
+
   const { error: observationError } = await supabase
     .from('provider_observations')
     .upsert({
@@ -164,7 +185,7 @@ capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: Fo
       resource_id: identity.postUrn,
       observed_state: observedState,
       observed_at: observedAt,
-      source_event_id: null,
+      source_event_id: sourceEventId,
     }, { onConflict: 'project_id,provider,resource_type,resource_id' });
 
   if (observationError) {
@@ -176,6 +197,7 @@ capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: Fo
     .set('Cache-Control', 'no-store')
     .json({
       observation: observedState,
+      sourceEventId,
       persistence: 'recorded',
       publicationTruth: 'USER_ATTESTED',
       providerVerified: false,
@@ -200,7 +222,7 @@ capabilitiesRouter.get('/founder-content/linkedin-observations', async (req: Fou
 
   const { data: observation, error: observationError } = await supabase
     .from('provider_observations')
-    .select('provider, resource_type, resource_id, observed_state, observed_at')
+    .select('provider, resource_type, resource_id, observed_state, observed_at, source_event_id')
     .eq('project_id', resolved.project.id)
     .eq('provider', 'linkedin')
     .eq('resource_type', FOUNDER_CONTENT_RESOURCE_TYPE)
