@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { getPortfolioProject } from '../config/portfolio.js';
+
 export type UnifiedMemoryKind =
   | 'working'
   | 'episodic'
@@ -18,6 +21,8 @@ export type UnifiedMemoryTrust =
 export type UnifiedMemoryPrivacy = 'public' | 'internal' | 'private' | 'restricted';
 export type UnifiedMemoryObservationState = 'fresh' | 'stale' | 'invalid' | 'future' | 'revoked';
 export type UnifiedMemoryContentMode = 'sanitized-summary' | 'metadata-only';
+export type UnifiedMemorySourceVerification = 'authenticated-source' | 'untrusted-import';
+export type UnifiedMemoryProjectRegistration = 'registered' | 'external';
 
 interface NativeKindPolicy {
   kind: UnifiedMemoryKind;
@@ -29,6 +34,8 @@ interface SourcePolicy {
   contentMode: UnifiedMemoryContentMode;
   allowedPrivacy: readonly UnifiedMemoryPrivacy[];
   nativeKinds: Readonly<Record<string, NativeKindPolicy>>;
+  projectScope: 'portfolio' | 'external';
+  fixedProjectSlug: string | null;
 }
 
 /**
@@ -36,6 +43,10 @@ interface SourcePolicy {
  * across the founder portfolio. Native storage remains owned by each product.
  * This registry only defines how a sanitized observation may enter FCR's
  * cross-system read model.
+ *
+ * `external` sources may contribute continuity, but they do not gain current
+ * decision-support authority until their project identity is explicitly added
+ * to the canonical FCR portfolio registry and this policy is updated.
  */
 export const UNIFIED_MEMORY_SOURCE_POLICIES = {
   'founder-control-room': {
@@ -48,6 +59,8 @@ export const UNIFIED_MEMORY_SOURCE_POLICIES = {
       evidence: { kind: 'evidence', durable: true },
       decision: { kind: 'decision', durable: true },
     },
+    projectScope: 'portfolio',
+    fixedProjectSlug: null,
   },
   'chief-ai-machine': {
     repository: 'jussray/chief-ai-machine',
@@ -59,6 +72,8 @@ export const UNIFIED_MEMORY_SOURCE_POLICIES = {
       'specialist-report': { kind: 'evidence', durable: true },
       'prompt-draft': { kind: 'working', durable: false },
     },
+    projectScope: 'portfolio',
+    fixedProjectSlug: 'chief-ai-machine',
   },
   storyengine: {
     repository: 'jussray/StoryEngine',
@@ -70,6 +85,8 @@ export const UNIFIED_MEMORY_SOURCE_POLICIES = {
       'semantic-cache': { kind: 'semantic', durable: false },
       'decision-artifact': { kind: 'decision', durable: true },
     },
+    projectScope: 'portfolio',
+    fixedProjectSlug: 'l99',
   },
   promptos: {
     repository: 'jussray/promptos',
@@ -80,6 +97,8 @@ export const UNIFIED_MEMORY_SOURCE_POLICIES = {
       'mission-compiler': { kind: 'goal', durable: false },
       'command-receipt': { kind: 'working', durable: false },
     },
+    projectScope: 'portfolio',
+    fixedProjectSlug: 'promptos',
   },
   'sekret-bip': {
     repository: 'jussray/Sekret-Bip',
@@ -90,6 +109,8 @@ export const UNIFIED_MEMORY_SOURCE_POLICIES = {
       'memory-category': { kind: 'semantic', durable: false },
       'reflection-metadata': { kind: 'episodic', durable: false },
     },
+    projectScope: 'portfolio',
+    fixedProjectSlug: 'sekret-bip',
   },
   'think-tank': {
     repository: 'jussray/THINK-TANK',
@@ -100,6 +121,8 @@ export const UNIFIED_MEMORY_SOURCE_POLICIES = {
       'version-receipt': { kind: 'episodic', durable: true },
       scorecard: { kind: 'decision', durable: true },
     },
+    projectScope: 'external',
+    fixedProjectSlug: 'think-tank',
   },
   solcontinuity: {
     repository: 'jussray/solcontinuity',
@@ -109,6 +132,8 @@ export const UNIFIED_MEMORY_SOURCE_POLICIES = {
       'evidence-history': { kind: 'evidence', durable: true },
       'resilience-manifest': { kind: 'semantic', durable: true },
     },
+    projectScope: 'external',
+    fixedProjectSlug: 'solcontinuity',
   },
   'sleepwealth-agent': {
     repository: 'jussray/SleepWealth-Agent',
@@ -119,6 +144,8 @@ export const UNIFIED_MEMORY_SOURCE_POLICIES = {
       'portfolio-state': { kind: 'evidence', durable: false },
       approval: { kind: 'decision', durable: true },
     },
+    projectScope: 'external',
+    fixedProjectSlug: 'sleepwealth-agent',
   },
 } as const satisfies Readonly<Record<string, SourcePolicy>>;
 
@@ -126,6 +153,7 @@ export type UnifiedMemorySourceSystem = keyof typeof UNIFIED_MEMORY_SOURCE_POLIC
 
 export interface NativeMemoryObservation {
   sourceSystem: UnifiedMemorySourceSystem;
+  sourceVerification: UnifiedMemorySourceVerification;
   projectSlug: string;
   repository: string;
   nativeKind: string;
@@ -147,7 +175,9 @@ export interface UnifiedMemoryRecord {
   identityKey: string;
   continuityFingerprint: string;
   sourceSystem: UnifiedMemorySourceSystem;
+  sourceVerification: UnifiedMemorySourceVerification;
   projectSlug: string;
+  projectRegistration: UnifiedMemoryProjectRegistration;
   repository: string;
   nativeKind: string;
   nativeId: string;
@@ -155,6 +185,7 @@ export interface UnifiedMemoryRecord {
   durable: boolean;
   observedAt: string;
   expiresAt: string | null;
+  revokedAt: string | null;
   sourceSha: string | null;
   trust: UnifiedMemoryTrust;
   privacy: UnifiedMemoryPrivacy;
@@ -178,6 +209,7 @@ export interface UnifiedMemoryConflict {
   identityKey: string;
   observedAt: string;
   fingerprints: string[];
+  variants: number;
 }
 
 export interface UnifiedMemoryView {
@@ -194,6 +226,7 @@ export interface UnifiedMemoryView {
     stale: number;
     verifiedForDecisionSupport: number;
     metadataOnly: number;
+    externalContinuityOnly: number;
   };
   executionAuthority: false;
 }
@@ -207,6 +240,17 @@ const DEFAULT_FRESHNESS_MS = 3 * 24 * 60 * 60 * 1000;
 const MAX_SUMMARY_LENGTH = 800;
 const MAX_PROVENANCE_REFS = 20;
 const MAX_PROVENANCE_REF_LENGTH = 500;
+const VALID_TRUST = new Set<UnifiedMemoryTrust>([
+  'verified',
+  'submitted-unverified',
+  'inferred',
+  'unknown',
+  'revoked',
+]);
+const VALID_SOURCE_VERIFICATION = new Set<UnifiedMemorySourceVerification>([
+  'authenticated-source',
+  'untrusted-import',
+]);
 
 function safeTime(value: string): number | null {
   const parsed = Date.parse(value);
@@ -250,16 +294,12 @@ function normalizedSummary(value: string | null | undefined): string | null | un
   return normalized;
 }
 
-function nonAuthorizingFingerprint(parts: readonly string[]): string {
-  // FNV-1a is used only as a compact continuity key. It is not a security or
-  // authorization primitive and must never substitute for source evidence.
-  let hash = 0x811c9dc5;
-  const input = parts.join('\u001f');
-  for (let index = 0; index < input.length; index += 1) {
-    hash ^= input.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return `memfp:${(hash >>> 0).toString(16).padStart(8, '0')}`;
+function nonAuthorizingFingerprint(parts: readonly unknown[]): string {
+  // This fingerprint is a continuity/provenance convenience only. It never
+  // grants authority and conflict detection also compares the full normalized
+  // logical observation, not only this digest.
+  const digest = createHash('sha256').update(JSON.stringify(parts)).digest('hex');
+  return `memfp:sha256:${digest}`;
 }
 
 function observationState(input: {
@@ -274,6 +314,29 @@ function observationState(input: {
   if (input.expiresAt !== null && input.expiresAt <= now) return 'stale';
   if (now - input.observedAt >= DEFAULT_FRESHNESS_MS) return 'stale';
   return 'fresh';
+}
+
+function canonicalObservationKey(record: UnifiedMemoryRecord): string {
+  return JSON.stringify([
+    record.identityKey,
+    record.sourceVerification,
+    record.projectRegistration,
+    record.repository,
+    record.kind,
+    record.durable,
+    record.observedAt,
+    record.expiresAt,
+    record.revokedAt,
+    record.sourceSha,
+    record.trust,
+    record.privacy,
+    record.contentMode,
+    record.summary,
+    record.categoryKeys,
+    record.contentHash,
+    record.provenanceRefs,
+    record.observationState,
+  ]);
 }
 
 export function normalizeUnifiedMemoryObservation(
@@ -297,13 +360,33 @@ export function normalizeUnifiedMemoryObservation(
   const summary = normalizedSummary(input.summary);
   const categories = boundedUniqueStrings(input.categoryKeys, SAFE_CATEGORY_KEY, 40);
   const provenanceRefs = boundedProvenanceRefs(input.provenanceRefs);
+  const registeredProject = getPortfolioProject(projectSlug);
+  const projectRegistration: UnifiedMemoryProjectRegistration = registeredProject?.status === 'active'
+    ? 'registered'
+    : 'external';
 
   if (!SAFE_ID.test(projectSlug)) errors.push('projectSlug must be a bounded safe identifier.');
   if (repository !== policy.repository) errors.push(`repository must be exactly ${policy.repository}.`);
   if (!SAFE_ID.test(nativeId)) errors.push('nativeId must be a bounded safe identifier.');
 
-  const nativeKindPolicy = policy.nativeKinds[nativeKind as keyof typeof policy.nativeKinds] as NativeKindPolicy | undefined;
+  if (policy.fixedProjectSlug && projectSlug !== policy.fixedProjectSlug) {
+    errors.push(`${input.sourceSystem} projectSlug must be exactly ${policy.fixedProjectSlug}.`);
+  }
+  if (policy.projectScope === 'portfolio' && projectRegistration !== 'registered') {
+    errors.push(`${input.sourceSystem} requires a registered FCR portfolio project.`);
+  }
+  if (policy.projectScope === 'external' && projectRegistration === 'registered') {
+    errors.push(`${input.sourceSystem} is still classified external and cannot silently inherit portfolio authority.`);
+  }
+
+  const nativeKinds = policy.nativeKinds as Readonly<Record<string, NativeKindPolicy>>;
+  const nativeKindPolicy = nativeKinds[nativeKind];
   if (!nativeKindPolicy) errors.push(`nativeKind ${nativeKind || '(empty)'} is not allowed for ${input.sourceSystem}.`);
+
+  if (!VALID_TRUST.has(input.trust)) errors.push('trust classification is invalid.');
+  if (!VALID_SOURCE_VERIFICATION.has(input.sourceVerification)) {
+    errors.push('sourceVerification classification is invalid.');
+  }
 
   if (observedAt === null) errors.push('observedAt must be a valid timestamp.');
   if (input.expiresAt && expiresAt === null) errors.push('expiresAt must be a valid timestamp when supplied.');
@@ -340,22 +423,39 @@ export function normalizeUnifiedMemoryObservation(
     return { ok: false, errors };
   }
 
+  const observedAtIso = new Date(observedAt).toISOString();
+  const expiresAtIso = expiresAt === null ? null : new Date(expiresAt).toISOString();
+  const revokedAtIso = revokedAt === null ? null : new Date(revokedAt).toISOString();
   const state = observationState({ trust: input.trust, observedAt, expiresAt, now });
   const identityKey = `${input.sourceSystem}:${projectSlug}:${nativeKind}:${nativeId}`;
   const sanitizedSummary = policy.contentMode === 'sanitized-summary' ? summary ?? null : null;
   const normalizedCategories = categories;
   const fingerprint = nonAuthorizingFingerprint([
     identityKey,
-    input.observedAt,
-    input.expiresAt ?? '',
+    input.sourceVerification,
+    projectRegistration,
+    repository,
+    nativeKindPolicy.kind,
+    nativeKindPolicy.durable,
+    observedAtIso,
+    expiresAtIso,
+    revokedAtIso,
     input.trust,
     input.privacy,
-    sourceSha ?? '',
-    contentHash ?? '',
-    sanitizedSummary ?? '',
-    normalizedCategories.join(','),
-    provenanceRefs.join(','),
+    sourceSha,
+    contentHash,
+    sanitizedSummary,
+    normalizedCategories,
+    provenanceRefs,
   ]);
+  const continuityUsable = state !== 'invalid'
+    && state !== 'future'
+    && state !== 'revoked'
+    && input.trust !== 'unknown';
+  const decisionSupportUsable = state === 'fresh'
+    && input.trust === 'verified'
+    && input.sourceVerification === 'authenticated-source'
+    && projectRegistration === 'registered';
 
   return {
     ok: true,
@@ -364,14 +464,17 @@ export function normalizeUnifiedMemoryObservation(
       identityKey,
       continuityFingerprint: fingerprint,
       sourceSystem: input.sourceSystem,
+      sourceVerification: input.sourceVerification,
       projectSlug,
+      projectRegistration,
       repository,
       nativeKind,
       nativeId,
       kind: nativeKindPolicy.kind,
       durable: nativeKindPolicy.durable,
-      observedAt: new Date(observedAt).toISOString(),
-      expiresAt: expiresAt === null ? null : new Date(expiresAt).toISOString(),
+      observedAt: observedAtIso,
+      expiresAt: expiresAtIso,
+      revokedAt: revokedAtIso,
       sourceSha,
       trust: input.trust,
       privacy: input.privacy,
@@ -381,8 +484,8 @@ export function normalizeUnifiedMemoryObservation(
       contentHash,
       provenanceRefs,
       observationState: state,
-      continuityUsable: state !== 'invalid' && state !== 'future' && state !== 'revoked' && input.trust !== 'unknown',
-      decisionSupportUsable: state === 'fresh' && input.trust === 'verified',
+      continuityUsable,
+      decisionSupportUsable,
       executionAuthority: false,
     },
   };
@@ -415,13 +518,14 @@ export function buildUnifiedMemoryView(
     observations.sort((a, b) => Date.parse(b.observedAt) - Date.parse(a.observedAt));
     const newestTime = observations[0]?.observedAt;
     const newest = observations.filter((record) => record.observedAt === newestTime);
-    const uniqueFingerprints = [...new Set(newest.map((record) => record.continuityFingerprint))];
+    const logicalVariants = [...new Set(newest.map(canonicalObservationKey))];
 
-    if (uniqueFingerprints.length > 1) {
+    if (logicalVariants.length > 1) {
       conflicts.push({
         identityKey,
         observedAt: newestTime ?? '',
-        fingerprints: uniqueFingerprints.sort(),
+        fingerprints: [...new Set(newest.map((record) => record.continuityFingerprint))].sort(),
+        variants: logicalVariants.length,
       });
       continue;
     }
@@ -447,6 +551,7 @@ export function buildUnifiedMemoryView(
       stale: records.filter((record) => record.observationState === 'stale').length,
       verifiedForDecisionSupport: records.filter((record) => record.decisionSupportUsable).length,
       metadataOnly: records.filter((record) => record.contentMode === 'metadata-only').length,
+      externalContinuityOnly: records.filter((record) => record.projectRegistration === 'external').length,
     },
     executionAuthority: false,
   };
