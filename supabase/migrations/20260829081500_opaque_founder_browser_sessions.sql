@@ -2,8 +2,8 @@
 --
 -- The browser receives only a random opaque capability. Supabase access and
 -- refresh credentials remain in this service-role-only table so browser-session
--- revocation, expiry, and rotation are controlled by FCR rather than by a
--- self-contained bearer cookie.
+-- revocation, expiry, rotation, and continuity verification are controlled by
+-- FCR rather than by a self-contained bearer cookie.
 
 create table if not exists public.founder_browser_sessions (
   session_id_hash text primary key,
@@ -15,10 +15,13 @@ create table if not exists public.founder_browser_sessions (
   issued_at timestamptz not null default now(),
   expires_at timestamptz not null,
   session_version integer not null default 1,
+  continuity_fingerprint text not null,
   revoked_at timestamptz,
   revoke_reason text,
   constraint founder_browser_sessions_hash_shape
     check (session_id_hash ~ '^[0-9a-f]{64}$'),
+  constraint founder_browser_sessions_continuity_fingerprint_shape
+    check (continuity_fingerprint ~ '^[0-9a-f]{64}$'),
   constraint founder_browser_sessions_positive_version
     check (session_version > 0),
   constraint founder_browser_sessions_expiry_after_issue
@@ -40,8 +43,10 @@ revoke all on table public.founder_browser_sessions from anon, authenticated;
 grant select, insert, update, delete on table public.founder_browser_sessions to service_role;
 
 comment on table public.founder_browser_sessions is
-  'Service-role-only FCR browser session state. Browser cookies contain only opaque random capabilities whose SHA-256 hashes index this table.';
+  'Service-role-only FCR browser session state. Browser cookies contain only opaque random capabilities whose SHA-256 hashes index this table; deterministic continuity fingerprints bind the exact server-side session state.';
 comment on column public.founder_browser_sessions.session_id_hash is
   'SHA-256 of the high-entropy opaque browser capability. The raw capability is never persisted.';
+comment on column public.founder_browser_sessions.continuity_fingerprint is
+  'SHA-256 state-integrity fingerprint over the session hash, founder identity, issue/expiry timestamps, and session version. It excludes browser/device/network tracking signals and grants no authority.';
 comment on column public.founder_browser_sessions.revoked_at is
   'Server-side revocation witness. Revoked capabilities fail closed and cannot regain validity.';
