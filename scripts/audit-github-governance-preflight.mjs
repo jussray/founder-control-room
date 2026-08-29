@@ -4,6 +4,11 @@ import { pathToFileURL } from 'node:url';
 export const CONTRACT = 'fcr/github-governance-preflight@v2';
 export const CANONICAL_RULESET_NAME = 'Founder Control Room main exact-head gate';
 export const REQUIRED_CHECKS = ['Required Gate', 'Verify test-ledger contract'];
+export const CODEQL_SECURITY_FLOOR = Object.freeze({
+  tool: 'CodeQL',
+  securityAlertsThreshold: 'high_or_higher',
+  alertsThreshold: 'errors',
+});
 
 const API_VERSION = '2026-03-10';
 const API_ROOT = 'https://api.github.com';
@@ -42,10 +47,21 @@ export function trustedBypassPolicy(appId) {
 export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = targetRef) {
   const pull = ruleOfType(ruleset, 'pull_request');
   const status = ruleOfType(ruleset, 'required_status_checks');
+  const codeScanning = ruleOfType(ruleset, 'code_scanning');
   const statusChecks = Array.isArray(status?.parameters?.required_status_checks)
     ? status.parameters.required_status_checks
         .map((entry) => text(entry?.context))
         .filter(Boolean)
+    : [];
+  const codeScanningTools = Array.isArray(codeScanning?.parameters?.code_scanning_tools)
+    ? codeScanning.parameters.code_scanning_tools
+        .map((entry) => ({
+          tool: text(entry?.tool),
+          securityAlertsThreshold: text(entry?.security_alerts_threshold),
+          alertsThreshold: text(entry?.alerts_threshold),
+        }))
+        .sort((a, b) => `${a.tool}:${a.securityAlertsThreshold}:${a.alertsThreshold}`
+          .localeCompare(`${b.tool}:${b.securityAlertsThreshold}:${b.alertsThreshold}`))
     : [];
   const ruleTypes = Array.isArray(ruleset?.rules)
     ? ruleset.rules.map((rule) => text(rule?.type)).filter(Boolean).sort()
@@ -73,10 +89,12 @@ export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = tar
     requirePullRequest: Boolean(pull),
     requiredApprovingReviewCount: Number(pull?.parameters?.required_approving_review_count ?? 0),
     dismissStaleReviewsOnPush: pull?.parameters?.dismiss_stale_reviews_on_push === true,
+    requireCodeOwnerReview: pull?.parameters?.require_code_owner_review === true,
     requireLastPushApproval: pull?.parameters?.require_last_push_approval === true,
     requiredReviewThreadResolution: pull?.parameters?.required_review_thread_resolution === true,
     strictRequiredStatusChecks: status?.parameters?.strict_required_status_checks_policy === true,
     requiredStatusCheckNames: statusChecks.sort(),
+    codeScanningTools,
     blockForcePushes: Boolean(ruleOfType(ruleset, 'non_fast_forward')),
     blockDeletion: Boolean(ruleOfType(ruleset, 'deletion')),
     bypassObservationComplete,
@@ -112,20 +130,30 @@ function exactRuleTypesMatch(snapshot, expectedRuleTypes) {
   return JSON.stringify(observed) === JSON.stringify(expected);
 }
 
+export function codeQLSecurityFloorSatisfied(snapshot) {
+  const observed = Array.isArray(snapshot?.codeScanningTools) ? snapshot.codeScanningTools : [];
+  return observed.length === 1
+    && observed[0]?.tool === CODEQL_SECURITY_FLOOR.tool
+    && observed[0]?.securityAlertsThreshold === CODEQL_SECURITY_FLOOR.securityAlertsThreshold
+    && observed[0]?.alertsThreshold === CODEQL_SECURITY_FLOOR.alertsThreshold;
+}
+
 export function canonicalFloorSatisfied(snapshot, expectedBypassActors) {
   if (!snapshot) return false;
   return snapshot.name === CANONICAL_RULESET_NAME
     && snapshot.enforcement === 'active'
     && snapshot.target === 'branch'
     && snapshot.targetsRequestedRef === true
-    && exactRuleTypesMatch(snapshot, ['pull_request', 'non_fast_forward', 'deletion'])
+    && exactRuleTypesMatch(snapshot, ['pull_request', 'code_scanning', 'non_fast_forward', 'deletion'])
     && snapshot.requirePullRequest === true
     && snapshot.requiredApprovingReviewCount >= 1
     && snapshot.dismissStaleReviewsOnPush === true
+    && snapshot.requireCodeOwnerReview === true
     && snapshot.requireLastPushApproval === true
     && snapshot.requiredReviewThreadResolution === true
     && snapshot.strictRequiredStatusChecks === false
     && snapshot.requiredStatusCheckNames.length === 0
+    && codeQLSecurityFloorSatisfied(snapshot)
     && snapshot.blockForcePushes === true
     && snapshot.blockDeletion === true
     && bypassPolicyMatches(snapshot, expectedBypassActors);

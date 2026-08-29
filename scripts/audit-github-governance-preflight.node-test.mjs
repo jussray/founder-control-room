@@ -3,12 +3,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   CANONICAL_RULESET_NAME,
+  CODEQL_SECURITY_FLOOR,
   buildBlockedReport,
   buildReport,
   bypassPolicyMatches,
   canonicalFloorSatisfied,
   canonicalFreshnessRulesetName,
   classifyProviderReadFailure,
+  codeQLSecurityFloorSatisfied,
   collaboratorCanReview,
   freshnessFloorSatisfied,
   rulesetSnapshot,
@@ -30,9 +32,20 @@ function canonicalRuleset(overrides = {}) {
         type: 'pull_request',
         parameters: {
           dismiss_stale_reviews_on_push: true,
+          require_code_owner_review: true,
           require_last_push_approval: true,
           required_approving_review_count: 1,
           required_review_thread_resolution: true,
+        },
+      },
+      {
+        type: 'code_scanning',
+        parameters: {
+          code_scanning_tools: [{
+            tool: 'CodeQL',
+            security_alerts_threshold: 'high_or_higher',
+            alerts_threshold: 'errors',
+          }],
         },
       },
       { type: 'non_fast_forward' },
@@ -81,19 +94,22 @@ function readyReport(overrides = {}) {
   });
 }
 
-test('canonical FCR governance requires separate review and zero-bypass freshness membranes', () => {
+test('canonical FCR governance requires security-preserving review and zero-bypass freshness membranes', () => {
   const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
   const review = rulesetSnapshot(canonicalRuleset(), 'main', 'main');
   const freshness = rulesetSnapshot(freshnessRuleset(), 'main', 'main');
 
   assert.equal(review.targetsRequestedRef, true);
-  assert.deepEqual(review.ruleTypes, ['deletion', 'non_fast_forward', 'pull_request']);
+  assert.deepEqual(review.ruleTypes, ['code_scanning', 'deletion', 'non_fast_forward', 'pull_request']);
   assert.equal(review.requiredApprovingReviewCount, 1);
   assert.equal(review.dismissStaleReviewsOnPush, true);
+  assert.equal(review.requireCodeOwnerReview, true);
   assert.equal(review.requireLastPushApproval, true);
   assert.equal(review.requiredReviewThreadResolution, true);
   assert.equal(review.strictRequiredStatusChecks, false);
   assert.deepEqual(review.requiredStatusCheckNames, []);
+  assert.deepEqual(review.codeScanningTools, [CODEQL_SECURITY_FLOOR]);
+  assert.equal(codeQLSecurityFloorSatisfied(review), true);
   assert.equal(review.blockForcePushes, true);
   assert.equal(review.blockDeletion, true);
   assert.equal(bypassPolicyMatches(review, expectedBypass), true);
@@ -128,6 +144,29 @@ test('zero review or stale-review policy cannot satisfy the review membrane', ()
   const staleAllowed = canonicalRuleset();
   staleAllowed.rules[0].parameters.dismiss_stale_reviews_on_push = false;
   assert.equal(canonicalFloorSatisfied(rulesetSnapshot(staleAllowed, 'main', 'main'), expectedBypass), false);
+});
+
+test('review membrane requires Code Owner review and the exact CodeQL security floor', () => {
+  const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
+
+  const noCodeOwner = canonicalRuleset();
+  noCodeOwner.rules[0].parameters.require_code_owner_review = false;
+  const noCodeOwnerSnapshot = rulesetSnapshot(noCodeOwner, 'main', 'main');
+  assert.equal(noCodeOwnerSnapshot.requireCodeOwnerReview, false);
+  assert.equal(canonicalFloorSatisfied(noCodeOwnerSnapshot, expectedBypass), false);
+
+  const noCodeQL = canonicalRuleset();
+  noCodeQL.rules = noCodeQL.rules.filter((rule) => rule.type !== 'code_scanning');
+  const noCodeQLSnapshot = rulesetSnapshot(noCodeQL, 'main', 'main');
+  assert.equal(codeQLSecurityFloorSatisfied(noCodeQLSnapshot), false);
+  assert.equal(canonicalFloorSatisfied(noCodeQLSnapshot, expectedBypass), false);
+
+  const weakCodeQL = canonicalRuleset();
+  const scanning = weakCodeQL.rules.find((rule) => rule.type === 'code_scanning');
+  scanning.parameters.code_scanning_tools[0].security_alerts_threshold = 'medium_or_higher';
+  const weakCodeQLSnapshot = rulesetSnapshot(weakCodeQL, 'main', 'main');
+  assert.equal(codeQLSecurityFloorSatisfied(weakCodeQLSnapshot), false);
+  assert.equal(canonicalFloorSatisfied(weakCodeQLSnapshot, expectedBypass), false);
 });
 
 test('collaborator readiness requires non-owner write authority and excludes bots', () => {
