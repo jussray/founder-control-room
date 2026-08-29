@@ -71,6 +71,22 @@ FOUNDER_ALLOWED_ORIGINS: https://foundercontrolroom.org
 
 The canonical Worker owns the reconciliation cron because no duplicate HTTP Worker should exist.
 
+### Durable release-proof Workflow binding
+
+The canonical Worker also exports `ReleaseProofWorkflowV0` and declares the same-Worker Cloudflare Workflows binding:
+
+```text
+binding: RELEASE_PROOF_WORKFLOW
+name: fcr-release-proof-v0
+class_name: ReleaseProofWorkflowV0
+```
+
+This binding is intentionally inert from application code in this slice: no public HTTP route, cron schedule, or other runtime path creates Workflow instances. It exists so later FCR-controlled orchestration can use Cloudflare's durable step/event state without creating a parallel release authority.
+
+`ReleaseProofWorkflowV0` binds exact repository, target branch, base SHA, head SHA, optional PR identity, and a deterministic candidate fingerprint. It may correlate separately supplied evidence and founder-approval observations, but even a fully correlated run stops at `READY_FOR_FINAL_REREAD` with merge, deployment, and provider-mutation authority explicitly false. The final mutable provider/PR reread and any consequential action remain owned by the existing FCR authority membrane.
+
+Repository configuration proves only the desired Workflow class/binding contract. It does not prove that Cloudflare has accepted the binding, that an instance exists or completed, or that any release/provider action occurred. Those are separate provider/runtime evidence gates.
+
 ### Remote read MCP operator boundary
 
 The canonical Worker also owns the served remote read-only MCP endpoint at:
@@ -173,7 +189,7 @@ Provider build/deploy comments, preview URLs, and successful uploads are useful 
 
 ## Documentation truth
 
-When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, remote MCP scope, hostname-inventory/Request Trace behavior, Worker build-authority behavior, or runtime proof requirements change, update this document in the same bounded repository change.
+When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, remote MCP scope, hostname-inventory/Request Trace behavior, Worker build-authority behavior, Cloudflare Workflow bindings/orchestration authority, or runtime proof requirements change, update this document in the same bounded repository change.
 
 Current executable source and authoritative provider readback outrank an older version of this runbook. Preserve older deployment evidence as historical provenance rather than deleting it.
 

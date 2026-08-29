@@ -7,3 +7,6 @@
 
 /control-room/*
   Cache-Control: no-store
+
+/demo/*
+  Cache-Control: no-store

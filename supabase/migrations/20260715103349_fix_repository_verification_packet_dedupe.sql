@@ -1,6 +1,4 @@
--- The initial live migration used a partial unique index. PostgREST upsert
--- cannot target a partial index by column list, so replace it with a normal
--- unique constraint. PostgreSQL still permits multiple NULL delivery IDs.
+-- Production-applied migration fossil restored from supabase_migrations.schema_migrations.
 
 drop index if exists public.repository_verification_delivery_dedupe;
 

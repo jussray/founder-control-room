@@ -49,7 +49,7 @@ export function sortRows(rows, col, ascending) {
 // Mirrors column defaults the real Postgres schema applies on insert (see
 // supabase/migrations) that this generic in-memory store wouldn't otherwise
 // know about — e.g. projects.verification_enabled defaults to true in
-// 20260717195000_guarded_terminal_and_schema_reconciliation.sql, and the
+// 20260718032552_guarded_terminal_and_schema_reconciliation.sql, and the
 // guarded terminal route 409s on any project row missing it.
 const TABLE_DEFAULTS = {
   projects: { verification_enabled: true },
