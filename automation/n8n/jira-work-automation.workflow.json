@@ -1,0 +1,125 @@
+{
+  "name": "FCR Jira Work Automation v1",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "fcr-jira-work-automation-v1",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1a63bc22-c57f-4a17-9142-81d05b8841d1",
+      "name": "Inbound FCR Jira Plan",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const envelope = $input.first().json;\nconst plan = envelope.body ?? envelope;\nconst headers = envelope.headers ?? {};\nconst fail = (message) => { throw new Error(`FCR_JIRA_PLAN_REJECTED: ${message}`); };\nconst isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);\nconst fullSha = /^[0-9a-f]{40}$/i;\nconst projectKey = /^[A-Z][A-Z0-9_]{1,19}$/;\nconst issueKey = /^[A-Z][A-Z0-9_]{1,19}-[1-9][0-9]*$/;\nif (!isObject(plan)) fail('plan must be an object');\nif (plan.contract !== 'founder-control-room/jira-work-automation@v1') fail('unsupported contract');\nif (!/^fcr-jira-v1:[0-9a-f]{64}$/i.test(String(plan.idempotencyKey ?? ''))) fail('invalid idempotency key');\nif (String(headers['idempotency-key'] ?? '') !== plan.idempotencyKey) fail('transport idempotency key mismatch');\nif (String(headers['x-fcr-jira-automation-contract'] ?? '') !== 'v1') fail('transport contract header mismatch');\nif (!fullSha.test(String(plan.runtimeHeadSha ?? ''))) fail('exact runtime head SHA required');\nif (!isObject(plan.issue)) fail('issue snapshot required');\nif (!projectKey.test(String(plan.issue.projectKey ?? ''))) fail('invalid project key');\nif (!issueKey.test(String(plan.issue.issueKey ?? ''))) fail('invalid issue key');\nif (String(plan.issue.issueKey).split('-')[0] !== plan.issue.projectKey) fail('issue/project identity mismatch');\nif (String(plan.issue.toStatus ?? '').trim().toLowerCase() !== 'in progress') fail('only In Progress work is supported');\nconst updatedAt = Date.parse(String(plan.issue.updatedAt ?? ''));\nconst observedAt = Date.parse(String(plan.issue.observedAt ?? ''));\nif (!Number.isFinite(updatedAt) || !Number.isFinite(observedAt) || updatedAt > observedAt) fail('invalid observation window');\nif (!Array.isArray(plan.actions) || plan.actions.length < 1 || plan.actions.length > 2) fail('one or two bounded actions required');\nif (!isObject(plan.authority)) fail('authority envelope required');\nfor (const field of ['transitionIssue', 'closeIssue', 'deleteIssue', 'mutateProjectSettings']) { if (plan.authority[field] !== false) fail(`forbidden authority opened: ${field}`); }\nconst actionTypes = new Set();\nfor (const action of plan.actions) {\n  if (!isObject(action) || (action.type !== 'assign-owner' && action.type !== 'comment-stale')) fail('unsupported action');\n  if (actionTypes.has(action.type)) fail('duplicate action type');\n  actionTypes.add(action.type);\n  if (action.type === 'assign-owner') {\n    if (action.ownerLabel !== 'sekretbip' || typeof action.ownerAccountId !== 'string' || !action.ownerAccountId.trim()) fail('invalid owner mapping');\n  } else {\n    if (!Number.isInteger(action.staleAfterHours) || action.staleAfterHours <= 0) fail('invalid stale threshold');\n    const expectedMessage = `FCR stale-work guard: this item has remained In Progress without an update for at least ${action.staleAfterHours} hours. Add a current status update or move it to the correct workflow state.`;\n    if (action.message !== expectedMessage) fail('stale comment content drift');\n  }\n}\nif (Boolean(plan.authority.assignIssue) !== actionTypes.has('assign-owner')) fail('assignment authority/action mismatch');\nif (Boolean(plan.authority.commentIssue) !== actionTypes.has('comment-stale')) fail('comment authority/action mismatch');\nconst material = { contract: plan.contract, idempotencyKey: plan.idempotencyKey, runtimeHeadSha: plan.runtimeHeadSha, issueKey: plan.issue.issueKey, actions: plan.actions };\nconst bytes = new TextEncoder().encode(JSON.stringify(material));\nconst digest = await crypto.subtle.digest('SHA-256', bytes);\nconst hex = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');\nreturn [{ json: { plan, expectedReceiptId: `fcr-jira-receipt-v1:${hex}` } }];"
+      },
+      "id": "f49df3e9-b3d2-4339-893e-7df969b09530",
+      "name": "Validate FCR Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "jiraSoftwareCloudApi",
+        "url": "={{$env.JIRA_BASE_URL + '/rest/api/3/issue/' + $json.plan.issue.issueKey + '?fields=status,assignee,updated'}}",
+        "options": {}
+      },
+      "id": "239ad203-c089-482c-b6b8-4bd909b10989",
+      "name": "Re-read Jira Issue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const jira = $input.first().json;\nconst validated = $('Validate FCR Plan').first().json;\nconst plan = validated.plan;\nconst fail = (message) => { throw new Error(`FCR_JIRA_STATE_DRIFT: ${message}`); };\nconst normalizeStatus = (value) => String(value ?? '').trim().toLowerCase();\nconst actualStatus = jira?.fields?.status?.name;\nconst actualAssignee = jira?.fields?.assignee?.accountId ?? null;\nconst actualUpdatedMs = Date.parse(String(jira?.fields?.updated ?? ''));\nconst plannedUpdatedMs = Date.parse(plan.issue.updatedAt);\nif (normalizeStatus(actualStatus) !== normalizeStatus(plan.issue.toStatus)) fail('status changed after FCR observation');\nif ((actualAssignee || null) !== (plan.issue.assigneeAccountId || null)) fail('assignee changed after FCR observation');\nif (!Number.isFinite(actualUpdatedMs) || actualUpdatedMs !== plannedUpdatedMs) fail('updated timestamp changed after FCR observation');\nconst outputs = [];\nfor (const action of plan.actions) {\n  if (action.type === 'assign-owner') {\n    if (actualAssignee !== null) fail('assignment no longer unowned');\n    outputs.push({ json: { expectedReceiptId: validated.expectedReceiptId, idempotencyKey: plan.idempotencyKey, actionType: action.type, issueKey: plan.issue.issueKey, request: { method: 'PUT', path: `/rest/api/3/issue/${encodeURIComponent(plan.issue.issueKey)}`, body: { fields: { assignee: { accountId: action.ownerAccountId } } } } } });\n    continue;\n  }\n  const observedAtMs = Date.parse(plan.issue.observedAt);\n  const ageHours = (observedAtMs - actualUpdatedMs) / 3600000;\n  if (!Number.isFinite(ageHours) || ageHours < action.staleAfterHours) fail('stale threshold no longer satisfied');\n  outputs.push({ json: { expectedReceiptId: validated.expectedReceiptId, idempotencyKey: plan.idempotencyKey, actionType: action.type, issueKey: plan.issue.issueKey, request: { method: 'POST', path: `/rest/api/3/issue/${encodeURIComponent(plan.issue.issueKey)}/comment`, body: { body: { type: 'doc', version: 1, content: [{ type: 'paragraph', content: [{ type: 'text', text: action.message }] }] } } } } });\n}\nif (outputs.length !== plan.actions.length) fail('bounded action expansion mismatch');\nreturn outputs;"
+      },
+      "id": "d41226e0-977a-4610-a266-cabfa1f64c69",
+      "name": "Guard State and Expand Actions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 0]
+    },
+    {
+      "parameters": {
+        "method": "={{$json.request.method}}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "jiraSoftwareCloudApi",
+        "url": "={{$env.JIRA_BASE_URL + $json.request.path}}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify($json.request.body)}}",
+        "options": {}
+      },
+      "id": "bb11ff15-d195-4360-a085-647bf1627136",
+      "name": "Apply Bounded Jira Mutation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 0],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const validated = $('Validate FCR Plan').first().json;\nconst plan = validated.plan;\nconst results = $input.all();\nif (results.length !== plan.actions.length) throw new Error('FCR_JIRA_MUTATION_COUNT_MISMATCH');\nreturn [{ json: { receiptId: validated.expectedReceiptId, contract: 'founder-control-room/jira-work-automation-receipt@v1', idempotencyKey: plan.idempotencyKey, runtimeHeadSha: plan.runtimeHeadSha, issueKey: plan.issue.issueKey, mutatedActions: plan.actions.map((action) => action.type) } }];"
+      },
+      "id": "53d53711-d6da-45e5-9563-a80de6696320b",
+      "name": "Build Exact Receipt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "6dfb5235-74fe-4bea-ad14-ce097518c39d",
+      "name": "Return Receipt",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [1440, 0]
+    }
+  ],
+  "connections": {
+    "Inbound FCR Jira Plan": {
+      "main": [[{"node":"Validate FCR Plan","type":"main","index":0}]]
+    },
+    "Validate FCR Plan": {
+      "main": [[{"node":"Re-read Jira Issue","type":"main","index":0}]]
+    },
+    "Re-read Jira Issue": {
+      "main": [[{"node":"Guard State and Expand Actions","type":"main","index":0}]]
+    },
+    "Guard State and Expand Actions": {
+      "main": [[{"node":"Apply Bounded Jira Mutation","type":"main","index":0}]]
+    },
+    "Apply Bounded Jira Mutation": {
+      "main": [[{"node":"Build Exact Receipt","type":"main","index":0}]]
+    },
+    "Build Exact Receipt": {
+      "main": [[{"node":"Return Receipt","type":"main","index":0}]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "versionId": "ebd6cb6c-d34b-47e9-8e58-995b32371852",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
