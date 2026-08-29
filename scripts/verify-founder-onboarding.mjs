@@ -48,8 +48,7 @@ requireText('auth', 'password handoff rate limit before interactive auth gate', 
 requireText('auth', 'password handoff cookie gate', 'readFounderSession(req)');
 requireText('auth', 'password handoff Supabase update', 'requestAuth.auth.updateUser({ password })');
 requireText('auth', 'password minimum', 'MIN_FOUNDER_PASSWORD_LENGTH = 12');
-requireText('auth', 'fragment handoff construction', 'new URLSearchParams');
-requireText('auth', 'fragment handoff redirect', "setHeader('Location', `/control-room/#${fragment.toString()}`)");
+requireText('auth', 'opaque callback redirect', "return res.redirect(303, '/')");
 
 requireText('ui', 'Google login control', 'Continue with Google');
 requireText('ui', 'Google login route', 'href="/auth/google"');
@@ -111,6 +110,12 @@ if (files.ui.includes('sekretbip@gmail.com')) {
 if (/json\([^)]*access_token\s*:\s*data\.session\.access_token/s.test(files.auth)) {
   errors.push('token handling: raw access tokens must not be returned as callback JSON');
 }
+if (files.auth.includes("setHeader('Location', `/control-room/#")) {
+  errors.push('token handling: founder callback must not export session credentials in a dashboard URL fragment');
+}
+if (/new URLSearchParams\(\{[\s\S]{0,400}access_token:\s*data\.session\.access_token/.test(files.auth)) {
+  errors.push('token handling: founder callback must not construct a credential-bearing redirect fragment');
+}
 if (files.auth.includes('SUPABASE_SERVICE_ROLE_KEY')) {
   errors.push('key boundary: auth route must not reference the service-role key');
 }
@@ -140,6 +145,7 @@ console.log('Founder onboarding contract verified.');
 console.log('Google OAuth: Supabase redirect + private founder allowlist');
 console.log('Workspace bootstrap: project registry + disconnected provider slots');
 console.log('Opaque browser cookie: HttpOnly + Strict + server-side revocation');
+console.log('Founder callback handoff: opaque cookie only; no Supabase credential fragment');
 console.log('Continuity fingerprint: deterministic server-state integrity only; no device/browser tracking');
 console.log('Provider credentials stored: no');
 console.log('Execution authority granted by onboarding: no');
