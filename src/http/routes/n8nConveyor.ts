@@ -1,4 +1,4 @@
-import { Router, type Response } from 'express';
+import { Router } from 'express';
 import {
   isV10CapabilityPlan,
   type V10CapabilityPlan,
@@ -13,6 +13,7 @@ import {
   N8N_FOUNDER_CONTENT_CONTRACT,
   N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
 } from '../../lib/n8nProviderNeutralFounderContentOrchestrator.js';
+import { dispatchAuthoritativeN8nFounderContent } from '../../lib/authoritativeN8nFounderContentPublisher.js';
 import { FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT } from '../../lib/firstPartyFounderContentExecutor.js';
 import { dispatchAuthoritativeFounderContentPublishNow } from '../../lib/authoritativeFounderContentPublisher.js';
 import {
@@ -64,29 +65,14 @@ function capabilityPlan(value: unknown): V10CapabilityPlan | null {
   return isV10CapabilityPlan(value) ? value : null;
 }
 
-function providerNeutralAuthorityRequired(
-  req: FounderRequest,
-  res: Response,
-) {
-  return res.status(409).json({
-    ok: false,
-    code: 'L99_AUTHORITY_REQUIRED',
-    contract: N8N_FOUNDER_CONTENT_CONTRACT,
-    published: false,
-    authorityRequired: 'L99_PROVIDER_NEUTRAL_AUTHORITATIVE_APPROVAL_ADAPTER',
-    operation: 'orchestrate',
-    reasons: [
-      'Provider-neutral founder-content mutation remains disabled in this slice.',
-      'Only the first-party LinkedIn path may consume the new authoritative FCR approval ledger; n8n/provider scheduling must gain the same readback contract separately before re-enablement.',
-    ],
-    founder: req.founder ? { userId: req.founder.userId } : null,
-    finalPublishedTruth: 'fcr-provider-readback-only',
-  });
-}
-
 n8nConveyorRouter.get('/', async (_req: FounderRequest, res) => {
   const readiness = await resolveFounderConveyorReadiness();
   const founderContentReadiness = founderContentOrchestrationReadiness();
+  const providerRuntimeConfigured =
+    founderContentReadiness.enabled
+    && founderContentReadiness.configured
+    && founderContentReadiness.invalidProviders.length === 0;
+
   return res.json({
     contract: FOUNDER_CONVEYOR_CONTRACT,
     capabilityPlanContract: 'juss-v10/capability-plan@v1',
@@ -103,9 +89,10 @@ n8nConveyorRouter.get('/', async (_req: FounderRequest, res) => {
     founderContent: {
       contract: N8N_FOUNDER_CONTENT_CONTRACT,
       route: '/founder-content',
-      enabled: false,
-      blockedBy: 'L99_PROVIDER_NEUTRAL_AUTHORITATIVE_APPROVAL_ADAPTER_REQUIRED',
-      inputAuthority: 'canonical-fcr-proposal-approval-firewall-input',
+      routeImplemented: true,
+      enabled: providerRuntimeConfigured,
+      blockedBy: providerRuntimeConfigured ? null : 'N8N_FOUNDER_CONTENT_RUNTIME_CONFIGURATION_REQUIRED',
+      inputAuthority: 'fcr-issued-one-shot-approval-id-plus-exact-copy-confirmation',
       providerSelection: 'founder-authenticated-bounded-platform-compatible',
       providerContractRoutes: N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
       providerRuntimeConfiguration: {
@@ -114,9 +101,10 @@ n8nConveyorRouter.get('/', async (_req: FounderRequest, res) => {
         rule: 'contract-capable-does-not-imply-runtime-enabled',
       },
       readiness: founderContentReadiness,
+      controlledProbeAllowed: founderContentReadiness.bufferReadyForProbe,
       authority: {
-        orchestrate: false,
-        requestProviderWrite: false,
+        orchestrate: true,
+        requestProviderWrite: true,
         authorizePublication: false,
         changeCopy: false,
         markPublished: false,
@@ -124,7 +112,13 @@ n8nConveyorRouter.get('/', async (_req: FounderRequest, res) => {
       },
       authoritativeApprovalStoreReadbackRequired: true,
       callerSuppliedApprovalIsAuthority: false,
+      oneShotApprovalClaimRequired: true,
+      providerReadbackRequired: true,
+      blindRetryAllowed: false,
       finalPublishedTruth: 'fcr-provider-readback-only',
+      nextRuntimeGate: founderContentReadiness.bufferReadyForProbe
+        ? 'Run one controlled FCR-authorized Buffer probe and persist provider-native readback bound to the exact runtime SHA.'
+        : 'Configure the n8n founder-content transport/provider allowlist before consuming any one-shot approval.',
       directPublish: {
         contract: FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
         route: '/founder-content/publish-now',
@@ -270,5 +264,32 @@ n8nConveyorRouter.post('/founder-content/publish-now', async (req: FounderReques
 });
 
 n8nConveyorRouter.post('/founder-content', async (req: FounderRequest, res) => {
-  return providerNeutralAuthorityRequired(req, res);
+  const body = (req.body ?? {}) as JsonRecord;
+  const founder = req.founder;
+  if (!founder) return res.status(401).json({ ok: false, code: 'FOUNDER_SESSION_REQUIRED' });
+  if (Object.hasOwn(body, 'approval')) {
+    return res.status(400).json({
+      ok: false,
+      code: 'CALLER_APPROVAL_OBJECT_FORBIDDEN',
+      contract: N8N_FOUNDER_CONTENT_CONTRACT,
+      published: false,
+      reasons: ['provider orchestration accepts only an FCR-issued approval_id, never caller-supplied approval authority'],
+    });
+  }
+
+  const result = await dispatchAuthoritativeN8nFounderContent({
+    proposal: record(body.proposal),
+    approval_id: text(body.approval_id),
+    n8n_provider: text(body.n8n_provider),
+    confirmation: publicationConfirmation(body.confirmation),
+  }, {
+    founderUserId: founder.userId,
+    founderIdentity: founder.email,
+  });
+
+  return res.status(result.status).json({
+    ...result,
+    published: false,
+    finalPublishedTruth: 'fcr-provider-readback-only',
+  });
 });
