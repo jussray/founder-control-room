@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import type { Request, Response } from 'express';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient.js';
@@ -12,6 +12,10 @@ const SESSION_VERSION = 1;
 const OPAQUE_TOKEN_BYTES = 32;
 const OPAQUE_COOKIE_PATTERN = /^v1\.[A-Za-z0-9_-]{43}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+const SESSION_CREDENTIAL_ALGORITHM = 'aes-256-gcm';
+const SESSION_CREDENTIAL_IV_BYTES = 12;
+const SESSION_CREDENTIAL_TAG_BYTES = 16;
+const SESSION_CREDENTIAL_KEY_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 export interface FounderCookieSession {
   accessToken: string;
@@ -23,6 +27,21 @@ export interface FounderCookieSession {
   sessionVersion: number;
   sessionExpiresAt: string;
   continuityFingerprint: string;
+}
+
+interface SessionCredentialContext {
+  sessionIdHash: string;
+  founderUserId: string;
+  founderEmail: string;
+  issuedAt: string;
+  expiresAt: string;
+  sessionVersion: number;
+}
+
+interface EncryptedSessionCredentials {
+  ciphertext: string;
+  iv: string;
+  authTag: string;
 }
 
 function parseCookieHeader(header: string | undefined): Map<string, string> {
@@ -55,14 +74,7 @@ function sessionIdHash(value: string): string {
   return sha256(value);
 }
 
-function sessionContinuityFingerprint(input: {
-  sessionIdHash: string;
-  founderUserId: string;
-  founderEmail: string;
-  issuedAt: string;
-  expiresAt: string;
-  sessionVersion: number;
-}): string {
+function sessionContinuityFingerprint(input: SessionCredentialContext): string {
   // This is a deterministic state-integrity fingerprint, not a browser/device
   // fingerprint. It deliberately excludes IP, ASN, country, JA4, user agent,
   // hardware entropy, storage identifiers, and other tracking surfaces.
@@ -75,6 +87,77 @@ function sessionContinuityFingerprint(input: {
     input.expiresAt,
     String(input.sessionVersion),
   ].join('\n'));
+}
+
+function sessionCredentialKey(): Buffer {
+  const encoded = process.env.FOUNDER_SESSION_ENCRYPTION_KEY?.trim() ?? '';
+  if (!SESSION_CREDENTIAL_KEY_PATTERN.test(encoded)) {
+    throw new Error('FOUNDER_SESSION_ENCRYPTION_KEY must be a 32-byte base64url key');
+  }
+  const key = Buffer.from(encoded, 'base64url');
+  if (key.length !== 32) {
+    throw new Error('FOUNDER_SESSION_ENCRYPTION_KEY must decode to exactly 32 bytes');
+  }
+  return key;
+}
+
+function sessionCredentialAad(context: SessionCredentialContext): Buffer {
+  return Buffer.from([
+    'fcr-founder-browser-session-credentials/v1',
+    context.sessionIdHash,
+    context.founderUserId,
+    context.founderEmail.trim().toLowerCase(),
+    context.issuedAt,
+    context.expiresAt,
+    String(context.sessionVersion),
+  ].join('\n'), 'utf8');
+}
+
+function encryptSessionCredentials(
+  session: Session,
+  context: SessionCredentialContext,
+): EncryptedSessionCredentials {
+  const iv = randomBytes(SESSION_CREDENTIAL_IV_BYTES);
+  const cipher = createCipheriv(SESSION_CREDENTIAL_ALGORITHM, sessionCredentialKey(), iv, {
+    authTagLength: SESSION_CREDENTIAL_TAG_BYTES,
+  });
+  cipher.setAAD(sessionCredentialAad(context));
+  const plaintext = Buffer.from(JSON.stringify({
+    accessToken: session.access_token,
+    refreshToken: session.refresh_token,
+  }), 'utf8');
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  return {
+    ciphertext: ciphertext.toString('base64url'),
+    iv: iv.toString('base64url'),
+    authTag: cipher.getAuthTag().toString('base64url'),
+  };
+}
+
+function decryptSessionCredentials(
+  encrypted: EncryptedSessionCredentials,
+  context: SessionCredentialContext,
+): { accessToken: string; refreshToken: string } | null {
+  try {
+    const iv = Buffer.from(encrypted.iv, 'base64url');
+    const authTag = Buffer.from(encrypted.authTag, 'base64url');
+    const ciphertext = Buffer.from(encrypted.ciphertext, 'base64url');
+    if (iv.length !== SESSION_CREDENTIAL_IV_BYTES || authTag.length !== SESSION_CREDENTIAL_TAG_BYTES || ciphertext.length === 0) {
+      return null;
+    }
+    const decipher = createDecipheriv(SESSION_CREDENTIAL_ALGORITHM, sessionCredentialKey(), iv, {
+      authTagLength: SESSION_CREDENTIAL_TAG_BYTES,
+    });
+    decipher.setAAD(sessionCredentialAad(context));
+    decipher.setAuthTag(authTag);
+    const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
+    const parsed = JSON.parse(plaintext) as Record<string, unknown>;
+    const accessToken = typeof parsed.accessToken === 'string' ? parsed.accessToken : '';
+    const refreshToken = typeof parsed.refreshToken === 'string' ? parsed.refreshToken : '';
+    return accessToken && refreshToken ? { accessToken, refreshToken } : null;
+  } catch {
+    return null;
+  }
 }
 
 function newOpaqueCookieValue(): string {
@@ -123,7 +206,7 @@ export async function readFounderSession(req: Request): Promise<FounderCookieSes
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from(SESSION_TABLE)
-    .select('session_id_hash,founder_user_id,founder_email,access_token,refresh_token,auth_expires_at,issued_at,expires_at,session_version,continuity_fingerprint,revoked_at')
+    .select('session_id_hash,founder_user_id,founder_email,credential_ciphertext,credential_iv,credential_auth_tag,auth_expires_at,issued_at,expires_at,session_version,continuity_fingerprint,revoked_at')
     .eq('session_id_hash', hash)
     .is('revoked_at', null)
     .gt('expires_at', now)
@@ -132,8 +215,6 @@ export async function readFounderSession(req: Request): Promise<FounderCookieSes
   if (error || !data) return null;
 
   const row = data as Record<string, unknown>;
-  const accessToken = typeof row.access_token === 'string' ? row.access_token : '';
-  const refreshToken = typeof row.refresh_token === 'string' ? row.refresh_token : '';
   const founderUserId = typeof row.founder_user_id === 'string' ? row.founder_user_id : '';
   const founderEmail = typeof row.founder_email === 'string' ? row.founder_email.toLowerCase() : '';
   const issuedAt = typeof row.issued_at === 'string' ? row.issued_at : '';
@@ -141,24 +222,33 @@ export async function readFounderSession(req: Request): Promise<FounderCookieSes
   const sessionVersion = typeof row.session_version === 'number' ? row.session_version : 0;
   const storedContinuityFingerprint = typeof row.continuity_fingerprint === 'string' ? row.continuity_fingerprint : '';
   const authExpiresAt = typeof row.auth_expires_at === 'number' ? row.auth_expires_at : undefined;
+  const encrypted = {
+    ciphertext: typeof row.credential_ciphertext === 'string' ? row.credential_ciphertext : '',
+    iv: typeof row.credential_iv === 'string' ? row.credential_iv : '',
+    authTag: typeof row.credential_auth_tag === 'string' ? row.credential_auth_tag : '',
+  };
 
-  if (!accessToken || !refreshToken || !founderUserId || !founderEmail || !issuedAt || !sessionExpiresAt) return null;
+  if (!founderUserId || !founderEmail || !issuedAt || !sessionExpiresAt) return null;
+  if (!encrypted.ciphertext || !encrypted.iv || !encrypted.authTag) return null;
   if (sessionVersion !== SESSION_VERSION) return null;
   if (!SHA256_PATTERN.test(storedContinuityFingerprint)) return null;
 
-  const expectedContinuityFingerprint = sessionContinuityFingerprint({
+  const context: SessionCredentialContext = {
     sessionIdHash: hash,
     founderUserId,
     founderEmail,
     issuedAt,
     expiresAt: sessionExpiresAt,
     sessionVersion,
-  });
+  };
+  const expectedContinuityFingerprint = sessionContinuityFingerprint(context);
   if (storedContinuityFingerprint !== expectedContinuityFingerprint) return null;
+  const credentials = decryptSessionCredentials(encrypted, context);
+  if (!credentials) return null;
 
   return {
-    accessToken,
-    refreshToken,
+    accessToken: credentials.accessToken,
+    refreshToken: credentials.refreshToken,
     ...(authExpiresAt !== undefined ? { expiresAt: authExpiresAt } : {}),
     founderUserId,
     founderEmail,
@@ -178,21 +268,24 @@ export async function writeFounderSession(res: Response, session: Session): Prom
   const expiresAt = new Date(issuedAt.getTime() + COOKIE_MAX_AGE_SECONDS * 1000);
   const issuedAtIso = issuedAt.toISOString();
   const expiresAtIso = expiresAt.toISOString();
-  const continuityFingerprint = sessionContinuityFingerprint({
+  const context: SessionCredentialContext = {
     sessionIdHash: hash,
     founderUserId: identity.userId,
     founderEmail: identity.email,
     issuedAt: issuedAtIso,
     expiresAt: expiresAtIso,
     sessionVersion: SESSION_VERSION,
-  });
+  };
+  const continuityFingerprint = sessionContinuityFingerprint(context);
+  const encrypted = encryptSessionCredentials(session, context);
 
   const { error } = await supabase.from(SESSION_TABLE).insert({
     session_id_hash: hash,
     founder_user_id: identity.userId,
     founder_email: identity.email,
-    access_token: session.access_token,
-    refresh_token: session.refresh_token,
+    credential_ciphertext: encrypted.ciphertext,
+    credential_iv: encrypted.iv,
+    credential_auth_tag: encrypted.authTag,
     auth_expires_at: typeof session.expires_at === 'number' ? session.expires_at : null,
     issued_at: issuedAtIso,
     expires_at: expiresAtIso,
