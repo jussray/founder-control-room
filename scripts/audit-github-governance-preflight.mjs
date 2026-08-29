@@ -340,7 +340,7 @@ async function main() {
       targetRef,
       trustedGitHubAppId: process.env.GITHUB_APP_ID,
     });
-    blocked = report.status === 'BLOCKED';
+    blocked = report.status !== 'READY';
   } catch (error) {
     blocked = true;
     report = buildBlockedReport({
