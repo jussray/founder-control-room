@@ -5,12 +5,14 @@ import {
   goalfixDiffFingerprint,
   goalfixFounderDecisionFingerprint,
   goalfixMergeAncestryFingerprint,
+  goalfixProviderMergeGateFingerprint,
   goalfixRuntimeReceiptFingerprint,
   goalfixSourceFingerprint,
   type GoalfixExecutionCheckpoint,
   type GoalfixExecutionInput,
   type GoalfixFounderDecision,
   type GoalfixMergeAncestryReceipt,
+  type GoalfixProviderMergeGateReadback,
   type GoalfixRuntimeReceipt,
 } from './executionWorkflow.js';
 import { fingerprintNormalized, type ProofCookieContract } from '../security/attack20V3.js';
@@ -26,6 +28,7 @@ const FOUNDER_PRINCIPAL = 'principal:founder';
 const DIFF = goalfixDiffFingerprint({ base: BASE, head: HEAD, scope: 'goalfix-v2' });
 const NOW = new Date('2026-08-26T12:00:00.000Z');
 const RUNTIME_FINGERPRINT = fingerprintNormalized({ mergedSha: MERGED, state: 'runtime-readback' });
+const PROVIDER_GATE_FINGERPRINT = fingerprintNormalized({ repository: REPOSITORY, provider: 'github-current-pr-readback' });
 
 function cookie(
   id: string,
@@ -105,6 +108,38 @@ function founderDecision(): GoalfixFounderDecision {
   };
 }
 
+function providerMergeGateReadback(
+  overrides: Partial<GoalfixProviderMergeGateReadback> = {},
+): GoalfixProviderMergeGateReadback {
+  const base: Omit<GoalfixProviderMergeGateReadback, 'proofBinding'> = {
+    receiptId: 'provider-merge-gate-red001',
+    repository: REPOSITORY,
+    pullRequestNumber: PR_NUMBER,
+    sourceBranch: SOURCE_BRANCH,
+    targetBranch: TARGET_BRANCH,
+    baseSha: BASE,
+    headSha: HEAD,
+    diffFingerprint: DIFF,
+    pullRequestState: 'OPEN',
+    requiredChecksState: 'PASS',
+    reviewState: 'APPROVED',
+    unresolvedMaterialThreads: 0,
+    observedAt: '2026-08-26T11:40:00.000Z',
+    ...Object.fromEntries(Object.entries(overrides).filter(([key]) => key !== 'proofBinding')),
+  } as Omit<GoalfixProviderMergeGateReadback, 'proofBinding'>;
+  return {
+    ...base,
+    proofBinding: overrides.proofBinding ?? {
+      fingerprints: {
+        sourceSha: goalfixSourceFingerprint(REPOSITORY, base.headSha),
+        provider: PROVIDER_GATE_FINGERPRINT,
+        evidenceBundle: goalfixProviderMergeGateFingerprint(base),
+      },
+      cookieContract: provider,
+    },
+  };
+}
+
 function ancestry(overrides: Partial<GoalfixMergeAncestryReceipt> = {}): GoalfixMergeAncestryReceipt {
   const base: Omit<GoalfixMergeAncestryReceipt, 'proofBinding'> = {
     receiptId: 'merge-ancestry-red001',
@@ -161,6 +196,8 @@ function validInput(): GoalfixExecutionInput {
     targetBranch: TARGET_BRANCH,
     trustedFounderPrincipalId: FOUNDER_PRINCIPAL,
     trustedRuntimeFingerprint: RUNTIME_FINGERPRINT,
+    trustedProviderMergeGateFingerprint: PROVIDER_GATE_FINGERPRINT,
+    providerMergeGateReadback: providerMergeGateReadback(),
     baseSha: BASE,
     candidateHeadSha: HEAD,
     currentMainSha: BASE,
