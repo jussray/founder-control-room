@@ -9,52 +9,44 @@ const { rows, failure, supabaseMock } = vi.hoisted(() => ({
 }));
 
 function browserSessionTable() {
-  let operation: 'read' | 'update' = 'read';
-  let updatePayload: Record<string, unknown> = {};
-  let hash = '';
-  let requireUnrevoked = false;
-  let expiresAfter = '';
-
-  const chain: any = {
-    select: () => chain,
-    eq: (field: string, value: unknown) => {
-      if (field === 'session_id_hash') hash = String(value);
-      return chain;
-    },
-    is: (field: string, value: unknown) => {
-      if (field === 'revoked_at' && value === null) requireUnrevoked = true;
-      return chain;
-    },
-    gt: (field: string, value: unknown) => {
-      if (field === 'expires_at') expiresAfter = String(value);
-      return chain;
-    },
+  return {
     insert: async (value: Record<string, unknown>) => {
       if (failure.insert) return { data: null, error: { message: 'insert failed' } };
       rows.set(String(value.session_id_hash), { ...value, revoked_at: null, revoke_reason: null });
       return { data: null, error: null };
     },
-    update: (value: Record<string, unknown>) => {
-      operation = 'update';
-      updatePayload = value;
-      return chain;
-    },
-    maybeSingle: async () => {
-      const row = rows.get(hash) ?? null;
-      if (!row) return { data: null, error: null };
-      if (requireUnrevoked && row.revoked_at != null) return { data: null, error: null };
-      if (expiresAfter && String(row.expires_at ?? '') <= expiresAfter) return { data: null, error: null };
-      return { data: row, error: null };
-    },
-    then: (resolve: (value: unknown) => void, reject: (reason: unknown) => void) => {
-      if (operation !== 'update') return Promise.resolve({ data: null, error: null }).then(resolve, reject);
-      if (failure.update) return Promise.resolve({ data: null, error: { message: 'update failed' } }).then(resolve, reject);
-      const row = rows.get(hash);
-      if (row && (!requireUnrevoked || row.revoked_at == null)) rows.set(hash, { ...row, ...updatePayload });
-      return Promise.resolve({ data: null, error: null }).then(resolve, reject);
-    },
+    select: (..._args: unknown[]) => ({
+      eq: (field: string, value: unknown) => ({
+        is: (nullField: string, nullValue: unknown) => ({
+          gt: (timeField: string, timeValue: unknown) => ({
+            maybeSingle: async () => {
+              if (field !== 'session_id_hash') return { data: null, error: null };
+              const row = rows.get(String(value)) ?? null;
+              if (!row) return { data: null, error: null };
+              if (nullField === 'revoked_at' && nullValue === null && row.revoked_at != null) return { data: null, error: null };
+              if (timeField === 'expires_at' && String(row.expires_at ?? '') <= String(timeValue)) return { data: null, error: null };
+              return { data: row, error: null };
+            },
+          }),
+        }),
+      }),
+    }),
+    update: (payload: Record<string, unknown>) => ({
+      eq: (field: string, value: unknown) => ({
+        is: async (nullField: string, nullValue: unknown) => {
+          if (failure.update) return { data: null, error: { message: 'update failed' } };
+          if (field === 'session_id_hash') {
+            const key = String(value);
+            const row = rows.get(key);
+            if (row && !(nullField === 'revoked_at' && nullValue === null && row.revoked_at != null)) {
+              rows.set(key, { ...row, ...payload });
+            }
+          }
+          return { data: null, error: null };
+        },
+      }),
+    }),
   };
-  return chain;
 }
 
 vi.mock('../../lib/supabaseClient.js', () => ({ supabase: supabaseMock }));
@@ -130,7 +122,6 @@ describe('opaque founder browser session integrity', () => {
   it('issues only an opaque __Host capability and stores credential state server-side', async () => {
     const { res, headers } = mockResponse();
     await writeFounderSession(res, session());
-
     const cookies = setCookies(headers);
     const primary = cookies[0] ?? '';
     expect(primary).toMatch(/^__Host-fcr_session=v1\.[A-Za-z0-9_-]{43};/);
@@ -143,7 +134,6 @@ describe('opaque founder browser session integrity', () => {
     expect(primary).not.toContain(REFRESH_TOKEN);
     expect(cookies[1]).toContain('fcr_session=;');
     expect(cookies[1]).toContain('Max-Age=0');
-
     expect(rows.size).toBe(1);
     const [hash, row] = [...rows.entries()][0] ?? [];
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
@@ -157,22 +147,13 @@ describe('opaque founder browser session integrity', () => {
   it('resolves a valid opaque capability only through active server-side state', async () => {
     const { res, headers } = mockResponse();
     await writeFounderSession(res, session());
-
     const resolved = await readFounderSession(requestWithCookie(primaryCookiePair(headers)));
-    expect(resolved).toEqual(expect.objectContaining({
-      accessToken: ACCESS_TOKEN,
-      refreshToken: REFRESH_TOKEN,
-      expiresAt: 2_000_000_000,
-      founderUserId: USER_ID,
-      founderEmail: EMAIL,
-      sessionVersion: 1,
-    }));
+    expect(resolved).toEqual(expect.objectContaining({ accessToken: ACCESS_TOKEN, refreshToken: REFRESH_TOKEN, expiresAt: 2_000_000_000, founderUserId: USER_ID, founderEmail: EMAIL, sessionVersion: 1 }));
     expect(resolved?.sessionIdHash).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('rejects the historical self-contained signed-cookie shape without consulting it as authority', async () => {
-    const forged = 'v1.payload.signature';
-    expect(await readFounderSession(requestWithCookie(`__Host-fcr_session=${forged}`))).toBeNull();
+    expect(await readFounderSession(requestWithCookie('__Host-fcr_session=v1.payload.signature'))).toBeNull();
     expect(rows.size).toBe(0);
   });
 
@@ -180,7 +161,6 @@ describe('opaque founder browser session integrity', () => {
     const { res, headers } = mockResponse();
     await writeFounderSession(res, session());
     const req = requestWithCookie(primaryCookiePair(headers));
-
     expect(await revokeFounderSession(req, 'logout')).toBe(true);
     expect(await readFounderSession(req)).toBeNull();
     expect([...rows.values()][0]?.revoke_reason).toBe('logout');
@@ -191,26 +171,29 @@ describe('opaque founder browser session integrity', () => {
     await writeFounderSession(first.res, session());
     const oldPair = primaryCookiePair(first.headers);
     const oldHash = [...rows.keys()][0] ?? '';
-
     const second = mockResponse();
     await rotateFounderSession(requestWithCookie(oldPair), second.res, session());
     const newPair = primaryCookiePair(second.headers);
-
     expect(newPair).not.toBe(oldPair);
     expect(rows.get(oldHash)?.revoked_at).toEqual(expect.any(String));
     expect(await readFounderSession(requestWithCookie(oldPair))).toBeNull();
-    expect(await readFounderSession(requestWithCookie(newPair))).toEqual(expect.objectContaining({
-      accessToken: ACCESS_TOKEN,
-      sessionVersion: 1,
-    }));
+    expect(await readFounderSession(requestWithCookie(newPair))).toEqual(expect.objectContaining({ accessToken: ACCESS_TOKEN, sessionVersion: 1 }));
   });
 
   it('does not issue a browser cookie when authoritative session persistence fails', async () => {
     failure.insert = true;
     const { res, headers } = mockResponse();
-
     await expect(writeFounderSession(res, session())).rejects.toThrow(/persist founder browser session/);
     expect(headers.has('Set-Cookie')).toBe(false);
+  });
+
+  it('fails closed when rotation cannot revoke the prior capability', async () => {
+    const first = mockResponse();
+    await writeFounderSession(first.res, session());
+    failure.update = true;
+    const second = mockResponse();
+    await expect(rotateFounderSession(requestWithCookie(primaryCookiePair(first.headers)), second.res, session())).rejects.toThrow(/revoke prior founder browser session/);
+    expect(setCookies(second.headers)[0]).toContain('__Host-fcr_session=;');
   });
 
   it('clears both the opaque cookie and the legacy token-container cookie', () => {
