@@ -135,12 +135,42 @@ function chiefDecisionReceipt(projectSlug, expectedHeadSha) {
   return { ...base, decisionHash: v10DecisionReceiptHash(base) };
 }
 
-// run.mjs performs one privileged create_branch directly with Node fetch for
-// the guarded-terminal proof. Bind that provider-boundary call to the same
-// canonical Chief plan/approved registry used by the real browser forms.
+let activeBrowserPage = null;
+
+async function replaceLegacyBearerWithOpaqueCookie(url, init) {
+  const headers = new Headers(init.headers ?? {});
+  const authorization = headers.get('authorization');
+  if (!authorization) return init;
+
+  if (!/^Bearer (?:undefined|null)?$/i.test(authorization.trim())) {
+    throw new Error('E2E_BROWSER_BEARER_REGRESSION: browser-readable bearer credentials must not cross the opaque-session boundary');
+  }
+  if (!activeBrowserPage) {
+    throw new Error('E2E_OPAQUE_COOKIE_UNAVAILABLE: no authenticated browser page is bound to the direct request');
+  }
+
+  const cookies = await activeBrowserPage.context().cookies(url);
+  const founderCookie = cookies.find((cookie) => cookie.name === '__Host-fcr_session');
+  if (!founderCookie || !founderCookie.value || founderCookie.httpOnly !== true) {
+    throw new Error('E2E_OPAQUE_COOKIE_UNAVAILABLE: expected an HttpOnly __Host-fcr_session cookie');
+  }
+
+  headers.delete('authorization');
+  headers.set('cookie', `${founderCookie.name}=${founderCookie.value}`);
+  return { ...init, headers };
+}
+
+// run.mjs performs a few provider-boundary calls with Node fetch. Its legacy
+// code still asks sessionStorage for an access token. After the opaque-session
+// cutover that value must be absent. Translate only that explicit stale test
+// shape into the real HttpOnly browser cookie, and fail if a readable bearer
+// token ever reappears. This keeps the browser UI itself cookie-native while
+// preserving the existing long-form E2E journey.
 const originalFetch = globalThis.fetch.bind(globalThis);
 globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  init = await replaceLegacyBearerWithOpaqueCookie(url, init);
+
   if (url.includes('/approvals/') && url.endsWith('/execute') && typeof init.body === 'string') {
     try {
       const body = JSON.parse(init.body);
@@ -156,6 +186,7 @@ globalThis.fetch = async (input, init = {}) => {
 };
 
 async function withV10PlanAwarePage(page) {
+  activeBrowserPage = page;
   const originalClick = page.click.bind(page);
   page.click = async (selector, options) => {
     if (selector === '#create-branch-form button[type=submit]') {
