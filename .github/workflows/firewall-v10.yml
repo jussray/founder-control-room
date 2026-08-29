@@ -54,6 +54,8 @@ jobs:
           node-version: '24'
 
       - name: Verify policy-as-code against runtime bindings
+        env:
+          GITHUB_SHA: ${{ env.EXPECTED_SHA }}
         run: node scripts/verify-firewall-v10.mjs
 
       - name: Upload exact-head firewall proof

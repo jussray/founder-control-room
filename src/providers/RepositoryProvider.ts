@@ -1,5 +1,3 @@
-import type { PullRequestAuditEvidence } from "./PullRequestAuditEvidence.js";
-
 /**
  * Provider-agnostic repository interface.
  *
@@ -62,11 +60,26 @@ export interface VerificationSignal {
   status: VerificationSignalStatus;
   commitSha: string;
   provider: string;
+  /** Full provider-backed evidence identity when the host exposes one (GitHub Check Run external_id). */
+  evidenceFingerprint?: string;
   /** Optional because not every provider exposes an issuer. Authority gates must fail closed when issuer identity is required. */
   issuer?: VerificationSignalIssuer;
   startedAt?: string;
   completedAt?: string;
   detailsUrl?: string;
+}
+
+/**
+ * Narrow provider write used only to publish one already-produced deterministic
+ * review witness. It is intentionally not a generic "create check" surface:
+ * the exact head, derived signal name, full review hash, and bounded summary
+ * must all survive provider validation before a host mutation is attempted.
+ */
+export interface DeterministicReviewWitnessPublication {
+  headSha: string;
+  name: string;
+  reviewHash: string;
+  summary: string;
 }
 
 export type ReviewSignalState =
@@ -226,6 +239,16 @@ export interface RepositoryProvider {
   listVerificationSignals(projectId: string, ref: string): Promise<VerificationSignal[]>;
 
   /**
+   * Publishes one deterministic-review verification witness. Optional because
+   * not every provider can mint a provider-backed App check. Review issuance
+   * must fail closed when this capability is unavailable.
+   */
+  publishDeterministicReviewWitness?(
+    projectId: string,
+    publication: DeterministicReviewWitnessPublication,
+  ): Promise<void>;
+
+  /**
    * Returns provider-recorded pull-request review events. Optional because
    * not every repository provider exposes a PR-review concept. Review gates
    * must fail closed when semantic review is required and this is absent.
@@ -241,18 +264,6 @@ export interface RepositoryProvider {
     projectId: string,
     pullRequestNumber: number,
   ): Promise<PullRequestReviewContext>;
-
-  /**
-   * Returns a bounded, provider-neutral evidence snapshot for one PR/MR audit.
-   * Optional because some repository providers do not expose equivalent
-   * pull-request evidence. Callers must fail closed when this capability is
-   * required but absent. This is read authority only and carries no merge or
-   * approval semantics.
-   */
-  auditPullRequestEvidence?(
-    projectId: string,
-    pullRequestNumber: number,
-  ): Promise<PullRequestAuditEvidence>;
 
   /** Creates a new branch from `baseRef`. Returns the created branch name. */
   createBranch(projectId: string, baseRef: string, name: string): Promise<string>;

@@ -7,10 +7,10 @@ export default defineConfig({
     // bleed between test files.
     isolate: true,
     environment: 'node',
-    // Discover supported JavaScript and TypeScript test/spec files anywhere
-    // under src so default npm test does not silently skip colocated or legacy
-    // __tests__ suites because of extension or directory shape.
-    include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx,mjs,cjs,mts,cts}'],
+    // Include colocated and __tests__/ suites written in TypeScript or
+    // JavaScript. The discovery ratchet separately rejects other candidate
+    // test/spec suffixes unless they are exact-base debt.
+    include: ['src/**/*.test.{ts,js}'],
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],

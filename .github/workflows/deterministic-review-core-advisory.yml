@@ -1,0 +1,275 @@
+name: Deterministic Review Witness
+
+on:
+  push:
+    branches:
+      - feat/deterministic-review-witness-v1-35817fe
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pull_request_number:
+        description: Pull request number to review from trusted current main
+        required: true
+        type: number
+      expected_main_sha:
+        description: Founder-bound exact current main SHA for this witness request
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.sha }}
+  DOC_TRUTH_BASE_SHA: 19682c6debfdf1be08a260ae02d6c393b5a6a881
+
+jobs:
+  deterministic-review-witness:
+    if: github.event_name == 'push'
+    name: Advisory deterministic review witness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact pushed head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact head and stacked base
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\nbase=%s\n' "$EXPECTED_HEAD_SHA" "$actual" "$DOC_TRUTH_BASE_SHA"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          git merge-base --is-ancestor "$DOC_TRUTH_BASE_SHA" "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Type check repository
+        run: npm run typecheck
+
+      - name: Run deterministic review producer and witness attacks
+        run: >-
+          npx vitest run
+          src/review/deterministicReviewProducer.test.ts
+          src/review/deterministicReviewProducer.boundary.test.ts
+          src/review/deterministicReviewWitnessPublisher.test.ts
+          src/review/deterministicReviewWitnessExecutionTrustRoot.test.ts
+          src/review/deterministicReviewFingerprintGate.test.ts
+          src/review/founderFinalReviewPolicy.test.ts
+          src/providers/__tests__/deterministicReviewGitHubProvider.test.ts
+          src/providers/__tests__/providerFactory.independentReviewBoundary.test.ts
+
+      - name: Verify stacked documentation truth
+        run: node scripts/verify-documentation-truth.mjs
+
+  dispatch-trusted-witness:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.number == 418 &&
+      github.event.comment.user.id == 286642846 &&
+      github.event.comment.user.login == 'jussray' &&
+      startsWith(github.event.comment.body, '/review-witness ')
+    name: Dispatch trusted deterministic review witness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+      issues: read
+      pull-requests: read
+    concurrency:
+      group: trusted-review-witness-command
+      cancel-in-progress: false
+    steps:
+      - name: Parse founder review-witness command
+        id: command
+        env:
+          COMMAND_BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+
+          body = os.environ.get('COMMAND_BODY', '').strip()
+          parts = body.split()
+          if len(parts) != 3 or parts[0] != '/review-witness':
+              raise SystemExit(
+                  'Expected exactly: /review-witness <pull-request-number> <40-char-current-main-sha>'
+              )
+
+          pr_number = parts[1]
+          main_sha = parts[2]
+
+          if not re.fullmatch(r'[1-9][0-9]{0,8}', pr_number):
+              raise SystemExit('Pull request number must be a positive decimal integer.')
+          if not re.fullmatch(r'[0-9a-f]{40}', main_sha):
+              raise SystemExit('Current main SHA must be a lowercase 40-character commit SHA.')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'pull_request_number={pr_number}\n')
+              output.write(f'expected_main_sha={main_sha}\n')
+          PY
+
+      - name: Verify exact current main and open main-target PR
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.command.outputs.pull_request_number }}
+          EXPECTED_MAIN_SHA: ${{ steps.command.outputs.expected_main_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          current_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
+          printf 'requested_main=%s\ncurrent_main=%s\n' "$EXPECTED_MAIN_SHA" "$current_main"
+          test "$current_main" = "$EXPECTED_MAIN_SHA"
+
+          pr_json="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")"
+          state="$(jq -r '.state' <<< "$pr_json")"
+          base_ref="$(jq -r '.base.ref' <<< "$pr_json")"
+          base_sha="$(jq -r '.base.sha' <<< "$pr_json")"
+          head_sha="$(jq -r '.head.sha' <<< "$pr_json")"
+
+          printf 'pr=%s\nstate=%s\nbase_ref=%s\nbase_sha=%s\nhead_sha=%s\n' \
+            "$PR_NUMBER" "$state" "$base_ref" "$base_sha" "$head_sha"
+
+          test "$state" = 'open'
+          test "$base_ref" = 'main'
+          test "$base_sha" = "$EXPECTED_MAIN_SHA"
+
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch trusted-main witness publisher
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.command.outputs.pull_request_number }}
+          EXPECTED_MAIN_SHA: ${{ steps.command.outputs.expected_main_sha }}
+          TARGET_HEAD_SHA: ${{ steps.target.outputs.head_sha }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          payload="$(jq -n \
+            --arg ref main \
+            --argjson pr "$PR_NUMBER" \
+            --arg expected_main_sha "$EXPECTED_MAIN_SHA" \
+            '{ref:$ref, inputs:{pull_request_number:$pr, expected_main_sha:$expected_main_sha}}')"
+
+          gh api \
+            --method POST \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/deterministic-review-core-advisory.yml/dispatches" \
+            --input - <<< "$payload"
+
+          {
+            echo '## Trusted deterministic review witness requested'
+            echo
+            echo "- Target PR: #$PR_NUMBER"
+            echo "- Target PR head observed before dispatch: \`$TARGET_HEAD_SHA\`"
+            echo "- Founder-bound current main: \`$EXPECTED_MAIN_SHA\`"
+            echo "- Founder immutable GitHub user ID: \`286642846\`"
+            echo "- Evidence cookie: issue #418 comment \`$COMMENT_ID\`"
+            echo '- Target workflow: `.github/workflows/deterministic-review-core-advisory.yml`'
+            echo '- Verdict, Founder Final, merge, deploy, provider, database, secret, and publication authority: none granted by this command'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish-trusted-witness:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    name: Publish trusted deterministic review witness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: production
+    concurrency:
+      group: deterministic-review-witness-${{ inputs.pull_request_number }}
+      cancel-in-progress: false
+    env:
+      FCR_REVIEW_PR_NUMBER: ${{ inputs.pull_request_number }}
+      EXPECTED_TRUSTED_MAIN_SHA: ${{ github.sha }}
+      EXPECTED_FOUNDER_MAIN_SHA: ${{ inputs.expected_main_sha }}
+      GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
+      GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}
+    steps:
+      - name: Check out trusted default-branch implementation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_TRUSTED_MAIN_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fail closed unless workflow code is founder-bound exact current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/main'
+          [[ "$EXPECTED_FOUNDER_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$EXPECTED_FOUNDER_MAIN_SHA" = "$EXPECTED_TRUSTED_MAIN_SHA"
+          test "$EXPECTED_TRUSTED_MAIN_SHA" = "$(git rev-parse HEAD)"
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          current_main="$(git rev-parse refs/remotes/origin/main)"
+          printf 'founder_bound_main=%s\ntrusted_workflow_sha=%s\ncurrent_main=%s\n' \
+            "$EXPECTED_FOUNDER_MAIN_SHA" "$EXPECTED_TRUSTED_MAIN_SHA" "$current_main"
+          test "$EXPECTED_FOUNDER_MAIN_SHA" = "$current_main"
+          test "$EXPECTED_TRUSTED_MAIN_SHA" = "$current_main"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build trusted review implementation
+        run: npm run build
+
+      - name: Verify witness trust-root contracts before publication
+        run: >-
+          npx vitest run
+          src/review/deterministicReviewProducer.test.ts
+          src/review/deterministicReviewProducer.boundary.test.ts
+          src/review/deterministicReviewWitnessPublisher.test.ts
+          src/review/deterministicReviewWitnessExecutionTrustRoot.test.ts
+          src/review/deterministicReviewFingerprintGate.test.ts
+          src/review/founderFinalReviewPolicy.test.ts
+          src/providers/__tests__/deterministicReviewGitHubProvider.test.ts
+          src/providers/__tests__/providerFactory.independentReviewBoundary.test.ts
+
+      - name: Publish and read back exact-head witness
+        run: node scripts/publish-deterministic-review-witness.mjs
+
+      - name: Re-read trusted main after publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          current_main="$(git rev-parse refs/remotes/origin/main)"
+          printf 'founder_bound_main=%s\ntrusted_workflow_sha=%s\ncurrent_main_after=%s\n' \
+            "$EXPECTED_FOUNDER_MAIN_SHA" "$EXPECTED_TRUSTED_MAIN_SHA" "$current_main"
+          test "$EXPECTED_FOUNDER_MAIN_SHA" = "$current_main"
+          test "$EXPECTED_TRUSTED_MAIN_SHA" = "$current_main"
+
+      - name: Retain deterministic review receipt and provider readback
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: deterministic-review-witness-pr-${{ inputs.pull_request_number }}-${{ github.run_id }}
+          path: artifacts/deterministic-review-witness.json
+          if-no-files-found: error
+          retention-days: 30

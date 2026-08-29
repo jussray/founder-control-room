@@ -28,6 +28,7 @@
  */
 
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import type { FounderRequest } from './requireFounder.js';
 
 const IS_PRODUCTION = process.env['NODE_ENV'] === 'production';
@@ -224,6 +225,23 @@ export const rateLimitGeneral = createRateLimiter(
   60,
   { error: 'Rate limit exceeded.' },
 );
+
+/**
+ * 60 founder-permission requests per minute per process/IP.
+ *
+ * This route-local limiter intentionally owns a store separate from the global
+ * rateLimitGeneral middleware. It uses the repository's existing
+ * express-rate-limit dependency so security analysis can recognize the
+ * authorization routes as explicitly rate-limited without double-counting the
+ * global limiter's in-memory bucket.
+ */
+export const rateLimitFounderPermissions = rateLimit({
+  windowMs: 60 * 1_000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Rate limit exceeded.' },
+});
 
 // ---------------------------------------------------------------------------
 // Request audit log

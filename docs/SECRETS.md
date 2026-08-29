@@ -190,3 +190,25 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] FOUNDER_REVIEW_EMAIL_INGRESS_SECRET when email intake is active
 [ ] REPOSITORY_INGEST_SECRET when repository ingest is active
 ```
+
+---
+
+## Complete workflow secret-name coverage
+
+This table covers GitHub Actions secret names that are referenced outside the canonical deploy registry above. A name appearing here documents wiring only; it does not prove that a value exists, is valid, or has sufficient provider permissions.
+
+| Secret | Referenced by | Requirement / boundary |
+|---|---|---|
+| `QODO_API_KEY` | `quality-gate.yml` | Optional Qodo workflow-contract integration; the job records missing configuration and keeps required repository gates separate. |
+| `SONAR_TOKEN` | `quality-gate.yml` | Optional SonarQube scan credential; scan runs only when both Sonar names are configured. |
+| `SONAR_HOST_URL` | `quality-gate.yml` | SonarQube server URL stored in the Actions secret plane because the workflow reads it through `secrets.*`. |
+| `NEON_API_KEY` | `neon-pr-branches.yml` | Required for create/delete of PR preview branches when that workflow runs. |
+| `OPENAI_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
+| `PERPLEXITY_API_KEY` | `playwright.yml` | Injected only into the E2E harness when configured; do not expose it to browser/static assets. |
+| `N8N_CONVEYOR_WEBHOOK_URL` | `n8n-conveyor-live-probe.yml` | Required private webhook URL for the founder-approved live conveyor probe. |
+| `N8N_CONVEYOR_BEARER_TOKEN` | `n8n-conveyor-live-probe.yml` | Required bearer credential paired with the live conveyor webhook probe. |
+| `CLOUDFLARE_DEPLOY_HOOK_URL` | `pages-production-release.yml` | Required reusable-workflow secret used to trigger the exact-SHA Pages release. |
+| `FCR_CLOUDFLARE_REQUEST_TRACER_TOKEN` | `cloudflare-build-diagnostic.yml` | Optional read credential for request-trace enrichment; does not authorize Worker mutation. |
+| `FCR_CLOUDFLARE_DNS_INVENTORY_TOKEN` | `cloudflare-build-diagnostic.yml` | Optional read credential for DNS inventory enrichment; does not authorize DNS mutation. |
+| `CLOUDFLARE_ACCESS_API_TOKEN` | `fcr-access-front-door-recovery.yml` | Dedicated read credential for Access inspection. It must not inherit admin mutation authority. |
+| `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN` | `fcr-access-front-door-recovery.yml` | Dedicated Access mutation credential used only when the founder-approved `apply=true` recovery path is invoked. |
