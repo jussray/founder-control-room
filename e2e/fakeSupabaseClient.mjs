@@ -30,7 +30,9 @@ class QueryBuilder {
   delete() { this.mode = 'delete'; return this; }
 
   eq(col, val) { this.filters.push({ col, op: 'eq', val }); return this; }
+  is(col, val) { this.filters.push({ col, op: 'is', val }); return this; }
   in(col, arr) { this.filters.push({ col, op: 'in', val: arr }); return this; }
+  gt(col, val) { this.filters.push({ col, op: 'gt', val }); return this; }
   gte(col, val) { this.filters.push({ col, op: 'gte', val }); return this; }
   lt(col, val) { this.filters.push({ col, op: 'lt', val }); return this; }
   filter(colExpr, _op, val) { this.filters.push({ col: colExpr, op: 'eq', val }); return this; }
