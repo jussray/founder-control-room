@@ -5,7 +5,22 @@ import { describe, expect, it } from 'vitest';
 const read = (path: string): string => readFileSync(resolve(process.cwd(), path), 'utf8');
 const normalizeSql = (sql: string): string => sql.replace(/\s+/g, ' ').trim();
 const destructiveOnboardingMutation = /(?:create\s+table|drop\s+table|truncate(?:\s+table)?|delete\s+from|update|alter\s+table)\s+(?:if\s+(?:not\s+)?exists\s+)?(?:public\.)?user_onboarding_state\b/i;
-const authenticatedLinkedInGrant = /grant\s+[^;]+?\s+on\s+(?:(?:table|view)\s+)?public\.(?:linkedin_experiments|linkedin_winning_patterns)\s+to\s+authenticated\b/i;
+
+const hasAuthenticatedLinkedInGrant = (sql: string): boolean => sql
+  .split(';')
+  .some((statement) => {
+    const normalized = normalizeSql(statement);
+    const match = normalized.match(
+      /^grant\s+[^;]+?\s+on\s+(?:(?:table|view)\s+)?public\.(?:linkedin_experiments|linkedin_winning_patterns)\s+to\s+(.+)$/i,
+    );
+    if (!match?.[1]) return false;
+
+    const granteeList = match[1].replace(/\s+with\s+grant\s+option\b.*$/i, '');
+    return granteeList.split(',').some((grantee) => {
+      const normalizedRole = grantee.trim().replace(/^"|"$/g, '').toLowerCase();
+      return normalizedRole === 'authenticated';
+    });
+  });
 
 const founderHelper = read('supabase/migrations/20260713034026_harden_founder_helper_server_only.sql');
 const mcpHubPhase1 = read('supabase/migrations/20260715073531_mcp_hub_phase1.sql');
@@ -43,6 +58,21 @@ describe('migration reconciliation security boundaries', () => {
     expect(steadyStateReplay).not.toMatch(destructiveOnboardingMutation);
   });
 
+  it('recognizes quoted and multi-grantee authenticated LinkedIn grants', () => {
+    expect(hasAuthenticatedLinkedInGrant(
+      'GRANT SELECT ON public.linkedin_experiments TO "authenticated";',
+    )).toBe(true);
+    expect(hasAuthenticatedLinkedInGrant(
+      'GRANT ALL PRIVILEGES ON TABLE public.linkedin_experiments TO anon, authenticated;',
+    )).toBe(true);
+    expect(hasAuthenticatedLinkedInGrant(
+      'GRANT SELECT ON VIEW public.linkedin_winning_patterns TO "anon", "authenticated" WITH GRANT OPTION;',
+    )).toBe(true);
+    expect(hasAuthenticatedLinkedInGrant(
+      'GRANT SELECT ON TABLE public.linkedin_experiments TO service_role;',
+    )).toBe(false);
+  });
+
   it('keeps LinkedIn experiments behind the existing server-owned founder boundary', () => {
     expect(founderHelper).toContain('revoke all on function public.is_founder() from public, anon, authenticated');
     expect(founderHelper).toContain('grant execute on function public.is_founder() to service_role');
@@ -54,7 +84,7 @@ describe('migration reconciliation security boundaries', () => {
     expect(linkedinHardening).toContain('alter view public.linkedin_winning_patterns set (security_invoker = true)');
     expect(linkedinHardening).toContain('revoke all privileges on table public.linkedin_winning_patterns from anon, authenticated');
     expect(linkedinHardening).toContain('grant select on table public.linkedin_winning_patterns to service_role');
-    expect(linkedinHardening).not.toMatch(authenticatedLinkedInGrant);
+    expect(hasAuthenticatedLinkedInGrant(linkedinHardening)).toBe(false);
   });
 
   it('reconciles already-recorded production state forward without deleting onboarding data or broadening cron cleanup', () => {
@@ -73,7 +103,7 @@ describe('migration reconciliation security boundaries', () => {
     expect(liveReconciliation).toContain('alter view public.linkedin_winning_patterns set (security_invoker = true)');
     expect(liveReconciliation).toContain('revoke all privileges on table public.linkedin_winning_patterns from anon, authenticated');
     expect(liveReconciliation).toContain('grant select on table public.linkedin_winning_patterns to service_role');
-    expect(liveReconciliation).not.toMatch(authenticatedLinkedInGrant);
+    expect(hasAuthenticatedLinkedInGrant(liveReconciliation)).toBe(false);
   });
 
   it('keeps branch-controlled Supabase candidate proof secretless and non-mutating', () => {
