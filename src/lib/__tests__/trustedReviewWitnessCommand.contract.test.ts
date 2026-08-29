@@ -8,10 +8,11 @@ const reviewWorkflow = readFileSync(
 );
 
 describe('trusted review witness command contract', () => {
-  it('accepts only the founder command on governance issue 418', () => {
+  it('accepts only the immutable founder identity on governance issue 418', () => {
     expect(reviewWorkflow).toContain('issue_comment:');
     expect(reviewWorkflow).toContain("github.event_name == 'issue_comment'");
     expect(reviewWorkflow).toContain('github.event.issue.number == 418');
+    expect(reviewWorkflow).toContain('github.event.comment.user.id == 286642846');
     expect(reviewWorkflow).toContain("github.event.comment.user.login == 'jussray'");
     expect(reviewWorkflow).toContain("startsWith(github.event.comment.body, '/review-witness ')");
     expect(reviewWorkflow).toContain(
@@ -41,13 +42,16 @@ describe('trusted review witness command contract', () => {
     expect(commandJob).not.toContain('pull-requests: write');
   });
 
-  it('hard-codes the trusted witness workflow and cannot select deploy or provider mutation targets', () => {
+  it('hard-codes the trusted witness workflow and binds dispatch to founder-supplied main', () => {
     expect(reviewWorkflow).toContain(
       '/actions/workflows/deterministic-review-core-advisory.yml/dispatches',
     );
     expect(reviewWorkflow).toContain('--arg ref main');
     expect(reviewWorkflow).toContain('--argjson pr "$PR_NUMBER"');
-    expect(reviewWorkflow).toContain("'{ref:$ref, inputs:{pull_request_number:$pr}}'");
+    expect(reviewWorkflow).toContain('--arg expected_main_sha "$EXPECTED_MAIN_SHA"');
+    expect(reviewWorkflow).toContain(
+      "'{ref:$ref, inputs:{pull_request_number:$pr, expected_main_sha:$expected_main_sha}}'",
+    );
 
     expect(reviewWorkflow).not.toContain('/actions/workflows/deploy.yml/dispatches');
     expect(reviewWorkflow).not.toContain('/actions/workflows/worker-reconcile.yml/dispatches');
@@ -57,11 +61,20 @@ describe('trusted review witness command contract', () => {
     expect(reviewWorkflow).not.toContain('SUPABASE_');
   });
 
-  it('leaves review publication and provider readback inside trusted current-main code', () => {
+  it('requires workflow dispatch to carry the founder-bound main SHA into trusted publication', () => {
     expect(reviewWorkflow).toContain('workflow_dispatch:');
     expect(reviewWorkflow).toContain('pull_request_number:');
-    expect(reviewWorkflow).toContain('required: true');
-    expect(reviewWorkflow).toContain('type: number');
+    expect(reviewWorkflow).toContain('expected_main_sha:');
+    expect(reviewWorkflow).toContain('Founder-bound exact current main SHA for this witness request');
+    expect(reviewWorkflow).toContain('EXPECTED_FOUNDER_MAIN_SHA: ${{ inputs.expected_main_sha }}');
+    expect(reviewWorkflow).toContain('[[ "$EXPECTED_FOUNDER_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]');
+    expect(reviewWorkflow).toContain(
+      'test "$EXPECTED_FOUNDER_MAIN_SHA" = "$EXPECTED_TRUSTED_MAIN_SHA"',
+    );
+    expect(reviewWorkflow).toContain('test "$EXPECTED_FOUNDER_MAIN_SHA" = "$current_main"');
+  });
+
+  it('leaves review publication and provider readback inside founder-bound exact current-main code', () => {
     expect(reviewWorkflow).toContain(
       "if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'",
     );
@@ -72,6 +85,7 @@ describe('trusted review witness command contract', () => {
     expect(reviewWorkflow).toContain('test "$EXPECTED_TRUSTED_MAIN_SHA" = "$current_main"');
     expect(reviewWorkflow).toContain('node scripts/publish-deterministic-review-witness.mjs');
     expect(reviewWorkflow).toContain('Re-read trusted main after publication');
+    expect(reviewWorkflow).toContain('founder_bound_main=%s');
   });
 
   it('keeps the command inside an existing P1 deterministic-review trust root', () => {
