@@ -124,7 +124,7 @@ function providerMergeGateReadback(
     requiredChecksState: 'PASS',
     reviewState: 'APPROVED',
     unresolvedMaterialThreads: 0,
-    observedAt: '2026-08-26T11:40:00.000Z',
+    observedAt: '2026-08-26T11:46:00.000Z',
     ...Object.fromEntries(Object.entries(overrides).filter(([key]) => key !== 'proofBinding')),
   } as Omit<GoalfixProviderMergeGateReadback, 'proofBinding'>;
   return {
