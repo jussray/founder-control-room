@@ -149,7 +149,12 @@ async function replaceLegacyBearerWithOpaqueCookie(url, init) {
     throw new Error('E2E_OPAQUE_COOKIE_UNAVAILABLE: no authenticated browser page is bound to the direct request');
   }
 
-  const cookies = await activeBrowserPage.context().cookies(url);
+  // Do not URL-filter the jar here. The real E2E origin is local HTTP while
+  // the production cookie intentionally carries Secure + __Host semantics.
+  // Chromium already proved the cookie-backed browser path against /auth/me;
+  // this bridge only needs the exact HttpOnly capability for the legacy
+  // Node-side provider-boundary calls in run.mjs.
+  const cookies = await activeBrowserPage.context().cookies();
   const founderCookie = cookies.find((cookie) => cookie.name === '__Host-fcr_session');
   if (!founderCookie || !founderCookie.value || founderCookie.httpOnly !== true) {
     throw new Error('E2E_OPAQUE_COOKIE_UNAVAILABLE: expected an HttpOnly __Host-fcr_session cookie');
