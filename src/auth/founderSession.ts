@@ -11,6 +11,7 @@ const SESSION_TABLE = 'founder_browser_sessions';
 const SESSION_VERSION = 1;
 const OPAQUE_TOKEN_BYTES = 32;
 const OPAQUE_COOKIE_PATTERN = /^v1\.[A-Za-z0-9_-]{43}$/;
+const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 
 export interface FounderCookieSession {
   accessToken: string;
@@ -21,6 +22,7 @@ export interface FounderCookieSession {
   sessionIdHash: string;
   sessionVersion: number;
   sessionExpiresAt: string;
+  continuityFingerprint: string;
 }
 
 function parseCookieHeader(header: string | undefined): Map<string, string> {
@@ -45,8 +47,34 @@ function opaqueCookieValue(req: Request): string | null {
   return OPAQUE_COOKIE_PATTERN.test(value) ? value : null;
 }
 
-function sessionIdHash(value: string): string {
+function sha256(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+function sessionIdHash(value: string): string {
+  return sha256(value);
+}
+
+function sessionContinuityFingerprint(input: {
+  sessionIdHash: string;
+  founderUserId: string;
+  founderEmail: string;
+  issuedAt: string;
+  expiresAt: string;
+  sessionVersion: number;
+}): string {
+  // This is a deterministic state-integrity fingerprint, not a browser/device
+  // fingerprint. It deliberately excludes IP, ASN, country, JA4, user agent,
+  // hardware entropy, storage identifiers, and other tracking surfaces.
+  return sha256([
+    'fcr-founder-browser-session/v1',
+    input.sessionIdHash,
+    input.founderUserId,
+    input.founderEmail.trim().toLowerCase(),
+    input.issuedAt,
+    input.expiresAt,
+    String(input.sessionVersion),
+  ].join('\n'));
 }
 
 function newOpaqueCookieValue(): string {
@@ -95,7 +123,7 @@ export async function readFounderSession(req: Request): Promise<FounderCookieSes
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from(SESSION_TABLE)
-    .select('session_id_hash,founder_user_id,founder_email,access_token,refresh_token,auth_expires_at,expires_at,session_version,revoked_at')
+    .select('session_id_hash,founder_user_id,founder_email,access_token,refresh_token,auth_expires_at,issued_at,expires_at,session_version,continuity_fingerprint,revoked_at')
     .eq('session_id_hash', hash)
     .is('revoked_at', null)
     .gt('expires_at', now)
@@ -108,12 +136,25 @@ export async function readFounderSession(req: Request): Promise<FounderCookieSes
   const refreshToken = typeof row.refresh_token === 'string' ? row.refresh_token : '';
   const founderUserId = typeof row.founder_user_id === 'string' ? row.founder_user_id : '';
   const founderEmail = typeof row.founder_email === 'string' ? row.founder_email.toLowerCase() : '';
+  const issuedAt = typeof row.issued_at === 'string' ? row.issued_at : '';
   const sessionExpiresAt = typeof row.expires_at === 'string' ? row.expires_at : '';
   const sessionVersion = typeof row.session_version === 'number' ? row.session_version : 0;
+  const storedContinuityFingerprint = typeof row.continuity_fingerprint === 'string' ? row.continuity_fingerprint : '';
   const authExpiresAt = typeof row.auth_expires_at === 'number' ? row.auth_expires_at : undefined;
 
-  if (!accessToken || !refreshToken || !founderUserId || !founderEmail || !sessionExpiresAt) return null;
+  if (!accessToken || !refreshToken || !founderUserId || !founderEmail || !issuedAt || !sessionExpiresAt) return null;
   if (sessionVersion !== SESSION_VERSION) return null;
+  if (!SHA256_PATTERN.test(storedContinuityFingerprint)) return null;
+
+  const expectedContinuityFingerprint = sessionContinuityFingerprint({
+    sessionIdHash: hash,
+    founderUserId,
+    founderEmail,
+    issuedAt,
+    expiresAt: sessionExpiresAt,
+    sessionVersion,
+  });
+  if (storedContinuityFingerprint !== expectedContinuityFingerprint) return null;
 
   return {
     accessToken,
@@ -124,6 +165,7 @@ export async function readFounderSession(req: Request): Promise<FounderCookieSes
     sessionIdHash: hash,
     sessionVersion,
     sessionExpiresAt,
+    continuityFingerprint: expectedContinuityFingerprint,
   };
 }
 
@@ -134,6 +176,16 @@ export async function writeFounderSession(res: Response, session: Session): Prom
   const hash = sessionIdHash(value);
   const issuedAt = new Date();
   const expiresAt = new Date(issuedAt.getTime() + COOKIE_MAX_AGE_SECONDS * 1000);
+  const issuedAtIso = issuedAt.toISOString();
+  const expiresAtIso = expiresAt.toISOString();
+  const continuityFingerprint = sessionContinuityFingerprint({
+    sessionIdHash: hash,
+    founderUserId: identity.userId,
+    founderEmail: identity.email,
+    issuedAt: issuedAtIso,
+    expiresAt: expiresAtIso,
+    sessionVersion: SESSION_VERSION,
+  });
 
   const { error } = await supabase.from(SESSION_TABLE).insert({
     session_id_hash: hash,
@@ -142,9 +194,10 @@ export async function writeFounderSession(res: Response, session: Session): Prom
     access_token: session.access_token,
     refresh_token: session.refresh_token,
     auth_expires_at: typeof session.expires_at === 'number' ? session.expires_at : null,
-    issued_at: issuedAt.toISOString(),
-    expires_at: expiresAt.toISOString(),
+    issued_at: issuedAtIso,
+    expires_at: expiresAtIso,
     session_version: SESSION_VERSION,
+    continuity_fingerprint: continuityFingerprint,
   });
 
   if (error) {
