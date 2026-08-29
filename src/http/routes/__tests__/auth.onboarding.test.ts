@@ -50,6 +50,7 @@ import { onboardingRouter } from '../onboarding.js';
 const EMAIL = 'sekretbip@gmail.com';
 const ACCESS_TOKEN = 'access-token-value';
 const REFRESH_TOKEN = 'refresh-token-value';
+const FOUNDER_SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64url');
 
 function app() {
   const instance = express();
@@ -155,6 +156,7 @@ describe('founder browser onboarding', () => {
     browserSessions.clear();
     vi.stubEnv('NODE_ENV', 'test');
     vi.stubEnv('FOUNDER_API_URL', 'https://control.example.com');
+    vi.stubEnv('FOUNDER_SESSION_ENCRYPTION_KEY', FOUNDER_SESSION_ENCRYPTION_KEY);
     setAllowlist(true);
     mockSignInWithOAuth.mockResolvedValue({
       data: { provider: 'google', url: 'https://supabase.example/authorize/google' },
