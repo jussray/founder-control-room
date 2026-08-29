@@ -132,6 +132,13 @@
         "src/providers/SecurityPreservingGitHubProvider.ts may diagnose requested-ref exclusion only from exact normalized ref equality or ~ALL; it must never invent wildcard, character-class, ~DEFAULT_BRANCH, or other GitHub pattern semantics locally.",
         "src/providers/SecurityPreservingGitHubProvider.ts must reject non-empty bypass replacement, keep FCR constitutional governance delegated to the canonical provider path, and cannot treat source state as proof of live provider configuration."
       ]
+    },
+    {
+      "path": "src/providers/GitHubPrTruthReader.ts",
+      "claims": [
+        "src/providers/GitHubPrTruthReader.ts must remain a read-only observation adapter over the current RepositoryProvider boundary, must derive PR/base/head/check/review/diff evidence without direct provider credentials, and must never expose merge, comment, dispatch, deployment, publication, or other provider-mutation authority.",
+        "src/providers/GitHubPrTruthReader.ts must preserve exact repository identity and bounded PR-number validation so the MCP audit can bind candidate/evidence fingerprints and a short-lived non-authorizing external-read continuity cookie without promoting collection completeness or continuity into approval or execution authority."
+      ]
     }
   ]
 }
