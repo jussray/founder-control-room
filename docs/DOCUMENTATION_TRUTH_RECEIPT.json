@@ -134,6 +134,13 @@
       ]
     },
     {
+      "path": ".github/workflows/deterministic-review-core-advisory.yml",
+      "claims": [
+        "The issue-418 founder command dispatcher must serialize workflow_dispatch inputs in the API-accepted form, including pull_request_number as a string value, while preserving immutable founder identity checks, exact current-main binding, open main-target PR validation, and the non-authorizing witness-only boundary.",
+        "A successful founder command may dispatch trusted current-main witness production only; it must not grant Founder Final, merge, deployment, provider-policy, database, secret, billing, publication, or destructive-action authority."
+      ]
+    },
+    {
       "path": "src/providers/GitHubProvider.ts",
       "claims": [
         "For active FCR main governance, src/providers/GitHubProvider.ts must keep Code Owner review enabled and carry exactly one CodeQL code-scanning rule at high_or_higher security alerts and errors alerts inside the review membrane while required-status strictness remains in the zero-bypass freshness companion.",
