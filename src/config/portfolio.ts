@@ -1,6 +1,6 @@
 import { L99_REPOSITORY_IDENTIFIER } from "./l99Repository.js";
 
-export type PortfolioProjectStatus = "active" | "quarantined";
+export type PortfolioProjectStatus = "active" | "external" | "quarantined";
 
 export interface PortfolioProject {
   slug: string;
@@ -11,16 +11,18 @@ export interface PortfolioProject {
 }
 
 /**
- * Founder-owned portfolio registry.
+ * Founder-owned repository index and portfolio registry.
  *
- * This is a bootstrap registry for provider discovery and MCP policy. The
- * Control Room database remains the runtime source of truth once a project is
- * registered there. Legacy and duplicate repositories are explicitly kept out
- * of every MCP allowlist.
+ * `active` means the project is registered for current FCR portfolio/MCP
+ * authority. `external` means the repository is a known founder project but
+ * remains continuity-only until separately registered. Quarantined and legacy
+ * repositories stay outside every allowlist.
  *
- * Slugs intentionally match the existing Control Room database registry. Do
- * not rename a product here without an explicit data migration; a second slug
- * would create a second project identity and split evidence provenance.
+ * The Control Room database remains the runtime source of truth once a project
+ * is registered there. Slugs intentionally match the existing Control Room
+ * database registry. Do not promote or rename a project here without the
+ * corresponding authority/data reconciliation; a second slug would split
+ * evidence provenance and `external` must never silently become `active`.
  */
 export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
   {
@@ -79,10 +81,39 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     status: "active",
     capabilities: ["prompt-registry", "ooda", "redteam", "l99", "lindymode"],
   },
+  {
+    slug: "think-tank",
+    name: "Think Tank",
+    repository: "jussray/THINK-TANK",
+    status: "external",
+    capabilities: ["idea-memory", "scorecards", "continuity"],
+  },
+  {
+    slug: "solcontinuity",
+    name: "SolContinuity",
+    repository: "jussray/solcontinuity",
+    status: "external",
+    capabilities: ["continuity", "evidence-history", "resilience"],
+  },
+  {
+    slug: "sleepwealth-agent",
+    name: "SleepWealth Agent",
+    repository: "jussray/SleepWealth-Agent",
+    status: "external",
+    capabilities: ["agent-runtime", "audit", "risk-gates"],
+  },
+  {
+    slug: "sweats",
+    name: "Sweats",
+    repository: "jussray/Sweats",
+    status: "external",
+    capabilities: ["product", "continuity"],
+  },
 ] as const;
 
 export const QUARANTINED_REPOSITORIES = new Set([
   "jussray/do-not-use",
+  "jussray/don-t-touch-this-one",
   "jussray/SekretBip_refactor_start",
   "jussray/Se-kretBip",
   "jussray/sekret-bip-demo",
@@ -92,6 +123,12 @@ export const QUARANTINED_REPOSITORIES = new Set([
 
 export const ACTIVE_PROJECT_SLUGS = new Set(
   PORTFOLIO_PROJECTS.filter((project) => project.status === "active").map(
+    (project) => project.slug,
+  ),
+);
+
+export const EXTERNAL_PROJECT_SLUGS = new Set(
+  PORTFOLIO_PROJECTS.filter((project) => project.status === "external").map(
     (project) => project.slug,
   ),
 );
