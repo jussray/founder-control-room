@@ -54,6 +54,8 @@ Founder-content orchestration readiness is a separate preflight truth layer. An 
 
 Founder-content orchestration must not reuse the generic conveyor activation receipt as Buffer proof. A founder-content `enabled-live-verified` state requires enabled/configured transport, a valid provider allowlist, Buffer enabled, and proof explicitly bound to `buffer` with a non-empty receipt ID, a valid observation timestamp, and `expectedHeadSha` exactly equal to deployed `GIT_SHA`. Missing, stale, unbound, incomplete, or provider-unverified proof remains non-live. This source contract does not claim the live route currently has a Buffer proof reader.
 
+A scheduled n8n acknowledgement is still pending provider truth even when it names a provider item. The provider-readback witness may upgrade that state only from a sanitized `provider-native-api` observation that exactly matches the orchestration ID, provider item/request identity, source repository and commit SHA, platform, channel, and requested schedule. Any mismatch, unsupported/raw payload field, missing native provider state, or `published:true` assertion must fail closed; a verified schedule remains scheduled rather than becoming publication truth.
+
 ## /confess
 
 Before release, state internally and, when material to the audience, publicly:
