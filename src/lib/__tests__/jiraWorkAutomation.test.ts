@@ -86,7 +86,7 @@ describe('Jira work automation contract', () => {
     expect(plan.authority.assignIssue).toBe(false);
   });
 
-  it('adds a stale-work comment on the scheduled scan after the configured threshold', () => {
+  it('adds a stale-work comment on a fresh scheduled scan after the configured threshold', () => {
     const plan = buildJiraWorkAutomationPlan(
       input({
         event: 'scheduled-scan',
@@ -104,7 +104,7 @@ describe('Jira work automation contract', () => {
     expect(plan.authority.closeIssue).toBe(false);
   });
 
-  it('self-heals missing ownership during a scheduled stale scan without gaining transition authority', () => {
+  it('repairs missing ownership first and requires a later fresh scan before any stale comment', () => {
     const plan = buildJiraWorkAutomationPlan(
       input({
         event: 'scheduled-scan',
@@ -115,10 +115,14 @@ describe('Jira work automation contract', () => {
       readJiraWorkAutomationConfig(enabledEnv()),
     );
 
-    expect(plan.actions.map((action) => action.type)).toEqual(['assign-owner', 'comment-stale']);
+    expect(plan.actions).toEqual([{
+      type: 'assign-owner',
+      ownerLabel: 'sekretbip',
+      ownerAccountId: 'jira-account-sekretbip',
+    }]);
     expect(plan.authority).toMatchObject({
       assignIssue: true,
-      commentIssue: true,
+      commentIssue: false,
       transitionIssue: false,
       closeIssue: false,
       deleteIssue: false,
@@ -171,6 +175,7 @@ describe('Jira work automation contract', () => {
       const body = JSON.parse(String(init?.body));
       expect(body.contract).toBe('founder-control-room/jira-work-automation@v1');
       expect(body.runtimeHeadSha).toBe(SHA);
+      expect(body.actions).toHaveLength(1);
       expect(body.authority.transitionIssue).toBe(false);
       expect(body.authority.closeIssue).toBe(false);
       expect(init?.headers).toMatchObject({
