@@ -421,18 +421,54 @@ describe('Goalfix execution workflow v2', () => {
     expect(result.state).toBe('COMPLETE');
   });
 
-  it('preserves already-consumed Builder, Verifier, and Red Team cookies as historical proof after merge', () => {
+  it('fails closed when consumed pre-merge proof expires before the provider merge boundary', () => {
     const historicalBuilder = cookie('cookie_builder_history1', 'builder-run', founderCookie.cookieId, {
       owner: 'actor-builder',
-      expiresAt: '2026-08-26T11:30:00.000Z',
+      expiresAt: '2026-08-26T11:51:00.000Z',
     });
     const historicalVerifier = cookie('cookie_verify_history01', 'verification-run', historicalBuilder.cookieId, {
       owner: 'actor-verifier',
-      expiresAt: '2026-08-26T11:30:00.000Z',
+      expiresAt: '2026-08-26T11:51:00.000Z',
     });
     const historicalRedteam = cookie('cookie_redteam_history1', 'verification-run', historicalBuilder.cookieId, {
       owner: 'actor-redteam',
-      expiresAt: '2026-08-26T11:30:00.000Z',
+      expiresAt: '2026-08-26T11:51:00.000Z',
+    });
+    const candidate = input({
+      founderDecision: founderDecision(),
+      postMergeTruth: postMergeTruth(),
+      now: new Date('2026-08-26T12:30:00.000Z'),
+    });
+    candidate.cookieIndex = new Map([
+      ...candidate.cookieIndex,
+      [historicalBuilder.cookieId, historicalBuilder],
+      [historicalVerifier.cookieId, historicalVerifier],
+      [historicalRedteam.cookieId, historicalRedteam],
+    ]);
+    candidate.checkpoints = candidate.checkpoints.map((item) => {
+      if (item.phase === 'builder') return checkpoint('builder', 'builder', 'actor-builder', historicalBuilder, 'PASS', { observedAt: '2026-08-26T11:00:00.000Z' });
+      if (item.phase === 'verify') return checkpoint('verify', 'verifier', 'actor-verifier', historicalVerifier, 'PASS', { observedAt: '2026-08-26T11:10:00.000Z' });
+      if (item.phase === 'redteam') return checkpoint('redteam', 'redteam', 'actor-redteam', historicalRedteam, 'PASS', { observedAt: '2026-08-26T11:20:00.000Z' });
+      return item;
+    });
+
+    const result = evaluateGoalfixExecution(candidate);
+    expect(result.state).toBe('UNVERIFIED');
+    expect(result.reasons.some((reason) => reason.includes('proof cookie is expired'))).toBe(true);
+  });
+
+  it('preserves consumed pre-merge proof that remains valid through provider merge as historical provenance', () => {
+    const historicalBuilder = cookie('cookie_builder_history2', 'builder-run', founderCookie.cookieId, {
+      owner: 'actor-builder',
+      expiresAt: '2026-08-26T12:00:00.000Z',
+    });
+    const historicalVerifier = cookie('cookie_verify_history02', 'verification-run', historicalBuilder.cookieId, {
+      owner: 'actor-verifier',
+      expiresAt: '2026-08-26T12:00:00.000Z',
+    });
+    const historicalRedteam = cookie('cookie_redteam_history2', 'verification-run', historicalBuilder.cookieId, {
+      owner: 'actor-redteam',
+      expiresAt: '2026-08-26T12:00:00.000Z',
     });
     const candidate = input({
       founderDecision: founderDecision(),
