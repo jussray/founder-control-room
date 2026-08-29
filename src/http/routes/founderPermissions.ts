@@ -96,15 +96,18 @@ function rowRequest(row: JsonRecord): FounderPermissionRequest | null {
   const requestId = text(row.request_id);
   const requestHash = text(row.request_hash).toLowerCase();
   if (!requestId || !requestHash) return null;
-  return {
-    contract: FOUNDER_PERMISSION_REQUEST_CONTRACT,
-    requestId,
-    requestedBySurface,
-    proposal,
-    actionTarget: actionTargetFrom(row.action_target),
-    requestHash,
-    note: text(row.note) || null,
-  };
+  try {
+    const normalized = createFounderPermissionRequest({
+      requestId,
+      requestedBySurface,
+      proposal,
+      actionTarget: actionTargetFrom(row.action_target),
+      note: text(row.note) || null,
+    });
+    return normalized.requestHash === requestHash ? normalized : null;
+  } catch {
+    return null;
+  }
 }
 function projection(row: JsonRecord, now = new Date()) {
   const status = statusFrom(row.status) ?? 'pending';
@@ -113,8 +116,10 @@ function projection(row: JsonRecord, now = new Date()) {
   const consumedAt = text(row.consumed_at) || null;
   const decisionSurface = surfaceFrom(row.decision_surface);
   const expiryMs = expiresAt ? Date.parse(expiresAt) : Number.NaN;
+  const exactStoredRequest = rowRequest(row);
   const approvedFreshUnconsumed = status === 'approved'
     && decisionSurface === 'fcr'
+    && exactStoredRequest !== null
     && Number.isFinite(expiryMs)
     && expiryMs > now.getTime()
     && !revokedAt
