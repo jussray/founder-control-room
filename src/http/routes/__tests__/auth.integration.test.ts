@@ -16,6 +16,7 @@ import { authRouter } from '../auth.js';
 
 const FOUNDER_EMAIL = 'founder@example.com';
 const FOUNDER_USER_ID = '11111111-1111-4111-8111-111111111111';
+const FOUNDER_SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64url');
 const VERIFIED_USER = { id: FOUNDER_USER_ID, email: FOUNDER_EMAIL };
 const SESSION = {
   access_token: 'supabase-access-token-value',
@@ -32,7 +33,7 @@ function setCookieHeader(res: ResponseWithHeaders): string { const cookie = res.
 function expectSessionCookie(res: ResponseWithHeaders) { const cookie = setCookieHeader(res); expect(cookie).toContain('__Host-fcr_session='); expect(cookie).toContain('HttpOnly'); expect(cookie).toContain('Secure'); expect(cookie).toContain('SameSite=Strict'); expect(cookie).not.toContain(SESSION.access_token); expect(cookie).not.toContain(SESSION.refresh_token); }
 function expectClearedSessionCookie(res: ResponseWithHeaders) { const cookie = setCookieHeader(res); expect(cookie).toContain('__Host-fcr_session=;'); expect(cookie).toContain('fcr_session=;'); expect(cookie).toContain('Max-Age=0'); expect(cookie).toContain('HttpOnly'); }
 
-beforeEach(() => { vi.clearAllMocks(); mockSignInWithOtp.mockResolvedValue({ error: null }); mockSetSession.mockResolvedValue({ data: {}, error: null }); mockVerifyOtp.mockResolvedValue({ data: {}, error: null }); });
+beforeEach(() => { vi.clearAllMocks(); vi.stubEnv('FOUNDER_SESSION_ENCRYPTION_KEY', FOUNDER_SESSION_ENCRYPTION_KEY); mockSignInWithOtp.mockResolvedValue({ error: null }); mockSetSession.mockResolvedValue({ data: {}, error: null }); mockVerifyOtp.mockResolvedValue({ data: {}, error: null }); });
 
 describe('POST /auth/magic-link', () => {
   it('requires an email with the standard error envelope', async () => { const res = await request(buildApp()).post('/auth/magic-link').send({}); expect(res.status).toBe(400); expect(res.body).toEqual({ success: false, error: { code: 'BAD_REQUEST', message: 'A valid email is required.', details: [] } }); });
