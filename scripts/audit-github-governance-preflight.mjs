@@ -29,6 +29,10 @@ function ruleOfType(ruleset, type) {
   return rules.find((rule) => rule?.type === type) ?? null;
 }
 
+export function canonicalFreshnessRulesetName(reviewRulesetName = CANONICAL_RULESET_NAME) {
+  return `${reviewRulesetName} [strict freshness]`;
+}
+
 export function trustedBypassPolicy(appId) {
   const id = text(appId);
   if (!/^\d+$/.test(id)) return null;
@@ -90,9 +94,16 @@ export function bypassPolicyMatches(snapshot, expectedBypassActors) {
   return JSON.stringify(snapshot.bypassActors) === JSON.stringify(expectedBypassActors);
 }
 
+function exactRequiredChecksMatch(snapshot) {
+  const observed = Array.isArray(snapshot?.requiredStatusCheckNames)
+    ? [...snapshot.requiredStatusCheckNames].sort()
+    : [];
+  const expected = [...REQUIRED_CHECKS].sort();
+  return JSON.stringify(observed) === JSON.stringify(expected);
+}
+
 export function canonicalFloorSatisfied(snapshot, expectedBypassActors) {
   if (!snapshot) return false;
-  const checks = new Set(snapshot.requiredStatusCheckNames);
   return snapshot.name === CANONICAL_RULESET_NAME
     && snapshot.enforcement === 'active'
     && snapshot.target === 'branch'
@@ -102,11 +113,27 @@ export function canonicalFloorSatisfied(snapshot, expectedBypassActors) {
     && snapshot.dismissStaleReviewsOnPush === true
     && snapshot.requireLastPushApproval === true
     && snapshot.requiredReviewThreadResolution === true
-    && snapshot.strictRequiredStatusChecks === true
-    && REQUIRED_CHECKS.every((check) => checks.has(check))
+    && snapshot.strictRequiredStatusChecks === false
+    && snapshot.requiredStatusCheckNames.length === 0
     && snapshot.blockForcePushes === true
     && snapshot.blockDeletion === true
     && bypassPolicyMatches(snapshot, expectedBypassActors);
+}
+
+export function freshnessFloorSatisfied(snapshot, expectedName = canonicalFreshnessRulesetName()) {
+  if (!snapshot) return false;
+  return snapshot.name === expectedName
+    && snapshot.enforcement === 'active'
+    && snapshot.target === 'branch'
+    && snapshot.targetsRequestedRef === true
+    && snapshot.requirePullRequest === false
+    && snapshot.strictRequiredStatusChecks === true
+    && exactRequiredChecksMatch(snapshot)
+    && snapshot.blockForcePushes === false
+    && snapshot.blockDeletion === false
+    && snapshot.bypassObservationComplete === true
+    && Array.isArray(snapshot.bypassActors)
+    && snapshot.bypassActors.length === 0;
 }
 
 export function buildReport({
@@ -120,22 +147,37 @@ export function buildReport({
 }) {
   const { owner } = parseRepository(repository);
   const expectedBypassActors = trustedBypassPolicy(trustedGitHubAppId);
+  const freshnessName = canonicalFreshnessRulesetName(canonicalName);
   const snapshots = fullRulesets
     .filter((ruleset) => ruleset?.target === 'branch')
     .map((ruleset) => rulesetSnapshot(ruleset, targetRef, defaultBranch));
   const activeTargetingRef = snapshots.filter((snapshot) =>
     snapshot.enforcement === 'active' && snapshot.targetsRequestedRef);
   const canonicalMatches = snapshots.filter((snapshot) => snapshot.name === canonicalName);
+  const freshnessMatches = snapshots.filter((snapshot) => snapshot.name === freshnessName);
   const canonical = canonicalMatches[0] ?? null;
+  const freshness = freshnessMatches[0] ?? null;
   const eligibleReviewers = collaborators.filter((collaborator) => collaboratorCanReview(collaborator, owner));
   const bypassObservationComplete = canonical?.bypassObservationComplete === true;
-  const observationComplete = expectedBypassActors !== null && (canonical === null || bypassObservationComplete);
+  const freshnessBypassObservationComplete = freshness?.bypassObservationComplete === true;
+  const observationComplete = expectedBypassActors !== null
+    && (canonical === null || bypassObservationComplete)
+    && (freshness === null || freshnessBypassObservationComplete);
   const blocker = expectedBypassActors === null
     ? 'trusted_bypass_policy_unavailable'
     : canonical !== null && !bypassObservationComplete
-      ? 'bypass_observation_unavailable'
-      : null;
+      ? 'review_bypass_observation_unavailable'
+      : freshness !== null && !freshnessBypassObservationComplete
+        ? 'freshness_bypass_observation_unavailable'
+        : null;
   const canonicalFloor = canonicalFloorSatisfied(canonical, expectedBypassActors);
+  const freshnessFloor = freshnessFloorSatisfied(freshness, freshnessName);
+  const reviewBypassSatisfied = canonical === null ? false : bypassPolicyMatches(canonical, expectedBypassActors);
+  const freshnessBypassSatisfied = freshness === null
+    ? false
+    : freshness.bypassObservationComplete === true
+      && Array.isArray(freshness.bypassActors)
+      && freshness.bypassActors.length === 0;
 
   return {
     contract: CONTRACT,
@@ -143,25 +185,33 @@ export function buildReport({
     targetRef,
     defaultBranch,
     canonicalRulesetName: canonicalName,
+    canonicalFreshnessRulesetName: freshnessName,
     observedAt: new Date().toISOString(),
     providerMutationPerformed: false,
     observationComplete,
     blocker,
     activeRulesetCountTargetingRef: activeTargetingRef.length,
     canonicalRulesetMatchCount: canonicalMatches.length,
+    canonicalFreshnessRulesetMatchCount: freshnessMatches.length,
     canonicalRuleset: canonical,
+    canonicalFreshnessRuleset: freshness,
     canonicalFloorSatisfied: canonicalFloor,
+    freshnessFloorSatisfied: freshnessFloor,
     bypassObservationComplete: canonical === null ? null : bypassObservationComplete,
+    freshnessBypassObservationComplete: freshness === null ? null : freshnessBypassObservationComplete,
     trustedBypassPolicyAvailable: expectedBypassActors !== null,
-    bypassPolicySatisfied: canonical === null ? false : bypassPolicyMatches(canonical, expectedBypassActors),
+    bypassPolicySatisfied: reviewBypassSatisfied,
+    freshnessBypassPolicySatisfied: freshnessBypassSatisfied,
     independentReviewerReady: eligibleReviewers.length > 0,
     eligibleNonOwnerWriteReviewerCount: eligibleReviewers.length,
     observedBranchRulesets: snapshots,
     status: !observationComplete
       ? 'BLOCKED'
       : canonicalMatches.length === 1
-        && activeTargetingRef.length === 1
+        && freshnessMatches.length === 1
+        && activeTargetingRef.length === 2
         && canonicalFloor
+        && freshnessFloor
         && eligibleReviewers.length > 0
           ? 'READY'
           : 'NOT_READY',
@@ -175,17 +225,23 @@ export function buildBlockedReport({ repository, targetRef = 'main', reason = 'p
     targetRef: text(targetRef) || 'main',
     defaultBranch: null,
     canonicalRulesetName: CANONICAL_RULESET_NAME,
+    canonicalFreshnessRulesetName: canonicalFreshnessRulesetName(),
     observedAt: new Date().toISOString(),
     providerMutationPerformed: false,
     observationComplete: false,
     blocker: reason,
     activeRulesetCountTargetingRef: null,
     canonicalRulesetMatchCount: null,
+    canonicalFreshnessRulesetMatchCount: null,
     canonicalRuleset: null,
+    canonicalFreshnessRuleset: null,
     canonicalFloorSatisfied: false,
+    freshnessFloorSatisfied: false,
     bypassObservationComplete: null,
+    freshnessBypassObservationComplete: null,
     trustedBypassPolicyAvailable: false,
     bypassPolicySatisfied: false,
+    freshnessBypassPolicySatisfied: false,
     independentReviewerReady: false,
     eligibleNonOwnerWriteReviewerCount: null,
     observedBranchRulesets: [],
@@ -294,10 +350,14 @@ async function main() {
     blocker: report.blocker,
     activeRulesetCountTargetingRef: report.activeRulesetCountTargetingRef,
     canonicalRulesetMatchCount: report.canonicalRulesetMatchCount,
+    canonicalFreshnessRulesetMatchCount: report.canonicalFreshnessRulesetMatchCount,
     canonicalFloorSatisfied: report.canonicalFloorSatisfied,
+    freshnessFloorSatisfied: report.freshnessFloorSatisfied,
     bypassObservationComplete: report.bypassObservationComplete,
+    freshnessBypassObservationComplete: report.freshnessBypassObservationComplete,
     trustedBypassPolicyAvailable: report.trustedBypassPolicyAvailable,
     bypassPolicySatisfied: report.bypassPolicySatisfied,
+    freshnessBypassPolicySatisfied: report.freshnessBypassPolicySatisfied,
     independentReviewerReady: report.independentReviewerReady,
     eligibleNonOwnerWriteReviewerCount: report.eligibleNonOwnerWriteReviewerCount,
   }, null, 2));
