@@ -25,6 +25,12 @@ for (const key of proxyEnvKeys) delete process.env[key];
 process.env.NO_PROXY = '*';
 process.env.no_proxy = '*';
 
+// The real E2E server persists opaque founder sessions through the same
+// encrypted-at-rest path as production. Supply a deterministic test-only key
+// at the harness boundary so every spawned scenario proves that path without
+// adding a production fallback or requiring a repository secret.
+process.env.FOUNDER_SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64url');
+
 // Keep the public package-script contract stable while proving each long
 // journey against a fresh real server. The application correctly enforces a
 // per-IP general request limit; running all three journeys in one process
