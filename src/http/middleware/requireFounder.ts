@@ -30,6 +30,17 @@ function authenticatedIdentity(user: unknown): AuthenticatedIdentity | null {
   return email && userId ? { email, userId } : null;
 }
 
+async function founderAllowlisted(identity: AuthenticatedIdentity): Promise<'allowed' | 'denied' | 'error'> {
+  const { data: allowRow, error: allowError } = await supabase
+    .from('founder_users')
+    .select('email')
+    .eq('email', identity.email)
+    .maybeSingle();
+
+  if (allowError) return 'error';
+  return allowRow ? 'allowed' : 'denied';
+}
+
 /**
  * Founder authorization has two independent gates:
  *
@@ -81,20 +92,56 @@ export async function requireFounder(
     return res.status(401).json({ error: 'Invalid or expired founder session' });
   }
 
-  const { data: allowRow, error: allowError } = await supabase
-    .from('founder_users')
-    .select('email')
-    .eq('email', identity.email)
-    .maybeSingle();
-
-  if (allowError) {
+  const allowState = await founderAllowlisted(identity);
+  if (allowState === 'error') {
     return res.status(500).json({ error: 'Founder allowlist check failed' });
   }
-  if (!allowRow) {
+  if (allowState === 'denied') {
     return res.status(403).json({ error: 'Not on the founder allowlist' });
   }
 
   if (refreshedSession) writeFounderSession(res, refreshedSession);
+
+  req.founder = identity;
+  next();
+}
+
+/**
+ * High-consequence interactive founder decisions must authenticate the browser
+ * cookie itself. An Authorization bearer header is deliberately ignored here,
+ * so bearer automation cannot borrow the mere presence of a signed cookie as
+ * proof of a current founder interaction.
+ *
+ * The access token in the cookie must still be current at decision time. We do
+ * not silently refresh it in this path: an expired browser identity must return
+ * through the normal authenticated UI flow before it can decide authority.
+ */
+export async function requireInteractiveFounder(
+  req: FounderRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  const cookieSession = readFounderSession(req);
+  if (!cookieSession) {
+    return res.status(401).json({ error: 'Interactive founder session required' });
+  }
+  if (typeof cookieSession.expiresAt === 'number' && cookieSession.expiresAt <= Math.floor(Date.now() / 1000)) {
+    return res.status(401).json({ error: 'Interactive founder session expired' });
+  }
+
+  const { data: userData, error: userError } = await supabaseAuth.auth.getUser(cookieSession.accessToken);
+  const identity = authenticatedIdentity(userData?.user);
+  if (userError || !identity) {
+    return res.status(401).json({ error: 'Invalid or expired interactive founder session' });
+  }
+
+  const allowState = await founderAllowlisted(identity);
+  if (allowState === 'error') {
+    return res.status(500).json({ error: 'Founder allowlist check failed' });
+  }
+  if (allowState === 'denied') {
+    return res.status(403).json({ error: 'Not on the founder allowlist' });
+  }
 
   req.founder = identity;
   next();
