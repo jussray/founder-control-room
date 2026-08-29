@@ -6,6 +6,7 @@ import {
   REQUIRED_FCR_PRODUCTION_WORKERS,
   aggregateSecurityStates,
   aggregateWorkerAttack20Status,
+  attackFixtureExpectationKey,
   evaluateReceiptFreshness,
   fingerprintNormalized,
   generateAttack20ApplicabilityPlan,
@@ -14,6 +15,7 @@ import {
   validateProofBinding,
   type Attack20Id,
   type Attack20ReceiptV3,
+  type AttackFixtureExpectation,
   type FingerprintClass,
   type ProofBinding,
   type ProofCookieContract,
@@ -74,6 +76,18 @@ function allCapabilities(): WorkerApplicabilityInput {
       schemaGoverned: true,
     },
     capabilityAbsenceEvidence: {},
+    trustedIngressTargets: [
+      {
+        hostname: 'api.foundercontrolroom.org',
+        route: '/synthetic/security-proof',
+        ingressSurface: 'custom-domain',
+      },
+      {
+        hostname: 'founder-control-room.workers.dev',
+        route: '/synthetic/security-proof',
+        ingressSurface: 'workers-dev',
+      },
+    ],
   };
 }
 
@@ -116,6 +130,24 @@ function receipt(attackId: Attack20Id, verdict: 'PASS' | 'FAILED' | 'UNVERIFIED'
     reason: verdict === 'FAILED' ? 'synthetic defensive failure' : null,
     expiresAt: '2026-08-27T11:00:00.000Z',
   };
+}
+
+function fixtureExpectation(receiptValue: Attack20ReceiptV3): AttackFixtureExpectation {
+  return {
+    attackId: receiptValue.attackId,
+    fixtureId: receiptValue.test.fixtureId,
+    ingressSurface: receiptValue.target.ingressSurface,
+    expectedOutcome: 'PASS',
+    allowedStatusCodes: [200],
+    applicationReached: false,
+  };
+}
+
+function expectationIndex(receipts: readonly Attack20ReceiptV3[]): ReadonlyMap<string, AttackFixtureExpectation> {
+  return new Map(receipts.map((item) => {
+    const expectation = fixtureExpectation(item);
+    return [attackFixtureExpectationKey(item.attackId, item.test.fixtureId, item.target.ingressSurface), expectation];
+  }));
 }
 
 function runtimeWitnessLineage() {
@@ -167,6 +199,9 @@ function aggregate(
   receipts: readonly Attack20ReceiptV3[],
   plan = generateAttack20ApplicabilityPlan(allCapabilities(), binding()),
   runtimeReadbackIndex?: ReadonlyMap<string, RuntimeReadbackWitness>,
+  fixtures: ReadonlyMap<string, AttackFixtureExpectation> = expectationIndex(receipts),
+  capabilityAbsenceEvidenceIndex: ReadonlySet<string> = new Set(),
+  applicabilityInput: WorkerApplicabilityInput = allCapabilities(),
 ) {
   const lineage = runtimeWitnessLineage();
   const a19 = receipts.find((item) => item.attackId === 'A19');
@@ -176,7 +211,7 @@ function aggregate(
     defaultWitnesses.set(witness.witnessId, witness);
   }
   return aggregateWorkerAttack20Status({
-    applicabilityInput: allCapabilities(),
+    applicabilityInput,
     plan,
     receipts,
     currentFingerprints: fingerprints(),
@@ -187,6 +222,8 @@ function aggregate(
       [lineage.provider.cookieId, lineage.provider],
     ]),
     runtimeReadbackIndex: runtimeReadbackIndex ?? defaultWitnesses,
+    capabilityAbsenceEvidenceIndex,
+    fixtureExpectationIndex: fixtures,
     now: NOW,
   });
 }
@@ -245,7 +282,7 @@ describe('ATTACK-20 V3', () => {
     input.capabilities.providerWebhook = false;
     input.capabilities.tenantOwnedData = 'unknown';
     input.capabilityAbsenceEvidence = {
-      A10: ['No provider webhook route exists in the declared Worker contract.'],
+      A10: ['absence:A10:no-provider-webhook'],
     };
 
     const plan = generateAttack20ApplicabilityPlan(input, binding());
@@ -257,6 +294,22 @@ describe('ATTACK-20 V3', () => {
     input.capabilityAbsenceEvidence = {};
     expect(generateAttack20ApplicabilityPlan(input, binding()).find((item) => item.attackId === 'A10')?.decision)
       .toBe('BLOCKED_BY_DISCOVERY');
+  });
+
+  it('authenticates NOT_APPLICABLE proof instead of trusting inline absence strings', () => {
+    const input = allCapabilities();
+    input.capabilities.providerWebhook = false;
+    input.capabilityAbsenceEvidence = { A10: ['absence:A10:no-provider-webhook'] };
+    const forgedPlan = generateAttack20ApplicabilityPlan(input, binding());
+
+    expect(aggregate(
+      ATTACK20_IDS.filter((id) => id !== 'A10').map((id) => receipt(id)),
+      forgedPlan,
+      undefined,
+      expectationIndex(ATTACK20_IDS.filter((id) => id !== 'A10').map((id) => receipt(id))),
+      new Set(['absence:A10:no-provider-webhook']),
+      input,
+    )).toBe('UNVERIFIED');
   });
 
   it('binds freshness to canonical dependencies rather than receipt-controlled dependencies', () => {
@@ -298,11 +351,25 @@ describe('ATTACK-20 V3', () => {
     expect(decision.reason).toContain('rls fingerprint changed');
   });
 
-  it('rejects a receipt that targets another Worker', () => {
+  it('rejects a receipt that targets another Worker or untrusted endpoint', () => {
     const candidate = receipt('A07');
     candidate.target.worker = 'founder-control-room-review-email';
     expect(validateAttack20Receipt(candidate, allCapabilities(), NOW)).toContain(
-      'receipt target does not match the Worker under evaluation',
+      'receipt target does not match the trusted Worker ingress under evaluation',
+    );
+
+    const wrongRoute = receipt('A07');
+    wrongRoute.target.route = '/unrelated-test-route';
+    expect(validateAttack20Receipt(wrongRoute, allCapabilities(), NOW)).toContain(
+      'receipt target does not match the trusted Worker ingress under evaluation',
+    );
+  });
+
+  it('rejects blank evidence references for every PASS attack', () => {
+    const candidate = receipt('A11');
+    candidate.evidence.applicationEventIds = [''];
+    expect(validateAttack20Receipt(candidate, allCapabilities(), NOW)).toContain(
+      'evidence reference IDs must be non-empty',
     );
   });
 
@@ -324,6 +391,17 @@ describe('ATTACK-20 V3', () => {
     expect(validateAttack20Receipt(noWitness, allCapabilities(), NOW)).toContain(
       'A19 PASS requires an independent runtime readback witness',
     );
+  });
+
+  it('validates PASS against trusted fixture expectations instead of receipt-controlled expected outcomes', () => {
+    const receipts = ATTACK20_IDS.map((id) => receipt(id));
+    const a11 = receipts[ATTACK20_IDS.indexOf('A11')]!;
+    const trustedFixtures = expectationIndex(receipts);
+    a11.test.expectedOutcome = 'DENY';
+    a11.test.observedOutcome = 'DENY';
+    a11.test.statusCode = 403;
+
+    expect(aggregate(receipts, undefined, undefined, trustedFixtures)).toBe('UNVERIFIED');
   });
 
   it('requires A19 witness IDs to resolve through the authenticated runtime-readback index', () => {
@@ -350,6 +428,7 @@ describe('ATTACK-20 V3', () => {
     const failedSurface = receipt('A07', 'FAILED');
     failedSurface.receiptId = 'receipt-A07-secondary-failure';
     failedSurface.test.fixtureId = 'fixture-A07-secondary';
+    failedSurface.target.hostname = 'founder-control-room.workers.dev';
     failedSurface.target.ingressSurface = 'workers-dev';
     failedSurface.test.executedAt = '2026-08-26T11:40:00.000Z';
     receipts.push(failedSurface);
