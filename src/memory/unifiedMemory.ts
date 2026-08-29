@@ -240,11 +240,11 @@ const EXACT_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^sha256:[0-9a-f]{64}$/i;
 const SAFE_ID = /^[A-Za-z0-9._:/-]{1,200}$/;
 const SAFE_CATEGORY_KEY = /^[A-Za-z0-9_-]{1,80}$/;
+const SAFE_PROVENANCE_REF = /^[A-Za-z0-9._:/#@-]{1,200}$/;
 const FUTURE_CLOCK_SKEW_MS = 5 * 60 * 1000;
 const DEFAULT_FRESHNESS_MS = 3 * 24 * 60 * 60 * 1000;
 const MAX_SUMMARY_LENGTH = 800;
 const MAX_PROVENANCE_REFS = 20;
-const MAX_PROVENANCE_REF_LENGTH = 500;
 const VALID_TRUST = new Set<UnifiedMemoryTrust>([
   'verified',
   'submitted-unverified',
@@ -272,7 +272,7 @@ function boundedUniqueStrings(
     if (!pattern.test(normalized) || output.includes(normalized)) return null;
     output.push(normalized);
   }
-  return output;
+  return output.sort();
 }
 
 function boundedProvenanceRefs(values: readonly string[]): string[] | null {
@@ -281,10 +281,10 @@ function boundedProvenanceRefs(values: readonly string[]): string[] | null {
   for (const value of values) {
     if (typeof value !== 'string') return null;
     const normalized = value.trim();
-    if (!normalized || normalized.length > MAX_PROVENANCE_REF_LENGTH || output.includes(normalized)) return null;
+    if (!SAFE_PROVENANCE_REF.test(normalized) || output.includes(normalized)) return null;
     output.push(normalized);
   }
-  return output;
+  return output.sort();
 }
 
 function normalizedSummary(value: string | null | undefined): string | null | undefined {
@@ -312,6 +312,12 @@ function observationState(input: {
   if (input.expiresAt !== null && input.expiresAt <= now) return 'stale';
   if (now - input.observedAt >= DEFAULT_FRESHNESS_MS) return 'stale';
   return 'fresh';
+}
+
+function effectiveObservationTime(record: UnifiedMemoryRecord): number {
+  const observedAt = Date.parse(record.observedAt);
+  const revokedAt = record.revokedAt ? Date.parse(record.revokedAt) : Number.NEGATIVE_INFINITY;
+  return Math.max(observedAt, revokedAt);
 }
 
 function canonicalObservationKey(record: UnifiedMemoryRecord): string {
@@ -353,9 +359,11 @@ export function normalizeUnifiedMemoryObservation(
   const repository = typeof input.repository === 'string' ? input.repository.trim() : '';
   const nativeId = typeof input.nativeId === 'string' ? input.nativeId.trim() : '';
   const nativeKind = typeof input.nativeKind === 'string' ? input.nativeKind.trim() : '';
-  const observedAt = safeTime(input.observedAt);
-  const expiresAt = input.expiresAt ? safeTime(input.expiresAt) : null;
-  const revokedAt = input.revokedAt ? safeTime(input.revokedAt) : null;
+  const observedAt = typeof input.observedAt === 'string' ? safeTime(input.observedAt) : null;
+  const hasExpiresAt = input.expiresAt !== undefined && input.expiresAt !== null;
+  const expiresAt = hasExpiresAt && typeof input.expiresAt === 'string' ? safeTime(input.expiresAt) : null;
+  const hasRevokedAt = input.revokedAt !== undefined && input.revokedAt !== null;
+  const revokedAt = hasRevokedAt && typeof input.revokedAt === 'string' ? safeTime(input.revokedAt) : null;
   const summary = normalizedSummary(input.summary);
   const categories = boundedUniqueStrings(input.categoryKeys, SAFE_CATEGORY_KEY, 40);
   const provenanceRefs = boundedProvenanceRefs(input.provenanceRefs);
@@ -385,11 +393,11 @@ export function normalizeUnifiedMemoryObservation(
   if (!VALID_TRUST.has(input.trust)) errors.push('trust classification is invalid.');
 
   if (observedAt === null) errors.push('observedAt must be a valid timestamp.');
-  if (input.expiresAt && expiresAt === null) errors.push('expiresAt must be a valid timestamp when supplied.');
+  if (hasExpiresAt && expiresAt === null) errors.push('expiresAt must be a valid timestamp when supplied.');
   if (observedAt !== null && expiresAt !== null && expiresAt < observedAt) {
     errors.push('expiresAt cannot predate observedAt.');
   }
-  if (input.revokedAt && revokedAt === null) errors.push('revokedAt must be a valid timestamp when supplied.');
+  if (hasRevokedAt && revokedAt === null) errors.push('revokedAt must be a valid timestamp when supplied.');
   if (input.trust === 'revoked' && revokedAt === null) errors.push('revoked memory requires revokedAt.');
   if (input.trust !== 'revoked' && revokedAt !== null) errors.push('revokedAt is only valid for revoked memory.');
 
@@ -405,14 +413,28 @@ export function normalizeUnifiedMemoryObservation(
 
   if (categories === null) errors.push('categoryKeys must be unique bounded safe identifiers.');
 
-  const contentHash = input.contentHash?.trim() || null;
-  if (contentHash && !SHA256.test(contentHash)) errors.push('contentHash must use sha256:<64 hex>.');
+  let contentHash: string | null = null;
+  if (input.contentHash !== undefined && input.contentHash !== null) {
+    if (typeof input.contentHash !== 'string') {
+      errors.push('contentHash must be a string when supplied.');
+    } else {
+      contentHash = input.contentHash.trim() || null;
+      if (contentHash && !SHA256.test(contentHash)) errors.push('contentHash must use sha256:<64 hex>.');
+    }
+  }
 
-  const sourceSha = input.sourceSha?.trim().toLowerCase() || null;
-  if (sourceSha && !EXACT_SHA.test(sourceSha)) errors.push('sourceSha must be an exact 40-character SHA when supplied.');
+  let sourceSha: string | null = null;
+  if (input.sourceSha !== undefined && input.sourceSha !== null) {
+    if (typeof input.sourceSha !== 'string') {
+      errors.push('sourceSha must be a string when supplied.');
+    } else {
+      sourceSha = input.sourceSha.trim().toLowerCase() || null;
+      if (sourceSha && !EXACT_SHA.test(sourceSha)) errors.push('sourceSha must be an exact 40-character SHA when supplied.');
+    }
+  }
 
   if (provenanceRefs === null) {
-    errors.push(`provenanceRefs must contain 1 to ${MAX_PROVENANCE_REFS} unique bounded references.`);
+    errors.push(`provenanceRefs must contain 1 to ${MAX_PROVENANCE_REFS} unique opaque references.`);
   }
 
   if (errors.length > 0 || observedAt === null || !nativeKindPolicy || categories === null || provenanceRefs === null) {
@@ -511,15 +533,15 @@ export function buildUnifiedMemoryView(
   const conflicts: UnifiedMemoryConflict[] = [];
 
   for (const [identityKey, observations] of byIdentity) {
-    observations.sort((a, b) => Date.parse(b.observedAt) - Date.parse(a.observedAt));
-    const newestTime = observations[0]?.observedAt;
-    const newest = observations.filter((record) => record.observedAt === newestTime);
+    observations.sort((a, b) => effectiveObservationTime(b) - effectiveObservationTime(a));
+    const newestEffectiveTime = effectiveObservationTime(observations[0]!);
+    const newest = observations.filter((record) => effectiveObservationTime(record) === newestEffectiveTime);
     const logicalVariants = [...new Set(newest.map(canonicalObservationKey))];
 
     if (logicalVariants.length > 1) {
       conflicts.push({
         identityKey,
-        observedAt: newestTime ?? '',
+        observedAt: new Date(newestEffectiveTime).toISOString(),
         fingerprints: [...new Set(newest.map((record) => record.continuityFingerprint))].sort(),
         variants: logicalVariants.length,
       });
@@ -530,7 +552,7 @@ export function buildUnifiedMemoryView(
     if (current) records.push(current);
   }
 
-  records.sort((a, b) => Date.parse(b.observedAt) - Date.parse(a.observedAt) || a.identityKey.localeCompare(b.identityKey));
+  records.sort((a, b) => effectiveObservationTime(b) - effectiveObservationTime(a) || a.identityKey.localeCompare(b.identityKey));
   conflicts.sort((a, b) => a.identityKey.localeCompare(b.identityKey));
 
   return {
@@ -553,8 +575,28 @@ export function buildUnifiedMemoryView(
   };
 }
 
-export function memoryRecordsForDecisionSupport(view: UnifiedMemoryView): UnifiedMemoryRecord[] {
-  return view.records.filter((record) => record.decisionSupportUsable);
+export function memoryRecordsForDecisionSupport(
+  view: UnifiedMemoryView,
+  now = new Date(),
+): UnifiedMemoryRecord[] {
+  const currentTime = now.getTime();
+  return view.records.filter((record) => {
+    if (!record.decisionSupportUsable) return false;
+    if (record.sourceVerification !== 'authenticated-source') return false;
+    if (record.projectRegistration !== 'registered' || record.trust !== 'verified') return false;
+    if (record.revokedAt !== null) return false;
+
+    const observedAt = Date.parse(record.observedAt);
+    if (!Number.isFinite(observedAt) || observedAt > currentTime + FUTURE_CLOCK_SKEW_MS) return false;
+    if (currentTime - observedAt >= DEFAULT_FRESHNESS_MS) return false;
+
+    if (record.expiresAt !== null) {
+      const expiresAt = Date.parse(record.expiresAt);
+      if (!Number.isFinite(expiresAt) || expiresAt <= currentTime) return false;
+    }
+
+    return true;
+  });
 }
 
 export function memoryRecordsForContinuity(view: UnifiedMemoryView): UnifiedMemoryRecord[] {
