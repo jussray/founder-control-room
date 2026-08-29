@@ -23,11 +23,13 @@ FCR does not guess the Jira account ID from the label `sekretbip`. The exact map
 
 ## Flow 2: stale-work guard
 
-On a scheduled scan, when an `In Progress` work item has not been updated for at least the configured number of hours, FCR may request one additional Jira mutation:
+On a scheduled scan, when an already-assigned `In Progress` work item has not been updated for at least the configured number of hours, FCR may request exactly one stale-work mutation:
 
 - add the deterministic stale-work status comment.
 
 The stale threshold is configuration, not hidden source policy. If no positive threshold is configured, the stale-comment action does not open. n8n recomputes the age from the freshly re-read Jira `updated` timestamp and refuses the comment if the threshold is no longer satisfied.
+
+**One observation may authorize at most one mutation.** If a stale scheduled item is unassigned, ownership repair takes precedence. Because assignment changes Jira's `updated` timestamp, stale-comment eligibility must be established by a later fresh scan rather than inherited from the pre-assignment snapshot.
 
 ## Authority ceiling
 
@@ -48,7 +50,7 @@ Every dispatched plan is bound to:
 - a plan idempotency key;
 - an exact expected n8n receipt ID.
 
-The n8n workflow independently reconstructs the receipt material from the validated plan, computes the SHA-256 receipt ID, re-reads Jira, performs only the bounded mutations, and returns the receipt after all requested mutations complete. FCR independently computes the same expected receipt and rejects any other acknowledgement.
+The n8n workflow independently reconstructs the receipt material from the validated plan, computes the SHA-256 receipt ID, re-reads Jira, performs exactly one bounded mutation, and returns the receipt only after that mutation completes. FCR independently computes the same expected receipt and rejects any other acknowledgement.
 
 The receipt is a deterministic continuity/proof binding. It is not a claim that n8n or Jira is cryptographically trusted beyond the authenticated provider boundary.
 
@@ -91,13 +93,13 @@ The artifact intentionally contains credential stubs only. Importing the JSON th
 The checked-in workflow is intentionally linear:
 
 1. authenticated webhook ingress;
-2. validate contract, idempotency header, exact runtime SHA, issue identity, allowed actions, and authority ceiling;
+2. validate contract, idempotency header, exact runtime SHA, issue identity, exactly-one-action rule, allowed action, and authority ceiling;
 3. independently compute the expected plan-bound receipt ID;
 4. re-read the exact Jira issue fields `status`, `assignee`, and `updated`;
 5. refuse status/assignee/timestamp drift and re-check stale age;
-6. expand only `assign-owner` and/or `comment-stale` into Jira REST requests;
-7. execute those bounded requests using the Jira credential;
-8. require the number of successful mutation results to equal the requested action count;
+6. expand exactly one `assign-owner` **or** `comment-stale` action into a Jira REST request;
+7. execute that single bounded request using the Jira credential;
+8. require exactly one successful mutation result;
 9. return the exact receipt to FCR.
 
 The workflow contains no Jira transition endpoint, DELETE request, project-settings endpoint, arbitrary caller-supplied URL, or caller-supplied HTTP method outside the two validated action expansions.
