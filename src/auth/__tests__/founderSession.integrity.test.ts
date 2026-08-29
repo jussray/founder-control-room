@@ -63,6 +63,7 @@ const ACCESS_TOKEN = 'access-token-from-supabase';
 const REFRESH_TOKEN = 'refresh-token-from-supabase';
 const EMAIL = 'founder@example.com';
 const USER_ID = '11111111-1111-4111-8111-111111111111';
+const ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64url');
 
 function session(): Session {
   return {
@@ -113,13 +114,14 @@ describe('opaque founder browser session integrity', () => {
     });
     vi.stubEnv('NODE_ENV', 'test');
     vi.stubEnv('FOUNDER_API_URL', 'https://foundercontrolroom.org');
+    vi.stubEnv('FOUNDER_SESSION_ENCRYPTION_KEY', ENCRYPTION_KEY);
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it('issues only an opaque __Host capability and stores credential state server-side', async () => {
+  it('issues only an opaque __Host capability and encrypts credential state at rest', async () => {
     const { res, headers } = mockResponse();
     await writeFounderSession(res, session());
     const cookies = setCookies(headers);
@@ -138,14 +140,19 @@ describe('opaque founder browser session integrity', () => {
     const [hash, row] = [...rows.entries()][0] ?? [];
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
     expect(hash).not.toContain('v1.');
-    expect(row?.access_token).toBe(ACCESS_TOKEN);
-    expect(row?.refresh_token).toBe(REFRESH_TOKEN);
+    expect(row?.access_token).toBeUndefined();
+    expect(row?.refresh_token).toBeUndefined();
+    expect(row?.credential_ciphertext).toEqual(expect.any(String));
+    expect(row?.credential_iv).toEqual(expect.any(String));
+    expect(row?.credential_auth_tag).toEqual(expect.any(String));
+    expect(String(row?.credential_ciphertext)).not.toContain(ACCESS_TOKEN);
+    expect(String(row?.credential_ciphertext)).not.toContain(REFRESH_TOKEN);
     expect(row?.founder_user_id).toBe(USER_ID);
     expect(row?.founder_email).toBe(EMAIL);
     expect(row?.continuity_fingerprint).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('resolves a valid opaque capability only through active fingerprint-bound server-side state', async () => {
+  it('resolves a valid opaque capability only through active fingerprint-bound encrypted server-side state', async () => {
     const { res, headers } = mockResponse();
     await writeFounderSession(res, session());
     const resolved = await readFounderSession(requestWithCookie(primaryCookiePair(headers)));
@@ -161,6 +168,23 @@ describe('opaque founder browser session integrity', () => {
     expect(hash).toBeTruthy();
     rows.set(String(hash), { ...row, founder_email: 'tampered@example.com' });
     expect(await readFounderSession(requestWithCookie(primaryCookiePair(headers)))).toBeNull();
+  });
+
+  it('fails closed when encrypted credential state is tampered', async () => {
+    const { res, headers } = mockResponse();
+    await writeFounderSession(res, session());
+    const [hash, row] = [...rows.entries()][0] ?? [];
+    expect(hash).toBeTruthy();
+    rows.set(String(hash), { ...row, credential_ciphertext: `${String(row?.credential_ciphertext ?? '')}A` });
+    expect(await readFounderSession(requestWithCookie(primaryCookiePair(headers)))).toBeNull();
+  });
+
+  it('fails closed when the server encryption key is unavailable', async () => {
+    vi.stubEnv('FOUNDER_SESSION_ENCRYPTION_KEY', '');
+    const { res, headers } = mockResponse();
+    await expect(writeFounderSession(res, session())).rejects.toThrow(/FOUNDER_SESSION_ENCRYPTION_KEY/);
+    expect(headers.has('Set-Cookie')).toBe(false);
+    expect(rows.size).toBe(0);
   });
 
   it('rejects the historical self-contained signed-cookie shape without consulting it as authority', async () => {
