@@ -180,7 +180,11 @@ export function buildJiraWorkAutomationPlan(
     });
   }
 
-  if (input.event === 'scheduled-scan' && inProgress && config.staleAfterHours !== null) {
+  // One observation may authorize at most one mutation. If a stale scheduled
+  // item is unassigned, ownership is repaired first. Assignment itself changes
+  // Jira's updated timestamp, so stale-comment eligibility must be re-observed
+  // on a later scan instead of being inherited from the pre-assignment snapshot.
+  if (input.event === 'scheduled-scan' && inProgress && currentAssignee && config.staleAfterHours !== null) {
     const updatedAtMs = Date.parse(input.updatedAt);
     const observedAtMs = Date.parse(input.observedAt);
     const ageHours = (observedAtMs - updatedAtMs) / (60 * 60 * 1000);
