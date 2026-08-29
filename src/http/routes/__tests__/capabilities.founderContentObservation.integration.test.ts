@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetUser, supabaseMock, observationUpsert } = vi.hoisted(() => ({
+const { mockGetUser, supabaseMock, observationUpsert, attestationInsert } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   supabaseMock: { from: vi.fn() },
   observationUpsert: vi.fn(),
+  attestationInsert: vi.fn(),
 }));
 
 vi.mock('../../../lib/supabaseAuthClient.js', () => ({
@@ -74,20 +75,26 @@ function observationReadBuilder(data: Record<string, unknown> | null) {
   };
 }
 
+function persistenceTables() {
+  supabaseMock.from.mockImplementation((table: string) => {
+    if (table === 'founder_users') return founderAllowlistBuilder();
+    if (table === 'projects') return projectBuilder();
+    if (table === 'founder_content_attestation_events') return { insert: attestationInsert };
+    if (table === 'provider_observations') return { upsert: observationUpsert };
+    throw new Error(`Unexpected table: ${table}`);
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   observationUpsert.mockResolvedValue({ error: null });
+  attestationInsert.mockResolvedValue({ error: null });
 });
 
 describe('FCR manual LinkedIn founder-content observations', () => {
-  it('records external publication as founder-bound user-attested truth while refusing provider or metric authority', async () => {
+  it('records immutable founder-attestation evidence before updating the latest non-authorizing view', async () => {
     authorizeFounder();
-    supabaseMock.from.mockImplementation((table: string) => {
-      if (table === 'founder_users') return founderAllowlistBuilder();
-      if (table === 'projects') return projectBuilder();
-      if (table === 'provider_observations') return { upsert: observationUpsert };
-      throw new Error(`Unexpected table: ${table}`);
-    });
+    persistenceTables();
 
     const res = await request(buildApp())
       .post('/capabilities/founder-content/linkedin-observations')
@@ -105,11 +112,30 @@ describe('FCR manual LinkedIn founder-content observations', () => {
     expect(res.status).toBe(200);
     expect(res.headers['cache-control']).toBe('no-store');
     expect(res.body).toEqual(expect.objectContaining({
+      sourceEventId: expect.stringMatching(/^fcae:/),
       persistence: 'recorded',
       publicationTruth: 'USER_ATTESTED',
       providerVerified: false,
       metricsState: 'UNKNOWN',
       authorityGranted: false,
+    }));
+
+    expect(attestationInsert).toHaveBeenCalledTimes(1);
+    const eventRow = attestationInsert.mock.calls[0][0];
+    expect(eventRow).toEqual(expect.objectContaining({
+      event_id: res.body.sourceEventId,
+      project_id: 'project-1',
+      founder_user_id: 'u1',
+      provider: 'linkedin',
+      resource_type: 'founder_content_post',
+      resource_id: LINKEDIN_URN,
+      observed_state: expect.objectContaining({
+        publication: {
+          state: 'USER_ATTESTED',
+          providerVerified: false,
+          publishedAt: '2026-08-28T03:00:00.000Z',
+        },
+      }),
     }));
 
     expect(observationUpsert).toHaveBeenCalledTimes(1);
@@ -120,17 +146,12 @@ describe('FCR manual LinkedIn founder-content observations', () => {
       provider: 'linkedin',
       resource_type: 'founder_content_post',
       resource_id: LINKEDIN_URN,
-      source_event_id: null,
+      source_event_id: res.body.sourceEventId,
       observed_state: expect.objectContaining({
         kind: 'fcr/founder-content-provider-observation@v1',
         platform: 'linkedin',
         postUrn: LINKEDIN_URN,
         permalink: LINKEDIN_URL,
-        publication: {
-          state: 'USER_ATTESTED',
-          providerVerified: false,
-          publishedAt: '2026-08-28T03:00:00.000Z',
-        },
         metrics: { state: 'UNKNOWN' },
         contentHash: 'a'.repeat(64),
         source: 'manual_founder_attestation',
@@ -149,6 +170,41 @@ describe('FCR manual LinkedIn founder-content observations', () => {
     expect(JSON.stringify(row)).not.toContain(FOUNDER_EMAIL);
   });
 
+  it('preserves a distinct immutable event when the same LinkedIn post is corrected later', async () => {
+    authorizeFounder();
+    persistenceTables();
+
+    const first = await request(buildApp())
+      .post('/capabilities/founder-content/linkedin-observations')
+      .set('Authorization', BEARER)
+      .send({
+        projectSlug: 'founder-control-room',
+        post: LINKEDIN_URL,
+        publicationAttested: true,
+        publishedAt: '2026-08-28T03:00:00.000Z',
+        contentHash: 'a'.repeat(64),
+      });
+    const corrected = await request(buildApp())
+      .post('/capabilities/founder-content/linkedin-observations')
+      .set('Authorization', BEARER)
+      .send({
+        projectSlug: 'founder-control-room',
+        post: LINKEDIN_URL,
+        publicationAttested: true,
+        publishedAt: '2026-08-28T03:05:00.000Z',
+        contentHash: 'b'.repeat(64),
+      });
+
+    expect(first.status).toBe(200);
+    expect(corrected.status).toBe(200);
+    expect(first.body.sourceEventId).not.toBe(corrected.body.sourceEventId);
+    expect(attestationInsert).toHaveBeenCalledTimes(2);
+    expect(observationUpsert).toHaveBeenCalledTimes(2);
+    expect(attestationInsert.mock.calls[0][0].observed_state.contentHash).toBe('a'.repeat(64));
+    expect(attestationInsert.mock.calls[1][0].observed_state.contentHash).toBe('b'.repeat(64));
+    expect(observationUpsert.mock.calls[1][0].source_event_id).toBe(corrected.body.sourceEventId);
+  });
+
   it('requires an explicit founder publication attestation and never persists an unasserted post', async () => {
     authorizeFounder();
     supabaseMock.from.mockImplementation((table: string) => {
@@ -163,6 +219,32 @@ describe('FCR manual LinkedIn founder-content observations', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toContain('publicationAttested=true');
+    expect(attestationInsert).not.toHaveBeenCalled();
+    expect(observationUpsert).not.toHaveBeenCalled();
+  });
+
+  it('rejects JavaScript-parseable timestamps that are not timezone-bearing RFC3339', async () => {
+    authorizeFounder();
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderAllowlistBuilder();
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
+    for (const publishedAt of ['08/09/2026', '2026-08-28T03:00:00']) {
+      const res = await request(buildApp())
+        .post('/capabilities/founder-content/linkedin-observations')
+        .set('Authorization', BEARER)
+        .send({
+          projectSlug: 'founder-control-room',
+          post: LINKEDIN_URL,
+          publicationAttested: true,
+          publishedAt,
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('RFC3339');
+    }
+    expect(attestationInsert).not.toHaveBeenCalled();
     expect(observationUpsert).not.toHaveBeenCalled();
   });
 
@@ -185,6 +267,7 @@ describe('FCR manual LinkedIn founder-content observations', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toContain('future-dated');
+    expect(attestationInsert).not.toHaveBeenCalled();
     expect(observationUpsert).not.toHaveBeenCalled();
   });
 
@@ -206,6 +289,7 @@ describe('FCR manual LinkedIn founder-content observations', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toContain('exact LinkedIn post URN');
+    expect(attestationInsert).not.toHaveBeenCalled();
     expect(observationUpsert).not.toHaveBeenCalled();
   });
 
@@ -215,6 +299,7 @@ describe('FCR manual LinkedIn founder-content observations', () => {
       provider: 'linkedin',
       resource_type: 'founder_content_post',
       resource_id: LINKEDIN_URN,
+      source_event_id: 'fcae:stored-event',
       observed_state: {
         kind: 'fcr/founder-content-provider-observation@v1',
         publication: { state: 'USER_ATTESTED', providerVerified: false },
