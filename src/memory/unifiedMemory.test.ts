@@ -77,9 +77,7 @@ describe('unified portfolio memory spine', () => {
   });
 
   it('rejects a registered source trying to claim another project identity', () => {
-    const spoofed = normalizeUnifiedMemoryObservation(chief({
-      projectSlug: 'sekret-bip',
-    }), NOW);
+    const spoofed = normalizeUnifiedMemoryObservation(chief({ projectSlug: 'sekret-bip' }), NOW);
 
     expect(spoofed.ok).toBe(false);
     if (!spoofed.ok) {
@@ -129,7 +127,7 @@ describe('unified portfolio memory spine', () => {
     if (safe.ok) {
       expect(safe.record.contentMode).toBe('metadata-only');
       expect(safe.record.summary).toBeNull();
-      expect(safe.record.categoryKeys).toEqual(['mood', 'journalTags']);
+      expect(safe.record.categoryKeys).toEqual(['journalTags', 'mood']);
       expect(safe.record.projectRegistration).toBe('registered');
       expect(safe.record.decisionSupportUsable).toBe(false);
       expect(safe.record.executionAuthority).toBe(false);
@@ -151,6 +149,24 @@ describe('unified portfolio memory spine', () => {
 
     expect(leaked.ok).toBe(false);
     if (!leaked.ok) expect(leaked.errors.join(' ')).toContain('metadata-only');
+  });
+
+  it('rejects free-form provenance text at metadata-only privacy boundaries', () => {
+    const result = normalizeUnifiedMemoryObservation({
+      sourceSystem: 'sekret-bip',
+      projectSlug: 'sekret-bip',
+      repository: 'jussray/Sekret-Bip',
+      nativeKind: 'reflection-metadata',
+      nativeId: 'reflection-9',
+      observedAt: '2026-08-29T19:30:00.000Z',
+      trust: 'submitted-unverified',
+      privacy: 'restricted',
+      categoryKeys: ['reflection'],
+      provenanceRefs: ['this is private journal prose and must not cross'],
+    }, NOW);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.join(' ')).toContain('opaque references');
   });
 
   it('keeps explicitly indexed external product memory continuity-only instead of granting portfolio authority', () => {
@@ -242,6 +258,26 @@ describe('unified portfolio memory spine', () => {
     }
   });
 
+  it('treats a later-effective revocation as newer than a later observed non-revoked snapshot', () => {
+    const view = buildUnifiedMemoryView([
+      chief({ observedAt: '2026-08-29T19:15:00.000Z', summary: 'still-active', contentHash: HASH_B }),
+      chief({
+        observedAt: '2026-08-29T18:00:00.000Z',
+        trust: 'revoked',
+        revokedAt: '2026-08-29T19:30:00.000Z',
+      }),
+    ], NOW);
+
+    expect(view.conflicts).toHaveLength(0);
+    expect(view.records).toHaveLength(1);
+    expect(view.records[0]).toMatchObject({
+      trust: 'revoked',
+      revokedAt: '2026-08-29T19:30:00.000Z',
+      continuityUsable: false,
+      decisionSupportUsable: false,
+    });
+  });
+
   it('uses the newest observation for one native identity', () => {
     const view = buildUnifiedMemoryView([
       chief({ observedAt: '2026-08-29T17:00:00.000Z', summary: 'older', contentHash: HASH_A }),
@@ -266,20 +302,71 @@ describe('unified portfolio memory spine', () => {
     expect(view.summary.conflicted).toBe(1);
   });
 
-  it('canonicalizes equivalent timestamps before fingerprinting', () => {
+  it('canonicalizes equivalent timestamps and set-like metadata before fingerprinting', () => {
     const first = normalizeUnifiedMemoryObservation(chief({
       observedAt: '2026-08-29T19:00:00Z',
+      categoryKeys: ['zeta', 'alpha'],
+      provenanceRefs: ['chief:z', 'chief:a'],
     }), NOW);
     const second = normalizeUnifiedMemoryObservation(chief({
       observedAt: '2026-08-29T15:00:00-04:00',
+      categoryKeys: ['alpha', 'zeta'],
+      provenanceRefs: ['chief:a', 'chief:z'],
     }), NOW);
 
     expect(first.ok).toBe(true);
     expect(second.ok).toBe(true);
     if (first.ok && second.ok) {
       expect(first.record.observedAt).toBe(second.record.observedAt);
+      expect(first.record.categoryKeys).toEqual(['alpha', 'zeta']);
+      expect(first.record.provenanceRefs).toEqual(['chief:a', 'chief:z']);
       expect(first.record.continuityFingerprint).toBe(second.record.continuityFingerprint);
     }
+
+    const view = buildUnifiedMemoryView([
+      chief({ categoryKeys: ['zeta', 'alpha'], provenanceRefs: ['chief:z', 'chief:a'] }),
+      chief({ categoryKeys: ['alpha', 'zeta'], provenanceRefs: ['chief:a', 'chief:z'] }),
+    ], NOW);
+    expect(view.conflicts).toHaveLength(0);
+    expect(view.records).toHaveLength(1);
+  });
+
+  it('rejects empty supplied expiry and malformed hash fields without throwing the view build', () => {
+    const malformedHash = {
+      ...chief({ nativeId: 'asset-hash' }),
+      contentHash: 123,
+      sourceSha: 456,
+    } as unknown as NativeMemoryObservation;
+
+    const view = buildUnifiedMemoryView([
+      chief({ nativeId: 'asset-expiry', expiresAt: '' }),
+      malformedHash,
+    ], NOW);
+
+    expect(view.records).toHaveLength(0);
+    expect(view.rejected).toHaveLength(2);
+    expect(view.rejected[0]?.errors.join(' ')).toContain('expiresAt must be a valid timestamp');
+    expect(view.rejected[1]?.errors.join(' ')).toContain('contentHash must be a string');
+    expect(view.rejected[1]?.errors.join(' ')).toContain('sourceSha must be a string');
+  });
+
+  it('revalidates decision-support freshness at use time instead of trusting a cached flag forever', () => {
+    const result = normalizeUnifiedMemoryObservation(chief(), NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const syntheticAuthenticated = {
+      ...result.record,
+      sourceVerification: 'authenticated-source' as const,
+      decisionSupportUsable: true,
+    };
+    const view = {
+      ...buildUnifiedMemoryView([], NOW),
+      records: [syntheticAuthenticated],
+    };
+
+    expect(memoryRecordsForDecisionSupport(view, NOW)).toHaveLength(1);
+    expect(memoryRecordsForDecisionSupport(view, new Date('2026-09-03T20:00:00.000Z'))).toHaveLength(0);
   });
 
   it('rejects repository spoofing and malformed provenance instead of laundering it into memory', () => {
