@@ -66,6 +66,24 @@ function stableObjectEntries(value) {
   return Object.entries(value ?? {}).sort(([left], [right]) => left.localeCompare(right));
 }
 
+function validExecutionProof(attackTest) {
+  return typeof attackTest?.executedAt === 'string'
+    && Number.isFinite(Date.parse(attackTest.executedAt))
+    && Array.isArray(attackTest?.evidenceReceiptIds)
+    && attackTest.evidenceReceiptIds.length > 0
+    && attackTest.evidenceReceiptIds.every((value) => typeof value === 'string' && value.trim().length > 0)
+    && new Set(attackTest.evidenceReceiptIds).size === attackTest.evidenceReceiptIds.length;
+}
+
+requireValue(
+  !validExecutionProof({ result: 'PASS', executedAt: null, evidenceReceiptIds: [] }),
+  'Attack-20 execution proof guard must reject unexecuted PASS state',
+);
+requireValue(
+  validExecutionProof({ result: 'PASS', executedAt: '2026-08-26T12:00:00.000Z', evidenceReceiptIds: ['receipt-a20-001'] }),
+  'Attack-20 execution proof guard must accept executed PASS state with receipt IDs',
+);
+
 requireValue(policy.schema === 'founder-control-room/attack-20-v3-policy@v1', 'policy schema must be attack-20-v3-policy@v1');
 requireValue(policy.suiteVersion === 'attack-20-v3', 'suiteVersion must be attack-20-v3');
 requireValue(policy.status === 'DESIGNED_UNVERIFIED', 'source policy status must remain DESIGNED_UNVERIFIED until live proof exists');
@@ -124,6 +142,9 @@ for (const worker of registry.workers ?? []) {
   requireValue(ALLOWED_WORKER_STATES.has(worker.observedProtection?.state), `${worker.worker}: observedProtection.state is invalid`);
   requireValue(ALLOWED_WORKER_STATES.has(worker.attackTest?.result), `${worker.worker}: attackTest.result is invalid`);
   requireValue(worker.attackTest?.suiteVersion === 'attack-20-v3', `${worker.worker}: attack suite version drifted`);
+  if (worker.attackTest?.result === 'PASS') {
+    requireValue(validExecutionProof(worker.attackTest), `${worker.worker}: Attack-20 PASS requires executedAt plus unique non-empty evidenceReceiptIds`);
+  }
 
   const alternateIngress = worker.alternateIngress;
   requireValue(
@@ -179,7 +200,7 @@ for (const requiredWorker of ['founder-control-room', 'founder-control-room-revi
 }
 
 if (registry.overallState === 'PASS') {
-  requireValue((registry.workers ?? []).every((worker) => worker.observedProtection?.state === 'PASS' && worker.attackTest?.result === 'PASS'), 'portfolio registry cannot PASS unless every production Worker passes');
+  requireValue((registry.workers ?? []).every((worker) => worker.observedProtection?.state === 'PASS' && worker.attackTest?.result === 'PASS' && validExecutionProof(worker.attackTest)), 'portfolio registry cannot PASS unless every production Worker has executed Attack-20 proof');
 }
 
 if (failures.length) {
