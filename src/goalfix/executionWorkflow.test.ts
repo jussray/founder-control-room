@@ -7,6 +7,7 @@ import {
   goalfixDiffFingerprint,
   goalfixFounderDecisionFingerprint,
   goalfixMergeAncestryFingerprint,
+  goalfixProviderMergeGateFingerprint,
   goalfixRuntimeReceiptFingerprint,
   goalfixSourceFingerprint,
   type GoalfixExecutionCheckpoint,
@@ -16,6 +17,7 @@ import {
   type GoalfixFounderDecision,
   type GoalfixMergeAncestryReceipt,
   type GoalfixPostMergeTruth,
+  type GoalfixProviderMergeGateReadback,
   type GoalfixRuntimeReceipt,
 } from './executionWorkflow.js';
 import { fingerprintNormalized, type ProofCookieContract } from '../security/attack20V3.js';
@@ -31,6 +33,7 @@ const FOUNDER_PRINCIPAL = 'principal:founder';
 const NOW = new Date('2026-08-26T12:00:00.000Z');
 const DIFF = goalfixDiffFingerprint({ files: ['src/goalfix/executionWorkflow.ts'], base: BASE, head: HEAD });
 const RUNTIME_FINGERPRINT = fingerprintNormalized({ mergedSha: MERGED, runtime: 'observed' });
+const PROVIDER_GATE_FINGERPRINT = fingerprintNormalized({ repository: REPOSITORY, provider: 'github-current-pr-readback' });
 
 function cookie(
   cookieId: string,
@@ -135,6 +138,36 @@ function founderDecision(overrides: Partial<GoalfixFounderDecision> = {}): Goalf
   };
 }
 
+function providerMergeGateReadback(overrides: Partial<GoalfixProviderMergeGateReadback> = {}): GoalfixProviderMergeGateReadback {
+  const base: Omit<GoalfixProviderMergeGateReadback, 'proofBinding'> = {
+    receiptId: 'provider-merge-gate-0001',
+    repository: REPOSITORY,
+    pullRequestNumber: PR_NUMBER,
+    sourceBranch: SOURCE_BRANCH,
+    targetBranch: TARGET_BRANCH,
+    baseSha: BASE,
+    headSha: HEAD,
+    diffFingerprint: DIFF,
+    pullRequestState: 'OPEN',
+    requiredChecksState: 'PASS',
+    reviewState: 'APPROVED',
+    unresolvedMaterialThreads: 0,
+    observedAt: '2026-08-26T11:55:00.000Z',
+    ...Object.fromEntries(Object.entries(overrides).filter(([key]) => key !== 'proofBinding')),
+  } as Omit<GoalfixProviderMergeGateReadback, 'proofBinding'>;
+  return {
+    ...base,
+    proofBinding: overrides.proofBinding ?? {
+      fingerprints: {
+        sourceSha: goalfixSourceFingerprint(REPOSITORY, base.headSha),
+        provider: PROVIDER_GATE_FINGERPRINT,
+        evidenceBundle: goalfixProviderMergeGateFingerprint(base),
+      },
+      cookieContract: providerCookie,
+    },
+  };
+}
+
 function ancestryReceipt(overrides: Partial<GoalfixMergeAncestryReceipt> = {}): GoalfixMergeAncestryReceipt {
   const base: Omit<GoalfixMergeAncestryReceipt, 'proofBinding'> = {
     receiptId: 'merge-ancestry-0001',
@@ -222,6 +255,8 @@ function input(overrides: Partial<GoalfixExecutionInput> = {}): GoalfixExecution
     targetBranch: TARGET_BRANCH,
     trustedFounderPrincipalId: FOUNDER_PRINCIPAL,
     trustedRuntimeFingerprint: RUNTIME_FINGERPRINT,
+    trustedProviderMergeGateFingerprint: PROVIDER_GATE_FINGERPRINT,
+    providerMergeGateReadback: providerMergeGateReadback(),
     baseSha: BASE,
     candidateHeadSha: HEAD,
     currentMainSha: overrides.postMergeTruth?.currentMainSha ?? BASE,
@@ -354,7 +389,35 @@ describe('Goalfix execution workflow v2', () => {
     expect(stale.reasons).toContain('founder decision approval is outside the merge proof freshness window');
   });
 
-  it('opens merge only for exact PR/base/head/branches/diff authenticated founder authority', () => {
+  it('refuses mayMerge without fresh authenticated provider PR/check/review truth', () => {
+    const missing = evaluateGoalfixExecution(input({ founderDecision: founderDecision(), providerMergeGateReadback: null }));
+    expect(missing.state).toBe('UNVERIFIED');
+    expect(missing.mayMerge).toBe(false);
+    expect(missing.reasons).toContain('fresh authenticated provider PR/check/review readback is required immediately before merge');
+
+    const closed = evaluateGoalfixExecution(input({
+      founderDecision: founderDecision(),
+      providerMergeGateReadback: providerMergeGateReadback({ pullRequestState: 'CLOSED' }),
+    }));
+    expect(closed.mayMerge).toBe(false);
+    expect(closed.reasons).toContain('provider merge-gate PR is not open');
+
+    const redChecks = evaluateGoalfixExecution(input({
+      founderDecision: founderDecision(),
+      providerMergeGateReadback: providerMergeGateReadback({ requiredChecksState: 'FAILED' }),
+    }));
+    expect(redChecks.mayMerge).toBe(false);
+    expect(redChecks.reasons).toContain('provider merge-gate required checks are not PASS');
+
+    const unresolved = evaluateGoalfixExecution(input({
+      founderDecision: founderDecision(),
+      providerMergeGateReadback: providerMergeGateReadback({ unresolvedMaterialThreads: 1 }),
+    }));
+    expect(unresolved.mayMerge).toBe(false);
+    expect(unresolved.reasons).toContain('provider merge-gate has unresolved material review threads');
+  });
+
+  it('opens merge only with exact founder authority plus current authenticated provider truth', () => {
     const result = evaluateGoalfixExecution(input({ founderDecision: founderDecision() }));
     expect(result.state).toBe('READY_TO_MERGE');
     expect(result.mayMerge).toBe(true);
@@ -400,6 +463,19 @@ describe('Goalfix execution workflow v2', () => {
     const result = evaluateGoalfixExecution(input({ founderDecision: founderDecision(), postMergeTruth: truth }));
     expect(result.state).toBe('MERGED_UNVERIFIED');
     expect(result.reasons).toContain('merge ancestry provider merge time predates Founder Final authorization');
+  });
+
+  it('rejects provider merge after the Founder Final lease expires', () => {
+    const truth = postMergeTruth({
+      mergeAncestryReceipt: ancestryReceipt({ mergedAt: '2026-08-26T12:05:00.001Z', observedAt: '2026-08-26T12:05:01.000Z' }),
+    });
+    const result = evaluateGoalfixExecution(input({
+      founderDecision: founderDecision(),
+      postMergeTruth: truth,
+      now: new Date('2026-08-26T12:06:00.000Z'),
+    }));
+    expect(result.state).toBe('MERGED_UNVERIFIED');
+    expect(result.reasons).toContain('merge ancestry provider merge time is outside the Founder Final merge lease');
   });
 
   it('keeps a merge unverified until runtime receipt IDs resolve to loaded PASS receipts', () => {
