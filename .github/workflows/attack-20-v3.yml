@@ -28,9 +28,7 @@ on:
       - scripts/verify-firewall-v10.mjs
       - .security/cookies.json
       - scripts/verify-cookie-contract.mjs
-      - wrangler.worker.toml
-      - wrangler.email.toml
-      - wrangler.deletion-queue.toml
+      - 'wrangler*.toml'
   push:
     branches:
       - main
@@ -60,9 +58,7 @@ on:
       - scripts/verify-firewall-v10.mjs
       - .security/cookies.json
       - scripts/verify-cookie-contract.mjs
-      - wrangler.worker.toml
-      - wrangler.email.toml
-      - wrangler.deletion-queue.toml
+      - 'wrangler*.toml'
 
 permissions:
   contents: read
