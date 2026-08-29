@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   GOALFIX_MERGE_PROOF_TTL_MS,
+  GOALFIX_RUNTIME_PROOF_TTL_MS,
   evaluateGoalfixExecution,
   goalfixCheckpointEvidenceFingerprint,
   goalfixDiffFingerprint,
@@ -29,6 +30,7 @@ const TARGET_BRANCH = 'main';
 const FOUNDER_PRINCIPAL = 'principal:founder';
 const NOW = new Date('2026-08-26T12:00:00.000Z');
 const DIFF = goalfixDiffFingerprint({ files: ['src/goalfix/executionWorkflow.ts'], base: BASE, head: HEAD });
+const RUNTIME_FINGERPRINT = fingerprintNormalized({ mergedSha: MERGED, runtime: 'observed' });
 
 function cookie(
   cookieId: string,
@@ -174,7 +176,7 @@ function runtimeReceipt(overrides: Partial<GoalfixRuntimeReceipt> = {}): Goalfix
     proofBinding: overrides.proofBinding ?? {
       fingerprints: {
         sourceSha: goalfixSourceFingerprint(REPOSITORY, base.mergedSha),
-        runtime: fingerprintNormalized({ mergedSha: base.mergedSha, runtime: 'observed' }),
+        runtime: RUNTIME_FINGERPRINT,
         evidenceBundle: goalfixRuntimeReceiptFingerprint(base),
       },
       cookieContract: providerCookie,
@@ -184,7 +186,6 @@ function runtimeReceipt(overrides: Partial<GoalfixRuntimeReceipt> = {}): Goalfix
 
 function postMergeTruth(overrides: Partial<GoalfixPostMergeTruth> = {}): GoalfixPostMergeTruth {
   const runtime = runtimeReceipt();
-  const runtimeFingerprint = runtime.proofBinding.fingerprints.runtime!;
   return {
     mergedSha: MERGED,
     currentMainSha: MERGED,
@@ -196,12 +197,21 @@ function postMergeTruth(overrides: Partial<GoalfixPostMergeTruth> = {}): Goalfix
     proofBinding: {
       fingerprints: {
         sourceSha: goalfixSourceFingerprint(REPOSITORY, MERGED),
-        runtime: runtimeFingerprint,
+        runtime: RUNTIME_FINGERPRINT,
       },
       cookieContract: providerCookie,
     },
     ...overrides,
   };
+}
+
+function freshPostMergeTruth(): GoalfixPostMergeTruth {
+  const runtime = runtimeReceipt({ observedAt: '2026-08-26T12:25:00.000Z' });
+  return postMergeTruth({
+    runtimeReceiptIds: [runtime.receiptId],
+    runtimeReceipts: [runtime],
+    observedAt: '2026-08-26T12:26:00.000Z',
+  });
 }
 
 function input(overrides: Partial<GoalfixExecutionInput> = {}): GoalfixExecutionInput {
@@ -211,9 +221,10 @@ function input(overrides: Partial<GoalfixExecutionInput> = {}): GoalfixExecution
     branch: SOURCE_BRANCH,
     targetBranch: TARGET_BRANCH,
     trustedFounderPrincipalId: FOUNDER_PRINCIPAL,
+    trustedRuntimeFingerprint: RUNTIME_FINGERPRINT,
     baseSha: BASE,
     candidateHeadSha: HEAD,
-    currentMainSha: BASE,
+    currentMainSha: overrides.postMergeTruth?.currentMainSha ?? BASE,
     diffFingerprint: DIFF,
     goal: 'Ship the smallest verified security repair.',
     stopCondition: 'Stop when exact-head verification, red team, and founder merge gate are satisfied.',
@@ -307,7 +318,7 @@ describe('Goalfix execution workflow v2', () => {
     expect(result.currentPhase).toBe('verify');
   });
 
-  it('invalidates the merge lane when main moved after proof', () => {
+  it('invalidates the pre-merge lane when main moved after proof', () => {
     const result = evaluateGoalfixExecution(input({ currentMainSha: 'd'.repeat(40) }));
     expect(result.state).toBe('REVERIFY_REQUIRED');
   });
@@ -349,6 +360,23 @@ describe('Goalfix execution workflow v2', () => {
     expect(result.mayMerge).toBe(true);
   });
 
+  it('accepts honest lifecycle movement when observed current main equals the provider-bound merged main', () => {
+    const truth = postMergeTruth();
+    const result = evaluateGoalfixExecution(input({ founderDecision: founderDecision(), postMergeTruth: truth }));
+    expect(result.state).toBe('COMPLETE');
+  });
+
+  it('rejects post-merge truth when provider current main disagrees with the observed current main', () => {
+    const truth = postMergeTruth();
+    const result = evaluateGoalfixExecution(input({
+      founderDecision: founderDecision(),
+      postMergeTruth: truth,
+      currentMainSha: 'd'.repeat(40),
+    }));
+    expect(result.state).toBe('MERGED_UNVERIFIED');
+    expect(result.reasons).toContain('post-merge provider current main does not match observed current main');
+  });
+
   it('keeps a merge unverified when ancestry does not prove the approved candidate landed', () => {
     const truth = postMergeTruth({ mergeAncestryReceipt: ancestryReceipt({ containsCandidate: false }) });
     const result = evaluateGoalfixExecution(input({ founderDecision: founderDecision(), postMergeTruth: truth }));
@@ -381,7 +409,7 @@ describe('Goalfix execution workflow v2', () => {
     expect(result.reasons).toContain('runtime receipt IDs must resolve to the loaded runtime receipt set');
   });
 
-  it('binds every runtime PASS receipt to the canonical authenticated provider witness', () => {
+  it('binds every runtime PASS receipt to the trusted authenticated provider witness', () => {
     const forgedRuntime = runtimeReceipt();
     forgedRuntime.proofBinding = {
       ...forgedRuntime.proofBinding,
@@ -397,7 +425,48 @@ describe('Goalfix execution workflow v2', () => {
     const result = evaluateGoalfixExecution(input({ founderDecision: founderDecision(), postMergeTruth: truth }));
     expect(result.state).toBe('MERGED_UNVERIFIED');
     expect(result.reasons).toContain(
-      `${forgedRuntime.receiptId}: runtime receipt fingerprint does not match canonical provider witness`,
+      `${forgedRuntime.receiptId}: runtime receipt fingerprint does not match trusted provider runtime witness`,
+    );
+  });
+
+  it('rejects a forged post-merge runtime value even when every caller-controlled payload agrees with it', () => {
+    const forgedFingerprint = fingerprintNormalized({ mergedSha: MERGED, runtime: 'forged-everywhere' });
+    const forgedRuntime = runtimeReceipt();
+    forgedRuntime.proofBinding = {
+      ...forgedRuntime.proofBinding,
+      fingerprints: { ...forgedRuntime.proofBinding.fingerprints, runtime: forgedFingerprint },
+    };
+    const truth = postMergeTruth({
+      runtimeReceiptIds: [forgedRuntime.receiptId],
+      runtimeReceipts: [forgedRuntime],
+      proofBinding: {
+        fingerprints: {
+          sourceSha: goalfixSourceFingerprint(REPOSITORY, MERGED),
+          runtime: forgedFingerprint,
+        },
+        cookieContract: providerCookie,
+      },
+    });
+    const result = evaluateGoalfixExecution(input({ founderDecision: founderDecision(), postMergeTruth: truth }));
+    expect(result.state).toBe('MERGED_UNVERIFIED');
+    expect(result.reasons).toContain('post-merge runtime fingerprint does not match trusted provider runtime witness');
+    expect(result.reasons).toContain(
+      `${forgedRuntime.receiptId}: runtime receipt fingerprint does not match trusted provider runtime witness`,
+    );
+  });
+
+  it('expires an old runtime PASS even when its cookie remains valid', () => {
+    const staleRuntime = runtimeReceipt({
+      observedAt: new Date(NOW.getTime() - GOALFIX_RUNTIME_PROOF_TTL_MS - 1).toISOString(),
+    });
+    const truth = postMergeTruth({
+      runtimeReceiptIds: [staleRuntime.receiptId],
+      runtimeReceipts: [staleRuntime],
+    });
+    const result = evaluateGoalfixExecution(input({ founderDecision: founderDecision(), postMergeTruth: truth }));
+    expect(result.state).toBe('MERGED_UNVERIFIED');
+    expect(result.reasons).toContain(
+      `${staleRuntime.receiptId}: runtime receipt is outside the runtime proof freshness window`,
     );
   });
 
@@ -415,7 +484,7 @@ describe('Goalfix execution workflow v2', () => {
   it('does not reapply pre-merge authority TTL after provider-bound merge execution is proven', () => {
     const result = evaluateGoalfixExecution(input({
       founderDecision: founderDecision(),
-      postMergeTruth: postMergeTruth(),
+      postMergeTruth: freshPostMergeTruth(),
       now: new Date('2026-08-26T12:30:00.000Z'),
     }));
     expect(result.state).toBe('COMPLETE');
@@ -436,7 +505,7 @@ describe('Goalfix execution workflow v2', () => {
     });
     const candidate = input({
       founderDecision: founderDecision(),
-      postMergeTruth: postMergeTruth(),
+      postMergeTruth: freshPostMergeTruth(),
       now: new Date('2026-08-26T12:30:00.000Z'),
     });
     candidate.cookieIndex = new Map([
@@ -472,7 +541,7 @@ describe('Goalfix execution workflow v2', () => {
     });
     const candidate = input({
       founderDecision: founderDecision(),
-      postMergeTruth: postMergeTruth(),
+      postMergeTruth: freshPostMergeTruth(),
       now: new Date('2026-08-26T12:30:00.000Z'),
     });
     candidate.cookieIndex = new Map([
