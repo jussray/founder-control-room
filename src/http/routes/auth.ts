@@ -86,9 +86,9 @@ authRouter.get('/callback', async (req, res) => {
     return res.status(503).type('html').send(founderCallbackHtml());
   }
 
-  const fragment = new URLSearchParams({ access_token: data.session.access_token, refresh_token: data.session.refresh_token ?? '', expires_at: String(data.session.expires_at ?? ''), email });
-  res.status(303).setHeader('Location', `/control-room/#${fragment.toString()}`);
-  return res.end();
+  // The opaque HttpOnly founder capability is now the only browser session handoff.
+  // Do not duplicate Supabase access/refresh credentials into a URL fragment.
+  return res.redirect(303, '/');
 });
 
 authRouter.post('/session', async (req, res) => {
