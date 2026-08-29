@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import type { Session } from '@supabase/supabase-js';
 import { createSupabaseAuthClient, supabaseAuth } from '../../lib/supabaseAuthClient.js';
 import { supabase } from '../../lib/supabaseClient.js';
@@ -11,6 +12,13 @@ import { founderCallbackHtml } from './onboarding.js';
 export const authRouter = Router();
 const GENERIC_MAGIC_LINK_MESSAGE = 'If this email is on the founder allowlist, a secure login link has been sent.';
 const MIN_FOUNDER_PASSWORD_LENGTH = 12;
+const rateLimitFounderPassword = rateLimit({
+  windowMs: 15 * 60 * 1_000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many password update attempts, please try again later.' },
+});
 
 function normalizeEmail(value: unknown): string { return typeof value === 'string' ? value.trim().toLowerCase() : ''; }
 function normalizePassword(value: unknown): string { return typeof value === 'string' ? value : ''; }
@@ -110,7 +118,7 @@ authRouter.get('/me', requireFounder, (req: FounderRequest, res) => {
   return respondSuccess(res, { founder: req.founder });
 });
 
-authRouter.post('/password', requireInteractiveFounder, async (req: FounderRequest, res) => {
+authRouter.post('/password', rateLimitFounderPassword, requireInteractiveFounder, async (req: FounderRequest, res) => {
   const password = normalizePassword(req.body?.password);
   const confirmPassword = normalizePassword(req.body?.confirmPassword);
   if (password.length < MIN_FOUNDER_PASSWORD_LENGTH) return respondError(res, 400, 'BAD_REQUEST', `Password must be at least ${MIN_FOUNDER_PASSWORD_LENGTH} characters.`);
