@@ -196,7 +196,7 @@ describe('founder permission broker HTTP contract', () => {
     const crossOrigin = await request(app)
       .post('/mcp/founder-permissions/requests/permission:origin-001/decision')
       .set('Authorization', bearer)
-      .set('Origin', 'https://evil.example')
+      .set('Origin', 'http://localhost:3000')
       .send({ decision: 'approved' });
     expect(crossOrigin.status).toBe(403);
     expect(crossOrigin.body.code).toBe('FOUNDER_INTERACTIVE_APPROVAL_REQUIRED');
