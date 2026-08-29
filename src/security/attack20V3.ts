@@ -136,12 +136,19 @@ export interface WorkerAttackCapabilities {
   schemaGoverned?: CapabilityValue;
 }
 
+export interface TrustedIngressTarget {
+  hostname: string | null;
+  route: string | null;
+  ingressSurface: string;
+}
+
 export interface WorkerApplicabilityInput {
   project: string;
   worker: string;
   environment: 'production' | 'staging' | 'preview' | 'development';
   capabilities: WorkerAttackCapabilities;
   capabilityAbsenceEvidence?: Partial<Record<Attack20Id, readonly string[]>>;
+  trustedIngressTargets: readonly TrustedIngressTarget[];
 }
 
 export interface AttackApplicabilityDecision {
@@ -191,6 +198,15 @@ export interface Attack20ReceiptV3 {
   expiresAt: string | null;
 }
 
+export interface AttackFixtureExpectation {
+  attackId: Attack20Id;
+  fixtureId: string;
+  ingressSurface: string;
+  expectedOutcome: Exclude<Attack20ReceiptV3['test']['expectedOutcome'], 'UNKNOWN'>;
+  allowedStatusCodes: readonly number[] | null;
+  applicationReached: boolean | 'unknown';
+}
+
 export interface RuntimeReadbackWitness {
   witnessId: string;
   target: {
@@ -238,20 +254,90 @@ function sameStringSet(left: readonly string[], right: readonly string[]): boole
 }
 
 function sameTarget(receipt: Attack20ReceiptV3, target: WorkerApplicabilityInput): boolean {
+  const trustedEndpoint = target.trustedIngressTargets.some((entry) => (
+    entry.hostname === receipt.target.hostname
+    && entry.route === receipt.target.route
+    && entry.ingressSurface === receipt.target.ingressSurface
+  ));
   return target.environment !== 'development'
+    && target.trustedIngressTargets.length > 0
     && receipt.target.project === target.project
     && receipt.target.worker === target.worker
-    && receipt.target.environment === target.environment;
+    && receipt.target.environment === target.environment
+    && trustedEndpoint;
+}
+
+function evidenceArrays(receipt: Attack20ReceiptV3): readonly (readonly string[])[] {
+  return [
+    receipt.evidence.edgeRuleIds,
+    receipt.evidence.accessPolicyIds,
+    receipt.evidence.applicationEventIds,
+    receipt.evidence.authorityReceiptIds,
+    receipt.evidence.providerActionIds,
+    receipt.evidence.runtimeReadbackIds,
+  ];
+}
+
+function evidenceReferenceErrors(receipt: Attack20ReceiptV3): string[] {
+  const errors: string[] = [];
+  if (receipt.evidence.cloudflareRayId !== null && !receipt.evidence.cloudflareRayId.trim()) {
+    errors.push('cloudflareRayId must be null or a non-empty ID');
+  }
+  for (const values of evidenceArrays(receipt)) {
+    if (values.some((value) => !value.trim())) errors.push('evidence reference IDs must be non-empty');
+    if (new Set(values).size !== values.length) errors.push('evidence reference IDs must be unique within each evidence class');
+  }
+  return [...new Set(errors)];
 }
 
 function evidenceReferenceCount(receipt: Attack20ReceiptV3): number {
-  return (receipt.evidence.cloudflareRayId ? 1 : 0)
-    + receipt.evidence.edgeRuleIds.length
-    + receipt.evidence.accessPolicyIds.length
-    + receipt.evidence.applicationEventIds.length
-    + receipt.evidence.authorityReceiptIds.length
-    + receipt.evidence.providerActionIds.length
-    + receipt.evidence.runtimeReadbackIds.length;
+  return (receipt.evidence.cloudflareRayId?.trim() ? 1 : 0)
+    + evidenceArrays(receipt).reduce((total, values) => total + values.filter((value) => value.trim()).length, 0);
+}
+
+export function attackFixtureExpectationKey(
+  attackId: Attack20Id,
+  fixtureId: string,
+  ingressSurface: string,
+): string {
+  return `${attackId}\u0000${fixtureId}\u0000${ingressSurface}`;
+}
+
+function validateFixtureExpectation(
+  receipt: Attack20ReceiptV3,
+  expectationIndex: ReadonlyMap<string, AttackFixtureExpectation>,
+): string[] {
+  if (receipt.verdict !== 'PASS') return [];
+  const key = attackFixtureExpectationKey(receipt.attackId, receipt.test.fixtureId, receipt.target.ingressSurface);
+  const expected = expectationIndex.get(key);
+  if (!expected) return ['PASS receipt requires a trusted canonical fixture expectation'];
+  const errors: string[] = [];
+  if (
+    expected.attackId !== receipt.attackId
+    || expected.fixtureId !== receipt.test.fixtureId
+    || expected.ingressSurface !== receipt.target.ingressSurface
+  ) {
+    errors.push('trusted fixture expectation does not match receipt identity');
+  }
+  if (receipt.test.expectedOutcome !== expected.expectedOutcome) {
+    errors.push('receipt-controlled expected outcome does not match trusted fixture expectation');
+  }
+  if (receipt.test.observedOutcome !== expected.expectedOutcome) {
+    errors.push('observed outcome does not match trusted fixture expectation');
+  }
+  if (
+    expected.allowedStatusCodes !== null
+    && (receipt.test.statusCode === null || !expected.allowedStatusCodes.includes(receipt.test.statusCode))
+  ) {
+    errors.push('observed status code does not match trusted fixture expectation');
+  }
+  if (receipt.test.applicationReached !== expected.applicationReached) {
+    errors.push('application reach does not match trusted fixture expectation');
+  }
+  if (receipt.test.sideEffectObserved !== false) {
+    errors.push('trusted fixture PASS requires no prohibited side effect');
+  }
+  return errors;
 }
 
 export function fingerprintNormalized(value: unknown): string {
@@ -442,7 +528,7 @@ export function validateAttack20Receipt(
   if (!receipt.receiptId.trim()) errors.push('receiptId is required');
   if (!receipt.runId.trim()) errors.push('runId is required');
   if (receipt.suiteVersion !== 'attack-20-v3') errors.push('receipt suiteVersion must be attack-20-v3');
-  if (!sameTarget(receipt, expectedTarget)) errors.push('receipt target does not match the Worker under evaluation');
+  if (!sameTarget(receipt, expectedTarget)) errors.push('receipt target does not match the trusted Worker ingress under evaluation');
   if (!receipt.test.fixtureId.trim()) errors.push('receipt fixtureId is required');
   if (receipt.test.requestFingerprint.length < 16) errors.push('receipt request fingerprint is missing or invalid');
   if (!receipt.target.ingressSurface.trim()) errors.push('receipt ingress surface is required');
@@ -458,6 +544,7 @@ export function validateAttack20Receipt(
   }
 
   if (receipt.verdict === 'PASS') {
+    errors.push(...evidenceReferenceErrors(receipt));
     if (receipt.test.expectedOutcome === 'UNKNOWN' || receipt.test.observedOutcome !== receipt.test.expectedOutcome) {
       errors.push('PASS receipt observed outcome does not match its expected defensive outcome');
     }
@@ -629,12 +716,15 @@ export function aggregateWorkerAttack20Status(input: {
   currentFingerprints: Partial<Record<FingerprintClass, string>>;
   cookieIndex: ReadonlyMap<string, ProofCookieContract>;
   runtimeReadbackIndex: ReadonlyMap<string, RuntimeReadbackWitness>;
+  capabilityAbsenceEvidenceIndex: ReadonlySet<string>;
+  fixtureExpectationIndex: ReadonlyMap<string, AttackFixtureExpectation>;
   now?: Date;
 }): AggregateSecurityState {
   const now = input.now ?? new Date();
   const planIds = input.plan.map((item) => item.attackId);
   if (
     input.applicabilityInput.environment === 'development'
+    || input.applicabilityInput.trustedIngressTargets.length === 0
     || planIds.length !== ATTACK20_IDS.length
     || new Set(planIds).size !== ATTACK20_IDS.length
     || ATTACK20_IDS.some((id) => !planIds.includes(id))
@@ -665,7 +755,14 @@ export function aggregateWorkerAttack20Status(input: {
     }
 
     if (decision.decision === 'NOT_APPLICABLE') {
-      if (decision.capabilityAbsenceEvidence.length === 0 || validateProofBinding(decision.proofBinding, [], now).length > 0) {
+      const evidence = decision.capabilityAbsenceEvidence;
+      const bindingErrors = validateProofBinding(decision.proofBinding, [], now);
+      const lineageErrors = validateCookieLineage(decision.proofBinding.cookieContract, input.cookieIndex, now);
+      const trustedContext = ['verification-run', 'provider-run'].includes(decision.proofBinding.cookieContract.contextType);
+      const evidenceTrusted = evidence.length > 0
+        && evidence.every((value) => value.trim() && input.capabilityAbsenceEvidenceIndex.has(value))
+        && new Set(evidence).size === evidence.length;
+      if (bindingErrors.length > 0 || lineageErrors.length > 0 || !trustedContext || !evidenceTrusted) {
         sawUnverified = true;
       }
       continue;
@@ -682,6 +779,10 @@ export function aggregateWorkerAttack20Status(input: {
     const currentReceipts = latestReceiptsByFixture(targetCandidates);
     for (const receipt of currentReceipts) {
       if (validateAttack20Receipt(receipt, input.applicabilityInput, now).length > 0) {
+        sawUnverified = true;
+        continue;
+      }
+      if (validateFixtureExpectation(receipt, input.fixtureExpectationIndex).length > 0) {
         sawUnverified = true;
         continue;
       }
