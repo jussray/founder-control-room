@@ -12,6 +12,10 @@ on:
         description: Pull request number to review from trusted current main
         required: true
         type: number
+      expected_main_sha:
+        description: Founder-bound exact current main SHA for this witness request
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -76,6 +80,7 @@ jobs:
     if: >-
       github.event_name == 'issue_comment' &&
       github.event.issue.number == 418 &&
+      github.event.comment.user.id == 286642846 &&
       github.event.comment.user.login == 'jussray' &&
       startsWith(github.event.comment.body, '/review-witness ')
     name: Dispatch trusted deterministic review witness
@@ -164,7 +169,8 @@ jobs:
           payload="$(jq -n \
             --arg ref main \
             --argjson pr "$PR_NUMBER" \
-            '{ref:$ref, inputs:{pull_request_number:$pr}}')"
+            --arg expected_main_sha "$EXPECTED_MAIN_SHA" \
+            '{ref:$ref, inputs:{pull_request_number:$pr, expected_main_sha:$expected_main_sha}}')"
 
           gh api \
             --method POST \
@@ -177,6 +183,7 @@ jobs:
             echo "- Target PR: #$PR_NUMBER"
             echo "- Target PR head observed before dispatch: \`$TARGET_HEAD_SHA\`"
             echo "- Founder-bound current main: \`$EXPECTED_MAIN_SHA\`"
+            echo "- Founder immutable GitHub user ID: \`286642846\`"
             echo "- Evidence cookie: issue #418 comment \`$COMMENT_ID\`"
             echo '- Target workflow: `.github/workflows/deterministic-review-core-advisory.yml`'
             echo '- Verdict, Founder Final, merge, deploy, provider, database, secret, and publication authority: none granted by this command'
@@ -194,6 +201,7 @@ jobs:
     env:
       FCR_REVIEW_PR_NUMBER: ${{ inputs.pull_request_number }}
       EXPECTED_TRUSTED_MAIN_SHA: ${{ github.sha }}
+      EXPECTED_FOUNDER_MAIN_SHA: ${{ inputs.expected_main_sha }}
       GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
       GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}
     steps:
@@ -204,15 +212,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Fail closed unless workflow code is exact current main
+      - name: Fail closed unless workflow code is founder-bound exact current main
         shell: bash
         run: |
           set -euo pipefail
           test "$GITHUB_REF" = 'refs/heads/main'
+          [[ "$EXPECTED_FOUNDER_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$EXPECTED_FOUNDER_MAIN_SHA" = "$EXPECTED_TRUSTED_MAIN_SHA"
           test "$EXPECTED_TRUSTED_MAIN_SHA" = "$(git rev-parse HEAD)"
           git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
           current_main="$(git rev-parse refs/remotes/origin/main)"
-          printf 'trusted_workflow_sha=%s\ncurrent_main=%s\n' "$EXPECTED_TRUSTED_MAIN_SHA" "$current_main"
+          printf 'founder_bound_main=%s\ntrusted_workflow_sha=%s\ncurrent_main=%s\n' \
+            "$EXPECTED_FOUNDER_MAIN_SHA" "$EXPECTED_TRUSTED_MAIN_SHA" "$current_main"
+          test "$EXPECTED_FOUNDER_MAIN_SHA" = "$current_main"
           test "$EXPECTED_TRUSTED_MAIN_SHA" = "$current_main"
 
       - name: Set up Node 24
@@ -248,7 +260,9 @@ jobs:
           set -euo pipefail
           git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
           current_main="$(git rev-parse refs/remotes/origin/main)"
-          printf 'trusted_workflow_sha=%s\ncurrent_main_after=%s\n' "$EXPECTED_TRUSTED_MAIN_SHA" "$current_main"
+          printf 'founder_bound_main=%s\ntrusted_workflow_sha=%s\ncurrent_main_after=%s\n' \
+            "$EXPECTED_FOUNDER_MAIN_SHA" "$EXPECTED_TRUSTED_MAIN_SHA" "$current_main"
+          test "$EXPECTED_FOUNDER_MAIN_SHA" = "$current_main"
           test "$EXPECTED_TRUSTED_MAIN_SHA" = "$current_main"
 
       - name: Retain deterministic review receipt and provider readback
