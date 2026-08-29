@@ -8,6 +8,7 @@ import {
 
 export const GOALFIX_EXECUTION_CONTRACT = 'founder-control-room/goalfix-execution@v2' as const;
 export const GOALFIX_MERGE_PROOF_TTL_MS = 15 * 60 * 1_000;
+export const GOALFIX_RUNTIME_PROOF_TTL_MS = 15 * 60 * 1_000;
 
 export const GOALFIX_EXECUTION_PHASES = [
   'observe',
@@ -155,6 +156,7 @@ export interface GoalfixExecutionInput {
   branch: string;
   targetBranch: string;
   trustedFounderPrincipalId: string;
+  trustedRuntimeFingerprint: string;
   baseSha: string;
   candidateHeadSha: string;
   currentMainSha: string;
@@ -487,7 +489,6 @@ function validateRuntimeReceipt(
   input: GoalfixExecutionInput,
   mergedSha: string,
   mergedAt: string,
-  expectedRuntimeFingerprint: string,
   now: Date,
 ): string[] {
   const errors: string[] = [];
@@ -495,6 +496,9 @@ function validateRuntimeReceipt(
   if (receipt.mergedSha.toLowerCase() !== mergedSha.toLowerCase()) errors.push(`${receipt.receiptId}: runtime receipt merged SHA is mismatched`);
   const observedAtMs = isIsoTimestamp(receipt.observedAt) ? Date.parse(receipt.observedAt) : null;
   if (observedAtMs === null || observedAtMs > now.getTime()) errors.push(`${receipt.receiptId}: runtime receipt observedAt is invalid`);
+  if (observedAtMs !== null && observedAtMs < now.getTime() - GOALFIX_RUNTIME_PROOF_TTL_MS) {
+    errors.push(`${receipt.receiptId}: runtime receipt is outside the runtime proof freshness window`);
+  }
   if (observedAtMs !== null && isIsoTimestamp(mergedAt) && observedAtMs < Date.parse(mergedAt)) {
     errors.push(`${receipt.receiptId}: runtime receipt predates provider merge`);
   }
@@ -502,7 +506,7 @@ function validateRuntimeReceipt(
   errors.push(...validateCookieLineage(receipt.proofBinding.cookieContract, input.cookieIndex, now).map((error) => `${receipt.receiptId}: ${error}`));
   if (receipt.proofBinding.cookieContract.contextType !== 'provider-run') errors.push(`${receipt.receiptId}: runtime receipt proof cookie context must be provider-run`);
   if (receipt.proofBinding.fingerprints.sourceSha !== goalfixSourceFingerprint(input.repository, mergedSha)) errors.push(`${receipt.receiptId}: runtime receipt sourceSha does not match merged main`);
-  if (receipt.proofBinding.fingerprints.runtime !== expectedRuntimeFingerprint) errors.push(`${receipt.receiptId}: runtime receipt fingerprint does not match canonical provider witness`);
+  if (receipt.proofBinding.fingerprints.runtime !== input.trustedRuntimeFingerprint) errors.push(`${receipt.receiptId}: runtime receipt fingerprint does not match trusted provider runtime witness`);
   if (receipt.proofBinding.fingerprints.evidenceBundle !== goalfixRuntimeReceiptFingerprint({ ...receipt, proofBinding: undefined } as never)) errors.push(`${receipt.receiptId}: runtime receipt evidenceBundle does not bind the receipt`);
   return errors;
 }
@@ -516,12 +520,16 @@ function validatePostMergeTruth(
   const errors: string[] = [];
   if (!exactSha(truth.mergedSha) || !exactSha(truth.currentMainSha)) errors.push('post-merge truth requires exact merged and current-main SHAs');
   if (truth.mergedSha.toLowerCase() !== truth.currentMainSha.toLowerCase()) errors.push('post-merge current main does not equal merged SHA');
+  if (truth.currentMainSha.toLowerCase() !== input.currentMainSha.toLowerCase()) errors.push('post-merge provider current main does not match observed current main');
   if (!isIsoTimestamp(truth.observedAt) || Date.parse(truth.observedAt) > now.getTime()) errors.push('post-merge observedAt must be a current ISO timestamp');
   errors.push(...validateProofBinding(truth.proofBinding, ['sourceSha', 'runtime'], now).map((error) => `post-merge: ${error}`));
   errors.push(...validateCookieLineage(truth.proofBinding.cookieContract, input.cookieIndex, now).map((error) => `post-merge: ${error}`));
   if (truth.proofBinding.cookieContract.contextType !== 'provider-run') errors.push('post-merge proof cookie context must be provider-run');
   if (truth.proofBinding.fingerprints.sourceSha !== goalfixSourceFingerprint(input.repository, truth.mergedSha)) {
     errors.push('post-merge sourceSha proof fingerprint does not match merged/current-main SHA');
+  }
+  if (truth.proofBinding.fingerprints.runtime !== input.trustedRuntimeFingerprint) {
+    errors.push('post-merge runtime fingerprint does not match trusted provider runtime witness');
   }
 
   errors.push(...validateMergeAncestryReceipt(truth.mergeAncestryReceipt, input, founderDecision, truth.mergedSha, now));
@@ -532,14 +540,12 @@ function validatePostMergeTruth(
   if (runtimeIds.length !== loadedIds.length || runtimeIds.some((id) => !loadedIds.includes(id)) || loadedIds.some((id) => !runtimeIds.includes(id))) {
     errors.push('runtime receipt IDs must resolve to the loaded runtime receipt set');
   }
-  const expectedRuntimeFingerprint = truth.proofBinding.fingerprints.runtime ?? '';
   for (const receipt of truth.runtimeReceipts) {
     errors.push(...validateRuntimeReceipt(
       receipt,
       input,
       truth.mergedSha,
       truth.mergeAncestryReceipt.mergedAt,
-      expectedRuntimeFingerprint,
       now,
     ));
   }
@@ -570,6 +576,7 @@ export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixE
   if (!input.repository.includes('/') || !input.branch.trim() || !input.targetBranch.trim() || !input.goal.trim()) reasons.push('authoritative repository, source/target branches, and founder goal are required');
   if (!Number.isInteger(input.pullRequestNumber) || input.pullRequestNumber <= 0) reasons.push('positive pull request number is required');
   if (!input.trustedFounderPrincipalId.trim()) reasons.push('trusted authenticated founder principal is required');
+  if (input.postMergeTruth && input.trustedRuntimeFingerprint.trim().length < 16) reasons.push('trusted provider runtime fingerprint is required for post-merge evaluation');
   if (!exactSha(input.baseSha) || !exactSha(input.candidateHeadSha) || !exactSha(input.currentMainSha)) reasons.push('base, candidate head, and current main must be exact 40-character SHAs');
   if (!input.diffFingerprint.trim()) reasons.push('diff fingerprint is required');
   if (!input.stopCondition.trim()) reasons.push('stop condition is required');
@@ -687,7 +694,7 @@ export function evaluateGoalfixExecution(input: GoalfixExecutionInput): GoalfixE
     };
   }
 
-  if (input.currentMainSha.toLowerCase() !== input.baseSha.toLowerCase()) {
+  if (!input.postMergeTruth && input.currentMainSha.toLowerCase() !== input.baseSha.toLowerCase()) {
     return {
       contract: GOALFIX_EXECUTION_CONTRACT,
       state: 'REVERIFY_REQUIRED',
