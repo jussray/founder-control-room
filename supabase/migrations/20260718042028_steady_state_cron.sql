@@ -1,31 +1,12 @@
--- Production-applied migration fossil restored from supabase_migrations.schema_migrations.
+-- Production-recorded migration identity: 20260718042028_steady_state_cron.
+--
+-- Production historically scheduled steady-state maintenance against the retired
+-- cross-project onboarding mirror. The preceding production-recorded onboarding
+-- migration is intentionally a no-op on clean replay.
+-- This fossil MUST NOT recreate, alter, or schedule work against that retired table.
+--
+-- Existing production cron jobs and table state are intentionally not dropped or
+-- mutated here. Any live cleanup requires separate database and data-retention
+-- authority with provider readback and rollback evidence.
 
-create extension if not exists pg_cron schema extensions;
-grant usage on schema cron to postgres;
-
-select cron.schedule(
-  'advance-to-steady-state',
-  '0 2 * * *',
-  $$
-    update public.user_onboarding_state
-    set stage = 'steady_state', updated_at = now()
-    where stage = 'activated'
-      and activated_at <= now() - interval '7 days'
-      and activated_at is not null;
-  $$
-);
-
-alter table public.user_onboarding_state
-  add column if not exists is_stuck boolean not null default false;
-
-select cron.schedule(
-  'flag-stuck-users',
-  '30 2 * * *',
-  $$
-    update public.user_onboarding_state
-    set is_stuck = true, updated_at = now()
-    where stage not in ('activated','steady_state')
-      and created_at < now() - interval '72 hours'
-      and is_stuck = false;
-  $$
-);
+select 1;

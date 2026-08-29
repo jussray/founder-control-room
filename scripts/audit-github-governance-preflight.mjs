@@ -32,7 +32,7 @@ function ruleOfType(ruleset, type) {
 export function trustedBypassPolicy(appId) {
   const id = text(appId);
   if (!/^\d+$/.test(id)) return null;
-  return [{ actorType: 'Integration', actorId: id, bypassMode: 'always' }];
+  return [{ actorType: 'Integration', actorId: id, bypassMode: 'pull_request' }];
 }
 
 export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = targetRef) {
