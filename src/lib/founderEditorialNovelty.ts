@@ -1,0 +1,343 @@
+import { createHash } from 'node:crypto';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+type JsonRecord = Record<string, unknown>;
+
+export const FOUNDER_EDITORIAL_NOVELTY_CONTRACT = 'fcr/founder-editorial-novelty@v1' as const;
+const MAX_HISTORY = 32;
+const HIGH_SIMILARITY = 0.55;
+const MEDIUM_SIMILARITY = 0.35;
+
+const STOPWORDS = new Set([
+  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'been', 'being', 'but', 'by', 'for', 'from', 'had', 'has', 'have',
+  'i', 'if', 'in', 'into', 'is', 'it', 'its', 'me', 'my', 'of', 'on', 'or', 'our', 'so', 'that', 'the', 'their',
+  'them', 'they', 'this', 'to', 'was', 'we', 'were', 'what', 'when', 'where', 'which', 'who', 'why', 'with', 'you',
+  'your',
+]);
+
+export interface FounderEditorialHistoryRecord {
+  id: string;
+  relatedProject: string | null;
+  coreThesis: string;
+  primaryHook: string;
+  angle: string;
+  meaningfulChange: string | null;
+  hookType: string | null;
+  proofStyle: string | null;
+  publishDate: string | null;
+  status: string;
+}
+
+export interface FounderEditorialHistoryRepository {
+  recentLinkedIn(limit: number): Promise<FounderEditorialHistoryRecord[]>;
+}
+
+export interface FounderEditorialIdentity {
+  lane: string;
+  platform: string;
+  project: string;
+  coreThesis: string;
+  hook: string;
+  eventRef: string;
+  proofDigest: string;
+  promptOsPatternFingerprint: string;
+  chiefAngleFingerprint: string;
+  storyFingerprint: string;
+}
+
+export interface FounderEditorialNoveltyReceipt {
+  contract: typeof FOUNDER_EDITORIAL_NOVELTY_CONTRACT;
+  allowed: boolean;
+  risk: 'LOW' | 'MEDIUM' | 'HIGH';
+  historyState: 'NOT_APPLICABLE' | 'EMPTY' | 'COMPARED';
+  comparedCount: number;
+  closestMatchId: string | null;
+  closestSimilarity: number;
+  storyFingerprint: string;
+  promptOsPatternFingerprint: string;
+  chiefAngleFingerprint: string;
+  continuityCookie: string;
+  roles: {
+    promptos: 'editorial-pattern-grammar';
+    chief: 'candidate-angle-proposal';
+    fcr: 'history-readback-and-approval-gate';
+  };
+  authority: {
+    publish: false;
+    approve: false;
+    schedule: false;
+  };
+  reason: string;
+}
+
+function text(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function record(value: unknown): JsonRecord {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonRecord : {};
+}
+
+function hash(value: unknown): string {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+function normalize(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function tokenSet(value: string): Set<string> {
+  return new Set(
+    normalize(value)
+      .split(' ')
+      .filter((token) => token.length > 2 && !STOPWORDS.has(token)),
+  );
+}
+
+function similarity(left: string, right: string): number {
+  const a = tokenSet(left);
+  const b = tokenSet(right);
+  if (a.size === 0 || b.size === 0) return 0;
+  let intersection = 0;
+  for (const token of a) if (b.has(token)) intersection += 1;
+  const union = a.size + b.size - intersection;
+  return union === 0 ? 0 : intersection / union;
+}
+
+function firstHook(draft: string): string {
+  const line = draft.split(/\r?\n/).map((part) => part.trim()).find(Boolean) ?? '';
+  const sentence = line.split(/(?<=[.!?])\s+/)[0] ?? line;
+  return sentence.slice(0, 240).trim();
+}
+
+function canonicalLane(sourceRepo: string): string {
+  const repo = sourceRepo.toLowerCase();
+  if (
+    repo === 'jussray/founder-control-room'
+    || repo === 'jussray/chief-ai-machine'
+    || repo === 'jussray/promptos'
+  ) return 'founder-machine';
+  return repo || 'unknown-project';
+}
+
+function publicClaimsText(payload: JsonRecord): string {
+  if (!Array.isArray(payload.public_claims)) return '';
+  return payload.public_claims
+    .map((claim) => text(record(claim).text))
+    .filter(Boolean)
+    .join(' ');
+}
+
+export function buildFounderEditorialIdentity(proposal: JsonRecord): FounderEditorialIdentity {
+  const source = record(proposal.source);
+  const payload = record(proposal.public_payload);
+  const evidence = record(proposal.internal_evidence);
+  const sourceRepo = text(source.repo);
+  const draft = text(payload.draft_text);
+  const claims = publicClaimsText(payload);
+  const hook = firstHook(draft);
+  const coreThesis = claims || draft.slice(0, 600);
+  const eventRef = text(evidence.ref);
+  const proofDigest = text(evidence.digest).toLowerCase();
+  const project = canonicalLane(sourceRepo);
+  const platform = text(payload.platform).toLowerCase();
+
+  const promptOsPatternFingerprint = hash({
+    contract: 'promptos/editorial-pattern@v1',
+    lane: project,
+    thesis: normalize(coreThesis),
+    hook: normalize(hook),
+  });
+  const chiefAngleFingerprint = hash({
+    contract: 'chief/editorial-angle@v1',
+    lane: project,
+    eventRef,
+    proofDigest,
+    storyType: text(payload.story_type).toLowerCase(),
+  });
+  const storyFingerprint = hash({
+    contract: FOUNDER_EDITORIAL_NOVELTY_CONTRACT,
+    lane: project,
+    platform,
+    coreThesis: normalize(coreThesis),
+    hook: normalize(hook),
+    eventRef,
+    proofDigest,
+    promptOsPatternFingerprint,
+    chiefAngleFingerprint,
+  });
+
+  return {
+    lane: project,
+    platform,
+    project,
+    coreThesis,
+    hook,
+    eventRef,
+    proofDigest,
+    promptOsPatternFingerprint,
+    chiefAngleFingerprint,
+    storyFingerprint,
+  };
+}
+
+function normalizeHistoryRow(value: unknown): FounderEditorialHistoryRecord {
+  const row = record(value);
+  return {
+    id: text(row.id),
+    relatedProject: text(row.related_project) || null,
+    coreThesis: text(row.core_thesis),
+    primaryHook: text(row.primary_hook),
+    angle: text(row.angle),
+    meaningfulChange: text(row.meaningful_change) || null,
+    hookType: text(row.hook_type) || null,
+    proofStyle: text(row.proof_style) || null,
+    publishDate: text(row.publish_date) || null,
+    status: text(row.status),
+  };
+}
+
+export function supabaseFounderEditorialHistoryRepository(client: SupabaseClient): FounderEditorialHistoryRepository {
+  return {
+    async recentLinkedIn(limit) {
+      const { data, error } = await client
+        .from('linkedin_experiments')
+        .select('id, related_project, core_thesis, primary_hook, angle, meaningful_change, hook_type, proof_style, publish_date, status')
+        .in('status', ['published', 'analyzed'])
+        .order('publish_date', { ascending: false })
+        .limit(limit);
+      if (error) throw new Error(`editorial history readback failed: ${error.message}`);
+      return Array.isArray(data) ? data.map(normalizeHistoryRow) : [];
+    },
+  };
+}
+
+async function defaultHistoryRepository(): Promise<FounderEditorialHistoryRepository> {
+  const { supabase } = await import('./supabaseClient.js');
+  return supabaseFounderEditorialHistoryRepository(supabase);
+}
+
+function historicalSemanticText(item: FounderEditorialHistoryRecord): string {
+  return [item.coreThesis, item.primaryHook, item.angle, item.meaningfulChange ?? ''].filter(Boolean).join(' ');
+}
+
+function riskFor(score: number, exactPatternMatch: boolean): 'LOW' | 'MEDIUM' | 'HIGH' {
+  if (exactPatternMatch || score >= HIGH_SIMILARITY) return 'HIGH';
+  if (score >= MEDIUM_SIMILARITY) return 'MEDIUM';
+  return 'LOW';
+}
+
+export async function evaluateFounderEditorialNovelty({
+  proposal,
+  historyRepository,
+}: {
+  proposal: JsonRecord;
+  historyRepository?: FounderEditorialHistoryRepository;
+}): Promise<FounderEditorialNoveltyReceipt> {
+  const identity = buildFounderEditorialIdentity(proposal);
+  const roles = {
+    promptos: 'editorial-pattern-grammar',
+    chief: 'candidate-angle-proposal',
+    fcr: 'history-readback-and-approval-gate',
+  } as const;
+  const authority = { publish: false, approve: false, schedule: false } as const;
+
+  if (identity.platform !== 'linkedin') {
+    const continuityCookie = hash({ identity, historyState: 'NOT_APPLICABLE', closestMatchId: null });
+    return {
+      contract: FOUNDER_EDITORIAL_NOVELTY_CONTRACT,
+      allowed: true,
+      risk: 'LOW',
+      historyState: 'NOT_APPLICABLE',
+      comparedCount: 0,
+      closestMatchId: null,
+      closestSimilarity: 0,
+      storyFingerprint: identity.storyFingerprint,
+      promptOsPatternFingerprint: identity.promptOsPatternFingerprint,
+      chiefAngleFingerprint: identity.chiefAngleFingerprint,
+      continuityCookie,
+      roles,
+      authority,
+      reason: 'LinkedIn editorial-history comparison is not applicable to this platform.',
+    };
+  }
+
+  const repository = historyRepository ?? await defaultHistoryRepository();
+  const history = await repository.recentLinkedIn(MAX_HISTORY);
+  if (history.length === 0) {
+    const continuityCookie = hash({ identity, historyState: 'EMPTY', closestMatchId: null });
+    return {
+      contract: FOUNDER_EDITORIAL_NOVELTY_CONTRACT,
+      allowed: true,
+      risk: 'LOW',
+      historyState: 'EMPTY',
+      comparedCount: 0,
+      closestMatchId: null,
+      closestSimilarity: 0,
+      storyFingerprint: identity.storyFingerprint,
+      promptOsPatternFingerprint: identity.promptOsPatternFingerprint,
+      chiefAngleFingerprint: identity.chiefAngleFingerprint,
+      continuityCookie,
+      roles,
+      authority,
+      reason: 'No published/analyzed LinkedIn experiment history was available for comparison.',
+    };
+  }
+
+  const currentSemanticText = `${identity.coreThesis} ${identity.hook}`;
+  let closest: FounderEditorialHistoryRecord | null = null;
+  let closestSimilarity = 0;
+  for (const item of history) {
+    const score = similarity(currentSemanticText, historicalSemanticText(item));
+    if (score > closestSimilarity) {
+      closest = item;
+      closestSimilarity = score;
+    }
+  }
+
+  const closestPatternFingerprint = closest
+    ? hash({
+        contract: 'promptos/editorial-pattern@v1',
+        lane: closest.relatedProject ?? 'unknown-project',
+        thesis: normalize(closest.coreThesis),
+        hook: normalize(closest.primaryHook),
+      })
+    : '';
+  const exactPatternMatch = closestPatternFingerprint === identity.promptOsPatternFingerprint;
+  const risk = riskFor(closestSimilarity, exactPatternMatch);
+  const allowed = risk !== 'HIGH';
+  const roundedSimilarity = Number(closestSimilarity.toFixed(4));
+  const continuityCookie = hash({
+    storyFingerprint: identity.storyFingerprint,
+    promptOsPatternFingerprint: identity.promptOsPatternFingerprint,
+    chiefAngleFingerprint: identity.chiefAngleFingerprint,
+    closestMatchId: closest?.id ?? null,
+    closestSimilarity: roundedSimilarity,
+    risk,
+    comparedCount: history.length,
+  });
+
+  return {
+    contract: FOUNDER_EDITORIAL_NOVELTY_CONTRACT,
+    allowed,
+    risk,
+    historyState: 'COMPARED',
+    comparedCount: history.length,
+    closestMatchId: closest?.id ?? null,
+    closestSimilarity: roundedSimilarity,
+    storyFingerprint: identity.storyFingerprint,
+    promptOsPatternFingerprint: identity.promptOsPatternFingerprint,
+    chiefAngleFingerprint: identity.chiefAngleFingerprint,
+    continuityCookie,
+    roles,
+    authority,
+    reason: allowed
+      ? `Editorial novelty gate accepted the candidate at ${risk.toLowerCase()} repetition risk.`
+      : 'Editorial novelty gate rejected a high-overlap thesis/hook pattern; Chief must select a materially different story angle before founder approval.',
+  };
+}
