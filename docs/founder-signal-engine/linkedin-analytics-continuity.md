@@ -89,7 +89,7 @@ python3 -m unittest scripts/test_linkedin_analytics_continuity.py
 
 `scripts/founder_content_supersession.py` implements `fcr/founder-content-supersession@v3` for two cumulative observations of the same content fingerprint. It is a separate observation-only seam because the aggregate `ENGAGEMENT` worksheet can contain activity from older posts and therefore cannot be silently reinterpreted as per-post cumulative engagement.
 
-The supersession contract requires the newer observation time to be strictly later, rejects decreases in cumulative impressions or engagements, requires SHA-256 source digests, preserves the prior claim as `SUPERSEDED_HISTORICAL`, emits the current claim as `VERIFIED_CURRENT`, classifies the evidence surprise, and binds the bounded strategy mutation into the deterministic receipt identity.
+The V3 supersession contract requires the newer observation time to be strictly later, rejects decreases in cumulative impressions or engagements, requires SHA-256-shaped source digests, preserves the prior claim as `SUPERSEDED_HISTORICAL`, emits the current claim as `ATTESTED_CURRENT`, classifies the evidence surprise, and binds the bounded strategy mutation into the deterministic receipt identity. V3 does not read the underlying source artifact bytes, so its source digests are caller-supplied provenance references rather than verified source bindings.
 
 ```text
 same post fingerprint
@@ -102,16 +102,29 @@ same post fingerprint
 -> next creative gate
 ```
 
-The V3 receipt carries source digests but deliberately reports `claim_source_binding: NOT_LOCKED_V3`. Digest presence is not the same as cryptographically proving that each claim was derived from those exact source bytes. A future provenance-locking layer must close that gap before the system can claim source-bound interpretation.
+The V3 receipt deliberately reports `source_digest_verification: UNVERIFIED_INPUT_V3` and `claim_source_binding: NOT_LOCKED_V3`. Digest presence is not the same as proving that the supplied digest matches the source artifact or that the supplied claim was derived correctly from that source.
 
-A predecessor supersession receipt may be supplied as lineage. The repository implementation uses the explicit `fcr-json-v1` canonicalization for new receipt identities; lineage never authorizes publication and an older receipt ID is not regenerated under a different hash contract.
+`scripts/founder_content_source_binding.py` implements the strict `fcr/founder-content-supersession@v4` successor seam. V4 reads the supplied prior/current source bytes, recomputes SHA-256, and fails closed unless those bytes match the exact digests bound into the V3 input. A successful V4 receipt reports `VERIFIED_FROM_SOURCE_BYTES_V4` and `LOCKED_TO_SOURCE_BYTES_V4` for provenance binding only.
 
-Run:
+Source-byte equality still does **not** let an executor certify itself. V4 therefore keeps both evidence observations and the current claim at the `ATTESTED` ceiling while explicitly recording `independent_witness: NOT_PRESENT_V4` and `execution_environment_attestation: NOT_LOCKED_V4`. Promotion to a `VERIFIED` claim requires a separate independent witness/environment boundary; a valid digest or receipt signature alone cannot supply that authority.
+
+Run V3 without source-byte resolution:
 
 ```bash
 python3 scripts/founder_content_supersession.py supersession-input.json \
   --output supersession-receipt.json
 ```
+
+Run V4 with exact source artifacts:
+
+```bash
+python3 scripts/founder_content_source_binding.py supersession-input.json \
+  --prior-source prior-source.bin \
+  --current-source current-source.bin \
+  --output supersession-source-bound-receipt.json
+```
+
+A predecessor supersession receipt may be supplied as lineage. The repository implementation uses the explicit `fcr-json-v1` canonicalization for new receipt identities; lineage never authorizes publication and an older receipt ID is not regenerated under a different hash contract.
 
 Focused verification:
 
