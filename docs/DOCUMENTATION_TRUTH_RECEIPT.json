@@ -37,6 +37,12 @@
       ]
     },
     {
+      "path": "src/lib/n8nFounderContentOrchestrator.ts",
+      "claims": [
+        "src/lib/n8nFounderContentOrchestrator.ts must carry the exact already-validated Current You approval expires_at into every canonical founder-content cadence reservation before any external n8n orchestration, so the canonical dispatcher cannot reserve or dispatch a schedule outside the founder approval lease."
+      ]
+    },
+    {
       "path": "src/lib/n8nProviderNeutralFounderContentPreparation.ts",
       "claims": [
         "src/lib/n8nProviderNeutralFounderContentPreparation.ts must complete provider-neutral envelope construction, transport/provider readiness, cadence reservation atomically bounded by the exact approval expiry, source-project resolution, and durable approval_executions reservation before one-shot founder approval is consumed; post-reservation expiry validation remains defense in depth, a claim failure may re-arm only an execution explicitly recorded as retryable_before_provider with provider_write_attempted=false, and preparation itself must never send the provider request."
