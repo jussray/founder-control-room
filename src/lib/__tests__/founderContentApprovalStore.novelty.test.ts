@@ -1,0 +1,154 @@
+import { createRequire } from 'node:module';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  issueFounderContentApproval,
+  type FounderContentApprovalRepository,
+} from '../founderContentApprovalStore.js';
+import type { FounderEditorialHistoryRepository } from '../founderEditorialNovelty.js';
+
+const require = createRequire(import.meta.url);
+const {
+  canonicalChiefIdentity,
+  hashPublicPayload,
+} = require('../../../tools/founder-content-contracts/founder-content-authorization-contract.cjs') as {
+  canonicalChiefIdentity: (proposal: Record<string, unknown>) => Record<string, unknown>;
+  hashPublicPayload: (value: unknown) => string;
+};
+
+const SOURCE_SHA = 'd'.repeat(40);
+const EVIDENCE_REF = `github:founder-control-room@${SOURCE_SHA}#editorial-convergence`;
+const NOW = '2026-08-29T23:40:00.000Z';
+
+function proposal() {
+  const value: Record<string, unknown> = {
+    version: 1,
+    kind: 'chief-ai/founder-content-proposal',
+    source: { repo: 'jussray/founder-control-room', commit_sha: SOURCE_SHA },
+    freshness: {
+      issued_at: '2026-08-29T23:20:00.000Z',
+      expires_at: '2026-08-30T00:20:00.000Z',
+    },
+    public_payload: {
+      platform: 'linkedin',
+      story_type: 'founder-progress',
+      draft_text: 'I stopped building separate AI apps. I am building one founder machine with different jobs.',
+      public_claims: [{
+        claim_id: 'founder-machine-convergence',
+        text: 'PromptOS, Chief, and Founder Control Room are converging into one founder operating system.',
+        truth_state: 'verified',
+        public_safe: true,
+        evidence_ref: EVIDENCE_REF,
+        evidence_scope: 'founder-machine-convergence',
+        temporal_class: 'historical_version',
+        temporal_version: SOURCE_SHA,
+      }],
+      proof_link: null,
+      proof_link_policy: 'editorial_optional',
+    },
+    internal_evidence: {
+      verified: true,
+      ref: EVIDENCE_REF,
+      kind: 'github-exact-head-contract',
+      digest: 'e'.repeat(64),
+      not_for_publication: true,
+      source_repo: 'jussray/founder-control-room',
+      source_commit_sha: SOURCE_SHA,
+      proves: ['founder-machine-convergence'],
+      does_not_prove: ['publication', 'traction'],
+    },
+    sauce_guard: {
+      scanner_version: 'sauce-guard-v1',
+      private_implementation_removed: true,
+      secret_material_removed: true,
+      raw_diff_removed: true,
+      private_metrics_removed: true,
+      unreleased_roadmap_removed: true,
+      customer_private_data_removed: true,
+      security_sensitive_details_removed: true,
+      public_claims_only: true,
+      independent_scan_passed: true,
+      blocked_categories: [],
+      withheld_categories: ['private-implementation'],
+    },
+    authority: {
+      proposal_only: true,
+      publish_authorized: false,
+      current_you_source: 'current_authenticated_founder',
+      current_you_intent_id: 'founder-content-current',
+      current_you_intent_version: 12,
+      current_you_observed_at: '2026-08-29T23:25:00.000Z',
+      proposal_evaluated_at: '2026-08-29T23:30:00.000Z',
+      future_you_advisory_only: true,
+      historical_content_intent_authoritative: false,
+      analytics_feedback_authority: 'observation-only',
+      analytics_can_authorize_publish: false,
+      external_feedback_trusted_for_authority: false,
+    },
+  };
+  value.proposal_hash = hashPublicPayload(canonicalChiefIdentity(value));
+  return value;
+}
+
+function approvalRepository(): FounderContentApprovalRepository {
+  return {
+    issue: vi.fn(async () => true),
+    readCurrent: vi.fn(),
+    claim: vi.fn(),
+  };
+}
+
+function historyRepository(coreThesis: string, primaryHook: string): FounderEditorialHistoryRepository {
+  return {
+    recentLinkedIn: vi.fn(async () => [{
+      id: 'prior-post-1',
+      relatedProject: 'fcr',
+      coreThesis,
+      primaryHook,
+      angle: 'founder operating system convergence',
+      meaningfulChange: null,
+      hookType: 'Build-in-public',
+      proofStyle: 'Technical proof',
+      publishDate: '2026-08-29',
+      status: 'published',
+    }]),
+  };
+}
+
+describe('founder content approval editorial gate', () => {
+  it('refuses to persist approval when the LinkedIn thesis/hook is highly repetitive', async () => {
+    const approvals = approvalRepository();
+    const history = historyRepository(
+      'PromptOS Chief and Founder Control Room are converging into one founder operating system.',
+      'I stopped building separate AI apps. I am building one founder machine with different jobs.',
+    );
+
+    await expect(issueFounderContentApproval({
+      proposal: proposal(),
+      founderUserId: 'founder-user-1',
+      now: NOW,
+      repository: approvals,
+      historyRepository: history,
+    })).rejects.toThrow('FOUNDER_EDITORIAL_REPETITION_BLOCKED');
+
+    expect(approvals.issue).not.toHaveBeenCalled();
+  });
+
+  it('persists approval when the closest prior story is materially different', async () => {
+    const approvals = approvalRepository();
+    const history = historyRepository(
+      'AI agents need exact runtime evidence before a completed claim is trusted.',
+      'A green checkmark is not proof that an AI agent finished the job.',
+    );
+
+    const issued = await issueFounderContentApproval({
+      proposal: proposal(),
+      founderUserId: 'founder-user-1',
+      now: NOW,
+      repository: approvals,
+      historyRepository: history,
+    });
+
+    expect(issued.platform).toBe('linkedin');
+    expect(approvals.issue).toHaveBeenCalledTimes(1);
+  });
+});
