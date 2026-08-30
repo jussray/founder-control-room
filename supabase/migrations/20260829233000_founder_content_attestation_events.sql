@@ -61,7 +61,10 @@ create trigger founder_content_attestation_events_append_only
 -- Under concurrent corrections an older request may reach its ON CONFLICT update
 -- after a newer request. Only a competing manual-attestation replacement is
 -- monotonic-guarded, so unrelated updates to the same observation remain allowed.
--- The immutable attestation event remains preserved regardless of projection outcome.
+-- A stale/equal replacement fails closed instead of silently returning OLD: that
+-- keeps the HTTP writer from reporting the submitted correction as latest when the
+-- database intentionally preserved a newer projection. The append-only event that
+-- was recorded before the projection attempt remains durable evidence.
 create or replace function public.keep_founder_content_observation_latest()
 returns trigger
 language plpgsql
@@ -77,7 +80,7 @@ begin
      and new.attestation_event_id is not null
      and new.attestation_event_id is distinct from old.attestation_event_id
      and new.observed_at <= old.observed_at then
-    return old;
+    raise exception 'stale founder-content observation projection rejected';
   end if;
   return new;
 end;
