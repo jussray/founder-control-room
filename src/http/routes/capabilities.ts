@@ -14,7 +14,7 @@ const PROJECT_HEALTH_RESOURCE_PREFIX = `capability:${PROJECT_HEALTH_CAPABILITY_I
 const FOUNDER_CONTENT_OBSERVATION_KIND = 'fcr/founder-content-provider-observation@v1';
 const FOUNDER_CONTENT_RESOURCE_TYPE = 'founder_content_post';
 const LINKEDIN_POST_URN = /^urn:li:(share|ugcPost):[A-Za-z0-9_-]+$/;
-const RFC3339_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
+const RFC3339_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(?:Z|([+-])(\d{2}):(\d{2}))$/;
 const SHA256 = /^[0-9a-f]{64}$/i;
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 const DYNAMIC_CAPABILITIES = new Map([
@@ -31,6 +31,30 @@ function asRecord(value: unknown): JsonRecord {
 
 function asText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function parseStrictRfc3339Timestamp(value: string): number | null {
+  const match = RFC3339_TIMESTAMP.exec(value);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  const offsetHour = match[8] === undefined ? 0 : Number(match[8]);
+  const offsetMinute = match[9] === undefined ? 0 : Number(match[9]);
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > daysInMonth[month - 1]) return null;
+  if (hour > 23 || minute > 59 || second > 59) return null;
+  if (offsetHour > 23 || offsetMinute > 59) return null;
+
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function linkedinPostIdentity(value: unknown): { postUrn: string; permalink: string } | null {
@@ -98,7 +122,7 @@ capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: Fo
   const publicationAttested = body.publicationAttested === true;
   const publishedAtRaw = asText(body.publishedAt);
   const contentHashRaw = asText(body.contentHash).toLowerCase();
-  const publishedAtMs = publishedAtRaw && RFC3339_TIMESTAMP.test(publishedAtRaw) ? Date.parse(publishedAtRaw) : null;
+  const publishedAtMs = publishedAtRaw ? parseStrictRfc3339Timestamp(publishedAtRaw) : null;
   const observedAtMs = Date.now();
 
   if (!projectSlug) return res.status(400).json({ error: 'projectSlug is required' });
@@ -112,8 +136,8 @@ capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: Fo
       error: 'publicationAttested=true is required for a manual publication observation',
     });
   }
-  if (publishedAtRaw && (!RFC3339_TIMESTAMP.test(publishedAtRaw) || publishedAtMs === null || Number.isNaN(publishedAtMs))) {
-    return res.status(400).json({ error: 'publishedAt must be an RFC3339 timestamp with an explicit timezone when provided' });
+  if (publishedAtRaw && publishedAtMs === null) {
+    return res.status(400).json({ error: 'publishedAt must be a real RFC3339 timestamp with an explicit timezone when provided' });
   }
   if (publishedAtMs !== null && publishedAtMs > observedAtMs + MAX_CLOCK_SKEW_MS) {
     return res.status(400).json({ error: 'publishedAt cannot be materially future-dated' });
@@ -185,7 +209,7 @@ capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: Fo
       resource_id: identity.postUrn,
       observed_state: observedState,
       observed_at: observedAt,
-      source_event_id: sourceEventId,
+      attestation_event_id: sourceEventId,
     }, { onConflict: 'project_id,provider,resource_type,resource_id' });
 
   if (observationError) {
@@ -222,7 +246,7 @@ capabilitiesRouter.get('/founder-content/linkedin-observations', async (req: Fou
 
   const { data: observation, error: observationError } = await supabase
     .from('provider_observations')
-    .select('provider, resource_type, resource_id, observed_state, observed_at, source_event_id')
+    .select('provider, resource_type, resource_id, observed_state, observed_at, source_event_id, attestation_event_id')
     .eq('project_id', resolved.project.id)
     .eq('provider', 'linkedin')
     .eq('resource_type', FOUNDER_CONTENT_RESOURCE_TYPE)
