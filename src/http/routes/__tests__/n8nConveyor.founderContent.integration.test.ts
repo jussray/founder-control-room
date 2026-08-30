@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockAuthoritativeN8n,
@@ -112,6 +112,10 @@ beforeEach(() => {
   });
 });
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe('n8n founder-content route', () => {
   it('rejects unauthenticated founder-content orchestration', async () => {
     const res = await request(buildApp())
@@ -172,6 +176,31 @@ describe('n8n founder-content route', () => {
     expect(res.body.founderContent.directPublish.nextRuntimeGate).toContain('approval-store migration state');
     expect(res.body.founderContent.readiness).not.toHaveProperty('webhookUrl');
     expect(res.body.founderContent.readiness).not.toHaveProperty('bearerToken');
+  });
+
+  it('fails runtime readiness closed when the enabled provider allowlist is explicitly empty', async () => {
+    vi.stubEnv('N8N_FOUNDER_CONTENT_ENABLED', 'true');
+    vi.stubEnv('N8N_FOUNDER_CONTENT_WEBHOOK_URL', 'https://n8n.example.com/webhook/founder-content');
+    vi.stubEnv('N8N_FOUNDER_CONTENT_BEARER_TOKEN', 'server-side-secret');
+    vi.stubEnv('N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS', ',');
+
+    const res = await request(buildApp())
+      .get('/automation/conveyor')
+      .set('Authorization', BEARER);
+
+    expect(res.status).toBe(200);
+    expect(res.body.founderContent.enabled).toBe(false);
+    expect(res.body.founderContent.blockedBy).toBe('N8N_FOUNDER_CONTENT_RUNTIME_CONFIGURATION_REQUIRED');
+    expect(res.body.founderContent.controlledProbeAllowed).toBe(false);
+    expect(res.body.founderContent.readiness).toEqual(expect.objectContaining({
+      enabled: true,
+      configured: true,
+      enabledProviders: [],
+      invalidProviders: [],
+      bufferEnabled: false,
+      bufferReadyForProbe: false,
+      liveVerified: false,
+    }));
   });
 
   it('routes provider-neutral orchestration through the FCR authority adapter and keeps publication truth pending readback', async () => {

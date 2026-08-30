@@ -71,6 +71,7 @@ n8nConveyorRouter.get('/', async (_req: FounderRequest, res) => {
   const providerRuntimeConfigured =
     founderContentReadiness.enabled
     && founderContentReadiness.configured
+    && founderContentReadiness.enabledProviders.length > 0
     && founderContentReadiness.invalidProviders.length === 0;
 
   return res.json({
