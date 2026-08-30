@@ -265,8 +265,9 @@ founderPermissionsRouter.post('/requests/:requestId/decision', rateLimitFounderP
     status: resolution.status, decision: resolution.decision, decision_hash: resolution.decision.decisionHash,
     decision_surface: 'fcr', founder_user_id: req.founder!.userId,
     founder_email: req.founder!.email, decided_at: decidedAt.toISOString(),
-    expires_at: expiresAt.toISOString(), revoked_at: null,
+    expires_at: expiresAt.toISOString(),
   }).eq('request_id', requestId).eq('status', 'pending')
+    .is('revoked_at', null)
     .select(REQUEST_SELECT).maybeSingle();
   if (error) return res.status(500).json({ error: 'Unable to persist founder decision.' });
   if (!data) return res.status(409).json({ error: 'Founder permission request changed before decision could be recorded.', code: 'FOUNDER_PERMISSION_DECISION_RACE' });
