@@ -15,6 +15,20 @@ const STOPWORDS = new Set([
   'your',
 ]);
 
+const FOUNDER_MACHINE_ALIASES = new Set([
+  'jussray/founder-control-room',
+  'founder-control-room',
+  'founder control room',
+  'foundercontrolroom',
+  'fcr',
+  'jussray/chief-ai-machine',
+  'chief-ai-machine',
+  'chief ai machine',
+  'chief',
+  'jussray/promptos',
+  'promptos',
+]);
+
 export interface FounderEditorialHistoryRecord {
   id: string;
   relatedProject: string | null;
@@ -116,13 +130,14 @@ function firstHook(draft: string): string {
 }
 
 function canonicalLane(sourceRepo: string): string {
-  const repo = sourceRepo.toLowerCase();
-  if (
-    repo === 'jussray/founder-control-room'
-    || repo === 'jussray/chief-ai-machine'
-    || repo === 'jussray/promptos'
-  ) return 'founder-machine';
-  return repo || 'unknown-project';
+  const normalized = sourceRepo
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/^https?:\/\/github\.com\//, '')
+    .replace(/\.git$/, '')
+    .trim();
+  if (FOUNDER_MACHINE_ALIASES.has(normalized)) return 'founder-machine';
+  return normalized || 'unknown-project';
 }
 
 function publicClaimsText(payload: JsonRecord): string {
@@ -303,7 +318,7 @@ export async function evaluateFounderEditorialNovelty({
   const closestPatternFingerprint = closest
     ? hash({
         contract: 'promptos/editorial-pattern@v1',
-        lane: closest.relatedProject ?? 'unknown-project',
+        lane: canonicalLane(closest.relatedProject ?? ''),
         thesis: normalize(closest.coreThesis),
         hook: normalize(closest.primaryHook),
       })
