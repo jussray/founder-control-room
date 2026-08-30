@@ -99,8 +99,8 @@ describe('founder session rotation retry membrane', () => {
     expect(response.headers['set-cookie']).toBeUndefined();
   });
 
-  it('does not erase the existing cookie when OAuth replacement revocation fails', async () => {
-    mocks.revokeFounderSession.mockResolvedValueOnce(false);
+  it('routes OAuth replacement through the same strict single-use rotation membrane', async () => {
+    mocks.rotateFounderSession.mockRejectedValueOnce(new Error('Unable to revoke prior founder browser session'));
 
     const response = await request(app())
       .get('/auth/callback')
@@ -108,6 +108,12 @@ describe('founder session rotation retry membrane', () => {
       .query({ token_hash: 'verified-token' });
 
     expect(response.status).toBe(503);
+    expect(mocks.rotateFounderSession).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ access_token: SESSION.access_token, refresh_token: SESSION.refresh_token }),
+    );
+    expect(mocks.revokeFounderSession).not.toHaveBeenCalled();
     expect(mocks.writeFounderSession).not.toHaveBeenCalled();
     expect(mocks.clearFounderSession).not.toHaveBeenCalled();
     expect(response.headers['set-cookie']).toBeUndefined();

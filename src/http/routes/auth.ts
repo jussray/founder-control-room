@@ -3,7 +3,7 @@ import { rateLimit } from 'express-rate-limit';
 import type { Session } from '@supabase/supabase-js';
 import { createSupabaseAuthClient, supabaseAuth } from '../../lib/supabaseAuthClient.js';
 import { supabase } from '../../lib/supabaseClient.js';
-import { clearFounderSession, readFounderSession, revokeFounderSession, rotateFounderSession, writeFounderSession } from '../../auth/founderSession.js';
+import { clearFounderSession, readFounderSession, revokeFounderSession, rotateFounderSession } from '../../auth/founderSession.js';
 import { respondError, respondSuccess } from '../apiResponse.js';
 import { FOUNDER_API_URL, rateLimitMagicLink } from '../middleware/security.js';
 import { requireFounder, requireInteractiveFounder, type FounderRequest } from '../middleware/requireFounder.js';
@@ -82,13 +82,8 @@ authRouter.get('/callback', rateLimitFounderOAuth, async (req, res) => {
     return res.status(401).type('html').send(founderCallbackHtml());
   }
 
-  const replaced = await revokeFounderSession(req, 'replaced');
-  if (!replaced) return res.status(503).type('html').send(founderCallbackHtml());
   const founderSession = sessionWithVerifiedUser(data.session, verifiedUser);
-  try { await writeFounderSession(res, founderSession); }
-  catch (sessionError) {
-    console.error('Founder browser session persistence failed:', sessionError instanceof Error ? sessionError.message : String(sessionError));
-    clearFounderSession(res);
+  if (!(await establishFounderSession(req, res, founderSession))) {
     return res.status(503).type('html').send(founderCallbackHtml());
   }
 
