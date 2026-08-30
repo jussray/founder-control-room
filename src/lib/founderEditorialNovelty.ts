@@ -232,7 +232,7 @@ export function supabaseFounderEditorialHistoryRepository(client: SupabaseClient
         .from('linkedin_experiments')
         .select('id, related_project, core_thesis, primary_hook, angle, meaningful_change, hook_type, proof_style, publish_date, status')
         .in('status', ['published', 'analyzed'])
-        .order('publish_date', { ascending: false })
+        .order('publish_date', { ascending: false, nullsFirst: false })
         .limit(limit);
       if (error) throw new Error(`editorial history readback failed: ${error.message}`);
       return Array.isArray(data) ? data.map(normalizeHistoryRow) : [];
