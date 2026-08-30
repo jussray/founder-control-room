@@ -146,7 +146,7 @@ describe('FCR manual LinkedIn founder-content observations', () => {
       provider: 'linkedin',
       resource_type: 'founder_content_post',
       resource_id: LINKEDIN_URN,
-      source_event_id: res.body.sourceEventId,
+      attestation_event_id: res.body.sourceEventId,
       observed_state: expect.objectContaining({
         kind: 'fcr/founder-content-provider-observation@v1',
         platform: 'linkedin',
@@ -166,6 +166,7 @@ describe('FCR manual LinkedIn founder-content observations', () => {
         },
       }),
     }));
+    expect(row.source_event_id).toBeUndefined();
     expect(JSON.stringify(row)).not.toContain('999999');
     expect(JSON.stringify(row)).not.toContain(FOUNDER_EMAIL);
   });
@@ -202,7 +203,7 @@ describe('FCR manual LinkedIn founder-content observations', () => {
     expect(observationUpsert).toHaveBeenCalledTimes(2);
     expect(attestationInsert.mock.calls[0][0].observed_state.contentHash).toBe('a'.repeat(64));
     expect(attestationInsert.mock.calls[1][0].observed_state.contentHash).toBe('b'.repeat(64));
-    expect(observationUpsert.mock.calls[1][0].source_event_id).toBe(corrected.body.sourceEventId);
+    expect(observationUpsert.mock.calls[1][0].attestation_event_id).toBe(corrected.body.sourceEventId);
   });
 
   it('requires an explicit founder publication attestation and never persists an unasserted post', async () => {
@@ -223,14 +224,21 @@ describe('FCR manual LinkedIn founder-content observations', () => {
     expect(observationUpsert).not.toHaveBeenCalled();
   });
 
-  it('rejects JavaScript-parseable timestamps that are not timezone-bearing RFC3339', async () => {
+  it('rejects non-RFC3339 and impossible calendar publication timestamps', async () => {
     authorizeFounder();
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'founder_users') return founderAllowlistBuilder();
       throw new Error(`Unexpected table: ${table}`);
     });
 
-    for (const publishedAt of ['08/09/2026', '2026-08-28T03:00:00']) {
+    for (const publishedAt of [
+      '08/09/2026',
+      '2026-08-28T03:00:00',
+      '2026-02-30T12:00:00Z',
+      '2025-02-29T12:00:00+00:00',
+      '2026-13-01T12:00:00Z',
+      '2026-08-28T24:00:00Z',
+    ]) {
       const res = await request(buildApp())
         .post('/capabilities/founder-content/linkedin-observations')
         .set('Authorization', BEARER)
@@ -299,7 +307,8 @@ describe('FCR manual LinkedIn founder-content observations', () => {
       provider: 'linkedin',
       resource_type: 'founder_content_post',
       resource_id: LINKEDIN_URN,
-      source_event_id: 'fcae:stored-event',
+      source_event_id: null,
+      attestation_event_id: 'fcae:stored-event',
       observed_state: {
         kind: 'fcr/founder-content-provider-observation@v1',
         publication: { state: 'USER_ATTESTED', providerVerified: false },
