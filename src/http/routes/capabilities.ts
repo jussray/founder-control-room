@@ -13,7 +13,7 @@ const PROJECT_HEALTH_CAPABILITY_ID = 'project-health-refresh-v1';
 const PROJECT_HEALTH_RESOURCE_PREFIX = `capability:${PROJECT_HEALTH_CAPABILITY_ID}:invocation:`;
 const FOUNDER_CONTENT_OBSERVATION_KIND = 'fcr/founder-content-provider-observation@v1';
 const FOUNDER_CONTENT_RESOURCE_TYPE = 'founder_content_post';
-const LINKEDIN_POST_URN = /^urn:li:(share|ugcPost):[A-Za-z0-9_-]+$/;
+const LINKEDIN_POST_URN = /^urn:li:(share|ugcPost|activity):[A-Za-z0-9_-]+$/;
 const RFC3339_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(?:Z|([+-])(\d{2}):(\d{2}))$/;
 const SHA256 = /^[0-9a-f]{64}$/i;
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
@@ -57,7 +57,7 @@ function parseStrictRfc3339Timestamp(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function linkedinPostIdentity(value: unknown): { postUrn: string; permalink: string } | null {
+export function linkedinPostIdentity(value: unknown): { postUrn: string; permalink: string } | null {
   const raw = asText(value);
   if (!raw) return null;
 
@@ -75,7 +75,7 @@ function linkedinPostIdentity(value: unknown): { postUrn: string; permalink: str
       return null;
     }
     const decodedPath = decodeURIComponent(url.pathname);
-    const match = decodedPath.match(/\/feed\/update\/(urn:li:(?:share|ugcPost):[A-Za-z0-9_-]+)\/?$/);
+    const match = decodedPath.match(/\/feed\/update\/(urn:li:(?:share|ugcPost|activity):[A-Za-z0-9_-]+)\/?$/);
     if (!match?.[1] || !LINKEDIN_POST_URN.test(match[1])) return null;
     return {
       postUrn: match[1],
