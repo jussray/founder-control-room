@@ -26,4 +26,48 @@ describe('founder permission surface migration', () => {
     expect(sql).toContain('expires_at > decided_at');
     expect(sql).toContain("expires_at <= decided_at + interval '20 minutes'");
   });
+
+  it('locks canonical founder permission identity after the explicit decision', () => {
+    const sql = readFileSync(resolve(
+      process.cwd(),
+      'supabase/migrations/20260830224500_lock_founder_permission_identity.sql',
+    ), 'utf8');
+
+    expect(sql).toContain('create or replace function public.enforce_founder_permission_identity_immutability()');
+    expect(sql).toContain('before update on public.founder_permission_requests');
+    expect(sql).toContain("old.status <> 'pending'");
+    expect(sql).toContain("using errcode = '23514'");
+
+    for (const field of [
+      'id',
+      'request_id',
+      'request_contract',
+      'requested_by_surface',
+      'request_hash',
+      'proposal',
+      'action_target',
+      'note',
+      'requested_at',
+    ]) {
+      expect(sql).toContain(`new.${field} is distinct from old.${field}`);
+    }
+
+    for (const field of [
+      'status',
+      'decision',
+      'decision_hash',
+      'decision_surface',
+      'founder_user_id',
+      'founder_email',
+      'decided_at',
+      'expires_at',
+    ]) {
+      expect(sql).toContain(`new.${field} is distinct from old.${field}`);
+    }
+
+    // One-shot consumption and founder revocation are lifecycle transitions,
+    // not authority-identity rewrites, so the trigger must keep them mutable.
+    expect(sql).not.toContain('new.consumed_at is distinct from old.consumed_at');
+    expect(sql).not.toContain('new.revoked_at is distinct from old.revoked_at');
+  });
 });
