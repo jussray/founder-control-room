@@ -1,4 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../../capabilities/workbenchRegistry.js', () => ({ capabilities: [] }));
+vi.mock('../../../events/outbox.js', () => ({ enqueueReconcile: vi.fn() }));
+vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: {} }));
+vi.mock('../../middleware/requireFounder.js', () => ({
+  requireFounder: vi.fn((_req: unknown, _res: unknown, next: () => void) => next()),
+}));
+
 import { linkedinPostIdentity } from '../capabilities.js';
 
 describe('LinkedIn founder-content canonical post identity', () => {
