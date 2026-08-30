@@ -78,7 +78,11 @@ function hasOpaqueFounderCookie(req) {
 const server = createServer((req, res) => {
   if (req.method === 'GET' && assets.has(req.url)) {
     const [contentType, content] = assets.get(req.url);
-    res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'no-store' });
+    const headers = { 'Content-Type': contentType, 'Cache-Control': 'no-store' };
+    if (req.url === '/control-room/goalfix.html') {
+      headers['Set-Cookie'] = `${SESSION_COOKIE_NAME}=${SESSION_COOKIE_VALUE}; Path=/; Secure; HttpOnly; SameSite=Strict`;
+    }
+    res.writeHead(200, headers);
     res.end(content);
     return;
   }
@@ -198,14 +202,6 @@ async function storedAttemptCounts(page) {
 async function proveViewport(name, viewport) {
   currentSha = OLD_SHA;
   const context = await browser.newContext({ viewport });
-  await context.addCookies([{
-    name: SESSION_COOKIE_NAME,
-    value: SESSION_COOKIE_VALUE,
-    url: baseUrl,
-    httpOnly: true,
-    secure: true,
-    sameSite: 'Strict',
-  }]);
   const page = await context.newPage();
   const pageErrors = [];
   const failedRequests = [];
