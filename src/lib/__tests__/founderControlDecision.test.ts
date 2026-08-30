@@ -16,7 +16,7 @@ const proposal: FounderControlProposalBinding = {
 };
 
 describe('founder control decision contract', () => {
-  it.each(['fcr', 'chatgpt', 'claude', 'perplexity'] as const)(
+  it.each(['fcr', 'chatgpt', 'claude', 'perplexity', 'manus'] as const)(
     'accepts explicit founder approval relayed from %s',
     (surface) => {
       const decision = createFounderControlDecision({ proposal, surface, decision: 'approved' });
