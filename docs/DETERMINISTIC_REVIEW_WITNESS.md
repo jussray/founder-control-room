@@ -26,7 +26,13 @@ The repository-provider write is deliberately narrow. `publishDeterministicRevie
 
 The full review hash is load-bearing on readback, not audit decoration. `DeterministicReviewGitHubProvider.listVerificationSignals(...)` preserves Check Run `external_id` as `VerificationSignal.evidenceFingerprint`. Both witness publication orchestration and the canonical founder-final independent-review gate require that full fingerprint to equal the exact receipt `reviewHash`, in addition to exact head, receipt-derived signal name, passed status, and trusted numeric GitHub App issuer. A missing fingerprint or a different 64-hex fingerprint that merely shares the displayed hash prefix fails closed.
 
-Provider construction exposes witness publication only when `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` produce a repository-scoped GitHub App installation token. The local/development `GITHUB_TOKEN` fallback retains ordinary repository capability but cannot mint deterministic review evidence.
+Provider construction exposes witness publication only when runtime `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` produce a repository-scoped GitHub App installation token. The local/development `GITHUB_TOKEN` fallback retains ordinary repository capability but cannot mint deterministic review evidence.
+
+### GitHub Actions credential-name boundary
+
+The GitHub Actions `production` environment stores the trusted App credentials under the legal secret names `APP_ID` and `APP_PRIVATE_KEY`. The trusted witness and governance jobs map those secrets into runtime `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` before invoking provider code. The mapping is intentional: the provider contract keeps its stable runtime names while the Actions secret plane avoids the reserved `GITHUB_` secret-name prefix.
+
+`APP_ID` must be the numeric App ID and `APP_PRIVATE_KEY` must be the matching private-key PEM for the same repository-scoped Founder Control Room GitHub App. The GitHub App Client ID is not consumed by this installation-token path. Secret presence is configuration evidence only; successful installation-token use, exact-head publication, App-issuer readback, and full receipt-fingerprint readback are required before the witness is considered provider-backed.
 
 Witness publication is retry-safe by **reconcile-before-create**. After rederiving the exact receipt and revalidating PR identity, the publisher reads exact-head verification signals before any provider write. If the trusted App already emitted the exact passed signal with the same full receipt fingerprint, that signal is re-used and no new Check Run is created. If the reconciliation read fails, no provider mutation occurs. This allows a retry after a previous post-write/readback interruption to converge on the already-created witness instead of blindly duplicating it.
 
