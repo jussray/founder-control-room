@@ -10,6 +10,9 @@ on:
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   repair:
     runs-on: ubuntu-latest
@@ -19,49 +22,147 @@ jobs:
           ref: fix/founder-permission-hardening-current-0884bef4
           fetch-depth: 0
 
-      - name: Patch exact deploy wiring
+      - name: Patch deploy wiring and secret registry
         shell: python
         run: |
           from pathlib import Path
 
-          path = Path('.github/workflows/deploy.yml')
-          text = path.read_text()
+          deploy_path = Path('.github/workflows/deploy.yml')
+          docs_path = Path('docs/SECRETS.md')
+          deploy = deploy_path.read_text().splitlines()
+          secret_expression = '$' + '{{ secrets.FOUNDER_SESSION_ENCRYPTION_KEY }}'
+          env_line = f'          FOUNDER_SESSION_ENCRYPTION_KEY: {secret_expression}'
+          list_line = '            FOUNDER_SESSION_ENCRYPTION_KEY'
 
-          env_old = '          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}\n          GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}\n'
-          env_new = '          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}\n          FOUNDER_SESSION_ENCRYPTION_KEY: ${{ secrets.FOUNDER_SESSION_ENCRYPTION_KEY }}\n          GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}\n'
-          list_old = '            SUPABASE_PUBLISHABLE_KEY\n            GITHUB_WEBHOOK_SECRET\n'
-          list_new = '            SUPABASE_PUBLISHABLE_KEY\n            FOUNDER_SESSION_ENCRYPTION_KEY\n            GITHUB_WEBHOOK_SECRET\n'
+          def index_exact(lines, value, start=0):
+              for index in range(start, len(lines)):
+                  if lines[index] == value:
+                      return index
+              raise SystemExit(f'expected line missing: {value!r}')
 
-          if text.count(env_old) != 2:
-              raise SystemExit(f'expected exactly 2 deploy env wiring sites, found {text.count(env_old)}')
-          if text.count(list_old) != 2:
-              raise SystemExit(f'expected exactly 2 deploy secret-list sites, found {text.count(list_old)}')
+          def index_prefix(lines, prefix, start, end):
+              for index in range(start, end):
+                  if lines[index].startswith(prefix):
+                      return index
+              raise SystemExit(f'expected prefix missing: {prefix!r}')
 
-          text = text.replace(env_old, env_new)
-          text = text.replace(list_old, list_new)
+          # Production authority gate: require the same secret that the runtime
+          # uses for AES-256-GCM session credential encryption.
+          authority_step = index_exact(deploy, '      - name: Validate required production configuration')
+          authority_shell = index_exact(deploy, '        shell: bash', authority_step)
+          if env_line not in deploy[authority_step:authority_shell]:
+              anchor = index_prefix(deploy, '          SUPABASE_PUBLISHABLE_KEY:', authority_step, authority_shell)
+              deploy.insert(anchor + 1, env_line)
 
-          if text.count('FOUNDER_SESSION_ENCRYPTION_KEY: ${{ secrets.FOUNDER_SESSION_ENCRYPTION_KEY }}') != 2:
-              raise SystemExit('expected founder session encryption key in authority-gate and worker env')
-          if text.count('            FOUNDER_SESSION_ENCRYPTION_KEY\n') != 2:
-              raise SystemExit('expected founder session encryption key in required and Wrangler secret lists')
+          authority_run = index_exact(deploy, '        run: |', authority_step)
+          required_start = index_exact(deploy, '          required=(', authority_run)
+          required_end = index_exact(deploy, '          )', required_start)
+          if list_line not in deploy[required_start:required_end]:
+              anchor = index_exact(deploy, '            SUPABASE_PUBLISHABLE_KEY', required_start)
+              deploy.insert(anchor + 1, list_line)
 
-          path.write_text(text)
+          validation_marker = 'Invalid founder session encryption key'
+          if not any(validation_marker in line for line in deploy[authority_step:]):
+              success_line = index_exact(
+                  deploy,
+                  '          echo "All required production configuration names are present."',
+                  required_end,
+              )
+              validation = [
+                  '          FOUNDER_SESSION_ENCRYPTION_KEY="$FOUNDER_SESSION_ENCRYPTION_KEY" python3 - <<\'PY\'',
+                  '          import base64',
+                  '          import os',
+                  '          import re',
+                  '',
+                  "          encoded = os.environ.get('FOUNDER_SESSION_ENCRYPTION_KEY', '').strip()",
+                  "          if not re.fullmatch(r'[A-Za-z0-9_-]{43}', encoded):",
+                  "              print('::error title=Invalid founder session encryption key::FOUNDER_SESSION_ENCRYPTION_KEY must be 43-character unpadded base64url')",
+                  '              raise SystemExit(1)',
+                  '',
+                  '          try:',
+                  "              decoded = base64.b64decode(encoded + '=', altchars=b'-_', validate=True)",
+                  '          except Exception:',
+                  "              print('::error title=Invalid founder session encryption key::FOUNDER_SESSION_ENCRYPTION_KEY is not valid base64url')",
+                  '              raise SystemExit(1)',
+                  '',
+                  '          if len(decoded) != 32:',
+                  "              print('::error title=Invalid founder session encryption key::FOUNDER_SESSION_ENCRYPTION_KEY must decode to exactly 32 bytes')",
+                  '              raise SystemExit(1)',
+                  '',
+                  "          print('FOUNDER_SESSION_ENCRYPTION_KEY format is valid.')",
+                  '          PY',
+                  '',
+              ]
+              deploy[success_line:success_line] = validation
 
-      - name: Verify bounded diff
+          # Wrangler upload: the secret must be supplied to the surviving API
+          # Worker on every authorized deployment, not merely documented.
+          worker_start = index_exact(deploy, '  worker-deploy:')
+          secrets_start = index_exact(deploy, '          secrets: |', worker_start)
+          worker_env = index_exact(deploy, '        env:', secrets_start)
+          if list_line not in deploy[secrets_start:worker_env]:
+              anchor = index_exact(deploy, '            SUPABASE_PUBLISHABLE_KEY', secrets_start)
+              deploy.insert(anchor + 1, list_line)
+
+          worker_start = index_exact(deploy, '  worker-deploy:')
+          worker_env = index_exact(deploy, '        env:', worker_start)
+          pages_release = index_exact(deploy, '  pages-release:', worker_env)
+          if env_line not in deploy[worker_env:pages_release]:
+              anchor = index_prefix(deploy, '          SUPABASE_PUBLISHABLE_KEY:', worker_env, pages_release)
+              deploy.insert(anchor + 1, env_line)
+
+          deploy_path.write_text('\n'.join(deploy) + '\n')
+
+          # Documentation must describe the GitHub production secret plane as
+          # well as the Worker binding plane because deploy.yml bridges them.
+          docs = docs_path.read_text().splitlines()
+          deploy_row = (
+              '| `FOUNDER_SESSION_ENCRYPTION_KEY` | `deploy.yml / authority-gate`, '
+              '`deploy.yml / worker-deploy` | Required 43-character unpadded base64url value '
+              'decoding to exactly 32 bytes. Passed to Wrangler as a Worker secret; never log or expose the value. |'
+          )
+          if deploy_row not in docs:
+              deploy_heading = index_exact(docs, '## Deploy')
+              deploy_url_row = index_prefix(docs, '| `DEPLOY_URL` |', deploy_heading, len(docs))
+              docs.insert(deploy_url_row, deploy_row)
+
+          checklist_line = '[ ] FOUNDER_SESSION_ENCRYPTION_KEY (32 random bytes, unpadded base64url; supplied to Worker deploy)'
+          if checklist_line not in docs:
+              checklist_heading = index_exact(docs, '### GitHub production environment')
+              checklist_anchor = index_exact(docs, '[ ] SUPABASE_PUBLISHABLE_KEY', checklist_heading)
+              docs.insert(checklist_anchor + 1, checklist_line)
+
+          docs_path.write_text('\n'.join(docs) + '\n')
+
+      - name: Verify bounded repair
         shell: bash
         run: |
           set -euo pipefail
           git diff --check
-          test "$(git diff --name-only | paste -sd, -)" = ".github/workflows/deploy.yml"
-          test "$(grep -c 'FOUNDER_SESSION_ENCRYPTION_KEY: \${{ secrets.FOUNDER_SESSION_ENCRYPTION_KEY }}' .github/workflows/deploy.yml)" -eq 2
-          test "$(grep -c '^            FOUNDER_SESSION_ENCRYPTION_KEY$' .github/workflows/deploy.yml)" -eq 2
+          test "$(git diff --name-only | sort | paste -sd, -)" = ".github/workflows/deploy.yml,docs/SECRETS.md"
+          test "$(grep -c '^[[:space:]]*FOUNDER_SESSION_ENCRYPTION_KEY:' .github/workflows/deploy.yml)" -ge 2
+          test "$(grep -c '^            FOUNDER_SESSION_ENCRYPTION_KEY$' .github/workflows/deploy.yml)" -ge 2
+          grep -q 'Invalid founder session encryption key' .github/workflows/deploy.yml
+          grep -q 'FOUNDER_SESSION_ENCRYPTION_KEY (32 random bytes, unpadded base64url; supplied to Worker deploy)' docs/SECRETS.md
 
-      - name: Commit repair to existing carrier
+      - name: Commit repair and retire temporary carrier
         shell: bash
         run: |
           set -euo pipefail
+          branch='fix/founder-permission-hardening-current-0884bef4'
+
+          git fetch origin "$branch"
+          if [[ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$branch")" ]]; then
+            echo '::error title=Stale repair checkout::The PR branch moved during deploy repair; refusing to overwrite newer work.'
+            exit 1
+          fi
+
+          git rm .github/workflows/repair-founder-session-deploy-wiring.yml
+          git diff --check
+          test "$(git diff --name-only | sort | paste -sd, -)" = ".github/workflows/deploy.yml,.github/workflows/repair-founder-session-deploy-wiring.yml,docs/SECRETS.md"
+
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add .github/workflows/deploy.yml
-          git commit -m 'fix(auth): wire founder session encryption into deploy'
-          git push origin HEAD:fix/founder-permission-hardening-current-0884bef4
+          git add .github/workflows/deploy.yml docs/SECRETS.md
+          git commit -m 'fix(auth): validate founder session deploy key'
+          git push origin HEAD:"$branch"
