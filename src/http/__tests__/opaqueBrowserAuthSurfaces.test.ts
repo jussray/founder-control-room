@@ -6,6 +6,11 @@ const SURFACES = [
   'public/control-room/mission-board.js',
   'public/control-room/futureyou-v8.js',
   'public/control-room/goalfix.js',
+  'public/control-room/plugin-center.html',
+  'public/control-room/github-workspace.html',
+  'public/control-room/command-bridge.html',
+  'public/control-room/repository-settings.html',
+  'public/control-room/founder-signal-engine.html',
 ] as const;
 
 describe('opaque founder browser auth surfaces', () => {
