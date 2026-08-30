@@ -228,6 +228,36 @@ describe('founder permission broker HTTP contract', () => {
     expect(replay.body.code).toBe('FOUNDER_PERMISSION_NOT_CONSUMABLE');
   });
 
+  it('rejects an approval whose persisted expiry exceeds the 20-minute founder decision window', async () => {
+    const app = createServer();
+    await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)
+      .send({ requestId: 'permission:extended-expiry-001', requestedBySurface: 'claude', proposal, actionTarget });
+    interactiveSession.enabled = true;
+    const approved = await interactivePost(app, '/mcp/founder-permissions/requests/permission:extended-expiry-001/decision')
+      .send({ decision: 'approved' });
+    expect(approved.status).toBe(200);
+    expect(approved.body.founderPermissionSatisfied).toBe(true);
+
+    const stored = rows.get('permission:extended-expiry-001');
+    expect(stored).toBeDefined();
+    const decidedAt = String(stored?.decided_at ?? '');
+    expect(Number.isFinite(Date.parse(decidedAt))).toBe(true);
+    stored!.expires_at = new Date(Date.parse(decidedAt) + (20 * 60 * 1000) + 1).toISOString();
+
+    const observed = await request(app)
+      .get('/mcp/founder-permissions/requests/permission:extended-expiry-001')
+      .set('Authorization', bearer);
+    expect(observed.status).toBe(200);
+    expect(observed.body.founderPermissionSatisfied).toBe(false);
+
+    const consumed = await request(app)
+      .post('/mcp/founder-permissions/requests/permission:extended-expiry-001/consume')
+      .set('Authorization', bearer)
+      .send({ requestHash: approved.body.requestHash, decisionHash: approved.body.decisionHash });
+    expect(consumed.status).toBe(409);
+    expect(consumed.body.code).toBe('FOUNDER_PERMISSION_NOT_CONSUMABLE');
+  });
+
   it('lets the interactive founder revoke an unconsumed approval', async () => {
     const app = createServer();
     await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)

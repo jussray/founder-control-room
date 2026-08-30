@@ -113,11 +113,17 @@ function rowRequest(row: JsonRecord): FounderPermissionRequest | null {
 }
 function projection(row: JsonRecord, now = new Date()) {
   const status = statusFrom(row.status) ?? 'pending';
+  const decidedAt = text(row.decided_at) || null;
   const expiresAt = text(row.expires_at) || null;
   const revokedAt = text(row.revoked_at) || null;
   const consumedAt = text(row.consumed_at) || null;
   const decisionSurface = surfaceFrom(row.decision_surface);
+  const decidedAtMs = decidedAt ? Date.parse(decidedAt) : Number.NaN;
   const expiryMs = expiresAt ? Date.parse(expiresAt) : Number.NaN;
+  const boundedDecisionWindow = Number.isFinite(decidedAtMs)
+    && Number.isFinite(expiryMs)
+    && expiryMs > decidedAtMs
+    && expiryMs <= decidedAtMs + FOUNDER_DECISION_TTL_MS;
   const exactStoredRequest = rowRequest(row);
   const exactStoredDecision = exactStoredRequest !== null
     && storedFounderPermissionDecisionMatches(exactStoredRequest, {
@@ -130,7 +136,7 @@ function projection(row: JsonRecord, now = new Date()) {
     && decisionSurface === 'fcr'
     && exactStoredRequest !== null
     && exactStoredDecision
-    && Number.isFinite(expiryMs)
+    && boundedDecisionWindow
     && expiryMs > now.getTime()
     && !revokedAt
     && !consumedAt;
@@ -142,7 +148,7 @@ function projection(row: JsonRecord, now = new Date()) {
     requestHash: text(row.request_hash) || null, proposal: isRecord(row.proposal) ? row.proposal : null,
     actionTarget: actionTargetFrom(row.action_target), note: text(row.note) || null,
     decision, decisionHash: text(row.decision_hash) || null, decisionSurface,
-    requestedAt: text(row.requested_at) || null, decidedAt: text(row.decided_at) || null,
+    requestedAt: text(row.requested_at) || null, decidedAt,
     expiresAt, revokedAt, consumedAt,
     founderPermissionSatisfied: approvedFreshUnconsumed,
     executionAuthorized: false,
@@ -289,7 +295,8 @@ founderPermissionsRouter.post('/requests/:requestId/consume', rateLimitFounderPe
   if (text(row.request_hash).toLowerCase() !== requestHash || text(row.decision_hash).toLowerCase() !== decisionHash) {
     return res.status(409).json({ error: 'Founder permission consumption does not match the exact decision.', code: 'FOUNDER_PERMISSION_CONSUMPTION_SCOPE_MISMATCH' });
   }
-  if (!projection(row).founderPermissionSatisfied) {
+  const projected = projection(row);
+  if (!projected.founderPermissionSatisfied || !projected.decidedAt || !projected.expiresAt) {
     return res.status(409).json({ error: 'Founder permission is not fresh and consumable.', code: 'FOUNDER_PERMISSION_NOT_CONSUMABLE' });
   }
 
@@ -300,6 +307,8 @@ founderPermissionsRouter.post('/requests/:requestId/consume', rateLimitFounderPe
     .eq('status', 'approved')
     .eq('request_hash', requestHash)
     .eq('decision_hash', decisionHash)
+    .eq('decided_at', projected.decidedAt)
+    .eq('expires_at', projected.expiresAt)
     .is('consumed_at', null)
     .is('revoked_at', null)
     .gt('expires_at', consumedAt)

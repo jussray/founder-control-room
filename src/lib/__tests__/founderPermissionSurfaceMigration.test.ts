@@ -14,4 +14,16 @@ describe('founder permission surface migration', () => {
     expect(sql).toContain('drop constraint if exists founder_permission_decision_surface');
     expect(sql).toContain("decision_surface is null or decision_surface in ('fcr','chatgpt','claude','perplexity','manus')");
   });
+
+  it('caps persisted founder decision expiry at the documented 20-minute window', () => {
+    const sql = readFileSync(resolve(
+      process.cwd(),
+      'supabase/migrations/20260830213000_bound_founder_permission_decision_expiry.sql',
+    ), 'utf8');
+
+    expect(sql).toContain('drop constraint if exists founder_permission_expiry_after_decision');
+    expect(sql).toContain('decided_at is not null');
+    expect(sql).toContain('expires_at > decided_at');
+    expect(sql).toContain("expires_at <= decided_at + interval '20 minutes'");
+  });
 });
