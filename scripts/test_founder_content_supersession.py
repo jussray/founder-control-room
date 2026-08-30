@@ -52,10 +52,19 @@ class FounderContentSupersessionTest(unittest.TestCase):
         self.assertEqual(receipt['surprise'], 'WEAKER_THAN_EXPECTED')
         self.assertEqual(receipt['evidence'][0]['metrics']['engagement_rate'], 7.41)
         self.assertEqual(receipt['evidence'][1]['metrics']['engagement_rate'], 3.64)
+        self.assertEqual(receipt['evidence'][0]['evidence_state'], 'ATTESTED_HISTORICAL')
+        self.assertEqual(receipt['evidence'][1]['evidence_state'], 'ATTESTED_CURRENT')
         self.assertEqual(receipt['supersession']['prior_claim_state'], 'SUPERSEDED_HISTORICAL')
-        self.assertEqual(receipt['supersession']['current_claim_state'], 'VERIFIED_CURRENT')
+        self.assertEqual(receipt['supersession']['current_claim_state'], 'ATTESTED_CURRENT')
         self.assertEqual(receipt['predecessor_receipt_id'], 'SUP-0123456789abcdef')
+        self.assertEqual(receipt['provenance']['source_digest_verification'], 'UNVERIFIED_INPUT_V3')
         self.assertEqual(receipt['provenance']['claim_source_binding'], 'NOT_LOCKED_V3')
+
+    def test_unchecked_digest_never_upgrades_to_verified_state(self):
+        receipt = mod.build_supersession_receipt(copy.deepcopy(CANONICAL))
+        serialized = repr(receipt)
+        self.assertNotIn('VERIFIED_CURRENT', serialized)
+        self.assertNotIn('VERIFIED_HISTORICAL', serialized)
 
     def test_receipt_is_deterministic_and_mutation_is_bound_into_identity(self):
         first = mod.build_supersession_receipt(copy.deepcopy(CANONICAL))
