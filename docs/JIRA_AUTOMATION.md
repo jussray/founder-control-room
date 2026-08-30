@@ -62,7 +62,7 @@ The JSON body must contain only this observation envelope:
 }
 ```
 
-For scheduled stale-work scans, use `event: "scheduled"` with the fresh issue fields read by the Jira Automation rule at execution time.
+For scheduled stale-work scans, use `event: "scheduled-scan"` with fresh issue fields read by the Jira Automation rule at execution time.
 
 `observedAt` must be fresh at FCR receipt time. Observations older than five minutes are rejected, and observations more than 30 seconds in the future are rejected. This prevents a caller from replaying an old snapshot or manufacturing stale eligibility with a future observation timestamp.
 
@@ -109,6 +109,17 @@ The n8n workflow independently reconstructs the receipt material from the valida
 
 The receipt is a deterministic continuity/proof binding. It is not a claim that n8n or Jira is cryptographically trusted beyond the authenticated provider boundary.
 
+### Residual duplicate-delivery race
+
+The plan idempotency key is a deterministic binding, **not a durable provider lock**. Normal sequential replay is expected to fail the n8n Jira-state re-read after the first mutation changes Jira's `updated` value. However, two genuinely concurrent deliveries could both re-read the same pre-mutation Jira snapshot before either write becomes visible.
+
+Therefore provider activation must also prove one of these conditions before `N8N_JIRA_AUTOMATION_ENABLED=true` is allowed:
+
+- the production provider serializes this workflow so only one execution can reach the Jira mutation section at a time; or
+- an equivalent durable provider-side dedupe/lock is installed and independently read back.
+
+Do not describe the idempotency header alone as duplicate-execution prevention.
+
 ## FCR runtime configuration
 
 Set these only in the FCR runtime secret/configuration store. Do not commit secret values.
@@ -143,6 +154,8 @@ Bind these provider-side values without committing them to this repository:
 3. **n8n runtime `JIRA_BASE_URL`**.
    - Exact tenant origin only, for example `https://your-site.atlassian.net`.
    - Do not include a path, username, password, token, query string, or fragment.
+4. **Provider serialization or durable dedupe** for this workflow.
+   - The activation proof must show that concurrent duplicate deliveries cannot both reach the Jira mutation section.
 
 The artifact intentionally contains credential stubs only. Importing the JSON therefore cannot create Jira authority by itself.
 
@@ -172,15 +185,16 @@ Required sequence:
 2. import the exact checked-in n8n workflow artifact;
 3. bind the inbound n8n header-auth and Jira credentials;
 4. set the exact Jira base URL;
-5. keep FCR `N8N_JIRA_AUTOMATION_ENABLED=false` until provider setup is complete;
-6. issue one controlled Jira Automation observation against a known test issue or otherwise isolated Jira work item;
-7. verify FCR accepted only the intended observation and derived no more than one action;
-8. verify the n8n execution re-read the intended issue, performed only the expected bounded mutation, and returned the exact FCR receipt;
-9. read the Jira issue back independently and confirm the intended state;
-10. bind that provider proof to the exact deployed FCR `GIT_SHA` and workflow artifact version;
-11. only then activate the n8n workflow and set FCR `N8N_JIRA_AUTOMATION_ENABLED=true`.
+5. prove provider serialization or equivalent durable dedupe for concurrent duplicate delivery;
+6. keep FCR `N8N_JIRA_AUTOMATION_ENABLED=false` until provider setup is complete;
+7. issue one controlled Jira Automation observation against a known test issue or otherwise isolated Jira work item;
+8. verify FCR accepted only the intended observation and derived no more than one action;
+9. verify the n8n execution re-read the intended issue, performed only the expected bounded mutation, and returned the exact FCR receipt;
+10. read the Jira issue back independently and confirm the intended state;
+11. bind that provider proof to the exact deployed FCR `GIT_SHA` and workflow artifact version;
+12. only then activate the n8n workflow and set FCR `N8N_JIRA_AUTOMATION_ENABLED=true`.
 
-If the Jira/Atlassian or n8n connection is unavailable, provider activation remains `BLOCKED`; repository source green must not be promoted into a live-provider claim.
+If the Jira/Atlassian or n8n connection is unavailable, or provider duplicate-execution prevention is unproven, provider activation remains `BLOCKED`; repository source green must not be promoted into a live-provider claim.
 
 ## Rollback
 
