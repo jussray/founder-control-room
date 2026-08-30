@@ -85,6 +85,40 @@ Focused verification:
 python3 -m unittest scripts/test_linkedin_analytics_continuity.py
 ```
 
+## Performance supersession
+
+`scripts/founder_content_supersession.py` implements `fcr/founder-content-supersession@v3` for two cumulative observations of the same content fingerprint. It is a separate observation-only seam because the aggregate `ENGAGEMENT` worksheet can contain activity from older posts and therefore cannot be silently reinterpreted as per-post cumulative engagement.
+
+The supersession contract requires the newer observation time to be strictly later, rejects decreases in cumulative impressions or engagements, requires SHA-256 source digests, preserves the prior claim as `SUPERSEDED_HISTORICAL`, emits the current claim as `VERIFIED_CURRENT`, classifies the evidence surprise, and binds the bounded strategy mutation into the deterministic receipt identity.
+
+```text
+same post fingerprint
++ prior cumulative observation
++ current cumulative observation
++ expectation
++ prior/current claims
++ bounded strategy mutation
+-> deterministic supersession receipt
+-> next creative gate
+```
+
+The V3 receipt carries source digests but deliberately reports `claim_source_binding: NOT_LOCKED_V3`. Digest presence is not the same as cryptographically proving that each claim was derived from those exact source bytes. A future provenance-locking layer must close that gap before the system can claim source-bound interpretation.
+
+A predecessor supersession receipt may be supplied as lineage. The repository implementation uses the explicit `fcr-json-v1` canonicalization for new receipt identities; lineage never authorizes publication and an older receipt ID is not regenerated under a different hash contract.
+
+Run:
+
+```bash
+python3 scripts/founder_content_supersession.py supersession-input.json \
+  --output supersession-receipt.json
+```
+
+Focused verification:
+
+```bash
+python3 -m unittest scripts/test_founder_content_supersession.py
+```
+
 ## Interpretation order
 
 For content decisions, prefer qualified engagement and follower/profile conversion, then relevant reach, then raw impressions. Comparable windows and per-post fingerprints should be used before inferring that a content theme improved. Analytics conclusions remain proposals for founder review and can feed the existing `linkedin_experiments` record; they do not authorize Buffer, LinkedIn, n8n, Zapier, or another distribution provider.

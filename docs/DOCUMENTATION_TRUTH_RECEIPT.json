@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind exact-current-main deterministic-review founder-runtime witness truth and current Goalfix, Cloudflare, founder-content, editorial-novelty, and repository-provider documentation to reviewed source invariants. This receipt does not grant merge, deploy, provider-policy, publication, database, secret, billing, destructive-action, or runtime authority.",
+  "purpose": "Bind the current founder-content editorial-novelty, provider-neutral n8n authority, and observation-only analytics supersession changes to reviewed source invariants without granting merge, deploy, publication, provider-policy, database, secret, billing, destructive-action, or runtime authority.",
   "domains": [
     "publishing"
   ],
@@ -9,31 +9,13 @@
       "path": "src/lib/founderEditorialNovelty.ts",
       "claims": [
         "src/lib/founderEditorialNovelty.ts must keep PromptOS pattern grammar, Chief candidate-angle identity, and FCR history/approval authority separate; build deterministic non-authorizing pattern, angle, story, and continuity fingerprints; compare LinkedIn candidates against recent published/analyzed linkedin_experiments history; and reject HIGH repetition risk without claiming that novelty itself authorizes publication.",
-        "PromptOS thesis+hook pattern identity must be portfolio-wide across the bounded LinkedIn history window, regardless of source product/repo; exact-pattern detection must scan all compared history independently of the closest token-similarity row, while Chief angle/story identity remains project/event-aware and a new event/proof must not automatically excuse a repetitive thesis/hook."
+        "src/lib/founderEditorialNovelty.ts must scan portfolio-wide thesis and hook pattern history independently of closest token similarity while keeping Chief angle and story identity project-aware."
       ]
     },
     {
       "path": "src/lib/founderContentApprovalStore.ts",
       "claims": [
         "src/lib/founderContentApprovalStore.ts must run the LinkedIn editorial novelty gate after canonical proposal validation but before persisting one-shot founder-content approval; HIGH repetition risk must fail before approval-store mutation, while novelty fingerprints remain continuity evidence and never become approval or publication authority."
-      ]
-    },
-    {
-      "path": "src/lib/__tests__/founderEditorialNovelty.test.ts",
-      "claims": [
-        "src/lib/__tests__/founderEditorialNovelty.test.ts must prove deterministic PromptOS/Chief/story fingerprints, high-overlap rejection, portfolio-wide exact-pattern rejection even when another project ranks closer by token similarity, materially different story acceptance, angle/story rotation on evidence changes without false novelty claims, and non-LinkedIn NOT_APPLICABLE behavior."
-      ]
-    },
-    {
-      "path": "src/lib/__tests__/founderContentApprovalStore.novelty.test.ts",
-      "claims": [
-        "src/lib/__tests__/founderContentApprovalStore.novelty.test.ts must prove a high-repetition LinkedIn proposal cannot persist founder approval and that a materially different candidate can continue to the existing one-shot approval store."
-      ]
-    },
-    {
-      "path": "docs/founder-signal-engine/editorial-novelty.md",
-      "claims": [
-        "docs/founder-signal-engine/editorial-novelty.md must document one FCR editorial lane with portfolio-wide PromptOS pattern memory and project-aware Chief proposal intelligence, deterministic fingerprint fields, exact-pattern scanning independent of similarity ranking, current repetition thresholds, linkedin_experiments as the existing history record, non-authorizing continuity cookies, and the exact pre-approval HIGH-risk hold boundary without claiming cross-platform coverage or live provider execution."
       ]
     },
     {
@@ -51,31 +33,7 @@
     {
       "path": "src/lib/n8nProviderNeutralFounderContentOrchestrator.ts",
       "claims": [
-        "src/lib/n8nProviderNeutralFounderContentOrchestrator.ts must derive Buffer and other deferred-provider schedule envelopes from canonical exact-current-you proposal and approval authority, preserve provider/platform compatibility and the 20-minute review-only boundary, and must never require caller-shaped firewall authority or treat n8n/provider acceptance as final publication truth."
-      ]
-    },
-    {
-      "path": "src/lib/authoritativeN8nFounderContentPublisher.ts",
-      "claims": [
-        "src/lib/authoritativeN8nFounderContentPublisher.ts must remain a compatibility export for the FCR-owned n8n authority adapter and cannot create an alternate approval or publication authority path."
-      ]
-    },
-    {
-      "path": "src/http/routes/__tests__/n8nConveyor.founderContent.integration.test.ts",
-      "claims": [
-        "src/http/routes/__tests__/n8nConveyor.founderContent.integration.test.ts must prove the founder-authenticated route delegates through authoritative approval readback, remains non-published without provider readback, and rejects caller-supplied approval objects."
-      ]
-    },
-    {
-      "path": "src/lib/__tests__/authoritativeN8nFounderContentPublisher.test.ts",
-      "claims": [
-        "src/lib/__tests__/authoritativeN8nFounderContentPublisher.test.ts must prove stored-approval injection, forged-approval rejection, preflight-before-consumption behavior, provider/platform mismatch rejection, and atomic claim failure before provider dispatch."
-      ]
-    },
-    {
-      "path": "README.md",
-      "claims": [
-        "README.md must describe the source-level n8n approval adapter without claiming deployed n8n, Buffer credentials, provider mutation, readback, or live publication outcome."
+        "src/lib/n8nProviderNeutralFounderContentOrchestrator.ts must derive deferred-provider schedule envelopes from canonical exact-current-you proposal and approval authority, preserve provider/platform compatibility and the review-only boundary, and must never treat n8n or provider acceptance as final publication truth."
       ]
     },
     {
@@ -85,30 +43,28 @@
       ]
     },
     {
-      "path": ".github/workflows/deterministic-review-core-advisory.yml",
+      "path": "README.md",
       "claims": [
-        "The issue-418 founder command dispatcher must serialize workflow_dispatch inputs in the API-accepted form, including pull_request_number as a string value, while preserving immutable founder identity checks, exact current-main binding, open main-target PR validation, and the non-authorizing witness-only boundary.",
-        "A successful founder command may dispatch trusted current-main witness production only; it must not grant Founder Final, merge, deployment, provider-policy, database, secret, billing, publication, or destructive-action authority."
+        "README.md must describe the source-level n8n approval adapter without claiming deployed n8n, Buffer credentials, provider mutation, readback, or live publication outcome."
       ]
     },
     {
-      "path": "src/providers/GitHubProvider.ts",
+      "path": "scripts/founder_content_supersession.py",
       "claims": [
-        "For active FCR main governance, src/providers/GitHubProvider.ts must keep Code Owner review enabled and carry exactly one CodeQL code-scanning rule at high_or_higher security alerts and errors alerts inside the review membrane while required-status strictness remains in the zero-bypass freshness companion.",
-        "FCR review readback must fail closed when Code Owner or the exact CodeQL floor is missing, duplicated, weakened, or accompanied by an unexpected rule type, and the no-bypass strict-freshness component must still be applied and verified before the review membrane is changed.",
-        "The FCR-specific security floor must not broaden generic repository behavior or reopen existing non-FCR ruleset mutation that SecurityPreservingGitHubProvider intentionally blocks."
+        "scripts/founder_content_supersession.py must remain observation-only, require strictly newer same-subject cumulative observations with SHA-256 source digests, reject decreasing cumulative impressions or engagements, preserve the prior claim as SUPERSEDED_HISTORICAL, classify surprise, and bind the bounded strategy mutation into a deterministic receipt without granting approval or publication authority.",
+        "scripts/founder_content_supersession.py must report claim_source_binding as NOT_LOCKED_V3 because carrying source digests cannot by itself prove that a claim was derived from those exact bytes, and predecessor receipt lineage must not be regenerated under a different canonicalization contract."
       ]
     },
     {
-      "path": "scripts/audit-github-governance-preflight.mjs",
+      "path": "scripts/test_founder_content_supersession.py",
       "claims": [
-        "scripts/audit-github-governance-preflight.mjs may report READY only when the canonical FCR review membrane includes Code Owner review, the exact CodeQL high_or_higher/errors floor, exact review rule types and pull-request-only trusted-App bypass, alongside the separate exact zero-bypass strict-freshness ruleset and an eligible non-owner write reviewer."
+        "scripts/test_founder_content_supersession.py must prove the weaker-signal supersession transition, deterministic receipt identity including strategy mutation, strict timestamp ordering, and fail-closed rejection of decreasing cumulative metrics using synthetic source digests rather than private analytics provenance."
       ]
     },
     {
-      "path": "docs/PROVIDERS.md",
+      "path": "docs/founder-signal-engine/linkedin-analytics-continuity.md",
       "claims": [
-        "docs/PROVIDERS.md must describe Code Owner review and the exact CodeQL high_or_higher/errors code-scanning rule as part of the FCR review membrane security floor, separate from the no-bypass strict required-status freshness membrane, without claiming that source configuration proves live provider reconciliation."
+        "docs/founder-signal-engine/linkedin-analytics-continuity.md must keep aggregate daily LinkedIn ENGAGEMENT activity separate from per-post cumulative performance, document the observation-only ACTUAL-FLOW V3 supersession seam, and state that V3 source-digest presence is not V4 claim-to-source provenance locking."
       ]
     }
   ]
