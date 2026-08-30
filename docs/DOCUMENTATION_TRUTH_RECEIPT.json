@@ -1,10 +1,41 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind exact-current-main deterministic-review founder-runtime witness truth and current Goalfix, Cloudflare, founder-content, and repository-provider documentation to reviewed source invariants, including fail-closed existing non-FCR ruleset behavior and the FCR constitutional Code Owner plus CodeQL two-membrane security floor. This receipt does not grant merge, deploy, provider-policy, publication, database, secret, billing, destructive-action, or runtime authority.",
+  "purpose": "Bind exact-current-main deterministic-review founder-runtime witness truth and current Goalfix, Cloudflare, founder-content, editorial-novelty, and repository-provider documentation to reviewed source invariants. This receipt does not grant merge, deploy, provider-policy, publication, database, secret, billing, destructive-action, or runtime authority.",
   "domains": [
     "publishing"
   ],
   "changes": [
+    {
+      "path": "src/lib/founderEditorialNovelty.ts",
+      "claims": [
+        "src/lib/founderEditorialNovelty.ts must keep PromptOS pattern grammar, Chief candidate-angle identity, and FCR history/approval authority separate; build deterministic non-authorizing pattern, angle, story, and continuity fingerprints; compare LinkedIn candidates against recent published/analyzed linkedin_experiments history; and reject HIGH repetition risk without claiming that novelty itself authorizes publication.",
+        "The founder-machine editorial lane must treat PromptOS, Chief AI Machine, and Founder Control Room as one repetition domain so changing repository identity cannot reset editorial history; a new event/proof may rotate angle/story fingerprints but must not automatically excuse a highly repetitive thesis/hook."
+      ]
+    },
+    {
+      "path": "src/lib/founderContentApprovalStore.ts",
+      "claims": [
+        "src/lib/founderContentApprovalStore.ts must run the LinkedIn editorial novelty gate after canonical proposal validation but before persisting one-shot founder-content approval; HIGH repetition risk must fail before approval-store mutation, while novelty fingerprints remain continuity evidence and never become approval or publication authority."
+      ]
+    },
+    {
+      "path": "src/lib/__tests__/founderEditorialNovelty.test.ts",
+      "claims": [
+        "src/lib/__tests__/founderEditorialNovelty.test.ts must prove deterministic PromptOS/Chief/story fingerprints, high-overlap rejection, materially different story acceptance, angle/story rotation on evidence changes without false novelty claims, and non-LinkedIn NOT_APPLICABLE behavior."
+      ]
+    },
+    {
+      "path": "src/lib/__tests__/founderContentApprovalStore.novelty.test.ts",
+      "claims": [
+        "src/lib/__tests__/founderContentApprovalStore.novelty.test.ts must prove a high-repetition LinkedIn proposal cannot persist founder approval and that a materially different candidate can continue to the existing one-shot approval store."
+      ]
+    },
+    {
+      "path": "docs/founder-signal-engine/editorial-novelty.md",
+      "claims": [
+        "docs/founder-signal-engine/editorial-novelty.md must document one FCR editorial lane with PromptOS as pattern grammar and Chief as proposal intelligence, deterministic fingerprint fields, current repetition thresholds, linkedin_experiments as the existing history record, non-authorizing continuity cookies, and the exact pre-approval HIGH-risk hold boundary without claiming cross-platform coverage or live provider execution."
+      ]
+    },
     {
       "path": "src/http/routes/n8nConveyor.ts",
       "claims": [
