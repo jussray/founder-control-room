@@ -200,6 +200,8 @@ The read-only Cloudflare audit keeps its primary Worker Git authority receipt in
 
 `wrangler.worker.toml` executes `scripts/verify-worker-build-authority.mjs` before canonical Worker builds. Native Cloudflare Workers Builds must bind their provider commit to the checked-out Git source SHA and may use only non-promoting `wrangler versions upload`; a native `wrangler deploy` fails closed. Manual GitHub `Deploy` / `FCR Worker Reconcile` remains the only source-recognized production-promotion context, and its checked-out SHA must match the exact GitHub workflow SHA. This repository membrane does not prove or mutate the live Cloudflare Builds settings.
 
+The guarded `.github/workflows/deploy.yml` production path must reject deployment unless `FOUNDER_SESSION_ENCRYPTION_KEY` is a 43-character unpadded base64url value that decodes to exactly 32 bytes, and it injects that secret only into the canonical Worker runtime rather than Pages or unrelated jobs. This source wiring proves the fail-closed requirement only; it does not prove the GitHub `production` environment currently contains a valid key or that a deployment occurred.
+
 Native Cloudflare Worker/Pages build receipts are provider build/deploy evidence for the exact artifact they name. They do not prove the guarded production release path, database migration, auth behavior, browser behavior, fleet-wide runtime identity, or publication outcome.
 
 Production release evidence remains incomplete until the applicable authorized lane proves, for one exact current-main SHA:
