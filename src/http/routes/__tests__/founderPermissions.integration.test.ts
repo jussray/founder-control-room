@@ -243,6 +243,27 @@ describe('founder permission broker HTTP contract', () => {
     expect(revoked.body.founderPermissionSatisfied).toBe(false);
   });
 
+  it('does not let a stale decision resurrect a revoked pending request', async () => {
+    const app = createServer();
+    await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)
+      .send({ requestId: 'permission:revoked-pending-001', requestedBySurface: 'chatgpt', proposal, actionTarget });
+    interactiveSession.enabled = true;
+
+    const revoked = await interactivePost(app, '/mcp/founder-permissions/requests/permission:revoked-pending-001/revoke').send({});
+    expect(revoked.status).toBe(200);
+    expect(revoked.body.status).toBe('pending');
+    const revokedAt = rows.get('permission:revoked-pending-001')?.revoked_at;
+    expect(typeof revokedAt).toBe('string');
+
+    const staleDecision = await interactivePost(app, '/mcp/founder-permissions/requests/permission:revoked-pending-001/decision')
+      .send({ decision: 'approved' });
+    expect(staleDecision.status).toBe(409);
+    expect(staleDecision.body.code).toBe('FOUNDER_PERMISSION_DECISION_RACE');
+    expect(rows.get('permission:revoked-pending-001')?.status).toBe('pending');
+    expect(rows.get('permission:revoked-pending-001')?.revoked_at).toBe(revokedAt);
+    expect(rows.get('permission:revoked-pending-001')?.decision).toBeNull();
+  });
+
   it('fails closed when the same request id is reused for another exact target', async () => {
     const app = createServer();
     const first = await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)
