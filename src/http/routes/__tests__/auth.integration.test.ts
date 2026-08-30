@@ -21,6 +21,7 @@ import { authRouter } from '../auth.js';
 const FOUNDER_EMAIL = 'founder@example.com';
 const FOUNDER_USER_ID = '11111111-1111-4111-8111-111111111111';
 const FOUNDER_SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64url');
+const VALID_OPAQUE_COOKIE = `v1.${'A'.repeat(43)}`;
 const VERIFIED_USER = { id: FOUNDER_USER_ID, email: FOUNDER_EMAIL };
 const SESSION = {
   access_token: 'supabase-access-token-value',
@@ -83,7 +84,7 @@ describe('POST /auth/logout', () => {
     browserSessionState.revocationError = true;
     const res = await request(buildApp())
       .post('/auth/logout')
-      .set('Cookie', '__Host-fcr_session=opaque-session-value');
+      .set('Cookie', `__Host-fcr_session=${VALID_OPAQUE_COOKIE}`);
     expect(res.status).toBe(503);
     expect(res.body).toEqual({
       success: false,
@@ -100,7 +101,7 @@ describe('POST /auth/logout', () => {
     setAllowlist(true);
     const res = await request(buildApp())
       .post('/auth/logout')
-      .set('Cookie', '__Host-fcr_session=opaque-session-value');
+      .set('Cookie', `__Host-fcr_session=${VALID_OPAQUE_COOKIE}`);
     expect(res.status).toBe(204);
     expectClearedSessionCookie(res);
   });
