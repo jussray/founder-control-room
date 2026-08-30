@@ -73,7 +73,7 @@ class FounderContentSupersessionTest(unittest.TestCase):
         self.assertNotIn('VERIFIED_CURRENT', serialized)
         self.assertNotIn('VERIFIED_HISTORICAL', serialized)
 
-    def test_source_bytes_can_be_bound_without_self_certifying_the_claim(self):
+    def test_source_bytes_bind_artifact_without_proving_claim_derivation(self):
         prior_bytes = b'linkedin export snapshot 2026-08-29'
         current_bytes = b'linkedin export snapshot 2026-08-30'
         payload = copy.deepcopy(CANONICAL)
@@ -90,7 +90,9 @@ class FounderContentSupersessionTest(unittest.TestCase):
         self.assertEqual(receipt['source_binding']['prior']['binding_state'], 'SOURCE_BYTES_MATCH_HISTORICAL')
         self.assertEqual(receipt['source_binding']['current']['binding_state'], 'SOURCE_BYTES_MATCH_CURRENT')
         self.assertEqual(receipt['provenance']['source_digest_verification'], 'VERIFIED_FROM_SOURCE_BYTES_V4')
-        self.assertEqual(receipt['provenance']['claim_source_binding'], 'LOCKED_TO_SOURCE_BYTES_V4')
+        self.assertEqual(receipt['provenance']['source_artifact_binding'], 'LOCKED_TO_SOURCE_BYTES_V4')
+        self.assertEqual(receipt['provenance']['claim_source_binding'], 'NOT_PROVEN_V4')
+        self.assertEqual(receipt['provenance']['metric_derivation_verification'], 'NOT_PROVEN_V4')
         self.assertEqual(receipt['provenance']['independent_witness'], 'NOT_PRESENT_V4')
         self.assertEqual(receipt['provenance']['execution_environment_attestation'], 'NOT_LOCKED_V4')
         self.assertEqual(receipt['provenance']['verification_ceiling'], 'ATTESTED')
