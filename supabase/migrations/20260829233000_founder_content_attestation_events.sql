@@ -25,6 +25,17 @@ create index if not exists idx_founder_content_attestation_events_history
     observed_at desc
   );
 
+-- Keep the existing provider_observations.source_event_id relationship reserved
+-- for provider_events(id). Manual founder attestations use their own compatible
+-- foreign key so observation provenance does not overload provider webhook truth.
+alter table public.provider_observations
+  add column if not exists attestation_event_id text
+    references public.founder_content_attestation_events(event_id) on delete set null;
+
+create index if not exists idx_provider_observations_attestation_event
+  on public.provider_observations (attestation_event_id)
+  where attestation_event_id is not null;
+
 alter table public.founder_content_attestation_events enable row level security;
 
 revoke all on table public.founder_content_attestation_events from anon, authenticated;
