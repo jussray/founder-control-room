@@ -74,6 +74,7 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `SUPABASE_URL` | non-secret variable | Required absolute URL for the Founder Control Room Supabase project. |
 | `SUPABASE_SERVICE_ROLE_KEY` | secret | Required server-only service-role credential. |
 | `SUPABASE_PUBLISHABLE_KEY` | secret or protected variable | Required publishable Supabase key used by server auth. |
+| `FOUNDER_SESSION_ENCRYPTION_KEY` | secret | Required 32-byte base64url key used only by the API Worker to encrypt Supabase credentials stored behind the opaque HttpOnly founder session. Generate it once with a cryptographically secure RNG; do not expose it to Pages or browser code. |
 | `GITHUB_WEBHOOK_SECRET` | secret | Required webhook verification secret. |
 | `GITHUB_APP_ID` | protected variable | Preferred GitHub authentication path; paired with `GITHUB_PRIVATE_KEY`. |
 | `GITHUB_PRIVATE_KEY` | secret | Preferred GitHub authentication path; paired with `GITHUB_APP_ID`. |
@@ -88,6 +89,14 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `REPOSITORY_INGEST_SECRET` | secret | Optional repository-verification ingest credential. |
 
 The Worker intentionally fails closed when required bindings are absent, empty, malformed, or when the GitHub App pair is incomplete. Do not weaken `validateWorkerEnv` to bypass provider configuration.
+
+Generate `FOUNDER_SESSION_ENCRYPTION_KEY` as exactly 32 random bytes encoded as unpadded base64url, for example:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+```
+
+The generated value belongs only in the surviving API Worker's secret store. Source documentation proves the required binding name and format, not that the live provider currently has a value. After installation, verify only the binding name/presence and an opaque-session login flow; never print or copy the secret value into evidence.
 
 The existing provider-held OpenAI key reference remains:
 
@@ -180,6 +189,7 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] SUPABASE_URL
 [ ] SUPABASE_SERVICE_ROLE_KEY
 [ ] SUPABASE_PUBLISHABLE_KEY
+[ ] FOUNDER_SESSION_ENCRYPTION_KEY (32 random bytes, unpadded base64url)
 [ ] GITHUB_WEBHOOK_SECRET
 [ ] GITHUB_APP_ID + GITHUB_PRIVATE_KEY
 [ ] FOUNDER_ALLOWED_ORIGINS=https://foundercontrolroom.org

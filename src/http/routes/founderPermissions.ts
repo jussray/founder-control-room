@@ -8,6 +8,7 @@ import {
   type FounderPermissionRequest,
   type FounderPermissionStatus,
 } from '../../lib/founderPermissionBroker.js';
+import { storedFounderPermissionDecisionMatches } from '../../lib/founderPermissionStoredDecision.js';
 import {
   FOUNDER_CONTROL_SURFACES,
   type FounderControlDecisionValue,
@@ -118,9 +119,17 @@ function projection(row: JsonRecord, now = new Date()) {
   const decisionSurface = surfaceFrom(row.decision_surface);
   const expiryMs = expiresAt ? Date.parse(expiresAt) : Number.NaN;
   const exactStoredRequest = rowRequest(row);
+  const exactStoredDecision = exactStoredRequest !== null
+    && storedFounderPermissionDecisionMatches(exactStoredRequest, {
+      status,
+      decision: row.decision,
+      decisionHash: row.decision_hash,
+      decisionSurface: row.decision_surface,
+    });
   const approvedFreshUnconsumed = status === 'approved'
     && decisionSurface === 'fcr'
     && exactStoredRequest !== null
+    && exactStoredDecision
     && Number.isFinite(expiryMs)
     && expiryMs > now.getTime()
     && !revokedAt
