@@ -1,7 +1,10 @@
 import { createRequire } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
 import type { FounderContentApprovalRepository } from '../founderContentApprovalStore.js';
-import type { N8nFounderContentDispatchResult } from '../n8nFounderContentOrchestrator.js';
+import type {
+  N8nFounderContentDispatchResult,
+  N8nFounderContentRequest,
+} from '../n8nFounderContentOrchestrator.js';
 import type {
   PreparedProviderNeutralN8nFounderContent,
   PrepareProviderNeutralN8nFounderContentResult,
@@ -177,12 +180,17 @@ function dispatched(): N8nFounderContentDispatchResult {
   };
 }
 
-function preparedHarness(result: N8nFounderContentDispatchResult = dispatched()) {
+function preparedHarness(
+  result: N8nFounderContentDispatchResult = dispatched(),
+  scheduleAt = '2026-08-18T01:50:00.000Z',
+) {
   const dispatch = vi.fn(async () => result);
   const abort = vi.fn(async () => true);
   const prepared: PreparedProviderNeutralN8nFounderContent = {
     prepared: true,
-    request: null as never,
+    request: {
+      providerRequest: { scheduleAt },
+    } as unknown as N8nFounderContentRequest,
     executionId: '22222222-2222-4222-8222-222222222222',
     dispatch,
     abort,
@@ -244,6 +252,7 @@ describe('authoritative n8n founder-content publisher', () => {
       authorizationHash: AUTHORIZATION_HASH,
       publicPayloadHash: PUBLIC_PAYLOAD_HASH,
       consumedBy: 'founder@example.com',
+      now: NOW,
     }));
     expect(prepared.prepare.mock.invocationCallOrder[0]).toBeLessThan(
       (store.claim as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0],
@@ -292,6 +301,51 @@ describe('authoritative n8n founder-content publisher', () => {
     expect(result.code).toBe('ACTION_RESERVATION_FAILED');
     expect(result.reasons.join(' ')).toContain('did not consume the one-shot approval');
     expect(store.claim).not.toHaveBeenCalled();
+  });
+
+  it('revalidates actual approval time after preparation and refuses to consume expired authority', async () => {
+    const store = repository(currentApproval());
+    const prepared = preparedHarness();
+
+    const result = await dispatchAuthoritativeN8nFounderContent(request(), {
+      founderUserId: 'founder-user-1',
+      founderIdentity: 'founder@example.com',
+      now: NOW,
+      claimNow: '2026-08-18T02:10:00.000Z',
+      env: READY_ENV,
+      approvalRepository: store,
+      prepare: prepared.prepare,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe('INVALID_AUTHORIZATION');
+    expect(result.reasons.join(' ')).toContain('approval expired during downstream preparation');
+    expect(result.reasons.join(' ')).toContain('did not consume the one-shot approval');
+    expect(store.claim).not.toHaveBeenCalled();
+    expect(prepared.abort).toHaveBeenCalledTimes(1);
+    expect(prepared.dispatch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a prepared schedule that became stale before the fresh approval claim boundary', async () => {
+    const store = repository(currentApproval());
+    const prepared = preparedHarness(dispatched(), '2026-08-18T01:50:00.000Z');
+
+    const result = await dispatchAuthoritativeN8nFounderContent(request(), {
+      founderUserId: 'founder-user-1',
+      founderIdentity: 'founder@example.com',
+      now: NOW,
+      claimNow: '2026-08-18T01:55:00.000Z',
+      env: READY_ENV,
+      approvalRepository: store,
+      prepare: prepared.prepare,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe('INVALID_AUTHORIZATION');
+    expect(result.reasons.join(' ')).toContain('schedule is no longer in the future');
+    expect(store.claim).not.toHaveBeenCalled();
+    expect(prepared.abort).toHaveBeenCalledTimes(1);
+    expect(prepared.dispatch).not.toHaveBeenCalled();
   });
 
   it('aborts the prepared execution without provider dispatch when the atomic approval claim loses the race', async () => {

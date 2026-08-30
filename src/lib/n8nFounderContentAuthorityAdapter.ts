@@ -35,6 +35,7 @@ export interface AuthoritativeN8nFounderContentOptions {
   founderUserId: string;
   founderIdentity: string;
   now?: string;
+  claimNow?: string;
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
   approvalRepository?: FounderContentApprovalRepository;
@@ -89,6 +90,32 @@ async function abortPreparedReservation(
   } catch {
     return 'prepared execution reservation abort outcome is unknown; reconcile the pending reservation before retry';
   }
+}
+
+function preparedClaimBoundaryFailure(
+  prepared: PreparedProviderNeutralN8nFounderContent,
+  approval: JsonRecord,
+  claimNow: string,
+): string | null {
+  const claimMs = Date.parse(claimNow);
+  const approvalExpiresAt = text(approval.expires_at);
+  const approvalExpiresMs = Date.parse(approvalExpiresAt);
+  const scheduleAt = text(prepared.request.providerRequest.scheduleAt);
+  const scheduleMs = Date.parse(scheduleAt);
+
+  if (!Number.isFinite(claimMs) || !Number.isFinite(approvalExpiresMs) || !Number.isFinite(scheduleMs)) {
+    return 'prepared founder-content claim boundary contains an invalid timestamp';
+  }
+  if (claimMs >= approvalExpiresMs) {
+    return 'authoritative founder approval expired during downstream preparation';
+  }
+  if (scheduleMs <= claimMs) {
+    return 'prepared provider schedule is no longer in the future at the approval claim boundary';
+  }
+  if (scheduleMs >= approvalExpiresMs) {
+    return 'prepared provider schedule is not before the exact founder approval expiry';
+  }
+  return null;
 }
 
 /**
@@ -237,6 +264,23 @@ export async function dispatchAuthoritativeN8nFounderContent(
     };
   }
   const prepared = preparedResult;
+  const claimNow = options.claimNow ?? (options.now ?? new Date().toISOString());
+  const claimBoundaryFailure = preparedClaimBoundaryFailure(
+    prepared,
+    record(preview.approval),
+    claimNow,
+  );
+  if (claimBoundaryFailure) {
+    const abortWarning = await abortPreparedReservation(
+      prepared,
+      'prepared founder-content authority became stale before approval claim',
+    );
+    return blocked([
+      claimBoundaryFailure,
+      'FCR did not consume the one-shot approval',
+      ...(abortWarning ? [abortWarning] : []),
+    ]);
+  }
 
   let claim;
   try {
@@ -247,7 +291,7 @@ export async function dispatchAuthoritativeN8nFounderContent(
       authorizationHash,
       expectedPublicPayloadHash: publicPayloadHash,
       consumedBy: founderIdentity,
-      now,
+      now: claimNow,
       repository: options.approvalRepository,
     });
   } catch (error) {
