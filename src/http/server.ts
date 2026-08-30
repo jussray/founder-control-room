@@ -36,6 +36,7 @@ import { handleFounderSignalEngineMcp } from './routes/founderSignalEngineMcp.js
 import { handleXEngagementSignalMcp } from './routes/xEngagementSignalMcp.js';
 import { handleFounderSignalReviewContextIngest } from './routes/founderSignalReviewContexts.js';
 import { handleFounderSignalReviewEmailIngest } from './routes/founderSignalReviewEmailIngress.js';
+import { handleJiraWorkAutomationIngress } from './routes/jiraWorkAutomationIngress.js';
 import { handleHairCommerceReceiptIngest } from './routes/hairCommerceReceipts.js';
 import {
   handleProofOfShipCommitLookup,
@@ -158,7 +159,7 @@ export function createServer(options: CreateServerOptions = {}) {
 
   // Webhooks, remote MCP calls, repo-runner pings, sanitized commerce
   // receipts, downstream publication receipts, review contexts, and signed
-  // review-email receipts do not use browser cookies. Mount them before the
+  // service receipts do not use browser cookies. Mount them before the
   // browser same-origin mutation gate and give each endpoint strict parser/auth rules.
   app.post(
     '/webhooks/github',
@@ -214,6 +215,12 @@ export function createServer(options: CreateServerOptions = {}) {
     rateLimitGeneral,
     express.raw({ type: 'application/json', limit: '16kb' }),
     handleFounderSignalReviewEmailIngest,
+  );
+  app.post(
+    '/ingest/jira-work-automation',
+    rateLimitGeneral,
+    express.raw({ type: 'application/json', limit: '16kb' }),
+    handleJiraWorkAutomationIngress,
   );
   app.post(
     '/mcp/founder-signal-engine',
