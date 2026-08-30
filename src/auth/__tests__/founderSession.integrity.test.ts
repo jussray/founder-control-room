@@ -161,6 +161,31 @@ describe('opaque founder browser session integrity', () => {
     expect(resolved?.continuityFingerprint).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it('survives equivalent database timestamp serialization without changing the bound instant', async () => {
+    const { res, headers } = mockResponse();
+    await writeFounderSession(res, session());
+    const [hash, row] = [...rows.entries()][0] ?? [];
+    expect(hash).toBeTruthy();
+    const issuedAt = String(row?.issued_at ?? '');
+    const expiresAt = String(row?.expires_at ?? '');
+    expect(issuedAt).toMatch(/Z$/);
+    expect(expiresAt).toMatch(/Z$/);
+    rows.set(String(hash), {
+      ...row,
+      issued_at: issuedAt.replace(/Z$/, '+00:00'),
+      expires_at: expiresAt.replace(/Z$/, '+00:00'),
+    });
+
+    const resolved = await readFounderSession(requestWithCookie(primaryCookiePair(headers)));
+    expect(resolved).toEqual(expect.objectContaining({
+      accessToken: ACCESS_TOKEN,
+      refreshToken: REFRESH_TOKEN,
+      founderUserId: USER_ID,
+      founderEmail: EMAIL,
+      sessionExpiresAt: new Date(expiresAt).toISOString(),
+    }));
+  });
+
   it('fails closed when server-side session state no longer matches its continuity fingerprint', async () => {
     const { res, headers } = mockResponse();
     await writeFounderSession(res, session());
