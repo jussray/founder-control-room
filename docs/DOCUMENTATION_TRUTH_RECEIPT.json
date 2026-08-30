@@ -27,7 +27,13 @@
     {
       "path": "src/lib/n8nFounderContentAuthorityAdapter.ts",
       "claims": [
-        "src/lib/n8nFounderContentAuthorityAdapter.ts must preflight n8n transport, provider allowlisting, and provider/platform compatibility before consuming one-shot authority, then atomically claim the exact FCR-stored approval before any provider dispatch and fail closed on missing or mismatched authority."
+        "src/lib/n8nFounderContentAuthorityAdapter.ts must preflight n8n transport, provider allowlisting, provider/platform compatibility, cadence and approval-expiry bounds, source-project resolution, and durable execution reservation before consuming one-shot authority; only after those non-provider gates succeed may it atomically claim the exact FCR-stored approval and permit provider dispatch, while a failed claim must stop before provider write and leave an auditable retryable pre-provider reservation state."
+      ]
+    },
+    {
+      "path": "src/lib/n8nProviderNeutralFounderContentPreparation.ts",
+      "claims": [
+        "src/lib/n8nProviderNeutralFounderContentPreparation.ts must complete provider-neutral envelope construction, transport/provider readiness, cadence reservation with post-cadence approval-expiry validation, source-project resolution, and durable approval_executions reservation before one-shot founder approval is consumed; a claim failure may re-arm only an execution explicitly recorded as retryable_before_provider with provider_write_attempted=false, and preparation itself must never send the provider request."
       ]
     },
     {
