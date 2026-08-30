@@ -237,6 +237,16 @@ async function withV10PlanAwarePage(page) {
 
   const originalClick = page.click.bind(page);
   page.click = async (selector, options) => {
+    if (selector === '.tabs button[data-tab=terminal]' && await page.locator(selector).count() === 0) {
+      // The opaque-session callback lands on the newer root shell. The guarded
+      // terminal remains in the canonical legacy cockpit at /control-room/.
+      // Enter that real surface with the same HttpOnly founder session before
+      // continuing the historical terminal journey. Do not synthesize DOM or
+      // bypass the normal tab click.
+      await page.goto(new URL('/control-room/', page.url()).href, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector(selector);
+    }
+
     if (selector === '#create-branch-form button[type=submit]') {
       await page.fill(
         '#create-branch-form textarea[name="capabilityPlan"]',
