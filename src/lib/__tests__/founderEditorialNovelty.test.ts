@@ -29,15 +29,17 @@ function history(records: Array<{
   coreThesis: string;
   primaryHook: string;
   angle?: string;
+  meaningfulChange?: string | null;
+  relatedProject?: string | null;
 }>): FounderEditorialHistoryRepository {
   return {
     recentLinkedIn: vi.fn(async () => records.map((item) => ({
       id: item.id,
-      relatedProject: 'fcr',
+      relatedProject: item.relatedProject === undefined ? 'fcr' : item.relatedProject,
       coreThesis: item.coreThesis,
       primaryHook: item.primaryHook,
       angle: item.angle ?? '',
-      meaningfulChange: null,
+      meaningfulChange: item.meaningfulChange ?? null,
       hookType: 'Build-in-public',
       proofStyle: 'Technical proof',
       publishDate: '2026-08-29',
@@ -79,6 +81,24 @@ describe('founder editorial novelty', () => {
       fcr: 'history-readback-and-approval-gate',
     });
     expect(result.authority).toEqual({ publish: false, approve: false, schedule: false });
+  });
+
+  it('keeps an exact founder-machine pattern HIGH across historical repo aliases even when extra notes dilute token similarity', async () => {
+    const repository = history([{
+      id: 'promptos-same-pattern',
+      relatedProject: 'PromptOS',
+      coreThesis: 'PromptOS, Chief, and Founder Control Room are converging into one founder operating system.',
+      primaryHook: 'I stopped building separate AI apps.',
+      angle: 'architecture boundaries governance provider reconciliation session continuity runtime deployment founder workflow design visual system company operations build log internal tooling product strategy orchestration',
+      meaningfulChange: 'This historical record contains deliberately verbose unrelated notes that should not make an exact thesis and hook pattern look new.',
+    }]);
+
+    const result = await evaluateFounderEditorialNovelty({ proposal: proposal(), historyRepository: repository });
+
+    expect(result.closestSimilarity).toBeLessThan(0.55);
+    expect(result.risk).toBe('HIGH');
+    expect(result.allowed).toBe(false);
+    expect(result.closestMatchId).toBe('promptos-same-pattern');
   });
 
   it('allows a materially different story while preserving the closest-match receipt', async () => {
