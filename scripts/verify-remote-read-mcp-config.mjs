@@ -4,7 +4,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
-const EXACT_REMOTE_SCOPE = 'sekret-bip,juss-beautiful-hair,jbh-private,l99,chief-ai-machine,untold-stories,founder-control-room,promptos';
 const REMOTE_ENDPOINT = 'POST https://api.foundercontrolroom.org/mcp/read';
 
 function read(relativePath) {
@@ -24,20 +23,17 @@ function slugsFromConst(source, constName) {
 const envExample = read('.env.example');
 const wrangler = read('wrangler.worker.toml');
 const docs = read('docs/MCP_STACK.md');
-const route = read('src/http/routes/remoteReadMcp.ts');
+const remoteRoute = read('src/http/routes/remoteReadMcp.ts');
+const mcpRouter = read('src/http/routes/mcp.ts');
 const portfolio = read('src/config/portfolio.ts');
 const activePortfolioSlugs = slugsFromConst(portfolio, 'PORTFOLIO_PROJECTS');
 const externalPortfolioSlugs = slugsFromConst(portfolio, 'EXTERNAL_PROJECTS');
-const remoteScopeSlugs = EXACT_REMOTE_SCOPE.split(',');
+const exactRemoteScope = activePortfolioSlugs.join(',');
 
 assert(activePortfolioSlugs.length > 0, 'active portfolio registry must be readable');
 assert(
-  JSON.stringify(remoteScopeSlugs) === JSON.stringify(activePortfolioSlugs),
-  `remote read scope must exactly mirror PORTFOLIO_PROJECTS order; expected ${activePortfolioSlugs.join(',')}`,
-);
-assert(
-  externalPortfolioSlugs.every((slug) => !remoteScopeSlugs.includes(slug)),
-  'external continuity-only projects must never inherit remote MCP authority',
+  externalPortfolioSlugs.every((slug) => !activePortfolioSlugs.includes(slug)),
+  'external continuity-only projects must never overlap the active MCP authority registry',
 );
 
 assert(
@@ -45,14 +41,10 @@ assert(
   '.env.example must declare the dedicated remote read MCP token name',
 );
 assert(
-  envExample.includes(`FCR_REMOTE_MCP_READ_PROJECTS=${EXACT_REMOTE_SCOPE}`),
-  `.env.example must keep the served remote read scope exactly ${EXACT_REMOTE_SCOPE}`,
+  envExample.includes(`FCR_REMOTE_MCP_READ_PROJECTS=${exactRemoteScope}`),
+  `.env.example must document the active portfolio scope as ${exactRemoteScope}`,
 );
 
-assert(
-  wrangler.includes(`FCR_REMOTE_MCP_READ_PROJECTS = "${EXACT_REMOTE_SCOPE}"`),
-  `Worker production vars must keep remote read scope exactly ${EXACT_REMOTE_SCOPE}`,
-);
 assert(
   /required\s*=\s*\[[\s\S]*?"FCR_REMOTE_MCP_READ_TOKEN"[\s\S]*?\]/m.test(wrangler),
   'Worker required secrets must include FCR_REMOTE_MCP_READ_TOKEN',
@@ -67,15 +59,16 @@ assert(
   `MCP stack docs must identify the compatibility endpoint as ${REMOTE_ENDPOINT}`,
 );
 assert(
-  docs.includes(`FCR_REMOTE_MCP_READ_PROJECTS=${EXACT_REMOTE_SCOPE}`),
-  'MCP stack docs must state the exact server-held active-portfolio scope',
+  docs.includes(`FCR_REMOTE_MCP_READ_PROJECTS=${exactRemoteScope}`),
+  'MCP stack docs must state the complete active-portfolio read scope',
 );
 assert(
   /fails closed/i.test(docs),
   'MCP stack docs must preserve the fail-closed operator boundary',
 );
 
-for (const requiredRouteFragment of [
+for (const requiredRemoteRouteFragment of [
+  'export function createRemoteReadMcpHandler',
   'env.FCR_REMOTE_MCP_READ_TOKEN',
   'env.FCR_REMOTE_MCP_READ_PROJECTS',
   "const MODERN_PROTOCOL_VERSION = '2026-07-28'",
@@ -84,21 +77,47 @@ for (const requiredRouteFragment of [
   'isExternalMcpToolName',
   'verifyRemoteMcpOauthToken',
   'assertNoSecretArguments(args)',
-  "createRemoteReadMcpHandler({ authMode: 'static' })",
-  "createRemoteReadMcpHandler({ authMode: 'oauth' })",
   'timingSafeEqual',
+  'intersectProjects(serverProjects, oauthIdentity.projectIds)',
 ]) {
   assert(
-    route.includes(requiredRouteFragment),
-    `served remote read route contract drifted: missing ${requiredRouteFragment}`,
+    remoteRoute.includes(requiredRemoteRouteFragment),
+    `served remote MCP route contract drifted: missing ${requiredRemoteRouteFragment}`,
+  );
+}
+
+for (const requiredMcpRouterFragment of [
+  'PORTFOLIO_PROJECTS',
+  '.map((project) => project.slug)',
+  '.join(",")',
+  '...process.env',
+  'FCR_REMOTE_MCP_READ_PROJECTS: portfolioRemoteReadScope',
+  'createRemoteReadMcpHandler({',
+  'authMode: "oauth"',
+  'authMode: "static"',
+  'env: portfolioRemoteMcpEnv',
+]) {
+  assert(
+    mcpRouter.includes(requiredMcpRouterFragment),
+    `MCP router must derive server scope from PORTFOLIO_PROJECTS: missing ${requiredMcpRouterFragment}`,
   );
 }
 
 assert(
-  !route.includes("'create_tool'") && !route.includes("'write_tool'") && !route.includes("'merge_tool'"),
+  !mcpRouter.includes('handlePairedRemoteMcp,') && !mcpRouter.includes('handleRemoteReadMcp,'),
+  'MCP router must not import pre-instantiated handlers that can bypass the registry-derived server scope',
+);
+assert(
+  mcpRouter.indexOf('...process.env') < mcpRouter.indexOf('FCR_REMOTE_MCP_READ_PROJECTS: portfolioRemoteReadScope'),
+  'registry-derived scope must override provider/runtime environment values rather than be overridden by them',
+);
+assert(
+  !remoteRoute.includes("'create_tool'")
+    && !remoteRoute.includes("'write_tool'")
+    && !remoteRoute.includes("'merge_tool'"),
   'served MCP route may not advertise write-shaped tools',
 );
 
 console.log(
-  '[verify:remote-read-mcp] static compatibility auth, paired OAuth auth, exact active-portfolio scope, external-project exclusion, secret rejection, and read/preview-only tool routing are pinned.',
+  `[verify:remote-read-mcp] registry-derived active scope (${exactRemoteScope}), external-project exclusion, OAuth intersection, static-token compatibility, secret rejection, and read/preview-only routing are pinned.`,
 );
