@@ -9,6 +9,7 @@ export interface FounderContentCadenceReservationInput {
   channel: string;
   contentId: string;
   requestedScheduleAt: string;
+  approvalExpiresAt: string;
 }
 
 export interface FounderContentCadenceReservation {
@@ -71,12 +72,16 @@ function validateInput(input: FounderContentCadenceReservationInput) {
   const channel = clean(input.channel, 160).toLowerCase();
   const contentId = clean(input.contentId, 80).toLowerCase();
   const requestedScheduleAt = iso(input.requestedScheduleAt, 'requestedScheduleAt');
+  const approvalExpiresAt = iso(input.approvalExpiresAt, 'approvalExpiresAt');
 
   if (!IDENTIFIER.test(provider)) throw new Error('FOUNDER_CONTENT_CADENCE_INVALID: provider is invalid');
   if (!IDENTIFIER.test(channel)) throw new Error('FOUNDER_CONTENT_CADENCE_INVALID: channel is invalid');
   if (!UUID.test(contentId)) throw new Error('FOUNDER_CONTENT_CADENCE_INVALID: contentId must be a UUID');
+  if (Date.parse(requestedScheduleAt) >= Date.parse(approvalExpiresAt)) {
+    throw new Error('FOUNDER_CONTENT_CADENCE_INVALID: approvalExpiresAt must be later than requestedScheduleAt');
+  }
 
-  return { provider, channel, contentId, requestedScheduleAt };
+  return { provider, channel, contentId, requestedScheduleAt, approvalExpiresAt };
 }
 
 function firstRow(data: unknown): Record<string, unknown> | null {
@@ -95,6 +100,7 @@ export async function reserveFounderContentCadence(
     p_channel: validated.channel,
     p_content_id: validated.contentId,
     p_requested_schedule_at: validated.requestedScheduleAt,
+    p_approval_expires_at: validated.approvalExpiresAt,
   });
 
   if (error) {
@@ -122,6 +128,9 @@ export async function reserveFounderContentCadence(
   }
   if (Date.parse(reservedScheduleAt) < Date.parse(requestedScheduleAt)) {
     throw new Error('FOUNDER_CONTENT_CADENCE_RESERVATION_FAILED: reserved schedule may not predate requested schedule');
+  }
+  if (Date.parse(reservedScheduleAt) >= Date.parse(validated.approvalExpiresAt)) {
+    throw new Error('FOUNDER_CONTENT_CADENCE_RESERVATION_FAILED: reserved schedule must remain before approval expiry');
   }
 
   return Object.freeze({
