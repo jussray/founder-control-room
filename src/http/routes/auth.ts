@@ -155,7 +155,7 @@ authRouter.post('/password', rateLimitFounderPassword, requireInteractiveFounder
 
 authRouter.post('/logout', async (req, res) => {
   const revoked = await revokeFounderSession(req, 'logout');
-  clearFounderSession(res);
   if (!revoked) return respondError(res, 503, 'SESSION_REVOCATION_FAILED', 'Founder browser session could not be revoked.');
+  clearFounderSession(res);
   return res.status(204).end();
 });
