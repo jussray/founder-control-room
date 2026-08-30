@@ -201,6 +201,8 @@ For native Cloudflare Workers Builds, the membrane requires the provider-reporte
 
 For GitHub Actions, production promotion is recognized only for the manual `Deploy` or `FCR Worker Reconcile` workflow-dispatch lanes when the checked-out SHA equals the exact GitHub workflow SHA. Ordinary CI remains verification-only. The emitted `fcr/worker-build-authority-receipt@v1` is redacted build evidence and explicitly cannot authorize provider mutation.
 
+The GitHub Actions credential source is deliberately split from the Worker/provider runtime contract: trusted production workflows read `APP_ID` and `APP_PRIVATE_KEY` from the GitHub `production` environment and map them to `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` only inside the bounded runtime/validation surfaces. A source-level mapping, secret-name display, fingerprint, or continuity cookie does not prove the values are present or valid, that they belong to the intended App, that GitHub accepted an installation token, or that any deployment/runtime action occurred. The GitHub App Client ID is not consumed by this installation-token path.
+
 This source membrane does not prove the current Cloudflare Workers Builds dashboard configuration, custom-domain routing, active deployment, or runtime SHA. Those remain separate provider/runtime readback gates.
 
 ## Durable release-proof Workflow boundary

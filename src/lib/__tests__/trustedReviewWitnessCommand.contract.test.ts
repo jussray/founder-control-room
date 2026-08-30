@@ -81,8 +81,10 @@ describe('trusted review witness command contract', () => {
     );
     expect(reviewWorkflow).toContain('environment: production');
     expect(reviewWorkflow).toContain('EXPECTED_TRUSTED_MAIN_SHA: ${{ github.sha }}');
-    expect(reviewWorkflow).toContain('GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}');
-    expect(reviewWorkflow).toContain('GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}');
+    expect(reviewWorkflow).toContain('GITHUB_APP_ID: ${{ secrets.APP_ID }}');
+    expect(reviewWorkflow).toContain('GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}');
+    expect(reviewWorkflow).not.toContain('secrets.GITHUB_APP_ID');
+    expect(reviewWorkflow).not.toContain('secrets.GITHUB_PRIVATE_KEY');
     expect(reviewWorkflow).toContain('test "$EXPECTED_TRUSTED_MAIN_SHA" = "$current_main"');
     expect(reviewWorkflow).toContain('node scripts/publish-deterministic-review-witness.mjs');
     expect(reviewWorkflow).toContain('Re-read trusted main after publication');
@@ -111,5 +113,96 @@ describe('trusted review witness command contract', () => {
     expect(reviewWorkflow).toContain(
       'Verdict, Founder Final, merge, deploy, provider, database, secret, and publication authority: none granted by this command',
     );
+  });
+
+  it('binds governance reconciliation to immutable founder identity and exact current main', () => {
+    const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
+
+    expect(governanceJob).toContain("github.event_name == 'issue_comment'");
+    expect(governanceJob).toContain('github.event.issue.number == 418');
+    expect(governanceJob).toContain('github.event.comment.user.id == 286642846');
+    expect(governanceJob).toContain("github.event.comment.user.login == 'jussray'");
+    expect(governanceJob).toContain("startsWith(github.event.comment.body, '/reconcile-fcr-governance ')");
+    expect(governanceJob).toContain(
+      'Expected exactly: /reconcile-fcr-governance <40-char-current-main-sha> <approval-reference>',
+    );
+    expect(governanceJob).toContain("re.fullmatch(r'[0-9a-f]{40}', main_sha)");
+    expect(governanceJob).toContain('test "$actual" = "$EXPECTED_MAIN_SHA"');
+    expect(governanceJob).toContain('test "$current_main" = "$EXPECTED_MAIN_SHA"');
+    expect(governanceJob).toContain('main moved before governance reconciliation');
+    expect(governanceJob).toContain('main moved during governance reconciliation');
+  });
+
+  it('keeps provider-policy mutation inside production App authority and the canonical provider factory', () => {
+    const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
+
+    expect(governanceJob).toContain('environment: production');
+    expect(governanceJob).toContain('GITHUB_APP_ID: ${{ secrets.APP_ID }}');
+    expect(governanceJob).toContain('GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}');
+    expect(governanceJob).not.toContain('secrets.GITHUB_APP_ID');
+    expect(governanceJob).not.toContain('secrets.GITHUB_PRIVATE_KEY');
+    expect(governanceJob).toContain("from './dist/providers/providerFactory.js'");
+    expect(governanceJob).toContain('providerForProject(PROJECT)');
+    expect(governanceJob).toContain('provider.applyBranchRuleset(PROJECT_ID');
+    expect(governanceJob).toContain('name: FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME');
+    expect(governanceJob).toContain("targetRefs: ['main']");
+    expect(governanceJob).toContain('requirePullRequest: true');
+    expect(governanceJob).toContain('requiredApprovingReviewCount: 1');
+    expect(governanceJob).toContain("requiredStatusCheckNames: ['Required Gate', 'Verify test-ledger contract']");
+    expect(governanceJob).toContain('blockForcePushes: true');
+    expect(governanceJob).toContain('blockDeletion: true');
+    expect(governanceJob).toContain("bypassActors: [{ kind: 'app', id: appId }]");
+
+    expect(governanceJob).not.toContain('/rulesets');
+    expect(governanceJob).not.toContain('wrangler');
+    expect(governanceJob).not.toContain('supabase');
+    expect(governanceJob).not.toContain('/actions/workflows/deploy.yml/dispatches');
+    expect(governanceJob).not.toContain('/actions/workflows/worker-reconcile.yml/dispatches');
+  });
+
+  it('requires a full provider topology READY readback before declaring governance reconciliation complete', () => {
+    const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
+
+    expect(governanceJob).toContain("from './scripts/audit-github-governance-preflight.mjs'");
+    expect(governanceJob).toContain("from './dist/providers/githubAppAuth.js'");
+    expect(governanceJob).toContain('collectGovernancePreflight({');
+    expect(governanceJob).toContain("targetRef: 'main'");
+    expect(governanceJob).toContain('trustedGitHubAppId: appId');
+    expect(governanceJob).toContain("if (topology.status !== 'READY')");
+    expect(governanceJob).toContain('FCR governance topology failed full provider preflight');
+    expect(governanceJob).toContain('full_topology_preflight=${topology.status}');
+    expect(governanceJob).toContain('Full provider topology preflight: `READY` required before this completion summary can run');
+  });
+
+  it('retains sanitized reconciliation evidence even after partial provider mutation failure', () => {
+    const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
+
+    expect(governanceJob).toContain('let providerMutationAttempted = false;');
+    expect(governanceJob).toContain('providerMutationAttempted = true;');
+    expect(governanceJob).toContain('} catch (error) {');
+    expect(governanceJob).toContain('} finally {');
+    expect(governanceJob).toContain("providerMutationAttempted ? 'UNKNOWN_OR_PARTIAL' : 'NOT_ATTEMPTED'");
+    expect(governanceJob).toContain("schema: 'fcr/github-governance-reconcile@v2'");
+    expect(governanceJob).toContain('providerMutationState,');
+    expect(governanceJob).toContain('topology,');
+    expect(governanceJob).toContain('failure,');
+
+    const receiptUpload = governanceJob.split('- name: Retain sanitized governance reconciliation receipt')[1] ?? '';
+    expect(receiptUpload).toContain('if: always()');
+  });
+
+  it('emits a sanitized provider receipt without widening authority', () => {
+    const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
+
+    expect(governanceJob).toContain("'artifacts/github-governance-reconcile.json'");
+    expect(governanceJob).toContain("schema: 'fcr/github-governance-reconcile@v2'");
+    expect(governanceJob).toContain('approvalReference');
+    expect(governanceJob).toContain('commandCommentId');
+    expect(governanceJob).toContain('result,');
+    expect(governanceJob).toContain(
+      'Merge, deployment, database, secret/credential, billing, publication, and branch-deletion authority: none granted by this command',
+    );
+    expect(governanceJob).not.toContain('console.log(process.env.GITHUB_PRIVATE_KEY');
+    expect(governanceJob).not.toContain('console.log(process.env.GITHUB_APP_ID');
   });
 });
