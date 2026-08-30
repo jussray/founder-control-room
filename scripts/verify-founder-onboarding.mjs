@@ -40,7 +40,8 @@ requireText('auth', 'Google OAuth callback', "redirectTo: `${FOUNDER_API_URL}/au
 requireText('auth', 'server-managed OAuth redirect', 'skipBrowserRedirect: true');
 requireText('auth', 'first-login identity creation', 'shouldCreateUser: true');
 requireText('auth', 'session endpoint', "authRouter.post('/session'");
-requireText('auth', 'verified session cookie write', 'writeFounderSession(res, founderSession)');
+requireText('auth', 'strict session establishment helper', 'await rotateFounderSession(req, res, session)');
+requireText('auth', 'verified session establishment', 'establishFounderSession(req, res, founderSession)');
 requireText('auth', 'generic enumeration-safe response', 'GENERIC_MAGIC_LINK_MESSAGE');
 requireText('auth', 'password handoff endpoint', "authRouter.post('/password'");
 requireText('auth', 'password handoff route-local rate limit', 'rateLimitFounderPassword');
@@ -115,6 +116,12 @@ if (files.auth.includes("setHeader('Location', `/control-room/#")) {
 }
 if (/new URLSearchParams\(\{[\s\S]{0,400}access_token:\s*data\.session\.access_token/.test(files.auth)) {
   errors.push('token handling: founder callback must not construct a credential-bearing redirect fragment');
+}
+if (files.auth.includes("revokeFounderSession(req, 'replaced')")) {
+  errors.push('session rotation: OAuth callback must use the strict shared rotation membrane, not best-effort replacement revocation');
+}
+if (files.auth.includes('writeFounderSession(res, founderSession)')) {
+  errors.push('session rotation: founder routes must not bypass the strict shared rotation membrane with a direct session write');
 }
 if (files.auth.includes('SUPABASE_SERVICE_ROLE_KEY')) {
   errors.push('key boundary: auth route must not reference the service-role key');
