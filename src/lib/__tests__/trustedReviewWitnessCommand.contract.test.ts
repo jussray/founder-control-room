@@ -81,8 +81,10 @@ describe('trusted review witness command contract', () => {
     );
     expect(reviewWorkflow).toContain('environment: production');
     expect(reviewWorkflow).toContain('EXPECTED_TRUSTED_MAIN_SHA: ${{ github.sha }}');
-    expect(reviewWorkflow).toContain('GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}');
-    expect(reviewWorkflow).toContain('GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}');
+    expect(reviewWorkflow).toContain('GITHUB_APP_ID: ${{ secrets.APP_ID }}');
+    expect(reviewWorkflow).toContain('GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}');
+    expect(reviewWorkflow).not.toContain('secrets.GITHUB_APP_ID');
+    expect(reviewWorkflow).not.toContain('secrets.GITHUB_PRIVATE_KEY');
     expect(reviewWorkflow).toContain('test "$EXPECTED_TRUSTED_MAIN_SHA" = "$current_main"');
     expect(reviewWorkflow).toContain('node scripts/publish-deterministic-review-witness.mjs');
     expect(reviewWorkflow).toContain('Re-read trusted main after publication');
@@ -135,8 +137,10 @@ describe('trusted review witness command contract', () => {
     const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
 
     expect(governanceJob).toContain('environment: production');
-    expect(governanceJob).toContain('GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}');
-    expect(governanceJob).toContain('GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}');
+    expect(governanceJob).toContain('GITHUB_APP_ID: ${{ secrets.APP_ID }}');
+    expect(governanceJob).toContain('GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}');
+    expect(governanceJob).not.toContain('secrets.GITHUB_APP_ID');
+    expect(governanceJob).not.toContain('secrets.GITHUB_PRIVATE_KEY');
     expect(governanceJob).toContain("from './dist/providers/providerFactory.js'");
     expect(governanceJob).toContain('providerForProject(PROJECT)');
     expect(governanceJob).toContain('provider.applyBranchRuleset(PROJECT_ID');
