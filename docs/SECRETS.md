@@ -109,7 +109,7 @@ Generate `FOUNDER_SESSION_ENCRYPTION_KEY` as exactly 32 random bytes encoded as 
 node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
-The generated value belongs only in the surviving API Worker's secret store. Source documentation proves the required binding name and format, not that the live provider currently has a value. After installation, verify only the binding name/presence and an opaque-session login flow; never print or copy the secret value into evidence.
+Store the generated value in the GitHub `production` environment as `FOUNDER_SESSION_ENCRYPTION_KEY`. The authorized deploy workflow requires that secret name and passes it to Wrangler as the surviving API Worker's secret binding. The value still belongs only in server-side secret planes, never Pages/browser configuration. Source wiring proves the required name and transport, not that the live provider currently has a valid value. After installation, verify only binding-name presence and an opaque-session login flow; never print or copy the secret value into evidence.
 
 The existing provider-held OpenAI key reference remains:
 
@@ -135,6 +135,7 @@ After configuration, capture:
 | Secret | Required by | Description |
 |---|---|---|
 | `DEPLOY_URL` | `deploy.yml / smoke-test` | Set to `https://api.foundercontrolroom.org` with no trailing slash. |
+| `FOUNDER_SESSION_ENCRYPTION_KEY` | `deploy.yml / authority-gate`, `deploy.yml / worker-deploy` | Required GitHub `production` secret. The gate requires its presence and the Worker runtime enforces the 43-character unpadded base64url / 32-byte key contract. Wrangler installs it as a Worker secret; never log or expose the value. |
 | `FOUNDER_SIGNAL_ENGINE_MCP_TOKEN` | authority gate and Worker deploy | Must match the encrypted value installed in the surviving Worker. |
 | `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL` | authority gate and Worker deploy | Must match the approved private provider hook installed in the Worker. |
 | `ZAPIER_CATCH_HOOK_URL` | `deploy.yml / proof-of-ship` | Dedicated Catch Hook for verified allowlisted release payloads; do not reuse the Worker bridge hook. |
@@ -179,6 +180,7 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] SUPABASE_DB_URL
 [ ] SUPABASE_SERVICE_ROLE_KEY
 [ ] SUPABASE_PUBLISHABLE_KEY
+[ ] FOUNDER_SESSION_ENCRYPTION_KEY (32 random bytes, unpadded base64url; supplied to Worker deploy)
 [ ] NEXT_PUBLIC_SUPABASE_URL
 [ ] GITHUB_WEBHOOK_SECRET
 [ ] APP_ID (numeric Founder Control Room GitHub App ID)
