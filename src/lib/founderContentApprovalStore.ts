@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   evaluateFounderEditorialNovelty,
@@ -88,14 +88,33 @@ function parseTime(value: unknown, label: string): number {
   return ms;
 }
 
+function deterministicApprovalId({
+  founderUserId,
+  proposalHash,
+}: {
+  founderUserId: string;
+  proposalHash: string;
+}): string {
+  const digest = createHash('sha256')
+    .update(JSON.stringify({
+      contract: 'fcr/founder-content-approval-reservation@v1',
+      founderUserId: text(founderUserId),
+      proposalHash: text(proposalHash).toLowerCase(),
+    }))
+    .digest('hex');
+  return `fca:${digest}`;
+}
+
 function canonicalIssue({
   proposal,
   founderUserId,
   now,
+  approvalId: requestedApprovalId,
 }: {
   proposal: JsonRecord;
   founderUserId: string;
   now: string;
+  approvalId?: string;
 }): FounderContentIssuedApproval {
   if (!text(founderUserId)) throw new Error('authenticated founder user id is required');
   const nowMs = parseTime(now, 'now');
@@ -108,7 +127,7 @@ function canonicalIssue({
   const expiresMs = Math.min(nowMs + MAX_APPROVAL_TTL_MS, proposalExpiresMs);
   if (expiresMs <= nowMs) throw new Error('proposal is already expired');
 
-  const approvalId = `fca:${randomUUID()}`;
+  const approvalId = text(requestedApprovalId) || `fca:${randomUUID()}`;
   const proposalHash = text(proposal.proposal_hash).toLowerCase();
   const publicPayloadHash = canonicalFounderContent.hashPublicPayload(payload).toLowerCase();
   const platform = text(payload.platform).toLowerCase();
@@ -332,16 +351,23 @@ export async function issueFounderContentApproval({
   repository?: FounderContentApprovalRepository;
   historyRepository?: FounderEditorialHistoryRepository;
 }): Promise<FounderContentIssuedApproval> {
-  const issued = buildFounderContentIssuedApproval({ proposal, founderUserId, now });
+  canonicalFounderContent.canonicalChiefIdentity(proposal);
   const novelty = await evaluateFounderEditorialNovelty({ proposal, historyRepository });
   if (!novelty.allowed) {
     throw new Error(
       `FOUNDER_EDITORIAL_REPETITION_BLOCKED: story=${novelty.storyFingerprint} closest=${novelty.closestMatchId ?? 'unknown'} similarity=${novelty.closestSimilarity}`,
     );
   }
+  const approvalId = deterministicApprovalId({
+    founderUserId,
+    proposalHash: text(proposal.proposal_hash),
+  });
+  const issued = canonicalIssue({ proposal, founderUserId, now, approvalId });
   const store = repository ?? await defaultRepository();
   const persisted = await store.issue({ ...issued, founderUserId });
-  if (!persisted) throw new Error('authoritative founder-content approval could not be persisted');
+  if (!persisted) {
+    throw new Error('authoritative founder-content approval could not be persisted; exact proposal approval is already reserved or store rejected issuance');
+  }
   return issued;
 }
 
