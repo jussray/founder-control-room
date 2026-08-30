@@ -57,5 +57,35 @@ create trigger founder_content_attestation_events_append_only
   before update or delete on public.founder_content_attestation_events
   for each row execute function public.reject_founder_content_attestation_event_mutation();
 
+-- The latest provider_observations row is a projection, not the immutable record.
+-- Under concurrent corrections an older request may reach its ON CONFLICT update
+-- after a newer request. Keep the projection monotonic by observation time so an
+-- older/equal attestation can never replace the newer latest-state row. The
+-- immutable attestation event remains preserved regardless of projection outcome.
+create or replace function public.keep_founder_content_observation_latest()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if old.provider = 'linkedin'
+     and old.resource_type = 'founder_content_post'
+     and new.provider = old.provider
+     and new.resource_type = old.resource_type
+     and new.project_id = old.project_id
+     and new.resource_id = old.resource_id
+     and new.observed_at <= old.observed_at then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.keep_founder_content_observation_latest() from public, anon, authenticated;
+
+create trigger provider_observations_founder_content_latest_monotonic
+  before update on public.provider_observations
+  for each row execute function public.keep_founder_content_observation_latest();
+
 comment on table public.founder_content_attestation_events is
   'Append-only service-role evidence for manual founder publication attestations. Rows are non-authorizing and cannot be updated or deleted.';
