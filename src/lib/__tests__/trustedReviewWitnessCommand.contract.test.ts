@@ -160,11 +160,42 @@ describe('trusted review witness command contract', () => {
     expect(governanceJob).not.toContain('/actions/workflows/worker-reconcile.yml/dispatches');
   });
 
+  it('requires a full provider topology READY readback before declaring governance reconciliation complete', () => {
+    const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
+
+    expect(governanceJob).toContain("from './scripts/audit-github-governance-preflight.mjs'");
+    expect(governanceJob).toContain("from './dist/providers/githubAppAuth.js'");
+    expect(governanceJob).toContain('collectGovernancePreflight({');
+    expect(governanceJob).toContain("targetRef: 'main'");
+    expect(governanceJob).toContain('trustedGitHubAppId: appId');
+    expect(governanceJob).toContain("if (topology.status !== 'READY')");
+    expect(governanceJob).toContain('FCR governance topology failed full provider preflight');
+    expect(governanceJob).toContain('full_topology_preflight=${topology.status}');
+    expect(governanceJob).toContain('Full provider topology preflight: `READY` required before this completion summary can run');
+  });
+
+  it('retains sanitized reconciliation evidence even after partial provider mutation failure', () => {
+    const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
+
+    expect(governanceJob).toContain('let providerMutationAttempted = false;');
+    expect(governanceJob).toContain('providerMutationAttempted = true;');
+    expect(governanceJob).toContain('} catch (error) {');
+    expect(governanceJob).toContain('} finally {');
+    expect(governanceJob).toContain("providerMutationAttempted ? 'UNKNOWN_OR_PARTIAL' : 'NOT_ATTEMPTED'");
+    expect(governanceJob).toContain("schema: 'fcr/github-governance-reconcile@v2'");
+    expect(governanceJob).toContain('providerMutationState,');
+    expect(governanceJob).toContain('topology,');
+    expect(governanceJob).toContain('failure,');
+
+    const receiptUpload = governanceJob.split('- name: Retain sanitized governance reconciliation receipt')[1] ?? '';
+    expect(receiptUpload).toContain('if: always()');
+  });
+
   it('emits a sanitized provider receipt without widening authority', () => {
     const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
 
     expect(governanceJob).toContain("'artifacts/github-governance-reconcile.json'");
-    expect(governanceJob).toContain("schema: 'fcr/github-governance-reconcile@v1'");
+    expect(governanceJob).toContain("schema: 'fcr/github-governance-reconcile@v2'");
     expect(governanceJob).toContain('approvalReference');
     expect(governanceJob).toContain('commandCommentId');
     expect(governanceJob).toContain('result,');
