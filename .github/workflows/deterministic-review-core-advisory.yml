@@ -168,7 +168,7 @@ jobs:
 
           payload="$(jq -n \
             --arg ref main \
-            --argjson pr "$PR_NUMBER" \
+            --arg pr "$PR_NUMBER" \
             --arg expected_main_sha "$EXPECTED_MAIN_SHA" \
             '{ref:$ref, inputs:{pull_request_number:$pr, expected_main_sha:$expected_main_sha}}')"
 

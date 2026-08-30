@@ -128,7 +128,7 @@
         "A10": ["worker receives Cloudflare Email Routing events rather than an HTTP provider webhook"],
         "A11": ["worker does not expose tenant-owned object access"],
         "A12": ["worker does not expose user-mutable object properties"],
-        "A14": ["worker does not expose Supabase data access"]
+        "A14": ["worker does not directly expose Supabase data access"]
       },
       "observedProtection": {
         "observedAt": null,
