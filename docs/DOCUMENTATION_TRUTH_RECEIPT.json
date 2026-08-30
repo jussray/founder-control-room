@@ -11,6 +11,13 @@
   ],
   "changes": [
     {
+      "path": ".github/workflows/deploy.yml",
+      "claims": [
+        ".github/workflows/deploy.yml must read the GitHub Actions production credential sources as APP_ID and APP_PRIVATE_KEY while mapping them only into the stable Worker/provider runtime names GITHUB_APP_ID and GITHUB_PRIVATE_KEY; legacy same-named Actions secret sources must remain rejected, and this wiring does not prove credential validity, provider acceptance, deployment authority, or runtime identity.",
+        "For PR #736, the bounded continuity fingerprint is base=4d956dd84c4318382ce1de9b50b76d6c39dcd27f with reviewed-head lineage=477ac6cbc24c3285c7fccea43b3db37f6fff50af; cookie=fcr/pr736/github-app-secret-adapter-repair@v1 is provenance only, becomes stale on base/head/diff/check/review/ruleset/provider movement, and cannot authorize merge, deploy, credential access, provider mutation, publication, database mutation, billing, or destructive action."
+      ]
+    },
+    {
       "path": "src/http/server.ts",
       "claims": [
         "src/http/server.ts may expose POST /review/deterministic-witness/:pullRequestNumber only inside the existing same-origin, repository-rate-limit, authenticated-founder, and fcr-privileged-execution-master membrane; caller input is limited to a positive pull-request number while repository/provider identity and PR/base/head/diff/verdict/hash/check/App authority remain server/provider derived.",

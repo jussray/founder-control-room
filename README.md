@@ -122,6 +122,8 @@ A GitHub merge outside the in-app FCR execution path does not prove the FCR dete
 
 Production GitHub authentication should prefer repository-scoped installation credentials minted from `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY`. The FCR App should be installed only on `jussray/founder-control-room` unless broader scope is separately reviewed.
 
+GitHub Actions uses a deliberate credential-name adapter: the `production` environment stores the Actions-facing secret names `APP_ID` and `APP_PRIVATE_KEY`, and trusted workflows map those values into the stable Worker/provider runtime names `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY`. The adapter is wiring, not authority: seeing the names in source or a continuity cookie does not prove the secret values exist, match the intended App, can mint an installation token, are accepted by GitHub, authorize deployment, or match a deployed runtime. The GitHub App Client ID is not consumed by this installation-token path.
+
 For any active ruleset protecting `jussray/founder-control-room` `main`, the only permitted bypass actor is exactly the numeric App identity configured by trusted `GITHUB_APP_ID`. Missing, mismatched, caller-supplied alternative, or additional bypass integration IDs fail closed. `GITHUB_WEBHOOK_SECRET` separately authenticates the signed `/api/webhooks/github` event ingress. Secret values never belong in source, PR bodies, issue comments, logs, screenshots, browser bundles, or chat-visible documentation.
 
 ## Founder-owned progress publishing

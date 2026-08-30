@@ -376,7 +376,11 @@ for (const name of requiredWorkerSecrets) {
 }
 
 for (const name of requiredWorkerSecrets.filter(
-  (secretName) => secretName !== 'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
+  (secretName) => ![
+    'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
+    'GITHUB_APP_ID',
+    'GITHUB_PRIVATE_KEY',
+  ].includes(secretName),
 )) {
   assert.match(
     deploySection,
@@ -384,6 +388,26 @@ for (const name of requiredWorkerSecrets.filter(
     `${name} must be mapped from the GitHub production environment`,
   );
 }
+assert.match(
+  deploySection,
+  /^          GITHUB_APP_ID: \$\{\{ secrets\.APP_ID \}\}$/m,
+  'GITHUB_APP_ID must map from the legal APP_ID Actions secret',
+);
+assert.match(
+  deploySection,
+  /^          GITHUB_PRIVATE_KEY: \$\{\{ secrets\.APP_PRIVATE_KEY \}\}$/m,
+  'GITHUB_PRIVATE_KEY must map from the legal APP_PRIVATE_KEY Actions secret',
+);
+assert.doesNotMatch(
+  deploySection,
+  /^          GITHUB_APP_ID: \$\{\{ secrets\.GITHUB_APP_ID \}\}$/m,
+  'legacy same-name GITHUB_APP_ID Actions secret source must stay rejected',
+);
+assert.doesNotMatch(
+  deploySection,
+  /^          GITHUB_PRIVATE_KEY: \$\{\{ secrets\.GITHUB_PRIVATE_KEY \}\}$/m,
+  'legacy same-name GITHUB_PRIVATE_KEY Actions secret source must stay rejected',
+);
 
 const authoritySectionStart = workflow.indexOf('  authority-gate:');
 const migrationSectionStart = workflow.indexOf('  # ── 1.');
@@ -432,8 +456,13 @@ const requiredAuthoritySecrets = [
   'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
   'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
 ];
+const authoritySecretSources = [
+  ...requiredAuthoritySecrets,
+  'APP_ID',
+  'APP_PRIVATE_KEY',
+];
 const outsideSecretMapping = new RegExp(
-  '^[ \\t]+(?:' + requiredAuthoritySecrets.join('|') + '): \\$\\{\\{ secrets\\.(?:' + requiredAuthoritySecrets.join('|') + ') \\}\\}$',
+  '^[ \\t]+(?:' + requiredAuthoritySecrets.join('|') + '): \\$\\{\\{ secrets\\.(?:' + authoritySecretSources.join('|') + ') \\}\\}$',
   'm',
 );
 assert.doesNotMatch(
@@ -442,16 +471,40 @@ assert.doesNotMatch(
   'required production secrets must be scoped only to the validation step',
 );
 
-for (const name of requiredAuthoritySecrets) {
+for (const name of requiredAuthoritySecrets.filter(
+  (secretName) => !['GITHUB_APP_ID', 'GITHUB_PRIVATE_KEY'].includes(secretName),
+)) {
   assert.match(
     validationStep,
     new RegExp('^          ' + name + ': \\$\\{\\{ secrets\\.' + name + ' \\}\\}$', 'm'),
     name + ' must be scoped to the pre-migration configuration gate',
   );
+}
+for (const name of requiredAuthoritySecrets) {
   assert.match(
     validationStep,
     new RegExp('^            ' + name + '$', 'm'),
     name + ' must be checked by the pre-migration configuration gate',
   );
 }
+assert.match(
+  validationStep,
+  /^          GITHUB_APP_ID: \$\{\{ secrets\.APP_ID \}\}$/m,
+  'GITHUB_APP_ID must map from APP_ID only inside the pre-migration configuration gate',
+);
+assert.match(
+  validationStep,
+  /^          GITHUB_PRIVATE_KEY: \$\{\{ secrets\.APP_PRIVATE_KEY \}\}$/m,
+  'GITHUB_PRIVATE_KEY must map from APP_PRIVATE_KEY only inside the pre-migration configuration gate',
+);
+assert.doesNotMatch(
+  validationStep,
+  /^          GITHUB_APP_ID: \$\{\{ secrets\.GITHUB_APP_ID \}\}$/m,
+  'legacy GITHUB_APP_ID secret source must stay rejected in the configuration gate',
+);
+assert.doesNotMatch(
+  validationStep,
+  /^          GITHUB_PRIVATE_KEY: \$\{\{ secrets\.GITHUB_PRIVATE_KEY \}\}$/m,
+  'legacy GITHUB_PRIVATE_KEY secret source must stay rejected in the configuration gate',
+);
 console.log('Production deployment authority, privacy receipt, LinkedIn freshness, and one-Worker binding contract verified.');
