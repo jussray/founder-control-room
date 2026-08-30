@@ -25,7 +25,6 @@ const {
 const SOURCE_SHA = 'd'.repeat(40);
 const NOW = '2026-08-18T01:30:00.000Z';
 const APPROVAL_EXPIRES_AT = '2026-08-18T02:10:00.000Z';
-const CADENCE_SCHEDULE_AT = '2026-08-18T02:15:00.000Z';
 const EVIDENCE_REF = `github:founder-control-room@${SOURCE_SHA}#quality-gate`;
 
 function proposal(): Record<string, unknown> {
@@ -120,26 +119,11 @@ function approval(proposed: Record<string, unknown>) {
 }
 
 describe('provider-neutral cadence authority expiry', () => {
-  it('fails closed when cadence defers the final schedule beyond exact founder approval expiry', async () => {
+  it('passes exact approval expiry into the atomic cadence RPC and stops before projection/provider dispatch on rejection', async () => {
     const proposed = proposal();
-    reserveCadence.mockResolvedValueOnce({
-      reservationId: '11111111-1111-4111-8111-111111111111',
-      policyId: 'founder-content-hourly-cap-v1',
-      provider: 'n8n',
-      channel: 'linkedin',
-      contentId: '22222222-2222-4222-8222-222222222222',
-      requestedScheduleAt: '2026-08-18T01:50:00.000Z',
-      reservedScheduleAt: CADENCE_SCHEDULE_AT,
-      deferredSeconds: 1500,
-      deferred: true,
-    });
-    applyCadence.mockImplementationOnce((input: Record<string, any>) => ({
-      ...input,
-      provider_request: {
-        ...input.provider_request,
-        schedule_at: CADENCE_SCHEDULE_AT,
-      },
-    }));
+    reserveCadence.mockRejectedValueOnce(new Error(
+      'FOUNDER_CONTENT_CADENCE_RESERVATION_FAILED: FOUNDER_CONTENT_CADENCE_APPROVAL_EXPIRED',
+    ));
 
     const fetchImpl = vi.fn();
     const result = await dispatchProviderNeutralN8nFounderContent({
@@ -158,11 +142,16 @@ describe('provider-neutral cadence authority expiry', () => {
       fetchImpl,
     });
 
+    expect(reserveCadence).toHaveBeenCalledTimes(1);
+    expect(reserveCadence).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'n8n',
+      channel: 'linkedin',
+      approvalExpiresAt: APPROVAL_EXPIRES_AT,
+    }));
     expect(result.ok).toBe(false);
     expect(result.code).toBe('CADENCE_RESERVATION_FAILED');
-    expect(result.reasons.join(' ')).toContain(
-      'cadence-adjusted schedule must remain before exact founder approval expiry',
-    );
+    expect(result.reasons.join(' ')).toContain('FOUNDER_CONTENT_CADENCE_APPROVAL_EXPIRED');
+    expect(applyCadence).not.toHaveBeenCalled();
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
