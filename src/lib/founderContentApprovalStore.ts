@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  evaluateFounderEditorialNovelty,
+  type FounderEditorialHistoryRepository,
+} from './founderEditorialNovelty.js';
 // @ts-expect-error -- canonical founder-content authority is the provider-neutral CommonJS firewall contract.
 import founderContentAuthorizationContract from '../../tools/founder-content-contracts/founder-content-authorization-contract.cjs';
 
@@ -320,13 +324,21 @@ export async function issueFounderContentApproval({
   founderUserId,
   now = new Date().toISOString(),
   repository,
+  historyRepository,
 }: {
   proposal: JsonRecord;
   founderUserId: string;
   now?: string;
   repository?: FounderContentApprovalRepository;
+  historyRepository?: FounderEditorialHistoryRepository;
 }): Promise<FounderContentIssuedApproval> {
   const issued = buildFounderContentIssuedApproval({ proposal, founderUserId, now });
+  const novelty = await evaluateFounderEditorialNovelty({ proposal, historyRepository });
+  if (!novelty.allowed) {
+    throw new Error(
+      `FOUNDER_EDITORIAL_REPETITION_BLOCKED: story=${novelty.storyFingerprint} closest=${novelty.closestMatchId ?? 'unknown'} similarity=${novelty.closestSimilarity}`,
+    );
+  }
   const store = repository ?? await defaultRepository();
   const persisted = await store.issue({ ...issued, founderUserId });
   if (!persisted) throw new Error('authoritative founder-content approval could not be persisted');
