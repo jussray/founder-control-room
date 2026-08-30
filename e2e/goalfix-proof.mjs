@@ -12,6 +12,8 @@ const OLD_SHA = 'abc123abc123abc123abc123abc123abc123abcd';
 const NEW_SHA = 'fedcba9876543210fedcba9876543210fedcba98';
 const REQUIRED_CHECKS = ['Typecheck', 'Product Design Playwright Proof'];
 const STOP_CONDITION = 'Stop after the complete named exact-head proof set is classified.';
+const SESSION_COOKIE_NAME = '__Host-fcr_session';
+const SESSION_COOKIE_VALUE = `v1.${'b'.repeat(43)}`;
 const requestAttemptCounts = [];
 let currentSha = OLD_SHA;
 
@@ -20,11 +22,7 @@ function normalizeSignalName(value) {
 }
 
 function normalizedRequiredNames(values) {
-  return [...new Set(
-    (Array.isArray(values) ? values : [])
-      .map(normalizeSignalName)
-      .filter(Boolean),
-  )].sort();
+  return [...new Set((Array.isArray(values) ? values : []).map(normalizeSignalName).filter(Boolean))].sort();
 }
 
 function buildProofReport(commitSha) {
@@ -54,27 +52,9 @@ function buildProofReport(commitSha) {
       stopCondition: STOP_CONDITION,
     },
     verificationSignals: [
-      {
-        id: 'proof-typecheck',
-        name: 'Typecheck',
-        status: 'passed',
-        commitSha,
-        provider: 'github',
-      },
-      {
-        id: 'proof-playwright',
-        name: 'Product Design Playwright Proof',
-        status: 'failed',
-        commitSha,
-        provider: 'github',
-      },
-      {
-        id: 'proof-playwright-duplicate-suite',
-        name: 'Product Design Playwright Proof',
-        status: 'failed',
-        commitSha,
-        provider: 'github',
-      },
+      { id: 'proof-typecheck', name: 'Typecheck', status: 'passed', commitSha, provider: 'github' },
+      { id: 'proof-playwright', name: 'Product Design Playwright Proof', status: 'failed', commitSha, provider: 'github' },
+      { id: 'proof-playwright-duplicate-suite', name: 'Product Design Playwright Proof', status: 'failed', commitSha, provider: 'github' },
       ...unrelatedSignals,
     ],
     observedAt: new Date('2026-07-27T20:00:00.000Z'),
@@ -82,16 +62,18 @@ function buildProofReport(commitSha) {
 }
 
 mkdirSync(ARTIFACT_DIR, { recursive: true });
-writeFileSync(
-  join(ARTIFACT_DIR, 'goalfix-report.json'),
-  `${JSON.stringify(buildProofReport(OLD_SHA), null, 2)}\n`,
-);
+writeFileSync(join(ARTIFACT_DIR, 'goalfix-report.json'), `${JSON.stringify(buildProofReport(OLD_SHA), null, 2)}\n`);
 
 const assets = new Map([
   ['/control-room/goalfix.html', ['text/html; charset=utf-8', readFileSync(join(ROOT, 'public/control-room/goalfix.html'))]],
   ['/control-room/goalfix.js', ['text/javascript; charset=utf-8', readFileSync(join(ROOT, 'public/control-room/goalfix.js'))]],
   ['/control-room/styles.css', ['text/css; charset=utf-8', readFileSync(join(ROOT, 'public/control-room/styles.css'))]],
 ]);
+
+function hasOpaqueFounderCookie(req) {
+  const cookie = req.headers.cookie ?? '';
+  return cookie.split(';').some((part) => part.trim() === `${SESSION_COOKIE_NAME}=${SESSION_COOKIE_VALUE}`);
+}
 
 const server = createServer((req, res) => {
   if (req.method === 'GET' && assets.has(req.url)) {
@@ -106,8 +88,7 @@ const server = createServer((req, res) => {
     req.setEncoding('utf8');
     req.on('data', (chunk) => { raw += chunk; });
     req.on('end', () => {
-      const authorization = req.headers.authorization ?? '';
-      if (authorization !== 'Bearer proof-token') {
+      if (!hasOpaqueFounderCookie(req) || req.headers.authorization) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Founder session required' }));
         return;
@@ -119,8 +100,7 @@ const server = createServer((req, res) => {
           || !payload.desiredOutcome
           || payload.resolvedIntent !== payload.desiredOutcome
           || payload.stopCondition !== STOP_CONDITION
-          || JSON.stringify(normalizedRequiredNames(payload.expectedVerificationNames))
-            !== JSON.stringify(normalizedRequiredNames(REQUIRED_CHECKS))
+          || JSON.stringify(normalizedRequiredNames(payload.expectedVerificationNames)) !== JSON.stringify(normalizedRequiredNames(REQUIRED_CHECKS))
         ) {
           throw new Error('Proof request did not preserve the confirmed founder goal, stop condition, and required check set.');
         }
@@ -137,30 +117,18 @@ const server = createServer((req, res) => {
             stopCondition: payload.stopCondition,
           },
         };
-        const preflightDecision = buildGoalfixSkillRuntimeDecision({
-          ...runtimeInput,
-          attempts: [],
-        });
+        const preflightDecision = buildGoalfixSkillRuntimeDecision({ ...runtimeInput, attempts: [] });
         if (!preflightDecision.mayProceed) {
           res.writeHead(409, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-          res.end(JSON.stringify({
-            error: preflightDecision.nextAction,
-            code: 'GOALFIX_RUNTIME_BLOCKED',
-            skillRuntime: preflightDecision,
-          }));
+          res.end(JSON.stringify({ error: preflightDecision.nextAction, code: 'GOALFIX_RUNTIME_BLOCKED', skillRuntime: preflightDecision }));
           return;
         }
 
         const requiredNames = new Set(REQUIRED_CHECKS.map(normalizeSignalName));
         const exactHeadAttempts = attempts.filter((attempt) => (
-          attempt?.commitSha === currentSha
-          && requiredNames.has(normalizeSignalName(attempt?.verificationName))
+          attempt?.commitSha === currentSha && requiredNames.has(normalizeSignalName(attempt?.verificationName))
         ));
-        const runtimeDecision = buildGoalfixSkillRuntimeDecision({
-          ...runtimeInput,
-          attempts: exactHeadAttempts,
-        });
-
+        const runtimeDecision = buildGoalfixSkillRuntimeDecision({ ...runtimeInput, attempts: exactHeadAttempts });
         if (!runtimeDecision.mayProceed) {
           res.writeHead(409, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
           res.end(JSON.stringify({
@@ -205,8 +173,7 @@ function assert(condition, message) {
 
 async function submitInspection(page) {
   const responsePromise = page.waitForResponse((response) => (
-    response.request().method() === 'POST'
-    && response.url().endsWith('/goalfix/inspect')
+    response.request().method() === 'POST' && response.url().endsWith('/goalfix/inspect')
   ));
   await page.click('#goalfix-submit');
   const response = await responsePromise;
@@ -231,18 +198,21 @@ async function storedAttemptCounts(page) {
 async function proveViewport(name, viewport) {
   currentSha = OLD_SHA;
   const context = await browser.newContext({ viewport });
+  await context.addCookies([{
+    name: SESSION_COOKIE_NAME,
+    value: SESSION_COOKIE_VALUE,
+    url: baseUrl,
+    httpOnly: true,
+    sameSite: 'Strict',
+  }]);
   const page = await context.newPage();
   const pageErrors = [];
   const failedRequests = [];
+  const authorizationHeaders = [];
   page.on('pageerror', (error) => pageErrors.push(String(error)));
   page.on('requestfailed', (request) => failedRequests.push(`${request.method()} ${request.url()}`));
-  await page.addInitScript(() => {
-    sessionStorage.setItem('fcr_session', JSON.stringify({
-      access_token: 'proof-token',
-      refresh_token: '',
-      expires_at: null,
-      email: 'founder@example.com',
-    }));
+  page.on('request', (request) => {
+    if (request.url().endsWith('/goalfix/inspect')) authorizationHeaders.push(request.headers().authorization ?? null);
   });
 
   await page.goto(`${baseUrl}/control-room/goalfix.html`, { waitUntil: 'networkidle' });
@@ -255,7 +225,7 @@ async function proveViewport(name, viewport) {
   await page.fill('[name="stopCondition"]', STOP_CONDITION);
 
   const firstResponse = await submitInspection(page);
-  assert(firstResponse.status() === 200, `${name}: confirmed first inspection executes`);
+  assert(firstResponse.status() === 200, `${name}: confirmed first inspection executes through opaque founder cookie`);
   await page.locator('[data-state="blocked"]').waitFor({ state: 'visible' });
 
   const text = await page.locator('#goalfix-result').innerText();
@@ -267,50 +237,34 @@ async function proveViewport(name, viewport) {
   assert(text.includes('Product Design Playwright Proof: failed'), `${name}: failed required proof remains visible`);
   assert(text.includes('Unrelated proof 24: passed'), `${name}: provider proof noise remains visible in the report`);
   assert(text.includes('NEXT GATE'), `${name}: founder next gate renders`);
-  assert(
-    JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([2]),
-    `${name}: duplicate suites collapse to one observation per required check`,
-  );
+  assert(JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([2]), `${name}: duplicate suites collapse to one observation per required check`);
 
   const secondResponse = await submitInspection(page);
   assert(secondResponse.status() === 200, `${name}: second inspection receives accumulated exact-head history`);
-  assert(
-    JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([4]),
-    `${name}: second inspection adds one observation per required check`,
-  );
+  assert(JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([4]), `${name}: second inspection adds one observation per required check`);
 
-  await page.fill(
-    '[name="expectedVerificationNames"]',
-    [...REQUIRED_CHECKS].reverse().join('\n'),
-  );
+  await page.fill('[name="expectedVerificationNames"]', [...REQUIRED_CHECKS].reverse().join('\n'));
   const thirdResponse = await submitInspection(page);
   assert(thirdResponse.status() === 409, `${name}: third repeated same-head inspection is blocked`);
   const errorText = await page.locator('#goalfix-message').innerText();
   assert(errorText.includes('Stop retrying the same path'), `${name}: founder sees stagnation reorientation`);
-  assert(
-    JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([4]),
-    `${name}: blocked inspection preserves prior evidence`,
-  );
+  assert(JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([4]), `${name}: blocked inspection preserves prior evidence`);
 
   currentSha = NEW_SHA;
   const advancedHeadResponse = await submitInspection(page);
   assert(advancedHeadResponse.status() === 200, `${name}: advancing main opens the repaired exact head`);
   const advancedText = await page.locator('#goalfix-result').innerText();
   assert(advancedText.includes(NEW_SHA), `${name}: new immutable head replaces the stale ref result`);
-  assert(
-    JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([6]),
-    `${name}: old and new heads remain bounded per required check`,
-  );
+  assert(JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([6]), `${name}: old and new heads remain bounded per required check`);
 
   await page.fill('[name="suspectedFailureArea"]', 'Inspect a different provider evidence lane.');
   const reorientedResponse = await submitInspection(page);
   assert(reorientedResponse.status() === 200, `${name}: changed failure area opens a fresh evidence lane`);
-  assert(
-    JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([2, 6]),
-    `${name}: reoriented lane is isolated from earlier history`,
-  );
+  assert(JSON.stringify(await storedAttemptCounts(page)) === JSON.stringify([2, 6]), `${name}: reoriented lane is isolated from earlier history`);
   assert(pageErrors.length === 0, `${name}: no uncaught browser errors`);
   assert(failedRequests.length === 0, `${name}: no failed network requests`);
+  assert(authorizationHeaders.every((value) => value === null), `${name}: no browser bearer header is sent`);
+  assert(await page.evaluate(() => !sessionStorage.getItem('fcr_session')), `${name}: browser-readable founder credentials remain absent`);
 
   await page.screenshot({ path: join(ARTIFACT_DIR, `goalfix-${name}.png`), fullPage: true });
   await context.close();
@@ -332,5 +286,5 @@ if (failures > 0) {
   console.error(`Goalfix browser proof failed with ${failures} assertion(s).`);
   process.exitCode = 1;
 } else {
-  console.log('Goalfix browser proof passed for desktop and mobile, including duplicate-suite collapse, exact-head recovery, and bounded required-check history.');
+  console.log('Goalfix browser proof passed for desktop and mobile with opaque-cookie auth, duplicate-suite collapse, exact-head recovery, and bounded required-check history.');
 }
