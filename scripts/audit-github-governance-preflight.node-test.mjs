@@ -370,14 +370,15 @@ test('workflow keeps production App identity outside the pull-request execution 
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(contractSide, /governance-contract:/);
   assert.doesNotMatch(contractSide, /environment:\s*production/);
-  assert.doesNotMatch(contractSide, /secrets\.GITHUB_APP_ID/);
+  assert.doesNotMatch(contractSide, /secrets\.APP_ID|secrets\.GITHUB_APP_ID/);
 
   assert.match(providerSide, /needs:\s*governance-contract/);
   assert.match(providerSide, /environment:\s*production/);
   assert.match(providerSide, /github\.event_name == 'push'/);
   assert.match(providerSide, /github\.event_name == 'workflow_dispatch'/);
   assert.match(providerSide, /github\.ref == 'refs\/heads\/main'/);
-  assert.match(providerSide, /GITHUB_APP_ID:\s*\$\{\{ secrets\.GITHUB_APP_ID \}\}/);
+  assert.match(providerSide, /GITHUB_APP_ID:\s*\$\{\{ secrets\.APP_ID \}\}/);
+  assert.doesNotMatch(providerSide, /GITHUB_APP_ID:\s*\$\{\{ secrets\.GITHUB_APP_ID \}\}/);
   assert.match(providerSide, /ref:\s*\$\{\{ github\.sha \}\}/);
 });
 

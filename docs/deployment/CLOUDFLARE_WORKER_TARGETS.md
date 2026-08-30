@@ -163,6 +163,8 @@ A failing or unavailable enrichment read is `UNKNOWN`/blocked evidence in that e
 
 Configure applicable secrets in the canonical Worker secret store and, where named by guarded workflows, in the GitHub `production` environment.
 
+For the GitHub `production` environment, the Actions-facing GitHub App credential names are `APP_ID` and `APP_PRIVATE_KEY`. Trusted deploy/governance workflows map those values into the stable Worker/provider runtime names `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY`; the canonical Worker secret registry continues to use the runtime names. The App Client ID is not consumed by this installation-token path. Secret-name presence, source wiring, fingerprints, and continuity cookies are not proof of credential value validity, App installation scope, provider acceptance, deployment authority, or runtime identity.
+
 For the served remote read MCP, `FCR_REMOTE_MCP_READ_TOKEN` is a required canonical Worker secret and must be distinct from write-capable MCP/provider credentials. `FCR_REMOTE_MCP_READ_PROJECTS` is a public-safe server-held scope variable, not a secret.
 
 Never copy secret values into repository files, logs, screenshots, issue comments, PR bodies, documentation, or public content. A secret name or presence check proves wiring only; provider acceptance/permission is a separate truth.

@@ -24,9 +24,22 @@ The output includes `public/_worker.js`, which forwards missing routes and brows
 
 ## GitHub Actions secrets
 
-Set these in **GitHub → Settings → Secrets and variables → Actions**, using the `production` environment where required by `deploy.yml`.
+Set these in **GitHub → Settings → Secrets and variables → Actions**, using the `production` environment where required by the workflow.
 
 Secrets marked required cause the named workflow job to fail if absent.
+
+GitHub Actions secret names must not use the reserved `GITHUB_` prefix. The trusted GitHub App workflows therefore store the App credentials as `APP_ID` and `APP_PRIVATE_KEY`, then map them into the server/runtime environment names `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` inside the job. Those internal environment names remain the provider contract and are intentionally unchanged.
+
+The GitHub App **Client ID is not used** by the current installation-token witness or governance-reconciliation path. Keeping a separately stored Client ID is harmless, but it is not a substitute for the numeric App ID or the App private-key PEM and should not be treated as proof that the trusted App path is configured.
+
+### GitHub App authority
+
+| Secret | Required by | Description |
+|---|---|---|
+| `APP_ID` | `deterministic-review-core-advisory.yml` trusted witness publication and FCR governance reconciliation | Numeric GitHub App ID for the repository-scoped Founder Control Room App. Mapped at job runtime to `GITHUB_APP_ID`. |
+| `APP_PRIVATE_KEY` | `deterministic-review-core-advisory.yml` trusted witness publication and FCR governance reconciliation | Complete PEM private key for the same GitHub App. Mapped at job runtime to `GITHUB_PRIVATE_KEY`. Never log or expose the value. |
+
+`APP_ID` and `APP_PRIVATE_KEY` must identify the same installed App. A successful job must prove that both mapped runtime values were usable and that provider readback reports the expected App issuer; secret-name presence alone is not provider proof.
 
 ---
 
@@ -75,8 +88,8 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `SUPABASE_SERVICE_ROLE_KEY` | secret | Required server-only service-role credential. |
 | `SUPABASE_PUBLISHABLE_KEY` | secret or protected variable | Required publishable Supabase key used by server auth. |
 | `GITHUB_WEBHOOK_SECRET` | secret | Required webhook verification secret. |
-| `GITHUB_APP_ID` | protected variable | Preferred GitHub authentication path; paired with `GITHUB_PRIVATE_KEY`. |
-| `GITHUB_PRIVATE_KEY` | secret | Preferred GitHub authentication path; paired with `GITHUB_APP_ID`. |
+| `GITHUB_APP_ID` | protected variable | Preferred GitHub authentication path; paired with `GITHUB_PRIVATE_KEY`. This is a Worker/runtime binding name, not the GitHub Actions secret name. |
+| `GITHUB_PRIVATE_KEY` | secret | Preferred GitHub authentication path; paired with `GITHUB_APP_ID`. This is a Worker/runtime binding name, not the GitHub Actions secret name. |
 | `GITHUB_TOKEN` | secret | Local/development fallback only when the GitHub App pair is absent. |
 | `FOUNDER_ALLOWED_ORIGINS` | non-secret variable | `https://foundercontrolroom.org`. |
 | `FOUNDER_API_URL` | non-secret variable | `https://foundercontrolroom.org` so auth callbacks return through Pages and are proxied to the API Worker. |
@@ -159,8 +172,8 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] SUPABASE_PUBLISHABLE_KEY
 [ ] NEXT_PUBLIC_SUPABASE_URL
 [ ] GITHUB_WEBHOOK_SECRET
-[ ] GITHUB_APP_ID
-[ ] GITHUB_PRIVATE_KEY
+[ ] APP_ID (numeric Founder Control Room GitHub App ID)
+[ ] APP_PRIVATE_KEY (matching GitHub App private-key PEM)
 [ ] CLOUDFLARE_API_TOKEN for canonical founder-control-room mutation only
 [ ] CLOUDFLARE_REVIEW_EMAIL_DEPLOY_TOKEN for founder-control-room-review-email only
 [ ] FCR_CLOUDFLARE_BUILDS_USER_TOKEN for read-only FCR Workers Builds inspection

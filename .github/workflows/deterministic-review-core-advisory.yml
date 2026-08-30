@@ -202,8 +202,8 @@ jobs:
       FCR_REVIEW_PR_NUMBER: ${{ inputs.pull_request_number }}
       EXPECTED_TRUSTED_MAIN_SHA: ${{ github.sha }}
       EXPECTED_FOUNDER_MAIN_SHA: ${{ inputs.expected_main_sha }}
-      GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
-      GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}
+      GITHUB_APP_ID: ${{ secrets.APP_ID }}
+      GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
     steps:
       - name: Check out trusted default-branch implementation
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -273,3 +273,254 @@ jobs:
           path: artifacts/deterministic-review-witness.json
           if-no-files-found: error
           retention-days: 30
+
+  reconcile-fcr-governance:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.number == 418 &&
+      github.event.comment.user.id == 286642846 &&
+      github.event.comment.user.login == 'jussray' &&
+      startsWith(github.event.comment.body, '/reconcile-fcr-governance ')
+    name: Reconcile FCR GitHub governance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: production
+    permissions:
+      contents: read
+      issues: read
+    concurrency:
+      group: fcr-github-governance-reconcile
+      cancel-in-progress: false
+    env:
+      GITHUB_APP_ID: ${{ secrets.APP_ID }}
+      GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+    steps:
+      - name: Parse founder governance command
+        id: governance-command
+        env:
+          COMMAND_BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+
+          body = os.environ.get('COMMAND_BODY', '').strip()
+          parts = body.split()
+          if len(parts) != 3 or parts[0] != '/reconcile-fcr-governance':
+              raise SystemExit(
+                  'Expected exactly: /reconcile-fcr-governance <40-char-current-main-sha> <approval-reference>'
+              )
+
+          main_sha = parts[1]
+          approval = parts[2]
+          if not re.fullmatch(r'[0-9a-f]{40}', main_sha):
+              raise SystemExit('Current main SHA must be a lowercase 40-character commit SHA.')
+          if not re.fullmatch(r'[A-Za-z0-9._:-]{8,200}', approval):
+              raise SystemExit('Approval reference must use 8-200 auditable characters: A-Z a-z 0-9 . _ : -')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'expected_main_sha={main_sha}\n')
+              output.write(f'approval_reference={approval}\n')
+          PY
+
+      - name: Check out founder-bound exact current main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.governance-command.outputs.expected_main_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fail closed unless command targets exact current main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ steps.governance-command.outputs.expected_main_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          current_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
+          printf 'requested_main=%s\nchecked_out=%s\ncurrent_main=%s\n' "$EXPECTED_MAIN_SHA" "$actual" "$current_main"
+          test "$actual" = "$EXPECTED_MAIN_SHA"
+          test "$current_main" = "$EXPECTED_MAIN_SHA"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build canonical provider implementation
+        run: npm run build
+
+      - name: Reconcile canonical two-membrane governance and prove full topology
+        env:
+          EXPECTED_MAIN_SHA: ${{ steps.governance-command.outputs.expected_main_sha }}
+          GOVERNANCE_APPROVAL_REFERENCE: ${{ steps.governance-command.outputs.approval_reference }}
+          GOVERNANCE_COMMAND_COMMENT_ID: ${{ github.event.comment.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs/promises';
+          import {
+            FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME,
+            providerForProject,
+          } from './dist/providers/providerFactory.js';
+          import { getGitHubInstallationToken } from './dist/providers/githubAppAuth.js';
+          import { collectGovernancePreflight } from './scripts/audit-github-governance-preflight.mjs';
+
+          const FULL_SHA = /^[0-9a-f]{40}$/;
+          const APPROVAL = /^[A-Za-z0-9._:-]{8,200}$/;
+          const PROJECT_ID = 'founder-control-room';
+          const PROJECT = {
+            repo_provider: 'github',
+            slug: PROJECT_ID,
+            repo_identifier: 'jussray/founder-control-room',
+          };
+
+          const expectedMainSha = String(process.env.EXPECTED_MAIN_SHA ?? '').trim().toLowerCase();
+          const appId = String(process.env.GITHUB_APP_ID ?? '').trim();
+          const privateKey = String(process.env.GITHUB_PRIVATE_KEY ?? '').trim();
+          const approvalReference = String(process.env.GOVERNANCE_APPROVAL_REFERENCE ?? '').trim();
+          const commandCommentId = String(process.env.GOVERNANCE_COMMAND_COMMENT_ID ?? '').trim();
+
+          let beforeMain = null;
+          let afterMain = null;
+          let result = null;
+          let topology = null;
+          let failure = null;
+          let providerMutationAttempted = false;
+
+          await fs.mkdir('artifacts', { recursive: true });
+
+          try {
+            if (!FULL_SHA.test(expectedMainSha)) throw new Error('EXPECTED_MAIN_SHA must be a lowercase full commit SHA');
+            if (!/^\d+$/.test(appId)) throw new Error('GITHUB_APP_ID must be a numeric trusted App identity');
+            if (!privateKey) throw new Error('GITHUB_PRIVATE_KEY is required');
+            if (!APPROVAL.test(approvalReference)) throw new Error('GOVERNANCE_APPROVAL_REFERENCE is invalid');
+
+            const provider = providerForProject(PROJECT);
+            beforeMain = await provider.resolveRef(PROJECT_ID, 'main');
+            if (beforeMain.toLowerCase() !== expectedMainSha) {
+              throw new Error(`main moved before governance reconciliation: expected ${expectedMainSha}, observed ${beforeMain}`);
+            }
+
+            if (!provider.applyBranchRuleset) {
+              throw new Error('Canonical repository provider does not expose applyBranchRuleset');
+            }
+
+            providerMutationAttempted = true;
+            result = await provider.applyBranchRuleset(PROJECT_ID, {
+              name: FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME,
+              enforcement: 'active',
+              targetRefs: ['main'],
+              requirePullRequest: true,
+              requiredApprovingReviewCount: 1,
+              requiredStatusCheckNames: ['Required Gate', 'Verify test-ledger contract'],
+              blockForcePushes: true,
+              blockDeletion: true,
+              bypassActors: [{ kind: 'app', id: appId }],
+            });
+
+            afterMain = await provider.resolveRef(PROJECT_ID, 'main');
+            if (afterMain.toLowerCase() !== expectedMainSha) {
+              throw new Error(`main moved during governance reconciliation: expected ${expectedMainSha}, observed ${afterMain}`);
+            }
+
+            const installationToken = await getGitHubInstallationToken(
+              appId,
+              privateKey,
+              PROJECT.repo_identifier,
+            );
+            topology = await collectGovernancePreflight({
+              token: installationToken,
+              repository: PROJECT.repo_identifier,
+              targetRef: 'main',
+              trustedGitHubAppId: appId,
+            });
+            if (topology.status !== 'READY') {
+              throw new Error(
+                `FCR governance topology failed full provider preflight: ${topology.status}`,
+              );
+            }
+
+            console.log(`Governance reconciliation completed at main=${expectedMainSha}`);
+            console.log(`review_ruleset=${result.name} (${result.id})`);
+            for (const component of result.components ?? []) {
+              console.log(`component=${component.purpose}:${component.name}:${component.id}:${component.enforcement}`);
+            }
+            console.log(`full_topology_preflight=${topology.status}`);
+          } catch (error) {
+            failure = {
+              name: error instanceof Error ? error.name : 'Error',
+              message: error instanceof Error ? error.message : String(error),
+            };
+            throw error;
+          } finally {
+            const providerMutationState = failure
+              ? providerMutationAttempted ? 'UNKNOWN_OR_PARTIAL' : 'NOT_ATTEMPTED'
+              : 'VERIFIED_COMPLETE';
+            await fs.writeFile(
+              'artifacts/github-governance-reconcile.json',
+              `${JSON.stringify({
+                schema: 'fcr/github-governance-reconcile@v2',
+                expectedMainSha,
+                beforeMain,
+                afterMain,
+                approvalReference,
+                commandCommentId,
+                generatedAt: new Date().toISOString(),
+                providerMutationAttempted,
+                providerMutationState,
+                result,
+                topology,
+                failure,
+              }, null, 2)}\n`,
+              'utf8',
+            );
+          }
+          NODE
+
+      - name: Re-read current main after provider mutation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ steps.governance-command.outputs.expected_main_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
+          printf 'expected_main=%s\ncurrent_main_after=%s\n' "$EXPECTED_MAIN_SHA" "$current_main"
+          test "$current_main" = "$EXPECTED_MAIN_SHA"
+
+      - name: Retain sanitized governance reconciliation receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: github-governance-reconcile-${{ steps.governance-command.outputs.expected_main_sha }}-${{ github.run_id }}
+          path: artifacts/github-governance-reconcile.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Summarize bounded provider-policy authority
+        env:
+          EXPECTED_MAIN_SHA: ${{ steps.governance-command.outputs.expected_main_sha }}
+          APPROVAL_REFERENCE: ${{ steps.governance-command.outputs.approval_reference }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        shell: bash
+        run: |
+          {
+            echo '## FCR GitHub governance reconciliation completed'
+            echo
+            echo "- Exact current main: \`$EXPECTED_MAIN_SHA\`"
+            echo "- Approval reference: \`$APPROVAL_REFERENCE\`"
+            echo "- Command receipt: issue #418 comment \`$COMMENT_ID\`"
+            echo '- Provider mutation path: canonical `providerForProject(...).applyBranchRuleset(...)` only'
+            echo '- Full provider topology preflight: `READY` required before this completion summary can run'
+            echo '- Intended topology: trusted-App pull-request-only review membrane + zero-bypass strict-freshness membrane'
+            echo '- Merge, deployment, database, secret/credential, billing, publication, and branch-deletion authority: none granted by this command'
+          } >> "$GITHUB_STEP_SUMMARY"
