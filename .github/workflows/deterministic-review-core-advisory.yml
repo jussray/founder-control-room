@@ -202,8 +202,8 @@ jobs:
       FCR_REVIEW_PR_NUMBER: ${{ inputs.pull_request_number }}
       EXPECTED_TRUSTED_MAIN_SHA: ${{ github.sha }}
       EXPECTED_FOUNDER_MAIN_SHA: ${{ inputs.expected_main_sha }}
-      GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
-      GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}
+      GITHUB_APP_ID: ${{ secrets.APP_ID }}
+      GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
     steps:
       - name: Check out trusted default-branch implementation
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -292,8 +292,8 @@ jobs:
       group: fcr-github-governance-reconcile
       cancel-in-progress: false
     env:
-      GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
-      GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}
+      GITHUB_APP_ID: ${{ secrets.APP_ID }}
+      GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
     steps:
       - name: Parse founder governance command
         id: governance-command
