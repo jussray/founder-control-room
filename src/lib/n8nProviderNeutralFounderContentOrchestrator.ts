@@ -201,6 +201,17 @@ function nativeScheduleAt(input: FirstPartyFounderDistributionInput, authorizati
   return new Date(scheduledMs).toISOString();
 }
 
+function assertScheduleBeforeApprovalExpiry(scheduleAt: string, expiresAt: string): void {
+  const scheduleMs = Date.parse(scheduleAt);
+  const expiresMs = Date.parse(expiresAt);
+  if (!Number.isFinite(scheduleMs) || !Number.isFinite(expiresMs)) {
+    throw new Error('N8N_FOUNDER_CONTENT_CADENCE_AUTHORITY_REJECTED: cadence schedule or approval expiry is invalid');
+  }
+  if (scheduleMs >= expiresMs) {
+    throw new Error('N8N_FOUNDER_CONTENT_CADENCE_AUTHORITY_REJECTED: cadence-adjusted schedule must remain before exact founder approval expiry');
+  }
+}
+
 function providerChannel(provider: N8nFounderContentProvider, platform: string): string {
   if (provider === DEFAULT_PROVIDER) {
     const channel = BUFFER_FOUNDER_CHANNELS[platform];
@@ -509,6 +520,11 @@ export async function dispatchProviderNeutralN8nFounderContent(
       content_id: envelope.content_id,
       provider_request: { schedule_at: envelope.provider_request.schedule_at },
     }, cadence);
+    const authorization = exactAuthorization(input);
+    assertScheduleBeforeApprovalExpiry(
+      cadenceProjection.provider_request.schedule_at,
+      authorization.expires_at,
+    );
     envelope = {
       ...envelope,
       provider_request: {
