@@ -171,21 +171,28 @@ describe('founder content approval editorial gate', () => {
     expect(approvals.issue).toHaveBeenCalledTimes(1);
   });
 
-  it('serializes concurrent issuance for the exact same founder and proposal through one deterministic reservation id', async () => {
+  it('serializes regenerated same-story proposals within the same current-you intent through one reservation id', async () => {
     const approvals = uniqueApprovalRepository();
     const history = emptyHistoryRepository();
-    const exactProposal = proposal();
+    const firstProposal = proposal();
+    const regeneratedProposal = proposal() as Record<string, any>;
+    regeneratedProposal.freshness = {
+      issued_at: '2026-08-29T23:21:00.000Z',
+      expires_at: '2026-08-30T00:21:00.000Z',
+    };
+    regeneratedProposal.proposal_hash = hashPublicPayload(canonicalChiefIdentity(regeneratedProposal));
+    expect(regeneratedProposal.proposal_hash).not.toBe(firstProposal.proposal_hash);
 
     const results = await Promise.allSettled([
       issueFounderContentApproval({
-        proposal: exactProposal,
+        proposal: firstProposal,
         founderUserId: 'founder-user-1',
         now: NOW,
         repository: approvals,
         historyRepository: history,
       }),
       issueFounderContentApproval({
-        proposal: exactProposal,
+        proposal: regeneratedProposal,
         founderUserId: 'founder-user-1',
         now: '2026-08-29T23:40:00.010Z',
         repository: approvals,
