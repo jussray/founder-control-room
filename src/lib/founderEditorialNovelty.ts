@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 type JsonRecord = Record<string, unknown>;
 
 export const FOUNDER_EDITORIAL_NOVELTY_CONTRACT = 'fcr/founder-editorial-novelty@v1' as const;
+const EDITORIAL_PATTERN_LANE = 'founder-editorial';
 const MAX_HISTORY = 32;
 const HIGH_SIMILARITY = 0.55;
 const MEDIUM_SIMILARITY = 0.35;
@@ -140,10 +141,10 @@ function canonicalLane(sourceRepo: string): string {
   return normalized || 'unknown-project';
 }
 
-function patternFingerprint({ lane, thesis, hook }: { lane: string; thesis: string; hook: string }): string {
+function patternFingerprint({ thesis, hook }: { thesis: string; hook: string }): string {
   return hash({
     contract: 'promptos/editorial-pattern@v1',
-    lane,
+    lane: EDITORIAL_PATTERN_LANE,
     thesis: normalize(thesis),
     hook: normalize(hook),
   });
@@ -172,7 +173,6 @@ export function buildFounderEditorialIdentity(proposal: JsonRecord): FounderEdit
   const platform = text(payload.platform).toLowerCase();
 
   const promptOsPatternFingerprint = patternFingerprint({
-    lane: project,
     thesis: coreThesis,
     hook,
   });
@@ -251,7 +251,6 @@ function historicalSemanticText(item: FounderEditorialHistoryRecord): string {
 
 function historicalPatternFingerprint(item: FounderEditorialHistoryRecord): string {
   return patternFingerprint({
-    lane: canonicalLane(item.relatedProject ?? ''),
     thesis: item.coreThesis,
     hook: item.primaryHook,
   });
