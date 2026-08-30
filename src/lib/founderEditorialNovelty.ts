@@ -140,6 +140,15 @@ function canonicalLane(sourceRepo: string): string {
   return normalized || 'unknown-project';
 }
 
+function patternFingerprint({ lane, thesis, hook }: { lane: string; thesis: string; hook: string }): string {
+  return hash({
+    contract: 'promptos/editorial-pattern@v1',
+    lane,
+    thesis: normalize(thesis),
+    hook: normalize(hook),
+  });
+}
+
 function publicClaimsText(payload: JsonRecord): string {
   if (!Array.isArray(payload.public_claims)) return '';
   return payload.public_claims
@@ -162,11 +171,10 @@ export function buildFounderEditorialIdentity(proposal: JsonRecord): FounderEdit
   const project = canonicalLane(sourceRepo);
   const platform = text(payload.platform).toLowerCase();
 
-  const promptOsPatternFingerprint = hash({
-    contract: 'promptos/editorial-pattern@v1',
+  const promptOsPatternFingerprint = patternFingerprint({
     lane: project,
-    thesis: normalize(coreThesis),
-    hook: normalize(hook),
+    thesis: coreThesis,
+    hook,
   });
   const chiefAngleFingerprint = hash({
     contract: 'chief/editorial-angle@v1',
@@ -241,6 +249,14 @@ function historicalSemanticText(item: FounderEditorialHistoryRecord): string {
   return [item.coreThesis, item.primaryHook, item.angle, item.meaningfulChange ?? ''].filter(Boolean).join(' ');
 }
 
+function historicalPatternFingerprint(item: FounderEditorialHistoryRecord): string {
+  return patternFingerprint({
+    lane: canonicalLane(item.relatedProject ?? ''),
+    thesis: item.coreThesis,
+    hook: item.primaryHook,
+  });
+}
+
 function riskFor(score: number, exactPatternMatch: boolean): 'LOW' | 'MEDIUM' | 'HIGH' {
   if (exactPatternMatch || score >= HIGH_SIMILARITY) return 'HIGH';
   if (score >= MEDIUM_SIMILARITY) return 'MEDIUM';
@@ -307,23 +323,18 @@ export async function evaluateFounderEditorialNovelty({
   const currentSemanticText = `${identity.coreThesis} ${identity.hook}`;
   let closest: FounderEditorialHistoryRecord | null = null;
   let closestSimilarity = 0;
+  let exactPatternMatch = false;
   for (const item of history) {
     const score = similarity(currentSemanticText, historicalSemanticText(item));
     if (score > closestSimilarity) {
       closest = item;
       closestSimilarity = score;
     }
+    if (historicalPatternFingerprint(item) === identity.promptOsPatternFingerprint) {
+      exactPatternMatch = true;
+    }
   }
 
-  const closestPatternFingerprint = closest
-    ? hash({
-        contract: 'promptos/editorial-pattern@v1',
-        lane: canonicalLane(closest.relatedProject ?? ''),
-        thesis: normalize(closest.coreThesis),
-        hook: normalize(closest.primaryHook),
-      })
-    : '';
-  const exactPatternMatch = closestPatternFingerprint === identity.promptOsPatternFingerprint;
   const risk = riskFor(closestSimilarity, exactPatternMatch);
   const allowed = risk !== 'HIGH';
   const roundedSimilarity = Number(closestSimilarity.toFixed(4));
@@ -333,6 +344,7 @@ export async function evaluateFounderEditorialNovelty({
     chiefAngleFingerprint: identity.chiefAngleFingerprint,
     closestMatchId: closest?.id ?? null,
     closestSimilarity: roundedSimilarity,
+    exactPatternMatch,
     risk,
     comparedCount: history.length,
   });
