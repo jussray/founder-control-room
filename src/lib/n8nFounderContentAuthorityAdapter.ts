@@ -1,11 +1,13 @@
 import {
   N8N_FOUNDER_CONTENT_PROVIDER_ROUTES,
-  buildProviderNeutralN8nFounderContentEnvelope,
-  dispatchProviderNeutralN8nFounderContent,
   readN8nFounderContentProviderConfig,
   resolveN8nFounderContentProvider,
   type N8nFounderContentProvider,
 } from './n8nProviderNeutralFounderContentOrchestrator.js';
+import {
+  prepareProviderNeutralN8nFounderContent,
+  type PreparedProviderNeutralN8nFounderContent,
+} from './n8nProviderNeutralFounderContentPreparation.js';
 import {
   readN8nFounderContentConfig,
   type N8nFounderContentDispatchResult,
@@ -36,8 +38,7 @@ export interface AuthoritativeN8nFounderContentOptions {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
   approvalRepository?: FounderContentApprovalRepository;
-  dispatch?: typeof dispatchProviderNeutralN8nFounderContent;
-  buildEnvelope?: typeof buildProviderNeutralN8nFounderContentEnvelope;
+  prepare?: typeof prepareProviderNeutralN8nFounderContent;
 }
 
 export type AuthoritativeN8nFounderContentResult = N8nFounderContentDispatchResult | {
@@ -76,14 +77,29 @@ function preflightFailure(
   return { ok: false, code, status, request: null, receipt: null, reasons };
 }
 
+async function abortPreparedReservation(
+  prepared: PreparedProviderNeutralN8nFounderContent,
+  reason: string,
+): Promise<string | null> {
+  try {
+    const aborted = await prepared.abort(reason);
+    return aborted
+      ? null
+      : 'prepared execution reservation could not be marked retryable; reconcile the pending reservation before retry';
+  } catch {
+    return 'prepared execution reservation abort outcome is unknown; reconcile the pending reservation before retry';
+  }
+}
+
 /**
  * FCR-owned authority membrane for provider-neutral founder-content orchestration.
  *
- * Transport/provider readiness and the complete server-owned provider envelope
- * are validated before consuming one-shot authority. The caller may reference
- * an approval id and exact-copy hashes, but the actual approval object is read
- * from FCR storage, validated non-destructively, and only then atomically claimed
- * before n8n receives any provider-write request.
+ * Transport readiness, cadence, exact approval-expiry bounds, source-project
+ * resolution, and the durable execution reservation all complete before FCR
+ * consumes one-shot founder authority. Only after those non-provider gates are
+ * proven does FCR atomically claim the approval and permit the prepared request
+ * to reach n8n. A failed approval claim aborts the prepared execution as a
+ * retryable pre-provider failure; no provider write is attempted.
  */
 export async function dispatchAuthoritativeN8nFounderContent(
   input: AuthoritativeN8nFounderContentInput,
@@ -184,20 +200,43 @@ export async function dispatchAuthoritativeN8nFounderContent(
     return blocked(['current authoritative approval does not match the exact founder confirmation']);
   }
 
-  const buildEnvelope = options.buildEnvelope ?? buildProviderNeutralN8nFounderContentEnvelope;
+  const prepare = options.prepare ?? prepareProviderNeutralN8nFounderContent;
+  let preparedResult;
   try {
-    buildEnvelope({
+    preparedResult = await prepare({
       n8n_provider: requestedProvider,
       proposal: input.proposal,
       approval: preview.approval,
       now,
+    }, {
+      env,
+      fetchImpl: options.fetchImpl,
+      executedBy: founderIdentity,
     });
   } catch (error) {
-    return preflightFailure('INVALID_ENVELOPE', 400, [
-      error instanceof Error ? error.message : 'server-owned provider envelope validation failed',
-      'FCR did not consume the one-shot approval',
-    ]);
+    return {
+      ok: false,
+      code: 'ACTION_RESERVATION_FAILED',
+      status: 503,
+      request: null,
+      receipt: null,
+      reasons: [
+        error instanceof Error ? error.message : 'downstream founder-content preparation failed',
+        'FCR did not consume the one-shot approval',
+      ],
+    };
   }
+
+  if (!preparedResult.prepared) {
+    return {
+      ...preparedResult.result,
+      reasons: [
+        ...preparedResult.result.reasons,
+        'FCR did not consume the one-shot approval',
+      ],
+    };
+  }
+  const prepared = preparedResult;
 
   let claim;
   try {
@@ -212,16 +251,26 @@ export async function dispatchAuthoritativeN8nFounderContent(
       repository: options.approvalRepository,
     });
   } catch (error) {
+    const abortWarning = await abortPreparedReservation(
+      prepared,
+      'authoritative approval claim threw before provider dispatch',
+    );
     return blocked([
       'provider orchestration stopped because FCR could not validate the approval request',
       error instanceof Error ? error.message : 'authoritative approval validation failed',
+      ...(abortWarning ? [abortWarning] : []),
     ]);
   }
 
   if (!claim.ok) {
+    const abortWarning = await abortPreparedReservation(
+      prepared,
+      'authoritative approval claim was rejected before provider dispatch',
+    );
     return blocked([
       'provider orchestration stopped because FCR could not claim a current authoritative ApprovalReceipt',
       claim.reason,
+      ...(abortWarning ? [abortWarning] : []),
     ]);
   }
   if (
@@ -229,18 +278,15 @@ export async function dispatchAuthoritativeN8nFounderContent(
     || claim.publicPayloadHash !== publicPayloadHash
     || claim.authorizationHash !== authorizationHash
   ) {
-    return blocked(['claimed authoritative approval does not match the exact founder confirmation']);
+    const abortWarning = await abortPreparedReservation(
+      prepared,
+      'claimed approval identity did not match the prepared provider request',
+    );
+    return blocked([
+      'claimed authoritative approval does not match the exact founder confirmation',
+      ...(abortWarning ? [abortWarning] : []),
+    ]);
   }
 
-  const dispatch = options.dispatch ?? dispatchProviderNeutralN8nFounderContent;
-  return dispatch({
-    n8n_provider: requestedProvider,
-    proposal: input.proposal,
-    approval: claim.approval,
-    now,
-  }, {
-    env,
-    fetchImpl: options.fetchImpl,
-    executedBy: founderIdentity,
-  });
+  return prepared.dispatch();
 }
