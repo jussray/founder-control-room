@@ -25,6 +25,12 @@ for (const key of proxyEnvKeys) delete process.env[key];
 process.env.NO_PROXY = '*';
 process.env.no_proxy = '*';
 
+// The real E2E server persists opaque founder sessions through the same
+// encrypted-at-rest path as production. Supply a deterministic test-only key
+// at the harness boundary so every spawned scenario proves that path without
+// adding a production fallback or requiring a repository secret.
+process.env.FOUNDER_SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64url');
+
 // Keep the public package-script contract stable while proving each long
 // journey against a fresh real server. The application correctly enforces a
 // per-IP general request limit; running all three journeys in one process
@@ -129,12 +135,67 @@ function chiefDecisionReceipt(projectSlug, expectedHeadSha) {
   return { ...base, decisionHash: v10DecisionReceiptHash(base) };
 }
 
-// run.mjs performs one privileged create_branch directly with Node fetch for
-// the guarded-terminal proof. Bind that provider-boundary call to the same
-// canonical Chief plan/approved registry used by the real browser forms.
+let activeBrowserPage = null;
+
+async function runLegacyBearerCallThroughOpaqueBrowser(url, init) {
+  const headers = new Headers(init.headers ?? {});
+  const authorization = headers.get('authorization');
+  if (!authorization) return null;
+
+  if (!/^Bearer (?:undefined|null)?$/i.test(authorization.trim())) {
+    throw new Error('E2E_BROWSER_BEARER_REGRESSION: browser-readable bearer credentials must not cross the opaque-session boundary');
+  }
+  if (!activeBrowserPage) {
+    throw new Error('E2E_OPAQUE_BROWSER_UNAVAILABLE: no authenticated browser page is bound to the direct request');
+  }
+  if (init.body !== undefined && typeof init.body !== 'string') {
+    throw new Error('E2E_OPAQUE_BROWSER_BODY_UNSUPPORTED: legacy compatibility calls must use a string body');
+  }
+
+  // The stale long-form harness still constructs a few Node-side requests as
+  // `Bearer undefined` after the browser credential cutover. Do not extract
+  // or replay the HttpOnly capability from Node. Execute only that exact stale
+  // request shape inside the already-authenticated Chromium page instead, so
+  // the real same-origin cookie, Origin semantics, and browser transport are
+  // exercised exactly as the product uses them.
+  headers.delete('authorization');
+  const request = {
+    url,
+    method: init.method ?? 'GET',
+    headers: Object.fromEntries(headers.entries()),
+    body: init.body ?? null,
+  };
+  const result = await activeBrowserPage.evaluate(async (browserRequest) => {
+    const response = await fetch(browserRequest.url, {
+      method: browserRequest.method,
+      headers: browserRequest.headers,
+      body: browserRequest.body,
+      credentials: 'same-origin',
+    });
+    return {
+      status: response.status,
+      statusText: response.statusText,
+      headers: [...response.headers.entries()],
+      body: await response.text(),
+    };
+  }, request);
+
+  return new Response(result.body, {
+    status: result.status,
+    statusText: result.statusText,
+    headers: result.headers,
+  });
+}
+
+// run.mjs still contains a few provider-boundary calls whose historical code
+// asks sessionStorage for an access token. After the opaque-session cutover
+// that value must be absent. Route only that explicit stale test shape through
+// the authenticated Chromium page and fail if a readable bearer token ever
+// reappears. No browser cookie is exposed to Node by this compatibility bridge.
 const originalFetch = globalThis.fetch.bind(globalThis);
 globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+
   if (url.includes('/approvals/') && url.endsWith('/execute') && typeof init.body === 'string') {
     try {
       const body = JSON.parse(init.body);
@@ -146,12 +207,46 @@ globalThis.fetch = async (input, init = {}) => {
       // Preserve malformed requests unchanged so the real route can reject them.
     }
   }
+
+  const browserResponse = await runLegacyBearerCallThroughOpaqueBrowser(url, init);
+  if (browserResponse) return browserResponse;
   return originalFetch(input, init);
 };
 
 async function withV10PlanAwarePage(page) {
+  activeBrowserPage = page;
+  const originalEvaluate = page.evaluate.bind(page);
+  page.evaluate = async (...args) => {
+    const [pageFunction] = args;
+    try {
+      return await originalEvaluate(...args);
+    } catch (error) {
+      const source = typeof pageFunction === 'function' ? pageFunction.toString() : '';
+      const staleBearerRead = source.includes("JSON.parse(sessionStorage.getItem('fcr_session')).access_token");
+      if (staleBearerRead && error instanceof Error && /Cannot read properties of null/.test(error.message)) {
+        // Opaque browser sessions intentionally leave no readable fcr_session.
+        // Return undefined only for this exact historical harness read so the
+        // existing fetch bridge can exercise the authenticated HttpOnly-cookie
+        // path. Any real readable token is returned normally and then rejected
+        // by E2E_BROWSER_BEARER_REGRESSION above.
+        return undefined;
+      }
+      throw error;
+    }
+  };
+
   const originalClick = page.click.bind(page);
   page.click = async (selector, options) => {
+    if (selector === '.tabs button[data-tab=terminal]' && await page.locator(selector).count() === 0) {
+      // The opaque-session callback lands on the newer root shell. The guarded
+      // terminal remains in the canonical legacy cockpit at /control-room/.
+      // Enter that real surface with the same HttpOnly founder session before
+      // continuing the historical terminal journey. Do not synthesize DOM or
+      // bypass the normal tab click.
+      await page.goto(new URL('/control-room/', page.url()).href, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector(selector);
+    }
+
     if (selector === '#create-branch-form button[type=submit]') {
       await page.fill(
         '#create-branch-form textarea[name="capabilityPlan"]',

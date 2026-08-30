@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { rows, mockGetUser, interactiveSession } = vi.hoisted(() => ({
+const { rows, mockGetUser, interactiveSession, raceNextInsert } = vi.hoisted(() => ({
   rows: new Map<string, Record<string, unknown>>(),
   mockGetUser: vi.fn(),
   interactiveSession: { enabled: false },
+  raceNextInsert: { enabled: false },
 }));
 
 vi.mock('../../../lib/supabaseAuthClient.js', () => ({
@@ -16,7 +17,11 @@ vi.mock('../../../auth/founderSession.js', async () => {
   return {
     ...actual,
     readFounderSession: vi.fn(() => interactiveSession.enabled
-      ? { accessToken: 'browser-founder-token', refreshToken: 'browser-founder-refresh' }
+      ? {
+        accessToken: 'browser-founder-token',
+        refreshToken: 'browser-founder-refresh',
+        expiresAt: Math.floor(Date.now() / 1000) + 600,
+      }
       : null),
   };
 });
@@ -31,20 +36,40 @@ vi.mock('../../../lib/supabaseClient.js', () => ({
       if (table !== 'founder_permission_requests') throw new Error(`unexpected table: ${table}`);
       let operation: 'read' | 'insert' | 'update' = 'read';
       let payload: Record<string, unknown> = {};
-      const filters = new Map<string, unknown>();
+      const filters: Array<{ field: string; op: 'eq' | 'is' | 'gt'; value: unknown }> = [];
+      const matches = (row: Record<string, unknown>): boolean => filters.every(({ field, op, value }) => {
+        if (op === 'eq') return row[field] === value;
+        if (op === 'is') return row[field] === value || (value === null && row[field] == null);
+        if (op === 'gt') return String(row[field] ?? '') > String(value ?? '');
+        return false;
+      });
+      const insertedRow = () => ({
+        ...payload,
+        decision: null,
+        decision_hash: null,
+        decision_surface: null,
+        requested_at: '2026-08-29T05:00:00.000Z',
+        decided_at: null,
+        expires_at: null,
+        revoked_at: null,
+        consumed_at: null,
+      });
       const chain: any = {
         select: () => chain,
         order: () => chain,
         limit: () => chain,
-        eq: (field: string, value: unknown) => { filters.set(field, value); return chain; },
+        eq: (field: string, value: unknown) => { filters.push({ field, op: 'eq', value }); return chain; },
+        is: (field: string, value: unknown) => { filters.push({ field, op: 'is', value }); return chain; },
+        gt: (field: string, value: unknown) => { filters.push({ field, op: 'gt', value }); return chain; },
         insert: (value: Record<string, unknown>) => { operation = 'insert'; payload = value; return chain; },
         update: (value: Record<string, unknown>) => { operation = 'update'; payload = value; return chain; },
         maybeSingle: async () => {
-          const requestId = String(filters.get('request_id') ?? '');
+          const requestIdFilter = filters.find((filter) => filter.field === 'request_id' && filter.op === 'eq');
+          const requestId = String(requestIdFilter?.value ?? '');
           const existing = rows.get(requestId) ?? null;
-          if (operation === 'read') return { data: existing, error: null };
+          if (operation === 'read') return { data: existing && matches(existing) ? existing : null, error: null };
           if (operation === 'update') {
-            if (!existing || (filters.has('status') && existing.status !== filters.get('status'))) return { data: null, error: null };
+            if (!existing || !matches(existing)) return { data: null, error: null };
             const updated = { ...existing, ...payload };
             rows.set(requestId, updated);
             return { data: updated, error: null };
@@ -54,15 +79,12 @@ vi.mock('../../../lib/supabaseClient.js', () => ({
         single: async () => {
           if (operation !== 'insert') throw new Error('single expected insert');
           const requestId = String(payload.request_id ?? '');
-          const inserted = {
-            ...payload,
-            decision: null,
-            decision_hash: null,
-            decision_surface: null,
-            requested_at: '2026-08-25T09:15:00.000Z',
-            decided_at: null,
-            consumed_at: null,
-          };
+          const inserted = insertedRow();
+          if (raceNextInsert.enabled) {
+            raceNextInsert.enabled = false;
+            rows.set(requestId, inserted);
+            return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } };
+          }
           rows.set(requestId, inserted);
           return { data: inserted, error: null };
         },
@@ -77,6 +99,7 @@ import request from 'supertest';
 import { createServer } from '../../server.js';
 
 const bearer = 'Bearer test-founder-token';
+const origin = 'http://localhost:8787';
 const proposal = {
   proposalId: 'mission-ask-founder',
   proposalHash: 'a'.repeat(64),
@@ -85,65 +108,178 @@ const proposal = {
   expectedHeadSha: 'b'.repeat(40),
   capabilityPlanHash: 'c'.repeat(64),
 };
+const actionTarget = {
+  type: 'merge',
+  repo: 'jussray/founder-control-room',
+  pullRequestNumber: 727,
+  baseSha: 'd'.repeat(40),
+  headSha: 'b'.repeat(40),
+};
+
+function founderUser(id = '11111111-1111-4111-8111-111111111111') {
+  return { data: { user: { id, email: 'founder@example.com' } }, error: null };
+}
+
+function interactivePost(app: ReturnType<typeof createServer>, path: string) {
+  return request(app)
+    .post(path)
+    .set('Authorization', bearer)
+    .set('Origin', origin)
+    .set('Sec-Fetch-Site', 'same-origin');
+}
 
 describe('founder permission broker HTTP contract', () => {
   beforeEach(() => {
     rows.clear();
     interactiveSession.enabled = false;
+    raceNextInsert.enabled = false;
     mockGetUser.mockReset();
-    mockGetUser.mockResolvedValue({ data: { user: { id: '11111111-1111-4111-8111-111111111111', email: 'founder@example.com' } }, error: null });
+    mockGetUser.mockResolvedValue(founderUser());
   });
 
-  it('lets a bearer-authenticated agent ask but not self-approve', async () => {
+  it('lets an agent ask but requires an independently authenticated browser session to decide', async () => {
     const app = createServer();
     const created = await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)
-      .send({ requestId: 'permission:ask-founder-001', requestedBySurface: 'chatgpt', proposal, note: 'Approve this exact candidate?' });
+      .send({ requestId: 'permission:ask-founder-001', requestedBySurface: 'chatgpt', proposal, actionTarget, note: 'Approve this exact candidate?' });
     expect(created.status).toBe(201);
     expect(created.body.status).toBe('pending');
     expect(created.body.founderPermissionSatisfied).toBe(false);
-    expect(created.body.independentReviewSatisfied).toBeNull();
+    expect(created.body.executionAuthorized).toBe(false);
 
     const bearerOnlyDecision = await request(app)
       .post('/mcp/founder-permissions/requests/permission:ask-founder-001/decision')
       .set('Authorization', bearer)
-      .send({ decision: 'approved', surface: 'chatgpt' });
-    expect(bearerOnlyDecision.status).toBe(403);
-    expect(bearerOnlyDecision.body.code).toBe('FOUNDER_INTERACTIVE_APPROVAL_REQUIRED');
+      .set('Origin', origin)
+      .set('Sec-Fetch-Site', 'same-origin')
+      .send({ decision: 'approved' });
+    expect(bearerOnlyDecision.status).toBe(401);
 
     interactiveSession.enabled = true;
-    const approved = await request(app)
-      .post('/mcp/founder-permissions/requests/permission:ask-founder-001/decision')
-      .set('Authorization', bearer)
+    const unattestedSurface = await interactivePost(app, '/mcp/founder-permissions/requests/permission:ask-founder-001/decision')
       .send({ decision: 'approved', surface: 'chatgpt' });
+    expect(unattestedSurface.status).toBe(400);
+    expect(unattestedSurface.body.code).toBe('FOUNDER_PERMISSION_UNATTESTED_DECISION_SURFACE');
+
+    const approved = await interactivePost(app, '/mcp/founder-permissions/requests/permission:ask-founder-001/decision')
+      .send({ decision: 'approved' });
     expect(approved.status).toBe(200);
     expect(approved.body.status).toBe('approved');
+    expect(approved.body.decisionSurface).toBe('fcr');
+    expect(approved.body.decision.executionAuthorized).toBe(false);
+    expect(approved.body.executionAuthorized).toBe(false);
     expect(approved.body.founderPermissionSatisfied).toBe(true);
+    expect(approved.body.expiresAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(approved.body.independentReviewSatisfied).toBeNull();
-    expect(approved.body.decisionHash).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('fails closed when the same request id is reused for another proposal', async () => {
+  it('ignores bearer identity when authenticating the interactive decision cookie', async () => {
+    const app = createServer();
+    await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)
+      .send({ requestId: 'permission:cookie-authority-001', requestedBySurface: 'chatgpt', proposal, actionTarget });
+    interactiveSession.enabled = true;
+    mockGetUser.mockImplementation(async (token: string) => token === 'browser-founder-token'
+      ? founderUser('22222222-2222-4222-8222-222222222222')
+      : { data: { user: { id: 'agent-id', email: 'agent@example.com' } }, error: null });
+
+    const approved = await interactivePost(app, '/mcp/founder-permissions/requests/permission:cookie-authority-001/decision')
+      .send({ decision: 'approved' });
+    expect(approved.status).toBe(200);
+    expect(rows.get('permission:cookie-authority-001')?.founder_user_id)
+      .toBe('22222222-2222-4222-8222-222222222222');
+  });
+
+  it('requires a browser Origin even when a bearer header is present', async () => {
+    const app = createServer();
+    await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)
+      .send({ requestId: 'permission:origin-001', requestedBySurface: 'chatgpt', proposal, actionTarget });
+    interactiveSession.enabled = true;
+    const noBrowserOrigin = await request(app)
+      .post('/mcp/founder-permissions/requests/permission:origin-001/decision')
+      .set('Authorization', bearer)
+      .send({ decision: 'approved' });
+    expect(noBrowserOrigin.status).toBe(403);
+    expect(noBrowserOrigin.body.code).toBe('FOUNDER_INTERACTIVE_APPROVAL_REQUIRED');
+  });
+
+  it('consumes a fresh approval exactly once and removes satisfied state', async () => {
+    const app = createServer();
+    const created = await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)
+      .send({ requestId: 'permission:consume-001', requestedBySurface: 'claude', proposal, actionTarget });
+    expect(created.status).toBe(201);
+    interactiveSession.enabled = true;
+    const approved = await interactivePost(app, '/mcp/founder-permissions/requests/permission:consume-001/decision')
+      .send({ decision: 'approved' });
+    expect(approved.body.founderPermissionSatisfied).toBe(true);
+
+    const consumed = await request(app)
+      .post('/mcp/founder-permissions/requests/permission:consume-001/consume')
+      .set('Authorization', bearer)
+      .send({ requestHash: approved.body.requestHash, decisionHash: approved.body.decisionHash });
+    expect(consumed.status).toBe(200);
+    expect(consumed.body.consumed).toBe(true);
+    expect(consumed.body.founderPermissionSatisfied).toBe(false);
+    expect(consumed.body.executionAuthorized).toBe(false);
+
+    const replay = await request(app)
+      .post('/mcp/founder-permissions/requests/permission:consume-001/consume')
+      .set('Authorization', bearer)
+      .send({ requestHash: approved.body.requestHash, decisionHash: approved.body.decisionHash });
+    expect(replay.status).toBe(409);
+    expect(replay.body.code).toBe('FOUNDER_PERMISSION_NOT_CONSUMABLE');
+  });
+
+  it('lets the interactive founder revoke an unconsumed approval', async () => {
+    const app = createServer();
+    await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)
+      .send({ requestId: 'permission:revoke-001', requestedBySurface: 'perplexity', proposal, actionTarget });
+    interactiveSession.enabled = true;
+    const approved = await interactivePost(app, '/mcp/founder-permissions/requests/permission:revoke-001/decision')
+      .send({ decision: 'approved' });
+    expect(approved.body.founderPermissionSatisfied).toBe(true);
+
+    const revoked = await interactivePost(app, '/mcp/founder-permissions/requests/permission:revoke-001/revoke').send({});
+    expect(revoked.status).toBe(200);
+    expect(revoked.body.revoked).toBe(true);
+    expect(revoked.body.founderPermissionSatisfied).toBe(false);
+  });
+
+  it('fails closed when the same request id is reused for another exact target', async () => {
     const app = createServer();
     const first = await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)
-      .send({ requestId: 'permission:ask-founder-002', requestedBySurface: 'claude', proposal });
+      .send({ requestId: 'permission:ask-founder-002', requestedBySurface: 'claude', proposal, actionTarget });
     expect(first.status).toBe(201);
     const conflicting = await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)
-      .send({ requestId: 'permission:ask-founder-002', requestedBySurface: 'claude', proposal: { ...proposal, expectedHeadSha: 'd'.repeat(40) } });
+      .send({
+        requestId: 'permission:ask-founder-002',
+        requestedBySurface: 'claude',
+        proposal: { ...proposal, expectedHeadSha: 'e'.repeat(40) },
+        actionTarget: { ...actionTarget, headSha: 'e'.repeat(40) },
+      });
     expect(conflicting.status).toBe(409);
     expect(conflicting.body.code).toBe('FOUNDER_PERMISSION_SCOPE_MISMATCH');
+  });
+
+  it('reconciles a concurrent duplicate insert as an idempotent retry', async () => {
+    const app = createServer();
+    raceNextInsert.enabled = true;
+    const result = await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)
+      .send({ requestId: 'permission:insert-race-001', requestedBySurface: 'chatgpt', proposal, actionTarget });
+    expect(result.status).toBe(200);
+    expect(result.body.idempotent).toBe(true);
+    expect(result.body.status).toBe('pending');
   });
 
   it('does not let a later approval overwrite an existing rejection', async () => {
     const app = createServer();
     await request(app).post('/mcp/founder-permissions/requests').set('Authorization', bearer)
-      .send({ requestId: 'permission:ask-founder-003', requestedBySurface: 'perplexity', proposal });
+      .send({ requestId: 'permission:ask-founder-003', requestedBySurface: 'perplexity', proposal, actionTarget });
     interactiveSession.enabled = true;
-    const rejected = await request(app).post('/mcp/founder-permissions/requests/permission:ask-founder-003/decision').set('Authorization', bearer)
-      .send({ decision: 'rejected', surface: 'perplexity' });
+    const rejected = await interactivePost(app, '/mcp/founder-permissions/requests/permission:ask-founder-003/decision')
+      .send({ decision: 'rejected' });
     expect(rejected.status).toBe(200);
     expect(rejected.body.founderPermissionSatisfied).toBe(false);
-    const overwrite = await request(app).post('/mcp/founder-permissions/requests/permission:ask-founder-003/decision').set('Authorization', bearer)
-      .send({ decision: 'approved', surface: 'perplexity' });
+    const overwrite = await interactivePost(app, '/mcp/founder-permissions/requests/permission:ask-founder-003/decision')
+      .send({ decision: 'approved' });
     expect(overwrite.status).toBe(409);
     expect(overwrite.body.code).toBe('FOUNDER_PERMISSION_ALREADY_DECIDED');
   });

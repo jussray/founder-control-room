@@ -10,7 +10,7 @@ export const controlRoomHtml = `<!doctype html>
 </head>
 <body>
   <main class="shell">
-    <header class="masthead">
+    <header class="masthead topbar">
       <div>
         <p class="eyebrow">Founder operating system</p>
         <h1>Founder Control Room</h1>
@@ -40,7 +40,7 @@ export const controlRoomHtml = `<!doctype html>
       <div class="panel identity">
         <div>
           <p class="eyebrow">Authenticated founder</p>
-          <h2 id="founder-email">Founder</h2>
+          <h2 id="founder-email" class="founder-email">Founder</h2>
           <p>Identity verified. Execution authority remains locked behind separate proof and approval gates.</p>
         </div>
         <button id="logout-button" class="secondary" type="button">Sign out</button>
