@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const readFounderSession = vi.fn();
+const { readFounderSession } = vi.hoisted(() => ({
+  readFounderSession: vi.fn(),
+}));
 
 vi.mock('../../../auth/founderSession.js', () => ({
   readFounderSession,
