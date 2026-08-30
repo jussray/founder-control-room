@@ -12,6 +12,13 @@ import { founderCallbackHtml } from './onboarding.js';
 export const authRouter = Router();
 const GENERIC_MAGIC_LINK_MESSAGE = 'If this email is on the founder allowlist, a secure login link has been sent.';
 const MIN_FOUNDER_PASSWORD_LENGTH = 12;
+const rateLimitFounderOAuth = rateLimit({
+  windowMs: 15 * 60 * 1_000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts, please try again later.' },
+});
 const rateLimitFounderPassword = rateLimit({
   windowMs: 15 * 60 * 1_000,
   limit: 5,
@@ -37,7 +44,7 @@ async function establishFounderSession(req: Request, res: Response, session: Ses
   }
 }
 
-authRouter.get('/google', async (_req, res) => {
+authRouter.get('/google', rateLimitFounderOAuth, async (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
     const { data, error } = await supabaseAuth.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${FOUNDER_API_URL}/auth/callback`, skipBrowserRedirect: true } });
@@ -61,7 +68,7 @@ authRouter.post('/magic-link', rateLimitMagicLink, async (req, res) => {
   return respondSuccess(res, { message: GENERIC_MAGIC_LINK_MESSAGE }, 202);
 });
 
-authRouter.get('/callback', async (req, res) => {
+authRouter.get('/callback', rateLimitFounderOAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const tokenHash = typeof req.query.token_hash === 'string' ? req.query.token_hash : null;
   const type = typeof req.query.type === 'string' ? req.query.type : 'magiclink';
