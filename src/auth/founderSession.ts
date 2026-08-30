@@ -74,6 +74,12 @@ function sessionIdHash(value: string): string {
   return sha256(value);
 }
 
+function canonicalTimestamp(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim()) return '';
+  const milliseconds = Date.parse(value);
+  return Number.isFinite(milliseconds) ? new Date(milliseconds).toISOString() : '';
+}
+
 function sessionContinuityFingerprint(input: SessionCredentialContext): string {
   // This is a deterministic state-integrity fingerprint, not a browser/device
   // fingerprint. It deliberately excludes IP, ASN, country, JA4, user agent,
@@ -217,8 +223,8 @@ export async function readFounderSession(req: Request): Promise<FounderCookieSes
   const row = data as Record<string, unknown>;
   const founderUserId = typeof row.founder_user_id === 'string' ? row.founder_user_id : '';
   const founderEmail = typeof row.founder_email === 'string' ? row.founder_email.toLowerCase() : '';
-  const issuedAt = typeof row.issued_at === 'string' ? row.issued_at : '';
-  const sessionExpiresAt = typeof row.expires_at === 'string' ? row.expires_at : '';
+  const issuedAt = canonicalTimestamp(row.issued_at);
+  const sessionExpiresAt = canonicalTimestamp(row.expires_at);
   const sessionVersion = typeof row.session_version === 'number' ? row.session_version : 0;
   const storedContinuityFingerprint = typeof row.continuity_fingerprint === 'string' ? row.continuity_fingerprint : '';
   const authExpiresAt = typeof row.auth_expires_at === 'number' ? row.auth_expires_at : undefined;
