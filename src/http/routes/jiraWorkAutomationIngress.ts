@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import type { Request, RequestHandler, Response } from 'express';
 import {
   dispatchJiraWorkAutomation,
@@ -7,11 +7,9 @@ import {
   type JiraWorkAutomationDispatchResult,
 } from '../../lib/jiraWorkAutomation.js';
 
-const MAX_TRANSPORT_CLOCK_SKEW_MS = 5 * 60 * 1000;
 const MAX_OBSERVATION_AGE_MS = 5 * 60 * 1000;
 const MAX_OBSERVATION_FUTURE_SKEW_MS = 30 * 1000;
-const MIN_INGRESS_SECRET_LENGTH = 32;
-const HEX_SHA256 = /^[0-9a-f]{64}$/;
+const MIN_INGRESS_TOKEN_LENGTH = 32;
 const ALLOWED_FIELDS = new Set([
   'event',
   'projectKey',
@@ -33,52 +31,26 @@ function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function hexToBytes(value: string): Uint8Array {
-  const bytes = new Uint8Array(value.length / 2);
-  for (let index = 0; index < value.length; index += 2) {
-    bytes[index / 2] = Number.parseInt(value.slice(index, index + 2), 16);
-  }
-  return bytes;
+function tokenDigest(value: string): Uint8Array {
+  return createHash('sha256').update(value, 'utf8').digest();
 }
 
-function safeEqualHex(left: string, right: string): boolean {
-  if (!HEX_SHA256.test(left) || !HEX_SHA256.test(right)) return false;
-  const leftBytes = hexToBytes(left);
-  const rightBytes = hexToBytes(right);
-  return leftBytes.length === rightBytes.length && timingSafeEqual(leftBytes, rightBytes);
-}
+export function verifyJiraWorkAutomationIngressBearer(
+  authorizationHeader: string | undefined,
+  expectedToken: string,
+): boolean {
+  if (!authorizationHeader?.startsWith('Bearer ')) return false;
+  const candidate = authorizationHeader.slice('Bearer '.length).trim();
+  if (!candidate) return false;
 
-export function verifyJiraWorkAutomationIngressSignature(
-  rawBody: Uint8Array,
-  timestampHeader: string | undefined,
-  signatureHeader: string | undefined,
-  secret: string,
-  nowMs: number,
-): { valid: boolean; signedAtMs: number | null } {
-  if (!timestampHeader || !/^\d{13}$/.test(timestampHeader)) {
-    return { valid: false, signedAtMs: null };
-  }
-
-  const signedAtMs = Number(timestampHeader);
-  if (!Number.isSafeInteger(signedAtMs) || Math.abs(nowMs - signedAtMs) > MAX_TRANSPORT_CLOCK_SKEW_MS) {
-    return { valid: false, signedAtMs: null };
-  }
-
-  const expected = createHmac('sha256', secret)
-    .update(timestampHeader, 'utf8')
-    .update('.', 'utf8')
-    .update(rawBody)
-    .digest('hex');
-
-  return {
-    valid: safeEqualHex(signatureHeader ?? '', expected),
-    signedAtMs,
-  };
+  const candidateDigest = tokenDigest(candidate);
+  const expectedDigest = tokenDigest(expectedToken);
+  return timingSafeEqual(candidateDigest, expectedDigest);
 }
 
 export function parseJiraWorkAutomationIngressInput(
   value: unknown,
-  signedAtMs: number,
+  nowMs: number,
 ): { input: JiraWorkAutomationInput | null; reasons: string[] } {
   if (!isRecord(value)) {
     return { input: null, reasons: ['jira automation ingress body must be an object'] };
@@ -116,11 +88,11 @@ export function parseJiraWorkAutomationIngressInput(
 
   const observedAtMs = Date.parse(input.observedAt);
   if (Number.isFinite(observedAtMs)) {
-    if (signedAtMs - observedAtMs > MAX_OBSERVATION_AGE_MS) {
-      reasons.push('observedAt is too old for this signed transport');
+    if (nowMs - observedAtMs > MAX_OBSERVATION_AGE_MS) {
+      reasons.push('observedAt is too old for Jira automation ingress');
     }
-    if (observedAtMs - signedAtMs > MAX_OBSERVATION_FUTURE_SKEW_MS) {
-      reasons.push('observedAt cannot materially postdate the signed transport');
+    if (observedAtMs - nowMs > MAX_OBSERVATION_FUTURE_SKEW_MS) {
+      reasons.push('observedAt cannot materially postdate FCR receipt time');
     }
   }
 
@@ -141,27 +113,20 @@ export function createJiraWorkAutomationIngressHandler(
       'X-Content-Type-Options': 'nosniff',
     });
 
-    const secret = process.env.FCR_JIRA_AUTOMATION_INGRESS_SECRET?.trim();
-    if (!secret || secret.length < MIN_INGRESS_SECRET_LENGTH) {
+    const ingressToken = process.env.FCR_JIRA_AUTOMATION_INGRESS_TOKEN?.trim();
+    if (!ingressToken || ingressToken.length < MIN_INGRESS_TOKEN_LENGTH) {
       return res.status(503).json({
         ok: false,
         code: 'JIRA_AUTOMATION_INGRESS_NOT_CONFIGURED',
       });
     }
 
-    if (!(req.body instanceof Uint8Array)) {
-      return res.status(400).json({ ok: false, code: 'RAW_JSON_BODY_REQUIRED' });
+    if (!verifyJiraWorkAutomationIngressBearer(req.get('authorization'), ingressToken)) {
+      return res.status(401).json({ ok: false, code: 'UNAUTHORIZED' });
     }
 
-    const signature = verifyJiraWorkAutomationIngressSignature(
-      req.body,
-      req.get('x-fcr-jira-timestamp'),
-      req.get('x-fcr-jira-signature'),
-      secret,
-      options.now?.() ?? Date.now(),
-    );
-    if (!signature.valid || signature.signedAtMs === null) {
-      return res.status(401).json({ ok: false, code: 'UNAUTHORIZED' });
+    if (!(req.body instanceof Uint8Array)) {
+      return res.status(400).json({ ok: false, code: 'RAW_JSON_BODY_REQUIRED' });
     }
 
     let parsed: unknown;
@@ -171,7 +136,7 @@ export function createJiraWorkAutomationIngressHandler(
       return res.status(400).json({ ok: false, code: 'INVALID_JSON' });
     }
 
-    const envelope = parseJiraWorkAutomationIngressInput(parsed, signature.signedAtMs);
+    const envelope = parseJiraWorkAutomationIngressInput(parsed, options.now?.() ?? Date.now());
     if (!envelope.input) {
       return res.status(400).json({
         ok: false,
