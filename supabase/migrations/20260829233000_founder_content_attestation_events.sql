@@ -59,9 +59,9 @@ create trigger founder_content_attestation_events_append_only
 
 -- The latest provider_observations row is a projection, not the immutable record.
 -- Under concurrent corrections an older request may reach its ON CONFLICT update
--- after a newer request. Keep the projection monotonic by observation time so an
--- older/equal attestation can never replace the newer latest-state row. The
--- immutable attestation event remains preserved regardless of projection outcome.
+-- after a newer request. Only a competing manual-attestation replacement is
+-- monotonic-guarded, so unrelated updates to the same observation remain allowed.
+-- The immutable attestation event remains preserved regardless of projection outcome.
 create or replace function public.keep_founder_content_observation_latest()
 returns trigger
 language plpgsql
@@ -74,6 +74,8 @@ begin
      and new.resource_type = old.resource_type
      and new.project_id = old.project_id
      and new.resource_id = old.resource_id
+     and new.attestation_event_id is not null
+     and new.attestation_event_id is distinct from old.attestation_event_id
      and new.observed_at <= old.observed_at then
     return old;
   end if;
