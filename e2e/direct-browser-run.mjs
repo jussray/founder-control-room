@@ -215,6 +215,26 @@ globalThis.fetch = async (input, init = {}) => {
 
 async function withV10PlanAwarePage(page) {
   activeBrowserPage = page;
+  const originalEvaluate = page.evaluate.bind(page);
+  page.evaluate = async (...args) => {
+    const [pageFunction] = args;
+    try {
+      return await originalEvaluate(...args);
+    } catch (error) {
+      const source = typeof pageFunction === 'function' ? pageFunction.toString() : '';
+      const staleBearerRead = source.includes("JSON.parse(sessionStorage.getItem('fcr_session')).access_token");
+      if (staleBearerRead && error instanceof Error && /Cannot read properties of null/.test(error.message)) {
+        // Opaque browser sessions intentionally leave no readable fcr_session.
+        // Return undefined only for this exact historical harness read so the
+        // existing fetch bridge can exercise the authenticated HttpOnly-cookie
+        // path. Any real readable token is returned normally and then rejected
+        // by E2E_BROWSER_BEARER_REGRESSION above.
+        return undefined;
+      }
+      throw error;
+    }
+  };
+
   const originalClick = page.click.bind(page);
   page.click = async (selector, options) => {
     if (selector === '#create-branch-form button[type=submit]') {
