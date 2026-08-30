@@ -357,7 +357,7 @@ jobs:
       - name: Build canonical provider implementation
         run: npm run build
 
-      - name: Reconcile canonical two-membrane governance through provider factory
+      - name: Reconcile canonical two-membrane governance and prove full topology
         env:
           EXPECTED_MAIN_SHA: ${{ steps.governance-command.outputs.expected_main_sha }}
           GOVERNANCE_APPROVAL_REFERENCE: ${{ steps.governance-command.outputs.approval_reference }}
@@ -371,6 +371,8 @@ jobs:
             FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME,
             providerForProject,
           } from './dist/providers/providerFactory.js';
+          import { getGitHubInstallationToken } from './dist/providers/githubAppAuth.js';
+          import { collectGovernancePreflight } from './scripts/audit-github-governance-preflight.mjs';
 
           const FULL_SHA = /^[0-9a-f]{40}$/;
           const APPROVAL = /^[A-Za-z0-9._:-]{8,200}$/;
@@ -383,61 +385,104 @@ jobs:
 
           const expectedMainSha = String(process.env.EXPECTED_MAIN_SHA ?? '').trim().toLowerCase();
           const appId = String(process.env.GITHUB_APP_ID ?? '').trim();
+          const privateKey = String(process.env.GITHUB_PRIVATE_KEY ?? '').trim();
           const approvalReference = String(process.env.GOVERNANCE_APPROVAL_REFERENCE ?? '').trim();
           const commandCommentId = String(process.env.GOVERNANCE_COMMAND_COMMENT_ID ?? '').trim();
 
-          if (!FULL_SHA.test(expectedMainSha)) throw new Error('EXPECTED_MAIN_SHA must be a lowercase full commit SHA');
-          if (!/^\d+$/.test(appId)) throw new Error('GITHUB_APP_ID must be a numeric trusted App identity');
-          if (!String(process.env.GITHUB_PRIVATE_KEY ?? '').trim()) throw new Error('GITHUB_PRIVATE_KEY is required');
-          if (!APPROVAL.test(approvalReference)) throw new Error('GOVERNANCE_APPROVAL_REFERENCE is invalid');
-
-          const provider = providerForProject(PROJECT);
-          const beforeMain = await provider.resolveRef(PROJECT_ID, 'main');
-          if (beforeMain.toLowerCase() !== expectedMainSha) {
-            throw new Error(`main moved before governance reconciliation: expected ${expectedMainSha}, observed ${beforeMain}`);
-          }
-
-          if (!provider.applyBranchRuleset) {
-            throw new Error('Canonical repository provider does not expose applyBranchRuleset');
-          }
-
-          const result = await provider.applyBranchRuleset(PROJECT_ID, {
-            name: FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME,
-            enforcement: 'active',
-            targetRefs: ['main'],
-            requirePullRequest: true,
-            requiredApprovingReviewCount: 1,
-            requiredStatusCheckNames: ['Required Gate', 'Verify test-ledger contract'],
-            blockForcePushes: true,
-            blockDeletion: true,
-            bypassActors: [{ kind: 'app', id: appId }],
-          });
-
-          const afterMain = await provider.resolveRef(PROJECT_ID, 'main');
-          if (afterMain.toLowerCase() !== expectedMainSha) {
-            throw new Error(`main moved during governance reconciliation: expected ${expectedMainSha}, observed ${afterMain}`);
-          }
+          let beforeMain = null;
+          let afterMain = null;
+          let result = null;
+          let topology = null;
+          let failure = null;
+          let providerMutationAttempted = false;
 
           await fs.mkdir('artifacts', { recursive: true });
-          await fs.writeFile(
-            'artifacts/github-governance-reconcile.json',
-            `${JSON.stringify({
-              schema: 'fcr/github-governance-reconcile@v1',
-              expectedMainSha,
-              beforeMain,
-              afterMain,
-              approvalReference,
-              commandCommentId,
-              generatedAt: new Date().toISOString(),
-              result,
-            }, null, 2)}\n`,
-            'utf8',
-          );
 
-          console.log(`Governance reconciliation completed at main=${expectedMainSha}`);
-          console.log(`review_ruleset=${result.name} (${result.id})`);
-          for (const component of result.components ?? []) {
-            console.log(`component=${component.purpose}:${component.name}:${component.id}:${component.enforcement}`);
+          try {
+            if (!FULL_SHA.test(expectedMainSha)) throw new Error('EXPECTED_MAIN_SHA must be a lowercase full commit SHA');
+            if (!/^\d+$/.test(appId)) throw new Error('GITHUB_APP_ID must be a numeric trusted App identity');
+            if (!privateKey) throw new Error('GITHUB_PRIVATE_KEY is required');
+            if (!APPROVAL.test(approvalReference)) throw new Error('GOVERNANCE_APPROVAL_REFERENCE is invalid');
+
+            const provider = providerForProject(PROJECT);
+            beforeMain = await provider.resolveRef(PROJECT_ID, 'main');
+            if (beforeMain.toLowerCase() !== expectedMainSha) {
+              throw new Error(`main moved before governance reconciliation: expected ${expectedMainSha}, observed ${beforeMain}`);
+            }
+
+            if (!provider.applyBranchRuleset) {
+              throw new Error('Canonical repository provider does not expose applyBranchRuleset');
+            }
+
+            providerMutationAttempted = true;
+            result = await provider.applyBranchRuleset(PROJECT_ID, {
+              name: FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME,
+              enforcement: 'active',
+              targetRefs: ['main'],
+              requirePullRequest: true,
+              requiredApprovingReviewCount: 1,
+              requiredStatusCheckNames: ['Required Gate', 'Verify test-ledger contract'],
+              blockForcePushes: true,
+              blockDeletion: true,
+              bypassActors: [{ kind: 'app', id: appId }],
+            });
+
+            afterMain = await provider.resolveRef(PROJECT_ID, 'main');
+            if (afterMain.toLowerCase() !== expectedMainSha) {
+              throw new Error(`main moved during governance reconciliation: expected ${expectedMainSha}, observed ${afterMain}`);
+            }
+
+            const installationToken = await getGitHubInstallationToken(
+              appId,
+              privateKey,
+              PROJECT.repo_identifier,
+            );
+            topology = await collectGovernancePreflight({
+              token: installationToken,
+              repository: PROJECT.repo_identifier,
+              targetRef: 'main',
+              trustedGitHubAppId: appId,
+            });
+            if (topology.status !== 'READY') {
+              throw new Error(
+                `FCR governance topology failed full provider preflight: ${topology.status}`,
+              );
+            }
+
+            console.log(`Governance reconciliation completed at main=${expectedMainSha}`);
+            console.log(`review_ruleset=${result.name} (${result.id})`);
+            for (const component of result.components ?? []) {
+              console.log(`component=${component.purpose}:${component.name}:${component.id}:${component.enforcement}`);
+            }
+            console.log(`full_topology_preflight=${topology.status}`);
+          } catch (error) {
+            failure = {
+              name: error instanceof Error ? error.name : 'Error',
+              message: error instanceof Error ? error.message : String(error),
+            };
+            throw error;
+          } finally {
+            const providerMutationState = failure
+              ? providerMutationAttempted ? 'UNKNOWN_OR_PARTIAL' : 'NOT_ATTEMPTED'
+              : 'VERIFIED_COMPLETE';
+            await fs.writeFile(
+              'artifacts/github-governance-reconcile.json',
+              `${JSON.stringify({
+                schema: 'fcr/github-governance-reconcile@v2',
+                expectedMainSha,
+                beforeMain,
+                afterMain,
+                approvalReference,
+                commandCommentId,
+                generatedAt: new Date().toISOString(),
+                providerMutationAttempted,
+                providerMutationState,
+                result,
+                topology,
+                failure,
+              }, null, 2)}\n`,
+              'utf8',
+            );
           }
           NODE
 
@@ -453,6 +498,7 @@ jobs:
           test "$current_main" = "$EXPECTED_MAIN_SHA"
 
       - name: Retain sanitized governance reconciliation receipt
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: github-governance-reconcile-${{ steps.governance-command.outputs.expected_main_sha }}-${{ github.run_id }}
@@ -474,6 +520,7 @@ jobs:
             echo "- Approval reference: \`$APPROVAL_REFERENCE\`"
             echo "- Command receipt: issue #418 comment \`$COMMENT_ID\`"
             echo '- Provider mutation path: canonical `providerForProject(...).applyBranchRuleset(...)` only'
+            echo '- Full provider topology preflight: `READY` required before this completion summary can run'
             echo '- Intended topology: trusted-App pull-request-only review membrane + zero-bypass strict-freshness membrane'
             echo '- Merge, deployment, database, secret/credential, billing, publication, and branch-deletion authority: none granted by this command'
           } >> "$GITHUB_STEP_SUMMARY"
