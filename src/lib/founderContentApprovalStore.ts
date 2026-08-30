@@ -90,16 +90,22 @@ function parseTime(value: unknown, label: string): number {
 
 function deterministicApprovalId({
   founderUserId,
-  proposalHash,
+  storyFingerprint,
+  intentId,
+  intentVersion,
 }: {
   founderUserId: string;
-  proposalHash: string;
+  storyFingerprint: string;
+  intentId: string;
+  intentVersion: unknown;
 }): string {
   const digest = createHash('sha256')
     .update(JSON.stringify({
       contract: 'fcr/founder-content-approval-reservation@v1',
       founderUserId: text(founderUserId),
-      proposalHash: text(proposalHash).toLowerCase(),
+      storyFingerprint: text(storyFingerprint).toLowerCase(),
+      currentYouIntentId: text(intentId),
+      currentYouIntentVersion: intentVersion,
     }))
     .digest('hex');
   return `fca:${digest}`;
@@ -351,7 +357,8 @@ export async function issueFounderContentApproval({
   repository?: FounderContentApprovalRepository;
   historyRepository?: FounderEditorialHistoryRepository;
 }): Promise<FounderContentIssuedApproval> {
-  canonicalFounderContent.canonicalChiefIdentity(proposal);
+  const canonicalIdentity = canonicalFounderContent.canonicalChiefIdentity(proposal);
+  const currentYou = record(canonicalIdentity.current_you);
   const novelty = await evaluateFounderEditorialNovelty({ proposal, historyRepository });
   if (!novelty.allowed) {
     throw new Error(
@@ -360,13 +367,15 @@ export async function issueFounderContentApproval({
   }
   const approvalId = deterministicApprovalId({
     founderUserId,
-    proposalHash: text(proposal.proposal_hash),
+    storyFingerprint: novelty.storyFingerprint,
+    intentId: text(currentYou.intent_id),
+    intentVersion: currentYou.intent_version,
   });
   const issued = canonicalIssue({ proposal, founderUserId, now, approvalId });
   const store = repository ?? await defaultRepository();
   const persisted = await store.issue({ ...issued, founderUserId });
   if (!persisted) {
-    throw new Error('authoritative founder-content approval could not be persisted; exact proposal approval is already reserved or store rejected issuance');
+    throw new Error('authoritative founder-content approval could not be persisted; exact story/current-intent approval is already reserved or store rejected issuance');
   }
   return issued;
 }
