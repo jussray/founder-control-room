@@ -1,4 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.hoisted(() => {
+  // createServer statically imports the auth router, whose public Supabase
+  // client validates these values at module initialization. They are test-only
+  // bootstrap configuration, not Jira authority or provider credentials.
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'test-publishable-auth-key';
+});
+
 import request from 'supertest';
 import { createServer } from '../../server.js';
 import { expectedJiraWorkAutomationReceiptId, type JiraWorkAutomationPlan } from '../../../lib/jiraWorkAutomation.js';
