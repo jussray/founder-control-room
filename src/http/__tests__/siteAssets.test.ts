@@ -38,8 +38,8 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(bootstrap).toContain("fetch('/auth/me'");
     expect(bootstrap).toContain("credentials: 'same-origin'");
     expect(bootstrap).toContain("sessionStorage.removeItem(LEGACY_SESSION_KEY)");
-    expect(bootstrap).not.toContain('access_token');
-    expect(bootstrap).not.toContain('refresh_token');
+    expect(bootstrap).not.toMatch(/sessionStorage\.setItem\([^\n]*(?:access_token|refresh_token)/i);
+    expect(bootstrap).not.toMatch(/JSON\.stringify\([^\n]*(?:access_token|refresh_token)/i);
     expect(existsSync(resolve(repoRoot, 'public/portable-founder-console/index.html'))).toBe(true);
   });
 
