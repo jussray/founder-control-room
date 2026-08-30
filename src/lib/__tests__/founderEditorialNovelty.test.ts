@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildFounderEditorialIdentity,
   evaluateFounderEditorialNovelty,
+  supabaseFounderEditorialHistoryRepository,
   type FounderEditorialHistoryRepository,
 } from '../founderEditorialNovelty.js';
 
@@ -159,5 +160,24 @@ describe('founder editorial novelty', () => {
     expect(result.allowed).toBe(true);
     expect(result.historyState).toBe('NOT_APPLICABLE');
     expect(repository.recentLinkedIn).not.toHaveBeenCalled();
+  });
+
+  it('orders dated LinkedIn history before null publish dates before applying the bounded window', async () => {
+    const query: Record<string, any> = {};
+    query.select = vi.fn(() => query);
+    query.in = vi.fn(() => query);
+    query.order = vi.fn(() => query);
+    query.limit = vi.fn(async () => ({ data: [], error: null }));
+    const client = {
+      from: vi.fn(() => query),
+    };
+
+    const repository = supabaseFounderEditorialHistoryRepository(client as any);
+    await repository.recentLinkedIn(32);
+
+    expect(client.from).toHaveBeenCalledWith('linkedin_experiments');
+    expect(query.order).toHaveBeenCalledWith('publish_date', { ascending: false, nullsFirst: false });
+    expect(query.limit).toHaveBeenCalledWith(32);
+    expect(query.order.mock.invocationCallOrder[0]).toBeLessThan(query.limit.mock.invocationCallOrder[0]);
   });
 });
