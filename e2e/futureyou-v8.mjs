@@ -159,6 +159,7 @@ try {
       value: SESSION_COOKIE_VALUE,
       url: BASE_URL,
       httpOnly: true,
+      secure: true,
       sameSite: 'Strict',
     }]);
     const page = await context.newPage();
