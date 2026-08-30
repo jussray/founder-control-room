@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the provider-neutral founder-content n8n route to FCR-owned exact one-shot approval readback while preserving provider preflight, replay resistance, and provider-native outcome proof as separate authority layers.",
+  "purpose": "Bind exact-current-main deterministic-review founder-runtime witness truth and current Goalfix, Cloudflare, founder-content, and repository-provider documentation to reviewed source invariants, including fail-closed existing non-FCR ruleset behavior and the FCR constitutional Code Owner plus CodeQL two-membrane security floor. This receipt does not grant merge, deploy, provider-policy, publication, database, secret, billing, destructive-action, or runtime authority.",
   "domains": [
     "publishing"
   ],
@@ -45,6 +45,33 @@
       "path": "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md",
       "claims": [
         "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md must require the same FCR-owned one-shot approval membrane for provider-neutral n8n writes, must preflight configuration before consumption, and must keep provider-native readback as terminal publication evidence."
+      ]
+    },
+    {
+      "path": ".github/workflows/deterministic-review-core-advisory.yml",
+      "claims": [
+        "The issue-418 founder command dispatcher must serialize workflow_dispatch inputs in the API-accepted form, including pull_request_number as a string value, while preserving immutable founder identity checks, exact current-main binding, open main-target PR validation, and the non-authorizing witness-only boundary.",
+        "A successful founder command may dispatch trusted current-main witness production only; it must not grant Founder Final, merge, deployment, provider-policy, database, secret, billing, publication, or destructive-action authority."
+      ]
+    },
+    {
+      "path": "src/providers/GitHubProvider.ts",
+      "claims": [
+        "For active FCR main governance, src/providers/GitHubProvider.ts must keep Code Owner review enabled and carry exactly one CodeQL code-scanning rule at high_or_higher security alerts and errors alerts inside the review membrane while required-status strictness remains in the zero-bypass freshness companion.",
+        "FCR review readback must fail closed when Code Owner or the exact CodeQL floor is missing, duplicated, weakened, or accompanied by an unexpected rule type, and the no-bypass strict-freshness component must still be applied and verified before the review membrane is changed.",
+        "The FCR-specific security floor must not broaden generic repository behavior or reopen existing non-FCR ruleset mutation that SecurityPreservingGitHubProvider intentionally blocks."
+      ]
+    },
+    {
+      "path": "scripts/audit-github-governance-preflight.mjs",
+      "claims": [
+        "scripts/audit-github-governance-preflight.mjs may report READY only when the canonical FCR review membrane includes Code Owner review, the exact CodeQL high_or_higher/errors floor, exact review rule types and pull-request-only trusted-App bypass, alongside the separate exact zero-bypass strict-freshness ruleset and an eligible non-owner write reviewer."
+      ]
+    },
+    {
+      "path": "docs/PROVIDERS.md",
+      "claims": [
+        "docs/PROVIDERS.md must describe Code Owner review and the exact CodeQL high_or_higher/errors code-scanning rule as part of the FCR review membrane security floor, separate from the no-bypass strict required-status freshness membrane, without claiming that source configuration proves live provider reconciliation."
       ]
     }
   ]
