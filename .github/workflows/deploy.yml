@@ -76,6 +76,7 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          FOUNDER_SESSION_ENCRYPTION_KEY: ${{ secrets.FOUNDER_SESSION_ENCRYPTION_KEY }}
           GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
           GITHUB_APP_ID: ${{ secrets.APP_ID }}
           GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
@@ -93,6 +94,7 @@ jobs:
             SUPABASE_DB_URL
             SUPABASE_SERVICE_ROLE_KEY
             SUPABASE_PUBLISHABLE_KEY
+            FOUNDER_SESSION_ENCRYPTION_KEY
             GITHUB_WEBHOOK_SECRET
             GITHUB_APP_ID
             GITHUB_PRIVATE_KEY
@@ -315,6 +317,7 @@ jobs:
           secrets: |
             SUPABASE_SERVICE_ROLE_KEY
             SUPABASE_PUBLISHABLE_KEY
+            FOUNDER_SESSION_ENCRYPTION_KEY
             GITHUB_WEBHOOK_SECRET
             GITHUB_APP_ID
             GITHUB_PRIVATE_KEY
@@ -325,6 +328,7 @@ jobs:
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          FOUNDER_SESSION_ENCRYPTION_KEY: ${{ secrets.FOUNDER_SESSION_ENCRYPTION_KEY }}
           GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
           GITHUB_APP_ID: ${{ secrets.APP_ID }}
           GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
