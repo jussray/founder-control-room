@@ -8,7 +8,7 @@
     {
       "name": "__Host-fcr_session",
       "classification": "strictly_necessary",
-      "purpose": "Carry a high-entropy opaque Founder Control Room browser-session capability whose authoritative credentials, expiry, rotation, and revocation state remain server-side.",
+      "purpose": "Carry a high-entropy opaque Founder Control Room browser-session capability whose authoritative credentials, expiry, rotation, revocation, founder identity, and continuity-integrity state remain server-side.",
       "owner": "backend",
       "providers": ["supabase", "cloudflare"],
       "sensitive": true,
@@ -18,7 +18,7 @@
       "path": "/",
       "maxAgeSeconds": 28800,
       "cacheControl": "private, no-store",
-      "integrity": "256-bit server-issued random capability; only its SHA-256 lookup hash is persisted and the cookie grants no authority without active server-side session state.",
+      "integrity": "256-bit server-issued random capability; only its SHA-256 lookup hash is persisted and the cookie grants no authority without active server-side session state whose deterministic continuity_fingerprint also validates.",
       "csrf": "Approved same-origin browser context is required for privileged mutations; founder authority remains separately gated by FCR policy.",
       "deletion": "Cleared by POST /auth/logout, session rotation failure, and failed or disallowed browser-session verification. Server-side logout also records revocation."
     },
@@ -41,13 +41,17 @@
     }
   ],
   "nonCookieState": [
-    "founder_browser_sessions: service-role-only server-side session state keyed by a SHA-256 hash of the opaque browser capability"
+    "founder_browser_sessions: service-role-only server-side session state keyed by a SHA-256 hash of the opaque browser capability",
+    "continuity_fingerprint: deterministic server-state integrity evidence over the active session identity and lifetime; it is not a browser/device fingerprint, does not use network/device tracking entropy, and grants no action authority",
+    "portfolio proof cookie / continuity receipt: bounded audit metadata over an exact repository/target/base/head/scope/evidence fingerprint; browserCookie=false and actionAuthority=false; it is never emitted with Set-Cookie and becomes historical when its bound fingerprint moves"
   ],
   "externalCookieProviders": [],
   "prohibited": [
     "analytics or advertising cookies",
     "client-readable founder auth tokens in the FCR browser-session cookie",
     "self-contained access or refresh token payloads in founder session cookies",
+    "writing portfolio proof cookies or continuity receipts into browser cookie storage",
+    "treating continuity_fingerprint, a proof cookie, or a browser session cookie as Founder Final, merge, deployment, provider, database, publication, billing, or destructive-action authority",
     "cross-project Se'kret Bip session reuse",
     "caching any response that writes, rotates, or clears the founder session"
   ]
