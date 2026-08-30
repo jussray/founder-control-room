@@ -118,7 +118,30 @@ jobs:
             exit 1
           fi
 
-          echo "All required production configuration names are present."
+          FOUNDER_SESSION_ENCRYPTION_KEY="$FOUNDER_SESSION_ENCRYPTION_KEY" python3 - <<'PY'
+          import base64
+          import os
+          import re
+
+          encoded = os.environ.get('FOUNDER_SESSION_ENCRYPTION_KEY', '').strip()
+          if not re.fullmatch(r'[A-Za-z0-9_-]{43}', encoded):
+              print('::error title=Invalid founder session encryption key::FOUNDER_SESSION_ENCRYPTION_KEY must be 43-character unpadded base64url')
+              raise SystemExit(1)
+
+          try:
+              decoded = base64.b64decode(encoded + '=', altchars=b'-_', validate=True)
+          except Exception:
+              print('::error title=Invalid founder session encryption key::FOUNDER_SESSION_ENCRYPTION_KEY is not valid base64url')
+              raise SystemExit(1)
+
+          if len(decoded) != 32:
+              print('::error title=Invalid founder session encryption key::FOUNDER_SESSION_ENCRYPTION_KEY must decode to exactly 32 bytes')
+              raise SystemExit(1)
+
+          print('FOUNDER_SESSION_ENCRYPTION_KEY format is valid.')
+          PY
+
+          echo "All required production configuration names are present and structurally valid."
 
       - name: Record authority receipt
         shell: bash
@@ -255,6 +278,7 @@ jobs:
           REQUIRED_MIGRATION_VERSIONS: 20260723000000,20260803011000
         run: |
           set -euo pipefail
+          mkdir -p test-results
           supabase migration list --db-url "$SUPABASE_DB_URL" | tee "$REMOTE_MIGRATION_LIST_PATH"
           node scripts/verify-production-migration-ledger.mjs
 
