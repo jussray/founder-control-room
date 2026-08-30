@@ -9,10 +9,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -109,17 +105,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm install
 
       - name: Install Chromium for Playwright harness
         shell: bash
         run: |
           sudo mkdir -p /opt/pw-browsers
           sudo chown -R "$USER:$USER" /opt/pw-browsers
-          PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers npx playwright install chromium
+          PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers npx playwright install --with-deps chromium
 
       - name: Run Playwright browser proof
         run: npm run test:e2e

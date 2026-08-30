@@ -9,10 +9,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: quality-gate-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -35,9 +31,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm install
       - run: npm run typecheck
 
   lint:
@@ -57,9 +52,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm install
       - run: npm run lint
 
   unit-tests:
@@ -79,9 +73,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm install
       - run: npm test -- --coverage --reporter=json --outputFile=test-results.json
       - uses: actions/upload-artifact@v4
         if: always()
@@ -108,9 +101,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm install
       - run: npm run verify:terminal-contract
       - run: npm run verify:juss-flow
       - run: npm run verify:production-authority
@@ -170,9 +162,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm install
       - run: npm run build
 
   qodo-contracts:
@@ -195,9 +186,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm install
       - name: Run Qodo tests
         if: env.QODO_API_KEY != ''
         run: npx qodo test --coverage --reporter=json --output=qodo-results.json
