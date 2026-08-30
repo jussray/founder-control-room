@@ -513,6 +513,7 @@ export async function dispatchProviderNeutralN8nFounderContent(
       channel: request.platform,
       contentId: envelope.content_id,
       requestedScheduleAt: envelope.provider_request.schedule_at,
+      approvalExpiresAt: exactAuthorization(input).expires_at,
     });
     const cadenceProjection = applyFounderContentCadenceSchedule({
       provider: PROVIDER_NEUTRAL_CADENCE_PROVIDER,
