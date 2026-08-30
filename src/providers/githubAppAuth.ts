@@ -1,4 +1,4 @@
-import { createSign } from "node:crypto";
+import { createPrivateKey, createSign, type KeyObject } from "node:crypto";
 import { Octokit } from "@octokit/rest";
 
 interface CachedInstallationToken {
@@ -16,8 +16,64 @@ function encodeBase64Url(value: string | Buffer): string {
     .replace(/\//g, "_");
 }
 
+function decodeJsonQuotedString(value: string): string {
+  if (!value.startsWith('"') || !value.endsWith('"')) return value;
+  try {
+    const decoded = JSON.parse(value) as unknown;
+    return typeof decoded === "string" ? decoded : value;
+  } catch {
+    return value;
+  }
+}
+
+function decodeBase64Pem(value: string): string {
+  const compact = value.replace(/\s+/g, "");
+  if (!compact || !/^[A-Za-z0-9+/]+={0,2}$/.test(compact)) return value;
+  try {
+    const decoded = Buffer.from(compact, "base64").toString("utf8").trim();
+    return decoded.includes("-----BEGIN") && decoded.includes("PRIVATE KEY-----")
+      ? decoded
+      : value;
+  } catch {
+    return value;
+  }
+}
+
 function normalizePrivateKey(value: string): string {
-  return value.includes("\\n") ? value.replace(/\\n/g, "\n") : value;
+  let normalized = decodeJsonQuotedString(value.trim())
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\r\n/g, "\n")
+    .trim();
+
+  if (!normalized.includes("-----BEGIN")) {
+    normalized = decodeBase64Pem(normalized);
+  }
+
+  return normalized.replace(/\r\n/g, "\n").trim();
+}
+
+function parseGitHubAppPrivateKey(value: string): KeyObject {
+  const normalized = normalizePrivateKey(value);
+  if (!/^-----BEGIN (?:RSA )?PRIVATE KEY-----\n/.test(normalized)) {
+    throw new Error(
+      "GITHUB_PRIVATE_KEY must contain the complete GitHub App RSA private-key PEM (raw PEM, escaped-newline PEM, JSON-quoted PEM, or base64-encoded PEM)",
+    );
+  }
+
+  let key: KeyObject;
+  try {
+    key = createPrivateKey({ key: normalized, format: "pem" });
+  } catch {
+    throw new Error(
+      "GITHUB_PRIVATE_KEY could not be parsed as the complete GitHub App RSA private-key PEM; verify APP_PRIVATE_KEY contains the downloaded .pem contents or a supported transport encoding",
+    );
+  }
+
+  if (key.type !== "private" || key.asymmetricKeyType !== "rsa") {
+    throw new Error("GITHUB_PRIVATE_KEY must be an RSA private key for GitHub App RS256 authentication");
+  }
+  return key;
 }
 
 /** Creates the short-lived RS256 JWT GitHub requires for App authentication. */
@@ -38,7 +94,7 @@ export function createGitHubAppJwt(
   const signer = createSign("RSA-SHA256");
   signer.update(signingInput);
   signer.end();
-  const signature = signer.sign(normalizePrivateKey(privateKey));
+  const signature = signer.sign(parseGitHubAppPrivateKey(privateKey));
   return `${signingInput}.${encodeBase64Url(signature)}`;
 }
 
