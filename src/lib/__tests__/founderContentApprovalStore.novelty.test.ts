@@ -171,17 +171,41 @@ describe('founder content approval editorial gate', () => {
     expect(approvals.issue).toHaveBeenCalledTimes(1);
   });
 
-  it('serializes regenerated same-story proposals within the same current-you intent through one reservation id', async () => {
+  it('serializes the same public pattern across evidence rotation within one current-you intent', async () => {
     const approvals = uniqueApprovalRepository();
     const history = emptyHistoryRepository();
     const firstProposal = proposal();
     const regeneratedProposal = proposal() as Record<string, any>;
+    const rotatedSha = 'f'.repeat(40);
+    const rotatedEvidenceRef = `github:founder-control-room@${rotatedSha}#editorial-convergence`;
+
+    regeneratedProposal.source = {
+      ...regeneratedProposal.source,
+      commit_sha: rotatedSha,
+    };
     regeneratedProposal.freshness = {
       issued_at: '2026-08-29T23:21:00.000Z',
       expires_at: '2026-08-30T00:21:00.000Z',
     };
+    regeneratedProposal.public_payload = {
+      ...regeneratedProposal.public_payload,
+      public_claims: regeneratedProposal.public_payload.public_claims.map((claim: Record<string, unknown>) => ({
+        ...claim,
+        evidence_ref: rotatedEvidenceRef,
+        temporal_version: rotatedSha,
+      })),
+    };
+    regeneratedProposal.internal_evidence = {
+      ...regeneratedProposal.internal_evidence,
+      ref: rotatedEvidenceRef,
+      digest: 'a'.repeat(64),
+      source_commit_sha: rotatedSha,
+    };
     regeneratedProposal.proposal_hash = hashPublicPayload(canonicalChiefIdentity(regeneratedProposal));
+
     expect(regeneratedProposal.proposal_hash).not.toBe(firstProposal.proposal_hash);
+    expect(regeneratedProposal.source.commit_sha).not.toBe((firstProposal.source as Record<string, unknown>).commit_sha);
+    expect(regeneratedProposal.internal_evidence.digest).not.toBe((firstProposal.internal_evidence as Record<string, unknown>).digest);
 
     const results = await Promise.allSettled([
       issueFounderContentApproval({
