@@ -251,11 +251,13 @@ export async function prepareProviderNeutralN8nFounderContent(
   }
 
   try {
+    const approvalExpiresAt = text(record(input.approval).expires_at);
     const cadence = await reserveFounderContentCadence({
       provider: PROVIDER_NEUTRAL_CADENCE_PROVIDER,
       channel: request.platform,
       contentId: envelope.content_id,
       requestedScheduleAt: envelope.provider_request.schedule_at,
+      approvalExpiresAt,
     });
     const cadenceProjection = applyFounderContentCadenceSchedule({
       provider: PROVIDER_NEUTRAL_CADENCE_PROVIDER,
@@ -265,7 +267,7 @@ export async function prepareProviderNeutralN8nFounderContent(
     }, cadence);
     assertScheduleBeforeApprovalExpiry(
       cadenceProjection.provider_request.schedule_at,
-      text(record(input.approval).expires_at),
+      approvalExpiresAt,
     );
     envelope = {
       ...envelope,
