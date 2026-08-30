@@ -51,7 +51,7 @@ export interface CadenceSchedulableEnvelope {
   content_id: string;
   provider_request: {
     schedule_at: string;
-    review_deadline?: string;
+    review_deadline?: string | null;
   };
 }
 
