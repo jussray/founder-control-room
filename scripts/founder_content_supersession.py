@@ -6,6 +6,11 @@ published content subject, preserves the prior claim as historical when newer
 evidence changes the conclusion, and emits a deterministic receipt plus the
 next bounded strategy mutation. It never approves, schedules, publishes, or
 mutates provider state.
+
+V3 records caller-supplied source digests but does not resolve or verify the
+source artifact bytes. Therefore V3 evidence/claim states are ATTESTED rather
+than VERIFIED. Provenance locking and verified source binding are reserved for
+an explicit successor contract.
 """
 from __future__ import annotations
 
@@ -188,7 +193,7 @@ def build_supersession_receipt(payload: dict[str, Any]) -> dict[str, Any]:
                     "engagements": prior_engagements,
                     "engagement_rate": prior_rate,
                 },
-                "evidence_state": "VERIFIED_HISTORICAL",
+                "evidence_state": "ATTESTED_HISTORICAL",
             },
             {
                 "observed_at": current_at_raw,
@@ -198,7 +203,7 @@ def build_supersession_receipt(payload: dict[str, Any]) -> dict[str, Any]:
                     "engagements": current_engagements,
                     "engagement_rate": current_rate,
                 },
-                "evidence_state": "VERIFIED_CURRENT",
+                "evidence_state": "ATTESTED_CURRENT",
             },
         ],
         "diff": {
@@ -211,7 +216,7 @@ def build_supersession_receipt(payload: dict[str, Any]) -> dict[str, Any]:
             "prior_claim": prior_claim,
             "prior_claim_state": "SUPERSEDED_HISTORICAL",
             "current_claim": current_claim,
-            "current_claim_state": "VERIFIED_CURRENT",
+            "current_claim_state": "ATTESTED_CURRENT",
         },
         "strategy_mutation": {
             "action": action,
@@ -219,6 +224,7 @@ def build_supersession_receipt(payload: dict[str, Any]) -> dict[str, Any]:
         },
         "provenance": {
             "source_digests_present": True,
+            "source_digest_verification": "UNVERIFIED_INPUT_V3",
             "claim_source_binding": "NOT_LOCKED_V3",
         },
     }
