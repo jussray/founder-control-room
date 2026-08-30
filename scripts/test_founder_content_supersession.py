@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import importlib.util
 import unittest
 from pathlib import Path
@@ -8,6 +9,12 @@ spec = importlib.util.spec_from_file_location('founder_content_supersession', MO
 mod = importlib.util.module_from_spec(spec)
 assert spec.loader
 spec.loader.exec_module(mod)
+
+SOURCE_BINDING_MODULE = Path(__file__).with_name('founder_content_source_binding.py')
+source_binding_spec = importlib.util.spec_from_file_location('founder_content_source_binding', SOURCE_BINDING_MODULE)
+source_binding = importlib.util.module_from_spec(source_binding_spec)
+assert source_binding_spec.loader
+source_binding_spec.loader.exec_module(source_binding)
 
 
 CANONICAL = {
@@ -65,6 +72,67 @@ class FounderContentSupersessionTest(unittest.TestCase):
         serialized = repr(receipt)
         self.assertNotIn('VERIFIED_CURRENT', serialized)
         self.assertNotIn('VERIFIED_HISTORICAL', serialized)
+
+    def test_source_bytes_can_be_bound_without_self_certifying_the_claim(self):
+        prior_bytes = b'linkedin export snapshot 2026-08-29'
+        current_bytes = b'linkedin export snapshot 2026-08-30'
+        payload = copy.deepcopy(CANONICAL)
+        payload['prior']['source_sha256'] = hashlib.sha256(prior_bytes).hexdigest()
+        payload['current']['source_sha256'] = hashlib.sha256(current_bytes).hexdigest()
+
+        receipt = source_binding.build_source_bound_supersession_receipt(
+            payload,
+            prior_source_bytes=prior_bytes,
+            current_source_bytes=current_bytes,
+        )
+
+        self.assertEqual(receipt['contract'], 'fcr/founder-content-supersession@v4')
+        self.assertEqual(receipt['source_binding']['prior']['binding_state'], 'SOURCE_BYTES_MATCH_HISTORICAL')
+        self.assertEqual(receipt['source_binding']['current']['binding_state'], 'SOURCE_BYTES_MATCH_CURRENT')
+        self.assertEqual(receipt['provenance']['source_digest_verification'], 'VERIFIED_FROM_SOURCE_BYTES_V4')
+        self.assertEqual(receipt['provenance']['claim_source_binding'], 'LOCKED_TO_SOURCE_BYTES_V4')
+        self.assertEqual(receipt['provenance']['independent_witness'], 'NOT_PRESENT_V4')
+        self.assertEqual(receipt['provenance']['execution_environment_attestation'], 'NOT_LOCKED_V4')
+        self.assertEqual(receipt['provenance']['verification_ceiling'], 'ATTESTED')
+        self.assertEqual(receipt['evidence'][0]['evidence_state'], 'ATTESTED_HISTORICAL')
+        self.assertEqual(receipt['evidence'][1]['evidence_state'], 'ATTESTED_CURRENT')
+        self.assertEqual(receipt['supersession']['current_claim_state'], 'ATTESTED_CURRENT')
+        self.assertNotIn('VERIFIED_CURRENT', repr(receipt))
+        self.assertNotIn('VERIFIED_HISTORICAL', repr(receipt))
+
+    def test_source_binding_rejects_bytes_that_do_not_match_claimed_digest(self):
+        prior_bytes = b'linkedin export snapshot 2026-08-29'
+        current_bytes = b'linkedin export snapshot 2026-08-30'
+        payload = copy.deepcopy(CANONICAL)
+        payload['prior']['source_sha256'] = hashlib.sha256(prior_bytes).hexdigest()
+        payload['current']['source_sha256'] = hashlib.sha256(current_bytes).hexdigest()
+
+        with self.assertRaisesRegex(ValueError, 'sha256 does not match'):
+            source_binding.build_source_bound_supersession_receipt(
+                payload,
+                prior_source_bytes=prior_bytes + b'-tampered',
+                current_source_bytes=current_bytes,
+            )
+
+    def test_source_bound_receipt_is_deterministic(self):
+        prior_bytes = b'linkedin export snapshot 2026-08-29'
+        current_bytes = b'linkedin export snapshot 2026-08-30'
+        payload = copy.deepcopy(CANONICAL)
+        payload['prior']['source_sha256'] = hashlib.sha256(prior_bytes).hexdigest()
+        payload['current']['source_sha256'] = hashlib.sha256(current_bytes).hexdigest()
+
+        first = source_binding.build_source_bound_supersession_receipt(
+            copy.deepcopy(payload),
+            prior_source_bytes=prior_bytes,
+            current_source_bytes=current_bytes,
+        )
+        second = source_binding.build_source_bound_supersession_receipt(
+            copy.deepcopy(payload),
+            prior_source_bytes=prior_bytes,
+            current_source_bytes=current_bytes,
+        )
+        self.assertEqual(first['receipt_id'], second['receipt_id'])
+        self.assertEqual(first['receipt_sha256'], second['receipt_sha256'])
 
     def test_receipt_is_deterministic_and_mutation_is_bound_into_identity(self):
         first = mod.build_supersession_receipt(copy.deepcopy(CANONICAL))
