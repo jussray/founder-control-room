@@ -97,6 +97,25 @@ function approvalRepository(): FounderContentApprovalRepository {
   };
 }
 
+function uniqueApprovalRepository(): FounderContentApprovalRepository {
+  const issuedIds = new Set<string>();
+  return {
+    issue: vi.fn(async (input) => {
+      if (issuedIds.has(input.approvalId)) return false;
+      issuedIds.add(input.approvalId);
+      return true;
+    }),
+    readCurrent: vi.fn(),
+    claim: vi.fn(),
+  };
+}
+
+function emptyHistoryRepository(): FounderEditorialHistoryRepository {
+  return {
+    recentLinkedIn: vi.fn(async () => []),
+  };
+}
+
 function historyRepository(coreThesis: string, primaryHook: string): FounderEditorialHistoryRepository {
   return {
     recentLinkedIn: vi.fn(async () => [{
@@ -150,5 +169,39 @@ describe('founder content approval editorial gate', () => {
 
     expect(issued.platform).toBe('linkedin');
     expect(approvals.issue).toHaveBeenCalledTimes(1);
+  });
+
+  it('serializes concurrent issuance for the exact same founder and proposal through one deterministic reservation id', async () => {
+    const approvals = uniqueApprovalRepository();
+    const history = emptyHistoryRepository();
+    const exactProposal = proposal();
+
+    const results = await Promise.allSettled([
+      issueFounderContentApproval({
+        proposal: exactProposal,
+        founderUserId: 'founder-user-1',
+        now: NOW,
+        repository: approvals,
+        historyRepository: history,
+      }),
+      issueFounderContentApproval({
+        proposal: exactProposal,
+        founderUserId: 'founder-user-1',
+        now: '2026-08-29T23:40:00.010Z',
+        repository: approvals,
+        historyRepository: history,
+      }),
+    ]);
+
+    const fulfilled = results.filter((result) => result.status === 'fulfilled');
+    const rejected = results.filter((result) => result.status === 'rejected');
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect(approvals.issue).toHaveBeenCalledTimes(2);
+
+    const firstId = vi.mocked(approvals.issue).mock.calls[0]?.[0].approvalId;
+    const secondId = vi.mocked(approvals.issue).mock.calls[1]?.[0].approvalId;
+    expect(firstId).toMatch(/^fca:[0-9a-f]{64}$/);
+    expect(secondId).toBe(firstId);
   });
 });
