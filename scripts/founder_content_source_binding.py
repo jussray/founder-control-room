@@ -3,10 +3,11 @@
 
 V4 is a strict successor layer over V3. It proves that the caller-supplied
 SHA-256 digests in a V3 payload match actual source bytes supplied to this
-verifier. Source-byte binding is stronger provenance, but it still does not
-make the execution actor or the resulting claim independently verified.
-Therefore claim/evidence states remain ATTESTED until a separate independent
-witness/environment contract proves the verifier itself.
+verifier. Source-byte binding strengthens artifact provenance, but it does not
+prove that caller-supplied metrics or claims were correctly derived from those
+bytes and it does not make the execution actor independently verified.
+Therefore claim/evidence states remain ATTESTED until separate derivation and
+independent witness/environment contracts prove more.
 """
 from __future__ import annotations
 
@@ -52,7 +53,7 @@ def build_source_bound_supersession_receipt(
     prior_source_bytes: bytes,
     current_source_bytes: bytes,
 ) -> dict[str, Any]:
-    """Bind V3 attested evidence to actual source bytes without self-verifying."""
+    """Bind V3 digests to source bytes without claiming derivation or self-verification."""
     receipt = mod.build_supersession_receipt(payload)
 
     prior_digest = receipt["evidence"][0]["source_sha256"]
@@ -80,15 +81,17 @@ def build_source_bound_supersession_receipt(
     body["provenance"] = {
         **body["provenance"],
         "source_digest_verification": "VERIFIED_FROM_SOURCE_BYTES_V4",
-        "claim_source_binding": "LOCKED_TO_SOURCE_BYTES_V4",
+        "source_artifact_binding": "LOCKED_TO_SOURCE_BYTES_V4",
+        "claim_source_binding": "NOT_PROVEN_V4",
+        "metric_derivation_verification": "NOT_PROVEN_V4",
         "independent_witness": "NOT_PRESENT_V4",
         "execution_environment_attestation": "NOT_LOCKED_V4",
         "verification_ceiling": VERIFICATION_CEILING,
     }
 
-    # Source-byte equality is provenance evidence only. It cannot upgrade the
-    # executor's own observation/claim into VERIFIED without an independent
-    # witness outside this execution boundary.
+    # Source-byte equality proves artifact identity only. It cannot prove the
+    # supplied metrics/claim were derived correctly, nor can the executor's own
+    # receipt upgrade itself to VERIFIED without an independent witness.
     body["evidence"][0]["evidence_state"] = "ATTESTED_HISTORICAL"
     body["evidence"][1]["evidence_state"] = "ATTESTED_CURRENT"
     body["supersession"]["current_claim_state"] = "ATTESTED_CURRENT"
