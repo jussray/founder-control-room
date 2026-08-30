@@ -83,15 +83,15 @@ describe('founder editorial novelty', () => {
     expect(result.authority).toEqual({ publish: false, approve: false, schedule: false });
   });
 
-  it('keeps any exact founder-machine pattern HIGH even when another row ranks closer by token similarity', async () => {
+  it('keeps any exact portfolio pattern HIGH even when another project ranks closer by token similarity', async () => {
     const repository = history([
       {
-        id: 'promptos-same-pattern',
-        relatedProject: 'PromptOS',
+        id: 'sekret-same-pattern',
+        relatedProject: 'Se’kret Bip',
         coreThesis: 'PromptOS, Chief, and Founder Control Room are converging into one founder operating system.',
         primaryHook: 'I stopped building separate AI apps.',
         angle: 'architecture boundaries governance provider reconciliation session continuity runtime deployment founder workflow design visual system company operations build log internal tooling product strategy orchestration',
-        meaningfulChange: 'This historical record contains deliberately verbose unrelated notes that dilute token similarity without changing the exact thesis and hook pattern.',
+        meaningfulChange: 'This historical product record contains deliberately verbose unrelated notes that dilute token similarity without changing the exact thesis and hook pattern.',
       },
       {
         id: 'semantic-distractor',
