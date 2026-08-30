@@ -10,6 +10,7 @@ import {
 
 const CONTENT_ID = '11111111-1111-4111-8111-111111111111';
 const REQUESTED = '2026-08-17T16:20:00.000Z';
+const RETRY_REQUESTED = '2026-08-17T16:40:00.000Z';
 const APPROVAL_EXPIRES_AT = '2026-08-17T18:20:00.000Z';
 const RESERVATION_ID = '22222222-2222-4222-8222-222222222222';
 const EXPIRY_GUARD_MIGRATION = 'supabase/migrations/20260830113000_founder_content_cadence_expiry_guard.sql';
@@ -25,7 +26,11 @@ function rpcRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function rpcClient(row = rpcRow(), error: { message: string } | null = null) {
+function rpcClient(
+  row = rpcRow(),
+  error: { message: string } | null = null,
+  expectedRequested = REQUESTED,
+) {
   return {
     async rpc(functionName: string, args: Record<string, unknown>) {
       expect(functionName).toBe('reserve_founder_content_cadence');
@@ -33,7 +38,7 @@ function rpcClient(row = rpcRow(), error: { message: string } | null = null) {
         p_provider: 'buffer',
         p_channel: 'juss_rayy_linkedin',
         p_content_id: CONTENT_ID,
-        p_requested_schedule_at: REQUESTED,
+        p_requested_schedule_at: expectedRequested,
         p_approval_expires_at: APPROVAL_EXPIRES_AT,
       });
       return { data: row ? [row] : null, error };
@@ -115,6 +120,54 @@ describe('founder-content hourly cadence', () => {
     expect(adjusted.provider_request.review_window_minutes).toBe(20);
     expect(adjusted.text).toBe(envelope.text);
     expect(envelope.provider_request.schedule_at).toBe(REQUESTED);
+  });
+
+  it('reuses the canonical cadence slot and original review deadline across a fresh retry timestamp', async () => {
+    const reserved = '2026-08-17T17:20:00.000Z';
+    const reservation = await reserveFounderContentCadence({
+      provider: 'buffer',
+      channel: 'juss_rayy_linkedin',
+      contentId: CONTENT_ID,
+      requestedScheduleAt: RETRY_REQUESTED,
+      approvalExpiresAt: APPROVAL_EXPIRES_AT,
+    }, rpcClient(rpcRow({
+      requested_schedule_at: REQUESTED,
+      reserved_schedule_at: reserved,
+      deferred_seconds: 3600,
+    }), null, RETRY_REQUESTED));
+
+    expect(reservation.requestedScheduleAt).toBe(REQUESTED);
+    expect(reservation.reservedScheduleAt).toBe(reserved);
+
+    const adjusted = applyFounderContentCadenceSchedule({
+      provider: 'buffer',
+      channel: 'juss_rayy_linkedin',
+      content_id: CONTENT_ID,
+      provider_request: {
+        schedule_at: RETRY_REQUESTED,
+        review_deadline: RETRY_REQUESTED,
+        review_window_minutes: 20,
+      },
+      text: 'same exact authorized content',
+    }, reservation);
+
+    expect(adjusted.provider_request.schedule_at).toBe(reserved);
+    expect(adjusted.provider_request.review_deadline).toBe(REQUESTED);
+    expect(adjusted.provider_request.review_window_minutes).toBe(20);
+  });
+
+  it('rejects a cadence row whose canonical review origin postdates the current request', async () => {
+    await expect(reserveFounderContentCadence({
+      provider: 'buffer',
+      channel: 'juss_rayy_linkedin',
+      contentId: CONTENT_ID,
+      requestedScheduleAt: REQUESTED,
+      approvalExpiresAt: APPROVAL_EXPIRES_AT,
+    }, rpcClient(rpcRow({
+      requested_schedule_at: '2026-08-17T16:30:00.000Z',
+      reserved_schedule_at: '2026-08-17T17:20:00.000Z',
+      deferred_seconds: 3000,
+    })))).rejects.toThrow(/may not postdate current request/);
   });
 
   it('rejects a reservation being replayed onto a different content or channel', async () => {
