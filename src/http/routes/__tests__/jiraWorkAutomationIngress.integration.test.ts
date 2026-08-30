@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.hoisted(() => {
-  // createServer statically imports the auth router, whose public Supabase
-  // client validates these values at module initialization. They are test-only
-  // bootstrap configuration, not Jira authority or provider credentials.
+  // createServer statically imports auth + server-side Supabase modules whose
+  // clients validate configuration at module initialization. These are fake
+  // test-only bootstrap values, not Jira authority or provider credentials.
   process.env.SUPABASE_URL = 'https://example.supabase.co';
   process.env.SUPABASE_PUBLISHABLE_KEY = 'test-publishable-auth-key';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
 });
 
 import request from 'supertest';
