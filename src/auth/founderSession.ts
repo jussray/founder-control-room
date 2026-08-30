@@ -306,22 +306,40 @@ export async function writeFounderSession(res: Response, session: Session): Prom
   setSessionCookie(res, value);
 }
 
-export async function revokeFounderSession(req: Request, reason = 'logout'): Promise<boolean> {
+async function revokeFounderSessionInternal(
+  req: Request,
+  reason: string,
+  requireActiveMatch: boolean,
+): Promise<boolean> {
   const value = opaqueCookieValue(req);
   if (!value) return true;
 
+  const hash = sessionIdHash(value);
   const revokedAt = new Date().toISOString();
-  const { error } = await supabase
+  const query = supabase
     .from(SESSION_TABLE)
     .update({ revoked_at: revokedAt, revoke_reason: reason })
-    .eq('session_id_hash', sessionIdHash(value))
+    .eq('session_id_hash', hash)
     .is('revoked_at', null);
 
-  return !error;
+  if (!requireActiveMatch) {
+    const { error } = await query;
+    return !error;
+  }
+
+  const { data, error } = await query
+    .select('session_id_hash')
+    .maybeSingle();
+  if (error || !data) return false;
+  return (data as { session_id_hash?: unknown }).session_id_hash === hash;
+}
+
+export async function revokeFounderSession(req: Request, reason = 'logout'): Promise<boolean> {
+  return revokeFounderSessionInternal(req, reason, false);
 }
 
 export async function rotateFounderSession(req: Request, res: Response, session: Session): Promise<void> {
-  const revoked = await revokeFounderSession(req, 'rotated');
+  const revoked = await revokeFounderSessionInternal(req, 'rotated', true);
   if (!revoked) {
     throw new Error('Unable to revoke prior founder browser session');
   }

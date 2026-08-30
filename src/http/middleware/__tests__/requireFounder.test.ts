@@ -69,15 +69,32 @@ function browserSessionTable() {
     }),
     update: (payload: Record<string, unknown>) => ({
       eq: (field: string, value: unknown) => ({
-        is: async (nullField: string, nullValue: unknown) => {
-          if (field === 'session_id_hash') {
+        is: (nullField: string, nullValue: unknown) => {
+          const mutate = () => {
+            if (field !== 'session_id_hash') return null;
             const key = String(value);
             const row = mocks.browserSessions.get(key);
-            if (row && !(nullField === 'revoked_at' && nullValue === null && row.revoked_at != null)) {
-              mocks.browserSessions.set(key, { ...row, ...payload });
-            }
-          }
-          return { data: null, error: null };
+            if (!row) return null;
+            if (nullField === 'revoked_at' && nullValue === null && row.revoked_at != null) return null;
+            const updated = { ...row, ...payload };
+            mocks.browserSessions.set(key, updated);
+            return updated;
+          };
+          return {
+            select: (..._args: unknown[]) => ({
+              maybeSingle: async () => {
+                const updated = mutate();
+                return {
+                  data: updated ? { session_id_hash: String(value) } : null,
+                  error: null,
+                };
+              },
+            }),
+            then: (resolve: (value: unknown) => void, reject: (reason: unknown) => void) => {
+              mutate();
+              return Promise.resolve({ data: null, error: null }).then(resolve, reject);
+            },
+          };
         },
       }),
     }),

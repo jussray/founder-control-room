@@ -39,7 +39,6 @@ async function establishFounderSession(req: Request, res: Response, session: Ses
   try { await rotateFounderSession(req, res, session); return true; }
   catch (error) {
     console.error('Founder browser session persistence failed:', error instanceof Error ? error.message : String(error));
-    clearFounderSession(res);
     return false;
   }
 }
@@ -84,7 +83,7 @@ authRouter.get('/callback', rateLimitFounderOAuth, async (req, res) => {
   }
 
   const replaced = await revokeFounderSession(req, 'replaced');
-  if (!replaced) { clearFounderSession(res); return res.status(503).type('html').send(founderCallbackHtml()); }
+  if (!replaced) return res.status(503).type('html').send(founderCallbackHtml());
   const founderSession = sessionWithVerifiedUser(data.session, verifiedUser);
   try { await writeFounderSession(res, founderSession); }
   catch (sessionError) {

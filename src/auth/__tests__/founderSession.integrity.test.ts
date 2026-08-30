@@ -33,16 +33,35 @@ function browserSessionTable() {
     }),
     update: (payload: Record<string, unknown>) => ({
       eq: (field: string, value: unknown) => ({
-        is: async (nullField: string, nullValue: unknown) => {
-          if (failure.update) return { data: null, error: { message: 'update failed' } };
-          if (field === 'session_id_hash') {
+        is: (nullField: string, nullValue: unknown) => {
+          const mutate = () => {
+            if (field !== 'session_id_hash') return null;
             const key = String(value);
             const row = rows.get(key);
-            if (row && !(nullField === 'revoked_at' && nullValue === null && row.revoked_at != null)) {
-              rows.set(key, { ...row, ...payload });
-            }
-          }
-          return { data: null, error: null };
+            if (!row) return null;
+            if (nullField === 'revoked_at' && nullValue === null && row.revoked_at != null) return null;
+            const updated = { ...row, ...payload };
+            rows.set(key, updated);
+            return updated;
+          };
+          const chain = {
+            select: (..._args: unknown[]) => ({
+              maybeSingle: async () => {
+                if (failure.update) return { data: null, error: { message: 'update failed' } };
+                const updated = mutate();
+                return {
+                  data: updated ? { session_id_hash: String(value) } : null,
+                  error: null,
+                };
+              },
+            }),
+            then: (resolve: (value: unknown) => void, reject: (reason: unknown) => void) => {
+              if (failure.update) return Promise.resolve({ data: null, error: { message: 'update failed' } }).then(resolve, reject);
+              mutate();
+              return Promise.resolve({ data: null, error: null }).then(resolve, reject);
+            },
+          };
+          return chain;
         },
       }),
     }),
@@ -242,6 +261,21 @@ describe('opaque founder browser session integrity', () => {
     expect(resolved).toEqual(expect.objectContaining({ accessToken: ACCESS_TOKEN, sessionVersion: 1 }));
     expect(resolved?.continuityFingerprint).toMatch(/^[0-9a-f]{64}$/);
     expect(resolved?.continuityFingerprint).not.toBe(oldFingerprint);
+  });
+
+  it('allows only one replacement capability when the same old cookie is rotated twice', async () => {
+    const first = mockResponse();
+    await writeFounderSession(first.res, session());
+    const oldReq = requestWithCookie(primaryCookiePair(first.headers));
+
+    const winner = mockResponse();
+    await expect(rotateFounderSession(oldReq, winner.res, session())).resolves.toBeUndefined();
+    expect(rows.size).toBe(2);
+
+    const loser = mockResponse();
+    await expect(rotateFounderSession(oldReq, loser.res, session())).rejects.toThrow(/revoke prior founder browser session/);
+    expect(loser.headers.has('Set-Cookie')).toBe(false);
+    expect(rows.size).toBe(2);
   });
 
   it('does not issue a browser cookie when authoritative session persistence fails', async () => {
