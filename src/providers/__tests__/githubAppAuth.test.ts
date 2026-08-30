@@ -6,6 +6,11 @@ function decodeJson(segment: string): Record<string, unknown> {
   return JSON.parse(Buffer.from(segment, "base64url").toString("utf8")) as Record<string, unknown>;
 }
 
+function generatePrivatePem(): string {
+  const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  return privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+}
+
 describe("GitHub App authentication", () => {
   it("creates a short-lived RS256 app JWT with a numeric issuer", () => {
     const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
@@ -28,18 +33,38 @@ describe("GitHub App authentication", () => {
   });
 
   it("normalizes escaped newlines used by secret stores", () => {
-    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
-    const escaped = privateKey
-      .export({ type: "pkcs8", format: "pem" })
-      .toString()
-      .replace(/\n/g, "\\n");
-
+    const escaped = generatePrivatePem().replace(/\n/g, "\\n");
     expect(() => createGitHubAppJwt("99", escaped)).not.toThrow();
   });
 
-  it("rejects non-numeric app identifiers before signing", () => {
-    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  it("accepts a JSON-quoted PEM secret without exposing its contents", () => {
+    const quoted = JSON.stringify(generatePrivatePem());
+    expect(() => createGitHubAppJwt("99", quoted)).not.toThrow();
+  });
+
+  it("accepts a base64-encoded PEM secret", () => {
+    const encoded = Buffer.from(generatePrivatePem(), "utf8").toString("base64");
+    expect(() => createGitHubAppJwt("99", encoded)).not.toThrow();
+  });
+
+  it("accepts base64-encoded PEM with CRLF line endings", () => {
+    const encoded = Buffer.from(generatePrivatePem().replace(/\n/g, "\r\n"), "utf8").toString("base64");
+    expect(() => createGitHubAppJwt("99", encoded)).not.toThrow();
+  });
+
+  it("fails closed with a configuration-safe error for malformed private-key secrets", () => {
+    expect(() => createGitHubAppJwt("99", "not-a-private-key")).toThrow(
+      /complete GitHub App RSA private-key PEM/,
+    );
+  });
+
+  it("rejects non-RSA private keys before signing", () => {
+    const { privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
     const privatePem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
-    expect(() => createGitHubAppJwt("github-app", privatePem)).toThrow(/numeric/);
+    expect(() => createGitHubAppJwt("99", privatePem)).toThrow(/must be an RSA private key/);
+  });
+
+  it("rejects non-numeric app identifiers before signing", () => {
+    expect(() => createGitHubAppJwt("github-app", generatePrivatePem())).toThrow(/numeric/);
   });
 });

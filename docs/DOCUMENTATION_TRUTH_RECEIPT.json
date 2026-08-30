@@ -18,6 +18,12 @@
       ]
     },
     {
+      "path": "src/providers/githubAppAuth.ts",
+      "claims": [
+        "src/providers/githubAppAuth.ts may normalize only transport-equivalent forms of one complete GitHub App private RSA PEM: raw PEM, escaped-newline or CRLF PEM, JSON-quoted PEM, and base64-encoded PEM; the normalized key must parse through Node createPrivateKey as a private RSA key for RS256, malformed/truncated/non-RSA material must fail closed with a bounded non-secret configuration error, and normalization must not be treated as proof of App identity, installation scope, token minting, provider acceptance, or mutation authority."
+      ]
+    },
+    {
       "path": "src/http/server.ts",
       "claims": [
         "src/http/server.ts may expose POST /review/deterministic-witness/:pullRequestNumber only inside the existing same-origin, repository-rate-limit, authenticated-founder, and fcr-privileged-execution-master membrane; caller input is limited to a positive pull-request number while repository/provider identity and PR/base/head/diff/verdict/hash/check/App authority remain server/provider derived.",
