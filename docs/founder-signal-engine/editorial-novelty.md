@@ -13,7 +13,7 @@ Founder Control Room -> history readback, novelty gate, approval authority
 provider -> execution only after separate exact-copy authority
 ```
 
-This separation exists to prevent the portfolio from publishing the same thesis repeatedly under different repo names.
+This separation exists to prevent the portfolio from publishing the same thesis repeatedly under different repo or product names.
 
 PromptOS does not publish. Chief does not publish. A novelty receipt does not publish. Founder Control Room remains the only approval membrane, and provider readback remains the only terminal external-publication evidence.
 
@@ -22,17 +22,18 @@ PromptOS does not publish. Chief does not publish. A novelty receipt does not pu
 `src/lib/founderEditorialNovelty.ts` creates three SHA-256 identities for each founder-content proposal:
 
 1. `promptOsPatternFingerprint`
-   - canonical founder-machine lane;
+   - one portfolio-wide `founder-editorial` pattern lane;
    - normalized core thesis;
    - normalized opening hook.
 
 2. `chiefAngleFingerprint`
-   - canonical founder-machine lane;
+   - project-aware source lane;
    - exact evidence/event reference;
    - exact proof digest;
    - story type.
 
 3. `storyFingerprint`
+   - project-aware source lane;
    - platform;
    - normalized core thesis;
    - normalized hook;
@@ -41,19 +42,17 @@ PromptOS does not publish. Chief does not publish. A novelty receipt does not pu
    - PromptOS pattern fingerprint;
    - Chief angle fingerprint.
 
+The separation is intentional: **pattern memory is portfolio-wide, while angle/story identity remains event- and project-aware.** A product name may explain why a story is different; it cannot erase the fact that the thesis and hook were already used.
+
 The fingerprints identify editorial state. They are continuity evidence only. They do not grant approval, scheduling, publication, merge, deploy, provider mutation, or any other authority.
 
-## One founder-machine lane
+## One editorial lane
 
-For repetition comparison, these source repositories belong to one editorial lane:
+All founder LinkedIn experiment history participates in the same PromptOS thesis/hook pattern memory, including stories sourced from Founder Control Room, PromptOS, Chief, Se'kret Bip, or another portfolio product.
 
-- `jussray/promptos`
-- `jussray/chief-ai-machine`
-- `jussray/founder-control-room`
+PromptOS, Chief, and Founder Control Room still canonicalize to the shared `founder-machine` source lane for project-aware angle/story identity. Other products retain their own source identity there.
 
-This means changing the repo name does not make a repeated thesis new.
-
-Se'kret Bip and other products may supply the event or proof that makes a story materially different, but they do not receive independent copies of the same editorial thesis merely because the product name changed.
+This means changing the repo or product name does not make a repeated thesis new. Se'kret Bip and other products may supply the event or proof that makes a story materially different, but they do not receive independent copies of the same editorial thesis merely because the product name changed.
 
 ## History authority
 
@@ -72,13 +71,18 @@ The historical record remains observation/evaluation evidence. Analytics can inf
 
 ## Novelty decision
 
-The current thesis + hook are compared deterministically with recent published/analyzed history using normalized meaningful-token overlap.
+The current thesis + hook are compared deterministically with recent published/analyzed history using two independent signals:
+
+1. portfolio-wide exact PromptOS thesis+hook pattern identity across **all** scanned history;
+2. normalized meaningful-token similarity used to rank the closest semantic prior.
 
 Current thresholds:
 
-- `HIGH`: exact pattern match or similarity >= `0.55` -> reject before approval persistence;
+- `HIGH`: any exact portfolio pattern match or similarity >= `0.55` -> reject before approval persistence;
 - `MEDIUM`: similarity >= `0.35` -> allow, but retain the closest-match continuity receipt;
 - `LOW`: below `0.35` -> allow, while still retaining the comparison receipt.
+
+Exact-pattern detection scans the whole bounded history window independently of similarity ranking. A verbose historical row cannot hide an exact repeated thesis/hook merely because another row ranks as the closest token match.
 
 A new commit, proof artifact, or event rotates the Chief angle fingerprint and final story fingerprint. That does **not** automatically prove editorial novelty. If the thesis/hook remains highly repetitive, the proposal is still rejected.
 
@@ -91,9 +95,9 @@ That rule is deliberate. New evidence is not a license to retell an old argument
 ```text
 verified product/repo event
 -> Chief candidate proposal
--> PromptOS pattern fingerprint
+-> portfolio-wide PromptOS pattern fingerprint
 -> FCR reads recent LinkedIn experiment history
--> FCR computes closest prior pattern + risk
+-> FCR scans exact patterns + computes closest semantic prior
 -> HIGH risk: reject; Chief must select a materially different angle
 -> LOW/MEDIUM: continue
 -> authenticated founder exact-copy confirmation
@@ -115,6 +119,7 @@ Every novelty evaluation produces a deterministic non-authorizing `continuityCoo
 - Chief angle fingerprint;
 - closest historical match identity;
 - rounded similarity;
+- whether any exact pattern match exists;
 - repetition risk;
 - compared history count.
 
@@ -124,7 +129,8 @@ If any of those values changes, the cookie changes. The cookie can be used to re
 
 The system must preserve all of these:
 
-- repo rotation does not reset repetition history;
+- repo or product rotation does not reset PromptOS repetition memory;
+- exact-pattern detection scans all bounded history instead of only the similarity winner;
 - a new event/proof does not automatically excuse a repeated thesis;
 - high-repetition proposals are rejected before approval persistence;
 - a novelty pass is not founder approval;
