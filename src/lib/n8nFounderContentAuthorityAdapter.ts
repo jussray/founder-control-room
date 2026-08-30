@@ -239,6 +239,7 @@ export async function dispatchAuthoritativeN8nFounderContent(
       env,
       fetchImpl: options.fetchImpl,
       executedBy: founderIdentity,
+      preclaimRecoveryAuthorizedAt: now,
     });
   } catch (error) {
     return {

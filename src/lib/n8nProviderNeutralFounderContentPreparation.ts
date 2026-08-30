@@ -24,6 +24,7 @@ import {
 
 const PROVIDER_NEUTRAL_CADENCE_PROVIDER = 'n8n' as const;
 const FOUNDER_CONTENT_ACTION = 'schedule_founder_content' as const;
+const PRECLAIM_RESERVATION_LEASE_MS = 2 * 60 * 1000;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -31,6 +32,7 @@ export interface PrepareProviderNeutralN8nFounderContentOptions {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
   executedBy?: string;
+  preclaimRecoveryAuthorizedAt?: string;
 }
 
 export interface PreparedProviderNeutralN8nFounderContent {
@@ -76,6 +78,21 @@ function assertScheduleBeforeApprovalExpiry(scheduleAt: string, expiresAt: strin
   }
 }
 
+export function isRecoverableAbandonedPreclaimReservation(input: {
+  status: unknown;
+  startedAt: unknown;
+  providerWriteAttempted: unknown;
+  preclaimRecoveryAuthorizedAt: unknown;
+}): boolean {
+  const startedAtMs = Date.parse(text(input.startedAt));
+  const recoveryAuthorizedAtMs = Date.parse(text(input.preclaimRecoveryAuthorizedAt));
+  return text(input.status) === 'pending'
+    && input.providerWriteAttempted !== true
+    && Number.isFinite(startedAtMs)
+    && Number.isFinite(recoveryAuthorizedAtMs)
+    && recoveryAuthorizedAtMs - startedAtMs >= PRECLAIM_RESERVATION_LEASE_MS;
+}
+
 function executionAuditRequest(request: N8nFounderContentRequest): JsonRecord {
   return {
     contract: request.contract,
@@ -103,13 +120,14 @@ async function tryRearmRetryablePreProviderReservation(
   request: N8nFounderContentRequest,
   executedBy: string,
   first: FounderContentReservationResult,
+  preclaimRecoveryAuthorizedAt: string,
 ): Promise<FounderContentReservationResult> {
   if (first.ok || first.code !== 'ACTION_ALREADY_RESERVED') return first;
 
   const supabase = await founderContentDb();
   const { data: existing, error: existingError } = await supabase
     .from('approval_executions')
-    .select('id, project_id, action_type, status, result')
+    .select('id, project_id, action_type, status, result, started_at')
     .eq('idempotency_key', request.orchestrationId)
     .maybeSingle();
 
@@ -122,34 +140,68 @@ async function tryRearmRetryablePreProviderReservation(
   }
 
   const result = record(existing?.result);
+  const retryableFailed = Boolean(
+    existing
+    && text(existing.status) === 'failed'
+    && result.retryable_before_provider === true
+    && result.provider_write_attempted === false
+  );
+  const abandonedPending = Boolean(
+    existing
+    && isRecoverableAbandonedPreclaimReservation({
+      status: existing.status,
+      startedAt: existing.started_at,
+      providerWriteAttempted: result.provider_write_attempted,
+      preclaimRecoveryAuthorizedAt,
+    })
+  );
+
   if (
     !existing
     || text(existing.action_type) !== FOUNDER_CONTENT_ACTION
-    || text(existing.status) !== 'failed'
-    || result.retryable_before_provider !== true
-    || result.provider_write_attempted !== false
+    || (!retryableFailed && !abandonedPending)
   ) {
     return first;
   }
 
-  const { data: rearmed, error: rearmError } = await supabase
-    .from('approval_executions')
-    .update({
-      executed_by: executedBy,
-      status: 'pending',
-      request: executionAuditRequest(request),
-      result: {
-        resumed_from_pre_provider_failure: true,
-        provider_write_attempted: false,
-      },
-      success: null,
-      started_at: new Date().toISOString(),
-      executed_at: null,
-    })
-    .eq('id', existing.id)
-    .eq('status', 'failed')
-    .select('id, project_id')
-    .maybeSingle();
+  const rearmPayload = {
+    executed_by: executedBy,
+    status: 'pending',
+    request: executionAuditRequest(request),
+    result: {
+      resumed_from_pre_provider_failure: retryableFailed,
+      resumed_from_abandoned_preclaim_reservation: abandonedPending,
+      provider_write_attempted: false,
+    },
+    success: null,
+    started_at: new Date().toISOString(),
+    executed_at: null,
+  };
+
+  let rearmed: { id?: unknown; project_id?: unknown } | null = null;
+  let rearmError: { message: string } | null = null;
+  if (abandonedPending) {
+    const update = await supabase
+      .from('approval_executions')
+      .update(rearmPayload)
+      .eq('id', existing.id)
+      .eq('status', 'pending')
+      .eq('started_at', text(existing.started_at))
+      .select('id, project_id')
+      .maybeSingle();
+    rearmed = update.data;
+    rearmError = update.error;
+  } else {
+    const update = await supabase
+      .from('approval_executions')
+      .update(rearmPayload)
+      .eq('id', existing.id)
+      .eq('status', 'failed')
+      .select('id, project_id')
+      .maybeSingle();
+    rearmed = update.data;
+    rearmError = update.error;
+  }
 
   if (rearmError) {
     return {
@@ -172,9 +224,15 @@ async function tryRearmRetryablePreProviderReservation(
 async function reservePreparedFounderContentExecution(
   request: N8nFounderContentRequest,
   executedBy: string,
+  preclaimRecoveryAuthorizedAt: string,
 ): Promise<FounderContentReservationResult> {
   const first = await reserveN8nFounderContentExecution(request, executedBy);
-  return tryRearmRetryablePreProviderReservation(request, executedBy, first);
+  return tryRearmRetryablePreProviderReservation(
+    request,
+    executedBy,
+    first,
+    preclaimRecoveryAuthorizedAt,
+  );
 }
 
 async function abortPreparedFounderContentExecution(
@@ -284,7 +342,11 @@ export async function prepareProviderNeutralN8nFounderContent(
     ]);
   }
 
-  const reservation = await reservePreparedFounderContentExecution(request, executedBy);
+  const reservation = await reservePreparedFounderContentExecution(
+    request,
+    executedBy,
+    text(options.preclaimRecoveryAuthorizedAt),
+  );
   if (!reservation.ok) {
     return failure(
       reservation.code,
