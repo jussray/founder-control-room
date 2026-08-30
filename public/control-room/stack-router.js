@@ -1,7 +1,6 @@
 import { installMissionBoard } from './mission-board.js';
 
 const PENDING_TAB_KEY = 'fcr_pending_tab';
-const SESSION_KEY = 'fcr_session';
 const CONVEYOR_CONTRACT = 'founder-control-room/n8n-conveyor@v3';
 const ALLOWED_TABS = new Set([
   'projects',
@@ -44,20 +43,6 @@ function safeSessionRemove(key) {
   }
 }
 
-function founderAccessToken() {
-  const raw = safeSessionGet(SESSION_KEY);
-  if (!raw) return null;
-
-  try {
-    const parsed = JSON.parse(raw);
-    return typeof parsed?.access_token === 'string' && parsed.access_token.trim()
-      ? parsed.access_token.trim()
-      : null;
-  } catch {
-    return null;
-  }
-}
-
 function setConveyorReadiness(state, label) {
   const status = document.querySelector('[data-conveyor-readiness]');
   const text = document.querySelector('[data-conveyor-readiness-label]');
@@ -77,21 +62,15 @@ function readinessCopy(readiness) {
 }
 
 async function refreshConveyorReadiness() {
-  const token = founderAccessToken();
-  if (!token) {
-    setConveyorReadiness('signed-out', 'Sign in to check n8n readiness');
-    return;
-  }
-
   setConveyorReadiness('checking', 'Checking n8n readiness…');
 
   try {
     const response = await fetch('/automation/conveyor/', {
       method: 'GET',
       cache: 'no-store',
+      credentials: 'same-origin',
       headers: {
         Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
       },
     });
 
