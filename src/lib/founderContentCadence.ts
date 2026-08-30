@@ -9,7 +9,7 @@ export interface FounderContentCadenceReservationInput {
   channel: string;
   contentId: string;
   requestedScheduleAt: string;
-  approvalExpiresAt?: string;
+  approvalExpiresAt: string;
 }
 
 export interface FounderContentCadenceReservation {

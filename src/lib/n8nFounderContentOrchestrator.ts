@@ -567,11 +567,17 @@ export async function dispatchN8nFounderContent(
   }
 
   try {
+    const approvalExpiresAt = text(
+      input.approval && typeof input.approval === 'object'
+        ? (input.approval as Record<string, unknown>).expires_at
+        : '',
+    );
     const cadence = await reserveFounderContentCadence({
       provider: envelope.provider,
       channel: envelope.channel,
       contentId: envelope.content_id,
       requestedScheduleAt: envelope.provider_request.schedule_at,
+      approvalExpiresAt,
     });
     envelope = applyFounderContentCadenceSchedule(envelope, cadence);
     request = buildN8nFounderContentRequest(envelope);
