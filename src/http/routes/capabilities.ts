@@ -209,6 +209,7 @@ capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: Fo
       resource_id: identity.postUrn,
       observed_state: observedState,
       observed_at: observedAt,
+      source_event_id: null,
       attestation_event_id: sourceEventId,
     }, { onConflict: 'project_id,provider,resource_type,resource_id' });
 

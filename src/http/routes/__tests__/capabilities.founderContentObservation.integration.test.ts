@@ -146,6 +146,7 @@ describe('FCR manual LinkedIn founder-content observations', () => {
       provider: 'linkedin',
       resource_type: 'founder_content_post',
       resource_id: LINKEDIN_URN,
+      source_event_id: null,
       attestation_event_id: res.body.sourceEventId,
       observed_state: expect.objectContaining({
         kind: 'fcr/founder-content-provider-observation@v1',
@@ -166,7 +167,7 @@ describe('FCR manual LinkedIn founder-content observations', () => {
         },
       }),
     }));
-    expect(row.source_event_id).toBeUndefined();
+    expect(row.source_event_id).toBeNull();
     expect(JSON.stringify(row)).not.toContain('999999');
     expect(JSON.stringify(row)).not.toContain(FOUNDER_EMAIL);
   });
