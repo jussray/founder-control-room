@@ -323,7 +323,6 @@ export async function revokeFounderSession(req: Request, reason = 'logout'): Pro
 export async function rotateFounderSession(req: Request, res: Response, session: Session): Promise<void> {
   const revoked = await revokeFounderSession(req, 'rotated');
   if (!revoked) {
-    clearFounderSession(res);
     throw new Error('Unable to revoke prior founder browser session');
   }
 

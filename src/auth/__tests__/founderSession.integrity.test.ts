@@ -251,13 +251,25 @@ describe('opaque founder browser session integrity', () => {
     expect(headers.has('Set-Cookie')).toBe(false);
   });
 
-  it('fails closed when rotation cannot revoke the prior capability', async () => {
+  it('preserves the old browser capability so rotation revocation failure can be retried', async () => {
     const first = mockResponse();
     await writeFounderSession(first.res, session());
+    const oldPair = primaryCookiePair(first.headers);
+    const oldReq = requestWithCookie(oldPair);
+
     failure.update = true;
-    const second = mockResponse();
-    await expect(rotateFounderSession(requestWithCookie(primaryCookiePair(first.headers)), second.res, session())).rejects.toThrow(/revoke prior founder browser session/);
-    expect(setCookies(second.headers)[0]).toContain('__Host-fcr_session=;');
+    const failedRotation = mockResponse();
+    await expect(rotateFounderSession(oldReq, failedRotation.res, session())).rejects.toThrow(/revoke prior founder browser session/);
+    expect(failedRotation.headers.has('Set-Cookie')).toBe(false);
+    expect(await readFounderSession(oldReq)).toEqual(expect.objectContaining({ accessToken: ACCESS_TOKEN }));
+
+    failure.update = false;
+    const retriedRotation = mockResponse();
+    await expect(rotateFounderSession(oldReq, retriedRotation.res, session())).resolves.toBeUndefined();
+    const newPair = primaryCookiePair(retriedRotation.headers);
+    expect(newPair).not.toBe(oldPair);
+    expect(await readFounderSession(oldReq)).toBeNull();
+    expect(await readFounderSession(requestWithCookie(newPair))).toEqual(expect.objectContaining({ accessToken: ACCESS_TOKEN }));
   });
 
   it('clears both the opaque cookie and the legacy token-container cookie', () => {
