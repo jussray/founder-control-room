@@ -203,6 +203,7 @@ async function proveViewport(name, viewport) {
     value: SESSION_COOKIE_VALUE,
     url: baseUrl,
     httpOnly: true,
+    secure: true,
     sameSite: 'Strict',
   }]);
   const page = await context.newPage();
