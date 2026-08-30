@@ -136,7 +136,11 @@ const server = createServer(async (request, response) => {
     }
     const filePath = join(CONTROL_ROOM_DIR, relativePath);
     const content = await readFile(filePath);
-    response.writeHead(200, { 'Content-Type': contentTypes[extname(filePath)] ?? 'application/octet-stream' });
+    const headers = { 'Content-Type': contentTypes[extname(filePath)] ?? 'application/octet-stream' };
+    if (pathname === '/control-room/futureyou-v8.html') {
+      headers['Set-Cookie'] = `${SESSION_COOKIE_NAME}=${SESSION_COOKIE_VALUE}; Path=/; Secure; HttpOnly; SameSite=Strict`;
+    }
+    response.writeHead(200, headers);
     response.end(content);
   } catch {
     response.writeHead(404).end('Not found');
@@ -154,14 +158,6 @@ try {
     { name: 'mobile', width: 390, height: 844 },
   ]) {
     const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
-    await context.addCookies([{
-      name: SESSION_COOKIE_NAME,
-      value: SESSION_COOKIE_VALUE,
-      url: BASE_URL,
-      httpOnly: true,
-      secure: true,
-      sameSite: 'Strict',
-    }]);
     const page = await context.newPage();
     const pageErrors = [];
     const authHeaders = [];
