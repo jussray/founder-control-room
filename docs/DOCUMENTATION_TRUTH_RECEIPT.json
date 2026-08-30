@@ -18,6 +18,12 @@
       ]
     },
     {
+      "path": "src/lib/n8nProviderNeutralFounderContentOrchestrator.ts",
+      "claims": [
+        "src/lib/n8nProviderNeutralFounderContentOrchestrator.ts must derive Buffer and other deferred-provider schedule envelopes from canonical exact-current-you proposal and approval authority, preserve provider/platform compatibility and the 20-minute review-only boundary, and must never require caller-shaped firewall authority or treat n8n/provider acceptance as final publication truth."
+      ]
+    },
+    {
       "path": "src/lib/authoritativeN8nFounderContentPublisher.ts",
       "claims": [
         "src/lib/authoritativeN8nFounderContentPublisher.ts must remain a compatibility export for the FCR-owned n8n authority adapter and cannot create an alternate approval or publication authority path."
