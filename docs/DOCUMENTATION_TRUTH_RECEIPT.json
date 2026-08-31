@@ -8,14 +8,14 @@
     {
       "path": "src/lib/founderEditorialNovelty.ts",
       "claims": [
-        "src/lib/founderEditorialNovelty.ts must keep PromptOS pattern grammar, Chief candidate-angle identity, and FCR history/approval authority separate; build deterministic non-authorizing pattern, angle, story, copy, and continuity fingerprints; compare LinkedIn candidates against a bounded union of published/analyzed linkedin_experiments, successful first-party publication receipts, and founder-attested LinkedIn observations; reject exact already-published public payload/copy identities or HIGH semantic repetition without upgrading attested evidence into provider verification or publication authority.",
-        "src/lib/founderEditorialNovelty.ts must scan portfolio-wide thesis and hook pattern history independently of closest token similarity while keeping Chief angle and story identity project-aware, and publication memory must retain only hashes/metadata rather than raw prior public copy."
+        "src/lib/founderEditorialNovelty.ts must keep PromptOS, Chief, and FCR roles separate; compare LinkedIn candidates against a bounded union of published/analyzed linkedin_experiments, successful first-party publication receipts, and founder-attested LinkedIn observations; reject exact published payload/copy identities or HIGH semantic repetition; and never upgrade attested evidence into provider verification or publication authority.",
+        "src/lib/founderEditorialNovelty.ts must keep publication memory hash-only: prior public copy may be represented by bounded hashes and metadata, but raw prior public copy must never be retained merely to enforce novelty."
       ]
     },
     {
       "path": "src/lib/__tests__/founderEditorialNovelty.publicationMemory.test.ts",
       "claims": [
-        "src/lib/__tests__/founderEditorialNovelty.publicationMemory.test.ts must prove that successful first-party publication receipts and founder-attested copy hashes become non-authorizing novelty history, exact published copy is blocked even without semantic text, the three history planes are unioned in bounded recency order, and raw public copy is not retained in the history projection."
+        "src/lib/__tests__/founderEditorialNovelty.publicationMemory.test.ts must prove that successful publication receipts and founder-attested copy hashes enter non-authorizing novelty history, exact published copy is blocked without semantic text, all three history planes are unioned in bounded recency order, and raw public copy is absent from the history projection."
       ]
     },
     {
