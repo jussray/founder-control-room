@@ -8,6 +8,7 @@ const EDITORIAL_PATTERN_LANE = 'founder-editorial';
 const MAX_HISTORY = 32;
 const HIGH_SIMILARITY = 0.55;
 const MEDIUM_SIMILARITY = 0.35;
+const SHA256 = /^[0-9a-f]{64}$/i;
 
 const STOPWORDS = new Set([
   'a', 'an', 'and', 'are', 'as', 'at', 'be', 'been', 'being', 'but', 'by', 'for', 'from', 'had', 'has', 'have',
@@ -41,6 +42,9 @@ export interface FounderEditorialHistoryRecord {
   proofStyle: string | null;
   publishDate: string | null;
   status: string;
+  publicPayloadHash?: string | null;
+  publicCopyHash?: string | null;
+  historySource?: 'experiment' | 'execution' | 'attestation';
 }
 
 export interface FounderEditorialHistoryRepository {
@@ -55,6 +59,8 @@ export interface FounderEditorialIdentity {
   hook: string;
   eventRef: string;
   proofDigest: string;
+  publicPayloadHash: string;
+  publicCopyHashes: string[];
   promptOsPatternFingerprint: string;
   chiefAngleFingerprint: string;
   storyFingerprint: string;
@@ -95,6 +101,10 @@ function record(value: unknown): JsonRecord {
 
 function hash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+function digestText(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
 }
 
 function normalize(value: string): string {
@@ -158,6 +168,12 @@ function publicClaimsText(payload: JsonRecord): string {
     .join(' ');
 }
 
+export function founderEditorialPublicCopyHashes(publicCopy: string): string[] {
+  const exact = digestText(publicCopy);
+  const normalized = digestText(normalize(publicCopy));
+  return [...new Set([exact, normalized])];
+}
+
 export function buildFounderEditorialIdentity(proposal: JsonRecord): FounderEditorialIdentity {
   const source = record(proposal.source);
   const payload = record(proposal.public_payload);
@@ -171,6 +187,8 @@ export function buildFounderEditorialIdentity(proposal: JsonRecord): FounderEdit
   const proofDigest = text(evidence.digest).toLowerCase();
   const project = canonicalLane(sourceRepo);
   const platform = text(payload.platform).toLowerCase();
+  const publicPayloadHash = hash(payload);
+  const publicCopyHashes = founderEditorialPublicCopyHashes(draft);
 
   const promptOsPatternFingerprint = patternFingerprint({
     thesis: coreThesis,
@@ -191,6 +209,8 @@ export function buildFounderEditorialIdentity(proposal: JsonRecord): FounderEdit
     hook: normalize(hook),
     eventRef,
     proofDigest,
+    publicPayloadHash,
+    publicCopyHashes,
     promptOsPatternFingerprint,
     chiefAngleFingerprint,
   });
@@ -203,6 +223,8 @@ export function buildFounderEditorialIdentity(proposal: JsonRecord): FounderEdit
     hook,
     eventRef,
     proofDigest,
+    publicPayloadHash,
+    publicCopyHashes,
     promptOsPatternFingerprint,
     chiefAngleFingerprint,
     storyFingerprint,
@@ -222,20 +244,117 @@ function normalizeHistoryRow(value: unknown): FounderEditorialHistoryRecord {
     proofStyle: text(row.proof_style) || null,
     publishDate: text(row.publish_date) || null,
     status: text(row.status),
+    publicPayloadHash: null,
+    publicCopyHash: null,
+    historySource: 'experiment',
   };
+}
+
+function normalizePublicationExecution(value: unknown): FounderEditorialHistoryRecord | null {
+  const row = record(value);
+  const request = record(row.request);
+  const result = record(row.result);
+  if (text(row.status) !== 'succeeded' || text(request.platform).toLowerCase() !== 'linkedin') return null;
+  const publicPayloadHash = text(request.publicPayloadHash).toLowerCase();
+  if (!SHA256.test(publicPayloadHash)) return null;
+  return {
+    id: `execution:${text(row.id)}`,
+    relatedProject: text(request.sourceRepo) || null,
+    coreThesis: '',
+    primaryHook: '',
+    angle: '',
+    meaningfulChange: null,
+    hookType: null,
+    proofStyle: 'provider-readback',
+    publishDate: text(result.publishedAt) || text(row.executed_at) || null,
+    status: 'published',
+    publicPayloadHash,
+    publicCopyHash: null,
+    historySource: 'execution',
+  };
+}
+
+function normalizeFounderAttestation(value: unknown): FounderEditorialHistoryRecord | null {
+  const row = record(value);
+  const observedState = record(row.observed_state);
+  const publication = record(observedState.publication);
+  const contentHash = text(observedState.contentHash).toLowerCase();
+  if (
+    text(observedState.platform).toLowerCase() !== 'linkedin'
+    || text(publication.state) !== 'USER_ATTESTED'
+    || !SHA256.test(contentHash)
+  ) return null;
+  return {
+    id: `attestation:${text(row.resource_id)}`,
+    relatedProject: null,
+    coreThesis: '',
+    primaryHook: '',
+    angle: '',
+    meaningfulChange: null,
+    hookType: null,
+    proofStyle: 'founder-attested-public-copy',
+    publishDate: text(publication.publishedAt) || text(row.observed_at) || null,
+    status: 'published',
+    publicPayloadHash: null,
+    publicCopyHash: contentHash,
+    historySource: 'attestation',
+  };
+}
+
+function historyTime(value: FounderEditorialHistoryRecord): number {
+  const parsed = value.publishDate ? Date.parse(value.publishDate) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
 }
 
 export function supabaseFounderEditorialHistoryRepository(client: SupabaseClient): FounderEditorialHistoryRepository {
   return {
     async recentLinkedIn(limit) {
-      const { data, error } = await client
-        .from('linkedin_experiments')
-        .select('id, related_project, core_thesis, primary_hook, angle, meaningful_change, hook_type, proof_style, publish_date, status')
-        .in('status', ['published', 'analyzed'])
-        .order('publish_date', { ascending: false, nullsFirst: false })
-        .limit(limit);
-      if (error) throw new Error(`editorial history readback failed: ${error.message}`);
-      return Array.isArray(data) ? data.map(normalizeHistoryRow) : [];
+      const [experimentsResult, executionsResult, observationsResult] = await Promise.all([
+        client
+          .from('linkedin_experiments')
+          .select('id, related_project, core_thesis, primary_hook, angle, meaningful_change, hook_type, proof_style, publish_date, status')
+          .in('status', ['published', 'analyzed'])
+          .order('publish_date', { ascending: false, nullsFirst: false })
+          .limit(limit),
+        client
+          .from('approval_executions')
+          .select('id, request, result, executed_at, status')
+          .in('action_type', ['publish_founder_content'])
+          .in('status', ['succeeded'])
+          .order('executed_at', { ascending: false, nullsFirst: false })
+          .limit(limit),
+        client
+          .from('provider_observations')
+          .select('resource_id, observed_state, observed_at')
+          .in('provider', ['linkedin'])
+          .in('resource_type', ['founder_content_post'])
+          .order('observed_at', { ascending: false, nullsFirst: false })
+          .limit(limit),
+      ]);
+
+      if (experimentsResult.error) {
+        throw new Error(`editorial experiment history readback failed: ${experimentsResult.error.message}`);
+      }
+      if (executionsResult.error) {
+        throw new Error(`editorial publication execution history readback failed: ${executionsResult.error.message}`);
+      }
+      if (observationsResult.error) {
+        throw new Error(`editorial founder-attestation history readback failed: ${observationsResult.error.message}`);
+      }
+
+      const experiments = Array.isArray(experimentsResult.data)
+        ? experimentsResult.data.map(normalizeHistoryRow)
+        : [];
+      const executions = Array.isArray(executionsResult.data)
+        ? executionsResult.data.map(normalizePublicationExecution).filter((item): item is FounderEditorialHistoryRecord => item !== null)
+        : [];
+      const observations = Array.isArray(observationsResult.data)
+        ? observationsResult.data.map(normalizeFounderAttestation).filter((item): item is FounderEditorialHistoryRecord => item !== null)
+        : [];
+
+      return [...experiments, ...executions, ...observations]
+        .sort((left, right) => historyTime(right) - historyTime(left))
+        .slice(0, limit);
     },
   };
 }
@@ -256,8 +375,8 @@ function historicalPatternFingerprint(item: FounderEditorialHistoryRecord): stri
   });
 }
 
-function riskFor(score: number, exactPatternMatch: boolean): 'LOW' | 'MEDIUM' | 'HIGH' {
-  if (exactPatternMatch || score >= HIGH_SIMILARITY) return 'HIGH';
+function riskFor(score: number, exactPatternMatch: boolean, exactPublishedCopyMatch: boolean): 'LOW' | 'MEDIUM' | 'HIGH' {
+  if (exactPatternMatch || exactPublishedCopyMatch || score >= HIGH_SIMILARITY) return 'HIGH';
   if (score >= MEDIUM_SIMILARITY) return 'MEDIUM';
   return 'LOW';
 }
@@ -315,7 +434,7 @@ export async function evaluateFounderEditorialNovelty({
       continuityCookie,
       roles,
       authority,
-      reason: 'No published/analyzed LinkedIn experiment history was available for comparison.',
+      reason: 'No published/analyzed LinkedIn history was available for comparison.',
     };
   }
 
@@ -323,6 +442,7 @@ export async function evaluateFounderEditorialNovelty({
   let closest: FounderEditorialHistoryRecord | null = null;
   let closestSimilarity = 0;
   let exactPatternMatch = false;
+  let exactPublishedCopyMatch = false;
   for (const item of history) {
     const score = similarity(currentSemanticText, historicalSemanticText(item));
     if (score > closestSimilarity) {
@@ -331,10 +451,25 @@ export async function evaluateFounderEditorialNovelty({
     }
     if (historicalPatternFingerprint(item) === identity.promptOsPatternFingerprint) {
       exactPatternMatch = true;
+      closest ??= item;
+    }
+    const publicPayloadMatch = Boolean(
+      item.publicPayloadHash
+      && SHA256.test(item.publicPayloadHash)
+      && item.publicPayloadHash.toLowerCase() === identity.publicPayloadHash,
+    );
+    const publicCopyMatch = Boolean(
+      item.publicCopyHash
+      && SHA256.test(item.publicCopyHash)
+      && identity.publicCopyHashes.includes(item.publicCopyHash.toLowerCase()),
+    );
+    if (publicPayloadMatch || publicCopyMatch) {
+      exactPublishedCopyMatch = true;
+      closest = item;
     }
   }
 
-  const risk = riskFor(closestSimilarity, exactPatternMatch);
+  const risk = riskFor(closestSimilarity, exactPatternMatch, exactPublishedCopyMatch);
   const allowed = risk !== 'HIGH';
   const roundedSimilarity = Number(closestSimilarity.toFixed(4));
   const continuityCookie = hash({
@@ -344,6 +479,7 @@ export async function evaluateFounderEditorialNovelty({
     closestMatchId: closest?.id ?? null,
     closestSimilarity: roundedSimilarity,
     exactPatternMatch,
+    exactPublishedCopyMatch,
     risk,
     comparedCount: history.length,
   });
@@ -364,6 +500,8 @@ export async function evaluateFounderEditorialNovelty({
     authority,
     reason: allowed
       ? `Editorial novelty gate accepted the candidate at ${risk.toLowerCase()} repetition risk.`
-      : 'Editorial novelty gate rejected a high-overlap thesis/hook pattern; Chief must select a materially different story angle before founder approval.',
+      : exactPublishedCopyMatch
+        ? 'Editorial novelty gate rejected public copy already present in successful publication or founder-attested history; Chief must select materially different copy before founder approval.'
+        : 'Editorial novelty gate rejected a high-overlap thesis/hook pattern; Chief must select a materially different story angle before founder approval.',
   };
 }

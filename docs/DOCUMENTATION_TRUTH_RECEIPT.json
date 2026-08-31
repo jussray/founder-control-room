@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the current founder-content editorial-novelty, provider-neutral n8n authority, cadence-expiry reservation, observation-only analytics supersession, ULTRATHINK V4 advisory anti-laundering, and current GitHub App credential-transport changes to reviewed source invariants without granting merge, deploy, publication, provider-policy, database, secret, billing, destructive-action, or runtime authority.",
+  "purpose": "Bind the current founder-content editorial-novelty and publication-memory, provider-neutral n8n authority, cadence-expiry reservation, observation-only analytics supersession, ULTRATHINK V4 advisory anti-laundering, and current GitHub App credential-transport changes to reviewed source invariants without granting merge, deploy, publication, provider-policy, database, secret, billing, destructive-action, or runtime authority.",
   "domains": [
     "publishing"
   ],
@@ -8,8 +8,14 @@
     {
       "path": "src/lib/founderEditorialNovelty.ts",
       "claims": [
-        "src/lib/founderEditorialNovelty.ts must keep PromptOS pattern grammar, Chief candidate-angle identity, and FCR history/approval authority separate; build deterministic non-authorizing pattern, angle, story, and continuity fingerprints; compare LinkedIn candidates against recent published/analyzed linkedin_experiments history; and reject HIGH repetition risk without claiming that novelty itself authorizes publication.",
-        "src/lib/founderEditorialNovelty.ts must scan portfolio-wide thesis and hook pattern history independently of closest token similarity while keeping Chief angle and story identity project-aware."
+        "src/lib/founderEditorialNovelty.ts must keep PromptOS pattern grammar, Chief candidate-angle identity, and FCR history/approval authority separate; build deterministic non-authorizing pattern, angle, story, copy, and continuity fingerprints; compare LinkedIn candidates against a bounded union of published/analyzed linkedin_experiments, successful first-party publication receipts, and founder-attested LinkedIn observations; reject exact already-published public payload/copy identities or HIGH semantic repetition without upgrading attested evidence into provider verification or publication authority.",
+        "src/lib/founderEditorialNovelty.ts must scan portfolio-wide thesis and hook pattern history independently of closest token similarity while keeping Chief angle and story identity project-aware, and publication memory must retain only hashes/metadata rather than raw prior public copy."
+      ]
+    },
+    {
+      "path": "src/lib/__tests__/founderEditorialNovelty.publicationMemory.test.ts",
+      "claims": [
+        "src/lib/__tests__/founderEditorialNovelty.publicationMemory.test.ts must prove that successful first-party publication receipts and founder-attested copy hashes become non-authorizing novelty history, exact published copy is blocked even without semantic text, the three history planes are unioned in bounded recency order, and raw public copy is not retained in the history projection."
       ]
     },
     {
