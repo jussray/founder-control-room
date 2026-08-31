@@ -1,0 +1,271 @@
+name: Chief ProofMode Access Recovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_head_sha:
+        description: 'Exact current FCR main SHA approved to control the Chief Access repair'
+        required: true
+        type: string
+      mode:
+        description: 'Inspect or repair only the exact immutable Chief preview Service Auth policy'
+        required: true
+        default: check
+        type: choice
+        options:
+          - check
+          - repair
+      target_url:
+        description: 'Exact immutable Chief workers.dev preview origin'
+        required: true
+        type: string
+      approval_reference:
+        description: 'Auditable founder approval reference; required for repair'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: chief-proofmode-access-recovery-production
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+  CHIEF_ACCESS_MODE: ${{ inputs.mode }}
+  CHIEF_ACCESS_TARGET_URL: ${{ inputs.target_url }}
+  CLOUDFLARE_ACCOUNT_ID: '9b59861bd1747cf7525571b4c51d2aa0'
+  CHIEF_ACCESS_APP_NAME: 'chief-ai - Cloudflare Workers'
+
+jobs:
+  recover:
+    name: Verify or repair exact Chief ProofMode Service Auth
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+
+    steps:
+      - name: Check out exact approved FCR current main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Verify exact FCR main, target, and founder mutation approval
+        env:
+          APPROVAL_REFERENCE: ${{ inputs.approval_reference }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error title=Invalid exact head::expected_head_sha must be a lowercase 40-character SHA.'
+            exit 1
+          fi
+          if [[ "$CHIEF_ACCESS_MODE" != 'check' && "$CHIEF_ACCESS_MODE" != 'repair' ]]; then
+            echo '::error title=Invalid mode::mode must be check or repair.'
+            exit 1
+          fi
+
+          actual="$(git rev-parse HEAD)"
+          git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
+          current_main="$(git rev-parse refs/remotes/origin/main)"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          test "$current_main" = "$EXPECTED_HEAD_SHA"
+
+          target_origin="$(node -e '
+            const raw = process.argv[1];
+            try {
+              const url = new URL(raw);
+              if (
+                url.protocol !== "https:"
+                || url.username
+                || url.password
+                || url.search
+                || url.hash
+                || (url.pathname !== "/" && url.pathname !== "")
+                || !/^[0-9a-f]{8}-chief-ai\.mcgill-raylene\.workers\.dev$/i.test(url.hostname)
+              ) process.exit(1);
+              process.stdout.write(url.origin);
+            } catch { process.exit(1); }
+          ' "$CHIEF_ACCESS_TARGET_URL")" || {
+            echo '::error title=Invalid Chief target::target_url must be one immutable Chief workers.dev preview origin.'
+            exit 1
+          }
+          printf 'CHIEF_ACCESS_TARGET_URL=%s\n' "$target_origin" >> "$GITHUB_ENV"
+
+          approval_reference_receipt='not-required-for-read-only'
+          if [[ "$CHIEF_ACCESS_MODE" == 'repair' ]]; then
+            if [[ ! "$APPROVAL_REFERENCE" =~ ^[A-Za-z0-9._:-]{8,200}$ ]]; then
+              echo '::error title=Missing mutation approval::repair requires an auditable 8-200 character approval_reference.'
+              exit 1
+            fi
+            approval_reference_receipt="sha256:$(printf '%s' "$APPROVAL_REFERENCE" | sha256sum | awk '{print $1}')"
+          elif [[ -n "${APPROVAL_REFERENCE:-}" ]]; then
+            echo '::error title=Unexpected approval::check must not carry approval_reference.'
+            exit 1
+          fi
+          printf 'APPROVAL_REFERENCE_RECEIPT=%s\n' "$approval_reference_receipt" >> "$GITHUB_ENV"
+
+          {
+            echo '## Chief ProofMode Access authority gate'
+            echo
+            echo "- Exact FCR current main: \`$EXPECTED_HEAD_SHA\`"
+            echo "- Mode: \`$CHIEF_ACCESS_MODE\`"
+            echo "- Target: \`$target_origin\`"
+            echo "- Approval reference receipt: \`$approval_reference_receipt\`"
+            echo '- Allowed mutation: create one specific non_identity Service Auth policy on one exact immutable Chief preview host'
+            echo '- Wildcard/public multi-destination/worker/preview_worker mutation: blocked'
+            echo '- Existing conflicting named policy overwrite: blocked'
+            echo '- DNS, Worker route, deployment, database, secret, and application mutation: none'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Prove Chief Access bounded-repair contracts
+        run: |
+          node --check scripts/reconcile-chief-proofmode-access.mjs
+          node --test scripts/reconcile-chief-proofmode-access.node-test.mjs
+          node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
+
+      - name: Require configured Chief service-token identity
+        env:
+          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" || {
+            echo '::error title=Missing Chief service-token identity::Configure CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID in the protected FCR production environment.'
+            exit 1
+          }
+
+      - name: Inspect current Chief Service Auth with dedicated read authority
+        if: inputs.mode == 'check'
+        env:
+          CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
+          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
+        run: node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
+
+      - name: Apply exact-host Chief Service Auth with dedicated admin authority
+        if: inputs.mode == 'repair'
+        env:
+          CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
+          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
+          cp test-results/chief-proofmode-access-recovery.json test-results/chief-proofmode-access-mutation.json
+
+      - name: Re-read repaired policy with provider authority
+        if: inputs.mode == 'repair'
+        env:
+          CHIEF_ACCESS_MODE: check
+          CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
+          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
+        run: node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
+
+      - name: Return sanitized Chief Access receipt to founder control issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RETURN_ISSUE: '485'
+          JOB_STATUS: ${{ job.status }}
+          WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_receipt='test-results/chief-proofmode-access-recovery.json'
+          mutation_receipt='test-results/chief-proofmode-access-mutation.json'
+          public_receipt='test-results/chief-proofmode-access-public-receipt.md'
+          mkdir -p test-results
+
+          safe_head='UNKNOWN'
+          if [[ "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then safe_head="$EXPECTED_HEAD_SHA"; fi
+          safe_target='UNKNOWN'
+          if [[ "$CHIEF_ACCESS_TARGET_URL" =~ ^https://[0-9a-fA-F]{8}-chief-ai\.mcgill-raylene\.workers\.dev$ ]]; then
+            safe_target="$CHIEF_ACCESS_TARGET_URL"
+          fi
+          safe_approval='unavailable'
+          if [[ "${APPROVAL_REFERENCE_RECEIPT:-}" == 'not-required-for-read-only' || "${APPROVAL_REFERENCE_RECEIPT:-}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            safe_approval="$APPROVAL_REFERENCE_RECEIPT"
+          fi
+
+          validate_receipt() {
+            local path="$1"
+            jq -e -s --arg target "$safe_target" '
+              def iso8601: type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$");
+              length == 1 and (.[0]
+                | type == "object"
+                and .schemaVersion == 1
+                and .scope == "chief-proofmode-access-recovery"
+                and (.observedAt | iso8601)
+                and (.mode == "check" or .mode == "repair")
+                and .state == "configured"
+                and (.mutationPerformed | type == "boolean")
+                and .targetOrigin == $target
+                and (.accessScope == "public_exact_host" or .accessScope == "public_path_or_multi_destination" or .accessScope == "preview_worker" or .accessScope == "worker")
+                and (.applicationId | type == "string" and length > 0 and length <= 200)
+                and (.policyId == null or (.policyId | type == "string" and length <= 200))
+                and (.serviceTokenId | type == "string" and length > 0 and length <= 200)
+              )
+            ' "$path" >/dev/null 2>&1
+          }
+
+          {
+            echo '## Chief ProofMode Cloudflare Access receipt'
+            echo
+            echo "- Exact FCR authority head: \`$safe_head\`"
+            echo "- Chief target: \`$safe_target\`"
+            echo "- Requested mode: \`$CHIEF_ACCESS_MODE\`"
+            echo "- Founder approval receipt: \`$safe_approval\`"
+            echo "- Workflow run: $WORKFLOW_RUN_URL"
+            echo "- Job status: \`$JOB_STATUS\`"
+
+            if [[ "$safe_target" == 'UNKNOWN' || ! -f "$current_receipt" ]] || ! validate_receipt "$current_receipt"; then
+              echo '- Current provider receipt: `missing-or-malformed`'
+              echo '- Current provider truth: `UNKNOWN`'
+            else
+              echo '- Current provider receipt: `present`'
+              echo
+              echo '```json'
+              jq -s '.[0] | {schemaVersion, scope, observedAt, mode, state, mutationPerformed, targetOrigin, accessScope, applicationId, policyId, serviceTokenId}' "$current_receipt"
+              echo '```'
+            fi
+
+            if [[ "$CHIEF_ACCESS_MODE" == 'repair' ]]; then
+              if [[ "$safe_target" == 'UNKNOWN' || ! -f "$mutation_receipt" ]] || ! validate_receipt "$mutation_receipt"; then
+                echo '- Mutation receipt: `missing-or-malformed`'
+              else
+                echo '- Mutation receipt: `present`'
+                echo
+                echo '```json'
+                jq -s '.[0] | {schemaVersion, scope, observedAt, mode, state, mutationPerformed, targetOrigin, accessScope, applicationId, policyId, serviceTokenId}' "$mutation_receipt"
+                echo '```'
+              fi
+            fi
+
+            echo '- Browser/runtime proof: `NOT CLAIMED HERE`; rerun Chief exact-head Playwright after provider repair.'
+          } > "$public_receipt"
+
+          gh issue comment "$RETURN_ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$public_receipt"
+          cat "$public_receipt" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload sanitized Chief Access evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: chief-proofmode-access-public-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/chief-proofmode-access-public-receipt.md
+          if-no-files-found: ignore
+          retention-days: 30
