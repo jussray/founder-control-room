@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createV4AdvisoryHandoffFromReceiptV0,
   createV4AdvisoryHandoffV0,
-} from "../src/v4-advisory-handoff.v0";
+} from "../src/v4-advisory-handoff.v0.js";
 
 const subjectHash = "a".repeat(64);
 const observationHash = "b".repeat(64);
