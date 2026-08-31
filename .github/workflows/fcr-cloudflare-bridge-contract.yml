@@ -18,6 +18,7 @@ on:
       - 'scripts/chief-proofmode-access-bridge-contract.node-test.mjs'
       - 'scripts/fcr-cloudflare-bridge-contract.node-test.mjs'
       - 'scripts/verify-fcr-front-door-playwright.mjs'
+      - 'docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md'
   push:
     branches: [main]
     paths:
@@ -35,6 +36,7 @@ on:
       - 'scripts/chief-proofmode-access-bridge-contract.node-test.mjs'
       - 'scripts/fcr-cloudflare-bridge-contract.node-test.mjs'
       - 'scripts/verify-fcr-front-door-playwright.mjs'
+      - 'docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md'
 
 permissions:
   contents: read
