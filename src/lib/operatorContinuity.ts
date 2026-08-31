@@ -56,6 +56,12 @@ export interface OperatorContinuityReceipt {
  * V2 binds every load-bearing continuity membrane used by the founder operator loop.
  * A dimension may be null while genuinely unknown/not-applicable; null -> observed
  * still counts as movement and requires reacquisition before inherited proof is reused.
+ *
+ * The state fingerprint deliberately excludes observer identity, evidence references,
+ * timestamps, expiry and predecessor metadata. Those remain on the receipt for
+ * provenance/freshness. The same reality therefore has the same fingerprint when
+ * handed from ChatGPT -> Work -> Chief/Codex, while proof/provider/runtime movement
+ * still invalidates inherited continuity.
  */
 export interface OperatorContinuityInputV2 {
   source: OperatorContinuitySourceV2;
@@ -111,7 +117,6 @@ export type OperatorContinuityInvalidationReasonV2 =
   | 'current_input_invalid'
   | 'observation_time_invalid'
   | 'receipt_expired'
-  | 'source_moved'
   | 'project_moved'
   | 'repository_moved'
   | 'target_branch_moved'
@@ -124,8 +129,7 @@ export type OperatorContinuityInvalidationReasonV2 =
   | 'review_moved'
   | 'provider_moved'
   | 'runtime_moved'
-  | 'authority_moved'
-  | 'evidence_refs_moved';
+  | 'authority_moved';
 
 export interface OperatorContinuityEvaluationV2 {
   state: 'current' | 'stale' | 'invalid';
@@ -303,11 +307,14 @@ export function operatorContinuityFingerprint(input: OperatorContinuityInput): s
   ])).digest('hex');
 }
 
+/**
+ * State identity only. Receipt provenance (source/evidence refs/time/expiry/predecessor)
+ * is intentionally excluded so identical reality hashes identically across operators.
+ */
 export function operatorContinuityFingerprintV2(input: OperatorContinuityInputV2): string {
   const value = normalizedInputV2(input);
   return createHash('sha256').update(JSON.stringify([
     OPERATOR_CONTINUITY_CONTRACT_V2,
-    value.source,
     value.projectSlug,
     value.repositoryFullName,
     value.targetBranch,
@@ -321,15 +328,6 @@ export function operatorContinuityFingerprintV2(input: OperatorContinuityInputV2
     value.providerFingerprint,
     value.runtimeFingerprint,
     value.authorityFingerprint,
-    value.evidenceRefs,
-    value.observedAt,
-    value.expiresAt,
-    value.predecessorFingerprint ?? null,
-    false,
-    false,
-    false,
-    false,
-    true,
   ])).digest('hex');
 }
 
@@ -459,10 +457,6 @@ export function validateOperatorContinuityReceiptV2(receipt: OperatorContinuityR
   return [...new Set(errors)];
 }
 
-function sameEvidenceRefs(a: readonly string[], b: readonly string[]): boolean {
-  return JSON.stringify(normalizedEvidenceRefs(a)) === JSON.stringify(normalizedEvidenceRefs(b));
-}
-
 export function evaluateOperatorContinuityReceiptV2(
   receipt: OperatorContinuityReceiptV2,
   current: OperatorContinuityInputV2,
@@ -507,7 +501,6 @@ export function evaluateOperatorContinuityReceiptV2(
     });
     const next = normalizedInputV2(current);
 
-    if (prior.source !== next.source) add('source_moved');
     if (prior.projectSlug !== next.projectSlug) add('project_moved');
     if (prior.repositoryFullName !== next.repositoryFullName) add('repository_moved');
     if (prior.targetBranch !== next.targetBranch) add('target_branch_moved');
@@ -521,7 +514,6 @@ export function evaluateOperatorContinuityReceiptV2(
     if (prior.providerFingerprint !== next.providerFingerprint) add('provider_moved');
     if (prior.runtimeFingerprint !== next.runtimeFingerprint) add('runtime_moved');
     if (prior.authorityFingerprint !== next.authorityFingerprint) add('authority_moved');
-    if (!sameEvidenceRefs(prior.evidenceRefs, next.evidenceRefs)) add('evidence_refs_moved');
   }
 
   const invalid = reasons.includes('receipt_invalid')
