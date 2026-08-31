@@ -8,6 +8,8 @@ on:
       - 'scripts/verify-founder-onboarding.mjs'
       - 'scripts/verify-guarded-terminal-contract.mjs'
       - 'src/auth/**'
+      - 'src/lib/operatorContinuity.ts'
+      - 'src/lib/__tests__/operatorContinuity.test.ts'
       - 'src/http/middleware/**'
       - 'src/http/routes/auth.ts'
       - 'src/terminal/registry.ts'
@@ -26,6 +28,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - run: npm ci
       - run: node scripts/verify-cookie-contract.mjs
+      - run: npx vitest run src/lib/__tests__/operatorContinuity.test.ts
       - run: node scripts/verify-founder-onboarding.mjs
       - run: node scripts/verify-guarded-terminal-contract.mjs
