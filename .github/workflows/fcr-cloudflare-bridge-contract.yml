@@ -6,11 +6,16 @@ on:
     paths:
       - '.github/workflows/fcr-access-front-door-recovery.yml'
       - '.github/workflows/fcr-cloudflare-command-bridge.yml'
+      - '.github/workflows/chief-proofmode-access-command-bridge.yml'
+      - '.github/workflows/chief-proofmode-access-recovery.yml'
       - '.github/workflows/fcr-cloudflare-bridge-contract.yml'
       - 'scripts/provider-credential-contract.mjs'
       - 'scripts/provider-credential-contract.node-test.mjs'
       - 'scripts/reconcile-cloudflare-access-public-zone.mjs'
       - 'scripts/reconcile-cloudflare-access-public-zone.node-test.mjs'
+      - 'scripts/reconcile-chief-proofmode-access.mjs'
+      - 'scripts/reconcile-chief-proofmode-access.node-test.mjs'
+      - 'scripts/chief-proofmode-access-bridge-contract.node-test.mjs'
       - 'scripts/fcr-cloudflare-bridge-contract.node-test.mjs'
       - 'scripts/verify-fcr-front-door-playwright.mjs'
   push:
@@ -18,11 +23,16 @@ on:
     paths:
       - '.github/workflows/fcr-access-front-door-recovery.yml'
       - '.github/workflows/fcr-cloudflare-command-bridge.yml'
+      - '.github/workflows/chief-proofmode-access-command-bridge.yml'
+      - '.github/workflows/chief-proofmode-access-recovery.yml'
       - '.github/workflows/fcr-cloudflare-bridge-contract.yml'
       - 'scripts/provider-credential-contract.mjs'
       - 'scripts/provider-credential-contract.node-test.mjs'
       - 'scripts/reconcile-cloudflare-access-public-zone.mjs'
       - 'scripts/reconcile-cloudflare-access-public-zone.node-test.mjs'
+      - 'scripts/reconcile-chief-proofmode-access.mjs'
+      - 'scripts/reconcile-chief-proofmode-access.node-test.mjs'
+      - 'scripts/chief-proofmode-access-bridge-contract.node-test.mjs'
       - 'scripts/fcr-cloudflare-bridge-contract.node-test.mjs'
       - 'scripts/verify-fcr-front-door-playwright.mjs'
 
@@ -63,7 +73,10 @@ jobs:
         run: |
           node --check scripts/provider-credential-contract.mjs
           node --check scripts/reconcile-cloudflare-access-public-zone.mjs
+          node --check scripts/reconcile-chief-proofmode-access.mjs
           node --check scripts/verify-fcr-front-door-playwright.mjs
           node --test scripts/provider-credential-contract.node-test.mjs
           node --test scripts/reconcile-cloudflare-access-public-zone.node-test.mjs
+          node --test scripts/reconcile-chief-proofmode-access.node-test.mjs
+          node --test scripts/chief-proofmode-access-bridge-contract.node-test.mjs
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
