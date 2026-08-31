@@ -60,7 +60,7 @@ describe('founder editorial publication memory', () => {
   });
 
   it('blocks founder-attested public copy by exact or normalized SHA-256 without upgrading attestation authority', async () => {
-    const copy = (proposal().public_payload as Record<string, string>).draft_text;
+    const copy = proposal().public_payload.draft_text;
     const [exactCopyHash, normalizedCopyHash] = founderEditorialPublicCopyHashes(copy);
 
     for (const publicCopyHash of [exactCopyHash, normalizedCopyHash]) {
@@ -151,6 +151,6 @@ describe('founder editorial publication memory', () => {
       publicCopyHash: exactCopyHash,
       proofStyle: 'founder-attested-public-copy',
     });
-    expect(JSON.stringify(rows)).not.toContain((proposal().public_payload as Record<string, string>).draft_text);
+    expect(JSON.stringify(rows)).not.toContain(proposal().public_payload.draft_text);
   });
 });
