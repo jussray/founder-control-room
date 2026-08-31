@@ -78,7 +78,6 @@ authRouter.get('/callback', rateLimitFounderOAuth, async (req, res) => {
   const verifiedUser = data.user;
   const email = normalizeEmail(verifiedUser?.email);
   if (error || !data.session || !verifiedUser || !email || !(await isAllowlisted(email))) {
-    clearFounderSession(res);
     return res.status(401).type('html').send(founderCallbackHtml());
   }
 
@@ -96,7 +95,6 @@ authRouter.post('/session', async (req, res) => {
   const accessToken = typeof req.body?.access_token === 'string' ? req.body.access_token : '';
   const refreshToken = typeof req.body?.refresh_token === 'string' ? req.body.refresh_token : '';
   if (!accessToken || !refreshToken || accessToken.length > 16_384 || refreshToken.length > 16_384) {
-    clearFounderSession(res);
     return respondError(res, 400, 'BAD_REQUEST', 'Session credentials are missing or malformed.');
   }
 
@@ -105,10 +103,9 @@ authRouter.post('/session', async (req, res) => {
   const verifiedUser = data.user;
   const email = normalizeEmail(verifiedUser?.email);
   if (error || !data.session || !verifiedUser || !email) {
-    clearFounderSession(res);
     return respondError(res, 401, 'UNAUTHENTICATED', 'The login link is invalid or expired.');
   }
-  if (!(await isAllowlisted(email))) { clearFounderSession(res); return respondError(res, 403, 'FORBIDDEN', 'Not on the founder allowlist.'); }
+  if (!(await isAllowlisted(email))) return respondError(res, 403, 'FORBIDDEN', 'Not on the founder allowlist.');
   const founderSession = sessionWithVerifiedUser(data.session, verifiedUser);
   if (!(await establishFounderSession(req, res, founderSession))) return respondError(res, 503, 'SESSION_UNAVAILABLE', 'Founder browser session storage is temporarily unavailable.');
   return respondSuccess(res, { founder: { email } }, 201);
