@@ -5,6 +5,7 @@ import test from 'node:test';
 const commandBridge = readFileSync('.github/workflows/chief-proofmode-access-command-bridge.yml', 'utf8');
 const recoveryWorkflow = readFileSync('.github/workflows/chief-proofmode-access-recovery.yml', 'utf8');
 const reconciler = readFileSync('scripts/reconcile-chief-proofmode-access.mjs', 'utf8');
+const recoveryDoc = readFileSync('docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md', 'utf8');
 
 const ACCOUNT_ID = '9b59861bd1747cf7525571b4c51d2aa0';
 
@@ -89,4 +90,15 @@ test('public receipt explicitly keeps browser/runtime proof separate', () => {
   assert.match(returnStep, /single-document|length == 1/);
   assert.doesNotMatch(returnStep, /cat "\$current_receipt"/);
   assert.doesNotMatch(returnStep, /cat "\$mutation_receipt"/);
+});
+
+test('dedicated recovery documentation keeps source, provider, and browser truth separate', () => {
+  assert.match(recoveryDoc, /SOURCE CONTRACT \/ PROVIDER REPAIR NOT YET EXECUTED/);
+  assert.match(recoveryDoc, /CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
+  assert.match(recoveryDoc, /CLOUDFLARE_ACCESS_API_TOKEN/);
+  assert.match(recoveryDoc, /CLOUDFLARE_ACCESS_ADMIN_API_TOKEN/);
+  assert.match(recoveryDoc, /does not prove Chief runtime equivalence/);
+  assert.match(recoveryDoc, /rerun failed Chief ProofMode MCP Playwright job/);
+  assert.match(recoveryDoc, /rerun failed Chief capability-plan Playwright job/);
+  assert.match(recoveryDoc, /If the Chief head moves, the old runtime proof is stale/);
 });
