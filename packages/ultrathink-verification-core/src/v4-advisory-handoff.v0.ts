@@ -12,7 +12,7 @@ export interface V4AdvisoryHandoffV0 {
 }
 
 const SHA256 = /^[a-f0-9]{64}$/;
-const RECEIPT_ID = /^SUP-[a-f0-9]{16}$/;
+const RECEIPT_ID = /^SUP-([a-f0-9]{16})$/i;
 
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
@@ -163,8 +163,13 @@ export function createV4AdvisoryHandoffFromReceiptV0(receipt: unknown): V4Adviso
   const platform = requiredText(subject.platform, "V4 receipt subject.platform").toLowerCase();
   const postFingerprint = requiredText(subject.post_fingerprint, "V4 receipt subject.post_fingerprint");
   const receiptSha256 = requiredDigest(value.receipt_sha256, "V4 receipt receipt_sha256");
-  const receiptId = requiredText(value.receipt_id, "V4 receipt receipt_id").toUpperCase();
-  if (!RECEIPT_ID.test(receiptId) || receiptId !== `SUP-${receiptSha256.slice(0, 16)}`.toUpperCase()) {
+  const receiptIdRaw = requiredText(value.receipt_id, "V4 receipt receipt_id");
+  const receiptIdMatch = RECEIPT_ID.exec(receiptIdRaw);
+  if (!receiptIdMatch) {
+    throw new Error("V4 receipt id/digest linkage mismatch");
+  }
+  const receiptId = `SUP-${receiptIdMatch[1].toLowerCase()}`;
+  if (receiptId !== `SUP-${receiptSha256.slice(0, 16)}`) {
     throw new Error("V4 receipt id/digest linkage mismatch");
   }
 
