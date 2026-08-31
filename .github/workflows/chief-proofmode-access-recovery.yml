@@ -136,16 +136,17 @@ jobs:
         run: |
           node --check scripts/reconcile-chief-proofmode-access.mjs
           node --test scripts/reconcile-chief-proofmode-access.node-test.mjs
+          node --test scripts/chief-proofmode-access-bridge-contract.node-test.mjs
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
 
       - name: Require configured Chief service-token identity
         env:
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
         shell: bash
         run: |
           set -euo pipefail
           test -n "$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" || {
-            echo '::error title=Missing Chief service-token identity::Configure CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID in the protected FCR production environment.'
+            echo '::error title=Missing Chief service-token identity::Configure CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID as a protected variable in the FCR production environment.'
             exit 1
           }
 
@@ -153,14 +154,14 @@ jobs:
         if: inputs.mode == 'check'
         env:
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
         run: node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
 
       - name: Apply exact-host Chief Service Auth with dedicated admin authority
         if: inputs.mode == 'repair'
         env:
           CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
         shell: bash
         run: |
           set -euo pipefail
@@ -172,7 +173,7 @@ jobs:
         env:
           CHIEF_ACCESS_MODE: check
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
         run: node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
 
       - name: Return sanitized Chief Access receipt to founder control issue
