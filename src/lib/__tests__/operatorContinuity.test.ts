@@ -100,11 +100,24 @@ describe('operator continuity contract', () => {
   });
 });
 
-describe('operator continuity v2 fingerprint + cookie', () => {
-  it('uses the cross-repo canonical v2 test vector', () => {
+describe('operator continuity v2 state fingerprint + cookie', () => {
+  it('uses the cross-repo canonical v2 state vector', () => {
     expect(operatorContinuityFingerprintV2(baseInputV2)).toBe(
-      'ee90f5351755772ed04169c63abb3347eba7b9ec721b706d0002f7fa0d32f3d9',
+      '635568aadd9174633266a8332139575f86d7ed265f51095749cf692aafe69aea',
     );
+  });
+
+  it('keeps one state fingerprint across observer and provenance rotation', () => {
+    const first = operatorContinuityFingerprintV2(baseInputV2);
+    const second = operatorContinuityFingerprintV2({
+      ...baseInputV2,
+      source: 'work',
+      evidenceRefs: ['cloudflare:receipt:9766241316'],
+      observedAt: '2026-08-31T16:29:00.000Z',
+      expiresAt: '2026-08-31T16:49:00.000Z',
+      predecessorFingerprint: '7'.repeat(64),
+    });
+    expect(second).toBe(first);
   });
 
   it('hashes provider observations so retry attempt/job/state movement is load-bearing', () => {
@@ -118,7 +131,8 @@ describe('operator continuity v2 fingerprint + cookie', () => {
     })).toBe('1a5507cb4afcde7281176b78d05e9b788a6f278672c1f196b1c0eb2f1d55171a');
   });
 
-  it('creates a valid non-authorizing v2 receipt for Work/Chief/Codex handoffs', () => {
+  it('creates valid non-authorizing v2 receipts for Work/Chief/Codex handoffs', () => {
+    const fingerprints = new Set<string>();
     for (const source of ['work', 'chief', 'codex'] as const) {
       const receipt = createOperatorContinuityReceiptV2({ ...baseInputV2, source });
       expect(validateOperatorContinuityReceiptV2(receipt)).toEqual([]);
@@ -130,15 +144,22 @@ describe('operator continuity v2 fingerprint + cookie', () => {
         approvalCarryForward: false,
         founderDecisionRequired: true,
       });
+      fingerprints.add(receipt.fingerprint);
     }
+    expect(fingerprints).toEqual(new Set([
+      '635568aadd9174633266a8332139575f86d7ed265f51095749cf692aafe69aea',
+    ]));
   });
 
-  it('allows a fresh reread when load-bearing state is unchanged even if observation time rotates', () => {
+  it('allows a fresh cross-operator reread when load-bearing reality is unchanged', () => {
     const receipt = createOperatorContinuityReceiptV2(baseInputV2);
     const result = evaluateOperatorContinuityReceiptV2(receipt, {
       ...baseInputV2,
+      source: 'work',
+      evidenceRefs: ['cloudflare:receipt:9766241316'],
       observedAt: '2026-08-31T16:29:00.000Z',
       expiresAt: '2026-08-31T16:49:00.000Z',
+      predecessorFingerprint: '7'.repeat(64),
     }, NOW);
     expect(result).toEqual({
       state: 'current',
@@ -148,10 +169,9 @@ describe('operator continuity v2 fingerprint + cookie', () => {
     });
   });
 
-  it('invalidates inherited green whenever any load-bearing dimension moves', () => {
+  it('invalidates inherited green whenever any load-bearing state dimension moves', () => {
     const receipt = createOperatorContinuityReceiptV2(baseInputV2);
     const variants: Array<[Partial<OperatorContinuityInputV2>, string]> = [
-      [{ source: 'work' }, 'source_moved'],
       [{ projectSlug: 'sekret-bip' }, 'project_moved'],
       [{ repositoryFullName: 'jussray/other' }, 'repository_moved'],
       [{ targetBranch: 'release' }, 'target_branch_moved'],
@@ -165,7 +185,6 @@ describe('operator continuity v2 fingerprint + cookie', () => {
       [{ providerFingerprint: 'a'.repeat(64) }, 'provider_moved'],
       [{ runtimeFingerprint: 'b'.repeat(64) }, 'runtime_moved'],
       [{ authorityFingerprint: 'c'.repeat(64) }, 'authority_moved'],
-      [{ evidenceRefs: ['github:main-readback', 'cloudflare:job:99560046321'] }, 'evidence_refs_moved'],
     ];
 
     for (const [change, reason] of variants) {
@@ -177,7 +196,7 @@ describe('operator continuity v2 fingerprint + cookie', () => {
     }
   });
 
-  it('classifies the Se’kret Bip Cloudflare rerun as a new cookie even when main is unchanged', () => {
+  it('classifies the Se’kret Bip Cloudflare rerun as a new state even when main is unchanged', () => {
     const attempt1Provider = operatorContinuityDimensionFingerprint({
       provider: 'cloudflare', audit: 'authority', attempt: 1, state: 'blocked', mutation: 'none',
     });
@@ -197,6 +216,7 @@ describe('operator continuity v2 fingerprint + cookie', () => {
     });
     const result = evaluateOperatorContinuityReceiptV2(receipt, {
       ...baseInputV2,
+      source: 'work',
       projectSlug: 'sekret-bip',
       repositoryFullName: 'jussray/Sekret-Bip',
       targetSha: '0d26db9c77799bd99ba68db194bd6bd948ca4f37',
@@ -207,7 +227,7 @@ describe('operator continuity v2 fingerprint + cookie', () => {
       evidenceRefs: ['cloudflare:authority-audit:attempt-2', 'cloudflare:job:99560046321'],
     }, NOW);
     expect(result.state).toBe('stale');
-    expect(result.reasons).toEqual(expect.arrayContaining(['provider_moved', 'evidence_refs_moved']));
+    expect(result.reasons).toEqual(['provider_moved']);
   });
 
   it('treats unknown provider/runtime evidence becoming observed as continuity movement', () => {
@@ -221,7 +241,7 @@ describe('operator continuity v2 fingerprint + cookie', () => {
     expect(result.reasons).toEqual(expect.arrayContaining(['provider_moved', 'runtime_moved']));
   });
 
-  it('expires without granting authority and fails closed on forged receipt fields', () => {
+  it('expires without granting authority and fails closed on forged authority fields', () => {
     const receipt = createOperatorContinuityReceiptV2(baseInputV2);
     const expired = evaluateOperatorContinuityReceiptV2(receipt, baseInputV2, '2026-08-31T16:40:00.001Z');
     expect(expired.state).toBe('stale');
