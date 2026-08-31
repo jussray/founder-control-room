@@ -122,6 +122,10 @@ A GitHub merge outside the in-app FCR execution path does not prove the FCR dete
 
 Production GitHub authentication should prefer repository-scoped installation credentials minted from `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY`. The FCR App should be installed only on `jussray/founder-control-room` unless broader scope is separately reviewed.
 
+GitHub Actions uses a deliberate credential-name adapter: the `production` environment stores the Actions-facing secret names `APP_ID` and `APP_PRIVATE_KEY`, and trusted workflows map those values into the stable Worker/provider runtime names `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY`. The adapter is wiring, not authority: seeing the names in source or a continuity cookie does not prove the secret values exist, match the intended App, can mint an installation token, are accepted by GitHub, authorize deployment, or match a deployed runtime. The GitHub App Client ID is not consumed by this installation-token path.
+
+GitHub App private-key transport normalization accepts only equivalent representations of the same complete RSA PEM: raw PEM, escaped-newline/CRLF PEM, JSON-quoted PEM, or base64-encoded PEM. The provider must parse the normalized material with Node's private-key parser and fail closed for malformed, truncated, non-private, or non-RSA material while returning a bounded configuration error instead of raw OpenSSL decoder output. This compatibility layer does not prove the configured secret is the intended App key, that the App is installed, that token minting succeeds, or that any provider mutation is authorized.
+
 For any active ruleset protecting `jussray/founder-control-room` `main`, the only permitted bypass actor is exactly the numeric App identity configured by trusted `GITHUB_APP_ID`. Missing, mismatched, caller-supplied alternative, or additional bypass integration IDs fail closed. `GITHUB_WEBHOOK_SECRET` separately authenticates the signed `/api/webhooks/github` event ingress. Secret values never belong in source, PR bodies, issue comments, logs, screenshots, browser bundles, or chat-visible documentation.
 
 ## Founder-owned progress publishing

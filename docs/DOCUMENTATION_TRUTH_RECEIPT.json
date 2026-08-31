@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the current founder-content editorial-novelty, provider-neutral n8n authority, cadence-expiry reservation, and observation-only analytics supersession changes to reviewed source invariants without granting merge, deploy, publication, provider-policy, database, secret, billing, destructive-action, or runtime authority.",
+  "purpose": "Bind the current founder-content editorial-novelty, provider-neutral n8n authority, cadence-expiry reservation, observation-only analytics supersession, ULTRATHINK V4 advisory anti-laundering, and current GitHub App credential-transport changes to reviewed source invariants without granting merge, deploy, publication, provider-policy, database, secret, billing, destructive-action, or runtime authority.",
   "domains": [
     "publishing"
   ],
@@ -69,7 +69,7 @@
     {
       "path": "README.md",
       "claims": [
-        "README.md must describe the source-level n8n approval adapter without claiming deployed n8n, Buffer credentials, provider mutation, readback, or live publication outcome."
+        "README.md must describe the source-level n8n approval adapter without claiming deployed n8n, Buffer credentials, provider mutation, readback, or live publication outcome, while preserving current-main GitHub App credential transport truth."
       ]
     },
     {
@@ -89,6 +89,24 @@
       "path": "docs/founder-signal-engine/linkedin-analytics-continuity.md",
       "claims": [
         "docs/founder-signal-engine/linkedin-analytics-continuity.md must keep aggregate daily LinkedIn ENGAGEMENT activity separate from per-post cumulative performance, document the observation-only ACTUAL-FLOW V3 supersession seam, and state that V3 source-digest presence is not V4 claim-to-source provenance locking."
+      ]
+    },
+    {
+      "path": "packages/ultrathink-verification-core/src/v4-advisory-handoff.v0.ts",
+      "claims": [
+        "packages/ultrathink-verification-core/src/v4-advisory-handoff.v0.ts must keep the FCR-to-Chief V4 advisory boundary evidence-only and capped at ATTESTED, derive advisory identity locally from a canonical validated projection rather than trusting caller-selected receipt_sha256 as the integrity root, require exact source-byte binding and provenance semantics, keep unproven metrics and claims outside the handoff, and reject receipt/source/evidence inconsistencies without granting publication or execution authority."
+      ]
+    },
+    {
+      "path": "packages/ultrathink-verification-core/test/v4-advisory-handoff.v0.test.ts",
+      "claims": [
+        "packages/ultrathink-verification-core/test/v4-advisory-handoff.v0.test.ts must preserve the sanitized five-field ATTESTED handoff contract and Attack Ten regressions for authority escalation, canonicalization drift, verification laundering, source-verification downgrade, false derivation claims, source-binding spoofing, digest disagreement, receipt identity mismatch, evidence injection, and replayed-digest freezing."
+      ]
+    },
+    {
+      "path": "src/providers/githubAppAuth.ts",
+      "claims": [
+        "src/providers/githubAppAuth.ts may normalize only transport-equivalent forms of one complete GitHub App private RSA PEM: raw PEM, escaped-newline or CRLF PEM, JSON-quoted PEM, and base64-encoded PEM; the normalized key must parse through Node createPrivateKey as a private RSA key for RS256, malformed/truncated/non-RSA material must fail closed with a bounded non-secret configuration error, and normalization must not be treated as proof of App identity, installation scope, token minting, provider acceptance, or mutation authority."
       ]
     }
   ]
