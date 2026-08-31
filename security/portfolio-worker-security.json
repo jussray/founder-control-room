@@ -2,7 +2,7 @@
   "schema": "founder-control-room/portfolio-worker-security@v1",
   "suiteVersion": "attack-20-v3",
   "repository": "jussray/founder-control-room",
-  "declaredFromMainSha": "4d956dd84c4318382ce1de9b50b76d6c39dcd27f",
+  "declaredFromMainSha": "f5308a3be9bae9cdaff21e274e5968d7f26bcaa7",
   "overallState": "UNVERIFIED",
   "aggregation": {
     "passRequiresEveryProductionWorkerPass": true,
@@ -128,7 +128,7 @@
         "A10": ["worker receives Cloudflare Email Routing events rather than an HTTP provider webhook"],
         "A11": ["worker does not expose tenant-owned object access"],
         "A12": ["worker does not expose user-mutable object properties"],
-        "A14": ["worker does not directly expose Supabase data access"]
+        "A14": ["worker does not expose Supabase data access"]
       },
       "observedProtection": {
         "observedAt": null,

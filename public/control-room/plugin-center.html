@@ -66,7 +66,6 @@
   </main>
 
   <script>
-    const STORAGE_KEY = 'fcr_session';
     const nodes = {
       summary: document.getElementById('summary'),
       contract: document.getElementById('contract'),
@@ -80,14 +79,8 @@
       return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
 
-    function session() {
-      try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || 'null'); } catch { return null; }
-    }
-
     async function api(path) {
-      const current = session();
-      if (!current?.access_token) throw new Error('No founder session found. Sign in through the main Control Room first.');
-      const res = await fetch(path, { headers: { Authorization: `Bearer ${current.access_token}` } });
+      const res = await fetch(path, { credentials: 'same-origin' });
       const body = await res.json().catch(() => null);
       if (!res.ok) throw new Error(body?.error || `Request failed (${res.status})`);
       return body;

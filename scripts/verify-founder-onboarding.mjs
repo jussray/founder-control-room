@@ -21,6 +21,10 @@ const files = {
     new URL('../supabase/migrations/20260723010000_add_hubspot_connection_type.sql', import.meta.url),
     'utf8',
   ),
+  browserSessionMigration: await readFile(
+    new URL('../supabase/migrations/20260829081500_opaque_founder_browser_sessions.sql', import.meta.url),
+    'utf8',
+  ),
   workerConfig: await readFile(new URL('../wrangler.worker.toml', import.meta.url), 'utf8'),
 };
 
@@ -36,15 +40,16 @@ requireText('auth', 'Google OAuth callback', "redirectTo: `${FOUNDER_API_URL}/au
 requireText('auth', 'server-managed OAuth redirect', 'skipBrowserRedirect: true');
 requireText('auth', 'first-login identity creation', 'shouldCreateUser: true');
 requireText('auth', 'session endpoint', "authRouter.post('/session'");
-requireText('auth', 'session cookie write', 'writeFounderSession(res, data.session)');
+requireText('auth', 'strict session establishment helper', 'await rotateFounderSession(req, res, session)');
+requireText('auth', 'verified session establishment', 'establishFounderSession(req, res, founderSession)');
 requireText('auth', 'generic enumeration-safe response', 'GENERIC_MAGIC_LINK_MESSAGE');
 requireText('auth', 'password handoff endpoint', "authRouter.post('/password'");
-requireText('auth', 'password handoff auth gate', "authRouter.post('/password', requireFounder");
+requireText('auth', 'password handoff route-local rate limit', 'rateLimitFounderPassword');
+requireText('auth', 'password handoff rate limit before interactive auth gate', "authRouter.post('/password', rateLimitFounderPassword, requireInteractiveFounder");
 requireText('auth', 'password handoff cookie gate', 'readFounderSession(req)');
 requireText('auth', 'password handoff Supabase update', 'requestAuth.auth.updateUser({ password })');
 requireText('auth', 'password minimum', 'MIN_FOUNDER_PASSWORD_LENGTH = 12');
-requireText('auth', 'fragment handoff construction', 'new URLSearchParams');
-requireText('auth', 'fragment handoff redirect', "setHeader('Location', `/control-room/#${fragment.toString()}`)");
+requireText('auth', 'opaque callback redirect', "return res.redirect(303, '/')");
 
 requireText('ui', 'Google login control', 'Continue with Google');
 requireText('ui', 'Google login route', 'href="/auth/google"');
@@ -76,6 +81,10 @@ requireText('session', 'HttpOnly cookie', 'HttpOnly');
 requireText('session', 'strict same-site cookie', 'SameSite=Strict');
 requireText('session', 'HTTPS-aware Secure cookie', "startsWith('https://')");
 requireText('session', 'private no-store session response', "'Cache-Control', 'private, no-store'");
+requireText('session', 'deterministic continuity fingerprint', 'sessionContinuityFingerprint');
+requireText('session', 'fingerprint fail-closed check', 'storedContinuityFingerprint !== expectedContinuityFingerprint');
+requireText('browserSessionMigration', 'continuity fingerprint persistence', 'continuity_fingerprint text not null');
+requireText('browserSessionMigration', 'continuity fingerprint shape', 'founder_browser_sessions_continuity_fingerprint_shape');
 requireText('middleware', 'Bearer compatibility', 'bearerToken(req)');
 requireText('middleware', 'browser cookie auth', 'readFounderSession(req)');
 requireText('middleware', 'server refresh', 'refreshSession');
@@ -101,6 +110,18 @@ if (files.ui.includes('sekretbip@gmail.com')) {
 }
 if (/json\([^)]*access_token\s*:\s*data\.session\.access_token/s.test(files.auth)) {
   errors.push('token handling: raw access tokens must not be returned as callback JSON');
+}
+if (files.auth.includes("setHeader('Location', `/control-room/#")) {
+  errors.push('token handling: founder callback must not export session credentials in a dashboard URL fragment');
+}
+if (/new URLSearchParams\(\{[\s\S]{0,400}access_token:\s*data\.session\.access_token/.test(files.auth)) {
+  errors.push('token handling: founder callback must not construct a credential-bearing redirect fragment');
+}
+if (files.auth.includes("revokeFounderSession(req, 'replaced')")) {
+  errors.push('session rotation: OAuth callback must use the strict shared rotation membrane, not best-effort replacement revocation');
+}
+if (files.auth.includes('writeFounderSession(res, founderSession)')) {
+  errors.push('session rotation: founder routes must not bypass the strict shared rotation membrane with a direct session write');
 }
 if (files.auth.includes('SUPABASE_SERVICE_ROLE_KEY')) {
   errors.push('key boundary: auth route must not reference the service-role key');
@@ -130,6 +151,9 @@ if (errors.length) {
 console.log('Founder onboarding contract verified.');
 console.log('Google OAuth: Supabase redirect + private founder allowlist');
 console.log('Workspace bootstrap: project registry + disconnected provider slots');
+console.log('Opaque browser cookie: HttpOnly + Strict + server-side revocation');
+console.log('Founder callback handoff: opaque cookie only; no Supabase credential fragment');
+console.log('Continuity fingerprint: deterministic server-state integrity only; no device/browser tracking');
 console.log('Provider credentials stored: no');
 console.log('Execution authority granted by onboarding: no');
 console.log('HubSpot catalog/schema parity: declared in source migration');
