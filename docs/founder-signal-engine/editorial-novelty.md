@@ -157,6 +157,22 @@ The system must preserve all of these:
 - Chief proposals remain proposal-only;
 - FCR approval remains exact-copy, founder-authenticated, one-shot authority.
 
+## Pre-draft fingerprint gate
+
+`src/lib/founderContentFingerprintGate.ts` (`fcr/founder-content-fingerprint-gate@v1`) is a separate, earlier checkpoint from the novelty gate above. It runs **before** Chief drafts a candidate, not at approval time:
+
+```text
+Chief candidate (project, platform, topic, differentiated thesis, format + rationale)
+-> FCR reads bounded recent LinkedIn + cross-social history
+-> FCR rules out recently used angles/hooks/CTAs and recent formats by token similarity
+-> PASS: history coverage proven, deliberate format + rationale present, thesis present, no high-overlap angle
+-> HOLD: any of the above is missing or a recent angle overlaps too strongly
+```
+
+The gate is fail-closed by design: it defaults to `HOLD` whenever cross-social history coverage has not been proven, even when LinkedIn coverage is complete, because the current default `supabaseFounderContentFingerprintHistoryRepository` only proves LinkedIn (`coverage.otherSocial` is always `false` unless a caller supplies reconciled cross-social history). Like the novelty gate, its output packet carries `authority: { draft: false, approve: false, schedule: false, publish: false }` — a `PASS` is permission to start drafting, never approval, scheduling, or publication authority.
+
+This is a distinct fingerprint/contract from `promptOsPatternFingerprint`/`storyFingerprint` above: the fingerprint gate compares candidate thesis/topic/angle text directly (no persisted fingerprint), while the novelty gate compares deterministic SHA-256 identities against LinkedIn/founder-attested history at proposal-approval time. A `PASS` here does not skip or substitute for the novelty gate that still runs when the resulting proposal reaches `issueFounderContentApproval()`.
+
 ## Verification
 
 Focused tests:
@@ -166,6 +182,7 @@ npx vitest run \
   src/lib/__tests__/founderEditorialNovelty.test.ts \
   src/lib/__tests__/founderEditorialNovelty.publicationMemory.test.ts \
   src/lib/__tests__/founderContentApprovalStore.novelty.test.ts \
+  src/lib/__tests__/founderContentFingerprintGate.test.ts \
   src/http/routes/__tests__/capabilities.founderContentObservation.integration.test.ts
 ```
 

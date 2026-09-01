@@ -456,6 +456,7 @@ export async function evaluateFounderEditorialNovelty({
   let closest: FounderEditorialHistoryRecord | null = null;
   let closestSimilarity = 0;
   let exactPatternMatch = false;
+  let exactMatch: FounderEditorialHistoryRecord | null = null;
   for (const item of history) {
     const score = similarity(currentSemanticText, historicalSemanticText(item));
     if (score > closestSimilarity) {
@@ -464,9 +465,17 @@ export async function evaluateFounderEditorialNovelty({
     }
     if (historicalPatternFingerprint(item) === identity.promptOsPatternFingerprint) {
       exactPatternMatch = true;
-      closest ??= item;
+      exactMatch ??= item;
     }
   }
+  // An exact pattern match always forces HIGH risk (see riskFor below), so
+  // whenever one is present it — not a merely higher-token-similarity but
+  // unrelated record — must be what closestMatchId/the continuity receipt
+  // point to; otherwise the audit trail names the wrong record as the
+  // reason for the block. closestSimilarity is left as the best raw
+  // token-overlap score found, a separate metric from which record is
+  // attributed as the match.
+  if (exactMatch) closest = exactMatch;
 
   const risk = riskFor(closestSimilarity, exactPatternMatch);
   const allowed = risk !== 'HIGH';

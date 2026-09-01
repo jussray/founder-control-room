@@ -32,6 +32,15 @@ function requiredText(value: unknown, label: string): string {
   return value.trim();
 }
 
+function requiredTimestampMs(value: unknown, label: string): number {
+  const raw = requiredText(value, label);
+  const ms = Date.parse(raw);
+  if (!Number.isFinite(ms)) {
+    throw new Error(`${label} must be a parseable timestamp`);
+  }
+  return ms;
+}
+
 function requiredDigest(value: unknown, label: string): string {
   const digest = requiredText(value, label).toLowerCase();
   if (!SHA256.test(digest)) {
@@ -157,6 +166,16 @@ export function createV4AdvisoryHandoffFromReceiptV0(receipt: unknown): V4Adviso
   }
   if (requiredDigest(currentEvidence.source_sha256, "V4 current evidence source_sha256") !== currentSourceDigest) {
     throw new Error("V4 current evidence/source binding digest mismatch");
+  }
+  // This boundary intentionally does not trust or recompute the caller's
+  // receipt digest, so it cannot rely on the producer having enforced
+  // chronology. A supersession's "current" evidence must be observed
+  // strictly after the "historical" evidence it supersedes, or a malformed
+  // receipt could present stale or reordered evidence as ATTESTED current.
+  const priorObservedAtMs = requiredTimestampMs(priorEvidence.observed_at, "V4 historical evidence observed_at");
+  const currentObservedAtMs = requiredTimestampMs(currentEvidence.observed_at, "V4 current evidence observed_at");
+  if (currentObservedAtMs <= priorObservedAtMs) {
+    throw new Error("V4 current evidence must be observed strictly after the historical evidence");
   }
 
   const subject = asRecord(value.subject, "V4 receipt subject");

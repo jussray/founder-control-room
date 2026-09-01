@@ -84,7 +84,7 @@ describe('founder editorial novelty', () => {
     expect(result.authority).toEqual({ publish: false, approve: false, schedule: false });
   });
 
-  it('keeps any exact portfolio pattern HIGH even when another project ranks closer by token similarity', async () => {
+  it('attributes the HIGH-risk block to the exact portfolio pattern match, not a merely closer-by-token-similarity distractor', async () => {
     const repository = history([
       {
         id: 'sekret-same-pattern',
@@ -104,7 +104,12 @@ describe('founder editorial novelty', () => {
 
     const result = await evaluateFounderEditorialNovelty({ proposal: proposal(), historyRepository: repository });
 
-    expect(result.closestMatchId).toBe('semantic-distractor');
+    // 'sekret-same-pattern' is the exact thesis/hook fingerprint match (its
+    // verbose padding only dilutes raw token similarity, not the exact
+    // fingerprint) and is what actually forces HIGH risk here — the audit
+    // trail must name it, not 'semantic-distractor', which merely happens to
+    // score higher on raw Jaccard similarity without matching at all.
+    expect(result.closestMatchId).toBe('sekret-same-pattern');
     expect(result.closestSimilarity).toBeGreaterThan(0.35);
     expect(result.closestSimilarity).toBeLessThan(0.55);
     expect(result.risk).toBe('HIGH');

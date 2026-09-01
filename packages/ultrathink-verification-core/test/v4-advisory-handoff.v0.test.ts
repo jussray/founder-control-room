@@ -199,5 +199,20 @@ describe("V4 advisory handoff", () => {
       expect(replayed.observationHash).toBe(original.observationHash);
       expect(replayed.learningHash).toBe(original.learningHash);
     });
+
+    it("12 rejects current evidence observed at or before the historical evidence", () => {
+      const receipt = v4Receipt();
+      (receipt.evidence as Array<Record<string, unknown>>)[1].observed_at =
+        (receipt.evidence as Array<Record<string, unknown>>)[0].observed_at;
+      expect(() => createV4AdvisoryHandoffFromReceiptV0(receipt))
+        .toThrow(/observed strictly after/);
+    });
+
+    it("13 rejects an unparseable current-evidence timestamp instead of accepting any nonempty string", () => {
+      const receipt = v4Receipt();
+      (receipt.evidence as Array<Record<string, unknown>>)[1].observed_at = "not-a-timestamp";
+      expect(() => createV4AdvisoryHandoffFromReceiptV0(receipt))
+        .toThrow(/parseable timestamp/);
+    });
   });
 });

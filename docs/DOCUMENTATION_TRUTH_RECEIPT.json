@@ -15,6 +15,18 @@
       ]
     },
     {
+      "path": "src/lib/founderContentFingerprintGate.ts",
+      "claims": [
+        "src/lib/founderContentFingerprintGate.ts must gate candidate drafting on proven recent history coverage, ruled-out recently used angles/formats, a deliberate format choice with rationale, and a differentiated thesis; it must default fail-closed (HOLD) whenever cross-social history coverage is unproven even when LinkedIn coverage is complete; and its output must never carry draft, approve, schedule, or publish authority. This pre-draft checkpoint is distinct from and does not substitute for the founderEditorialNovelty.ts gate that still runs at approval time."
+      ]
+    },
+    {
+      "path": "docs/founder-signal-engine/editorial-novelty.md",
+      "claims": [
+        "docs/founder-signal-engine/editorial-novelty.md must document founderContentFingerprintGate.ts as a distinct pre-draft checkpoint from the approval-time novelty gate, state that its PASS carries no draft/approve/schedule/publish authority, and state that a PASS does not skip the novelty gate that still runs when the resulting proposal reaches issueFounderContentApproval()."
+      ]
+    },
+    {
       "path": "src/http/routes/capabilities.ts",
       "claims": [
         "src/http/routes/capabilities.ts must keep manual LinkedIn publication observations USER_ATTESTED and non-authorizing, require bounded transient coreThesis and openingHook inputs for new publication-memory attestations, derive the PromptOS editorial pattern fingerprint server-side, persist only that fingerprint rather than the raw thesis/hook text, reject malformed or future publication identity/time inputs, preserve immutable attestation events, and explicitly clear stale provider-event provenance in the latest observation view."
