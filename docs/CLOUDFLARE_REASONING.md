@@ -201,7 +201,25 @@ For native Cloudflare Workers Builds, the membrane requires the provider-reporte
 
 For GitHub Actions, production promotion is recognized only for the manual `Deploy` or `FCR Worker Reconcile` workflow-dispatch lanes when the checked-out SHA equals the exact GitHub workflow SHA. Ordinary CI remains verification-only. The emitted `fcr/worker-build-authority-receipt@v1` is redacted build evidence and explicitly cannot authorize provider mutation.
 
+The GitHub Actions credential source is deliberately split from the Worker/provider runtime contract: trusted production workflows read `APP_ID` and `APP_PRIVATE_KEY` from the GitHub `production` environment and map them to `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` only inside the bounded runtime/validation surfaces. A source-level mapping, secret-name display, fingerprint, or continuity cookie does not prove the values are present or valid, that they belong to the intended App, that GitHub accepted an installation token, or that any deployment/runtime action occurred. The GitHub App Client ID is not consumed by this installation-token path.
+
+The guarded production deploy also requires `FOUNDER_SESSION_ENCRYPTION_KEY` to be a 43-character unpadded base64url value that decodes to exactly 32 bytes before the release can proceed. `.github/workflows/deploy.yml` must inject that key only into the canonical Worker secret set; Pages and unrelated jobs must not receive it. This source preflight proves the fail-closed contract only, not that the GitHub `production` environment currently contains a valid key or that Cloudflare accepted a deployment.
+
 This source membrane does not prove the current Cloudflare Workers Builds dashboard configuration, custom-domain routing, active deployment, or runtime SHA. Those remain separate provider/runtime readback gates.
+
+## Durable release-proof Workflow boundary
+
+`wrangler.worker.toml` declares one Cloudflare Workflows binding for the exported `ReleaseProofWorkflowV0` class:
+
+```text
+binding: RELEASE_PROOF_WORKFLOW
+name: fcr-release-proof-v0
+class: ReleaseProofWorkflowV0
+```
+
+This is durable orchestration, not release authority. No HTTP route, cron schedule, or other application trigger creates Workflow instances in this slice. The Workflow binds repository, target branch, exact base/head SHAs, optional PR identity, and a deterministic candidate fingerprint; waits for separately supplied exact evidence and founder-approval observations; rejects mismatched or blocked observations; and stops at `READY_FOR_FINAL_REREAD`.
+
+Its final receipt deliberately keeps `mergeAuthorized`, `deploymentAuthorized`, and `providerMutationAuthorized` false. A Workflow event or completed instance cannot replace authenticated Founder Final, the final mutable provider/PR reread, expected-head protection, or the existing guarded deployment path. Repository source proves only the intended class/binding contract. Cloudflare provider configuration, instance state, and runtime behavior require their own readback evidence.
 
 ## Verification
 

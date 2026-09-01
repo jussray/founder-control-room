@@ -272,10 +272,11 @@ export async function requireV10DecisionFounderBinding(
   const body = isRecord(req.body) ? req.body : null;
   if (text(body?.actionType) !== 'merge') return next();
 
+  const founderCookieSession = await readFounderSession(req);
   const transportErrors = founderMergeTransportErrors({
     actionType: body?.actionType,
     authorization: req.header('authorization'),
-    hasFounderCookieSession: Boolean(readFounderSession(req)),
+    hasFounderCookieSession: founderCookieSession !== null,
   });
   if (transportErrors.length > 0) {
     return res.status(403).json({

@@ -76,9 +76,10 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          FOUNDER_SESSION_ENCRYPTION_KEY: ${{ secrets.FOUNDER_SESSION_ENCRYPTION_KEY }}
           GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
-          GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
-          GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}
+          GITHUB_APP_ID: ${{ secrets.APP_ID }}
+          GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
@@ -93,6 +94,7 @@ jobs:
             SUPABASE_DB_URL
             SUPABASE_SERVICE_ROLE_KEY
             SUPABASE_PUBLISHABLE_KEY
+            FOUNDER_SESSION_ENCRYPTION_KEY
             GITHUB_WEBHOOK_SECRET
             GITHUB_APP_ID
             GITHUB_PRIVATE_KEY
@@ -116,7 +118,30 @@ jobs:
             exit 1
           fi
 
-          echo "All required production configuration names are present."
+          FOUNDER_SESSION_ENCRYPTION_KEY="$FOUNDER_SESSION_ENCRYPTION_KEY" python3 - <<'PY'
+          import base64
+          import os
+          import re
+
+          encoded = os.environ.get('FOUNDER_SESSION_ENCRYPTION_KEY', '').strip()
+          if not re.fullmatch(r'[A-Za-z0-9_-]{43}', encoded):
+              print('::error title=Invalid founder session encryption key::FOUNDER_SESSION_ENCRYPTION_KEY must be 43-character unpadded base64url')
+              raise SystemExit(1)
+
+          try:
+              decoded = base64.b64decode(encoded + '=', altchars=b'-_', validate=True)
+          except Exception:
+              print('::error title=Invalid founder session encryption key::FOUNDER_SESSION_ENCRYPTION_KEY is not valid base64url')
+              raise SystemExit(1)
+
+          if len(decoded) != 32:
+              print('::error title=Invalid founder session encryption key::FOUNDER_SESSION_ENCRYPTION_KEY must decode to exactly 32 bytes')
+              raise SystemExit(1)
+
+          print('FOUNDER_SESSION_ENCRYPTION_KEY format is valid.')
+          PY
+
+          echo "All required production configuration names are present and structurally valid."
 
       - name: Record authority receipt
         shell: bash
@@ -253,6 +278,7 @@ jobs:
           REQUIRED_MIGRATION_VERSIONS: 20260723000000,20260803011000
         run: |
           set -euo pipefail
+          mkdir -p test-results
           supabase migration list --db-url "$SUPABASE_DB_URL" | tee "$REMOTE_MIGRATION_LIST_PATH"
           node scripts/verify-production-migration-ledger.mjs
 
@@ -315,6 +341,7 @@ jobs:
           secrets: |
             SUPABASE_SERVICE_ROLE_KEY
             SUPABASE_PUBLISHABLE_KEY
+            FOUNDER_SESSION_ENCRYPTION_KEY
             GITHUB_WEBHOOK_SECRET
             GITHUB_APP_ID
             GITHUB_PRIVATE_KEY
@@ -325,9 +352,10 @@ jobs:
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          FOUNDER_SESSION_ENCRYPTION_KEY: ${{ secrets.FOUNDER_SESSION_ENCRYPTION_KEY }}
           GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
-          GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
-          GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}
+          GITHUB_APP_ID: ${{ secrets.APP_ID }}
+          GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
           FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
           ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL: ${{ secrets.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL }}
           FOUNDER_REVIEW_EMAIL_INGRESS_SECRET: ${{ secrets.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET }}

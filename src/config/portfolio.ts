@@ -1,6 +1,6 @@
 import { L99_REPOSITORY_IDENTIFIER } from "./l99Repository.js";
 
-export type PortfolioProjectStatus = "active" | "quarantined";
+export type PortfolioProjectStatus = "active" | "external";
 
 export interface PortfolioProject {
   slug: string;
@@ -11,16 +11,13 @@ export interface PortfolioProject {
 }
 
 /**
- * Founder-owned portfolio registry.
+ * Projects that currently carry FCR portfolio/MCP authority.
  *
- * This is a bootstrap registry for provider discovery and MCP policy. The
- * Control Room database remains the runtime source of truth once a project is
- * registered there. Legacy and duplicate repositories are explicitly kept out
- * of every MCP allowlist.
- *
- * Slugs intentionally match the existing Control Room database registry. Do
- * not rename a product here without an explicit data migration; a second slug
- * would create a second project identity and split evidence provenance.
+ * Keep this collection active-only. Existing consumers historically treated
+ * PORTFOLIO_PROJECTS as an authority-bearing allowlist, so known external
+ * repositories must never be added here merely for discovery or continuity.
+ * The Control Room database remains the runtime source of truth once a project
+ * is registered there. Slugs intentionally match that existing registry.
  */
 export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
   {
@@ -38,7 +35,7 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     capabilities: ["commerce", "storefront", "playwright"],
   },
   {
-    slug: "jbh-private",
+    slug: "juss-beautiful-hair-private",
     name: "Juss Beautiful Hair Private Operations",
     repository: "jussray/jbh-private",
     status: "active",
@@ -81,8 +78,45 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
   },
 ] as const;
 
+/**
+ * Founder-owned repositories that are known to FCR for identity/continuity
+ * only. Presence here grants no portfolio, MCP, decision, merge, deploy, or
+ * execution authority.
+ */
+export const EXTERNAL_PROJECTS: readonly PortfolioProject[] = [
+  {
+    slug: "think-tank",
+    name: "Think Tank",
+    repository: "jussray/THINK-TANK",
+    status: "external",
+    capabilities: ["idea-memory", "scorecards", "continuity"],
+  },
+  {
+    slug: "solcontinuity",
+    name: "SolContinuity",
+    repository: "jussray/solcontinuity",
+    status: "external",
+    capabilities: ["continuity", "evidence-history", "resilience"],
+  },
+  {
+    slug: "sleepwealth-agent",
+    name: "SleepWealth Agent",
+    repository: "jussray/SleepWealth-Agent",
+    status: "external",
+    capabilities: ["agent-runtime", "audit", "risk-gates"],
+  },
+  {
+    slug: "sweats",
+    name: "Sweats",
+    repository: "jussray/Sweats",
+    status: "external",
+    capabilities: ["product", "continuity"],
+  },
+] as const;
+
 export const QUARANTINED_REPOSITORIES = new Set([
   "jussray/do-not-use",
+  "jussray/don-t-touch-this-one",
   "jussray/SekretBip_refactor_start",
   "jussray/Se-kretBip",
   "jussray/sekret-bip-demo",
@@ -91,11 +125,19 @@ export const QUARANTINED_REPOSITORIES = new Set([
 ]);
 
 export const ACTIVE_PROJECT_SLUGS = new Set(
-  PORTFOLIO_PROJECTS.filter((project) => project.status === "active").map(
-    (project) => project.slug,
-  ),
+  PORTFOLIO_PROJECTS.map((project) => project.slug),
 );
 
+export const EXTERNAL_PROJECT_SLUGS = new Set(
+  EXTERNAL_PROJECTS.map((project) => project.slug),
+);
+
+/** Authority-bearing lookup. External identities are intentionally invisible. */
 export function getPortfolioProject(slug: string): PortfolioProject | undefined {
   return PORTFOLIO_PROJECTS.find((project) => project.slug === slug);
+}
+
+/** Read-only identity lookup for continuity/provenance code. Never an allowlist. */
+export function getKnownProject(slug: string): PortfolioProject | undefined {
+  return getPortfolioProject(slug) ?? EXTERNAL_PROJECTS.find((project) => project.slug === slug);
 }
