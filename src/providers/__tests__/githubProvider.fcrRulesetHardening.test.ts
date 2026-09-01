@@ -50,8 +50,19 @@ function reviewReadback(request: TestConfig = config) {
       parameters: {
         required_approving_review_count: request.requiredApprovingReviewCount,
         dismiss_stale_reviews_on_push: true,
+        require_code_owner_review: true,
         require_last_push_approval: true,
         required_review_thread_resolution: true,
+      },
+    },
+    {
+      type: "code_scanning",
+      parameters: {
+        code_scanning_tools: [{
+          tool: "CodeQL",
+          security_alerts_threshold: "high_or_higher",
+          alerts_threshold: "errors",
+        }],
       },
     },
   ];
@@ -142,7 +153,7 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     installStrongProviderMocks();
   });
 
-  it("separates no-bypass strict freshness from the pull-request-only review membrane", async () => {
+  it("separates no-bypass strict freshness from the security-preserving review membrane", async () => {
     const provider = buildProvider();
     const result = await provider.applyBranchRuleset("founder-control-room", config);
 
@@ -178,8 +189,17 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
       .toMatchObject({
         required_approving_review_count: 1,
         dismiss_stale_reviews_on_push: true,
+        require_code_owner_review: true,
         require_last_push_approval: true,
         required_review_thread_resolution: true,
+      });
+    expect(reviewPayload.rules.find((rule: { type: string }) => rule.type === "code_scanning")?.parameters)
+      .toEqual({
+        code_scanning_tools: [{
+          tool: "CodeQL",
+          security_alerts_threshold: "high_or_higher",
+          alerts_threshold: "errors",
+        }],
       });
 
     expect(mockGetRepoRuleset.mock.calls.map((call) => call[0].ruleset_id)).toEqual([2, 1]);
@@ -277,6 +297,32 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
       .rejects.toThrow("bypass actors do not match the requested policy");
   });
 
+  it("fails closed when review readback drops Code Owner review", async () => {
+    const weakened = reviewReadback();
+    const pullRequestRule = weakened.rules.find((rule) => rule.type === "pull_request");
+    if (!pullRequestRule?.parameters) throw new Error("test fixture missing pull_request parameters");
+    pullRequestRule.parameters.require_code_owner_review = false;
+    mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+      data: ruleset_id === 2 ? freshnessReadback() : weakened,
+    }));
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", config))
+      .rejects.toThrow("Code Owner review is not required");
+  });
+
+  it("fails closed when review readback drops the CodeQL floor", async () => {
+    const weakened = reviewReadback();
+    weakened.rules = weakened.rules.filter((rule) => rule.type !== "code_scanning");
+    mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+      data: ruleset_id === 2 ? freshnessReadback() : weakened,
+    }));
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", config))
+      .rejects.toThrow("exactly one CodeQL code-scanning rule");
+  });
+
   it("surfaces the verified freshness identity when the review mutation fails", async () => {
     mockCreateRepoRuleset.mockImplementation(async (payload: { name: string; enforcement: string }) => {
       if (payload.name === freshnessName()) {
@@ -345,9 +391,11 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     expect(payload.rules.find((rule: { type: string }) => rule.type === "pull_request")?.parameters)
       .toMatchObject({
         dismiss_stale_reviews_on_push: false,
+        require_code_owner_review: false,
         require_last_push_approval: false,
         required_review_thread_resolution: true,
       });
+    expect(payload.rules.find((rule: { type: string }) => rule.type === "code_scanning")).toBeUndefined();
     expect(payload.rules.find((rule: { type: string }) => rule.type === "required_status_checks")).toBeTruthy();
     expect(payload.bypass_actors).toEqual([
       { actor_type: "Integration", actor_id: 123, bypass_mode: "always" },

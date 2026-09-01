@@ -1,0 +1,91 @@
+name: Exact-Head Recovery Command
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  actions: write
+  issues: read
+
+concurrency:
+  group: exact-head-recovery-command
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: Dispatch bounded exact-head recovery diagnostics
+    if: >-
+      github.event.issue.number == 73 &&
+      github.event.comment.user.login == 'jussray' &&
+      startsWith(github.event.comment.body, '/recover-exact-head ')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Parse founder recovery command
+        id: command
+        env:
+          COMMAND_BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+
+          body = os.environ.get('COMMAND_BODY', '').strip()
+          parts = body.split()
+          if len(parts) != 2 or parts[0] != '/recover-exact-head':
+              raise SystemExit('Expected exactly: /recover-exact-head <40-char-sha>')
+
+          sha = parts[1]
+          if not re.fullmatch(r'[0-9a-f]{40}', sha):
+              raise SystemExit('Recovery SHA must be a lowercase 40-character commit SHA.')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'expected_head_sha={sha}\n')
+          PY
+
+      - name: Verify target commit exists in this repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ steps.command.outputs.expected_head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          observed="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${EXPECTED_HEAD_SHA}" --jq .sha)"
+          printf 'requested_sha=%s\nobserved_sha=%s\n' "$EXPECTED_HEAD_SHA" "$observed"
+          test "$observed" = "$EXPECTED_HEAD_SHA"
+
+      - name: Dispatch immutable recovery driver
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ steps.command.outputs.expected_head_sha }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          reason="founder exact-head recovery via issue #${ISSUE_NUMBER} comment ${COMMENT_ID}"
+          payload="$(jq -n \
+            --arg ref main \
+            --arg sha "$EXPECTED_HEAD_SHA" \
+            --arg reason "$reason" \
+            '{ref:$ref, inputs:{expected_head_sha:$sha, reason:$reason}}')"
+
+          gh api \
+            --method POST \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/pr35-recovery-driver.yml/dispatches" \
+            --input - <<< "$payload"
+
+          {
+            echo '## Exact-head recovery dispatched'
+            echo
+            echo "- Target SHA: \`$EXPECTED_HEAD_SHA\`"
+            echo "- Authority: founder comment on issue #$ISSUE_NUMBER"
+            echo "- Evidence cookie: comment \`$COMMENT_ID\`"
+            echo '- Target workflow: `.github/workflows/pr35-recovery-driver.yml`'
+            echo '- Deploy/provider/database/merge mutation authority: none'
+          } >> "$GITHUB_STEP_SUMMARY"

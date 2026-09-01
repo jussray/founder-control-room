@@ -71,6 +71,22 @@ FOUNDER_ALLOWED_ORIGINS: https://foundercontrolroom.org
 
 The canonical Worker owns the reconciliation cron because no duplicate HTTP Worker should exist.
 
+### Durable release-proof Workflow binding
+
+The canonical Worker also exports `ReleaseProofWorkflowV0` and declares the same-Worker Cloudflare Workflows binding:
+
+```text
+binding: RELEASE_PROOF_WORKFLOW
+name: fcr-release-proof-v0
+class_name: ReleaseProofWorkflowV0
+```
+
+This binding is intentionally inert from application code in this slice: no public HTTP route, cron schedule, or other runtime path creates Workflow instances. It exists so later FCR-controlled orchestration can use Cloudflare's durable step/event state without creating a parallel release authority.
+
+`ReleaseProofWorkflowV0` binds exact repository, target branch, base SHA, head SHA, optional PR identity, and a deterministic candidate fingerprint. It may correlate separately supplied evidence and founder-approval observations, but even a fully correlated run stops at `READY_FOR_FINAL_REREAD` with merge, deployment, and provider-mutation authority explicitly false. The final mutable provider/PR reread and any consequential action remain owned by the existing FCR authority membrane.
+
+Repository configuration proves only the desired Workflow class/binding contract. It does not prove that Cloudflare has accepted the binding, that an instance exists or completed, or that any release/provider action occurred. Those are separate provider/runtime evidence gates.
+
 ### Remote read MCP operator boundary
 
 The canonical Worker also owns the served remote read-only MCP endpoint at:
@@ -147,6 +163,10 @@ A failing or unavailable enrichment read is `UNKNOWN`/blocked evidence in that e
 
 Configure applicable secrets in the canonical Worker secret store and, where named by guarded workflows, in the GitHub `production` environment.
 
+For the GitHub `production` environment, the Actions-facing GitHub App credential names are `APP_ID` and `APP_PRIVATE_KEY`. Trusted deploy/governance workflows map those values into the stable Worker/provider runtime names `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY`; the canonical Worker secret registry continues to use the runtime names. The App Client ID is not consumed by this installation-token path. Secret-name presence, source wiring, fingerprints, and continuity cookies are not proof of credential value validity, App installation scope, provider acceptance, deployment authority, or runtime identity.
+
+The canonical Worker additionally requires `FOUNDER_SESSION_ENCRYPTION_KEY` for hardened founder-session cryptography. The guarded `.github/workflows/deploy.yml` path must reject production deployment unless the value is exactly 43 characters of unpadded base64url and decodes to exactly 32 bytes, and the workflow must pass it only to the canonical Worker secret set. Pages, migration-only steps, and unrelated workers must not inherit this secret. Repository validation proves the intended boundary, not live secret presence or provider acceptance.
+
 For the served remote read MCP, `FCR_REMOTE_MCP_READ_TOKEN` is a required canonical Worker secret and must be distinct from write-capable MCP/provider credentials. `FCR_REMOTE_MCP_READ_PROJECTS` is a public-safe server-held scope variable, not a secret.
 
 Never copy secret values into repository files, logs, screenshots, issue comments, PR bodies, documentation, or public content. A secret name or presence check proves wiring only; provider acceptance/permission is a separate truth.
@@ -173,7 +193,7 @@ Provider build/deploy comments, preview URLs, and successful uploads are useful 
 
 ## Documentation truth
 
-When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, remote MCP scope, hostname-inventory/Request Trace behavior, Worker build-authority behavior, or runtime proof requirements change, update this document in the same bounded repository change.
+When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, remote MCP scope, hostname-inventory/Request Trace behavior, Worker build-authority behavior, Cloudflare Workflow bindings/orchestration authority, or runtime proof requirements change, update this document in the same bounded repository change.
 
 Current executable source and authoritative provider readback outrank an older version of this runbook. Preserve older deployment evidence as historical provenance rather than deleting it.
 

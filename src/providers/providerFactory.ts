@@ -1,7 +1,9 @@
 import { getGitHubInstallationToken } from "./githubAppAuth.js";
+import { DeterministicReviewGitHubProvider } from "./DeterministicReviewGitHubProvider.js";
 import { SecurityPreservingGitHubProvider } from "./SecurityPreservingGitHubProvider.js";
 import { GitLabProvider } from "./GitLabProvider.js";
 import type {
+  DeterministicReviewWitnessPublication,
   Diff,
   FileEntry,
   Patch,
@@ -173,6 +175,17 @@ class LazyRepositoryProvider implements RepositoryProvider {
     return (await this.delegate()).listVerificationSignals(projectId, ref);
   }
 
+  async publishDeterministicReviewWitness(
+    projectId: string,
+    publication: DeterministicReviewWitnessPublication,
+  ): Promise<void> {
+    const delegate = await this.delegate();
+    if (!delegate.publishDeterministicReviewWitness) {
+      throw new Error(`${delegate.name}: deterministic review witness publication requires GitHub App authority`);
+    }
+    return delegate.publishDeterministicReviewWitness(this.governanceProjectId(projectId), publication);
+  }
+
   async listReviewSignals(projectId: string, pullRequestNumber: number): Promise<ReviewSignal[]> {
     const delegate = await this.delegate();
     if (!delegate.listReviewSignals) {
@@ -275,7 +288,12 @@ export function providerConfigurationError(
     const fallbackToken = env.GITHUB_TOKEN?.trim();
     const appId = env.GITHUB_APP_ID?.trim();
     const privateKey = env.GITHUB_PRIVATE_KEY?.trim();
-    return fallbackToken || (appId && privateKey)
+    const hasAppId = Boolean(appId);
+    const hasPrivateKey = Boolean(privateKey);
+    if (hasAppId !== hasPrivateKey) {
+      return "GitHub App authentication is incomplete; set both GITHUB_APP_ID and GITHUB_PRIVATE_KEY or neither";
+    }
+    return fallbackToken || (hasAppId && hasPrivateKey)
       ? null
       : "GitHub authentication is not configured; set GITHUB_APP_ID and GITHUB_PRIVATE_KEY or a local GITHUB_TOKEN fallback";
   }
@@ -298,8 +316,9 @@ async function githubProvider(project: ProviderProjectConfig): Promise<Repositor
   const privateKey = process.env.GITHUB_PRIVATE_KEY?.trim();
   // GITHUB_TOKEN remains a local/development fallback only; production prefers
   // repository-scoped GitHub App installation credentials minted on demand.
-  const token = appId && privateKey
-    ? await getGitHubInstallationToken(appId, privateKey, project.repo_identifier)
+  const hasAppAuthority = Boolean(appId && privateKey);
+  const token = hasAppAuthority
+    ? await getGitHubInstallationToken(appId!, privateKey!, project.repo_identifier)
     : fallbackToken!;
 
   const projectMap: Record<string, string> = { [project.slug]: project.repo_identifier };
@@ -307,11 +326,15 @@ async function githubProvider(project: ProviderProjectConfig): Promise<Repositor
     projectMap[FOUNDER_CONTROL_ROOM_PROJECT_ID] = project.repo_identifier;
   }
 
-  return new SecurityPreservingGitHubProvider({
+  const config = {
     token,
     projectMap,
     baseUrl: process.env.GITHUB_API_BASE_URL,
-  });
+  };
+
+  return hasAppAuthority && isFounderControlRoomRepository(project.repo_identifier)
+    ? new DeterministicReviewGitHubProvider(config)
+    : new SecurityPreservingGitHubProvider(config);
 }
 
 async function gitlabProvider(project: ProviderProjectConfig): Promise<RepositoryProvider> {

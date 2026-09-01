@@ -59,7 +59,7 @@ jobs:
       - name: Read live GitHub governance state
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
+          GITHUB_APP_ID: ${{ secrets.APP_ID }}
           FCR_GOVERNANCE_TARGET_REF: main
         run: node scripts/audit-github-governance-preflight.mjs
       - name: Publish sanitized governance receipt
