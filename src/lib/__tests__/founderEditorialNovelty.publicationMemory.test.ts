@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildFounderEditorialIdentity,
   evaluateFounderEditorialNovelty,
-  founderEditorialPublicCopyHashes,
+  founderEditorialPatternFingerprint,
   supabaseFounderEditorialHistoryRepository,
   type FounderEditorialHistoryRepository,
 } from '../founderEditorialNovelty.js';
@@ -13,8 +13,8 @@ function proposal() {
     public_payload: {
       platform: 'linkedin',
       story_type: 'founder-progress',
-      draft_text: 'The exact public copy should not be allowed to sneak through twice.',
-      public_claims: [{ text: 'Founder Control Room remembers published public copy.' }],
+      draft_text: 'The exact public thesis should not vanish after publication.',
+      public_claims: [{ text: 'Founder Control Room remembers published editorial patterns.' }],
     },
     internal_evidence: {
       ref: 'github:jussray/founder-control-room@a#publication-memory',
@@ -33,7 +33,7 @@ function history(record: Record<string, unknown>): FounderEditorialHistoryReposi
       angle: '',
       meaningfulChange: null,
       hookType: null,
-      proofStyle: 'provider-readback',
+      proofStyle: 'founder-attested-editorial-pattern',
       publishDate: '2026-08-31T12:00:00.000Z',
       status: 'published',
       ...record,
@@ -41,14 +41,23 @@ function history(record: Record<string, unknown>): FounderEditorialHistoryReposi
   };
 }
 
+function query(data: unknown[]) {
+  const chain: Record<string, any> = {};
+  chain.select = vi.fn(() => chain);
+  chain.in = vi.fn(() => chain);
+  chain.order = vi.fn(() => chain);
+  chain.limit = vi.fn(async () => ({ data, error: null }));
+  return chain;
+}
+
 describe('founder editorial publication memory', () => {
-  it('blocks copy already present in a successful first-party publication receipt even when semantic history is empty', async () => {
+  it('blocks a founder-attested thesis/hook pattern even when semantic text history is empty', async () => {
     const identity = buildFounderEditorialIdentity(proposal());
     const result = await evaluateFounderEditorialNovelty({
       proposal: proposal(),
       historyRepository: history({
-        publicPayloadHash: identity.publicPayloadHash,
-        historySource: 'execution',
+        promptOsPatternFingerprint: identity.promptOsPatternFingerprint,
+        historySource: 'attestation',
       }),
     });
 
@@ -56,40 +65,36 @@ describe('founder editorial publication memory', () => {
     expect(result.risk).toBe('HIGH');
     expect(result.closestMatchId).toBe('published-memory');
     expect(result.closestSimilarity).toBe(0);
-    expect(result.reason).toContain('public copy already present');
+    expect(result.reason).toContain('already-attested thesis/hook pattern');
   });
 
-  it('blocks founder-attested public copy by exact or normalized SHA-256 without upgrading attestation authority', async () => {
-    const copy = proposal().public_payload.draft_text;
-    const [exactCopyHash, normalizedCopyHash] = founderEditorialPublicCopyHashes(copy);
+  it('does not treat a succeeded schedule execution as publication history', async () => {
+    const experiments = query([]);
+    const observations = query([]);
+    const client = {
+      from: vi.fn((table: string) => {
+        if (table === 'linkedin_experiments') return experiments;
+        if (table === 'provider_observations') return observations;
+        if (table === 'approval_executions') {
+          throw new Error('schedule execution must not be queried as publication memory');
+        }
+        throw new Error(`unexpected table ${table}`);
+      }),
+    };
 
-    for (const publicCopyHash of [exactCopyHash, normalizedCopyHash]) {
-      const result = await evaluateFounderEditorialNovelty({
-        proposal: proposal(),
-        historyRepository: history({
-          publicCopyHash,
-          historySource: 'attestation',
-          proofStyle: 'founder-attested-public-copy',
-        }),
-      });
-      expect(result.allowed).toBe(false);
-      expect(result.risk).toBe('HIGH');
-    }
+    const repository = supabaseFounderEditorialHistoryRepository(client as any);
+    const rows = await repository.recentLinkedIn(32);
+
+    expect(rows).toEqual([]);
+    expect(client.from).not.toHaveBeenCalledWith('approval_executions');
   });
 
-  it('unions experiment, successful publication, and founder-attested evidence without retaining raw copy', async () => {
+  it('unions experiment and founder-attested pattern memory without retaining raw thesis or hook', async () => {
     const identity = buildFounderEditorialIdentity(proposal());
-    const exactCopyHash = identity.publicCopyHashes[0];
-
-    function query(data: unknown[]) {
-      const chain: Record<string, any> = {};
-      chain.select = vi.fn(() => chain);
-      chain.in = vi.fn(() => chain);
-      chain.order = vi.fn(() => chain);
-      chain.limit = vi.fn(async () => ({ data, error: null }));
-      return chain;
-    }
-
+    const attestedPattern = founderEditorialPatternFingerprint({
+      thesis: identity.coreThesis,
+      hook: identity.hook,
+    });
     const experiments = query([{
       id: 'experiment-1',
       related_project: 'fcr',
@@ -102,17 +107,6 @@ describe('founder editorial publication memory', () => {
       publish_date: '2026-08-29T12:00:00.000Z',
       status: 'published',
     }]);
-    const executions = query([{
-      id: 'execution-1',
-      request: {
-        platform: 'linkedin',
-        sourceRepo: 'jussray/founder-control-room',
-        publicPayloadHash: identity.publicPayloadHash,
-      },
-      result: { publishedAt: '2026-08-31T12:00:00.000Z' },
-      executed_at: '2026-08-31T12:00:01.000Z',
-      status: 'succeeded',
-    }]);
     const observations = query([{
       resource_id: 'urn:li:activity:123',
       observed_state: {
@@ -122,7 +116,12 @@ describe('founder editorial publication memory', () => {
           providerVerified: false,
           publishedAt: '2026-08-30T12:00:00.000Z',
         },
-        contentHash: exactCopyHash,
+        editorialMemory: {
+          state: 'USER_ATTESTED_PATTERN',
+          promptOsPatternFingerprint: attestedPattern,
+          rawTextPersisted: false,
+        },
+        contentHash: 'c'.repeat(64),
       },
       observed_at: '2026-08-30T12:05:00.000Z',
     }]);
@@ -130,7 +129,6 @@ describe('founder editorial publication memory', () => {
     const client = {
       from: vi.fn((table: string) => {
         if (table === 'linkedin_experiments') return experiments;
-        if (table === 'approval_executions') return executions;
         if (table === 'provider_observations') return observations;
         throw new Error(`unexpected table ${table}`);
       }),
@@ -139,18 +137,39 @@ describe('founder editorial publication memory', () => {
     const repository = supabaseFounderEditorialHistoryRepository(client as any);
     const rows = await repository.recentLinkedIn(32);
 
-    expect(rows).toHaveLength(3);
-    expect(rows.map((row) => row.historySource)).toEqual(['execution', 'attestation', 'experiment']);
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.historySource)).toEqual(['attestation', 'experiment']);
     expect(rows[0]).toMatchObject({
-      id: 'execution:execution-1',
-      publicPayloadHash: identity.publicPayloadHash,
+      id: 'attestation:urn:li:activity:123',
+      promptOsPatternFingerprint: attestedPattern,
+      proofStyle: 'founder-attested-editorial-pattern',
       status: 'published',
     });
-    expect(rows[1]).toMatchObject({
-      id: 'attestation:urn:li:activity:123',
-      publicCopyHash: exactCopyHash,
-      proofStyle: 'founder-attested-public-copy',
-    });
-    expect(JSON.stringify(rows)).not.toContain(proposal().public_payload.draft_text);
+    expect(JSON.stringify(rows)).not.toContain(identity.coreThesis);
+    expect(JSON.stringify(rows)).not.toContain(identity.hook);
+    expect(rows[0].publicCopyHash).toBeNull();
+  });
+
+  it('ignores founder-attested observations that lack a server-derived editorial pattern', async () => {
+    const experiments = query([]);
+    const observations = query([{
+      resource_id: 'urn:li:activity:456',
+      observed_state: {
+        platform: 'linkedin',
+        publication: { state: 'USER_ATTESTED', providerVerified: false },
+        contentHash: 'd'.repeat(64),
+      },
+      observed_at: '2026-08-30T12:05:00.000Z',
+    }]);
+    const client = {
+      from: vi.fn((table: string) => {
+        if (table === 'linkedin_experiments') return experiments;
+        if (table === 'provider_observations') return observations;
+        throw new Error(`unexpected table ${table}`);
+      }),
+    };
+
+    const repository = supabaseFounderEditorialHistoryRepository(client as any);
+    expect(await repository.recentLinkedIn(32)).toEqual([]);
   });
 });

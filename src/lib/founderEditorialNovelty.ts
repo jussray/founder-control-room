@@ -42,9 +42,10 @@ export interface FounderEditorialHistoryRecord {
   proofStyle: string | null;
   publishDate: string | null;
   status: string;
+  promptOsPatternFingerprint?: string | null;
   publicPayloadHash?: string | null;
   publicCopyHash?: string | null;
-  historySource?: 'experiment' | 'execution' | 'attestation';
+  historySource?: 'experiment' | 'attestation' | 'provider_readback';
 }
 
 export interface FounderEditorialHistoryRepository {
@@ -151,7 +152,7 @@ function canonicalLane(sourceRepo: string): string {
   return normalized || 'unknown-project';
 }
 
-function patternFingerprint({ thesis, hook }: { thesis: string; hook: string }): string {
+export function founderEditorialPatternFingerprint({ thesis, hook }: { thesis: string; hook: string }): string {
   return hash({
     contract: 'promptos/editorial-pattern@v1',
     lane: EDITORIAL_PATTERN_LANE,
@@ -190,7 +191,7 @@ export function buildFounderEditorialIdentity(proposal: JsonRecord): FounderEdit
   const publicPayloadHash = hash(payload);
   const publicCopyHashes = founderEditorialPublicCopyHashes(draft);
 
-  const promptOsPatternFingerprint = patternFingerprint({
+  const promptOsPatternFingerprint = founderEditorialPatternFingerprint({
     thesis: coreThesis,
     hook,
   });
@@ -244,33 +245,10 @@ function normalizeHistoryRow(value: unknown): FounderEditorialHistoryRecord {
     proofStyle: text(row.proof_style) || null,
     publishDate: text(row.publish_date) || null,
     status: text(row.status),
+    promptOsPatternFingerprint: null,
     publicPayloadHash: null,
     publicCopyHash: null,
     historySource: 'experiment',
-  };
-}
-
-function normalizePublicationExecution(value: unknown): FounderEditorialHistoryRecord | null {
-  const row = record(value);
-  const request = record(row.request);
-  const result = record(row.result);
-  if (text(row.status) !== 'succeeded' || text(request.platform).toLowerCase() !== 'linkedin') return null;
-  const publicPayloadHash = text(request.publicPayloadHash).toLowerCase();
-  if (!SHA256.test(publicPayloadHash)) return null;
-  return {
-    id: `execution:${text(row.id)}`,
-    relatedProject: text(request.sourceRepo) || null,
-    coreThesis: '',
-    primaryHook: '',
-    angle: '',
-    meaningfulChange: null,
-    hookType: null,
-    proofStyle: 'provider-readback',
-    publishDate: text(result.publishedAt) || text(row.executed_at) || null,
-    status: 'published',
-    publicPayloadHash,
-    publicCopyHash: null,
-    historySource: 'execution',
   };
 }
 
@@ -278,12 +256,15 @@ function normalizeFounderAttestation(value: unknown): FounderEditorialHistoryRec
   const row = record(value);
   const observedState = record(row.observed_state);
   const publication = record(observedState.publication);
-  const contentHash = text(observedState.contentHash).toLowerCase();
+  const editorialMemory = record(observedState.editorialMemory);
+  const promptOsPatternFingerprint = text(editorialMemory.promptOsPatternFingerprint).toLowerCase();
   if (
     text(observedState.platform).toLowerCase() !== 'linkedin'
     || text(publication.state) !== 'USER_ATTESTED'
-    || !SHA256.test(contentHash)
+    || text(editorialMemory.state) !== 'USER_ATTESTED_PATTERN'
+    || !SHA256.test(promptOsPatternFingerprint)
   ) return null;
+
   return {
     id: `attestation:${text(row.resource_id)}`,
     relatedProject: null,
@@ -292,11 +273,12 @@ function normalizeFounderAttestation(value: unknown): FounderEditorialHistoryRec
     angle: '',
     meaningfulChange: null,
     hookType: null,
-    proofStyle: 'founder-attested-public-copy',
+    proofStyle: 'founder-attested-editorial-pattern',
     publishDate: text(publication.publishedAt) || text(row.observed_at) || null,
     status: 'published',
+    promptOsPatternFingerprint,
     publicPayloadHash: null,
-    publicCopyHash: contentHash,
+    publicCopyHash: null,
     historySource: 'attestation',
   };
 }
@@ -309,19 +291,12 @@ function historyTime(value: FounderEditorialHistoryRecord): number {
 export function supabaseFounderEditorialHistoryRepository(client: SupabaseClient): FounderEditorialHistoryRepository {
   return {
     async recentLinkedIn(limit) {
-      const [experimentsResult, executionsResult, observationsResult] = await Promise.all([
+      const [experimentsResult, observationsResult] = await Promise.all([
         client
           .from('linkedin_experiments')
           .select('id, related_project, core_thesis, primary_hook, angle, meaningful_change, hook_type, proof_style, publish_date, status')
           .in('status', ['published', 'analyzed'])
           .order('publish_date', { ascending: false, nullsFirst: false })
-          .limit(limit),
-        client
-          .from('approval_executions')
-          .select('id, request, result, executed_at, status')
-          .in('action_type', ['publish_founder_content'])
-          .in('status', ['succeeded'])
-          .order('executed_at', { ascending: false, nullsFirst: false })
           .limit(limit),
         client
           .from('provider_observations')
@@ -335,9 +310,6 @@ export function supabaseFounderEditorialHistoryRepository(client: SupabaseClient
       if (experimentsResult.error) {
         throw new Error(`editorial experiment history readback failed: ${experimentsResult.error.message}`);
       }
-      if (executionsResult.error) {
-        throw new Error(`editorial publication execution history readback failed: ${executionsResult.error.message}`);
-      }
       if (observationsResult.error) {
         throw new Error(`editorial founder-attestation history readback failed: ${observationsResult.error.message}`);
       }
@@ -345,14 +317,11 @@ export function supabaseFounderEditorialHistoryRepository(client: SupabaseClient
       const experiments = Array.isArray(experimentsResult.data)
         ? experimentsResult.data.map(normalizeHistoryRow)
         : [];
-      const executions = Array.isArray(executionsResult.data)
-        ? executionsResult.data.map(normalizePublicationExecution).filter((item): item is FounderEditorialHistoryRecord => item !== null)
-        : [];
       const observations = Array.isArray(observationsResult.data)
         ? observationsResult.data.map(normalizeFounderAttestation).filter((item): item is FounderEditorialHistoryRecord => item !== null)
         : [];
 
-      return [...experiments, ...executions, ...observations]
+      return [...experiments, ...observations]
         .sort((left, right) => historyTime(right) - historyTime(left))
         .slice(0, limit);
     },
@@ -369,14 +338,16 @@ function historicalSemanticText(item: FounderEditorialHistoryRecord): string {
 }
 
 function historicalPatternFingerprint(item: FounderEditorialHistoryRecord): string {
-  return patternFingerprint({
+  const persisted = text(item.promptOsPatternFingerprint).toLowerCase();
+  if (SHA256.test(persisted)) return persisted;
+  return founderEditorialPatternFingerprint({
     thesis: item.coreThesis,
     hook: item.primaryHook,
   });
 }
 
-function riskFor(score: number, exactPatternMatch: boolean, exactPublishedCopyMatch: boolean): 'LOW' | 'MEDIUM' | 'HIGH' {
-  if (exactPatternMatch || exactPublishedCopyMatch || score >= HIGH_SIMILARITY) return 'HIGH';
+function riskFor(score: number, exactPatternMatch: boolean): 'LOW' | 'MEDIUM' | 'HIGH' {
+  if (exactPatternMatch || score >= HIGH_SIMILARITY) return 'HIGH';
   if (score >= MEDIUM_SIMILARITY) return 'MEDIUM';
   return 'LOW';
 }
@@ -434,7 +405,7 @@ export async function evaluateFounderEditorialNovelty({
       continuityCookie,
       roles,
       authority,
-      reason: 'No published/analyzed LinkedIn history was available for comparison.',
+      reason: 'No published/analyzed or founder-attested LinkedIn pattern history was available for comparison.',
     };
   }
 
@@ -442,7 +413,6 @@ export async function evaluateFounderEditorialNovelty({
   let closest: FounderEditorialHistoryRecord | null = null;
   let closestSimilarity = 0;
   let exactPatternMatch = false;
-  let exactPublishedCopyMatch = false;
   for (const item of history) {
     const score = similarity(currentSemanticText, historicalSemanticText(item));
     if (score > closestSimilarity) {
@@ -453,23 +423,9 @@ export async function evaluateFounderEditorialNovelty({
       exactPatternMatch = true;
       closest ??= item;
     }
-    const publicPayloadMatch = Boolean(
-      item.publicPayloadHash
-      && SHA256.test(item.publicPayloadHash)
-      && item.publicPayloadHash.toLowerCase() === identity.publicPayloadHash,
-    );
-    const publicCopyMatch = Boolean(
-      item.publicCopyHash
-      && SHA256.test(item.publicCopyHash)
-      && identity.publicCopyHashes.includes(item.publicCopyHash.toLowerCase()),
-    );
-    if (publicPayloadMatch || publicCopyMatch) {
-      exactPublishedCopyMatch = true;
-      closest = item;
-    }
   }
 
-  const risk = riskFor(closestSimilarity, exactPatternMatch, exactPublishedCopyMatch);
+  const risk = riskFor(closestSimilarity, exactPatternMatch);
   const allowed = risk !== 'HIGH';
   const roundedSimilarity = Number(closestSimilarity.toFixed(4));
   const continuityCookie = hash({
@@ -479,7 +435,6 @@ export async function evaluateFounderEditorialNovelty({
     closestMatchId: closest?.id ?? null,
     closestSimilarity: roundedSimilarity,
     exactPatternMatch,
-    exactPublishedCopyMatch,
     risk,
     comparedCount: history.length,
   });
@@ -500,8 +455,6 @@ export async function evaluateFounderEditorialNovelty({
     authority,
     reason: allowed
       ? `Editorial novelty gate accepted the candidate at ${risk.toLowerCase()} repetition risk.`
-      : exactPublishedCopyMatch
-        ? 'Editorial novelty gate rejected public copy already present in successful publication or founder-attested history; Chief must select materially different copy before founder approval.'
-        : 'Editorial novelty gate rejected a high-overlap thesis/hook pattern; Chief must select a materially different story angle before founder approval.',
+      : 'Editorial novelty gate rejected a high-overlap or already-attested thesis/hook pattern; Chief must select a materially different story angle before founder approval.',
   };
 }

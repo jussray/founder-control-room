@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { capabilities } from '../../capabilities/workbenchRegistry.js';
 import { enqueueReconcile } from '../../events/outbox.js';
+import { founderEditorialPatternFingerprint } from '../../lib/founderEditorialNovelty.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
@@ -17,6 +18,8 @@ const LINKEDIN_POST_URN = /^urn:li:(share|ugcPost|activity):[A-Za-z0-9_-]+$/;
 const RFC3339_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(?:Z|([+-])(\d{2}):(\d{2}))$/;
 const SHA256 = /^[0-9a-f]{64}$/i;
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
+const MAX_EDITORIAL_THESIS_CHARS = 600;
+const MAX_EDITORIAL_HOOK_CHARS = 240;
 const DYNAMIC_CAPABILITIES = new Map([
   [PROJECT_HEALTH_CAPABILITY_ID, { controller: 'ProjectController', resourcePrefix: PROJECT_HEALTH_RESOURCE_PREFIX }],
 ]);
@@ -114,6 +117,10 @@ capabilitiesRouter.get('/', (_req, res) => {
  * performed or provider-verified the publication. This is an observation-only
  * bridge for founder-attested external state. It deliberately accepts no
  * engagement metrics and cannot mint publication or analytics authority.
+ *
+ * coreThesis/openingHook are transient inputs used only to derive the same
+ * portfolio-wide PromptOS editorial pattern fingerprint used by the novelty
+ * gate. Raw thesis/hook text is never persisted by this route.
  */
 capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: FounderRequest, res) => {
   const body = asRecord(req.body);
@@ -122,6 +129,8 @@ capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: Fo
   const publicationAttested = body.publicationAttested === true;
   const publishedAtRaw = asText(body.publishedAt);
   const contentHashRaw = asText(body.contentHash).toLowerCase();
+  const coreThesis = asText(body.coreThesis);
+  const openingHook = asText(body.openingHook);
   const publishedAtMs = publishedAtRaw ? parseStrictRfc3339Timestamp(publishedAtRaw) : null;
   const observedAtMs = Date.now();
 
@@ -145,6 +154,16 @@ capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: Fo
   if (contentHashRaw && !SHA256.test(contentHashRaw)) {
     return res.status(400).json({ error: 'contentHash must be a SHA-256 hex digest when provided' });
   }
+  if (!coreThesis || coreThesis.length > MAX_EDITORIAL_THESIS_CHARS) {
+    return res.status(400).json({
+      error: `coreThesis is required for publication memory and must be at most ${MAX_EDITORIAL_THESIS_CHARS} characters`,
+    });
+  }
+  if (!openingHook || openingHook.length > MAX_EDITORIAL_HOOK_CHARS) {
+    return res.status(400).json({
+      error: `openingHook is required for publication memory and must be at most ${MAX_EDITORIAL_HOOK_CHARS} characters`,
+    });
+  }
 
   const resolved = await resolveActiveProject(projectSlug, 'founder-content observations');
   if (!resolved.project) return res.status(resolved.status).json({ error: resolved.error });
@@ -153,6 +172,10 @@ capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: Fo
   }
 
   const observedAt = new Date(observedAtMs).toISOString();
+  const promptOsPatternFingerprint = founderEditorialPatternFingerprint({
+    thesis: coreThesis,
+    hook: openingHook,
+  });
   const observedState = {
     kind: FOUNDER_CONTENT_OBSERVATION_KIND,
     platform: 'linkedin',
@@ -162,6 +185,11 @@ capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: Fo
       state: 'USER_ATTESTED',
       providerVerified: false,
       publishedAt: publishedAtMs === null ? null : new Date(publishedAtMs).toISOString(),
+    },
+    editorialMemory: {
+      state: 'USER_ATTESTED_PATTERN',
+      promptOsPatternFingerprint,
+      rawTextPersisted: false,
     },
     metrics: {
       state: 'UNKNOWN',
@@ -227,6 +255,10 @@ capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: Fo
       publicationTruth: 'USER_ATTESTED',
       providerVerified: false,
       metricsState: 'UNKNOWN',
+      editorialMemory: {
+        state: 'USER_ATTESTED_PATTERN',
+        promptOsPatternFingerprint,
+      },
       authorityGranted: false,
     });
 });

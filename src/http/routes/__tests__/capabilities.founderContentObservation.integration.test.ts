@@ -21,6 +21,8 @@ const FOUNDER_EMAIL = 'founder@example.com';
 const BEARER = 'Bearer test-token';
 const LINKEDIN_URN = 'urn:li:share:1234567890';
 const LINKEDIN_URL = `https://www.linkedin.com/feed/update/${LINKEDIN_URN}/`;
+const CORE_THESIS = 'Founder Control Room remembers published editorial patterns.';
+const OPENING_HOOK = 'The exact public thesis should not vanish after publication.';
 
 function buildApp() {
   const app = express();
@@ -92,7 +94,7 @@ beforeEach(() => {
 });
 
 describe('FCR manual LinkedIn founder-content observations', () => {
-  it('records immutable founder-attestation evidence before updating the latest non-authorizing view', async () => {
+  it('records immutable founder-attestation evidence plus non-authorizing pattern memory before updating the latest view', async () => {
     authorizeFounder();
     persistenceTables();
 
@@ -105,6 +107,8 @@ describe('FCR manual LinkedIn founder-content observations', () => {
         publicationAttested: true,
         publishedAt: '2026-08-28T03:00:00.000Z',
         contentHash: 'a'.repeat(64),
+        coreThesis: CORE_THESIS,
+        openingHook: OPENING_HOOK,
         providerVerified: true,
         metrics: { impressions: 999999, comments: 999999 },
       });
@@ -117,6 +121,10 @@ describe('FCR manual LinkedIn founder-content observations', () => {
       publicationTruth: 'USER_ATTESTED',
       providerVerified: false,
       metricsState: 'UNKNOWN',
+      editorialMemory: {
+        state: 'USER_ATTESTED_PATTERN',
+        promptOsPatternFingerprint: expect.stringMatching(/^[0-9a-f]{64}$/),
+      },
       authorityGranted: false,
     }));
 
@@ -134,6 +142,11 @@ describe('FCR manual LinkedIn founder-content observations', () => {
           state: 'USER_ATTESTED',
           providerVerified: false,
           publishedAt: '2026-08-28T03:00:00.000Z',
+        },
+        editorialMemory: {
+          state: 'USER_ATTESTED_PATTERN',
+          promptOsPatternFingerprint: expect.stringMatching(/^[0-9a-f]{64}$/),
+          rawTextPersisted: false,
         },
       }),
     }));
@@ -156,6 +169,11 @@ describe('FCR manual LinkedIn founder-content observations', () => {
         metrics: { state: 'UNKNOWN' },
         contentHash: 'a'.repeat(64),
         source: 'manual_founder_attestation',
+        editorialMemory: {
+          state: 'USER_ATTESTED_PATTERN',
+          promptOsPatternFingerprint: expect.stringMatching(/^[0-9a-f]{64}$/),
+          rawTextPersisted: false,
+        },
         attestation: expect.objectContaining({
           founderUserId: 'u1',
           observedAt: expect.any(String),
@@ -170,6 +188,8 @@ describe('FCR manual LinkedIn founder-content observations', () => {
     expect(row.source_event_id).toBeNull();
     expect(JSON.stringify(row)).not.toContain('999999');
     expect(JSON.stringify(row)).not.toContain(FOUNDER_EMAIL);
+    expect(JSON.stringify(row)).not.toContain(CORE_THESIS);
+    expect(JSON.stringify(row)).not.toContain(OPENING_HOOK);
   });
 
   it('preserves a distinct immutable event when the same LinkedIn post is corrected later', async () => {
@@ -185,6 +205,8 @@ describe('FCR manual LinkedIn founder-content observations', () => {
         publicationAttested: true,
         publishedAt: '2026-08-28T03:00:00.000Z',
         contentHash: 'a'.repeat(64),
+        coreThesis: CORE_THESIS,
+        openingHook: OPENING_HOOK,
       });
     const corrected = await request(buildApp())
       .post('/capabilities/founder-content/linkedin-observations')
@@ -195,6 +217,8 @@ describe('FCR manual LinkedIn founder-content observations', () => {
         publicationAttested: true,
         publishedAt: '2026-08-28T03:05:00.000Z',
         contentHash: 'b'.repeat(64),
+        coreThesis: CORE_THESIS,
+        openingHook: OPENING_HOOK,
       });
 
     expect(first.status).toBe(200);
@@ -204,7 +228,43 @@ describe('FCR manual LinkedIn founder-content observations', () => {
     expect(observationUpsert).toHaveBeenCalledTimes(2);
     expect(attestationInsert.mock.calls[0][0].observed_state.contentHash).toBe('a'.repeat(64));
     expect(attestationInsert.mock.calls[1][0].observed_state.contentHash).toBe('b'.repeat(64));
+    expect(attestationInsert.mock.calls[0][0].observed_state.editorialMemory.promptOsPatternFingerprint)
+      .toBe(attestationInsert.mock.calls[1][0].observed_state.editorialMemory.promptOsPatternFingerprint);
     expect(observationUpsert.mock.calls[1][0].attestation_event_id).toBe(corrected.body.sourceEventId);
+  });
+
+  it('requires thesis and opening-hook inputs so every new attestation leaves usable pattern memory', async () => {
+    authorizeFounder();
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'founder_users') return founderAllowlistBuilder();
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
+    const missingThesis = await request(buildApp())
+      .post('/capabilities/founder-content/linkedin-observations')
+      .set('Authorization', BEARER)
+      .send({
+        projectSlug: 'founder-control-room',
+        post: LINKEDIN_URL,
+        publicationAttested: true,
+        openingHook: OPENING_HOOK,
+      });
+    expect(missingThesis.status).toBe(400);
+    expect(missingThesis.body.error).toContain('coreThesis');
+
+    const missingHook = await request(buildApp())
+      .post('/capabilities/founder-content/linkedin-observations')
+      .set('Authorization', BEARER)
+      .send({
+        projectSlug: 'founder-control-room',
+        post: LINKEDIN_URL,
+        publicationAttested: true,
+        coreThesis: CORE_THESIS,
+      });
+    expect(missingHook.status).toBe(400);
+    expect(missingHook.body.error).toContain('openingHook');
+    expect(attestationInsert).not.toHaveBeenCalled();
+    expect(observationUpsert).not.toHaveBeenCalled();
   });
 
   it('requires an explicit founder publication attestation and never persists an unasserted post', async () => {
@@ -313,6 +373,11 @@ describe('FCR manual LinkedIn founder-content observations', () => {
       observed_state: {
         kind: 'fcr/founder-content-provider-observation@v1',
         publication: { state: 'USER_ATTESTED', providerVerified: false },
+        editorialMemory: {
+          state: 'USER_ATTESTED_PATTERN',
+          promptOsPatternFingerprint: 'e'.repeat(64),
+          rawTextPersisted: false,
+        },
         metrics: { state: 'UNKNOWN' },
       },
       observed_at: '2026-08-28T03:30:00.000Z',

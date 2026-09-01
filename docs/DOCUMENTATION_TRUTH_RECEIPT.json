@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the current founder-content editorial-novelty and publication-memory, provider-neutral n8n authority, cadence-expiry reservation, observation-only analytics supersession, ULTRATHINK V4 advisory anti-laundering, and current GitHub App credential-transport changes to reviewed source invariants without granting merge, deploy, publication, provider-policy, database, secret, billing, destructive-action, or runtime authority.",
+  "purpose": "Bind the current founder-content editorial-novelty, founder-attested publication-memory, provider-neutral n8n authority, cadence-expiry reservation, observation-only analytics supersession, ULTRATHINK V4 advisory anti-laundering, and current GitHub App credential-transport changes to reviewed source invariants without granting merge, deploy, publication, provider-policy, database, secret, billing, destructive-action, or runtime authority.",
   "domains": [
     "publishing"
   ],
@@ -8,14 +8,15 @@
     {
       "path": "src/lib/founderEditorialNovelty.ts",
       "claims": [
-        "src/lib/founderEditorialNovelty.ts must keep PromptOS, Chief, and FCR roles separate; compare LinkedIn candidates against a bounded union of published/analyzed linkedin_experiments, successful first-party publication receipts, and founder-attested LinkedIn observations; reject exact published payload/copy identities or HIGH semantic repetition; and never upgrade attested evidence into provider verification or publication authority.",
-        "src/lib/founderEditorialNovelty.ts must keep publication memory hash-only: prior public copy may be represented by bounded hashes and metadata, but raw prior public copy must never be retained merely to enforce novelty."
+        "src/lib/founderEditorialNovelty.ts must keep PromptOS pattern grammar, Chief candidate-angle identity, and FCR history/approval authority separate; build deterministic non-authorizing pattern, angle, story, and continuity fingerprints; compare LinkedIn candidates against published/analyzed linkedin_experiments plus bounded USER_ATTESTED provider_observations carrying a valid server-derived PromptOS pattern fingerprint; and reject HIGH repetition risk without claiming that novelty itself authorizes publication.",
+        "src/lib/founderEditorialNovelty.ts must never promote approval_executions schedule success into publication history while the execution result remains provider_schedule_receipt_pending_readback with published=false/requiresProviderReadback=true; provider schedule acceptance is not publication truth.",
+        "src/lib/founderEditorialNovelty.ts must scan portfolio-wide thesis and hook pattern history independently of closest token similarity while keeping Chief angle and story identity project-aware."
       ]
     },
     {
-      "path": "src/lib/__tests__/founderEditorialNovelty.publicationMemory.test.ts",
+      "path": "src/http/routes/capabilities.ts",
       "claims": [
-        "src/lib/__tests__/founderEditorialNovelty.publicationMemory.test.ts must prove that successful publication receipts and founder-attested copy hashes enter non-authorizing novelty history, exact published copy is blocked without semantic text, all three history planes are unioned in bounded recency order, and raw public copy is absent from the history projection."
+        "src/http/routes/capabilities.ts must keep manual LinkedIn publication observations USER_ATTESTED and non-authorizing, require bounded transient coreThesis and openingHook inputs for new publication-memory attestations, derive the PromptOS editorial pattern fingerprint server-side, persist only that fingerprint rather than the raw thesis/hook text, reject malformed or future publication identity/time inputs, preserve immutable attestation events, and explicitly clear stale provider-event provenance in the latest observation view."
       ]
     },
     {
