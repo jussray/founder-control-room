@@ -6,7 +6,9 @@ import founderContentAuthorizationContract from '../../tools/founder-content-con
 type JsonRecord = Record<string, unknown>;
 
 interface CanonicalFounderContentIdentity {
-  canonicalChiefIdentity(proposal: JsonRecord): { public_payload: { draft_text: string } };
+  canonicalChiefIdentity(proposal: JsonRecord): {
+    public_payload: { draft_text: string; public_claims: Array<{ text: string }> };
+  };
 }
 
 const canonicalFounderContent = founderContentAuthorizationContract as CanonicalFounderContentIdentity;
@@ -191,7 +193,16 @@ export function buildFounderEditorialIdentity(proposal: JsonRecord): FounderEdit
   const evidence = record(proposal.internal_evidence);
   const sourceRepo = text(source.repo);
   const draft = text(payload.draft_text);
-  const claims = publicClaimsText(payload);
+  // canonicalChiefIdentity() truncates each public_claims[].text to the
+  // 500-char canonical bound (and draft_text to 3000) before it is
+  // authorized/published. Deriving the novelty thesis from the raw proposal
+  // instead would let a caller pad a claim past that bound with unique
+  // filler that never gets authorized or published, diluting the Jaccard
+  // similarity and pattern fingerprint enough for a genuinely repeated
+  // thesis to slip past the repetition gate. Compute it once and reuse it
+  // for the reservation-identity draft below too.
+  const canonicalPayload = canonicalFounderContent.canonicalChiefIdentity(proposal).public_payload;
+  const claims = publicClaimsText(canonicalPayload as unknown as JsonRecord);
   const hook = firstHook(draft);
   const coreThesis = claims || draft.slice(0, 600);
   const eventRef = text(evidence.ref);
@@ -217,7 +228,7 @@ export function buildFounderEditorialIdentity(proposal: JsonRecord): FounderEdit
   // whitespace are still distinct publishable copy and must NOT collide —
   // normalize() would let the second one's approval get wrongly blocked as
   // an already-reserved duplicate.
-  const canonicalDraft = text(canonicalFounderContent.canonicalChiefIdentity(proposal).public_payload.draft_text);
+  const canonicalDraft = text(canonicalPayload.draft_text);
   const publicCopyFingerprint = digestText(canonicalDraft);
 
   const promptOsPatternFingerprint = founderEditorialPatternFingerprint({

@@ -143,6 +143,45 @@ describe('founder editorial novelty', () => {
     expect(second.storyFingerprint).not.toBe(first.storyFingerprint);
   });
 
+  it('derives the novelty thesis from the canonical claim text, not raw padding past the 500-char authorization bound', async () => {
+    const phrase = 'PromptOS Chief and Founder Control Room are converging into one founder operating system with different jobs and shared identity. ';
+    let base = '';
+    while (base.length < 500) base += phrase;
+    base = base.slice(0, 500);
+    // canonicalChiefIdentity() truncates each claim's text to 500 chars
+    // before it is authorized/published, so this filler never crosses that
+    // boundary and must not affect the novelty comparison — a proposal
+    // repeating an already-published thesis must not be able to dodge the
+    // repetition gate just by padding the claim past what gets published.
+    const uniqueFiller = Array.from({ length: 300 }, (_, i) => `zzzuniquefillertoken${i}`).join(' ');
+
+    const paddedProposal = proposal({
+      public_payload: {
+        platform: 'linkedin',
+        story_type: 'founder-progress',
+        draft_text: 'I stopped building separate AI apps. I am building one founder machine with different jobs.',
+        public_claims: [{ text: `${base} ${uniqueFiller}` }],
+      },
+    });
+
+    const identity = buildFounderEditorialIdentity(paddedProposal);
+    expect(identity.coreThesis).toBe(base);
+
+    const repository = history([{
+      id: 'prior-canonical-thesis',
+      coreThesis: base,
+      primaryHook: identity.hook,
+      angle: '',
+    }]);
+
+    const result = await evaluateFounderEditorialNovelty({ proposal: paddedProposal, historyRepository: repository });
+
+    expect(result.allowed).toBe(false);
+    expect(result.risk).toBe('HIGH');
+    expect(result.closestMatchId).toBe('prior-canonical-thesis');
+    expect(result.closestSimilarity).toBe(1);
+  });
+
   it('does not query LinkedIn history for a non-LinkedIn proposal', async () => {
     const repository = history([]);
     const result = await evaluateFounderEditorialNovelty({
