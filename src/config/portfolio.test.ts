@@ -35,13 +35,22 @@ describe('founder repository index', () => {
     expect([...ACTIVE_PROJECT_SLUGS].sort()).toEqual([
       'chief-ai-machine',
       'founder-control-room',
-      'jbh-private',
       'juss-beautiful-hair',
+      'juss-beautiful-hair-private',
       'l99',
       'promptos',
       'sekret-bip',
       'untold-stories',
     ]);
+  });
+
+  it('binds the private hair repository to the database registry slug', () => {
+    expect(getPortfolioProject('juss-beautiful-hair-private')).toMatchObject({
+      slug: 'juss-beautiful-hair-private',
+      repository: 'jussray/jbh-private',
+      status: 'active',
+    });
+    expect(getPortfolioProject('jbh-private')).toBeUndefined();
   });
 
   it('does not allow one repository to occupy more than one known project identity', () => {

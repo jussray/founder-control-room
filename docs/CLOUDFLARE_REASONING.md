@@ -203,6 +203,8 @@ For GitHub Actions, production promotion is recognized only for the manual `Depl
 
 The GitHub Actions credential source is deliberately split from the Worker/provider runtime contract: trusted production workflows read `APP_ID` and `APP_PRIVATE_KEY` from the GitHub `production` environment and map them to `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` only inside the bounded runtime/validation surfaces. A source-level mapping, secret-name display, fingerprint, or continuity cookie does not prove the values are present or valid, that they belong to the intended App, that GitHub accepted an installation token, or that any deployment/runtime action occurred. The GitHub App Client ID is not consumed by this installation-token path.
 
+The guarded production deploy also requires `FOUNDER_SESSION_ENCRYPTION_KEY` to be a 43-character unpadded base64url value that decodes to exactly 32 bytes before the release can proceed. `.github/workflows/deploy.yml` must inject that key only into the canonical Worker secret set; Pages and unrelated jobs must not receive it. This source preflight proves the fail-closed contract only, not that the GitHub `production` environment currently contains a valid key or that Cloudflare accepted a deployment.
+
 This source membrane does not prove the current Cloudflare Workers Builds dashboard configuration, custom-domain routing, active deployment, or runtime SHA. Those remain separate provider/runtime readback gates.
 
 ## Durable release-proof Workflow boundary

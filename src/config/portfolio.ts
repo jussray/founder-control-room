@@ -35,7 +35,7 @@ export const PORTFOLIO_PROJECTS: readonly PortfolioProject[] = [
     capabilities: ["commerce", "storefront", "playwright"],
   },
   {
-    slug: "jbh-private",
+    slug: "juss-beautiful-hair-private",
     name: "Juss Beautiful Hair Private Operations",
     repository: "jussray/jbh-private",
     status: "active",
