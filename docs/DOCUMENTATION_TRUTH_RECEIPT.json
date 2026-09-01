@@ -2,7 +2,8 @@
   "contract": "fcr/documentation-truth-receipt@v1",
   "purpose": "Bind the current founder-content editorial-novelty, founder-attested publication-memory, provider-neutral n8n authority, cadence-expiry reservation, observation-only analytics supersession, ULTRATHINK V4 advisory anti-laundering, and current GitHub App credential-transport changes to reviewed source invariants without granting merge, deploy, publication, provider-policy, database, secret, billing, destructive-action, or runtime authority.",
   "domains": [
-    "publishing"
+    "publishing",
+    "cloudflare-authority"
   ],
   "changes": [
     {
