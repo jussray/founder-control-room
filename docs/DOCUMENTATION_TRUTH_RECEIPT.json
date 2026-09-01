@@ -111,6 +111,14 @@
       ]
     },
     {
+      "path": ".github/workflows/deploy.yml",
+      "claims": [
+        ".github/workflows/deploy.yml must read the GitHub Actions production credential sources as APP_ID and APP_PRIVATE_KEY while mapping them only into the stable Worker/provider runtime names GITHUB_APP_ID and GITHUB_PRIVATE_KEY; legacy same-named Actions secret sources must remain rejected, and this wiring does not prove credential validity, provider acceptance, deployment authority, or runtime identity.",
+        "For PR #736, the bounded continuity fingerprint is base=4d956dd84c4318382ce1de9b50b76d6c39dcd27f with reviewed-head lineage=477ac6cbc24c3285c7fccea43b3db37f6fff50af; cookie=fcr/pr736/github-app-secret-adapter-repair@v1 is provenance only, becomes stale on base/head/diff/check/review/ruleset/provider movement, and cannot authorize merge, deploy, credential access, provider mutation, publication, database mutation, billing, or destructive action.",
+        ".github/workflows/deploy.yml must reject production deployment unless FOUNDER_SESSION_ENCRYPTION_KEY is a 43-character unpadded base64url value that decodes to exactly 32 bytes, and it must inject that secret only into the canonical Worker secret set rather than Pages or unrelated jobs; this source contract does not prove live secret presence, provider acceptance, or a production deployment."
+      ]
+    },
+    {
       "path": "src/providers/githubAppAuth.ts",
       "claims": [
         "src/providers/githubAppAuth.ts may normalize only transport-equivalent forms of one complete GitHub App private RSA PEM: raw PEM, escaped-newline or CRLF PEM, JSON-quoted PEM, and base64-encoded PEM; the normalized key must parse through Node createPrivateKey as a private RSA key for RS256, malformed/truncated/non-RSA material must fail closed with a bounded non-secret configuration error, and normalization must not be treated as proof of App identity, installation scope, token minting, provider acceptance, or mutation authority."

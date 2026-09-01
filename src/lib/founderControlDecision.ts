@@ -7,6 +7,7 @@ export const FOUNDER_CONTROL_SURFACES = [
   'chatgpt',
   'claude',
   'perplexity',
+  'manus',
 ] as const;
 
 export const FOUNDER_CONTROL_ORCHESTRATORS = ['n8n', 'zapier'] as const;
