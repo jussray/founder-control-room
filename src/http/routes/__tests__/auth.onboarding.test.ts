@@ -271,7 +271,8 @@ describe('founder browser onboarding', () => {
     expect(browserSessions.size).toBe(1);
   });
 
-  it('rejects a valid Supabase session when the email is not allowlisted', async () => {
+  it('rejects a valid Supabase session when the email is not allowlisted without erasing the existing founder capability', async () => {
+    const existingCookie = await browserCookie();
     setAllowlist(false);
     mockSetSession.mockResolvedValue({
       data: { session: validSession(), user: { id: 'outsider', email: 'outsider@example.com' } },
@@ -280,11 +281,12 @@ describe('founder browser onboarding', () => {
 
     const response = await request(app())
       .post('/auth/session')
+      .set('Cookie', existingCookie)
       .send({ access_token: ACCESS_TOKEN, refresh_token: REFRESH_TOKEN });
 
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe('FORBIDDEN');
-    expect(response.headers['set-cookie']?.[0]).toContain('Max-Age=0');
+    expect(response.headers['set-cookie']).toBeUndefined();
     expect(response.headers['cache-control']).toBe('private, no-store');
   });
 
