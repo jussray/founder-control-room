@@ -356,8 +356,8 @@ describe('founder content approval editorial gate', () => {
     longerSuffixProposal.proposal_hash = hashPublicPayload(canonicalChiefIdentity(longerSuffixProposal));
 
     expect(firstProposal.public_payload.draft_text).not.toBe(longerSuffixProposal.public_payload.draft_text);
-    expect(canonicalChiefIdentity(firstProposal).public_payload.draft_text)
-      .toBe(canonicalChiefIdentity(longerSuffixProposal).public_payload.draft_text);
+    expect((canonicalChiefIdentity(firstProposal).public_payload as Record<string, unknown>).draft_text)
+      .toBe((canonicalChiefIdentity(longerSuffixProposal).public_payload as Record<string, unknown>).draft_text);
 
     const results = await Promise.allSettled([
       issueFounderContentApproval({
