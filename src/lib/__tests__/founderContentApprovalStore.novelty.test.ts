@@ -287,4 +287,55 @@ describe('founder content approval editorial gate', () => {
     expect(firstId).toMatch(/^fca:[0-9a-f]{64}$/);
     expect(secondId).toBe(firstId);
   });
+
+  it('serializes the same reservation across Current You intent rotation for byte-identical copy', async () => {
+    const approvals = uniqueApprovalRepository();
+    const history = emptyHistoryRepository();
+    const firstProposal = proposal();
+    const rotatedIntentProposal = proposal() as Record<string, any>;
+
+    // draft_text and public_claims are unchanged; only the founder's
+    // authenticated intent id/version rotate (e.g. a fresh session or
+    // re-issued intent). The reservation must still collide on the same
+    // public copy — intent identity is authorization provenance, not part
+    // of what makes two proposals "the same publishable content".
+    rotatedIntentProposal.authority = {
+      ...rotatedIntentProposal.authority,
+      current_you_intent_id: 'founder-content-current-rotated',
+      current_you_intent_version: 13,
+    };
+    rotatedIntentProposal.proposal_hash = hashPublicPayload(canonicalChiefIdentity(rotatedIntentProposal));
+
+    expect(rotatedIntentProposal.authority.current_you_intent_version)
+      .not.toBe((firstProposal.authority as Record<string, unknown>).current_you_intent_version);
+    expect(rotatedIntentProposal.public_payload.draft_text).toBe((firstProposal.public_payload as Record<string, unknown>).draft_text);
+
+    const results = await Promise.allSettled([
+      issueFounderContentApproval({
+        proposal: firstProposal,
+        founderUserId: 'founder-user-1',
+        now: NOW,
+        repository: approvals,
+        historyRepository: history,
+      }),
+      issueFounderContentApproval({
+        proposal: rotatedIntentProposal,
+        founderUserId: 'founder-user-1',
+        now: '2026-08-29T23:40:00.010Z',
+        repository: approvals,
+        historyRepository: history,
+      }),
+    ]);
+
+    const fulfilled = results.filter((result) => result.status === 'fulfilled');
+    const rejected = results.filter((result) => result.status === 'rejected');
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect(approvals.issue).toHaveBeenCalledTimes(2);
+
+    const firstId = vi.mocked(approvals.issue).mock.calls[0]?.[0].approvalId;
+    const secondId = vi.mocked(approvals.issue).mock.calls[1]?.[0].approvalId;
+    expect(firstId).toMatch(/^fca:[0-9a-f]{64}$/);
+    expect(secondId).toBe(firstId);
+  });
 });

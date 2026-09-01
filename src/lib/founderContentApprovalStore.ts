@@ -92,23 +92,24 @@ function deterministicApprovalId({
   founderUserId,
   platform,
   publicPatternFingerprint,
-  intentId,
-  intentVersion,
 }: {
   founderUserId: string;
   platform: string;
   publicPatternFingerprint: string;
-  intentId: string;
-  intentVersion: unknown;
 }): string {
+  // Deliberately excludes Current You intent id/version: the reservation
+  // exists to serialize duplicate dispatch of the same public copy, and an
+  // intent rotation between two proposals of identical draft_text (a new
+  // authentication/session, an unrelated re-issued intent) must not mint a
+  // second, independently issuable/claimable reservation for that copy.
+  // Intent identity is still recorded on the authorization record itself
+  // (see canonicalIssue), just not part of the dedup key.
   const digest = createHash('sha256')
     .update(JSON.stringify({
-      contract: 'fcr/founder-content-approval-reservation@v3',
+      contract: 'fcr/founder-content-approval-reservation@v4',
       founderUserId: text(founderUserId),
       platform: text(platform).toLowerCase(),
       publicPatternFingerprint: text(publicPatternFingerprint).toLowerCase(),
-      currentYouIntentId: text(intentId),
-      currentYouIntentVersion: intentVersion,
     }))
     .digest('hex');
   return `fca:${digest}`;
@@ -361,7 +362,6 @@ export async function issueFounderContentApproval({
   historyRepository?: FounderEditorialHistoryRepository;
 }): Promise<FounderContentIssuedApproval> {
   const canonicalIdentity = canonicalFounderContent.canonicalChiefIdentity(proposal);
-  const currentYou = record(canonicalIdentity.current_you);
   const platform = text(record(canonicalIdentity.public_payload).platform).toLowerCase();
   const novelty = await evaluateFounderEditorialNovelty({ proposal, historyRepository });
   if (!novelty.allowed) {
@@ -379,8 +379,6 @@ export async function issueFounderContentApproval({
     // claim metadata would otherwise reserve separate approval IDs and both
     // could be approved for the same public copy.
     publicPatternFingerprint: novelty.publicCopyFingerprint,
-    intentId: text(currentYou.intent_id),
-    intentVersion: currentYou.intent_version,
   });
   const issued = canonicalIssue({ proposal, founderUserId, now, approvalId });
   const store = repository ?? await defaultRepository();
