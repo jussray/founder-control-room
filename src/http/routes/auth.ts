@@ -92,6 +92,9 @@ authRouter.get('/callback', rateLimitFounderOAuth, async (req, res) => {
 });
 
 authRouter.post('/session', async (req, res) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   const accessToken = typeof req.body?.access_token === 'string' ? req.body.access_token : '';
   const refreshToken = typeof req.body?.refresh_token === 'string' ? req.body.refresh_token : '';
   if (!accessToken || !refreshToken || accessToken.length > 16_384 || refreshToken.length > 16_384) {
