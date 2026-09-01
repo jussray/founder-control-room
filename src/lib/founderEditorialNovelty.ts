@@ -211,9 +211,14 @@ export function buildFounderEditorialIdentity(proposal: JsonRecord): FounderEdit
   // authorization contract truncates draft_text to 3000 chars before
   // hashing/publishing, so two proposals whose raw drafts diverge only past
   // that bound still authorize and publish byte-identical text and must
-  // collide here too.
+  // collide here too. Hashed exact (not normalize()'d): this fingerprint is
+  // a reservation identity key, not a semantic-similarity input, so two
+  // proposals whose published text differs only in case/punctuation/
+  // whitespace are still distinct publishable copy and must NOT collide —
+  // normalize() would let the second one's approval get wrongly blocked as
+  // an already-reserved duplicate.
   const canonicalDraft = text(canonicalFounderContent.canonicalChiefIdentity(proposal).public_payload.draft_text);
-  const publicCopyFingerprint = digestText(normalize(canonicalDraft));
+  const publicCopyFingerprint = digestText(canonicalDraft);
 
   const promptOsPatternFingerprint = founderEditorialPatternFingerprint({
     thesis: coreThesis,

@@ -387,4 +387,47 @@ describe('founder content approval editorial gate', () => {
     expect(firstId).toMatch(/^fca:[0-9a-f]{64}$/);
     expect(secondId).toBe(firstId);
   });
+
+  it('does not serialize two distinct published drafts that differ only in case, punctuation, or whitespace', async () => {
+    const approvals = uniqueApprovalRepository();
+    const history = emptyHistoryRepository();
+    const firstProposal = proposal() as Record<string, any>;
+    const secondProposal = proposal() as Record<string, any>;
+
+    // These two drafts publish genuinely different text (different casing and
+    // punctuation), so they must reserve independently. A fingerprint that
+    // normalizes case/punctuation before hashing would wrongly collide them,
+    // blocking the second founder's real, distinct post as an
+    // already-reserved duplicate.
+    firstProposal.public_payload = { ...firstProposal.public_payload, draft_text: 'Ship the founder machine today.' };
+    secondProposal.public_payload = { ...secondProposal.public_payload, draft_text: 'ship   the founder machine today' };
+    firstProposal.proposal_hash = hashPublicPayload(canonicalChiefIdentity(firstProposal));
+    secondProposal.proposal_hash = hashPublicPayload(canonicalChiefIdentity(secondProposal));
+
+    const results = await Promise.allSettled([
+      issueFounderContentApproval({
+        proposal: firstProposal,
+        founderUserId: 'founder-user-1',
+        now: NOW,
+        repository: approvals,
+        historyRepository: history,
+      }),
+      issueFounderContentApproval({
+        proposal: secondProposal,
+        founderUserId: 'founder-user-1',
+        now: '2026-08-29T23:40:00.010Z',
+        repository: approvals,
+        historyRepository: history,
+      }),
+    ]);
+
+    const fulfilled = results.filter((result) => result.status === 'fulfilled');
+    expect(fulfilled).toHaveLength(2);
+    expect(approvals.issue).toHaveBeenCalledTimes(2);
+
+    const firstId = vi.mocked(approvals.issue).mock.calls[0]?.[0].approvalId;
+    const secondId = vi.mocked(approvals.issue).mock.calls[1]?.[0].approvalId;
+    expect(firstId).toMatch(/^fca:[0-9a-f]{64}$/);
+    expect(secondId).not.toBe(firstId);
+  });
 });

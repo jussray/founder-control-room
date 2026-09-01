@@ -218,8 +218,12 @@ export function createV4AdvisoryHandoffFromReceiptV0(receipt: unknown): V4Adviso
       executionEnvironmentAttestation: provenance.execution_environment_attestation,
       verificationCeiling: provenance.verification_ceiling,
     },
-    receiptId,
-    receiptSha256,
+    // receiptId/receiptSha256 are deliberately excluded: they are
+    // caller-supplied metadata (only cross-checked against each other, never
+    // verified against the receipt body), so including them here would let a
+    // caller mint arbitrarily many distinct observation/learning hashes for
+    // one identical accepted subject/evidence/provenance projection, which
+    // defeats hash-based downstream dedup.
   }));
 
   return createV4AdvisoryHandoffV0({ subjectHash, observationHash });

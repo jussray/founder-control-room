@@ -186,5 +186,18 @@ describe("V4 advisory handoff", () => {
       expect(replayed.observationHash).not.toBe(original.observationHash);
       expect(replayed.learningHash).not.toBe(original.learningHash);
     });
+
+    it("11 does not let an unverified receipt id/digest pair mint a distinct learning for identical accepted evidence", () => {
+      const original = createV4AdvisoryHandoffFromReceiptV0(v4Receipt());
+      const rotatedReceiptSha256 = "1".repeat(64);
+      const rotated = v4Receipt({
+        receipt_id: `SUP-${rotatedReceiptSha256.slice(0, 16)}`,
+        receipt_sha256: rotatedReceiptSha256,
+      });
+
+      const replayed = createV4AdvisoryHandoffFromReceiptV0(rotated);
+      expect(replayed.observationHash).toBe(original.observationHash);
+      expect(replayed.learningHash).toBe(original.learningHash);
+    });
   });
 });
