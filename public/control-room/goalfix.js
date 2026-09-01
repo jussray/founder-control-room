@@ -1,4 +1,3 @@
-const STORAGE_KEY = 'fcr_session';
 const ATTEMPTS_KEY_PREFIX = 'fcr_goalfix_attempts_v1';
 const MAX_ATTEMPTS_PER_SIGNATURE = 3;
 const MAX_ATTEMPTS = 60;
@@ -7,15 +6,6 @@ const form = document.getElementById('goalfix-form');
 const result = document.getElementById('goalfix-result');
 const message = document.getElementById('goalfix-message');
 const submit = document.getElementById('goalfix-submit');
-
-function loadSession() {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
 
 function lines(value) {
   return String(value ?? '')
@@ -273,12 +263,6 @@ form.addEventListener('submit', async (event) => {
   event.preventDefault();
   message.replaceChildren();
 
-  const session = loadSession();
-  if (!session?.access_token) {
-    renderError('Founder session missing. Open the Control Room, sign in, then return to Goalfix.');
-    return;
-  }
-
   const values = Object.fromEntries(new FormData(form).entries());
   const expectedVerificationNames = lines(values.expectedVerificationNames);
   if (expectedVerificationNames.length === 0) {
@@ -320,15 +304,15 @@ form.addEventListener('submit', async (event) => {
   try {
     const response = await fetch('/goalfix/inspect', {
       method: 'POST',
+      cache: 'no-store',
+      credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
       },
       body: JSON.stringify(payload),
     });
     const body = await response.json().catch(() => null);
     if (response.status === 401) {
-      sessionStorage.removeItem(STORAGE_KEY);
       sessionStorage.removeItem(attemptStorageKey(projectSlug, targetRef, scopeId));
     }
     if (!response.ok) throw new Error(body?.error ?? `Inspection failed (${response.status})`);

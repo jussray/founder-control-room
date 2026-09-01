@@ -75,7 +75,6 @@
 <script type="module">
 import { buildFounderSignalModel, DEFAULT_SOURCE } from './founder-signal-engine-model.js';
 
-const SESSION_KEY = 'fcr_session';
 let latestModel = null;
 
 function escapeHtml(value) {
@@ -88,15 +87,6 @@ function displayDate(value) {
   if (!value) return 'Not observed';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
-}
-
-function readSession() {
-  try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
 }
 
 function render(model) {
@@ -139,24 +129,13 @@ function render(model) {
 async function loadEvidence() {
   const message = document.getElementById('message');
   message.hidden = true;
-  const session = readSession();
-  if (!session?.access_token) {
-    message.hidden = false;
-    message.className = 'notice error';
-    message.innerHTML = 'Founder session required. <a href="/control-room/">Return to Founder Control Room to sign in.</a>';
-    render(buildFounderSignalModel([], DEFAULT_SOURCE));
-    return;
-  }
 
   try {
     const response = await fetch('/dashboard/activity', {
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      credentials: 'same-origin',
       cache: 'no-store',
     });
-    if (response.status === 401) {
-      sessionStorage.removeItem(SESSION_KEY);
-      throw new Error('Founder session expired. Sign in again.');
-    }
+    if (response.status === 401) throw new Error('Founder session expired. Sign in again.');
     if (!response.ok) throw new Error(`Evidence request failed (${response.status})`);
     const payload = await response.json();
     render(buildFounderSignalModel(Array.isArray(payload.activity) ? payload.activity : [], DEFAULT_SOURCE));
