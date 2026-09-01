@@ -1,13 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.hoisted(() => {
-  // createServer statically imports auth + server-side Supabase modules whose
-  // clients validate configuration at module initialization. These are fake
-  // test-only bootstrap values, not Jira authority or provider credentials.
-  process.env.SUPABASE_URL = 'https://example.supabase.co';
-  process.env.SUPABASE_PUBLISHABLE_KEY = 'test-publishable-auth-key';
-  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
-});
+// createServer statically imports auth + server-side Supabase client modules,
+// which validate configuration (including, for the service-role client, an
+// exact-project-ref hostname check) at module initialization. This ingress
+// test exercises none of that Supabase surface, so the modules are mocked
+// outright rather than fed fake env values that would otherwise have to keep
+// pace with those modules' own validation rules.
+vi.mock('../../../lib/supabaseAuthClient.js', () => ({
+  supabaseAuth: { auth: { getUser: vi.fn() } },
+}));
+vi.mock('../../../lib/supabaseClient.js', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }));
 
 import request from 'supertest';
 import { createServer } from '../../server.js';
