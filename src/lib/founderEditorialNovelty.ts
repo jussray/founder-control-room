@@ -1,7 +1,15 @@
 import { createHash } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
+// @ts-expect-error -- canonical founder-content authority is the provider-neutral CommonJS firewall contract.
+import founderContentAuthorizationContract from '../../tools/founder-content-contracts/founder-content-authorization-contract.cjs';
 
 type JsonRecord = Record<string, unknown>;
+
+interface CanonicalFounderContentIdentity {
+  canonicalChiefIdentity(proposal: JsonRecord): { public_payload: { draft_text: string } };
+}
+
+const canonicalFounderContent = founderContentAuthorizationContract as CanonicalFounderContentIdentity;
 
 export const FOUNDER_EDITORIAL_NOVELTY_CONTRACT = 'fcr/founder-editorial-novelty@v1' as const;
 const EDITORIAL_PATTERN_LANE = 'founder-editorial';
@@ -192,14 +200,20 @@ export function buildFounderEditorialIdentity(proposal: JsonRecord): FounderEdit
   const platform = text(payload.platform).toLowerCase();
   const publicPayloadHash = hash(payload);
   const publicCopyHashes = founderEditorialPublicCopyHashes(draft);
-  // Bound to the exact text the provider actually publishes (the draft),
-  // never public_claims — those are evidence metadata, not published copy,
-  // so two proposals that publish identical text but carry different claims
-  // must still resolve to the same canonical copy identity for approval
+  // Bound to the exact text the provider actually publishes, never
+  // public_claims — those are evidence metadata, not published copy, so two
+  // proposals that publish identical text but carry different claims must
+  // still resolve to the same canonical copy identity for approval
   // reservation. promptOsPatternFingerprint below intentionally prefers
   // claims for thesis-level repetition detection, which is a different
-  // concern from "is this the same public copy".
-  const publicCopyFingerprint = digestText(normalize(draft));
+  // concern from "is this the same public copy". Derived from
+  // canonicalChiefIdentity()'s draft_text (not the raw draft above): the
+  // authorization contract truncates draft_text to 3000 chars before
+  // hashing/publishing, so two proposals whose raw drafts diverge only past
+  // that bound still authorize and publish byte-identical text and must
+  // collide here too.
+  const canonicalDraft = text(canonicalFounderContent.canonicalChiefIdentity(proposal).public_payload.draft_text);
+  const publicCopyFingerprint = digestText(normalize(canonicalDraft));
 
   const promptOsPatternFingerprint = founderEditorialPatternFingerprint({
     thesis: coreThesis,

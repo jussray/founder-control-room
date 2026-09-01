@@ -338,4 +338,53 @@ describe('founder content approval editorial gate', () => {
     expect(firstId).toMatch(/^fca:[0-9a-f]{64}$/);
     expect(secondId).toBe(firstId);
   });
+
+  it('serializes the same reservation when drafts diverge only past the canonical 3000-char bound', async () => {
+    const approvals = uniqueApprovalRepository();
+    const history = emptyHistoryRepository();
+    const sharedPrefix = 'A'.repeat(3000);
+    const firstProposal = proposal() as Record<string, any>;
+    const longerSuffixProposal = proposal() as Record<string, any>;
+
+    // canonicalChiefIdentity() truncates draft_text to 3000 chars before it
+    // is authorized/published, so these two proposals authorize and publish
+    // byte-identical text even though their raw draft_text values differ.
+    // The reservation must still collide.
+    firstProposal.public_payload = { ...firstProposal.public_payload, draft_text: `${sharedPrefix} first tail.` };
+    longerSuffixProposal.public_payload = { ...longerSuffixProposal.public_payload, draft_text: `${sharedPrefix} a completely different, much longer tail that changes nothing published.` };
+    firstProposal.proposal_hash = hashPublicPayload(canonicalChiefIdentity(firstProposal));
+    longerSuffixProposal.proposal_hash = hashPublicPayload(canonicalChiefIdentity(longerSuffixProposal));
+
+    expect(firstProposal.public_payload.draft_text).not.toBe(longerSuffixProposal.public_payload.draft_text);
+    expect(canonicalChiefIdentity(firstProposal).public_payload.draft_text)
+      .toBe(canonicalChiefIdentity(longerSuffixProposal).public_payload.draft_text);
+
+    const results = await Promise.allSettled([
+      issueFounderContentApproval({
+        proposal: firstProposal,
+        founderUserId: 'founder-user-1',
+        now: NOW,
+        repository: approvals,
+        historyRepository: history,
+      }),
+      issueFounderContentApproval({
+        proposal: longerSuffixProposal,
+        founderUserId: 'founder-user-1',
+        now: '2026-08-29T23:40:00.010Z',
+        repository: approvals,
+        historyRepository: history,
+      }),
+    ]);
+
+    const fulfilled = results.filter((result) => result.status === 'fulfilled');
+    const rejected = results.filter((result) => result.status === 'rejected');
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect(approvals.issue).toHaveBeenCalledTimes(2);
+
+    const firstId = vi.mocked(approvals.issue).mock.calls[0]?.[0].approvalId;
+    const secondId = vi.mocked(approvals.issue).mock.calls[1]?.[0].approvalId;
+    expect(firstId).toMatch(/^fca:[0-9a-f]{64}$/);
+    expect(secondId).toBe(firstId);
+  });
 });
