@@ -103,7 +103,7 @@ function deterministicApprovalId({
 }): string {
   const digest = createHash('sha256')
     .update(JSON.stringify({
-      contract: 'fcr/founder-content-approval-reservation@v2',
+      contract: 'fcr/founder-content-approval-reservation@v3',
       founderUserId: text(founderUserId),
       platform: text(platform).toLowerCase(),
       publicPatternFingerprint: text(publicPatternFingerprint).toLowerCase(),
@@ -372,7 +372,13 @@ export async function issueFounderContentApproval({
   const approvalId = deterministicApprovalId({
     founderUserId,
     platform,
-    publicPatternFingerprint: novelty.promptOsPatternFingerprint,
+    // The reservation must bind to the exact copy the provider will publish
+    // (publicCopyFingerprint), not promptOsPatternFingerprint — that field
+    // prefers public_claims text for thesis-repetition detection, so two
+    // proposals publishing byte-identical draft text but carrying different
+    // claim metadata would otherwise reserve separate approval IDs and both
+    // could be approved for the same public copy.
+    publicPatternFingerprint: novelty.publicCopyFingerprint,
     intentId: text(currentYou.intent_id),
     intentVersion: currentYou.intent_version,
   });

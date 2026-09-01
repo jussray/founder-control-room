@@ -235,4 +235,56 @@ describe('founder content approval editorial gate', () => {
     expect(firstId).toMatch(/^fca:[0-9a-f]{64}$/);
     expect(secondId).toBe(firstId);
   });
+
+  it('serializes the same reservation when public_claims text differs but the draft is byte-identical', async () => {
+    const approvals = uniqueApprovalRepository();
+    const history = emptyHistoryRepository();
+    const firstProposal = proposal();
+    const relabeledProposal = proposal() as Record<string, any>;
+
+    // draft_text (what the provider actually publishes) is unchanged; only
+    // the claim metadata text differs. The reservation must still collide,
+    // since two proposals that publish identical copy must not both be
+    // approvable — this is the exact gap a claims-derived reservation
+    // fingerprint would miss.
+    relabeledProposal.public_payload = {
+      ...relabeledProposal.public_payload,
+      public_claims: relabeledProposal.public_payload.public_claims.map((claim: Record<string, unknown>) => ({
+        ...claim,
+        text: 'A materially different claim sentence describing the same convergence.',
+      })),
+    };
+    relabeledProposal.proposal_hash = hashPublicPayload(canonicalChiefIdentity(relabeledProposal));
+
+    expect(relabeledProposal.proposal_hash).not.toBe(firstProposal.proposal_hash);
+    expect(relabeledProposal.public_payload.draft_text).toBe((firstProposal.public_payload as Record<string, unknown>).draft_text);
+
+    const results = await Promise.allSettled([
+      issueFounderContentApproval({
+        proposal: firstProposal,
+        founderUserId: 'founder-user-1',
+        now: NOW,
+        repository: approvals,
+        historyRepository: history,
+      }),
+      issueFounderContentApproval({
+        proposal: relabeledProposal,
+        founderUserId: 'founder-user-1',
+        now: '2026-08-29T23:40:00.010Z',
+        repository: approvals,
+        historyRepository: history,
+      }),
+    ]);
+
+    const fulfilled = results.filter((result) => result.status === 'fulfilled');
+    const rejected = results.filter((result) => result.status === 'rejected');
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect(approvals.issue).toHaveBeenCalledTimes(2);
+
+    const firstId = vi.mocked(approvals.issue).mock.calls[0]?.[0].approvalId;
+    const secondId = vi.mocked(approvals.issue).mock.calls[1]?.[0].approvalId;
+    expect(firstId).toMatch(/^fca:[0-9a-f]{64}$/);
+    expect(secondId).toBe(firstId);
+  });
 });

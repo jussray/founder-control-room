@@ -62,6 +62,7 @@ export interface FounderEditorialIdentity {
   proofDigest: string;
   publicPayloadHash: string;
   publicCopyHashes: string[];
+  publicCopyFingerprint: string;
   promptOsPatternFingerprint: string;
   chiefAngleFingerprint: string;
   storyFingerprint: string;
@@ -77,6 +78,7 @@ export interface FounderEditorialNoveltyReceipt {
   closestSimilarity: number;
   storyFingerprint: string;
   promptOsPatternFingerprint: string;
+  publicCopyFingerprint: string;
   chiefAngleFingerprint: string;
   continuityCookie: string;
   roles: {
@@ -190,6 +192,14 @@ export function buildFounderEditorialIdentity(proposal: JsonRecord): FounderEdit
   const platform = text(payload.platform).toLowerCase();
   const publicPayloadHash = hash(payload);
   const publicCopyHashes = founderEditorialPublicCopyHashes(draft);
+  // Bound to the exact text the provider actually publishes (the draft),
+  // never public_claims — those are evidence metadata, not published copy,
+  // so two proposals that publish identical text but carry different claims
+  // must still resolve to the same canonical copy identity for approval
+  // reservation. promptOsPatternFingerprint below intentionally prefers
+  // claims for thesis-level repetition detection, which is a different
+  // concern from "is this the same public copy".
+  const publicCopyFingerprint = digestText(normalize(draft));
 
   const promptOsPatternFingerprint = founderEditorialPatternFingerprint({
     thesis: coreThesis,
@@ -226,6 +236,7 @@ export function buildFounderEditorialIdentity(proposal: JsonRecord): FounderEdit
     proofDigest,
     publicPayloadHash,
     publicCopyHashes,
+    publicCopyFingerprint,
     promptOsPatternFingerprint,
     chiefAngleFingerprint,
     storyFingerprint,
@@ -379,6 +390,7 @@ export async function evaluateFounderEditorialNovelty({
       closestSimilarity: 0,
       storyFingerprint: identity.storyFingerprint,
       promptOsPatternFingerprint: identity.promptOsPatternFingerprint,
+      publicCopyFingerprint: identity.publicCopyFingerprint,
       chiefAngleFingerprint: identity.chiefAngleFingerprint,
       continuityCookie,
       roles,
@@ -401,6 +413,7 @@ export async function evaluateFounderEditorialNovelty({
       closestSimilarity: 0,
       storyFingerprint: identity.storyFingerprint,
       promptOsPatternFingerprint: identity.promptOsPatternFingerprint,
+      publicCopyFingerprint: identity.publicCopyFingerprint,
       chiefAngleFingerprint: identity.chiefAngleFingerprint,
       continuityCookie,
       roles,
@@ -449,6 +462,7 @@ export async function evaluateFounderEditorialNovelty({
     closestSimilarity: roundedSimilarity,
     storyFingerprint: identity.storyFingerprint,
     promptOsPatternFingerprint: identity.promptOsPatternFingerprint,
+    publicCopyFingerprint: identity.publicCopyFingerprint,
     chiefAngleFingerprint: identity.chiefAngleFingerprint,
     continuityCookie,
     roles,
