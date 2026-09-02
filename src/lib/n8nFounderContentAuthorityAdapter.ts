@@ -92,6 +92,29 @@ async function abortPreparedReservation(
   }
 }
 
+function alignDeferredReviewDeadline(
+  prepared: PreparedProviderNeutralN8nFounderContent,
+): void {
+  const scheduleAt = text(prepared.request.providerRequest.scheduleAt);
+  const reviewDeadline = text(prepared.request.providerRequest.reviewDeadline);
+  const reviewWindowMinutes = prepared.request.providerRequest.reviewWindowMinutes;
+  const scheduleMs = Date.parse(scheduleAt);
+  const reviewDeadlineMs = Date.parse(reviewDeadline);
+
+  if (
+    !reviewDeadline
+    || !Number.isFinite(scheduleMs)
+    || !Number.isFinite(reviewDeadlineMs)
+    || !Number.isFinite(reviewWindowMinutes)
+    || Number(reviewWindowMinutes) <= 0
+    || reviewDeadlineMs >= scheduleMs
+  ) {
+    return;
+  }
+
+  prepared.request.providerRequest.reviewDeadline = scheduleAt;
+}
+
 function preparedClaimBoundaryFailure(
   prepared: PreparedProviderNeutralN8nFounderContent,
   approval: JsonRecord,
@@ -275,6 +298,7 @@ export async function dispatchAuthoritativeN8nFounderContent(
     };
   }
   const prepared = preparedResult;
+  alignDeferredReviewDeadline(prepared);
   const claimNow = options.claimNow ?? (options.now ?? new Date().toISOString());
   const claimBoundaryFailure = preparedClaimBoundaryFailure(
     prepared,
