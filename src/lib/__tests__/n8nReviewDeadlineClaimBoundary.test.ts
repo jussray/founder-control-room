@@ -123,4 +123,23 @@ describe('authoritative n8n review deadline claim boundary', () => {
     expect(mocks.abort).not.toHaveBeenCalled();
     expect(mocks.dispatch).toHaveBeenCalledTimes(1);
   });
+
+  it('rejects a review deadline that extends beyond the provider schedule before claim or n8n dispatch', async () => {
+    preparedRequest.providerRequest.reviewDeadline = '2026-08-18T01:55:00.000Z';
+
+    const result = await dispatchAuthoritativeN8nFounderContent(request(), {
+      founderUserId: 'founder-user-1',
+      founderIdentity: 'founder@example.com',
+      now: NOW,
+      claimNow: CLAIM_NOW,
+      env: {},
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe('INVALID_AUTHORIZATION');
+    expect(result.reasons.join(' ')).toContain('review deadline must match the provider schedule after cadence');
+    expect(mocks.claim).not.toHaveBeenCalled();
+    expect(mocks.abort).toHaveBeenCalledTimes(1);
+    expect(mocks.dispatch).not.toHaveBeenCalled();
+  });
 });
