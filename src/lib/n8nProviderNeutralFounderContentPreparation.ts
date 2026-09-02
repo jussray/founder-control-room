@@ -164,6 +164,7 @@ async function tryRearmRetryablePreProviderReservation(
     return first;
   }
 
+  const reservationStartedAt = new Date().toISOString();
   const rearmPayload = {
     executed_by: executedBy,
     status: 'pending',
@@ -174,7 +175,7 @@ async function tryRearmRetryablePreProviderReservation(
       provider_write_attempted: false,
     },
     success: null,
-    started_at: new Date().toISOString(),
+    started_at: reservationStartedAt,
     executed_at: null,
   };
 
@@ -197,6 +198,7 @@ async function tryRearmRetryablePreProviderReservation(
       .update(rearmPayload)
       .eq('id', existing.id)
       .eq('status', 'failed')
+      .eq('started_at', text(existing.started_at))
       .select('id, project_id')
       .maybeSingle();
     rearmed = update.data;
@@ -218,6 +220,7 @@ async function tryRearmRetryablePreProviderReservation(
     ok: true,
     executionId: String(rearmed.id),
     projectId: String(rearmed.project_id ?? existing.project_id),
+    reservationStartedAt,
   };
 }
 
@@ -237,8 +240,12 @@ async function reservePreparedFounderContentExecution(
 
 async function abortPreparedFounderContentExecution(
   executionId: string,
+  reservationStartedAt: string,
   reason: string,
 ): Promise<boolean> {
+  const generation = text(reservationStartedAt);
+  if (!generation) return false;
+
   const supabase = await founderContentDb();
   const { data, error } = await supabase
     .from('approval_executions')
@@ -255,6 +262,7 @@ async function abortPreparedFounderContentExecution(
     })
     .eq('id', executionId)
     .eq('status', 'pending')
+    .eq('started_at', generation)
     .select('id')
     .maybeSingle();
 
@@ -365,7 +373,11 @@ export async function prepareProviderNeutralN8nFounderContent(
     request,
     executionId: reservation.executionId,
     abort: (reason = 'founder approval claim did not complete after downstream preparation') => (
-      abortPreparedFounderContentExecution(reservation.executionId, reason)
+      abortPreparedFounderContentExecution(
+        reservation.executionId,
+        reservation.reservationStartedAt,
+        reason,
+      )
     ),
     async dispatch() {
       try {
@@ -405,7 +417,11 @@ export async function prepareProviderNeutralN8nFounderContent(
 
         try {
           const receipt = verifyProviderNeutralN8nFounderContentReceipt(request, body);
-          const finalized = await finalizeN8nFounderContentExecution(reservation.executionId, receipt);
+          const finalized = await finalizeN8nFounderContentExecution(
+            reservation.executionId,
+            receipt,
+            reservation.reservationStartedAt,
+          );
           if (!finalized) {
             return {
               ok: false,
