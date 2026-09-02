@@ -31,6 +31,11 @@ describe('production Playwright exact-SHA witness contract', () => {
     expect(playwrightWorkflow).toContain("if: github.event_name != 'workflow_run'");
   });
 
+  it('uses the canonical public API origin instead of a duplicate secret', () => {
+    expect(playwrightWorkflow).toContain('DEPLOY_URL: https://api.foundercontrolroom.org');
+    expect(playwrightWorkflow).not.toContain('DEPLOY_URL: ${{ secrets.DEPLOY_URL }}');
+  });
+
   it('proves one exact release before and after the browser journey', () => {
     const beforeDirect = witness.indexOf("readDirectIdentity('before-browser')");
     const beforePublic = witness.indexOf("readPublicIdentity('before-browser')");
