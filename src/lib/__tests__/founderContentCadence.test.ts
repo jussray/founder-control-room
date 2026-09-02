@@ -91,7 +91,8 @@ describe('founder-content hourly cadence', () => {
     expect(FOUNDER_CONTENT_MIN_GAP_MINUTES).toBe(60);
   });
 
-  it('changes only the provider schedule after cadence reservation and preserves founder review timing', async () => {
+  it('moves the review deadline with a cadence-deferred provider schedule', async () => {
+    const reserved = '2026-08-17T17:20:00.000Z';
     const reservation = await reserveFounderContentCadence({
       provider: 'buffer',
       channel: 'juss_rayy_linkedin',
@@ -99,7 +100,7 @@ describe('founder-content hourly cadence', () => {
       requestedScheduleAt: REQUESTED,
       approvalExpiresAt: APPROVAL_EXPIRES_AT,
     }, rpcClient(rpcRow({
-      reserved_schedule_at: '2026-08-17T17:20:00.000Z',
+      reserved_schedule_at: reserved,
       deferred_seconds: 3600,
     })));
     const envelope = {
@@ -115,14 +116,15 @@ describe('founder-content hourly cadence', () => {
     };
 
     const adjusted = applyFounderContentCadenceSchedule(envelope, reservation);
-    expect(adjusted.provider_request.schedule_at).toBe('2026-08-17T17:20:00.000Z');
-    expect(adjusted.provider_request.review_deadline).toBe(REQUESTED);
+    expect(adjusted.provider_request.schedule_at).toBe(reserved);
+    expect(adjusted.provider_request.review_deadline).toBe(reserved);
     expect(adjusted.provider_request.review_window_minutes).toBe(20);
     expect(adjusted.text).toBe(envelope.text);
     expect(envelope.provider_request.schedule_at).toBe(REQUESTED);
+    expect(envelope.provider_request.review_deadline).toBe(REQUESTED);
   });
 
-  it('reuses the canonical cadence slot and original review deadline across a fresh retry timestamp', async () => {
+  it('reuses the canonical cadence slot and carries the review deadline to that slot on retry', async () => {
     const reserved = '2026-08-17T17:20:00.000Z';
     const reservation = await reserveFounderContentCadence({
       provider: 'buffer',
@@ -152,7 +154,7 @@ describe('founder-content hourly cadence', () => {
     }, reservation);
 
     expect(adjusted.provider_request.schedule_at).toBe(reserved);
-    expect(adjusted.provider_request.review_deadline).toBe(REQUESTED);
+    expect(adjusted.provider_request.review_deadline).toBe(reserved);
     expect(adjusted.provider_request.review_window_minutes).toBe(20);
   });
 
