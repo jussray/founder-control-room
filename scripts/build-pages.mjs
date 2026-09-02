@@ -5,6 +5,8 @@ import { constants } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
+await import('./verify-sekret-bip-control-room-bridge.mjs');
+
 const repositoryRoot = fileURLToPath(new URL('../', import.meta.url));
 const sourceDirectory = resolve(repositoryRoot, 'public');
 const outputDirectory = resolve(repositoryRoot, 'dist-pages');
