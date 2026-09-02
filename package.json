@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "npm run generate:worker-types && tsc -p tsconfig.json",
-    "build:pages": "node scripts/build-pages.mjs",
+    "build:pages": "node scripts/verify-sekret-bip-control-room-bridge.mjs && node scripts/build-pages.mjs",
+    "verify:sekret-bip-bridge": "node scripts/verify-sekret-bip-control-room-bridge.mjs",
     "typecheck": "npm run generate:worker-types && tsc -p tsconfig.json --noEmit",
     "typecheck:design-os": "tsc -p tsconfig.design-os.json",
     "dev": "tsx watch src/index.ts",
