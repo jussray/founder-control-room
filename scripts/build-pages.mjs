@@ -13,6 +13,7 @@ const requiredAssets = [
   'index.html',
   '_headers',
   '_worker.js',
+  '.well-known/sekret-bip-control-room.json',
   'control-room/index.html',
   'control-room/app.js',
   'control-room/styles.css',
