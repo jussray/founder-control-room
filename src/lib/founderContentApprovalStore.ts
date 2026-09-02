@@ -363,6 +363,15 @@ export async function issueFounderContentApproval({
 }): Promise<FounderContentIssuedApproval> {
   const canonicalIdentity = canonicalFounderContent.canonicalChiefIdentity(proposal);
   const platform = text(record(canonicalIdentity.public_payload).platform).toLowerCase();
+  // Validate the proposal's canonical authorization contract (proposal_hash,
+  // evidence binding, Sauce Guard state, Current You freshness, ...) before
+  // any history lookup. canonicalIssue() also performs this validation, but
+  // running it here first — with a throwaway approval id, discarded below —
+  // rejects a malformed proposal before evaluateFounderEditorialNovelty()
+  // reads history for it. Without this, an invalid proposal could be
+  // misreported as a repetition hold or history-read failure instead of
+  // being rejected for its invalid authority contract.
+  canonicalIssue({ proposal, founderUserId, now });
   const novelty = await evaluateFounderEditorialNovelty({ proposal, historyRepository });
   if (!novelty.allowed) {
     throw new Error(

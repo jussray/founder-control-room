@@ -430,4 +430,25 @@ describe('founder content approval editorial gate', () => {
     expect(firstId).toMatch(/^fca:[0-9a-f]{64}$/);
     expect(secondId).not.toBe(firstId);
   });
+
+  it('rejects an invalid canonical authorization contract before reading novelty history', async () => {
+    const approvals = approvalRepository();
+    const history = emptyHistoryRepository();
+    const invalidProposal = proposal() as Record<string, unknown>;
+    // Corrupt the canonical identity binding so authorizeFounderContentPublication()
+    // must reject it. The novelty history read must never happen for a
+    // proposal that fails its own authorization contract.
+    invalidProposal.proposal_hash = '0'.repeat(64);
+
+    await expect(issueFounderContentApproval({
+      proposal: invalidProposal,
+      founderUserId: 'founder-user-1',
+      now: NOW,
+      repository: approvals,
+      historyRepository: history,
+    })).rejects.toThrow(/proposal_hash does not match/);
+
+    expect(history.recentLinkedIn).not.toHaveBeenCalled();
+    expect(approvals.issue).not.toHaveBeenCalled();
+  });
 });
