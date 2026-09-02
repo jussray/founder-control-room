@@ -22,6 +22,8 @@ const AUTH_HASH = 'a'.repeat(64);
 const PROPOSAL_HASH = 'b'.repeat(64);
 const PAYLOAD_HASH = 'c'.repeat(64);
 const SOURCE_SHA = 'd'.repeat(40);
+const RESERVATION_STARTED_AT = '2026-09-02T02:00:00.000Z';
+const STALE_RESERVATION_STARTED_AT = '2026-09-02T01:57:00.000Z';
 
 function envelope(): FirstPartyFounderScheduleEnvelope {
   return {
@@ -73,10 +75,12 @@ interface DbOptions {
     status: 'pending' | 'succeeded' | 'failed';
   } | null;
   finalizeRow?: { id: string } | null;
+  currentStartedAt?: string;
 }
 
 function installDb(options: DbOptions = {}) {
   const events: string[] = [];
+  const updateFilters: Array<Array<[string, unknown]>> = [];
   const insertMock = vi.fn((_payload: Record<string, unknown>) => ({
     select: () => ({
       single: async () => {
@@ -85,18 +89,29 @@ function installDb(options: DbOptions = {}) {
       },
     }),
   }));
-  const updateMock = vi.fn((_payload: Record<string, unknown>) => ({
-    eq: () => ({
-      eq: () => ({
-        select: () => ({
-          maybeSingle: async () => ({
-            data: options.finalizeRow === undefined ? { id: EXECUTION_ID } : options.finalizeRow,
-            error: null,
-          }),
-        }),
-      }),
-    }),
-  }));
+  const updateMock = vi.fn((_payload: Record<string, unknown>) => {
+    const filters: Array<[string, unknown]> = [];
+    updateFilters.push(filters);
+    const builder = {
+      eq(field: string, value: unknown) {
+        filters.push([field, value]);
+        return builder;
+      },
+      select() {
+        return {
+          maybeSingle: async () => {
+            const startedAtFilter = filters.find(([field]) => field === 'started_at')?.[1];
+            const generationMatches = startedAtFilter === (options.currentStartedAt ?? RESERVATION_STARTED_AT);
+            const data = options.finalizeRow === undefined
+              ? (generationMatches ? { id: EXECUTION_ID } : null)
+              : options.finalizeRow;
+            return { data, error: null };
+          },
+        };
+      },
+    };
+    return builder;
+  });
 
   fromMock.mockImplementation((table: string) => {
     if (table === 'projects') {
@@ -125,7 +140,20 @@ function installDb(options: DbOptions = {}) {
     throw new Error(`unexpected table ${table}`);
   });
 
-  return { events, insertMock, updateMock };
+  return { events, insertMock, updateMock, updateFilters };
+}
+
+function receipt(): VerifiedN8nFounderContentReceipt {
+  return {
+    orchestrationId: 'fcr-n8n-social-v1:test',
+    provider: 'buffer',
+    state: 'scheduled',
+    providerItemId: 'buffer-item-1',
+    providerRequestId: 'buffer-request-1',
+    truthState: 'provider_schedule_receipt_pending_readback',
+    published: false,
+    requiresProviderReadback: true,
+  };
 }
 
 beforeEach(() => {
@@ -139,7 +167,12 @@ describe('n8n founder-content durable reservation', () => {
 
     const result = await reserveN8nFounderContentExecution(request, 'Founder@Example.com');
 
-    expect(result).toEqual({ ok: true, executionId: EXECUTION_ID, projectId: PROJECT_ID });
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      executionId: EXECUTION_ID,
+      projectId: PROJECT_ID,
+      reservationStartedAt: expect.any(String),
+    }));
     expect(db.events).toEqual(['reserve']);
     expect(db.insertMock).toHaveBeenCalledWith(expect.objectContaining({
       mission_id: null,
@@ -149,8 +182,10 @@ describe('n8n founder-content durable reservation', () => {
       executed_by: 'founder@example.com',
       status: 'pending',
       success: null,
+      started_at: expect.any(String),
     }));
-    const inserted = db.insertMock.mock.calls[0]?.[0] as { request?: unknown };
+    const inserted = db.insertMock.mock.calls[0]?.[0] as { request?: unknown; started_at?: unknown };
+    if (result.ok) expect(inserted.started_at).toBe(result.reservationStartedAt);
     expect(JSON.stringify(inserted.request)).not.toContain(envelope().text);
   });
 
@@ -190,36 +225,24 @@ describe('n8n founder-content durable reservation', () => {
     expect(db.insertMock).not.toHaveBeenCalled();
   });
 
-  it('requires an actual matched pending row before claiming audit finalization', async () => {
+  it('requires an actual matched pending generation before claiming audit finalization', async () => {
     installDb({ finalizeRow: null });
-    const receipt: VerifiedN8nFounderContentReceipt = {
-      orchestrationId: 'fcr-n8n-social-v1:test',
-      provider: 'buffer',
-      state: 'scheduled',
-      providerItemId: 'buffer-item-1',
-      providerRequestId: 'buffer-request-1',
-      truthState: 'provider_schedule_receipt_pending_readback',
-      published: false,
-      requiresProviderReadback: true,
-    };
 
-    expect(await finalizeN8nFounderContentExecution(EXECUTION_ID, receipt)).toBe(false);
+    expect(await finalizeN8nFounderContentExecution(
+      EXECUTION_ID,
+      receipt(),
+      RESERVATION_STARTED_AT,
+    )).toBe(false);
   });
 
-  it('finalizes only a matched pending reservation and retains provider read-back as the truth gate', async () => {
-    const db = installDb();
-    const receipt: VerifiedN8nFounderContentReceipt = {
-      orchestrationId: 'fcr-n8n-social-v1:test',
-      provider: 'buffer',
-      state: 'scheduled',
-      providerItemId: 'buffer-item-1',
-      providerRequestId: 'buffer-request-1',
-      truthState: 'provider_schedule_receipt_pending_readback',
-      published: false,
-      requiresProviderReadback: true,
-    };
+  it('finalizes only a matched pending reservation generation and retains provider read-back as the truth gate', async () => {
+    const db = installDb({ currentStartedAt: RESERVATION_STARTED_AT });
 
-    expect(await finalizeN8nFounderContentExecution(EXECUTION_ID, receipt)).toBe(true);
+    expect(await finalizeN8nFounderContentExecution(
+      EXECUTION_ID,
+      receipt(),
+      RESERVATION_STARTED_AT,
+    )).toBe(true);
     expect(db.updateMock).toHaveBeenCalledWith(expect.objectContaining({
       status: 'succeeded',
       success: true,
@@ -228,5 +251,24 @@ describe('n8n founder-content durable reservation', () => {
         requiresProviderReadback: true,
       }),
     }));
+    expect(db.updateFilters[0]).toContainEqual(['started_at', RESERVATION_STARTED_AT]);
+  });
+
+  it('prevents generation A from finalizing a row rearmed as generation B', async () => {
+    const db = installDb({ currentStartedAt: RESERVATION_STARTED_AT });
+
+    expect(await finalizeN8nFounderContentExecution(
+      EXECUTION_ID,
+      receipt(),
+      STALE_RESERVATION_STARTED_AT,
+    )).toBe(false);
+    expect(await finalizeN8nFounderContentExecution(
+      EXECUTION_ID,
+      receipt(),
+      RESERVATION_STARTED_AT,
+    )).toBe(true);
+
+    expect(db.updateFilters[0]).toContainEqual(['started_at', STALE_RESERVATION_STARTED_AT]);
+    expect(db.updateFilters[1]).toContainEqual(['started_at', RESERVATION_STARTED_AT]);
   });
 });
