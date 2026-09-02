@@ -19,8 +19,18 @@ const { fakeDb } = vi.hoisted(() => {
     let nextId = 1;
     const projectRow = { id: 'p-1', repo_identifier: 'jussray/founder-control-room' };
 
+    function filterValue(row: Row, column: string): unknown {
+      if (column === 'result->>provider_write_attempted') {
+        const result = row.result && typeof row.result === 'object' && !Array.isArray(row.result)
+          ? row.result as Record<string, unknown>
+          : {};
+        return result.provider_write_attempted;
+      }
+      return (row as Record<string, unknown>)[column];
+    }
+
     function matchesFilters(row: Row, filters: Array<[string, unknown]>): boolean {
-      return filters.every(([col, val]) => String((row as Record<string, unknown>)[col]) === String(val));
+      return filters.every(([col, val]) => String(filterValue(row, col)) === String(val));
     }
 
     function findByFilters(filters: Array<[string, unknown]>): Row | null {
@@ -204,6 +214,12 @@ function approval(proposed: Record<string, unknown>) {
 
 function successfulFetchImpl(): typeof fetch {
   return vi.fn(async (_url, init: RequestInit) => {
+    const activeRow = [...fakeDb.__rows.values()][0];
+    const activeResult = activeRow?.result && typeof activeRow.result === 'object' && !Array.isArray(activeRow.result)
+      ? activeRow.result as Record<string, unknown>
+      : {};
+    expect(activeResult.provider_write_attempted).toBe(true);
+
     const sentBody = JSON.parse(String(init.body)) as { orchestrationId: string };
     return {
       ok: true,
@@ -244,7 +260,7 @@ describe('n8n prepared-reservation abort/finalize generation fencing', () => {
     }));
   });
 
-  it('lets a rearmed retry finalize normally while the stale original worker cannot abort or finalize it', async () => {
+  it('lets only the rearmed reservation generation cross the provider-write boundary', async () => {
     const input = prepareInput();
     const fetchImpl = successfulFetchImpl();
 
@@ -273,15 +289,21 @@ describe('n8n prepared-reservation abort/finalize generation fencing', () => {
     expect(String(rowAfterRearm.started_at)).not.toBe(generationA);
     expect(rowAfterRearm.status).toBe('pending');
 
-    // Worker A wakes up: its claim failed (approval already consumed by the
-    // rearmed worker in a real flow), so it aborts its own prepared
-    // reservation. That must be a no-op against the rearmed generation.
+    // Worker A can wake after its one-shot approval claim, but its stale
+    // reservation generation may not cross the external-write boundary.
+    const staleDispatch = await preparedA.dispatch();
+    expect(staleDispatch.ok).toBe(false);
+    expect(staleDispatch.code).toBe('ACTION_AUDIT_INCOMPLETE');
+    expect(staleDispatch.reasons.join(' ')).toContain('no provider request was attempted');
+    expect(fetchImpl).toHaveBeenCalledTimes(0);
+    expect(fakeDb.__rows.get(preparedB.executionId)!.status).toBe('pending');
+
+    // Worker A's own abort remains a no-op against the rearmed generation.
     const abortedByA = await preparedA.abort('worker A lost the approval claim race');
     expect(abortedByA).toBe(false);
     expect(fakeDb.__rows.get(preparedB.executionId)!.status).toBe('pending');
 
-    // Worker A's own (redundant/stale) finalize attempt must also be a
-    // no-op against the rearmed generation.
+    // Worker A's redundant/stale finalize attempt must also be a no-op.
     const staleReceipt: VerifiedN8nFounderContentReceipt = {
       orchestrationId: preparedA.request.orchestrationId,
       provider: 'buffer',
@@ -296,13 +318,42 @@ describe('n8n prepared-reservation abort/finalize generation fencing', () => {
     expect(finalizedByA).toBe(false);
     expect(fakeDb.__rows.get(preparedB.executionId)!.status).toBe('pending');
 
-    // Worker B — the legitimate holder of the current generation — can
-    // still dispatch and finalize normally.
+    // Worker B — the legitimate holder of the current generation — crosses
+    // the latch once, dispatches once, and finalizes normally.
     const dispatchResult = await preparedB.dispatch();
 
     expect(dispatchResult.ok).toBe(true);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const finalRow = fakeDb.__rows.get(preparedB.executionId)!;
     expect(finalRow.status).toBe('succeeded');
+    expect(finalRow.result).toEqual(expect.objectContaining({ provider_write_attempted: true }));
+  });
+
+  it('allows at most one provider request for duplicate dispatch attempts on the same generation', async () => {
+    const input = prepareInput();
+    const fetchImpl = successfulFetchImpl();
+
+    const prepared = await prepareProviderNeutralN8nFounderContent(input, {
+      env,
+      executedBy: 'founder@example.com',
+      fetchImpl,
+    });
+    if (!prepared.prepared) throw new Error(`worker did not prepare: ${JSON.stringify(prepared.result.reasons)}`);
+
+    const [first, second] = await Promise.all([
+      prepared.dispatch(),
+      prepared.dispatch(),
+    ]);
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect([first.ok, second.ok].filter(Boolean)).toHaveLength(1);
+    const blocked = first.ok ? second : first;
+    expect(blocked.ok).toBe(false);
+    expect(blocked.code).toBe('ACTION_AUDIT_INCOMPLETE');
+    expect(blocked.reasons.join(' ')).toContain('no provider request was attempted');
+
+    const finalRow = fakeDb.__rows.get(prepared.executionId)!;
+    expect(finalRow.status).toBe('succeeded');
+    expect(finalRow.result).toEqual(expect.objectContaining({ provider_write_attempted: true }));
   });
 });

@@ -7,6 +7,7 @@ import { temporalClaimTextDomainErrors } from '../governance/temporalClaimTruth.
 import {
   N8N_FOUNDER_CONTENT_CONTRACT,
   N8N_FOUNDER_CONTENT_EVENT,
+  acquireN8nFounderContentProviderWrite,
   buildN8nFounderContentRequest,
   finalizeN8nFounderContentExecution,
   readN8nFounderContentConfig,
@@ -557,6 +558,24 @@ export async function dispatchProviderNeutralN8nFounderContent(
       request,
       receipt: null,
       reasons: [reservation.reason],
+    };
+  }
+
+  const providerWriteAcquired = await acquireN8nFounderContentProviderWrite(
+    reservation.executionId,
+    reservation.reservationStartedAt,
+  );
+  if (!providerWriteAcquired) {
+    return {
+      ok: false,
+      code: 'ACTION_AUDIT_INCOMPLETE',
+      status: 409,
+      request,
+      receipt: null,
+      reasons: [
+        'FCR could not acquire the active reservation generation at the provider-write boundary',
+        'no provider request was attempted',
+      ],
     };
   }
 

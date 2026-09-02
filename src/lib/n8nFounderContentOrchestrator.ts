@@ -464,7 +464,7 @@ export async function reserveN8nFounderContentExecution(
         provider: request.providerRequest.provider,
         scheduleAt: request.providerRequest.scheduleAt,
       },
-      result: {},
+      result: { provider_write_attempted: false },
       success: null,
       started_at: reservationStartedAt,
     })
@@ -502,6 +502,36 @@ export async function reserveN8nFounderContentExecution(
   };
 }
 
+export async function acquireN8nFounderContentProviderWrite(
+  executionId: string,
+  reservationStartedAt: string,
+): Promise<boolean> {
+  const generation = text(reservationStartedAt);
+  if (!generation) return false;
+
+  try {
+    const supabase = await founderContentDb();
+    const { data, error } = await supabase
+      .from('approval_executions')
+      .update({
+        result: {
+          phase: 'provider_dispatch_started',
+          provider_write_attempted: true,
+        },
+      })
+      .eq('id', executionId)
+      .eq('status', 'pending')
+      .eq('started_at', generation)
+      .eq('result->>provider_write_attempted', 'false')
+      .select('id')
+      .maybeSingle();
+
+    return !error && String(data?.id ?? '') === executionId;
+  } catch {
+    return false;
+  }
+}
+
 export async function finalizeN8nFounderContentExecution(
   executionId: string,
   receipt: VerifiedN8nFounderContentReceipt,
@@ -516,6 +546,7 @@ export async function finalizeN8nFounderContentExecution(
     .update({
       status: 'succeeded',
       result: {
+        provider_write_attempted: true,
         orchestrationId: receipt.orchestrationId,
         provider: receipt.provider,
         state: receipt.state,
@@ -616,6 +647,24 @@ export async function dispatchN8nFounderContent(
       request,
       receipt: null,
       reasons: [reservation.reason],
+    };
+  }
+
+  const providerWriteAcquired = await acquireN8nFounderContentProviderWrite(
+    reservation.executionId,
+    reservation.reservationStartedAt,
+  );
+  if (!providerWriteAcquired) {
+    return {
+      ok: false,
+      code: 'ACTION_AUDIT_INCOMPLETE',
+      status: 409,
+      request,
+      receipt: null,
+      reasons: [
+        'FCR could not acquire the active reservation generation at the provider-write boundary',
+        'no provider request was attempted',
+      ],
     };
   }
 

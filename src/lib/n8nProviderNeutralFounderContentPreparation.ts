@@ -4,6 +4,7 @@ import {
 } from './founderContentCadence.js';
 import {
   N8N_FOUNDER_CONTENT_CONTRACT,
+  acquireN8nFounderContentProviderWrite,
   finalizeN8nFounderContentExecution,
   readN8nFounderContentConfig,
   reserveN8nFounderContentExecution,
@@ -380,6 +381,24 @@ export async function prepareProviderNeutralN8nFounderContent(
       )
     ),
     async dispatch() {
+      const providerWriteAcquired = await acquireN8nFounderContentProviderWrite(
+        reservation.executionId,
+        reservation.reservationStartedAt,
+      );
+      if (!providerWriteAcquired) {
+        return {
+          ok: false,
+          code: 'ACTION_AUDIT_INCOMPLETE',
+          status: 409,
+          request,
+          receipt: null,
+          reasons: [
+            'FCR could not acquire the active reservation generation at the provider-write boundary',
+            'no provider request was attempted',
+          ],
+        };
+      }
+
       try {
         const response = await fetchImpl(webhookUrl, {
           method: 'POST',

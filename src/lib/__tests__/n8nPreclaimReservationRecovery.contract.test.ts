@@ -80,4 +80,36 @@ describe('n8n abandoned pre-claim reservation recovery', () => {
     expect(coreSource).toContain('reservation.reservationStartedAt');
     expect(providerNeutralSource).toContain('reservation.reservationStartedAt');
   });
+
+  it('requires the exact active reservation generation to acquire the provider-write boundary before every n8n fetch', () => {
+    const preparationSource = readFileSync(fileURLToPath(new URL('../n8nProviderNeutralFounderContentPreparation.ts', import.meta.url)), 'utf8');
+    const coreSource = readFileSync(fileURLToPath(new URL('../n8nFounderContentOrchestrator.ts', import.meta.url)), 'utf8');
+    const providerNeutralSource = readFileSync(fileURLToPath(new URL('../n8nProviderNeutralFounderContentOrchestrator.ts', import.meta.url)), 'utf8');
+
+    expect(coreSource).toContain('result: { provider_write_attempted: false }');
+    expect(coreSource).toContain(".eq('result->>provider_write_attempted', 'false')");
+    expect(coreSource).toContain("phase: 'provider_dispatch_started'");
+    expect(coreSource).toContain('provider_write_attempted: true');
+
+    const preparedDispatch = preparationSource.indexOf('async dispatch()');
+    const preparedLatch = preparationSource.indexOf('await acquireN8nFounderContentProviderWrite', preparedDispatch);
+    const preparedFetch = preparationSource.indexOf('await fetchImpl(', preparedDispatch);
+    expect(preparedDispatch).toBeGreaterThanOrEqual(0);
+    expect(preparedLatch).toBeGreaterThan(preparedDispatch);
+    expect(preparedFetch).toBeGreaterThan(preparedLatch);
+
+    const coreDispatch = coreSource.indexOf('export async function dispatchN8nFounderContent');
+    const coreLatch = coreSource.indexOf('await acquireN8nFounderContentProviderWrite', coreDispatch);
+    const coreFetch = coreSource.indexOf('await (options.fetchImpl ?? fetch)', coreDispatch);
+    expect(coreDispatch).toBeGreaterThanOrEqual(0);
+    expect(coreLatch).toBeGreaterThan(coreDispatch);
+    expect(coreFetch).toBeGreaterThan(coreLatch);
+
+    const providerDispatch = providerNeutralSource.indexOf('export async function dispatchProviderNeutralN8nFounderContent');
+    const providerLatch = providerNeutralSource.indexOf('await acquireN8nFounderContentProviderWrite', providerDispatch);
+    const providerFetch = providerNeutralSource.indexOf('await (options.fetchImpl ?? fetch)', providerDispatch);
+    expect(providerDispatch).toBeGreaterThanOrEqual(0);
+    expect(providerLatch).toBeGreaterThan(providerDispatch);
+    expect(providerFetch).toBeGreaterThan(providerLatch);
+  });
 });
