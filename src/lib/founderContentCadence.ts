@@ -169,7 +169,7 @@ export function applyFounderContentCadenceSchedule<T extends CadenceSchedulableE
       ...envelope.provider_request,
       schedule_at: reservation.reservedScheduleAt,
       ...(Object.hasOwn(envelope.provider_request, 'review_deadline')
-        ? { review_deadline: reservation.requestedScheduleAt }
+        ? { review_deadline: reservation.reservedScheduleAt }
         : {}),
     },
   } as T;
