@@ -92,9 +92,9 @@ async function abortPreparedReservation(
   }
 }
 
-function alignDeferredReviewDeadline(
+function alignAndVerifyPreparedReviewDeadline(
   prepared: PreparedProviderNeutralN8nFounderContent,
-): void {
+): string | null {
   const scheduleAt = text(prepared.request.providerRequest.scheduleAt);
   const reviewDeadline = text(prepared.request.providerRequest.reviewDeadline);
   const reviewWindowMinutes = prepared.request.providerRequest.reviewWindowMinutes;
@@ -102,17 +102,26 @@ function alignDeferredReviewDeadline(
   const reviewDeadlineMs = Date.parse(reviewDeadline);
 
   if (
-    !reviewDeadline
+    !scheduleAt
+    || !reviewDeadline
     || !Number.isFinite(scheduleMs)
     || !Number.isFinite(reviewDeadlineMs)
     || !Number.isFinite(reviewWindowMinutes)
     || Number(reviewWindowMinutes) <= 0
-    || reviewDeadlineMs >= scheduleMs
   ) {
-    return;
+    return 'prepared founder-content review-window boundary is invalid';
   }
 
-  prepared.request.providerRequest.reviewDeadline = scheduleAt;
+  if (reviewDeadlineMs < scheduleMs) {
+    prepared.request.providerRequest.reviewDeadline = scheduleAt;
+    return null;
+  }
+
+  if (reviewDeadlineMs > scheduleMs) {
+    return 'prepared founder-content review deadline must match the provider schedule after cadence';
+  }
+
+  return null;
 }
 
 function preparedClaimBoundaryFailure(
@@ -298,7 +307,19 @@ export async function dispatchAuthoritativeN8nFounderContent(
     };
   }
   const prepared = preparedResult;
-  alignDeferredReviewDeadline(prepared);
+  const reviewDeadlineFailure = alignAndVerifyPreparedReviewDeadline(prepared);
+  if (reviewDeadlineFailure) {
+    const abortWarning = await abortPreparedReservation(
+      prepared,
+      'prepared founder-content review-window boundary was invalid before approval claim',
+    );
+    return blocked([
+      reviewDeadlineFailure,
+      'FCR did not consume the one-shot approval',
+      ...(abortWarning ? [abortWarning] : []),
+    ]);
+  }
+
   const claimNow = options.claimNow ?? (options.now ?? new Date().toISOString());
   const claimBoundaryFailure = preparedClaimBoundaryFailure(
     prepared,
