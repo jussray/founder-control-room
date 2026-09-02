@@ -60,4 +60,24 @@ describe('n8n abandoned pre-claim reservation recovery', () => {
     expect(preparationSource).toContain(".eq('started_at', text(existing.started_at))");
     expect(preparationSource).toContain('PRECLAIM_RESERVATION_LEASE_MS = 2 * 60 * 1000');
   });
+
+  it('fences stale abort and every n8n success finalizer to the exact reservation generation', () => {
+    const preparationSource = readFileSync(fileURLToPath(new URL('../n8nProviderNeutralFounderContentPreparation.ts', import.meta.url)), 'utf8');
+    const coreSource = readFileSync(fileURLToPath(new URL('../n8nFounderContentOrchestrator.ts', import.meta.url)), 'utf8');
+    const providerNeutralSource = readFileSync(fileURLToPath(new URL('../n8nProviderNeutralFounderContentOrchestrator.ts', import.meta.url)), 'utf8');
+
+    const abortStart = preparationSource.indexOf('async function abortPreparedFounderContentExecution');
+    const prepareStart = preparationSource.indexOf('export async function prepareProviderNeutralN8nFounderContent');
+    const abortSource = preparationSource.slice(abortStart, prepareStart);
+
+    expect(abortStart).toBeGreaterThanOrEqual(0);
+    expect(abortSource).toContain('reservationStartedAt: string');
+    expect(abortSource).toContain(".eq('started_at', generation)");
+    expect(preparationSource).toContain('reservation.reservationStartedAt');
+
+    expect(coreSource).toContain('reservationStartedAt: string');
+    expect(coreSource).toContain(".eq('started_at', generation)");
+    expect(coreSource).toContain('reservation.reservationStartedAt');
+    expect(providerNeutralSource).toContain('reservation.reservationStartedAt');
+  });
 });
