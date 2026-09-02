@@ -102,12 +102,22 @@ function preparedClaimBoundaryFailure(
   const approvalExpiresMs = Date.parse(approvalExpiresAt);
   const scheduleAt = text(prepared.request.providerRequest.scheduleAt);
   const scheduleMs = Date.parse(scheduleAt);
+  const reviewDeadline = text(prepared.request.providerRequest.reviewDeadline);
+  const reviewDeadlineMs = reviewDeadline ? Date.parse(reviewDeadline) : null;
 
-  if (!Number.isFinite(claimMs) || !Number.isFinite(approvalExpiresMs) || !Number.isFinite(scheduleMs)) {
+  if (
+    !Number.isFinite(claimMs)
+    || !Number.isFinite(approvalExpiresMs)
+    || !Number.isFinite(scheduleMs)
+    || (reviewDeadlineMs !== null && !Number.isFinite(reviewDeadlineMs))
+  ) {
     return 'prepared founder-content claim boundary contains an invalid timestamp';
   }
   if (claimMs >= approvalExpiresMs) {
     return 'authoritative founder approval expired during downstream preparation';
+  }
+  if (reviewDeadlineMs !== null && claimMs >= reviewDeadlineMs) {
+    return 'founder-content review window expired before the final approval claim';
   }
   if (scheduleMs <= claimMs) {
     return 'prepared provider schedule is no longer in the future at the approval claim boundary';
