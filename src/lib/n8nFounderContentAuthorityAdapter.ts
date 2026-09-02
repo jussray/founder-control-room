@@ -96,19 +96,19 @@ function alignAndVerifyPreparedReviewDeadline(
   prepared: PreparedProviderNeutralN8nFounderContent,
 ): string | null {
   const scheduleAt = text(prepared.request.providerRequest.scheduleAt);
-  const reviewDeadline = text(prepared.request.providerRequest.reviewDeadline);
-  const reviewWindowMinutes = prepared.request.providerRequest.reviewWindowMinutes;
   const scheduleMs = Date.parse(scheduleAt);
-  const reviewDeadlineMs = Date.parse(reviewDeadline);
+  if (!scheduleAt || !Number.isFinite(scheduleMs)) {
+    return 'prepared founder-content provider schedule is invalid';
+  }
 
-  if (
-    !scheduleAt
-    || !reviewDeadline
-    || !Number.isFinite(scheduleMs)
-    || !Number.isFinite(reviewDeadlineMs)
-    || !Number.isFinite(reviewWindowMinutes)
-    || Number(reviewWindowMinutes) <= 0
-  ) {
+  const reviewDeadline = text(prepared.request.providerRequest.reviewDeadline);
+  if (!reviewDeadline) {
+    prepared.request.providerRequest.reviewDeadline = scheduleAt;
+    return null;
+  }
+
+  const reviewDeadlineMs = Date.parse(reviewDeadline);
+  if (!Number.isFinite(reviewDeadlineMs)) {
     return 'prepared founder-content review-window boundary is invalid';
   }
 
@@ -148,11 +148,11 @@ function preparedClaimBoundaryFailure(
   if (claimMs >= approvalExpiresMs) {
     return 'authoritative founder approval expired during downstream preparation';
   }
-  if (reviewDeadlineMs !== null && claimMs >= reviewDeadlineMs) {
-    return 'founder-content review window expired before the final approval claim';
-  }
   if (scheduleMs <= claimMs) {
     return 'prepared provider schedule is no longer in the future at the approval claim boundary';
+  }
+  if (reviewDeadlineMs !== null && claimMs >= reviewDeadlineMs) {
+    return 'founder-content review window expired before the final approval claim';
   }
   if (scheduleMs >= approvalExpiresMs) {
     return 'prepared provider schedule is not before the exact founder approval expiry';
