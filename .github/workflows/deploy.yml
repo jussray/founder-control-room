@@ -74,36 +74,16 @@ jobs:
       - name: Validate required production configuration
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          FOUNDER_SESSION_ENCRYPTION_KEY: ${{ secrets.FOUNDER_SESSION_ENCRYPTION_KEY }}
-          GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
-          GITHUB_APP_ID: ${{ secrets.APP_ID }}
-          GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
-          FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
-          ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL: ${{ secrets.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL }}
-          FOUNDER_REVIEW_EMAIL_INGRESS_SECRET: ${{ secrets.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET }}
         shell: bash
         run: |
           set -euo pipefail
 
           required=(
             SUPABASE_DB_URL
-            SUPABASE_SERVICE_ROLE_KEY
-            SUPABASE_PUBLISHABLE_KEY
-            FOUNDER_SESSION_ENCRYPTION_KEY
-            GITHUB_WEBHOOK_SECRET
-            GITHUB_APP_ID
-            GITHUB_PRIVATE_KEY
             CLOUDFLARE_API_TOKEN
             CLOUDFLARE_ACCOUNT_ID
-            DEPLOY_URL
-            FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
-            ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
-            FOUNDER_REVIEW_EMAIL_INGRESS_SECRET
           )
           missing=()
 
@@ -114,34 +94,11 @@ jobs:
           done
 
           if (( ${#missing[@]} > 0 )); then
-            printf '::error title=Missing production configuration::Set these GitHub production environment secrets before deployment: %s\n' "${missing[*]}"
+            printf '::error title=Missing production deployment configuration::Set these GitHub production environment secrets before deployment: %s\n' "${missing[*]}"
             exit 1
           fi
 
-          FOUNDER_SESSION_ENCRYPTION_KEY="$FOUNDER_SESSION_ENCRYPTION_KEY" python3 - <<'PY'
-          import base64
-          import os
-          import re
-
-          encoded = os.environ.get('FOUNDER_SESSION_ENCRYPTION_KEY', '').strip()
-          if not re.fullmatch(r'[A-Za-z0-9_-]{43}', encoded):
-              print('::error title=Invalid founder session encryption key::FOUNDER_SESSION_ENCRYPTION_KEY must be 43-character unpadded base64url')
-              raise SystemExit(1)
-
-          try:
-              decoded = base64.b64decode(encoded + '=', altchars=b'-_', validate=True)
-          except Exception:
-              print('::error title=Invalid founder session encryption key::FOUNDER_SESSION_ENCRYPTION_KEY is not valid base64url')
-              raise SystemExit(1)
-
-          if len(decoded) != 32:
-              print('::error title=Invalid founder session encryption key::FOUNDER_SESSION_ENCRYPTION_KEY must decode to exactly 32 bytes')
-              raise SystemExit(1)
-
-          print('FOUNDER_SESSION_ENCRYPTION_KEY format is valid.')
-          PY
-
-          echo "All required production configuration names are present and structurally valid."
+          echo "GitHub deployment-plane configuration is present. Worker runtime secrets remain provider-held and are validated by wrangler.worker.toml."
 
       - name: Record authority receipt
         shell: bash
@@ -153,6 +110,7 @@ jobs:
             echo "- Approval reference: \`$DEPLOYMENT_APPROVAL_ID\`"
             echo "- Reason: ${DEPLOYMENT_REASON:-not supplied}"
             echo "- Trigger: manual workflow dispatch"
+            echo "- Existing Worker runtime secrets: preserved; required names validated by \`wrangler.worker.toml\`"
             echo "- Broad Founder Signal automation grant: disabled"
             echo "- Proof-of-ship scheduled publication: enabled with 20-minute founder review"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -339,31 +297,13 @@ jobs:
           wranglerVersion: '4.110.0'
           command: deploy --config wrangler.worker.toml --var GIT_SHA:${{ inputs.expected_head_sha }}
           secrets: |
-            SUPABASE_SERVICE_ROLE_KEY
-            SUPABASE_PUBLISHABLE_KEY
-            FOUNDER_SESSION_ENCRYPTION_KEY
-            GITHUB_WEBHOOK_SECRET
-            GITHUB_APP_ID
-            GITHUB_PRIVATE_KEY
             FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
-            FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
-            ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
-            FOUNDER_REVIEW_EMAIL_INGRESS_SECRET
         env:
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          FOUNDER_SESSION_ENCRYPTION_KEY: ${{ secrets.FOUNDER_SESSION_ENCRYPTION_KEY }}
-          GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
-          GITHUB_APP_ID: ${{ secrets.APP_ID }}
-          GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
-          FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
-          ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL: ${{ secrets.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL }}
-          FOUNDER_REVIEW_EMAIL_INGRESS_SECRET: ${{ secrets.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET }}
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CF_SESSIONS_KV_NAMESPACE_ID: ${{ secrets.CF_SESSIONS_KV_NAMESPACE_ID }}
-          CF_FEATURE_FLAGS_KV_NAMESPACE_ID: ${{ secrets.CF_FEATURE_FLAGS_KV_NAMESPACE_ID }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          # Canonical deploy preserves provider-held Worker secrets. The only
+          # runtime secret this workflow actively writes is the fail-closed
+          # publication grant below.
           FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON: >-
             {"id":"founder-signal-draft-only-v2","enabled":false,"routes":[{"channel":"linkedin","audienceSegment":"build-in-public"},{"channel":"facebook","audienceSegment":"build-in-public"}],"repositories":[],"repositoryScope":{"mode":"all_owned","owner":"jussray"},"approvedRecipientIds":[],"expiresAt":null}
 
@@ -403,7 +343,7 @@ jobs:
               raise SystemExit(f'unexpected health payload: {body!r}')
           PY
         env:
-          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          DEPLOY_URL: https://api.foundercontrolroom.org
 
       - name: Verify exact deployed commit and disabled broad automation grant
         run: |
@@ -432,7 +372,7 @@ jobs:
               raise SystemExit('broad Founder Signal automation grant fail-closed read-back failed')
           PY
         env:
-          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          DEPLOY_URL: https://api.foundercontrolroom.org
 
       - name: Verify public guardrail surface
         run: |
@@ -450,7 +390,7 @@ jobs:
               raise SystemExit('standing merge authority is not active')
           PY
         env:
-          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          DEPLOY_URL: https://api.foundercontrolroom.org
 
       - name: Verify public Pages shell and exact API proxy
         run: |
@@ -497,7 +437,7 @@ jobs:
     if: needs.smoke-test.result == 'success'
     env:
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
-      DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+      DEPLOY_URL: https://api.foundercontrolroom.org
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       ZAPIER_CATCH_HOOK_URL: ${{ secrets.ZAPIER_CATCH_HOOK_URL }}
       PROOF_OF_SHIP_STEERING_GRANT_ID: ${{ secrets.PROOF_OF_SHIP_STEERING_GRANT_ID }}
