@@ -169,7 +169,7 @@ interface FounderContentExecutionRecord {
 }
 
 export type FounderContentReservationResult =
-  | { ok: true; executionId: string; projectId: string }
+  | { ok: true; executionId: string; projectId: string; reservationStartedAt: string }
   | {
       ok: false;
       code:
@@ -439,6 +439,7 @@ export async function reserveN8nFounderContentExecution(
     };
   }
 
+  const reservationStartedAt = new Date().toISOString();
   const { data: reservation, error: reservationError } = await supabase
     .from('approval_executions')
     .insert({
@@ -465,7 +466,7 @@ export async function reserveN8nFounderContentExecution(
       },
       result: {},
       success: null,
-      started_at: new Date().toISOString(),
+      started_at: reservationStartedAt,
     })
     .select('id')
     .single();
@@ -493,13 +494,22 @@ export async function reserveN8nFounderContentExecution(
     };
   }
 
-  return { ok: true, executionId: String(reservation.id), projectId };
+  return {
+    ok: true,
+    executionId: String(reservation.id),
+    projectId,
+    reservationStartedAt,
+  };
 }
 
 export async function finalizeN8nFounderContentExecution(
   executionId: string,
   receipt: VerifiedN8nFounderContentReceipt,
+  reservationStartedAt: string,
 ): Promise<boolean> {
+  const generation = text(reservationStartedAt);
+  if (!generation) return false;
+
   const supabase = await founderContentDb();
   const { data, error } = await supabase
     .from('approval_executions')
@@ -520,6 +530,7 @@ export async function finalizeN8nFounderContentExecution(
     })
     .eq('id', executionId)
     .eq('status', 'pending')
+    .eq('started_at', generation)
     .select('id')
     .maybeSingle();
 
@@ -644,7 +655,11 @@ export async function dispatchN8nFounderContent(
 
     try {
       const receipt = verifyN8nFounderContentReceipt(request, body);
-      const finalized = await finalizeN8nFounderContentExecution(reservation.executionId, receipt);
+      const finalized = await finalizeN8nFounderContentExecution(
+        reservation.executionId,
+        receipt,
+        reservation.reservationStartedAt,
+      );
       if (!finalized) {
         return {
           ok: false,
