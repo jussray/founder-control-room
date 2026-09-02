@@ -597,7 +597,11 @@ export async function dispatchProviderNeutralN8nFounderContent(
 
     try {
       const receipt = verifyProviderNeutralN8nFounderContentReceipt(request, body);
-      const finalized = await finalizeN8nFounderContentExecution(reservation.executionId, receipt);
+      const finalized = await finalizeN8nFounderContentExecution(
+        reservation.executionId,
+        receipt,
+        reservation.reservationStartedAt,
+      );
       if (!finalized) {
         return {
           ok: false,
