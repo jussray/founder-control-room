@@ -39,9 +39,17 @@ import { dispatchAuthoritativeN8nFounderContent } from '../n8nFounderContentAuth
 
 const NOW = '2026-08-18T01:30:00.000Z';
 const CLAIM_NOW = '2026-08-18T01:45:00.000Z';
-const REVIEW_DEADLINE = '2026-08-18T01:40:00.000Z';
+const ORIGINAL_REVIEW_DEADLINE = '2026-08-18T01:40:00.000Z';
 const DEFERRED_SCHEDULE = '2026-08-18T01:50:00.000Z';
 const APPROVAL_EXPIRES_AT = '2026-08-18T02:10:00.000Z';
+
+const preparedRequest = {
+  providerRequest: {
+    scheduleAt: DEFERRED_SCHEDULE,
+    reviewDeadline: ORIGINAL_REVIEW_DEADLINE,
+    reviewWindowMinutes: 20,
+  },
+};
 
 function request() {
   return {
@@ -61,12 +69,13 @@ function request() {
 describe('authoritative n8n review deadline claim boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    preparedRequest.providerRequest.reviewDeadline = ORIGINAL_REVIEW_DEADLINE;
     mocks.abort.mockResolvedValue(true);
     mocks.dispatch.mockResolvedValue({
       ok: true,
       code: 'DISPATCHED',
       status: 202,
-      request: null,
+      request: preparedRequest,
       receipt: null,
       reasons: [],
     });
@@ -80,21 +89,26 @@ describe('authoritative n8n review deadline claim boundary', () => {
       authorizationHash: 'a'.repeat(64),
       publicPayloadHash: 'b'.repeat(64),
     });
+    mocks.claim.mockResolvedValue({
+      ok: true,
+      approval: {
+        approval_id: 'fca:review-window-test',
+        expires_at: APPROVAL_EXPIRES_AT,
+      },
+      approvalId: 'fca:review-window-test',
+      authorizationHash: 'a'.repeat(64),
+      publicPayloadHash: 'b'.repeat(64),
+    });
     mocks.prepare.mockResolvedValue({
       prepared: true,
-      request: {
-        providerRequest: {
-          scheduleAt: DEFERRED_SCHEDULE,
-          reviewDeadline: REVIEW_DEADLINE,
-        },
-      },
+      request: preparedRequest,
       executionId: '22222222-2222-4222-8222-222222222222',
       abort: mocks.abort,
       dispatch: mocks.dispatch,
     });
   });
 
-  it('rejects an expired review window before consuming approval or dispatching the deferred provider request', async () => {
+  it('moves a stale cadence review deadline to the deferred schedule and still reaches n8n', async () => {
     const result = await dispatchAuthoritativeN8nFounderContent(request(), {
       founderUserId: 'founder-user-1',
       founderIdentity: 'founder@example.com',
@@ -103,12 +117,10 @@ describe('authoritative n8n review deadline claim boundary', () => {
       env: {},
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.code).toBe('INVALID_AUTHORIZATION');
-    expect(result.reasons.join(' ')).toContain('review window expired before the final approval claim');
-    expect(result.reasons.join(' ')).toContain('did not consume the one-shot approval');
-    expect(mocks.claim).not.toHaveBeenCalled();
-    expect(mocks.abort).toHaveBeenCalledTimes(1);
-    expect(mocks.dispatch).not.toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+    expect(preparedRequest.providerRequest.reviewDeadline).toBe(DEFERRED_SCHEDULE);
+    expect(mocks.claim).toHaveBeenCalledTimes(1);
+    expect(mocks.abort).not.toHaveBeenCalled();
+    expect(mocks.dispatch).toHaveBeenCalledTimes(1);
   });
 });
