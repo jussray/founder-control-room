@@ -23,6 +23,12 @@
       "claims": [
         "wrangler.worker.toml must declare the canonical Worker runtime secret names as provider-held required bindings, including FOUNDER_SESSION_ENCRYPTION_KEY, so missing required runtime bindings fail closed at the Cloudflare deployment membrane without requiring canonical Deploy to copy secret values through GitHub Actions."
       ]
+    },
+    {
+      "path": "config/cloudflare-worker-git-authority-policy.json",
+      "claims": [
+        "config/cloudflare-worker-git-authority-policy.json must keep native Cloudflare Workers Builds non-promoting and bind the current desired deploy command to npx wrangler versions upload --config wrangler.worker.toml so the canonical wrangler.worker.toml entry point is discovered without granting production-promotion authority."
+      ]
     }
   ]
 }
