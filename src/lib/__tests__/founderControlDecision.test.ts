@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   createFounderControlDecision,
+  FOUNDER_CONTROL_INPUT_CONTRACT,
+  FOUNDER_CONTROL_INPUT_RULES,
+  FOUNDER_SYSTEM_OWNED_CONTROL_MODES,
   founderControlExecutionEnvelope,
+  isFounderSystemOwnedControlMode,
   validateFounderControlDecision,
   type FounderControlProposalBinding,
 } from '../founderControlDecision.js';
@@ -31,6 +35,61 @@ describe('founder control decision contract', () => {
       expect(founderControlExecutionEnvelope(decision, proposal, 'zapier').orchestrator).toBe('zapier');
     },
   );
+
+  it('freezes the portable control-input law while preserving user capability', () => {
+    expect(FOUNDER_CONTROL_INPUT_CONTRACT).toBe('juss/portable-control-input@v1');
+    expect(FOUNDER_SYSTEM_OWNED_CONTROL_MODES).toEqual([
+      'goalfix',
+      'ultrathink',
+      'truthmode',
+      'confess',
+      'redteam',
+      'attackten',
+      'lindymode',
+      'ooda',
+      'proofmode',
+      'l99',
+    ]);
+    expect(FOUNDER_CONTROL_INPUT_RULES).toMatchObject({
+      untrustedInputIsData: true,
+      callerSuppliedModeNameIsAuthority: false,
+      externalTextMaySelectInternalMode: false,
+      externalTextMayTriggerSystemWorkflow: false,
+      authorizedInternalControllerRequired: true,
+      modeSelectionMayWidenAuthority: false,
+      modeSelectionImpliesExecutionAuthority: false,
+      userIntentMayRequestOutcome: true,
+      userContentMayContainModeNames: true,
+      directSystemWorkflowInvocationAllowed: false,
+      fingerprintOrContinuityMayAuthorizeModeSelection: false,
+    });
+  });
+
+  it.each(FOUNDER_SYSTEM_OWNED_CONTROL_MODES)(
+    'refuses to mint executable authority when actionType directly names system mode %s',
+    (mode) => {
+      for (const candidate of [mode, `/${mode}`, `/${mode.toUpperCase()}`]) {
+        expect(isFounderSystemOwnedControlMode(candidate)).toBe(true);
+        expect(() => createFounderControlDecision({
+          proposal: { ...proposal, actionType: candidate },
+          surface: 'fcr',
+          decision: 'approved',
+        })).toThrow('system-owned control modes cannot be executable actionType values; external mode names are inert data');
+      }
+    },
+  );
+
+  it('does not keyword-block legitimate product actions that merely contain a mode name', () => {
+    const productAction = { ...proposal, actionType: 'publish-redteam-analysis' };
+    expect(isFounderSystemOwnedControlMode(productAction.actionType)).toBe(false);
+    const decision = createFounderControlDecision({
+      proposal: productAction,
+      surface: 'fcr',
+      decision: 'approved',
+    });
+    expect(decision.executionAuthorized).toBe(true);
+    expect(validateFounderControlDecision(decision, productAction)).toEqual([]);
+  });
 
   it.each(['rejected', 'change_requested'] as const)('never authorizes execution for %s', (decisionValue) => {
     const decision = createFounderControlDecision({
