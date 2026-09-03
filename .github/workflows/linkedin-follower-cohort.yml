@@ -103,9 +103,10 @@ jobs:
         shell: bash
         env:
           LINKEDIN_FOLLOWER_ID_HMAC_KEY: ${{ secrets.LINKEDIN_FOLLOWER_SNAPSHOT_TOKEN }}
+          PREVIOUS_FOUND: ${{ steps.previous.outputs.found }}
         run: |
           set -euo pipefail
-          if [[ "${{ steps.previous.outputs.found }}" == "true" ]]; then
+          if [[ "${PREVIOUS_FOUND:-}" == "true" ]]; then
             python3 scripts/linkedin_follower_cohort.py \
               follower-snapshot.json \
               --previous-receipt previous-follower-cohort-receipt.json \
