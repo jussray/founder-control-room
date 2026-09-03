@@ -46,7 +46,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Require private source authority
+      - name: Require private source and privacy key
         shell: bash
         run: |
           set -euo pipefail
@@ -54,25 +54,25 @@ jobs:
             echo "BLOCKED_SOURCE: LINKEDIN_FOLLOWER_SNAPSHOT_URL is not configured." >&2
             exit 1
           fi
-          echo "::add-mask::${SNAPSHOT_URL}"
-          if [[ -n "${SNAPSHOT_TOKEN:-}" ]]; then
-            echo "::add-mask::${SNAPSHOT_TOKEN}"
+          if [[ -z "${SNAPSHOT_TOKEN:-}" ]]; then
+            echo "BLOCKED_PRIVACY_KEY: LINKEDIN_FOLLOWER_SNAPSHOT_TOKEN is required for authenticated source access and domain-separated HMAC cohort identity." >&2
+            exit 1
           fi
+          if (( ${#SNAPSHOT_TOKEN} < 32 )); then
+            echo "BLOCKED_PRIVACY_KEY: LINKEDIN_FOLLOWER_SNAPSHOT_TOKEN must contain at least 32 characters." >&2
+            exit 1
+          fi
+          echo "::add-mask::${SNAPSHOT_URL}"
+          echo "::add-mask::${SNAPSHOT_TOKEN}"
 
       - name: Download private follower snapshot
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -n "${SNAPSHOT_TOKEN:-}" ]]; then
-            curl --fail --silent --show-error --location \
-              -H "Authorization: Bearer ${SNAPSHOT_TOKEN}" \
-              "${SNAPSHOT_URL}" \
-              --output follower-snapshot.json
-          else
-            curl --fail --silent --show-error --location \
-              "${SNAPSHOT_URL}" \
-              --output follower-snapshot.json
-          fi
+          curl --fail --silent --show-error --location \
+            -H "Authorization: Bearer ${SNAPSHOT_TOKEN}" \
+            "${SNAPSHOT_URL}" \
+            --output follower-snapshot.json
 
       - name: Recover latest redacted cohort receipt
         id: previous
@@ -101,6 +101,8 @@ jobs:
 
       - name: Reconcile cohort
         shell: bash
+        env:
+          LINKEDIN_FOLLOWER_ID_HMAC_KEY: ${{ secrets.LINKEDIN_FOLLOWER_SNAPSHOT_TOKEN }}
         run: |
           set -euo pipefail
           if [[ "${{ steps.previous.outputs.found }}" == "true" ]]; then
@@ -114,7 +116,7 @@ jobs:
               --output follower-cohort-receipt.json
           fi
 
-      - name: Ensure raw identity did not enter the redacted receipt
+      - name: Ensure redacted privacy invariants
         shell: bash
         run: |
           set -euo pipefail
@@ -130,6 +132,12 @@ jobs:
               raise SystemExit('redacted receipt names invariant failed')
           if privacy.get('public_receipt_contains_profile_urls') is not False:
               raise SystemExit('redacted receipt profile URL invariant failed')
+          if privacy.get('private_key_persisted') is not False:
+              raise SystemExit('redacted receipt private-key invariant failed')
+          if privacy.get('member_identity_scheme') != 'HMAC-SHA256/private-runtime-key/v1':
+              raise SystemExit('redacted receipt keyed-identity invariant failed')
+          if privacy.get('redacted_metadata_policy') != 'ALLOWLISTED_ENUMS_ONLY':
+              raise SystemExit('redacted receipt enum-redaction invariant failed')
           print(json.dumps(receipt.get('summary', {}), sort_keys=True))
           PY
 
