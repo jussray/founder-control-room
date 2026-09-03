@@ -260,7 +260,7 @@ describe('n8n prepared-reservation abort/finalize generation fencing', () => {
     }));
   });
 
-  it('lets only the rearmed reservation generation cross the provider-write boundary', async () => {
+  it('lets only the rearmed reservation generation acquire approval authority and cross the provider-write boundary', async () => {
     const input = prepareInput();
     const fetchImpl = successfulFetchImpl();
 
@@ -271,8 +271,6 @@ describe('n8n prepared-reservation abort/finalize generation fencing', () => {
     expect(rowAfterA).toBeTruthy();
     const generationA = String(rowAfterA.started_at);
 
-    // Worker A stalls past the 2-minute preclaim recovery lease before it
-    // ever claims the founder approval or dispatches to n8n.
     const recoveryAuthorizedAt = new Date(new Date(generationA).getTime() + 2 * 60 * 1000).toISOString();
 
     const preparedB = await prepareProviderNeutralN8nFounderContent(input, {
@@ -283,14 +281,20 @@ describe('n8n prepared-reservation abort/finalize generation fencing', () => {
     });
     if (!preparedB.prepared) throw new Error(`worker B did not prepare: ${JSON.stringify(preparedB.result.reasons)}`);
 
-    // Same durable row (rearmed in place), but a new generation.
     expect(preparedB.executionId).toBe(preparedA.executionId);
     const rowAfterRearm = fakeDb.__rows.get(preparedB.executionId)!;
     expect(String(rowAfterRearm.started_at)).not.toBe(generationA);
     expect(rowAfterRearm.status).toBe('pending');
 
-    // Worker A can wake after its one-shot approval claim, but its stale
-    // reservation generation may not cross the external-write boundary.
+    const staleClaimBoundary = await preparedA.acquireApprovalClaimBoundary();
+    expect(staleClaimBoundary).toBe(false);
+    expect(fetchImpl).toHaveBeenCalledTimes(0);
+    expect(fakeDb.__rows.get(preparedB.executionId)!.status).toBe('pending');
+
+    const activeClaimBoundary = await preparedB.acquireApprovalClaimBoundary();
+    expect(activeClaimBoundary).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledTimes(0);
+
     const staleDispatch = await preparedA.dispatch();
     expect(staleDispatch.ok).toBe(false);
     expect(staleDispatch.code).toBe('ACTION_AUDIT_INCOMPLETE');
@@ -298,12 +302,10 @@ describe('n8n prepared-reservation abort/finalize generation fencing', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(0);
     expect(fakeDb.__rows.get(preparedB.executionId)!.status).toBe('pending');
 
-    // Worker A's own abort remains a no-op against the rearmed generation.
     const abortedByA = await preparedA.abort('worker A lost the approval claim race');
     expect(abortedByA).toBe(false);
     expect(fakeDb.__rows.get(preparedB.executionId)!.status).toBe('pending');
 
-    // Worker A's redundant/stale finalize attempt must also be a no-op.
     const staleReceipt: VerifiedN8nFounderContentReceipt = {
       orchestrationId: preparedA.request.orchestrationId,
       provider: 'buffer',
@@ -318,8 +320,6 @@ describe('n8n prepared-reservation abort/finalize generation fencing', () => {
     expect(finalizedByA).toBe(false);
     expect(fakeDb.__rows.get(preparedB.executionId)!.status).toBe('pending');
 
-    // Worker B — the legitimate holder of the current generation — crosses
-    // the latch once, dispatches once, and finalizes normally.
     const dispatchResult = await preparedB.dispatch();
 
     expect(dispatchResult.ok).toBe(true);
