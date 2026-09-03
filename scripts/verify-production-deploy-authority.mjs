@@ -405,76 +405,102 @@ for (const name of requiredWorkerSecrets.filter(
 }
 assert.doesNotMatch(
   deploySection,
-  /^          GITHUB_APP_ID: \$\{\{ secrets\.APP_ID \}\}$/m,
-  'GitHub App runtime identity must remain provider-held during canonical deploy',
+  /^          GITHUB_APP_ID: \$\{\{ secrets\.GITHUB_APP_ID \}\}$/m,
+  'canonical deploy must not require a second GITHUB_APP_ID Actions secret when APP_ID is the configured source',
 );
 assert.doesNotMatch(
   deploySection,
-  /^          GITHUB_PRIVATE_KEY: \$\{\{ secrets\.APP_PRIVATE_KEY \}\}$/m,
-  'GitHub App private key must remain provider-held during canonical deploy',
+  /^          GITHUB_PRIVATE_KEY: \$\{\{ secrets\.GITHUB_PRIVATE_KEY \}\}$/m,
+  'canonical deploy must not require a second GITHUB_PRIVATE_KEY Actions secret when APP_PRIVATE_KEY is the configured source',
+);
+assert.doesNotMatch(
+  deploySection,
+  /^          DEPLOY_URL: \$\{\{ secrets\.DEPLOY_URL \}\}$/m,
+  'canonical deploy must not require DEPLOY_URL as an Actions secret when it is public configuration',
 );
 
+assert.doesNotMatch(
+  deploySection,
+  /apiToken:\s*\$\{\{ secrets\.CLOUDFLARE_API_TOKEN_OLD \}\}/,
+  'production Worker deploy must not use a stale Cloudflare credential name',
+);
 assert.match(
-  workflow,
-  /DEPLOY_URL: https:\/\/api\.foundercontrolroom\.org/,
-  'canonical API origin is public configuration and must be explicit in release proof',
-);
-assert.doesNotMatch(
-  workflow,
-  /DEPLOY_URL: \$\{\{ secrets\.DEPLOY_URL \}\}/,
-  'canonical API origin must not be duplicated as a GitHub secret',
+  deploySection,
+  /apiToken:\s*\$\{\{ secrets\.CLOUDFLARE_API_TOKEN \}\}/,
+  'production Worker deploy must use the canonical Cloudflare API token',
 );
 
-const authoritySectionStart = workflow.indexOf('  authority-gate:');
-const migrationSectionStart = workflow.indexOf('  # ── 1.');
-const startupValidationIndex = workflow.indexOf(
-  '      - name: Validate required production configuration',
+const pagesStart = workflow.indexOf('  pages-release:');
+const pagesEnd = workflow.indexOf('  # ── 3.', pagesStart);
+assert.notEqual(pagesStart, -1, 'pages-release section must exist');
+assert.notEqual(pagesEnd, -1, 'pages-release section must have a bounded end');
+const pagesSection = workflow.slice(pagesStart, pagesEnd);
+assert.match(
+  pagesSection,
+  /uses: \.\/\.github\/workflows\/pages-production-release\.yml/,
+  'canonical production release must use the guarded Pages release workflow',
 );
-assert.notEqual(authoritySectionStart, -1, 'authority-gate section must exist');
-assert.notEqual(startupValidationIndex, -1, 'startup deployment-plane validation step must exist');
-assert.ok(
-  startupValidationIndex > authoritySectionStart && startupValidationIndex < migrationSectionStart,
-  'all GitHub deployment-plane configuration must be validated before Supabase mutation begins',
+assert.match(
+  pagesSection,
+  /expected_head_sha: \$\{\{ inputs\.expected_head_sha \}\}/,
+  'Pages release must receive the exact founder-approved head SHA',
 );
-
-const validationStepStart = authoritySectionStart === -1
-  ? -1
-  : workflow.indexOf(
-      '      - name: Validate required production configuration',
-      authoritySectionStart,
-    );
-const receiptStepStart = validationStepStart === -1
-  ? -1
-  : workflow.indexOf(
-      '      - name: Record authority receipt',
-      validationStepStart,
-    );
-assert.notEqual(validationStepStart, -1, 'deployment-plane validation step must exist');
-assert.notEqual(receiptStepStart, -1, 'authority receipt step must follow configuration validation');
-const authoritySection = workflow.slice(authoritySectionStart, migrationSectionStart);
-const validationRelativeStart = validationStepStart - authoritySectionStart;
-const receiptRelativeStart = receiptStepStart - authoritySectionStart;
-const authorityOutsideValidation =
-  authoritySection.slice(0, validationRelativeStart)
-  + authoritySection.slice(receiptRelativeStart);
-const validationStep = workflow.slice(validationStepStart, receiptStepStart);
-
-const requiredAuthoritySecrets = [
-  'SUPABASE_DB_URL',
-  'CLOUDFLARE_API_TOKEN',
-  'CLOUDFLARE_ACCOUNT_ID',
-];
-const outsideSecretMapping = new RegExp(
-  '^[ \\t]+(?:' + requiredAuthoritySecrets.join('|') + '): \\$\\{\\{ secrets\\.(?:' + requiredAuthoritySecrets.join('|') + ') \\}\\}$',
-  'm',
-);
-assert.doesNotMatch(
-  authorityOutsideValidation,
-  outsideSecretMapping,
-  'GitHub deployment-plane secrets must be scoped only to the validation step',
+assert.match(
+  pagesSection,
+  /secrets: inherit/,
+  'Pages release must inherit the existing GitHub Actions secret boundary',
 );
 
-for (const name of requiredAuthoritySecrets) {
+const smokeTestStart = workflow.indexOf('  smoke-test:');
+const proofOfShipStart = workflow.indexOf('  proof-of-ship:', smokeTestStart);
+assert.notEqual(smokeTestStart, -1, 'smoke-test section must exist');
+assert.notEqual(proofOfShipStart, -1, 'proof-of-ship section must exist');
+const smokeTestSection = workflow.slice(smokeTestStart, proofOfShipStart);
+assert.match(
+  smokeTestSection,
+  /BODY=\$\(curl --fail --silent --show-error --dump-header "\$HEADERS" "\$DEPLOY_URL\/health"\)/,
+  'production smoke test must call the direct Worker health endpoint',
+);
+assert.match(
+  smokeTestSection,
+  /x-founder-control-room-service:/,
+  'production smoke test must verify the Worker service-identity header',
+);
+assert.match(
+  smokeTestSection,
+  /PUBLIC_URL: https:\/\/foundercontrolroom\.org/,
+  'production smoke test must exercise the public Pages origin',
+);
+assert.match(
+  smokeTestSection,
+  /VERSION_BODY=.*"\$PUBLIC_URL\/version"/,
+  'production smoke test must verify the public Pages proxy version endpoint',
+);
+assert.match(
+  smokeTestSection,
+  /body\.get\('gitSha'\) != os\.environ\['EXPECTED_SHA'\]/,
+  'production smoke test must require exact deployed commit identity through the public origin',
+);
+
+const proofOfShipSection = workflow.slice(proofOfShipStart);
+assert.match(
+  proofOfShipSection,
+  /needs: smoke-test/,
+  'proof-of-ship must run only after successful production smoke proof',
+);
+assert.match(
+  proofOfShipSection,
+  /if: needs\.smoke-test\.result == 'success'/,
+  'proof-of-ship must fail closed unless smoke-test succeeded',
+);
+
+const gateStart = workflow.indexOf('      - name: Validate required production configuration');
+const gateEnd = workflow.indexOf('      - name: Record authority receipt', gateStart);
+assert.notEqual(gateStart, -1, 'production configuration gate must exist');
+assert.notEqual(gateEnd, -1, 'production configuration gate must have a bounded end');
+const validationStep = workflow.slice(gateStart, gateEnd);
+
+for (const name of ['SUPABASE_DB_URL', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID']) {
   assert.match(
     validationStep,
     new RegExp('^          ' + name + ': \\$\\{\\{ secrets\\.' + name + ' \\}\\}$', 'm'),
@@ -514,7 +540,7 @@ for (const name of [
 
 assert.match(
   validationStep,
-  /Worker runtime secrets remain provider-held and are validated by wrangler\.worker\.toml/,
-  'authority gate must state the provider-held runtime-secret boundary',
+  /Worker runtime secrets remain provider-held and are name-read-back/,
+  'authority gate must state the provider-held runtime-secret readback boundary',
 );
 console.log('Production deployment authority, provider-held Worker secrets, privacy receipt, LinkedIn freshness, and one-Worker binding contract verified.');
