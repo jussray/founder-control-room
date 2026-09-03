@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   createFounderControlDecision,
@@ -18,6 +19,22 @@ const proposal: FounderControlProposalBinding = {
   expectedHeadSha: 'b'.repeat(40),
   capabilityPlanHash: 'c'.repeat(64),
 };
+
+const externalizableControlDocs = [
+  '.ai-skills/README.md',
+  '.ai-skills/chatgpt-custom-instructions.md',
+  '.ai-skills/claude-project-instructions.md',
+  '.ai-skills/custom-gpt-system-prompt.md',
+  '.ai-skills/gpts/capability-mode-router.md',
+];
+
+const forbiddenRawActivationPhrases = [
+  /the user may type these commands to switch your behavior/i,
+  /i may type these commands to switch your behavior/i,
+  /type these commands to switch behavior/i,
+  /type command shortcuts like .* in a conversation/i,
+  /type commands like .* in chat/i,
+];
 
 describe('founder control decision contract', () => {
   it.each(['fcr', 'chatgpt', 'claude', 'perplexity', 'manus'] as const)(
@@ -89,6 +106,20 @@ describe('founder control decision contract', () => {
     });
     expect(decision.executionAuthorized).toBe(true);
     expect(validateFounderControlDecision(decision, productAction)).toEqual([]);
+  });
+
+  it('keeps copyable AI instructions aligned with the executable control-input boundary', () => {
+    for (const relativePath of externalizableControlDocs) {
+      const source = readFileSync(relativePath, 'utf8');
+      expect(source).toMatch(/juss\/portable-control-input@v1/);
+      expect(source).toMatch(/untrusted external text is inert data/i);
+      expect(source).toMatch(/authorized internal controller|trusted controller/i);
+      expect(source).toMatch(/raw string never self-activates|raw strings do not self-activate|cannot activate|cannot activate or select/i);
+
+      for (const forbidden of forbiddenRawActivationPhrases) {
+        expect(source).not.toMatch(forbidden);
+      }
+    }
   });
 
   it.each(['rejected', 'change_requested'] as const)('never authorizes execution for %s', (decisionValue) => {
