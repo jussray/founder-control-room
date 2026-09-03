@@ -39,7 +39,8 @@ describe('production deploy recovery contract', () => {
     const secretMapping = `${secret}: ` + '${{ secrets.' + secret + ' }}';
 
     expect(workerConfig).toContain(`"${secret}",`);
-    expect(authority).toContain('Worker runtime secrets remain provider-held and are validated by wrangler.worker.toml.');
+    expect(authority).toContain('Worker runtime secrets remain provider-held');
+    expect(authority).toContain('name-read-back in the next authority-gate step');
     expect(authority).not.toContain(secretMapping);
     expect(worker).not.toContain(secretMapping);
     expect(worker).not.toMatch(new RegExp(`\\n\\s+${secret}\\n`));
