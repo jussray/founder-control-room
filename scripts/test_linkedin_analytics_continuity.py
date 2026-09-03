@@ -82,12 +82,35 @@ class LinkedInAnalyticsContinuityTest(unittest.TestCase):
         self.assertEqual(mod.post_fingerprint(day, base), mod.post_fingerprint(day, base + '?utm_source=foo'))
 
     def test_reconcile_preserves_history_without_treating_missing_as_deleted(self):
-        previous = {'posts': [{'fingerprint':'a'}, {'fingerprint':'b'}]}
+        previous = {
+            'contract': 'linkedin-analytics-continuity@v1',
+            'posts': [{'fingerprint':'a'}, {'fingerprint':'b'}],
+        }
         current = {'posts': [{'fingerprint':'b'}, {'fingerprint':'c'}]}
         result = mod.reconcile(previous, current)
         self.assertEqual(result['new'], ['c'])
         self.assertEqual(result['retained'], ['b'])
         self.assertEqual(result['missing_from_current_visible_set'], ['a'])
+
+    def test_reconcile_unwraps_redacted_post_evidence_envelope(self):
+        previous = {
+            'contract': 'linkedin-post-evidence@v1',
+            'continuity': {
+                'contract': 'linkedin-analytics-continuity@v1',
+                'posts': [{'fingerprint':'a'}, {'fingerprint':'b'}],
+            },
+            'performance': {'contract': 'linkedin-post-performance@v1'},
+        }
+        current = {'posts': [{'fingerprint':'b'}, {'fingerprint':'c'}]}
+        result = mod.reconcile(previous, current)
+        self.assertEqual(result['new'], ['c'])
+        self.assertEqual(result['retained'], ['b'])
+        self.assertEqual(result['missing_from_current_visible_set'], ['a'])
+
+    def test_reconcile_rejects_malformed_outer_envelope(self):
+        previous = {'contract': 'linkedin-post-evidence@v1', 'continuity': {'posts': []}}
+        with self.assertRaisesRegex(ValueError, 'nested continuity receipt contract mismatch'):
+            mod.reconcile(previous, {'posts': []})
 
 
 if __name__ == '__main__':
