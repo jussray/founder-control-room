@@ -40,6 +40,7 @@ export interface PreparedProviderNeutralN8nFounderContent {
   prepared: true;
   request: N8nFounderContentRequest;
   executionId: string;
+  acquireApprovalClaimBoundary(): Promise<boolean>;
   dispatch(): Promise<N8nFounderContentDispatchResult>;
   abort(reason?: string): Promise<boolean>;
 }
@@ -189,6 +190,7 @@ async function tryRearmRetryablePreProviderReservation(
       .eq('id', existing.id)
       .eq('status', 'pending')
       .eq('started_at', text(existing.started_at))
+      .eq('result->>provider_write_attempted', 'false')
       .select('id, project_id')
       .maybeSingle();
     rearmed = update.data;
@@ -200,6 +202,7 @@ async function tryRearmRetryablePreProviderReservation(
       .eq('id', existing.id)
       .eq('status', 'failed')
       .eq('started_at', text(existing.started_at))
+      .eq('result->>provider_write_attempted', 'false')
       .select('id, project_id')
       .maybeSingle();
     rearmed = update.data;
@@ -237,6 +240,44 @@ async function reservePreparedFounderContentExecution(
     first,
     preclaimRecoveryAuthorizedAt,
   );
+}
+
+async function acquirePreparedFounderContentApprovalClaimBoundary(
+  executionId: string,
+  reservationStartedAt: string,
+): Promise<string | null> {
+  const generation = text(reservationStartedAt);
+  const generationMs = Date.parse(generation);
+  if (!generation || !Number.isFinite(generationMs)) return null;
+
+  const claimBoundaryStartedAt = new Date(
+    Math.max(Date.now(), generationMs + 1),
+  ).toISOString();
+
+  try {
+    const supabase = await founderContentDb();
+    const { data, error } = await supabase
+      .from('approval_executions')
+      .update({
+        result: {
+          phase: 'approval_claim_boundary_acquired',
+          provider_write_attempted: false,
+        },
+        started_at: claimBoundaryStartedAt,
+      })
+      .eq('id', executionId)
+      .eq('status', 'pending')
+      .eq('started_at', generation)
+      .eq('result->>provider_write_attempted', 'false')
+      .select('id, started_at')
+      .maybeSingle();
+
+    return !error && String(data?.id ?? '') === executionId
+      ? text(data?.started_at) || claimBoundaryStartedAt
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 async function abortPreparedFounderContentExecution(
@@ -368,22 +409,35 @@ export async function prepareProviderNeutralN8nFounderContent(
   const webhookUrl = config.webhookUrl;
   const bearerToken = config.bearerToken;
   const fetchImpl = options.fetchImpl ?? fetch;
+  let reservationStartedAt = reservation.reservationStartedAt;
+  let approvalClaimBoundaryAcquired = false;
 
   return {
     prepared: true,
     request,
     executionId: reservation.executionId,
+    async acquireApprovalClaimBoundary() {
+      if (approvalClaimBoundaryAcquired) return false;
+      const acquiredGeneration = await acquirePreparedFounderContentApprovalClaimBoundary(
+        reservation.executionId,
+        reservationStartedAt,
+      );
+      if (!acquiredGeneration) return false;
+      reservationStartedAt = acquiredGeneration;
+      approvalClaimBoundaryAcquired = true;
+      return true;
+    },
     abort: (reason = 'founder approval claim did not complete after downstream preparation') => (
       abortPreparedFounderContentExecution(
         reservation.executionId,
-        reservation.reservationStartedAt,
+        reservationStartedAt,
         reason,
       )
     ),
     async dispatch() {
       const providerWriteAcquired = await acquireN8nFounderContentProviderWrite(
         reservation.executionId,
-        reservation.reservationStartedAt,
+        reservationStartedAt,
       );
       if (!providerWriteAcquired) {
         return {
@@ -439,7 +493,7 @@ export async function prepareProviderNeutralN8nFounderContent(
           const finalized = await finalizeN8nFounderContentExecution(
             reservation.executionId,
             receipt,
-            reservation.reservationStartedAt,
+            reservationStartedAt,
           );
           if (!finalized) {
             return {
