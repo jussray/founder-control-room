@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   readCurrent: vi.fn(),
   claim: vi.fn(),
   prepare: vi.fn(),
+  acquireApprovalClaimBoundary: vi.fn(),
   abort: vi.fn(),
   dispatch: vi.fn(),
 }));
@@ -70,6 +71,7 @@ describe('authoritative n8n review deadline claim boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     preparedRequest.providerRequest.reviewDeadline = ORIGINAL_REVIEW_DEADLINE;
+    mocks.acquireApprovalClaimBoundary.mockResolvedValue(true);
     mocks.abort.mockResolvedValue(true);
     mocks.dispatch.mockResolvedValue({
       ok: true,
@@ -103,6 +105,7 @@ describe('authoritative n8n review deadline claim boundary', () => {
       prepared: true,
       request: preparedRequest,
       executionId: '22222222-2222-4222-8222-222222222222',
+      acquireApprovalClaimBoundary: mocks.acquireApprovalClaimBoundary,
       abort: mocks.abort,
       dispatch: mocks.dispatch,
     });
@@ -119,6 +122,10 @@ describe('authoritative n8n review deadline claim boundary', () => {
 
     expect(result.ok).toBe(true);
     expect(preparedRequest.providerRequest.reviewDeadline).toBe(DEFERRED_SCHEDULE);
+    expect(mocks.acquireApprovalClaimBoundary).toHaveBeenCalledTimes(1);
+    expect(mocks.acquireApprovalClaimBoundary.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.claim.mock.invocationCallOrder[0],
+    );
     expect(mocks.claim).toHaveBeenCalledTimes(1);
     expect(mocks.abort).not.toHaveBeenCalled();
     expect(mocks.dispatch).toHaveBeenCalledTimes(1);
@@ -138,6 +145,7 @@ describe('authoritative n8n review deadline claim boundary', () => {
     expect(result.ok).toBe(false);
     expect(result.code).toBe('INVALID_AUTHORIZATION');
     expect(result.reasons.join(' ')).toContain('review deadline must match the provider schedule after cadence');
+    expect(mocks.acquireApprovalClaimBoundary).not.toHaveBeenCalled();
     expect(mocks.claim).not.toHaveBeenCalled();
     expect(mocks.abort).toHaveBeenCalledTimes(1);
     expect(mocks.dispatch).not.toHaveBeenCalled();
