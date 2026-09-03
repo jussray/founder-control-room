@@ -123,9 +123,11 @@ jobs:
 
       - name: Normalize and reconcile post continuity
         shell: bash
+        env:
+          PREVIOUS_FOUND: ${{ steps.previous.outputs.found }}
         run: |
           set -euo pipefail
-          if [[ "${{ steps.previous.outputs.found }}" == "true" ]]; then
+          if [[ "${PREVIOUS_FOUND:-}" == "true" ]]; then
             python3 scripts/linkedin_analytics_continuity.py \
               linkedin-analytics.xlsx \
               --start "${WINDOW_START}" \
