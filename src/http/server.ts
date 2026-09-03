@@ -1,4 +1,5 @@
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authRouter } from './routes/auth.js';
@@ -79,6 +80,13 @@ import { requireFounderSignalEngineReviewOnly } from './middleware/founderSignal
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SUPABASE_PROJECT_REF = /^[a-z0-9]{20}$/;
 const SERVICE_IDENTITY = 'founder-control-room';
+const rateLimitJiraWorkAutomationIngress = rateLimit({
+  windowMs: 60 * 1_000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Rate limit exceeded.' },
+});
 const FCR_REVIEW_PROJECT = {
   repo_provider: 'github',
   slug: 'founder-control-room',
@@ -218,7 +226,7 @@ export function createServer(options: CreateServerOptions = {}) {
   );
   app.post(
     '/ingest/jira-work-automation',
-    rateLimitGeneral,
+    rateLimitJiraWorkAutomationIngress,
     express.raw({ type: 'application/json', limit: '16kb' }),
     handleJiraWorkAutomationIngress,
   );
