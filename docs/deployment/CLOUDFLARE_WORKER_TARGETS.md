@@ -159,17 +159,27 @@ The sanitized receipt may prove what that provider read observed at that time. C
 
 A failing or unavailable enrichment read is `UNKNOWN`/blocked evidence in that enrichment lane, not permission to infer the missing provider state, not a reason to rewrite the core Worker Git authority verdict, and not permission to mutate DNS, routes, Access, Workers, credentials, or deployment configuration.
 
-## Required Worker secrets
+## Required Worker secrets and deployment-plane credentials
 
-Configure applicable secrets in the canonical Worker secret store and, where named by guarded workflows, in the GitHub `production` environment.
+The canonical Worker runtime secret values belong in the Cloudflare Worker secret store. Canonical `.github/workflows/deploy.yml` preserves those provider-held values instead of copying them through GitHub Actions. The required runtime secret names are declared by `wrangler.worker.toml [secrets].required`, including `FOUNDER_SESSION_ENCRYPTION_KEY`; Wrangler must fail closed when a required binding name is absent before the Worker promotion can be treated as successful.
 
-For the GitHub `production` environment, the Actions-facing GitHub App credential names are `APP_ID` and `APP_PRIVATE_KEY`. Trusted deploy/governance workflows map those values into the stable Worker/provider runtime names `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY`; the canonical Worker secret registry continues to use the runtime names. The App Client ID is not consumed by this installation-token path. Secret-name presence, source wiring, fingerprints, and continuity cookies are not proof of credential value validity, App installation scope, provider acceptance, deployment authority, or runtime identity.
+The canonical Deploy authority gate has a smaller GitHub production credential surface. It requires only the credentials needed to perform the release itself:
 
-The canonical Worker additionally requires `FOUNDER_SESSION_ENCRYPTION_KEY` for hardened founder-session cryptography. The guarded `.github/workflows/deploy.yml` path must reject production deployment unless the value is exactly 43 characters of unpadded base64url and decodes to exactly 32 bytes, and the workflow must pass it only to the canonical Worker secret set. Pages, migration-only steps, and unrelated workers must not inherit this secret. Repository validation proves the intended boundary, not live secret presence or provider acceptance.
+```text
+SUPABASE_DB_URL
+CLOUDFLARE_API_TOKEN
+CLOUDFLARE_ACCOUNT_ID
+```
 
-For the served remote read MCP, `FCR_REMOTE_MCP_READ_TOKEN` is a required canonical Worker secret and must be distinct from write-capable MCP/provider credentials. `FCR_REMOTE_MCP_READ_PROJECTS` is a public-safe server-held scope variable, not a secret.
+Those deployment-plane values do not become Worker runtime bindings. Conversely, Worker runtime values such as `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PUBLISHABLE_KEY`, `FOUNDER_SESSION_ENCRYPTION_KEY`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, MCP tokens, provider hook URLs, and review-email ingress secrets are not duplicated into the canonical Deploy authority gate.
 
-Never copy secret values into repository files, logs, screenshots, issue comments, PR bodies, documentation, or public content. A secret name or presence check proves wiring only; provider acceptance/permission is a separate truth.
+The only runtime secret canonical Deploy deliberately writes is `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON`, and the checked-in value is fail-closed with `enabled:false`. This lets the release actively preserve the broad automation kill switch while leaving unrelated provider-held runtime secrets untouched.
+
+`https://api.foundercontrolroom.org` is the canonical public API origin and therefore is source configuration, not a GitHub secret. Smoke proof, proof-of-ship runtime readback, and the post-Deploy production Playwright witness use that explicit origin. The witness still requires a successful canonical Deploy and binds direct Worker plus public Pages/proxy `/version` reads to the exact Deploy run SHA before and after the browser journey.
+
+Trusted deterministic-review or other bounded workflows that actually need GitHub App execution credentials may continue to use their separately scoped Actions-facing `APP_ID` / `APP_PRIVATE_KEY` inputs. That does not make canonical Deploy responsible for re-uploading the Worker's provider-held `GITHUB_APP_ID` / `GITHUB_PRIVATE_KEY` pair.
+
+Never copy secret values into repository files, logs, screenshots, issue comments, PR bodies, documentation, or public content. A source declaration or required-name check proves only the intended boundary. Live provider secret presence, validity, permissions, deployment success, and runtime identity still require provider/runtime evidence.
 
 ## Verification gate
 
@@ -180,7 +190,7 @@ At minimum verify:
 1. `npm run build:pages` succeeds and contains required browser assets, `_headers`, and `_worker.js`;
 2. the exact Pages artifact/deployment intended for production succeeds;
 3. the canonical Worker deployment/version intended for production succeeds;
-4. required secrets/configuration are available for the authorized scope;
+4. deployment-plane credentials pass the pre-mutation authority gate and provider-held Worker required-secret names pass the Wrangler binding membrane;
 5. the Pages `FCR_API` Service Binding is provider-proven to target the canonical `founder-control-room` Worker;
 6. `https://api.foundercontrolroom.org/health` returns the expected service identity/health payload;
 7. `https://foundercontrolroom.org/health` reaches the same canonical API service through the Pages binding;

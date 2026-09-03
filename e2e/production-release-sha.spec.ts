@@ -17,49 +17,66 @@ test.describe('production exact-SHA release witness', () => {
       /^[0-9a-f]{40}$/,
     );
 
-    const nonce = `${Date.now()}-${testInfo.retry}`;
-    const directVersionResponse = await request.get(`${deployUrl}/version?release_witness=${nonce}`, {
-      headers: {
-        'cache-control': 'no-cache',
-        pragma: 'no-cache',
-      },
-    });
-    expect(directVersionResponse.status()).toBe(200);
-    expect(directVersionResponse.headers()['x-founder-control-room-service']).toBe(
-      'founder-control-room',
-    );
-
-    const directVersion = (await directVersionResponse.json()) as {
-      service?: string;
-      gitSha?: string | null;
+    const readDirectIdentity = async (phase: string) => {
+      const nonce = `${Date.now()}-${testInfo.retry}-${phase}`;
+      const response = await request.get(`${deployUrl}/version?release_witness=${nonce}`, {
+        headers: {
+          'cache-control': 'no-cache',
+          pragma: 'no-cache',
+        },
+      });
+      expect(response.status()).toBe(200);
+      expect(response.headers()['x-founder-control-room-service']).toBe('founder-control-room');
+      const body = (await response.json()) as {
+        service?: string;
+        gitSha?: string | null;
+      };
+      expect(body.service).toBe('founder-control-room');
+      expect(body.gitSha).toBe(expectedReleaseSha);
+      return body;
     };
-    expect(directVersion.service).toBe('founder-control-room');
-    expect(directVersion.gitSha).toBe(expectedReleaseSha);
 
-    const publicVersionResponse = await page.goto(
-      `${publicUrl}/version?release_witness=${nonce}`,
-      { waitUntil: 'domcontentloaded' },
-    );
-    expect(publicVersionResponse?.status()).toBe(200);
-    expect(publicVersionResponse?.headers()['x-founder-control-room-service']).toBe(
-      'founder-control-room',
-    );
-
-    const publicVersionText = await page.locator('body').innerText();
-    const publicVersion = JSON.parse(publicVersionText) as {
-      service?: string;
-      gitSha?: string | null;
+    const readPublicIdentity = async (phase: string) => {
+      const nonce = `${Date.now()}-${testInfo.retry}-${phase}`;
+      const response = await request.get(`${publicUrl}/version?release_witness=${nonce}`, {
+        headers: {
+          'cache-control': 'no-cache',
+          pragma: 'no-cache',
+        },
+      });
+      expect(response.status()).toBe(200);
+      expect(response.headers()['x-founder-control-room-service']).toBe('founder-control-room');
+      const body = (await response.json()) as {
+        service?: string;
+        gitSha?: string | null;
+      };
+      expect(body.service).toBe('founder-control-room');
+      expect(body.gitSha).toBe(expectedReleaseSha);
+      return body;
     };
-    expect(publicVersion.service).toBe('founder-control-room');
-    expect(publicVersion.gitSha).toBe(expectedReleaseSha);
+
+    const directVersionBefore = await readDirectIdentity('before-browser');
+    const publicVersionBefore = await readPublicIdentity('before-browser');
+
+    // Browser journey is accepted only after both runtime identity witnesses agree.
+    const controlRoomResponse = await page.goto(`${publicUrl}/`, { waitUntil: 'domcontentloaded' });
+    expect(controlRoomResponse?.status()).toBe(200);
+    await expect(page.locator('body')).toContainText('Founder Control Room');
+
+    // Re-read release identity after the browser journey so a deployment change during the
+    // journey cannot combine release-A identity evidence with release-B browser evidence.
+    const directVersionAfter = await readDirectIdentity('after-browser');
+    const publicVersionAfter = await readPublicIdentity('after-browser');
 
     await testInfo.attach('production-release-witness.json', {
       body: JSON.stringify(
         {
           expectedReleaseSha,
-          directWorkerGitSha: directVersion.gitSha,
-          publicProxyGitSha: publicVersion.gitSha,
-          service: publicVersion.service,
+          directWorkerGitShaBefore: directVersionBefore.gitSha,
+          publicProxyGitShaBefore: publicVersionBefore.gitSha,
+          directWorkerGitShaAfter: directVersionAfter.gitSha,
+          publicProxyGitShaAfter: publicVersionAfter.gitSha,
+          service: publicVersionAfter.service,
         },
         null,
         2,
@@ -67,10 +84,6 @@ test.describe('production exact-SHA release witness', () => {
       contentType: 'application/json',
     });
 
-    // Browser journey is accepted only after both runtime identity witnesses agree.
-    const controlRoomResponse = await page.goto(`${publicUrl}/`, { waitUntil: 'domcontentloaded' });
-    expect(controlRoomResponse?.status()).toBe(200);
-    await expect(page.locator('body')).toContainText('Founder Control Room');
     await page.screenshot({
       path: 'test-results/production-release-witness.png',
       fullPage: true,

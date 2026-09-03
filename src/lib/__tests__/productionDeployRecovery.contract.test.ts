@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const workflow = readFileSync(resolve(repositoryRoot, '.github/workflows/deploy.yml'), 'utf8');
+const workerConfig = readFileSync(resolve(repositoryRoot, 'wrangler.worker.toml'), 'utf8');
 
 function section(start: string, end: string): string {
   const startIndex = workflow.indexOf(start);
@@ -28,7 +29,7 @@ describe('production deploy recovery contract', () => {
     expect(push).toContain('--include-all');
   });
 
-  it('validates and carries the founder review ingress secret into the production Worker deploy', () => {
+  it('keeps the founder review ingress secret provider-held while requiring its Worker binding', () => {
     const authority = section(
       '      - name: Validate required production configuration',
       '      - name: Record authority receipt',
@@ -37,10 +38,12 @@ describe('production deploy recovery contract', () => {
     const secret = 'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET';
     const secretMapping = `${secret}: ` + '${{ secrets.' + secret + ' }}';
 
-    expect(authority).toContain(secretMapping);
-    expect(authority).toMatch(new RegExp(`\\n\\s+${secret}\\n`));
-
-    expect(worker).toMatch(new RegExp(`\\n\\s+${secret}\\n`));
-    expect(worker).toContain(secretMapping);
+    expect(workerConfig).toContain(`"${secret}",`);
+    expect(authority).toContain('Worker runtime secrets remain provider-held');
+    expect(authority).toContain('name-read-back in the next authority-gate step');
+    expect(authority).not.toContain(secretMapping);
+    expect(worker).not.toContain(secretMapping);
+    expect(worker).not.toMatch(new RegExp(`\\n\\s+${secret}\\n`));
+    expect(worker).toMatch(/secrets:\s*\|\s*\n\s+FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON/);
   });
 });

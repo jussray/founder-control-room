@@ -162,6 +162,7 @@ describe('Founder deploy command authority contract', () => {
     expect(configuredWorkerSecretNames()).toEqual([
       'SUPABASE_SERVICE_ROLE_KEY',
       'SUPABASE_PUBLISHABLE_KEY',
+      'FOUNDER_SESSION_ENCRYPTION_KEY',
       'GITHUB_WEBHOOK_SECRET',
       'GITHUB_APP_ID',
       'GITHUB_PRIVATE_KEY',

@@ -108,7 +108,9 @@ describe("Cloudflare Worker Git authority audit", () => {
   it("distinguishes safe fallback from the current desired topology", () => {
     expect(policy.allowedSafeStates).toEqual(["disconnected", "non-promoting"]);
     expect(policy.currentDesiredState).toBe("non-promoting");
-    expect(policy.currentDesiredDeployCommand).toBe("npx wrangler versions upload");
+    expect(policy.currentDesiredDeployCommand).toBe(
+      "npx wrangler versions upload --config wrangler.worker.toml",
+    );
     expect(policy.canAuthorizeProviderMutation).toBe(false);
     expect(inspector).toContain("WORKER_GIT_CURRENT_TOPOLOGY_DRIFT");
     expect(inspector).toContain('driftClass = !safetySatisfied');

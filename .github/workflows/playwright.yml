@@ -186,7 +186,7 @@ jobs:
     env:
       PRODUCTION_RELEASE_WITNESS_REQUIRED: 'true'
       EXPECTED_RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
-      DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+      DEPLOY_URL: https://api.foundercontrolroom.org
       PUBLIC_URL: https://foundercontrolroom.org
 
     steps:
