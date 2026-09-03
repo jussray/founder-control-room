@@ -98,7 +98,88 @@ jobs:
             exit 1
           fi
 
-          echo "GitHub deployment-plane configuration is present. Worker runtime secrets remain provider-held and are validated by wrangler.worker.toml."
+          echo "GitHub deployment-plane configuration is present. Worker runtime secrets remain provider-held and are name-read-back in the next authority-gate step."
+
+      - name: Verify provider-held Worker secret names before mutation
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import os
+          import re
+          import sys
+
+          token = os.environ.get('CLOUDFLARE_API_TOKEN', '')
+          account_id = os.environ.get('CLOUDFLARE_ACCOUNT_ID', '')
+
+          try:
+              token.encode('ascii')
+          except UnicodeEncodeError:
+              print('::error title=Malformed Cloudflare API token::CLOUDFLARE_API_TOKEN contains non-ASCII characters. Re-copy the exact Cloudflare-issued token.')
+              sys.exit(1)
+
+          if any(ord(char) < 33 or ord(char) > 126 or char.isspace() for char in token):
+              print('::error title=Malformed Cloudflare API token::CLOUDFLARE_API_TOKEN contains whitespace or non-printable characters. Re-copy the exact Cloudflare-issued token.')
+              sys.exit(1)
+
+          if not re.fullmatch(r'[0-9a-f]{32}', account_id):
+              print('::error title=Invalid Cloudflare account authority::CLOUDFLARE_ACCOUNT_ID must be a 32-character lowercase hexadecimal account ID.')
+              sys.exit(1)
+
+          print('Cloudflare production credential is header-safe and account authority is structurally valid. The token value was not printed.')
+          PY
+
+          secret_receipt="$RUNNER_TEMP/fcr-worker-secret-names.json"
+          npx --yes wrangler@4.110.0 secret list \
+            --config wrangler.worker.toml \
+            --format json > "$secret_receipt"
+
+          SECRET_RECEIPT="$secret_receipt" python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import tomllib
+
+          with open('wrangler.worker.toml', 'rb') as handle:
+              config = tomllib.load(handle)
+
+          required = set(config.get('secrets', {}).get('required', []))
+          workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}
+          if not required:
+              print('::error title=Missing Worker secret contract::wrangler.worker.toml must declare [secrets].required before production deployment.')
+              sys.exit(1)
+          if not workflow_written <= required:
+              print('::error title=Worker secret contract drift::The workflow-written Founder Signal grant must remain declared in [secrets].required.')
+              sys.exit(1)
+
+          provider_required = sorted(required - workflow_written)
+          with open(os.environ['SECRET_RECEIPT'], encoding='utf-8') as handle:
+              receipt = json.load(handle)
+
+          if not isinstance(receipt, list):
+              print('::error title=Invalid Cloudflare secret receipt::wrangler secret list did not return the expected name-only list.')
+              sys.exit(1)
+
+          present = {
+              entry.get('name')
+              for entry in receipt
+              if isinstance(entry, dict) and isinstance(entry.get('name'), str)
+          }
+          missing = [name for name in provider_required if name not in present]
+          if missing:
+              for name in missing:
+                  print(f'::error title=Missing provider-held Worker secret::{name} is not installed on founder-control-room.')
+              sys.exit(1)
+
+          print(
+              f'Provider-held Worker secret names verified: {len(provider_required)} names present; '
+              'values were not read.'
+          )
+          PY
 
       - name: Record authority receipt
         shell: bash
@@ -110,7 +191,7 @@ jobs:
             echo "- Approval reference: \`$DEPLOYMENT_APPROVAL_ID\`"
             echo "- Reason: ${DEPLOYMENT_REASON:-not supplied}"
             echo "- Trigger: manual workflow dispatch"
-            echo "- Existing Worker runtime secrets: preserved; required names validated by \`wrangler.worker.toml\`"
+            echo "- Existing Worker runtime secrets: preserved; provider-held required names read back from Cloudflare before any production mutation"
             echo "- Broad Founder Signal automation grant: disabled"
             echo "- Proof-of-ship scheduled publication: enabled with 20-minute founder review"
           } >> "$GITHUB_STEP_SUMMARY"
