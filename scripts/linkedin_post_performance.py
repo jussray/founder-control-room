@@ -8,12 +8,18 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 from datetime import date
 from pathlib import Path
 from typing import Any
 
-import linkedin_analytics_continuity as continuity
+CONTINUITY_MODULE = Path(__file__).with_name("linkedin_analytics_continuity.py")
+continuity_spec = importlib.util.spec_from_file_location("linkedin_analytics_continuity", CONTINUITY_MODULE)
+if continuity_spec is None or continuity_spec.loader is None:
+    raise RuntimeError("unable to load linkedin_analytics_continuity.py")
+continuity = importlib.util.module_from_spec(continuity_spec)
+continuity_spec.loader.exec_module(continuity)
 
 
 def _extract_ranked(
