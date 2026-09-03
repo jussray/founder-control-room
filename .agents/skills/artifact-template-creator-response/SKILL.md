@@ -4,6 +4,8 @@ description: >
   Repo-local response contract for artifact-template creator Create and Update runs.
   Use only after the creator has produced and verified the matching skill.zip archive.
 version: 1.0
+status: active
+scope: founder-control-room
 visibility: private
 owner: Juss
 triggers:
