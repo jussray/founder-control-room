@@ -237,3 +237,7 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 | `FCR_CLOUDFLARE_DNS_INVENTORY_TOKEN` | `cloudflare-build-diagnostic.yml` | Optional read credential for DNS inventory enrichment; does not authorize DNS mutation. |
 | `CLOUDFLARE_ACCESS_API_TOKEN` | `fcr-access-front-door-recovery.yml` | Dedicated read credential for Access inspection. It must not inherit admin mutation authority. |
 | `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN` | `fcr-access-front-door-recovery.yml` | Dedicated Access mutation credential used only when the founder-approved `apply=true` recovery path is invoked. |
+| `LINKEDIN_FOLLOWER_SNAPSHOT_URL` | `linkedin-follower-cohort.yml` | Private source locator for an authorized follower snapshot. Source configuration is required only for snapshot-reconciliation events; absence must fail closed as `BLOCKED_SOURCE`. |
+| `LINKEDIN_FOLLOWER_SNAPSHOT_TOKEN` | `linkedin-follower-cohort.yml` | Optional bearer credential for the private follower snapshot source. Never store follower identity data in the public repository. |
+| `LINKEDIN_ANALYTICS_SNAPSHOT_URL` | `linkedin-post-analytics.yml` | Private source locator for an authorized LinkedIn analytics XLSX snapshot. Source configuration is required only for analytics-reconciliation events; absence must fail closed as `BLOCKED_SOURCE`. |
+| `LINKEDIN_ANALYTICS_SNAPSHOT_TOKEN` | `linkedin-post-analytics.yml` | Optional bearer credential for the private analytics snapshot source. Never persist the raw XLSX into public repository evidence. |
