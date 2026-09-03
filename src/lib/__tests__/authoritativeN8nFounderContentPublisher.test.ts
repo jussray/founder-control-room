@@ -192,6 +192,7 @@ function preparedHarness(
       providerRequest: { scheduleAt },
     } as unknown as N8nFounderContentRequest,
     executionId: '22222222-2222-4222-8222-222222222222',
+    reservationGeneration: '2026-08-30T22:00:00.000Z',
     dispatch,
     abort,
   };

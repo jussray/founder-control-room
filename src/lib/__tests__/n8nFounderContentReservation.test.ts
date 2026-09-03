@@ -22,6 +22,7 @@ const AUTH_HASH = 'a'.repeat(64);
 const PROPOSAL_HASH = 'b'.repeat(64);
 const PAYLOAD_HASH = 'c'.repeat(64);
 const SOURCE_SHA = 'd'.repeat(40);
+const RESERVATION_GENERATION = '2026-08-30T22:00:00.000Z';
 
 function envelope(): FirstPartyFounderScheduleEnvelope {
   return {
@@ -81,17 +82,19 @@ function installDb(options: DbOptions = {}) {
     select: () => ({
       single: async () => {
         events.push('reserve');
-        return { data: { id: EXECUTION_ID }, error: null };
+        return { data: { id: EXECUTION_ID, started_at: RESERVATION_GENERATION }, error: null };
       },
     }),
   }));
   const updateMock = vi.fn((_payload: Record<string, unknown>) => ({
     eq: () => ({
       eq: () => ({
-        select: () => ({
-          maybeSingle: async () => ({
-            data: options.finalizeRow === undefined ? { id: EXECUTION_ID } : options.finalizeRow,
-            error: null,
+        eq: () => ({
+          select: () => ({
+            maybeSingle: async () => ({
+              data: options.finalizeRow === undefined ? { id: EXECUTION_ID } : options.finalizeRow,
+              error: null,
+            }),
           }),
         }),
       }),
@@ -139,7 +142,12 @@ describe('n8n founder-content durable reservation', () => {
 
     const result = await reserveN8nFounderContentExecution(request, 'Founder@Example.com');
 
-    expect(result).toEqual({ ok: true, executionId: EXECUTION_ID, projectId: PROJECT_ID });
+    expect(result).toEqual({
+      ok: true,
+      executionId: EXECUTION_ID,
+      projectId: PROJECT_ID,
+      reservationGeneration: RESERVATION_GENERATION,
+    });
     expect(db.events).toEqual(['reserve']);
     expect(db.insertMock).toHaveBeenCalledWith(expect.objectContaining({
       mission_id: null,
@@ -203,7 +211,7 @@ describe('n8n founder-content durable reservation', () => {
       requiresProviderReadback: true,
     };
 
-    expect(await finalizeN8nFounderContentExecution(EXECUTION_ID, receipt)).toBe(false);
+    expect(await finalizeN8nFounderContentExecution(EXECUTION_ID, RESERVATION_GENERATION, receipt)).toBe(false);
   });
 
   it('finalizes only a matched pending reservation and retains provider read-back as the truth gate', async () => {
@@ -219,7 +227,7 @@ describe('n8n founder-content durable reservation', () => {
       requiresProviderReadback: true,
     };
 
-    expect(await finalizeN8nFounderContentExecution(EXECUTION_ID, receipt)).toBe(true);
+    expect(await finalizeN8nFounderContentExecution(EXECUTION_ID, RESERVATION_GENERATION, receipt)).toBe(true);
     expect(db.updateMock).toHaveBeenCalledWith(expect.objectContaining({
       status: 'succeeded',
       success: true,

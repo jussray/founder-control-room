@@ -65,7 +65,13 @@
     {
       "path": "src/lib/n8nProviderNeutralFounderContentPreparation.ts",
       "claims": [
-        "src/lib/n8nProviderNeutralFounderContentPreparation.ts must complete provider-neutral envelope construction, transport/provider readiness, cadence reservation atomically bounded by the exact approval expiry, source-project resolution, and durable approval_executions reservation before one-shot founder approval is consumed; post-reservation expiry validation remains defense in depth, a claim failure may re-arm only an execution explicitly recorded as retryable_before_provider with provider_write_attempted=false, and preparation itself must never send the provider request."
+        "src/lib/n8nProviderNeutralFounderContentPreparation.ts must complete provider-neutral envelope construction, transport/provider readiness, cadence reservation atomically bounded by the exact approval expiry, source-project resolution, and durable approval_executions reservation before one-shot founder approval is consumed; post-reservation expiry validation remains defense in depth, a claim failure may re-arm only an execution explicitly recorded as retryable_before_provider with provider_write_attempted=false, every prepared worker must carry the authoritative approval_executions.started_at generation returned by reservation or rearm, and abort/finalization must match id plus pending status plus that exact generation before mutation; preparation itself must never send the provider request."
+      ]
+    },
+    {
+      "path": "src/lib/n8nFounderContentOrchestrator.ts",
+      "claims": [
+        "src/lib/n8nFounderContentOrchestrator.ts must return the authoritative approval_executions.started_at value for each n8n reservation and require that exact reservation generation when transitioning a pending execution to succeeded, so an older worker cannot finalize a rearmed generation."
       ]
     },
     {

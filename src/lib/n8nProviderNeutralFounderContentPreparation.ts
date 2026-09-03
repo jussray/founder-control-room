@@ -39,6 +39,7 @@ export interface PreparedProviderNeutralN8nFounderContent {
   prepared: true;
   request: N8nFounderContentRequest;
   executionId: string;
+  reservationGeneration: string;
   dispatch(): Promise<N8nFounderContentDispatchResult>;
   abort(reason?: string): Promise<boolean>;
 }
@@ -164,6 +165,7 @@ async function tryRearmRetryablePreProviderReservation(
     return first;
   }
 
+  const rearmedAt = new Date().toISOString();
   const rearmPayload = {
     executed_by: executedBy,
     status: 'pending',
@@ -174,11 +176,11 @@ async function tryRearmRetryablePreProviderReservation(
       provider_write_attempted: false,
     },
     success: null,
-    started_at: new Date().toISOString(),
+    started_at: rearmedAt,
     executed_at: null,
   };
 
-  let rearmed: { id?: unknown; project_id?: unknown } | null = null;
+  let rearmed: { id?: unknown; project_id?: unknown; started_at?: unknown } | null = null;
   let rearmError: { message: string } | null = null;
   if (abandonedPending) {
     const update = await supabase
@@ -187,7 +189,7 @@ async function tryRearmRetryablePreProviderReservation(
       .eq('id', existing.id)
       .eq('status', 'pending')
       .eq('started_at', text(existing.started_at))
-      .select('id, project_id')
+      .select('id, project_id, started_at')
       .maybeSingle();
     rearmed = update.data;
     rearmError = update.error;
@@ -197,7 +199,7 @@ async function tryRearmRetryablePreProviderReservation(
       .update(rearmPayload)
       .eq('id', existing.id)
       .eq('status', 'failed')
-      .select('id, project_id')
+      .select('id, project_id, started_at')
       .maybeSingle();
     rearmed = update.data;
     rearmError = update.error;
@@ -210,7 +212,7 @@ async function tryRearmRetryablePreProviderReservation(
       reason: `pre-provider reservation recovery failed: ${rearmError.message}`,
     };
   }
-  if (!rearmed?.id) {
+  if (!rearmed?.id || !text(rearmed.started_at)) {
     return reserveN8nFounderContentExecution(request, executedBy);
   }
 
@@ -218,6 +220,7 @@ async function tryRearmRetryablePreProviderReservation(
     ok: true,
     executionId: String(rearmed.id),
     projectId: String(rearmed.project_id ?? existing.project_id),
+    reservationGeneration: text(rearmed.started_at),
   };
 }
 
@@ -237,6 +240,7 @@ async function reservePreparedFounderContentExecution(
 
 async function abortPreparedFounderContentExecution(
   executionId: string,
+  reservationGeneration: string,
   reason: string,
 ): Promise<boolean> {
   const supabase = await founderContentDb();
@@ -255,6 +259,7 @@ async function abortPreparedFounderContentExecution(
     })
     .eq('id', executionId)
     .eq('status', 'pending')
+    .eq('started_at', reservationGeneration)
     .select('id')
     .maybeSingle();
 
@@ -364,8 +369,13 @@ export async function prepareProviderNeutralN8nFounderContent(
     prepared: true,
     request,
     executionId: reservation.executionId,
+    reservationGeneration: reservation.reservationGeneration,
     abort: (reason = 'founder approval claim did not complete after downstream preparation') => (
-      abortPreparedFounderContentExecution(reservation.executionId, reason)
+      abortPreparedFounderContentExecution(
+        reservation.executionId,
+        reservation.reservationGeneration,
+        reason,
+      )
     ),
     async dispatch() {
       try {
@@ -405,7 +415,11 @@ export async function prepareProviderNeutralN8nFounderContent(
 
         try {
           const receipt = verifyProviderNeutralN8nFounderContentReceipt(request, body);
-          const finalized = await finalizeN8nFounderContentExecution(reservation.executionId, receipt);
+          const finalized = await finalizeN8nFounderContentExecution(
+            reservation.executionId,
+            reservation.reservationGeneration,
+            receipt,
+          );
           if (!finalized) {
             return {
               ok: false,

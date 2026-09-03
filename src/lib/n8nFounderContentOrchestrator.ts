@@ -169,7 +169,7 @@ interface FounderContentExecutionRecord {
 }
 
 export type FounderContentReservationResult =
-  | { ok: true; executionId: string; projectId: string }
+  | { ok: true; executionId: string; projectId: string; reservationGeneration: string }
   | {
       ok: false;
       code:
@@ -467,10 +467,10 @@ export async function reserveN8nFounderContentExecution(
       success: null,
       started_at: new Date().toISOString(),
     })
-    .select('id')
+    .select('id, started_at')
     .single();
 
-  if (reservationError || !reservation?.id) {
+  if (reservationError || !reservation?.id || !text(reservation.started_at)) {
     const raced = await findFounderContentExecution(request.orchestrationId);
     if (!raced.error && raced.data) {
       if (!executionScopeMatches(raced.data, expectedScope)) {
@@ -493,11 +493,17 @@ export async function reserveN8nFounderContentExecution(
     };
   }
 
-  return { ok: true, executionId: String(reservation.id), projectId };
+  return {
+    ok: true,
+    executionId: String(reservation.id),
+    projectId,
+    reservationGeneration: text(reservation.started_at),
+  };
 }
 
 export async function finalizeN8nFounderContentExecution(
   executionId: string,
+  reservationGeneration: string,
   receipt: VerifiedN8nFounderContentReceipt,
 ): Promise<boolean> {
   const supabase = await founderContentDb();
@@ -520,6 +526,7 @@ export async function finalizeN8nFounderContentExecution(
     })
     .eq('id', executionId)
     .eq('status', 'pending')
+    .eq('started_at', reservationGeneration)
     .select('id')
     .maybeSingle();
 
@@ -644,7 +651,11 @@ export async function dispatchN8nFounderContent(
 
     try {
       const receipt = verifyN8nFounderContentReceipt(request, body);
-      const finalized = await finalizeN8nFounderContentExecution(reservation.executionId, receipt);
+      const finalized = await finalizeN8nFounderContentExecution(
+        reservation.executionId,
+        reservation.reservationGeneration,
+        receipt,
+      );
       if (!finalized) {
         return {
           ok: false,

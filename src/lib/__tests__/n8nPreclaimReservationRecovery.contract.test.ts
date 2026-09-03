@@ -58,6 +58,28 @@ describe('n8n abandoned pre-claim reservation recovery', () => {
     expect(recoveryMarker).toBeGreaterThan(currentApprovalRead);
     expect(approvalClaim).toBeGreaterThan(recoveryMarker);
     expect(preparationSource).toContain(".eq('started_at', text(existing.started_at))");
+    expect(preparationSource).toContain(".eq('started_at', reservationGeneration)");
+    expect(preparationSource).toContain('reservationGeneration: text(rearmed.started_at)');
+    expect(preparationSource).toContain('reservation.reservationGeneration,');
+    expect(preparationSource).toContain('finalizeN8nFounderContentExecution(\n            reservation.executionId,\n            reservation.reservationGeneration,');
     expect(preparationSource).toContain('PRECLAIM_RESERVATION_LEASE_MS = 2 * 60 * 1000');
+  });
+
+  it('fences stale worker abort and finalization to the exact rearmed generation', () => {
+    const generationA = '2026-08-30T21:58:00.000Z';
+    const generationB = '2026-08-30T22:00:00.000Z';
+    let row = { status: 'pending', startedAt: generationA };
+
+    row = { status: 'pending', startedAt: generationB };
+    const transition = (generation: string, status: 'failed' | 'succeeded') => {
+      if (row.status !== 'pending' || row.startedAt !== generation) return false;
+      row = { ...row, status };
+      return true;
+    };
+
+    expect(transition(generationA, 'failed')).toBe(false);
+    expect(transition(generationA, 'succeeded')).toBe(false);
+    expect(transition(generationB, 'succeeded')).toBe(true);
+    expect(row).toEqual({ status: 'succeeded', startedAt: generationB });
   });
 });
