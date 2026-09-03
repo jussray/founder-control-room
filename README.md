@@ -193,6 +193,14 @@ api.foundercontrolroom.org
   -> canonical Worker: founder-control-room
 ```
 
+### Se’kret Bip runtime bridge
+
+FCR has no ChatGPT Sites project identity. The bounded Se’kret Bip connection therefore uses the existing Cloudflare runtime instead of inventing or substituting a Sites slug.
+
+Cloudflare Pages publishes `/.well-known/sekret-bip-control-room.json` as a static, privacy-safe registration contract. It names the public FCR control room and API origins, the Se’kret Bip Site and its reciprocal manifest route, and the asymmetric authority boundary: FCR may approve/execute while the Bip surface may observe/request only. The manifest contains no journal, mood, conversation, youth, credential, or private evidence data.
+
+`CONFIGURED` is source/build truth only. The Bip Site may render the bridge `VERIFIED` only after a fresh browser readback of the live Pages manifest matches the expected routes, authority, and privacy contract. A PR, merge, successful Pages build, or previously observed response does not prove current deployment or runtime availability.
+
 The retired `founder-control-room2` identity must not be recreated.
 
 The canonical Worker also owns FCR's outbound Cloudflare Email Service capability through the project-scoped `FCR_EMAIL` binding. Its sender identity is pinned in source/config to `welcome@api.foundercontrolroom.org`; callers cannot supply another project's `from` address, and other portfolio projects do not inherit this capability by default. Checked repository configuration is not proof that Cloudflare has onboarded the sender domain, that the deployed Worker exposes the binding, or that a message was delivered.
