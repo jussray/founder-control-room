@@ -165,10 +165,10 @@ function preparedClaimBoundaryFailure(
  *
  * Transport readiness, cadence, exact approval-expiry bounds, source-project
  * resolution, and the durable execution reservation all complete before FCR
- * consumes one-shot founder authority. Only after those non-provider gates are
- * proven does FCR atomically claim the approval and permit the prepared request
- * to reach n8n. A failed approval claim aborts the prepared execution as a
- * retryable pre-provider failure; no provider write is attempted.
+ * consumes one-shot founder authority. Immediately before the approval claim,
+ * FCR atomically rotates the exact active reservation generation so a stale or
+ * rearmed worker cannot consume authority. Only the worker holding that fresh
+ * generation may claim approval and proceed toward the provider-write latch.
  */
 export async function dispatchAuthoritativeN8nFounderContent(
   input: AuthoritativeN8nFounderContentInput,
@@ -335,6 +335,25 @@ export async function dispatchAuthoritativeN8nFounderContent(
       claimBoundaryFailure,
       'FCR did not consume the one-shot approval',
       ...(abortWarning ? [abortWarning] : []),
+    ]);
+  }
+
+  let activeClaimBoundary = false;
+  try {
+    activeClaimBoundary = await prepared.acquireApprovalClaimBoundary();
+  } catch (error) {
+    return blocked([
+      'prepared execution reservation generation could not be acquired before approval claim',
+      error instanceof Error ? error.message : 'reservation claim-boundary acquisition failed',
+      'FCR did not consume the one-shot approval',
+      'no provider request was attempted',
+    ]);
+  }
+  if (!activeClaimBoundary) {
+    return blocked([
+      'prepared execution reservation generation is no longer active at the approval claim boundary',
+      'FCR did not consume the one-shot approval',
+      'no provider request was attempted',
     ]);
   }
 
