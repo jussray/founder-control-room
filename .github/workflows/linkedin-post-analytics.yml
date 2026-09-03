@@ -7,12 +7,16 @@ on:
     paths:
       - scripts/linkedin_analytics_continuity.py
       - scripts/test_linkedin_analytics_continuity.py
+      - scripts/linkedin_post_performance.py
+      - scripts/test_linkedin_post_performance.py
       - docs/founder-signal-engine/linkedin-analytics-continuity.md
       - .github/workflows/linkedin-post-analytics.yml
   pull_request:
     paths:
       - scripts/linkedin_analytics_continuity.py
       - scripts/test_linkedin_analytics_continuity.py
+      - scripts/linkedin_post_performance.py
+      - scripts/test_linkedin_post_performance.py
       - docs/founder-signal-engine/linkedin-analytics-continuity.md
       - .github/workflows/linkedin-post-analytics.yml
   repository_dispatch:
@@ -25,13 +29,15 @@ permissions:
 
 jobs:
   contract-test:
-    name: post analytics continuity contract
+    name: post analytics contracts
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Verify deterministic post continuity engine
-        run: python3 -m unittest scripts/test_linkedin_analytics_continuity.py
+      - name: Verify deterministic continuity and performance engines
+        run: |
+          python3 -m unittest scripts/test_linkedin_analytics_continuity.py
+          python3 -m unittest scripts/test_linkedin_post_performance.py
 
   reconcile-private-analytics:
     name: reconcile authorized private LinkedIn analytics
@@ -43,6 +49,7 @@ jobs:
       ANALYTICS_TOKEN: ${{ secrets.LINKEDIN_ANALYTICS_SNAPSHOT_TOKEN }}
       WINDOW_START: ${{ github.event.client_payload.start }}
       WINDOW_END: ${{ github.event.client_payload.end }}
+      WINDOW_ROLE: ${{ github.event.client_payload.window_role }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout
@@ -64,6 +71,11 @@ jobs:
             echo "BLOCKED_SOURCE: dispatch payload must provide end=YYYY-MM-DD." >&2
             exit 1
           fi
+          if [[ "${WINDOW_ROLE:-}" != "historical_365" && "${WINDOW_ROLE:-}" != "recent_90" ]]; then
+            echo "BLOCKED_SOURCE: window_role must be historical_365 or recent_90." >&2
+            exit 1
+          fi
+          echo "ARTIFACT_NAME=linkedin-post-analytics-${WINDOW_ROLE}" >> "${GITHUB_ENV}"
           echo "::add-mask::${ANALYTICS_URL}"
           if [[ -n "${ANALYTICS_TOKEN:-}" ]]; then
             echo "::add-mask::${ANALYTICS_TOKEN}"
@@ -84,13 +96,13 @@ jobs:
               --output linkedin-analytics.xlsx
           fi
 
-      - name: Recover latest redacted post receipt
+      - name: Recover latest same-window redacted receipt
         id: previous
         shell: bash
         run: |
           set -euo pipefail
           artifact_id="$({
-            gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=linkedin-post-analytics-latest&per_page=100" \
+            gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${ARTIFACT_NAME}&per_page=100" \
               --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty'
           } || true)"
 
@@ -109,7 +121,7 @@ jobs:
             echo "found=false" >> "${GITHUB_OUTPUT}"
           fi
 
-      - name: Normalize and reconcile posts
+      - name: Normalize and reconcile post continuity
         shell: bash
         run: |
           set -euo pipefail
@@ -128,7 +140,18 @@ jobs:
               --output linkedin-post-analytics-private.json
           fi
 
-      - name: Redact provider locators and bind source digest
+      - name: Derive ranked post performance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/linkedin_post_performance.py \
+            linkedin-analytics.xlsx \
+            --start "${WINDOW_START}" \
+            --end "${WINDOW_END}" \
+            --window-role "${WINDOW_ROLE}" \
+            --output linkedin-post-performance-private.json
+
+      - name: Bind source digest and redact provider locators
         shell: bash
         run: |
           set -euo pipefail
@@ -138,19 +161,35 @@ jobs:
           from pathlib import Path
 
           source = Path('linkedin-analytics.xlsx').read_bytes()
-          report = json.loads(Path('linkedin-post-analytics-private.json').read_text())
-          report['source']['sha256'] = hashlib.sha256(source).hexdigest()
-          report['privacy'] = {
-              'raw_xlsx_persisted': False,
-              'post_urls_persisted': False,
-              'linkedin_post_ids_persisted': False,
-              'public_receipt_contains_only_observation_evidence': True,
-          }
-          for post in report.get('posts', []):
+          continuity = json.loads(Path('linkedin-post-analytics-private.json').read_text())
+          performance = json.loads(Path('linkedin-post-performance-private.json').read_text())
+          source_sha = hashlib.sha256(source).hexdigest()
+
+          continuity['source']['sha256'] = source_sha
+          for post in continuity.get('posts', []):
               post.pop('post_url', None)
               post.pop('linkedin_post_id', None)
+
+          receipt = {
+              'contract': 'linkedin-post-evidence@v1',
+              'authority': 'observation_only',
+              'source': {
+                  'sha256': source_sha,
+                  'window_role': performance['window']['role'],
+                  'window_start': performance['window']['start'],
+                  'window_end': performance['window']['end'],
+              },
+              'privacy': {
+                  'raw_xlsx_persisted': False,
+                  'post_urls_persisted': False,
+                  'linkedin_post_ids_persisted': False,
+                  'public_receipt_contains_only_observation_evidence': True,
+              },
+              'continuity': continuity,
+              'performance': performance,
+          }
           Path('linkedin-post-analytics-receipt.json').write_text(
-              json.dumps(report, indent=2, sort_keys=True) + '\n'
+              json.dumps(receipt, indent=2, sort_keys=True) + '\n'
           )
           PY
 
@@ -166,22 +205,25 @@ jobs:
           privacy = receipt.get('privacy', {})
           if privacy.get('raw_xlsx_persisted') is not False:
               raise SystemExit('raw XLSX privacy invariant failed')
-          for post in receipt.get('posts', []):
-              if 'post_url' in post or 'linkedin_post_id' in post:
-                  raise SystemExit('provider locator leaked into redacted post receipt')
+          encoded = json.dumps(receipt)
+          if 'linkedin.com/posts/' in encoded:
+              raise SystemExit('provider post URL leaked into redacted receipt')
+          if receipt.get('source', {}).get('window_role') not in {'historical_365', 'recent_90'}:
+              raise SystemExit('window role invariant failed')
           source_sha = receipt.get('source', {}).get('sha256', '')
           if len(source_sha) != 64:
               raise SystemExit('source digest missing from redacted post receipt')
           print(json.dumps({
-              'summary': receipt.get('summary', {}),
-              'reconciliation': {k: len(v) for k, v in receipt.get('reconciliation', {}).items()},
+              'window_role': receipt['source']['window_role'],
+              'continuity_summary': receipt['continuity'].get('summary', {}),
+              'performance_summary': receipt['performance'].get('summary', {}),
           }, sort_keys=True))
           PY
 
-      - name: Upload redacted post analytics receipt
+      - name: Upload redacted post evidence receipt
         uses: actions/upload-artifact@v4
         with:
-          name: linkedin-post-analytics-latest
+          name: ${{ env.ARTIFACT_NAME }}
           path: linkedin-post-analytics-receipt.json
           if-no-files-found: error
           retention-days: 90
