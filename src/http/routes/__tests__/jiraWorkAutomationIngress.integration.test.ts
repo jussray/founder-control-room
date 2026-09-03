@@ -165,6 +165,22 @@ describe('Jira work automation service ingress', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['mode', '/redteam'],
+    ['modeId', 'ooda'],
+    ['workflowId', 'internal-release-v1'],
+    ['workflowName', 'proofmode'],
+  ])('rejects caller-selected internal control field %s before dispatch', async (field, value) => {
+    const fetchImpl = vi.fn();
+    vi.stubGlobal('fetch', fetchImpl);
+    const response = await authorizedPost(JSON.stringify(observation({ [field]: value })));
+
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe('INVALID_JIRA_AUTOMATION_OBSERVATION');
+    expect(response.body.reasons).toContain(`unexpected fields are forbidden: ${field}`);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it('remains fail-closed when the FCR Jira bridge is disabled', async () => {
     process.env.N8N_JIRA_AUTOMATION_ENABLED = 'false';
     const fetchImpl = vi.fn();
