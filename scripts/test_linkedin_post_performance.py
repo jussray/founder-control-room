@@ -29,7 +29,7 @@ def sheet_xml(rows):
     return f'<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="{MAIN_NS}"><sheetData>{"".join(rows)}</sheetData></worksheet>'
 
 
-def write_fixture(path: Path):
+def write_fixture(path: Path, *, include_out_of_window_leaders=False):
     workbook = f'''<?xml version="1.0" encoding="UTF-8"?>
 <workbook xmlns="{MAIN_NS}" xmlns:r="{REL_NS}"><sheets>
 <sheet name="ENGAGEMENT" sheetId="1" r:id="rId1"/><sheet name="TOP POSTS" sheetId="2" r:id="rId2"/>
@@ -43,14 +43,31 @@ def write_fixture(path: Path):
         row(1, [cell('A1','Date'), cell('B1','Impressions'), cell('C1','Engagements')]),
         row(2, [cell('A2','8/2/2026'), cell('B2','100'), cell('C2','4')]),
     ])
-    top = sheet_xml([
+    top_rows = [
         row(1, [cell('A1','Maximum of 50 posts available to include in this list')]),
         row(2, []),
         row(3, [cell('A3','Post URL'), cell('B3','Post Publish Date'), cell('C3','Engagements'), cell('E3','Post URL'), cell('F3','Post Publish Date'), cell('G3','Impressions')]),
-        row(4, [cell('A4','https://www.linkedin.com/posts/juss_share-111-A?trk=x'), cell('B4','8/2/2026'), cell('C4','10'), cell('E4','https://www.linkedin.com/posts/juss_share-222-B'), cell('F4','8/2/2026'), cell('G4','900')]),
-        row(5, [cell('A5','https://www.linkedin.com/posts/juss_share-222-B'), cell('B5','8/2/2026'), cell('C5','5'), cell('E5','https://www.linkedin.com/posts/juss_share-111-A?utm_source=y'), cell('F5','8/2/2026'), cell('G5','100')]),
-        row(6, [cell('A6','https://www.linkedin.com/posts/juss_share-333-C'), cell('B6','8/2/2026'), cell('C6','4')]),
+    ]
+    if include_out_of_window_leaders:
+        for index in range(1, 12):
+            excel_row = 3 + index
+            top_rows.append(row(excel_row, [
+                cell(f'A{excel_row}', f'https://www.linkedin.com/posts/juss_share-old-{index}'),
+                cell(f'B{excel_row}', '7/1/2026'),
+                cell(f'C{excel_row}', str(100-index)),
+                cell(f'E{excel_row}', f'https://www.linkedin.com/posts/juss_share-old-impr-{index}'),
+                cell(f'F{excel_row}', '7/1/2026'),
+                cell(f'G{excel_row}', str(1000-index)),
+            ]))
+        start_row = 15
+    else:
+        start_row = 4
+    top_rows.extend([
+        row(start_row, [cell(f'A{start_row}','https://www.linkedin.com/posts/juss_share-111-A?trk=x'), cell(f'B{start_row}','8/2/2026'), cell(f'C{start_row}','10'), cell(f'E{start_row}','https://www.linkedin.com/posts/juss_share-222-B'), cell(f'F{start_row}','8/2/2026'), cell(f'G{start_row}','900')]),
+        row(start_row+1, [cell(f'A{start_row+1}','https://www.linkedin.com/posts/juss_share-222-B'), cell(f'B{start_row+1}','8/2/2026'), cell(f'C{start_row+1}','5'), cell(f'E{start_row+1}','https://www.linkedin.com/posts/juss_share-111-A?utm_source=y'), cell(f'F{start_row+1}','8/2/2026'), cell(f'G{start_row+1}','100')]),
+        row(start_row+2, [cell(f'A{start_row+2}','https://www.linkedin.com/posts/juss_share-333-C'), cell(f'B{start_row+2}','8/2/2026'), cell(f'C{start_row+2}','4')]),
     ])
+    top = sheet_xml(top_rows)
     with ZipFile(path, 'w') as zf:
         zf.writestr('xl/workbook.xml', workbook)
         zf.writestr('xl/_rels/workbook.xml.rels', rels)
@@ -104,6 +121,25 @@ class LinkedInPostPerformanceTest(unittest.TestCase):
         signals = {p['performance_signal'] for p in report['posts']}
         self.assertIn('BALANCED_TOP_10_VISIBLE', signals)
         self.assertIn('ENGAGEMENT_RANKED_ONLY', signals)
+
+    def test_date_filter_preserves_original_provider_rank(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / 'analytics.xlsx'
+            write_fixture(path, include_out_of_window_leaders=True)
+            report = mod.analyze_performance(
+                path,
+                date(2026,8,2),
+                date(2026,8,2),
+                window_role='recent_90',
+            )
+        ranked = {p['publish_date']: p for p in report['posts'] if p.get('engagements') == 10}
+        target = ranked['2026-08-02']
+        self.assertEqual(target['engagements_rank'], 12)
+        self.assertNotIn(target['performance_signal'], {'BALANCED_TOP_10_VISIBLE', 'RESONANCE_LED_VISIBLE'})
+        self.assertEqual(
+            report['provider_rank_visibility']['rank_policy'],
+            'PRESERVE_EXPORTED_PROVIDER_POSITION_BEFORE_WINDOW_FILTER',
+        )
 
 
 if __name__ == '__main__':
