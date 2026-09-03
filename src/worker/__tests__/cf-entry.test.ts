@@ -17,6 +17,7 @@ const VALID_ENV: ControlRoomWorkerEnv = {
   SUPABASE_PROJECT_REF: PROJECT_REF,
   SUPABASE_SERVICE_ROLE_KEY: 'service-role-test-key',
   SUPABASE_PUBLISHABLE_KEY: 'publishable-test-key',
+  FOUNDER_SESSION_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
   GITHUB_WEBHOOK_SECRET: 'webhook-test-secret',
   GITHUB_APP_ID: '123456',
   GITHUB_PRIVATE_KEY: 'private-key-test-value',
@@ -50,6 +51,18 @@ describe('Cloudflare Worker binding validation', () => {
   it('reports every missing required service binding in one failure', () => {
     expect(() => validateWorkerEnv({ SUPABASE_URL: `https://${PROJECT_REF}.supabase.co` }))
       .toThrow('Missing required Worker bindings: SUPABASE_PROJECT_REF');
+  });
+
+  it('rejects a missing or malformed provider-held founder session key', () => {
+    expect(() => validateWorkerEnv({
+      ...VALID_ENV,
+      FOUNDER_SESSION_ENCRYPTION_KEY: undefined,
+    })).toThrow('Missing required Worker bindings: FOUNDER_SESSION_ENCRYPTION_KEY');
+
+    expect(() => validateWorkerEnv({
+      ...VALID_ENV,
+      FOUNDER_SESSION_ENCRYPTION_KEY: 'not-base64url',
+    })).toThrow('FOUNDER_SESSION_ENCRYPTION_KEY must be 43-character unpadded base64url');
   });
 
   it('rejects a missing outbound FCR email binding', () => {

@@ -67,10 +67,14 @@ FCR_V10_RECEIPT_PERSISTENCE_REQUIRED = "true"
 MCP_EXA_URL = "https://mcp.exa.ai/mcp"
 MCP_RESEND_URL = "https://mcp.resend.com/mcp"
 
+# Runtime secrets are provider-held in Cloudflare. Canonical GitHub production
+# deployment preserves them rather than copying their values through Actions.
+# Wrangler validates these required names before a Worker deployment succeeds.
 [secrets]
 required = [
   "SUPABASE_SERVICE_ROLE_KEY",
   "SUPABASE_PUBLISHABLE_KEY",
+  "FOUNDER_SESSION_ENCRYPTION_KEY",
   "GITHUB_WEBHOOK_SECRET",
   "GITHUB_APP_ID",
   "GITHUB_PRIVATE_KEY",

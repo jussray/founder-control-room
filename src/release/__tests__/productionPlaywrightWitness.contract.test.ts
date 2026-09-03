@@ -31,15 +31,30 @@ describe('production Playwright exact-SHA witness contract', () => {
     expect(playwrightWorkflow).toContain("if: github.event_name != 'workflow_run'");
   });
 
-  it('proves runtime identity before accepting the browser journey', () => {
-    const directIdentity = witness.indexOf('expect(directVersion.gitSha).toBe(expectedReleaseSha)');
-    const publicIdentity = witness.indexOf('expect(publicVersion.gitSha).toBe(expectedReleaseSha)');
-    const browserJourney = witness.indexOf("page.goto(`${publicUrl}/`,");
+  it('uses the canonical public API origin instead of a duplicate secret', () => {
+    expect(playwrightWorkflow).toContain('DEPLOY_URL: https://api.foundercontrolroom.org');
+    expect(playwrightWorkflow).not.toContain('DEPLOY_URL: ${{ secrets.DEPLOY_URL }}');
+  });
 
-    expect(directIdentity).toBeGreaterThan(-1);
-    expect(publicIdentity).toBeGreaterThan(directIdentity);
-    expect(browserJourney).toBeGreaterThan(publicIdentity);
-    expect(witness).toContain('production-release-witness.json');
+  it('proves one exact release before and after the browser journey', () => {
+    const beforeDirect = witness.indexOf("readDirectIdentity('before-browser')");
+    const beforePublic = witness.indexOf("readPublicIdentity('before-browser')");
+    const browserJourney = witness.indexOf("page.goto(`${publicUrl}/`,");
+    const afterDirect = witness.indexOf("readDirectIdentity('after-browser')");
+    const afterPublic = witness.indexOf("readPublicIdentity('after-browser')");
+    const receipt = witness.indexOf("testInfo.attach('production-release-witness.json'");
+
+    expect(beforeDirect).toBeGreaterThan(-1);
+    expect(beforePublic).toBeGreaterThan(beforeDirect);
+    expect(browserJourney).toBeGreaterThan(beforePublic);
+    expect(afterDirect).toBeGreaterThan(browserJourney);
+    expect(afterPublic).toBeGreaterThan(afterDirect);
+    expect(receipt).toBeGreaterThan(afterPublic);
+    expect(witness).toContain('expect(body.gitSha).toBe(expectedReleaseSha)');
+    expect(witness).toContain('directWorkerGitShaBefore');
+    expect(witness).toContain('publicProxyGitShaBefore');
+    expect(witness).toContain('directWorkerGitShaAfter');
+    expect(witness).toContain('publicProxyGitShaAfter');
     expect(witness).toContain('production-release-witness.png');
   });
 });
