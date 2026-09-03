@@ -36,7 +36,7 @@ A statement can be accurate when recorded and wrong when reused later. The Contr
 1. **Observed** — what repository, provider, runtime, or human-outcome evidence says now. Provider/runtime facts require fresh at-use evidence under the Truth Lease contract.
 2. **Safety invariant** — what must remain true regardless of current preference. For the FCR Worker, native Worker Git may not promote production outside the governed deploy authority.
 3. **Allowed safe states** — states that satisfy the invariant. `disconnected` and `non-promoting` are both safe with respect to duplicate production promotion.
-4. **Current desired state** — the founder's current product/architecture preference. The current Worker Git preference is connected but non-promoting, with `npx wrangler versions upload` as the deploy command.
+4. **Current desired state** — the founder's current product/architecture preference. The current Worker Git preference is connected but non-promoting, with `npx wrangler versions upload --config wrangler.worker.toml` as the deploy command.
 5. **Historical decision** — what was once recommended or preferred. A historical disconnect recommendation remains useful provenance and may still describe a safe fallback, but it is not current intent and cannot authorize a provider change.
 
 This separation fixes the failure mode where “disconnect Worker Git Builds” was once a defensible safe recommendation and later got repeated as though it were the current architecture plan. The problem was not that the old statement had never been true. The problem was that **allowed safe state**, **current preference**, and **execution authority** had been collapsed.
@@ -145,7 +145,7 @@ It writes one sanitized `cloudflare_reasoning_completed` event. If that audit wr
 
 When native Git deployment succeeds while an old token-upload workflow reports Cloudflare code `9109`, the reasoner should not immediately demand another token. It should first detect two deployment authorities and propose reducing the system to one production authority through a separately approved repository or provider change.
 
-For Founder Control Room specifically, a native Worker Git trigger may remain connected when it is non-promoting. A provider read-back showing `wrangler versions upload` satisfies the current desired topology; a disconnected trigger satisfies the safety invariant but is reported as `safe-but-not-current`; a production-capable `wrangler deploy` trigger is an authority conflict.
+For Founder Control Room specifically, a native Worker Git trigger may remain connected when it is non-promoting. A provider read-back showing `wrangler versions upload --config wrangler.worker.toml` satisfies the current desired topology; a disconnected trigger satisfies the safety invariant but is reported as `safe-but-not-current`; a production-capable `wrangler deploy` trigger is an authority conflict.
 
 The complete reasoning path becomes:
 
@@ -197,15 +197,17 @@ Repository configuration can prove the desired binding name and sender restricti
 
 `wrangler.worker.toml` runs `scripts/verify-worker-build-authority.mjs` as its custom Worker build hook. The hook is a repository-side fail-closed membrane, not a provider mutation authority.
 
-For native Cloudflare Workers Builds, the membrane requires the provider-reported commit SHA to equal the checked-out Git source, requires branch/build UUID evidence, and permits only the non-promoting `wrangler versions upload` command. A native `wrangler deploy` is rejected before promotion with `NATIVE_WORKER_GIT_PROMOTION_BLOCKED`.
+For native Cloudflare Workers Builds, the membrane requires the provider-reported commit SHA to equal the checked-out Git source, requires branch/build UUID evidence, and permits only the non-promoting `wrangler versions upload --config wrangler.worker.toml` command. A native `wrangler deploy` is rejected before promotion with `NATIVE_WORKER_GIT_PROMOTION_BLOCKED`.
 
 For GitHub Actions, production promotion is recognized only for the manual `Deploy` or `FCR Worker Reconcile` workflow-dispatch lanes when the checked-out SHA equals the exact GitHub workflow SHA. Ordinary CI remains verification-only. The emitted `fcr/worker-build-authority-receipt@v1` is redacted build evidence and explicitly cannot authorize provider mutation.
 
-The GitHub Actions credential source is deliberately split from the Worker/provider runtime contract: trusted production workflows read `APP_ID` and `APP_PRIVATE_KEY` from the GitHub `production` environment and map them to `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` only inside the bounded runtime/validation surfaces. A source-level mapping, secret-name display, fingerprint, or continuity cookie does not prove the values are present or valid, that they belong to the intended App, that GitHub accepted an installation token, or that any deployment/runtime action occurred. The GitHub App Client ID is not consumed by this installation-token path.
+Canonical Deploy now separates **deployment-plane credentials** from **Worker runtime secrets**. The GitHub `production` authority gate needs only `SUPABASE_DB_URL`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID` to prove the release can perform its database and Cloudflare operations. Runtime secret values remain provider-held in the canonical Cloudflare Worker and are not copied through the Deploy workflow. `wrangler.worker.toml [secrets].required` names the required runtime bindings, including `FOUNDER_SESSION_ENCRYPTION_KEY`, so Wrangler is the fail-closed binding-name membrane at deployment time.
 
-The guarded production deploy also requires `FOUNDER_SESSION_ENCRYPTION_KEY` to be a 43-character unpadded base64url value that decodes to exactly 32 bytes before the release can proceed. `.github/workflows/deploy.yml` must inject that key only into the canonical Worker secret set; Pages and unrelated jobs must not receive it. This source preflight proves the fail-closed contract only, not that the GitHub `production` environment currently contains a valid key or that Cloudflare accepted a deployment.
+The only runtime secret canonical Deploy actively writes is the checked-in fail-closed `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` with `enabled:false`. This preserves the automation kill switch while leaving unrelated runtime secret values untouched. Other trusted workflows that actually need GitHub App execution credentials may still use their separately scoped `APP_ID` / `APP_PRIVATE_KEY` Actions inputs, but canonical Deploy does not re-upload the Worker's `GITHUB_APP_ID` / `GITHUB_PRIVATE_KEY` pair.
 
-This source membrane does not prove the current Cloudflare Workers Builds dashboard configuration, custom-domain routing, active deployment, or runtime SHA. Those remain separate provider/runtime readback gates.
+`https://api.foundercontrolroom.org` is public release configuration, not secret material. The canonical smoke checks, proof-of-ship runtime readback, and post-Deploy Playwright witness use that explicit API origin. The Playwright witness derives `EXPECTED_RELEASE_SHA` from the successful Deploy run, proves direct Worker and public Pages/proxy identity before the browser journey, reruns both identity reads afterward, and fails if any observation differs from that same SHA.
+
+This source membrane does not prove the current Cloudflare required-secret set, values, Workers Builds dashboard configuration, custom-domain routing, active deployment, or runtime SHA. Those remain separate provider/runtime readback gates.
 
 ## Durable release-proof Workflow boundary
 

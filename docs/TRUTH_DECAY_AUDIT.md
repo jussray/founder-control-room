@@ -20,6 +20,14 @@ The Documentation Truth gate had a parallel weakness: it treated a touched docum
 
 Goalfix governance exposed another false-green class: canonical execution/adaptive documents and their portable Claude/Perplexity entry points could change while the verifier reported zero truth-sensitive files. Those paths are now registered as `truth-governance`. The gate must therefore require a current README/truth-decay refresh and path-bound receipt whenever the canonical Goalfix workflow, adaptive kernel, portable Goalfix skills, or Claude/Perplexity master execution overlays move. Registration is documentation consistency evidence only; it does not prove `/goalfix/inspect` runtime adoption, independent review, Founder Final, merge authority, provider configuration, deployment, or publication.
 
+## 2026-09 control correction: deployment-plane secrets versus runtime-secret authority
+
+Canonical Deploy #218 exposed a second truth-decay pattern: documentation still described Worker runtime secret values as GitHub production configuration even though those values belong to the Cloudflare Worker secret plane. The exact-head authority check was correct, but an old secret-copy model made the deployment gate fail before any migration or provider mutation. Treating that failure as evidence that the runtime secret was absent in Cloudflare would have crossed an authority boundary without provider readback.
+
+The corrected contract keeps one authority per secret plane. GitHub production validates only the deployment credentials that canonical Deploy itself needs: `SUPABASE_DB_URL`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID`. Worker runtime secret values remain provider-held in Cloudflare and are named by `wrangler.worker.toml [secrets].required`, including `FOUNDER_SESSION_ENCRYPTION_KEY`. Canonical Deploy preserves those values and actively writes only the fail-closed `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON` with `enabled:false`.
+
+`https://api.foundercontrolroom.org` is public release configuration, not a secret. The post-Deploy Playwright witness derives its expected identity from the successful Deploy run and must prove both the direct Worker and public Pages/proxy `/version` identities equal that exact SHA before and after the browser journey. A source declaration, required-name membrane, or green PR still does not prove that provider-held secrets are currently installed or that production serves the candidate. Those remain provider/runtime observations at the use boundary.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -322,6 +330,8 @@ The strongest optimization is not faster claiming. It is shortening the distance
 25. A stored `validity: current` flag does not outrank an elapsed `expiresAt`; evidence authority must re-evaluate expiration when the receipt is used.
 26. Readback completion is not the same as a verified verdict, and an unscoped or wrong-authority receipt cannot prepare merge review.
 27. A governance document that changes future agent execution order is truth-sensitive even when no runtime source changes; failing to register it with Documentation Truth is a false green, not a harmless docs-only omission.
+28. A missing GitHub copy of a provider-held Worker runtime secret does not prove the Cloudflare runtime secret is absent; read the provider-held binding plane before making that claim.
+29. A public deployment origin must not be mislabeled as a secret merely because a workflow consumes it; authority classification must follow the sensitivity and mutation boundary of the value.
 
 ## Rollback
 
