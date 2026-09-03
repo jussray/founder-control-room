@@ -61,7 +61,7 @@ describe('Cloudflare Worker Git authority contract', () => {
     ]);
     expect(authorityPolicy.currentDesiredState).toBe('non-promoting');
     expect(authorityPolicy.currentDesiredDeployCommand).toBe(
-      'npx wrangler versions upload',
+      'npx wrangler versions upload --config wrangler.worker.toml',
     );
     expect(authorityPolicy.canonicalProductionAuthority).toBe(
       'github-manual-deploy-workflow',
