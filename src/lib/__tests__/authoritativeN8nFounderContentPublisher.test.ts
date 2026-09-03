@@ -184,6 +184,7 @@ function preparedHarness(
   result: N8nFounderContentDispatchResult = dispatched(),
   scheduleAt = '2026-08-18T01:50:00.000Z',
 ) {
+  const acquireApprovalClaimBoundary = vi.fn(async () => true);
   const dispatch = vi.fn(async () => result);
   const abort = vi.fn(async () => true);
   const prepared: PreparedProviderNeutralN8nFounderContent = {
@@ -192,11 +193,12 @@ function preparedHarness(
       providerRequest: { scheduleAt },
     } as unknown as N8nFounderContentRequest,
     executionId: '22222222-2222-4222-8222-222222222222',
+    acquireApprovalClaimBoundary,
     dispatch,
     abort,
   };
   const prepare = vi.fn(async (): Promise<PrepareProviderNeutralN8nFounderContentResult> => prepared);
-  return { prepare, dispatch, abort };
+  return { prepare, acquireApprovalClaimBoundary, dispatch, abort };
 }
 
 function preparationFailure(
@@ -216,7 +218,7 @@ function preparationFailure(
 }
 
 describe('authoritative n8n founder-content publisher', () => {
-  it('reserves downstream state before atomically claiming approval, then dispatches only after the claim succeeds', async () => {
+  it('reserves and fences downstream state before atomically claiming approval, then dispatches only after the claim succeeds', async () => {
     const store = repository(currentApproval());
     const prepared = preparedHarness();
 
@@ -255,6 +257,9 @@ describe('authoritative n8n founder-content publisher', () => {
       now: NOW,
     }));
     expect(prepared.prepare.mock.invocationCallOrder[0]).toBeLessThan(
+      prepared.acquireApprovalClaimBoundary.mock.invocationCallOrder[0],
+    );
+    expect(prepared.acquireApprovalClaimBoundary.mock.invocationCallOrder[0]).toBeLessThan(
       (store.claim as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0],
     );
     expect((store.claim as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]).toBeLessThan(
@@ -262,6 +267,30 @@ describe('authoritative n8n founder-content publisher', () => {
     );
     expect(prepared.abort).not.toHaveBeenCalled();
     expect(prepared.dispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed before consuming approval when the prepared reservation generation is stale or rearmed', async () => {
+    const store = repository(currentApproval());
+    const prepared = preparedHarness();
+    prepared.acquireApprovalClaimBoundary.mockResolvedValue(false);
+
+    const result = await dispatchAuthoritativeN8nFounderContent(request(), {
+      founderUserId: 'founder-user-1',
+      founderIdentity: 'founder@example.com',
+      now: NOW,
+      env: READY_ENV,
+      approvalRepository: store,
+      prepare: prepared.prepare,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe('INVALID_AUTHORIZATION');
+    expect(result.reasons.join(' ')).toContain('generation is no longer active');
+    expect(result.reasons.join(' ')).toContain('did not consume the one-shot approval');
+    expect(result.reasons.join(' ')).toContain('no provider request was attempted');
+    expect(prepared.acquireApprovalClaimBoundary).toHaveBeenCalledTimes(1);
+    expect(store.claim).not.toHaveBeenCalled();
+    expect(prepared.dispatch).not.toHaveBeenCalled();
   });
 
   it('fails an invalid server-owned envelope without consuming one-shot approval', async () => {
@@ -323,6 +352,7 @@ describe('authoritative n8n founder-content publisher', () => {
     expect(result.reasons.join(' ')).toContain('did not consume the one-shot approval');
     expect(store.claim).not.toHaveBeenCalled();
     expect(prepared.abort).toHaveBeenCalledTimes(1);
+    expect(prepared.acquireApprovalClaimBoundary).not.toHaveBeenCalled();
     expect(prepared.dispatch).not.toHaveBeenCalled();
   });
 
@@ -345,6 +375,7 @@ describe('authoritative n8n founder-content publisher', () => {
     expect(result.reasons.join(' ')).toContain('schedule is no longer in the future');
     expect(store.claim).not.toHaveBeenCalled();
     expect(prepared.abort).toHaveBeenCalledTimes(1);
+    expect(prepared.acquireApprovalClaimBoundary).not.toHaveBeenCalled();
     expect(prepared.dispatch).not.toHaveBeenCalled();
   });
 
@@ -367,6 +398,7 @@ describe('authoritative n8n founder-content publisher', () => {
 
     expect(result.ok).toBe(false);
     expect(result.code).toBe('INVALID_AUTHORIZATION');
+    expect(prepared.acquireApprovalClaimBoundary).toHaveBeenCalledTimes(1);
     expect(prepared.abort).toHaveBeenCalledTimes(1);
     expect(prepared.dispatch).not.toHaveBeenCalled();
   });
@@ -457,6 +489,7 @@ describe('authoritative n8n founder-content publisher', () => {
     expect(result.code).toBe('INVALID_AUTHORIZATION');
     expect(store.readCurrent).toHaveBeenCalledTimes(1);
     expect(prepared.prepare).toHaveBeenCalledTimes(1);
+    expect(prepared.acquireApprovalClaimBoundary).toHaveBeenCalledTimes(1);
     expect(store.claim).toHaveBeenCalledTimes(1);
     expect(prepared.abort).toHaveBeenCalledTimes(1);
     expect(prepared.dispatch).not.toHaveBeenCalled();
