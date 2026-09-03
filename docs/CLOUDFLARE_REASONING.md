@@ -36,7 +36,7 @@ A statement can be accurate when recorded and wrong when reused later. The Contr
 1. **Observed** — what repository, provider, runtime, or human-outcome evidence says now. Provider/runtime facts require fresh at-use evidence under the Truth Lease contract.
 2. **Safety invariant** — what must remain true regardless of current preference. For the FCR Worker, native Worker Git may not promote production outside the governed deploy authority.
 3. **Allowed safe states** — states that satisfy the invariant. `disconnected` and `non-promoting` are both safe with respect to duplicate production promotion.
-4. **Current desired state** — the founder's current product/architecture preference. The current Worker Git preference is connected but non-promoting, with `npx wrangler versions upload` as the deploy command.
+4. **Current desired state** — the founder's current product/architecture preference. The current Worker Git preference is connected but non-promoting, with `npx wrangler versions upload --config wrangler.worker.toml` as the deploy command.
 5. **Historical decision** — what was once recommended or preferred. A historical disconnect recommendation remains useful provenance and may still describe a safe fallback, but it is not current intent and cannot authorize a provider change.
 
 This separation fixes the failure mode where “disconnect Worker Git Builds” was once a defensible safe recommendation and later got repeated as though it were the current architecture plan. The problem was not that the old statement had never been true. The problem was that **allowed safe state**, **current preference**, and **execution authority** had been collapsed.
@@ -145,7 +145,7 @@ It writes one sanitized `cloudflare_reasoning_completed` event. If that audit wr
 
 When native Git deployment succeeds while an old token-upload workflow reports Cloudflare code `9109`, the reasoner should not immediately demand another token. It should first detect two deployment authorities and propose reducing the system to one production authority through a separately approved repository or provider change.
 
-For Founder Control Room specifically, a native Worker Git trigger may remain connected when it is non-promoting. A provider read-back showing `wrangler versions upload` satisfies the current desired topology; a disconnected trigger satisfies the safety invariant but is reported as `safe-but-not-current`; a production-capable `wrangler deploy` trigger is an authority conflict.
+For Founder Control Room specifically, a native Worker Git trigger may remain connected when it is non-promoting. A provider read-back showing `wrangler versions upload --config wrangler.worker.toml` satisfies the current desired topology; a disconnected trigger satisfies the safety invariant but is reported as `safe-but-not-current`; a production-capable `wrangler deploy` trigger is an authority conflict.
 
 The complete reasoning path becomes:
 
@@ -197,7 +197,7 @@ Repository configuration can prove the desired binding name and sender restricti
 
 `wrangler.worker.toml` runs `scripts/verify-worker-build-authority.mjs` as its custom Worker build hook. The hook is a repository-side fail-closed membrane, not a provider mutation authority.
 
-For native Cloudflare Workers Builds, the membrane requires the provider-reported commit SHA to equal the checked-out Git source, requires branch/build UUID evidence, and permits only the non-promoting `wrangler versions upload` command. A native `wrangler deploy` is rejected before promotion with `NATIVE_WORKER_GIT_PROMOTION_BLOCKED`.
+For native Cloudflare Workers Builds, the membrane requires the provider-reported commit SHA to equal the checked-out Git source, requires branch/build UUID evidence, and permits only the non-promoting `wrangler versions upload --config wrangler.worker.toml` command. A native `wrangler deploy` is rejected before promotion with `NATIVE_WORKER_GIT_PROMOTION_BLOCKED`.
 
 For GitHub Actions, production promotion is recognized only for the manual `Deploy` or `FCR Worker Reconcile` workflow-dispatch lanes when the checked-out SHA equals the exact GitHub workflow SHA. Ordinary CI remains verification-only. The emitted `fcr/worker-build-authority-receipt@v1` is redacted build evidence and explicitly cannot authorize provider mutation.
 
