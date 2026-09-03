@@ -34,21 +34,27 @@ def _extract_ranked(
 ) -> tuple[dict[str, dict[str, Any]], int]:
     visible: dict[str, dict[str, Any]] = {}
     provider_rows = 0
-    rank = 0
     for row in rows[3:]:
         if len(row) <= max(url_col, date_col, value_col):
             continue
         url = str(row[url_col] or "")
         if not url.startswith("https://www.linkedin.com/posts/"):
             continue
+
+        # Provider rank is the exported row position among valid ranked post rows.
+        # It must advance before local date filtering, otherwise a provider-rank-40
+        # post can be relabeled rank 1 merely because ranks 1-39 fall outside the
+        # requested analysis window.
         provider_rows += 1
+        provider_rank = provider_rows
+
         try:
             publish_day = continuity._parse_date(str(row[date_col]))
         except ValueError:
             continue
         if not start <= publish_day <= end:
             continue
-        rank += 1
+
         normalized = continuity._normalize_url(url)
         fp = continuity.post_fingerprint(publish_day, normalized)
         raw_value = row[value_col]
@@ -56,7 +62,7 @@ def _extract_ranked(
         visible[fp] = {
             "fingerprint": fp,
             "publish_date": publish_day.isoformat(),
-            f"{metric}_rank": rank,
+            f"{metric}_rank": provider_rank,
             metric: value,
         }
     return visible, provider_rows
@@ -157,6 +163,7 @@ def analyze_performance(
             "provider_export_limit": export_limit,
             "engagement_list_capped": engagement_rows >= export_limit,
             "impression_list_capped": impression_rows >= export_limit,
+            "rank_policy": "PRESERVE_EXPORTED_PROVIDER_POSITION_BEFORE_WINDOW_FILTER",
             "missing_metric_policy": "UNKNOWN_NOT_ZERO",
         },
         "summary": {
