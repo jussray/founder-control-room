@@ -514,7 +514,7 @@ for (const name of [
 
 assert.match(
   validationStep,
-  /Worker runtime secrets remain provider-held and are validated by wrangler\.worker\.toml/,
-  'authority gate must state the provider-held runtime-secret boundary',
+  /Worker runtime secrets remain provider-held and are name-read-back/,
+  'authority gate must state the provider-held runtime-secret readback boundary',
 );
 console.log('Production deployment authority, provider-held Worker secrets, privacy receipt, LinkedIn freshness, and one-Worker binding contract verified.');
