@@ -233,8 +233,25 @@ def analyze_export(path: str | Path, start: date, end: date, export_limit: int =
     }
 
 
+def _continuity_payload(previous: dict[str, Any] | None) -> dict[str, Any]:
+    """Accept either the inner continuity receipt or the redacted outer evidence envelope."""
+    if previous is None:
+        return {}
+    if previous.get("contract") == "linkedin-post-evidence@v1":
+        inner = previous.get("continuity")
+        if not isinstance(inner, dict):
+            raise ValueError("linkedin-post-evidence@v1 previous receipt must contain continuity object")
+        if inner.get("contract") != "linkedin-analytics-continuity@v1":
+            raise ValueError("nested continuity receipt contract mismatch")
+        return inner
+    if previous.get("contract") == "linkedin-analytics-continuity@v1":
+        return previous
+    raise ValueError("unsupported previous LinkedIn continuity receipt contract")
+
+
 def reconcile(previous: dict[str, Any] | None, current: dict[str, Any]) -> dict[str, list[str]]:
-    previous_fps = {p["fingerprint"] for p in (previous or {}).get("posts", [])}
+    prior = _continuity_payload(previous)
+    previous_fps = {p["fingerprint"] for p in prior.get("posts", [])}
     current_fps = {p["fingerprint"] for p in current.get("posts", [])}
     return {
         "new": sorted(current_fps - previous_fps),
