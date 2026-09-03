@@ -68,6 +68,16 @@ describe('Cloudflare Worker Git authority contract', () => {
     );
   });
 
+  it('keeps a non-promoting but stale deploy command as visible drift', () => {
+    expect(authorityScript).toContain('normalizeDeployCommand');
+    expect(authorityScript).toContain('matchesDesiredDeployCommand');
+    expect(authorityScript).toContain('desiredDeployCommandMatched');
+    expect(authorityScript).toContain('WORKER_GIT_DESIRED_DEPLOY_COMMAND_DRIFT');
+    expect(authorityScript).toContain(
+      'observedState !== "non-promoting" || desiredDeployCommandMatched',
+    );
+  });
+
   it('keeps current founder preference durable but non-executing', () => {
     expect(authorityPolicy.policyRole).toBe('desired-state-only');
     expect(authorityPolicy.canAuthorizeProviderMutation).toBe(false);
