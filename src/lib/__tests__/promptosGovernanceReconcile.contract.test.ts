@@ -18,6 +18,9 @@ describe("PromptOS governance reconciler contract", () => {
   it("binds the provider mutation to exact FCR main and exact PromptOS main", () => {
     expect(workflow).toContain("EXPECTED_FCR_MAIN_SHA");
     expect(workflow).toContain("EXPECTED_PROMPTOS_MAIN_SHA");
+    expect(workflow).toContain("ref: main");
+    expect(workflow).not.toContain("ref: ${{ steps.command.outputs.fcr_main_sha }}");
+    expect(workflow).toContain("test \"$actual\" = \"$current_main\"");
     expect(workflow).toContain("test \"$actual\" = \"$EXPECTED_FCR_MAIN_SHA\"");
     expect(workflow).toContain("PromptOS main moved before governance reconciliation");
     expect(workflow).toContain("PromptOS main moved during governance reconciliation");
