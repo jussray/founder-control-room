@@ -61,13 +61,13 @@
     {
       "path": "src/lib/n8nFounderContentOrchestrator.ts",
       "claims": [
-        "src/lib/n8nFounderContentOrchestrator.ts must carry exact approved expiry and reservation-generation evidence through cadence and provider-write boundaries so an external request cannot outlive or escape the authoritative execution generation."
+        "src/lib/n8nFounderContentOrchestrator.ts must carry exact approved expiry and reservation-generation evidence through cadence and provider-write boundaries, consume the authoritative approval_executions.started_at generation returned by the database after reservation, and fail closed when that generation is absent so an external request cannot outlive or escape the authoritative execution generation."
       ]
     },
     {
       "path": "src/lib/n8nProviderNeutralFounderContentPreparation.ts",
       "claims": [
-        "src/lib/n8nProviderNeutralFounderContentPreparation.ts must complete provider-envelope, configuration, cadence, source-project, and durable execution preparation before one-shot approval consumption; stale pre-provider reservations may be recovered only under bounded authoritative conditions and all abort/finalization/provider-write mutations remain fenced to the exact reservation generation."
+        "src/lib/n8nProviderNeutralFounderContentPreparation.ts must complete provider-envelope, configuration, cadence, source-project, and durable execution preparation before one-shot approval consumption; stale pre-provider reservations may be recovered only under bounded authoritative conditions, every successful rearm must consume the database-returned approval_executions.started_at generation, and all abort/finalization/provider-write mutations remain fenced to the exact reservation generation."
       ]
     },
     {
@@ -85,13 +85,13 @@
     {
       "path": "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md",
       "claims": [
-        "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md must require the same FCR-owned one-shot approval membrane for provider-neutral n8n writes, keep pre-provider checks ahead of consumption, and keep provider-native readback as terminal publication evidence."
+        "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md must require the same FCR-owned one-shot approval membrane for provider-neutral n8n writes, keep pre-provider checks ahead of consumption, document database-owned reservation generations and stale-worker fencing, and keep provider-native readback as terminal publication evidence."
       ]
     },
     {
       "path": "README.md",
       "claims": [
-        "README.md must describe the source-level founder-content/n8n authority membrane without claiming deployed provider state, preserve current production release truth that Worker runtime secrets remain provider-held and the post-Deploy Playwright witness binds direct Worker and public release identity to the exact Deploy SHA, and describe the current founder-only native GitHub human-review phase without removing deterministic independent review, authenticated Founder Final, exact-head machine gates, CodeQL, thread resolution, force-push/deletion protection, or live provider readback."
+        "README.md must describe the source-level founder-content/n8n authority membrane without claiming deployed provider state, including database-owned reservation generations that fence stale workers, preserve current production release truth that Worker runtime secrets remain provider-held and the post-Deploy Playwright witness binds direct Worker and public release identity to the exact Deploy SHA, and describe the current founder-only native GitHub human-review phase without removing deterministic independent review, authenticated Founder Final, exact-head machine gates, CodeQL, thread resolution, force-push/deletion protection, or live provider readback."
       ]
     },
     {
