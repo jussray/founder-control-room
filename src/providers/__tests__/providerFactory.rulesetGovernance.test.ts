@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RulesetConfig } from "../RepositoryProvider.js";
+import type { PhaseAwareRulesetConfig } from "../fcrGovernancePhase.js";
 import {
   assertFounderControlRoomTrustedBypassActor,
   assertRulesetGovernancePolicy,
@@ -25,9 +26,29 @@ const canonicalConfig: RulesetConfig = {
   name: FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME,
 };
 
+const founderOnlyConfig: PhaseAwareRulesetConfig = {
+  ...canonicalConfig,
+  governancePhase: "founder_only",
+  requiredApprovingReviewCount: 0,
+};
+
+const independentReviewConfig: PhaseAwareRulesetConfig = {
+  ...canonicalConfig,
+  governancePhase: "independent_review",
+  requiredApprovingReviewCount: 1,
+};
+
 describe("Founder Control Room ruleset governance", () => {
-  it("accepts an active FCR main ruleset only when the constitutional floor is preserved", () => {
+  it("keeps historical >=1-review configs compatible as independent-review policy", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", baseConfig)).not.toThrow();
+  });
+
+  it("accepts explicit founder_only with zero outside approving reviews", () => {
+    expect(() => assertRulesetGovernancePolicy("founder-control-room", founderOnlyConfig)).not.toThrow();
+  });
+
+  it("accepts explicit independent_review for the later team phase", () => {
+    expect(() => assertRulesetGovernancePolicy("founder-control-room", independentReviewConfig)).not.toThrow();
   });
 
   it("binds FCR constitutional identity to repository identity instead of a mutable project slug", () => {
@@ -43,51 +64,65 @@ describe("Founder Control Room ruleset governance", () => {
     expect(governanceProjectIdForRepository("fcr-alias", "jussray/other-repo")).toBe("fcr-alias");
   });
 
-  it("fails closed when FCR main requests zero approving reviews", () => {
+  it("fails closed when zero approvals are requested without explicit founder_only", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", {
       ...baseConfig,
       requiredApprovingReviewCount: 0,
-    })).toThrow(/at least one approving review/);
+    })).toThrow(/explicit governancePhase=founder_only/);
+  });
+
+  it("fails closed when founder_only is paired with a nonzero approval count", () => {
+    expect(() => assertRulesetGovernancePolicy("founder-control-room", {
+      ...founderOnlyConfig,
+      requiredApprovingReviewCount: 1,
+    })).toThrow(/founder_only requires exactly zero/);
+  });
+
+  it("fails closed when independent_review is paired with zero approvals", () => {
+    expect(() => assertRulesetGovernancePolicy("founder-control-room", {
+      ...independentReviewConfig,
+      requiredApprovingReviewCount: 0,
+    })).toThrow(/independent_review requires at least one/);
   });
 
   it("fails closed when FCR main disables pull-request enforcement", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", {
-      ...baseConfig,
+      ...founderOnlyConfig,
       requirePullRequest: false,
     })).toThrow(/pull-request enforcement/);
   });
 
   it("fails closed on a non-integer FCR main review count", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", {
-      ...baseConfig,
+      ...founderOnlyConfig,
       requiredApprovingReviewCount: Number.NaN,
-    })).toThrow(/at least one approving review/);
+    })).toThrow(/must be an integer/);
   });
 
   it("fails closed when FCR main drops the Required Gate status check", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", {
-      ...baseConfig,
+      ...founderOnlyConfig,
       requiredStatusCheckNames: ["Verify test-ledger contract"],
     })).toThrow(/Required Gate/);
   });
 
   it("fails closed when FCR main drops the exact-head ledger status check", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", {
-      ...baseConfig,
+      ...founderOnlyConfig,
       requiredStatusCheckNames: ["Required Gate"],
     })).toThrow(/Verify test-ledger contract/);
   });
 
   it("fails closed when FCR main permits force pushes", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", {
-      ...baseConfig,
+      ...founderOnlyConfig,
       blockForcePushes: false,
     })).toThrow(/block force pushes/);
   });
 
   it("fails closed when FCR main permits branch deletion", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", {
-      ...baseConfig,
+      ...founderOnlyConfig,
       blockDeletion: false,
     })).toThrow(/block branch deletion/);
   });
@@ -115,28 +150,28 @@ describe("Founder Control Room ruleset governance", () => {
 
   it("requires the active FCR main ruleset bypass to match the configured GitHub App id exactly", () => {
     expect(() => assertFounderControlRoomTrustedBypassActor({
-      ...canonicalConfig,
+      ...founderOnlyConfig,
       bypassActors: [{ kind: "app", id: "123456" }],
     }, "123456")).not.toThrow();
   });
 
   it("fails closed when the trusted GitHub App id is unavailable", () => {
     expect(() => assertFounderControlRoomTrustedBypassActor({
-      ...canonicalConfig,
+      ...founderOnlyConfig,
       bypassActors: [{ kind: "app", id: "123456" }],
     }, undefined)).toThrow(/trusted GITHUB_APP_ID/);
   });
 
   it("rejects a caller-supplied bypass app that does not match trusted configuration", () => {
     expect(() => assertFounderControlRoomTrustedBypassActor({
-      ...canonicalConfig,
+      ...founderOnlyConfig,
       bypassActors: [{ kind: "app", id: "999999" }],
     }, "123456")).toThrow(/must exactly match/);
   });
 
   it("rejects additional FCR main bypass actors even when the trusted app is present", () => {
     expect(() => assertFounderControlRoomTrustedBypassActor({
-      ...canonicalConfig,
+      ...founderOnlyConfig,
       bypassActors: [
         { kind: "app", id: "123456" },
         { kind: "app", id: "999999" },
@@ -144,7 +179,7 @@ describe("Founder Control Room ruleset governance", () => {
     }, "123456")).toThrow(/must exactly match/);
   });
 
-  it("does not impose FCR's review floor on another project's policy", () => {
+  it("does not impose FCR's phase floor on another project's policy", () => {
     expect(() => assertRulesetGovernancePolicy("sekret-bip", {
       ...baseConfig,
       requiredApprovingReviewCount: 0,
