@@ -38,16 +38,15 @@ jobs:
     if: github.event_name == 'repository_dispatch'
     needs: contract-test
     runs-on: ubuntu-latest
-    env:
-      SNAPSHOT_URL: ${{ secrets.LINKEDIN_FOLLOWER_SNAPSHOT_URL }}
-      SNAPSHOT_TOKEN: ${{ secrets.LINKEDIN_FOLLOWER_SNAPSHOT_TOKEN }}
-      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Require private source and privacy key
+      - name: Download private follower snapshot
         shell: bash
+        env:
+          SNAPSHOT_URL: ${{ secrets.LINKEDIN_FOLLOWER_SNAPSHOT_URL }}
+          SNAPSHOT_TOKEN: ${{ secrets.LINKEDIN_FOLLOWER_SNAPSHOT_TOKEN }}
         run: |
           set -euo pipefail
           if [[ -z "${SNAPSHOT_URL:-}" ]]; then
@@ -55,20 +54,11 @@ jobs:
             exit 1
           fi
           if [[ -z "${SNAPSHOT_TOKEN:-}" ]]; then
-            echo "BLOCKED_PRIVACY_KEY: LINKEDIN_FOLLOWER_SNAPSHOT_TOKEN is required for authenticated source access and domain-separated HMAC cohort identity." >&2
-            exit 1
-          fi
-          if (( ${#SNAPSHOT_TOKEN} < 32 )); then
-            echo "BLOCKED_PRIVACY_KEY: LINKEDIN_FOLLOWER_SNAPSHOT_TOKEN must contain at least 32 characters." >&2
+            echo "BLOCKED_SOURCE_AUTH: LINKEDIN_FOLLOWER_SNAPSHOT_TOKEN is required for authenticated source access." >&2
             exit 1
           fi
           echo "::add-mask::${SNAPSHOT_URL}"
           echo "::add-mask::${SNAPSHOT_TOKEN}"
-
-      - name: Download private follower snapshot
-        shell: bash
-        run: |
-          set -euo pipefail
           curl --fail --silent --show-error --location \
             -H "Authorization: Bearer ${SNAPSHOT_TOKEN}" \
             "${SNAPSHOT_URL}" \
@@ -77,12 +67,14 @@ jobs:
       - name: Recover latest redacted cohort receipt
         id: previous
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          artifact_id="$({
+          artifact_id="$(
             gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=linkedin-follower-cohort-latest&per_page=100" \
               --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty'
-          } || true)"
+          )"
 
           if [[ -z "${artifact_id}" ]]; then
             echo "found=false" >> "${GITHUB_OUTPUT}"
@@ -92,20 +84,34 @@ jobs:
           mkdir -p previous-artifact
           gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" > previous.zip
           unzip -q previous.zip -d previous-artifact
-          if [[ -f previous-artifact/follower-cohort-receipt.json ]]; then
-            cp previous-artifact/follower-cohort-receipt.json previous-follower-cohort-receipt.json
-            echo "found=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "found=false" >> "${GITHUB_OUTPUT}"
+          if [[ ! -f previous-artifact/follower-cohort-receipt.json ]]; then
+            echo "BLOCKED_PREDECESSOR_ARTIFACT: latest cohort artifact does not contain follower-cohort-receipt.json." >&2
+            exit 1
           fi
+          cp previous-artifact/follower-cohort-receipt.json previous-follower-cohort-receipt.json
+          echo "found=true" >> "${GITHUB_OUTPUT}"
 
       - name: Reconcile cohort
         shell: bash
         env:
-          LINKEDIN_FOLLOWER_ID_HMAC_KEY: ${{ secrets.LINKEDIN_FOLLOWER_SNAPSHOT_TOKEN }}
+          LINKEDIN_FOLLOWER_ID_HMAC_KEY: ${{ secrets.LINKEDIN_FOLLOWER_ID_HMAC_KEY }}
+          LINKEDIN_FOLLOWER_ID_HMAC_EPOCH: ${{ vars.LINKEDIN_FOLLOWER_ID_HMAC_EPOCH }}
           PREVIOUS_FOUND: ${{ steps.previous.outputs.found }}
         run: |
           set -euo pipefail
+          if [[ -z "${LINKEDIN_FOLLOWER_ID_HMAC_KEY:-}" ]]; then
+            echo "BLOCKED_PRIVACY_KEY: LINKEDIN_FOLLOWER_ID_HMAC_KEY is required." >&2
+            exit 1
+          fi
+          if (( ${#LINKEDIN_FOLLOWER_ID_HMAC_KEY} < 32 )); then
+            echo "BLOCKED_PRIVACY_KEY: LINKEDIN_FOLLOWER_ID_HMAC_KEY must contain at least 32 characters." >&2
+            exit 1
+          fi
+          if [[ -z "${LINKEDIN_FOLLOWER_ID_HMAC_EPOCH:-}" ]]; then
+            echo "BLOCKED_PRIVACY_EPOCH: LINKEDIN_FOLLOWER_ID_HMAC_EPOCH is required." >&2
+            exit 1
+          fi
+          echo "::add-mask::${LINKEDIN_FOLLOWER_ID_HMAC_KEY}"
           if [[ "${PREVIOUS_FOUND:-}" == "true" ]]; then
             python3 scripts/linkedin_follower_cohort.py \
               follower-snapshot.json \
@@ -119,10 +125,13 @@ jobs:
 
       - name: Ensure redacted privacy invariants
         shell: bash
+        env:
+          EXPECTED_IDENTITY_KEY_EPOCH: ${{ vars.LINKEDIN_FOLLOWER_ID_HMAC_EPOCH }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import json
+          import os
           from pathlib import Path
 
           receipt = json.loads(Path('follower-cohort-receipt.json').read_text())
@@ -137,6 +146,8 @@ jobs:
               raise SystemExit('redacted receipt private-key invariant failed')
           if privacy.get('member_identity_scheme') != 'HMAC-SHA256/private-runtime-key/v1':
               raise SystemExit('redacted receipt keyed-identity invariant failed')
+          if privacy.get('identity_key_epoch') != os.environ.get('EXPECTED_IDENTITY_KEY_EPOCH'):
+              raise SystemExit('redacted receipt identity-key epoch invariant failed')
           if privacy.get('redacted_metadata_policy') != 'ALLOWLISTED_ENUMS_ONLY':
               raise SystemExit('redacted receipt enum-redaction invariant failed')
           print(json.dumps(receipt.get('summary', {}), sort_keys=True))
