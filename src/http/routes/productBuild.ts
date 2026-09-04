@@ -20,6 +20,7 @@ import {
 } from '../../lib/founderControlDecision.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 import { requirePortfolioSwitchOn } from '../middleware/requirePortfolioSwitchOn.js';
+import { rateLimitFounderPermissions } from '../middleware/security.js';
 
 export const productBuildRouter = Router();
 
@@ -181,6 +182,7 @@ productBuildRouter.use(requireFounder);
 productBuildRouter.post(
   '/storyengine/directive',
   requirePortfolioSwitchOn('fcr-privileged-execution-master'),
+  rateLimitFounderPermissions,
   (req: FounderRequest, res) => {
     const prepared = prepareStoryEngineDirective(req.body);
     if (!prepared.ok) return res.status(prepared.status).json(prepared.body);
@@ -199,6 +201,7 @@ productBuildRouter.post(
 productBuildRouter.post(
   '/storyengine/execute',
   requirePortfolioSwitchOn('fcr-privileged-execution-master'),
+  rateLimitFounderPermissions,
   async (req: FounderRequest, res) => {
     const prepared = prepareStoryEngineDirective(req.body);
     if (!prepared.ok) return res.status(prepared.status).json(prepared.body);
