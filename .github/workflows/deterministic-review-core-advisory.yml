@@ -369,6 +369,7 @@ jobs:
           import fs from 'node:fs/promises';
           import {
             FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME,
+            FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS,
             providerForProject,
           } from './dist/providers/providerFactory.js';
           import { getGitHubInstallationToken } from './dist/providers/githubAppAuth.js';
@@ -420,7 +421,7 @@ jobs:
               enforcement: 'active',
               targetRefs: ['main'],
               requirePullRequest: true,
-              requiredApprovingReviewCount: 1,
+              requiredApprovingReviewCount: FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS,
               requiredStatusCheckNames: ['Required Gate', 'Verify test-ledger contract'],
               blockForcePushes: true,
               blockDeletion: true,
@@ -477,6 +478,7 @@ jobs:
                 generatedAt: new Date().toISOString(),
                 providerMutationAttempted,
                 providerMutationState,
+                requiredNativeApprovals: FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS,
                 result,
                 topology,
                 failure,
@@ -521,6 +523,7 @@ jobs:
             echo "- Command receipt: issue #418 comment \`$COMMENT_ID\`"
             echo '- Provider mutation path: canonical `providerForProject(...).applyBranchRuleset(...)` only'
             echo '- Full provider topology preflight: `READY` required before this completion summary can run'
+            echo '- Human review phase: founder-only; native independent/code-owner approval count is zero until deliberately upgraded'
             echo '- Intended topology: trusted-App pull-request-only review membrane + zero-bypass strict-freshness membrane'
             echo '- Merge, deployment, database, secret/credential, billing, publication, and branch-deletion authority: none granted by this command'
           } >> "$GITHUB_STEP_SUMMARY"

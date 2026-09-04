@@ -20,15 +20,19 @@ test('Chief Access command bridge is founder-only, issue-scoped, and exact-FCR-m
   assert.doesNotMatch(commandBridge, /CLOUDFLARE_ACCESS_API_TOKEN/);
   assert.doesNotMatch(commandBridge, /CLOUDFLARE_ACCESS_ADMIN_API_TOKEN/);
   assert.doesNotMatch(commandBridge, /CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
+  assert.doesNotMatch(commandBridge, /CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
 });
 
-test('recovery is protected by production environment and separates secrets from Chief client identity config', () => {
+test('recovery is protected by production environment and separates secrets from Chief service-token identity selectors', () => {
   assert.match(recoveryWorkflow, /environment:\s*production/);
   assert.match(recoveryWorkflow, new RegExp(ACCOUNT_ID));
   assert.match(recoveryWorkflow, /CLOUDFLARE_ACCESS_API_TOKEN:\s*\$\{\{ secrets\.CLOUDFLARE_ACCESS_API_TOKEN \}\}/);
   assert.match(recoveryWorkflow, /CLOUDFLARE_ACCESS_ADMIN_API_TOKEN:\s*\$\{\{ secrets\.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN \}\}/);
   assert.match(recoveryWorkflow, /CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID:\s*\$\{\{ vars\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID \}\}/);
+  assert.match(recoveryWorkflow, /CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID:\s*\$\{\{ vars\.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID \}\}/);
   assert.doesNotMatch(recoveryWorkflow, /secrets\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
+  assert.doesNotMatch(recoveryWorkflow, /secrets\.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
+  assert.match(recoveryWorkflow, /-z "\$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" && -z "\$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID"/);
   assert.match(recoveryWorkflow, /if: inputs\.mode == 'check'/);
   assert.match(recoveryWorkflow, /if: inputs\.mode == 'repair'/);
   assert.match(recoveryWorkflow, /current_main.*EXPECTED_HEAD_SHA/s);
@@ -97,6 +101,7 @@ test('public receipt explicitly keeps browser/runtime proof separate', () => {
 test('dedicated recovery documentation keeps source, provider, and browser truth separate', () => {
   assert.match(recoveryDoc, /SOURCE CONTRACT \/ PROVIDER REPAIR NOT YET EXECUTED/);
   assert.match(recoveryDoc, /CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
+  assert.match(recoveryDoc, /CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
   assert.match(recoveryDoc, /CLOUDFLARE_ACCESS_API_TOKEN/);
   assert.match(recoveryDoc, /CLOUDFLARE_ACCESS_ADMIN_API_TOKEN/);
   assert.match(recoveryDoc, /does not prove Chief runtime equivalence/);

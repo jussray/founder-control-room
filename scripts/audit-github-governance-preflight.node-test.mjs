@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
+  CANONICAL_NATIVE_APPROVAL_COUNT,
   CANONICAL_RULESET_NAME,
   CODEQL_SECURITY_FLOOR,
   buildBlockedReport,
@@ -32,9 +33,9 @@ function canonicalRuleset(overrides = {}) {
         type: 'pull_request',
         parameters: {
           dismiss_stale_reviews_on_push: true,
-          require_code_owner_review: true,
-          require_last_push_approval: true,
-          required_approving_review_count: 1,
+          require_code_owner_review: false,
+          require_last_push_approval: false,
+          required_approving_review_count: 0,
           required_review_thread_resolution: true,
         },
       },
@@ -53,6 +54,14 @@ function canonicalRuleset(overrides = {}) {
     ],
     ...overrides,
   };
+}
+
+function futureTeamRuleset(overrides = {}) {
+  const value = canonicalRuleset();
+  value.rules[0].parameters.required_approving_review_count = 1;
+  value.rules[0].parameters.require_code_owner_review = true;
+  value.rules[0].parameters.require_last_push_approval = true;
+  return { ...value, ...overrides };
 }
 
 function freshnessRuleset(overrides = {}) {
@@ -94,17 +103,18 @@ function readyReport(overrides = {}) {
   });
 }
 
-test('canonical FCR governance requires security-preserving review and zero-bypass freshness membranes', () => {
+test('canonical FCR governance preserves founder-only review and zero-bypass freshness membranes', () => {
   const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
   const review = rulesetSnapshot(canonicalRuleset(), 'main', 'main');
   const freshness = rulesetSnapshot(freshnessRuleset(), 'main', 'main');
 
+  assert.equal(CANONICAL_NATIVE_APPROVAL_COUNT, 0);
   assert.equal(review.targetsRequestedRef, true);
   assert.deepEqual(review.ruleTypes, ['code_scanning', 'deletion', 'non_fast_forward', 'pull_request']);
-  assert.equal(review.requiredApprovingReviewCount, 1);
+  assert.equal(review.requiredApprovingReviewCount, 0);
   assert.equal(review.dismissStaleReviewsOnPush, true);
-  assert.equal(review.requireCodeOwnerReview, true);
-  assert.equal(review.requireLastPushApproval, true);
+  assert.equal(review.requireCodeOwnerReview, false);
+  assert.equal(review.requireLastPushApproval, false);
   assert.equal(review.requiredReviewThreadResolution, true);
   assert.equal(review.strictRequiredStatusChecks, false);
   assert.deepEqual(review.requiredStatusCheckNames, []);
@@ -124,6 +134,18 @@ test('canonical FCR governance requires security-preserving review and zero-bypa
   assert.equal(freshnessFloorSatisfied(freshness), true);
 });
 
+test('future-team phase is representable without weakening any machine or provider floor', () => {
+  const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
+  const future = rulesetSnapshot(futureTeamRuleset(), 'main', 'main');
+  assert.equal(future.requiredApprovingReviewCount, 1);
+  assert.equal(future.requireCodeOwnerReview, true);
+  assert.equal(future.requireLastPushApproval, true);
+  assert.equal(canonicalFloorSatisfied(future, expectedBypass, 1), true);
+  assert.equal(codeQLSecurityFloorSatisfied(future), true);
+  assert.equal(future.blockForcePushes, true);
+  assert.equal(future.blockDeletion, true);
+});
+
 test('default-branch sentinel resolves only to the observed repository default branch', () => {
   const sentinel = canonicalRuleset();
   assert.equal(rulesetSnapshot(sentinel, 'main', 'main').targetsRequestedRef, true);
@@ -135,25 +157,31 @@ test('default-branch sentinel resolves only to the observed repository default b
   assert.equal(rulesetSnapshot(literal, 'main', 'main').targetsRequestedRef, true);
 });
 
-test('zero review or stale-review policy cannot satisfy the review membrane', () => {
+test('wrong native-review phase or stale-review policy cannot satisfy the current review membrane', () => {
   const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
-  const zeroReview = canonicalRuleset();
-  zeroReview.rules[0].parameters.required_approving_review_count = 0;
-  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(zeroReview, 'main', 'main'), expectedBypass), false);
+  const future = futureTeamRuleset();
+  assert.equal(canonicalFloorSatisfied(rulesetSnapshot(future, 'main', 'main'), expectedBypass), false);
 
   const staleAllowed = canonicalRuleset();
   staleAllowed.rules[0].parameters.dismiss_stale_reviews_on_push = false;
   assert.equal(canonicalFloorSatisfied(rulesetSnapshot(staleAllowed, 'main', 'main'), expectedBypass), false);
 });
 
-test('review membrane requires Code Owner review and the exact CodeQL security floor', () => {
+test('review membrane requires the exact phase flags and exact CodeQL security floor', () => {
   const expectedBypass = trustedBypassPolicy(TRUSTED_APP_ID);
 
-  const noCodeOwner = canonicalRuleset();
-  noCodeOwner.rules[0].parameters.require_code_owner_review = false;
-  const noCodeOwnerSnapshot = rulesetSnapshot(noCodeOwner, 'main', 'main');
-  assert.equal(noCodeOwnerSnapshot.requireCodeOwnerReview, false);
-  assert.equal(canonicalFloorSatisfied(noCodeOwnerSnapshot, expectedBypass), false);
+  const unexpectedCodeOwner = canonicalRuleset();
+  unexpectedCodeOwner.rules[0].parameters.require_code_owner_review = true;
+  const unexpectedCodeOwnerSnapshot = rulesetSnapshot(unexpectedCodeOwner, 'main', 'main');
+  assert.equal(unexpectedCodeOwnerSnapshot.requireCodeOwnerReview, true);
+  assert.equal(canonicalFloorSatisfied(unexpectedCodeOwnerSnapshot, expectedBypass), false);
+
+  const futureMissingCodeOwner = futureTeamRuleset();
+  futureMissingCodeOwner.rules[0].parameters.require_code_owner_review = false;
+  assert.equal(
+    canonicalFloorSatisfied(rulesetSnapshot(futureMissingCodeOwner, 'main', 'main'), expectedBypass, 1),
+    false,
+  );
 
   const noCodeQL = canonicalRuleset();
   noCodeQL.rules = noCodeQL.rules.filter((rule) => rule.type !== 'code_scanning');
@@ -169,16 +197,20 @@ test('review membrane requires Code Owner review and the exact CodeQL security f
   assert.equal(canonicalFloorSatisfied(weakCodeQLSnapshot, expectedBypass), false);
 });
 
-test('collaborator readiness requires non-owner write authority and excludes bots', () => {
+test('collaborator readiness remains observable and excludes owner and bots', () => {
   assert.equal(collaboratorCanReview({ login: 'jussray', permissions: { admin: true } }, 'jussray'), false);
   assert.equal(collaboratorCanReview({ login: 'reviewer[bot]', type: 'Bot', permissions: { push: true } }, 'jussray'), false);
   assert.equal(collaboratorCanReview({ login: 'reader', permissions: { pull: true } }, 'jussray'), false);
   assert.equal(collaboratorCanReview({ login: 'reviewer', permissions: { push: true } }, 'jussray'), true);
 });
 
-test('report is READY only for exactly the canonical two-ruleset topology plus reviewer readiness', () => {
-  const ready = readyReport();
+test('founder-only report is READY for exact topology even before a future reviewer exists', () => {
+  const ready = readyReport({
+    collaborators: [{ login: 'jussray', permissions: { admin: true } }],
+  });
   assert.equal(ready.status, 'READY');
+  assert.equal(ready.humanReviewPhase, 'founder-only');
+  assert.equal(ready.requiredNativeApprovalCount, 0);
   assert.equal(ready.observationComplete, true);
   assert.equal(ready.defaultBranch, 'main');
   assert.equal(ready.activeRulesetCountTargetingRef, 2);
@@ -186,7 +218,8 @@ test('report is READY only for exactly the canonical two-ruleset topology plus r
   assert.equal(ready.canonicalFreshnessRulesetMatchCount, 1);
   assert.equal(ready.canonicalFloorSatisfied, true);
   assert.equal(ready.freshnessFloorSatisfied, true);
-  assert.equal(ready.eligibleNonOwnerWriteReviewerCount, 1);
+  assert.equal(ready.independentReviewerReady, false);
+  assert.equal(ready.eligibleNonOwnerWriteReviewerCount, 0);
   assert.equal(ready.trustedBypassPolicyAvailable, true);
   assert.equal(ready.bypassPolicySatisfied, true);
   assert.equal(ready.freshnessBypassPolicySatisfied, true);
@@ -197,7 +230,7 @@ test('report is READY only for exactly the canonical two-ruleset topology plus r
       freshnessRuleset(),
       { ...canonicalRuleset(), id: 999, name: 'duplicate-main-gate' },
     ],
-    collaborators: [{ login: 'reviewer', permissions: { maintain: true } }],
+    collaborators: [],
   });
   assert.equal(duplicate.status, 'NOT_READY');
   assert.equal(duplicate.activeRulesetCountTargetingRef, 3);
@@ -340,6 +373,8 @@ test('provider-read failure produces a sanitized blocked receipt instead of fake
     reason: 'provider_read_forbidden',
   });
   assert.equal(report.status, 'BLOCKED');
+  assert.equal(report.humanReviewPhase, 'founder-only');
+  assert.equal(report.requiredNativeApprovalCount, 0);
   assert.equal(report.observationComplete, false);
   assert.equal(report.blocker, 'provider_read_forbidden');
   assert.equal(report.defaultBranch, null);

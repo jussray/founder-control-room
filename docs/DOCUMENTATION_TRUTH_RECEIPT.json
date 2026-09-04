@@ -1,10 +1,11 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the current Founder Signal Engine authority, privacy-safe LinkedIn follower/post evidence automation, provider-neutral n8n publication membrane, ULTRATHINK advisory evidence boundary, and current production release authority repair to reviewed source invariants without claiming live provider configuration, publication outcome, deployment success, merge authority, database mutation, secret validity, billing, or destructive-action authority.",
+  "purpose": "Bind the current Founder Signal Engine authority, privacy-safe keyed LinkedIn follower/post evidence automation, provider-neutral n8n publication membrane, ULTRATHINK advisory evidence boundary, current production release authority repair, and founder-only native GitHub human-review phase to reviewed source invariants without claiming live provider configuration, publication outcome, deployment success, merge authority, database mutation, secret validity, billing, or destructive-action authority.",
   "domains": [
     "publishing",
     "cloudflare-authority",
-    "evidence-authority"
+    "evidence-authority",
+    "repository-provider"
   ],
   "changes": [
     {
@@ -47,7 +48,7 @@
     {
       "path": "src/lib/n8nFounderContentAuthorityAdapter.ts",
       "claims": [
-        "src/lib/n8nFounderContentAuthorityAdapter.ts must preflight transport/provider configuration, review/cadence time bounds, source-project resolution, and durable execution reservation before consuming one-shot authority; provider dispatch must remain generation-fenced and a failed/stale claim or reservation generation must make zero provider requests."
+        "src/lib/n8nFounderContentAuthorityAdapter.ts must preflight transport/provider configuration, review/cadence time bounds, source-project resolution, durable execution reservation, and the authoritative approval-claim boundary before consuming one-shot authority; provider dispatch must remain generation-fenced and a failed/stale claim or reservation generation must make zero provider requests."
       ]
     },
     {
@@ -89,7 +90,7 @@
     {
       "path": "README.md",
       "claims": [
-        "README.md must describe the source-level founder-content/n8n authority membrane without claiming deployed provider state, while also preserving current production release truth that Worker runtime secrets remain provider-held and the post-Deploy Playwright witness must bind direct Worker and public release identity to the exact Deploy SHA."
+        "README.md must describe the source-level founder-content/n8n authority membrane without claiming deployed provider state, preserve current production release truth that Worker runtime secrets remain provider-held and the post-Deploy Playwright witness binds direct Worker and public release identity to the exact Deploy SHA, and describe the current founder-only native GitHub human-review phase without removing deterministic independent review, authenticated Founder Final, exact-head machine gates, CodeQL, thread resolution, force-push/deletion protection, or live provider readback."
       ]
     },
     {
@@ -101,43 +102,43 @@
     {
       "path": "docs/founder-signal-engine/linkedin-analytics-continuity.md",
       "claims": [
-        "docs/founder-signal-engine/linkedin-analytics-continuity.md must keep aggregate LinkedIn activity, post continuity, ranked post performance, and source-digest provenance as distinct observation-only evidence classes; provider rank caps and absent metrics must never be silently converted into zeros or complete-history claims."
+        "docs/founder-signal-engine/linkedin-analytics-continuity.md must document dedicated private-key HMAC post identity, non-secret key epochs, privacy-baseline behavior on intentional key rotation, aggregate activity versus post continuity versus ranked performance, provider rank caps, and UNKNOWN-not-zero semantics; identity fingerprints and epochs remain observation-only and non-authorizing."
       ]
     },
     {
       "path": "scripts/linkedin_analytics_continuity.py",
       "claims": [
-        "scripts/linkedin_analytics_continuity.py must reconcile recurring analytics against either the canonical inner linkedin-analytics-continuity@v1 receipt or the continuity object nested inside linkedin-post-evidence@v1; it must reject malformed/unsupported predecessor contracts so recurring runs cannot reset retained posts to NEW by reading the wrong envelope level."
+        "scripts/linkedin_analytics_continuity.py must derive public post identity with private-key HMAC rather than a dictionary-recomputable public hash, bind the non-secret identity-key epoch into the receipt, treat legacy or mismatched epochs as a new privacy baseline without fabricated NEW/missing claims, reject stale chronology, and fail closed on malformed/unsupported predecessor envelopes while preserving recurring continuity."
       ]
     },
     {
       "path": ".github/workflows/linkedin-post-analytics.yml",
       "claims": [
-        ".github/workflows/linkedin-post-analytics.yml must keep raw LinkedIn XLSX data runtime-private, persist only the redacted linkedin-post-evidence@v1 envelope, preserve separate 365-day historical and 90-day operating artifact lineages, and feed prior redacted evidence back through a continuity reader that explicitly unwraps the nested continuity contract."
+        ".github/workflows/linkedin-post-analytics.yml must keep raw LinkedIn XLSX data runtime-private, keep snapshot-source authentication separate from dedicated LINKEDIN_POST_ID_HMAC_KEY identity material, bind LINKEDIN_POST_ID_HMAC_EPOCH as non-secret continuity metadata, scope credentials to the steps that require them, fail closed on predecessor artifact discovery/malformed recovery, and persist only redacted observation-only evidence."
       ]
     },
     {
       "path": "scripts/linkedin_post_performance.py",
       "claims": [
-        "scripts/linkedin_post_performance.py must preserve LinkedIn's exported provider rank before applying a local analysis date window, and any metric hidden by provider ranking limits must remain UNKNOWN rather than zero so an out-of-window leader cannot promote a lower-ranked in-window post into a false top-10 signal."
+        "scripts/linkedin_post_performance.py must merge ranked metrics by the same dedicated-key HMAC post identity used by continuity, preserve LinkedIn's exported provider rank before local date filtering, and keep metrics hidden by provider rank caps UNKNOWN rather than zero; fingerprints and performance cookies remain observation-only."
       ]
     },
     {
       "path": "scripts/linkedin_follower_cohort.py",
       "claims": [
-        "scripts/linkedin_follower_cohort.py must derive persisted member identity with private-key HMAC rather than a dictionary-reversible public hash, allow only coarse explicit enum metadata in redacted receipts, reject out-of-order snapshots, treat the initial/legacy-keyed capture as baseline, require a complete prior cohort before classifying a newly visible member as NEW, and require a complete current cohort before classifying a missing member as LOST."
+        "scripts/linkedin_follower_cohort.py must derive persisted member identity with dedicated private-key HMAC, bind a validated non-secret identity-key epoch, treat intentional key rotation as a privacy baseline without fabricated NEW/LOST churn, allow only coarse explicit enum metadata in redacted receipts, and reject out-of-order snapshots while keeping complete/partial visibility chronology conservative."
       ]
     },
     {
       "path": ".github/workflows/linkedin-follower-cohort.yml",
       "claims": [
-        ".github/workflows/linkedin-follower-cohort.yml must require authenticated private snapshot access and 32+ character private key material, mask private source/key values, run keyed follower reconciliation only at runtime, and upload only a redacted receipt that asserts keyed identity plus allowlisted metadata while raw identity evidence and key material remain outside the public artifact."
+        ".github/workflows/linkedin-follower-cohort.yml must separate LINKEDIN_FOLLOWER_SNAPSHOT_TOKEN source authentication from dedicated LINKEDIN_FOLLOWER_ID_HMAC_KEY identity material, bind LINKEDIN_FOLLOWER_ID_HMAC_EPOCH as non-secret continuity metadata, scope credentials to the steps that require them, fail closed on predecessor artifact discovery/malformed recovery, and upload only the redacted cohort receipt."
       ]
     },
     {
       "path": "docs/founder-signal-engine/linkedin-follower-cohorts.md",
       "claims": [
-        "docs/founder-signal-engine/linkedin-follower-cohorts.md must document the v2 keyed-HMAC privacy boundary, conservative baseline/NEW/LOST chronology rules, legacy privacy-epoch reset behavior, and fail-closed BLOCKED_SOURCE/BLOCKED_PRIVACY_KEY states without claiming a provider roster acquisition capability that is not proven."
+        "docs/founder-signal-engine/linkedin-follower-cohorts.md must document dedicated source-auth versus HMAC-identity authorities, explicit non-secret key epochs, conservative baseline/NEW/LOST chronology, key-rotation privacy resets, and fail-closed source/privacy-key/privacy-epoch states without claiming provider acquisition capability that is not proven."
       ]
     },
     {
@@ -168,6 +169,18 @@
       "path": "config/cloudflare-worker-git-authority-policy.json",
       "claims": [
         "config/cloudflare-worker-git-authority-policy.json must keep native Cloudflare Workers Builds non-promoting and bind the desired deploy command to npx wrangler versions upload --config wrangler.worker.toml so the canonical Worker config is discovered without granting production-promotion authority."
+      ]
+    },
+    {
+      "path": "src/providers/GitHubProvider.ts",
+      "claims": [
+        "src/providers/GitHubProvider.ts must derive Code Owner and last-push human-review requirements from whether the canonical native approving-review count is greater than zero, while preserving pull-request enforcement, review-thread resolution, CodeQL, trusted-App bypass limits, force-push/deletion protection, strict-freshness separation, and provider readback."
+      ]
+    },
+    {
+      "path": "src/providers/providerFactory.ts",
+      "claims": [
+        "src/providers/providerFactory.ts must keep the current FCR founder-only native approving-review floor at zero while retaining the constitutional required checks and trusted GitHub App boundary, and a later deliberate positive native-review count must remain representable without weakening the existing machine or founder-final authority membrane."
       ]
     }
   ]

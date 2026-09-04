@@ -68,6 +68,16 @@ founderFinalApprovalRequired: true
 
 A caller cannot turn deterministic review off, weaken P2 handling, substitute model output for founder authority, redefine the policy, or reuse a founder approval against another PR/base/head. The deterministic review receipt itself remains proposal-only and non-authorizing. The authenticated founder-final receipt supplies the final human authority after the independent proof layer passes.
 
+### Current native GitHub human-review phase
+
+The canonical **current** provider-governance phase is `founder-only` on the human side. That means the GitHub-native pull-request membrane requests **zero native approving reviews** and does not require Code Owner or last-push human approval merely to satisfy a reviewer role that does not yet exist.
+
+This phase does **not** remove the rest of the merge membrane. FCR still requires the pull-request path, deterministic independent review evidence, authenticated founder-final authority, exact-head machine gates, review-thread resolution, stale-review invalidation semantics, CodeQL security scanning, force-push protection, deletion protection, exact provider readback, and the separate zero-bypass strict-freshness ruleset containing `Required Gate` plus `Verify test-ledger contract`.
+
+The phase is intentionally upgradeable rather than permanent. When the founder deliberately activates a future-team phase by setting the canonical native approving-review count above zero, the GitHub provider must automatically require Code Owner review and last-push approval again, while preserving every existing machine, freshness, CodeQL, founder-final, and rollback boundary.
+
+Repository source policy and live provider state remain separate truths. Merely changing this source declaration does not prove GitHub is enforcing the founder-only phase. Provider reconciliation may occur only through the trusted current-main governance path with an exact founder-bound main SHA, an auditable approval reference, canonical GitHub App authority, and authoritative post-write readback. Until that reconciliation succeeds, the observed live ruleset must be reported exactly as observed rather than relabeled to match source intent.
+
 ### Deterministic witness production and bootstrap truth
 
 The deterministic-review producer must derive repository, pull request, base/head identity, author, complete diff identity, rule version, findings, verdict, and receipt hash from provider-observed state. A caller cannot supply a trusted reviewer identity, verdict, policy, check conclusion, witness name, or trusted App identity and have that become review authority.
@@ -88,7 +98,7 @@ New canonical FCR founder-final approvals do **not** depend on `FCR_TRUSTED_SEMA
 
 The source/runtime FCR merge membrane and the **live GitHub repository ruleset are a separate provider gate**.
 
-A correct in-app founder-final review engine does not prove that GitHub's web/API merge surface independently enforces the same approval count, stale-review dismissal, last-push approval, thread resolution, strict status freshness, bypass actors, or bypass modes. Those provider protections require their own current GitHub readback.
+A correct in-app founder-final review engine does not prove that GitHub's web/API merge surface independently enforces the intended current phase, stale-review dismissal, thread resolution, strict status freshness, bypass actors, or bypass modes. Those provider protections require their own current GitHub readback.
 
 Do not claim repository-wide GitHub governance is fixed merely because the FCR source gate is strong. Conversely, a GitHub merge that occurred outside the in-app FCR path does not prove the in-app deterministic-review + founder-final contract was satisfied.
 

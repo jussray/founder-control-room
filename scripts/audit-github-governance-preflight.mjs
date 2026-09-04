@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url';
 
 export const CONTRACT = 'fcr/github-governance-preflight@v2';
 export const CANONICAL_RULESET_NAME = 'Founder Control Room main exact-head gate';
+export const CANONICAL_NATIVE_APPROVAL_COUNT = 0;
 export const REQUIRED_CHECKS = ['Required Gate', 'Verify test-ledger contract'];
 export const CODEQL_SECURITY_FLOOR = Object.freeze({
   tool: 'CodeQL',
@@ -138,18 +139,23 @@ export function codeQLSecurityFloorSatisfied(snapshot) {
     && observed[0]?.alertsThreshold === CODEQL_SECURITY_FLOOR.alertsThreshold;
 }
 
-export function canonicalFloorSatisfied(snapshot, expectedBypassActors) {
+export function canonicalFloorSatisfied(
+  snapshot,
+  expectedBypassActors,
+  requiredNativeApprovals = CANONICAL_NATIVE_APPROVAL_COUNT,
+) {
   if (!snapshot) return false;
+  const requireNativeHumanReview = requiredNativeApprovals > 0;
   return snapshot.name === CANONICAL_RULESET_NAME
     && snapshot.enforcement === 'active'
     && snapshot.target === 'branch'
     && snapshot.targetsRequestedRef === true
     && exactRuleTypesMatch(snapshot, ['pull_request', 'code_scanning', 'non_fast_forward', 'deletion'])
     && snapshot.requirePullRequest === true
-    && snapshot.requiredApprovingReviewCount >= 1
+    && snapshot.requiredApprovingReviewCount === requiredNativeApprovals
     && snapshot.dismissStaleReviewsOnPush === true
-    && snapshot.requireCodeOwnerReview === true
-    && snapshot.requireLastPushApproval === true
+    && snapshot.requireCodeOwnerReview === requireNativeHumanReview
+    && snapshot.requireLastPushApproval === requireNativeHumanReview
     && snapshot.requiredReviewThreadResolution === true
     && snapshot.strictRequiredStatusChecks === false
     && snapshot.requiredStatusCheckNames.length === 0
@@ -226,6 +232,8 @@ export function buildReport({
     defaultBranch,
     canonicalRulesetName: canonicalName,
     canonicalFreshnessRulesetName: freshnessName,
+    humanReviewPhase: CANONICAL_NATIVE_APPROVAL_COUNT === 0 ? 'founder-only' : 'founder-plus-independent',
+    requiredNativeApprovalCount: CANONICAL_NATIVE_APPROVAL_COUNT,
     observedAt: new Date().toISOString(),
     providerMutationPerformed: false,
     observationComplete,
@@ -252,7 +260,6 @@ export function buildReport({
         && activeTargetingRef.length === 2
         && canonicalFloor
         && freshnessFloor
-        && eligibleReviewers.length > 0
           ? 'READY'
           : 'NOT_READY',
   };
@@ -266,6 +273,8 @@ export function buildBlockedReport({ repository, targetRef = 'main', reason = 'p
     defaultBranch: null,
     canonicalRulesetName: CANONICAL_RULESET_NAME,
     canonicalFreshnessRulesetName: canonicalFreshnessRulesetName(),
+    humanReviewPhase: CANONICAL_NATIVE_APPROVAL_COUNT === 0 ? 'founder-only' : 'founder-plus-independent',
+    requiredNativeApprovalCount: CANONICAL_NATIVE_APPROVAL_COUNT,
     observedAt: new Date().toISOString(),
     providerMutationPerformed: false,
     observationComplete: false,
@@ -385,6 +394,8 @@ async function main() {
     repository: report.repository,
     targetRef: report.targetRef,
     defaultBranch: report.defaultBranch,
+    humanReviewPhase: report.humanReviewPhase,
+    requiredNativeApprovalCount: report.requiredNativeApprovalCount,
     status: report.status,
     observationComplete: report.observationComplete,
     blocker: report.blocker,
