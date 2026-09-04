@@ -177,12 +177,11 @@ function issuedAuthority(crossProductDispatchPerformed: boolean) {
   };
 }
 
-productBuildRouter.use(requireFounder);
-
 productBuildRouter.post(
   '/storyengine/directive',
-  requirePortfolioSwitchOn('fcr-privileged-execution-master'),
   rateLimitFounderPermissions,
+  requireFounder,
+  requirePortfolioSwitchOn('fcr-privileged-execution-master'),
   (req: FounderRequest, res) => {
     const prepared = prepareStoryEngineDirective(req.body);
     if (!prepared.ok) return res.status(prepared.status).json(prepared.body);
@@ -200,8 +199,9 @@ productBuildRouter.post(
 
 productBuildRouter.post(
   '/storyengine/execute',
-  requirePortfolioSwitchOn('fcr-privileged-execution-master'),
   rateLimitFounderPermissions,
+  requireFounder,
+  requirePortfolioSwitchOn('fcr-privileged-execution-master'),
   async (req: FounderRequest, res) => {
     const prepared = prepareStoryEngineDirective(req.body);
     if (!prepared.ok) return res.status(prepared.status).json(prepared.body);
