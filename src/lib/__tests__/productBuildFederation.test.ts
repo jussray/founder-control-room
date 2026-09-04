@@ -123,10 +123,10 @@ describe('StoryEngine product-build federation', () => {
       baseUrl: 'http://127.0.0.1:3901',
       apiKey: 'scoped-fcr-key',
       fetchImpl,
-    })).rejects.toMatchObject<ProductBuildFederationError>({
+    })).rejects.toMatchObject({
       code: 'PRODUCT_BUILD_STALE_RUNTIME',
       mayHaveExecuted: false,
-    });
+    } satisfies Pick<ProductBuildFederationError, 'code' | 'mayHaveExecuted'>);
     expect(calls).toHaveLength(1);
   });
 
@@ -148,9 +148,9 @@ describe('StoryEngine product-build federation', () => {
       baseUrl: 'http://127.0.0.1:3901',
       apiKey: 'scoped-fcr-key',
       fetchImpl,
-    })).rejects.toMatchObject<ProductBuildFederationError>({
+    })).rejects.toMatchObject({
       code: 'PRODUCT_BUILD_EXECUTION_UNKNOWN',
       mayHaveExecuted: true,
-    });
+    } satisfies Pick<ProductBuildFederationError, 'code' | 'mayHaveExecuted'>);
   });
 });
