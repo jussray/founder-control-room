@@ -13,10 +13,12 @@ import {
   type N8nFounderContentDispatchResult,
 } from './n8nFounderContentOrchestrator.js';
 import {
-  claimFounderContentApproval,
   readCurrentFounderContentApproval,
   type FounderContentApprovalRepository,
 } from './founderContentApprovalStore.js';
+import {
+  claimFounderContentApprovalForExecutionGeneration,
+} from './atomicFounderContentExecutionClaim.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -40,6 +42,7 @@ export interface AuthoritativeN8nFounderContentOptions {
   fetchImpl?: typeof fetch;
   approvalRepository?: FounderContentApprovalRepository;
   prepare?: typeof prepareProviderNeutralN8nFounderContent;
+  atomicClaim?: typeof claimFounderContentApprovalForExecutionGeneration;
 }
 
 export type AuthoritativeN8nFounderContentResult = N8nFounderContentDispatchResult | {
@@ -165,10 +168,10 @@ function preparedClaimBoundaryFailure(
  *
  * Transport readiness, cadence, exact approval-expiry bounds, source-project
  * resolution, and the durable execution reservation all complete before FCR
- * consumes one-shot founder authority. Immediately before the approval claim,
- * FCR atomically rotates the exact active reservation generation so a stale or
- * rearmed worker cannot consume authority. Only the worker holding that fresh
- * generation may claim approval and proceed toward the provider-write latch.
+ * consumes one-shot founder authority. The final approval consumption is bound
+ * in one database transaction to the exact database-returned execution
+ * generation. A stale/rearmed worker therefore cannot burn one-shot authority
+ * before its later provider-write fence rejects it.
  */
 export async function dispatchAuthoritativeN8nFounderContent(
   input: AuthoritativeN8nFounderContentInput,
@@ -338,72 +341,74 @@ export async function dispatchAuthoritativeN8nFounderContent(
     ]);
   }
 
-  let activeClaimBoundary = false;
-  try {
-    activeClaimBoundary = await prepared.acquireApprovalClaimBoundary();
-  } catch (error) {
+  const executionStartedAt = text(prepared.reservationStartedAt);
+  if (!executionStartedAt || !Number.isFinite(Date.parse(executionStartedAt))) {
+    const abortWarning = await abortPreparedReservation(
+      prepared,
+      'prepared founder-content execution did not expose an authoritative reservation generation',
+    );
     return blocked([
-      'prepared execution reservation generation could not be acquired before approval claim',
-      error instanceof Error ? error.message : 'reservation claim-boundary acquisition failed',
+      'prepared execution reservation did not expose the database-returned started_at generation required for atomic approval claim',
       'FCR did not consume the one-shot approval',
       'no provider request was attempted',
-    ]);
-  }
-  if (!activeClaimBoundary) {
-    return blocked([
-      'prepared execution reservation generation is no longer active at the approval claim boundary',
-      'FCR did not consume the one-shot approval',
-      'no provider request was attempted',
+      ...(abortWarning ? [abortWarning] : []),
     ]);
   }
 
+  const atomicClaim = options.atomicClaim ?? claimFounderContentApprovalForExecutionGeneration;
   let claim;
   try {
-    claim = await claimFounderContentApproval({
-      proposal: input.proposal,
-      founderUserId,
+    claim = await atomicClaim({
+      executionId: prepared.executionId,
+      executionStartedAt,
       approvalId,
+      founderUserId,
+      proposalHash: text(input.proposal.proposal_hash).toLowerCase(),
+      publicPayloadHash,
       authorizationHash,
-      expectedPublicPayloadHash: publicPayloadHash,
       consumedBy: founderIdentity,
       now: claimNow,
-      repository: options.approvalRepository,
     });
   } catch (error) {
-    const abortWarning = await abortPreparedReservation(
-      prepared,
-      'authoritative approval claim threw before provider dispatch',
-    );
     return blocked([
-      'provider orchestration stopped because FCR could not validate the approval request',
-      error instanceof Error ? error.message : 'authoritative approval validation failed',
-      ...(abortWarning ? [abortWarning] : []),
+      'atomic founder-content approval claim outcome is unknown; reconcile the execution and approval ledgers before retry',
+      error instanceof Error ? error.message : 'atomic execution-bound approval claim failed',
+      'no provider request was attempted',
     ]);
   }
 
   if (!claim.ok) {
+    if (claim.code === 'CLAIM_STORE_FAILED') {
+      return blocked([
+        'atomic founder-content approval claim outcome could not be proven; reconcile the execution and approval ledgers before retry',
+        claim.reason,
+        'no provider request was attempted',
+      ]);
+    }
+
     const abortWarning = await abortPreparedReservation(
       prepared,
-      'authoritative approval claim was rejected before provider dispatch',
+      'atomic founder-content approval claim rejected the stale or non-current execution generation',
     );
     return blocked([
-      'provider orchestration stopped because FCR could not claim a current authoritative ApprovalReceipt',
+      'provider orchestration stopped because the exact execution generation could not atomically claim current founder authority',
       claim.reason,
+      'FCR did not consume the one-shot approval',
+      'no provider request was attempted',
       ...(abortWarning ? [abortWarning] : []),
     ]);
   }
+
   if (
     claim.approvalId !== approvalId
     || claim.publicPayloadHash !== publicPayloadHash
     || claim.authorizationHash !== authorizationHash
+    || Date.parse(claim.executionStartedAt) !== Date.parse(executionStartedAt)
   ) {
-    const abortWarning = await abortPreparedReservation(
-      prepared,
-      'claimed approval identity did not match the prepared provider request',
-    );
     return blocked([
-      'claimed authoritative approval does not match the exact founder confirmation',
-      ...(abortWarning ? [abortWarning] : []),
+      'atomic founder-content approval claim returned mismatched authority evidence; reconcile before retry',
+      'the approval may already be consumed, so FCR will not rewrite the execution reservation automatically',
+      'no provider request was attempted',
     ]);
   }
 
