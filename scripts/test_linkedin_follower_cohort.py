@@ -178,6 +178,30 @@ class LinkedInFollowerCohortTest(unittest.TestCase):
         self.assertEqual(receipt['summary']['identified'], 0)
         self.assertEqual(receipt['summary']['unresolved_identity_count'], 1)
 
+    def test_workflow_separates_source_auth_from_identity_and_fails_closed(self):
+        workflow = (
+            Path(__file__).resolve().parents[1]
+            / '.github'
+            / 'workflows'
+            / 'linkedin-follower-cohort.yml'
+        ).read_text()
+        self.assertIn(
+            'LINKEDIN_FOLLOWER_ID_HMAC_KEY: ${{ secrets.LINKEDIN_FOLLOWER_ID_HMAC_KEY }}',
+            workflow,
+        )
+        self.assertNotIn(
+            'LINKEDIN_FOLLOWER_ID_HMAC_KEY: ${{ secrets.LINKEDIN_FOLLOWER_SNAPSHOT_TOKEN }}',
+            workflow,
+        )
+        self.assertIn(
+            'LINKEDIN_FOLLOWER_ID_HMAC_EPOCH: ${{ vars.LINKEDIN_FOLLOWER_ID_HMAC_EPOCH }}',
+            workflow,
+        )
+        self.assertNotIn('} || true)', workflow)
+        self.assertIn('BLOCKED_PREDECESSOR_ARTIFACT', workflow)
+        job_header = workflow.split('reconcile-private-snapshot:', 1)[1].split('steps:', 1)[0]
+        self.assertNotIn('\n    env:', job_header)
+
 
 if __name__ == '__main__':
     unittest.main()
