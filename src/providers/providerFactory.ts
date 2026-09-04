@@ -112,10 +112,10 @@ export function assertRulesetGovernancePolicy(
   }
   if (
     !Number.isInteger(config.requiredApprovingReviewCount)
-    || config.requiredApprovingReviewCount < FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS
+    || config.requiredApprovingReviewCount !== FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS
   ) {
     throw new Error(
-      `Founder Control Room main governance requires at least ${FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS} native approving reviews`,
+      `Founder Control Room main governance requires exactly ${FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS} native approving reviews for the checked-in phase`,
     );
   }
   for (const requiredCheck of FOUNDER_CONTROL_ROOM_REQUIRED_STATUS_CHECKS) {
