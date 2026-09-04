@@ -16,6 +16,8 @@ Each registered repository remains authoritative for:
 
 Founder Control Room may read approved repository metadata, compare declared capabilities with exact-commit evidence, retain sanitized operational observations, create findings, and prepare a proposed repair mission. It may not create a branch, integrate, deploy, roll back, reveal a secret, or perform a destructive action without a separate founder approval for that action.
 
+A separately approved bounded product-build directive may cross the repository boundary only through a product-owned control-room contract whose target, exact head, capabilities, mutation scope, required proof, rollback, and authority ceiling are all explicit. That bounded execution does not transfer repository ownership to FCR and does not grant merge, deploy, publication, provider-mutation, spend, deletion, or destructive authority.
+
 ## Repository-owned manifest
 
 Every portfolio repository stores:
@@ -138,6 +140,35 @@ REPOSITORY_INGEST_SECRET_<NORMALIZED_PROJECT_SLUG>
 ```
 
 The backend discards unknown packet fields and verifies project/repository identity against its registry before accepting evidence.
+
+## Bounded StoryEngine product-build federation
+
+FCR and StoryEngine currently share the versioned `juss-v10/product-build-directive@v1` / `juss-v10/product-build-receipt@v1` seam. The current first actuator is deliberately narrow:
+
+```text
+FCR founder decision
+-> exact StoryEngine proposal/head binding
+-> FCR local peer-contract validation
+-> canonical directive JSON at the HTTP request body root
+-> StoryEngine independent validation
+-> control-room:event-log actuator
+-> exact receipt
+-> FCR reconciliation
+```
+
+The following invariants are mandatory:
+
+- the directive targets `jussray/StoryEngine`, project `l99`, and `storyengine-control-room`;
+- `expectedHeadSha` is a full exact StoryEngine SHA and must equal the runtime identity immediately before and after execution;
+- the allowed capability includes only the reviewed StoryEngine federation capability for this seam;
+- the mutation scope is bounded to `control-room:event-log` for the first actuator;
+- `requiredProof` includes both `node-test` and `playwright`; FCR rejects drift from this peer contract before dispatch and StoryEngine validates it independently;
+- the request body is the canonical directive object itself, not a nested `{ directive: ... }` wrapper;
+- the returned receipt must bind to the exact directive and may not claim merge, deploy, or provider mutation;
+- an ambiguous transport result is not blindly retried because the bounded actuator may already have executed;
+- source wiring, unit tests, or a reachable HTTP endpoint do not prove the current peer loop. Current proof requires the exact FCR head, exact StoryEngine runtime head, receipt reconciliation, and the applicable real-path browser evidence.
+
+If either repository head, the peer runtime identity, contract version, proof requirements, serialized wire shape, or provider/runtime context changes, predecessor federation proof is `STALE/SUPERSEDED` until the exact successor is reverified. See `docs/PR_CONTINUITY.md`.
 
 ## GitHub webhook privacy
 
