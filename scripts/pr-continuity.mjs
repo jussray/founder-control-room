@@ -23,22 +23,29 @@ export function assertExpectedHead(expected, actual) {
 export function replaceManagedBlock(body = '', block) {
   const starts = body.split(START_MARKER).length - 1;
   const ends = body.split(END_MARKER).length - 1;
-  if (!starts && !ends) {
-    return `${body.trimEnd()}${body.trimEnd() ? '\n\n' : ''}${block}\n`;
+  if (starts !== ends || starts > 1 || ends > 1) {
+    throw new Error('MALFORMED_CONTINUITY_MARKERS');
   }
-  if (starts !== 1 || ends !== 1) throw new Error('MALFORMED_CONTINUITY_MARKERS');
-  const start = body.indexOf(START_MARKER);
-  const end = body.indexOf(END_MARKER);
-  if (start > end) throw new Error('MALFORMED_CONTINUITY_MARKERS');
-  const before = body.slice(0, start).trimEnd();
-  const after = body.slice(end + END_MARKER.length).trimStart();
-  return `${before}${before ? '\n\n' : ''}${block}${after ? `\n\n${after}` : '\n'}`;
+
+  let human = body.trim();
+  if (starts === 1) {
+    const start = body.indexOf(START_MARKER);
+    const end = body.indexOf(END_MARKER);
+    if (start > end) throw new Error('MALFORMED_CONTINUITY_MARKERS');
+    const before = body.slice(0, start).trim();
+    const after = body.slice(end + END_MARKER.length).trim();
+    human = [before, after].filter(Boolean).join('\n\n');
+  }
+
+  return `${block}${human ? `\n\n${human}` : ''}\n`;
 }
 
 export function continuityBlock(value) {
   return [
     START_MARKER,
     '## PR Continuity Receipt',
+    '',
+    '> **MACHINE CURRENT TRUTH:** This block governs present-tense PR identity and continuity status. SHA/status prose below is historical unless it matches this receipt.',
     '',
     `- schema: \`${SCHEMA}\``,
     `- repository: \`${value.repository}\``,
