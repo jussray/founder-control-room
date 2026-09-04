@@ -28,11 +28,16 @@ import {
   createFounderControlDecision,
   type FounderControlProposalBinding,
 } from '../../../lib/founderControlDecision.js';
+import {
+  productBuildReceiptHash,
+  type ProductBuildReceipt,
+} from '../../../lib/productBuildDirective.js';
 import { productBuildRouter } from '../productBuild.js';
 
 const FOUNDER_EMAIL = 'founder@example.com';
 const BEARER = 'Bearer founder-token';
 const STORY_HEAD = 'b'.repeat(40);
+const STARTED_AT = '2026-09-04T16:00:00.000Z';
 
 function buildApp() {
   const app = express();
@@ -107,9 +112,23 @@ function requestBody() {
   };
 }
 
+function runtimeIdentity() {
+  return {
+    service: 'l99-story-engine',
+    release_sha: STORY_HEAD,
+    runtime_mode: 'test',
+    state_backend: 'sqlite',
+    persistence_contract: 'repo-local',
+    started_at: STARTED_AT,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
   readEffectiveDesiredState.mockResolvedValue('on');
+  process.env.STORYENGINE_PRODUCT_CONTROL_ROOM_URL = 'http://127.0.0.1:3901';
+  process.env.STORYENGINE_PRODUCT_CONTROL_ROOM_API_KEY = 'test-scoped-product-build-key';
   supabaseMock.from.mockImplementation((table: string) => {
     if (table === 'founder_users') return founderUsersRow();
     throw new Error(`Unexpected persistence access: ${table}`);
@@ -232,5 +251,89 @@ describe('POST /product-build/storyengine/directive', () => {
 
     expect(response.status).toBe(409);
     expect(response.body.reasons).toContain('Chief capability plan must select founder-control-room-federation');
+  });
+});
+
+describe('POST /product-build/storyengine/execute', () => {
+  it('drives one exact-head federation lap and returns the reconciled receipt', async () => {
+    founderSession();
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/runtime-identity')) {
+        return new Response(JSON.stringify(runtimeIdentity()), { status: 200 });
+      }
+      if (url.endsWith('/api/control-room/product-build/execute')) {
+        const parsed = JSON.parse(String(init?.body ?? '{}')) as { directive: { directiveHash: string } };
+        const withoutHash: Omit<ProductBuildReceipt, 'receiptHash'> = {
+          contract: 'juss-v10/product-build-receipt@v1',
+          directiveHash: parsed.directive.directiveHash,
+          productControlRoomId: 'storyengine-control-room',
+          repository: 'jussray/StoryEngine',
+          status: 'completed',
+          changedResources: ['control-room:event-log'],
+          proofRefs: ['storyengine:event-log:42'],
+          executionReceiptId: '42',
+          mergePerformed: false,
+          deployPerformed: false,
+          providerMutationPerformed: false,
+        };
+        return new Response(JSON.stringify({
+          receipt: { ...withoutHash, receiptHash: productBuildReceiptHash(withoutHash) },
+        }), { status: 200 });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await request(buildApp())
+      .post('/product-build/storyengine/execute')
+      .set('Authorization', BEARER)
+      .send(requestBody());
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      ok: true,
+      receipt: {
+        status: 'completed',
+        changedResources: ['control-room:event-log'],
+        mergePerformed: false,
+        deployPerformed: false,
+        providerMutationPerformed: false,
+      },
+      reconciliation: {
+        state: 'verified',
+        exactHeadVerified: true,
+        receiptVerified: true,
+      },
+      authority: {
+        crossProductDispatchPerformed: true,
+        mergeAuthorized: false,
+        deployAuthorized: false,
+        providerMutationAuthorized: false,
+      },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not pretend execution happened when federation configuration is missing', async () => {
+    founderSession();
+    delete process.env.STORYENGINE_PRODUCT_CONTROL_ROOM_URL;
+    delete process.env.STORYENGINE_PRODUCT_CONTROL_ROOM_API_KEY;
+
+    const response = await request(buildApp())
+      .post('/product-build/storyengine/execute')
+      .set('Authorization', BEARER)
+      .send(requestBody());
+
+    expect(response.status).toBe(503);
+    expect(response.body).toMatchObject({
+      ok: false,
+      code: 'PRODUCT_BUILD_FEDERATION_NOT_CONFIGURED',
+      executionState: 'not_verified',
+      blindRetryAllowed: false,
+      mergeAuthorized: false,
+      deployAuthorized: false,
+      providerMutationAuthorized: false,
+    });
   });
 });
