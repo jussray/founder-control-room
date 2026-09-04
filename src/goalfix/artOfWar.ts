@@ -338,13 +338,22 @@ export function validateArtOfWarContinuity(
   if (cookie.predecessorCookieId) {
     if (!predecessor || predecessor.cookieId !== cookie.predecessorCookieId) {
       errors.push('declared predecessor continuity cookie is missing or mismatched');
-    } else if (
-      predecessor.browserCookie !== false
-      || predecessor.authorizing !== false
-      || predecessor.approvalCarryForward !== false
-      || predecessor.standingMutationAuthority !== false
-    ) {
-      errors.push('predecessor continuity cookie violates non-authorizing boundary');
+    } else {
+      const predecessorObservedAt = Date.parse(predecessor.observedAt);
+      const successorObservedAt = Date.parse(cookie.observedAt);
+      if (!Number.isFinite(predecessorObservedAt)) {
+        errors.push('predecessor continuity observedAt is invalid');
+      } else if (!Number.isFinite(successorObservedAt) || successorObservedAt < predecessorObservedAt) {
+        errors.push('continuity successor cannot predate predecessor');
+      }
+      if (
+        predecessor.browserCookie !== false
+        || predecessor.authorizing !== false
+        || predecessor.approvalCarryForward !== false
+        || predecessor.standingMutationAuthority !== false
+      ) {
+        errors.push('predecessor continuity cookie violates non-authorizing boundary');
+      }
     }
   }
 
