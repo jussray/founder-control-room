@@ -4,6 +4,11 @@ import {
   type GoalfixAttempt,
   type GoalfixStagnationResult,
 } from './stagnation.js';
+import {
+  assessArtOfWar,
+  type ArtOfWarAssessment,
+  type ArtOfWarAssessmentInput,
+} from './artOfWar.js';
 
 export interface GoalfixScopeBudget {
   firstFilesOrLogs: string[];
@@ -15,6 +20,7 @@ export interface BuildGoalfixSkillRuntimeInput {
   intent: ResolveGoalfixIntentInput;
   attempts?: GoalfixAttempt[];
   scope: GoalfixScopeBudget;
+  strategy?: ArtOfWarAssessmentInput;
   provenance?: {
     artifactSha256?: string;
     sourceName?: string;
@@ -26,6 +32,7 @@ export interface GoalfixSkillRuntimeDecision {
   intent: GoalfixIntent;
   stagnation: GoalfixStagnationResult;
   scope: GoalfixScopeBudget;
+  artOfWar: ArtOfWarAssessment | null;
   provenance: {
     artifactSha256?: string;
     sourceName?: string;
@@ -53,9 +60,10 @@ export function buildGoalfixSkillRuntimeDecision(
   const intent = resolveGoalfixIntent(input.intent);
   const stagnation = detectGoalfixStagnation(input.attempts ?? []);
   const scope = normalizeScope(input.scope);
+  const artOfWar = input.strategy ? assessArtOfWar(input.strategy) : null;
 
   let mayProceed = true;
-  let nextAction = 'Inspect only the scoped first files or logs, then re-observe.';
+  let nextAction = artOfWar?.nextAction ?? 'Inspect only the scoped first files or logs, then re-observe.';
 
   if (intent.confidence === 'low') {
     mayProceed = false;
@@ -66,6 +74,9 @@ export function buildGoalfixSkillRuntimeDecision(
   } else if (stagnation.stagnant) {
     mayProceed = false;
     nextAction = stagnation.nextAction;
+  } else if (artOfWar && !artOfWar.mayProceed) {
+    mayProceed = false;
+    nextAction = artOfWar.nextAction;
   }
 
   return {
@@ -73,6 +84,7 @@ export function buildGoalfixSkillRuntimeDecision(
     intent,
     stagnation,
     scope,
+    artOfWar,
     provenance: input.provenance ?? {},
     mayProceed,
     nextAction,
