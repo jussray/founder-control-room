@@ -41,6 +41,8 @@ The workflow uses dedicated `LINKEDIN_POST_ID_HMAC_KEY` secret material for iden
 
 Every receipt also carries the non-secret `LINKEDIN_POST_ID_HMAC_EPOCH`. Keep the epoch stable while a given private HMAC key remains active. When the key is intentionally rotated, advance the epoch. A predecessor from a different or legacy/missing epoch becomes a new privacy baseline: current visible posts are `baseline_or_unknown_visible`, not fabricated `new` posts, and prior identifiers are not called missing merely because the private identity key changed.
 
+The epoch is continuity metadata only. It never grants execution, publication, provider, or approval authority.
+
 The fingerprint is observation identity only. It is not publication proof, approval, provider authority, or permission to correlate private analytics outside the authorized evidence lane.
 
 ### Cadence cookies
