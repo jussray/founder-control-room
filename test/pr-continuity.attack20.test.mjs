@@ -29,18 +29,20 @@ test('AT06 expected head mismatch fails', () => assert.throws(() => assertExpect
 test('AT07 exact head match passes', () => assert.equal(assertExpectedHead('a'.repeat(40), 'a'.repeat(40)), true));
 test('AT08 fork pull is not same-repository authority', () => assert.equal(sameRepositoryPull(pr(1, 'main', 'fork', 'open', { full_name: 'other/repo' }), repo), false));
 test('AT09 same-repo pull qualifies', () => assert.equal(sameRepositoryPull(pr(1, 'main', 'feature'), repo), true));
-test('AT10 append managed block preserves body', () => {
-  const next = replaceManagedBlock('Human scope', `${START_MARKER}\nreceipt\n${END_MARKER}`);
-  assert.match(next, /^Human scope/);
-  assert.match(next, /receipt/);
+test('AT10 managed current truth is prepended ahead of human prose', () => {
+  const block = `${START_MARKER}\nreceipt\n${END_MARKER}`;
+  const next = replaceManagedBlock('Human scope', block);
+  assert.equal(next.startsWith(block), true);
+  assert.ok(next.indexOf('Human scope') > next.indexOf(END_MARKER));
 });
-test('AT11 refresh managed block preserves surrounding prose', () => {
+test('AT11 refresh relocates managed truth to the top while preserving human prose order', () => {
   const body = `Before\n\n${START_MARKER}\nold\n${END_MARKER}\n\nAfter`;
-  const next = replaceManagedBlock(body, `${START_MARKER}\nnew\n${END_MARKER}`);
-  assert.match(next, /^Before/);
-  assert.match(next, /new/);
+  const block = `${START_MARKER}\nnew\n${END_MARKER}`;
+  const next = replaceManagedBlock(body, block);
+  assert.equal(next.startsWith(block), true);
   assert.doesNotMatch(next, /old/);
-  assert.match(next, /After$/);
+  assert.match(next, /Before\n\nAfter/);
+  assert.ok(next.indexOf('Before') > next.indexOf(END_MARKER));
 });
 test('AT12 duplicate markers block metadata mutation', () => assert.throws(() => replaceManagedBlock(`${START_MARKER}${START_MARKER}${END_MARKER}`, 'x'), /MALFORMED/));
 test('AT13 orphan start marker blocks', () => assert.throws(() => replaceManagedBlock(`${START_MARKER}x`, 'x'), /MALFORMED/));
@@ -48,6 +50,7 @@ test('AT14 orphan end marker blocks', () => assert.throws(() => replaceManagedBl
 test('AT15 proof subject equals live head', () => {
   const block = continuityBlock({ repository: repo, prNumber: 7, rootBaseRef: 'main', rootBaseSha: '1'.repeat(40), baseRef: 'main', baseSha: '1'.repeat(40), headRef: 'feature', headSha: '2'.repeat(40), continuityState: 'CURRENT', proofState: 'EXACT_HEAD_PROOF_SEPARATE' });
   assert.ok(block.includes(`proof_subject: \`${'2'.repeat(40)}\``));
+  assert.match(block, /MACHINE CURRENT TRUTH/);
 });
 test('AT16 receipt explicitly denies merge authority', () => assert.match(continuityBlock({ repository: repo, prNumber: 1, rootBaseRef: 'main', rootBaseSha: '1', baseRef: 'main', baseSha: '1', headRef: 'x', headSha: '2', continuityState: 'CURRENT', proofState: 'SEPARATE' }), /merge_authority: \*\*false\*\*/));
 test('AT17 receipt explicitly denies deploy authority', () => assert.match(continuityBlock({ repository: repo, prNumber: 1, rootBaseRef: 'main', rootBaseSha: '1', baseRef: 'main', baseSha: '1', headRef: 'x', headSha: '2', continuityState: 'CURRENT', proofState: 'SEPARATE' }), /deploy_authority: \*\*false\*\*/));
