@@ -22,6 +22,9 @@ import {
   verifyProviderNeutralN8nFounderContentReceipt,
   type N8nFounderContentProvider,
 } from './n8nProviderNeutralFounderContentOrchestrator.js';
+import {
+  rearmFounderContentPreclaimExecution,
+} from './atomicFounderContentPreclaimRearm.js';
 
 const PROVIDER_NEUTRAL_CADENCE_PROVIDER = 'n8n' as const;
 const FOUNDER_CONTENT_ACTION = 'schedule_founder_content' as const;
@@ -150,6 +153,7 @@ async function tryRearmRetryablePreProviderReservation(
     && text(existing.status) === 'failed'
     && result.retryable_before_provider === true
     && result.provider_write_attempted === false
+    && result.approval_claimed !== true
   );
   const abandonedPending = Boolean(
     existing
@@ -170,75 +174,44 @@ async function tryRearmRetryablePreProviderReservation(
     return first;
   }
 
-  const reservationStartedAt = new Date().toISOString();
-  const rearmPayload = {
-    executed_by: executedBy,
-    status: 'pending',
-    request: executionAuditRequest(request),
-    result: {
-      resumed_from_pre_provider_failure: retryableFailed,
-      resumed_from_abandoned_preclaim_reservation: abandonedPending,
-      approval_claimed: false,
-      provider_write_attempted: false,
-    },
-    success: null,
-    started_at: reservationStartedAt,
-    executed_at: null,
-  };
-
-  let rearmed: { id?: unknown; project_id?: unknown; started_at?: unknown } | null = null;
-  let rearmError: { message: string } | null = null;
-  if (abandonedPending) {
-    const update = await supabase
-      .from('approval_executions')
-      .update(rearmPayload)
-      .eq('id', existing.id)
-      .eq('status', 'pending')
-      .eq('started_at', text(existing.started_at))
-      .eq('result->>provider_write_attempted', 'false')
-      .select('id, project_id, started_at')
-      .maybeSingle();
-    rearmed = update.data;
-    rearmError = update.error;
-  } else {
-    const update = await supabase
-      .from('approval_executions')
-      .update(rearmPayload)
-      .eq('id', existing.id)
-      .eq('status', 'failed')
-      .eq('started_at', text(existing.started_at))
-      .eq('result->>provider_write_attempted', 'false')
-      .select('id, project_id, started_at')
-      .maybeSingle();
-    rearmed = update.data;
-    rearmError = update.error;
-  }
-
-  if (rearmError) {
+  const expectedStartedAt = text(existing.started_at);
+  const expectedStartedMs = Date.parse(expectedStartedAt);
+  if (!expectedStartedAt || !Number.isFinite(expectedStartedMs)) {
     return {
       ok: false,
       code: 'ACTION_RESERVATION_FAILED',
-      reason: `pre-provider reservation recovery failed: ${rearmError.message}`,
+      reason: 'pre-provider reservation recovery has no authoritative started_at generation',
     };
   }
-  if (!rearmed?.id) {
-    return reserveN8nFounderContentExecution(request, executedBy);
-  }
 
-  const authoritativeReservationStartedAt = text(rearmed.started_at);
-  if (!authoritativeReservationStartedAt) {
+  const newStartedAt = new Date(
+    Math.max(Date.now(), expectedStartedMs + 1),
+  ).toISOString();
+  const rearmed = await rearmFounderContentPreclaimExecution({
+    executionId: String(existing.id),
+    expectedStatus: abandonedPending ? 'pending' : 'failed',
+    expectedStartedAt,
+    newStartedAt,
+    executedBy,
+    request: executionAuditRequest(request),
+    resumedFromFailed: retryableFailed,
+    resumedFromAbandoned: abandonedPending,
+  });
+
+  if (!rearmed.ok) {
+    if (rearmed.code === 'REARM_NOT_CURRENT') return first;
     return {
       ok: false,
       code: 'ACTION_RESERVATION_FAILED',
-      reason: 'pre-provider reservation recovery did not return the authoritative started_at generation',
+      reason: `pre-provider reservation recovery failed: ${rearmed.reason}`,
     };
   }
 
   return {
     ok: true,
-    executionId: String(rearmed.id),
-    projectId: String(rearmed.project_id ?? existing.project_id),
-    reservationStartedAt: authoritativeReservationStartedAt,
+    executionId: rearmed.executionId,
+    projectId: rearmed.projectId,
+    reservationStartedAt: rearmed.executionStartedAt,
   };
 }
 
@@ -312,6 +285,7 @@ async function abortPreparedFounderContentExecution(
         phase: 'pre_provider_approval_claim',
         reason: text(reason).slice(0, 500) || 'founder approval claim did not complete',
         retryable_before_provider: true,
+        approval_claimed: false,
         provider_write_attempted: false,
       },
       success: false,
@@ -320,6 +294,7 @@ async function abortPreparedFounderContentExecution(
     .eq('id', executionId)
     .eq('status', 'pending')
     .eq('started_at', generation)
+    .eq('result->>approval_claimed', 'false')
     .select('id')
     .maybeSingle();
 
