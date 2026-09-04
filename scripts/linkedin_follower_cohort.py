@@ -20,6 +20,7 @@ from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+KEY_EPOCH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
 ALLOWED_AUTHORITIES = {
     "FOUNDER_AUTHENTICATED_LINKEDIN_SURFACE",
     "USER_SUPPLIED_LINKEDIN_EVIDENCE",
@@ -105,6 +106,13 @@ def _key_bytes(identity_key: str | bytes) -> bytes:
     if len(key) < 32:
         raise ValueError("follower identity HMAC key must contain at least 32 bytes")
     return key
+
+
+def _key_epoch(value: Any) -> str:
+    epoch = str(value or "").strip()
+    if not KEY_EPOCH_RE.fullmatch(epoch):
+        raise ValueError("identity_key_epoch must be a 1-64 character non-secret epoch identifier")
+    return epoch
 
 
 def follower_fingerprint(
@@ -219,10 +227,16 @@ def normalize_snapshot(snapshot: dict[str, Any], identity_key: str | bytes) -> d
     }
 
 
-def _compatible_previous(previous_receipt: dict[str, Any] | None) -> dict[str, Any] | None:
+def _compatible_previous(
+    previous_receipt: dict[str, Any] | None,
+    identity_key_epoch: str,
+) -> dict[str, Any] | None:
     if previous_receipt is None:
         return None
     if previous_receipt.get("contract") != "linkedin-follower-cohort@v2":
+        return None
+    previous_epoch = previous_receipt.get("privacy", {}).get("identity_key_epoch")
+    if previous_epoch != identity_key_epoch:
         return None
     return previous_receipt
 
@@ -232,12 +246,16 @@ def build_receipt(
     previous_receipt: dict[str, Any] | None = None,
     *,
     identity_key: str | bytes,
+    identity_key_epoch: str,
 ) -> dict[str, Any]:
+    epoch = _key_epoch(identity_key_epoch)
     current = normalize_snapshot(current_snapshot, identity_key)
-    previous = _compatible_previous(previous_receipt)
-    if previous is not None and _observed_at(current["observed_at"]) <= _observed_at(previous.get("observed_at")):
-        raise ValueError("current follower snapshot must be strictly newer than the previous cohort receipt")
 
+    if previous_receipt is not None and previous_receipt.get("contract") == "linkedin-follower-cohort@v2":
+        if _observed_at(current["observed_at"]) <= _observed_at(previous_receipt.get("observed_at")):
+            raise ValueError("current follower snapshot must be strictly newer than the previous cohort receipt")
+
+    previous = _compatible_previous(previous_receipt, epoch)
     previous_items = (previous or {}).get("followers", [])
     previous_map = {item["member_id"]: item for item in previous_items if item.get("member_id")}
     current_map = {item["member_id"]: item for item in current["followers"]}
@@ -252,7 +270,10 @@ def build_receipt(
     if previous is None:
         new: list[str] = []
         baseline_or_unknown_added = sorted(current_ids)
-        baseline_reason = "INITIAL_OR_LEGACY_PRIVACY_BASELINE"
+        if previous_receipt is not None and previous_receipt.get("contract") == "linkedin-follower-cohort@v2":
+            baseline_reason = "IDENTITY_KEY_EPOCH_CHANGED"
+        else:
+            baseline_reason = "INITIAL_OR_LEGACY_PRIVACY_BASELINE"
     elif previous_complete:
         new = visible_not_previously_seen
         baseline_or_unknown_added = []
@@ -270,6 +291,7 @@ def build_receipt(
         unknown_missing = missing
 
     cohort_material = "|".join([
+        epoch,
         current["observed_at"],
         current["source_digest_sha256"],
         current["completeness"],
@@ -287,6 +309,7 @@ def build_receipt(
             "public_receipt_contains_names": False,
             "public_receipt_contains_profile_urls": False,
             "member_identity_scheme": "HMAC-SHA256/private-runtime-key/v1",
+            "identity_key_epoch": epoch,
             "private_key_persisted": False,
             "redacted_metadata_policy": "ALLOWLISTED_ENUMS_ONLY",
         },
@@ -330,10 +353,18 @@ def main() -> int:
     identity_key = os.environ.get("LINKEDIN_FOLLOWER_ID_HMAC_KEY", "")
     if not identity_key:
         raise SystemExit("BLOCKED_PRIVACY_KEY: LINKEDIN_FOLLOWER_ID_HMAC_KEY is required")
+    identity_key_epoch = os.environ.get("LINKEDIN_FOLLOWER_ID_HMAC_EPOCH", "")
+    if not identity_key_epoch:
+        raise SystemExit("BLOCKED_PRIVACY_EPOCH: LINKEDIN_FOLLOWER_ID_HMAC_EPOCH is required")
 
     current = json.loads(Path(args.snapshot_json).read_text())
     previous = json.loads(Path(args.previous_receipt).read_text()) if args.previous_receipt else None
-    receipt = build_receipt(current, previous, identity_key=identity_key)
+    receipt = build_receipt(
+        current,
+        previous,
+        identity_key=identity_key,
+        identity_key_epoch=identity_key_epoch,
+    )
     encoded = json.dumps(receipt, indent=2, sort_keys=True)
     if args.output:
         Path(args.output).write_text(encoded + "\n")
