@@ -167,7 +167,7 @@ describe("FounderControlRoomGovernanceGitHubProvider", () => {
       if (ruleset_id === 22) return { data: freshnessReadback(base) };
       const bad = reviewReadback(base);
       const pull = bad.rules.find((rule) => rule.type === "pull_request");
-      if (pull) pull.parameters.require_code_owner_review = true;
+      if (pull?.parameters) pull.parameters.require_code_owner_review = true;
       return { data: bad };
     });
 
