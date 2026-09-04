@@ -58,6 +58,8 @@ describe('n8n abandoned pre-claim reservation recovery', () => {
     expect(recoveryMarker).toBeGreaterThan(currentApprovalRead);
     expect(approvalClaim).toBeGreaterThan(recoveryMarker);
     expect(preparationSource).toContain(".eq('started_at', text(existing.started_at))");
+    expect(preparationSource).toContain(".select('id, project_id, started_at')");
+    expect(preparationSource).toContain('reservationStartedAt: authoritativeReservationStartedAt');
     expect(preparationSource).toContain('PRECLAIM_RESERVATION_LEASE_MS = 2 * 60 * 1000');
   });
 
@@ -75,6 +77,8 @@ describe('n8n abandoned pre-claim reservation recovery', () => {
     expect(abortSource).toContain(".eq('started_at', generation)");
     expect(preparationSource).toContain('reservation.reservationStartedAt');
 
+    expect(coreSource).toContain(".select('id, started_at')");
+    expect(coreSource).toContain('reservationStartedAt: text(reservation.started_at)');
     expect(coreSource).toContain('reservationStartedAt: string');
     expect(coreSource).toContain(".eq('started_at', generation)");
     expect(coreSource).toContain('reservation.reservationStartedAt');
