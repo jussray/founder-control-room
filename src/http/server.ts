@@ -11,6 +11,8 @@ import { handleBuildEventReceiptIngest } from './routes/buildEventReceipts.js';
 import { reasoningRunsRouter } from './routes/reasoningRuns.js';
 import { approvalsRouter } from './routes/approvals.js';
 import { l99Router } from './routes/l99.js';
+import { productBuildRouter } from './routes/productBuild.js';
+import { handleProductBuildReceiptIngest } from './routes/productBuildReceipts.js';
 import { terminalRouter } from './routes/terminal.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { missionsRouter } from './routes/missions.js';
@@ -231,6 +233,12 @@ export function createServer(options: CreateServerOptions = {}) {
     handleJiraWorkAutomationIngress,
   );
   app.post(
+    '/ingest/product-build-receipts/storyengine',
+    rateLimitGeneral,
+    express.json({ type: 'application/json', limit: '32kb' }),
+    handleProductBuildReceiptIngest,
+  );
+  app.post(
     '/mcp/founder-signal-engine',
     rateLimitGeneral,
     express.json({ type: 'application/json', limit: '64kb' }),
@@ -377,6 +385,7 @@ export function createServer(options: CreateServerOptions = {}) {
   );
   app.use('/approvals', approvalsRouter);
   app.use('/l99', l99Router);
+  app.use('/l99/product-build', productBuildRouter);
   app.use('/terminal', terminalRouter);
   app.use('/dashboard', dashboardRouter);
   app.use('/futureyou', futureYouRouter);
