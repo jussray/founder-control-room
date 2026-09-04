@@ -50,6 +50,14 @@ export interface ProductBuildReceipt {
   receiptHash: string;
 }
 
+type JsonRecord = Record<string, unknown>;
+
+function record(value: unknown): JsonRecord | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as JsonRecord
+    : null;
+}
+
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -68,6 +76,19 @@ function normalizedProposal(input: FounderControlProposalBinding): FounderContro
     expectedHeadSha: text(input.expectedHeadSha).toLowerCase() || null,
     capabilityPlanHash: text(input.capabilityPlanHash).toLowerCase() || null,
   };
+}
+
+function proposalFromUnknown(value: unknown): FounderControlProposalBinding | null {
+  const candidate = record(value);
+  if (!candidate) return null;
+  return normalizedProposal({
+    proposalId: text(candidate.proposalId),
+    proposalHash: text(candidate.proposalHash),
+    projectSlug: text(candidate.projectSlug),
+    actionType: text(candidate.actionType),
+    expectedHeadSha: text(candidate.expectedHeadSha) || null,
+    capabilityPlanHash: text(candidate.capabilityPlanHash) || null,
+  });
 }
 
 function digest(value: unknown): string {
@@ -171,6 +192,82 @@ export function createProductBuildDirective(input: {
   };
 
   return { ...withoutHash, directiveHash: productBuildDirectiveHash(withoutHash) };
+}
+
+export function validateProductBuildDirective(value: unknown): string[] {
+  const candidate = record(value);
+  if (!candidate) return ['product build directive shape is invalid'];
+
+  const errors: string[] = [];
+  const proposal = proposalFromUnknown(candidate.proposal);
+  const directiveId = text(candidate.directiveId);
+  const founderDecisionHash = text(candidate.founderDecisionHash).toLowerCase();
+  const productControlRoomId = text(candidate.productControlRoomId);
+  const repository = text(candidate.repository);
+  const objective = text(candidate.objective);
+  const allowedCapabilities = normalizedList(candidate.allowedCapabilities);
+  const allowedMutationScope = normalizedList(candidate.allowedMutationScope);
+  const requiredProof = normalizedList(candidate.requiredProof);
+  const stopConditions = normalizedList(candidate.stopConditions);
+  const rollback = text(candidate.rollback);
+  const directiveHash = text(candidate.directiveHash).toLowerCase();
+
+  if (candidate.contract !== PRODUCT_BUILD_DIRECTIVE_CONTRACT) errors.push('product build directive contract is unsupported');
+  if (!directiveId) errors.push('product build directiveId is required');
+  if (!proposal) {
+    errors.push('product build directive proposal is invalid');
+  } else {
+    if (!proposal.proposalId) errors.push('product build proposalId is required');
+    if (!SHA256.test(proposal.proposalHash)) errors.push('product build proposalHash must be sha256');
+    if (!proposal.projectSlug) errors.push('product build projectSlug is required');
+    if (!proposal.actionType) errors.push('product build actionType is required');
+    if (!proposal.expectedHeadSha || !FULL_SHA.test(proposal.expectedHeadSha)) errors.push('product build expectedHeadSha must be a full Git SHA');
+    if (!proposal.capabilityPlanHash || !SHA256.test(proposal.capabilityPlanHash)) errors.push('product build capabilityPlanHash must be sha256');
+  }
+  if (!SHA256.test(founderDecisionHash)) errors.push('product build founderDecisionHash must be sha256');
+  if (!productControlRoomId) errors.push('product build control room identity is required');
+  if (!REPOSITORY.test(repository)) errors.push('product build repository identity is invalid');
+  if (!objective) errors.push('product build objective is required');
+  if (allowedCapabilities.length === 0) errors.push('product build allowedCapabilities are required');
+  if (allowedMutationScope.length === 0) errors.push('product build allowedMutationScope is required');
+  if (candidate.authorityCeiling !== 'reversible_product_change') errors.push('product build authority ceiling is unsupported');
+  if (requiredProof.length === 0) errors.push('product build requiredProof is required');
+  if (stopConditions.length === 0) errors.push('product build stopConditions are required');
+  if (!rollback) errors.push('product build rollback is required');
+  if (candidate.chiefCapabilityPlanRequired !== true) errors.push('product build requires Chief capability-plan evidence');
+  if (candidate.executionAuthorized !== true) errors.push('product build execution must be explicitly authorized');
+  if (candidate.receiptRequired !== true) errors.push('product build receipt must be required');
+  if (candidate.mergeAuthorized !== false) errors.push('product build directive cannot grant merge authority');
+  if (candidate.deployAuthorized !== false) errors.push('product build directive cannot grant deploy authority');
+  if (candidate.providerMutationAuthorized !== false) errors.push('product build directive cannot grant provider mutation authority');
+  if (!SHA256.test(directiveHash)) errors.push('product build directiveHash must be sha256');
+
+  if (proposal && errors.length === 0) {
+    const expectedHash = productBuildDirectiveHash({
+      contract: PRODUCT_BUILD_DIRECTIVE_CONTRACT,
+      directiveId,
+      proposal,
+      founderDecisionHash,
+      productControlRoomId,
+      repository,
+      objective,
+      allowedCapabilities,
+      allowedMutationScope,
+      authorityCeiling: 'reversible_product_change',
+      requiredProof,
+      stopConditions,
+      rollback,
+      chiefCapabilityPlanRequired: true,
+      executionAuthorized: true,
+      receiptRequired: true,
+      mergeAuthorized: false,
+      deployAuthorized: false,
+      providerMutationAuthorized: false,
+    });
+    if (directiveHash !== expectedHash) errors.push('product build directive hash does not match the canonical directive identity');
+  }
+
+  return [...new Set(errors)];
 }
 
 function receiptIdentity(receipt: Omit<ProductBuildReceipt, 'receiptHash'>): unknown[] {
