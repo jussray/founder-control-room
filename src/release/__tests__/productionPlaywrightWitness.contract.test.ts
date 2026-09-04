@@ -19,7 +19,8 @@ describe('production Playwright exact-SHA witness contract', () => {
     expect(playwrightWorkflow).toContain(
       'EXPECTED_RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}',
     );
-    expect(playwrightWorkflow).toContain(
+    expect(playwrightWorkflow).toContain('ref: ${{ github.sha }}');
+    expect(playwrightWorkflow).not.toContain(
       'ref: ${{ github.event.workflow_run.head_sha }}',
     );
     expect(playwrightWorkflow).toContain(
