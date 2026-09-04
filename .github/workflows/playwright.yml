@@ -8,6 +8,7 @@ on:
   workflow_run:
     workflows: [Deploy]
     types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
@@ -242,7 +243,7 @@ jobs:
           retention-days: 30
 
   production-release-witness:
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'workflow_dispatch' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success'
     name: Production Playwright Exact-SHA Witness
     runs-on: ubuntu-22.04
     timeout-minutes: 15
@@ -254,19 +255,20 @@ jobs:
       PUBLIC_URL: https://foundercontrolroom.org
 
     steps:
-      - name: Check out the Deploy run head
+      - name: Check out trusted witness source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
 
-      - name: Record and verify witness source head
+      - name: Record trusted witness source and release evidence
         shell: bash
         run: |
           set -euo pipefail
-          actual="$(git rev-parse HEAD)"
-          printf 'deploy_run_head=%s\nchecked_out=%s\n' "$EXPECTED_RELEASE_SHA" "$actual"
-          test "$actual" = "$EXPECTED_RELEASE_SHA"
+          witness_source="$(git rev-parse HEAD)"
+          printf 'trusted_witness_source=%s\ndeploy_run_head=%s\n' "$witness_source" "$EXPECTED_RELEASE_SHA"
+          test "$witness_source" = "$GITHUB_SHA"
+          [[ "$EXPECTED_RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
 
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
