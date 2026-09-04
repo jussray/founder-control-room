@@ -168,7 +168,9 @@ The following invariants are mandatory:
 - an ambiguous transport result is not blindly retried because the bounded actuator may already have executed;
 - source wiring, unit tests, or a reachable HTTP endpoint do not prove the current peer loop. Current proof requires the exact FCR head, exact StoryEngine runtime head, receipt reconciliation, and the applicable real-path browser evidence.
 
-If either repository head, the peer runtime identity, contract version, proof requirements, serialized wire shape, or provider/runtime context changes, predecessor federation proof is `STALE/SUPERSEDED` until the exact successor is reverified. See `docs/PR_CONTINUITY.md`.
+The HTTP ingress firewall is a separate proof membrane from the federation contract itself. The founder-facing directive and execute routes must remain behind the same-origin browser mutation gate and preserve route-local `rateLimitFounderPermissions -> requireFounder -> fcr-privileged-execution-master` ordering. The StoryEngine receipt ingress is intentionally server-to-server and sits outside the browser CSRF gate with its own rate limiting and receipt validation. `test/firewall.product-build.attack10.test.mjs` and `docs/FIREWALL_V10.md` bind those source invariants. A green application firewall test does not prove Cloudflare WAF/API Shield activation, and provider firewall evidence does not prove the exact federation wire/receipt loop.
+
+If either repository head, the peer runtime identity, contract version, proof requirements, serialized wire shape, firewall binding, or provider/runtime context changes, predecessor federation proof is `STALE/SUPERSEDED` until the exact successor is reverified. See `docs/PR_CONTINUITY.md` and `docs/FIREWALL_V10.md`.
 
 ## GitHub webhook privacy
 
