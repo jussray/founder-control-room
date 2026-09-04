@@ -15,7 +15,7 @@ LinkedIn XLSX export
 -> read TOP POSTS + ENGAGEMENT
 -> normalize publish dates separately from activity dates
 -> canonicalize LinkedIn post URLs
--> SHA-256 post fingerprint
+-> private-key HMAC post identity
 -> per-day post set
 -> deterministic day cadence cookie
 -> cadence + comparable 7-day windows
@@ -26,13 +26,22 @@ LinkedIn XLSX export
 
 ### Fingerprints
 
-A post fingerprint is the first 16 hex characters of SHA-256 over:
+Public post fingerprints are HMAC-SHA256 identifiers derived from:
 
 ```text
-linkedin|<publish-date>|<normalized-post-url>
+private runtime key
++ fcr/linkedin-post-id@v1
++ <publish-date>
++ <normalized-post-url>
 ```
 
-Tracking query parameters and URL fragments are removed before hashing. The fingerprint identifies the same visible post across later exports; it is not publication proof, approval, provider truth, or a secret.
+The public receipt stores only the first 32 lowercase hex characters of the HMAC result. Tracking query parameters and URL fragments are removed before keyed identity derivation. The private key is never persisted, so someone who merely knows the public post URL and publish date cannot recompute the repository identifier.
+
+The workflow uses dedicated `LINKEDIN_POST_ID_HMAC_KEY` secret material for identity. That key is separate from `LINKEDIN_ANALYTICS_SNAPSHOT_TOKEN`, which is source-access authority only. Do not substitute the source bearer token for the HMAC key.
+
+Every receipt also carries the non-secret `LINKEDIN_POST_ID_HMAC_EPOCH`. Keep the epoch stable while a given private HMAC key remains active. When the key is intentionally rotated, advance the epoch. A predecessor from a different or legacy/missing epoch becomes a new privacy baseline: current visible posts are `baseline_or_unknown_visible`, not fabricated `new` posts, and prior identifiers are not called missing merely because the private identity key changed.
+
+The fingerprint is observation identity only. It is not publication proof, approval, provider authority, or permission to correlate private analytics outside the authorized evidence lane.
 
 ### Cadence cookies
 
@@ -42,7 +51,7 @@ Each calendar day receives a deterministic reconciliation token:
 LI-DAY-YYYYMMDD-PNN-<12-char-digest>
 ```
 
-The digest is computed from the sorted visible post fingerprints for that day, or from an explicit empty-day identity when no visible post is present. A cadence cookie binds the observed visible set for reconciliation only. It grants no execution or publishing authority.
+The digest is computed from the sorted keyed visible post fingerprints for that day, or from an explicit empty-day identity when no visible post is present. A cadence cookie binds the observed visible set for reconciliation only. It grants no execution or publishing authority.
 
 ### Export caps
 
@@ -60,7 +69,11 @@ Posting cadence is computed from `Post Publish Date` in TOP POSTS. Daily impress
 
 ## Run
 
+Local/manual execution requires a dedicated private HMAC key plus its non-secret epoch. Do not put the key on a command line or commit it to source.
+
 ```bash
+export LINKEDIN_POST_ID_HMAC_KEY='<private 32+ byte value>'
+export LINKEDIN_POST_ID_HMAC_EPOCH='linkedin-post-id-v1'
 python3 scripts/linkedin_analytics_continuity.py \
   AggregateAnalytics.xlsx \
   --start 8/2/2026 \
@@ -71,6 +84,8 @@ python3 scripts/linkedin_analytics_continuity.py \
 To reconcile a later export against an earlier normalized receipt:
 
 ```bash
+export LINKEDIN_POST_ID_HMAC_KEY='<same private key for this epoch>'
+export LINKEDIN_POST_ID_HMAC_EPOCH='linkedin-post-id-v1'
 python3 scripts/linkedin_analytics_continuity.py \
   LaterAggregateAnalytics.xlsx \
   --start 8/2/2026 \
@@ -83,7 +98,10 @@ Focused verification:
 
 ```bash
 python3 -m unittest scripts/test_linkedin_analytics_continuity.py
+python3 -m unittest scripts/test_linkedin_post_performance.py
 ```
+
+The Actions workflow fails closed if predecessor-artifact discovery errors or if the latest named artifact is malformed. A provider/API failure must never be reinterpreted as "no previous receipt" because that would silently reset continuity.
 
 ## Performance supersession
 
@@ -134,4 +152,4 @@ python3 -m unittest scripts/test_founder_content_supersession.py
 
 ## Interpretation order
 
-For content decisions, prefer qualified engagement and follower/profile conversion, then relevant reach, then raw impressions. Comparable windows and per-post fingerprints should be used before inferring that a content theme improved. Analytics conclusions remain proposals for founder review and can feed the existing `linkedin_experiments` record; they do not authorize Buffer, LinkedIn, n8n, Zapier, or another distribution provider.
+For content decisions, prefer qualified engagement and follower/profile conversion, then relevant reach, then raw impressions. Comparable windows and keyed per-post fingerprints should be used before inferring that a content theme improved. Analytics conclusions remain proposals for founder review and can feed the existing `linkedin_experiments` record; they do not authorize Buffer, LinkedIn, n8n, Zapier, or another distribution provider.
