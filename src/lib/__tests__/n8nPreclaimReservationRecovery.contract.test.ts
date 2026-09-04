@@ -49,6 +49,7 @@ describe('n8n abandoned pre-claim reservation recovery', () => {
   it('binds recovery authorization after current approval readback and before the atomic claim', () => {
     const adapterSource = readFileSync(fileURLToPath(new URL('../n8nFounderContentAuthorityAdapter.ts', import.meta.url)), 'utf8');
     const preparationSource = readFileSync(fileURLToPath(new URL('../n8nProviderNeutralFounderContentPreparation.ts', import.meta.url)), 'utf8');
+    const rearmSource = readFileSync(fileURLToPath(new URL('../atomicFounderContentPreclaimRearm.ts', import.meta.url)), 'utf8');
 
     const currentApprovalRead = adapterSource.indexOf('preview = await readCurrentFounderContentApproval');
     const recoveryMarker = adapterSource.indexOf('preclaimRecoveryAuthorizedAt: now');
@@ -57,9 +58,11 @@ describe('n8n abandoned pre-claim reservation recovery', () => {
     expect(currentApprovalRead).toBeGreaterThanOrEqual(0);
     expect(recoveryMarker).toBeGreaterThan(currentApprovalRead);
     expect(atomicApprovalClaim).toBeGreaterThan(recoveryMarker);
-    expect(preparationSource).toContain(".eq('started_at', text(existing.started_at))");
-    expect(preparationSource).toContain(".select('id, project_id, started_at')");
-    expect(preparationSource).toContain('reservationStartedAt: authoritativeReservationStartedAt');
+    expect(preparationSource).toContain('rearmFounderContentPreclaimExecution({');
+    expect(preparationSource).toContain('expectedStartedAt,');
+    expect(preparationSource).toContain('reservationStartedAt: rearmed.executionStartedAt');
+    expect(rearmSource).toContain("rpc('rearm_founder_content_preclaim_execution'");
+    expect(rearmSource).toContain('p_expected_started_at: new Date(expectedStartedMs).toISOString()');
     expect(preparationSource).toContain('PRECLAIM_RESERVATION_LEASE_MS = 2 * 60 * 1000');
   });
 
