@@ -173,4 +173,52 @@ describe('StoryEngine product-build federation', () => {
       mayHaveExecuted: true,
     } satisfies Pick<ProductBuildFederationError, 'code' | 'mayHaveExecuted'>);
   });
+
+  it('treats a server error after dispatch as ambiguous execution', async () => {
+    let call = 0;
+    const fetchImpl = async () => {
+      call += 1;
+      if (call === 1) {
+        return response({
+          service: 'l99-story-engine', release_sha: HEAD, runtime_mode: 'test', state_backend: 'sqlite',
+          persistence_contract: 'repo-local', started_at: STARTED_AT,
+        });
+      }
+      return response({ error: 'internal failure after actuator boundary' }, 500);
+    };
+
+    await expect(dispatchStoryEngineProductBuildDirective(directive(), {
+      baseUrl: 'http://127.0.0.1:3901',
+      apiKey: 'scoped-fcr-key',
+      fetchImpl,
+    })).rejects.toMatchObject({
+      code: 'PRODUCT_BUILD_EXECUTION_UNKNOWN',
+      mayHaveExecuted: true,
+      message: expect.stringContaining('Do not blind-retry'),
+    } satisfies Partial<ProductBuildFederationError>);
+  });
+
+  it('keeps explicit client rejection distinct from ambiguous execution', async () => {
+    let call = 0;
+    const fetchImpl = async () => {
+      call += 1;
+      if (call === 1) {
+        return response({
+          service: 'l99-story-engine', release_sha: HEAD, runtime_mode: 'test', state_backend: 'sqlite',
+          persistence_contract: 'repo-local', started_at: STARTED_AT,
+        });
+      }
+      return response({ error: 'directive rejected before actuator' }, 409);
+    };
+
+    await expect(dispatchStoryEngineProductBuildDirective(directive(), {
+      baseUrl: 'http://127.0.0.1:3901',
+      apiKey: 'scoped-fcr-key',
+      fetchImpl,
+    })).rejects.toMatchObject({
+      code: 'PRODUCT_BUILD_EXECUTION_REJECTED',
+      mayHaveExecuted: false,
+      message: 'directive rejected before actuator',
+    } satisfies Partial<ProductBuildFederationError>);
+  });
 });
