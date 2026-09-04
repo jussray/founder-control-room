@@ -58,6 +58,12 @@
       ]
     },
     {
+      "path": "src/lib/atomicFounderContentPreclaimRearm.ts",
+      "claims": [
+        "src/lib/atomicFounderContentPreclaimRearm.ts must rearm only an exact pre-claim execution generation through the service-role RPC, require a strictly newer started_at generation, and fail closed when approval or provider-write authority moved after recovery readback."
+      ]
+    },
+    {
       "path": "src/lib/founderContentCadence.ts",
       "claims": [
         "src/lib/founderContentCadence.ts must bind cadence reservation to the exact founder approval expiry and fail closed when any computed or read-back slot exceeds that approval lease."
@@ -72,7 +78,7 @@
     {
       "path": "src/lib/n8nProviderNeutralFounderContentPreparation.ts",
       "claims": [
-        "src/lib/n8nProviderNeutralFounderContentPreparation.ts must expose the database-returned reservation generation to the authority layer, limit two-minute recovery to genuinely pre-claim work, and keep abort, finalization, and provider-write mutations generation-fenced."
+        "src/lib/n8nProviderNeutralFounderContentPreparation.ts must expose the database-returned reservation generation to the authority layer, route stale pre-claim recovery through an atomic approval_claimed-aware rearm, and keep abort, finalization, and provider-write mutations generation-fenced."
       ]
     },
     {
@@ -90,13 +96,13 @@
     {
       "path": "supabase/migrations/20260904190000_founder_content_atomic_execution_claim.sql",
       "claims": [
-        "supabase/migrations/20260904190000_founder_content_atomic_execution_claim.sql must lock the exact pending execution generation and exact live founder approval in one service-role-only transaction, consume neither authority nor provider state on a stale generation, and mark approval_claimed so stale pre-claim recovery cannot rearm consumed authority."
+        "supabase/migrations/20260904190000_founder_content_atomic_execution_claim.sql must keep exact execution-generation approval consumption and stale pre-claim rearm as service-role-only transactions; claim or recovery must lose cleanly when approval_claimed, provider-write state, status, or started_at changed."
       ]
     },
     {
       "path": "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md",
       "claims": [
-        "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md must require provider-neutral n8n approval consumption to be atomic with the exact execution generation, preserve generation-fenced provider writes, and require provider-native readback for terminal publication evidence."
+        "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md must require provider-neutral n8n approval consumption to be atomic with the exact execution generation, restrict abandoned recovery to pre-claim authority, preserve generation-fenced provider writes, and require provider-native readback for terminal publication evidence."
       ]
     },
     {
