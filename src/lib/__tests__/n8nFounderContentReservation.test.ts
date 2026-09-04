@@ -76,6 +76,7 @@ interface DbOptions {
   } | null;
   finalizeRow?: { id: string } | null;
   currentStartedAt?: string;
+  reservationStartedAt?: string | null;
 }
 
 function installDb(options: DbOptions = {}) {
@@ -85,7 +86,15 @@ function installDb(options: DbOptions = {}) {
     select: () => ({
       single: async () => {
         events.push('reserve');
-        return { data: { id: EXECUTION_ID }, error: null };
+        return {
+          data: {
+            id: EXECUTION_ID,
+            started_at: options.reservationStartedAt === undefined
+              ? RESERVATION_STARTED_AT
+              : options.reservationStartedAt,
+          },
+          error: null,
+        };
       },
     }),
   }));
@@ -161,7 +170,7 @@ beforeEach(() => {
 });
 
 describe('n8n founder-content durable reservation', () => {
-  it('reserves the exact authorization in FCR before external orchestration can proceed', async () => {
+  it('reserves the exact authorization in FCR before external orchestration can proceed and carries the DB-returned generation', async () => {
     const db = installDb();
     const request = buildN8nFounderContentRequest(envelope());
 
@@ -171,7 +180,7 @@ describe('n8n founder-content durable reservation', () => {
       ok: true,
       executionId: EXECUTION_ID,
       projectId: PROJECT_ID,
-      reservationStartedAt: expect.any(String),
+      reservationStartedAt: RESERVATION_STARTED_AT,
     }));
     expect(db.events).toEqual(['reserve']);
     expect(db.insertMock).toHaveBeenCalledWith(expect.objectContaining({
@@ -185,8 +194,21 @@ describe('n8n founder-content durable reservation', () => {
       started_at: expect.any(String),
     }));
     const inserted = db.insertMock.mock.calls[0]?.[0] as { request?: unknown; started_at?: unknown };
-    if (result.ok) expect(inserted.started_at).toBe(result.reservationStartedAt);
+    expect(inserted.started_at).toEqual(expect.any(String));
     expect(JSON.stringify(inserted.request)).not.toContain(envelope().text);
+  });
+
+  it('fails closed when the reservation write does not return an authoritative started_at generation', async () => {
+    const db = installDb({ reservationStartedAt: null });
+    const request = buildN8nFounderContentRequest(envelope());
+
+    const result = await reserveN8nFounderContentExecution(request, 'Founder@Example.com');
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: false,
+      code: 'ACTION_RESERVATION_FAILED',
+    }));
+    expect(db.events).toEqual(['reserve']);
   });
 
   it('blocks an exact authorization that is already reserved without creating another row', async () => {
