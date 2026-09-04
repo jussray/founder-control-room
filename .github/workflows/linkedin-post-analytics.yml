@@ -45,18 +45,18 @@ jobs:
     needs: contract-test
     runs-on: ubuntu-latest
     env:
-      ANALYTICS_URL: ${{ secrets.LINKEDIN_ANALYTICS_SNAPSHOT_URL }}
-      ANALYTICS_TOKEN: ${{ secrets.LINKEDIN_ANALYTICS_SNAPSHOT_TOKEN }}
       WINDOW_START: ${{ github.event.client_payload.start }}
       WINDOW_END: ${{ github.event.client_payload.end }}
       WINDOW_ROLE: ${{ github.event.client_payload.window_role }}
-      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Require private analytics source and bounded window
+      - name: Download private LinkedIn XLSX
         shell: bash
+        env:
+          ANALYTICS_URL: ${{ secrets.LINKEDIN_ANALYTICS_SNAPSHOT_URL }}
+          ANALYTICS_TOKEN: ${{ secrets.LINKEDIN_ANALYTICS_SNAPSHOT_TOKEN }}
         run: |
           set -euo pipefail
           if [[ -z "${ANALYTICS_URL:-}" ]]; then
@@ -79,13 +79,6 @@ jobs:
           echo "::add-mask::${ANALYTICS_URL}"
           if [[ -n "${ANALYTICS_TOKEN:-}" ]]; then
             echo "::add-mask::${ANALYTICS_TOKEN}"
-          fi
-
-      - name: Download private LinkedIn XLSX
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -n "${ANALYTICS_TOKEN:-}" ]]; then
             curl --fail --silent --show-error --location \
               -H "Authorization: Bearer ${ANALYTICS_TOKEN}" \
               "${ANALYTICS_URL}" \
@@ -99,12 +92,14 @@ jobs:
       - name: Recover latest same-window redacted receipt
         id: previous
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          artifact_id="$({
+          artifact_id="$(
             gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${ARTIFACT_NAME}&per_page=100" \
               --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty'
-          } || true)"
+          )"
 
           if [[ -z "${artifact_id}" ]]; then
             echo "found=false" >> "${GITHUB_OUTPUT}"
@@ -114,19 +109,34 @@ jobs:
           mkdir -p previous-artifact
           gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" > previous.zip
           unzip -q previous.zip -d previous-artifact
-          if [[ -f previous-artifact/linkedin-post-analytics-receipt.json ]]; then
-            cp previous-artifact/linkedin-post-analytics-receipt.json previous-linkedin-post-analytics-receipt.json
-            echo "found=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "found=false" >> "${GITHUB_OUTPUT}"
+          if [[ ! -f previous-artifact/linkedin-post-analytics-receipt.json ]]; then
+            echo "BLOCKED_PREDECESSOR_ARTIFACT: latest analytics artifact does not contain linkedin-post-analytics-receipt.json." >&2
+            exit 1
           fi
+          cp previous-artifact/linkedin-post-analytics-receipt.json previous-linkedin-post-analytics-receipt.json
+          echo "found=true" >> "${GITHUB_OUTPUT}"
 
       - name: Normalize and reconcile post continuity
         shell: bash
         env:
+          LINKEDIN_POST_ID_HMAC_KEY: ${{ secrets.LINKEDIN_POST_ID_HMAC_KEY }}
+          LINKEDIN_POST_ID_HMAC_EPOCH: ${{ vars.LINKEDIN_POST_ID_HMAC_EPOCH }}
           PREVIOUS_FOUND: ${{ steps.previous.outputs.found }}
         run: |
           set -euo pipefail
+          if [[ -z "${LINKEDIN_POST_ID_HMAC_KEY:-}" ]]; then
+            echo "BLOCKED_PRIVACY_KEY: LINKEDIN_POST_ID_HMAC_KEY is required." >&2
+            exit 1
+          fi
+          if (( ${#LINKEDIN_POST_ID_HMAC_KEY} < 32 )); then
+            echo "BLOCKED_PRIVACY_KEY: LINKEDIN_POST_ID_HMAC_KEY must contain at least 32 characters." >&2
+            exit 1
+          fi
+          if [[ -z "${LINKEDIN_POST_ID_HMAC_EPOCH:-}" ]]; then
+            echo "BLOCKED_PRIVACY_EPOCH: LINKEDIN_POST_ID_HMAC_EPOCH is required." >&2
+            exit 1
+          fi
+          echo "::add-mask::${LINKEDIN_POST_ID_HMAC_KEY}"
           if [[ "${PREVIOUS_FOUND:-}" == "true" ]]; then
             python3 scripts/linkedin_analytics_continuity.py \
               linkedin-analytics.xlsx \
@@ -144,8 +154,20 @@ jobs:
 
       - name: Derive ranked post performance
         shell: bash
+        env:
+          LINKEDIN_POST_ID_HMAC_KEY: ${{ secrets.LINKEDIN_POST_ID_HMAC_KEY }}
+          LINKEDIN_POST_ID_HMAC_EPOCH: ${{ vars.LINKEDIN_POST_ID_HMAC_EPOCH }}
         run: |
           set -euo pipefail
+          if [[ -z "${LINKEDIN_POST_ID_HMAC_KEY:-}" ]]; then
+            echo "BLOCKED_PRIVACY_KEY: LINKEDIN_POST_ID_HMAC_KEY is required." >&2
+            exit 1
+          fi
+          if [[ -z "${LINKEDIN_POST_ID_HMAC_EPOCH:-}" ]]; then
+            echo "BLOCKED_PRIVACY_EPOCH: LINKEDIN_POST_ID_HMAC_EPOCH is required." >&2
+            exit 1
+          fi
+          echo "::add-mask::${LINKEDIN_POST_ID_HMAC_KEY}"
           python3 scripts/linkedin_post_performance.py \
             linkedin-analytics.xlsx \
             --start "${WINDOW_START}" \
@@ -167,6 +189,16 @@ jobs:
           performance = json.loads(Path('linkedin-post-performance-private.json').read_text())
           source_sha = hashlib.sha256(source).hexdigest()
 
+          continuity_privacy = continuity.get('privacy', {})
+          performance_privacy = performance.get('privacy', {})
+          identity_epoch = continuity_privacy.get('post_identity_key_epoch')
+          if not identity_epoch or performance_privacy.get('post_identity_key_epoch') != identity_epoch:
+              raise SystemExit('post identity epoch mismatch between continuity and performance receipts')
+          if continuity_privacy.get('post_identity_scheme') != 'HMAC-SHA256/private-runtime-key/v1':
+              raise SystemExit('continuity post identity scheme mismatch')
+          if performance_privacy.get('post_identity_scheme') != 'HMAC-SHA256/private-runtime-key/v1':
+              raise SystemExit('performance post identity scheme mismatch')
+
           continuity['source']['sha256'] = source_sha
           for post in continuity.get('posts', []):
               post.pop('post_url', None)
@@ -186,6 +218,9 @@ jobs:
                   'post_urls_persisted': False,
                   'linkedin_post_ids_persisted': False,
                   'public_receipt_contains_only_observation_evidence': True,
+                  'post_identity_scheme': 'HMAC-SHA256/private-runtime-key/v1',
+                  'post_identity_key_epoch': identity_epoch,
+                  'private_key_persisted': False,
               },
               'continuity': continuity,
               'performance': performance,
@@ -201,12 +236,19 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           import json
+          import re
           from pathlib import Path
 
           receipt = json.loads(Path('linkedin-post-analytics-receipt.json').read_text())
           privacy = receipt.get('privacy', {})
           if privacy.get('raw_xlsx_persisted') is not False:
               raise SystemExit('raw XLSX privacy invariant failed')
+          if privacy.get('private_key_persisted') is not False:
+              raise SystemExit('post identity private-key invariant failed')
+          if privacy.get('post_identity_scheme') != 'HMAC-SHA256/private-runtime-key/v1':
+              raise SystemExit('post identity scheme invariant failed')
+          if not privacy.get('post_identity_key_epoch'):
+              raise SystemExit('post identity key epoch missing')
           encoded = json.dumps(receipt)
           if 'linkedin.com/posts/' in encoded:
               raise SystemExit('provider post URL leaked into redacted receipt')
@@ -215,8 +257,16 @@ jobs:
           source_sha = receipt.get('source', {}).get('sha256', '')
           if len(source_sha) != 64:
               raise SystemExit('source digest missing from redacted post receipt')
+          fingerprints = [
+              post.get('fingerprint', '')
+              for section in ('continuity', 'performance')
+              for post in receipt.get(section, {}).get('posts', [])
+          ]
+          if any(not re.fullmatch(r'[0-9a-f]{32}', fp) for fp in fingerprints):
+              raise SystemExit('post fingerprint must be a 32-character keyed HMAC identifier')
           print(json.dumps({
               'window_role': receipt['source']['window_role'],
+              'identity_key_epoch': privacy['post_identity_key_epoch'],
               'continuity_summary': receipt['continuity'].get('summary', {}),
               'performance_summary': receipt['performance'].get('summary', {}),
           }, sort_keys=True))
