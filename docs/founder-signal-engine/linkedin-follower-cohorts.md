@@ -28,7 +28,9 @@ Each follower requires a stable LinkedIn profile URL or public identifier. A dis
 
 Public cohort member IDs are derived with HMAC-SHA256 over the normalized LinkedIn identity using private runtime key material. The public artifact never contains the key and an observer cannot reproduce a member ID from a guessed public profile URL without that private key.
 
-The current workflow derives the domain-separated cohort identity from the private `LINKEDIN_FOLLOWER_SNAPSHOT_TOKEN`, which is already required to access the private snapshot source. The token must contain at least 32 characters and is masked in workflow logs. Rotating that token intentionally resets the privacy identity epoch; a legacy unkeyed v1 receipt is treated as a fresh privacy baseline rather than cross-correlated.
+The workflow uses a dedicated `LINKEDIN_FOLLOWER_ID_HMAC_KEY` secret for cohort identity. It is intentionally separate from `LINKEDIN_FOLLOWER_SNAPSHOT_TOKEN`, which is only a bearer credential for the private snapshot source. Reusing the source credential as the cohort identity key is prohibited.
+
+Every redacted receipt also records the non-secret `LINKEDIN_FOLLOWER_ID_HMAC_EPOCH` value. The epoch is continuity metadata, not authority. It must remain stable while the HMAC key remains stable and must change whenever that key rotates. A prior v2 receipt with a different or missing epoch is treated as a fresh privacy baseline rather than cross-correlating incompatible member IDs. Rotation cannot manufacture `NEW` or `LOST` followers, and chronology remains fail-closed across the epoch boundary.
 
 Tracking parameters and fragments are removed from profile URLs before keyed identity derivation.
 
@@ -47,18 +49,21 @@ Those values may exist only in the founder-authenticated/private source boundary
 
 Persisted strategy metadata is restricted to explicit enums for category, seniority, relationship signal, and project relevance plus a boolean high-value flag and derived priority score. Free-form values fail closed rather than being copied into a supposedly redacted artifact.
 
+Workflow credentials are step-scoped. Snapshot URL/token are available only to the source-download step, the GitHub token only to predecessor-artifact recovery, and the HMAC key only to cohort reconciliation. The non-secret epoch may be passed to reconciliation and invariant verification.
+
 ## Reconciliation truth
 
 Follower reconciliation is intentionally conservative.
 
 - The first compatible v2 capture is a baseline. Existing visible followers are `baseline_or_unknown_added`, not `NEW`.
+- A v2 predecessor with a different or missing identity-key epoch starts a new privacy baseline; unchanged people are not reported as both acquired and lost.
 - When the previous capture was partial, newly visible identities remain `baseline_or_unknown_added`; partial visibility does not prove acquisition.
 - `NEW` requires a previous `COMPLETE_VISIBLE_LIST` that proves the keyed identity was absent.
 - `LOST` requires a current `COMPLETE_VISIBLE_LIST` that proves a previously observed keyed identity is now absent.
 - Missing identities under a current partial capture are `unknown_missing`, never `LOST`.
-- Every successor snapshot must have an `observed_at` timestamp strictly later than the compatible previous receipt. Delayed/replayed snapshots fail closed instead of replacing newer cohort truth.
+- Every successor snapshot must have an `observed_at` timestamp strictly later than any v2 predecessor receipt, including across a key-epoch change. Delayed/replayed snapshots fail closed instead of replacing newer cohort truth.
 
-This prevents screenshots, pagination, UI caps, partial exports, replayed evidence, or incomplete browser observations from manufacturing follower acquisition or churn.
+This prevents screenshots, pagination, UI caps, partial exports, replayed evidence, incomplete browser observations, or HMAC-key rotation from manufacturing follower acquisition or churn.
 
 ## Autonomous trigger
 
@@ -66,7 +71,9 @@ The cohort engine is event-driven.
 
 An authorized private adapter may emit `linkedin-follower-snapshot-ready` after it has produced a complete or explicitly partial snapshot. The repository workflow downloads the private snapshot at runtime, reconciles it against the most recent redacted receipt when available, and stores only a redacted Actions artifact.
 
-The event payload must carry a protected snapshot reference, not raw follower identities. Snapshot URL and token are masked in workflow logs. If an authorized machine-readable follower source or the private keyed-identity material is unavailable, the acquisition/reconciliation stage fails closed as `BLOCKED_SOURCE` or `BLOCKED_PRIVACY_KEY`; the system must not scrape around provider controls, infer identities from demographics, downgrade to an unkeyed public hash, or fabricate a cohort.
+The predecessor lookup is fail-closed: a successful lookup with no matching artifact is a legitimate first run, but GitHub API/authentication/rate-limit errors, failed artifact downloads, malformed ZIPs, or an artifact missing `follower-cohort-receipt.json` stop reconciliation instead of silently resetting continuity.
+
+The event payload must carry a protected snapshot reference, not raw follower identities. Snapshot URL and token are masked in workflow logs. If an authorized machine-readable follower source, its source-access credential, the dedicated private HMAC key, or the non-secret key epoch is unavailable, the acquisition/reconciliation stage fails closed; the system must not scrape around provider controls, infer identities from demographics, downgrade to an unkeyed public hash, reuse the source bearer as the HMAC key, or fabricate a cohort.
 
 Provider acquisition and cohort analysis are intentionally separate:
 
@@ -75,18 +82,19 @@ LinkedIn/private source authority
   -> authenticated acquisition adapter
   -> private snapshot
   -> repository_dispatch event
-  -> keyed deterministic cohort engine
-  -> redacted receipt
+  -> dedicated-key deterministic cohort engine
+  -> redacted epoch-bound receipt
 ```
 
 The engine can therefore run autonomously once legitimate source evidence exists without giving the analytics lane authority over LinkedIn or publication.
 
 ## Run locally
 
-Local/manual execution requires private key material in the environment. Do not put the key on a command line or commit it to source.
+Local/manual execution requires private key material and a non-secret epoch in the environment. Do not put the key on a command line or commit it to source.
 
 ```bash
 export LINKEDIN_FOLLOWER_ID_HMAC_KEY='<private 32+ byte value>'
+export LINKEDIN_FOLLOWER_ID_HMAC_EPOCH='2026-09-v1'
 python3 scripts/linkedin_follower_cohort.py follower-snapshot.json \
   --previous-receipt previous-redacted-receipt.json \
   --output follower-cohort-receipt.json
