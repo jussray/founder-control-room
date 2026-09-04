@@ -14,6 +14,9 @@ spec.loader.exec_module(mod)
 MAIN_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
 REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 PKG_NS = 'http://schemas.openxmlformats.org/package/2006/relationships'
+KEY = 'k' * 64
+OTHER_KEY = 'z' * 64
+EPOCH = 'linkedin-post-id-v1'
 
 
 def cell(ref, value):
@@ -76,32 +79,53 @@ def write_fixture(path: Path, *, include_out_of_window_leaders=False):
 
 
 class LinkedInPostPerformanceTest(unittest.TestCase):
-    def test_merges_ranked_lists_by_stable_fingerprint(self):
+    def analyze(self, path, *, window_role='recent_90'):
+        return mod.analyze_performance(
+            path,
+            date(2026,8,2),
+            date(2026,8,2),
+            window_role=window_role,
+            identity_key=KEY,
+            identity_key_epoch=EPOCH,
+        )
+
+    def test_merges_ranked_lists_by_stable_keyed_fingerprint(self):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / 'analytics.xlsx'
             write_fixture(path)
-            report = mod.analyze_performance(
-                path,
-                date(2026,8,2),
-                date(2026,8,2),
-                window_role='recent_90',
-            )
+            report = self.analyze(path)
         self.assertEqual(report['contract'], 'linkedin-post-performance@v1')
         self.assertEqual(report['summary']['unique_ranked_posts'], 3)
         both = [p for p in report['posts'] if p['metric_completeness'] == 'BOTH_VISIBLE']
         self.assertEqual(len(both), 2)
         self.assertTrue(all(p['engagement_rate'] is not None for p in both))
+        self.assertEqual(report['privacy']['post_identity_scheme'], 'HMAC-SHA256/private-runtime-key/v1')
+        self.assertEqual(report['privacy']['post_identity_key_epoch'], EPOCH)
+        self.assertNotIn(KEY, str(report))
+
+    def test_different_private_keys_produce_different_public_post_ids(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / 'analytics.xlsx'
+            write_fixture(path)
+            a = self.analyze(path)
+            b = mod.analyze_performance(
+                path,
+                date(2026,8,2),
+                date(2026,8,2),
+                window_role='recent_90',
+                identity_key=OTHER_KEY,
+                identity_key_epoch=EPOCH,
+            )
+        self.assertNotEqual(
+            sorted(p['fingerprint'] for p in a['posts']),
+            sorted(p['fingerprint'] for p in b['posts']),
+        )
 
     def test_missing_ranked_metric_is_unknown_not_zero(self):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / 'analytics.xlsx'
             write_fixture(path)
-            report = mod.analyze_performance(
-                path,
-                date(2026,8,2),
-                date(2026,8,2),
-                window_role='historical_365',
-            )
+            report = self.analyze(path, window_role='historical_365')
         only_engagement = [p for p in report['posts'] if p['metric_completeness'] == 'ENGAGEMENT_ONLY_VISIBLE']
         self.assertEqual(len(only_engagement), 1)
         self.assertIsNone(only_engagement[0]['engagement_rate'])
@@ -112,12 +136,7 @@ class LinkedInPostPerformanceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / 'analytics.xlsx'
             write_fixture(path)
-            report = mod.analyze_performance(
-                path,
-                date(2026,8,2),
-                date(2026,8,2),
-                window_role='recent_90',
-            )
+            report = self.analyze(path)
         signals = {p['performance_signal'] for p in report['posts']}
         self.assertIn('BALANCED_TOP_10_VISIBLE', signals)
         self.assertIn('ENGAGEMENT_RANKED_ONLY', signals)
@@ -126,12 +145,7 @@ class LinkedInPostPerformanceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / 'analytics.xlsx'
             write_fixture(path, include_out_of_window_leaders=True)
-            report = mod.analyze_performance(
-                path,
-                date(2026,8,2),
-                date(2026,8,2),
-                window_role='recent_90',
-            )
+            report = self.analyze(path)
         ranked = {p['publish_date']: p for p in report['posts'] if p.get('engagements') == 10}
         target = ranked['2026-08-02']
         self.assertEqual(target['engagements_rank'], 12)
