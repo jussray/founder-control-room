@@ -103,6 +103,7 @@ describe('StoryEngine product-build federation', () => {
     expect(reconciled.providerMutationPerformed).toBe(false);
     expect(calls.map((call) => call.init?.method)).toEqual(['GET', 'POST', 'GET']);
     expect(calls[1]?.url).toBe('http://127.0.0.1:3901/api/control-room/product-build/execute');
+    expect(calls[1]?.init?.body).toBe(JSON.stringify(buildDirective));
   });
 
   it('rejects StoryEngine proof-contract drift before any network call', async () => {
