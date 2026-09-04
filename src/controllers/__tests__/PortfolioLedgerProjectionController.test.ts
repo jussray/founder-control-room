@@ -31,7 +31,7 @@ describe('portfolio ledger projection contract', () => {
     const projection = buildPortfolioLedgerProjection(observation());
 
     expect(projection.contract).toBe(PORTFOLIO_LEDGER_PROJECTION_CONTRACT);
-    expect(projection.projectionId).toBe(`github-merge:jussray/JussBeautifulHair-Site:${MERGE_SHA}`);
+    expect(projection.projectionId).toBe(`github-merge:jussray/jussbeautifulhair-site:${MERGE_SHA}`);
     expect(projection.idempotencyKey).toBe(projection.projectionId);
     expect(projection.authority).toBe('observed');
     expect(projection.authorizing).toBe(false);
