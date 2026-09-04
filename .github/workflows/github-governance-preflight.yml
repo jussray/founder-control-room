@@ -5,14 +5,24 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/github-governance-preflight.yml'
+      - '.github/workflows/reconcile-fcr-governance-phase.yml'
       - 'scripts/audit-github-governance-preflight.mjs'
       - 'scripts/audit-github-governance-preflight.node-test.mjs'
+      - 'scripts/audit-fcr-governance-phase.mjs'
+      - 'scripts/audit-fcr-governance-phase.node-test.mjs'
+      - 'src/providers/fcrGovernancePhase.ts'
+      - 'src/providers/FounderControlRoomGovernanceGitHubProvider.ts'
   push:
     branches: [main]
     paths:
       - '.github/workflows/github-governance-preflight.yml'
+      - '.github/workflows/reconcile-fcr-governance-phase.yml'
       - 'scripts/audit-github-governance-preflight.mjs'
       - 'scripts/audit-github-governance-preflight.node-test.mjs'
+      - 'scripts/audit-fcr-governance-phase.mjs'
+      - 'scripts/audit-fcr-governance-phase.node-test.mjs'
+      - 'src/providers/fcrGovernancePhase.ts'
+      - 'src/providers/FounderControlRoomGovernanceGitHubProvider.ts'
   workflow_dispatch:
 
 permissions:
@@ -34,8 +44,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Verify preflight contract
+      - name: Verify legacy independent-review preflight contract
         run: node --test scripts/audit-github-governance-preflight.node-test.mjs
+      - name: Verify phase-aware governance contract
+        run: node --test scripts/audit-fcr-governance-phase.node-test.mjs
 
   governance-provider-read:
     name: GitHub Governance Preflight Provider Read
@@ -56,17 +68,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Read live GitHub governance state
+      - name: Read live GitHub governance state for current phase
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_APP_ID: ${{ secrets.APP_ID }}
           FCR_GOVERNANCE_TARGET_REF: main
-        run: node scripts/audit-github-governance-preflight.mjs
+          FCR_GOVERNANCE_PHASE: founder_only
+        run: node scripts/audit-fcr-governance-phase.mjs
       - name: Publish sanitized governance receipt
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: github-governance-preflight-${{ github.run_id }}
-          path: artifacts/github-governance-preflight.json
+          name: github-governance-phase-preflight-${{ github.run_id }}
+          path: artifacts/github-governance-phase-preflight.json
           if-no-files-found: error
           retention-days: 14
