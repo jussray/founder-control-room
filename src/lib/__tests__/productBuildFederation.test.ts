@@ -16,7 +16,7 @@ import {
 const HEAD = 'b'.repeat(40);
 const STARTED_AT = '2026-09-04T16:00:00.000Z';
 
-function directive() {
+function directive(requiredProof = ['node-test', 'playwright']) {
   const proposal: FounderControlProposalBinding = {
     proposalId: 'chief-storyengine-build-001',
     proposalHash: 'a'.repeat(64),
@@ -35,7 +35,7 @@ function directive() {
     objective: 'Prove one bounded FCR to StoryEngine Control Room execution and receipt loop.',
     allowedCapabilities: ['founder-control-room-federation'],
     allowedMutationScope: ['control-room:event-log'],
-    requiredProof: ['node-test', 'playwright'],
+    requiredProof,
     stopConditions: ['one-successful-receipt', 'any-authority-drift'],
     rollback: 'Delete the single product-build audit event and revert the focused product-control-room adapter commit.',
   });
@@ -103,6 +103,25 @@ describe('StoryEngine product-build federation', () => {
     expect(reconciled.providerMutationPerformed).toBe(false);
     expect(calls.map((call) => call.init?.method)).toEqual(['GET', 'POST', 'GET']);
     expect(calls[1]?.url).toBe('http://127.0.0.1:3901/api/control-room/product-build/execute');
+  });
+
+  it('rejects StoryEngine proof-contract drift before any network call', async () => {
+    let called = false;
+    const fetchImpl = async () => {
+      called = true;
+      throw new Error('network should not be reached');
+    };
+
+    await expect(dispatchStoryEngineProductBuildDirective(directive(['playwright']), {
+      baseUrl: 'http://127.0.0.1:3901',
+      apiKey: 'scoped-fcr-key',
+      fetchImpl,
+    })).rejects.toMatchObject({
+      code: 'PRODUCT_BUILD_DIRECTIVE_INVALID',
+      mayHaveExecuted: false,
+      message: expect.stringContaining('StoryEngine product build requires node-test and playwright proof'),
+    } satisfies Partial<ProductBuildFederationError>);
+    expect(called).toBe(false);
   });
 
   it('blocks before the actuator when StoryEngine runtime identity is stale', async () => {
