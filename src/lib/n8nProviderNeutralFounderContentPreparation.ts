@@ -40,6 +40,7 @@ export interface PreparedProviderNeutralN8nFounderContent {
   prepared: true;
   request: N8nFounderContentRequest;
   executionId: string;
+  readonly reservationStartedAt?: string;
   acquireApprovalClaimBoundary(): Promise<boolean>;
   dispatch(): Promise<N8nFounderContentDispatchResult>;
   abort(reason?: string): Promise<boolean>;
@@ -84,12 +85,14 @@ export function isRecoverableAbandonedPreclaimReservation(input: {
   status: unknown;
   startedAt: unknown;
   providerWriteAttempted: unknown;
+  approvalClaimed?: unknown;
   preclaimRecoveryAuthorizedAt: unknown;
 }): boolean {
   const startedAtMs = Date.parse(text(input.startedAt));
   const recoveryAuthorizedAtMs = Date.parse(text(input.preclaimRecoveryAuthorizedAt));
   return text(input.status) === 'pending'
     && input.providerWriteAttempted !== true
+    && input.approvalClaimed !== true
     && Number.isFinite(startedAtMs)
     && Number.isFinite(recoveryAuthorizedAtMs)
     && recoveryAuthorizedAtMs - startedAtMs >= PRECLAIM_RESERVATION_LEASE_MS;
@@ -154,6 +157,7 @@ async function tryRearmRetryablePreProviderReservation(
       status: existing.status,
       startedAt: existing.started_at,
       providerWriteAttempted: result.provider_write_attempted,
+      approvalClaimed: result.approval_claimed,
       preclaimRecoveryAuthorizedAt,
     })
   );
@@ -174,6 +178,7 @@ async function tryRearmRetryablePreProviderReservation(
     result: {
       resumed_from_pre_provider_failure: retryableFailed,
       resumed_from_abandoned_preclaim_reservation: abandonedPending,
+      approval_claimed: false,
       provider_write_attempted: false,
     },
     success: null,
@@ -270,6 +275,7 @@ async function acquirePreparedFounderContentApprovalClaimBoundary(
       .update({
         result: {
           phase: 'approval_claim_boundary_acquired',
+          approval_claimed: false,
           provider_write_attempted: false,
         },
         started_at: claimBoundaryStartedAt,
@@ -425,6 +431,9 @@ export async function prepareProviderNeutralN8nFounderContent(
     prepared: true,
     request,
     executionId: reservation.executionId,
+    get reservationStartedAt() {
+      return reservationStartedAt;
+    },
     async acquireApprovalClaimBoundary() {
       if (approvalClaimBoundaryAcquired) return false;
       const acquiredGeneration = await acquirePreparedFounderContentApprovalClaimBoundary(
