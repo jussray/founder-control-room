@@ -10,6 +10,8 @@ spec.loader.exec_module(mod)
 
 KEY = 'k' * 64
 OTHER_KEY = 'z' * 64
+EPOCH = '2026-09-v1'
+NEXT_EPOCH = '2026-10-v1'
 
 
 class LinkedInFollowerCohortTest(unittest.TestCase):
@@ -28,8 +30,13 @@ class LinkedInFollowerCohortTest(unittest.TestCase):
         item.update(extra)
         return item
 
-    def receipt(self, snapshot, previous=None):
-        return mod.build_receipt(snapshot, previous, identity_key=KEY)
+    def receipt(self, snapshot, previous=None, *, key=KEY, epoch=EPOCH):
+        return mod.build_receipt(
+            snapshot,
+            previous,
+            identity_key=key,
+            identity_key_epoch=epoch,
+        )
 
     def test_fingerprint_is_stable_across_tracking_noise_but_keyed(self):
         a = mod.follower_fingerprint(KEY, 'https://www.linkedin.com/in/example-person/?trk=foo')
@@ -58,9 +65,14 @@ class LinkedInFollowerCohortTest(unittest.TestCase):
         self.assertNotIn(KEY, encoded)
         self.assertEqual(receipt['contract'], 'linkedin-follower-cohort@v2')
         self.assertEqual(receipt['privacy']['member_identity_scheme'], 'HMAC-SHA256/private-runtime-key/v1')
+        self.assertEqual(receipt['privacy']['identity_key_epoch'], EPOCH)
         self.assertEqual(receipt['summary']['identified'], 1)
         self.assertEqual(receipt['summary']['priority_ge_5'], 1)
         self.assertFalse(receipt['privacy']['raw_identity_persisted'])
+
+    def test_rejects_invalid_identity_key_epoch(self):
+        with self.assertRaisesRegex(ValueError, 'identity_key_epoch'):
+            self.receipt(self.snapshot(), epoch='bad epoch with spaces')
 
     def test_rejects_free_form_metadata_from_redacted_receipt(self):
         with self.assertRaisesRegex(ValueError, 'allowed redacted enum'):
@@ -87,6 +99,30 @@ class LinkedInFollowerCohortTest(unittest.TestCase):
         self.assertEqual(receipt['summary']['lost'], 1)
         self.assertEqual(receipt['summary']['baseline_or_unknown_added'], 0)
         self.assertEqual(receipt['summary']['unknown_missing'], 0)
+
+    def test_key_epoch_rotation_resets_to_baseline_without_false_new_or_lost(self):
+        prior = self.receipt(self.snapshot(followers=[self.follower('one'), self.follower('two')]))
+        current = self.snapshot(
+            observed_at='2026-09-10T03:30:00Z',
+            followers=[self.follower('one'), self.follower('two')],
+        )
+        receipt = self.receipt(current, prior, key=OTHER_KEY, epoch=NEXT_EPOCH)
+        self.assertEqual(receipt['privacy']['identity_key_epoch'], NEXT_EPOCH)
+        self.assertEqual(receipt['summary']['new'], 0)
+        self.assertEqual(receipt['summary']['lost'], 0)
+        self.assertEqual(receipt['summary']['retained'], 0)
+        self.assertEqual(receipt['summary']['baseline_or_unknown_added'], 2)
+        self.assertEqual(receipt['reconciliation']['baseline_reason'], 'IDENTITY_KEY_EPOCH_CHANGED')
+
+    def test_epoch_rotation_still_rejects_stale_snapshot(self):
+        prior = self.receipt(self.snapshot(followers=[self.follower('one')]))
+        with self.assertRaisesRegex(ValueError, 'strictly newer'):
+            self.receipt(
+                self.snapshot(observed_at='2026-09-02T03:30:00Z', followers=[self.follower('one')]),
+                prior,
+                key=OTHER_KEY,
+                epoch=NEXT_EPOCH,
+            )
 
     def test_partial_predecessor_does_not_call_new_visibility_acquisition(self):
         prior = self.receipt(self.snapshot(
