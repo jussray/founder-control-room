@@ -172,6 +172,8 @@ Production does not deploy merely because `main` moved or a Cloudflare build suc
 
 A production-specific Truth Lease composes already-authoritative observations. It does not manufacture missing provider/runtime facts.
 
+The privileged post-Deploy Playwright witness is an **independent verifier**, not an executor for the Deploy-run checkout. It must run only for a successful `workflow_dispatch` Deploy run from `main`, execute trusted witness source, and treat the Deploy run SHA only as release evidence to compare with the deployed Worker and public browser/runtime identity. A `workflow_run` SHA must never become executable authority merely because the upstream workflow succeeded.
+
 ### Evidence Trust Plane
 
 The Evidence Trust Plane keeps observation, provider readback, evidence validity, freshness, and action ceilings separate.
