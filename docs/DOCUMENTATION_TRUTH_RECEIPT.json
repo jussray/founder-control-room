@@ -1,33 +1,26 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the bounded production release authority repair to current documentation without claiming provider secret values, deployment success, runtime identity, merge authority, database mutation, publication, billing, or destructive-action authority.",
+  "purpose": "Bind the explicit founder_only and independent_review governance-phase repair to current repository-provider documentation while preserving exact-head, CodeQL, pull-request, force-push, deletion, trusted-App, readback, and non-authorizing evidence boundaries.",
   "domains": [
-    "cloudflare-authority",
-    "evidence-authority"
+    "repository-provider"
   ],
   "changes": [
     {
-      "path": ".github/workflows/deploy.yml",
+      "path": "src/providers/fcrGovernancePhase.ts",
       "claims": [
-        ".github/workflows/deploy.yml must keep GitHub production deployment-plane credentials limited to SUPABASE_DB_URL, CLOUDFLARE_API_TOKEN, and CLOUDFLARE_ACCOUNT_ID while preserving provider-held Worker runtime secret values; canonical Deploy must only actively write the fail-closed FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON runtime secret and cannot treat public DEPLOY_URL configuration as secret authority."
+        "src/providers/fcrGovernancePhase.ts must require explicit founder_only before zero outside approving reviews can be accepted, while historical one-or-more-review configurations remain independent_review-compatible and cannot silently infer the weaker human-review phase."
       ]
     },
     {
-      "path": ".github/workflows/playwright.yml",
+      "path": "src/providers/FounderControlRoomGovernanceGitHubProvider.ts",
       "claims": [
-        ".github/workflows/playwright.yml must run the Production Playwright Exact-SHA Witness only after a successful canonical Deploy, bind EXPECTED_RELEASE_SHA to that Deploy run head, use the canonical public API and Pages origins, and require direct Worker plus public release identity to remain equal to the same exact SHA across the browser journey."
+        "src/providers/FounderControlRoomGovernanceGitHubProvider.ts must encode founder_only and independent_review without changing the shared pull-request, CodeQL, force-push, deletion, trusted-App pull-request-only bypass, review-thread, and zero-bypass strict exact-head freshness floor, and provider readback must reject phase drift."
       ]
     },
     {
-      "path": "wrangler.worker.toml",
+      "path": "src/providers/providerFactory.ts",
       "claims": [
-        "wrangler.worker.toml must declare the canonical Worker runtime secret names as provider-held required bindings, including FOUNDER_SESSION_ENCRYPTION_KEY, so missing required runtime bindings fail closed at the Cloudflare deployment membrane without requiring canonical Deploy to copy secret values through GitHub Actions."
-      ]
-    },
-    {
-      "path": "config/cloudflare-worker-git-authority-policy.json",
-      "claims": [
-        "config/cloudflare-worker-git-authority-policy.json must keep native Cloudflare Workers Builds non-promoting and bind the current desired deploy command to npx wrangler versions upload --config wrangler.worker.toml so the canonical wrangler.worker.toml entry point is discovered without granting production-promotion authority."
+        "src/providers/providerFactory.ts must route canonical Founder Control Room GitHub App governance through the phase-aware provider, preserve repository-identity binding and exact trusted-App bypass validation, and reject a zero-review FCR main policy unless founder_only is explicitly selected."
       ]
     }
   ]
