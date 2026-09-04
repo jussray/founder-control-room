@@ -15,6 +15,8 @@ export const PORTFOLIO_LEDGER_RECEIPT_CONTRACT = 'fcr/portfolio-ledger-write-rec
 
 const EXACT_SHA = /^[0-9a-f]{40}$/i;
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/g;
+const SPREADSHEET_FORMULA_PREFIX = /^[=+\-@]/;
 const MAX_RESPONSE_BYTES = 32 * 1024;
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -50,6 +52,7 @@ export interface PortfolioLedgerProjection {
     workbook: 'ULTRATHINK Portfolio Proof Orientation Ledger';
     tab: 'Orientation Ledger';
     mode: 'upsert';
+    valueInputOption: 'RAW';
     rowKey: string;
   };
   row: {
@@ -84,7 +87,13 @@ interface PortfolioLedgerWriteReceipt {
 }
 
 function bounded(value: unknown, max: number): string {
-  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+  return typeof value === 'string'
+    ? value.replace(CONTROL_CHARACTERS, ' ').trim().slice(0, max)
+    : '';
+}
+
+function sheetSafe(value: string): string {
+  return SPREADSHEET_FORMULA_PREFIX.test(value) ? `'${value}` : value;
 }
 
 function exactSha(value: unknown): string | null {
@@ -98,11 +107,12 @@ function validTimestamp(value: unknown): string | null {
 }
 
 function projectionId(repository: string, mergeCommitSha: string): string {
-  return `github-merge:${repository}:${mergeCommitSha}`;
+  return `github-merge:${repository.toLowerCase()}:${mergeCommitSha}`;
 }
 
 export function buildPortfolioLedgerProjection(observation: MergeObservation): PortfolioLedgerProjection {
   const id = projectionId(observation.repository, observation.mergeCommitSha);
+  const safeTitle = sheetSafe(observation.title || `PR #${observation.pullRequestNumber}`);
   return {
     contract: PORTFOLIO_LEDGER_PROJECTION_CONTRACT,
     projectionId: id,
@@ -123,6 +133,7 @@ export function buildPortfolioLedgerProjection(observation: MergeObservation): P
       workbook: 'ULTRATHINK Portfolio Proof Orientation Ledger',
       tab: 'Orientation Ledger',
       mode: 'upsert',
+      valueInputOption: 'RAW',
       rowKey: `github:${observation.repository.toLowerCase()}`,
     },
     row: {
@@ -131,7 +142,7 @@ export function buildPortfolioLedgerProjection(observation: MergeObservation): P
       classification: 'VERIFIED',
       proofGate: 'Source merge observed; runtime and deployment proof remain separate gates.',
       dependencyTrigger: `PR #${observation.pullRequestNumber} merged into ${observation.targetBranch}`,
-      currentReality: `${observation.title || `PR #${observation.pullRequestNumber}`} landed at ${observation.mergeCommitSha}.`,
+      currentReality: `${safeTitle} landed at ${observation.mergeCommitSha}.`,
       action: 'Reacquire exact-main machine, provider, and runtime proof before promoting runtime truth.',
       evidenceRequired: 'Signature-verified GitHub merge receipt plus exact landed SHA; runtime evidence remains separate.',
       ownerDecision: 'Founder / FCR',
@@ -302,7 +313,7 @@ export class PortfolioLedgerProjectionController extends BaseController {
     }
 
     const projection = buildPortfolioLedgerProjection(observation);
-    const subject = `portfolio-ledger:${observation.repository}:${observation.mergeCommitSha}`;
+    const subject = `portfolio-ledger:${observation.repository.toLowerCase()}:${observation.mergeCommitSha}`;
     const { data: prior, error: priorError } = await supabase
       .from('evidence')
       .select('id, details_ref')
