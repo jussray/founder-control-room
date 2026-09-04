@@ -468,10 +468,10 @@ export async function reserveN8nFounderContentExecution(
       success: null,
       started_at: reservationStartedAt,
     })
-    .select('id')
+    .select('id, started_at')
     .single();
 
-  if (reservationError || !reservation?.id) {
+  if (reservationError || !reservation?.id || !text(reservation.started_at)) {
     const raced = await findFounderContentExecution(request.orchestrationId);
     if (!raced.error && raced.data) {
       if (!executionScopeMatches(raced.data, expectedScope)) {
@@ -498,7 +498,7 @@ export async function reserveN8nFounderContentExecution(
     ok: true,
     executionId: String(reservation.id),
     projectId,
-    reservationStartedAt,
+    reservationStartedAt: text(reservation.started_at),
   };
 }
 
