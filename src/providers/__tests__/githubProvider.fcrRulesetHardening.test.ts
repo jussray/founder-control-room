@@ -30,7 +30,7 @@ const config = {
   enforcement: "active" as const,
   targetRefs: ["main"],
   requirePullRequest: true,
-  requiredApprovingReviewCount: 1,
+  requiredApprovingReviewCount: 0,
   requiredStatusCheckNames: ["Required Gate", "Verify test-ledger contract"],
   blockForcePushes: true,
   blockDeletion: true,
@@ -44,14 +44,15 @@ function freshnessName(request: TestConfig = config) {
 }
 
 function reviewReadback(request: TestConfig = config) {
+  const requireNativeHumanReview = request.requiredApprovingReviewCount > 0;
   const rules: Array<{ type: string; parameters?: Record<string, unknown> }> = [
     {
       type: "pull_request",
       parameters: {
         required_approving_review_count: request.requiredApprovingReviewCount,
         dismiss_stale_reviews_on_push: true,
-        require_code_owner_review: true,
-        require_last_push_approval: true,
+        require_code_owner_review: requireNativeHumanReview,
+        require_last_push_approval: requireNativeHumanReview,
         required_review_thread_resolution: true,
       },
     },
@@ -153,7 +154,7 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     installStrongProviderMocks();
   });
 
-  it("separates no-bypass strict freshness from the security-preserving review membrane", async () => {
+  it("separates no-bypass strict freshness from the founder-only review membrane", async () => {
     const provider = buildProvider();
     const result = await provider.applyBranchRuleset("founder-control-room", config);
 
@@ -187,10 +188,10 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     expect(reviewPayload.rules.some((rule: { type: string }) => rule.type === "required_status_checks")).toBe(false);
     expect(reviewPayload.rules.find((rule: { type: string }) => rule.type === "pull_request")?.parameters)
       .toMatchObject({
-        required_approving_review_count: 1,
+        required_approving_review_count: 0,
         dismiss_stale_reviews_on_push: true,
-        require_code_owner_review: true,
-        require_last_push_approval: true,
+        require_code_owner_review: false,
+        require_last_push_approval: false,
         required_review_thread_resolution: true,
       });
     expect(reviewPayload.rules.find((rule: { type: string }) => rule.type === "code_scanning")?.parameters)
@@ -205,13 +206,32 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
     expect(mockGetRepoRuleset.mock.calls.map((call) => call[0].ruleset_id)).toEqual([2, 1]);
   });
 
-  it("rejects weak FCR main policy before any provider mutation", async () => {
+  it("restores Code Owner and last-push review automatically in a future-team phase", async () => {
+    const futureConfig = { ...config, requiredApprovingReviewCount: 1 };
+    installStrongProviderMocks(futureConfig);
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", futureConfig)).resolves.toMatchObject({
+      name: futureConfig.name,
+      enforcement: "active",
+    });
+
+    const reviewPayload = mockCreateRepoRuleset.mock.calls.find((call) => call[0].name === futureConfig.name)?.[0];
+    expect(reviewPayload.rules.find((rule: { type: string }) => rule.type === "pull_request")?.parameters)
+      .toMatchObject({
+        required_approving_review_count: 1,
+        require_code_owner_review: true,
+        require_last_push_approval: true,
+      });
+  });
+
+  it("rejects invalid FCR main policy before any provider mutation", async () => {
     const provider = buildProvider();
 
     await expect(provider.applyBranchRuleset("founder-control-room", {
       ...config,
-      requiredApprovingReviewCount: 0,
-    })).rejects.toThrow("at least one approving review is required");
+      requiredApprovingReviewCount: -1,
+    })).rejects.toThrow("approving review count must be a non-negative integer");
 
     await expect(provider.applyBranchRuleset("founder-control-room", {
       ...config,
@@ -297,18 +317,33 @@ describe("GitHubProvider FCR main ruleset hardening", () => {
       .rejects.toThrow("bypass actors do not match the requested policy");
   });
 
-  it("fails closed when review readback drops Code Owner review", async () => {
+  it("fails closed when founder-only readback unexpectedly requires Code Owner review", async () => {
     const weakened = reviewReadback();
     const pullRequestRule = weakened.rules.find((rule) => rule.type === "pull_request");
     if (!pullRequestRule?.parameters) throw new Error("test fixture missing pull_request parameters");
-    pullRequestRule.parameters.require_code_owner_review = false;
+    pullRequestRule.parameters.require_code_owner_review = true;
     mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
       data: ruleset_id === 2 ? freshnessReadback() : weakened,
     }));
 
     const provider = buildProvider();
     await expect(provider.applyBranchRuleset("founder-control-room", config))
-      .rejects.toThrow("Code Owner review is not required");
+      .rejects.toThrow("Code Owner review requirement does not match the requested native-review phase");
+  });
+
+  it("fails closed when future-team readback drops Code Owner review", async () => {
+    const futureConfig = { ...config, requiredApprovingReviewCount: 1 };
+    const weakened = reviewReadback(futureConfig);
+    const pullRequestRule = weakened.rules.find((rule) => rule.type === "pull_request");
+    if (!pullRequestRule?.parameters) throw new Error("test fixture missing pull_request parameters");
+    pullRequestRule.parameters.require_code_owner_review = false;
+    mockGetRepoRuleset.mockImplementation(async ({ ruleset_id }: { ruleset_id: number }) => ({
+      data: ruleset_id === 2 ? freshnessReadback(futureConfig) : weakened,
+    }));
+
+    const provider = buildProvider();
+    await expect(provider.applyBranchRuleset("founder-control-room", futureConfig))
+      .rejects.toThrow("Code Owner review requirement does not match the requested native-review phase");
   });
 
   it("fails closed when review readback drops the CodeQL floor", async () => {

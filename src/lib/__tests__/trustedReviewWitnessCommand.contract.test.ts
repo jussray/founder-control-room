@@ -142,12 +142,16 @@ describe('trusted review witness command contract', () => {
     expect(governanceJob).not.toContain('secrets.GITHUB_APP_ID');
     expect(governanceJob).not.toContain('secrets.GITHUB_PRIVATE_KEY');
     expect(governanceJob).toContain("from './dist/providers/providerFactory.js'");
+    expect(governanceJob).toContain('FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS');
     expect(governanceJob).toContain('providerForProject(PROJECT)');
     expect(governanceJob).toContain('provider.applyBranchRuleset(PROJECT_ID');
     expect(governanceJob).toContain('name: FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME');
     expect(governanceJob).toContain("targetRefs: ['main']");
     expect(governanceJob).toContain('requirePullRequest: true');
-    expect(governanceJob).toContain('requiredApprovingReviewCount: 1');
+    expect(governanceJob).toContain(
+      'requiredApprovingReviewCount: FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS',
+    );
+    expect(governanceJob).not.toContain('requiredApprovingReviewCount: 1');
     expect(governanceJob).toContain("requiredStatusCheckNames: ['Required Gate', 'Verify test-ledger contract']");
     expect(governanceJob).toContain('blockForcePushes: true');
     expect(governanceJob).toContain('blockDeletion: true');
@@ -184,6 +188,7 @@ describe('trusted review witness command contract', () => {
     expect(governanceJob).toContain("providerMutationAttempted ? 'UNKNOWN_OR_PARTIAL' : 'NOT_ATTEMPTED'");
     expect(governanceJob).toContain("schema: 'fcr/github-governance-reconcile@v2'");
     expect(governanceJob).toContain('providerMutationState,');
+    expect(governanceJob).toContain('requiredNativeApprovals: FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS,');
     expect(governanceJob).toContain('topology,');
     expect(governanceJob).toContain('failure,');
 
@@ -191,7 +196,7 @@ describe('trusted review witness command contract', () => {
     expect(receiptUpload).toContain('if: always()');
   });
 
-  it('emits a sanitized provider receipt without widening authority', () => {
+  it('emits a sanitized founder-phase provider receipt without widening authority', () => {
     const governanceJob = reviewWorkflow.split('  reconcile-fcr-governance:')[1] ?? '';
 
     expect(governanceJob).toContain("'artifacts/github-governance-reconcile.json'");
@@ -199,6 +204,9 @@ describe('trusted review witness command contract', () => {
     expect(governanceJob).toContain('approvalReference');
     expect(governanceJob).toContain('commandCommentId');
     expect(governanceJob).toContain('result,');
+    expect(governanceJob).toContain(
+      'Human review phase: founder-only; native independent/code-owner approval count is zero until deliberately upgraded',
+    );
     expect(governanceJob).toContain(
       'Merge, deployment, database, secret/credential, billing, publication, and branch-deletion authority: none granted by this command',
     );
