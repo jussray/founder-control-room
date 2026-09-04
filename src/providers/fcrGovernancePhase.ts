@@ -7,10 +7,20 @@ export type PhaseAwareRulesetConfig = RulesetConfig & {
   governancePhase?: FcrGovernancePhase;
 };
 
+/**
+ * An explicit phase is required to enter founder_only. Historical FCR configs
+ * with >=1 approval remain compatible and resolve to independent_review, so
+ * this governance repair cannot accidentally reinterpret an old request as a
+ * weaker policy.
+ */
 export function readFcrGovernancePhase(config: RulesetConfig): FcrGovernancePhase | null {
-  const phase = (config as PhaseAwareRulesetConfig).governancePhase;
-  return FCR_GOVERNANCE_PHASES.includes(phase as FcrGovernancePhase)
-    ? phase as FcrGovernancePhase
+  const explicit = (config as PhaseAwareRulesetConfig).governancePhase;
+  if (FCR_GOVERNANCE_PHASES.includes(explicit as FcrGovernancePhase)) {
+    return explicit as FcrGovernancePhase;
+  }
+  return Number.isInteger(config.requiredApprovingReviewCount)
+    && config.requiredApprovingReviewCount >= 1
+    ? "independent_review"
     : null;
 }
 
@@ -22,7 +32,7 @@ export function fcrGovernancePhaseErrors(config: RulesetConfig): string[] {
   const errors: string[] = [];
   const phase = readFcrGovernancePhase(config);
   if (!phase) {
-    errors.push("governancePhase must be founder_only or independent_review");
+    errors.push("zero-review FCR governance requires explicit governancePhase=founder_only");
     return errors;
   }
 
