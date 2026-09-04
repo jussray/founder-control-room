@@ -43,6 +43,13 @@ export interface ArtOfWarScoredOption extends ArtOfWarOption {
   score: number;
 }
 
+export interface ArtOfWarSourceIdentity {
+  repository: string;
+  targetBranch: string;
+  baseSha: string;
+  currentMainSha: string;
+}
+
 export interface ArtOfWarContinuityCookie {
   contract: typeof ART_OF_WAR_CONTINUITY_CONTRACT;
   cookieId: string;
@@ -60,6 +67,7 @@ export interface ArtOfWarAssessment {
   contract: typeof ART_OF_WAR_ASSESSMENT_CONTRACT;
   state: 'READY' | 'HOLD';
   maneuver: ArtOfWarManeuver;
+  source: ArtOfWarSourceIdentity;
   ground: readonly string[];
   objective: string;
   position: 'CURRENT' | 'STALE' | 'UNKNOWN';
@@ -119,25 +127,41 @@ function optionScore(option: ArtOfWarOption): number {
   );
 }
 
-export function artOfWarSourceFingerprint(input: Pick<
+function sourceIdentity(input: Pick<
   ArtOfWarAssessmentInput,
   'repository' | 'targetBranch' | 'baseSha' | 'currentMainSha'
->): string {
-  return fingerprintNormalized({
+>): ArtOfWarSourceIdentity {
+  return {
     repository: input.repository.trim(),
     targetBranch: input.targetBranch.trim(),
     baseSha: input.baseSha.toLowerCase(),
     currentMainSha: input.currentMainSha.toLowerCase(),
-  });
+  };
+}
+
+export function artOfWarSourceFingerprint(input: Pick<
+  ArtOfWarAssessmentInput,
+  'repository' | 'targetBranch' | 'baseSha' | 'currentMainSha'
+>): string {
+  return fingerprintNormalized(sourceIdentity(input));
+}
+
+function artOfWarContinuityCookieId(input: {
+  assessmentFingerprint: string;
+  sourceFingerprint: string;
+  observedAt: string;
+  predecessorCookieId: string | null;
+}): string {
+  return `aowc:${fingerprintNormalized({
+    contract: ART_OF_WAR_CONTINUITY_CONTRACT,
+    ...input,
+  })}`;
 }
 
 function assessmentFingerprintPayload(input: ArtOfWarAssessmentInput, options: readonly ArtOfWarScoredOption[], selectedOptionId: string | null, maneuver: ArtOfWarManeuver) {
   return {
     contract: ART_OF_WAR_ASSESSMENT_CONTRACT,
-    repository: input.repository.trim(),
-    targetBranch: input.targetBranch.trim(),
-    baseSha: input.baseSha.toLowerCase(),
-    currentMainSha: input.currentMainSha.toLowerCase(),
+    ...sourceIdentity(input),
     goal: input.goal.trim(),
     groundFacts: normalizeText(input.groundFacts),
     unknowns: normalizeText(input.unknowns),
@@ -163,6 +187,7 @@ function assessmentFingerprintPayload(input: ArtOfWarAssessmentInput, options: r
 
 export function assessArtOfWar(input: ArtOfWarAssessmentInput): ArtOfWarAssessment {
   const observedAt = input.observedAt ?? new Date().toISOString();
+  const source = sourceIdentity(input);
   const ground = normalizeText(input.groundFacts);
   const unknowns = normalizeText(input.unknowns);
   const asymmetry = normalizeText(input.verifiedAsymmetries);
@@ -182,6 +207,12 @@ export function assessArtOfWar(input: ArtOfWarAssessmentInput): ArtOfWarAssessme
     errors.push('strategy options require unique non-empty IDs');
   }
   if (normalizedOptions.some((option) => !option.label)) errors.push('strategy options require labels');
+  if (normalizedOptions.some((option) => option.evidenceStrength > 0 && option.evidenceIds.length === 0)) {
+    errors.push('nonzero option evidence strength requires at least one evidence ID');
+  }
+  if (asymmetry.length > 0 && proofOfAdvantage.length === 0) {
+    errors.push('verified asymmetry requires proof of advantage');
+  }
 
   const options = normalizedOptions
     .map((option) => ({ ...option, score: optionScore(option) }))
@@ -230,6 +261,9 @@ export function assessArtOfWar(input: ArtOfWarAssessmentInput): ArtOfWarAssessme
     ...options
       .filter((option) => option.id !== selectedOptionId && option.siegeCost >= 4)
       .map((option) => `Avoid high-siege option ${option.id}: ${option.label}`),
+    ...(maneuver === 'AVOID_SIEGE' && selectedOptionId
+      ? [`Avoid selected high-siege option ${selectedOptionId} until a lower-friction route is proven.`]
+      : []),
     'Do not treat a continuity cookie, fingerprint, model output, or prior approval as execution authority.',
   ];
 
@@ -237,12 +271,18 @@ export function assessArtOfWar(input: ArtOfWarAssessmentInput): ArtOfWarAssessme
     assessmentFingerprintPayload(input, options, selectedOptionId, maneuver),
   );
   const sourceFingerprint = artOfWarSourceFingerprint(input);
+  const predecessorCookieId = input.predecessorCookieId?.trim() || null;
   const continuityCookie: ArtOfWarContinuityCookie = {
     contract: ART_OF_WAR_CONTINUITY_CONTRACT,
-    cookieId: `aow:${fingerprint}`,
+    cookieId: artOfWarContinuityCookieId({
+      assessmentFingerprint: fingerprint,
+      sourceFingerprint,
+      observedAt,
+      predecessorCookieId,
+    }),
     assessmentFingerprint: fingerprint,
     sourceFingerprint,
-    predecessorCookieId: input.predecessorCookieId?.trim() || null,
+    predecessorCookieId,
     observedAt,
     browserCookie: false,
     authorizing: false,
@@ -254,6 +294,7 @@ export function assessArtOfWar(input: ArtOfWarAssessmentInput): ArtOfWarAssessme
     contract: ART_OF_WAR_ASSESSMENT_CONTRACT,
     state: mayProceed ? 'READY' : 'HOLD',
     maneuver,
+    source,
     ground,
     objective: input.goal.trim(),
     position,
@@ -278,10 +319,18 @@ export function validateArtOfWarContinuity(
 ): string[] {
   const errors: string[] = [];
   const cookie = assessment.continuityCookie;
+  const expectedSourceFingerprint = fingerprintNormalized(assessment.source);
+  const expectedCookieId = artOfWarContinuityCookieId({
+    assessmentFingerprint: assessment.fingerprint,
+    sourceFingerprint: expectedSourceFingerprint,
+    observedAt: cookie.observedAt,
+    predecessorCookieId: cookie.predecessorCookieId,
+  });
 
   if (cookie.contract !== ART_OF_WAR_CONTINUITY_CONTRACT) errors.push('continuity contract mismatch');
-  if (cookie.cookieId !== `aow:${assessment.fingerprint}`) errors.push('continuity cookie does not bind assessment fingerprint');
+  if (cookie.cookieId !== expectedCookieId) errors.push('continuity cookie does not bind assessment, source, freshness, and lineage');
   if (cookie.assessmentFingerprint !== assessment.fingerprint) errors.push('continuity assessment fingerprint mismatch');
+  if (cookie.sourceFingerprint !== expectedSourceFingerprint) errors.push('continuity source fingerprint mismatch');
   if (cookie.browserCookie !== false || cookie.authorizing !== false || cookie.approvalCarryForward !== false || cookie.standingMutationAuthority !== false) {
     errors.push('continuity cookie must remain non-browser and non-authorizing');
   }
@@ -289,6 +338,13 @@ export function validateArtOfWarContinuity(
   if (cookie.predecessorCookieId) {
     if (!predecessor || predecessor.cookieId !== cookie.predecessorCookieId) {
       errors.push('declared predecessor continuity cookie is missing or mismatched');
+    } else if (
+      predecessor.browserCookie !== false
+      || predecessor.authorizing !== false
+      || predecessor.approvalCarryForward !== false
+      || predecessor.standingMutationAuthority !== false
+    ) {
+      errors.push('predecessor continuity cookie violates non-authorizing boundary');
     }
   }
 
