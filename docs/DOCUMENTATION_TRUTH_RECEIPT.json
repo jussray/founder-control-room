@@ -1,11 +1,12 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the current Founder Signal Engine authority, privacy-safe keyed LinkedIn follower/post evidence automation, provider-neutral n8n publication membrane, ULTRATHINK advisory evidence boundary, current production release authority repair, and founder-only native GitHub human-review phase to reviewed source invariants without claiming live provider configuration, publication outcome, deployment success, merge authority, database mutation, secret validity, billing, or destructive-action authority.",
+  "purpose": "Bind the current Founder Signal Engine authority, privacy-safe keyed LinkedIn follower/post evidence automation, provider-neutral n8n publication membrane, ULTRATHINK advisory evidence boundary, current production release authority repair, founder-only native GitHub human-review phase, and GitHub BuildEvent truth-governance projection to reviewed source invariants without claiming live provider configuration, publication outcome, deployment success, merge authority, database mutation, secret validity, billing, or destructive-action authority.",
   "domains": [
     "publishing",
     "cloudflare-authority",
     "evidence-authority",
-    "repository-provider"
+    "repository-provider",
+    "truth-governance"
   ],
   "changes": [
     {
@@ -181,6 +182,12 @@
       "path": "src/providers/providerFactory.ts",
       "claims": [
         "src/providers/providerFactory.ts must keep the current FCR founder-only native approving-review floor at zero while retaining the constitutional required checks and trusted GitHub App boundary, and a later deliberate positive native-review count must remain representable without weakening the existing machine or founder-final authority membrane."
+      ]
+    },
+    {
+      "path": "src/buildEvents/githubBuildEvent.ts",
+      "claims": [
+        "src/buildEvents/githubBuildEvent.ts must represent a merged pull request with the validated GitHub merge_commit_sha as the authoritative landed commit on the PR base branch while preserving the proposal head SHA separately as auditedCommitSha; proposal-head proof must never be projected as merged-main identity, malformed or zero SHAs must fail closed, and webhook-derived BuildEvents remain observed evidence rather than merge, deployment, or publication authority."
       ]
     }
   ]
