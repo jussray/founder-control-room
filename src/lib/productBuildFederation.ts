@@ -323,7 +323,7 @@ export async function dispatchStoryEngineProductBuildDirective(
         'Content-Type': 'application/json',
         'X-API-Key': apiKey,
       },
-      body: JSON.stringify({ directive }),
+      body: JSON.stringify(directive),
       signal,
     }));
   } catch {
