@@ -7,7 +7,12 @@ import {
 import {
   createProductBuildDirective,
   PRODUCT_BUILD_DIRECTIVE_CONTRACT,
+  type ProductBuildDirective,
 } from '../../lib/productBuildDirective.js';
+import {
+  ProductBuildFederationError,
+  dispatchStoryEngineProductBuildDirective,
+} from '../../lib/productBuildFederation.js';
 import {
   validateFounderControlDecision,
   type FounderControlDecision,
@@ -26,6 +31,10 @@ const FIRST_ACTUATOR_SCOPE = 'control-room:event-log';
 const BUILD_ACTION = 'build-product-control-room-loop';
 
 type JsonRecord = Record<string, unknown>;
+
+type DirectivePreparation =
+  | { ok: true; directive: ProductBuildDirective }
+  | { ok: false; status: number; body: JsonRecord };
 
 function record(value: unknown): JsonRecord {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonRecord : {};
@@ -71,53 +80,62 @@ function capabilityIds(plan: V10CapabilityPlan): string[] {
   return [...new Set(plan.capabilities.map((capability) => capability.id.trim()).filter(Boolean))].sort();
 }
 
-productBuildRouter.use(requireFounder);
+function prepareStoryEngineDirective(input: unknown): DirectivePreparation {
+  const body = record(input);
+  const selectedPlan = isV10CapabilityPlan(body.capabilityPlan)
+    ? body.capabilityPlan
+    : null;
+  const boundProposal = proposal(body.proposal);
+  const decision = founderDecision(body.founderDecision);
+  const directiveId = text(body.directiveId);
 
-productBuildRouter.post(
-  '/storyengine/directive',
-  requirePortfolioSwitchOn('fcr-privileged-execution-master'),
-  (req: FounderRequest, res) => {
-    const body = record(req.body);
-    const selectedPlan = isV10CapabilityPlan(body.capabilityPlan)
-      ? body.capabilityPlan
-      : null;
-    const boundProposal = proposal(body.proposal);
-    const decision = founderDecision(body.founderDecision);
-    const directiveId = text(body.directiveId);
-
-    if (!selectedPlan || !boundProposal || !decision || !directiveId) {
-      return res.status(400).json({
+  if (!selectedPlan || !boundProposal || !decision || !directiveId) {
+    return {
+      ok: false,
+      status: 400,
+      body: {
         ok: false,
         code: 'INVALID_PRODUCT_BUILD_INPUT',
         reasons: ['directiveId, Chief capabilityPlan, exact proposal, and founderDecision are required'],
-      });
-    }
+      },
+    };
+  }
 
-    const planErrors = validateV10CapabilityPlan(selectedPlan);
-    if (planErrors.length > 0) {
-      return res.status(400).json({ ok: false, code: 'INVALID_CHIEF_CAPABILITY_PLAN', reasons: planErrors });
-    }
+  const planErrors = validateV10CapabilityPlan(selectedPlan);
+  if (planErrors.length > 0) {
+    return {
+      ok: false,
+      status: 400,
+      body: { ok: false, code: 'INVALID_CHIEF_CAPABILITY_PLAN', reasons: planErrors },
+    };
+  }
 
-    const ids = capabilityIds(selectedPlan);
-    const bindingErrors: string[] = [];
-    if (selectedPlan.projectSlug !== STORYENGINE_PROJECT) bindingErrors.push('Chief capability plan must target StoryEngine project l99');
-    if (!ids.includes(FEDERATION_CAPABILITY)) bindingErrors.push('Chief capability plan must select founder-control-room-federation');
-    if (boundProposal.projectSlug !== selectedPlan.projectSlug) bindingErrors.push('proposal project must match Chief capability plan project');
-    if (boundProposal.actionType !== BUILD_ACTION) bindingErrors.push('proposal actionType is not the bounded product-build action');
-    if (boundProposal.expectedHeadSha !== selectedPlan.expectedHeadSha) bindingErrors.push('proposal head must match Chief capability plan head');
-    if (boundProposal.capabilityPlanHash !== selectedPlan.planHash) bindingErrors.push('proposal capabilityPlanHash must match the exact Chief plan hash');
-    bindingErrors.push(...validateFounderControlDecision(decision, boundProposal));
+  const ids = capabilityIds(selectedPlan);
+  const bindingErrors: string[] = [];
+  if (selectedPlan.projectSlug !== STORYENGINE_PROJECT) bindingErrors.push('Chief capability plan must target StoryEngine project l99');
+  if (!ids.includes(FEDERATION_CAPABILITY)) bindingErrors.push('Chief capability plan must select founder-control-room-federation');
+  if (boundProposal.projectSlug !== selectedPlan.projectSlug) bindingErrors.push('proposal project must match Chief capability plan project');
+  if (boundProposal.actionType !== BUILD_ACTION) bindingErrors.push('proposal actionType is not the bounded product-build action');
+  if (boundProposal.expectedHeadSha !== selectedPlan.expectedHeadSha) bindingErrors.push('proposal head must match Chief capability plan head');
+  if (boundProposal.capabilityPlanHash !== selectedPlan.planHash) bindingErrors.push('proposal capabilityPlanHash must match the exact Chief plan hash');
+  bindingErrors.push(...validateFounderControlDecision(decision, boundProposal));
 
-    if (bindingErrors.length > 0) {
-      return res.status(409).json({
+  if (bindingErrors.length > 0) {
+    return {
+      ok: false,
+      status: 409,
+      body: {
         ok: false,
         code: 'PRODUCT_BUILD_BINDING_MISMATCH',
         reasons: [...new Set(bindingErrors)],
-      });
-    }
+      },
+    };
+  }
 
-    try {
-      const directive = createProductBuildDirective({
+  try {
+    return {
+      ok: true,
+      directive: createProductBuildDirective({
         directiveId,
         founderDecision: decision,
         proposal: boundProposal,
@@ -129,31 +147,100 @@ productBuildRouter.post(
         requiredProof: ['node-test', 'playwright'],
         stopConditions: ['one-successful-receipt', 'any-authority-drift'],
         rollback: 'Delete the single product-build audit event and revert the focused product-control-room adapter commit.',
-      });
+      }),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 400,
+      body: {
+        ok: false,
+        code: 'PRODUCT_BUILD_DIRECTIVE_REJECTED',
+        reasons: [error instanceof Error ? error.message : 'Product build directive could not be created'],
+      },
+    };
+  }
+}
 
+function issuedAuthority(crossProductDispatchPerformed: boolean) {
+  return {
+    issuedBy: 'founder-control-room',
+    chiefPlanValidated: true,
+    founderDecisionValidated: true,
+    crossProductDispatchPerformed,
+    productControlRoomMustRevalidateExactHead: true,
+    receiptRequired: true,
+    mergeAuthorized: false,
+    deployAuthorized: false,
+    providerMutationAuthorized: false,
+  };
+}
+
+productBuildRouter.use(requireFounder);
+
+productBuildRouter.post(
+  '/storyengine/directive',
+  requirePortfolioSwitchOn('fcr-privileged-execution-master'),
+  (req: FounderRequest, res) => {
+    const prepared = prepareStoryEngineDirective(req.body);
+    if (!prepared.ok) return res.status(prepared.status).json(prepared.body);
+
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json({
+      ok: true,
+      contract: PRODUCT_BUILD_DIRECTIVE_CONTRACT,
+      directive: prepared.directive,
+      founder: req.founder ? { userId: req.founder.userId } : null,
+      authority: issuedAuthority(false),
+    });
+  },
+);
+
+productBuildRouter.post(
+  '/storyengine/execute',
+  requirePortfolioSwitchOn('fcr-privileged-execution-master'),
+  async (req: FounderRequest, res) => {
+    const prepared = prepareStoryEngineDirective(req.body);
+    if (!prepared.ok) return res.status(prepared.status).json(prepared.body);
+
+    try {
+      const reconciliation = await dispatchStoryEngineProductBuildDirective(prepared.directive);
       res.setHeader('Cache-Control', 'no-store');
       return res.status(200).json({
         ok: true,
         contract: PRODUCT_BUILD_DIRECTIVE_CONTRACT,
-        directive,
+        directive: prepared.directive,
+        receipt: reconciliation.receipt,
+        reconciliation,
         founder: req.founder ? { userId: req.founder.userId } : null,
-        authority: {
-          issuedBy: 'founder-control-room',
-          chiefPlanValidated: true,
-          founderDecisionValidated: true,
-          crossProductDispatchPerformed: false,
-          productControlRoomMustRevalidateExactHead: true,
-          receiptRequired: true,
+        authority: issuedAuthority(true),
+      });
+    } catch (error) {
+      if (error instanceof ProductBuildFederationError) {
+        const notConfigured = error.code === 'PRODUCT_BUILD_FEDERATION_NOT_CONFIGURED'
+          || error.code === 'PRODUCT_BUILD_FEDERATION_URL_INVALID'
+          || error.code === 'PRODUCT_BUILD_FEDERATION_URL_INSECURE';
+        const stale = error.code === 'PRODUCT_BUILD_STALE_RUNTIME';
+        return res.status(notConfigured ? 503 : stale ? 409 : 502).json({
+          ok: false,
+          code: error.code,
+          reasons: [error.message],
+          executionState: error.mayHaveExecuted ? 'unknown' : 'not_verified',
+          blindRetryAllowed: false,
           mergeAuthorized: false,
           deployAuthorized: false,
           providerMutationAuthorized: false,
-        },
-      });
-    } catch (error) {
-      return res.status(400).json({
+        });
+      }
+      return res.status(502).json({
         ok: false,
-        code: 'PRODUCT_BUILD_DIRECTIVE_REJECTED',
-        reasons: [error instanceof Error ? error.message : 'Product build directive could not be created'],
+        code: 'PRODUCT_BUILD_FEDERATION_FAILED',
+        reasons: ['StoryEngine federation failed without verified terminal evidence.'],
+        executionState: 'unknown',
+        blindRetryAllowed: false,
+        mergeAuthorized: false,
+        deployAuthorized: false,
+        providerMutationAuthorized: false,
       });
     }
   },
