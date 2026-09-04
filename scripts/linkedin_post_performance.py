@@ -2,7 +2,7 @@
 """Merge LinkedIn's engagement-ranked and impression-ranked TOP POSTS lists.
 
 Observation-only. Missing values caused by provider rank caps remain unknown, never zero.
-The output is keyed by the existing deterministic post fingerprint.
+The output is keyed by private-key HMAC post identities.
 """
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import os
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,7 @@ def _extract_ranked(
     date_col: int,
     value_col: int,
     metric: str,
+    identity_key: str | bytes,
 ) -> tuple[dict[str, dict[str, Any]], int]:
     visible: dict[str, dict[str, Any]] = {}
     provider_rows = 0
@@ -56,7 +58,11 @@ def _extract_ranked(
             continue
 
         normalized = continuity._normalize_url(url)
-        fp = continuity.post_fingerprint(publish_day, normalized)
+        fp = continuity.post_fingerprint(
+            publish_day,
+            normalized,
+            identity_key=identity_key,
+        )
         raw_value = row[value_col]
         value = int(float(raw_value)) if str(raw_value or "").strip() else None
         visible[fp] = {
@@ -92,18 +98,22 @@ def analyze_performance(
     end: date,
     *,
     window_role: str,
+    identity_key: str | bytes,
+    identity_key_epoch: str,
     export_limit: int = 50,
 ) -> dict[str, Any]:
     if window_role not in {"historical_365", "recent_90"}:
         raise ValueError("window_role must be historical_365 or recent_90")
+    epoch = continuity._key_epoch(identity_key_epoch)
+    continuity._key_bytes(identity_key)
     sheets = continuity.read_export(path)
     rows = sheets["TOP POSTS"]
 
     engagement, engagement_rows = _extract_ranked(
-        rows, start, end, url_col=0, date_col=1, value_col=2, metric="engagements"
+        rows, start, end, url_col=0, date_col=1, value_col=2, metric="engagements", identity_key=identity_key
     )
     impressions, impression_rows = _extract_ranked(
-        rows, start, end, url_col=4, date_col=5, value_col=6, metric="impressions"
+        rows, start, end, url_col=4, date_col=5, value_col=6, metric="impressions", identity_key=identity_key
     )
 
     merged: list[dict[str, Any]] = []
@@ -152,6 +162,11 @@ def analyze_performance(
     return {
         "contract": "linkedin-post-performance@v1",
         "authority": "observation_only",
+        "privacy": {
+            "post_identity_scheme": "HMAC-SHA256/private-runtime-key/v1",
+            "post_identity_key_epoch": epoch,
+            "private_key_persisted": False,
+        },
         "window": {
             "role": window_role,
             "start": start.isoformat(),
@@ -185,11 +200,20 @@ def main() -> int:
     parser.add_argument("--output")
     args = parser.parse_args()
 
+    identity_key = os.environ.get("LINKEDIN_POST_ID_HMAC_KEY", "")
+    if not identity_key:
+        raise SystemExit("BLOCKED_PRIVACY_KEY: LINKEDIN_POST_ID_HMAC_KEY is required")
+    identity_key_epoch = os.environ.get("LINKEDIN_POST_ID_HMAC_EPOCH", "")
+    if not identity_key_epoch:
+        raise SystemExit("BLOCKED_PRIVACY_EPOCH: LINKEDIN_POST_ID_HMAC_EPOCH is required")
+
     report = analyze_performance(
         args.xlsx,
         continuity._parse_date(args.start),
         continuity._parse_date(args.end),
         window_role=args.window_role,
+        identity_key=identity_key,
+        identity_key_epoch=identity_key_epoch,
     )
     encoded = json.dumps(report, indent=2, sort_keys=True)
     if args.output:
