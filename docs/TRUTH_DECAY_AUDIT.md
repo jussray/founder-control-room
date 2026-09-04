@@ -28,6 +28,14 @@ The corrected contract keeps one authority per secret plane. GitHub production v
 
 `https://api.foundercontrolroom.org` is public release configuration, not a secret. The post-Deploy Playwright witness derives its expected identity from the successful Deploy run and must prove both the direct Worker and public Pages/proxy `/version` identities equal that exact SHA before and after the browser journey. A source declaration, required-name membrane, or green PR still does not prove that provider-held secrets are currently installed or that production serves the candidate. Those remain provider/runtime observations at the use boundary.
 
+## 2026-09 control correction: merged PR identity versus proposal-head identity
+
+The GitHub BuildEvent projection exposed a truth-governance boundary that cannot be inferred from a green proposal head. A pull request can be reviewed and tested at one head SHA, while the authoritative repository identity after merge is the landed `merge_commit_sha` on the base branch. Projecting the proposal head as merged-main identity would make a historically valid review fact masquerade as the repository state that actually landed.
+
+The corrected GitHub webhook projection keeps those identities separate. For a merged pull request, `src/buildEvents/githubBuildEvent.ts` must validate and project the GitHub `merge_commit_sha` as the authoritative landed commit on the base branch while retaining the former PR head separately as `auditedCommitSha`. Non-merged pull requests remain proposal-head observations. Invalid, empty, or all-zero SHAs fail closed instead of being promoted into repository truth.
+
+This separation is still observation, not authority escalation. A webhook-derived BuildEvent may support portfolio-ledger and reconciliation evidence, but it does not by itself authorize merge, prove current `main` after time has passed, prove deployment/runtime identity, or prove publication. Current-state use still requires the appropriate repository/provider revalidation at the use boundary.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -332,6 +340,7 @@ The strongest optimization is not faster claiming. It is shortening the distance
 27. A governance document that changes future agent execution order is truth-sensitive even when no runtime source changes; failing to register it with Documentation Truth is a false green, not a harmless docs-only omission.
 28. A missing GitHub copy of a provider-held Worker runtime secret does not prove the Cloudflare runtime secret is absent; read the provider-held binding plane before making that claim.
 29. A public deployment origin must not be mislabeled as a secret merely because a workflow consumes it; authority classification must follow the sensitivity and mutation boundary of the value.
+30. A reviewed proposal head must not be projected as merged-main identity; the landed merge commit and the audited proposal head are distinct truth objects and must remain separately bound.
 
 ## Rollback
 
