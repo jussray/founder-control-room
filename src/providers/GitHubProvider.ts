@@ -444,6 +444,8 @@ export class GitHubProvider implements RepositoryProvider {
       projectId === "founder-control-room"
       && config.enforcement === "active"
       && config.targetRefs.includes("main");
+    const requireNativeHumanReview =
+      hardenFounderControlRoomMainReview && config.requiredApprovingReviewCount > 0;
 
     if (hardenFounderControlRoomMainReview) {
       const errors = fcrMainRulesetConfigErrors(config);
@@ -464,8 +466,8 @@ export class GitHubProvider implements RepositoryProvider {
         type: "pull_request",
         parameters: {
           dismiss_stale_reviews_on_push: hardenFounderControlRoomMainReview,
-          require_code_owner_review: hardenFounderControlRoomMainReview,
-          require_last_push_approval: hardenFounderControlRoomMainReview,
+          require_code_owner_review: requireNativeHumanReview,
+          require_last_push_approval: requireNativeHumanReview,
           required_approving_review_count: config.requiredApprovingReviewCount,
           required_review_thread_resolution: true,
         },
@@ -666,8 +668,8 @@ type RulesetReadback = {
 function fcrMainRulesetConfigErrors(config: RulesetConfig): string[] {
   const errors: string[] = [];
   if (!config.requirePullRequest) errors.push("pull requests must be required");
-  if (!Number.isInteger(config.requiredApprovingReviewCount) || config.requiredApprovingReviewCount < 1) {
-    errors.push("at least one approving review is required");
+  if (!Number.isInteger(config.requiredApprovingReviewCount) || config.requiredApprovingReviewCount < 0) {
+    errors.push("approving review count must be a non-negative integer");
   }
   const requiredChecks = config.requiredStatusCheckNames.map((name) => name.trim());
   if (requiredChecks.length === 0) {
@@ -746,13 +748,18 @@ function fcrMainReviewRulesetReadbackErrors(config: RulesetConfig, value: unknow
   const rules = Array.isArray(readback.rules) ? readback.rules : [];
   const pullRequest = rules.find((rule) => rule.type === "pull_request");
   const pullParameters = pullRequest?.parameters ?? {};
+  const requireNativeHumanReview = config.requiredApprovingReviewCount > 0;
   if (!pullRequest) errors.push("pull request rule is missing");
   if (pullParameters.required_approving_review_count !== config.requiredApprovingReviewCount) {
     errors.push("approving review count does not match requested policy");
   }
   if (pullParameters.dismiss_stale_reviews_on_push !== true) errors.push("stale approvals are not dismissed on push");
-  if (pullParameters.require_code_owner_review !== true) errors.push("Code Owner review is not required");
-  if (pullParameters.require_last_push_approval !== true) errors.push("last-push approval is not required");
+  if (pullParameters.require_code_owner_review !== requireNativeHumanReview) {
+    errors.push("Code Owner review requirement does not match the requested native-review phase");
+  }
+  if (pullParameters.require_last_push_approval !== requireNativeHumanReview) {
+    errors.push("last-push approval requirement does not match the requested native-review phase");
+  }
   if (pullParameters.required_review_thread_resolution !== true) errors.push("review-thread resolution is not required");
   if (rules.some((rule) => rule.type === "required_status_checks")) {
     errors.push("review membrane must not own bypassable required-status freshness");
