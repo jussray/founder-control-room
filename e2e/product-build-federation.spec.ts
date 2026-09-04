@@ -67,7 +67,7 @@ function directive() {
     objective: 'Prove one real exact-head FCR to StoryEngine Control Room HTTP execution and receipt return lap.',
     allowedCapabilities: ['founder-control-room-federation'],
     allowedMutationScope: ['control-room:event-log'],
-    requiredProof: ['playwright', 'exact-head-runtime-identity'],
+    requiredProof: ['node-test', 'playwright', 'exact-head-runtime-identity'],
     stopConditions: ['one-successful-receipt', 'any-authority-drift'],
     rollback: 'Delete the single local proof audit event and revert the focused federation adapter changes.',
   });
