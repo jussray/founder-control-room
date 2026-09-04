@@ -312,6 +312,8 @@ async function githubProvider(project: ProviderProjectConfig): Promise<Repositor
   const fallbackToken = process.env.GITHUB_TOKEN?.trim();
   const appId = process.env.GITHUB_APP_ID?.trim();
   const privateKey = process.env.GITHUB_PRIVATE_KEY?.trim();
+  // GITHUB_TOKEN remains a local/development fallback only; production prefers
+  // repository-scoped GitHub App installation credentials minted on demand.
   const hasAppAuthority = Boolean(appId && privateKey);
   const token = hasAppAuthority
     ? await getGitHubInstallationToken(appId!, privateKey!, project.repo_identifier)
