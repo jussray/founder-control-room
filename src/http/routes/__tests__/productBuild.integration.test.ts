@@ -263,10 +263,10 @@ describe('POST /product-build/storyengine/execute', () => {
         return new Response(JSON.stringify(runtimeIdentity()), { status: 200 });
       }
       if (url.endsWith('/api/control-room/product-build/execute')) {
-        const parsed = JSON.parse(String(init?.body ?? '{}')) as { directive: { directiveHash: string } };
+        const parsed = JSON.parse(String(init?.body ?? '{}')) as { directiveHash: string };
         const withoutHash: Omit<ProductBuildReceipt, 'receiptHash'> = {
           contract: 'juss-v10/product-build-receipt@v1',
-          directiveHash: parsed.directive.directiveHash,
+          directiveHash: parsed.directiveHash,
           productControlRoomId: 'storyengine-control-room',
           repository: 'jussray/StoryEngine',
           status: 'completed',
