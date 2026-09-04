@@ -48,6 +48,7 @@ describe('portfolio ledger projection contract', () => {
       workbook: 'ULTRATHINK Portfolio Proof Orientation Ledger',
       tab: 'Orientation Ledger',
       mode: 'upsert',
+      valueInputOption: 'RAW',
       rowKey: 'github:jussray/jussbeautifulhair-site',
     });
     expect(projection.row.classification).toBe('VERIFIED');
