@@ -335,6 +335,13 @@ export async function dispatchStoryEngineProductBuildDirective(
   }
 
   if (!response.ok) {
+    if (response.status >= 500) {
+      throw new ProductBuildFederationError(
+        'PRODUCT_BUILD_EXECUTION_UNKNOWN',
+        `StoryEngine returned HTTP ${response.status} after product-build dispatch; execution may have occurred. Do not blind-retry without independent reconciliation.`,
+        true,
+      );
+    }
     const body = await readBoundedJson(response, 'StoryEngine product-build response').catch(() => null);
     const detail = record(body);
     throw new ProductBuildFederationError(
