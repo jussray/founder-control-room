@@ -52,7 +52,7 @@ on:
         required: true
         type: string
       target_branch:
-        description: Branch expected to be checked out
+        description: Branch expected to contain the approved commit
         required: true
         default: main
         type: string
@@ -85,26 +85,28 @@ jobs:
       FOUNDER_APPROVAL_ID: ${{ inputs.founder_approval_id || '' }}
 
     steps:
-      - name: Checkout target branch
+      - name: Checkout approved head
         uses: actions/checkout@v4
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ env.TARGET_BRANCH }}
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify approved branch and head before installing dependencies
+      - name: Verify approved branch lineage and exact head before installing dependencies
         shell: bash
         run: |
           set -euo pipefail
-          ACTUAL_BRANCH="$(git branch --show-current)"
           ACTUAL_HEAD_SHA="$(git rev-parse HEAD)"
-          echo "Expected branch: ${TARGET_BRANCH}"
-          echo "Actual branch:   ${ACTUAL_BRANCH}"
-          echo "Expected head:   ${EXPECTED_HEAD_SHA}"
-          echo "Actual head:     ${ACTUAL_HEAD_SHA}"
-          test "${ACTUAL_BRANCH}" = "${TARGET_BRANCH}"
+          REMOTE_BRANCH_REF="refs/remotes/origin/${TARGET_BRANCH}"
+          git fetch --no-tags origin "+refs/heads/${TARGET_BRANCH}:${REMOTE_BRANCH_REF}"
+          CURRENT_BRANCH_HEAD_SHA="$(git rev-parse "${REMOTE_BRANCH_REF}")"
+          echo "Expected branch:      ${TARGET_BRANCH}"
+          echo "Current branch head:  ${CURRENT_BRANCH_HEAD_SHA}"
+          echo "Expected exact head:  ${EXPECTED_HEAD_SHA}"
+          echo "Checked-out head:     ${ACTUAL_HEAD_SHA}"
           test "${ACTUAL_HEAD_SHA}" = "${EXPECTED_HEAD_SHA}"
+          git merge-base --is-ancestor "${EXPECTED_HEAD_SHA}" "${REMOTE_BRANCH_REF}"
 
       - name: Setup Node
         uses: actions/setup-node@v4
