@@ -2,6 +2,9 @@ import { createRequire } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
 import type { FounderContentApprovalRepository } from '../founderContentApprovalStore.js';
 import type {
+  AtomicFounderContentExecutionClaimResult,
+} from '../atomicFounderContentExecutionClaim.js';
+import type {
   N8nFounderContentDispatchResult,
   N8nFounderContentRequest,
 } from '../n8nFounderContentOrchestrator.js';
@@ -25,6 +28,8 @@ const {
 const SOURCE_SHA = 'd'.repeat(40);
 const EVIDENCE_REF = `github:founder-control-room@${SOURCE_SHA}#quality-gate`;
 const NOW = '2026-08-18T01:30:00.000Z';
+const RESERVATION_GENERATION = '2026-08-18T01:30:00.000Z';
+const EXECUTION_ID = '22222222-2222-4222-8222-222222222222';
 
 function proposal(): Record<string, unknown> {
   const value: Record<string, unknown> = {
@@ -156,6 +161,21 @@ function currentApproval(): ApprovalResult {
   };
 }
 
+function currentAtomicClaim(): AtomicFounderContentExecutionClaimResult {
+  return {
+    ok: true,
+    approval: STORED_APPROVAL,
+    approvalId: 'fca:buffer-test-1',
+    authorizationHash: AUTHORIZATION_HASH,
+    publicPayloadHash: PUBLIC_PAYLOAD_HASH,
+    executionStartedAt: RESERVATION_GENERATION,
+  };
+}
+
+function atomicClaim(result: AtomicFounderContentExecutionClaimResult = currentAtomicClaim()) {
+  return vi.fn(async () => result);
+}
+
 function request() {
   return {
     proposal: TEST_PROPOSAL,
@@ -192,7 +212,8 @@ function preparedHarness(
     request: {
       providerRequest: { scheduleAt },
     } as unknown as N8nFounderContentRequest,
-    executionId: '22222222-2222-4222-8222-222222222222',
+    executionId: EXECUTION_ID,
+    reservationStartedAt: RESERVATION_GENERATION,
     acquireApprovalClaimBoundary,
     dispatch,
     abort,
@@ -218,9 +239,10 @@ function preparationFailure(
 }
 
 describe('authoritative n8n founder-content publisher', () => {
-  it('reserves and fences downstream state before atomically claiming approval, then dispatches only after the claim succeeds', async () => {
+  it('reserves downstream state before atomically claiming the exact execution generation, then dispatches only after the claim succeeds', async () => {
     const store = repository(currentApproval());
     const prepared = preparedHarness();
+    const claim = atomicClaim();
 
     const result = await dispatchAuthoritativeN8nFounderContent(request(), {
       founderUserId: 'founder-user-1',
@@ -229,6 +251,7 @@ describe('authoritative n8n founder-content publisher', () => {
       env: READY_ENV,
       approvalRepository: store,
       prepare: prepared.prepare,
+      atomicClaim: claim,
     });
 
     expect(result.ok).toBe(true);
@@ -247,7 +270,9 @@ describe('authoritative n8n founder-content publisher', () => {
       env: READY_ENV,
       executedBy: 'founder@example.com',
     }));
-    expect(store.claim).toHaveBeenCalledWith(expect.objectContaining({
+    expect(claim).toHaveBeenCalledWith(expect.objectContaining({
+      executionId: EXECUTION_ID,
+      executionStartedAt: RESERVATION_GENERATION,
       founderUserId: 'founder-user-1',
       approvalId: 'fca:buffer-test-1',
       proposalHash: PROPOSAL_HASH,
@@ -257,22 +282,25 @@ describe('authoritative n8n founder-content publisher', () => {
       now: NOW,
     }));
     expect(prepared.prepare.mock.invocationCallOrder[0]).toBeLessThan(
-      prepared.acquireApprovalClaimBoundary.mock.invocationCallOrder[0],
+      claim.mock.invocationCallOrder[0],
     );
-    expect(prepared.acquireApprovalClaimBoundary.mock.invocationCallOrder[0]).toBeLessThan(
-      (store.claim as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0],
-    );
-    expect((store.claim as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]).toBeLessThan(
+    expect(claim.mock.invocationCallOrder[0]).toBeLessThan(
       prepared.dispatch.mock.invocationCallOrder[0],
     );
+    expect(store.claim).not.toHaveBeenCalled();
+    expect(prepared.acquireApprovalClaimBoundary).not.toHaveBeenCalled();
     expect(prepared.abort).not.toHaveBeenCalled();
     expect(prepared.dispatch).toHaveBeenCalledTimes(1);
   });
 
-  it('fails closed before consuming approval when the prepared reservation generation is stale or rearmed', async () => {
+  it('fails closed without consuming approval when the exact prepared reservation generation is stale or rearmed', async () => {
     const store = repository(currentApproval());
     const prepared = preparedHarness();
-    prepared.acquireApprovalClaimBoundary.mockResolvedValue(false);
+    const claim = atomicClaim({
+      ok: false,
+      code: 'CLAIM_NOT_CURRENT',
+      reason: 'execution generation or authoritative founder approval is no longer current',
+    });
 
     const result = await dispatchAuthoritativeN8nFounderContent(request(), {
       founderUserId: 'founder-user-1',
@@ -281,15 +309,21 @@ describe('authoritative n8n founder-content publisher', () => {
       env: READY_ENV,
       approvalRepository: store,
       prepare: prepared.prepare,
+      atomicClaim: claim,
     });
 
     expect(result.ok).toBe(false);
     expect(result.code).toBe('INVALID_AUTHORIZATION');
-    expect(result.reasons.join(' ')).toContain('generation is no longer active');
+    expect(result.reasons.join(' ')).toContain('exact execution generation could not atomically claim');
     expect(result.reasons.join(' ')).toContain('did not consume the one-shot approval');
     expect(result.reasons.join(' ')).toContain('no provider request was attempted');
-    expect(prepared.acquireApprovalClaimBoundary).toHaveBeenCalledTimes(1);
+    expect(claim).toHaveBeenCalledWith(expect.objectContaining({
+      executionId: EXECUTION_ID,
+      executionStartedAt: RESERVATION_GENERATION,
+    }));
     expect(store.claim).not.toHaveBeenCalled();
+    expect(prepared.acquireApprovalClaimBoundary).not.toHaveBeenCalled();
+    expect(prepared.abort).toHaveBeenCalledTimes(1);
     expect(prepared.dispatch).not.toHaveBeenCalled();
   });
 
@@ -335,6 +369,7 @@ describe('authoritative n8n founder-content publisher', () => {
   it('revalidates actual approval time after preparation and refuses to consume expired authority', async () => {
     const store = repository(currentApproval());
     const prepared = preparedHarness();
+    const claim = atomicClaim();
 
     const result = await dispatchAuthoritativeN8nFounderContent(request(), {
       founderUserId: 'founder-user-1',
@@ -344,12 +379,14 @@ describe('authoritative n8n founder-content publisher', () => {
       env: READY_ENV,
       approvalRepository: store,
       prepare: prepared.prepare,
+      atomicClaim: claim,
     });
 
     expect(result.ok).toBe(false);
     expect(result.code).toBe('INVALID_AUTHORIZATION');
     expect(result.reasons.join(' ')).toContain('approval expired during downstream preparation');
     expect(result.reasons.join(' ')).toContain('did not consume the one-shot approval');
+    expect(claim).not.toHaveBeenCalled();
     expect(store.claim).not.toHaveBeenCalled();
     expect(prepared.abort).toHaveBeenCalledTimes(1);
     expect(prepared.acquireApprovalClaimBoundary).not.toHaveBeenCalled();
@@ -359,6 +396,7 @@ describe('authoritative n8n founder-content publisher', () => {
   it('rejects a prepared schedule that became stale before the fresh approval claim boundary', async () => {
     const store = repository(currentApproval());
     const prepared = preparedHarness(dispatched(), '2026-08-18T01:50:00.000Z');
+    const claim = atomicClaim();
 
     const result = await dispatchAuthoritativeN8nFounderContent(request(), {
       founderUserId: 'founder-user-1',
@@ -368,24 +406,27 @@ describe('authoritative n8n founder-content publisher', () => {
       env: READY_ENV,
       approvalRepository: store,
       prepare: prepared.prepare,
+      atomicClaim: claim,
     });
 
     expect(result.ok).toBe(false);
     expect(result.code).toBe('INVALID_AUTHORIZATION');
     expect(result.reasons.join(' ')).toContain('schedule is no longer in the future');
+    expect(claim).not.toHaveBeenCalled();
     expect(store.claim).not.toHaveBeenCalled();
     expect(prepared.abort).toHaveBeenCalledTimes(1);
     expect(prepared.acquireApprovalClaimBoundary).not.toHaveBeenCalled();
     expect(prepared.dispatch).not.toHaveBeenCalled();
   });
 
-  it('aborts the prepared execution without provider dispatch when the atomic approval claim loses the race', async () => {
-    const store = repository({
-      ok: false,
-      code: 'APPROVAL_NOT_CURRENT',
-      reason: 'authoritative approval is expired, revoked, or already consumed',
-    }, currentApproval());
+  it('aborts the prepared execution without provider dispatch when the atomic execution-bound claim loses the race', async () => {
+    const store = repository(currentApproval());
     const prepared = preparedHarness();
+    const claim = atomicClaim({
+      ok: false,
+      code: 'CLAIM_NOT_CURRENT',
+      reason: 'execution generation or authoritative founder approval is no longer current',
+    });
 
     const result = await dispatchAuthoritativeN8nFounderContent(request(), {
       founderUserId: 'founder-user-1',
@@ -394,12 +435,40 @@ describe('authoritative n8n founder-content publisher', () => {
       env: READY_ENV,
       approvalRepository: store,
       prepare: prepared.prepare,
+      atomicClaim: claim,
     });
 
     expect(result.ok).toBe(false);
     expect(result.code).toBe('INVALID_AUTHORIZATION');
-    expect(prepared.acquireApprovalClaimBoundary).toHaveBeenCalledTimes(1);
+    expect(claim).toHaveBeenCalledTimes(1);
+    expect(store.claim).not.toHaveBeenCalled();
     expect(prepared.abort).toHaveBeenCalledTimes(1);
+    expect(prepared.dispatch).not.toHaveBeenCalled();
+  });
+
+  it('does not abort or dispatch when the atomic store outcome is unknown', async () => {
+    const store = repository(currentApproval());
+    const prepared = preparedHarness();
+    const claim = atomicClaim({
+      ok: false,
+      code: 'CLAIM_STORE_FAILED',
+      reason: 'database response was lost',
+    });
+
+    const result = await dispatchAuthoritativeN8nFounderContent(request(), {
+      founderUserId: 'founder-user-1',
+      founderIdentity: 'founder@example.com',
+      now: NOW,
+      env: READY_ENV,
+      approvalRepository: store,
+      prepare: prepared.prepare,
+      atomicClaim: claim,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.reasons.join(' ')).toContain('outcome could not be proven');
+    expect(result.reasons.join(' ')).toContain('reconcile');
+    expect(prepared.abort).not.toHaveBeenCalled();
     expect(prepared.dispatch).not.toHaveBeenCalled();
   });
 
@@ -468,13 +537,14 @@ describe('authoritative n8n founder-content publisher', () => {
     expect(prepared.prepare).not.toHaveBeenCalled();
   });
 
-  it('rechecks atomically after downstream preparation and stops before n8n when approval changes or is consumed', async () => {
-    const store = repository({
-      ok: false,
-      code: 'APPROVAL_NOT_CURRENT',
-      reason: 'authoritative approval is expired, revoked, or already consumed',
-    }, currentApproval());
+  it('rechecks atomically after downstream preparation and stops before n8n when approval or generation changes', async () => {
+    const store = repository(currentApproval());
     const prepared = preparedHarness();
+    const claim = atomicClaim({
+      ok: false,
+      code: 'CLAIM_NOT_CURRENT',
+      reason: 'execution generation or authoritative founder approval is no longer current',
+    });
 
     const result = await dispatchAuthoritativeN8nFounderContent(request(), {
       founderUserId: 'founder-user-1',
@@ -483,14 +553,16 @@ describe('authoritative n8n founder-content publisher', () => {
       env: READY_ENV,
       approvalRepository: store,
       prepare: prepared.prepare,
+      atomicClaim: claim,
     });
 
     expect(result.ok).toBe(false);
     expect(result.code).toBe('INVALID_AUTHORIZATION');
     expect(store.readCurrent).toHaveBeenCalledTimes(1);
     expect(prepared.prepare).toHaveBeenCalledTimes(1);
-    expect(prepared.acquireApprovalClaimBoundary).toHaveBeenCalledTimes(1);
-    expect(store.claim).toHaveBeenCalledTimes(1);
+    expect(claim).toHaveBeenCalledTimes(1);
+    expect(store.claim).not.toHaveBeenCalled();
+    expect(prepared.acquireApprovalClaimBoundary).not.toHaveBeenCalled();
     expect(prepared.abort).toHaveBeenCalledTimes(1);
     expect(prepared.dispatch).not.toHaveBeenCalled();
   });
