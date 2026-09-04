@@ -1,7 +1,8 @@
 import { getGitHubInstallationToken } from "./githubAppAuth.js";
-import { DeterministicReviewGitHubProvider } from "./DeterministicReviewGitHubProvider.js";
+import { FounderControlRoomGovernanceGitHubProvider } from "./FounderControlRoomGovernanceGitHubProvider.js";
 import { SecurityPreservingGitHubProvider } from "./SecurityPreservingGitHubProvider.js";
 import { GitLabProvider } from "./GitLabProvider.js";
+import { fcrGovernancePhaseErrors } from "./fcrGovernancePhase.js";
 import type {
   DeterministicReviewWitnessPublication,
   Diff,
@@ -71,13 +72,12 @@ export function assertFounderControlRoomTrustedBypassActor(
 
 /**
  * Founder Control Room's own merge policy must fail closed before a provider
- * mutation is attempted. Other projects retain provider-neutral flexibility,
- * including evaluate-only or zero-review rulesets when their own policy allows
- * it. FCR main is the constitutional authority surface: an active policy must
- * retain the complete minimum floor, and the canonical ruleset may not be
- * disabled, demoted to evaluate mode, or retargeted away from main through the
- * generic repository-administration route. Repository identity, not a mutable
- * project slug alias, determines whether that constitutional floor applies.
+ * mutation is attempted. Other projects retain provider-neutral flexibility.
+ * FCR main supports two explicit human-review phases while preserving the same
+ * pull-request, exact-head, CodeQL, force-push, deletion, and bypass ceilings:
+ * founder_only (zero outside approvals) and independent_review (one-or-more).
+ * Historical >=1-review configs remain independent_review-compatible; entering
+ * founder_only always requires an explicit phase declaration.
  */
 export function assertRulesetGovernancePolicy(
   projectId: string,
@@ -109,8 +109,9 @@ export function assertRulesetGovernancePolicy(
   if (!config.requirePullRequest) {
     throw new Error("Founder Control Room main governance requires pull-request enforcement");
   }
-  if (!Number.isInteger(config.requiredApprovingReviewCount) || config.requiredApprovingReviewCount < 1) {
-    throw new Error("Founder Control Room main governance requires at least one approving review");
+  const phaseErrors = fcrGovernancePhaseErrors(config);
+  if (phaseErrors.length > 0) {
+    throw new Error(`Founder Control Room main governance phase rejected: ${phaseErrors.join("; ")}`);
   }
   for (const requiredCheck of FOUNDER_CONTROL_ROOM_REQUIRED_STATUS_CHECKS) {
     if (!config.requiredStatusCheckNames.includes(requiredCheck)) {
@@ -246,9 +247,6 @@ class LazyRepositoryProvider implements RepositoryProvider {
       );
     }
 
-    // Last-mile TOCTOU membrane: re-read BOTH mutable refs immediately before
-    // handing control to the provider mutation. The semantic review is bound to
-    // context.baseSha/context.headSha; moving either ref invalidates that review.
     const currentBaseSha = await delegate.resolveRef(governanceProjectId, base);
     const currentHeadSha = await delegate.resolveRef(governanceProjectId, head);
     if (currentBaseSha.toLowerCase() !== context.baseSha.toLowerCase()) {
@@ -314,8 +312,6 @@ async function githubProvider(project: ProviderProjectConfig): Promise<Repositor
   const fallbackToken = process.env.GITHUB_TOKEN?.trim();
   const appId = process.env.GITHUB_APP_ID?.trim();
   const privateKey = process.env.GITHUB_PRIVATE_KEY?.trim();
-  // GITHUB_TOKEN remains a local/development fallback only; production prefers
-  // repository-scoped GitHub App installation credentials minted on demand.
   const hasAppAuthority = Boolean(appId && privateKey);
   const token = hasAppAuthority
     ? await getGitHubInstallationToken(appId!, privateKey!, project.repo_identifier)
@@ -333,7 +329,7 @@ async function githubProvider(project: ProviderProjectConfig): Promise<Repositor
   };
 
   return hasAppAuthority && isFounderControlRoomRepository(project.repo_identifier)
-    ? new DeterministicReviewGitHubProvider(config)
+    ? new FounderControlRoomGovernanceGitHubProvider(config)
     : new SecurityPreservingGitHubProvider(config);
 }
 
@@ -348,15 +344,6 @@ async function gitlabProvider(project: ProviderProjectConfig): Promise<Repositor
   });
 }
 
-/**
- * Provider construction belongs in one place so routes, reconcilers, and
- * mission runners do not grow direct host dependencies.
- *
- * GitHub prefers a repository-scoped App installation token, while GitLab
- * consumes its own provider token and optional self-managed instance URL.
- * Authentication is demand-driven and cached so callers retain the synchronous
- * factory contract without coupling project existence to either provider.
- */
 export function providerForProject(project: ProviderProjectConfig): RepositoryProvider {
   if (project.repo_provider === "github") {
     return new LazyRepositoryProvider("github", () => githubProvider(project), project.repo_identifier);
