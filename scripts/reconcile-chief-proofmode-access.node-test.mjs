@@ -108,6 +108,46 @@ test('accepts only the configured service token on an existing exact-host Servic
   assert.equal(calls.length, 3);
 });
 
+test('accepts the configured service-token ID without requiring a client ID', async () => {
+  const { fetchImpl, calls } = routeFetch({
+    serviceTokens: [activeToken],
+    apps: [workerApp, exactPublicApp],
+    policiesByApp: {
+      [exactPublicApp.id]: [{
+        id: 'policy-1',
+        decision: 'non_identity',
+        include: [{ service_token: { token_id: SERVICE_ID } }],
+      }],
+    },
+  });
+
+  const result = await ensureChiefProofModeAccessPolicy({
+    ...baseArgs,
+    serviceClientId: undefined,
+    serviceTokenId: SERVICE_ID,
+    fetchImpl,
+  });
+  assert.equal(result.changed, false);
+  assert.equal(result.serviceTokenId, SERVICE_ID);
+  assert.equal(calls.length, 3);
+});
+
+test('fails closed when configured token ID and client ID identify different service tokens', async () => {
+  const { fetchImpl, calls } = routeFetch({
+    serviceTokens: [{ ...activeToken, client_id: 'different-client.access' }],
+    apps: [exactPublicApp],
+  });
+  await assert.rejects(
+    ensureChiefProofModeAccessPolicy({
+      ...baseArgs,
+      serviceTokenId: SERVICE_ID,
+      fetchImpl,
+    }),
+    /does not match the configured client ID/,
+  );
+  assert.equal(calls.length, 1);
+});
+
 test('rejects non-immutable or path-bearing targets before provider access', async () => {
   const { fetchImpl, calls } = routeFetch({ serviceTokens: [], apps: [] });
   await assert.rejects(
