@@ -125,16 +125,38 @@ export function githubWebhookToBuildEvent(
   if (eventType === 'pull_request') {
     const pullRequest = asRecord(payload.pull_request);
     const head = asRecord(pullRequest?.head);
+    const base = asRecord(pullRequest?.base);
     const headSha = sha(head?.sha);
     const headBranch = branchFromRef(head?.ref);
     if (!pullRequest || !headSha || !headBranch) return null;
 
     const merged = pullRequest.merged === true;
     const state = text(pullRequest.state)?.toLowerCase();
+
+    if (merged) {
+      const mergeCommitSha = sha(pullRequest.merge_commit_sha);
+      const baseBranch = branchFromRef(base?.ref);
+      if (!mergeCommitSha || !baseBranch) return null;
+
+      return build(deliveryId, occurredAt, {
+        category: 'source',
+        phase: 'build',
+        status: 'completed',
+        repository: {
+          name: repository,
+          branch: baseBranch,
+          refKind: 'branch-head',
+          commitSha: mergeCommitSha,
+          auditedCommitSha: headSha,
+        },
+        evidenceUrls: text(pullRequest.html_url) ? [text(pullRequest.html_url)!] : [],
+      });
+    }
+
     return build(deliveryId, occurredAt, {
       category: 'source',
       phase: 'build',
-      status: merged || state === 'closed' ? 'completed' : 'running',
+      status: state === 'closed' ? 'completed' : 'running',
       repository: {
         name: repository,
         branch: headBranch,
