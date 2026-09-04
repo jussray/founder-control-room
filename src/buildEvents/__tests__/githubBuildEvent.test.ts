@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { githubWebhookToBuildEvent } from '../githubBuildEvent.js';
 
 const SHA = 'a'.repeat(40);
+const MERGE_SHA = 'c'.repeat(40);
 
 describe('GitHub build-event projection', () => {
   it('turns a main push into verified branch-head truth', () => {
@@ -41,6 +42,46 @@ describe('GitHub build-event projection', () => {
       refKind: 'proposal-head',
       commitSha: SHA,
     });
+  });
+
+  it('binds a merged pull request to the landed merge SHA on the base branch', () => {
+    const event = githubWebhookToBuildEvent('pull_request', 'delivery-merged', {
+      repository: { full_name: 'jussray/founder-control-room' },
+      pull_request: {
+        number: 56,
+        state: 'closed',
+        merged: true,
+        merge_commit_sha: MERGE_SHA,
+        html_url: 'https://github.com/jussray/founder-control-room/pull/56',
+        head: { sha: SHA, ref: 'fix/content' },
+        base: { ref: 'main' },
+      },
+    }, '2026-08-16T03:00:45Z');
+
+    expect(event?.status).toBe('completed');
+    expect(event?.repository).toEqual({
+      name: 'jussray/founder-control-room',
+      branch: 'main',
+      refKind: 'branch-head',
+      commitSha: MERGE_SHA,
+      auditedCommitSha: SHA,
+    });
+  });
+
+  it('fails closed when a merged pull request lacks landed merge identity', () => {
+    const event = githubWebhookToBuildEvent('pull_request', 'delivery-merged-missing', {
+      repository: { full_name: 'jussray/founder-control-room' },
+      pull_request: {
+        number: 57,
+        state: 'closed',
+        merged: true,
+        merge_commit_sha: null,
+        head: { sha: SHA, ref: 'fix/content' },
+        base: { ref: 'main' },
+      },
+    }, '2026-08-16T03:00:50Z');
+
+    expect(event).toBeNull();
   });
 
   it('turns a workflow run into exact-head verification truth without claiming branch ownership', () => {
