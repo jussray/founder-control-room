@@ -29,6 +29,7 @@ import {
   buildL99RepositoryFields,
   needsL99RepositoryReconciliation,
 } from '../../config/l99Repository.js';
+import { productBuildRouter } from './productBuild.js';
 
 export const l99Router = Router();
 
@@ -300,3 +301,8 @@ l99Router.post('/seed', requireFounder, async (req: FounderRequest, res) => {
     nextStep: 'POST /l99/gate/l99-creator-journey with ProofEvidence to begin OODA loop.',
   });
 });
+
+// Product-build graduation stays under the existing L99 founder Control Room.
+// The nested router validates Chief's exact capability plan + explicit founder
+// decision, then issues a StoryEngine-only directive. It performs no dispatch.
+l99Router.use('/product-build', productBuildRouter);
