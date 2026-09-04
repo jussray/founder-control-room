@@ -38,6 +38,14 @@ A unit test, source declaration, reachable endpoint, or earlier successful Playw
 
 This is why the exact-head Playwright workflow is registered as `evidence-authority`: changing what the browser witness sends or accepts can change what future operators believe has been proven even when the underlying actuator remains intentionally bounded.
 
+## 2026-09 control correction: privileged production witness isolation
+
+A post-Deploy `workflow_run` witness is privileged even when its purpose is read-only verification. Treating the triggering workflow's `head_sha` as both the release identity to observe and the code to execute collapses evidence identity into executable authority. A successful upstream workflow must not make its checkout trusted merely by becoming a completed run.
+
+The corrected rule keeps those roles separate: `.github/workflows/playwright.yml` restricts the production witness to successful `workflow_dispatch` Deploy runs from `main`, executes only the trusted witness source associated with the privileged workflow context, and carries `workflow_run.head_sha` only as the expected release identity to compare against production. The witness can prove that deployed Worker and browser/runtime identity match the Deploy run SHA, but it cannot execute the Deploy-run checkout or use upstream success as authority to widen what code runs in the privileged phase.
+
+This remains a proof contract, not production proof by itself. The witness must actually run for the relevant release and return terminal exact-SHA evidence before a production-runtime claim becomes current.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -196,6 +204,8 @@ The Evidence Trust Plane is now explicitly part of Documentation Truth. Changes 
 
 For cross-repository product-build proof, `.github/workflows/playwright.yml` is part of that same evidence-authority surface. Its StoryEngine federation fixture must preserve the canonical root directive wire shape, require `node-test` and `playwright`, and prove the exact peer runtime identity before and after the browser-governed execution. A source/test change that touches this witness therefore requires current documentation, but documentation cannot promote an unexecuted successor head into browser truth.
 
+The same workflow also contains a privileged post-Deploy production witness. That witness must not execute `workflow_run.head_sha`; it must execute trusted witness source and carry the successful main-bound Deploy run SHA only as release evidence. Separating witness code from observed release identity is part of the evidence-authority contract, because upstream workflow success cannot itself grant executable trust to an arbitrary checkout.
+
 That registration does not mean durable evidence persistence exists. The current Evidence Trust Plane slice defines receipt, validity, and action-ceiling contracts only; `ledgerState` is supplied state until a separately reviewed persistence writer/store exists. Current receipt use must also re-evaluate expiration and bind merge-review preparation to GitHub API evidence for an exact repository, full SHA, workflow, and run identity. Rejected or non-GitHub evidence cannot be relabeled as merge-review-ready merely because readback completed.
 
 ### Release-coverage at-use gate
@@ -345,6 +355,7 @@ The strongest optimization is not faster claiming. It is shortening the distance
 28. A missing GitHub copy of a provider-held Worker runtime secret does not prove the Cloudflare runtime secret is absent; read the provider-held binding plane before making that claim.
 29. A public deployment origin must not be mislabeled as a secret merely because a workflow consumes it; authority classification must follow the sensitivity and mutation boundary of the value.
 30. A predecessor Playwright success cannot prove a cross-repository federation successor after either repository head, peer proof contract, peer runtime identity, or serialized wire shape moves.
+31. A privileged `workflow_run` witness may consume an upstream release SHA as evidence, but it cannot execute that upstream checkout or treat upstream success as executable trust.
 
 ## Rollback
 
