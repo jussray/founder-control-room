@@ -181,7 +181,7 @@ async function tryRearmRetryablePreProviderReservation(
     executed_at: null,
   };
 
-  let rearmed: { id?: unknown; project_id?: unknown } | null = null;
+  let rearmed: { id?: unknown; project_id?: unknown; started_at?: unknown } | null = null;
   let rearmError: { message: string } | null = null;
   if (abandonedPending) {
     const update = await supabase
@@ -191,7 +191,7 @@ async function tryRearmRetryablePreProviderReservation(
       .eq('status', 'pending')
       .eq('started_at', text(existing.started_at))
       .eq('result->>provider_write_attempted', 'false')
-      .select('id, project_id')
+      .select('id, project_id, started_at')
       .maybeSingle();
     rearmed = update.data;
     rearmError = update.error;
@@ -203,7 +203,7 @@ async function tryRearmRetryablePreProviderReservation(
       .eq('status', 'failed')
       .eq('started_at', text(existing.started_at))
       .eq('result->>provider_write_attempted', 'false')
-      .select('id, project_id')
+      .select('id, project_id, started_at')
       .maybeSingle();
     rearmed = update.data;
     rearmError = update.error;
@@ -220,11 +220,20 @@ async function tryRearmRetryablePreProviderReservation(
     return reserveN8nFounderContentExecution(request, executedBy);
   }
 
+  const authoritativeReservationStartedAt = text(rearmed.started_at);
+  if (!authoritativeReservationStartedAt) {
+    return {
+      ok: false,
+      code: 'ACTION_RESERVATION_FAILED',
+      reason: 'pre-provider reservation recovery did not return the authoritative started_at generation',
+    };
+  }
+
   return {
     ok: true,
     executionId: String(rearmed.id),
     projectId: String(rearmed.project_id ?? existing.project_id),
-    reservationStartedAt,
+    reservationStartedAt: authoritativeReservationStartedAt,
   };
 }
 
