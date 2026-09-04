@@ -19,12 +19,18 @@ const { fakeDb } = vi.hoisted(() => {
     let nextId = 1;
     const projectRow = { id: 'p-1', repo_identifier: 'jussray/founder-control-room' };
 
+    function resultRecord(row: Row): Record<string, unknown> {
+      return row.result && typeof row.result === 'object' && !Array.isArray(row.result)
+        ? row.result as Record<string, unknown>
+        : {};
+    }
+
     function filterValue(row: Row, column: string): unknown {
       if (column === 'result->>provider_write_attempted') {
-        const result = row.result && typeof row.result === 'object' && !Array.isArray(row.result)
-          ? row.result as Record<string, unknown>
-          : {};
-        return result.provider_write_attempted;
+        return resultRecord(row).provider_write_attempted;
+      }
+      if (column === 'result->>approval_claimed') {
+        return resultRecord(row).approval_claimed;
       }
       return (row as Record<string, unknown>)[column];
     }
@@ -93,7 +99,43 @@ const { fakeDb } = vi.hoisted(() => {
       throw new Error(`unexpected table ${table}`);
     }
 
-    return { from, __rows: rows };
+    async function rpc(functionName: string, args: Record<string, unknown>) {
+      if (functionName !== 'rearm_founder_content_preclaim_execution') {
+        throw new Error(`unexpected rpc ${functionName}`);
+      }
+
+      const row = rows.get(String(args.p_execution_id));
+      if (!row) return { data: [], error: null };
+      const result = resultRecord(row);
+      const matches = row.status === String(args.p_expected_status)
+        && row.started_at === String(args.p_expected_started_at)
+        && result.provider_write_attempted !== true
+        && result.approval_claimed !== true;
+      if (!matches) return { data: [], error: null };
+
+      row.executed_by = args.p_executed_by;
+      row.status = 'pending';
+      row.request = args.p_request;
+      row.result = {
+        resumed_from_pre_provider_failure: args.p_resumed_from_failed === true,
+        resumed_from_abandoned_preclaim_reservation: args.p_resumed_from_abandoned === true,
+        approval_claimed: false,
+        provider_write_attempted: false,
+      };
+      row.success = null;
+      row.started_at = String(args.p_new_started_at);
+      row.executed_at = null;
+      return {
+        data: [{
+          execution_id: row.id,
+          project_id: row.project_id,
+          execution_started_at: row.started_at,
+        }],
+        error: null,
+      };
+    }
+
+    return { from, rpc, __rows: rows };
   }
 
   return { fakeDb: build() };
@@ -285,6 +327,7 @@ describe('n8n prepared-reservation abort/finalize generation fencing', () => {
     const rowAfterRearm = fakeDb.__rows.get(preparedB.executionId)!;
     expect(String(rowAfterRearm.started_at)).not.toBe(generationA);
     expect(rowAfterRearm.status).toBe('pending');
+    expect(rowAfterRearm.result).toEqual(expect.objectContaining({ approval_claimed: false }));
 
     const staleClaimBoundary = await preparedA.acquireApprovalClaimBoundary();
     expect(staleClaimBoundary).toBe(false);
