@@ -4,6 +4,7 @@ import {
   assertFounderControlRoomTrustedBypassActor,
   assertRulesetGovernancePolicy,
   FOUNDER_CONTROL_ROOM_CANONICAL_RULESET_NAME,
+  FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS,
   governanceProjectIdForRepository,
 } from "../providerFactory.js";
 
@@ -14,7 +15,7 @@ const baseConfig: RulesetConfig = {
   enforcement: "active",
   targetRefs: ["main"],
   requirePullRequest: true,
-  requiredApprovingReviewCount: 1,
+  requiredApprovingReviewCount: FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS,
   requiredStatusCheckNames: ["Playwright E2E", "Required Gate", "Verify test-ledger contract"],
   blockForcePushes: true,
   blockDeletion: true,
@@ -26,7 +27,8 @@ const canonicalConfig: RulesetConfig = {
 };
 
 describe("Founder Control Room ruleset governance", () => {
-  it("accepts an active FCR main ruleset only when the constitutional floor is preserved", () => {
+  it("accepts the current founder-only FCR main constitutional floor", () => {
+    expect(FOUNDER_CONTROL_ROOM_REQUIRED_NATIVE_APPROVALS).toBe(0);
     expect(() => assertRulesetGovernancePolicy("founder-control-room", baseConfig)).not.toThrow();
   });
 
@@ -43,11 +45,18 @@ describe("Founder Control Room ruleset governance", () => {
     expect(governanceProjectIdForRepository("fcr-alias", "jussray/other-repo")).toBe("fcr-alias");
   });
 
-  it("fails closed when FCR main requests zero approving reviews", () => {
+  it("accepts a deliberate future-team native review phase without redesigning the authority membrane", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", {
       ...baseConfig,
-      requiredApprovingReviewCount: 0,
-    })).toThrow(/at least one approving review/);
+      requiredApprovingReviewCount: 1,
+    })).not.toThrow();
+  });
+
+  it("fails closed when FCR main requests a negative approving-review count", () => {
+    expect(() => assertRulesetGovernancePolicy("founder-control-room", {
+      ...baseConfig,
+      requiredApprovingReviewCount: -1,
+    })).toThrow(/at least 0 native approving reviews/);
   });
 
   it("fails closed when FCR main disables pull-request enforcement", () => {
@@ -61,7 +70,7 @@ describe("Founder Control Room ruleset governance", () => {
     expect(() => assertRulesetGovernancePolicy("founder-control-room", {
       ...baseConfig,
       requiredApprovingReviewCount: Number.NaN,
-    })).toThrow(/at least one approving review/);
+    })).toThrow(/at least 0 native approving reviews/);
   });
 
   it("fails closed when FCR main drops the Required Gate status check", () => {
