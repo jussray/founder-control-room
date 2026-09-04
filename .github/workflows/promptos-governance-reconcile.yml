@@ -63,14 +63,14 @@ jobs:
               output.write(f'approval_reference={approval}\n')
           PY
 
-      - name: Check out founder-bound exact FCR main
+      - name: Check out trusted FCR main only
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ steps.command.outputs.fcr_main_sha }}
+          ref: main
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Fail closed unless command targets exact current FCR main
+      - name: Fail closed unless trusted checkout matches approved exact current FCR main
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_FCR_MAIN_SHA: ${{ steps.command.outputs.fcr_main_sha }}
@@ -79,10 +79,10 @@ jobs:
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
           current_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
-          printf 'requested_fcr_main=%s\nchecked_out=%s\ncurrent_fcr_main=%s\n' \
+          printf 'requested_fcr_main=%s\nchecked_out_trusted_main=%s\ncurrent_fcr_main=%s\n' \
             "$EXPECTED_FCR_MAIN_SHA" "$actual" "$current_main"
+          test "$actual" = "$current_main"
           test "$actual" = "$EXPECTED_FCR_MAIN_SHA"
-          test "$current_main" = "$EXPECTED_FCR_MAIN_SHA"
 
       - name: Set up Node 24
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
