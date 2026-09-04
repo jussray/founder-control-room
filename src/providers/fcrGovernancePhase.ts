@@ -30,15 +30,18 @@ export function independentReviewRequired(config: RulesetConfig): boolean {
 
 export function fcrGovernancePhaseErrors(config: RulesetConfig): string[] {
   const errors: string[] = [];
+  if (!Number.isInteger(config.requiredApprovingReviewCount)) {
+    errors.push("required approving review count must be an integer");
+    return errors;
+  }
+
   const phase = readFcrGovernancePhase(config);
   if (!phase) {
     errors.push("zero-review FCR governance requires explicit governancePhase=founder_only");
     return errors;
   }
 
-  if (!Number.isInteger(config.requiredApprovingReviewCount)) {
-    errors.push("required approving review count must be an integer");
-  } else if (phase === "founder_only" && config.requiredApprovingReviewCount !== 0) {
+  if (phase === "founder_only" && config.requiredApprovingReviewCount !== 0) {
     errors.push("founder_only requires exactly zero outside approving reviews");
   } else if (phase === "independent_review" && config.requiredApprovingReviewCount < 1) {
     errors.push("independent_review requires at least one approving review");
