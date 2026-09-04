@@ -9,6 +9,9 @@ import {
   type ProductBuildReceipt,
 } from '../productBuildDirective.js';
 
+const CROSS_REPO_FOUNDER_DECISION_HASH = '45a2b662e3d015dcf8482304198b1df804766ed583627992b9d1be2ee76d394d';
+const CROSS_REPO_DIRECTIVE_HASH = '125d224d7aa29b657f0732d0bc209df9d94848708764a5a8e5d74d4e85100247';
+
 const proposal: FounderControlProposalBinding = {
   proposalId: 'chief-storyengine-build-001',
   proposalHash: 'a'.repeat(64),
@@ -40,8 +43,11 @@ function directive() {
 
 describe('product build directive contract', () => {
   it('turns exact Chief-bound founder approval into a narrow product Control Room directive', () => {
+    const decision = approvedDecision();
     const value = directive();
     expect(value.contract).toBe(PRODUCT_BUILD_DIRECTIVE_CONTRACT);
+    expect(decision.decisionHash).toBe(CROSS_REPO_FOUNDER_DECISION_HASH);
+    expect(value.directiveHash).toBe(CROSS_REPO_DIRECTIVE_HASH);
     expect(value.proposal.capabilityPlanHash).toBe('c'.repeat(64));
     expect(value.proposal.expectedHeadSha).toBe('b'.repeat(40));
     expect(value.repository).toBe('jussray/StoryEngine');
@@ -52,7 +58,6 @@ describe('product build directive contract', () => {
     expect(value.mergeAuthorized).toBe(false);
     expect(value.deployAuthorized).toBe(false);
     expect(value.providerMutationAuthorized).toBe(false);
-    expect(value.directiveHash).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('refuses to create a product directive without Chief capability-plan evidence', () => {
