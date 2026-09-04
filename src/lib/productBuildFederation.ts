@@ -94,6 +94,21 @@ function exactList(actual: unknown, expected: readonly string[]): boolean {
   return JSON.stringify(stringArray(actual)) === JSON.stringify([...expected].sort());
 }
 
+function storyEngineDirectiveBoundaryErrors(directive: ProductBuildDirective): string[] {
+  const errors: string[] = [];
+  if (directive.proposal.projectSlug !== STORYENGINE_PRODUCT_BUILD_PROJECT) errors.push('product build directive must target project l99');
+  if (directive.proposal.actionType !== STORYENGINE_PRODUCT_BUILD_ACTION) errors.push('product build directive actionType is outside the StoryEngine federation boundary');
+  if (directive.repository !== STORYENGINE_PRODUCT_BUILD_REPOSITORY) errors.push('product build directive repository is outside the StoryEngine federation boundary');
+  if (directive.productControlRoomId !== STORYENGINE_PRODUCT_CONTROL_ROOM) errors.push('product build directive control room is outside the StoryEngine federation boundary');
+  if (!exactList(directive.allowedCapabilities, [STORYENGINE_PRODUCT_BUILD_CAPABILITY])) errors.push('product build directive capability set is outside the StoryEngine federation boundary');
+  if (!exactList(directive.allowedMutationScope, [STORYENGINE_PRODUCT_BUILD_MUTATION_SCOPE])) errors.push('product build directive mutation scope is outside the StoryEngine federation boundary');
+  const requiredProof = new Set(stringArray(directive.requiredProof));
+  if (!requiredProof.has('node-test') || !requiredProof.has('playwright')) {
+    errors.push('StoryEngine product build requires node-test and playwright proof');
+  }
+  return errors;
+}
+
 function runtimeIdentity(value: unknown): StoryEngineRuntimeIdentity | null {
   const candidate = record(value);
   if (!candidate) return null;
@@ -225,15 +240,8 @@ export function reconcileStoryEngineProductBuild(input: {
   runtimeIdentityAfter: StoryEngineRuntimeIdentity;
 }): ProductBuildFederationReconciliation {
   const directiveErrors = validateProductBuildDirective(input.directive);
-  const errors = [...directiveErrors];
+  const errors = [...directiveErrors, ...storyEngineDirectiveBoundaryErrors(input.directive)];
   const expectedHead = input.directive.proposal.expectedHeadSha?.toLowerCase() ?? '';
-
-  if (input.directive.proposal.projectSlug !== STORYENGINE_PRODUCT_BUILD_PROJECT) errors.push('product build directive must target project l99');
-  if (input.directive.proposal.actionType !== STORYENGINE_PRODUCT_BUILD_ACTION) errors.push('product build directive actionType is outside the StoryEngine federation boundary');
-  if (input.directive.repository !== STORYENGINE_PRODUCT_BUILD_REPOSITORY) errors.push('product build directive repository is outside the StoryEngine federation boundary');
-  if (input.directive.productControlRoomId !== STORYENGINE_PRODUCT_CONTROL_ROOM) errors.push('product build directive control room is outside the StoryEngine federation boundary');
-  if (!exactList(input.directive.allowedCapabilities, [STORYENGINE_PRODUCT_BUILD_CAPABILITY])) errors.push('product build directive capability set is outside the StoryEngine federation boundary');
-  if (!exactList(input.directive.allowedMutationScope, [STORYENGINE_PRODUCT_BUILD_MUTATION_SCOPE])) errors.push('product build directive mutation scope is outside the StoryEngine federation boundary');
 
   if (input.runtimeIdentityBefore.service !== 'l99-story-engine' || input.runtimeIdentityAfter.service !== 'l99-story-engine') {
     errors.push('StoryEngine service identity mismatch');
@@ -275,9 +283,15 @@ export async function dispatchStoryEngineProductBuildDirective(
   directive: ProductBuildDirective,
   options: ProductBuildFederationOptions = {},
 ): Promise<ProductBuildFederationReconciliation> {
-  const directiveErrors = validateProductBuildDirective(directive);
+  const directiveErrors = [
+    ...validateProductBuildDirective(directive),
+    ...storyEngineDirectiveBoundaryErrors(directive),
+  ];
   if (directiveErrors.length > 0) {
-    throw new ProductBuildFederationError('PRODUCT_BUILD_DIRECTIVE_INVALID', directiveErrors.join('; '));
+    throw new ProductBuildFederationError(
+      'PRODUCT_BUILD_DIRECTIVE_INVALID',
+      [...new Set(directiveErrors)].join('; '),
+    );
   }
 
   const baseUrl = normalizedBaseUrl(options.baseUrl ?? process.env.STORYENGINE_PRODUCT_CONTROL_ROOM_URL ?? '');
