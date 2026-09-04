@@ -21,6 +21,7 @@ describe('buildGoalfixSkillRuntimeDecision', () => {
     expect(decision.scope.firstFilesOrLogs).toEqual(['src/goalfix/engine.ts']);
     expect(decision.scope.maxInitialReads).toBe(1);
     expect(decision.provenance.sourceName).toBe('ai-skill-suite.zip');
+    expect(decision.artOfWar).toBeNull();
   });
 
   it('deduplicates before applying the read budget', () => {
@@ -93,5 +94,76 @@ describe('buildGoalfixSkillRuntimeDecision', () => {
     expect(decision.scope.maxInitialReads).toBe(1);
     expect(decision.mayProceed).toBe(false);
     expect(decision.nextAction).toContain('Define a concrete stop condition');
+  });
+
+  it('routes movement through the Art of War assessment when exact strategy context is supplied', () => {
+    const currentMain = 'a'.repeat(40);
+    const decision = buildGoalfixSkillRuntimeDecision({
+      intent: { raw: 'Use the smallest verified route to repair the current blocker.', confirmed: true },
+      scope: {
+        firstFilesOrLogs: ['src/goalfix/skillRuntime.ts'],
+        maxInitialReads: 1,
+        stopCondition: 'Stop after the focused strategy contract is proven.',
+      },
+      strategy: {
+        repository: 'jussray/founder-control-room',
+        targetBranch: 'main',
+        baseSha: currentMain,
+        currentMainSha: currentMain,
+        goal: 'Choose one reversible evidence-backed move.',
+        groundFacts: ['Exact main is known'],
+        unknowns: [],
+        verifiedAsymmetries: ['Focused tests already exist'],
+        options: [
+          {
+            id: 'focused',
+            label: 'Patch the focused cause',
+            expectedValue: 5,
+            evidenceStrength: 5,
+            reversibility: 5,
+            siegeCost: 1,
+            uncertainty: 1,
+            dependencyCost: 1,
+            preservesFutureOptions: true,
+            evidenceIds: ['test:goalfix'],
+          },
+        ],
+        proofOfAdvantage: ['test:goalfix'],
+        observedAt: '2026-09-03T22:55:00.000Z',
+      },
+    });
+
+    expect(decision.mayProceed).toBe(true);
+    expect(decision.artOfWar?.maneuver).toBe('EXPLOIT_VERIFIED_ASYMMETRY');
+    expect(decision.artOfWar?.continuityCookie.authorizing).toBe(false);
+    expect(decision.nextAction).toContain('Use verified advantage');
+  });
+
+  it('lets stale-ground strategy veto movement before mutation', () => {
+    const decision = buildGoalfixSkillRuntimeDecision({
+      intent: { raw: 'Continue the repair.', confirmed: true },
+      scope: {
+        firstFilesOrLogs: ['src/goalfix/skillRuntime.ts'],
+        maxInitialReads: 1,
+        stopCondition: 'Stop if main moved.',
+      },
+      strategy: {
+        repository: 'jussray/founder-control-room',
+        targetBranch: 'main',
+        baseSha: 'a'.repeat(40),
+        currentMainSha: 'b'.repeat(40),
+        goal: 'Continue only if the ground is current.',
+        groundFacts: ['Candidate was prepared against the prior main'],
+        unknowns: [],
+        verifiedAsymmetries: [],
+        options: [],
+        proofOfAdvantage: [],
+        observedAt: '2026-09-03T23:00:00.000Z',
+      },
+    });
+
+    expect(decision.mayProceed).toBe(false);
+    expect(decision.artOfWar?.maneuver).toBe('REACQUIRE_GROUND');
+    expect(decision.nextAction).toContain('Reacquire current main');
   });
 });
