@@ -2,16 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   readCurrent: vi.fn(),
-  claim: vi.fn(),
+  atomicClaim: vi.fn(),
   prepare: vi.fn(),
-  acquireApprovalClaimBoundary: vi.fn(),
   abort: vi.fn(),
   dispatch: vi.fn(),
 }));
 
 vi.mock('../founderContentApprovalStore.js', () => ({
   readCurrentFounderContentApproval: mocks.readCurrent,
-  claimFounderContentApproval: mocks.claim,
+}));
+
+vi.mock('../atomicFounderContentExecutionClaim.js', () => ({
+  claimFounderContentApprovalForExecutionGeneration: mocks.atomicClaim,
 }));
 
 vi.mock('../n8nProviderNeutralFounderContentPreparation.js', () => ({
@@ -43,6 +45,8 @@ const CLAIM_NOW = '2026-08-18T01:45:00.000Z';
 const ORIGINAL_REVIEW_DEADLINE = '2026-08-18T01:40:00.000Z';
 const DEFERRED_SCHEDULE = '2026-08-18T01:50:00.000Z';
 const APPROVAL_EXPIRES_AT = '2026-08-18T02:10:00.000Z';
+const RESERVATION_STARTED_AT = '2026-08-18T01:30:01.000Z';
+const EXECUTION_ID = '22222222-2222-4222-8222-222222222222';
 
 const preparedRequest = {
   providerRequest: {
@@ -55,6 +59,7 @@ const preparedRequest = {
 function request() {
   return {
     proposal: {
+      proposal_hash: 'c'.repeat(64),
       public_payload: { platform: 'linkedin' },
     },
     approval_id: 'fca:review-window-test',
@@ -71,7 +76,6 @@ describe('authoritative n8n review deadline claim boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     preparedRequest.providerRequest.reviewDeadline = ORIGINAL_REVIEW_DEADLINE;
-    mocks.acquireApprovalClaimBoundary.mockResolvedValue(true);
     mocks.abort.mockResolvedValue(true);
     mocks.dispatch.mockResolvedValue({
       ok: true,
@@ -91,7 +95,7 @@ describe('authoritative n8n review deadline claim boundary', () => {
       authorizationHash: 'a'.repeat(64),
       publicPayloadHash: 'b'.repeat(64),
     });
-    mocks.claim.mockResolvedValue({
+    mocks.atomicClaim.mockResolvedValue({
       ok: true,
       approval: {
         approval_id: 'fca:review-window-test',
@@ -100,12 +104,13 @@ describe('authoritative n8n review deadline claim boundary', () => {
       approvalId: 'fca:review-window-test',
       authorizationHash: 'a'.repeat(64),
       publicPayloadHash: 'b'.repeat(64),
+      executionStartedAt: RESERVATION_STARTED_AT,
     });
     mocks.prepare.mockResolvedValue({
       prepared: true,
       request: preparedRequest,
-      executionId: '22222222-2222-4222-8222-222222222222',
-      acquireApprovalClaimBoundary: mocks.acquireApprovalClaimBoundary,
+      executionId: EXECUTION_ID,
+      reservationStartedAt: RESERVATION_STARTED_AT,
       abort: mocks.abort,
       dispatch: mocks.dispatch,
     });
@@ -122,11 +127,21 @@ describe('authoritative n8n review deadline claim boundary', () => {
 
     expect(result.ok).toBe(true);
     expect(preparedRequest.providerRequest.reviewDeadline).toBe(DEFERRED_SCHEDULE);
-    expect(mocks.acquireApprovalClaimBoundary).toHaveBeenCalledTimes(1);
-    expect(mocks.acquireApprovalClaimBoundary.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.claim.mock.invocationCallOrder[0],
+    expect(mocks.atomicClaim).toHaveBeenCalledTimes(1);
+    expect(mocks.atomicClaim).toHaveBeenCalledWith(expect.objectContaining({
+      executionId: EXECUTION_ID,
+      executionStartedAt: RESERVATION_STARTED_AT,
+      approvalId: 'fca:review-window-test',
+      founderUserId: 'founder-user-1',
+      proposalHash: 'c'.repeat(64),
+      publicPayloadHash: 'b'.repeat(64),
+      authorizationHash: 'a'.repeat(64),
+      consumedBy: 'founder@example.com',
+      now: CLAIM_NOW,
+    }));
+    expect(mocks.atomicClaim.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.dispatch.mock.invocationCallOrder[0],
     );
-    expect(mocks.claim).toHaveBeenCalledTimes(1);
     expect(mocks.abort).not.toHaveBeenCalled();
     expect(mocks.dispatch).toHaveBeenCalledTimes(1);
   });
@@ -145,8 +160,7 @@ describe('authoritative n8n review deadline claim boundary', () => {
     expect(result.ok).toBe(false);
     expect(result.code).toBe('INVALID_AUTHORIZATION');
     expect(result.reasons.join(' ')).toContain('review deadline must match the provider schedule after cadence');
-    expect(mocks.acquireApprovalClaimBoundary).not.toHaveBeenCalled();
-    expect(mocks.claim).not.toHaveBeenCalled();
+    expect(mocks.atomicClaim).not.toHaveBeenCalled();
     expect(mocks.abort).toHaveBeenCalledTimes(1);
     expect(mocks.dispatch).not.toHaveBeenCalled();
   });

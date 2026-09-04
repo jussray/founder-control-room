@@ -52,11 +52,11 @@ describe('n8n abandoned pre-claim reservation recovery', () => {
 
     const currentApprovalRead = adapterSource.indexOf('preview = await readCurrentFounderContentApproval');
     const recoveryMarker = adapterSource.indexOf('preclaimRecoveryAuthorizedAt: now');
-    const approvalClaim = adapterSource.indexOf('claim = await claimFounderContentApproval');
+    const atomicApprovalClaim = adapterSource.indexOf('claim = await atomicClaim({');
 
     expect(currentApprovalRead).toBeGreaterThanOrEqual(0);
     expect(recoveryMarker).toBeGreaterThan(currentApprovalRead);
-    expect(approvalClaim).toBeGreaterThan(recoveryMarker);
+    expect(atomicApprovalClaim).toBeGreaterThan(recoveryMarker);
     expect(preparationSource).toContain(".eq('started_at', text(existing.started_at))");
     expect(preparationSource).toContain(".select('id, project_id, started_at')");
     expect(preparationSource).toContain('reservationStartedAt: authoritativeReservationStartedAt');
