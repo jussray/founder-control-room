@@ -41,7 +41,7 @@ function input(overrides: Partial<ArtOfWarAssessmentInput> = {}): ArtOfWarAssess
         uncertainty: 5,
         dependencyCost: 5,
         preservesFutureOptions: false,
-        evidenceIds: [],
+        evidenceIds: ['spec:rewrite'],
       },
     ],
     proofOfAdvantage: ['focused test exists'],
@@ -57,7 +57,8 @@ describe('assessArtOfWar', () => {
     expect(assessment.state).toBe('READY');
     expect(assessment.maneuver).toBe('EXPLOIT_VERIFIED_ASYMMETRY');
     expect(assessment.selectedOptionId).toBe('focused-fix');
-    expect(assessment.continuityCookie.cookieId).toBe(`aow:${assessment.fingerprint}`);
+    expect(assessment.continuityCookie.cookieId.startsWith('aowc:')).toBe(true);
+    expect(assessment.continuityCookie.assessmentFingerprint).toBe(assessment.fingerprint);
     expect(assessment.continuityCookie.browserCookie).toBe(false);
     expect(assessment.continuityCookie.authorizing).toBe(false);
     expect(assessment.continuityCookie.approvalCarryForward).toBe(false);
@@ -77,6 +78,7 @@ describe('assessArtOfWar', () => {
   it('avoids a siege even when it is the only offered path', () => {
     const assessment = assessArtOfWar(input({
       verifiedAsymmetries: [],
+      proofOfAdvantage: [],
       options: [
         {
           id: 'siege',
@@ -95,22 +97,69 @@ describe('assessArtOfWar', () => {
 
     expect(assessment.state).toBe('HOLD');
     expect(assessment.maneuver).toBe('AVOID_SIEGE');
+    expect(assessment.doNotFight.join(' ')).toContain('selected high-siege option siege');
     expect(assessment.doNotFight.join(' ')).toContain('continuity cookie');
   });
 
-  it('binds successor continuity to the exact predecessor cookie without transferring authority', () => {
+  it('keeps semantic fingerprint stable while minting a fresh successor cookie', () => {
     const first = assessArtOfWar(input());
     const second = assessArtOfWar(input({
-      goal: 'Continue the same verified repair after one new observation.',
-      groundFacts: ['Exact main is known', 'Rollback exists', 'Focused proof remains green'],
       predecessorCookieId: first.continuityCookie.cookieId,
       observedAt: '2026-09-03T22:50:00.000Z',
     }));
 
-    expect(second.fingerprint).not.toBe(first.fingerprint);
+    expect(second.fingerprint).toBe(first.fingerprint);
+    expect(second.continuityCookie.cookieId).not.toBe(first.continuityCookie.cookieId);
     expect(second.continuityCookie.predecessorCookieId).toBe(first.continuityCookie.cookieId);
     expect(validateArtOfWarContinuity(second, first.continuityCookie)).toEqual([]);
     expect(second.continuityCookie.authorizing).toBe(false);
+  });
+
+  it('rejects reversed continuity time', () => {
+    const first = assessArtOfWar(input({ observedAt: '2026-09-03T22:50:00.000Z' }));
+    const second = assessArtOfWar(input({
+      predecessorCookieId: first.continuityCookie.cookieId,
+      observedAt: '2026-09-03T22:45:00.000Z',
+    }));
+
+    expect(validateArtOfWarContinuity(second, first.continuityCookie)).toContain(
+      'continuity successor cannot predate predecessor',
+    );
+  });
+
+  it('detects source-fingerprint tampering', () => {
+    const assessment = assessArtOfWar(input());
+    const tampered = {
+      ...assessment,
+      continuityCookie: {
+        ...assessment.continuityCookie,
+        sourceFingerprint: 'tampered',
+      },
+    };
+
+    expect(validateArtOfWarContinuity(tampered)).toContain('continuity source fingerprint mismatch');
+  });
+
+  it('requires evidence IDs for claimed evidence strength', () => {
+    const assessment = assessArtOfWar(input({
+      options: [
+        {
+          id: 'unsupported',
+          label: 'Claim evidence without an evidence record',
+          expectedValue: 5,
+          evidenceStrength: 5,
+          reversibility: 5,
+          siegeCost: 1,
+          uncertainty: 1,
+          dependencyCost: 1,
+          preservesFutureOptions: true,
+          evidenceIds: [],
+        },
+      ],
+    }));
+
+    expect(assessment.state).toBe('HOLD');
+    expect(assessment.errors).toContain('nonzero option evidence strength requires at least one evidence ID');
   });
 
   it('fails closed on malformed ground identity', () => {
