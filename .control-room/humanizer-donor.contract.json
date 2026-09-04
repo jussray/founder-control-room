@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "contract": "juss/humanizer-donor@v1",
+  "skillId": "humanizer",
+  "status": "founder-approved",
+  "approvedBy": "founder",
+  "source": {
+    "repository": "blader/humanizer",
+    "commit": "e2e92e7b4b8229253ed5c8e81dc65463fdeddda5",
+    "path": "SKILL.md",
+    "gitBlobSha": "c9c22422f822f07767ad1b6e79eedccbfe4e9f63",
+    "version": "2.11.2",
+    "license": "MIT",
+    "sourceIdentityCanonical": "blader/humanizer@e2e92e7b4b8229253ed5c8e81dc65463fdeddda5:SKILL.md#c9c22422f822f07767ad1b6e79eedccbfe4e9f63",
+    "capabilitySourceHashSha256": "e86e6c4897212837d0a2a9b966e50e2839eefc0358c5e110e48d494bf3d25186"
+  },
+  "capability": {
+    "id": "humanizer",
+    "version": "2.11.2",
+    "origin": "community",
+    "owner": "blader/humanizer",
+    "sourceHash": "e86e6c4897212837d0a2a9b966e50e2839eefc0358c5e110e48d494bf3d25186",
+    "authorityCeiling": "draft"
+  },
+  "selectionOwner": {
+    "repository": "jussray/promptos",
+    "path": "skills/humanizer/SKILL.md"
+  },
+  "executionOwner": {
+    "repository": "jussray/chief-ai-machine",
+    "path": ".agents/skills/humanizer/SKILL.md"
+  },
+  "authority": {
+    "mode": "text-transform-only",
+    "repositoryWrite": false,
+    "externalCommunication": false,
+    "publish": false,
+    "providerMutation": false,
+    "authorityExpansion": false
+  },
+  "proofRequirements": [
+    "observe the exact pinned donor repository, commit, path, Git blob SHA, and version",
+    "preserve source claims",
+    "add no unsupported facts",
+    "match a user-provided voice sample when supplied",
+    "retain donor provenance in the evidence trail"
+  ],
+  "truthBoundary": "Approval of this donor authorizes only selection and draft-level text transformation. It does not prove runtime availability or execution and grants no external mutation authority."
+}
