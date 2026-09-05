@@ -90,8 +90,9 @@ export type PortableFounderApprovalValidationResult =
   | {
       readonly ok: true;
       readonly packet: PortableFounderApprovalPacket;
+      readonly founderApproved: boolean;
       readonly executionAuthorized: false;
-      readonly consumptionRequired: true;
+      readonly consumptionRequired: boolean;
     }
   | {
       readonly ok: false;
@@ -318,10 +319,12 @@ export async function validatePortableFounderApprovalPacket(
     return { ok: false, code: 'FOUNDER_NOT_ALLOWED', reason: 'founder identity is not allowlisted' };
   }
 
+  const founderApproved = packet.decision === 'approve';
   return {
     ok: true,
     packet,
+    founderApproved,
     executionAuthorized: false,
-    consumptionRequired: true,
+    consumptionRequired: founderApproved,
   };
 }
