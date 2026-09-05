@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { supabase } from '../lib/supabaseClient.js';
 import {
   FOUNDER_PROOF_AUDIT_LIFECYCLE_CONTRACT,
   evaluateFounderProofAuditLifecycle,
@@ -148,6 +147,7 @@ export function founderProofAuditDryRunEventMetadata(
 
 const defaultStore: FounderProofAuditDryRunStore = {
   async persist(dryRun) {
+    const { supabase } = await import('../lib/supabaseClient.js');
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select('id')
