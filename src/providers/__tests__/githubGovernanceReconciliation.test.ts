@@ -62,38 +62,36 @@ function pair() {
 }
 
 describe("Chief GitHub governance reconciliation", () => {
-  it("plans the exact migration but blocks provider mutation without an atomic precondition", () => {
-    const plan = planChiefProofModeRulesetMigration(pair());
-
-    expect(plan.changesRequired).toBe(true);
-    expect(plan.disposition).toBe("BLOCKED_PROVIDER_ATOMIC_PRECONDITION_UNAVAILABLE");
-    expect(plan.atomicProviderPreconditionRequired).toBe(true);
-    expect(plan.atomicProviderPreconditionAvailable).toBe(false);
-    expect(plan.authority.providerMutationAuthority).toBe(false);
-    expect(plan.authority.mergeAuthority).toBe(false);
-    expect(plan.desiredRequiredStatusChecks.governanceBoundary).toEqual([
-      { context: "Verify operational authority", integrationId: "15368" },
-    ]);
-    expect(plan.desiredRequiredStatusChecks.exactHeadGate).toContainEqual({
-      context: CHIEF_GOVERNANCE.candidateContext,
-      integrationId: CHIEF_GOVERNANCE.candidateIntegrationId,
-    });
+  it("fails closed before planning until an external candidate-check producer is observed", () => {
+    expect(CHIEF_GOVERNANCE.candidateIntegrationId).toBeNull();
+    expect(CHIEF_GOVERNANCE.candidateProducerTrust).toBe("external-github-app-check-required");
+    expect(() => planChiefProofModeRulesetMigration(pair())).toThrow(
+      /external check producer integration is not yet observed/,
+    );
   });
 
-  it("preserves unrelated required-check producer bindings", () => {
-    const plan = planChiefProofModeRulesetMigration(pair());
+  it("does not accept GitHub Actions integration 15368 as proof of the intended candidate workflow", () => {
+    const input = pair();
+    input.exactHeadGate = observe(rulesetReadback({
+      id: 20818149,
+      name: "Chief AI main exact-head gate",
+      bypass_actors: [],
+      rules: [{
+        type: "required_status_checks",
+        parameters: {
+          required_status_checks: [
+            { context: CHIEF_GOVERNANCE.candidateContext, integration_id: 15368 },
+          ],
+        },
+      }],
+    }));
 
-    expect(plan.desiredRequiredStatusChecks.exactHeadGate).toContainEqual({
-      context: "Verify test-ledger contract",
-      integrationId: "15368",
-    });
-    expect(plan.desiredRequiredStatusChecks.exactHeadGate).toContainEqual({
-      context: "Typecheck",
-      integrationId: null,
-    });
+    expect(() => planChiefProofModeRulesetMigration(input)).toThrow(
+      /refusing to plan a GitHub Actions-only required check/,
+    );
   });
 
-  it("replaces a same-named candidate check from the wrong producer", () => {
+  it("does not manufacture a replacement producer when a same-named candidate check has another integration", () => {
     const input = pair();
     input.exactHeadGate = observe(rulesetReadback({
       id: 20818149,
@@ -109,46 +107,12 @@ describe("Chief GitHub governance reconciliation", () => {
       }],
     }));
 
-    const plan = planChiefProofModeRulesetMigration(input);
-    expect(plan.desiredRequiredStatusChecks.exactHeadGate).toEqual([{
-      context: CHIEF_GOVERNANCE.candidateContext,
-      integrationId: CHIEF_GOVERNANCE.candidateIntegrationId,
-    }]);
+    expect(() => planChiefProofModeRulesetMigration(input)).toThrow(
+      /external check producer integration is not yet observed/,
+    );
   });
 
-  it("returns no-change without manufacturing mutation authority when provider state already matches", () => {
-    const input = pair();
-    input.governanceBoundary = observe(rulesetReadback({
-      rules: [{
-        type: "required_status_checks",
-        parameters: {
-          required_status_checks: [{ context: "Verify operational authority", integration_id: 15368 }],
-        },
-      }],
-    }));
-    input.exactHeadGate = observe(rulesetReadback({
-      id: 20818149,
-      name: "Chief AI main exact-head gate",
-      bypass_actors: [],
-      rules: [{
-        type: "required_status_checks",
-        parameters: {
-          required_status_checks: [
-            { context: "Typecheck" },
-            { context: "Verify test-ledger contract", integration_id: 15368 },
-            { context: CHIEF_GOVERNANCE.candidateContext, integration_id: 15368 },
-          ],
-        },
-      }],
-    }));
-
-    const plan = planChiefProofModeRulesetMigration(input);
-    expect(plan.changesRequired).toBe(false);
-    expect(plan.disposition).toBe("NO_CHANGE_REQUIRED");
-    expect(plan.authority.providerMutationAuthority).toBe(false);
-  });
-
-  it("fails closed when the authoritative candidate ruleset has a bypass actor", () => {
+  it("fails closed when the authoritative candidate ruleset has a bypass actor before producer planning", () => {
     const input = pair();
     input.exactHeadGate = observe(rulesetReadback({
       id: 20818149,
@@ -159,9 +123,22 @@ describe("Chief GitHub governance reconciliation", () => {
     expect(() => planChiefProofModeRulesetMigration(input)).toThrow(/zero bypass actors/);
   });
 
+  it("preserves observed unrelated required-check producer bindings without upgrading them to candidate authority", () => {
+    const { exactHeadGate } = pair();
+
+    expect(exactHeadGate.requiredStatusChecks).toContainEqual({
+      context: "Verify test-ledger contract",
+      integrationId: "15368",
+    });
+    expect(exactHeadGate.requiredStatusChecks).toContainEqual({
+      context: "Typecheck",
+      integrationId: null,
+    });
+    expect(CHIEF_GOVERNANCE.candidateIntegrationId).toBeNull();
+  });
+
   it("fails closed when bypass state is not present in provider readback", () => {
     const { bypass_actors: _bypassActors, ...withoutBypassActors } = rulesetReadback();
-
     expect(() => observe(withoutBypassActors)).toThrow(/bypass actors must be provider-observed/);
   });
 
