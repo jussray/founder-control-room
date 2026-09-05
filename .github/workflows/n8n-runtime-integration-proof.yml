@@ -8,6 +8,8 @@ on:
       - 'src/lib/n8nActivationProbe.ts'
       - 'src/lib/n8nConveyor.ts'
       - 'src/lib/v10ConveyorReceiptStore.ts'
+      - 'src/lib/authoritativeN8nFounderContentPublisher.ts'
+      - 'src/lib/__tests__/authoritativeN8nFounderContentRuntimeIdentity.test.ts'
       - 'scripts/verify-n8n-conveyor-live.ts'
       - 'scripts/verify-n8n-runtime-integration.ts'
       - 'scripts/generate-n8n-runtime-proof-plan.ts'
@@ -59,6 +61,9 @@ jobs:
 
       - name: Install locked dependencies
         run: npm ci
+
+      - name: Verify founder-content runtime identity membrane
+        run: npx vitest run src/lib/__tests__/authoritativeN8nFounderContentRuntimeIdentity.test.ts
 
       - name: Generate exact-head Chief capability plan
         shell: bash
