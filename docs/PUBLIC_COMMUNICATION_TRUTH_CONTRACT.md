@@ -107,12 +107,14 @@ An approved automated publishing class defines the maximum class of communicatio
 
 Current founder-content execution uses exact Current You authority and an FCR-owned approval store. Caller-supplied approval JSON is not publication authority. An authenticated founder first confirms the exact copy; FCR then issues and persists a one-shot approval bound to the exact proposal hash, public-payload hash, authorization hash, channel, source repository/SHA, founder identity, approval time, and expiry. Any active provider-writing route must atomically claim the matching unrevoked, unconsumed, unexpired stored approval before provider mutation. For provider-neutral n8n execution, that approval consumption and the exact `approval_executions.started_at` generation check must succeed or fail in the same database transaction.
 
+Approval issuance has two independent anti-duplication identities. The deterministic approval ID serializes exact canonical public copy. Separately, `promptOsPatternFingerprint` serializes the founder/platform editorial thesis+hook pattern through the bounded approval/provider-readback window. FCR must persist the one-shot approval and acquire that pattern reservation in the same database transaction; if a non-revoked, unexpired approval already owns the pattern, issuance fails closed even when the candidate wording and exact-copy approval ID differ. One-shot consumption does not release the pattern early because provider execution or provider-native readback may still be pending. The reservation may move to a later approval after the prior lease expires or is explicitly revoked, without deleting or rewriting the historical approval row. Pattern reservation is authority control, not publication evidence. The source migration that implements this rule does not prove it has been applied to production.
+
 The active route therefore separates approval issuance from publication:
 
 ```text
 exact public-safe proposal
 → authenticated founder + confirm_exact_copy
-→ FCR issues and stores exact one-shot approval
+→ FCR atomically stores exact-copy approval + bounded editorial-pattern reservation
 → publish/orchestration request references the exact authorization_hash
 → FCR preflights route/provider configuration without consuming approval
 → FCR atomically binds the matching stored approval claim to the exact execution generation
@@ -122,7 +124,7 @@ exact public-safe proposal
 → durable publication receipt
 ```
 
-Changing approved copy, evidence identity, proposal identity, source version, channel, or governing authorization fingerprint requires a fresh matching approval. A consumed approval is not replay authority after a downstream failure. Approval existence, approval issuance, or successful approval claim is not publication truth; provider readback remains terminal evidence of the external artifact.
+Changing approved copy, evidence identity, proposal identity, source version, channel, or governing authorization fingerprint requires a fresh matching approval. A consumed approval is not replay authority after a downstream failure. Approval existence, approval issuance, successful pattern reservation, or successful approval claim is not publication truth; provider readback remains terminal evidence of the external artifact.
 
 Provider-neutral n8n execution uses the same FCR-owned one-shot approval-store membrane as direct first-party publication. The n8n authority adapter must preflight transport configuration, provider allowlisting, and provider/platform compatibility before consuming one-shot authority; it then atomically consumes the exact stored approval only while the worker's exact database-returned execution generation remains active, and injects only that server-read approval into the existing provider-neutral dispatcher. Caller-supplied approval objects are forbidden. n8n may request a provider write only after that claim, may not change approved copy, and may never mark publication complete; provider-native readback remains terminal publication evidence.
 
@@ -194,6 +196,7 @@ Hold the post when:
 - a generic n8n stage-conveyor receipt is being used as proof that a founder-content provider write or publication occurred;
 - a founder-content `verified` proof label is missing Buffer provider binding, receipt identity, observation time, or exact deployed-SHA binding;
 - the post falls outside the approved automated publishing class or a stricter exact Current You gate is unsatisfied;
+- approval issuance cannot atomically reserve the founder/platform editorial pattern through the bounded approval/provider-readback lease without rewriting historical approval rows;
 - the active provider-writing route cannot atomically bind an exact matching FCR-owned approval claim to the active execution generation;
 - the post depends on a workflow that failed before executing steps;
 - private, sensitive, proprietary, or security-relevant information could be exposed;
@@ -202,6 +205,6 @@ Hold the post when:
 
 ## Completion standard
 
-A posting workflow is not complete when a draft exists, an approval is issued, a stored approval is claimed, a scheduler accepted it, or an automation was triggered.
+A posting workflow is not complete when a draft exists, an approval is issued, an editorial pattern is reserved, a stored approval is claimed, a scheduler accepted it, or an automation was triggered.
 
 It is complete only when the intended publication artifact is observable, its claims remain accurate for their declared temporal class, the platform result is reconciled, and the evidence is recorded.

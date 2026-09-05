@@ -53,7 +53,10 @@ export interface FounderContentApprovalClaimFailure {
 }
 
 export interface FounderContentApprovalRepository {
-  issue(input: FounderContentIssuedApproval & { founderUserId: string }): Promise<boolean>;
+  issue(input: FounderContentIssuedApproval & {
+    founderUserId: string;
+    editorialPatternFingerprint: string;
+  }): Promise<boolean>;
   readCurrent?(input: {
     founderUserId: string;
     approvalId: string;
@@ -205,25 +208,24 @@ function normalizeStoredApproval(data: Record<string, unknown>): FounderContentA
 function supabaseRepository(client: SupabaseClient): FounderContentApprovalRepository {
   return {
     async issue(input) {
-      const { error } = await client
-        .from('founder_content_approvals')
-        .insert({
-          approval_id: input.approvalId,
-          founder_user_id: input.founderUserId,
-          proposal_hash: input.proposalHash,
-          public_payload_hash: input.publicPayloadHash,
-          authorization_hash: input.authorizationHash,
-          platform: input.platform,
-          source_repo: input.sourceRepo,
-          source_commit_sha: input.sourceCommitSha,
-          approval: input.approval,
-          approved_at: input.approvedAt,
-          expires_at: input.expiresAt,
-          revoked_at: null,
-          consumed_at: null,
-          consumed_by: null,
-        });
-      return !error;
+      const { data, error } = await client.rpc(
+        'issue_founder_content_approval_with_pattern_reservation',
+        {
+          p_approval_id: input.approvalId,
+          p_founder_user_id: input.founderUserId,
+          p_proposal_hash: input.proposalHash,
+          p_public_payload_hash: input.publicPayloadHash,
+          p_authorization_hash: input.authorizationHash,
+          p_platform: input.platform,
+          p_source_repo: input.sourceRepo,
+          p_source_commit_sha: input.sourceCommitSha,
+          p_approval: input.approval,
+          p_approved_at: input.approvedAt,
+          p_expires_at: input.expiresAt,
+          p_pattern_fingerprint: input.editorialPatternFingerprint,
+        },
+      );
+      return !error && data === true;
     },
 
     async readCurrent(input) {
@@ -381,19 +383,22 @@ export async function issueFounderContentApproval({
   const approvalId = deterministicApprovalId({
     founderUserId,
     platform,
-    // The reservation must bind to the exact copy the provider will publish
-    // (publicCopyFingerprint), not promptOsPatternFingerprint — that field
-    // prefers public_claims text for thesis-repetition detection, so two
-    // proposals publishing byte-identical draft text but carrying different
-    // claim metadata would otherwise reserve separate approval IDs and both
-    // could be approved for the same public copy.
+    // Exact-copy identity stays separate from editorial-pattern identity.
+    // The deterministic approval_id continues to serialize byte-identical
+    // canonical public copy, while the repository transaction independently
+    // reserves novelty.promptOsPatternFingerprint so differently worded drafts
+    // with the same active thesis/hook cannot both hold live authority.
     publicPatternFingerprint: novelty.publicCopyFingerprint,
   });
   const issued = canonicalIssue({ proposal, founderUserId, now, approvalId });
   const store = repository ?? await defaultRepository();
-  const persisted = await store.issue({ ...issued, founderUserId });
+  const persisted = await store.issue({
+    ...issued,
+    founderUserId,
+    editorialPatternFingerprint: novelty.promptOsPatternFingerprint,
+  });
   if (!persisted) {
-    throw new Error('authoritative founder-content approval could not be persisted; exact public pattern/current-intent approval is already reserved or store rejected issuance');
+    throw new Error('authoritative founder-content approval could not be persisted; exact public copy or active editorial pattern is already reserved, or the store rejected issuance');
   }
   return issued;
 }
