@@ -50,6 +50,8 @@ FCR models projects, proposals, missions, exact refs, verification runs, evidenc
 
 The repository has machine-enforced PR continuity. Eligible same-repository branches may roll forward when their live base moves, but every head movement creates a new proof subject.
 
+Continuity resolves each PR's named `base.ref` to its current provider SHA at the use boundary. GitHub's stored `pr.base.sha` is historical snapshot evidence only and cannot classify a carrier `CURRENT`; stacked PRs resolve the live parent branch by the same rule.
+
 ```text
 main/base moves
 -> trusted continuity re-observes the PR graph
@@ -137,6 +139,8 @@ verified evidence
 -> FCR outcome receipt
 -> observation-only analytics
 ```
+
+For provider-neutral n8n execution, FCR finishes transport/provider, cadence, project, and durable-reservation preflight before consuming one-shot founder authority. The execution-generation membrane uses the database-returned `approval_executions.started_at` as authoritative generation evidence; stale generations cannot consume approval, cross the provider-write boundary, abort, or finalize a successor generation.
 
 A draft, provider acceptance, or n8n execution is not publication truth. **Provider readback** is the terminal external-state evidence for the route that actually ran.
 

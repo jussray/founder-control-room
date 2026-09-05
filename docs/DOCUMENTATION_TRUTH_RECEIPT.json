@@ -1,28 +1,216 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the current evidence-authority Playwright federation and privileged production-witness changes plus the retained repository-provider governance invariants to truthful documentation without claiming live GitHub, StoryEngine, Cloudflare, deployment, merge, publication, database, secret, billing, or destructive-action proof.",
+  "purpose": "Bind the current Founder Signal Engine, provider-neutral n8n authority membrane, PR continuity live-base observation rule, truth-governance, provider review policy, Cloudflare release authority, and BuildEvent projection to reviewed source invariants without claiming provider configuration, publication outcome, deployment success, merge authority, database mutation, secret validity, billing, or destructive-action authority.",
   "domains": [
+    "publishing",
+    "cloudflare-authority",
+    "evidence-authority",
     "repository-provider",
-    "evidence-authority"
+    "truth-governance"
   ],
   "changes": [
     {
-      "path": "src/providers/GitHubProvider.ts",
+      "path": "src/lib/founderEditorialNovelty.ts",
       "claims": [
-        "src/providers/GitHubProvider.ts must derive Code Owner and last-push human-review requirements from whether the canonical native approving-review count is greater than zero, while preserving pull-request enforcement, review-thread resolution, CodeQL, trusted-App bypass limits, force-push/deletion protection, strict-freshness separation, and provider readback."
+        "src/lib/founderEditorialNovelty.ts must keep PromptOS pattern grammar, Chief candidate-angle identity, and FCR history/approval authority separate; derive non-authorizing novelty fingerprints; reject HIGH repetition risk; and never treat provider schedule acceptance as publication truth."
       ]
     },
     {
-      "path": "src/providers/providerFactory.ts",
+      "path": "src/lib/founderContentFingerprintGate.ts",
       "claims": [
-        "src/providers/providerFactory.ts must keep the current FCR founder-only native approving-review floor at zero while retaining the constitutional required checks and trusted GitHub App boundary, and a later deliberate positive native-review count must remain representable without weakening the existing machine or founder-final authority membrane."
+        "src/lib/founderContentFingerprintGate.ts must fail closed unless recent history, ruled-out angles/formats, deliberate format choice, and differentiated thesis are proven; its PASS never grants draft, approve, schedule, or publish authority."
+      ]
+    },
+    {
+      "path": "docs/founder-signal-engine/editorial-novelty.md",
+      "claims": [
+        "docs/founder-signal-engine/editorial-novelty.md must document the pre-draft fingerprint gate as separate from the approval-time novelty gate, and must state that PASS grants no publication authority and never skips approval-time review."
+      ]
+    },
+    {
+      "path": "src/http/routes/capabilities.ts",
+      "claims": [
+        "src/http/routes/capabilities.ts must keep manual LinkedIn publication observations USER_ATTESTED and non-authorizing, derive editorial identity server-side, reject malformed publication inputs, preserve immutable attestations, and keep projections monotonic."
+      ]
+    },
+    {
+      "path": "src/lib/founderContentApprovalStore.ts",
+      "claims": [
+        "src/lib/founderContentApprovalStore.ts must validate the canonical proposal before history lookup, run LinkedIn novelty review before one-shot approval persistence, and never treat novelty identity as publication truth."
+      ]
+    },
+    {
+      "path": "src/http/routes/n8nConveyor.ts",
+      "claims": [
+        "src/http/routes/n8nConveyor.ts must require authenticated founder execution through the FCR-owned approval adapter, reject caller-supplied approval authority, fail closed on invalid provider configuration, and never treat route acceptance as publication truth."
+      ]
+    },
+    {
+      "path": "src/lib/n8nFounderContentAuthorityAdapter.ts",
+      "claims": [
+        "src/lib/n8nFounderContentAuthorityAdapter.ts must finish configuration, cadence, project, durable reservation, and time-window preflight before atomically binding one-shot approval consumption to the exact database-returned execution generation; stale generations must consume no approval and make zero provider requests."
+      ]
+    },
+    {
+      "path": "src/lib/atomicFounderContentExecutionClaim.ts",
+      "claims": [
+        "src/lib/atomicFounderContentExecutionClaim.ts must pass the exact execution id and database-returned started_at generation with exact founder/proposal/copy/authorization identity to the service-role atomic claim RPC, fail closed on missing or mismatched evidence, and never infer provider success from approval consumption."
+      ]
+    },
+    {
+      "path": "src/lib/atomicFounderContentPreclaimRearm.ts",
+      "claims": [
+        "src/lib/atomicFounderContentPreclaimRearm.ts must rearm only an exact pre-claim execution generation through the service-role RPC, require a strictly newer started_at generation, and fail closed when approval or provider-write authority moved after recovery readback."
+      ]
+    },
+    {
+      "path": "src/lib/founderContentCadence.ts",
+      "claims": [
+        "src/lib/founderContentCadence.ts must bind cadence reservation to the exact founder approval expiry and fail closed when any computed or read-back slot exceeds that approval lease."
+      ]
+    },
+    {
+      "path": "src/lib/n8nFounderContentOrchestrator.ts",
+      "claims": [
+        "src/lib/n8nFounderContentOrchestrator.ts must use the database-returned approval_executions.started_at as the authoritative reservation generation and fail closed when that generation is absent, so provider writes cannot escape the exact reserved execution."
+      ]
+    },
+    {
+      "path": "src/lib/n8nProviderNeutralFounderContentPreparation.ts",
+      "claims": [
+        "src/lib/n8nProviderNeutralFounderContentPreparation.ts must expose the database-returned reservation generation to the authority layer, route stale pre-claim recovery through an atomic approval_claimed-aware rearm, and keep abort, finalization, and provider-write mutations generation-fenced."
+      ]
+    },
+    {
+      "path": "src/lib/n8nProviderNeutralFounderContentOrchestrator.ts",
+      "claims": [
+        "src/lib/n8nProviderNeutralFounderContentOrchestrator.ts must derive provider-neutral schedule envelopes from canonical exact-current-you authority, preserve provider/platform compatibility, and never treat n8n or provider acceptance as final publication truth."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20260830113000_founder_content_cadence_expiry_guard.sql",
+      "claims": [
+        "supabase/migrations/20260830113000_founder_content_cadence_expiry_guard.sql must reject expired cadence slots before durable insertion while preserving serialized cadence evidence and bounded idempotent reuse."
+      ]
+    },
+    {
+      "path": "supabase/migrations/20260904190000_founder_content_atomic_execution_claim.sql",
+      "claims": [
+        "supabase/migrations/20260904190000_founder_content_atomic_execution_claim.sql must keep exact execution-generation approval consumption and stale pre-claim rearm as service-role-only transactions; claim or recovery must lose cleanly when approval_claimed, provider-write state, status, or started_at changed."
+      ]
+    },
+    {
+      "path": "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md",
+      "claims": [
+        "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md must require provider-neutral n8n approval consumption to be atomic with the exact execution generation, restrict abandoned recovery to pre-claim authority, preserve generation-fenced provider writes, and require provider-native readback for terminal publication evidence."
+      ]
+    },
+    {
+      "path": "README.md",
+      "claims": [
+        "README.md must describe the source-level founder-content and n8n authority membrane without claiming deployed provider state, preserve live-base PR continuity observation, and retain exact-SHA release proof, deterministic review, authenticated Founder Final, machine gates, CodeQL, thread resolution, and force-push/deletion protection."
+      ]
+    },
+    {
+      "path": "scripts/pr-continuity.mjs",
+      "claims": [
+        "scripts/pr-continuity.mjs must resolve each pull request base.ref to its live provider SHA at the use boundary instead of trusting frozen pr.base.sha, re-observe that live base after update-branch races, preserve expected_head_sha fencing, and never classify stale ancestry as CURRENT or grant merge/deploy authority."
+      ]
+    },
+    {
+      "path": "scripts/founder_content_supersession.py",
+      "claims": [
+        "scripts/founder_content_supersession.py must remain observation-only, preserve superseded evidence, reject invalid temporal or metric lineage, never launder caller-supplied digests into verified claims, and grant no approval or publication authority."
+      ]
+    },
+    {
+      "path": "docs/founder-signal-engine/linkedin-analytics-continuity.md",
+      "claims": [
+        "docs/founder-signal-engine/linkedin-analytics-continuity.md must document private-key HMAC post identity, non-secret key epochs, privacy-baseline rotation behavior, provider rank caps, and UNKNOWN-not-zero semantics; fingerprints remain non-authorizing."
+      ]
+    },
+    {
+      "path": "scripts/linkedin_analytics_continuity.py",
+      "claims": [
+        "scripts/linkedin_analytics_continuity.py must derive persisted post identity with private-key HMAC, bind a non-secret key epoch, treat mismatched epochs as privacy baselines, reject stale chronology, and fail closed on malformed predecessor envelopes."
+      ]
+    },
+    {
+      "path": ".github/workflows/linkedin-post-analytics.yml",
+      "claims": [
+        ".github/workflows/linkedin-post-analytics.yml must keep raw LinkedIn data runtime-private, separate source authentication from HMAC identity material, bind a non-secret identity epoch, scope credentials narrowly, fail closed on malformed predecessor recovery, and persist only redacted evidence."
+      ]
+    },
+    {
+      "path": "scripts/linkedin_post_performance.py",
+      "claims": [
+        "scripts/linkedin_post_performance.py must join metrics by the same dedicated-key HMAC identity used by continuity, preserve exported provider rank before local filtering, and keep metrics hidden by provider caps UNKNOWN rather than zero."
+      ]
+    },
+    {
+      "path": "scripts/linkedin_follower_cohort.py",
+      "claims": [
+        "scripts/linkedin_follower_cohort.py must derive member identity with dedicated private-key HMAC, bind a validated non-secret key epoch, treat rotation as a privacy baseline without fabricated churn, and reject out-of-order snapshots."
+      ]
+    },
+    {
+      "path": ".github/workflows/linkedin-follower-cohort.yml",
+      "claims": [
+        ".github/workflows/linkedin-follower-cohort.yml must separate snapshot authentication from follower HMAC identity material, bind a non-secret identity epoch, scope credentials narrowly, fail closed on malformed predecessor recovery, and upload only redacted cohort evidence."
+      ]
+    },
+    {
+      "path": "docs/founder-signal-engine/linkedin-follower-cohorts.md",
+      "claims": [
+        "docs/founder-signal-engine/linkedin-follower-cohorts.md must document separate source-auth and HMAC-identity authorities, key epochs, conservative NEW/LOST chronology, privacy resets on rotation, and fail-closed source/privacy-key states without claiming unproven provider acquisition."
+      ]
+    },
+    {
+      "path": "packages/ultrathink-verification-core/src/v4-advisory-handoff.v0.ts",
+      "claims": [
+        "packages/ultrathink-verification-core/src/v4-advisory-handoff.v0.ts must keep the FCR-to-Chief advisory boundary evidence-only and capped at ATTESTED, validate chronology, derive advisory identity from accepted evidence, and never grant publication or execution authority."
+      ]
+    },
+    {
+      "path": ".github/workflows/deploy.yml",
+      "claims": [
+        ".github/workflows/deploy.yml must keep deployment-plane credentials bounded, preserve provider-held Worker runtime secrets, and never treat public deployment URL configuration as secret or mutation authority."
       ]
     },
     {
       "path": ".github/workflows/playwright.yml",
       "claims": [
-        ".github/workflows/playwright.yml must keep the StoryEngine product-build federation witness bound to the canonical root directive wire shape, require both node-test and playwright proof, and verify the exact peer runtime identity before and after execution without granting merge, deploy, production-promotion, or provider-mutation authority.",
-        ".github/workflows/playwright.yml must keep the privileged production workflow_run witness restricted to successful Deploy workflow_dispatch runs from main, execute only trusted witness source instead of the Deploy run head, and treat workflow_run.head_sha as release evidence rather than executable authority."
+        ".github/workflows/playwright.yml must run the production exact-SHA Playwright witness only after successful canonical Deploy, bind EXPECTED_RELEASE_SHA to that Deploy head, and require direct Worker plus public release identity to equal the same exact SHA."
+      ]
+    },
+    {
+      "path": "wrangler.worker.toml",
+      "claims": [
+        "wrangler.worker.toml must declare canonical Worker runtime secret names as provider-held required bindings, including FOUNDER_SESSION_ENCRYPTION_KEY, so missing bindings fail closed without copying secret values through GitHub Actions."
+      ]
+    },
+    {
+      "path": "config/cloudflare-worker-git-authority-policy.json",
+      "claims": [
+        "config/cloudflare-worker-git-authority-policy.json must keep native Cloudflare Workers Builds non-promoting and bind the verification upload command to the canonical Worker config without granting production-promotion authority."
+      ]
+    },
+    {
+      "path": "src/providers/GitHubProvider.ts",
+      "claims": [
+        "src/providers/GitHubProvider.ts must derive native human-review requirements from the configured approving-review count while preserving PR enforcement, thread resolution, CodeQL, trusted-App bypass limits, force-push/deletion protection, freshness separation, and provider readback."
+      ]
+    },
+    {
+      "path": "src/providers/providerFactory.ts",
+      "claims": [
+        "src/providers/providerFactory.ts must preserve the current founder-only native approving-review floor and constitutional required checks while allowing a future deliberate positive native-review count without weakening machine or Founder Final authority."
+      ]
+    },
+    {
+      "path": "src/buildEvents/githubBuildEvent.ts",
+      "claims": [
+        "src/buildEvents/githubBuildEvent.ts must use validated merge_commit_sha as landed base-branch identity for merged PRs while retaining proposal head as auditedCommitSha; malformed SHAs must fail closed, and webhook BuildEvents never grant merge, deployment, or publication authority."
       ]
     }
   ]

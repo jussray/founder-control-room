@@ -10,9 +10,9 @@ main moves -> trusted main reacquires open PR graph -> same-repo branches roll f
 
 ## Rules
 
-1. `main` is the root authority; stacked PRs are followed through live base branches.
+1. `main` is the root authority. Every continuity decision resolves the PR's live `base.ref` to its current provider SHA at the use boundary; GitHub's `pr.base.sha` is a historical snapshot and must never decide whether a carrier is `CURRENT`. Stacked PRs resolve their parent branch the same way.
 2. Rollover uses GitHub `update-branch` with `expected_head_sha`. Never force-push, reset, rebase, delete, or guess through conflicts.
-3. Forks, conflicts, races, malformed managed metadata, and provider uncertainty fail closed.
+3. Forks, conflicts, races, malformed managed metadata, missing live-base identity, and provider uncertainty fail closed.
 4. Every head movement expires predecessor CI, review, runtime, provider, artifact, and browser proof.
 5. `CURRENT` ancestry is not completion; ordinary exact-head and real-path gates still apply.
 6. The machine-managed PR continuity block is always rendered first. It governs present-tense base/head/proof-subject identity and continuity status. Human prose is preserved below it as historical/contextual text; any SHA or status prose below is historical unless it matches the machine block.
@@ -20,6 +20,21 @@ main moves -> trusted main reacquires open PR graph -> same-repo branches roll f
 8. Continuity receipts never authorize merge, deploy, publish, provider mutation, spend, deletion, or authority expansion.
 9. Write authority runs only from trusted `main`; PR-head code receives read-only continuity verification.
 10. Moving the managed block to the top is a truth-ordering operation only. It never converts source ancestry into runtime, provider, review, Playwright, merge, or deploy proof.
+
+## Live-base observation rule
+
+GitHub pull-request payloads can retain the base SHA that existed when a PR snapshot was produced even after the named base branch advances. Continuity therefore treats the base **ref name** as the pointer and resolves that ref immediately before each compare, metadata classification, and post-update race check.
+
+```text
+PR says base.ref = main
+PR snapshot says base.sha = OLD
+provider says refs/heads/main = NEW
+
+continuity base authority = NEW
+OLD = historical snapshot only
+```
+
+For stacked carriers, the same rule applies to the live parent branch. A child whose stored base snapshot is still an ancestor of its head is not `CURRENT` if the live parent branch has moved beyond that snapshot.
 
 ## Machine current truth precedence
 
@@ -49,4 +64,4 @@ Founder Control Room remains the authority/evidence boundary. Continuity may rol
 
 ## Attack 20
 
-`test/pr-continuity.attack20.test.mjs` attacks ancestry, divergence, unknown state, TOCTOU, forks, machine-truth ordering, human-body preservation, malformed markers, proof-subject binding, authority leakage, stacked propagation, unrelated stacks, and cycles before any write step.
+`test/pr-continuity.attack20.test.mjs` attacks ancestry, divergence, unknown state, TOCTOU, forks, machine-truth ordering, human-body preservation, malformed markers, proof-subject binding, authority leakage, stacked propagation, unrelated stacks, cycles, frozen root-base snapshots, and stale stacked-parent snapshots before any write step.
