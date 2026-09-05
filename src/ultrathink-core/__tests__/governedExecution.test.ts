@@ -5,6 +5,7 @@ import {
   evaluateGovernedExecution,
   evaluateGovernedExecutionOutcome,
   type GovernedExecutionLease,
+  type GovernedExecutionReceipt,
   type GovernedExecutionWorld,
 } from '../governedExecution.js';
 
@@ -83,6 +84,32 @@ function world(overrides: Partial<GovernedExecutionWorld> = {}): GovernedExecuti
     attempt: 1,
     leaseConsumed: false,
     previousOutcome: 'none',
+    ...overrides,
+  };
+}
+
+const receipt: GovernedExecutionReceipt = {
+  leaseId: 'lease-1',
+  idempotencyKey: lease.execution.idempotencyKey,
+  status: 'succeeded',
+  runtimeIdentity: 'openclaw-derived@spike-v1',
+  externalRefs: ['simulated:observation:1'],
+  observedAt: '2026-09-05T21:00:01.000Z',
+};
+
+function receiptBinding(overrides: Partial<{
+  leaseId: string;
+  idempotencyKey: string;
+  runtimeIdentity: string;
+  externalRefs: readonly string[];
+  receiptObservedAt: string;
+}> = {}) {
+  return {
+    leaseId: receipt.leaseId,
+    idempotencyKey: receipt.idempotencyKey,
+    runtimeIdentity: receipt.runtimeIdentity,
+    externalRefs: receipt.externalRefs,
+    receiptObservedAt: receipt.observedAt,
     ...overrides,
   };
 }
@@ -182,44 +209,80 @@ describe('FCR governed execution membrane', () => {
     });
   });
 
-  it('10 reconciles an unknown prior outcome instead of retrying automatically', () => {
+  it('10 denies contradictory state that reports an already successful outcome', () => {
+    expect(evaluateGovernedExecution(lease, world({ previousOutcome: 'known_success' }))).toEqual({
+      disposition: 'DENY',
+      reasons: ['previous_outcome_already_succeeded'],
+    });
+  });
+
+  it('11 reconciles an unknown prior outcome instead of retrying automatically', () => {
     expect(evaluateGovernedExecution(lease, world({ previousOutcome: 'unknown' }))).toEqual({
       disposition: 'RECONCILE',
       reasons: ['previous_outcome_unknown'],
     });
   });
 
-  it('11 does not promote runtime success to verified truth without a witness', () => {
-    expect(evaluateGovernedExecutionOutcome({
-      leaseId: 'lease-1',
-      idempotencyKey: lease.execution.idempotencyKey,
-      status: 'succeeded',
-      runtimeIdentity: 'openclaw-derived@spike-v1',
-      externalRefs: ['simulated:observation:1'],
-      observedAt: '2026-09-05T21:00:01.000Z',
-    })).toBe('EXECUTED_UNVERIFIED');
+  it('12 does not promote runtime success to verified truth without a witness', () => {
+    expect(evaluateGovernedExecutionOutcome(receipt)).toBe('EXECUTED_UNVERIFIED');
   });
 
-  it('12 executes the valid read-only lease and verifies only with a sufficient witness', () => {
+  it('13 refuses a verified witness bound to a different execution receipt', () => {
+    expect(evaluateGovernedExecutionOutcome(
+      receipt,
+      {
+        status: 'verified',
+        strength: 'W4',
+        evidenceFingerprint: 'witness-fingerprint-unrelated',
+        observedAt: '2026-09-05T21:00:02.000Z',
+        receiptBinding: receiptBinding({ idempotencyKey: 'different-operation' }),
+      },
+      'W2',
+    )).toBe('EXECUTED_UNVERIFIED');
+  });
+
+  it('14 refuses a contradictory witness bound to a different execution receipt', () => {
+    expect(evaluateGovernedExecutionOutcome(
+      receipt,
+      {
+        status: 'contradicted',
+        strength: 'W4',
+        evidenceFingerprint: 'witness-fingerprint-unrelated',
+        observedAt: '2026-09-05T21:00:02.000Z',
+        receiptBinding: receiptBinding({ leaseId: 'lease-other' }),
+      },
+      'W2',
+    )).toBe('EXECUTED_UNVERIFIED');
+  });
+
+  it('15 refuses a witness observed before the execution receipt', () => {
+    expect(evaluateGovernedExecutionOutcome(
+      receipt,
+      {
+        status: 'verified',
+        strength: 'W4',
+        evidenceFingerprint: 'witness-fingerprint-too-early',
+        observedAt: '2026-09-05T21:00:00.000Z',
+        receiptBinding: receiptBinding(),
+      },
+      'W2',
+    )).toBe('EXECUTED_UNVERIFIED');
+  });
+
+  it('16 executes the valid read-only lease and verifies only with a sufficient exact witness', () => {
     expect(evaluateGovernedExecution(lease, world())).toEqual({
       disposition: 'EXECUTE',
       reasons: [],
     });
 
     expect(evaluateGovernedExecutionOutcome(
-      {
-        leaseId: 'lease-1',
-        idempotencyKey: lease.execution.idempotencyKey,
-        status: 'succeeded',
-        runtimeIdentity: 'openclaw-derived@spike-v1',
-        externalRefs: ['simulated:observation:1'],
-        observedAt: '2026-09-05T21:00:01.000Z',
-      },
+      receipt,
       {
         status: 'verified',
         strength: 'W2',
         evidenceFingerprint: 'witness-fingerprint-a',
         observedAt: '2026-09-05T21:00:02.000Z',
+        receiptBinding: receiptBinding(),
       },
       'W2',
     )).toBe('VERIFIED');
