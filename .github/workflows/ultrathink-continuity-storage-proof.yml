@@ -65,7 +65,38 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -n "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          if [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            jq -n \
+              --arg sha "$EXPECTED_HEAD_SHA" \
+              --arg run_id "$GITHUB_RUN_ID" \
+              '{
+                schemaVersion: 1,
+                verified: false,
+                status: "blocked",
+                error: "missing_supabase_service_role_key",
+                exactHeadSha: $sha,
+                runId: $run_id,
+                ledger: "project_events",
+                externalExecutionPerformed: false
+              }' > ultrathink-continuity-storage-proof.json
+            printf '%s\n' \
+              "ULTRATHINK continuity storage proof BLOCKED" \
+              "exact_head=$EXPECTED_HEAD_SHA" \
+              "reason=missing_supabase_service_role_key" \
+              "external_execution_performed=false" \
+              > ultrathink-continuity-storage-proof.log
+            {
+              echo '## ULTRATHINK Continuity storage receipt'
+              echo
+              echo "- Exact head: \`$EXPECTED_HEAD_SHA\`"
+              echo '- Status: **BLOCKED**'
+              echo '- Reason: protected `SUPABASE_SERVICE_ROLE_KEY` was unavailable to this job'
+              echo '- Persistence claim: not made'
+              echo '- External execution: none'
+              echo '- Sanitized blocker artifact: retained'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
           npx tsx scripts/prove-ultrathink-continuity-storage.ts | tee ultrathink-continuity-storage-proof.log
           test -s ultrathink-continuity-storage-proof.json
           jq -e '.classifications == {stale:"STALE",diverged:"DIVERGED",revoked:"REVOKED"}' ultrathink-continuity-storage-proof.json >/dev/null
