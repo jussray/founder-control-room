@@ -6,6 +6,16 @@ interface CachedInstallationToken {
   expiresAtMs: number;
 }
 
+export interface GitHubRepositoryInstallationEvidence {
+  repository: string;
+  appId: string;
+  installationId: string;
+  repositorySelection: string;
+  permissions: Readonly<Record<string, string>>;
+  accountLogin?: string;
+  accountType?: string;
+}
+
 const tokenCache = new Map<string, CachedInstallationToken>();
 
 function encodeBase64Url(value: string | Buffer): string {
@@ -95,6 +105,48 @@ function parseGitHubAppPrivateKey(value: string): KeyObject {
   return key;
 }
 
+function parseRepositoryIdentifier(repositoryIdentifier: string): { owner: string; repo: string; canonical: string } {
+  const [owner, repo, ...rest] = repositoryIdentifier.trim().split("/");
+  if (!owner || !repo || rest.length > 0) {
+    throw new Error(`Malformed GitHub repository identifier: ${repositoryIdentifier}`);
+  }
+  return { owner, repo, canonical: `${owner}/${repo}` };
+}
+
+function createGitHubAppClient(appId: string, privateKey: string): Octokit {
+  return new Octokit({
+    auth: createGitHubAppJwt(appId, privateKey),
+    userAgent: "founder-control-room-repo-brain",
+  });
+}
+
+async function resolveGitHubRepositoryInstallation(
+  appId: string,
+  privateKey: string,
+  repositoryIdentifier: string,
+) {
+  const normalizedAppId = appId.trim();
+  const repository = parseRepositoryIdentifier(repositoryIdentifier);
+  const appClient = createGitHubAppClient(normalizedAppId, privateKey);
+  const { data: installation } = await appClient.apps.getRepoInstallation({
+    owner: repository.owner,
+    repo: repository.repo,
+  });
+
+  const observedAppId = String(installation.app_id ?? "");
+  const installationId = String(installation.id ?? "");
+  if (!/^\d+$/.test(installationId)) {
+    throw new Error(`GitHub App returned an invalid installation id for ${repository.canonical}`);
+  }
+  if (observedAppId !== normalizedAppId) {
+    throw new Error(
+      `GitHub repository installation app identity mismatch for ${repository.canonical}: expected ${normalizedAppId}, observed ${observedAppId || "missing"}`,
+    );
+  }
+
+  return { appClient, installation, repository, installationId, observedAppId };
+}
+
 /** Creates the short-lived RS256 JWT GitHub requires for App authentication. */
 export function createGitHubAppJwt(
   appId: string,
@@ -118,37 +170,77 @@ export function createGitHubAppJwt(
 }
 
 /**
+ * Provider-observed, read-only evidence that one GitHub App installation owns
+ * the requested repository and which installation permissions GitHub reports.
+ * This does not mint an installation token and cannot publish a Check Run.
+ */
+export async function observeGitHubRepositoryInstallation(
+  appId: string,
+  privateKey: string,
+  repositoryIdentifier: string,
+): Promise<GitHubRepositoryInstallationEvidence> {
+  const {
+    installation,
+    repository,
+    installationId,
+    observedAppId,
+  } = await resolveGitHubRepositoryInstallation(appId, privateKey, repositoryIdentifier);
+
+  const repositorySelection = String(installation.repository_selection ?? "");
+  if (!repositorySelection) {
+    throw new Error(`GitHub App installation omitted repository selection for ${repository.canonical}`);
+  }
+
+  const permissions = Object.fromEntries(
+    Object.entries(installation.permissions ?? {})
+      .filter((entry): entry is [string, string] => typeof entry[1] === "string")
+      .map(([name, value]) => [name, value]),
+  );
+  const account = installation.account as { login?: string; slug?: string; type?: string } | null;
+  const accountLogin = account?.login ?? account?.slug;
+
+  return {
+    repository: repository.canonical,
+    appId: observedAppId,
+    installationId,
+    repositorySelection,
+    permissions: Object.freeze(permissions),
+    ...(accountLogin ? { accountLogin } : {}),
+    ...(account?.type ? { accountType: account.type } : {}),
+  };
+}
+
+/**
  * Resolves the installation owning one repository and returns a cached,
  * repository-scoped installation token. Tokens are refreshed five minutes
- * before GitHub's expiration timestamp.
+ * before GitHub's expiration timestamp. Cache identity includes BOTH App and
+ * repository so credentials from separate Apps can never alias each other.
  */
 export async function getGitHubInstallationToken(
   appId: string,
   privateKey: string,
   repositoryIdentifier: string,
 ): Promise<string> {
-  const [owner, repo, ...rest] = repositoryIdentifier.split("/");
-  if (!owner || !repo || rest.length > 0) {
-    throw new Error(`Malformed GitHub repository identifier: ${repositoryIdentifier}`);
-  }
-
-  const cached = tokenCache.get(repositoryIdentifier);
+  const normalizedAppId = appId.trim();
+  const repository = parseRepositoryIdentifier(repositoryIdentifier);
+  const cacheKey = `${normalizedAppId}:${repository.canonical.toLowerCase()}`;
+  const cached = tokenCache.get(cacheKey);
   if (cached && cached.expiresAtMs - Date.now() > 5 * 60_000) return cached.token;
 
-  const appClient = new Octokit({
-    auth: createGitHubAppJwt(appId, privateKey),
-    userAgent: "founder-control-room-repo-brain",
-  });
-  const { data: installation } = await appClient.apps.getRepoInstallation({ owner, repo });
+  const { appClient, installation, installationId } = await resolveGitHubRepositoryInstallation(
+    normalizedAppId,
+    privateKey,
+    repository.canonical,
+  );
   const { data: access } = await appClient.apps.createInstallationAccessToken({
     installation_id: installation.id,
-    repositories: [repo],
+    repositories: [repository.repo],
   });
   const expiresAtMs = Date.parse(access.expires_at);
   if (!access.token || !Number.isFinite(expiresAtMs)) {
-    throw new Error(`GitHub App returned an invalid installation token for ${repositoryIdentifier}`);
+    throw new Error(`GitHub App returned an invalid installation token for ${repository.canonical}`);
   }
 
-  tokenCache.set(repositoryIdentifier, { token: access.token, expiresAtMs });
+  tokenCache.set(cacheKey, { token: access.token, expiresAtMs });
   return access.token;
 }

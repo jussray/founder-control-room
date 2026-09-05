@@ -1,6 +1,9 @@
 import { Octokit } from "@octokit/rest";
 
-import { getGitHubInstallationToken } from "./githubAppAuth.js";
+import {
+  getGitHubInstallationToken,
+  observeGitHubRepositoryInstallation,
+} from "./githubAppAuth.js";
 import {
   CHIEF_GOVERNANCE,
   createTrustedGithubRulesetObservation,
@@ -14,12 +17,42 @@ export interface TrustedChiefGovernanceObservation {
   exactHeadGate: TrustedGithubRulesetObservation;
 }
 
+export interface TrustedChiefCandidateProducerInstallationObservation {
+  repository: string;
+  appId: string;
+  installationId: string;
+  repositorySelection: string;
+  permissions: Readonly<Record<string, string>>;
+  checksPermission: string | null;
+  checksWriteAvailable: boolean;
+  observedAt: string;
+  authority: {
+    candidateCheckPublicationAuthority: false;
+    providerMutationAuthority: false;
+  };
+}
+
 function numericAppId(value: string): string {
   const normalized = value.trim();
   if (!/^\d+$/.test(normalized)) {
     throw new Error("trusted Chief governance observation requires a numeric GitHub App id");
   }
   return normalized;
+}
+
+function requirePrivateKey(value: string): string {
+  if (!value.trim()) {
+    throw new Error("trusted Chief governance observation requires a GitHub App private key");
+  }
+  return value;
+}
+
+function observationTime(value: Date | undefined): string {
+  const now = value instanceof Date ? value : new Date();
+  if (Number.isNaN(now.getTime())) {
+    throw new Error("trusted Chief governance observation requires a valid observation time");
+  }
+  return now.toISOString();
 }
 
 /**
@@ -36,17 +69,12 @@ export async function observeChiefGovernanceWithGitHubApp(input: {
   now?: Date;
 }): Promise<TrustedChiefGovernanceObservation> {
   const appId = numericAppId(input.appId);
-  if (!input.privateKey.trim()) {
-    throw new Error("trusted Chief governance observation requires a GitHub App private key");
-  }
-  const now = input.now instanceof Date ? input.now : new Date();
-  if (Number.isNaN(now.getTime())) {
-    throw new Error("trusted Chief governance observation requires a valid observation time");
-  }
+  const privateKey = requirePrivateKey(input.privateKey);
+  const observedAt = observationTime(input.now);
 
   const token = await getGitHubInstallationToken(
     appId,
-    input.privateKey,
+    privateKey,
     CHIEF_GOVERNANCE.repository,
   );
   const octokit = new Octokit({
@@ -54,7 +82,6 @@ export async function observeChiefGovernanceWithGitHubApp(input: {
     userAgent: "founder-control-room-chief-governance-observer",
   });
   const [owner, repo] = CHIEF_GOVERNANCE.repository.split("/");
-  const observedAt = now.toISOString();
 
   const [governanceBoundaryReadback, exactHeadGateReadback] = await Promise.all([
     octokit.repos.getRepoRuleset({
@@ -84,6 +111,43 @@ export async function observeChiefGovernanceWithGitHubApp(input: {
       observerAppId: appId,
       observedAt,
     }),
+  };
+}
+
+/**
+ * Reads the custom App's installation identity and permissions for Chief
+ * without minting a token or publishing a probe Check Run. `checks: write`
+ * proves capability only; candidate publication authority remains false until
+ * a separately contracted narrow producer exists and its output is read back.
+ */
+export async function observeChiefCandidateProducerInstallationWithGitHubApp(input: {
+  appId: string;
+  privateKey: string;
+  now?: Date;
+}): Promise<TrustedChiefCandidateProducerInstallationObservation> {
+  const appId = numericAppId(input.appId);
+  const privateKey = requirePrivateKey(input.privateKey);
+  const observedAt = observationTime(input.now);
+  const evidence = await observeGitHubRepositoryInstallation(
+    appId,
+    privateKey,
+    CHIEF_GOVERNANCE.repository,
+  );
+  const checksPermission = evidence.permissions.checks ?? null;
+
+  return {
+    repository: evidence.repository,
+    appId: evidence.appId,
+    installationId: evidence.installationId,
+    repositorySelection: evidence.repositorySelection,
+    permissions: evidence.permissions,
+    checksPermission,
+    checksWriteAvailable: checksPermission === "write",
+    observedAt,
+    authority: {
+      candidateCheckPublicationAuthority: false,
+      providerMutationAuthority: false,
+    },
   };
 }
 

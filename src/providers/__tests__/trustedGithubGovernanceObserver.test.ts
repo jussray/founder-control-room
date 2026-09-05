@@ -1,8 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockGetRepoRuleset, mockGetGitHubInstallationToken } = vi.hoisted(() => ({
+const {
+  mockGetRepoRuleset,
+  mockGetGitHubInstallationToken,
+  mockObserveGitHubRepositoryInstallation,
+} = vi.hoisted(() => ({
   mockGetRepoRuleset: vi.fn(),
   mockGetGitHubInstallationToken: vi.fn(),
+  mockObserveGitHubRepositoryInstallation: vi.fn(),
 }));
 
 vi.mock("@octokit/rest", () => ({
@@ -13,12 +18,16 @@ vi.mock("@octokit/rest", () => ({
 
 vi.mock("../githubAppAuth.js", () => ({
   getGitHubInstallationToken: mockGetGitHubInstallationToken,
+  observeGitHubRepositoryInstallation: mockObserveGitHubRepositoryInstallation,
 }));
 
 const {
+  observeChiefCandidateProducerInstallationWithGitHubApp,
   observeChiefGovernanceWithGitHubApp,
   planChiefGovernanceWithGitHubApp,
 } = await import("../trustedGithubGovernanceObserver.js");
+
+const TEST_FCR_APP_ID = "900001";
 
 function readback(id: number, name: string, checks: Array<Record<string, unknown>>, bypassActors: Array<Record<string, unknown>>) {
   return {
@@ -41,6 +50,13 @@ describe("trusted Chief governance GitHub App observer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetGitHubInstallationToken.mockResolvedValue("installation-token");
+    mockObserveGitHubRepositoryInstallation.mockResolvedValue({
+      repository: "jussray/chief-ai-machine",
+      appId: TEST_FCR_APP_ID,
+      installationId: "7654321",
+      repositorySelection: "selected",
+      permissions: { checks: "write", contents: "read" },
+    });
     mockGetRepoRuleset
       .mockResolvedValueOnce(readback(
         21261587,
@@ -62,13 +78,13 @@ describe("trusted Chief governance GitHub App observer", () => {
 
   it("mints a repository-scoped installation token instead of accepting caller token authority", async () => {
     const result = await observeChiefGovernanceWithGitHubApp({
-      appId: "85455",
+      appId: TEST_FCR_APP_ID,
       privateKey: "test-private-key",
       now: new Date("2026-09-05T21:20:00.000Z"),
     });
 
     expect(mockGetGitHubInstallationToken).toHaveBeenCalledWith(
-      "85455",
+      TEST_FCR_APP_ID,
       "test-private-key",
       "jussray/chief-ai-machine",
     );
@@ -82,14 +98,59 @@ describe("trusted Chief governance GitHub App observer", () => {
       repo: "chief-ai-machine",
       ruleset_id: 20818149,
     });
-    expect(result.governanceBoundary.observer).toEqual({ kind: "github-app", appId: "85455" });
-    expect(result.exactHeadGate.observer).toEqual({ kind: "github-app", appId: "85455" });
+    expect(result.governanceBoundary.observer).toEqual({ kind: "github-app", appId: TEST_FCR_APP_ID });
+    expect(result.exactHeadGate.observer).toEqual({ kind: "github-app", appId: TEST_FCR_APP_ID });
     expect(result.exactHeadGate.authority.providerMutationAuthority).toBe(false);
+  });
+
+  it("observes fixed-repository Check Run capability without granting publication authority", async () => {
+    const result = await observeChiefCandidateProducerInstallationWithGitHubApp({
+      appId: TEST_FCR_APP_ID,
+      privateKey: "test-private-key",
+      now: new Date("2026-09-05T22:50:00.000Z"),
+    });
+
+    expect(mockObserveGitHubRepositoryInstallation).toHaveBeenCalledWith(
+      TEST_FCR_APP_ID,
+      "test-private-key",
+      "jussray/chief-ai-machine",
+    );
+    expect(result).toMatchObject({
+      repository: "jussray/chief-ai-machine",
+      appId: TEST_FCR_APP_ID,
+      installationId: "7654321",
+      checksPermission: "write",
+      checksWriteAvailable: true,
+      observedAt: "2026-09-05T22:50:00.000Z",
+      authority: {
+        candidateCheckPublicationAuthority: false,
+        providerMutationAuthority: false,
+      },
+    });
+  });
+
+  it("reports missing Check Run write authority without upgrading capability", async () => {
+    mockObserveGitHubRepositoryInstallation.mockResolvedValueOnce({
+      repository: "jussray/chief-ai-machine",
+      appId: TEST_FCR_APP_ID,
+      installationId: "7654321",
+      repositorySelection: "selected",
+      permissions: { checks: "read", contents: "read" },
+    });
+
+    const result = await observeChiefCandidateProducerInstallationWithGitHubApp({
+      appId: TEST_FCR_APP_ID,
+      privateKey: "test-private-key",
+    });
+
+    expect(result.checksPermission).toBe("read");
+    expect(result.checksWriteAvailable).toBe(false);
+    expect(result.authority.candidateCheckPublicationAuthority).toBe(false);
   });
 
   it("refuses to plan a ruleset migration until an external candidate-check producer is observed", async () => {
     await expect(planChiefGovernanceWithGitHubApp({
-      appId: "85455",
+      appId: TEST_FCR_APP_ID,
       privateKey: "test-private-key",
       now: new Date("2026-09-05T21:20:00.000Z"),
     })).rejects.toThrow(/external check producer integration is not yet observed/);
@@ -105,7 +166,7 @@ describe("trusted Chief governance GitHub App observer", () => {
 
   it("fails closed before provider access when the private key is empty", async () => {
     await expect(observeChiefGovernanceWithGitHubApp({
-      appId: "85455",
+      appId: TEST_FCR_APP_ID,
       privateKey: "  ",
     })).rejects.toThrow(/requires a GitHub App private key/);
     expect(mockGetGitHubInstallationToken).not.toHaveBeenCalled();
