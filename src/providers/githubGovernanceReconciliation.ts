@@ -11,7 +11,8 @@ export const CHIEF_GOVERNANCE = Object.freeze({
   governanceBoundaryRulesetId: "21261587",
   governanceBoundaryRulesetName: "governance boundary",
   candidateContext: "Verify candidate ProofMode runtime with Playwright",
-  candidateIntegrationId: "15368",
+  candidateIntegrationId: null,
+  candidateProducerTrust: "external-github-app-check-required",
   legacyPreMergeContexts: [
     "Verify live ProofMode MCP with Playwright",
     "Verify production ProofMode MCP with Playwright",
@@ -270,6 +271,13 @@ export function planChiefProofModeRulesetMigration(input: {
     throw new Error("Chief exact-head candidate ruleset must have zero bypass actors");
   }
 
+  const candidateIntegrationId = cleanId(CHIEF_GOVERNANCE.candidateIntegrationId);
+  if (!candidateIntegrationId || candidateIntegrationId === "15368") {
+    throw new Error(
+      "Chief candidate ProofMode external check producer integration is not yet observed; refusing to plan a GitHub Actions-only required check",
+    );
+  }
+
   const legacy = new Set<string>(CHIEF_GOVERNANCE.legacyPreMergeContexts);
   const governanceDesired = governanceBoundary.requiredStatusChecks.filter(
     (check) => !legacy.has(check.context) && check.context !== CHIEF_GOVERNANCE.candidateContext,
@@ -278,7 +286,7 @@ export function planChiefProofModeRulesetMigration(input: {
     .filter((check) => check.context !== CHIEF_GOVERNANCE.candidateContext)
     .concat({
       context: CHIEF_GOVERNANCE.candidateContext,
-      integrationId: CHIEF_GOVERNANCE.candidateIntegrationId,
+      integrationId: candidateIntegrationId,
     });
 
   const changesRequired = !sameChecks(governanceBoundary.requiredStatusChecks, governanceDesired)
