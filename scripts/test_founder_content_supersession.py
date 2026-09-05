@@ -67,6 +67,18 @@ class FounderContentSupersessionTest(unittest.TestCase):
         self.assertEqual(receipt['provenance']['source_digest_verification'], 'UNVERIFIED_INPUT_V3')
         self.assertEqual(receipt['provenance']['claim_source_binding'], 'NOT_LOCKED_V3')
 
+    def test_rejects_non_sup_predecessor_prefix_before_normalization(self):
+        payload = copy.deepcopy(CANONICAL)
+        payload['predecessor_receipt_id'] = 'garbage-0123456789abcdef'
+        with self.assertRaisesRegex(ValueError, 'must match SUP-<16 hex>'):
+            mod.build_supersession_receipt(payload)
+
+    def test_normalizes_case_only_after_valid_predecessor_shape(self):
+        payload = copy.deepcopy(CANONICAL)
+        payload['predecessor_receipt_id'] = 'sup-ABCDEF0123456789'
+        receipt = mod.build_supersession_receipt(payload)
+        self.assertEqual(receipt['predecessor_receipt_id'], 'SUP-abcdef0123456789')
+
     def test_unchecked_digest_never_upgrades_to_verified_state(self):
         receipt = mod.build_supersession_receipt(copy.deepcopy(CANONICAL))
         serialized = repr(receipt)
