@@ -3,14 +3,23 @@ name: Chief ProofMode Governance Witness
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: Run a read-only App/governance preflight or publish the final trusted witness
+        required: true
+        default: preflight
+        type: choice
+        options:
+          - preflight
+          - publish
       chief_pull_request_number:
         description: Chief pull request number whose exact current head owns the proof
         required: true
         default: '143'
         type: string
       proofmode_run_id:
-        description: Successful founder workflow_dispatch run id for the audited Chief ProofMode workflow
-        required: true
+        description: Successful founder workflow_dispatch run id; required only for publish mode
+        required: false
+        default: ''
         type: string
       expected_fcr_main_sha:
         description: Founder-bound exact current Founder Control Room main SHA
@@ -21,7 +30,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: chief-proofmode-governance-witness-${{ inputs.chief_pull_request_number }}
+  group: chief-proofmode-governance-witness-${{ inputs.mode }}-${{ inputs.chief_pull_request_number }}
   cancel-in-progress: false
 
 env:
@@ -30,11 +39,12 @@ env:
 jobs:
   trusted-governance-witness:
     if: github.ref == 'refs/heads/main' && github.actor == github.repository_owner
-    name: Publish FCR-owned Chief ProofMode governance witness
+    name: Run FCR-owned Chief ProofMode governance trust root
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment: production
     env:
+      WITNESS_MODE: ${{ inputs.mode }}
       EXPECTED_TRUSTED_MAIN_SHA: ${{ github.sha }}
       EXPECTED_FOUNDER_MAIN_SHA: ${{ inputs.expected_fcr_main_sha }}
       EXPECTED_FOUNDER_ACTOR_ID: '286642846'
@@ -63,8 +73,8 @@ jobs:
           test "$EXPECTED_TRUSTED_MAIN_SHA" = "$(git rev-parse HEAD)"
           git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
           current_main="$(git rev-parse refs/remotes/origin/main)"
-          printf 'founder_bound_main=%s\ntrusted_workflow_sha=%s\ncurrent_main=%s\n' \
-            "$EXPECTED_FOUNDER_MAIN_SHA" "$EXPECTED_TRUSTED_MAIN_SHA" "$current_main"
+          printf 'mode=%s\nfounder_bound_main=%s\ntrusted_workflow_sha=%s\ncurrent_main=%s\n' \
+            "$WITNESS_MODE" "$EXPECTED_FOUNDER_MAIN_SHA" "$EXPECTED_TRUSTED_MAIN_SHA" "$current_main"
           test "$EXPECTED_FOUNDER_MAIN_SHA" = "$current_main"
           test "$EXPECTED_TRUSTED_MAIN_SHA" = "$current_main"
 
@@ -72,8 +82,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          case "$WITNESS_MODE" in
+            preflight)
+              ;;
+            publish)
+              [[ "$CHIEF_PROOFMODE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+              ;;
+            *)
+              printf 'Unsupported witness mode: %s\n' "$WITNESS_MODE" >&2
+              exit 1
+              ;;
+          esac
           [[ "$CHIEF_PR_NUMBER" =~ ^[1-9][0-9]*$ ]]
-          [[ "$CHIEF_PROOFMODE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$GITHUB_APP_ID" =~ ^[1-9][0-9]*$ ]]
           test -n "$GITHUB_PRIVATE_KEY"
 
@@ -86,31 +106,42 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Prove Chief governance witness source contract
-        run: npx vitest run test/chief-proofmode-governance-witness.test.mjs
+      - name: Prove Chief governance trust-root source contracts
+        run: >-
+          npx vitest run
+          test/chief-proofmode-governance-witness.test.mjs
+          test/chief-proofmode-governance-preflight.test.mjs
 
       - name: Build trusted FCR App authentication implementation
         run: npm run build
 
+      - name: Observe Chief App installation and governance read authority
+        if: ${{ inputs.mode == 'preflight' }}
+        run: node scripts/chief-proofmode-governance-preflight.mjs
+
       - name: Observe Chief governance and publish exact trusted receipt
+        if: ${{ inputs.mode == 'publish' }}
         run: node scripts/chief-proofmode-governance-witness.mjs
 
-      - name: Re-read trusted FCR main after provider publication
+      - name: Re-read trusted FCR main after provider operation
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
           git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
           current_main="$(git rev-parse refs/remotes/origin/main)"
-          printf 'founder_bound_main=%s\ntrusted_workflow_sha=%s\ncurrent_main_after=%s\n' \
-            "$EXPECTED_FOUNDER_MAIN_SHA" "$EXPECTED_TRUSTED_MAIN_SHA" "$current_main"
+          printf 'mode=%s\nfounder_bound_main=%s\ntrusted_workflow_sha=%s\ncurrent_main_after=%s\n' \
+            "$WITNESS_MODE" "$EXPECTED_FOUNDER_MAIN_SHA" "$EXPECTED_TRUSTED_MAIN_SHA" "$current_main"
           test "$EXPECTED_FOUNDER_MAIN_SHA" = "$current_main"
           test "$EXPECTED_TRUSTED_MAIN_SHA" = "$current_main"
 
-      - name: Retain Chief governance witness receipt
+      - name: Retain Chief governance trust-root receipt
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: chief-proofmode-governance-witness-${{ inputs.chief_pull_request_number }}-${{ github.run_id }}
-          path: artifacts/chief-proofmode-governance-witness.json
+          name: chief-proofmode-governance-${{ inputs.mode }}-${{ inputs.chief_pull_request_number }}-${{ github.run_id }}
+          path: |
+            artifacts/chief-proofmode-governance-preflight.json
+            artifacts/chief-proofmode-governance-witness.json
           if-no-files-found: warn
           retention-days: 30
