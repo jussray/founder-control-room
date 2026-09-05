@@ -171,6 +171,10 @@ describe('Founder deploy command authority contract', () => {
       'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
       'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
       'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET',
+      'N8N_FOUNDER_CONTENT_WEBHOOK_URL',
+      'N8N_FOUNDER_CONTENT_BEARER_TOKEN',
+      'N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT',
+      'N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET',
     ]);
     expect(reconcileWorkflow).toContain('./node_modules/.bin/wrangler secret put FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON \\');
     expect(reconcileWorkflow).toContain('--config wrangler.worker.toml < "$grant_file"');

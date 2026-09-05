@@ -129,6 +129,22 @@ const branchSha = async (repository, ref) =>
 const compare = async (repository, base, head) =>
   (await github(`/repos/${repository}/compare/${base}...${head}`)).payload.status;
 
+export async function resolveLiveBaseObservation(
+  repository,
+  pr,
+  rootRef = 'main',
+  resolveBranch = branchSha,
+) {
+  const baseRef = pr?.base?.ref;
+  if (!baseRef) throw new Error('BASE_REF_REQUIRED');
+  const rootSha = await resolveBranch(repository, rootRef);
+  const baseSha = baseRef === rootRef
+    ? rootSha
+    : await resolveBranch(repository, baseRef);
+  if (!rootSha || !baseSha) throw new Error('LIVE_BASE_SHA_REQUIRED');
+  return { rootRef, rootSha, baseRef, baseSha };
+}
+
 async function listOpenPulls(repository) {
   const all = [];
   for (let page = 1; page <= 10; page += 1) {
@@ -151,14 +167,14 @@ async function patchBody(repository, pr, block) {
   return { updated: true, blocked: false };
 }
 
-const blockFor = (repository, pr, rootRef, rootSha, state, proof) =>
+const blockFor = (repository, pr, observation, state, proof) =>
   continuityBlock({
     repository,
     prNumber: pr.number,
-    rootBaseRef: rootRef,
-    rootBaseSha: rootSha,
-    baseRef: pr.base.ref,
-    baseSha: pr.base.sha,
+    rootBaseRef: observation.rootRef,
+    rootBaseSha: observation.rootSha,
+    baseRef: observation.baseRef,
+    baseSha: observation.baseSha,
     headRef: pr.head.ref,
     headSha: pr.head.sha,
     continuityState: state,
@@ -167,15 +183,15 @@ const blockFor = (repository, pr, rootRef, rootSha, state, proof) =>
 
 async function updateOnePull(repository, number, rootRef) {
   let pr = await getPull(repository, number);
-  const rootSha = await branchSha(repository, rootRef);
+  let observation = await resolveLiveBaseObservation(repository, pr, rootRef);
   if (!sameRepositoryPull(pr, repository)) {
-    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, 'BLOCKED_FORK', 'BLOCKED'));
+    const metadata = await patchBody(repository, pr, blockFor(repository, pr, observation, 'BLOCKED_FORK', 'BLOCKED'));
     return { number, state: 'BLOCKED_FORK', headRef: pr.head.ref, metadata };
   }
 
-  let status = await compare(repository, pr.base.sha, pr.head.sha);
+  let status = await compare(repository, observation.baseSha, pr.head.sha);
   if (isCurrentCompareStatus(status)) {
-    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, 'CURRENT', 'EXACT_HEAD_PROOF_SEPARATE'));
+    const metadata = await patchBody(repository, pr, blockFor(repository, pr, observation, 'CURRENT', 'EXACT_HEAD_PROOF_SEPARATE'));
     return {
       number,
       state: metadata.blocked ? 'BLOCKED_METADATA' : 'CURRENT',
@@ -194,9 +210,10 @@ async function updateOnePull(repository, number, rootRef) {
 
   if (update.status === 422) {
     pr = await getPull(repository, number);
-    status = sameRepositoryPull(pr, repository) ? await compare(repository, pr.base.sha, pr.head.sha) : 'fork';
+    observation = await resolveLiveBaseObservation(repository, pr, rootRef);
+    status = sameRepositoryPull(pr, repository) ? await compare(repository, observation.baseSha, pr.head.sha) : 'fork';
     if (isCurrentCompareStatus(status)) return updateOnePull(repository, number, rootRef);
-    const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, 'BLOCKED_CONFLICT_OR_RACE', 'BLOCKED'));
+    const metadata = await patchBody(repository, pr, blockFor(repository, pr, observation, 'BLOCKED_CONFLICT_OR_RACE', 'BLOCKED'));
     return {
       number,
       state: 'BLOCKED_CONFLICT_OR_RACE',
@@ -210,11 +227,13 @@ async function updateOnePull(repository, number, rootRef) {
   for (let index = 0; index < 15; index += 1) {
     await new Promise((resolve) => setTimeout(resolve, 2000));
     pr = await getPull(repository, number);
-    status = await compare(repository, pr.base.sha, pr.head.sha);
+    observation = await resolveLiveBaseObservation(repository, pr, rootRef);
+    status = await compare(repository, observation.baseSha, pr.head.sha);
     if (pr.head.sha !== before && isCurrentCompareStatus(status)) break;
   }
 
-  status = await compare(repository, pr.base.sha, pr.head.sha);
+  observation = await resolveLiveBaseObservation(repository, pr, rootRef);
+  status = await compare(repository, observation.baseSha, pr.head.sha);
   let state = isCurrentCompareStatus(status)
     ? (pr.head.sha !== before ? 'ROLLED_FORWARD' : 'CURRENT_AFTER_RACE')
     : 'BLOCKED_UPDATE_TIMEOUT';
@@ -223,7 +242,7 @@ async function updateOnePull(repository, number, rootRef) {
     : state === 'CURRENT_AFTER_RACE'
       ? 'EXACT_HEAD_PROOF_SEPARATE'
       : 'BLOCKED';
-  const metadata = await patchBody(repository, pr, blockFor(repository, pr, rootRef, rootSha, state, proof));
+  const metadata = await patchBody(repository, pr, blockFor(repository, pr, observation, state, proof));
   if (metadata.blocked) state = 'BLOCKED_METADATA';
   return { number, state, headRef: pr.head.ref, headBefore: before, headSha: pr.head.sha, metadata };
 }
@@ -242,7 +261,8 @@ export async function auditMode() {
     throw new Error('BLOCKED_FORK');
   }
 
-  const status = await compare(repository, pr.base.sha, pr.head.sha);
+  const observation = await resolveLiveBaseObservation(repository, pr, rootRef);
+  const status = await compare(repository, observation.baseSha, pr.head.sha);
   const state = classifyCompareStatus(status);
   const receipt = {
     schema: SCHEMA,
@@ -250,9 +270,9 @@ export async function auditMode() {
     repository,
     prNumber: number,
     rootBaseRef: rootRef,
-    rootBaseSha: await branchSha(repository, rootRef),
-    baseRef: pr.base.ref,
-    baseSha: pr.base.sha,
+    rootBaseSha: observation.rootSha,
+    baseRef: observation.baseRef,
+    baseSha: observation.baseSha,
     headRef: pr.head.ref,
     headSha: pr.head.sha,
     compareStatus: status,
@@ -263,7 +283,7 @@ export async function auditMode() {
     authorizesDeploy: false,
   };
   writeReceipt(receipt);
-  if (state !== 'CURRENT') throw new Error(`${state}: ${pr.base.sha} is not an ancestor of ${pr.head.sha}`);
+  if (state !== 'CURRENT') throw new Error(`${state}: ${observation.baseSha} is not an ancestor of ${pr.head.sha}`);
   console.log(JSON.stringify(receipt));
 }
 
@@ -274,14 +294,14 @@ export async function metadataMode() {
   if (!repository || !number) throw new Error('METADATA_INPUT_REQUIRED');
 
   const pr = await getPull(repository, number);
-  const rootSha = await branchSha(repository, rootRef);
+  const observation = await resolveLiveBaseObservation(repository, pr, rootRef);
   const state = sameRepositoryPull(pr, repository)
-    ? classifyCompareStatus(await compare(repository, pr.base.sha, pr.head.sha))
+    ? classifyCompareStatus(await compare(repository, observation.baseSha, pr.head.sha))
     : 'BLOCKED_FORK';
   const metadata = await patchBody(
     repository,
     pr,
-    blockFor(repository, pr, rootRef, rootSha, state, state === 'CURRENT' ? 'EXACT_HEAD_PROOF_SEPARATE' : 'REVERIFY_OR_ROLLOVER_REQUIRED'),
+    blockFor(repository, pr, observation, state, state === 'CURRENT' ? 'EXACT_HEAD_PROOF_SEPARATE' : 'REVERIFY_OR_ROLLOVER_REQUIRED'),
   );
   const receipt = { schema: SCHEMA, mode: 'metadata', repository, prNumber: number, state, metadata, authorizesMerge: false, authorizesDeploy: false };
   writeReceipt(receipt);

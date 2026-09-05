@@ -154,6 +154,95 @@ describe('GitHub webhook ingestion', () => {
     });
   });
 
+  it('binds a merged pull-request webhook to landed source truth and ledger reconciliation', async () => {
+    const reviewedHeadSha = 'a'.repeat(40);
+    const mergeCommitSha = 'c'.repeat(40);
+    const payload = {
+      repository: { full_name: 'jussray/founder-control-room' },
+      action: 'closed',
+      pull_request: {
+        number: 482,
+        title: 'Land portfolio merge truth',
+        state: 'closed',
+        merged: true,
+        merge_commit_sha: mergeCommitSha,
+        html_url: 'https://github.com/jussray/founder-control-room/pull/482',
+        updated_at: '2026-09-04T16:30:00Z',
+        head: { sha: reviewedHeadSha, ref: 'fix/portfolio-merge-truth' },
+        base: { ref: 'main' },
+        user: { login: 'jussray' },
+      },
+    };
+    const req = signedRequest(payload);
+    const res = makeResponse();
+
+    await handleGitHubWebhook(req, res as unknown as Response);
+
+    expect(mockPersistProviderEvent).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'github',
+      projectId: 'project-123',
+      providerEventId: 'delivery-123',
+      eventType: 'pull_request',
+      resourceType: 'pull_request',
+      resourceId: '482',
+      payload: expect.objectContaining({
+        repository: { full_name: 'jussray/founder-control-room' },
+        pull_request: expect.objectContaining({
+          number: 482,
+          merged: true,
+          merge_commit_sha: mergeCommitSha,
+          head: { sha: reviewedHeadSha, ref: 'fix/portfolio-merge-truth' },
+          base: { ref: 'main' },
+        }),
+      }),
+    }));
+    expect(mockStoreBuildEvent).toHaveBeenCalledWith(
+      'project-123',
+      expect.objectContaining({
+        source: 'github',
+        category: 'source',
+        truth: 'verified',
+        status: 'completed',
+        repository: {
+          name: 'jussray/founder-control-room',
+          branch: 'main',
+          refKind: 'branch-head',
+          commitSha: mergeCommitSha,
+          auditedCommitSha: reviewedHeadSha,
+        },
+      }),
+    );
+    expect(mockEnqueueReconcile).toHaveBeenCalledTimes(2);
+    expect(mockEnqueueReconcile).toHaveBeenCalledWith(
+      {
+        projectId: 'project-123',
+        controller: 'ChangeProposalController',
+        resourceId: '482',
+        reason: 'provider_event',
+        sourceEventId: 'event-123',
+      },
+      { availableAt: expect.any(String) },
+    );
+    expect(mockEnqueueReconcile).toHaveBeenCalledWith(
+      {
+        projectId: 'project-123',
+        controller: 'PortfolioLedgerProjectionController',
+        resourceId: mergeCommitSha,
+        reason: 'provider_event',
+        sourceEventId: 'event-123',
+      },
+      { availableAt: expect.any(String) },
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      accepted: true,
+      eventId: 'event-123',
+      controllers: ['ChangeProposalController', 'PortfolioLedgerProjectionController'],
+      enqueueFailures: [],
+      buildMemory: 'stored',
+    });
+  });
+
   it('routes a future repository through the explicit all-owned portfolio connection', async () => {
     const directChain = {
       select: vi.fn().mockReturnThis(),

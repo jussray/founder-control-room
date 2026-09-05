@@ -5,6 +5,7 @@ import {
 } from './temporallyGovernedFounderContentExecutor.js';
 import {
   claimFounderContentApproval,
+  readCurrentFounderContentApproval,
   type FounderContentApprovalRepository,
 } from './founderContentApprovalStore.js';
 import { FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT } from './firstPartyFounderContentExecutor.js';
@@ -26,6 +27,8 @@ export interface AuthoritativeFounderContentPublishOptions extends TemporallyGov
   founderUserId: string;
   founderIdentity: string;
   approvalRepository?: FounderContentApprovalRepository;
+  /** Test seam for the final atomic claim clock. Production uses a fresh clock at provider dispatch. */
+  claimNow?: string;
 }
 
 function text(value: unknown): string {
@@ -59,8 +62,10 @@ function blocked(reasons: string[]): TemporallyGovernedFounderPublishResult {
  * Execution membrane for direct founder publication.
  *
  * The caller may present an approval id and exact-copy confirmation, but never an
- * approval object. FCR atomically claims the exact stored approval, then injects
- * that authoritative row into the existing temporal + provider executor.
+ * approval object. FCR first performs a non-consuming exact-current read, then
+ * runs the existing temporal/provider/project/reservation preflights. The atomic
+ * one-shot claim is injected at the first provider-fetch boundary, after those
+ * preflights and immediately before any LinkedIn request can leave FCR.
  */
 export async function dispatchAuthoritativeFounderContentPublishNow(
   input: AuthoritativeFounderContentPublishInput,
@@ -82,39 +87,77 @@ export async function dispatchAuthoritativeFounderContentPublishNow(
   if (!publicPayloadHash) reasons.push('public_payload_hash confirmation is required');
   if (reasons.length > 0) return blocked(reasons);
 
-  const claim = await claimFounderContentApproval({
+  const current = await readCurrentFounderContentApproval({
     proposal: input.proposal,
     founderUserId,
     approvalId,
     authorizationHash,
     expectedPublicPayloadHash: publicPayloadHash,
-    consumedBy: founderIdentity,
     now,
     repository: options.approvalRepository,
   });
-  if (!claim.ok) {
+  if (!current.ok) {
     return blocked([
-      'publication stopped because FCR could not claim a current authoritative ApprovalReceipt',
-      claim.reason,
+      'publication stopped because FCR could not read a current authoritative ApprovalReceipt',
+      current.reason,
     ]);
   }
-  if (claim.publicPayloadHash !== publicPayloadHash || claim.authorizationHash !== authorizationHash) {
-    return blocked(['claimed authoritative approval does not match the exact browser confirmation']);
+  if (
+    current.approvalId !== approvalId
+    || current.publicPayloadHash !== publicPayloadHash
+    || current.authorizationHash !== authorizationHash
+  ) {
+    return blocked(['current authoritative approval does not match the exact browser confirmation']);
   }
 
-  const storedCurrentYou = claim.approval.current_you as JsonRecord | undefined;
+  const storedCurrentYou = current.approval.current_you as JsonRecord | undefined;
   const intentVersion = positiveInteger(storedCurrentYou?.intent_version);
   if (!intentVersion) {
-    return blocked(['claimed authoritative approval has an invalid Current You intent version']);
+    return blocked(['current authoritative approval has an invalid Current You intent version']);
   }
 
-  return dispatchTemporallyGovernedFounderContentPublishNow({
+  const providerFetch = options.fetchImpl ?? fetch;
+  let approvalClaimed = false;
+  let finalClaimFailure: string | null = null;
+
+  const claimThenFetch: typeof fetch = async (resource, init) => {
+    if (!approvalClaimed) {
+      const claimNow = options.claimNow ?? new Date().toISOString();
+      const claim = await claimFounderContentApproval({
+        proposal: input.proposal,
+        founderUserId,
+        approvalId,
+        authorizationHash,
+        expectedPublicPayloadHash: publicPayloadHash,
+        consumedBy: founderIdentity,
+        now: claimNow,
+        repository: options.approvalRepository,
+      });
+      if (!claim.ok) {
+        finalClaimFailure = `publication stopped because FCR could not atomically claim the current ApprovalReceipt: ${claim.reason}`;
+        throw new Error('FOUNDER_CONTENT_FINAL_APPROVAL_CLAIM_FAILED');
+      }
+      if (
+        claim.approvalId !== current.approvalId
+        || claim.publicPayloadHash !== current.publicPayloadHash
+        || claim.authorizationHash !== current.authorizationHash
+      ) {
+        finalClaimFailure = 'atomically claimed approval differs from the exact approval that passed preflight';
+        throw new Error('FOUNDER_CONTENT_FINAL_APPROVAL_CLAIM_MISMATCH');
+      }
+      approvalClaimed = true;
+    }
+
+    return providerFetch(resource, init);
+  };
+
+  const result = await dispatchTemporallyGovernedFounderContentPublishNow({
     proposal: input.proposal,
-    approval: claim.approval,
+    approval: current.approval,
     confirmation: {
       confirm_publication: true,
-      authorization_hash: claim.authorizationHash,
-      public_payload_hash: claim.publicPayloadHash,
+      authorization_hash: current.authorizationHash,
+      public_payload_hash: current.publicPayloadHash,
       truth_context_hash: text(input.confirmation?.truth_context_hash),
     },
     current_you: {
@@ -128,5 +171,50 @@ export async function dispatchAuthoritativeFounderContentPublishNow(
     ...options,
     now,
     executedBy: founderIdentity,
+    fetchImpl: claimThenFetch,
   });
+
+  if (finalClaimFailure) {
+    return {
+      ...result,
+      ok: false,
+      code: 'INVALID_AUTHORIZATION',
+      status: 409,
+      truthState: 'BLOCKED',
+      published: false,
+      retrySafe: false,
+      freshApprovalMayRetry: true,
+      receipt: null,
+      providerEvidence: {
+        ...(result.providerEvidence ?? {}),
+        providerWriteAttempted: false,
+        finalApprovalClaimed: false,
+      },
+      reasons: [
+        finalClaimFailure,
+        'the durable execution reservation reached a terminal non-success state without a provider request',
+      ],
+    };
+  }
+
+  if (result.published && !approvalClaimed) {
+    return {
+      ...result,
+      ok: false,
+      code: 'INVALID_AUTHORIZATION',
+      status: 500,
+      truthState: 'BLOCKED',
+      published: false,
+      retrySafe: false,
+      freshApprovalMayRetry: true,
+      receipt: null,
+      providerEvidence: {
+        ...(result.providerEvidence ?? {}),
+        finalApprovalClaimed: false,
+      },
+      reasons: ['publication result was rejected because no final atomic founder approval claim occurred'],
+    };
+  }
+
+  return result;
 }

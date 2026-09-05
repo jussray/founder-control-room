@@ -169,7 +169,7 @@ interface FounderContentExecutionRecord {
 }
 
 export type FounderContentReservationResult =
-  | { ok: true; executionId: string; projectId: string }
+  | { ok: true; executionId: string; projectId: string; reservationStartedAt: string }
   | {
       ok: false;
       code:
@@ -439,6 +439,7 @@ export async function reserveN8nFounderContentExecution(
     };
   }
 
+  const reservationStartedAt = new Date().toISOString();
   const { data: reservation, error: reservationError } = await supabase
     .from('approval_executions')
     .insert({
@@ -463,14 +464,14 @@ export async function reserveN8nFounderContentExecution(
         provider: request.providerRequest.provider,
         scheduleAt: request.providerRequest.scheduleAt,
       },
-      result: {},
+      result: { provider_write_attempted: false },
       success: null,
-      started_at: new Date().toISOString(),
+      started_at: reservationStartedAt,
     })
-    .select('id')
+    .select('id, started_at')
     .single();
 
-  if (reservationError || !reservation?.id) {
+  if (reservationError || !reservation?.id || !text(reservation.started_at)) {
     const raced = await findFounderContentExecution(request.orchestrationId);
     if (!raced.error && raced.data) {
       if (!executionScopeMatches(raced.data, expectedScope)) {
@@ -493,19 +494,59 @@ export async function reserveN8nFounderContentExecution(
     };
   }
 
-  return { ok: true, executionId: String(reservation.id), projectId };
+  return {
+    ok: true,
+    executionId: String(reservation.id),
+    projectId,
+    reservationStartedAt: text(reservation.started_at),
+  };
+}
+
+export async function acquireN8nFounderContentProviderWrite(
+  executionId: string,
+  reservationStartedAt: string,
+): Promise<boolean> {
+  const generation = text(reservationStartedAt);
+  if (!generation) return false;
+
+  try {
+    const supabase = await founderContentDb();
+    const { data, error } = await supabase
+      .from('approval_executions')
+      .update({
+        result: {
+          phase: 'provider_dispatch_started',
+          provider_write_attempted: true,
+        },
+      })
+      .eq('id', executionId)
+      .eq('status', 'pending')
+      .eq('started_at', generation)
+      .eq('result->>provider_write_attempted', 'false')
+      .select('id')
+      .maybeSingle();
+
+    return !error && String(data?.id ?? '') === executionId;
+  } catch {
+    return false;
+  }
 }
 
 export async function finalizeN8nFounderContentExecution(
   executionId: string,
   receipt: VerifiedN8nFounderContentReceipt,
+  reservationStartedAt: string,
 ): Promise<boolean> {
+  const generation = text(reservationStartedAt);
+  if (!generation) return false;
+
   const supabase = await founderContentDb();
   const { data, error } = await supabase
     .from('approval_executions')
     .update({
       status: 'succeeded',
       result: {
+        provider_write_attempted: true,
         orchestrationId: receipt.orchestrationId,
         provider: receipt.provider,
         state: receipt.state,
@@ -520,6 +561,7 @@ export async function finalizeN8nFounderContentExecution(
     })
     .eq('id', executionId)
     .eq('status', 'pending')
+    .eq('started_at', generation)
     .select('id')
     .maybeSingle();
 
@@ -567,11 +609,17 @@ export async function dispatchN8nFounderContent(
   }
 
   try {
+    const approvalExpiresAt = text(
+      input.approval && typeof input.approval === 'object'
+        ? (input.approval as Record<string, unknown>).expires_at
+        : '',
+    );
     const cadence = await reserveFounderContentCadence({
       provider: envelope.provider,
       channel: envelope.channel,
       contentId: envelope.content_id,
       requestedScheduleAt: envelope.provider_request.schedule_at,
+      approvalExpiresAt,
     });
     envelope = applyFounderContentCadenceSchedule(envelope, cadence);
     request = buildN8nFounderContentRequest(envelope);
@@ -599,6 +647,24 @@ export async function dispatchN8nFounderContent(
       request,
       receipt: null,
       reasons: [reservation.reason],
+    };
+  }
+
+  const providerWriteAcquired = await acquireN8nFounderContentProviderWrite(
+    reservation.executionId,
+    reservation.reservationStartedAt,
+  );
+  if (!providerWriteAcquired) {
+    return {
+      ok: false,
+      code: 'ACTION_AUDIT_INCOMPLETE',
+      status: 409,
+      request,
+      receipt: null,
+      reasons: [
+        'FCR could not acquire the active reservation generation at the provider-write boundary',
+        'no provider request was attempted',
+      ],
     };
   }
 
@@ -638,7 +704,11 @@ export async function dispatchN8nFounderContent(
 
     try {
       const receipt = verifyN8nFounderContentReceipt(request, body);
-      const finalized = await finalizeN8nFounderContentExecution(reservation.executionId, receipt);
+      const finalized = await finalizeN8nFounderContentExecution(
+        reservation.executionId,
+        receipt,
+        reservation.reservationStartedAt,
+      );
       if (!finalized) {
         return {
           ok: false,

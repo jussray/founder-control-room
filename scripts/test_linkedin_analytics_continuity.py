@@ -1,3 +1,4 @@
+import hashlib
 import tempfile
 import unittest
 from datetime import date
@@ -14,6 +15,10 @@ spec.loader.exec_module(mod)
 MAIN_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
 REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 PKG_NS = 'http://schemas.openxmlformats.org/package/2006/relationships'
+KEY = 'k' * 64
+OTHER_KEY = 'z' * 64
+EPOCH = 'linkedin-post-id-v1'
+OTHER_EPOCH = 'linkedin-post-id-v2'
 
 
 def cell(ref, value):
@@ -64,7 +69,14 @@ class LinkedInAnalyticsContinuityTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / 'analytics.xlsx'
             write_fixture(path)
-            report = mod.analyze_export(path, date(2026,8,2), date(2026,8,3), export_limit=3)
+            report = mod.analyze_export(
+                path,
+                date(2026,8,2),
+                date(2026,8,3),
+                export_limit=3,
+                identity_key=KEY,
+                identity_key_epoch=EPOCH,
+            )
 
         self.assertEqual(report['contract'], 'linkedin-analytics-continuity@v1')
         self.assertEqual(report['authority'], 'observation_only')
@@ -75,19 +87,104 @@ class LinkedInAnalyticsContinuityTest(unittest.TestCase):
         self.assertEqual([d['verified_visible_posts'] for d in report['days']], [2,1])
         self.assertTrue(report['days'][0]['day_cookie'].startswith('LI-DAY-20260802-P02-'))
         self.assertNotIn('utm_source', report['posts'][0]['post_url'])
+        self.assertEqual(report['privacy']['post_identity_scheme'], 'HMAC-SHA256/private-runtime-key/v1')
+        self.assertEqual(report['privacy']['post_identity_key_epoch'], EPOCH)
+        self.assertFalse(report['privacy']['private_key_persisted'])
+        self.assertNotIn(KEY, str(report))
 
-    def test_fingerprint_is_stable_across_tracking_query_noise(self):
+    def test_fingerprint_is_stable_across_tracking_noise_but_keyed(self):
         day = date(2026,8,2)
         base = 'https://www.linkedin.com/posts/juss-rayy_share-111-A'
-        self.assertEqual(mod.post_fingerprint(day, base), mod.post_fingerprint(day, base + '?utm_source=foo'))
+        a = mod.post_fingerprint(day, base, identity_key=KEY)
+        b = mod.post_fingerprint(day, base + '?utm_source=foo', identity_key=KEY)
+        c = mod.post_fingerprint(day, base, identity_key=OTHER_KEY)
+        legacy = hashlib.sha256(f'linkedin|{day.isoformat()}|{base}'.encode()).hexdigest()[:16]
+        self.assertEqual(a, b)
+        self.assertNotEqual(a, c)
+        self.assertNotEqual(a, legacy)
+        self.assertEqual(len(a), 32)
 
     def test_reconcile_preserves_history_without_treating_missing_as_deleted(self):
-        previous = {'posts': [{'fingerprint':'a'}, {'fingerprint':'b'}]}
-        current = {'posts': [{'fingerprint':'b'}, {'fingerprint':'c'}]}
+        previous = {
+            'contract': 'linkedin-analytics-continuity@v1',
+            'privacy': {'post_identity_key_epoch': EPOCH},
+            'posts': [{'fingerprint':'a'}, {'fingerprint':'b'}],
+        }
+        current = {
+            'privacy': {'post_identity_key_epoch': EPOCH},
+            'posts': [{'fingerprint':'b'}, {'fingerprint':'c'}],
+        }
         result = mod.reconcile(previous, current)
         self.assertEqual(result['new'], ['c'])
         self.assertEqual(result['retained'], ['b'])
         self.assertEqual(result['missing_from_current_visible_set'], ['a'])
+        self.assertEqual(result['baseline_or_unknown_visible'], [])
+
+    def test_reconcile_unwraps_redacted_post_evidence_envelope(self):
+        previous = {
+            'contract': 'linkedin-post-evidence@v1',
+            'continuity': {
+                'contract': 'linkedin-analytics-continuity@v1',
+                'privacy': {'post_identity_key_epoch': EPOCH},
+                'posts': [{'fingerprint':'a'}, {'fingerprint':'b'}],
+            },
+            'performance': {'contract': 'linkedin-post-performance@v1'},
+        }
+        current = {
+            'privacy': {'post_identity_key_epoch': EPOCH},
+            'posts': [{'fingerprint':'b'}, {'fingerprint':'c'}],
+        }
+        result = mod.reconcile(previous, current)
+        self.assertEqual(result['new'], ['c'])
+        self.assertEqual(result['retained'], ['b'])
+        self.assertEqual(result['missing_from_current_visible_set'], ['a'])
+
+    def test_key_rotation_starts_baseline_instead_of_fake_growth_or_churn(self):
+        previous = {
+            'contract': 'linkedin-analytics-continuity@v1',
+            'privacy': {'post_identity_key_epoch': EPOCH},
+            'posts': [{'fingerprint':'old-a'}, {'fingerprint':'old-b'}],
+        }
+        current = {
+            'privacy': {'post_identity_key_epoch': OTHER_EPOCH},
+            'posts': [{'fingerprint':'new-a'}, {'fingerprint':'new-b'}],
+        }
+        result = mod.reconcile(previous, current)
+        self.assertEqual(result['new'], [])
+        self.assertEqual(result['retained'], [])
+        self.assertEqual(result['missing_from_current_visible_set'], [])
+        self.assertEqual(result['baseline_or_unknown_visible'], ['new-a', 'new-b'])
+        self.assertEqual(result['baseline_reason'], 'POST_IDENTITY_KEY_EPOCH_CHANGED')
+
+    def test_legacy_receipt_without_epoch_starts_new_keyed_baseline(self):
+        previous = {
+            'contract': 'linkedin-analytics-continuity@v1',
+            'posts': [{'fingerprint':'legacy-public-hash'}],
+        }
+        current = {
+            'privacy': {'post_identity_key_epoch': EPOCH},
+            'posts': [{'fingerprint':'keyed-a'}],
+        }
+        result = mod.reconcile(previous, current)
+        self.assertEqual(result['new'], [])
+        self.assertEqual(result['missing_from_current_visible_set'], [])
+        self.assertEqual(result['baseline_or_unknown_visible'], ['keyed-a'])
+        self.assertEqual(result['baseline_reason'], 'POST_IDENTITY_KEY_EPOCH_CHANGED')
+
+    def test_reconcile_rejects_malformed_outer_envelope(self):
+        previous = {'contract': 'linkedin-post-evidence@v1', 'continuity': {'posts': []}}
+        current = {'privacy': {'post_identity_key_epoch': EPOCH}, 'posts': []}
+        with self.assertRaisesRegex(ValueError, 'nested continuity receipt contract mismatch'):
+            mod.reconcile(previous, current)
+
+    def test_workflow_keeps_source_auth_separate_from_post_identity_key(self):
+        workflow = (Path(__file__).parents[1] / '.github/workflows/linkedin-post-analytics.yml').read_text()
+        self.assertIn('LINKEDIN_POST_ID_HMAC_KEY', workflow)
+        self.assertIn('LINKEDIN_POST_ID_HMAC_EPOCH', workflow)
+        self.assertIn('LINKEDIN_ANALYTICS_SNAPSHOT_TOKEN', workflow)
+        self.assertNotIn('LINKEDIN_POST_ID_HMAC_KEY: ${{ secrets.LINKEDIN_ANALYTICS_SNAPSHOT_TOKEN }}', workflow)
+        self.assertNotIn('} || true)', workflow)
+        self.assertIn('BLOCKED_PREDECESSOR_ARTIFACT', workflow)
 
 
 if __name__ == '__main__':

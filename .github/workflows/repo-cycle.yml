@@ -126,7 +126,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: npm
 
       - name: Verify Node 24 runtime authority
         run: node scripts/verify-node24-runtime-authority.mjs

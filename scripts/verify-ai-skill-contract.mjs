@@ -66,6 +66,28 @@ for (const [label, source, metadata] of [
 for (const phrase of ['5W1H', 'Qualify', 'disqualifiers', 'evidence', 'No approval carries forward', 'A sales plan is not authorization']) {
   requireText('sales invariant', files.sales, phrase);
 }
+for (const phrase of [
+  '## Seven-day revenue strike mode',
+  'cash_collected',
+  'signed_contract_value',
+  'qualified_pipeline',
+  'Borrowing is not revenue',
+  '## Attack-1000 commercial red team',
+  '10 truth domains x 10 failure modes x 10 adversary lenses = 1,000 probes',
+  'REDTEAM I / PREMISE ATTACK',
+  'LINDY SCREEN',
+  'L99 COMMERCIAL MODEL',
+  'OODA',
+  'REDTEAM II / SELECTED-PLAN ATTACK',
+  'Use all relevant connected skills and plugins',
+  'juss-v10/operator-continuity@v2',
+  'operatorContinuityDimensionFingerprint',
+  'browserCookie: false',
+  'authorizing: false',
+  'approvalCarryForward: false',
+  'founderDecisionRequired: true',
+  'expire revenue-state continuity no later than 24 hours',
+]) requireText('revenue strike invariant', files.sales, phrase);
 for (const phrase of ['Pass I — premise attack', 'Pass II — selected-plan attack', 'kill criteria', 'does not authorize execution']) {
   requireText('devil invariant', files.devil, phrase);
 }

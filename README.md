@@ -50,6 +50,8 @@ FCR models projects, proposals, missions, exact refs, verification runs, evidenc
 
 The repository has machine-enforced PR continuity. Eligible same-repository branches may roll forward when their live base moves, but every head movement creates a new proof subject.
 
+Continuity resolves each PR's named `base.ref` to its current provider SHA at the use boundary. GitHub's stored `pr.base.sha` is historical snapshot evidence only and cannot classify a carrier `CURRENT`; stacked PRs resolve the live parent branch by the same rule.
+
 ```text
 main/base moves
 -> trusted continuity re-observes the PR graph
@@ -137,6 +139,12 @@ verified evidence
 -> FCR outcome receipt
 -> observation-only analytics
 ```
+
+Approval issuance keeps two identities separate. The deterministic approval ID still serializes exact canonical public copy, while a database-owned active `promptOsPatternFingerprint` reservation serializes the founder/platform thesis+hook pattern. FCR may persist a new approval only when the same transaction proves no non-revoked, unexpired approval still owns that editorial pattern. One-shot consumption does not release the pattern early because provider execution/readback may still be in flight; the pattern stays reserved through that bounded approval lease unless the approval is explicitly revoked. After the lease expires or is revoked, the active reservation may point to a later approval without deleting or rewriting historical approval rows. This is a source contract until its migration is separately authorized and applied, and neither reservation identity is publication truth.
+
+A provider-readback-verified direct LinkedIn publication preserves two fingerprint-only memory identities without persisting raw post copy: `publicCopyHash` is SHA-256 of the exact canonical text that FCR sent and LinkedIn readback verified, while immutable approval-pattern history preserves the broader PromptOS thesis+hook fingerprint. Future LinkedIn novelty review can therefore HOLD on either an exact verified public copy or an already-published editorial pattern even when source SHA, evidence, claims, or other proposal metadata rotates. Schedule receipts, failed/UNKNOWN provider outcomes, and request/readback copy-hash conflicts do not manufacture exact-copy publication memory.
+
+For provider-neutral n8n execution, FCR finishes transport/provider, cadence, project, and durable-reservation preflight before consuming one-shot founder authority. The execution-generation membrane uses the database-returned `approval_executions.started_at` as authoritative generation evidence; stale generations cannot consume approval, cross the provider-write boundary, abort, or finalize a successor generation.
 
 A draft, provider acceptance, or n8n execution is not publication truth. **Provider readback** is the terminal external-state evidence for the route that actually ran.
 

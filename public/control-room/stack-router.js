@@ -1,5 +1,3 @@
-import { installMissionBoard } from './mission-board.js';
-
 const PENDING_TAB_KEY = 'fcr_pending_tab';
 const CONVEYOR_CONTRACT = 'founder-control-room/n8n-conveyor@v3';
 const ALLOWED_TABS = new Set([
@@ -18,6 +16,8 @@ const READINESS_COPY = {
   'enabled-awaiting-proof': 'n8n enabled · live proof missing',
   'enabled-live-verified': 'n8n live · exact-head receipt verified',
 };
+
+let missionBoardInstallPromise = null;
 
 function safeSessionGet(key) {
   try {
@@ -116,11 +116,25 @@ function removeTabQueryParameter() {
   history.replaceState(null, '', nextUrl);
 }
 
+function installMissionBoardWhenNeeded() {
+  if (missionBoardInstallPromise) return missionBoardInstallPromise;
+  missionBoardInstallPromise = import('./mission-board.js')
+    .then(({ installMissionBoard }) => {
+      installMissionBoard();
+    })
+    .catch((error) => {
+      missionBoardInstallPromise = null;
+      throw error;
+    });
+  return missionBoardInstallPromise;
+}
+
 function activateTab(tab) {
   const button = document.querySelector(`.tabs button[data-tab="${tab}"]`);
   if (!(button instanceof HTMLButtonElement)) return false;
 
   button.click();
+  if (tab === 'missions') void installMissionBoardWhenNeeded();
   safeSessionRemove(PENDING_TAB_KEY);
   removeTabQueryParameter();
   return true;
@@ -142,12 +156,16 @@ if (pendingTab && ALLOWED_TABS.has(pendingTab) && !activateTab(pendingTab)) {
   }
 }
 
+document.addEventListener('click', (event) => {
+  const target = event.target instanceof Element
+    ? event.target.closest('.tabs button[data-tab="missions"]')
+    : null;
+  if (target) void installMissionBoardWhenNeeded();
+});
+
 const launchDock = document.querySelector('.launch-dock');
 if (launchDock instanceof HTMLDetailsElement) {
   launchDock.addEventListener('toggle', () => {
     if (launchDock.open) void refreshConveyorReadiness();
   });
 }
-
-installMissionBoard();
-void refreshConveyorReadiness();

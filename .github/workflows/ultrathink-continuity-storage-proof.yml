@@ -1,0 +1,135 @@
+name: ULTRATHINK Continuity Storage Proof
+
+on:
+  push:
+    branches:
+      - codex/provider-neutral-founder-content-contracts
+    paths:
+      - scripts/prove-ultrathink-continuity-storage.ts
+      - src/lib/ultrathinkContinuity.ts
+      - src/services/ultrathinkContinuityStore.ts
+      - .github/workflows/ultrathink-continuity-storage-proof.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ultrathink-continuity-storage-${{ github.sha }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  persisted-state-proof:
+    if: github.repository == 'jussray/founder-control-room' && github.ref == 'refs/heads/codex/provider-neutral-founder-content-contracts'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Check out exact continuity carrier head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact branch and source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/codex/provider-neutral-founder-content-contracts'
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Reprove non-mutating continuity contracts
+        run: >-
+          npx vitest run
+          src/lib/__tests__/ultrathinkContinuity.test.ts
+          src/services/__tests__/ultrathinkContinuityStore.test.ts
+
+      - name: Persist, read back, and classify real project_events continuity
+        env:
+          NODE_ENV: production
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+          SUPABASE_URL: https://oojzfmmywbvficgybaxd.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            jq -n \
+              --arg sha "$EXPECTED_HEAD_SHA" \
+              --arg run_id "$GITHUB_RUN_ID" \
+              '{
+                schemaVersion: 1,
+                verified: false,
+                status: "blocked",
+                error: "missing_supabase_service_role_key",
+                exactHeadSha: $sha,
+                runId: $run_id,
+                ledger: "project_events",
+                externalExecutionPerformed: false
+              }' > ultrathink-continuity-storage-proof.json
+            printf '%s\n' \
+              "ULTRATHINK continuity storage proof BLOCKED" \
+              "exact_head=$EXPECTED_HEAD_SHA" \
+              "reason=missing_supabase_service_role_key" \
+              "external_execution_performed=false" \
+              > ultrathink-continuity-storage-proof.log
+            {
+              echo '## ULTRATHINK Continuity storage receipt'
+              echo
+              echo "- Exact head: \`$EXPECTED_HEAD_SHA\`"
+              echo '- Status: **BLOCKED**'
+              echo '- Reason: protected `SUPABASE_SERVICE_ROLE_KEY` was unavailable to this job'
+              echo '- Persistence claim: not made'
+              echo '- External execution: none'
+              echo '- Sanitized blocker artifact: retained'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          npx tsx scripts/prove-ultrathink-continuity-storage.ts | tee ultrathink-continuity-storage-proof.log
+          test -s ultrathink-continuity-storage-proof.json
+          jq -e '.classifications == {stale:"STALE",diverged:"DIVERGED",revoked:"REVOKED"}' ultrathink-continuity-storage-proof.json >/dev/null
+          jq -e '.invariants.historicalReceiptStatus == "verified"' ultrathink-continuity-storage-proof.json >/dev/null
+          jq -e '.invariants.historicalStateHashPreserved == true' ultrathink-continuity-storage-proof.json >/dev/null
+          jq -e '.invariants.continuityMayAuthorizeAction == false' ultrathink-continuity-storage-proof.json >/dev/null
+          jq -e '.invariants.executionAuthority == false' ultrathink-continuity-storage-proof.json >/dev/null
+          jq -e '.invariants.proofCookieActionAuthority == false' ultrathink-continuity-storage-proof.json >/dev/null
+          jq -e '.invariants.externalExecutionPerformed == false' ultrathink-continuity-storage-proof.json >/dev/null
+
+      - name: Record founder-readable storage receipt
+        if: success()
+        shell: bash
+        run: |
+          {
+            echo '## ULTRATHINK Continuity storage receipt'
+            echo
+            echo "- Exact head: \`$GITHUB_SHA\`"
+            echo '- Carrier: existing PR #735 branch'
+            echo '- Ledger: FCR project_events'
+            echo '- Persisted classifications: STALE → DIVERGED → REVOKED'
+            echo '- Historical receipt: preserved as verified'
+            echo '- Continuity/action authority: false'
+            echo '- External execution: none'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload retained storage proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultrathink-continuity-storage-proof-${{ github.sha }}-${{ github.run_id }}
+          path: |
+            ultrathink-continuity-storage-proof.json
+            ultrathink-continuity-storage-proof.log
+          if-no-files-found: error
+          retention-days: 30

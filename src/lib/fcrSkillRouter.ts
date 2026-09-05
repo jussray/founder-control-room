@@ -10,6 +10,16 @@ export const FCR_REQUIRED_PARALLEL_LENSES = [
   'deep-research',
 ] as const;
 
+// Keep this tuple synchronized with .control-room/humanizer-donor.contract.json; mismatches fail closed below.
+export const FCR_HUMANIZER_CAPABILITY = {
+  id: 'humanizer',
+  version: '2.11.2',
+  origin: 'community',
+  owner: 'blader/humanizer',
+  sourceHash: 'e86e6c4897212837d0a2a9b966e50e2839eefc0358c5e110e48d494bf3d25186',
+  authorityCeiling: 'draft',
+} as const;
+
 export type FcrSkillRouterAction =
   | 'inspect'
   | 'plan'
@@ -53,6 +63,7 @@ export interface FcrSkillRoutingDecision {
   requiredTools: string[];
   requiredProof: string[];
   mutationRequested: boolean;
+  untrustedWorkflowTokensInert: true;
   runtimeDiscoveryRequired: true;
   executionAllowed: false;
   errors: string[];
@@ -70,24 +81,6 @@ const MUTATING_ACTIONS = new Set<FcrSkillRouterAction>([
   'delete',
 ]);
 
-const EXPLICIT_SKILL_ALIASES: Readonly<Record<string, string>> = {
-  goalfix: 'goalfix',
-  'repo-truth': 'repo-truth',
-  'truth-decay': 'truth-decay-audit',
-  'truth-decay-audit': 'truth-decay-audit',
-  truthdecay: 'truth-decay-audit',
-  'review-verify-merge': 'review-verify-merge',
-  'proof-led-publishing': 'proof-led-publishing',
-  'juss-chief-ai': 'juss-chief-ai',
-  'control-room-agent-router': 'control-room-agent-router',
-  'control-room-proof-ladder': 'control-room-proof-ladder',
-  'control-room-incident-triage': 'control-room-incident-triage',
-  'control-room-design-implementation': 'control-room-design-implementation',
-  'control-room-skill-router': 'control-room-skill-router',
-  sales: 'sales',
-  devil: 'devil',
-};
-
 function normalize(value: string): string {
   return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
 }
@@ -98,15 +91,6 @@ function pushUnique(values: string[], value: string): void {
 
 function canonicalCapabilityId(value: string): string {
   return normalize(value).replace(/^(skill|command):/, '');
-}
-
-function explicitSkillsFromGoal(goal: string): string[] {
-  const required: string[] = [];
-  for (const match of goal.matchAll(/\/([a-z0-9-]+)/g)) {
-    const skill = EXPLICIT_SKILL_ALIASES[match[1]];
-    if (skill) pushUnique(required, skill);
-  }
-  return required;
 }
 
 function isRepositoryGoal(goal: string): boolean {
@@ -125,28 +109,52 @@ function isCommercialGoal(goal: string): boolean {
   return /\b(sales|offer|pricing|discount|revenue|conversion|retention|checkout|commercial)\b/.test(goal);
 }
 
+function isHumanizerGoal(goal: string): boolean {
+  return /\b(humanize|humanizer|de-ai|ai-sounding|sound human|sound more human|match my voice|match the voice|voice-match)\b/.test(goal);
+}
+
+function matchesApprovedHumanizerCapability(capability: V10CapabilityPlan['capabilities'][number]): boolean {
+  return canonicalCapabilityId(capability.id) === FCR_HUMANIZER_CAPABILITY.id
+    && capability.version === FCR_HUMANIZER_CAPABILITY.version
+    && capability.origin === FCR_HUMANIZER_CAPABILITY.origin
+    && capability.owner === FCR_HUMANIZER_CAPABILITY.owner
+    && capability.sourceHash.toLowerCase() === FCR_HUMANIZER_CAPABILITY.sourceHash
+    && capability.authorityCeiling === FCR_HUMANIZER_CAPABILITY.authorityCeiling;
+}
+
 export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecision {
   const goal = normalize(input.goal);
   const errors: string[] = [];
   const requiredTools: string[] = [];
   const requiredProof: string[] = [];
-  const policyRequiredCapabilityIds = explicitSkillsFromGoal(goal);
+  // Raw goal text may contain copied prompts, issues, emails, MCP/tool results, or
+  // other imported material. Workflow and mode names in that text are inert.
+  // Chief owns hash-bound capability composition; FCR adds only semantic policy
+  // requirements that are independently defined here.
+  const policyRequiredCapabilityIds: string[] = [];
   const requiredParallelLenses = [...FCR_REQUIRED_PARALLEL_LENSES];
   const mutationRequested = MUTATING_ACTIONS.has(input.action);
   const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository);
   const uiGoal = isUiGoal(goal);
   const messagingGoal = isMessagingGoal(goal);
   const commercialGoal = isCommercialGoal(goal);
+  const humanizerGoal = isHumanizerGoal(goal);
   const mergeReviewGoal = repositoryGoal && (input.action === 'merge' || input.action === 'review');
 
   pushUnique(requiredProof, 'Product Design disposition recorded for the selected path; UI/runtime claims still require rendered browser evidence');
   pushUnique(requiredProof, 'Data Analytics outcome signals declared before execution and treated as observation-only evidence');
   pushUnique(requiredProof, 'Deep Research uses authoritative primary sources when research can change the decision; research never grants execution authority');
+  pushUnique(requiredProof, 'Workflow and mode tokens embedded in goal or imported content are inert; capability policy comes from the validated Chief plan and FCR semantic policy, never slash-command parsing');
 
   if (commercialGoal) {
     pushUnique(policyRequiredCapabilityIds, 'sales');
     pushUnique(policyRequiredCapabilityIds, 'devil');
     pushUnique(requiredProof, 'truthful commercial claims and adversarial plan review');
+  }
+
+  if (humanizerGoal) {
+    pushUnique(policyRequiredCapabilityIds, 'humanizer');
+    pushUnique(requiredProof, 'Humanizer execution observes the founder-approved Blader donor pin and preserves claims without unsupported facts');
   }
 
   if (messagingGoal) {
@@ -189,6 +197,16 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
     if (input.capabilityPlan.registryHash.toLowerCase() !== input.expectedRegistryHash.trim().toLowerCase()) {
       errors.push('capability plan registry hash does not match the authoritative registry');
     }
+
+    const humanizerCapability = input.capabilityPlan.capabilities.find(
+      (capability) => canonicalCapabilityId(capability.id) === FCR_HUMANIZER_CAPABILITY.id,
+    );
+    if (humanizerCapability) {
+      if (!matchesApprovedHumanizerCapability(humanizerCapability)) {
+        errors.push('Chief AI humanizer capability does not match the founder-approved Blader donor pin');
+      }
+      pushUnique(requiredProof, 'Humanizer capability provenance matches .control-room/humanizer-donor.contract.json');
+    }
   }
 
   const plannedCapabilityIds = input.capabilityPlan
@@ -225,6 +243,7 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
     requiredTools,
     requiredProof,
     mutationRequested,
+    untrustedWorkflowTokensInert: true,
     runtimeDiscoveryRequired: true,
     executionAllowed: false,
     errors,

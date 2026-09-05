@@ -1,0 +1,300 @@
+name: n8n Founder Content Buffer Runtime Proof
+# CI-only proof. Uses an isolated Buffer GraphQL fake and never activates production n8n or social accounts.
+
+on:
+  pull_request:
+    paths:
+      - 'automation/n8n/founder-content-buffer.workflow.json'
+      - 'automation/n8n/self-hosted/**'
+      - 'src/lib/authoritativeN8nFounderContentPublisher.ts'
+      - 'src/lib/n8nFounderContentOrchestrator.ts'
+      - 'src/lib/n8nProviderNeutralFounderContentOrchestrator.ts'
+      - '.github/workflows/n8n-founder-content-buffer-runtime-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: n8n-founder-content-buffer-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  runtime-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      COMPOSE_FILE: automation/n8n/self-hosted/docker-compose.yml
+      EXACT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      POSTGRES_DB: n8n
+      POSTGRES_USER: n8n
+      POSTGRES_PASSWORD: founder-content-proof-postgres-password
+      N8N_PUBLIC_HOST: localhost
+      N8N_PUBLIC_BASE_URL: http://127.0.0.1:5678/
+      N8N_LOCAL_PORT: 5678
+      GENERIC_TIMEZONE: America/New_York
+      N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_ID: fcrFounderContentV1
+      N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION: 2.32.6
+      BUFFER_API_URL: http://buffer-mock:18080
+      BUFFER_FOUNDER_LINKEDIN_CHANNEL_ID: buffer-proof-linkedin
+      BUFFER_FOUNDER_FACEBOOK_CHANNEL_ID: buffer-proof-facebook
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXACT_SHA }}
+          persist-credentials: false
+
+      - name: Verify immutable target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXACT_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Generate exact workflow identity and ephemeral proof credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp
+          workflow_fingerprint="$(sha256sum automation/n8n/founder-content-buffer.workflow.json | awk '{print $1}')"
+          founder_bearer="$(openssl rand -hex 32)"
+          buffer_key="$(openssl rand -hex 32)"
+          identity_secret="$(openssl rand -hex 32)"
+          encryption_key="$(openssl rand -hex 32)"
+          for secret in "$founder_bearer" "$buffer_key" "$identity_secret" "$encryption_key"; do
+            printf '::add-mask::%s\n' "$secret"
+          done
+          {
+            printf 'N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT=%s\n' "$workflow_fingerprint"
+            printf 'N8N_FOUNDER_CONTENT_PROOF_BEARER=%s\n' "$founder_bearer"
+            printf 'BUFFER_MOCK_API_KEY=%s\n' "$buffer_key"
+            printf 'N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET=%s\n' "$identity_secret"
+            printf 'N8N_ENCRYPTION_KEY=%s\n' "$encryption_key"
+          } >> "$GITHUB_ENV"
+          jq -n \
+            --arg founderValue "Bearer $founder_bearer" \
+            --arg bufferValue "Bearer $buffer_key" \
+            '[
+              {id:"fcr-founder-content-bearer-auth",name:"FCR Founder Content Bearer Auth",type:"httpHeaderAuth",data:{name:"Authorization",value:$founderValue}},
+              {id:"fcr-buffer-api-auth",name:"FCR Buffer API Auth",type:"httpHeaderAuth",data:{name:"Authorization",value:$bufferValue}}
+            ]' > .tmp/n8n-founder-content-proof-credentials.json
+
+      - name: Start pinned Postgres and isolated Buffer proof service
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f "$COMPOSE_FILE" --profile proof up -d postgres buffer-mock
+          for attempt in $(seq 1 30); do
+            if docker compose -f "$COMPOSE_FILE" exec -T postgres \
+              pg_isready -h localhost -U "$POSTGRES_USER" -d "$POSTGRES_DB"; then
+              break
+            fi
+            sleep 2
+          done
+          docker compose -f "$COMPOSE_FILE" exec -T postgres \
+            pg_isready -h localhost -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+          test "$(docker inspect -f '{{.State.Running}}' "$(docker compose -f "$COMPOSE_FILE" ps -q buffer-mock)")" = true
+
+      - name: Import credentials and founder-content workflow into real n8n
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f "$COMPOSE_FILE" run --rm --no-deps \
+            -v "$PWD:/workspace:ro" --entrypoint n8n n8n \
+            import:credentials --input=/workspace/.tmp/n8n-founder-content-proof-credentials.json
+          docker compose -f "$COMPOSE_FILE" run --rm --no-deps \
+            -v "$PWD:/workspace:ro" --entrypoint n8n n8n \
+            import:workflow --input=/workspace/automation/n8n/founder-content-buffer.workflow.json
+          docker compose -f "$COMPOSE_FILE" run --rm --no-deps \
+            --entrypoint n8n n8n publish:workflow --id=fcrFounderContentV1
+
+      - name: Start pinned n8n runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f "$COMPOSE_FILE" up -d n8n
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:5678/healthz >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f "$COMPOSE_FILE" logs n8n
+          exit 1
+
+      - name: Wait for founder-content production webhook registration
+        shell: bash
+        run: |
+          set -euo pipefail
+          webhook='http://127.0.0.1:5678/webhook/founder-control-room/founder-content'
+          for attempt in $(seq 1 30); do
+            status="$(curl -sS -o .tmp/n8n-founder-content-readiness.txt -w '%{http_code}' \
+              -X POST "$webhook" \
+              -H 'content-type: application/json' \
+              --data '{}' || true)"
+            case "$status" in
+              401|403)
+                printf 'Founder-content production webhook registered after %s attempt(s).\n' "$attempt"
+                exit 0
+                ;;
+              404|000)
+                sleep 2
+                ;;
+              *)
+                cat .tmp/n8n-founder-content-readiness.txt || true
+                echo "Unexpected founder-content webhook readiness status: HTTP $status" >&2
+                exit 1
+                ;;
+            esac
+          done
+          cat .tmp/n8n-founder-content-readiness.txt || true
+          echo 'Founder-content production webhook never registered.' >&2
+          docker compose -f "$COMPOSE_FILE" exec -T postgres \
+            psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+            -c "SELECT id, name, active, \"activeVersionId\", \"versionId\" FROM workflow_entity WHERE id = '$N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_ID';" || true
+          docker compose -f "$COMPOSE_FILE" exec -T postgres \
+            psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+            -c "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND (tablename ILIKE '%webhook%' OR tablename ILIKE '%workflow%') ORDER BY tablename;" || true
+          docker compose -f "$COMPOSE_FILE" logs n8n || true
+          exit 1
+
+      - name: Reject unauthenticated founder-content request
+        shell: bash
+        run: |
+          set -euo pipefail
+          webhook='http://127.0.0.1:5678/webhook/founder-control-room/founder-content'
+          status="$(curl -sS -o .tmp/n8n-founder-content-no-auth.txt -w '%{http_code}' \
+            -X POST "$webhook" \
+            -H 'content-type: application/json' \
+            --data '{}')"
+          case "$status" in
+            401|403) ;;
+            *)
+              cat .tmp/n8n-founder-content-no-auth.txt || true
+              echo "Expected authenticated webhook rejection, got HTTP $status" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Prove bounded Buffer schedule and signed runtime identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          webhook='http://127.0.0.1:5678/webhook/founder-control-room/founder-content'
+          challenge="$(openssl rand -hex 32)"
+          schedule_at="$(node -e 'console.log(new Date(Date.now()+60*60*1000).toISOString())')"
+          orchestration_id="fcr-n8n-social-v2:$(printf 'c%.0s' {1..64})"
+          jq -n \
+            --arg orchestrationId "$orchestration_id" \
+            --arg sha "$EXACT_SHA" \
+            --arg scheduleAt "$schedule_at" \
+            '{
+              contract:"fcr/n8n-founder-content-orchestration@v1",
+              event:"founder-content.schedule.requested",
+              orchestrationId:$orchestrationId,
+              contentId:"11111111-1111-4111-8111-111111111111",
+              platform:"linkedin",
+              channel:"juss_rayy_linkedin",
+              text:"Founder-content n8n runtime proof fixture.",
+              source:{repo:"jussray/founder-control-room",commitSha:$sha},
+              fcrAuthorization:{
+                mode:"exact-current-you",
+                authorizationHash:("a"*64),
+                proposalHash:("b"*64),
+                publicPayloadHash:("d"*64),
+                currentYouIntentId:"runtime-proof-intent",
+                currentYouIntentVersion:1
+              },
+              providerRequest:{provider:"buffer",method:"schedule",scheduleAt:$scheduleAt,reviewDeadline:$scheduleAt,reviewWindowMinutes:20,shareNowAllowed:false},
+              authority:{orchestrate:true,requestProviderWrite:true,authorizePublication:false,changeCopy:false,markPublished:false,readPrivateEvidence:false}
+            }' > .tmp/n8n-founder-content-request.json
+          status="$(curl -sS -D .tmp/n8n-founder-content-response.headers \
+            -o .tmp/n8n-founder-content-response.json -w '%{http_code}' \
+            -X POST "$webhook" \
+            -H "Authorization: Bearer $N8N_FOUNDER_CONTENT_PROOF_BEARER" \
+            -H 'Content-Type: application/json' \
+            -H "Idempotency-Key: $orchestration_id" \
+            -H 'X-FCR-Orchestration-Contract: fcr/n8n-founder-content-orchestration@v1' \
+            -H 'X-FCR-Social-Provider: buffer' \
+            -H "X-FCR-N8N-Identity-Challenge: $challenge" \
+            -H 'X-FCR-N8N-Identity-Contract: fcr/n8n-founder-content-runtime-identity@v1' \
+            -H "X-FCR-N8N-Expected-Workflow-Id: $N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_ID" \
+            -H "X-FCR-N8N-Expected-Workflow-Fingerprint: $N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT" \
+            -H "X-FCR-N8N-Expected-Runtime-Version: $N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION" \
+            --data-binary @.tmp/n8n-founder-content-request.json)"
+          test "$status" = 202
+          CHALLENGE="$challenge" ORCHESTRATION_ID="$orchestration_id" node --input-type=module <<'NODE'
+          import crypto from 'node:crypto';
+          import fs from 'node:fs';
+          const body = JSON.parse(fs.readFileSync('.tmp/n8n-founder-content-response.json', 'utf8'));
+          const rawHeaders = fs.readFileSync('.tmp/n8n-founder-content-response.headers', 'utf8');
+          const headers = new Map();
+          for (const line of rawHeaders.split(/\r?\n/)) {
+            const index = line.indexOf(':');
+            if (index > 0) headers.set(line.slice(0, index).trim().toLowerCase(), line.slice(index + 1).trim());
+          }
+          const assert = (condition, message) => { if (!condition) throw new Error(message); };
+          assert(body.orchestrationId === process.env.ORCHESTRATION_ID, 'orchestration id mismatch');
+          assert(body.provider === 'buffer', 'provider mismatch');
+          assert(body.state === 'scheduled', 'provider state mismatch');
+          assert(body.providerItemId === 'buffer-proof-post-1', 'provider item id missing');
+          assert(body.published === false, 'n8n may not claim published truth');
+          assert(headers.get('x-fcr-n8n-identity-challenge') === process.env.CHALLENGE, 'identity challenge mismatch');
+          assert(headers.get('x-fcr-n8n-identity-contract') === 'fcr/n8n-founder-content-runtime-identity@v1', 'identity contract mismatch');
+          assert(headers.get('x-fcr-n8n-workflow-id') === process.env.N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_ID, 'workflow id mismatch');
+          assert(headers.get('x-fcr-n8n-workflow-fingerprint') === process.env.N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT, 'workflow fingerprint mismatch');
+          assert(headers.get('x-fcr-n8n-runtime-version') === process.env.N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION, 'runtime version mismatch');
+          const message = [
+            'fcr/n8n-founder-content-runtime-identity@v1',
+            process.env.CHALLENGE,
+            process.env.N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_ID,
+            process.env.N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT,
+            process.env.N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION,
+            'fcr/n8n-founder-content-orchestration@v1',
+          ].join('\n');
+          const expected = crypto.createHmac('sha256', process.env.N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET).update(message).digest('hex');
+          assert(headers.get('x-fcr-n8n-identity-signature') === expected, 'identity signature mismatch');
+          fs.writeFileSync('n8n-founder-content-buffer-runtime-proof.json', JSON.stringify({
+            verified: true,
+            exactHeadSha: process.env.EXACT_SHA,
+            workflowId: process.env.N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_ID,
+            workflowFingerprint: process.env.N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT,
+            runtimeVersion: process.env.N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION,
+            orchestrationId: body.orchestrationId,
+            provider: body.provider,
+            state: body.state,
+            providerItemId: body.providerItemId,
+            published: false,
+            productionProviderMutation: false
+          }, null, 2) + '\n');
+          NODE
+
+      - name: Upload retained founder-content runtime proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: n8n-founder-content-buffer-${{ env.EXACT_SHA }}
+          path: n8n-founder-content-buffer-runtime-proof.json
+          if-no-files-found: error
+
+      - name: Dump runtime logs on failure
+        if: failure()
+        shell: bash
+        run: docker compose -f "$COMPOSE_FILE" --profile proof logs --no-color || true
+
+      - name: Tear down ephemeral runtime
+        if: always()
+        shell: bash
+        run: docker compose -f "$COMPOSE_FILE" --profile proof down -v --remove-orphans || true
