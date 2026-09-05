@@ -13,6 +13,7 @@ export const CHIEF_GOVERNANCE = Object.freeze({
   candidateContext: "Verify candidate ProofMode runtime with Playwright",
   candidateIntegrationId: null,
   candidateProducerTrust: "external-github-app-check-required",
+  postMergeOnlyDeploymentEnvironments: ["Cloudflare Production"],
   legacyPreMergeContexts: [
     "Verify live ProofMode MCP with Playwright",
     "Verify production ProofMode MCP with Playwright",
@@ -44,6 +45,7 @@ export interface TrustedGithubRulesetObservation {
   includedRefs: string[];
   excludedRefs: string[];
   requiredStatusChecks: GithubRequiredStatusCheck[];
+  requiredDeploymentEnvironments: string[];
   bypassActors: GithubBypassActorObservation[];
   providerFingerprint: string;
   observedAt: string;
@@ -147,6 +149,26 @@ function requiredStatusChecks(readback: JsonObject): GithubRequiredStatusCheck[]
   });
 }
 
+function requiredDeploymentEnvironments(readback: JsonObject): string[] {
+  const rules = requireArray(readback.rules, "ruleset rules");
+  const deploymentRules = rules.filter(
+    (rule) => isObject(rule) && cleanText(rule.type) === "required_deployments",
+  );
+  if (deploymentRules.length > 1) {
+    throw new Error("ruleset must not contain duplicate required_deployments rules");
+  }
+  if (deploymentRules.length === 0) return [];
+
+  const parameters = isObject((deploymentRules[0] as JsonObject).parameters)
+    ? ((deploymentRules[0] as JsonObject).parameters as JsonObject)
+    : {};
+  const environments = requireArray(
+    parameters.required_deployment_environments,
+    "required deployment environments",
+  ).map(cleanText).filter(Boolean);
+  return [...new Set(environments)];
+}
+
 function bypassActors(readback: JsonObject): GithubBypassActorObservation[] {
   const actors = requireArray(readback.bypass_actors, "ruleset bypass actors");
   return actors.map((actor) => {
@@ -210,6 +232,7 @@ export function createTrustedGithubRulesetObservation(input: {
     includedRefs: refs(input.readback, "include"),
     excludedRefs: refs(input.readback, "exclude"),
     requiredStatusChecks: requiredStatusChecks(input.readback),
+    requiredDeploymentEnvironments: requiredDeploymentEnvironments(input.readback),
     bypassActors: bypassActors(input.readback),
     providerFingerprint: sha256(input.readback),
     observedAt: new Date(input.observedAt).toISOString(),
@@ -269,6 +292,16 @@ export function planChiefProofModeRulesetMigration(input: {
   }
   if (exactHeadGate.bypassActors.length !== 0) {
     throw new Error("Chief exact-head candidate ruleset must have zero bypass actors");
+  }
+
+  for (const environment of CHIEF_GOVERNANCE.postMergeOnlyDeploymentEnvironments) {
+    const blockers = [governanceBoundary, exactHeadGate]
+      .filter((observation) => observation.requiredDeploymentEnvironments.includes(environment));
+    if (blockers.length > 0) {
+      throw new Error(
+        `post-merge-only deployment environment ${environment} is required pre-merge by ${blockers.map((entry) => entry.rulesetName).join(", ")}`,
+      );
+    }
   }
 
   const candidateIntegrationId = cleanId(CHIEF_GOVERNANCE.candidateIntegrationId);
