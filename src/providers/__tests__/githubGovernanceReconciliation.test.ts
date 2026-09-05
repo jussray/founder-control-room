@@ -134,7 +134,7 @@ describe("Chief GitHub governance reconciliation", () => {
     expect(() => planChiefProofModeRulesetMigration(input)).toThrow(/zero bypass actors/);
   });
 
-  it("observes required deployments and rejects post-merge production as a pre-merge rule", () => {
+  it("observes required deployments and does not deadlock before external producer proof", () => {
     const input = pair();
     input.exactHeadGate = observe(rulesetReadback({
       id: 20818149,
@@ -154,12 +154,13 @@ describe("Chief GitHub governance reconciliation", () => {
       ],
     }));
 
+    expect(CHIEF_GOVERNANCE.postMergeOnlyDeploymentEnvironments).toEqual(["Cloudflare Production"]);
     expect(input.exactHeadGate.requiredDeploymentEnvironments).toEqual([
       "Cloudflare Production",
       "proofmode-access-admin",
     ]);
     expect(() => planChiefProofModeRulesetMigration(input)).toThrow(
-      /post-merge-only deployment environment Cloudflare Production is required pre-merge/,
+      /external check producer integration is not yet observed/,
     );
   });
 
