@@ -65,12 +65,11 @@ FCR_V10_MAX_RUNTIME_AUTHORITY = "draft"
 FCR_V10_REGISTRY_RESOLUTION_REQUIRED = "true"
 FCR_V10_RECEIPT_PERSISTENCE_REQUIRED = "true"
 
-# Founder-content n8n is explicitly OFF in the checked-in production manifest.
-# Source capability does not activate orchestration. A separate founder-approved
-# provider configuration must install the private webhook/bearer/fingerprint/HMAC
-# bindings and only then change N8N_FOUNDER_CONTENT_ENABLED to true. Buffer is the
-# only runtime-eligible provider for this v1 lane; share-now remains forbidden.
-N8N_FOUNDER_CONTENT_ENABLED = "false"
+# Founder-approved production activation. Buffer is the only runtime-eligible
+# provider for this v1 lane; share-now remains forbidden. Canonical production
+# deployment must verify the four provider-held n8n bindings by name before any
+# Worker mutation, because they are part of [secrets].required while enabled.
+N8N_FOUNDER_CONTENT_ENABLED = "true"
 N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS = "buffer"
 N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_ID = "fcrFounderContentV1"
 N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION = "2.32.6"
@@ -94,17 +93,11 @@ required = [
   "FOUNDER_SIGNAL_ENGINE_MCP_TOKEN",
   "ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL",
   "FOUNDER_REVIEW_EMAIL_INGRESS_SECRET",
+  "N8N_FOUNDER_CONTENT_WEBHOOK_URL",
+  "N8N_FOUNDER_CONTENT_BEARER_TOKEN",
+  "N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT",
+  "N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET",
 ]
-
-# Conditional n8n founder-content activation bindings are intentionally NOT in
-# the unconditional required list above, so disabled deployments remain valid.
-# Before enabling the lane, install all four provider-held values below and read
-# them back by binding name only. Runtime code fails closed if any are absent or
-# malformed when N8N_FOUNDER_CONTENT_ENABLED=true:
-#   N8N_FOUNDER_CONTENT_WEBHOOK_URL
-#   N8N_FOUNDER_CONTENT_BEARER_TOKEN
-#   N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT
-#   N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET
 
 # With the duplicate API Worker deleted, this Worker is also the sole owner of
 # the reconciliation schedule. Keeping the cron here prevents silent loss of
