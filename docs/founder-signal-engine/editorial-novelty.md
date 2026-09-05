@@ -159,19 +159,49 @@ The system must preserve all of these:
 
 ## Pre-draft fingerprint gate
 
-`src/lib/founderContentFingerprintGate.ts` (`fcr/founder-content-fingerprint-gate@v1`) is a separate, earlier checkpoint from the novelty gate above. It runs **before** Chief drafts a candidate, not at approval time:
+`src/lib/founderContentFingerprintGate.ts` (`fcr/founder-content-fingerprint-gate@v1`) is a separate, earlier checkpoint from the novelty gate above. The live founder-authenticated preview surface is:
+
+```text
+POST /automation/conveyor/founder-content/pre-draft-fingerprint
+```
+
+It accepts only the candidate fields needed to evaluate the next story:
+
+```text
+project
+platform
+topic
+differentiatedThesis
+format
+formatRationale
+```
+
+Caller-supplied `history` is forbidden. FCR owns the recent-history readback, so an untrusted caller cannot manufacture a `PASS` by submitting a hand-built evidence set. The endpoint is read-only and its packet always carries:
+
+```text
+authority.draft = false
+authority.approve = false
+authority.schedule = false
+authority.publish = false
+```
+
+The intended pre-draft flow is:
 
 ```text
 Chief candidate (project, platform, topic, differentiated thesis, format + rationale)
--> FCR reads bounded recent LinkedIn + cross-social history
--> FCR rules out recently used angles/hooks/CTAs and recent formats by token similarity
--> PASS: history coverage proven, deliberate format + rationale present, thesis present, no high-overlap angle
--> HOLD: any of the above is missing or a recent angle overlaps too strongly
+-> founder-authenticated FCR pre-draft preview
+-> FCR reads bounded server-owned history
+-> FCR rules out recently used angles/hooks/CTAs and recent formats
+-> PASS: required history coverage proven, deliberate format + rationale present, thesis present, no exact recent angle reuse, no high-overlap angle
+-> HOLD: any required coverage is missing, an exact normalized topic/angle was recently used, or similarity is too high
+-> Chief may use PASS as non-authorizing evidence to begin drafting
 ```
 
-The gate is fail-closed by design: it defaults to `HOLD` whenever cross-social history coverage has not been proven, even when LinkedIn coverage is complete, because the current default `supabaseFounderContentFingerprintHistoryRepository` only proves LinkedIn (`coverage.otherSocial` is always `false` unless a caller supplies reconciled cross-social history). Like the novelty gate, its output packet carries `authority: { draft: false, approve: false, schedule: false, publish: false }` — a `PASS` is permission to start drafting, never approval, scheduling, or publication authority.
+The gate is fail-closed by design. `coverage.linkedin`, `coverage.otherSocial`, and `coverage.formatHistory` must all be proven. `formatHistory = false` is independently a `HOLD`, even if LinkedIn and other-social coverage are true. Exact normalized reuse of a recent `topic` or `angle` is also independently a `HOLD`; a differentiated thesis cannot dilute that exact reuse below the similarity threshold.
 
-This is a distinct fingerprint/contract from `promptOsPatternFingerprint`/`storyFingerprint` above: the fingerprint gate compares candidate thesis/topic/angle text directly (no persisted fingerprint), while the novelty gate compares deterministic SHA-256 identities against LinkedIn/founder-attested history at proposal-approval time. A `PASS` here does not skip or substitute for the novelty gate that still runs when the resulting proposal reaches `issueFounderContentApproval()`.
+The current default `supabaseFounderContentFingerprintHistoryRepository` proves only LinkedIn history and derives format coverage from those rows. It does not yet prove cross-social history, so the default server-owned route is expected to return `HOLD` until a reconciled server-owned cross-social history adapter is added. That is a truthful blocked state, not a reason to accept caller-provided history.
+
+This is a distinct fingerprint/contract from `promptOsPatternFingerprint`/`storyFingerprint` above. The pre-draft gate compares candidate thesis/topic/angle text directly, while the novelty gate compares deterministic SHA-256 identities against LinkedIn/founder-attested history at proposal-approval time. A `PASS` here never skips or substitutes for the novelty gate that still runs when the resulting proposal reaches `issueFounderContentApproval()`.
 
 ## Verification
 
@@ -183,7 +213,9 @@ npx vitest run \
   src/lib/__tests__/founderEditorialNovelty.publicationMemory.test.ts \
   src/lib/__tests__/founderContentApprovalStore.novelty.test.ts \
   src/lib/__tests__/founderContentFingerprintGate.test.ts \
+  src/lib/__tests__/founderContentFingerprintGate.failClosed.test.ts \
+  src/http/routes/__tests__/n8nConveyor.preDraftFingerprint.integration.test.ts \
   src/http/routes/__tests__/capabilities.founderContentObservation.integration.test.ts
 ```
 
-The exact PR head must still pass the repository's normal typecheck, lint, unit, Documentation Truth, CodeQL, and applicable Playwright/control-room gates before this source contract can be considered merge-ready.
+The exact PR head must still pass the repository's normal typecheck, lint, unit, Documentation Truth, provider-owned CodeQL, and applicable Playwright/control-room gates before this source contract can be considered merge-ready.

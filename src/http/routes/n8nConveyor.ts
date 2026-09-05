@@ -21,6 +21,11 @@ import {
   issueFounderContentApproval,
 } from '../../lib/founderContentApprovalStore.js';
 import {
+  FOUNDER_CONTENT_FINGERPRINT_GATE_CONTRACT,
+  evaluateFounderContentFingerprintGate,
+  type FounderContentFormat,
+} from '../../lib/founderContentFingerprintGate.js';
+import {
   founderContentOrchestrationReadiness,
   resolveFounderConveyorReadiness,
 } from '../../lib/n8nConveyorReadiness.js';
@@ -63,6 +68,13 @@ function stringArray(value: unknown): string[] | null {
 
 function capabilityPlan(value: unknown): V10CapabilityPlan | null {
   return isV10CapabilityPlan(value) ? value : null;
+}
+
+function founderContentFormat(value: unknown): FounderContentFormat | null {
+  const normalized = text(value).toUpperCase();
+  return normalized === 'VIDEO' || normalized === 'IMAGE' || normalized === 'TEXT'
+    ? normalized
+    : null;
 }
 
 n8nConveyorRouter.get('/', async (_req: FounderRequest, res) => {
@@ -120,6 +132,21 @@ n8nConveyorRouter.get('/', async (_req: FounderRequest, res) => {
       nextRuntimeGate: founderContentReadiness.bufferReadyForProbe
         ? 'Run one controlled FCR-authorized Buffer probe and persist provider-native readback bound to the exact runtime SHA.'
         : 'Configure the n8n founder-content transport/provider allowlist before consuming any one-shot approval.',
+      preDraftFingerprint: {
+        contract: FOUNDER_CONTENT_FINGERPRINT_GATE_CONTRACT,
+        route: '/founder-content/pre-draft-fingerprint',
+        routeImplemented: true,
+        readOnly: true,
+        serverOwnedHistoryRequired: true,
+        callerSuppliedHistoryAccepted: false,
+        currentDefaultCoverage: 'linkedin-only-until-server-reconciled-cross-social-history-is-available',
+        authority: {
+          draft: false,
+          approve: false,
+          schedule: false,
+          publish: false,
+        },
+      },
       directPublish: {
         contract: FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
         route: '/founder-content/publish-now',
@@ -186,6 +213,51 @@ n8nConveyorRouter.post('/advance', async (req: FounderRequest, res) => {
     ...result,
     contract: FOUNDER_CONVEYOR_CONTRACT,
   });
+});
+
+n8nConveyorRouter.post('/founder-content/pre-draft-fingerprint', async (req: FounderRequest, res) => {
+  const body = (req.body ?? {}) as JsonRecord;
+  const founder = req.founder;
+  if (!founder) return res.status(401).json({ ok: false, code: 'FOUNDER_SESSION_REQUIRED' });
+  if (Object.hasOwn(body, 'history')) {
+    return res.status(400).json({
+      ok: false,
+      code: 'CALLER_HISTORY_FORBIDDEN',
+      contract: FOUNDER_CONTENT_FINGERPRINT_GATE_CONTRACT,
+      reasons: ['Recent-history evidence is server-owned; callers may submit only the candidate being evaluated.'],
+      authority: { draft: false, approve: false, schedule: false, publish: false },
+    });
+  }
+
+  try {
+    const packet = await evaluateFounderContentFingerprintGate({
+      candidate: {
+        project: text(body.project),
+        platform: text(body.platform),
+        topic: text(body.topic),
+        differentiatedThesis: text(body.differentiatedThesis),
+        format: founderContentFormat(body.format),
+        formatRationale: text(body.formatRationale),
+      },
+    });
+    return res.status(200).json({
+      ok: true,
+      contract: FOUNDER_CONTENT_FINGERPRINT_GATE_CONTRACT,
+      packet,
+      authority: packet.authority,
+      nextGate: packet.gate === 'PASS'
+        ? 'Return this non-authorizing evidence to Chief before drafting; approval-time novelty review still remains required.'
+        : 'Do not draft from this candidate until the HOLD reasons are repaired with fresh server-owned history evidence.',
+    });
+  } catch (error) {
+    return res.status(503).json({
+      ok: false,
+      code: 'FINGERPRINT_HISTORY_UNAVAILABLE',
+      contract: FOUNDER_CONTENT_FINGERPRINT_GATE_CONTRACT,
+      reasons: [error instanceof Error ? error.message : 'pre-draft fingerprint history is unavailable'],
+      authority: { draft: false, approve: false, schedule: false, publish: false },
+    });
+  }
 });
 
 n8nConveyorRouter.post('/founder-content/approvals', async (req: FounderRequest, res) => {

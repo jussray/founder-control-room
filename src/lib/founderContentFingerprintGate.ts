@@ -217,16 +217,20 @@ export function evaluateFounderContentFingerprintHistory(
   const reasons: string[] = [];
   const thesis = text(candidate.differentiatedThesis);
   const formatRationale = text(candidate.formatRationale);
-  const candidateSemantic = `${text(candidate.topic)} ${thesis}`;
+  const candidateTopic = text(candidate.topic);
+  const normalizedCandidateTopic = normalize(candidateTopic);
+  const candidateSemantic = `${candidateTopic} ${thesis}`;
 
   if (!history.coverage.linkedin) reasons.push('Recent LinkedIn history has not been checked.');
   if (!history.coverage.otherSocial) reasons.push('Recent non-LinkedIn social history has not been checked.');
+  if (!history.coverage.formatHistory) reasons.push('Recent format history has not been checked.');
   if (!thesis) reasons.push('One differentiated thesis is required before drafting.');
   if (!candidate.format) reasons.push('A deliberate VIDEO, IMAGE, or TEXT format choice is required before drafting.');
   if (candidate.format && !formatRationale) reasons.push('The format choice requires an explicit rationale before drafting.');
 
   let closestMatchId: string | null = null;
   let closestSimilarity = 0;
+  let exactRecentAngleMatchId: string | null = null;
   const ruledOutAngles: FounderContentFingerprintPacket['ruledOutAngles'] = [];
 
   for (const item of history.records) {
@@ -235,6 +239,14 @@ export function evaluateFounderContentFingerprintHistory(
     if (score > closestSimilarity) {
       closestSimilarity = score;
       closestMatchId = item.id;
+    }
+
+    if (
+      !exactRecentAngleMatchId
+      && normalizedCandidateTopic
+      && [item.topic, item.angle].some((value) => normalize(value) === normalizedCandidateTopic)
+    ) {
+      exactRecentAngleMatchId = item.id;
     }
 
     const angle = item.angle || item.thesis || item.topic;
@@ -250,6 +262,10 @@ export function evaluateFounderContentFingerprintHistory(
   }
 
   const roundedSimilarity = Number(closestSimilarity.toFixed(4));
+  if (exactRecentAngleMatchId) {
+    reasons.push('The proposed topic/angle exactly repeats a recently used angle.');
+    closestMatchId = exactRecentAngleMatchId;
+  }
   if (roundedSimilarity >= HIGH_SIMILARITY) {
     reasons.push('The proposed thesis/topic overlaps too strongly with a recently used angle.');
   }
@@ -264,7 +280,7 @@ export function evaluateFounderContentFingerprintHistory(
     candidate: {
       project: text(candidate.project),
       platform: text(candidate.platform).toLowerCase(),
-      topic: text(candidate.topic),
+      topic: candidateTopic,
       differentiatedThesis: thesis,
       format: candidate.format,
       formatRationale,
