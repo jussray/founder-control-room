@@ -88,6 +88,7 @@ describe('portable founder approval packet validation', () => {
 
     expect(result).toEqual(expect.objectContaining({
       ok: true,
+      founderApproved: true,
       executionAuthorized: false,
       consumptionRequired: true,
     }));
@@ -241,13 +242,14 @@ describe('portable founder approval packet validation', () => {
     expect(deps.verify).not.toHaveBeenCalled();
   });
 
-  it('accepts an authenticated deny decision while preserving zero execution authority', async () => {
+  it('validates an authenticated denial without making it approvable or consumable for execution', async () => {
     const result = await validatePortableFounderApprovalPacket(packet({ decision: 'deny' }), context());
 
     expect(result).toEqual(expect.objectContaining({
       ok: true,
+      founderApproved: false,
       executionAuthorized: false,
-      consumptionRequired: true,
+      consumptionRequired: false,
       packet: expect.objectContaining({ decision: 'deny' }),
     }));
   });
