@@ -20,6 +20,7 @@ const HASH = /^[0-9a-f]{64}$/i;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const OWNED_REPO = /^jussray\/[A-Za-z0-9._-]+$/;
 const LINKEDIN_AUTHOR_URN = /^urn:li:(person|organization):[A-Za-z0-9_-]+$/;
+const LINKEDIN_API_VERSION = /^20\d{4}$/;
 const MAX_CURRENT_YOU_AGE_MS = 24 * 60 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 
@@ -273,6 +274,9 @@ function validateAuthority(
   if (!LINKEDIN_AUTHOR_URN.test(config.authorUrn)) {
     reasons.push('LINKEDIN_AUTHOR_URN is not configured as a valid member or organization URN');
   }
+  if (config.apiVersion && !LINKEDIN_API_VERSION.test(config.apiVersion)) {
+    reasons.push('LINKEDIN_API_VERSION is not configured as a valid YYYYMM version');
+  }
 
   if (reasons.length > 0) throw invalid(reasons);
 
@@ -474,7 +478,9 @@ export async function dispatchFirstPartyFounderContentPublishNow(
     authority = validateAuthority(input, options.env ?? process.env, now);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'invalid founder-content authorization';
-    const code = message.includes('LINKEDIN_ACCESS_TOKEN') || message.includes('LINKEDIN_AUTHOR_URN')
+    const code = message.includes('LINKEDIN_ACCESS_TOKEN')
+      || message.includes('LINKEDIN_AUTHOR_URN')
+      || message.includes('LINKEDIN_API_VERSION')
       ? 'LINKEDIN_NOT_CONFIGURED'
       : 'INVALID_AUTHORIZATION';
     return blocked(code, code === 'LINKEDIN_NOT_CONFIGURED' ? 503 : 400, [message]);
