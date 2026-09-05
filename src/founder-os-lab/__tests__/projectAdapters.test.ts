@@ -229,6 +229,6 @@ describe('Se’kret Bip Founder OS project adapter', () => {
     expect(crm.truth.blocked.join(' ')).toContain(
       'hubspot is not an allowed sekret-bip preview provider',
     );
-    expect(plan.authority.executionAllowed).toBe(false);
+    expect(crm.authority.executionAllowed).toBe(false);
   });
 });
