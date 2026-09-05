@@ -176,6 +176,16 @@ test('serves the owned Juss Rayy identity from Pages with machine-readable ident
   await expect(page.locator('main[itemprop="mainEntity"][itemtype="https://schema.org/Person"]')).toHaveCount(1);
   await expect(page.locator('link[itemprop="sameAs"][href="https://github.com/jussray"]')).toHaveCount(1);
   await expect(page.locator('link[itemprop="sameAs"][href="https://www.linkedin.com/in/juss-rayy-13ba691a1"]')).toHaveCount(1);
+  await expect(page.getByRole('heading', { level: 2, name: 'Support the work' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Sponsor on GitHub →' })).toHaveAttribute(
+    'href',
+    'https://github.com/sponsors/jussray',
+  );
+  await expect(page.getByRole('link', { name: 'Buy me a coffee' })).toHaveAttribute(
+    'href',
+    'https://buymeacoffee.com/jussrayy',
+  );
+  await expect(page.getByText(/does not represent an investment or ownership interest/i)).toBeVisible();
   await expect(page.getByRole('heading', { level: 2, name: 'Juss Receipts' })).toBeVisible();
 
   mkdirSync(outputDir, { recursive: true });
@@ -187,6 +197,7 @@ test('serves the owned Juss Rayy identity from Pages with machine-readable ident
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('heading', { level: 1, name: 'Juss Rayy' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Public identity links' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Support links' })).toBeVisible();
   const hasHorizontalOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
   );
