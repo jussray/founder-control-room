@@ -47,7 +47,7 @@ CANONICAL = {
 
 
 class FounderContentSupersessionTest(unittest.TestCase):
-    def test_canonical_weaker_signal_supersedes_without_deleting_history(self):
+    def test_canonical_metric_change_supersedes_without_inventing_expectation_comparison(self):
         receipt = mod.build_supersession_receipt(copy.deepcopy(CANONICAL))
         self.assertEqual(receipt['contract'], 'fcr/founder-content-supersession@v3')
         self.assertEqual(receipt['authority'], 'observation_only')
@@ -56,7 +56,9 @@ class FounderContentSupersessionTest(unittest.TestCase):
             'engagements': 0,
             'engagement_rate_pp': -3.77,
         })
-        self.assertEqual(receipt['surprise'], 'WEAKER_THAN_EXPECTED')
+        self.assertEqual(receipt['metric_change'], 'IMPRESSIONS_UP_WITHOUT_ENGAGEMENTS')
+        self.assertEqual(receipt['surprise'], 'UNKNOWN')
+        self.assertEqual(receipt['expectation_evaluation'], 'NOT_EVALUATED_UNSTRUCTURED_V3')
         self.assertEqual(receipt['evidence'][0]['metrics']['engagement_rate'], 7.41)
         self.assertEqual(receipt['evidence'][1]['metrics']['engagement_rate'], 3.64)
         self.assertEqual(receipt['evidence'][0]['evidence_state'], 'ATTESTED_HISTORICAL')
@@ -66,6 +68,31 @@ class FounderContentSupersessionTest(unittest.TestCase):
         self.assertEqual(receipt['predecessor_receipt_id'], 'SUP-0123456789abcdef')
         self.assertEqual(receipt['provenance']['source_digest_verification'], 'UNVERIFIED_INPUT_V3')
         self.assertEqual(receipt['provenance']['claim_source_binding'], 'NOT_LOCKED_V3')
+
+    def test_free_form_expectation_never_changes_factual_metric_classification(self):
+        first_payload = copy.deepcopy(CANONICAL)
+        first_payload['expectation'] = 'Engagement rate should double.'
+        second_payload = copy.deepcopy(CANONICAL)
+        second_payload['expectation'] = 'Any increase would be amazing.'
+
+        first = mod.build_supersession_receipt(first_payload)
+        second = mod.build_supersession_receipt(second_payload)
+
+        self.assertEqual(first['metric_change'], 'IMPRESSIONS_UP_WITHOUT_ENGAGEMENTS')
+        self.assertEqual(second['metric_change'], 'IMPRESSIONS_UP_WITHOUT_ENGAGEMENTS')
+        self.assertEqual(first['surprise'], 'UNKNOWN')
+        self.assertEqual(second['surprise'], 'UNKNOWN')
+        self.assertEqual(first['expectation_evaluation'], 'NOT_EVALUATED_UNSTRUCTURED_V3')
+        self.assertEqual(second['expectation_evaluation'], 'NOT_EVALUATED_UNSTRUCTURED_V3')
+        self.assertNotEqual(first['receipt_id'], second['receipt_id'])
+
+    def test_metric_change_reports_rate_direction_without_calling_it_surprise(self):
+        payload = copy.deepcopy(CANONICAL)
+        payload['current']['impressions'] = 100
+        payload['current']['engagements'] = 10
+        receipt = mod.build_supersession_receipt(payload)
+        self.assertEqual(receipt['metric_change'], 'ENGAGEMENT_RATE_UP')
+        self.assertEqual(receipt['surprise'], 'UNKNOWN')
 
     def test_rejects_non_sup_predecessor_prefix_before_normalization(self):
         payload = copy.deepcopy(CANONICAL)
@@ -111,6 +138,8 @@ class FounderContentSupersessionTest(unittest.TestCase):
         self.assertEqual(receipt['evidence'][0]['evidence_state'], 'ATTESTED_HISTORICAL')
         self.assertEqual(receipt['evidence'][1]['evidence_state'], 'ATTESTED_CURRENT')
         self.assertEqual(receipt['supersession']['current_claim_state'], 'ATTESTED_CURRENT')
+        self.assertEqual(receipt['surprise'], 'UNKNOWN')
+        self.assertIn('metric_change', receipt)
         self.assertNotIn('VERIFIED_CURRENT', repr(receipt))
         self.assertNotIn('VERIFIED_HISTORICAL', repr(receipt))
 
