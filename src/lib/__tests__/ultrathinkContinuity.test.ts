@@ -12,6 +12,7 @@ const SHA_B = 'b'.repeat(40);
 const HASH_A = `sha256:${'a'.repeat(64)}`;
 const HASH_B = `sha256:${'b'.repeat(64)}`;
 const NOW = new Date('2026-09-05T16:00:00.000Z');
+const VERIFIED_EVIDENCE = { checksum: async () => HASH_A };
 
 function record(
   continuationId: string,
@@ -126,10 +127,20 @@ describe('ULTRATHINK non-mutating continuity core', () => {
     expect(result.continuityMayAuthorizeAction).toBe(false);
   });
 
+  it('blocks an otherwise active checkpoint until evidence is independently resolvable', async () => {
+    const checkpoint = record('CNT-NO-RESOLVER');
+    const result = await inspectUltrathinkContinuity(new MemoryReader([checkpoint]), checkpoint.continuationId, {
+      namespace: 'chief', missionId: 'CHIEF-143', now: new Date('2026-09-05T15:30:00.000Z'),
+    });
+
+    expect(result.classification).toBe('BLOCKED');
+    expect(result.reasons).toEqual(['evidence_resolver_required']);
+  });
+
   it('marks an expired record stale when no fresh authority observation is supplied', async () => {
     const checkpoint = record('CNT-STALE', { freshnessPolicyMs: 5 * 60 * 1000 });
     const result = await inspectUltrathinkContinuity(new MemoryReader([checkpoint]), checkpoint.continuationId, {
-      namespace: 'chief', missionId: 'CHIEF-143', now: NOW,
+      namespace: 'chief', missionId: 'CHIEF-143', now: NOW, evidenceResolver: VERIFIED_EVIDENCE,
     });
 
     expect(result.classification).toBe('STALE');
@@ -142,6 +153,7 @@ describe('ULTRATHINK non-mutating continuity core', () => {
       namespace: 'chief',
       missionId: 'CHIEF-143',
       now: NOW,
+      evidenceResolver: VERIFIED_EVIDENCE,
       currentAuthority: {
         authorityIdentity: checkpoint.authorityIdentity,
         observedAt: NOW.toISOString(),
@@ -158,6 +170,7 @@ describe('ULTRATHINK non-mutating continuity core', () => {
     const result = await inspectUltrathinkContinuity(new MemoryReader([checkpoint]), checkpoint.continuationId, {
       namespace: 'chief',
       missionId: 'CHIEF-143',
+      evidenceResolver: VERIFIED_EVIDENCE,
       currentAuthority: {
         authorityIdentity: { ...checkpoint.authorityIdentity, sha: SHA_B },
         observedAt: NOW.toISOString(),
