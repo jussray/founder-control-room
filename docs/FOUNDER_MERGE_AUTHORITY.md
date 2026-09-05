@@ -102,6 +102,12 @@ A correct in-app founder-final review engine does not prove that GitHub's web/AP
 
 Do not claim repository-wide GitHub governance is fixed merely because the FCR source gate is strong. Conversely, a GitHub merge that occurred outside the in-app FCR path does not prove the in-app deterministic-review + founder-final contract was satisfied.
 
+### Chief candidate-proof producer boundary
+
+For Chief pre-merge ProofMode authority, a required status-check name plus GitHub Actions integration `15368` is **not** sufficient evidence of the workflow file or event that produced the check. PR-controlled Chief Actions could otherwise manufacture the same context under the same GitHub Actions App.
+
+FCR governance reconciliation therefore remains fail-closed until the candidate ProofMode context is bound to a provider-observed external GitHub App/check producer that is unavailable to PR-authored Chief Actions. It must also reject a pre-merge ruleset that requires the post-merge-only `Cloudflare Production` deployment environment. Observation or planning does not itself grant GitHub ruleset mutation, merge, deploy, or provider authority.
+
 ## Documentation truth
 
 A merge is a truth transition. Documentation that describes current architecture, authority, provider topology, publication policy, capability state, launch state, or blockers must not remain current by inertia after the underlying state changes.

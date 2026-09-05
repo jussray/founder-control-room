@@ -1,9 +1,10 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the current evidence-authority Playwright federation, privileged production-witness changes, retained FCR repository-provider governance invariants, GitHub App credential transport normalization, and the Chief governance observation/reconciliation boundary to truthful documentation without claiming live GitHub, Chief ruleset mutation, StoryEngine, Cloudflare, deployment, merge, publication, database, secret, billing, or destructive-action proof.",
+  "purpose": "Bind the current evidence-authority Playwright federation, privileged production-witness changes, retained FCR repository-provider governance invariants, GitHub App credential transport normalization, deterministic review witness publication boundary, and the Chief governance observation/reconciliation boundary to truthful documentation without claiming live GitHub, Chief ruleset mutation, StoryEngine, Cloudflare, deployment, merge, publication, database, secret, billing, or destructive-action proof.",
   "domains": [
     "repository-provider",
-    "evidence-authority"
+    "evidence-authority",
+    "merge-authority"
   ],
   "changes": [
     {
@@ -28,7 +29,8 @@
     {
       "path": "src/providers/githubGovernanceReconciliation.ts",
       "claims": [
-        "src/providers/githubGovernanceReconciliation.ts must keep Chief governance reconciliation pinned to jussray/chief-ai-machine and ruleset IDs 20818149 and 21261587, preserve required-check integration_id producer identity and unrelated checks, require complete bypass-state evidence, and refuse to describe a read-then-PUT update of existing rulesets as concurrency-safe when no atomic provider precondition is available.",
+        "src/providers/githubGovernanceReconciliation.ts must keep Chief governance reconciliation pinned to jussray/chief-ai-machine and ruleset IDs 20818149 and 21261587, preserve required-check integration_id producer identity and unrelated checks, require complete bypass-state and required-deployment evidence, and refuse to describe a read-then-PUT update of existing rulesets as concurrency-safe when no atomic provider precondition is available.",
+        "src/providers/githubGovernanceReconciliation.ts must not treat GitHub Actions integration 15368 as sufficient provenance for the intended Chief candidate ProofMode workflow; candidate ruleset planning remains fail-closed until an external GitHub App/check producer unavailable to PR-authored Chief Actions is provider-observed and bound, and post-merge-only Cloudflare Production must not be required by the pre-merge candidate rulesets.",
         "src/providers/githubGovernanceReconciliation.ts may return NO_CHANGE_REQUIRED only for already-correct observed provider state; a required live change remains BLOCKED_PROVIDER_ATOMIC_PRECONDITION_UNAVAILABLE and neither disposition grants provider mutation, merge, deploy, or execution authority."
       ]
     },
@@ -36,6 +38,12 @@
       "path": "src/providers/trustedGithubGovernanceObserver.ts",
       "claims": [
         "src/providers/trustedGithubGovernanceObserver.ts must observe only the fixed Chief repository and fixed governance rulesets through FCR's repository-scoped GitHub App installation-token path, reject caller-supplied PAT/token authority, require complete provider readback suitable for fingerprinting, and remain evidence-only rather than minting ruleset-mutation, merge, deploy, or execution authority."
+      ]
+    },
+    {
+      "path": "src/review/deterministicReviewWitnessPublisher.ts",
+      "claims": [
+        "src/review/deterministicReviewWitnessPublisher.ts may publish only a derived deterministic review witness through the repository-scoped GitHub App authority, must preserve a sanitized durable failure receipt when provider authentication/publication fails while rethrowing the original failure, and must never convert publication, credential presence, or a same-named check into founder-final, merge, deploy, provider-policy, or self-certification authority."
       ]
     },
     {
