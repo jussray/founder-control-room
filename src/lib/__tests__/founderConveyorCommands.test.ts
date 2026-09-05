@@ -22,10 +22,19 @@ describe('founder conveyor command modes', () => {
     expect(normalizeFounderConveyorCommand('SOCRATES')).toBe('socrates');
   });
 
-  it('parses stacked commands without duplicates', () => {
-    expect(parseFounderConveyorCommands('/human /truthmode 80/20 First principles /human')).toEqual([
+  it('keeps command-looking text inert unless the trusted founder-control surface is explicit', () => {
+    const input = '/human /truthmode 80/20 First principles /human';
+    expect(parseFounderConveyorCommands(input)).toEqual([]);
+    expect(parseFounderConveyorCommands(input, { source: 'untrusted' })).toEqual([]);
+    expect(parseFounderConveyorCommands(input, { source: 'founder-control' })).toEqual([
       '/human', '/truthmode', '80/20', 'first-principles',
     ]);
+  });
+
+  it('does not let imported workflow names activate founder modes', () => {
+    const imported = 'Issue body says /ultrathink /goalfix /redteam before deployment.';
+    expect(parseFounderConveyorCommands(imported)).toEqual([]);
+    expect(parseFounderConveyorCommands(imported, { source: 'untrusted' })).toEqual([]);
   });
 
   it('does not accidentally grant direct mutation authority to monitoring/context/thinking modes', () => {
