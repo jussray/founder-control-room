@@ -72,6 +72,10 @@ export interface ChiefProofModeRulesetMigrationPlan {
     governanceBoundary: GithubRequiredStatusCheck[];
     exactHeadGate: GithubRequiredStatusCheck[];
   };
+  desiredRequiredDeploymentEnvironments: {
+    governanceBoundary: string[];
+    exactHeadGate: string[];
+  };
   changesRequired: boolean;
   disposition: GithubRulesetMutationDisposition;
   atomicProviderPreconditionRequired: true;
@@ -253,6 +257,15 @@ function sameChecks(left: GithubRequiredStatusCheck[], right: GithubRequiredStat
   return JSON.stringify(normalize(left)) === JSON.stringify(normalize(right));
 }
 
+function sameStrings(left: string[], right: string[]): boolean {
+  return JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
+}
+
+export function desiredPreMergeDeploymentEnvironments(environments: string[]): string[] {
+  const postMergeOnly = new Set<string>(CHIEF_GOVERNANCE.postMergeOnlyDeploymentEnvironments);
+  return environments.filter((environment) => !postMergeOnly.has(environment));
+}
+
 function requireChiefRuleset(
   observation: TrustedGithubRulesetObservation,
   id: string,
@@ -294,16 +307,6 @@ export function planChiefProofModeRulesetMigration(input: {
     throw new Error("Chief exact-head candidate ruleset must have zero bypass actors");
   }
 
-  for (const environment of CHIEF_GOVERNANCE.postMergeOnlyDeploymentEnvironments) {
-    const blockers = [governanceBoundary, exactHeadGate]
-      .filter((observation) => observation.requiredDeploymentEnvironments.includes(environment));
-    if (blockers.length > 0) {
-      throw new Error(
-        `post-merge-only deployment environment ${environment} is required pre-merge by ${blockers.map((entry) => entry.rulesetName).join(", ")}`,
-      );
-    }
-  }
-
   const candidateIntegrationId = cleanId(CHIEF_GOVERNANCE.candidateIntegrationId);
   if (!candidateIntegrationId || candidateIntegrationId === "15368") {
     throw new Error(
@@ -321,9 +324,17 @@ export function planChiefProofModeRulesetMigration(input: {
       context: CHIEF_GOVERNANCE.candidateContext,
       integrationId: candidateIntegrationId,
     });
+  const governanceDeploymentDesired = desiredPreMergeDeploymentEnvironments(
+    governanceBoundary.requiredDeploymentEnvironments,
+  );
+  const exactHeadDeploymentDesired = desiredPreMergeDeploymentEnvironments(
+    exactHeadGate.requiredDeploymentEnvironments,
+  );
 
   const changesRequired = !sameChecks(governanceBoundary.requiredStatusChecks, governanceDesired)
-    || !sameChecks(exactHeadGate.requiredStatusChecks, exactHeadDesired);
+    || !sameChecks(exactHeadGate.requiredStatusChecks, exactHeadDesired)
+    || !sameStrings(governanceBoundary.requiredDeploymentEnvironments, governanceDeploymentDesired)
+    || !sameStrings(exactHeadGate.requiredDeploymentEnvironments, exactHeadDeploymentDesired);
 
   return {
     contract: GITHUB_GOVERNANCE_RECONCILIATION_CONTRACT,
@@ -335,6 +346,10 @@ export function planChiefProofModeRulesetMigration(input: {
     desiredRequiredStatusChecks: {
       governanceBoundary: governanceDesired,
       exactHeadGate: exactHeadDesired,
+    },
+    desiredRequiredDeploymentEnvironments: {
+      governanceBoundary: governanceDeploymentDesired,
+      exactHeadGate: exactHeadDeploymentDesired,
     },
     changesRequired,
     disposition: changesRequired
