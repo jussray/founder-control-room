@@ -16,6 +16,12 @@ V3 expectation text is narrative, not a structured threshold/direction
 contract. The receipt therefore reports factual metric movement separately and
 must keep expectation-relative surprise UNKNOWN until a future structured
 expectation contract can be evaluated deterministically.
+
+The v2 input contract also requires an explicit as-of horizon. Prior/current
+observations later than that horizon fail closed so a typo or replayed future
+timestamp cannot become ATTESTED_CURRENT merely because it sorts after history.
+The horizon itself is caller-attested in V3; it is bound into receipt identity
+but is not promoted into independently verified clock evidence.
 """
 from __future__ import annotations
 
@@ -28,11 +34,12 @@ from pathlib import Path
 from typing import Any
 
 CONTRACT = "fcr/founder-content-supersession@v3"
-INPUT_CONTRACT = "fcr/founder-content-supersession-input@v1"
+INPUT_CONTRACT = "fcr/founder-content-supersession-input@v2"
 AUTHORITY = "observation_only"
 CANONICALIZATION = "fcr-json-v1"
 SURPRISES = {"UNKNOWN"}
 EXPECTATION_EVALUATION = "NOT_EVALUATED_UNSTRUCTURED_V3"
+OBSERVATION_HORIZON_STATE = "ATTESTED_INPUT_V2"
 METRIC_CHANGES = {
     "NO_CHANGE",
     "ENGAGEMENTS_UP_WITHOUT_IMPRESSIONS",
@@ -138,8 +145,13 @@ def build_supersession_receipt(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(prior, dict) or not isinstance(current, dict):
         raise ValueError("prior and current observations required")
 
+    as_of_raw, as_of = _observed_at(payload.get("as_of"), "as_of")
     prior_at_raw, prior_at = _observed_at(prior.get("observed_at"), "prior.observed_at")
     current_at_raw, current_at = _observed_at(current.get("observed_at"), "current.observed_at")
+    if prior_at > as_of:
+        raise ValueError("prior.observed_at must not be later than as_of")
+    if current_at > as_of:
+        raise ValueError("current.observed_at must not be later than as_of")
     if current_at <= prior_at:
         raise ValueError("current.observed_at must be later than prior.observed_at")
 
@@ -184,10 +196,6 @@ def build_supersession_receipt(payload: dict[str, Any]) -> dict[str, Any]:
     if metric_change not in METRIC_CHANGES:
         raise AssertionError("invalid metric change classification")
 
-    # V3 accepts narrative expectation text but has no structured threshold or
-    # direction semantics. Any stronger/weaker/as-expected label would invent
-    # an evaluation that did not occur, so expectation-relative surprise stays
-    # UNKNOWN until a successor contract defines deterministic expectation data.
     surprise = "UNKNOWN"
     if surprise not in SURPRISES:
         raise AssertionError("invalid surprise classification")
@@ -200,6 +208,8 @@ def build_supersession_receipt(payload: dict[str, Any]) -> dict[str, Any]:
             "platform": platform,
             "post_fingerprint": post_fingerprint,
         },
+        "as_of": as_of_raw,
+        "observation_horizon_state": OBSERVATION_HORIZON_STATE,
         "expectation": expectation,
         "expectation_evaluation": EXPECTATION_EVALUATION,
         "evidence": [
@@ -245,6 +255,7 @@ def build_supersession_receipt(payload: dict[str, Any]) -> dict[str, Any]:
             "source_digests_present": True,
             "source_digest_verification": "UNVERIFIED_INPUT_V3",
             "claim_source_binding": "NOT_LOCKED_V3",
+            "observation_horizon_verification": OBSERVATION_HORIZON_STATE,
         },
     }
     if predecessor:
