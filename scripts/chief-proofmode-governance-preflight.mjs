@@ -16,6 +16,7 @@ export const REQUIRED_APP_PERMISSIONS = Object.freeze({
   checks: 'write',
   contents: 'read',
   metadata: 'read',
+  pull_requests: 'read',
 });
 
 const API_ROOT = 'https://api.github.com';
