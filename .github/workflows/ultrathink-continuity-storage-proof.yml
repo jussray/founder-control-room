@@ -25,6 +25,7 @@ jobs:
     if: github.repository == 'jussray/founder-control-room' && github.ref == 'refs/heads/codex/provider-neutral-founder-content-contracts'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment: production
     steps:
       - name: Check out exact continuity carrier head
         uses: actions/checkout@v4
