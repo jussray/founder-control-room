@@ -94,25 +94,31 @@ function parseTime(value: unknown, label: string): number {
 function deterministicApprovalId({
   founderUserId,
   platform,
-  publicPatternFingerprint,
+  publicCopyFingerprint,
+  approvedAt,
 }: {
   founderUserId: string;
   platform: string;
-  publicPatternFingerprint: string;
+  publicCopyFingerprint: string;
+  approvedAt: string;
 }): string {
-  // Deliberately excludes Current You intent id/version: the reservation
-  // exists to serialize duplicate dispatch of the same public copy, and an
-  // intent rotation between two proposals of identical draft_text (a new
-  // authentication/session, an unrelated re-issued intent) must not mint a
-  // second, independently issuable/claimable reservation for that copy.
-  // Intent identity is still recorded on the authorization record itself
-  // (see canonicalIssue), just not part of the dedup key.
+  // The canonical public-copy fingerprint remains the content identity, but
+  // approval rows are immutable historical one-shot records. A later fresh
+  // approval for unchanged copy must therefore receive a new row identity once
+  // the previous editorial-pattern lease is inactive instead of colliding with
+  // the old primary key forever. The server-observed issuance timestamp versions
+  // that row identity. Concurrent or near-concurrent duplicate authority is
+  // still serialized by the database-owned founder/platform/editorial-pattern
+  // reservation, so changing the row id does not weaken the active duplicate
+  // publication boundary. Current You intent id/version remain recorded on the
+  // authorization itself and are intentionally excluded from this identity.
   const digest = createHash('sha256')
     .update(JSON.stringify({
-      contract: 'fcr/founder-content-approval-reservation@v4',
+      contract: 'fcr/founder-content-approval-reservation@v5',
       founderUserId: text(founderUserId),
       platform: text(platform).toLowerCase(),
-      publicPatternFingerprint: text(publicPatternFingerprint).toLowerCase(),
+      publicCopyFingerprint: text(publicCopyFingerprint).toLowerCase(),
+      approvedAt: new Date(parseTime(approvedAt, 'approval issuance time')).toISOString(),
     }))
     .digest('hex');
   return `fca:${digest}`;
@@ -380,17 +386,14 @@ export async function issueFounderContentApproval({
       `FOUNDER_EDITORIAL_REPETITION_BLOCKED: story=${novelty.storyFingerprint} closest=${novelty.closestMatchId ?? 'unknown'} similarity=${novelty.closestSimilarity}`,
     );
   }
+  const approvedAt = new Date(parseTime(now, 'now')).toISOString();
   const approvalId = deterministicApprovalId({
     founderUserId,
     platform,
-    // Exact-copy identity stays separate from editorial-pattern identity.
-    // The deterministic approval_id continues to serialize byte-identical
-    // canonical public copy, while the repository transaction independently
-    // reserves novelty.promptOsPatternFingerprint so differently worded drafts
-    // with the same active thesis/hook cannot both hold live authority.
-    publicPatternFingerprint: novelty.publicCopyFingerprint,
+    publicCopyFingerprint: novelty.publicCopyFingerprint,
+    approvedAt,
   });
-  const issued = canonicalIssue({ proposal, founderUserId, now, approvalId });
+  const issued = canonicalIssue({ proposal, founderUserId, now: approvedAt, approvalId });
   const store = repository ?? await defaultRepository();
   const persisted = await store.issue({
     ...issued,
@@ -398,7 +401,7 @@ export async function issueFounderContentApproval({
     editorialPatternFingerprint: novelty.promptOsPatternFingerprint,
   });
   if (!persisted) {
-    throw new Error('authoritative founder-content approval could not be persisted; exact public copy or active editorial pattern is already reserved, or the store rejected issuance');
+    throw new Error('authoritative founder-content approval could not be persisted; active editorial pattern is already reserved, the exact issuance row already exists, or the store rejected issuance');
   }
   return issued;
 }
