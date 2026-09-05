@@ -59,7 +59,8 @@ export interface FounderProofAuditLifecycleReceipt {
   highestTruthPlane: FounderProofAuditTruthPlane;
   recognizedOutcome: string;
   claims: {
-    commerceExecutionVerified: boolean;
+    commerceExecutionObserved: boolean;
+    commercePaymentVerified: boolean;
     auditExecutionVerified: boolean;
     deliverySimulationVerified: boolean;
     deliveryOutcomeVerified: boolean;
@@ -178,7 +179,8 @@ export function evaluateFounderProofAuditLifecycle(
 
   if (errors.length > 0) reject(errors);
 
-  const commerceExecutionVerified = input.mode === 'LIVE' && input.commerce.status === 'PAYMENT_VERIFIED';
+  const commerceExecutionObserved = input.mode === 'LIVE' && input.commerce.status !== 'NOT_EXECUTED';
+  const commercePaymentVerified = input.mode === 'LIVE' && input.commerce.status === 'PAYMENT_VERIFIED';
   const auditExecutionVerified = input.audit.status === 'COMPLETED';
   const deliverySimulationVerified = input.mode === 'DRY_RUN' && input.delivery.status === 'SIMULATED';
   const deliveryOutcomeVerified = input.mode === 'LIVE'
@@ -215,15 +217,19 @@ export function evaluateFounderProofAuditLifecycle(
     highestTruthPlane = 'AUDIT_EXECUTION';
     recognizedOutcome = 'Audit execution is in progress; completion and delivery are not proven.';
     nextGate = 'Complete the audit and preserve exact completion evidence.';
-  } else if (input.mode === 'LIVE' && commerceExecutionVerified && input.intake.status === 'VALIDATED') {
+  } else if (input.mode === 'LIVE' && commercePaymentVerified && input.intake.status === 'VALIDATED') {
     disposition = 'READY_FOR_AUDIT';
     highestTruthPlane = 'COMMERCE_EXECUTION';
     recognizedOutcome = 'Shopify payment execution and bounded intake were verified; audit completion and delivery are not proven.';
     nextGate = 'Execute the bounded audit without expanding authority.';
-  } else if (input.mode === 'LIVE' && commerceExecutionVerified) {
+  } else if (input.mode === 'LIVE' && commercePaymentVerified) {
     highestTruthPlane = 'COMMERCE_EXECUTION';
     recognizedOutcome = 'Shopify payment execution was verified; audit intake, completion, and delivery are not proven.';
     nextGate = 'Validate bounded intake without collecting secrets.';
+  } else if (input.mode === 'LIVE' && commerceExecutionObserved) {
+    highestTruthPlane = 'COMMERCE_EXECUTION';
+    recognizedOutcome = 'Shopify order creation was observed; payment is not verified, so audit execution is not authorized by this lifecycle.';
+    nextGate = 'Independently verify Shopify payment before starting the live audit, or preserve the unpaid/abandoned order state without upgrading it.';
   }
 
   return Object.freeze({
@@ -234,7 +240,8 @@ export function evaluateFounderProofAuditLifecycle(
     highestTruthPlane,
     recognizedOutcome,
     claims: Object.freeze({
-      commerceExecutionVerified,
+      commerceExecutionObserved,
+      commercePaymentVerified,
       auditExecutionVerified,
       deliverySimulationVerified,
       deliveryOutcomeVerified,

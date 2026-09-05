@@ -4,26 +4,33 @@ Contract: `fcr/founder-proof-audit-lifecycle@v1`
 
 ## Purpose
 
-Bind the $99 Founder Proof Audit service to FCR truth semantics without allowing commerce execution, audit execution, delivery simulation, real delivery, or customer value to collapse into one claim.
+Bind the $99 Founder Proof Audit service to FCR truth semantics without allowing order creation, payment, audit execution, delivery simulation, real delivery, or customer value to collapse into one claim.
 
 ## Invariants
 
-1. **Shopify payment is commerce execution truth only.** A paid order does not prove that the audit was completed or delivered.
-2. **Audit completion is execution truth only.** A completed audit does not prove customer receipt or customer value.
-3. **Delivery simulation is not delivery outcome truth.** A dry run may prove that the delivery boundary works, but its highest truth plane remains `AUDIT_EXECUTION` because no customer delivery occurred.
-4. **Real delivery requires completed-audit evidence.** `DELIVERED` and `ACKNOWLEDGED` are available only in `LIVE` mode.
-5. **Customer acknowledgement is not customer-value proof.** Receipt acknowledgement can advance delivery truth, but customer value and business outcome remain unverified until separately observed.
-6. **Dry-run truth cannot impersonate live truth.** `DRY_RUN` requires commerce `NOT_EXECUTED` and may use only simulated delivery.
-7. **The lifecycle never grants production mutation authority.** A separate authorization reference may be recorded, but `canMutateProduction` remains false. Repairs require a separately authorized execution contract.
-8. **No bypass authority.** The lifecycle cannot authorize bypassing access controls or expanding scope.
-9. **Bounded intake only.** Intake carries target, objective, and authorized evidence references. Passwords, private keys, recovery codes, raw payment-card data, and other secrets do not belong in this contract.
-10. **Runtime enum values fail closed.** Unknown modes, statuses, or commerce sources are rejected rather than silently degraded.
-11. **Price, tax, turnaround, refund, and cancellation policy are external business/legal policy gates.** This contract does not invent them.
-12. **Historical truth is immutable. Current truth must be re-observed.** Every present-tense claim remains bounded to the evidence plane that actually proved it.
+1. **Shopify order creation is commerce execution truth, not payment truth.** An observed order advances the current truth plane to `COMMERCE_EXECUTION` while payment remains unverified.
+2. **Shopify payment is stronger commerce execution truth only.** A verified payment does not prove that the audit was completed or delivered.
+3. **Audit completion is execution truth only.** A completed audit does not prove customer receipt or customer value.
+4. **Delivery simulation is not delivery outcome truth.** A dry run may prove that the delivery boundary works, but its highest truth plane remains `AUDIT_EXECUTION` because no customer delivery occurred.
+5. **Real delivery requires completed-audit evidence.** `DELIVERED` and `ACKNOWLEDGED` are available only in `LIVE` mode.
+6. **Customer acknowledgement is not customer-value proof.** Receipt acknowledgement can advance delivery truth, but customer value and business outcome remain unverified until separately observed.
+7. **Dry-run truth cannot impersonate live truth.** `DRY_RUN` requires commerce `NOT_EXECUTED` and may use only simulated delivery.
+8. **The lifecycle never grants production mutation authority.** A separate authorization reference may be recorded, but `canMutateProduction` remains false. Repairs require a separately authorized execution contract.
+9. **No bypass authority.** The lifecycle cannot authorize bypassing access controls or expanding scope.
+10. **Bounded intake only.** Intake carries target, objective, and authorized evidence references. Passwords, private keys, recovery codes, raw payment-card data, and other secrets do not belong in this contract.
+11. **Runtime enum values fail closed.** Unknown modes, statuses, or commerce sources are rejected rather than silently degraded.
+12. **Price, tax, turnaround, refund, and cancellation policy are external business/legal policy gates.** This contract does not invent them.
+13. **Historical truth is immutable. Current truth must be re-observed.** Every present-tense claim remains bounded to the evidence plane that actually proved it.
 
 ## Truth planes
 
 `INTENT → COMMERCE_EXECUTION → AUDIT_EXECUTION → DELIVERY_OUTCOME`
+
+Within `COMMERCE_EXECUTION`, order creation and payment are distinct claims:
+
+- `commerceExecutionObserved: true` means Shopify order creation or stronger commerce execution was observed.
+- `commercePaymentVerified: true` means the stronger payment gate was independently represented by Shopify evidence.
+- A live audit may not start from order creation alone.
 
 Delivery simulation is a proof artifact within the dry-run execution slice. It does not advance the lifecycle to `DELIVERY_OUTCOME`.
 
@@ -44,11 +51,25 @@ Expected highest truth plane: `AUDIT_EXECUTION`.
 
 The receipt may assert `deliverySimulationVerified: true` while `deliveryOutcomeVerified` remains false.
 
+## Live commerce states
+
+### Order created, payment not verified
+
+Expected disposition: `HOLD`.
+
+Expected highest truth plane: `COMMERCE_EXECUTION`.
+
+FCR preserves the order event without inventing payment. Audit execution remains blocked.
+
+### Payment verified
+
+Payment may advance the live audit toward `READY_FOR_AUDIT` only when bounded intake is also validated. Payment alone does not certify audit completion or delivery.
+
 ## Live acceptance slice
 
 A live paid audit may begin only after:
 
-- Shopify independently verifies payment execution,
+- Shopify independently represents payment execution,
 - bounded intake is validated,
 - FCR preserves audit-execution evidence.
 

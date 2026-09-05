@@ -49,7 +49,8 @@ describe('Founder Proof Audit lifecycle truth contract', () => {
 
     expect(receipt.disposition).toBe('DRY_RUN_VERIFIED');
     expect(receipt.highestTruthPlane).toBe('AUDIT_EXECUTION');
-    expect(receipt.claims.commerceExecutionVerified).toBe(false);
+    expect(receipt.claims.commerceExecutionObserved).toBe(false);
+    expect(receipt.claims.commercePaymentVerified).toBe(false);
     expect(receipt.claims.auditExecutionVerified).toBe(true);
     expect(receipt.claims.deliverySimulationVerified).toBe(true);
     expect(receipt.claims.deliveryOutcomeVerified).toBe(false);
@@ -62,6 +63,28 @@ describe('Founder Proof Audit lifecycle truth contract', () => {
     expect(() => evaluateFounderProofAuditLifecycle(base({
       delivery: { status: 'DELIVERED', evidenceRef: 'fcr://delivery/001' },
     }))).toThrow(/DRY_RUN may not claim customer delivery/);
+  });
+
+  it('preserves Shopify order creation as commerce execution without upgrading it to payment truth', () => {
+    const receipt = evaluateFounderProofAuditLifecycle(base({
+      mode: 'LIVE',
+      commerce: {
+        status: 'ORDER_CREATED',
+        source: 'shopify',
+        evidenceRef: 'shopify://orders/1000',
+      },
+      intake: { status: 'VALIDATED', evidenceRef: 'fcr://proof-audit/intake/1000' },
+      audit: { status: 'NOT_STARTED', evidenceRef: null },
+      delivery: { status: 'NOT_DELIVERED', evidenceRef: null },
+    }));
+
+    expect(receipt.disposition).toBe('HOLD');
+    expect(receipt.highestTruthPlane).toBe('COMMERCE_EXECUTION');
+    expect(receipt.claims.commerceExecutionObserved).toBe(true);
+    expect(receipt.claims.commercePaymentVerified).toBe(false);
+    expect(receipt.claims.auditExecutionVerified).toBe(false);
+    expect(receipt.recognizedOutcome).toMatch(/order creation was observed/i);
+    expect(receipt.recognizedOutcome).toMatch(/payment is not verified/i);
   });
 
   it('keeps verified Shopify payment separate from audit delivery truth', () => {
@@ -78,7 +101,8 @@ describe('Founder Proof Audit lifecycle truth contract', () => {
     }));
 
     expect(receipt.highestTruthPlane).toBe('COMMERCE_EXECUTION');
-    expect(receipt.claims.commerceExecutionVerified).toBe(true);
+    expect(receipt.claims.commerceExecutionObserved).toBe(true);
+    expect(receipt.claims.commercePaymentVerified).toBe(true);
     expect(receipt.claims.auditExecutionVerified).toBe(false);
     expect(receipt.claims.deliverySimulationVerified).toBe(false);
     expect(receipt.claims.deliveryOutcomeVerified).toBe(false);
