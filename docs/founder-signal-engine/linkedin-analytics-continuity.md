@@ -109,13 +109,23 @@ The Actions workflow fails closed if predecessor-artifact discovery errors or if
 
 `scripts/founder_content_supersession.py` implements `fcr/founder-content-supersession@v3` for two cumulative observations of the same content fingerprint. It is a separate observation-only seam because the aggregate `ENGAGEMENT` worksheet can contain activity from older posts and therefore cannot be silently reinterpreted as per-post cumulative engagement.
 
-The V3 supersession contract requires the newer observation time to be strictly later, rejects decreases in cumulative impressions or engagements, requires SHA-256-shaped source digests, preserves the prior claim as `SUPERSEDED_HISTORICAL`, emits the current claim as `ATTESTED_CURRENT`, classifies the evidence surprise, and binds the bounded strategy mutation into the deterministic receipt identity. V3 does not read the underlying source artifact bytes, so its source digests are caller-supplied provenance references rather than verified source bindings.
+The V3 supersession contract requires the newer observation time to be strictly later, rejects decreases in cumulative impressions or engagements, requires SHA-256-shaped source digests, preserves the prior claim as `SUPERSEDED_HISTORICAL`, emits the current claim as `ATTESTED_CURRENT`, classifies the **observed metric movement**, and binds the bounded strategy mutation into the deterministic receipt identity. V3 does not read the underlying source artifact bytes, so its source digests are caller-supplied provenance references rather than verified source bindings.
+
+The `expectation` field in V3 is narrative text, not a structured threshold/direction contract. V3 therefore must not infer `STRONGER_THAN_EXPECTED`, `WEAKER_THAN_EXPECTED`, or `AS_EXPECTED` from metric movement alone. Current receipts emit:
+
+```text
+metric_change = factual observed movement
+surprise = UNKNOWN
+expectation_evaluation = NOT_EVALUATED_UNSTRUCTURED_V3
+```
+
+`metric_change` describes only facts such as `ENGAGEMENT_RATE_UP`, `ENGAGEMENT_RATE_DOWN`, or `IMPRESSIONS_UP_WITHOUT_ENGAGEMENTS`. A future successor may evaluate expectation-relative surprise only after the expectation itself has a deterministic structured schema. Free-form prose must never be treated as if it had been parsed and compared.
 
 ```text
 same post fingerprint
 + prior cumulative observation
 + current cumulative observation
-+ expectation
++ narrative expectation (retained, not evaluated by V3)
 + prior/current claims
 + bounded strategy mutation
 -> deterministic supersession receipt
