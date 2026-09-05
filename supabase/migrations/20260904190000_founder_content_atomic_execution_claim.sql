@@ -82,10 +82,10 @@ begin
     return;
   end if;
 
-  update public.founder_content_approvals
+  update public.founder_content_approvals as approvals
      set consumed_at = p_claimed_at,
          consumed_by = btrim(p_consumed_by)
-   where approval_id = approval_row.approval_id;
+   where approvals.approval_id = approval_row.approval_id;
 
   -- Preserve the generation token. Provider-write acquisition, abort, and
   -- finalization continue to fence on this same database-returned started_at.
