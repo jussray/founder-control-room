@@ -29,10 +29,12 @@ REQUIRED_SHEETS = {
     "FOLLOWERS",
     "AUDIENCE DEMOGRAPHICS",
 }
+EVIDENCE_DECISION_LOOP_CONTRACT = "juss/evidence-decision-loop@v1"
 
 LANE_CONTRACT: dict[str, Any] = {
     "id": "linkedin_thesis_comment",
     "version": 1,
+    "decision_loop_contract": EVIDENCE_DECISION_LOOP_CONTRACT,
     "surface": "linkedin_comment",
     "authority": "observation_only",
     "execution": "founder_manual_only",
@@ -61,6 +63,7 @@ LANE_CONTRACT: dict[str, Any] = {
         "failure_rule": "Stop or revise if comments earn reach without qualified response, repeat the same angle, or create audience mismatch.",
     },
     "truth_boundary": {
+        "founder_confirmation": "OBSERVED execution evidence only; not independent platform or outcome verification",
         "comment_posted": "UNKNOWN until founder/manual platform confirmation",
         "outcome": "UNKNOWN until a later analytics snapshot and qualified-response evidence exist",
         "auto_publish": False,
@@ -195,6 +198,7 @@ def analyze_export(path: str | Path) -> dict[str, Any]:
 
     return {
         "contract": "linkedin-thesis-comment-lane@v1",
+        "decision_loop_contract": EVIDENCE_DECISION_LOOP_CONTRACT,
         "authority": "observation_only",
         "source": {"filename": Path(path).name},
         "lane": LANE_CONTRACT,
@@ -214,6 +218,7 @@ def analyze_export(path: str | Path) -> dict[str, Any]:
         },
         "field_test": {
             "state": "READY_TO_TEST",
+            "execution_state": "UNKNOWN",
             "outcome_state": "UNKNOWN",
             "required_comment_receipts": LANE_CONTRACT["test"]["target_comments"],
             "next_measurement": "Compare the next equivalent analytics snapshot plus manually confirmed qualified replies/conversations.",
