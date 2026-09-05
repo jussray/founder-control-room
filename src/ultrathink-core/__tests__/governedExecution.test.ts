@@ -97,6 +97,9 @@ const receipt: GovernedExecutionReceipt = {
   observedAt: '2026-09-05T21:00:01.000Z',
 };
 
+const VERIFIED_EVIDENCE_FINGERPRINT = 'a'.repeat(64);
+const CONTRADICTED_EVIDENCE_FINGERPRINT = 'b'.repeat(64);
+
 function receiptBinding(overrides: Partial<{
   leaseId: string;
   idempotencyKey: string;
@@ -235,7 +238,7 @@ describe('FCR governed execution membrane', () => {
       {
         status: 'verified',
         strength: 'W4',
-        evidenceFingerprint: 'witness-fingerprint-unrelated',
+        evidenceFingerprint: VERIFIED_EVIDENCE_FINGERPRINT,
         observedAt: '2026-09-05T21:00:02.000Z',
         receiptBinding: receiptBinding({ idempotencyKey: 'different-operation' }),
       },
@@ -249,7 +252,7 @@ describe('FCR governed execution membrane', () => {
       {
         status: 'contradicted',
         strength: 'W4',
-        evidenceFingerprint: 'witness-fingerprint-unrelated',
+        evidenceFingerprint: CONTRADICTED_EVIDENCE_FINGERPRINT,
         observedAt: '2026-09-05T21:00:02.000Z',
         receiptBinding: receiptBinding({ leaseId: 'lease-other' }),
       },
@@ -263,7 +266,7 @@ describe('FCR governed execution membrane', () => {
       {
         status: 'verified',
         strength: 'W4',
-        evidenceFingerprint: 'witness-fingerprint-too-early',
+        evidenceFingerprint: VERIFIED_EVIDENCE_FINGERPRINT,
         observedAt: '2026-09-05T21:00:00.000Z',
         receiptBinding: receiptBinding(),
       },
@@ -277,7 +280,7 @@ describe('FCR governed execution membrane', () => {
       {
         status: 'verified',
         strength: 'W4',
-        evidenceFingerprint: 'witness-fingerprint-status-cross',
+        evidenceFingerprint: VERIFIED_EVIDENCE_FINGERPRINT,
         observedAt: '2026-09-05T21:00:02.000Z',
         receiptBinding: receiptBinding({ status: 'failed' }),
       },
@@ -285,7 +288,35 @@ describe('FCR governed execution membrane', () => {
     )).toBe('EXECUTED_UNVERIFIED');
   });
 
-  it('17 executes the valid read-only lease and verifies only with a sufficient exact witness', () => {
+  it('17 refuses a verified witness with a malformed evidence fingerprint', () => {
+    expect(evaluateGovernedExecutionOutcome(
+      receipt,
+      {
+        status: 'verified',
+        strength: 'W4',
+        evidenceFingerprint: 'not-an-immutable-fingerprint',
+        observedAt: '2026-09-05T21:00:02.000Z',
+        receiptBinding: receiptBinding(),
+      },
+      'W2',
+    )).toBe('EXECUTED_UNVERIFIED');
+  });
+
+  it('18 refuses a contradictory witness with a malformed evidence fingerprint', () => {
+    expect(evaluateGovernedExecutionOutcome(
+      receipt,
+      {
+        status: 'contradicted',
+        strength: 'W4',
+        evidenceFingerprint: '',
+        observedAt: '2026-09-05T21:00:02.000Z',
+        receiptBinding: receiptBinding(),
+      },
+      'W2',
+    )).toBe('EXECUTED_UNVERIFIED');
+  });
+
+  it('19 executes the valid read-only lease and verifies only with a sufficient exact witness', () => {
     expect(evaluateGovernedExecution(lease, world())).toEqual({
       disposition: 'EXECUTE',
       reasons: [],
@@ -296,7 +327,7 @@ describe('FCR governed execution membrane', () => {
       {
         status: 'verified',
         strength: 'W2',
-        evidenceFingerprint: 'witness-fingerprint-a',
+        evidenceFingerprint: VERIFIED_EVIDENCE_FINGERPRINT,
         observedAt: '2026-09-05T21:00:02.000Z',
         receiptBinding: receiptBinding(),
       },
