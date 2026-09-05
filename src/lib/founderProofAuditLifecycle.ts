@@ -61,6 +61,7 @@ export interface FounderProofAuditLifecycleReceipt {
   claims: {
     commerceExecutionVerified: boolean;
     auditExecutionVerified: boolean;
+    deliverySimulationVerified: boolean;
     deliveryOutcomeVerified: boolean;
     customerReceiptAcknowledged: boolean;
     customerValueOutcomeVerified: false;
@@ -76,6 +77,7 @@ export interface FounderProofAuditLifecycleReceipt {
 }
 
 const ID = /^[a-z0-9][a-z0-9._:-]{0,159}$/;
+const MODES: FounderProofAuditMode[] = ['DRY_RUN', 'LIVE'];
 const TARGET_TYPES: FounderProofAuditTargetType[] = [
   'WEBSITE',
   'AI_WORKFLOW',
@@ -84,6 +86,11 @@ const TARGET_TYPES: FounderProofAuditTargetType[] = [
   'CHECKOUT_PATH',
   'DEPLOYMENT',
 ];
+const COMMERCE_STATUSES: FounderProofAuditCommerceStatus[] = ['NOT_EXECUTED', 'ORDER_CREATED', 'PAYMENT_VERIFIED'];
+const INTAKE_STATUSES: FounderProofAuditIntakeStatus[] = ['MISSING', 'VALIDATED'];
+const AUDIT_STATUSES: FounderProofAuditExecutionStatus[] = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'];
+const DELIVERY_STATUSES: FounderProofAuditDeliveryStatus[] = ['NOT_DELIVERED', 'SIMULATED', 'DELIVERED', 'ACKNOWLEDGED'];
+const COMMERCE_SOURCES = ['shopify', 'none'] as const;
 
 function text(value: unknown, max = 1200): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -100,24 +107,31 @@ export function evaluateFounderProofAuditLifecycle(
   input: FounderProofAuditLifecycleInput,
 ): FounderProofAuditLifecycleReceipt {
   const errors: string[] = [];
-  const auditId = text(input.auditId, 160).toLowerCase();
-  const targetRef = text(input.scope?.targetRef);
-  const objective = text(input.scope?.objective, 600);
-  const authorizedEvidenceRefs = Array.isArray(input.scope?.authorizedEvidenceRefs)
+  const auditId = text(input?.auditId, 160).toLowerCase();
+  const targetRef = text(input?.scope?.targetRef);
+  const objective = text(input?.scope?.objective, 600);
+  const authorizedEvidenceRefs = Array.isArray(input?.scope?.authorizedEvidenceRefs)
     ? input.scope.authorizedEvidenceRefs.map((item) => text(item)).filter(Boolean)
     : [];
-  const productionMutationAuthorizationRef = text(input.scope?.productionMutationAuthorizationRef || '') || null;
-  const commerceEvidenceRef = text(input.commerce?.evidenceRef || '') || null;
-  const intakeEvidenceRef = text(input.intake?.evidenceRef || '') || null;
-  const auditEvidenceRef = text(input.audit?.evidenceRef || '') || null;
-  const deliveryEvidenceRef = text(input.delivery?.evidenceRef || '') || null;
-  const customerEvidenceRef = text(input.delivery?.customerEvidenceRef || '') || null;
+  const productionMutationAuthorizationRef = text(input?.scope?.productionMutationAuthorizationRef || '') || null;
+  const commerceEvidenceRef = text(input?.commerce?.evidenceRef || '') || null;
+  const intakeEvidenceRef = text(input?.intake?.evidenceRef || '') || null;
+  const auditEvidenceRef = text(input?.audit?.evidenceRef || '') || null;
+  const deliveryEvidenceRef = text(input?.delivery?.evidenceRef || '') || null;
+  const customerEvidenceRef = text(input?.delivery?.customerEvidenceRef || '') || null;
 
+  if (!MODES.includes(input?.mode)) errors.push('mode is invalid');
   if (!ID.test(auditId)) errors.push('auditId is invalid');
-  if (!TARGET_TYPES.includes(input.scope?.targetType)) errors.push('scope.targetType is invalid');
+  if (!TARGET_TYPES.includes(input?.scope?.targetType)) errors.push('scope.targetType is invalid');
   if (!targetRef) errors.push('scope.targetRef is required');
   if (!objective) errors.push('scope.objective is required');
   if (authorizedEvidenceRefs.length === 0) errors.push('scope.authorizedEvidenceRefs must contain at least one authorized evidence reference');
+  if (!COMMERCE_STATUSES.includes(input?.commerce?.status)) errors.push('commerce.status is invalid');
+  if (!COMMERCE_SOURCES.includes(input?.commerce?.source)) errors.push('commerce.source is invalid');
+  if (!INTAKE_STATUSES.includes(input?.intake?.status)) errors.push('intake.status is invalid');
+  if (!AUDIT_STATUSES.includes(input?.audit?.status)) errors.push('audit.status is invalid');
+  if (!DELIVERY_STATUSES.includes(input?.delivery?.status)) errors.push('delivery.status is invalid');
+  if (errors.length > 0) reject(errors);
 
   if (input.mode === 'DRY_RUN') {
     if (input.commerce.status !== 'NOT_EXECUTED' || input.commerce.source !== 'none') {
@@ -166,6 +180,7 @@ export function evaluateFounderProofAuditLifecycle(
 
   const commerceExecutionVerified = input.mode === 'LIVE' && input.commerce.status === 'PAYMENT_VERIFIED';
   const auditExecutionVerified = input.audit.status === 'COMPLETED';
+  const deliverySimulationVerified = input.mode === 'DRY_RUN' && input.delivery.status === 'SIMULATED';
   const deliveryOutcomeVerified = input.mode === 'LIVE'
     && (input.delivery.status === 'DELIVERED' || input.delivery.status === 'ACKNOWLEDGED');
   const customerReceiptAcknowledged = input.mode === 'LIVE' && input.delivery.status === 'ACKNOWLEDGED';
@@ -175,10 +190,10 @@ export function evaluateFounderProofAuditLifecycle(
   let recognizedOutcome = 'Audit intent and bounded scope are recorded; execution is not yet proven.';
   let nextGate = input.intake.status === 'VALIDATED' ? 'Acquire the next required execution proof.' : 'Validate bounded intake without collecting secrets.';
 
-  if (input.mode === 'DRY_RUN' && input.audit.status === 'COMPLETED' && input.delivery.status === 'SIMULATED') {
+  if (input.mode === 'DRY_RUN' && input.audit.status === 'COMPLETED' && deliverySimulationVerified) {
     disposition = 'DRY_RUN_VERIFIED';
-    highestTruthPlane = 'DELIVERY_OUTCOME';
-    recognizedOutcome = 'Dry-run intake, audit, and delivery path were verified; no Shopify payment or customer delivery occurred.';
+    highestTruthPlane = 'AUDIT_EXECUTION';
+    recognizedOutcome = 'Dry-run intake and audit execution were verified, and the delivery boundary was simulated; no Shopify payment or customer delivery occurred.';
     nextGate = 'Reacquire the same lifecycle in LIVE mode only after payment authority and customer-facing policy gates are verified.';
   } else if (customerReceiptAcknowledged) {
     disposition = 'DELIVERY_ACKNOWLEDGED';
@@ -221,6 +236,7 @@ export function evaluateFounderProofAuditLifecycle(
     claims: Object.freeze({
       commerceExecutionVerified,
       auditExecutionVerified,
+      deliverySimulationVerified,
       deliveryOutcomeVerified,
       customerReceiptAcknowledged,
       customerValueOutcomeVerified: false as const,

@@ -44,14 +44,17 @@ function base(overrides: Record<string, any> = {}) {
 }
 
 describe('Founder Proof Audit lifecycle truth contract', () => {
-  it('verifies the entire dry-run path without inventing payment or customer delivery', () => {
+  it('verifies the dry-run path without promoting simulation into delivery outcome truth', () => {
     const receipt = evaluateFounderProofAuditLifecycle(base());
 
     expect(receipt.disposition).toBe('DRY_RUN_VERIFIED');
-    expect(receipt.highestTruthPlane).toBe('DELIVERY_OUTCOME');
+    expect(receipt.highestTruthPlane).toBe('AUDIT_EXECUTION');
     expect(receipt.claims.commerceExecutionVerified).toBe(false);
+    expect(receipt.claims.auditExecutionVerified).toBe(true);
+    expect(receipt.claims.deliverySimulationVerified).toBe(true);
     expect(receipt.claims.deliveryOutcomeVerified).toBe(false);
     expect(receipt.claims.customerValueOutcomeVerified).toBe(false);
+    expect(receipt.recognizedOutcome).toMatch(/delivery boundary was simulated/i);
     expect(receipt.recognizedOutcome).toMatch(/no Shopify payment or customer delivery occurred/i);
   });
 
@@ -77,6 +80,7 @@ describe('Founder Proof Audit lifecycle truth contract', () => {
     expect(receipt.highestTruthPlane).toBe('COMMERCE_EXECUTION');
     expect(receipt.claims.commerceExecutionVerified).toBe(true);
     expect(receipt.claims.auditExecutionVerified).toBe(false);
+    expect(receipt.claims.deliverySimulationVerified).toBe(false);
     expect(receipt.claims.deliveryOutcomeVerified).toBe(false);
     expect(receipt.recognizedOutcome).toMatch(/delivery are not proven/i);
   });
@@ -167,5 +171,12 @@ describe('Founder Proof Audit lifecycle truth contract', () => {
       audit: { status: 'NOT_STARTED', evidenceRef: null },
       delivery: { status: 'NOT_DELIVERED', evidenceRef: null },
     }))).toThrow(/must be certified by Shopify/);
+  });
+
+  it('rejects unknown lifecycle enum values instead of silently degrading them', () => {
+    expect(() => evaluateFounderProofAuditLifecycle(base({ mode: 'MAYBE' }))).toThrow(/mode is invalid/);
+    expect(() => evaluateFounderProofAuditLifecycle(base({
+      commerce: { status: 'MONEYISH', source: 'shopify', evidenceRef: 'shopify://orders/1006' },
+    }))).toThrow(/commerce.status is invalid/);
   });
 });
