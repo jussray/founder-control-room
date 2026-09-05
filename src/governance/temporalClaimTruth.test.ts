@@ -147,6 +147,45 @@ describe('temporal public-claim truth', () => {
     }
   });
 
+  it('keeps runtime-state proximity bounded at the historical 80-character gap', () => {
+    const withinForward = `production ${'x'.repeat(78)} live`;
+    const beyondForward = `production ${'x'.repeat(79)} live`;
+    const withinReverse = `healthy ${'x'.repeat(78)} api`;
+    const acrossLineBreak = 'production\nlive';
+
+    expect(temporalClaimTextDomainErrors({
+      label: 'claim',
+      text: withinForward,
+      temporalClass: 'current_repo_state',
+    })).toEqual(expect.arrayContaining([
+      expect.stringContaining('requires current_runtime evidence'),
+    ]));
+
+    expect(temporalClaimTextDomainErrors({
+      label: 'claim',
+      text: withinReverse,
+      temporalClass: 'current_repo_state',
+    })).toEqual(expect.arrayContaining([
+      expect.stringContaining('requires current_runtime evidence'),
+    ]));
+
+    expect(temporalClaimTextDomainErrors({
+      label: 'claim',
+      text: beyondForward,
+      temporalClass: 'current_repo_state',
+    })).not.toEqual(expect.arrayContaining([
+      expect.stringContaining('requires current_runtime evidence'),
+    ]));
+
+    expect(temporalClaimTextDomainErrors({
+      label: 'claim',
+      text: acrossLineBreak,
+      temporalClass: 'current_repo_state',
+    })).not.toEqual(expect.arrayContaining([
+      expect.stringContaining('requires current_runtime evidence'),
+    ]));
+  });
+
   it('keeps metric claims on analytics authority even when wording is historical', async () => {
     for (const claimText of [
       'We now have 54 followers.',
