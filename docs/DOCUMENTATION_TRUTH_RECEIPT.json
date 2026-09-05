@@ -240,6 +240,12 @@
       ]
     },
     {
+      "path": "src/governance/temporalClaimTruth.ts",
+      "claims": [
+        "src/governance/temporalClaimTruth.ts must preserve historical verification without upgrading it to current truth, bind current repository claims to the exact source commit and re-observed current repository version, require current runtime and metric claims to remain blocked until fresh external evidence is revalidated, and fail closed when proposal, public-payload, temporal-classification, evidence, or truth-context bindings drift."
+      ]
+    },
+    {
       "path": "src/lib/providerObservation.ts",
       "claims": [
         "src/lib/providerObservation.ts must classify provider child evidence without granting authority, require complete fresh identity-bound observations before CURRENT, surface undeclared, scope-drift, identity-drift, stale, and unknown states explicitly, and never convert a matching declaration into provider execution permission."
