@@ -34,7 +34,7 @@ SURPRISES = {
     "UNKNOWN",
 }
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-RECEIPT_RE = re.compile(r"^SUP-[0-9a-f]{16}$")
+RECEIPT_RE = re.compile(r"^SUP-([0-9a-f]{16})$", re.IGNORECASE)
 
 
 def _text(value: Any, field: str) -> str:
@@ -159,10 +159,10 @@ def build_supersession_receipt(payload: dict[str, Any]) -> dict[str, Any]:
     predecessor = payload.get("predecessor_receipt_id")
     if predecessor is not None:
         raw_predecessor = _text(predecessor, "predecessor_receipt_id")
-        candidate = f"SUP-{raw_predecessor.split('-', 1)[1].lower()}" if "-" in raw_predecessor else raw_predecessor
-        if not RECEIPT_RE.fullmatch(candidate):
+        match = RECEIPT_RE.fullmatch(raw_predecessor)
+        if not match:
             raise ValueError("predecessor_receipt_id must match SUP-<16 hex>")
-        predecessor = candidate
+        predecessor = f"SUP-{match.group(1).lower()}"
 
     prior_rate = _rate(prior_engagements, prior_impressions)
     current_rate = _rate(current_engagements, current_impressions)
