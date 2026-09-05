@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the current Founder Signal Engine, atomic active editorial-pattern approval reservation, provider-neutral n8n authority membrane, PR continuity live-base observation rule, truth-governance, provider review policy, Cloudflare release authority, and BuildEvent projection to reviewed source invariants without claiming production migration apply, provider configuration, publication outcome, deployment success, merge authority, database mutation, secret validity, billing, or destructive-action authority.",
+  "purpose": "Bind the current Founder Signal Engine, atomic active editorial-pattern approval reservation, direct first-party provider configuration preflight, provider-neutral n8n authority membrane, PR continuity live-base observation rule, truth-governance, provider review policy, Cloudflare release authority, and BuildEvent projection to reviewed source invariants without claiming production migration apply, provider configuration, publication outcome, deployment success, merge authority, database mutation, secret validity, billing, or destructive-action authority.",
   "domains": [
     "publishing",
     "cloudflare-authority",
@@ -43,6 +43,12 @@
       "path": "supabase/migrations/20260904221500_founder_content_active_editorial_pattern_reservation.sql",
       "claims": [
         "supabase/migrations/20260904221500_founder_content_active_editorial_pattern_reservation.sql must atomically serialize one founder/platform PromptOS editorial pattern through the bounded non-revoked approval lease, preserve founder_content_approvals as immutable history, keep one-shot consumption from releasing the pattern before provider execution/readback latency is covered, keep exact-copy identity separate, restrict execution to service_role, and remain source-only until a separately authorized production apply."
+      ]
+    },
+    {
+      "path": "src/lib/firstPartyFounderContentExecutor.ts",
+      "claims": [
+        "src/lib/firstPartyFounderContentExecutor.ts must validate complete server-side LinkedIn adapter configuration, including configured LINKEDIN_API_VERSION format, before creating any durable approval_executions reservation; malformed provider configuration must create zero reservation, consume no approval, make zero provider requests, and remain distinct from provider publication truth."
       ]
     },
     {
@@ -108,7 +114,7 @@
     {
       "path": "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md",
       "claims": [
-        "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md must require exact-copy approval identity and editorial-pattern identity to remain separate, require approval persistence plus pattern reservation to be atomic without rewriting historical approvals, keep one-shot consumption from releasing the pattern before the bounded approval/provider-readback lease ends, preserve generation-fenced n8n approval consumption, and require provider-native readback for terminal publication evidence."
+        "docs/PUBLIC_COMMUNICATION_TRUTH_CONTRACT.md must require exact-copy approval identity and editorial-pattern identity to remain separate, require approval persistence plus pattern reservation to be atomic without rewriting historical approvals, require complete direct first-party provider adapter configuration validation before durable execution reservation, keep one-shot consumption from releasing the pattern before the bounded approval/provider-readback lease ends, preserve generation-fenced n8n approval consumption, and require provider-native readback for terminal publication evidence."
       ]
     },
     {
