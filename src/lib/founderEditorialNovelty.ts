@@ -19,6 +19,8 @@ const MAX_HISTORY = 32;
 const HIGH_SIMILARITY = 0.55;
 const MEDIUM_SIMILARITY = 0.35;
 const SHA256 = /^[0-9a-f]{64}$/i;
+const DIRECT_PUBLISH_ACTION = 'publish_founder_content';
+const DIRECT_PUBLISH_CONTRACT = 'fcr/first-party-founder-content-publish@v1';
 
 const STOPWORDS = new Set([
   'a', 'an', 'and', 'are', 'as', 'at', 'be', 'been', 'being', 'but', 'by', 'for', 'from', 'had', 'has', 'have',
@@ -324,6 +326,64 @@ function normalizeFounderAttestation(value: unknown): FounderEditorialHistoryRec
   };
 }
 
+function approvalPatternMap(value: unknown): Map<string, string> {
+  const patterns = new Map<string, string>();
+  if (!Array.isArray(value)) return patterns;
+  for (const item of value) {
+    const row = record(item);
+    const approvalId = text(row.approval_id).toLowerCase();
+    const pattern = text(row.pattern_fingerprint).toLowerCase();
+    if (approvalId && SHA256.test(pattern)) patterns.set(approvalId, pattern);
+  }
+  return patterns;
+}
+
+function normalizeProviderReadback(
+  value: unknown,
+  patterns: Map<string, string>,
+): FounderEditorialHistoryRecord | null {
+  const row = record(value);
+  const request = record(row.request);
+  const result = record(row.result);
+  const approvalId = text(request.approvalId).toLowerCase();
+  const promptOsPatternFingerprint = patterns.get(approvalId) ?? '';
+  const publishedAt = text(result.publishedAt);
+  const externalPostId = text(result.externalPostId);
+  const permalink = text(result.permalink);
+  const publicPayloadHash = text(request.publicPayloadHash).toLowerCase();
+
+  if (
+    text(row.action_type) !== DIRECT_PUBLISH_ACTION
+    || text(row.status) !== 'succeeded'
+    || row.success !== true
+    || text(result.contract) !== DIRECT_PUBLISH_CONTRACT
+    || text(result.truthState) !== 'PUBLISHED'
+    || result.published !== true
+    || text(result.platform).toLowerCase() !== 'linkedin'
+    || !externalPostId.startsWith('urn:li:')
+    || !permalink.startsWith('https://www.linkedin.com/feed/update/urn:li:')
+    || !Number.isFinite(Date.parse(publishedAt))
+    || !SHA256.test(promptOsPatternFingerprint)
+  ) return null;
+
+  return {
+    id: `provider-readback:${externalPostId}`,
+    relatedProject: null,
+    coreThesis: '',
+    primaryHook: '',
+    angle: '',
+    meaningfulChange: null,
+    hookType: null,
+    proofStyle: 'provider-verified-editorial-pattern',
+    publishDate: new Date(publishedAt).toISOString(),
+    status: 'published',
+    promptOsPatternFingerprint,
+    publicPayloadHash: SHA256.test(publicPayloadHash) ? publicPayloadHash : null,
+    publicCopyHash: null,
+    historySource: 'provider_readback',
+  };
+}
+
 function historyTime(value: FounderEditorialHistoryRecord): number {
   const parsed = value.publishDate ? Date.parse(value.publishDate) : Number.NaN;
   return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
@@ -332,7 +392,7 @@ function historyTime(value: FounderEditorialHistoryRecord): number {
 export function supabaseFounderEditorialHistoryRepository(client: SupabaseClient): FounderEditorialHistoryRepository {
   return {
     async recentLinkedIn(limit) {
-      const [experimentsResult, observationsResult] = await Promise.all([
+      const [experimentsResult, observationsResult, executionsResult, patternReservationsResult] = await Promise.all([
         client
           .from('linkedin_experiments')
           .select('id, related_project, core_thesis, primary_hook, angle, meaningful_change, hook_type, proof_style, publish_date, status')
@@ -346,6 +406,19 @@ export function supabaseFounderEditorialHistoryRepository(client: SupabaseClient
           .in('resource_type', ['founder_content_post'])
           .order('observed_at', { ascending: false, nullsFirst: false })
           .limit(limit),
+        client
+          .from('approval_executions')
+          .select('id, action_type, status, success, request, result, executed_at')
+          .eq('action_type', DIRECT_PUBLISH_ACTION)
+          .eq('status', 'succeeded')
+          .eq('success', true)
+          .order('executed_at', { ascending: false, nullsFirst: false })
+          .limit(limit),
+        client
+          .from('founder_content_active_editorial_pattern_reservations')
+          .select('approval_id, pattern_fingerprint, reserved_at, expires_at')
+          .order('reserved_at', { ascending: false, nullsFirst: false })
+          .limit(limit),
       ]);
 
       if (experimentsResult.error) {
@@ -354,6 +427,12 @@ export function supabaseFounderEditorialHistoryRepository(client: SupabaseClient
       if (observationsResult.error) {
         throw new Error(`editorial founder-attestation history readback failed: ${observationsResult.error.message}`);
       }
+      if (executionsResult.error) {
+        throw new Error(`editorial provider-readback execution history failed: ${executionsResult.error.message}`);
+      }
+      if (patternReservationsResult.error) {
+        throw new Error(`editorial approval-pattern history readback failed: ${patternReservationsResult.error.message}`);
+      }
 
       const experiments = Array.isArray(experimentsResult.data)
         ? experimentsResult.data.map(normalizeHistoryRow)
@@ -361,8 +440,14 @@ export function supabaseFounderEditorialHistoryRepository(client: SupabaseClient
       const observations = Array.isArray(observationsResult.data)
         ? observationsResult.data.map(normalizeFounderAttestation).filter((item): item is FounderEditorialHistoryRecord => item !== null)
         : [];
+      const patterns = approvalPatternMap(patternReservationsResult.data);
+      const providerReadbacks = Array.isArray(executionsResult.data)
+        ? executionsResult.data
+          .map((item) => normalizeProviderReadback(item, patterns))
+          .filter((item): item is FounderEditorialHistoryRecord => item !== null)
+        : [];
 
-      return [...experiments, ...observations]
+      return [...experiments, ...observations, ...providerReadbacks]
         .sort((left, right) => historyTime(right) - historyTime(left))
         .slice(0, limit);
     },
@@ -448,7 +533,7 @@ export async function evaluateFounderEditorialNovelty({
       continuityCookie,
       roles,
       authority,
-      reason: 'No published/analyzed or founder-attested LinkedIn pattern history was available for comparison.',
+      reason: 'No published/analyzed, founder-attested, or provider-verified LinkedIn pattern history was available for comparison.',
     };
   }
 
@@ -508,6 +593,6 @@ export async function evaluateFounderEditorialNovelty({
     authority,
     reason: allowed
       ? `Editorial novelty gate accepted the candidate at ${risk.toLowerCase()} repetition risk.`
-      : 'Editorial novelty gate rejected a high-overlap or already-attested thesis/hook pattern; Chief must select a materially different story angle before founder approval.',
+      : 'Editorial novelty gate rejected a high-overlap or already-published thesis/hook pattern; Chief must select a materially different story angle before founder approval.',
   };
 }
