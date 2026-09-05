@@ -98,11 +98,16 @@ function approvalRepository(): FounderContentApprovalRepository {
 }
 
 function uniqueApprovalRepository(): FounderContentApprovalRepository {
-  const issuedIds = new Set<string>();
+  const activePublicCopyReservations = new Set<string>();
   return {
     issue: vi.fn(async (input) => {
-      if (issuedIds.has(input.approvalId)) return false;
-      issuedIds.add(input.approvalId);
+      const reservationKey = [
+        input.founderUserId,
+        input.platform,
+        input.publicCopyFingerprint,
+      ].join('\u001f');
+      if (activePublicCopyReservations.has(reservationKey)) return false;
+      activePublicCopyReservations.add(reservationKey);
       return true;
     }),
     readCurrent: vi.fn(),
@@ -233,7 +238,7 @@ describe('founder content approval editorial gate', () => {
     const firstId = vi.mocked(approvals.issue).mock.calls[0]?.[0].approvalId;
     const secondId = vi.mocked(approvals.issue).mock.calls[1]?.[0].approvalId;
     expect(firstId).toMatch(/^fca:[0-9a-f]{64}$/);
-    expect(secondId).toBe(firstId);
+    expect(secondId).not.toBe(firstId);
   });
 
   it('serializes the same reservation when public_claims text differs but the draft is byte-identical', async () => {
@@ -285,7 +290,7 @@ describe('founder content approval editorial gate', () => {
     const firstId = vi.mocked(approvals.issue).mock.calls[0]?.[0].approvalId;
     const secondId = vi.mocked(approvals.issue).mock.calls[1]?.[0].approvalId;
     expect(firstId).toMatch(/^fca:[0-9a-f]{64}$/);
-    expect(secondId).toBe(firstId);
+    expect(secondId).not.toBe(firstId);
   });
 
   it('serializes the same reservation across Current You intent rotation for byte-identical copy', async () => {
@@ -336,7 +341,7 @@ describe('founder content approval editorial gate', () => {
     const firstId = vi.mocked(approvals.issue).mock.calls[0]?.[0].approvalId;
     const secondId = vi.mocked(approvals.issue).mock.calls[1]?.[0].approvalId;
     expect(firstId).toMatch(/^fca:[0-9a-f]{64}$/);
-    expect(secondId).toBe(firstId);
+    expect(secondId).not.toBe(firstId);
   });
 
   it('serializes the same reservation when drafts diverge only past the canonical 3000-char bound', async () => {
@@ -385,7 +390,7 @@ describe('founder content approval editorial gate', () => {
     const firstId = vi.mocked(approvals.issue).mock.calls[0]?.[0].approvalId;
     const secondId = vi.mocked(approvals.issue).mock.calls[1]?.[0].approvalId;
     expect(firstId).toMatch(/^fca:[0-9a-f]{64}$/);
-    expect(secondId).toBe(firstId);
+    expect(secondId).not.toBe(firstId);
   });
 
   it('does not serialize two distinct published drafts that differ only in case, punctuation, or whitespace', async () => {
