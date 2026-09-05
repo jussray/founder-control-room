@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateFounderProofAuditLifecycle } from '../founderProofAuditLifecycle.js';
+import {
+  FOUNDER_PROOF_AUDIT_COMMERCE_AUTHORITY,
+  evaluateFounderProofAuditLifecycle,
+} from '../founderProofAuditLifecycle.js';
+
+const FCR_SHOPIFY_IDENTITY = Object.freeze({
+  ...FOUNDER_PROOF_AUDIT_COMMERCE_AUTHORITY,
+});
 
 function base(overrides: Record<string, any> = {}) {
   const input = {
@@ -16,6 +23,7 @@ function base(overrides: Record<string, any> = {}) {
       status: 'NOT_EXECUTED',
       source: 'none',
       evidenceRef: null,
+      storeIdentity: null,
     },
     intake: {
       status: 'VALIDATED',
@@ -32,11 +40,17 @@ function base(overrides: Record<string, any> = {}) {
     },
   };
 
+  const commerceOverride = overrides.commerce || {};
+
   return {
     ...input,
     ...overrides,
     scope: { ...input.scope, ...(overrides.scope || {}) },
-    commerce: { ...input.commerce, ...(overrides.commerce || {}) },
+    commerce: {
+      ...input.commerce,
+      ...(commerceOverride.source === 'shopify' ? { storeIdentity: FCR_SHOPIFY_IDENTITY } : {}),
+      ...commerceOverride,
+    },
     intake: { ...input.intake, ...(overrides.intake || {}) },
     audit: { ...input.audit, ...(overrides.audit || {}) },
     delivery: { ...input.delivery, ...(overrides.delivery || {}) },
@@ -51,6 +65,7 @@ describe('Founder Proof Audit lifecycle truth contract', () => {
     expect(receipt.highestTruthPlane).toBe('AUDIT_EXECUTION');
     expect(receipt.claims.commerceExecutionObserved).toBe(false);
     expect(receipt.claims.commercePaymentVerified).toBe(false);
+    expect(receipt.claims.commerceStoreAuthorityVerified).toBe(false);
     expect(receipt.claims.auditExecutionVerified).toBe(true);
     expect(receipt.claims.deliverySimulationVerified).toBe(true);
     expect(receipt.claims.deliveryOutcomeVerified).toBe(false);
@@ -82,8 +97,9 @@ describe('Founder Proof Audit lifecycle truth contract', () => {
     expect(receipt.highestTruthPlane).toBe('COMMERCE_EXECUTION');
     expect(receipt.claims.commerceExecutionObserved).toBe(true);
     expect(receipt.claims.commercePaymentVerified).toBe(false);
+    expect(receipt.claims.commerceStoreAuthorityVerified).toBe(true);
     expect(receipt.claims.auditExecutionVerified).toBe(false);
-    expect(receipt.recognizedOutcome).toMatch(/order creation was observed/i);
+    expect(receipt.recognizedOutcome).toMatch(/order creation.*FCR commerce authority/i);
     expect(receipt.recognizedOutcome).toMatch(/payment is not verified/i);
   });
 
@@ -103,10 +119,80 @@ describe('Founder Proof Audit lifecycle truth contract', () => {
     expect(receipt.highestTruthPlane).toBe('COMMERCE_EXECUTION');
     expect(receipt.claims.commerceExecutionObserved).toBe(true);
     expect(receipt.claims.commercePaymentVerified).toBe(true);
+    expect(receipt.claims.commerceStoreAuthorityVerified).toBe(true);
     expect(receipt.claims.auditExecutionVerified).toBe(false);
     expect(receipt.claims.deliverySimulationVerified).toBe(false);
     expect(receipt.claims.deliveryOutcomeVerified).toBe(false);
     expect(receipt.recognizedOutcome).toMatch(/delivery are not proven/i);
+  });
+
+  it('fails closed if Shopify commerce omits the canonical FCR store identity', () => {
+    expect(() => evaluateFounderProofAuditLifecycle(base({
+      mode: 'LIVE',
+      commerce: {
+        status: 'PAYMENT_VERIFIED',
+        source: 'shopify',
+        evidenceRef: 'shopify://orders/wrong-store/payment',
+        storeIdentity: null,
+      },
+      intake: { status: 'MISSING', evidenceRef: null },
+      audit: { status: 'NOT_STARTED', evidenceRef: null },
+      delivery: { status: 'NOT_DELIVERED', evidenceRef: null, customerEvidenceRef: null },
+    }))).toThrow(/requires an explicit storeIdentity/);
+  });
+
+  it('rejects JBH custom-domain evidence for an FCR audit', () => {
+    expect(() => evaluateFounderProofAuditLifecycle(base({
+      mode: 'LIVE',
+      commerce: {
+        status: 'PAYMENT_VERIFIED',
+        source: 'shopify',
+        evidenceRef: 'shopify://orders/jbh/payment',
+        storeIdentity: {
+          ...FCR_SHOPIFY_IDENTITY,
+          customDomain: 'jussbeautifulhair.com',
+        },
+      },
+      intake: { status: 'MISSING', evidenceRef: null },
+      audit: { status: 'NOT_STARTED', evidenceRef: null },
+      delivery: { status: 'NOT_DELIVERED', evidenceRef: null, customerEvidenceRef: null },
+    }))).toThrow(/custom-domain authority mismatch/);
+  });
+
+  it('rejects JBH permanent Shopify identity for an FCR audit', () => {
+    expect(() => evaluateFounderProofAuditLifecycle(base({
+      mode: 'LIVE',
+      commerce: {
+        status: 'PAYMENT_VERIFIED',
+        source: 'shopify',
+        evidenceRef: 'shopify://orders/jbh/payment',
+        storeIdentity: {
+          ...FCR_SHOPIFY_IDENTITY,
+          shopDomain: '8qp1z2-az.myshopify.com',
+        },
+      },
+      intake: { status: 'MISSING', evidenceRef: null },
+      audit: { status: 'NOT_STARTED', evidenceRef: null },
+      delivery: { status: 'NOT_DELIVERED', evidenceRef: null, customerEvidenceRef: null },
+    }))).toThrow(/permanent-shop authority mismatch/);
+  });
+
+  it('rejects a cross-project Shopify identity even when both domains look plausible', () => {
+    expect(() => evaluateFounderProofAuditLifecycle(base({
+      mode: 'LIVE',
+      commerce: {
+        status: 'PAYMENT_VERIFIED',
+        source: 'shopify',
+        evidenceRef: 'shopify://orders/cross-project/payment',
+        storeIdentity: {
+          ...FCR_SHOPIFY_IDENTITY,
+          project: 'juss-beautiful-hair',
+        },
+      },
+      intake: { status: 'MISSING', evidenceRef: null },
+      audit: { status: 'NOT_STARTED', evidenceRef: null },
+      delivery: { status: 'NOT_DELIVERED', evidenceRef: null, customerEvidenceRef: null },
+    }))).toThrow(/project authority mismatch/);
   });
 
   it('fails closed if a live audit starts before Shopify payment is verified', () => {
@@ -208,6 +294,10 @@ describe('Founder Proof Audit lifecycle truth contract', () => {
     expect(() => evaluateFounderProofAuditLifecycle(base({
       commerce: { status: 'NOT_EXECUTED', source: 'none', evidenceRef: 'shopify://stale/order' },
     }))).toThrow(/NOT_EXECUTED commerce must not carry evidenceRef/);
+
+    expect(() => evaluateFounderProofAuditLifecycle(base({
+      commerce: { status: 'NOT_EXECUTED', source: 'none', storeIdentity: FCR_SHOPIFY_IDENTITY },
+    }))).toThrow(/NOT_EXECUTED commerce must not carry storeIdentity/);
 
     expect(() => evaluateFounderProofAuditLifecycle(base({
       intake: { status: 'MISSING', evidenceRef: 'fcr://stale/intake' },
