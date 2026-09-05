@@ -3,6 +3,7 @@ import {
   CHIEF_REPOSITORY,
   EXACT_HEAD_RULESET_ID,
   EXPECTED_CHIEF_BASE_SHA,
+  FOUNDER_GITHUB_USER_ID,
   GOVERNANCE_BOUNDARY_RULESET_ID,
   LEGACY_PREMERGE_CONTEXTS,
   PROOFMODE_RUNTIME_JOB,
@@ -69,7 +70,8 @@ function evidence(overrides = {}) {
     head_sha: HEAD,
     head_branch: HEAD_REF,
     path: PROOFMODE_WORKFLOW_PATH,
-    actor: { login: 'jussray' },
+    actor: { login: 'jussray', id: Number(FOUNDER_GITHUB_USER_ID) },
+    triggering_actor: { login: 'jussray', id: Number(FOUNDER_GITHUB_USER_ID) },
     repository: { full_name: CHIEF_REPOSITORY },
   };
   const jobs = [{
@@ -122,6 +124,8 @@ describe('FCR-owned Chief ProofMode governance witness', () => {
     expect(result.headSha).toBe(HEAD);
     expect(result.trustedAppId).toBe(APP_ID);
     expect(result.trustedWitnessContext).toBe(TRUSTED_WITNESS_CONTEXT);
+    expect(result.evidence.workflowRunActorId).toBe(FOUNDER_GITHUB_USER_ID);
+    expect(result.evidence.workflowRunTriggeringActorId).toBe(FOUNDER_GITHUB_USER_ID);
     expect(result.violations).toEqual([]);
     expect(result.evidenceFingerprint).toMatch(/^[0-9a-f]{64}$/);
   });
@@ -173,7 +177,8 @@ describe('FCR-owned Chief ProofMode governance witness', () => {
 
   it('rejects non-founder, non-dispatch, wrong-head, wrong-path, or unsuccessful workflow runs', () => {
     const variants = [
-      ['workflow-run-actor-not-founder', { actor: { login: 'someone-else' } }],
+      ['workflow-run-actor-not-founder', { actor: { login: 'someone-else', id: 7 } }],
+      ['workflow-run-actor-not-founder', { actor: { login: 'jussray', id: 7 } }],
       ['workflow-run-event-not-founder-dispatch', { event: 'pull_request' }],
       ['workflow-run-head-mismatch', { head_sha: 'c'.repeat(40) }],
       ['workflow-run-branch-mismatch', { head_branch: 'other-branch' }],
@@ -188,6 +193,15 @@ describe('FCR-owned Chief ProofMode governance witness', () => {
       expect(classifications(result)).toContain(expected);
       expect(result.ok).toBe(false);
     }
+  });
+
+  it('rejects a non-founder rerun even when the original workflow actor is the founder', () => {
+    const input = evidence();
+    input.workflowRun.run_attempt = 2;
+    input.workflowRun.triggering_actor = { login: 'someone-else', id: 7 };
+    const result = evaluateChiefProofModeGovernanceEvidence(input);
+    expect(classifications(result)).toContain('workflow-run-triggering-actor-not-founder');
+    expect(result.ok).toBe(false);
   });
 
   it('rejects missing, duplicate, or unsuccessful candidate runtime jobs', () => {
