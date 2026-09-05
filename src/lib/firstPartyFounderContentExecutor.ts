@@ -122,6 +122,7 @@ interface ValidatedAuthority {
   sourceCommitSha: string;
   authorizationHash: string;
   publicPayloadHash: string;
+  publicCopyHash: string;
   approvalId: string;
   text: string;
   proofUrl: string | null;
@@ -144,6 +145,10 @@ function record(value: unknown): JsonRecord {
 
 function stableHash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+function exactTextHash(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
 }
 
 function validTime(value: unknown): { iso: string; ms: number } | null {
@@ -280,6 +285,11 @@ function validateAuthority(
 
   if (reasons.length > 0) throw invalid(reasons);
 
+  // This is the exact canonical provider text only. It deliberately excludes
+  // claims, evidence, source SHA, proof URLs, provider account, and other
+  // metadata so a provider-verified publication can remain exact-copy memory
+  // even when surrounding evidence or proposal metadata later rotates.
+  const publicCopyHash = exactTextHash(approvedText);
   const contentHash = stableHash({
     contract: FIRST_PARTY_FOUNDER_PUBLISH_CONTRACT,
     authorizationHash,
@@ -328,6 +338,7 @@ function validateAuthority(
     sourceCommitSha,
     authorizationHash,
     publicPayloadHash,
+    publicCopyHash,
     approvalId,
     text: approvedText,
     proofUrl,
@@ -498,6 +509,7 @@ export async function dispatchFirstPartyFounderContentPublishNow(
       sourceCommitSha: authority.sourceCommitSha,
       authorizationHash: authority.authorizationHash,
       publicPayloadHash: authority.publicPayloadHash,
+      publicCopyHash: authority.publicCopyHash,
       approvalId: authority.approvalId,
       platform: 'linkedin',
       providerAccountId: authority.authorUrn,
@@ -534,6 +546,7 @@ export async function dispatchFirstPartyFounderContentPublishNow(
       permalink: receipt.permalink,
       providerRequestId: receipt.providerRequestId,
       publishedAt: receipt.publishedAt,
+      publicCopyHash: authority.publicCopyHash,
       contentHash: receipt.contentHash,
       sourceCommitSha: receipt.sourceCommitSha,
       proofUrls: receipt.proofUrls,
