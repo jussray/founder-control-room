@@ -144,7 +144,7 @@ python3 scripts/founder_content_source_binding.py supersession-input.json \
   --output supersession-source-bound-receipt.json
 ```
 
-A predecessor supersession receipt may be supplied as lineage. The repository implementation uses the explicit `fcr-json-v1` canonicalization for new receipt identities; lineage never authorizes publication and an older receipt ID is not regenerated under a different hash contract.
+A predecessor supersession receipt may be supplied as lineage only when the complete raw identifier matches `SUP-<16 hex>` case-insensitively. The implementation validates that full shape before normalizing it to uppercase `SUP-` plus lowercase hex. Arbitrary prefixes must fail closed rather than being rewritten into valid-looking lineage. The repository implementation uses the explicit `fcr-json-v1` canonicalization for new receipt identities; lineage never authorizes publication and an older receipt ID is not regenerated under a different hash contract.
 
 Focused verification:
 
