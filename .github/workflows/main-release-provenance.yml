@@ -20,6 +20,10 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   TARGET_SHA: ${{ inputs.target_sha || github.event.pull_request.head.sha || github.sha }}
 
+concurrency:
+  group: main-release-provenance-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   contract:
     name: Main release provenance contract
@@ -62,13 +66,40 @@ jobs:
         run: |
           set -euo pipefail
           current_main_sha="$(gh api "repos/${GITHUB_REPOSITORY}/branches/main" --jq '.commit.sha')"
+          printf 'current_main_sha=%s\n' "$current_main_sha" >> "$GITHUB_OUTPUT"
+
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$TARGET_SHA" != "$current_main_sha" ]; then
+            printf '[]\n' > associated-pulls.json
+            exit 0
+          fi
+
           gh api \
             -H 'Accept: application/vnd.github+json' \
             -H 'X-GitHub-Api-Version: 2022-11-28' \
             "repos/${GITHUB_REPOSITORY}/commits/${TARGET_SHA}/pulls" \
             > associated-pulls.json
-          printf 'current_main_sha=%s\n' "$current_main_sha" >> "$GITHUB_OUTPUT"
+      - name: Record superseded push without manufacturing a failure
+        if: ${{ github.event_name == 'push' && env.TARGET_SHA != steps.provider.outputs.current_main_sha }}
+        shell: bash
+        env:
+          CURRENT_MAIN_SHA: ${{ steps.provider.outputs.current_main_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          const result = {
+            ok: true,
+            enforced: false,
+            reason: 'superseded_by_newer_main',
+            targetSha: process.env.TARGET_SHA,
+            currentMainSha: process.env.CURRENT_MAIN_SHA,
+          };
+          writeFileSync('artifacts/main-release-provenance.json', `${JSON.stringify(result, null, 2)}\n`, 'utf8');
+          process.stdout.write(`${JSON.stringify(result)}\n`);
+          NODE
       - name: Verify release provenance against live GitHub state
+        if: ${{ github.event_name != 'push' || env.TARGET_SHA == steps.provider.outputs.current_main_sha }}
         shell: bash
         env:
           CURRENT_MAIN_SHA: ${{ steps.provider.outputs.current_main_sha }}
