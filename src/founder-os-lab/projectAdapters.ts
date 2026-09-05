@@ -50,9 +50,9 @@ interface NormalizedContractUrls {
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SEKRET_BIP_REPOSITORY = 'jussray/Sekret-Bip';
-const SEKRET_BIP_AUDITED_HEAD = '467da149bad1720f87885a991a924aa143eb2ddd';
+const SEKRET_BIP_AUDITED_HEAD = 'aeacd00379dbe3b3c457d140ab5b89210f8afeda';
 const SEKRET_BIP_AUDITED_CONTRACT_BLOBS = {
-  'app/index.tsx': '9fd126bbec9a9958ef9c39cf9a25356bee83bb87',
+  'app/index.tsx': '299da021482968e415ab1016b19f52daeeec497a',
   'screens/WebWelcomeScreen.tsx': '5f1dafb209a9e8aee050b61fe38ace808e99f4b1',
   'constants/frontDoorTheme.ts': '0c331d30058ad21ea3cbb51e0788165008992d2f',
   'docs/COMPANION_NAME_CANON.md': 'fec910ecd3c99b08f1305225cfe3d1b1e82aa171',
