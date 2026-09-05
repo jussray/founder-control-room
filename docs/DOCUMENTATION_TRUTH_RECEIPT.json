@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the current Founder Signal Engine, atomic active editorial-pattern approval reservation, direct first-party provider configuration preflight, provider-neutral n8n authority membrane, PR continuity live-base observation rule, truth-governance, provider review policy, Cloudflare release authority, and BuildEvent projection to reviewed source invariants without claiming production migration apply, provider configuration, publication outcome, deployment success, merge authority, database mutation, secret validity, billing, or destructive-action authority.",
+  "purpose": "Bind the current Founder Signal Engine, provider-readback-verified exact-copy and editorial-pattern publication memory, atomic active editorial-pattern approval reservation, direct first-party provider configuration preflight, provider-neutral n8n authority membrane, PR continuity live-base observation rule, truth-governance, provider review policy, Cloudflare release authority, and BuildEvent projection to reviewed source invariants without claiming production migration apply, provider configuration, publication outcome, deployment success, merge authority, database mutation, secret validity, billing, or destructive-action authority.",
   "domains": [
     "publishing",
     "cloudflare-authority",
@@ -12,7 +12,7 @@
     {
       "path": "src/lib/founderEditorialNovelty.ts",
       "claims": [
-        "src/lib/founderEditorialNovelty.ts must keep PromptOS pattern grammar, Chief candidate-angle identity, and FCR history/approval authority separate; derive non-authorizing novelty fingerprints; reject HIGH repetition risk; and never treat provider schedule acceptance as publication truth."
+        "src/lib/founderEditorialNovelty.ts must keep PromptOS pattern grammar, provider-verified exact-copy identity, Chief candidate-angle identity, and FCR history/approval authority separate; retain fingerprint-only provider-readback memory; reject HIGH repetition risk on either exact verified public copy or an already-published thesis/hook pattern; and never treat provider schedule acceptance, failed/UNKNOWN outcomes, or a request hash without matching provider-readback truth as publication memory."
       ]
     },
     {
@@ -24,7 +24,7 @@
     {
       "path": "docs/founder-signal-engine/editorial-novelty.md",
       "claims": [
-        "docs/founder-signal-engine/editorial-novelty.md must document the pre-draft fingerprint gate as separate from the approval-time novelty gate, and must state that PASS grants no publication authority and never skips approval-time review."
+        "docs/founder-signal-engine/editorial-novelty.md must document the pre-draft fingerprint gate as separate from the approval-time novelty gate, keep provider-readback publication evidence separate from schedule acceptance, and state that PASS grants no publication authority and never skips approval-time review."
       ]
     },
     {
@@ -46,9 +46,15 @@
       ]
     },
     {
+      "path": "supabase/migrations/20260905032000_founder_content_approval_editorial_pattern_history.sql",
+      "claims": [
+        "supabase/migrations/20260905032000_founder_content_approval_editorial_pattern_history.sql must preserve immutable fingerprint-only approval-to-editorial-pattern history in the same serialized issuance transaction, keep raw thesis/hook/copy out of the ledger, fail closed on conflicting approval identity, restrict direct table mutation, and remain source-only until a separately authorized production apply."
+      ]
+    },
+    {
       "path": "src/lib/firstPartyFounderContentExecutor.ts",
       "claims": [
-        "src/lib/firstPartyFounderContentExecutor.ts must validate complete server-side LinkedIn adapter configuration, including configured LINKEDIN_API_VERSION format, before creating any durable approval_executions reservation; malformed provider configuration must create zero reservation, consume no approval, make zero provider requests, and remain distinct from provider publication truth."
+        "src/lib/firstPartyFounderContentExecutor.ts must validate complete server-side LinkedIn adapter configuration before creating any durable approval_executions reservation; derive publicCopyHash only from the exact canonical provider text; carry that hash through the execution request and successful provider-readback result without storing raw copy in novelty history; and never treat the pre-write hash, malformed configuration, provider acceptance, or ambiguous provider outcome as publication truth."
       ]
     },
     {
@@ -120,7 +126,7 @@
     {
       "path": "README.md",
       "claims": [
-        "README.md must describe the source-level founder-content issuance membrane as separate exact-copy and bounded editorial-pattern authority identities, state that one-shot consumption does not release the pattern before provider/readback latency is covered, preserve historical approvals, state that the new migration is not production proof, preserve the n8n generation membrane and live-base PR continuity observation, and retain exact-SHA release proof, deterministic review, authenticated Founder Final, machine gates, CodeQL, thread resolution, and force-push/deletion protection."
+        "README.md must describe the source-level founder-content issuance membrane as separate exact-copy and bounded editorial-pattern authority identities; state that provider-readback-verified direct LinkedIn publication retains fingerprint-only exact-copy and editorial-pattern memory while schedule/failed/UNKNOWN outcomes do not; preserve historical approvals; state that source migrations are not production proof; preserve the n8n generation membrane and live-base PR continuity observation; and retain exact-SHA release proof, deterministic review, authenticated Founder Final, machine gates, CodeQL, thread resolution, and force-push/deletion protection."
       ]
     },
     {
