@@ -6,6 +6,8 @@ const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const TARGET_BRANCH = /^[A-Za-z0-9._/-]+$/;
 
 export const RELEASE_PROOF_SCHEMA = 'fcr-release-proof-workflow@v0' as const;
+export const RELEASE_PROOF_CONTINUITY_SCHEMA = 'fcr/release-proof-continuity@v1' as const;
+export const ATTACK_1000_PRESSURE_BUDGET = 1000 as const;
 
 export type ReleaseProofCandidate = {
   repository: string;
@@ -18,12 +20,14 @@ export type ReleaseProofCandidate = {
 export type BoundReleaseProofCandidate = {
   candidate: ReleaseProofCandidate;
   candidateFingerprint: string;
+  candidateCookie: string;
 };
 
 export type ReleaseEvidenceObservation = {
   repository: string;
   headSha: string;
   candidateFingerprint: string;
+  candidateCookie: string;
   evidenceFingerprint: string;
   verdict: 'clear' | 'blocked';
 };
@@ -32,20 +36,39 @@ export type FounderApprovalObservation = {
   repository: string;
   headSha: string;
   candidateFingerprint: string;
+  candidateCookie: string;
+  evidenceFingerprint: string;
+  evidenceCookie: string;
   authorityReceiptFingerprint: string;
   approved: boolean;
 };
 
 export type EvidenceDecision =
-  | { state: 'EVIDENCE_CLEAR'; evidenceFingerprint: string }
-  | { state: 'BLOCKED'; reason: 'EVIDENCE_IDENTITY_MISMATCH' | 'EVIDENCE_REPORTED_BLOCKER' | 'INVALID_EVIDENCE_OBSERVATION' };
+  | { state: 'EVIDENCE_CLEAR'; evidenceFingerprint: string; evidenceCookie: string }
+  | {
+    state: 'BLOCKED';
+    reason:
+      | 'EVIDENCE_IDENTITY_MISMATCH'
+      | 'EVIDENCE_COOKIE_MISMATCH'
+      | 'EVIDENCE_REPORTED_BLOCKER'
+      | 'INVALID_EVIDENCE_OBSERVATION';
+  };
 
 export type FounderDecision =
-  | { state: 'FOUNDER_APPROVAL_OBSERVED'; authorityReceiptFingerprint: string }
-  | { state: 'HOLD'; reason: 'FOUNDER_IDENTITY_MISMATCH' | 'FOUNDER_APPROVAL_NOT_OBSERVED' | 'INVALID_FOUNDER_OBSERVATION' };
+  | { state: 'FOUNDER_APPROVAL_OBSERVED'; authorityReceiptFingerprint: string; authorityCookie: string }
+  | {
+    state: 'HOLD';
+    reason:
+      | 'FOUNDER_IDENTITY_MISMATCH'
+      | 'FOUNDER_COOKIE_MISMATCH'
+      | 'FOUNDER_EVIDENCE_MISMATCH'
+      | 'FOUNDER_APPROVAL_NOT_OBSERVED'
+      | 'INVALID_FOUNDER_OBSERVATION';
+  };
 
 export type ReleaseProofReceipt = {
   schemaVersion: typeof RELEASE_PROOF_SCHEMA;
+  continuitySchema: typeof RELEASE_PROOF_CONTINUITY_SCHEMA;
   state: 'READY_FOR_FINAL_REREAD';
   repository: string;
   targetBranch: string;
@@ -53,12 +76,26 @@ export type ReleaseProofReceipt = {
   headSha: string;
   pullRequestNumber?: number;
   candidateFingerprint: string;
+  candidateCookie: string;
   evidenceFingerprint: string;
+  evidenceCookie: string;
   authorityReceiptFingerprint: string;
+  authorityCookie: string;
   founderApprovalObserved: true;
   mergeAuthorized: false;
   deploymentAuthorized: false;
   providerMutationAuthorized: false;
+  attack1000: {
+    pressureBudget: typeof ATTACK_1000_PRESSURE_BUDGET;
+    literalExternalActionsClaimed: 0;
+  };
+  invariants: {
+    historicalFingerprintIsImmutable: true;
+    candidateMovementExpiresContinuity: true;
+    evidenceCannotCrossCandidateCookie: true;
+    authorityCannotCrossEvidenceCookie: true;
+    receiptDoesNotSelfAuthorize: true;
+  };
   nextGate: 'FINAL_PROVIDER_REREAD_AND_EXISTING_AUTHORITY_CONTRACT_REQUIRED';
 };
 
@@ -80,6 +117,12 @@ function fullSha(value: unknown): string | null {
 function sha256(value: unknown): string | null {
   const candidate = cleanString(value);
   return candidate && SHA256.test(candidate) ? candidate.toLowerCase() : null;
+}
+
+function hashContinuity(label: string, ...parts: string[]): string {
+  return createHash('sha256')
+    .update(JSON.stringify([RELEASE_PROOF_CONTINUITY_SCHEMA, label, ...parts]))
+    .digest('hex');
 }
 
 export function normalizeReleaseProofCandidate(input: unknown): ReleaseProofCandidate {
@@ -131,11 +174,43 @@ export function fingerprintReleaseCandidate(candidate: ReleaseProofCandidate): s
   return createHash('sha256').update(canonical).digest('hex');
 }
 
+export function buildCandidateContinuityCookie(candidateFingerprint: string): string {
+  const normalized = sha256(candidateFingerprint);
+  if (!normalized) throw new Error('candidateFingerprint must be a SHA-256 fingerprint.');
+  return hashContinuity('candidate-cookie', normalized);
+}
+
+export function buildEvidenceContinuityCookie(
+  candidateCookie: string,
+  evidenceFingerprint: string,
+): string {
+  const normalizedCandidateCookie = sha256(candidateCookie);
+  const normalizedEvidenceFingerprint = sha256(evidenceFingerprint);
+  if (!normalizedCandidateCookie || !normalizedEvidenceFingerprint) {
+    throw new Error('Evidence continuity requires valid candidate and evidence fingerprints.');
+  }
+  return hashContinuity('evidence-cookie', normalizedCandidateCookie, normalizedEvidenceFingerprint);
+}
+
+export function buildAuthorityContinuityCookie(
+  evidenceCookie: string,
+  authorityReceiptFingerprint: string,
+): string {
+  const normalizedEvidenceCookie = sha256(evidenceCookie);
+  const normalizedAuthorityFingerprint = sha256(authorityReceiptFingerprint);
+  if (!normalizedEvidenceCookie || !normalizedAuthorityFingerprint) {
+    throw new Error('Authority continuity requires valid evidence and authority fingerprints.');
+  }
+  return hashContinuity('authority-cookie', normalizedEvidenceCookie, normalizedAuthorityFingerprint);
+}
+
 export function bindReleaseProofCandidate(input: unknown): BoundReleaseProofCandidate {
   const candidate = normalizeReleaseProofCandidate(input);
+  const candidateFingerprint = fingerprintReleaseCandidate(candidate);
   return {
     candidate,
-    candidateFingerprint: fingerprintReleaseCandidate(candidate),
+    candidateFingerprint,
+    candidateCookie: buildCandidateContinuityCookie(candidateFingerprint),
   };
 }
 
@@ -160,7 +235,8 @@ export function evaluateReleaseEvidence(
   if (!source) return { state: 'BLOCKED', reason: 'INVALID_EVIDENCE_OBSERVATION' };
 
   const evidenceFingerprint = sha256(source.evidenceFingerprint);
-  if (!evidenceFingerprint || (source.verdict !== 'clear' && source.verdict !== 'blocked')) {
+  const candidateCookie = sha256(source.candidateCookie);
+  if (!evidenceFingerprint || !candidateCookie || (source.verdict !== 'clear' && source.verdict !== 'blocked')) {
     return { state: 'BLOCKED', reason: 'INVALID_EVIDENCE_OBSERVATION' };
   }
 
@@ -168,22 +244,40 @@ export function evaluateReleaseEvidence(
     return { state: 'BLOCKED', reason: 'EVIDENCE_IDENTITY_MISMATCH' };
   }
 
+  if (candidateCookie !== bound.candidateCookie) {
+    return { state: 'BLOCKED', reason: 'EVIDENCE_COOKIE_MISMATCH' };
+  }
+
   if (source.verdict !== 'clear') {
     return { state: 'BLOCKED', reason: 'EVIDENCE_REPORTED_BLOCKER' };
   }
 
-  return { state: 'EVIDENCE_CLEAR', evidenceFingerprint };
+  return {
+    state: 'EVIDENCE_CLEAR',
+    evidenceFingerprint,
+    evidenceCookie: buildEvidenceContinuityCookie(bound.candidateCookie, evidenceFingerprint),
+  };
 }
 
 export function evaluateFounderApprovalObservation(
   bound: BoundReleaseProofCandidate,
+  evidence: Extract<EvidenceDecision, { state: 'EVIDENCE_CLEAR' }>,
   input: unknown,
 ): FounderDecision {
   const source = record(input);
   if (!source) return { state: 'HOLD', reason: 'INVALID_FOUNDER_OBSERVATION' };
 
   const authorityReceiptFingerprint = sha256(source.authorityReceiptFingerprint);
-  if (!authorityReceiptFingerprint || typeof source.approved !== 'boolean') {
+  const candidateCookie = sha256(source.candidateCookie);
+  const evidenceFingerprint = sha256(source.evidenceFingerprint);
+  const evidenceCookie = sha256(source.evidenceCookie);
+  if (
+    !authorityReceiptFingerprint
+    || !candidateCookie
+    || !evidenceFingerprint
+    || !evidenceCookie
+    || typeof source.approved !== 'boolean'
+  ) {
     return { state: 'HOLD', reason: 'INVALID_FOUNDER_OBSERVATION' };
   }
 
@@ -191,11 +285,23 @@ export function evaluateFounderApprovalObservation(
     return { state: 'HOLD', reason: 'FOUNDER_IDENTITY_MISMATCH' };
   }
 
+  if (candidateCookie !== bound.candidateCookie) {
+    return { state: 'HOLD', reason: 'FOUNDER_COOKIE_MISMATCH' };
+  }
+
+  if (evidenceFingerprint !== evidence.evidenceFingerprint || evidenceCookie !== evidence.evidenceCookie) {
+    return { state: 'HOLD', reason: 'FOUNDER_EVIDENCE_MISMATCH' };
+  }
+
   if (!source.approved) {
     return { state: 'HOLD', reason: 'FOUNDER_APPROVAL_NOT_OBSERVED' };
   }
 
-  return { state: 'FOUNDER_APPROVAL_OBSERVED', authorityReceiptFingerprint };
+  return {
+    state: 'FOUNDER_APPROVAL_OBSERVED',
+    authorityReceiptFingerprint,
+    authorityCookie: buildAuthorityContinuityCookie(evidence.evidenceCookie, authorityReceiptFingerprint),
+  };
 }
 
 export function buildReleaseProofReceipt(
@@ -205,15 +311,30 @@ export function buildReleaseProofReceipt(
 ): ReleaseProofReceipt {
   return {
     schemaVersion: RELEASE_PROOF_SCHEMA,
+    continuitySchema: RELEASE_PROOF_CONTINUITY_SCHEMA,
     state: 'READY_FOR_FINAL_REREAD',
     ...bound.candidate,
     candidateFingerprint: bound.candidateFingerprint,
+    candidateCookie: bound.candidateCookie,
     evidenceFingerprint: evidence.evidenceFingerprint,
+    evidenceCookie: evidence.evidenceCookie,
     authorityReceiptFingerprint: founder.authorityReceiptFingerprint,
+    authorityCookie: founder.authorityCookie,
     founderApprovalObserved: true,
     mergeAuthorized: false,
     deploymentAuthorized: false,
     providerMutationAuthorized: false,
+    attack1000: {
+      pressureBudget: ATTACK_1000_PRESSURE_BUDGET,
+      literalExternalActionsClaimed: 0,
+    },
+    invariants: {
+      historicalFingerprintIsImmutable: true,
+      candidateMovementExpiresContinuity: true,
+      evidenceCannotCrossCandidateCookie: true,
+      authorityCannotCrossEvidenceCookie: true,
+      receiptDoesNotSelfAuthorize: true,
+    },
     nextGate: 'FINAL_PROVIDER_REREAD_AND_EXISTING_AUTHORITY_CONTRACT_REQUIRED',
   };
 }
