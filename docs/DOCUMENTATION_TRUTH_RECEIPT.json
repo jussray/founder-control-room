@@ -231,6 +231,12 @@
       "claims": [
         "src/buildEvents/githubBuildEvent.ts must use validated merge_commit_sha as landed base-branch identity for merged PRs while retaining proposal head as auditedCommitSha; malformed SHAs must fail closed, and webhook BuildEvents never grant merge, deployment, or publication authority."
       ]
+    },
+    {
+      "path": "src/governance/consequentialResumeRequires.ts",
+      "claims": [
+        "src/governance/consequentialResumeRequires.ts must remain a non-executing eligibility gate: it requires explicit fresh authority re-observation, exact continuity/proposal/action/version idempotency binding, fresh independent artifact-bound witnesses, and the existing governed-action authorization and recovery checks; it cannot transfer continuity authority or perform external execution."
+      ]
     }
   ]
 }
