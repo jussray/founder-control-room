@@ -151,6 +151,10 @@ describe('POST /founder-os/proof-audit/internal-dry-run', () => {
       .post('/founder-os/proof-audit/internal-dry-run')
       .set('Authorization', BEARER)
       .send({ evidence: 'caller-controlled' });
+    const emptyJsonResponse = await request(buildApp())
+      .post('/founder-os/proof-audit/internal-dry-run')
+      .set('Authorization', BEARER)
+      .send({});
     const rawResponse = await request(buildApp())
       .post('/founder-os/proof-audit/internal-dry-run')
       .set('Authorization', BEARER)
@@ -158,10 +162,12 @@ describe('POST /founder-os/proof-audit/internal-dry-run', () => {
       .send('caller-controlled');
 
     expect(jsonResponse.status).toBe(400);
+    expect(emptyJsonResponse.status).toBe(400);
     expect(rawResponse.status).toBe(400);
     expect(jsonResponse.body).toEqual({
       error: 'Founder Proof Audit internal dry run accepts no request body.',
     });
+    expect(emptyJsonResponse.body).toEqual(jsonResponse.body);
     expect(rawResponse.body).toEqual(jsonResponse.body);
     expect(mocks.runDryRun).not.toHaveBeenCalled();
   });
