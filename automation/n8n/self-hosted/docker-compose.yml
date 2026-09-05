@@ -21,7 +21,7 @@ services:
     working_dir: /proof
     command: ["node", "mock-buffer-graphql.mjs"]
     environment:
-      BUFFER_MOCK_API_KEY: ${BUFFER_MOCK_API_KEY:?set BUFFER_MOCK_API_KEY for proof profile}
+      BUFFER_MOCK_API_KEY: ${BUFFER_MOCK_API_KEY:-}
     volumes:
       - ./mock-buffer-graphql.mjs:/proof/mock-buffer-graphql.mjs:ro
 
