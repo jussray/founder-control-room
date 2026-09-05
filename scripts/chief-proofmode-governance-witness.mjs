@@ -107,6 +107,7 @@ function pushViolation(violations, classification, detail = {}) {
 
 export function evaluateChiefProofModeGovernanceEvidence({
   appId,
+  trustedFcrMainSha,
   pullRequestNumber,
   pullRequest,
   workflowFile,
@@ -116,6 +117,7 @@ export function evaluateChiefProofModeGovernanceEvidence({
 }) {
   const violations = [];
   const trustedAppId = numericId(appId);
+  const trustRootSha = lower(trustedFcrMainSha);
   const prNumber = Number(pullRequestNumber);
   const prHeadSha = lower(pullRequest?.head?.sha);
   const prHeadRef = text(pullRequest?.head?.ref);
@@ -127,6 +129,11 @@ export function evaluateChiefProofModeGovernanceEvidence({
 
   if (!trustedAppId) {
     pushViolation(violations, 'trusted-app-id-invalid');
+  }
+  if (!FULL_SHA.test(trustRootSha)) {
+    pushViolation(violations, 'trusted-fcr-main-sha-invalid', {
+      observed: trustRootSha || null,
+    });
   }
   if (!Number.isSafeInteger(prNumber) || prNumber <= 0 || pullRequest?.number !== prNumber) {
     pushViolation(violations, 'pull-request-number-mismatch', {
@@ -292,6 +299,7 @@ export function evaluateChiefProofModeGovernanceEvidence({
 
   const evidence = {
     contract: CONTRACT,
+    trustedFcrMainSha: FULL_SHA.test(trustRootSha) ? trustRootSha : null,
     repository: CHIEF_REPOSITORY,
     pullRequestNumber: Number.isSafeInteger(prNumber) ? prNumber : null,
     baseSha: prBaseSha || null,
@@ -318,6 +326,7 @@ export function evaluateChiefProofModeGovernanceEvidence({
     ok: violations.length === 0,
     classification: violations.length === 0 ? 'VERIFIED' : 'BLOCKED',
     providerMutationPerformed: false,
+    providerReceiptReused: false,
     headSha: prHeadSha || null,
     trustedWitnessContext: TRUSTED_WITNESS_CONTEXT,
     trustedAppId,
@@ -379,7 +388,13 @@ async function publishAndReadBackWitness(token, appId, decision) {
     && lower(run?.external_id) === decision.evidenceFingerprint
     && String(run?.app?.id ?? '') === String(appId),
   );
-  if (matching) return matching;
+  if (matching) {
+    return {
+      checkRun: matching,
+      providerMutationPerformed: false,
+      providerReceiptReused: true,
+    };
+  }
 
   await githubJson(`/repos/${CHIEF_OWNER}/chief-ai-machine/check-runs`, token, {
     method: 'POST',
@@ -393,6 +408,7 @@ async function publishAndReadBackWitness(token, appId, decision) {
         title: 'FCR trusted Chief ProofMode governance witness',
         summary: [
           `Contract: ${CONTRACT}`,
+          `FCR trust-root main: ${decision.evidence.trustedFcrMainSha}`,
           `Chief PR: #${decision.evidence.pullRequestNumber}`,
           `Exact head: ${decision.headSha}`,
           `Founder workflow_dispatch: ${decision.evidence.workflowRunId}`,
@@ -421,17 +437,23 @@ async function publishAndReadBackWitness(token, appId, decision) {
   if (!verified) {
     throw new Error('FCR App Check Run publication succeeded without exact trusted readback');
   }
-  return verified;
+  return {
+    checkRun: verified,
+    providerMutationPerformed: true,
+    providerReceiptReused: false,
+  };
 }
 
 export async function runChiefProofModeGovernanceWitness(env = process.env) {
   const appId = text(env.GITHUB_APP_ID);
   const privateKey = text(env.GITHUB_PRIVATE_KEY);
+  const trustedFcrMainSha = lower(env.EXPECTED_TRUSTED_MAIN_SHA);
   const prNumber = Number(env.CHIEF_PR_NUMBER ?? '143');
   const runId = text(env.CHIEF_PROOFMODE_RUN_ID);
 
   if (!numericId(appId)) throw new Error('GITHUB_APP_ID must be the numeric FCR-owned GitHub App id');
   if (!privateKey) throw new Error('GITHUB_PRIVATE_KEY is required for the FCR-owned GitHub App');
+  if (!FULL_SHA.test(trustedFcrMainSha)) throw new Error('EXPECTED_TRUSTED_MAIN_SHA must be the exact FCR trust-root main SHA');
   if (!Number.isSafeInteger(prNumber) || prNumber <= 0) throw new Error('CHIEF_PR_NUMBER must be a positive integer');
   if (!numericId(runId)) throw new Error('CHIEF_PROOFMODE_RUN_ID must be a positive workflow run id');
 
@@ -455,6 +477,7 @@ export async function runChiefProofModeGovernanceWitness(env = process.env) {
 
   const decision = evaluateChiefProofModeGovernanceEvidence({
     appId,
+    trustedFcrMainSha,
     pullRequestNumber: prNumber,
     pullRequest,
     workflowFile,
@@ -469,10 +492,12 @@ export async function runChiefProofModeGovernanceWitness(env = process.env) {
     throw new Error(`Chief ProofMode governance witness blocked: ${decision.violations.map((item) => item.classification).join(', ')}`);
   }
 
-  const checkRun = await publishAndReadBackWitness(token, appId, decision);
+  const publication = await publishAndReadBackWitness(token, appId, decision);
+  const checkRun = publication.checkRun;
   const verified = {
     ...decision,
-    providerMutationPerformed: true,
+    providerMutationPerformed: publication.providerMutationPerformed,
+    providerReceiptReused: publication.providerReceiptReused,
     checkRun: {
       id: checkRun?.id == null ? null : String(checkRun.id),
       name: checkRun?.name ?? null,
