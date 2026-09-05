@@ -1,6 +1,6 @@
 import type { Server } from 'node:http';
 import express from 'express';
-import { expect, test } from '@playwright/test';
+import { expect, test, type APIRequestContext } from '@playwright/test';
 import {
   createFounderControlDecision,
   type FounderControlProposalBinding,
@@ -15,6 +15,7 @@ import {
 const peerUrl = process.env.STORYENGINE_PEER_URL ?? 'http://127.0.0.1:3901';
 const peerSha = process.env.STORYENGINE_PEER_SHA ?? '';
 const peerApiKey = process.env.STORYENGINE_PEER_API_KEY ?? '';
+const peerPullRequestApi = 'https://api.github.com/repos/jussray/StoryEngine/pulls/89';
 const receiptRoot = 'playwright-local-product-build-receipt-root';
 
 let receiptServer: Server;
@@ -43,6 +44,19 @@ test.afterAll(async () => {
   if (!receiptServer) return;
   await new Promise<void>((resolve, reject) => receiptServer.close((error) => error ? reject(error) : resolve()));
 });
+
+async function expectLivePeerStillPinned(request: APIRequestContext) {
+  const response = await request.get(peerPullRequestApi, {
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'founder-control-room-federation-proof',
+    },
+  });
+  expect(response.status()).toBe(200);
+  const body = await response.json() as { state?: string; head?: { sha?: string } };
+  expect(body.state).toBe('open');
+  expect(body.head?.sha).toBe(peerSha);
+}
 
 function directive() {
   const proposal: FounderControlProposalBinding = {
@@ -73,7 +87,9 @@ function directive() {
   });
 }
 
-test('FCR drives exact StoryEngine runtime and reconciles its receipt through the service ingress', async ({ page, request }) => {
+test('FCR drives exact live StoryEngine peer, proves replay safety, and reconciles execution evidence without outcome promotion', async ({ page, request }) => {
+  await expectLivePeerStillPinned(request);
+
   const identityResponse = await page.goto(`${peerUrl}/runtime-identity`);
   expect(identityResponse?.status()).toBe(200);
   const browserIdentity = await identityResponse?.json() as { service?: string; release_sha?: string };
@@ -85,8 +101,12 @@ test('FCR drives exact StoryEngine runtime and reconciles its receipt through th
     baseUrl: peerUrl,
     apiKey: peerApiKey,
   });
+  const replay = await dispatchStoryEngineProductBuildDirective(buildDirective, {
+    baseUrl: peerUrl,
+    apiKey: peerApiKey,
+  });
 
-  expect(reconciliation.state).toBe('verified');
+  expect(reconciliation.state).toBe('execution_reconciled');
   expect(reconciliation.runtimeIdentityBefore.release_sha).toBe(peerSha);
   expect(reconciliation.runtimeIdentityAfter.release_sha).toBe(peerSha);
   expect(reconciliation.receipt.status).toBe('completed');
@@ -94,6 +114,13 @@ test('FCR drives exact StoryEngine runtime and reconciles its receipt through th
   expect(reconciliation.receipt.mergePerformed).toBe(false);
   expect(reconciliation.receipt.deployPerformed).toBe(false);
   expect(reconciliation.receipt.providerMutationPerformed).toBe(false);
+  expect(reconciliation.outcomeVerified).toBe(false);
+
+  expect(replay.state).toBe('execution_reconciled');
+  expect(replay.receipt).toEqual(reconciliation.receipt);
+  expect(replay.receipt.executionReceiptId).toBe(reconciliation.receipt.executionReceiptId);
+  expect(replay.receipt.receiptHash).toBe(reconciliation.receipt.receiptHash);
+  expect(replay.outcomeVerified).toBe(false);
 
   const ingress = await request.post(`${receiptOrigin}/ingest/product-build-receipts/storyengine`, {
     headers: {
@@ -113,17 +140,21 @@ test('FCR drives exact StoryEngine runtime and reconciles its receipt through th
     ok: true,
     accepted: true,
     reconciled: true,
-    evidenceState: 'verified-in-request',
+    evidenceState: 'execution-reconciled-in-request',
+    outcomeVerified: false,
     durablePersistencePerformed: false,
     replayProtectionPerformed: false,
     mergeAuthorized: false,
     deployAuthorized: false,
     providerMutationAuthorized: false,
     reconciliation: {
-      state: 'verified',
+      state: 'execution_reconciled',
       exactHeadVerified: true,
       serviceIdentityVerified: true,
       receiptVerified: true,
+      outcomeVerified: false,
     },
   });
+
+  await expectLivePeerStillPinned(request);
 });
