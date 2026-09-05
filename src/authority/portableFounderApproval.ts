@@ -3,6 +3,7 @@ export const REGISTERED_ADAPTER_ATTESTATION_TYPE = 'registered-adapter-signature
 
 const EXACT_SHA = /^[0-9a-f]{40}$/i;
 const SHA256_CONTENT_HASH = /^sha256:[0-9a-f]{64}$/i;
+const CANONICAL_ACTION = /^[a-z][a-z0-9_-]*$/;
 const APPROVED_SOURCE_CONSOLES = new Set([
   'chatgpt',
   'claude',
@@ -113,8 +114,12 @@ function nonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function nullableNonEmptyString(value: unknown): value is string | null | undefined {
-  return value === undefined || value === null || nonEmptyString(value);
+function canonicalNonEmptyString(value: unknown): value is string {
+  return nonEmptyString(value) && value === value.trim();
+}
+
+function nullableCanonicalString(value: unknown): value is string | null | undefined {
+  return value === undefined || value === null || canonicalNonEmptyString(value);
 }
 
 function invalid(reason: string): PortableFounderApprovalValidationResult {
@@ -143,22 +148,22 @@ function parsePacket(input: unknown): PortableFounderApprovalPacket | PortableFo
   }
 
   if (input.version !== PORTABLE_FOUNDER_APPROVAL_VERSION) return invalid('unsupported portable founder approval version');
-  if (!nonEmptyString(input.decisionId)) return invalid('decisionId is required');
-  if (!nonEmptyString(input.founderId)) return invalid('founderId is required');
+  if (!canonicalNonEmptyString(input.decisionId)) return invalid('decisionId must be canonical non-empty text');
+  if (!canonicalNonEmptyString(input.founderId)) return invalid('founderId must be canonical non-empty text');
   if (input.decision !== 'approve' && input.decision !== 'deny') return invalid('decision must be approve or deny');
-  if (!nonEmptyString(input.sourceConsole) || !APPROVED_SOURCE_CONSOLES.has(input.sourceConsole as PortableFounderApprovalSourceConsole)) {
+  if (!canonicalNonEmptyString(input.sourceConsole) || !APPROVED_SOURCE_CONSOLES.has(input.sourceConsole as PortableFounderApprovalSourceConsole)) {
     return invalid('sourceConsole is not an approved portable founder console');
   }
-  if (!nonEmptyString(input.sourceConversationRef)) return invalid('sourceConversationRef is required');
-  if (!nonEmptyString(input.sourceAdapterRef)) return invalid('sourceAdapterRef is required');
+  if (!canonicalNonEmptyString(input.sourceConversationRef)) return invalid('sourceConversationRef must be canonical non-empty text');
+  if (!canonicalNonEmptyString(input.sourceAdapterRef)) return invalid('sourceAdapterRef must be canonical non-empty text');
   if (input.oneTime !== true) return invalid('mutation-capable portable approvals must be one-time');
   if (input.founderNote !== undefined && typeof input.founderNote !== 'string') return invalid('founderNote must be text when present');
 
-  if (!Array.isArray(input.constraints) || input.constraints.some((constraint) => !nonEmptyString(constraint))) {
-    return invalid('constraints must be an array of non-empty strings');
+  if (!Array.isArray(input.constraints) || input.constraints.some((constraint) => !canonicalNonEmptyString(constraint))) {
+    return invalid('constraints must be canonical non-empty strings');
   }
 
-  if (!nonEmptyString(input.issuedAt) || !nonEmptyString(input.expiresAt)) {
+  if (!canonicalNonEmptyString(input.issuedAt) || !canonicalNonEmptyString(input.expiresAt)) {
     return invalid('issuedAt and expiresAt are required');
   }
 
@@ -175,22 +180,24 @@ function parsePacket(input: unknown): PortableFounderApprovalPacket | PortableFo
     return invalid('scope is invalid or contains unknown fields');
   }
   const scope = input.scope;
-  if (!nonEmptyString(scope.action)) return invalid('scope.action is required');
-  if (!nonEmptyString(scope.target)) return invalid('scope.target is required');
-  if (!nonEmptyString(scope.environment)) return invalid('scope.environment is required');
-  if (scope.branch !== undefined && !nonEmptyString(scope.branch)) return invalid('scope.branch must be non-empty when present');
-  if (scope.expectedCommitSha !== undefined && (!nonEmptyString(scope.expectedCommitSha) || !EXACT_SHA.test(scope.expectedCommitSha))) {
+  if (!canonicalNonEmptyString(scope.action) || !CANONICAL_ACTION.test(scope.action)) {
+    return invalid('scope.action must use canonical lowercase action syntax');
+  }
+  if (!canonicalNonEmptyString(scope.target)) return invalid('scope.target must be canonical non-empty text');
+  if (!canonicalNonEmptyString(scope.environment)) return invalid('scope.environment must be canonical non-empty text');
+  if (scope.branch !== undefined && !canonicalNonEmptyString(scope.branch)) return invalid('scope.branch must be canonical non-empty text when present');
+  if (scope.expectedCommitSha !== undefined && (!canonicalNonEmptyString(scope.expectedCommitSha) || !EXACT_SHA.test(scope.expectedCommitSha))) {
     return invalid('scope.expectedCommitSha must be an exact 40-character Git SHA when present');
   }
-  if (scope.contentHash !== undefined && (!nonEmptyString(scope.contentHash) || !SHA256_CONTENT_HASH.test(scope.contentHash))) {
+  if (scope.contentHash !== undefined && (!canonicalNonEmptyString(scope.contentHash) || !SHA256_CONTENT_HASH.test(scope.contentHash))) {
     return invalid('scope.contentHash must be sha256:<64 hex> when present');
   }
-  if (!nullableNonEmptyString(scope.missionId)) return invalid('scope.missionId must be non-empty or null when present');
-  if (!nullableNonEmptyString(scope.commandId)) return invalid('scope.commandId must be non-empty or null when present');
-  if (REPOSITORY_SHA_ACTIONS.has(scope.action) && (!nonEmptyString(scope.branch) || !nonEmptyString(scope.expectedCommitSha) || !EXACT_SHA.test(scope.expectedCommitSha))) {
+  if (!nullableCanonicalString(scope.missionId)) return invalid('scope.missionId must be canonical non-empty text or null when present');
+  if (!nullableCanonicalString(scope.commandId)) return invalid('scope.commandId must be canonical non-empty text or null when present');
+  if (REPOSITORY_SHA_ACTIONS.has(scope.action) && (!canonicalNonEmptyString(scope.branch) || !canonicalNonEmptyString(scope.expectedCommitSha) || !EXACT_SHA.test(scope.expectedCommitSha))) {
     return invalid(`${scope.action} requires an exact branch and expectedCommitSha`);
   }
-  if (CONTENT_HASH_ACTIONS.has(scope.action) && (!nonEmptyString(scope.contentHash) || !SHA256_CONTENT_HASH.test(scope.contentHash))) {
+  if (CONTENT_HASH_ACTIONS.has(scope.action) && (!canonicalNonEmptyString(scope.contentHash) || !SHA256_CONTENT_HASH.test(scope.contentHash))) {
     return invalid(`${scope.action} requires an exact contentHash`);
   }
 
@@ -200,8 +207,8 @@ function parsePacket(input: unknown): PortableFounderApprovalPacket | PortableFo
   if (input.attestation.type !== REGISTERED_ADAPTER_ATTESTATION_TYPE) {
     return invalid('attestation type must be registered-adapter-signature');
   }
-  if (!nonEmptyString(input.attestation.keyId)) return invalid('attestation.keyId is required');
-  if (!nonEmptyString(input.attestation.signature)) return invalid('attestation.signature is required');
+  if (!canonicalNonEmptyString(input.attestation.keyId)) return invalid('attestation.keyId must be canonical non-empty text');
+  if (!canonicalNonEmptyString(input.attestation.signature)) return invalid('attestation.signature must be canonical non-empty text');
 
   return input as unknown as PortableFounderApprovalPacket;
 }
