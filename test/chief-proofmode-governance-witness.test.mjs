@@ -17,6 +17,7 @@ import {
 const APP_ID = '424242';
 const HEAD = 'a'.repeat(40);
 const HEAD_REF = 'fix/proofmode-main-audit-20260828';
+const TRUSTED_FCR_MAIN = 'f'.repeat(40);
 
 function check(context, integrationId = null) {
   return { context, integration_id: integrationId };
@@ -101,6 +102,7 @@ function evidence(overrides = {}) {
 
   return {
     appId: APP_ID,
+    trustedFcrMainSha: TRUSTED_FCR_MAIN,
     pullRequestNumber: 143,
     pullRequest,
     workflowFile,
@@ -121,9 +123,11 @@ describe('FCR-owned Chief ProofMode governance witness', () => {
     expect(result.ok).toBe(true);
     expect(result.classification).toBe('VERIFIED');
     expect(result.providerMutationPerformed).toBe(false);
+    expect(result.providerReceiptReused).toBe(false);
     expect(result.headSha).toBe(HEAD);
     expect(result.trustedAppId).toBe(APP_ID);
     expect(result.trustedWitnessContext).toBe(TRUSTED_WITNESS_CONTEXT);
+    expect(result.evidence.trustedFcrMainSha).toBe(TRUSTED_FCR_MAIN);
     expect(result.evidence.workflowRunActorId).toBe(FOUNDER_GITHUB_USER_ID);
     expect(result.evidence.workflowRunTriggeringActorId).toBe(FOUNDER_GITHUB_USER_ID);
     expect(result.violations).toEqual([]);
@@ -219,7 +223,12 @@ describe('FCR-owned Chief ProofMode governance witness', () => {
     expect(classifications(failed)).toContain('candidate-runtime-job-not-successful');
   });
 
-  it('expires when Chief main or PR identity moves', () => {
+  it('expires when FCR trust-root main, Chief main, or PR identity moves', () => {
+    const invalidTrustRoot = evaluateChiefProofModeGovernanceEvidence(
+      evidence({ trustedFcrMainSha: 'not-a-sha' }),
+    );
+    expect(classifications(invalidTrustRoot)).toContain('trusted-fcr-main-sha-invalid');
+
     const movedBase = evidence();
     movedBase.pullRequest.base.sha = 'd'.repeat(40);
     const movedBaseResult = evaluateChiefProofModeGovernanceEvidence(movedBase);
@@ -229,6 +238,16 @@ describe('FCR-owned Chief ProofMode governance witness', () => {
     forkedHead.pullRequest.head.repo.full_name = 'attacker/chief-ai-machine';
     const forkedHeadResult = evaluateChiefProofModeGovernanceEvidence(forkedHead);
     expect(classifications(forkedHeadResult)).toContain('head-repository-mismatch');
+  });
+
+  it('binds the receipt fingerprint to the exact trusted FCR main SHA', () => {
+    const first = evaluateChiefProofModeGovernanceEvidence(evidence());
+    const second = evaluateChiefProofModeGovernanceEvidence(
+      evidence({ trustedFcrMainSha: 'e'.repeat(40) }),
+    );
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    expect(first.evidenceFingerprint).not.toBe(second.evidenceFingerprint);
   });
 
   it('produces a stable fingerprint and changes it when governed evidence changes', () => {
