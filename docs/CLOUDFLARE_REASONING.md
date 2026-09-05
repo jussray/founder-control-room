@@ -215,6 +215,10 @@ This source membrane does not prove the current Cloudflare required-secret set, 
 
 Enabling this lane requires a separate founder-approved provider configuration step, provider-held binding readback, and exact deployed-runtime proof. A source commit, successful Worker build, or n8n import is never enough to claim orchestration is active or publication occurred.
 
+The isolated n8n runtime proof must distinguish process health from route readiness. `GET /healthz` proves only that n8n is responding; it does not prove the published founder-content workflow has registered its production webhook. The proof therefore waits on `POST /webhook/founder-control-room/founder-content` itself and accepts only the expected unauthenticated `401`/`403` boundary as route-ready. A `404` remains a hard missing-route failure and must not be reclassified as authentication success. If registration never appears, the proof records sanitized workflow publication/database state and n8n logs before failing.
+
+This CI registration probe uses only ephemeral local credentials and the isolated Buffer fake. It neither enables the Cloudflare `N8N_FOUNDER_CONTENT_ENABLED` production switch nor proves production n8n, Buffer, or social-account activation. Production remains separately gated by founder approval, provider-held bindings, exact deployed identity, and provider readback.
+
 ## Durable release-proof Workflow boundary
 
 `wrangler.worker.toml` declares one Cloudflare Workflows binding for the exported `ReleaseProofWorkflowV0` class:
