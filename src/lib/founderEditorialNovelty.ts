@@ -392,7 +392,7 @@ function historyTime(value: FounderEditorialHistoryRecord): number {
 export function supabaseFounderEditorialHistoryRepository(client: SupabaseClient): FounderEditorialHistoryRepository {
   return {
     async recentLinkedIn(limit) {
-      const [experimentsResult, observationsResult, executionsResult, patternReservationsResult] = await Promise.all([
+      const [experimentsResult, observationsResult, executionsResult] = await Promise.all([
         client
           .from('linkedin_experiments')
           .select('id, related_project, core_thesis, primary_hook, angle, meaningful_change, hook_type, proof_style, publish_date, status')
@@ -414,11 +414,6 @@ export function supabaseFounderEditorialHistoryRepository(client: SupabaseClient
           .eq('success', true)
           .order('executed_at', { ascending: false, nullsFirst: false })
           .limit(limit),
-        client
-          .from('founder_content_active_editorial_pattern_reservations')
-          .select('approval_id, pattern_fingerprint, reserved_at, expires_at')
-          .order('reserved_at', { ascending: false, nullsFirst: false })
-          .limit(limit),
       ]);
 
       if (experimentsResult.error) {
@@ -430,8 +425,19 @@ export function supabaseFounderEditorialHistoryRepository(client: SupabaseClient
       if (executionsResult.error) {
         throw new Error(`editorial provider-readback execution history failed: ${executionsResult.error.message}`);
       }
-      if (patternReservationsResult.error) {
-        throw new Error(`editorial approval-pattern history readback failed: ${patternReservationsResult.error.message}`);
+
+      const executionRows = Array.isArray(executionsResult.data) ? executionsResult.data : [];
+      const approvalIds = [...new Set(executionRows
+        .map((item) => text(record(record(item).request).approvalId).toLowerCase())
+        .filter(Boolean))];
+      const patternHistoryResult = await client
+        .from('founder_content_approval_editorial_pattern_history')
+        .select('approval_id, pattern_fingerprint, bound_at')
+        .in('approval_id', approvalIds.length > 0 ? approvalIds : ['__no_direct_publication__'])
+        .limit(Math.max(limit, approvalIds.length));
+
+      if (patternHistoryResult.error) {
+        throw new Error(`editorial approval-pattern history readback failed: ${patternHistoryResult.error.message}`);
       }
 
       const experiments = Array.isArray(experimentsResult.data)
@@ -440,12 +446,10 @@ export function supabaseFounderEditorialHistoryRepository(client: SupabaseClient
       const observations = Array.isArray(observationsResult.data)
         ? observationsResult.data.map(normalizeFounderAttestation).filter((item): item is FounderEditorialHistoryRecord => item !== null)
         : [];
-      const patterns = approvalPatternMap(patternReservationsResult.data);
-      const providerReadbacks = Array.isArray(executionsResult.data)
-        ? executionsResult.data
-          .map((item) => normalizeProviderReadback(item, patterns))
-          .filter((item): item is FounderEditorialHistoryRecord => item !== null)
-        : [];
+      const patterns = approvalPatternMap(patternHistoryResult.data);
+      const providerReadbacks = executionRows
+        .map((item) => normalizeProviderReadback(item, patterns))
+        .filter((item): item is FounderEditorialHistoryRecord => item !== null);
 
       return [...experiments, ...observations, ...providerReadbacks]
         .sort((left, right) => historyTime(right) - historyTime(left))
