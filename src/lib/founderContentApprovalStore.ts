@@ -55,6 +55,7 @@ export interface FounderContentApprovalClaimFailure {
 export interface FounderContentApprovalRepository {
   issue(input: FounderContentIssuedApproval & {
     founderUserId: string;
+    publicCopyFingerprint: string;
     editorialPatternFingerprint: string;
   }): Promise<boolean>;
   readCurrent?(input: {
@@ -105,12 +106,12 @@ function deterministicApprovalId({
   // The canonical public-copy fingerprint remains the content identity, but
   // approval rows are immutable historical one-shot records. A later fresh
   // approval for unchanged copy must therefore receive a new row identity once
-  // the previous editorial-pattern lease is inactive instead of colliding with
-  // the old primary key forever. The server-observed issuance timestamp versions
-  // that row identity. Concurrent or near-concurrent duplicate authority is
-  // still serialized by the database-owned founder/platform/editorial-pattern
-  // reservation, so changing the row id does not weaken the active duplicate
-  // publication boundary. Current You intent id/version remain recorded on the
+  // both the previous exact-copy and editorial-pattern leases are inactive,
+  // instead of colliding with the old primary key forever. The server-observed
+  // issuance timestamp versions that immutable row identity. Concurrent or
+  // near-concurrent duplicate authority is serialized separately by the
+  // database-owned exact-copy and editorial-pattern reservations in one
+  // transaction. Current You intent id/version remain recorded on the
   // authorization itself and are intentionally excluded from this identity.
   const digest = createHash('sha256')
     .update(JSON.stringify({
@@ -215,7 +216,7 @@ function supabaseRepository(client: SupabaseClient): FounderContentApprovalRepos
   return {
     async issue(input) {
       const { data, error } = await client.rpc(
-        'issue_founder_content_approval_with_pattern_reservation',
+        'issue_founder_content_approval_with_active_reservations',
         {
           p_approval_id: input.approvalId,
           p_founder_user_id: input.founderUserId,
@@ -228,6 +229,7 @@ function supabaseRepository(client: SupabaseClient): FounderContentApprovalRepos
           p_approval: input.approval,
           p_approved_at: input.approvedAt,
           p_expires_at: input.expiresAt,
+          p_public_copy_fingerprint: input.publicCopyFingerprint,
           p_pattern_fingerprint: input.editorialPatternFingerprint,
         },
       );
@@ -398,10 +400,11 @@ export async function issueFounderContentApproval({
   const persisted = await store.issue({
     ...issued,
     founderUserId,
+    publicCopyFingerprint: novelty.publicCopyFingerprint,
     editorialPatternFingerprint: novelty.promptOsPatternFingerprint,
   });
   if (!persisted) {
-    throw new Error('authoritative founder-content approval could not be persisted; active editorial pattern is already reserved, the exact issuance row already exists, or the store rejected issuance');
+    throw new Error('authoritative founder-content approval could not be persisted; active public copy or editorial pattern is already reserved, the exact issuance row already exists, or the store rejected issuance');
   }
   return issued;
 }
