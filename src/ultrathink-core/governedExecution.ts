@@ -265,6 +265,13 @@ const WITNESS_STRENGTH: Record<WitnessStrength, number> = {
   W4: 4,
 };
 
+const SHA256_FINGERPRINT = /^[0-9a-f]{64}$/i;
+
+function validEvidenceFingerprint(value: string | undefined): boolean {
+  const fingerprint = normalized(value);
+  return Boolean(fingerprint && SHA256_FINGERPRINT.test(fingerprint));
+}
+
 function sameRefs(expected: readonly string[], actual: readonly string[]): boolean {
   if (expected.length !== actual.length) return false;
   return expected.every((value, index) => same(value, actual[index]));
@@ -290,22 +297,24 @@ function witnessBindsReceipt(
 
 /** Runtime success is execution evidence only. Verification requires a separately
  * supplied witness at or above the caller's required independence strength, bound
- * to the exact execution receipt it claims to verify or contradict. */
+ * to the exact execution receipt it claims to verify or contradict, and carrying
+ * an immutable SHA-256 evidence identity. */
 export function evaluateGovernedExecutionOutcome(
   receipt: GovernedExecutionReceipt,
   witness?: GovernedExecutionWitness,
   minimumWitnessStrength: WitnessStrength = 'W1',
 ): GovernedOutcomeDisposition {
-  const boundWitness = witness && witnessBindsReceipt(receipt, witness)
+  const trustedWitness = witness
+    && witnessBindsReceipt(receipt, witness)
+    && validEvidenceFingerprint(witness.evidenceFingerprint)
     ? witness
     : undefined;
 
-  if (boundWitness?.status === 'contradicted') return 'CONTRADICTED';
+  if (trustedWitness?.status === 'contradicted') return 'CONTRADICTED';
 
   if (
-    boundWitness?.status === 'verified' &&
-    normalized(boundWitness.evidenceFingerprint) &&
-    WITNESS_STRENGTH[boundWitness.strength] >= WITNESS_STRENGTH[minimumWitnessStrength]
+    trustedWitness?.status === 'verified' &&
+    WITNESS_STRENGTH[trustedWitness.strength] >= WITNESS_STRENGTH[minimumWitnessStrength]
   ) {
     return 'VERIFIED';
   }
