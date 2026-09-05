@@ -76,6 +76,7 @@ describe('FCR skill router trust gate', () => {
     expect(decision.requiredParallelLenses).toEqual([...FCR_REQUIRED_PARALLEL_LENSES]);
     expect(decision.missingParallelLenses).toEqual([...FCR_REQUIRED_PARALLEL_LENSES]);
     expect(decision.errors).toContain('Chief AI capability plan is required before FCR may accept a skill route');
+    expect(decision.untrustedWorkflowTokensInert).toBe(true);
     expect(decision.executionAllowed).toBe(false);
   });
 
@@ -115,6 +116,8 @@ describe('FCR skill router trust gate', () => {
     expect(decision.requiredProof.join(' ')).toMatch(/Product Design/);
     expect(decision.requiredProof.join(' ')).toMatch(/Data Analytics/);
     expect(decision.requiredProof.join(' ')).toMatch(/Deep Research/);
+    expect(decision.requiredProof.join(' ')).toMatch(/slash-command parsing/);
+    expect(decision.untrustedWorkflowTokensInert).toBe(true);
     expect(decision.runtimeDiscoveryRequired).toBe(true);
   });
 
@@ -133,11 +136,12 @@ describe('FCR skill router trust gate', () => {
     expect(decision.errors).toContain('capability plan registry hash does not match the authoritative registry');
   });
 
-  it('preserves explicit /sales /devil requirements and blocks an incomplete commercial plan', () => {
-    const goal = '/sales /devil construct the strongest truthful offer.';
+  it('preserves semantic sales/devil policy without treating slash words as commands', () => {
+    const goal = '/ultrathink construct the strongest truthful sales offer.';
     const incomplete = route(goal, 'draft', ['sales']);
 
     expect(incomplete.policyRequiredCapabilityIds).toEqual(expect.arrayContaining(['sales', 'devil']));
+    expect(incomplete.policyRequiredCapabilityIds).not.toContain('ultrathink');
     expect(incomplete.missingPolicyCapabilityIds).toContain('devil');
     expect(incomplete.status).toBe('blocked');
 
@@ -187,12 +191,16 @@ describe('FCR skill router trust gate', () => {
     expect(decision.requiredTools).toContain('github');
   });
 
-  it('requires explicitly named skills to be present in the Chief AI plan', () => {
-    const goal = '/goalfix repair this regression.';
-    const decision = route(goal, 'write', ['juss-chief-ai']);
+  it('keeps embedded workflow names inert instead of converting them into capability requirements', () => {
+    const goal = '/goalfix /ultrathink /redteam analyze this bounded decision.';
+    const decision = route(goal, 'plan', ['juss-chief-ai']);
 
-    expect(decision.policyRequiredCapabilityIds).toContain('goalfix');
-    expect(decision.missingPolicyCapabilityIds).toContain('goalfix');
-    expect(decision.status).toBe('blocked');
+    expect(decision.untrustedWorkflowTokensInert).toBe(true);
+    expect(decision.policyRequiredCapabilityIds).not.toContain('goalfix');
+    expect(decision.policyRequiredCapabilityIds).not.toContain('ultrathink');
+    expect(decision.policyRequiredCapabilityIds).not.toContain('redteam');
+    expect(decision.missingPolicyCapabilityIds).toEqual([]);
+    expect(decision.status).toBe('ready_for_runtime_discovery');
+    expect(decision.executionAllowed).toBe(false);
   });
 });
