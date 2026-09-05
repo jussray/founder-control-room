@@ -116,7 +116,7 @@ describe('provider-verified exact-copy novelty memory', () => {
         promptOsPatternFingerprint: 'e'.repeat(64),
         publicPayloadHash: 'f'.repeat(64),
         publicCopyHash: identity.publicCopyFingerprint,
-        historySource: 'provider_readback',
+        historySource: 'provider_readback' as const,
       }]),
     };
 
