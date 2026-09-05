@@ -33,10 +33,10 @@ function classifyFailure(error, stage) {
       summary: "GitHub App identifier failed local credential preflight.",
     };
   }
-  if (/PR identity moved/.test(message)) {
+  if (/PR identity moved|founder-bound expected head/i.test(message)) {
     return {
       reasonCode: "PULL_REQUEST_IDENTITY_MOVED",
-      summary: "Pull request identity moved while the deterministic review witness was executing.",
+      summary: "Pull request identity no longer matches the founder-bound exact review head.",
     };
   }
   if (/not publishable/.test(message)) {
@@ -65,6 +65,7 @@ async function writeArtifact(artifact) {
 
 let stage = "input_validation";
 let trustedMainSha = null;
+let expectedReviewHeadSha = null;
 let pullRequestNumber = null;
 
 try {
@@ -75,6 +76,11 @@ try {
   pullRequestNumber = Number(rawPullRequestNumber);
   if (!Number.isSafeInteger(pullRequestNumber)) {
     throw new Error("FCR_REVIEW_PR_NUMBER exceeds the safe integer range");
+  }
+
+  expectedReviewHeadSha = required("EXPECTED_REVIEW_HEAD_SHA").toLowerCase();
+  if (!FULL_SHA.test(expectedReviewHeadSha)) {
+    throw new Error("EXPECTED_REVIEW_HEAD_SHA must be a lowercase full commit SHA");
   }
 
   trustedMainSha = required("EXPECTED_TRUSTED_MAIN_SHA").toLowerCase();
@@ -93,6 +99,7 @@ try {
     provider,
     projectId: PROJECT_ID,
     pullRequestNumber,
+    expectedHeadSha: expectedReviewHeadSha,
   });
 
   stage = "success_receipt";
@@ -100,6 +107,7 @@ try {
     schema: "fcr/deterministic-review-witness-run@v1",
     status: "published",
     trustedMainSha,
+    expectedReviewHeadSha,
     pullRequestNumber,
     generatedAt: new Date().toISOString(),
     production: result.production,
@@ -118,6 +126,7 @@ try {
       schema: "fcr/deterministic-review-witness-run@v1",
       status: "failed",
       trustedMainSha,
+      expectedReviewHeadSha,
       pullRequestNumber,
       generatedAt: new Date().toISOString(),
       failure: {

@@ -12,6 +12,10 @@ on:
         description: Pull request number to review from trusted current main
         required: true
         type: number
+      expected_pr_head_sha:
+        description: Exact PR head observed before trusted witness dispatch
+        required: true
+        type: string
       expected_main_sha:
         description: Founder-bound exact current main SHA for this witness request
         required: true
@@ -67,9 +71,11 @@ jobs:
           src/review/deterministicReviewProducer.test.ts
           src/review/deterministicReviewProducer.boundary.test.ts
           src/review/deterministicReviewWitnessPublisher.test.ts
+          src/review/deterministicReviewWitnessExpectedHead.test.ts
           src/review/deterministicReviewWitnessExecutionTrustRoot.test.ts
           src/review/deterministicReviewFingerprintGate.test.ts
           src/review/founderFinalReviewPolicy.test.ts
+          src/lib/__tests__/trustedReviewWitnessExactHeadDispatch.contract.test.ts
           src/providers/__tests__/deterministicReviewGitHubProvider.test.ts
           src/providers/__tests__/providerFactory.independentReviewBoundary.test.ts
 
@@ -152,6 +158,7 @@ jobs:
           test "$state" = 'open'
           test "$base_ref" = 'main'
           test "$base_sha" = "$EXPECTED_MAIN_SHA"
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
 
           echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
 
@@ -169,8 +176,9 @@ jobs:
           payload="$(jq -n \
             --arg ref main \
             --arg pr "$PR_NUMBER" \
+            --arg expected_pr_head_sha "$TARGET_HEAD_SHA" \
             --arg expected_main_sha "$EXPECTED_MAIN_SHA" \
-            '{ref:$ref, inputs:{pull_request_number:$pr, expected_main_sha:$expected_main_sha}}')"
+            '{ref:$ref, inputs:{pull_request_number:$pr, expected_pr_head_sha:$expected_pr_head_sha, expected_main_sha:$expected_main_sha}}')"
 
           gh api \
             --method POST \
@@ -181,7 +189,7 @@ jobs:
             echo '## Trusted deterministic review witness requested'
             echo
             echo "- Target PR: #$PR_NUMBER"
-            echo "- Target PR head observed before dispatch: \`$TARGET_HEAD_SHA\`"
+            echo "- Founder-bound exact PR head: \`$TARGET_HEAD_SHA\`"
             echo "- Founder-bound current main: \`$EXPECTED_MAIN_SHA\`"
             echo "- Founder immutable GitHub user ID: \`286642846\`"
             echo "- Evidence cookie: issue #418 comment \`$COMMENT_ID\`"
@@ -200,6 +208,7 @@ jobs:
       cancel-in-progress: false
     env:
       FCR_REVIEW_PR_NUMBER: ${{ inputs.pull_request_number }}
+      EXPECTED_REVIEW_HEAD_SHA: ${{ inputs.expected_pr_head_sha }}
       EXPECTED_TRUSTED_MAIN_SHA: ${{ github.sha }}
       EXPECTED_FOUNDER_MAIN_SHA: ${{ inputs.expected_main_sha }}
       GITHUB_APP_ID: ${{ secrets.APP_ID }}
@@ -217,13 +226,14 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF" = 'refs/heads/main'
+          [[ "$EXPECTED_REVIEW_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$EXPECTED_FOUNDER_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]
           test "$EXPECTED_FOUNDER_MAIN_SHA" = "$EXPECTED_TRUSTED_MAIN_SHA"
           test "$EXPECTED_TRUSTED_MAIN_SHA" = "$(git rev-parse HEAD)"
           git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
           current_main="$(git rev-parse refs/remotes/origin/main)"
-          printf 'founder_bound_main=%s\ntrusted_workflow_sha=%s\ncurrent_main=%s\n' \
-            "$EXPECTED_FOUNDER_MAIN_SHA" "$EXPECTED_TRUSTED_MAIN_SHA" "$current_main"
+          printf 'founder_bound_pr_head=%s\nfounder_bound_main=%s\ntrusted_workflow_sha=%s\ncurrent_main=%s\n' \
+            "$EXPECTED_REVIEW_HEAD_SHA" "$EXPECTED_FOUNDER_MAIN_SHA" "$EXPECTED_TRUSTED_MAIN_SHA" "$current_main"
           test "$EXPECTED_FOUNDER_MAIN_SHA" = "$current_main"
           test "$EXPECTED_TRUSTED_MAIN_SHA" = "$current_main"
 
@@ -245,9 +255,11 @@ jobs:
           src/review/deterministicReviewProducer.test.ts
           src/review/deterministicReviewProducer.boundary.test.ts
           src/review/deterministicReviewWitnessPublisher.test.ts
+          src/review/deterministicReviewWitnessExpectedHead.test.ts
           src/review/deterministicReviewWitnessExecutionTrustRoot.test.ts
           src/review/deterministicReviewFingerprintGate.test.ts
           src/review/founderFinalReviewPolicy.test.ts
+          src/lib/__tests__/trustedReviewWitnessExactHeadDispatch.contract.test.ts
           src/providers/__tests__/deterministicReviewGitHubProvider.test.ts
           src/providers/__tests__/providerFactory.independentReviewBoundary.test.ts
 
