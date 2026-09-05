@@ -344,6 +344,10 @@ function parseUntrustedArtifacts(value: unknown): UntrustedArtifact[] | undefine
   return artifacts;
 }
 
+function isTransportBodyEmpty(value: unknown): boolean {
+  return value === undefined || (Buffer.isBuffer(value) && value.length === 0);
+}
+
 founderOsSkillsRouter.post(
   '/proof-audit/internal-dry-run',
   requirePortfolioSwitchOn('fcr-privileged-execution-master'),
@@ -351,7 +355,7 @@ founderOsSkillsRouter.post(
   async (req, res, next) => {
     res.set('Cache-Control', 'no-store');
 
-    if (req.body !== undefined) {
+    if (!isTransportBodyEmpty(req.body)) {
       return res.status(400).json({
         error: 'Founder Proof Audit internal dry run accepts no request body.',
       });
