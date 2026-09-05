@@ -32,6 +32,10 @@ export type ReleaseEvidenceObservation = {
   verdict: 'clear' | 'blocked';
 };
 
+/**
+ * Event payload only. Receiving/correlating this object does not authenticate a
+ * founder or prove that the referenced authority receipt is genuine/current.
+ */
 export type FounderApprovalObservation = {
   repository: string;
   headSha: string;
@@ -55,14 +59,18 @@ export type EvidenceDecision =
   };
 
 export type FounderDecision =
-  | { state: 'FOUNDER_APPROVAL_OBSERVED'; authorityReceiptFingerprint: string; authorityCookie: string }
+  | {
+    state: 'FOUNDER_APPROVAL_CLAIM_CORRELATED';
+    authorityReceiptFingerprint: string;
+    authorityCookie: string;
+  }
   | {
     state: 'HOLD';
     reason:
       | 'FOUNDER_IDENTITY_MISMATCH'
       | 'FOUNDER_COOKIE_MISMATCH'
       | 'FOUNDER_EVIDENCE_MISMATCH'
-      | 'FOUNDER_APPROVAL_NOT_OBSERVED'
+      | 'FOUNDER_APPROVAL_NOT_CLAIMED'
       | 'INVALID_FOUNDER_OBSERVATION';
   };
 
@@ -81,7 +89,8 @@ export type ReleaseProofReceipt = {
   evidenceCookie: string;
   authorityReceiptFingerprint: string;
   authorityCookie: string;
-  founderApprovalObserved: true;
+  founderApprovalClaimCorrelated: true;
+  founderAuthorityAuthenticated: false;
   mergeAuthorized: false;
   deploymentAuthorized: false;
   providerMutationAuthorized: false;
@@ -94,6 +103,7 @@ export type ReleaseProofReceipt = {
     candidateMovementExpiresContinuity: true;
     evidenceCannotCrossCandidateCookie: true;
     authorityCannotCrossEvidenceCookie: true;
+    continuityCookieDoesNotAuthenticate: true;
     receiptDoesNotSelfAuthorize: true;
   };
   nextGate: 'FINAL_PROVIDER_REREAD_AND_EXISTING_AUTHORITY_CONTRACT_REQUIRED';
@@ -119,6 +129,10 @@ function sha256(value: unknown): string | null {
   return candidate && SHA256.test(candidate) ? candidate.toLowerCase() : null;
 }
 
+/**
+ * Deterministic correlation identity only. These hashes detect stale/cross-packet
+ * mixing; they are not MACs, signatures, credentials, or proof of event provenance.
+ */
 function hashContinuity(label: string, ...parts: string[]): string {
   return createHash('sha256')
     .update(JSON.stringify([RELEASE_PROOF_CONTINUITY_SCHEMA, label, ...parts]))
@@ -259,6 +273,11 @@ export function evaluateReleaseEvidence(
   };
 }
 
+/**
+ * Correlate a founder-approval-shaped claim to this exact candidate/evidence packet.
+ * This does not authenticate the event sender or validate the referenced authority
+ * receipt. The existing authenticated authority contract remains the next gate.
+ */
 export function evaluateFounderApprovalObservation(
   bound: BoundReleaseProofCandidate,
   evidence: Extract<EvidenceDecision, { state: 'EVIDENCE_CLEAR' }>,
@@ -294,11 +313,11 @@ export function evaluateFounderApprovalObservation(
   }
 
   if (!source.approved) {
-    return { state: 'HOLD', reason: 'FOUNDER_APPROVAL_NOT_OBSERVED' };
+    return { state: 'HOLD', reason: 'FOUNDER_APPROVAL_NOT_CLAIMED' };
   }
 
   return {
-    state: 'FOUNDER_APPROVAL_OBSERVED',
+    state: 'FOUNDER_APPROVAL_CLAIM_CORRELATED',
     authorityReceiptFingerprint,
     authorityCookie: buildAuthorityContinuityCookie(evidence.evidenceCookie, authorityReceiptFingerprint),
   };
@@ -307,7 +326,7 @@ export function evaluateFounderApprovalObservation(
 export function buildReleaseProofReceipt(
   bound: BoundReleaseProofCandidate,
   evidence: Extract<EvidenceDecision, { state: 'EVIDENCE_CLEAR' }>,
-  founder: Extract<FounderDecision, { state: 'FOUNDER_APPROVAL_OBSERVED' }>,
+  founder: Extract<FounderDecision, { state: 'FOUNDER_APPROVAL_CLAIM_CORRELATED' }>,
 ): ReleaseProofReceipt {
   return {
     schemaVersion: RELEASE_PROOF_SCHEMA,
@@ -320,7 +339,8 @@ export function buildReleaseProofReceipt(
     evidenceCookie: evidence.evidenceCookie,
     authorityReceiptFingerprint: founder.authorityReceiptFingerprint,
     authorityCookie: founder.authorityCookie,
-    founderApprovalObserved: true,
+    founderApprovalClaimCorrelated: true,
+    founderAuthorityAuthenticated: false,
     mergeAuthorized: false,
     deploymentAuthorized: false,
     providerMutationAuthorized: false,
@@ -333,6 +353,7 @@ export function buildReleaseProofReceipt(
       candidateMovementExpiresContinuity: true,
       evidenceCannotCrossCandidateCookie: true,
       authorityCannotCrossEvidenceCookie: true,
+      continuityCookieDoesNotAuthenticate: true,
       receiptDoesNotSelfAuthorize: true,
     },
     nextGate: 'FINAL_PROVIDER_REREAD_AND_EXISTING_AUTHORITY_CONTRACT_REQUIRED',
