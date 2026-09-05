@@ -109,7 +109,11 @@ The Actions workflow fails closed if predecessor-artifact discovery errors or if
 
 `scripts/founder_content_supersession.py` implements `fcr/founder-content-supersession@v3` for two cumulative observations of the same content fingerprint. It is a separate observation-only seam because the aggregate `ENGAGEMENT` worksheet can contain activity from older posts and therefore cannot be silently reinterpreted as per-post cumulative engagement.
 
-The V3 supersession contract requires the newer observation time to be strictly later, rejects decreases in cumulative impressions or engagements, requires SHA-256-shaped source digests, preserves the prior claim as `SUPERSEDED_HISTORICAL`, emits the current claim as `ATTESTED_CURRENT`, classifies the **observed metric movement**, and binds the bounded strategy mutation into the deterministic receipt identity. V3 does not read the underlying source artifact bytes, so its source digests are caller-supplied provenance references rather than verified source bindings.
+The current input contract is `fcr/founder-content-supersession-input@v2`. It requires an explicit deterministic `as_of` horizon in addition to the two observations. Both `prior.observed_at` and `current.observed_at` must be at or before that horizon, and current must still be strictly later than prior. A legacy v1 payload without the horizon fails closed instead of allowing an accidentally future-dated observation to become `ATTESTED_CURRENT`.
+
+The horizon is evidence, not clock authority. V3 records it as `observation_horizon_state: ATTESTED_INPUT_V2` and `observation_horizon_verification: ATTESTED_INPUT_V2`; it is bound into the deterministic receipt identity but is not independently verified merely because it was supplied. An orchestrator that needs stronger time truth must bind `as_of` to its own trusted clock/evidence layer.
+
+The V3 supersession contract rejects observations beyond that horizon, requires the newer observation time to be strictly later, rejects decreases in cumulative impressions or engagements, requires SHA-256-shaped source digests, preserves the prior claim as `SUPERSEDED_HISTORICAL`, emits the current claim as `ATTESTED_CURRENT`, classifies the **observed metric movement**, and binds the bounded strategy mutation into the deterministic receipt identity. V3 does not read the underlying source artifact bytes, so its source digests are caller-supplied provenance references rather than verified source bindings.
 
 The `expectation` field in V3 is narrative text, not a structured threshold/direction contract. V3 therefore must not infer `STRONGER_THAN_EXPECTED`, `WEAKER_THAN_EXPECTED`, or `AS_EXPECTED` from metric movement alone. Current receipts emit:
 
@@ -123,8 +127,9 @@ expectation_evaluation = NOT_EVALUATED_UNSTRUCTURED_V3
 
 ```text
 same post fingerprint
-+ prior cumulative observation
-+ current cumulative observation
++ explicit as_of evidence horizon
++ prior cumulative observation at/before as_of
++ current cumulative observation at/before as_of
 + narrative expectation (retained, not evaluated by V3)
 + prior/current claims
 + bounded strategy mutation
