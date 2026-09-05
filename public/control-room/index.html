@@ -1,153 +1,21 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Founder Control Room</title>
-<link rel="stylesheet" href="/control-room/styles.css" />
-<style>
-.launch-dock{--dock-border:rgba(148,163,184,.28);position:fixed;right:max(1rem,env(safe-area-inset-right));bottom:max(1rem,env(safe-area-inset-bottom));z-index:1000;width:min(64rem,calc(100vw - 2rem));padding:.8rem;border:1px solid var(--dock-border);border-radius:1.35rem;background:rgba(8,13,25,.96);box-shadow:0 24px 72px rgba(0,0,0,.46);backdrop-filter:blur(18px)}
-.launch-dock summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.25rem .35rem;color:#eef5ff;font:700 14px system-ui,sans-serif}
-.launch-dock summary::-webkit-details-marker{display:none}
-.launch-dock summary::after{content:'+';display:grid;place-items:center;flex:0 0 auto;width:2rem;height:2rem;border-radius:999px;background:rgba(148,163,184,.14);font-size:1.25rem}
-.launch-dock[open] summary::after{content:'−'}
-.launch-summary-copy{display:grid;gap:.15rem}
-.launch-summary-copy small{color:#94a3b8;font-size:.72rem;font-weight:650;letter-spacing:.02em}
-.stack-loop{max-height:min(72vh,49rem);overflow:auto;margin-top:.8rem;padding:.25rem .25rem .6rem;overscroll-behavior:contain}
-.stack-intro{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin:0 0 .7rem;padding:.75rem .8rem;border:1px solid rgba(148,163,184,.2);border-radius:1rem;background:rgba(15,23,42,.78)}
-.stack-intro strong{display:block;color:#f8fafc;font:800 1rem/1.2 system-ui,sans-serif}
-.stack-intro span{display:block;margin-top:.2rem;color:#aebbd0;font:500 .78rem/1.35 system-ui,sans-serif}
-.stack-intro .conveyor-readiness{display:inline-flex;align-items:center;gap:.42rem;width:max-content;max-width:100%;margin-top:.58rem;padding:.32rem .55rem;border:1px solid rgba(148,163,184,.28);border-radius:999px;background:rgba(2,6,23,.55);color:#dbe7f7;font:750 .7rem/1.25 system-ui,sans-serif}
-.conveyor-readiness::before{content:'';display:block;flex:0 0 auto;width:.5rem;height:.5rem;margin:0;border-radius:999px;background:#94a3b8}
-.conveyor-readiness[data-state='ready-for-probe']{border-color:rgba(103,232,165,.42)}
-.conveyor-readiness[data-state='ready-for-probe']::before{background:#67e8a5}
-.conveyor-readiness[data-state='not-configured'],.conveyor-readiness[data-state='enabled-awaiting-proof']{border-color:rgba(255,209,102,.45)}
-.conveyor-readiness[data-state='not-configured']::before,.conveyor-readiness[data-state='enabled-awaiting-proof']::before{background:#ffd166}
-.conveyor-readiness[data-state='error']{border-color:rgba(255,125,139,.48)}
-.conveyor-readiness[data-state='error']::before{background:#ff7d8b}
-.genesis-evidence-link{display:inline-flex;align-items:center;gap:.35rem;width:max-content;max-width:100%;margin-top:.5rem;margin-right:.7rem;color:#c4b5fd;text-decoration:none;font:750 .7rem/1.25 system-ui,sans-serif}
-.genesis-evidence-link::before{content:'↗';flex:0 0 auto;color:#a78bfa;font-size:.76rem;line-height:1}
-.genesis-evidence-link:hover{text-decoration:underline;text-underline-offset:.2em}
-.genesis-evidence-link:focus-visible{outline:2px solid #ddd6fe;outline-offset:3px;border-radius:.2rem}
-.loop-mark{flex:0 0 auto;color:#f8fafc;font-size:1.5rem;line-height:1}
-.stack-lane{--lane:#7dd3fc;display:grid;grid-template-columns:8rem minmax(0,1fr);gap:.75rem;align-items:center;padding:.72rem;border:1px solid color-mix(in srgb,var(--lane) 42%,transparent);border-radius:1rem;background:linear-gradient(90deg,color-mix(in srgb,var(--lane) 10%,transparent),rgba(15,23,42,.7));box-shadow:inset 0 0 28px color-mix(in srgb,var(--lane) 5%,transparent)}
-.stack-lane[data-lane='chat']{--lane:#67e8f9}
-.stack-lane[data-lane='workflows']{--lane:#c084fc}
-.stack-lane[data-lane='code']{--lane:#f472b6}
-.stack-lane[data-lane='projects']{--lane:#fb7185}
-.stack-lane[data-lane='skills']{--lane:#fde047}
-.lane-heading{display:flex;align-items:center;gap:.55rem;color:var(--lane);font:800 .98rem/1 system-ui,sans-serif}
-.lane-number{display:grid;place-items:center;width:2rem;height:2rem;border:1px solid var(--lane);border-radius:999px;background:color-mix(in srgb,var(--lane) 10%,transparent);font-size:.78rem}
-.lane-flow{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(7.8rem,1fr);gap:.48rem;overflow-x:auto;padding:.1rem .05rem .3rem;scrollbar-width:thin}
-.stage{position:relative;display:grid;align-content:center;min-height:4.25rem;padding:.58rem .62rem;border:1px solid color-mix(in srgb,var(--lane) 30%,transparent);border-radius:.8rem;background:rgba(2,6,23,.68);color:#e8eef8;text-decoration:none;font:680 .76rem/1.24 system-ui,sans-serif}
-.stage small{display:block;margin-bottom:.18rem;color:var(--lane);font-size:.62rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
-a.stage:hover{border-color:var(--lane);background:color-mix(in srgb,var(--lane) 10%,rgba(2,6,23,.85));transform:translateY(-1px)}
-a.stage:focus-visible,.launch-dock summary:focus-visible{outline:3px solid #f8fafc;outline-offset:3px}
-.stage[data-spine='terminal']{border-width:2px;box-shadow:0 0 20px color-mix(in srgb,var(--lane) 14%,transparent)}
-.handoff{display:flex;align-items:center;gap:.45rem;padding:.34rem .75rem;color:#9aa8bc;font:750 .68rem/1 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase}
-.handoff::before{content:'↓';color:currentColor;font-size:.9rem}
-.loop-footer{display:flex;align-items:center;justify-content:center;gap:.5rem;margin-top:.62rem;padding:.68rem;border:1px solid rgba(148,163,184,.22);border-radius:999px;color:#cbd5e1;font:650 .74rem/1.25 system-ui,sans-serif;text-align:center}
-.loop-footer strong{color:#f8fafc}
-@media(max-width:760px){.launch-dock{left:max(.75rem,env(safe-area-inset-left));right:max(.75rem,env(safe-area-inset-right));bottom:max(.75rem,env(safe-area-inset-bottom));width:auto}.stack-loop{max-height:68vh}.stack-intro{padding:.68rem}.stack-lane{grid-template-columns:1fr;gap:.55rem}.lane-flow{grid-auto-columns:minmax(8.4rem,48%)}.lane-heading{padding-left:.15rem}.stage{min-height:4.6rem}}
-@media(prefers-reduced-motion:no-preference){.launch-dock{transition:transform .16s ease}.stage{transition:background-color .16s ease,border-color .16s ease,transform .16s ease}}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="description" content="Founder Control Room private founder workspace." />
+  <title>Founder Control Room</title>
+  <link rel="stylesheet" href="/control-room/styles.css" />
 </head>
 <body>
 <div id="root">
-  <!-- Rendered entirely by app.js. Kept empty here on purpose: this page
-       has no meaning without a founder session, and app.js decides whether
-       to show the sign-in screen or the app shell. -->
-  <p class="boot-fallback">Loading Founder Control Room…</p>
+  <p class="boot-fallback">Opening Founder Control Room…</p>
 </div>
-<details class="launch-dock">
-  <summary>
-    <span class="launch-summary-copy">
-      <strong>Open the founder stack</strong>
-      <small>Every output fuels the next prompt 🔁</small>
-    </span>
-  </summary>
-  <div class="stack-loop">
-    <header class="stack-intro">
-      <div>
-        <strong>Founder Control Room execution loop</strong>
-        <span>Move from thinking to verified code, then create or update the project that carries the work forward.</span>
-        <span class="conveyor-readiness" data-conveyor-readiness data-state="checking" role="status" aria-live="polite" aria-atomic="true">
-          <span data-conveyor-readiness-label>Checking n8n readiness…</span>
-        </span>
-        <a class="genesis-evidence-link" data-genesis-evidence href="/control-room/genesis.html" aria-label="View Bip Genesis provenance evidence">Genesis evidence · view origin record</a>
-        <a class="genesis-evidence-link" data-evidence-trust-link href="/control-room/evidence-trust.html" aria-label="View the Evidence Trust Plane">Evidence trust plane · observation → authority</a>
-      </div>
-      <span class="loop-mark" aria-hidden="true">🔁</span>
-    </header>
-
-    <section class="stack-lane" data-lane="chat" aria-labelledby="stack-chat">
-      <h2 class="lane-heading" id="stack-chat"><span class="lane-number">1</span>Chat</h2>
-      <div class="lane-flow">
-        <a class="stage" href="/control-room/?tab=promptos"><small>Start</small>Prompt</a>
-        <span class="stage"><small>Think</small>Reasoning</span>
-        <span class="stage"><small>Shape</small>Structured output</span>
-        <a class="stage" href="/control-room/goalfix.html"><small>Challenge</small>Feedback</a>
-        <a class="stage" href="/control-room/?tab=promptos"><small>Handoff</small>Refined prompting</a>
-      </div>
-    </section>
-    <div class="handoff">Chat output becomes the Workflows prompt</div>
-
-    <section class="stack-lane" data-lane="workflows" aria-labelledby="stack-workflows">
-      <h2 class="lane-heading" id="stack-workflows"><span class="lane-number">2</span>Workflows</h2>
-      <div class="lane-flow">
-        <a class="stage" href="/control-room/futureyou-v8.html"><small>Start</small>Prompt</a>
-        <a class="stage" href="/control-room/?tab=missions"><small>Plan</small>Task planning</a>
-        <a class="stage" href="/control-room/command-bridge.html"><small>Run</small>Automation loop</a>
-        <a class="stage" href="/control-room/plugin-center.html"><small>Connect</small>Cross-app execution</a>
-        <a class="stage" href="/control-room/founder-signal-engine.html"><small>Improve</small>Optimization</a>
-        <a class="stage" href="/control-room/content-manager.html"><small>Review</small>Content manager</a>
-        <a class="stage" href="/control-room/?tab=activity"><small>Handoff</small>Output</a>
-      </div>
-    </section>
-    <div class="handoff">Workflows output becomes the Code prompt</div>
-
-    <section class="stack-lane" data-lane="code" aria-labelledby="stack-code">
-      <h2 class="lane-heading" id="stack-code"><span class="lane-number">3</span>Code</h2>
-      <div class="lane-flow">
-        <a class="stage" href="/control-room/goalfix.html"><small>Start</small>Prompt</a>
-        <a class="stage" href="/control-room/goalfix.html"><small>Inspect</small>Codebase analysis</a>
-        <a class="stage" href="/control-room/github-workspace.html"><small>Build</small>Multi-file changes</a>
-        <a class="stage" data-spine="terminal" href="/control-room/?tab=terminal"><small>Execute</small>Terminal build/test</a>
-        <a class="stage" href="/control-room/?tab=missions"><small>Loop</small>Iteration</a>
-        <a class="stage" data-spine="terminal" href="/control-room/?tab=terminal"><small>Proof</small>Final code</a>
-      </div>
-    </section>
-    <div class="handoff">Verified final code creates or updates its project</div>
-
-    <section class="stack-lane" data-lane="projects" aria-labelledby="stack-projects">
-      <h2 class="lane-heading" id="stack-projects"><span class="lane-number">4</span>Projects</h2>
-      <div class="lane-flow">
-        <a class="stage" href="/control-room/?tab=projects"><small>Route</small>Create / Add to Project</a>
-        <a class="stage" href="/control-room/github-workspace.html"><small>Context</small>Add instructions &amp; files</a>
-        <a class="stage" href="/control-room/repository-settings.html"><small>Ground</small>Work with context</a>
-        <a class="stage" href="/control-room/?tab=missions"><small>Improve</small>Iterate</a>
-        <a class="stage" href="/control-room/?tab=activity"><small>Compound</small>Build knowledge base</a>
-      </div>
-    </section>
-    <div class="handoff">Project knowledge becomes reusable Skills</div>
-
-    <section class="stack-lane" data-lane="skills" aria-labelledby="stack-skills">
-      <h2 class="lane-heading" id="stack-skills"><span class="lane-number">5</span>Skills</h2>
-      <div class="lane-flow">
-        <a class="stage" href="/control-room/goalfix.html"><small>Specify</small>Define task</a>
-        <a class="stage" href="/control-room/?tab=promptos"><small>Capture</small>Create skill</a>
-        <a class="stage" href="/control-room/command-bridge.html"><small>Execute</small>Apply skill</a>
-        <a class="stage" href="/control-room/?tab=l99"><small>Govern</small>Follow best practices</a>
-        <a class="stage" href="/control-room/?tab=activity"><small>Return</small>Consistent output</a>
-      </div>
-    </section>
-
-    <p class="loop-footer"><span aria-hidden="true">♾️</span><span>A continuous system. <strong>Consistent output becomes the next Chat prompt.</strong></span></p>
-  </div>
-</details>
 <script src="/control-room/read-truth-membrane.js"></script>
 <script src="/control-room/v10-plan-bridge.js"></script>
 <script src="/control-room/opaque-session-bootstrap.js"></script>
 <script type="module" src="/control-room/stack-router.js"></script>
+<script type="module" src="/control-room/entry-flow.js"></script>
 </body>
 </html>
