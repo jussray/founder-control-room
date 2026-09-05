@@ -222,6 +222,7 @@ export async function getGitHubInstallationToken(
 ): Promise<string> {
   const normalizedAppId = appId.trim();
   const repository = parseRepositoryIdentifier(repositoryIdentifier);
+  const repo = repository.repo;
   const cacheKey = `${normalizedAppId}:${repository.canonical.toLowerCase()}`;
   const cached = tokenCache.get(cacheKey);
   if (cached && cached.expiresAtMs - Date.now() > 5 * 60_000) return cached.token;
@@ -233,7 +234,7 @@ export async function getGitHubInstallationToken(
   );
   const { data: access } = await appClient.apps.createInstallationAccessToken({
     installation_id: installation.id,
-    repositories: [repository.repo],
+    repositories: [repo],
   });
   const expiresAtMs = Date.parse(access.expires_at);
   if (!access.token || !Number.isFinite(expiresAtMs)) {
