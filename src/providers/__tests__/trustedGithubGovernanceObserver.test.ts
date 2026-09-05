@@ -87,15 +87,12 @@ describe("trusted Chief governance GitHub App observer", () => {
     expect(result.exactHeadGate.authority.providerMutationAuthority).toBe(false);
   });
 
-  it("produces a migration plan that remains provider-mutation blocked", async () => {
-    const plan = await planChiefGovernanceWithGitHubApp({
+  it("refuses to plan a ruleset migration until an external candidate-check producer is observed", async () => {
+    await expect(planChiefGovernanceWithGitHubApp({
       appId: "85455",
       privateKey: "test-private-key",
       now: new Date("2026-09-05T21:20:00.000Z"),
-    });
-
-    expect(plan.disposition).toBe("BLOCKED_PROVIDER_ATOMIC_PRECONDITION_UNAVAILABLE");
-    expect(plan.authority.providerMutationAuthority).toBe(false);
+    })).rejects.toThrow(/external check producer integration is not yet observed/);
   });
 
   it("fails closed before token minting when App identity is malformed", async () => {
