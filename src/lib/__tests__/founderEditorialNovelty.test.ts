@@ -210,6 +210,7 @@ describe('founder editorial novelty', () => {
     const query: Record<string, any> = {};
     query.select = vi.fn(() => query);
     query.in = vi.fn(() => query);
+    query.eq = vi.fn(() => query);
     query.order = vi.fn(() => query);
     query.limit = vi.fn(async () => ({ data: [], error: null }));
     const client = {
