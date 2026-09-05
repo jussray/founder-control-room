@@ -36,14 +36,21 @@ describe("Portfolio Design OS registry", () => {
 
   it("tracks current runtime profiles without converting runtime existence into design proof", () => {
     const bip = getDesignOsProject("sekret-bip");
+    const storyEngine = getDesignOsProject("l99-story-engine");
     const chief = getDesignOsProject("chief-ai-machine");
+    const jbh = getDesignOsProject("juss-beautiful-hair-public");
 
     expect(bip?.runtimeProfile).toContain("React Native Web");
     expect(bip?.runtimeProfile).toContain("Python/FastAPI Piper TTS");
+    expect(storyEngine?.runtimeProfile).toContain("Node.js 24");
+    expect(storyEngine?.runtimeProfile).toContain("node:sqlite");
     expect(chief?.runtimeProfile).toContain("Cloudflare Worker backend/runtime");
     expect(chief?.runtimeProfile).not.toContain("remain planned");
+    expect(jbh?.runtimeProfile).toContain("React, TypeScript, and Vite");
     expect(bip?.implementationState).toBe("not_started");
+    expect(storyEngine?.implementationState).toBe("not_started");
     expect(chief?.implementationState).toBe("not_started");
+    expect(jbh?.implementationState).toBe("not_started");
   });
 
   it("registers the Command Center Figma file without claiming implementation proof", () => {
