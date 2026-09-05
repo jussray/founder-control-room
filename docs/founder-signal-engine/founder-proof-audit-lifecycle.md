@@ -15,12 +15,14 @@ Bind the $99 Founder Proof Audit service to FCR truth semantics without allowing
 5. **Real delivery requires completed-audit evidence.** `DELIVERED` and `ACKNOWLEDGED` are available only in `LIVE` mode.
 6. **Customer acknowledgement is not customer-value proof.** Receipt acknowledgement can advance delivery truth, but customer value and business outcome remain unverified until separately observed.
 7. **Dry-run truth cannot impersonate live truth.** `DRY_RUN` requires commerce `NOT_EXECUTED` and may use only simulated delivery.
-8. **The lifecycle never grants production mutation authority.** A separate authorization reference may be recorded, but `canMutateProduction` remains false. Repairs require a separately authorized execution contract.
-9. **No bypass authority.** The lifecycle cannot authorize bypassing access controls or expanding scope.
-10. **Bounded intake only.** Intake carries target, objective, and authorized evidence references. Passwords, private keys, recovery codes, raw payment-card data, and other secrets do not belong in this contract.
-11. **Runtime enum values fail closed.** Unknown modes, statuses, or commerce sources are rejected rather than silently degraded.
-12. **Price, tax, turnaround, refund, and cancellation policy are external business/legal policy gates.** This contract does not invent them.
-13. **Historical truth is immutable. Current truth must be re-observed.** Every present-tense claim remains bounded to the evidence plane that actually proved it.
+8. **Evidence/state coherence is fail-closed.** `NOT_EXECUTED`, `MISSING`, `NOT_STARTED`, and `NOT_DELIVERED` states cannot carry stale evidence for the event they say has not occurred. Customer evidence is valid only for `ACKNOWLEDGED` delivery.
+9. **Evidence identity is never silently rewritten.** Oversized IDs or evidence references are rejected instead of truncated. Authorized evidence references must be bounded, non-empty, and non-duplicated.
+10. **The lifecycle never grants production mutation authority.** A separate authorization reference may be recorded, but `canMutateProduction` remains false. Repairs require a separately authorized execution contract.
+11. **No bypass authority.** The lifecycle cannot authorize bypassing access controls or expanding scope.
+12. **Bounded intake only.** Intake carries target, objective, and authorized evidence references. Passwords, private keys, recovery codes, raw payment-card data, and other secrets do not belong in this contract.
+13. **Runtime enum values fail closed.** Unknown modes, statuses, or commerce sources are rejected rather than silently degraded.
+14. **Price, tax, turnaround, refund, and cancellation policy are external business/legal policy gates.** This contract does not invent them.
+15. **Historical truth is immutable. Current truth must be re-observed.** Every present-tense claim remains bounded to the evidence plane that actually proved it.
 
 ## Truth planes
 
@@ -33,6 +35,18 @@ Within `COMMERCE_EXECUTION`, order creation and payment are distinct claims:
 - A live audit may not start from order creation alone.
 
 Delivery simulation is a proof artifact within the dry-run execution slice. It does not advance the lifecycle to `DELIVERY_OUTCOME`.
+
+## Evidence/state coherence
+
+The lifecycle refuses contradictory baggage instead of keeping stale proof around for later accidental reuse:
+
+- `NOT_EXECUTED` commerce requires `evidenceRef: null`.
+- `MISSING` intake requires `evidenceRef: null`.
+- `NOT_STARTED` audit requires `evidenceRef: null`.
+- `NOT_DELIVERED` requires both delivery and customer evidence to be absent.
+- `customerEvidenceRef` is accepted only when delivery is `ACKNOWLEDGED`.
+
+Reference length and count limits are validation boundaries, not truncation rules. A reference that exceeds the contract limit is rejected unchanged.
 
 ## Dry-run acceptance slice
 

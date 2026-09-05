@@ -75,7 +75,7 @@ describe('Founder Proof Audit lifecycle truth contract', () => {
       },
       intake: { status: 'VALIDATED', evidenceRef: 'fcr://proof-audit/intake/1000' },
       audit: { status: 'NOT_STARTED', evidenceRef: null },
-      delivery: { status: 'NOT_DELIVERED', evidenceRef: null },
+      delivery: { status: 'NOT_DELIVERED', evidenceRef: null, customerEvidenceRef: null },
     }));
 
     expect(receipt.disposition).toBe('HOLD');
@@ -97,7 +97,7 @@ describe('Founder Proof Audit lifecycle truth contract', () => {
       },
       intake: { status: 'MISSING', evidenceRef: null },
       audit: { status: 'NOT_STARTED', evidenceRef: null },
-      delivery: { status: 'NOT_DELIVERED', evidenceRef: null },
+      delivery: { status: 'NOT_DELIVERED', evidenceRef: null, customerEvidenceRef: null },
     }));
 
     expect(receipt.highestTruthPlane).toBe('COMMERCE_EXECUTION');
@@ -118,7 +118,7 @@ describe('Founder Proof Audit lifecycle truth contract', () => {
         evidenceRef: 'shopify://orders/1001',
       },
       audit: { status: 'IN_PROGRESS', evidenceRef: 'fcr://audit/1001/start' },
-      delivery: { status: 'NOT_DELIVERED', evidenceRef: null },
+      delivery: { status: 'NOT_DELIVERED', evidenceRef: null, customerEvidenceRef: null },
     }))).toThrow(/requires independently verified Shopify payment/);
   });
 
@@ -131,7 +131,7 @@ describe('Founder Proof Audit lifecycle truth contract', () => {
         evidenceRef: 'shopify://orders/1002/payment',
       },
       audit: { status: 'IN_PROGRESS', evidenceRef: 'fcr://audit/1002/start' },
-      delivery: { status: 'DELIVERED', evidenceRef: 'fcr://delivery/1002' },
+      delivery: { status: 'DELIVERED', evidenceRef: 'fcr://delivery/1002', customerEvidenceRef: null },
     }))).toThrow(/delivery requires a completed audit/);
   });
 
@@ -193,7 +193,7 @@ describe('Founder Proof Audit lifecycle truth contract', () => {
         evidenceRef: 'fcr://claimed-payment/1005',
       },
       audit: { status: 'NOT_STARTED', evidenceRef: null },
-      delivery: { status: 'NOT_DELIVERED', evidenceRef: null },
+      delivery: { status: 'NOT_DELIVERED', evidenceRef: null, customerEvidenceRef: null },
     }))).toThrow(/must be certified by Shopify/);
   });
 
@@ -202,5 +202,62 @@ describe('Founder Proof Audit lifecycle truth contract', () => {
     expect(() => evaluateFounderProofAuditLifecycle(base({
       commerce: { status: 'MONEYISH', source: 'shopify', evidenceRef: 'shopify://orders/1006' },
     }))).toThrow(/commerce.status is invalid/);
+  });
+
+  it('rejects stale evidence attached to states that claim nothing happened', () => {
+    expect(() => evaluateFounderProofAuditLifecycle(base({
+      commerce: { status: 'NOT_EXECUTED', source: 'none', evidenceRef: 'shopify://stale/order' },
+    }))).toThrow(/NOT_EXECUTED commerce must not carry evidenceRef/);
+
+    expect(() => evaluateFounderProofAuditLifecycle(base({
+      intake: { status: 'MISSING', evidenceRef: 'fcr://stale/intake' },
+      audit: { status: 'NOT_STARTED', evidenceRef: null },
+      delivery: { status: 'NOT_DELIVERED', evidenceRef: null, customerEvidenceRef: null },
+    }))).toThrow(/MISSING intake must not carry evidenceRef/);
+
+    expect(() => evaluateFounderProofAuditLifecycle(base({
+      audit: { status: 'NOT_STARTED', evidenceRef: 'fcr://stale/audit' },
+      delivery: { status: 'NOT_DELIVERED', evidenceRef: null, customerEvidenceRef: null },
+    }))).toThrow(/NOT_STARTED audit must not carry evidenceRef/);
+
+    expect(() => evaluateFounderProofAuditLifecycle(base({
+      delivery: { status: 'NOT_DELIVERED', evidenceRef: 'fcr://stale/delivery', customerEvidenceRef: null },
+    }))).toThrow(/NOT_DELIVERED delivery must not carry evidenceRef/);
+  });
+
+  it('allows customer evidence only on an acknowledged delivery', () => {
+    expect(() => evaluateFounderProofAuditLifecycle(base({
+      mode: 'LIVE',
+      commerce: {
+        status: 'PAYMENT_VERIFIED',
+        source: 'shopify',
+        evidenceRef: 'shopify://orders/1007/payment',
+      },
+      delivery: {
+        status: 'DELIVERED',
+        evidenceRef: 'fcr://delivery/1007',
+        customerEvidenceRef: 'customer://stale/1007',
+      },
+    }))).toThrow(/customerEvidenceRef is only valid for ACKNOWLEDGED delivery/);
+  });
+
+  it('rejects oversized identities and evidence references instead of silently truncating them', () => {
+    expect(() => evaluateFounderProofAuditLifecycle(base({
+      auditId: `a${'b'.repeat(160)}`,
+    }))).toThrow(/auditId exceeds 160 characters/);
+
+    expect(() => evaluateFounderProofAuditLifecycle(base({
+      scope: { authorizedEvidenceRefs: [`github://${'x'.repeat(1200)}`] },
+    }))).toThrow(/authorizedEvidenceRefs\[0\] exceeds 1200 characters/);
+  });
+
+  it('rejects blank or duplicate authorized evidence references', () => {
+    expect(() => evaluateFounderProofAuditLifecycle(base({
+      scope: { authorizedEvidenceRefs: ['github://one', '   '] },
+    }))).toThrow(/only non-empty string references/);
+
+    expect(() => evaluateFounderProofAuditLifecycle(base({
+      scope: { authorizedEvidenceRefs: ['github://one', 'github://one'] },
+    }))).toThrow(/must not contain duplicate references/);
   });
 });

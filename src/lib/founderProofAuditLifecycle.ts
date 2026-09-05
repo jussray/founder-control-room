@@ -92,9 +92,15 @@ const INTAKE_STATUSES: FounderProofAuditIntakeStatus[] = ['MISSING', 'VALIDATED'
 const AUDIT_STATUSES: FounderProofAuditExecutionStatus[] = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'];
 const DELIVERY_STATUSES: FounderProofAuditDeliveryStatus[] = ['NOT_DELIVERED', 'SIMULATED', 'DELIVERED', 'ACKNOWLEDGED'];
 const COMMERCE_SOURCES = ['shopify', 'none'] as const;
+const MAX_REF_LENGTH = 1200;
+const MAX_EVIDENCE_REFS = 50;
 
-function text(value: unknown, max = 1200): string {
-  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+function text(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function checkMax(errors: string[], field: string, value: string, max: number): void {
+  if (value.length > max) errors.push(`${field} exceeds ${max} characters`);
 }
 
 function reject(errors: string[]): never {
@@ -108,12 +114,14 @@ export function evaluateFounderProofAuditLifecycle(
   input: FounderProofAuditLifecycleInput,
 ): FounderProofAuditLifecycleReceipt {
   const errors: string[] = [];
-  const auditId = text(input?.auditId, 160).toLowerCase();
+  const rawAuditId = text(input?.auditId);
+  const auditId = rawAuditId.toLowerCase();
   const targetRef = text(input?.scope?.targetRef);
-  const objective = text(input?.scope?.objective, 600);
-  const authorizedEvidenceRefs = Array.isArray(input?.scope?.authorizedEvidenceRefs)
-    ? input.scope.authorizedEvidenceRefs.map((item) => text(item)).filter(Boolean)
+  const objective = text(input?.scope?.objective);
+  const rawAuthorizedEvidenceRefs = Array.isArray(input?.scope?.authorizedEvidenceRefs)
+    ? input.scope.authorizedEvidenceRefs
     : [];
+  const authorizedEvidenceRefs = rawAuthorizedEvidenceRefs.map((item) => text(item));
   const productionMutationAuthorizationRef = text(input?.scope?.productionMutationAuthorizationRef || '') || null;
   const commerceEvidenceRef = text(input?.commerce?.evidenceRef || '') || null;
   const intakeEvidenceRef = text(input?.intake?.evidenceRef || '') || null;
@@ -122,11 +130,39 @@ export function evaluateFounderProofAuditLifecycle(
   const customerEvidenceRef = text(input?.delivery?.customerEvidenceRef || '') || null;
 
   if (!MODES.includes(input?.mode)) errors.push('mode is invalid');
+  checkMax(errors, 'auditId', rawAuditId, 160);
   if (!ID.test(auditId)) errors.push('auditId is invalid');
   if (!TARGET_TYPES.includes(input?.scope?.targetType)) errors.push('scope.targetType is invalid');
   if (!targetRef) errors.push('scope.targetRef is required');
+  checkMax(errors, 'scope.targetRef', targetRef, MAX_REF_LENGTH);
   if (!objective) errors.push('scope.objective is required');
-  if (authorizedEvidenceRefs.length === 0) errors.push('scope.authorizedEvidenceRefs must contain at least one authorized evidence reference');
+  checkMax(errors, 'scope.objective', objective, 600);
+
+  if (!Array.isArray(input?.scope?.authorizedEvidenceRefs)) {
+    errors.push('scope.authorizedEvidenceRefs must be an array');
+  } else {
+    if (authorizedEvidenceRefs.length === 0) {
+      errors.push('scope.authorizedEvidenceRefs must contain at least one authorized evidence reference');
+    }
+    if (authorizedEvidenceRefs.length > MAX_EVIDENCE_REFS) {
+      errors.push(`scope.authorizedEvidenceRefs exceeds ${MAX_EVIDENCE_REFS} entries`);
+    }
+    if (authorizedEvidenceRefs.some((ref) => !ref)) {
+      errors.push('scope.authorizedEvidenceRefs must contain only non-empty string references');
+    }
+    if (new Set(authorizedEvidenceRefs).size !== authorizedEvidenceRefs.length) {
+      errors.push('scope.authorizedEvidenceRefs must not contain duplicate references');
+    }
+    authorizedEvidenceRefs.forEach((ref, index) => checkMax(errors, `scope.authorizedEvidenceRefs[${index}]`, ref, MAX_REF_LENGTH));
+  }
+
+  if (productionMutationAuthorizationRef) checkMax(errors, 'scope.productionMutationAuthorizationRef', productionMutationAuthorizationRef, MAX_REF_LENGTH);
+  if (commerceEvidenceRef) checkMax(errors, 'commerce.evidenceRef', commerceEvidenceRef, MAX_REF_LENGTH);
+  if (intakeEvidenceRef) checkMax(errors, 'intake.evidenceRef', intakeEvidenceRef, MAX_REF_LENGTH);
+  if (auditEvidenceRef) checkMax(errors, 'audit.evidenceRef', auditEvidenceRef, MAX_REF_LENGTH);
+  if (deliveryEvidenceRef) checkMax(errors, 'delivery.evidenceRef', deliveryEvidenceRef, MAX_REF_LENGTH);
+  if (customerEvidenceRef) checkMax(errors, 'delivery.customerEvidenceRef', customerEvidenceRef, MAX_REF_LENGTH);
+
   if (!COMMERCE_STATUSES.includes(input?.commerce?.status)) errors.push('commerce.status is invalid');
   if (!COMMERCE_SOURCES.includes(input?.commerce?.source)) errors.push('commerce.source is invalid');
   if (!INTAKE_STATUSES.includes(input?.intake?.status)) errors.push('intake.status is invalid');
@@ -145,15 +181,22 @@ export function evaluateFounderProofAuditLifecycle(
 
   if (input.commerce.status === 'NOT_EXECUTED') {
     if (input.commerce.source !== 'none') errors.push('NOT_EXECUTED commerce must use source none');
+    if (commerceEvidenceRef) errors.push('NOT_EXECUTED commerce must not carry evidenceRef');
   } else {
     if (input.commerce.source !== 'shopify') errors.push('ORDER_CREATED and PAYMENT_VERIFIED must be certified by Shopify');
     if (!commerceEvidenceRef) errors.push('commerce evidenceRef is required once commerce execution is claimed');
   }
 
+  if (input.intake.status === 'MISSING' && intakeEvidenceRef) {
+    errors.push('MISSING intake must not carry evidenceRef');
+  }
   if (input.intake.status === 'VALIDATED' && !intakeEvidenceRef) {
     errors.push('validated intake requires evidenceRef');
   }
 
+  if (input.audit.status === 'NOT_STARTED' && auditEvidenceRef) {
+    errors.push('NOT_STARTED audit must not carry evidenceRef');
+  }
   if (input.audit.status !== 'NOT_STARTED') {
     if (input.intake.status !== 'VALIDATED') errors.push('audit execution requires validated intake');
     if (!auditEvidenceRef) errors.push('audit execution requires evidenceRef');
@@ -162,7 +205,10 @@ export function evaluateFounderProofAuditLifecycle(
     }
   }
 
-  if (input.delivery.status !== 'NOT_DELIVERED') {
+  if (input.delivery.status === 'NOT_DELIVERED') {
+    if (deliveryEvidenceRef) errors.push('NOT_DELIVERED delivery must not carry evidenceRef');
+    if (customerEvidenceRef) errors.push('NOT_DELIVERED delivery must not carry customerEvidenceRef');
+  } else {
     if (input.audit.status !== 'COMPLETED') errors.push('delivery requires a completed audit');
     if (!deliveryEvidenceRef) errors.push('delivery requires evidenceRef');
   }
@@ -175,6 +221,9 @@ export function evaluateFounderProofAuditLifecycle(
   }
   if (input.delivery.status === 'ACKNOWLEDGED' && !customerEvidenceRef) {
     errors.push('ACKNOWLEDGED delivery requires independent customer evidence');
+  }
+  if (input.delivery.status !== 'ACKNOWLEDGED' && customerEvidenceRef) {
+    errors.push('customerEvidenceRef is only valid for ACKNOWLEDGED delivery');
   }
 
   if (errors.length > 0) reject(errors);
