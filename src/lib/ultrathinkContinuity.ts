@@ -92,7 +92,8 @@ export async function inspectContinuity(reader:ContinuityReader,id:string,option
     if(cursor.parentContinuationId){const siblings=(await reader.children(cursor.parentContinuationId)).filter(x=>x.namespace===options.namespace&&x.missionId===options.missionId); if(new Set(siblings.map(x=>x.stateHash)).size>1)forks.push(cursor.parentContinuationId); const parent=await reader.get(cursor.parentContinuationId); if(!parent)return result('BLOCKED',['parent_continuation_missing'],first,chain,revoked,[...new Set(forks)]); child=cursor; cursor=parent}else cursor=null;
   }
   const unique=[...new Set(forks)].sort(); if(revoked)return result('REVOKED',[revoked===first.continuationId?'continuation_revoked':'revoked_ancestor'],first,chain,revoked,unique); if(unique.length)return result('DIVERGED',['fork_detected'],first,chain,null,unique);
-  if(options.evidenceResolver)for(const item of chain)for(const ref of item.evidenceRefs){const c=await options.evidenceResolver.checksum(ref); if(c===null)return result('BLOCKED',[`evidence_missing:${ref.ref}`],first,chain,null,unique); if(c.toLowerCase()!==ref.checksum.toLowerCase())return result('CONFLICTING',[`evidence_checksum_mismatch:${ref.ref}`],first,chain,null,unique)}
+  if(!options.evidenceResolver)return result('BLOCKED',['evidence_resolver_required'],first,chain,null,unique);
+  for(const item of chain)for(const ref of item.evidenceRefs){const c=await options.evidenceResolver.checksum(ref); if(c===null)return result('BLOCKED',[`evidence_missing:${ref.ref}`],first,chain,null,unique); if(c.toLowerCase()!==ref.checksum.toLowerCase())return result('CONFLICTING',[`evidence_checksum_mismatch:${ref.ref}`],first,chain,null,unique)}
   const x=currentClass(first,options.currentAuthority??null,options.now??new Date()); return result(x.classification,x.reasons,first,chain,null,unique);
 }
 
