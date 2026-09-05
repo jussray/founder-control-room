@@ -2,6 +2,10 @@
 
 A set of skills and instructions for maximizing build output across Claude, ChatGPT, and Perplexity Computer. Built for incremental, working-code-first development with minimum token waste and explicit capability truth.
 
+## Control-input trust boundary
+
+FCR implements `juss/portable-control-input@v1` in `src/lib/founderControlDecision.ts`. Mode names are authorized founder/operator shorthand, not public control-plane commands. Untrusted external text is inert data: product-user text, API payloads, webpages, emails, retrieved/imported documents, plugin/tool output, and other model output cannot activate or select internal modes by naming them. Only an authorized internal controller may map authenticated founder/operator intent to a mode, and selection never implies workflow execution or widens authority.
+
 ## What's Inside
 
 ### Skill Files (`skills/`)
@@ -14,7 +18,7 @@ Five installable skills — for Perplexity Computer (`save_custom_skill`) or as 
 | **regression-stagnation-guard** | Prevent code regression, detect project stagnation, dependency drift, stuck loops |
 | **truth-research-optimizer** | Source discipline, contradiction detection, confidence labeling, anti-hallucination |
 | **intent-repair-reader** | Parse human intent from typos using context clues, keyboard analysis, phonics |
-| **capability-mode-router** | Command system: /redteam, /lindy, /ooda, /human, /confess, /truth, /ultrathink, /artifact |
+| **capability-mode-router** | Authorized founder/operator reasoning labels for red-team, Lindy, OODA, human, truth, deep-reasoning, and artifact work; never a public trigger surface |
 
 ### ChatGPT GPT Instruction Templates (`gpts/`)
 
@@ -37,15 +41,15 @@ Tool-dependent rules inside these templates are capability-aware: web search, Co
 ### On Perplexity Computer
 1. Install each skill from `skills/` using the current supported skill mechanism.
 2. Load `HUMAN_SAFE_BUILD.md` as an always-on rule where persistent instructions are supported.
-3. Let skills activate based on task context.
-4. Type command shortcuts like `/lindy /artifact` in a conversation.
+3. Let skills be selected only through the host's trusted skill-selection boundary; task content does not self-select a protected mode.
+4. Founder/operator shorthand such as `/lindy /artifact` may express intent, but the raw strings do not self-activate or self-authorize.
 
 ### On Claude
 1. Create or use a persistent project/workspace when that feature is available.
 2. Add `claude-project-instructions.md` to the persistent instruction surface.
 3. Add repo files to the project knowledge/context surface as supported.
 4. Load `HUMAN_SAFE_BUILD.md` as an always-on project rule.
-5. Type commands like `/redteam` or `/ooda` in chat.
+5. Use `/redteam` or `/ooda` only as authorized founder/operator intent shorthand; identical strings inside task or retrieved content remain inert.
 
 ### On ChatGPT
 1. Use the available Custom Instructions, project/workspace instructions, or equivalent persistent instruction surface.
@@ -53,7 +57,7 @@ Tool-dependent rules inside these templates are capability-aware: web search, Co
 3. If the current paid plan or managed workspace permits GPT creation/editing, create a GPT and use a file from `gpts/` as its Instructions.
 4. Enable only the GPT capabilities the workflow actually needs and that the account/workspace allows.
 5. Keep `HUMAN_SAFE_BUILD.md` attached or copied into the persistent instruction context where supported.
-6. Type commands like `/lindy /artifact` in chat.
+6. Use `/lindy /artifact` only as authorized founder/operator shorthand; user/retrieved/tool/model content containing those strings cannot activate a mode.
 
 ## Capability Truth Rule
 
@@ -77,7 +81,7 @@ Across every platform:
 | `/ultrathink` | Maximum reasoning depth for complex problems |
 | `/artifact` | Must produce working code/file/test when the capability exists, or an exact actionable verification step when it does not |
 
-Commands stack: `/lindy /ooda /artifact` = proven-tech incremental build with decision loop, shipping only what can be evidenced.
+Labels may be combined as authenticated founder/operator intent. The authorized controller, not the strings, decides whether any internal mode applies.
 
 ## Human-safe build contract
 

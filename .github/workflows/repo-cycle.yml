@@ -52,7 +52,7 @@ on:
         required: true
         type: string
       target_branch:
-        description: Branch expected to contain the approved commit
+        description: Branch expected to contain the approved head
         required: true
         default: main
         type: string
@@ -66,8 +66,8 @@ permissions:
   actions: read
 
 concurrency:
-  group: founder-repo-cycle-${{ github.repository }}-${{ github.event.pull_request.number || inputs.target_branch || github.ref }}-${{ github.event.pull_request.head.sha || inputs.expected_head_sha || github.sha }}
-  cancel-in-progress: false
+  group: founder-repo-cycle-${{ github.repository }}-${{ github.event_name }}-${{ github.event.pull_request.number || inputs.target_branch || github.ref }}-${{ inputs.operation || 'verify' }}
+  cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -85,7 +85,19 @@ jobs:
       FOUNDER_APPROVAL_ID: ${{ inputs.founder_approval_id || '' }}
 
     steps:
-      - name: Checkout approved head
+      - name: Verify dispatch ref is still the approved head
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Dispatch ref head: ${GITHUB_SHA}"
+          echo "Approved head:     ${EXPECTED_HEAD_SHA}"
+          if [ "${GITHUB_SHA}" != "${EXPECTED_HEAD_SHA}" ]; then
+            echo "::error title=Stale repo-cycle dispatch::Target branch moved before workflow dispatch. Reacquire the current head and dispatch again."
+            exit 1
+          fi
+
+      - name: Checkout approved exact head
         uses: actions/checkout@v4
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
@@ -93,20 +105,22 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify approved branch lineage and exact head before installing dependencies
+      - name: Verify approved head is the current target branch tip
         shell: bash
         run: |
           set -euo pipefail
           ACTUAL_HEAD_SHA="$(git rev-parse HEAD)"
-          REMOTE_BRANCH_REF="refs/remotes/origin/${TARGET_BRANCH}"
-          git fetch --no-tags origin "+refs/heads/${TARGET_BRANCH}:${REMOTE_BRANCH_REF}"
-          CURRENT_BRANCH_HEAD_SHA="$(git rev-parse "${REMOTE_BRANCH_REF}")"
-          echo "Expected branch:      ${TARGET_BRANCH}"
-          echo "Current branch head:  ${CURRENT_BRANCH_HEAD_SHA}"
-          echo "Expected exact head:  ${EXPECTED_HEAD_SHA}"
-          echo "Checked-out head:     ${ACTUAL_HEAD_SHA}"
+          git fetch --no-tags origin "${TARGET_BRANCH}"
+          TARGET_TIP_SHA="$(git rev-parse FETCH_HEAD)"
+          echo "Target branch:      ${TARGET_BRANCH}"
+          echo "Target branch tip:  ${TARGET_TIP_SHA}"
+          echo "Expected head:      ${EXPECTED_HEAD_SHA}"
+          echo "Checked-out head:   ${ACTUAL_HEAD_SHA}"
           test "${ACTUAL_HEAD_SHA}" = "${EXPECTED_HEAD_SHA}"
-          git merge-base --is-ancestor "${EXPECTED_HEAD_SHA}" "${REMOTE_BRANCH_REF}"
+          if [ "${TARGET_TIP_SHA}" != "${EXPECTED_HEAD_SHA}" ]; then
+            echo "::error title=Stale exact-head proof::${TARGET_BRANCH} moved from ${EXPECTED_HEAD_SHA} to ${TARGET_TIP_SHA}. Reacquire current state; predecessor proof is historical."
+            exit 1
+          fi
 
       - name: Setup Node
         uses: actions/setup-node@v4
