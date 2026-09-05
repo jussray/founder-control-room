@@ -20,48 +20,48 @@ export type PortableFounderApprovalSourceConsole =
   | 'founder-control-room';
 
 export interface PortableFounderApprovalScope {
-  action: string;
-  target: string;
-  branch?: string;
-  expectedCommitSha?: string;
-  contentHash?: string;
-  missionId?: string | null;
-  commandId?: string | null;
-  environment: string;
+  readonly action: string;
+  readonly target: string;
+  readonly branch?: string;
+  readonly expectedCommitSha?: string;
+  readonly contentHash?: string;
+  readonly missionId?: string | null;
+  readonly commandId?: string | null;
+  readonly environment: string;
 }
 
 export interface PortableFounderApprovalAttestation {
-  type: typeof REGISTERED_ADAPTER_ATTESTATION_TYPE;
-  keyId: string;
-  signature: string;
+  readonly type: typeof REGISTERED_ADAPTER_ATTESTATION_TYPE;
+  readonly keyId: string;
+  readonly signature: string;
 }
 
 export interface PortableFounderApprovalPacket {
-  version: typeof PORTABLE_FOUNDER_APPROVAL_VERSION;
-  decisionId: string;
-  founderId: string;
-  decision: PortableFounderApprovalDecision;
-  sourceConsole: PortableFounderApprovalSourceConsole;
-  sourceConversationRef: string;
-  sourceAdapterRef: string;
-  scope: PortableFounderApprovalScope;
-  constraints: string[];
-  issuedAt: string;
-  expiresAt: string;
-  oneTime: true;
-  founderNote?: string;
-  attestation: PortableFounderApprovalAttestation;
+  readonly version: typeof PORTABLE_FOUNDER_APPROVAL_VERSION;
+  readonly decisionId: string;
+  readonly founderId: string;
+  readonly decision: PortableFounderApprovalDecision;
+  readonly sourceConsole: PortableFounderApprovalSourceConsole;
+  readonly sourceConversationRef: string;
+  readonly sourceAdapterRef: string;
+  readonly scope: PortableFounderApprovalScope;
+  readonly constraints: readonly string[];
+  readonly issuedAt: string;
+  readonly expiresAt: string;
+  readonly oneTime: true;
+  readonly founderNote?: string;
+  readonly attestation: PortableFounderApprovalAttestation;
 }
 
 export interface PortableFounderApprovalUnsignedPacket
   extends Omit<PortableFounderApprovalPacket, 'attestation'> {
-  attestation: Omit<PortableFounderApprovalAttestation, 'signature'>;
+  readonly attestation: Omit<PortableFounderApprovalAttestation, 'signature'>;
 }
 
 export interface RegisteredPortableApprovalAdapterVerifier {
-  sourceConsole: PortableFounderApprovalSourceConsole;
-  sourceAdapterRef: string;
-  keyId: string;
+  readonly sourceConsole: PortableFounderApprovalSourceConsole;
+  readonly sourceAdapterRef: string;
+  readonly keyId: string;
   verify(input: {
     packet: PortableFounderApprovalUnsignedPacket;
     signature: string;
@@ -69,7 +69,7 @@ export interface RegisteredPortableApprovalAdapterVerifier {
 }
 
 export interface PortableFounderApprovalValidationContext {
-  checkedAt?: string;
+  readonly checkedAt?: string;
   isFounderAllowed(founderId: string): boolean | Promise<boolean>;
   resolveAdapter(input: {
     sourceConsole: PortableFounderApprovalSourceConsole;
@@ -87,15 +87,15 @@ export type PortableFounderApprovalValidationFailureCode =
 
 export type PortableFounderApprovalValidationResult =
   | {
-      ok: true;
-      packet: PortableFounderApprovalPacket;
-      executionAuthorized: false;
-      consumptionRequired: true;
+      readonly ok: true;
+      readonly packet: PortableFounderApprovalPacket;
+      readonly executionAuthorized: false;
+      readonly consumptionRequired: true;
     }
   | {
-      ok: false;
-      code: PortableFounderApprovalValidationFailureCode;
-      reason: string;
+      readonly ok: false;
+      readonly code: PortableFounderApprovalValidationFailureCode;
+      readonly reason: string;
     };
 
 type JsonRecord = Record<string, unknown>;
@@ -206,8 +206,12 @@ function parsePacket(input: unknown): PortableFounderApprovalPacket | PortableFo
   return input as unknown as PortableFounderApprovalPacket;
 }
 
-function unsignedPacket(packet: PortableFounderApprovalPacket): PortableFounderApprovalUnsignedPacket {
-  return {
+function snapshotPacket(packet: PortableFounderApprovalPacket): PortableFounderApprovalPacket {
+  const scope = Object.freeze({ ...packet.scope });
+  const constraints = Object.freeze([...packet.constraints]);
+  const attestation = Object.freeze({ ...packet.attestation });
+
+  return Object.freeze({
     version: packet.version,
     decisionId: packet.decisionId,
     founderId: packet.founderId,
@@ -215,17 +219,36 @@ function unsignedPacket(packet: PortableFounderApprovalPacket): PortableFounderA
     sourceConsole: packet.sourceConsole,
     sourceConversationRef: packet.sourceConversationRef,
     sourceAdapterRef: packet.sourceAdapterRef,
-    scope: { ...packet.scope },
-    constraints: [...packet.constraints],
+    scope,
+    constraints,
     issuedAt: packet.issuedAt,
     expiresAt: packet.expiresAt,
     oneTime: packet.oneTime,
     ...(packet.founderNote === undefined ? {} : { founderNote: packet.founderNote }),
-    attestation: {
+    attestation,
+  });
+}
+
+function unsignedPacket(packet: PortableFounderApprovalPacket): PortableFounderApprovalUnsignedPacket {
+  return Object.freeze({
+    version: packet.version,
+    decisionId: packet.decisionId,
+    founderId: packet.founderId,
+    decision: packet.decision,
+    sourceConsole: packet.sourceConsole,
+    sourceConversationRef: packet.sourceConversationRef,
+    sourceAdapterRef: packet.sourceAdapterRef,
+    scope: packet.scope,
+    constraints: packet.constraints,
+    issuedAt: packet.issuedAt,
+    expiresAt: packet.expiresAt,
+    oneTime: packet.oneTime,
+    ...(packet.founderNote === undefined ? {} : { founderNote: packet.founderNote }),
+    attestation: Object.freeze({
       type: packet.attestation.type,
       keyId: packet.attestation.keyId,
-    },
-  };
+    }),
+  });
 }
 
 export async function validatePortableFounderApprovalPacket(
@@ -234,9 +257,10 @@ export async function validatePortableFounderApprovalPacket(
 ): Promise<PortableFounderApprovalValidationResult> {
   const parsed = parsePacket(input);
   if ('ok' in parsed) return parsed;
+  const packet = snapshotPacket(parsed);
 
-  const issuedAtMs = Date.parse(parsed.issuedAt);
-  const expiresAtMs = Date.parse(parsed.expiresAt);
+  const issuedAtMs = Date.parse(packet.issuedAt);
+  const expiresAtMs = Date.parse(packet.expiresAt);
   const checkedAt = context.checkedAt ?? new Date().toISOString();
   const checkedAtMs = Date.parse(checkedAt);
   if (!Number.isFinite(issuedAtMs) || !Number.isFinite(expiresAtMs) || !Number.isFinite(checkedAtMs)) {
@@ -247,33 +271,49 @@ export async function validatePortableFounderApprovalPacket(
     return { ok: false, code: 'DECISION_NOT_CURRENT', reason: 'portable founder approval is not current at validation time' };
   }
 
-  if (!(await context.isFounderAllowed(parsed.founderId))) {
-    return { ok: false, code: 'FOUNDER_NOT_ALLOWED', reason: 'founder identity is not allowlisted' };
+  let adapter: RegisteredPortableApprovalAdapterVerifier | null;
+  try {
+    adapter = await context.resolveAdapter({
+      sourceConsole: packet.sourceConsole,
+      sourceAdapterRef: packet.sourceAdapterRef,
+      keyId: packet.attestation.keyId,
+    });
+  } catch {
+    adapter = null;
   }
-
-  const adapter = await context.resolveAdapter({
-    sourceConsole: parsed.sourceConsole,
-    sourceAdapterRef: parsed.sourceAdapterRef,
-    keyId: parsed.attestation.keyId,
-  });
   if (!adapter
-    || adapter.sourceConsole !== parsed.sourceConsole
-    || adapter.sourceAdapterRef !== parsed.sourceAdapterRef
-    || adapter.keyId !== parsed.attestation.keyId) {
+    || adapter.sourceConsole !== packet.sourceConsole
+    || adapter.sourceAdapterRef !== packet.sourceAdapterRef
+    || adapter.keyId !== packet.attestation.keyId) {
     return { ok: false, code: 'ADAPTER_NOT_REGISTERED', reason: 'exact source console, adapter version, and attestation key are not registered' };
   }
 
-  const verified = await adapter.verify({
-    packet: unsignedPacket(parsed),
-    signature: parsed.attestation.signature,
-  });
+  let verified = false;
+  try {
+    verified = await adapter.verify({
+      packet: unsignedPacket(packet),
+      signature: packet.attestation.signature,
+    });
+  } catch {
+    verified = false;
+  }
   if (!verified) {
     return { ok: false, code: 'ATTESTATION_INVALID', reason: 'registered adapter attestation could not be verified' };
   }
 
+  let founderAllowed = false;
+  try {
+    founderAllowed = await context.isFounderAllowed(packet.founderId);
+  } catch {
+    founderAllowed = false;
+  }
+  if (!founderAllowed) {
+    return { ok: false, code: 'FOUNDER_NOT_ALLOWED', reason: 'founder identity is not allowlisted' };
+  }
+
   return {
     ok: true,
-    packet: parsed,
+    packet,
     executionAuthorized: false,
     consumptionRequired: true,
   };
