@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the current Founder Signal Engine, provider-readback publication memory, editorial-pattern reservation, direct provider preflight, provider-neutral n8n authority membrane, PR continuity, truth governance, provider review policy, Cloudflare release authority, and BuildEvent projection to reviewed source invariants without claiming production migration apply, provider configuration, publication outcome, deployment success, merge authority, database mutation, secret validity, billing, or destructive-action authority.",
+  "purpose": "Bind the current Founder Signal Engine, provider-readback publication memory, editorial-pattern reservation, direct provider preflight, provider-neutral n8n authority membrane, PR continuity, truth governance, provider review policy, read-only Shopify child-provider observation, Cloudflare release authority, and BuildEvent projection to reviewed source invariants without claiming production migration apply, provider configuration, live Shopify inventory, publication outcome, deployment success, merge authority, database mutation, secret validity, billing, or destructive-action authority.",
   "domains": [
     "publishing",
     "cloudflare-authority",
@@ -127,7 +127,8 @@
       "path": "README.md",
       "claims": [
         "README.md must describe founder-content issuance as separate exact-copy and bounded editorial-pattern authority identities, preserve fingerprint-only provider-readback publication memory, and never treat schedule, failed, or UNKNOWN outcomes as publication truth.",
-        "README.md must state that source migrations are not production proof, preserve the n8n generation membrane and live-base PR continuity observation, and retain exact-SHA release proof, deterministic review, authenticated Founder Final, machine gates, CodeQL, thread resolution, and force-push/deletion protection."
+        "README.md must state that source migrations are not production proof, preserve the n8n generation membrane and live-base PR continuity observation, and retain exact-SHA release proof, deterministic review, authenticated Founder Final, machine gates, CodeQL, thread resolution, and force-push/deletion protection.",
+        "README.md must keep child-provider observation separate from authority, state that Shopify CURRENT requires fresh complete exact-identity and exact-scope evidence, and never claim that the source-only preflight performs live Shopify reads, persistence, or provider mutation."
       ]
     },
     {
@@ -236,6 +237,18 @@
       "path": "src/governance/consequentialResumeRequires.ts",
       "claims": [
         "src/governance/consequentialResumeRequires.ts must remain a non-executing eligibility gate: it requires explicit fresh authority re-observation, exact continuity/proposal/action/version idempotency binding, fresh independent artifact-bound witnesses, and the existing governed-action authorization and recovery checks; it cannot transfer continuity authority or perform external execution."
+      ]
+    },
+    {
+      "path": "src/lib/providerObservation.ts",
+      "claims": [
+        "src/lib/providerObservation.ts must classify provider child evidence without granting authority, require complete fresh identity-bound observations before CURRENT, surface undeclared, scope-drift, identity-drift, stale, and unknown states explicitly, and never convert a matching declaration into provider execution permission."
+      ]
+    },
+    {
+      "path": "src/providers/ShopifyReadOnlyProvider.ts",
+      "claims": [
+        "src/providers/ShopifyReadOnlyProvider.ts must bind Shopify child observations to the exact Founder Control Room permanent Shopify domain and branded primary domain, require complete pagination and app scope inventory, withhold currentness for incomplete or mismatched provider evidence, keep every reconciliation non-authorizing, and never persist provider inventory or perform Shopify mutation."
       ]
     }
   ]
