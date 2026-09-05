@@ -3,6 +3,7 @@ import {
   FOUNDER_PROOF_AUDIT_INTERNAL_DRY_RUN_CONTRACT,
   createFounderProofAuditInternalDryRun,
   founderProofAuditDryRunEventMetadata,
+  founderProofAuditDryRunMetadataFingerprint,
   runFounderProofAuditInternalDryRun,
   type FounderProofAuditDryRunStore,
 } from '../founderProofAuditDryRun.js';
@@ -70,6 +71,27 @@ describe('Founder Proof Audit internal dry-run runtime service', () => {
     expect(serialized).not.toContain('objective');
     expect(serialized).not.toContain('evidenceRef');
     expect(serialized).not.toMatch(/password|private[_-]?key|recovery[_-]?code|card[_-]?number/i);
+  });
+
+  it('treats JSONB-equivalent metadata as the same receipt regardless of object key order', () => {
+    const metadata = founderProofAuditDryRunEventMetadata(
+      createFounderProofAuditInternalDryRun(SHA),
+    );
+    const reordered = {
+      guarantees: metadata.guarantees,
+      receipt: metadata.receipt,
+      inputFingerprint: metadata.inputFingerprint,
+      testCase: metadata.testCase,
+      runtimeSha: metadata.runtimeSha,
+      contract: metadata.contract,
+    };
+
+    expect(founderProofAuditDryRunMetadataFingerprint(reordered)).toBe(
+      founderProofAuditDryRunMetadataFingerprint(metadata),
+    );
+    expect(
+      founderProofAuditDryRunMetadataFingerprint({ ...reordered, runtimeSha: 'a'.repeat(40) }),
+    ).not.toBe(founderProofAuditDryRunMetadataFingerprint(metadata));
   });
 
   it('runs through the persistence boundary and preserves the store disposition', async () => {

@@ -55,8 +55,25 @@ function fingerprint(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
+function canonicalJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((item) => canonicalJson(item));
+  if (value !== null && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => [key, canonicalJson(item)] as const);
+    return Object.fromEntries(entries);
+  }
+  return value;
+}
+
+export function founderProofAuditDryRunMetadataFingerprint(value: unknown): string {
+  return fingerprint(canonicalJson(value));
+}
+
 function sameMetadata(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return founderProofAuditDryRunMetadataFingerprint(left)
+    === founderProofAuditDryRunMetadataFingerprint(right);
 }
 
 export function createFounderProofAuditInternalDryRun(
