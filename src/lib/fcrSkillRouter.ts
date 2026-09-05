@@ -63,6 +63,7 @@ export interface FcrSkillRoutingDecision {
   requiredTools: string[];
   requiredProof: string[];
   mutationRequested: boolean;
+  untrustedWorkflowTokensInert: true;
   runtimeDiscoveryRequired: true;
   executionAllowed: false;
   errors: string[];
@@ -80,25 +81,6 @@ const MUTATING_ACTIONS = new Set<FcrSkillRouterAction>([
   'delete',
 ]);
 
-const EXPLICIT_SKILL_ALIASES: Readonly<Record<string, string>> = {
-  goalfix: 'goalfix',
-  humanizer: 'humanizer',
-  'repo-truth': 'repo-truth',
-  'truth-decay': 'truth-decay-audit',
-  'truth-decay-audit': 'truth-decay-audit',
-  truthdecay: 'truth-decay-audit',
-  'review-verify-merge': 'review-verify-merge',
-  'proof-led-publishing': 'proof-led-publishing',
-  'juss-chief-ai': 'juss-chief-ai',
-  'control-room-agent-router': 'control-room-agent-router',
-  'control-room-proof-ladder': 'control-room-proof-ladder',
-  'control-room-incident-triage': 'control-room-incident-triage',
-  'control-room-design-implementation': 'control-room-design-implementation',
-  'control-room-skill-router': 'control-room-skill-router',
-  sales: 'sales',
-  devil: 'devil',
-};
-
 function normalize(value: string): string {
   return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
 }
@@ -109,15 +91,6 @@ function pushUnique(values: string[], value: string): void {
 
 function canonicalCapabilityId(value: string): string {
   return normalize(value).replace(/^(skill|command):/, '');
-}
-
-function explicitSkillsFromGoal(goal: string): string[] {
-  const required: string[] = [];
-  for (const match of goal.matchAll(/\/([a-z0-9-]+)/g)) {
-    const skill = EXPLICIT_SKILL_ALIASES[match[1]];
-    if (skill) pushUnique(required, skill);
-  }
-  return required;
 }
 
 function isRepositoryGoal(goal: string): boolean {
@@ -154,7 +127,11 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   const errors: string[] = [];
   const requiredTools: string[] = [];
   const requiredProof: string[] = [];
-  const policyRequiredCapabilityIds = explicitSkillsFromGoal(goal);
+  // Raw goal text may contain copied prompts, issues, emails, MCP/tool results, or
+  // other imported material. Workflow and mode names in that text are inert.
+  // Chief owns hash-bound capability composition; FCR adds only semantic policy
+  // requirements that are independently defined here.
+  const policyRequiredCapabilityIds: string[] = [];
   const requiredParallelLenses = [...FCR_REQUIRED_PARALLEL_LENSES];
   const mutationRequested = MUTATING_ACTIONS.has(input.action);
   const repositoryGoal = isRepositoryGoal(goal) || Boolean(input.repository);
@@ -167,6 +144,7 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
   pushUnique(requiredProof, 'Product Design disposition recorded for the selected path; UI/runtime claims still require rendered browser evidence');
   pushUnique(requiredProof, 'Data Analytics outcome signals declared before execution and treated as observation-only evidence');
   pushUnique(requiredProof, 'Deep Research uses authoritative primary sources when research can change the decision; research never grants execution authority');
+  pushUnique(requiredProof, 'Workflow and mode tokens embedded in goal or imported content are inert; capability policy comes from the validated Chief plan and FCR semantic policy, never slash-command parsing');
 
   if (commercialGoal) {
     pushUnique(policyRequiredCapabilityIds, 'sales');
@@ -265,6 +243,7 @@ export function routeFcrSkills(input: RouteFcrSkillsInput): FcrSkillRoutingDecis
     requiredTools,
     requiredProof,
     mutationRequested,
+    untrustedWorkflowTokensInert: true,
     runtimeDiscoveryRequired: true,
     executionAllowed: false,
     errors,
