@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the current evidence-authority Playwright federation and privileged production-witness changes plus the retained repository-provider governance invariants to truthful documentation without claiming live GitHub, StoryEngine, Cloudflare, deployment, merge, publication, database, secret, billing, or destructive-action proof.",
+  "purpose": "Bind the current evidence-authority Playwright federation, privileged production-witness changes, retained FCR repository-provider governance invariants, and the Chief governance observation/reconciliation boundary to truthful documentation without claiming live GitHub, Chief ruleset mutation, StoryEngine, Cloudflare, deployment, merge, publication, database, secret, billing, or destructive-action proof.",
   "domains": [
     "repository-provider",
     "evidence-authority"
@@ -16,6 +16,19 @@
       "path": "src/providers/providerFactory.ts",
       "claims": [
         "src/providers/providerFactory.ts must keep the current FCR founder-only native approving-review floor at zero while retaining the constitutional required checks and trusted GitHub App boundary, and a later deliberate positive native-review count must remain representable without weakening the existing machine or founder-final authority membrane."
+      ]
+    },
+    {
+      "path": "src/providers/githubGovernanceReconciliation.ts",
+      "claims": [
+        "src/providers/githubGovernanceReconciliation.ts must keep Chief governance reconciliation pinned to jussray/chief-ai-machine and ruleset IDs 20818149 and 21261587, preserve required-check integration_id producer identity and unrelated checks, require complete bypass-state evidence, and refuse to describe a read-then-PUT update of existing rulesets as concurrency-safe when no atomic provider precondition is available.",
+        "src/providers/githubGovernanceReconciliation.ts may return NO_CHANGE_REQUIRED only for already-correct observed provider state; a required live change remains BLOCKED_PROVIDER_ATOMIC_PRECONDITION_UNAVAILABLE and neither disposition grants provider mutation, merge, deploy, or execution authority."
+      ]
+    },
+    {
+      "path": "src/providers/trustedGithubGovernanceObserver.ts",
+      "claims": [
+        "src/providers/trustedGithubGovernanceObserver.ts must observe only the fixed Chief repository and fixed governance rulesets through FCR's repository-scoped GitHub App installation-token path, reject caller-supplied PAT/token authority, require complete provider readback suitable for fingerprinting, and remain evidence-only rather than minting ruleset-mutation, merge, deploy, or execution authority."
       ]
     },
     {
