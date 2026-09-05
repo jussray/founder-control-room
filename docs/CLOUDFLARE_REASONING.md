@@ -209,6 +209,12 @@ The only runtime secret canonical Deploy actively writes is the checked-in fail-
 
 This source membrane does not prove the current Cloudflare required-secret set, values, Workers Builds dashboard configuration, custom-domain routing, active deployment, or runtime SHA. Those remain separate provider/runtime readback gates.
 
+## Founder-content n8n activation boundary
+
+`wrangler.worker.toml` keeps founder-content n8n orchestration **disabled by default** with `N8N_FOUNDER_CONTENT_ENABLED="false"`, limits the checked-in v1 provider set to `buffer`, and pins the expected workflow/runtime identity. Those source declarations describe the desired fail-closed Worker configuration only. They do not prove that private webhook, bearer, workflow-fingerprint, or HMAC bindings exist in Cloudflare, and they do not authorize changing the switch to `true`.
+
+Enabling this lane requires a separate founder-approved provider configuration step, provider-held binding readback, and exact deployed-runtime proof. A source commit, successful Worker build, or n8n import is never enough to claim orchestration is active or publication occurred.
+
 ## Durable release-proof Workflow boundary
 
 `wrangler.worker.toml` declares one Cloudflare Workflows binding for the exported `ReleaseProofWorkflowV0` class:
