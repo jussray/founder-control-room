@@ -139,6 +139,10 @@ const READY_ENV = {
   N8N_FOUNDER_CONTENT_WEBHOOK_URL: 'https://n8n.example/webhook/founder-content',
   N8N_FOUNDER_CONTENT_BEARER_TOKEN: 'server-only-test-token',
   N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS: 'buffer',
+  N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_ID: 'fcrFounderContentV1',
+  N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT: 'a'.repeat(64),
+  N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION: '2.32.6',
+  N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET: 'runtime-identity-secret-32-characters-minimum',
 };
 
 type ApprovalResult = Awaited<ReturnType<FounderContentApprovalRepository['claim']>>;
