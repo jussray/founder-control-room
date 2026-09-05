@@ -12,6 +12,10 @@ on:
         required: false
         type: string
 
+concurrency:
+  group: main-release-provenance-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   pull-requests: read
@@ -68,7 +72,37 @@ jobs:
             "repos/${GITHUB_REPOSITORY}/commits/${TARGET_SHA}/pulls" \
             > associated-pulls.json
           printf 'current_main_sha=%s\n' "$current_main_sha" >> "$GITHUB_OUTPUT"
+      - name: Classify superseded push run
+        id: supersession
+        shell: bash
+        env:
+          CURRENT_MAIN_SHA: ${{ steps.provider.outputs.current_main_sha }}
+        run: |
+          set -euo pipefail
+          superseded=false
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${TARGET_SHA}" != "${CURRENT_MAIN_SHA}" ]]; then
+            superseded=true
+            mkdir -p artifacts
+            node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+
+          const receipt = {
+            ok: false,
+            reason: 'superseded_push',
+            superseded: true,
+            enforced: false,
+            targetSha: process.env.TARGET_SHA,
+            currentMainSha: process.env.CURRENT_MAIN_SHA,
+          };
+
+          writeFileSync('artifacts/main-release-provenance.json', `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
+          process.stdout.write(`${JSON.stringify(receipt)}\n`);
+          NODE
+            echo "Superseded push run: ${TARGET_SHA} is no longer current main (${CURRENT_MAIN_SHA})."
+          fi
+          echo "superseded=${superseded}" >> "$GITHUB_OUTPUT"
       - name: Verify release provenance against live GitHub state
+        if: ${{ steps.supersession.outputs.superseded != 'true' }}
         shell: bash
         env:
           CURRENT_MAIN_SHA: ${{ steps.provider.outputs.current_main_sha }}

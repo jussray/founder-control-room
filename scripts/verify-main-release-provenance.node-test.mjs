@@ -158,3 +158,28 @@ test('preflight verifier is load-bearing before the first production mutation', 
   assert.ok(workerDependency > worker, 'Worker deploy must remain dependent on the Supabase job');
   assert.ok(pagesDependency > pages, 'Pages release must remain dependent on Worker deploy');
 });
+
+test('main provenance workflow cancels stale push runs without weakening provenance semantics', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/main-release-provenance.yml', import.meta.url), 'utf8');
+
+  assert.match(
+    workflow,
+    /concurrency:\n\s+group: main-release-provenance-\$\{\{ github\.event_name \}\}-\$\{\{ github\.ref \}\}\n\s+cancel-in-progress: true/,
+  );
+
+  const supersession = workflow.indexOf('- name: Classify superseded push run');
+  const pushOnly = workflow.indexOf('"${GITHUB_EVENT_NAME}" == "push"', supersession);
+  const staleOnly = workflow.indexOf('"${TARGET_SHA}" != "${CURRENT_MAIN_SHA}"', supersession);
+  const receipt = workflow.indexOf("reason: 'superseded_push'", supersession);
+  const unenforced = workflow.indexOf('enforced: false', supersession);
+  const verifier = workflow.indexOf('- name: Verify release provenance against live GitHub state', supersession);
+  const verifierGuard = workflow.indexOf("if: ${{ steps.supersession.outputs.superseded != 'true' }}", verifier);
+
+  assert.ok(supersession >= 0, 'workflow must classify superseded push runs');
+  assert.ok(pushOnly > supersession, 'supersession must be limited to push events');
+  assert.ok(staleOnly > pushOnly, 'supersession must require target/main mismatch');
+  assert.ok(receipt > staleOnly, 'superseded runs must emit an explicit receipt');
+  assert.ok(unenforced > receipt, 'superseded receipt must not claim provenance enforcement');
+  assert.ok(verifier > unenforced, 'current candidates must still reach the provenance verifier');
+  assert.ok(verifierGuard > verifier, 'the verifier may be skipped only for an explicitly superseded push');
+});
