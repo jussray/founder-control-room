@@ -11,6 +11,11 @@ V3 records caller-supplied source digests but does not resolve or verify the
 source artifact bytes. Therefore V3 evidence/claim states are ATTESTED rather
 than VERIFIED. Provenance locking and verified source binding are reserved for
 an explicit successor contract.
+
+V3 expectation text is narrative, not a structured threshold/direction
+contract. The receipt therefore reports factual metric movement separately and
+must keep expectation-relative surprise UNKNOWN until a future structured
+expectation contract can be evaluated deterministically.
 """
 from __future__ import annotations
 
@@ -26,12 +31,15 @@ CONTRACT = "fcr/founder-content-supersession@v3"
 INPUT_CONTRACT = "fcr/founder-content-supersession-input@v1"
 AUTHORITY = "observation_only"
 CANONICALIZATION = "fcr-json-v1"
-SURPRISES = {
-    "STRONGER_THAN_EXPECTED",
-    "AS_EXPECTED",
-    "WEAKER_THAN_EXPECTED",
-    "UNEXPECTED_DIRECTION",
-    "UNKNOWN",
+SURPRISES = {"UNKNOWN"}
+EXPECTATION_EVALUATION = "NOT_EVALUATED_UNSTRUCTURED_V3"
+METRIC_CHANGES = {
+    "NO_CHANGE",
+    "ENGAGEMENTS_UP_WITHOUT_IMPRESSIONS",
+    "IMPRESSIONS_UP_WITHOUT_ENGAGEMENTS",
+    "ENGAGEMENT_RATE_DOWN",
+    "ENGAGEMENT_RATE_UP",
+    "ENGAGEMENT_RATE_FLAT",
 }
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 RECEIPT_RE = re.compile(r"^SUP-([0-9a-f]{16})$", re.IGNORECASE)
@@ -90,28 +98,29 @@ def _canonical_bytes(payload: dict[str, Any]) -> bytes:
     ).encode("utf-8")
 
 
-def _classify(
+def _classify_metric_change(
     prior_impressions: int,
     prior_engagements: int,
     current_impressions: int,
     current_engagements: int,
 ) -> str:
+    """Classify only observed metric movement, never expectation-relative surprise."""
     delta_impressions = current_impressions - prior_impressions
     delta_engagements = current_engagements - prior_engagements
     prior_rate = _rate(prior_engagements, prior_impressions)
     current_rate = _rate(current_engagements, current_impressions)
 
     if delta_impressions == 0 and delta_engagements == 0:
-        return "UNKNOWN"
+        return "NO_CHANGE"
     if delta_impressions == 0 and delta_engagements > 0:
-        return "UNEXPECTED_DIRECTION"
+        return "ENGAGEMENTS_UP_WITHOUT_IMPRESSIONS"
     if delta_impressions > 0 and delta_engagements == 0:
-        return "WEAKER_THAN_EXPECTED"
+        return "IMPRESSIONS_UP_WITHOUT_ENGAGEMENTS"
     if current_rate < prior_rate:
-        return "WEAKER_THAN_EXPECTED"
-    if delta_engagements > 0 and current_rate > prior_rate:
-        return "STRONGER_THAN_EXPECTED"
-    return "AS_EXPECTED"
+        return "ENGAGEMENT_RATE_DOWN"
+    if current_rate > prior_rate:
+        return "ENGAGEMENT_RATE_UP"
+    return "ENGAGEMENT_RATE_FLAT"
 
 
 def build_supersession_receipt(payload: dict[str, Any]) -> dict[str, Any]:
@@ -166,12 +175,20 @@ def build_supersession_receipt(payload: dict[str, Any]) -> dict[str, Any]:
 
     prior_rate = _rate(prior_engagements, prior_impressions)
     current_rate = _rate(current_engagements, current_impressions)
-    surprise = _classify(
+    metric_change = _classify_metric_change(
         prior_impressions,
         prior_engagements,
         current_impressions,
         current_engagements,
     )
+    if metric_change not in METRIC_CHANGES:
+        raise AssertionError("invalid metric change classification")
+
+    # V3 accepts narrative expectation text but has no structured threshold or
+    # direction semantics. Any stronger/weaker/as-expected label would invent
+    # an evaluation that did not occur, so expectation-relative surprise stays
+    # UNKNOWN until a successor contract defines deterministic expectation data.
+    surprise = "UNKNOWN"
     if surprise not in SURPRISES:
         raise AssertionError("invalid surprise classification")
 
@@ -184,6 +201,7 @@ def build_supersession_receipt(payload: dict[str, Any]) -> dict[str, Any]:
             "post_fingerprint": post_fingerprint,
         },
         "expectation": expectation,
+        "expectation_evaluation": EXPECTATION_EVALUATION,
         "evidence": [
             {
                 "observed_at": prior_at_raw,
@@ -211,6 +229,7 @@ def build_supersession_receipt(payload: dict[str, Any]) -> dict[str, Any]:
             "engagements": current_engagements - prior_engagements,
             "engagement_rate_pp": round(current_rate - prior_rate, 2),
         },
+        "metric_change": metric_change,
         "surprise": surprise,
         "supersession": {
             "prior_claim": prior_claim,
