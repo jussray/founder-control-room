@@ -28,6 +28,7 @@ function blockedReceipt(
     reason,
     ...bound.candidate,
     candidateFingerprint: bound.candidateFingerprint,
+    candidateCookie: bound.candidateCookie,
     founderApprovalObserved: false,
     mergeAuthorized: false,
     deploymentAuthorized: false,
@@ -43,6 +44,11 @@ function blockedReceipt(
  * execution authority. It correlates exact release/evidence/founder receipts,
  * then stops at READY_FOR_FINAL_REREAD so the repository's existing authority
  * contract can perform the final mutable provider reread and any later action.
+ *
+ * Fingerprints identify immutable subjects. Continuity cookies cryptographically
+ * chain the currently valid candidate -> evidence -> founder-authority path.
+ * A moved candidate or replayed predecessor cookie fails closed rather than
+ * borrowing historical proof.
  */
 export class ReleaseProofWorkflowV0 extends WorkflowEntrypoint<ReleaseProofWorkflowEnv, ReleaseProofCandidate> {
   async run(event: WorkflowEvent<ReleaseProofCandidate>, step: WorkflowStep) {
@@ -57,7 +63,7 @@ export class ReleaseProofWorkflowV0 extends WorkflowEntrypoint<ReleaseProofWorkf
       },
     );
 
-    const evidence = await step.do('validate evidence correlation', async () =>
+    const evidence = await step.do('validate evidence fingerprint and continuity cookie', async () =>
       evaluateReleaseEvidence(bound, evidenceEvent.payload));
 
     if (evidence.state !== 'EVIDENCE_CLEAR') {
@@ -72,8 +78,8 @@ export class ReleaseProofWorkflowV0 extends WorkflowEntrypoint<ReleaseProofWorkf
       },
     );
 
-    const founder = await step.do('validate founder observation correlation', async () =>
-      evaluateFounderApprovalObservation(bound, founderEvent.payload));
+    const founder = await step.do('validate founder fingerprint and evidence cookie chain', async () =>
+      evaluateFounderApprovalObservation(bound, evidence, founderEvent.payload));
 
     if (founder.state !== 'FOUNDER_APPROVAL_OBSERVED') {
       return blockedReceipt(bound, 'HOLD', founder.reason);
