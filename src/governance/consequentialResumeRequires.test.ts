@@ -206,6 +206,23 @@ describe('fcr/consequential-resume-requires@v1', () => {
     expect(verdict.reasons.join(' ')).toContain('Independent witness is stale.');
   });
 
+  it('fails closed when runtime input invents an unsupported witness kind', () => {
+    const base = input();
+    const forged = [{ ...base.independentEvidence[0], kind: 'self_verified' }]
+      as unknown as ConsequentialResumeInput['independentEvidence'];
+    const verdict = evaluateConsequentialResume({ ...base, independentEvidence: forged });
+    expect(verdict.disposition).toBe('reconfirm');
+    expect(verdict.reasons.join(' ')).toContain('Independent witness kind is unsupported.');
+  });
+
+  it('requires the independent witness identity to differ from the proof identity', () => {
+    const base = input();
+    const forged = [{ ...base.independentEvidence[0], witnessId: 'proof-provider-ready' }];
+    const verdict = evaluateConsequentialResume({ ...base, independentEvidence: forged });
+    expect(verdict.disposition).toBe('reconfirm');
+    expect(verdict.reasons.join(' ')).toContain('identity distinct from the proof');
+  });
+
   it('reuses the existing governed-action recovery gate instead of inventing a second one', () => {
     const weak = action({
       recoveryPlan: {

@@ -63,6 +63,13 @@ const STATE_HASH = /^sha256:[0-9a-f]{64}$/i;
 const MAX_WITNESS_FRESHNESS_MS = 24 * 60 * 60 * 1000;
 const FUTURE_SKEW_MS = 5 * 60 * 1000;
 const IDEMPOTENCY_PREFIX = 'fcr-consequential-resume-v1:';
+const INDEPENDENT_WITNESS_KINDS = new Set<IndependentWitnessKind>([
+  'provider_readback',
+  'database_readback',
+  'runtime_probe',
+  'browser_witness',
+  'repository_readback',
+]);
 
 function digest(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -147,6 +154,8 @@ function witnessSupportsProof(
   now: Date,
 ): { supported: boolean; reason: string } {
   if (!witness.witnessId.trim()) return { supported: false, reason: 'Independent witness identity is missing.' };
+  if (witness.witnessId === proof.id) return { supported: false, reason: 'Independent witness must have an identity distinct from the proof it observes.' };
+  if (!INDEPENDENT_WITNESS_KINDS.has(witness.kind)) return { supported: false, reason: 'Independent witness kind is unsupported.' };
   if (witness.proofId !== proof.id) return { supported: false, reason: 'Independent witness is bound to a different proof.' };
   if (!HASH.test(witness.artifactHash) || witness.artifactHash.toLowerCase() !== proof.artifactHash.toLowerCase()) {
     return { supported: false, reason: 'Independent witness artifact hash does not bind to the selected proof artifact.' };
