@@ -135,6 +135,42 @@ jobs:
           docker compose -f "$COMPOSE_FILE" logs n8n
           exit 1
 
+      - name: Wait for founder-content production webhook registration
+        shell: bash
+        run: |
+          set -euo pipefail
+          webhook='http://127.0.0.1:5678/webhook/founder-control-room/founder-content'
+          for attempt in $(seq 1 30); do
+            status="$(curl -sS -o .tmp/n8n-founder-content-readiness.txt -w '%{http_code}' \
+              -X POST "$webhook" \
+              -H 'content-type: application/json' \
+              --data '{}' || true)"
+            case "$status" in
+              401|403)
+                printf 'Founder-content production webhook registered after %s attempt(s).\n' "$attempt"
+                exit 0
+                ;;
+              404|000)
+                sleep 2
+                ;;
+              *)
+                cat .tmp/n8n-founder-content-readiness.txt || true
+                echo "Unexpected founder-content webhook readiness status: HTTP $status" >&2
+                exit 1
+                ;;
+            esac
+          done
+          cat .tmp/n8n-founder-content-readiness.txt || true
+          echo 'Founder-content production webhook never registered.' >&2
+          docker compose -f "$COMPOSE_FILE" exec -T postgres \
+            psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+            -c "SELECT id, name, active, \"activeVersionId\", \"versionId\" FROM workflow_entity WHERE id = '$N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_ID';" || true
+          docker compose -f "$COMPOSE_FILE" exec -T postgres \
+            psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+            -c "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND (tablename ILIKE '%webhook%' OR tablename ILIKE '%workflow%') ORDER BY tablename;" || true
+          docker compose -f "$COMPOSE_FILE" logs n8n || true
+          exit 1
+
       - name: Reject unauthenticated founder-content request
         shell: bash
         run: |
