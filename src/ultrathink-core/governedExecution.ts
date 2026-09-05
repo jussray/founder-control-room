@@ -206,6 +206,9 @@ export function evaluateGovernedExecution(
   if (world.leaseConsumed) {
     addReason(reasons, 'lease_replay');
   }
+  if (world.previousOutcome === 'known_success') {
+    addReason(reasons, 'previous_outcome_already_succeeded');
+  }
 
   if (reasons.size > 0) {
     return { disposition: 'DENY', reasons: [...reasons] };
@@ -237,11 +240,20 @@ export interface GovernedExecutionReceipt {
   observedAt: string;
 }
 
+export interface GovernedReceiptBinding {
+  leaseId: string;
+  idempotencyKey: string;
+  runtimeIdentity: string;
+  externalRefs: readonly string[];
+  receiptObservedAt: string;
+}
+
 export interface GovernedExecutionWitness {
   status: 'verified' | 'contradicted' | 'unknown';
   strength: WitnessStrength;
   evidenceFingerprint: string;
   observedAt: string;
+  receiptBinding: GovernedReceiptBinding;
 }
 
 const WITNESS_STRENGTH: Record<WitnessStrength, number> = {
@@ -252,19 +264,46 @@ const WITNESS_STRENGTH: Record<WitnessStrength, number> = {
   W4: 4,
 };
 
+function sameRefs(expected: readonly string[], actual: readonly string[]): boolean {
+  if (expected.length !== actual.length) return false;
+  return expected.every((value, index) => same(value, actual[index]));
+}
+
+function witnessBindsReceipt(
+  receipt: GovernedExecutionReceipt,
+  witness: GovernedExecutionWitness,
+): boolean {
+  const receiptTime = Date.parse(receipt.observedAt);
+  const witnessTime = Date.parse(witness.observedAt);
+
+  return same(receipt.leaseId, witness.receiptBinding.leaseId)
+    && same(receipt.idempotencyKey, witness.receiptBinding.idempotencyKey)
+    && same(receipt.runtimeIdentity, witness.receiptBinding.runtimeIdentity)
+    && sameRefs(receipt.externalRefs, witness.receiptBinding.externalRefs)
+    && same(receipt.observedAt, witness.receiptBinding.receiptObservedAt)
+    && Number.isFinite(receiptTime)
+    && Number.isFinite(witnessTime)
+    && witnessTime >= receiptTime;
+}
+
 /** Runtime success is execution evidence only. Verification requires a separately
- * supplied witness at or above the caller's required independence strength. */
+ * supplied witness at or above the caller's required independence strength, bound
+ * to the exact execution receipt it claims to verify or contradict. */
 export function evaluateGovernedExecutionOutcome(
   receipt: GovernedExecutionReceipt,
   witness?: GovernedExecutionWitness,
   minimumWitnessStrength: WitnessStrength = 'W1',
 ): GovernedOutcomeDisposition {
-  if (witness?.status === 'contradicted') return 'CONTRADICTED';
+  const boundWitness = witness && witnessBindsReceipt(receipt, witness)
+    ? witness
+    : undefined;
+
+  if (boundWitness?.status === 'contradicted') return 'CONTRADICTED';
 
   if (
-    witness?.status === 'verified' &&
-    normalized(witness.evidenceFingerprint) &&
-    WITNESS_STRENGTH[witness.strength] >= WITNESS_STRENGTH[minimumWitnessStrength]
+    boundWitness?.status === 'verified' &&
+    normalized(boundWitness.evidenceFingerprint) &&
+    WITNESS_STRENGTH[boundWitness.strength] >= WITNESS_STRENGTH[minimumWitnessStrength]
   ) {
     return 'VERIFIED';
   }
