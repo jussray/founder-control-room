@@ -99,6 +99,10 @@ The former `founder-control-room2` Worker was deleted and must not be recreated 
 | `ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL` | secret | Private approved Zapier Catch Hook URL. |
 | `FOUNDER_SIGNAL_ENGINE_HOOK_TIMEOUT_MS` | protected variable | Optional bounded provider timeout. |
 | `FOUNDER_REVIEW_EMAIL_INGRESS_SECRET` | secret | Shared only with the review-email Worker when that route is activated. |
+| `N8N_FOUNDER_CONTENT_WEBHOOK_URL` | secret | Required private production webhook URL for the governed founder-content n8n workflow. |
+| `N8N_FOUNDER_CONTENT_BEARER_TOKEN` | secret | Required bearer credential paired only with the founder-content n8n production webhook. |
+| `N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT` | secret | Required expected workflow fingerprint used to bind the Worker to the exact published n8n workflow identity. |
+| `N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET` | secret | Required HMAC secret for verifying signed n8n runtime identity receipts. |
 | `REPOSITORY_INGEST_SECRET` | secret | Optional repository-verification ingest credential. |
 
 The Worker intentionally fails closed when required bindings are absent, empty, malformed, or when the GitHub App pair is incomplete. Do not weaken `validateWorkerEnv` to bypass provider configuration.
@@ -213,6 +217,10 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
 [ ] ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
 [ ] FOUNDER_REVIEW_EMAIL_INGRESS_SECRET when email intake is active
+[ ] N8N_FOUNDER_CONTENT_WEBHOOK_URL
+[ ] N8N_FOUNDER_CONTENT_BEARER_TOKEN
+[ ] N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT
+[ ] N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET
 [ ] REPOSITORY_INGEST_SECRET when repository ingest is active
 ```
 
