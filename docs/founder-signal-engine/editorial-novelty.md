@@ -51,13 +51,13 @@ The fingerprints identify editorial state. They are continuity evidence only. Th
 
 All founder LinkedIn experiment history participates in the same PromptOS thesis/hook pattern memory, including stories sourced from Founder Control Room, PromptOS, Chief, Se'kret Bip, or another portfolio product.
 
-Founder-attested LinkedIn publications can also contribute to this same pattern memory, but only through a bounded non-authorizing observation contract.
+Founder-attested LinkedIn publications can contribute to this same pattern memory through a bounded non-authorizing observation contract. Provider-readback-verified direct LinkedIn publications also contribute after FCR has durable execution truth. Neither path stores raw thesis or hook text for fingerprint-only memory.
 
 Changing the repo or product name does not make a repeated thesis new.
 
 ## History authority
 
-LinkedIn novelty readback uses two current evidence sources:
+LinkedIn novelty readback uses three evidence sources:
 
 1. `linkedin_experiments`
    - only `published` / `analyzed` rows;
@@ -69,11 +69,24 @@ LinkedIn novelty readback uses two current evidence sources:
    - no raw thesis or opening-hook text is persisted for this memory path;
    - the observation remains user-attested evidence and never becomes provider verification or publication authority.
 
+3. provider-readback-verified direct publication executions
+   - only `approval_executions` for action `publish_founder_content` that are `succeeded` with `success = true`;
+   - the stored result must retain the direct-publication contract, `truthState = PUBLISHED`, `published = true`, LinkedIn platform identity, a provider post id/permalink, and a valid publication timestamp;
+   - the approval id is joined to `founder_content_approval_editorial_pattern_history`, an immutable fingerprint-only mapping captured from the serialized approval-pattern reservation transaction;
+   - raw thesis, hook, or post copy is not reconstructed or persisted by this history lane;
+   - an execution without its immutable approval-pattern binding is not accepted as editorial memory.
+
 Manual observation input supplies `coreThesis` and `openingHook` transiently. FCR derives the same PromptOS fingerprint used by the proposal novelty gate and persists only that fingerprint. `contentHash`, when supplied, remains separate attestation evidence and is not treated as proof that FCR verified public copy.
+
+### Provider-readback publication boundary
+
+The direct LinkedIn adapter does not call a successful POST publication truth. After LinkedIn accepts the write, FCR performs provider-native readback and verifies the exact post id, author, copy, `PUBLISHED` lifecycle, `PUBLIC` visibility, and publication timestamp. Only that verified receipt can produce the succeeded direct-publication execution consumed by novelty memory.
+
+`founder_content_active_editorial_pattern_reservations` remains an active authority lease and may move after expiry. It is therefore not used as historical publication memory. Migration `20260905032000_founder_content_approval_editorial_pattern_history.sql` copies each approval-pattern binding into immutable history inside the same serialized issuance transaction. Conflicting reuse of an approval id fails closed.
 
 ### Explicit exclusion: schedule receipts
 
-`approval_executions.status = succeeded` is **not publication history** for the n8n/Buffer lane. A successful execution row can represent only an accepted/scheduled provider request whose receipt still says:
+`approval_executions.status = succeeded` by itself is **not publication history**. The n8n/Buffer lane can succeed with only an accepted/scheduled provider request whose receipt still says:
 
 ```text
 truthState = provider_schedule_receipt_pending_readback
@@ -81,13 +94,13 @@ published = false
 requiresProviderReadback = true
 ```
 
-Therefore `approval_executions` is not queried by the novelty history reader. A future provider-readback lane may contribute publication memory only after it has its own explicit externally observed publication truth contract.
+The novelty reader may inspect the execution ledger, but it accepts only the exact direct-publish action and verified publication-result shape above. Schedule executions, provider failures, UNKNOWN outcomes, and missing approval-pattern mappings are excluded.
 
 ## Novelty decision
 
 The current thesis + hook are compared deterministically with recent history using two independent signals:
 
-1. portfolio-wide exact PromptOS thesis+hook pattern identity across **all** scanned history, including server-derived founder-attested pattern memory;
+1. portfolio-wide exact PromptOS thesis+hook pattern identity across **all** scanned history, including founder-attested and provider-readback-verified fingerprint memory;
 2. normalized meaningful-token similarity across experiment records, used to rank the closest semantic prior.
 
 Current thresholds:
@@ -96,7 +109,7 @@ Current thresholds:
 - `MEDIUM`: similarity >= `0.35` -> allow, but retain the closest-match continuity receipt;
 - `LOW`: below `0.35` -> allow, while still retaining the comparison receipt.
 
-Exact-pattern detection scans the whole bounded history window independently of similarity ranking. An attested pattern can therefore block reuse even though no raw thesis/hook text is stored and semantic similarity for that row is zero.
+Exact-pattern detection scans the whole bounded history window independently of similarity ranking. A fingerprint-only publication record can therefore block reuse even though no raw thesis/hook text is stored and semantic similarity for that row is zero.
 
 A new commit, proof artifact, or event rotates the Chief angle fingerprint and final story fingerprint. That does **not** automatically prove editorial novelty. If the thesis/hook remains highly repetitive, the proposal is still rejected.
 
@@ -110,15 +123,16 @@ New evidence is not a license to retell an old argument with a fresh SHA taped t
 verified product/repo event
 -> Chief candidate proposal
 -> portfolio-wide PromptOS pattern fingerprint
--> FCR reads experiment + bounded founder-attested pattern history
+-> FCR reads experiment + founder-attested + verified direct-publication pattern history
 -> FCR scans exact patterns + computes closest semantic prior
 -> HIGH risk: reject; Chief must select a materially different angle
 -> LOW/MEDIUM: continue
 -> authenticated founder exact-copy confirmation
--> FCR one-shot approval
+-> FCR one-shot approval + immutable approval-pattern binding
 -> provider route
--> provider schedule receipt (still pending readback)
--> externally observed publication truth, when available
+-> schedule receipt: still pending publication readback
+   OR direct LinkedIn write + provider-native publication readback
+-> verified direct publication execution becomes fingerprint-only novelty history
 ```
 
 The novelty check is load-bearing for LinkedIn approval issuance, not an optional suggestion after approval.
@@ -147,8 +161,11 @@ The system must preserve all of these:
 - repo or product rotation does not reset PromptOS repetition memory;
 - exact-pattern detection scans all bounded history instead of only the similarity winner;
 - founder-attested publication can block reuse without being relabeled provider-verified;
-- raw transient thesis/hook text is not persisted in the manual observation memory path;
+- provider-readback-verified direct publication remains novelty memory after its active approval lease expires or moves;
+- raw transient thesis/hook text is not persisted in fingerprint-only publication memory;
 - a schedule receipt never becomes publication memory merely because an execution row is `succeeded`;
+- FAILED or UNKNOWN direct-provider outcomes never become publication memory;
+- an unmapped approval execution cannot invent an editorial pattern;
 - a new event/proof does not automatically excuse a repeated thesis;
 - high-repetition proposals are rejected before approval persistence;
 - a novelty pass is not founder approval;
@@ -201,7 +218,7 @@ The gate is fail-closed by design. `coverage.linkedin`, `coverage.otherSocial`, 
 
 The current default `supabaseFounderContentFingerprintHistoryRepository` proves only LinkedIn history and derives format coverage from those rows. It does not yet prove cross-social history, so the default server-owned route is expected to return `HOLD` until a reconciled server-owned cross-social history adapter is added. That is a truthful blocked state, not a reason to accept caller-provided history.
 
-This is a distinct fingerprint/contract from `promptOsPatternFingerprint`/`storyFingerprint` above. The pre-draft gate compares candidate thesis/topic/angle text directly, while the novelty gate compares deterministic SHA-256 identities against LinkedIn/founder-attested history at proposal-approval time. A `PASS` here never skips or substitutes for the novelty gate that still runs when the resulting proposal reaches `issueFounderContentApproval()`.
+This is a distinct fingerprint/contract from `promptOsPatternFingerprint`/`storyFingerprint` above. The pre-draft gate compares candidate thesis/topic/angle text directly, while the novelty gate compares deterministic SHA-256 identities against LinkedIn publication history at proposal-approval time. A `PASS` here never skips or substitutes for the novelty gate that still runs when the resulting proposal reaches `issueFounderContentApproval()`.
 
 ## Verification
 
@@ -211,6 +228,7 @@ Focused tests:
 npx vitest run \
   src/lib/__tests__/founderEditorialNovelty.test.ts \
   src/lib/__tests__/founderEditorialNovelty.publicationMemory.test.ts \
+  src/lib/__tests__/founderContentApprovalPatternHistory.contract.test.ts \
   src/lib/__tests__/founderContentApprovalStore.novelty.test.ts \
   src/lib/__tests__/founderContentFingerprintGate.test.ts \
   src/lib/__tests__/founderContentFingerprintGate.failClosed.test.ts \
