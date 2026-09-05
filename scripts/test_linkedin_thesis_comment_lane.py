@@ -83,8 +83,10 @@ class LinkedInThesisCommentLaneTest(unittest.TestCase):
             report = mod.analyze_export(path)
 
         self.assertEqual(report['contract'], 'linkedin-thesis-comment-lane@v1')
+        self.assertEqual(report['decision_loop_contract'], 'juss/evidence-decision-loop@v1')
         self.assertEqual(report['authority'], 'observation_only')
         self.assertEqual(report['lane']['execution'], 'founder_manual_only')
+        self.assertEqual(report['lane']['decision_loop_contract'], 'juss/evidence-decision-loop@v1')
         self.assertEqual(report['baseline']['impressions'], 2233)
         self.assertEqual(report['baseline']['members_reached'], 1096)
         self.assertEqual(report['baseline']['engagements'], 2)
@@ -93,11 +95,13 @@ class LinkedInThesisCommentLaneTest(unittest.TestCase):
         self.assertEqual(report['baseline']['audience_senior_pct'], 37.0)
         self.assertEqual(report['baseline']['audience_cxo_pct'], 14.0)
         self.assertEqual(report['field_test']['state'], 'READY_TO_TEST')
+        self.assertEqual(report['field_test']['execution_state'], 'UNKNOWN')
         self.assertEqual(report['field_test']['outcome_state'], 'UNKNOWN')
 
     def test_lane_cannot_win_on_impressions_only_or_auto_publish(self):
         lane = mod.LANE_CONTRACT
         self.assertIn('raw impressions alone cannot declare a winner', lane['test']['winner_rule'])
+        self.assertIn('OBSERVED execution evidence only', lane['truth_boundary']['founder_confirmation'])
         self.assertEqual(lane['test']['target_comments'], 6)
         self.assertEqual(lane['test']['window_days'], 7)
         self.assertEqual(lane['test']['max_comments_per_day'], 2)
