@@ -63,7 +63,7 @@ describe('ReleaseProofWorkflowV0 contract', () => {
     expect(fingerprintReleaseCandidate(candidate)).toBe(fingerprintReleaseCandidate({ ...candidate }));
   });
 
-  it('binds a deterministic continuity cookie to the exact candidate fingerprint', () => {
+  it('binds deterministic correlation continuity to the exact candidate fingerprint', () => {
     const bound = bindReleaseProofCandidate(candidateInput);
 
     expect(bound.candidateCookie).toMatch(/^[0-9a-f]{64}$/);
@@ -142,7 +142,7 @@ describe('ReleaseProofWorkflowV0 contract', () => {
     expect(evidence.evidenceCookie).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('correlates founder approval to the exact evidence cookie without converting it into execution authority', () => {
+  it('correlates a founder approval claim without authenticating founder authority', () => {
     const bound = bindReleaseProofCandidate(candidateInput);
     const evidence = requireClear(clearEvidence(bound));
     const founder = evaluateFounderApprovalObservation(bound, evidence, {
@@ -156,10 +156,10 @@ describe('ReleaseProofWorkflowV0 contract', () => {
       approved: true,
     });
 
-    expect(founder.state).toBe('FOUNDER_APPROVAL_OBSERVED');
+    expect(founder.state).toBe('FOUNDER_APPROVAL_CLAIM_CORRELATED');
 
-    if (founder.state !== 'FOUNDER_APPROVAL_OBSERVED') {
-      throw new Error('Test setup failed to reach correlated founder observation.');
+    if (founder.state !== 'FOUNDER_APPROVAL_CLAIM_CORRELATED') {
+      throw new Error('Test setup failed to correlate founder approval claim.');
     }
 
     expect(founder.authorityCookie).toBe(
@@ -180,7 +180,8 @@ describe('ReleaseProofWorkflowV0 contract', () => {
       evidenceCookie: evidence.evidenceCookie,
       authorityReceiptFingerprint: AUTHORITY_FINGERPRINT,
       authorityCookie: founder.authorityCookie,
-      founderApprovalObserved: true,
+      founderApprovalClaimCorrelated: true,
+      founderAuthorityAuthenticated: false,
       mergeAuthorized: false,
       deploymentAuthorized: false,
       providerMutationAuthorized: false,
@@ -193,13 +194,14 @@ describe('ReleaseProofWorkflowV0 contract', () => {
         candidateMovementExpiresContinuity: true,
         evidenceCannotCrossCandidateCookie: true,
         authorityCannotCrossEvidenceCookie: true,
+        continuityCookieDoesNotAuthenticate: true,
         receiptDoesNotSelfAuthorize: true,
       },
       nextGate: 'FINAL_PROVIDER_REREAD_AND_EXISTING_AUTHORITY_CONTRACT_REQUIRED',
     });
   });
 
-  it('rejects founder approval replayed from another evidence packet', () => {
+  it('rejects founder approval claim replayed from another evidence packet', () => {
     const bound = bindReleaseProofCandidate(candidateInput);
     const evidence = requireClear(clearEvidence(bound));
 
@@ -215,7 +217,7 @@ describe('ReleaseProofWorkflowV0 contract', () => {
     })).toEqual({ state: 'HOLD', reason: 'FOUNDER_EVIDENCE_MISMATCH' });
   });
 
-  it('rejects founder approval replayed with a predecessor candidate cookie', () => {
+  it('rejects founder approval claim replayed with a predecessor candidate cookie', () => {
     const bound = bindReleaseProofCandidate(candidateInput);
     const evidence = requireClear(clearEvidence(bound));
 
@@ -231,7 +233,7 @@ describe('ReleaseProofWorkflowV0 contract', () => {
     })).toEqual({ state: 'HOLD', reason: 'FOUNDER_COOKIE_MISMATCH' });
   });
 
-  it('holds when founder approval is absent or correlated to another candidate', () => {
+  it('holds when founder approval is not claimed or is correlated to another candidate', () => {
     const bound = bindReleaseProofCandidate(candidateInput);
     const evidence = requireClear(clearEvidence(bound));
 
@@ -244,7 +246,7 @@ describe('ReleaseProofWorkflowV0 contract', () => {
       evidenceCookie: evidence.evidenceCookie,
       authorityReceiptFingerprint: AUTHORITY_FINGERPRINT,
       approved: false,
-    })).toEqual({ state: 'HOLD', reason: 'FOUNDER_APPROVAL_NOT_OBSERVED' });
+    })).toEqual({ state: 'HOLD', reason: 'FOUNDER_APPROVAL_NOT_CLAIMED' });
 
     expect(evaluateFounderApprovalObservation(bound, evidence, {
       repository: bound.candidate.repository,
