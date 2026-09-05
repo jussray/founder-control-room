@@ -221,6 +221,26 @@ describe('portable founder approval packet validation', () => {
     });
   });
 
+  it('rejects noncanonical action spellings before they can bypass action-specific scope rules', async () => {
+    const deps = context();
+    const result = await validatePortableFounderApprovalPacket(packet({
+      scope: {
+        ...packet().scope,
+        action: 'merge ',
+        branch: undefined,
+        expectedCommitSha: undefined,
+      },
+    }), deps);
+
+    expect(result).toEqual({
+      ok: false,
+      code: 'PACKET_INVALID',
+      reason: 'scope.action must use canonical lowercase action syntax',
+    });
+    expect(deps.resolveAdapter).not.toHaveBeenCalled();
+    expect(deps.verify).not.toHaveBeenCalled();
+  });
+
   it('accepts an authenticated deny decision while preserving zero execution authority', async () => {
     const result = await validatePortableFounderApprovalPacket(packet({ decision: 'deny' }), context());
 
