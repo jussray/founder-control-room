@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the current Founder Signal Engine, provider-readback-verified exact-copy and editorial-pattern publication memory, atomic active editorial-pattern approval reservation, direct first-party provider configuration preflight, provider-neutral n8n authority membrane, PR continuity live-base observation rule, truth-governance, provider review policy, Cloudflare release authority, and BuildEvent projection to reviewed source invariants without claiming production migration apply, provider configuration, publication outcome, deployment success, merge authority, database mutation, secret validity, billing, or destructive-action authority.",
+  "purpose": "Bind the current Founder Signal Engine, provider-readback publication memory, editorial-pattern reservation, direct provider preflight, provider-neutral n8n authority membrane, PR continuity, truth governance, provider review policy, Cloudflare release authority, and BuildEvent projection to reviewed source invariants without claiming production migration apply, provider configuration, publication outcome, deployment success, merge authority, database mutation, secret validity, billing, or destructive-action authority.",
   "domains": [
     "publishing",
     "cloudflare-authority",
@@ -126,7 +126,8 @@
     {
       "path": "README.md",
       "claims": [
-        "README.md must describe the source-level founder-content issuance membrane as separate exact-copy and bounded editorial-pattern authority identities; state that provider-readback-verified direct LinkedIn publication retains fingerprint-only exact-copy and editorial-pattern memory while schedule/failed/UNKNOWN outcomes do not; preserve historical approvals; state that source migrations are not production proof; preserve the n8n generation membrane and live-base PR continuity observation; and retain exact-SHA release proof, deterministic review, authenticated Founder Final, machine gates, CodeQL, thread resolution, and force-push/deletion protection."
+        "README.md must describe founder-content issuance as separate exact-copy and bounded editorial-pattern authority identities, preserve fingerprint-only provider-readback publication memory, and never treat schedule, failed, or UNKNOWN outcomes as publication truth.",
+        "README.md must state that source migrations are not production proof, preserve the n8n generation membrane and live-base PR continuity observation, and retain exact-SHA release proof, deterministic review, authenticated Founder Final, machine gates, CodeQL, thread resolution, and force-push/deletion protection."
       ]
     },
     {
