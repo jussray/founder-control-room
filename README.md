@@ -101,6 +101,8 @@ Source policy is not live GitHub provider truth. Current rulesets, bypass actors
 
 Founder self-approval is not relabeled as independent review. The canonical path keeps deterministic independent review and authenticated exact-candidate founder-final approval separate.
 
+For Chief governance, FCR also contains a **read-only trusted observation and reconciliation-planning boundary**. That source is pinned to `jussray/chief-ai-machine` and Chief ruleset IDs `20818149` and `21261587`, uses the repository-scoped FCR GitHub App installation-token path rather than caller-supplied PAT/token authority, preserves required-check `integration_id` producer identity, requires complete bypass-state readback, and fingerprints the complete observation. It does not mutate Chief rulesets. If existing Chief rulesets require a change and GitHub offers no atomic conditional-update precondition, the plan must remain `BLOCKED_PROVIDER_ATOMIC_PRECONDITION_UNAVAILABLE`; `NO_CHANGE_REQUIRED` is valid only when the observed provider state is already correct. Neither result grants provider mutation, merge, deploy, or execution authority.
+
 See [`docs/FOUNDER_MERGE_AUTHORITY.md`](docs/FOUNDER_MERGE_AUTHORITY.md).
 
 ### Capability authority
