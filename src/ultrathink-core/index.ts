@@ -17,3 +17,23 @@ export {
   type FreshnessStatus,
   type FreshnessWitness,
 } from './freshnessWitness.js';
+
+export {
+  GOVERNED_EXECUTION_SCHEMA,
+  evaluateGovernedExecution,
+  evaluateGovernedExecutionOutcome,
+  type GovernedAuthoritySnapshot,
+  type GovernedExecutionDecision,
+  type GovernedExecutionDisposition,
+  type GovernedExecutionLease,
+  type GovernedExecutionReceipt,
+  type GovernedExecutionWitness,
+  type GovernedExecutionWorld,
+  type GovernedOutcomeDisposition,
+  type GovernedPrincipal,
+  type GovernedReceiptStatus,
+  type GovernedRuntimeBinding,
+  type GovernedSubject,
+  type Reversibility,
+  type WitnessStrength,
+} from './governedExecution.js';
