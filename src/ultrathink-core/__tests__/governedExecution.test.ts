@@ -100,6 +100,7 @@ const receipt: GovernedExecutionReceipt = {
 function receiptBinding(overrides: Partial<{
   leaseId: string;
   idempotencyKey: string;
+  status: GovernedExecutionReceipt['status'];
   runtimeIdentity: string;
   externalRefs: readonly string[];
   receiptObservedAt: string;
@@ -107,6 +108,7 @@ function receiptBinding(overrides: Partial<{
   return {
     leaseId: receipt.leaseId,
     idempotencyKey: receipt.idempotencyKey,
+    status: receipt.status,
     runtimeIdentity: receipt.runtimeIdentity,
     externalRefs: receipt.externalRefs,
     receiptObservedAt: receipt.observedAt,
@@ -269,7 +271,21 @@ describe('FCR governed execution membrane', () => {
     )).toBe('EXECUTED_UNVERIFIED');
   });
 
-  it('16 executes the valid read-only lease and verifies only with a sufficient exact witness', () => {
+  it('16 refuses a witness bound to a different receipt status', () => {
+    expect(evaluateGovernedExecutionOutcome(
+      receipt,
+      {
+        status: 'verified',
+        strength: 'W4',
+        evidenceFingerprint: 'witness-fingerprint-status-cross',
+        observedAt: '2026-09-05T21:00:02.000Z',
+        receiptBinding: receiptBinding({ status: 'failed' }),
+      },
+      'W2',
+    )).toBe('EXECUTED_UNVERIFIED');
+  });
+
+  it('17 executes the valid read-only lease and verifies only with a sufficient exact witness', () => {
     expect(evaluateGovernedExecution(lease, world())).toEqual({
       disposition: 'EXECUTE',
       reasons: [],
