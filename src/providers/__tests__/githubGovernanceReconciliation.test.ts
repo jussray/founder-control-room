@@ -123,6 +123,35 @@ describe("Chief GitHub governance reconciliation", () => {
     expect(() => planChiefProofModeRulesetMigration(input)).toThrow(/zero bypass actors/);
   });
 
+  it("observes required deployments and rejects post-merge production as a pre-merge rule", () => {
+    const input = pair();
+    input.exactHeadGate = observe(rulesetReadback({
+      id: 20818149,
+      name: "Chief AI main exact-head gate",
+      bypass_actors: [],
+      rules: [
+        {
+          type: "required_status_checks",
+          parameters: { required_status_checks: [{ context: "Typecheck" }] },
+        },
+        {
+          type: "required_deployments",
+          parameters: {
+            required_deployment_environments: ["Cloudflare Production", "proofmode-access-admin"],
+          },
+        },
+      ],
+    }));
+
+    expect(input.exactHeadGate.requiredDeploymentEnvironments).toEqual([
+      "Cloudflare Production",
+      "proofmode-access-admin",
+    ]);
+    expect(() => planChiefProofModeRulesetMigration(input)).toThrow(
+      /post-merge-only deployment environment Cloudflare Production is required pre-merge/,
+    );
+  });
+
   it("preserves observed unrelated required-check producer bindings without upgrading them to candidate authority", () => {
     const { exactHeadGate } = pair();
 
