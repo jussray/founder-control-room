@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Juss Rayy | Founder · Product & Systems Architect</title>
+  <meta name="description" content="Juss Rayy builds human-centered products and founder-controlled systems that turn intent into provable outcomes." />
+  <meta name="robots" content="index,follow" />
+  <link rel="canonical" href="https://foundercontrolroom.org/juss-rayy" />
+  <meta property="og:type" content="profile" />
+  <meta property="og:title" content="Juss Rayy | Founder · Product & Systems Architect" />
+  <meta property="og:description" content="Human-centered products. Founder-controlled systems. Proof before claim." />
+  <meta property="og:url" content="https://foundercontrolroom.org/juss-rayy" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Juss Rayy | Founder · Product & Systems Architect" />
+  <meta name="twitter:description" content="Human-centered products. Founder-controlled systems. Proof before claim." />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #070711;
+      --panel: rgba(20, 20, 39, 0.78);
+      --panel-strong: rgba(27, 27, 53, 0.94);
+      --line: rgba(188, 168, 255, 0.22);
+      --text: #fbf9ff;
+      --muted: #c5bfd4;
+      --violet: #bba6ff;
+      --blue: #78b9ff;
+      --gold: #ffd36a;
+      --orange: #ff9e57;
+      --green: #9af0b3;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 13% 8%, rgba(119, 82, 255, 0.28), transparent 30rem),
+        radial-gradient(circle at 89% 18%, rgba(255, 158, 87, 0.15), transparent 25rem),
+        radial-gradient(circle at 62% 70%, rgba(68, 142, 255, 0.12), transparent 34rem),
+        linear-gradient(145deg, #05050b 0%, var(--bg) 48%, #0d0d1d 100%);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.15;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: linear-gradient(to bottom, black, transparent 90%);
+    }
+
+    a { color: inherit; }
+    a:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; border-radius: 8px; }
+
+    .shell {
+      position: relative;
+      width: min(1120px, calc(100% - 2rem));
+      margin: 0 auto;
+      padding: 1.2rem 0 4rem;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.6rem 0;
+    }
+
+    .identity-mark {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.72rem;
+      text-decoration: none;
+      font-weight: 850;
+      letter-spacing: -0.02em;
+    }
+
+    .signal-dot {
+      width: 2.15rem;
+      height: 2.15rem;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: #0b0814;
+      background: linear-gradient(135deg, var(--gold), var(--orange) 45%, var(--violet));
+      box-shadow: 0 0 34px rgba(255, 211, 106, 0.3);
+      font-size: 0.78rem;
+    }
+
+    .fcr-link {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.88rem;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+      gap: clamp(2.25rem, 6vw, 5.4rem);
+      align-items: center;
+      padding: clamp(4rem, 10vw, 8rem) 0 4.5rem;
+    }
+
+    .eyebrow {
+      margin: 0;
+      color: var(--gold);
+      font-size: 0.76rem;
+      font-weight: 900;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0.65rem 0 0;
+      font-size: clamp(4.4rem, 13vw, 9.2rem);
+      line-height: 0.82;
+      letter-spacing: -0.078em;
+    }
+
+    .role {
+      margin: 1.35rem 0 0;
+      color: #e9e4f4;
+      font-size: clamp(1.05rem, 2vw, 1.28rem);
+      font-weight: 750;
+    }
+
+    .intro {
+      max-width: 650px;
+      margin: 1rem 0 0;
+      color: var(--muted);
+      font-size: clamp(1.06rem, 2.2vw, 1.28rem);
+      line-height: 1.72;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1.75rem;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 3rem;
+      padding: 0.72rem 1rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.035);
+      text-decoration: none;
+      font-weight: 850;
+    }
+
+    .button-primary {
+      border-color: transparent;
+      color: #0b0814;
+      background: linear-gradient(100deg, var(--gold), #f2c1ff 48%, var(--blue));
+    }
+
+    .creed {
+      position: relative;
+      padding: 1.35rem;
+      border: 1px solid var(--line);
+      border-radius: 1.5rem;
+      background: linear-gradient(155deg, rgba(34, 29, 67, 0.96), rgba(13, 13, 28, 0.94));
+      box-shadow: 0 28px 90px rgba(0,0,0,0.42);
+    }
+
+    .creed::before {
+      content: "SIGNAL / 001";
+      display: block;
+      margin-bottom: 2.5rem;
+      color: var(--blue);
+      font-size: 0.72rem;
+      font-weight: 900;
+      letter-spacing: 0.15em;
+    }
+
+    .creed blockquote {
+      margin: 0;
+      font-size: clamp(1.7rem, 4.5vw, 3rem);
+      line-height: 1.06;
+      letter-spacing: -0.045em;
+      font-weight: 850;
+    }
+
+    .creed p {
+      margin: 1.3rem 0 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    section.content {
+      padding: 2.4rem 0;
+    }
+
+    .section-head {
+      display: grid;
+      grid-template-columns: 0.7fr 1.3fr;
+      gap: 2rem;
+      align-items: start;
+      margin-bottom: 1.3rem;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 3.3rem);
+      line-height: 0.98;
+      letter-spacing: -0.05em;
+    }
+
+    .section-head p {
+      margin: 0;
+      max-width: 630px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .signal-grid, .proof-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.9rem;
+    }
+
+    .signal-card, .proof-card, .receipt {
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 1.2rem;
+      background: var(--panel);
+      backdrop-filter: blur(10px);
+    }
+
+    .signal-card {
+      min-height: 10.5rem;
+      padding: 1.15rem;
+    }
+
+    .signal-card small {
+      color: var(--orange);
+      font-weight: 900;
+      letter-spacing: 0.1em;
+    }
+
+    .signal-card strong {
+      display: block;
+      margin-top: 1.9rem;
+      font-size: 1.08rem;
+      line-height: 1.35;
+    }
+
+    .proof-card {
+      display: flex;
+      min-height: 13rem;
+      flex-direction: column;
+      padding: 1.2rem;
+    }
+
+    .proof-card .label {
+      color: var(--blue);
+      font-size: 0.72rem;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .proof-card h3 {
+      margin: 0.8rem 0 0;
+      font-size: 1.32rem;
+      letter-spacing: -0.025em;
+    }
+
+    .proof-card p {
+      margin: 0.75rem 0 1.2rem;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 0.92rem;
+    }
+
+    .proof-card a {
+      margin-top: auto;
+      color: #f5efff;
+      font-weight: 800;
+      text-underline-offset: 0.2rem;
+    }
+
+    .boundary {
+      margin-top: 1rem;
+      padding: 1rem 1.15rem;
+      border-left: 4px solid var(--green);
+      border-radius: 0.8rem;
+      background: rgba(95, 220, 134, 0.07);
+      color: #d9fbe2;
+      line-height: 1.6;
+    }
+
+    .receipt {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      overflow: hidden;
+    }
+
+    .receipt-step {
+      min-height: 10rem;
+      padding: 1rem;
+      border-right: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .receipt-step:last-child { border-right: 0; }
+    .receipt-step strong { display: block; color: var(--gold); font-size: 0.78rem; letter-spacing: 0.1em; }
+    .receipt-step span { display: block; margin-top: 2rem; color: var(--muted); line-height: 1.5; font-size: 0.9rem; }
+
+    .receipt-note {
+      margin: 0.9rem 0 0;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 2.5rem;
+      padding-top: 1.2rem;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      color: #948da7;
+      font-size: 0.82rem;
+    }
+
+    @media (max-width: 860px) {
+      .hero { grid-template-columns: 1fr; padding-top: 3.5rem; }
+      .creed { max-width: 650px; }
+      .section-head { grid-template-columns: 1fr; gap: 0.75rem; }
+      .signal-grid, .proof-grid { grid-template-columns: 1fr 1fr; }
+      .receipt { grid-template-columns: 1fr; }
+      .receipt-step { min-height: auto; border-right: 0; border-bottom: 1px solid rgba(255,255,255,0.07); }
+      .receipt-step:last-child { border-bottom: 0; }
+      .receipt-step span { margin-top: 0.7rem; }
+    }
+
+    @media (max-width: 560px) {
+      .shell { width: min(100% - 1.25rem, 1120px); }
+      .fcr-link { font-size: 0.78rem; }
+      h1 { font-size: clamp(4rem, 22vw, 6.6rem); }
+      .actions { display: grid; }
+      .button { width: 100%; }
+      .signal-grid, .proof-grid { grid-template-columns: 1fr; }
+      .signal-card, .proof-card { min-height: auto; }
+      footer { flex-direction: column; }
+    }
+  </style>
+</head>
+<body itemscope itemtype="https://schema.org/ProfilePage">
+  <meta itemprop="dateModified" content="2026-09-05" />
+  <main class="shell" itemprop="mainEntity" itemscope itemtype="https://schema.org/Person" itemid="https://foundercontrolroom.org/juss-rayy#juss-rayy">
+    <meta itemprop="url" content="https://foundercontrolroom.org/juss-rayy" />
+    <meta itemprop="jobTitle" content="Founder · Product & Systems Architect" />
+    <meta itemprop="description" content="Juss Rayy builds human-centered products and founder-controlled systems that turn intent into provable outcomes." />
+    <meta itemprop="knowsAbout" content="Evidence-driven product systems" />
+    <meta itemprop="knowsAbout" content="Human-centered product design" />
+    <meta itemprop="knowsAbout" content="Founder-controlled AI systems" />
+    <link itemprop="sameAs" href="https://github.com/jussray" />
+    <link itemprop="sameAs" href="https://www.linkedin.com/in/juss-rayy-13ba691a1" />
+
+    <header class="topbar">
+      <a class="identity-mark" href="/juss-rayy" aria-label="Juss Rayy public founder identity">
+        <span class="signal-dot" aria-hidden="true">JR</span>
+        <span>Juss Rayy</span>
+      </a>
+      <a class="fcr-link" href="/">Hosted by Founder Control Room ↗</a>
+    </header>
+
+    <section class="hero" aria-labelledby="identity-name">
+      <div>
+        <p class="eyebrow">Founder / Product & Systems Architect</p>
+        <h1 id="identity-name" itemprop="name">Juss Rayy</h1>
+        <p class="role">Human-centered products. Founder-controlled systems. Provable outcomes.</p>
+        <p class="intro">
+          I turn ambitious ideas into products and operating systems where intent, authority, evidence, recovery, and outcomes remain connected. The goal is not to look finished. The goal is to know what is actually true.
+        </p>
+        <nav class="actions" aria-label="Public identity links">
+          <a class="button button-primary" href="https://github.com/jussray" rel="me">GitHub proof →</a>
+          <a class="button" href="https://www.linkedin.com/in/juss-rayy-13ba691a1" rel="me">LinkedIn</a>
+          <a class="button" href="/">Founder Control Room</a>
+        </nav>
+      </div>
+
+      <aside class="creed" aria-label="Signature principle">
+        <blockquote>Historical truth is immutable. Current truth must be re-observed.</blockquote>
+        <p>Keep the receipt for what was proven then. Recheck the world before claiming what is true now.</p>
+      </aside>
+    </section>
+
+    <section class="content" aria-labelledby="signal-title">
+      <div class="section-head">
+        <h2 id="signal-title">The signal</h2>
+        <p>These ideas repeat across the work on purpose. They are a public fingerprint for how I build, review, recover, and decide when something has earned the word “done.”</p>
+      </div>
+      <div class="signal-grid">
+        <article class="signal-card"><small>01</small><strong>Proof before claim.</strong></article>
+        <article class="signal-card"><small>02</small><strong>Activity is not accomplishment.</strong></article>
+        <article class="signal-card"><small>03</small><strong>Execution truth is not outcome truth.</strong></article>
+        <article class="signal-card"><small>04</small><strong>Historical truth stays immutable. Current truth gets re-observed.</strong></article>
+        <article class="signal-card"><small>05</small><strong>Standardize the laws of trust. Customize how trust feels.</strong></article>
+        <article class="signal-card"><small>06</small><strong>Founder intent → execution → evidence → outcome.</strong></article>
+      </div>
+    </section>
+
+    <section class="content" aria-labelledby="proof-title">
+      <div class="section-head">
+        <h2 id="proof-title">Public proof graph</h2>
+        <p>The products keep their own identities. This page connects them back to one founder without pretending a repository, build, or deployment proves more than its evidence supports.</p>
+      </div>
+      <div class="proof-grid">
+        <article class="proof-card">
+          <span class="label">Flagship product / canonical source</span>
+          <h3>Se’kret Bip</h3>
+          <p>Privacy-first emotional growth and self-expression work for teens and families.</p>
+          <a href="https://github.com/jussray/Sekret-Bip">Inspect source →</a>
+        </article>
+        <article class="proof-card">
+          <span class="label">Operational authority</span>
+          <h3>Founder Control Room</h3>
+          <p>Founder-gated approvals, evidence, verification, release state, and recovery.</p>
+          <a href="https://github.com/jussray/founder-control-room">Inspect source →</a>
+        </article>
+        <article class="proof-card">
+          <span class="label">Controlled AI execution</span>
+          <h3>Chief / Proof Mode</h3>
+          <p>AI decision and execution-contract work with explicit authority and proof boundaries.</p>
+          <a href="https://github.com/jussray/chief-ai-machine">Inspect source →</a>
+        </article>
+        <article class="proof-card">
+          <span class="label">Agent operating contracts</span>
+          <h3>PromptOS</h3>
+          <p>Prompt and agent behavior designed around controlled execution instead of invisible authority.</p>
+          <a href="https://github.com/jussray/promptos">Inspect source →</a>
+        </article>
+      </div>
+      <p class="boundary"><strong>Evidence boundary:</strong> a green build is not automatically a live product. A deployment is not automatically the correct runtime. An executed action is not automatically a successful outcome. Anything not independently supported stays bounded to the evidence that exists.</p>
+    </section>
+
+    <section class="content" aria-labelledby="receipt-title">
+      <div class="section-head">
+        <h2 id="receipt-title">Juss Receipts</h2>
+        <p>A compact public record for meaningful work. Not a content treadmill. A durable trail from reality to the next exact gate.</p>
+      </div>
+      <div class="receipt" aria-label="Juss Receipt format">
+        <div class="receipt-step"><strong>REALITY</strong><span>What was actually true.</span></div>
+        <div class="receipt-step"><strong>BUILD</strong><span>What changed.</span></div>
+        <div class="receipt-step"><strong>PROOF</strong><span>What demonstrates it worked.</span></div>
+        <div class="receipt-step"><strong>LEARNED</strong><span>What changed in the model or decision.</span></div>
+        <div class="receipt-step"><strong>NEXT</strong><span>The next exact gate.</span></div>
+      </div>
+      <p class="receipt-note">The point is not to publish constantly. It is to leave artifacts worth finding later.</p>
+    </section>
+
+    <footer>
+      <span>Juss Rayy · public founder identity</span>
+      <span>Founder Control Room hosts this profile without becoming the founder brand.</span>
+    </footer>
+  </main>
+</body>
+</html>

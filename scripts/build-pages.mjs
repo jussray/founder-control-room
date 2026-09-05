@@ -32,6 +32,7 @@ const requiredAssets = [
   'control-room/genesis.css',
   'control-room/evidence-trust.html',
   'portable-founder-console/index.html',
+  'juss-rayy/index.html',
 ];
 
 await rm(outputDirectory, { recursive: true, force: true });
