@@ -52,7 +52,8 @@ function packet(overrides: Partial<PortableFounderApprovalPacket> = {}): Portabl
 function context(options: {
   registered?: boolean;
   founderAllowed?: boolean;
-  verify?: (packet: PortableFounderApprovalUnsignedPacket, signature: string) => boolean;
+  resolveThrows?: boolean;
+  verify?: (packet: PortableFounderApprovalUnsignedPacket, signature: string) => boolean | Promise<boolean>;
 } = {}) {
   const verify = vi.fn(async ({
     packet: unsigned,
@@ -72,7 +73,10 @@ function context(options: {
   return {
     checkedAt: CHECKED_AT,
     isFounderAllowed: vi.fn(async () => options.founderAllowed ?? true),
-    resolveAdapter: vi.fn(async () => options.registered === false ? null : adapter),
+    resolveAdapter: vi.fn(async () => {
+      if (options.resolveThrows) throw new Error('registry unavailable');
+      return options.registered === false ? null : adapter;
+    }),
     verify,
   };
 }
@@ -95,6 +99,27 @@ describe('portable founder approval packet validation', () => {
     expect(deps.verify.mock.calls[0]?.[0].packet).not.toHaveProperty('attestation.signature');
   });
 
+  it('snapshots and freezes the attested identity before returning a validated result', async () => {
+    const original = packet();
+    const result = await validatePortableFounderApprovalPacket(original, context());
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected portable approval to validate');
+
+    const mutableOriginal = original as unknown as {
+      scope: { target: string };
+      constraints: string[];
+    };
+    mutableOriginal.scope.target = 'jussray/tampered-after-validation';
+    mutableOriginal.constraints.push('silently expanded authority');
+
+    expect(result.packet.scope.target).toBe('jussray/founder-control-room');
+    expect(result.packet.constraints).not.toContain('silently expanded authority');
+    expect(Object.isFrozen(result.packet)).toBe(true);
+    expect(Object.isFrozen(result.packet.scope)).toBe(true);
+    expect(Object.isFrozen(result.packet.constraints)).toBe(true);
+    expect(Object.isFrozen(result.packet.attestation)).toBe(true);
+  });
+
   it('rejects a packet when the exact console adapter tuple is not registered', async () => {
     const result = await validatePortableFounderApprovalPacket(packet(), context({ registered: false }));
 
@@ -105,14 +130,26 @@ describe('portable founder approval packet validation', () => {
     });
   });
 
+  it('fails closed when the adapter registry cannot resolve safely', async () => {
+    const result = await validatePortableFounderApprovalPacket(packet(), context({ resolveThrows: true }));
+
+    expect(result).toEqual({
+      ok: false,
+      code: 'ADAPTER_NOT_REGISTERED',
+      reason: 'exact source console, adapter version, and attestation key are not registered',
+    });
+  });
+
   it('rejects a packet when founder identity is not allowlisted', async () => {
-    const result = await validatePortableFounderApprovalPacket(packet(), context({ founderAllowed: false }));
+    const deps = context({ founderAllowed: false });
+    const result = await validatePortableFounderApprovalPacket(packet(), deps);
 
     expect(result).toEqual({
       ok: false,
       code: 'FOUNDER_NOT_ALLOWED',
       reason: 'founder identity is not allowlisted',
     });
+    expect(deps.verify).toHaveBeenCalledTimes(1);
   });
 
   it('rejects tampering when the registered adapter verifier does not attest the changed scope', async () => {
@@ -130,6 +167,22 @@ describe('portable founder approval packet validation', () => {
     });
 
     const result = await validatePortableFounderApprovalPacket(tampered, deps);
+
+    expect(result).toEqual({
+      ok: false,
+      code: 'ATTESTATION_INVALID',
+      reason: 'registered adapter attestation could not be verified',
+    });
+  });
+
+  it('fails closed when the registered adapter verifier throws', async () => {
+    const deps = context({
+      verify: () => {
+        throw new Error('verification backend unavailable');
+      },
+    });
+
+    const result = await validatePortableFounderApprovalPacket(packet(), deps);
 
     expect(result).toEqual({
       ok: false,
