@@ -14,6 +14,17 @@ services:
       timeout: 5s
       retries: 10
 
+  buffer-mock:
+    image: node:24-alpine
+    profiles: ["proof"]
+    restart: "no"
+    working_dir: /proof
+    command: ["node", "mock-buffer-graphql.mjs"]
+    environment:
+      BUFFER_MOCK_API_KEY: ${BUFFER_MOCK_API_KEY:?set BUFFER_MOCK_API_KEY for proof profile}
+    volumes:
+      - ./mock-buffer-graphql.mjs:/proof/mock-buffer-graphql.mjs:ro
+
   n8n:
     image: docker.n8n.io/n8nio/n8n:2.32.6
     restart: unless-stopped
