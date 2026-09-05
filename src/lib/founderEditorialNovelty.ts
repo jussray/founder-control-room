@@ -351,6 +351,12 @@ function normalizeProviderReadback(
   const externalPostId = text(result.externalPostId);
   const permalink = text(result.permalink);
   const publicPayloadHash = text(request.publicPayloadHash).toLowerCase();
+  const requestPublicCopyHash = text(request.publicCopyHash).toLowerCase();
+  const resultPublicCopyHash = text(result.publicCopyHash).toLowerCase();
+  const publicCopyHash = SHA256.test(requestPublicCopyHash)
+    && requestPublicCopyHash === resultPublicCopyHash
+    ? requestPublicCopyHash
+    : null;
 
   if (
     text(row.action_type) !== DIRECT_PUBLISH_ACTION
@@ -379,7 +385,7 @@ function normalizeProviderReadback(
     status: 'published',
     promptOsPatternFingerprint,
     publicPayloadHash: SHA256.test(publicPayloadHash) ? publicPayloadHash : null,
-    publicCopyHash: null,
+    publicCopyHash,
     historySource: 'provider_readback',
   };
 }
@@ -476,8 +482,12 @@ function historicalPatternFingerprint(item: FounderEditorialHistoryRecord): stri
   });
 }
 
-function riskFor(score: number, exactPatternMatch: boolean): 'LOW' | 'MEDIUM' | 'HIGH' {
-  if (exactPatternMatch || score >= HIGH_SIMILARITY) return 'HIGH';
+function riskFor(
+  score: number,
+  exactPatternMatch: boolean,
+  exactCopyMatch: boolean,
+): 'LOW' | 'MEDIUM' | 'HIGH' {
+  if (exactCopyMatch || exactPatternMatch || score >= HIGH_SIMILARITY) return 'HIGH';
   if (score >= MEDIUM_SIMILARITY) return 'MEDIUM';
   return 'LOW';
 }
@@ -545,6 +555,7 @@ export async function evaluateFounderEditorialNovelty({
   let closest: FounderEditorialHistoryRecord | null = null;
   let closestSimilarity = 0;
   let exactPatternMatch = false;
+  let exactCopyMatch = false;
   let exactMatch: FounderEditorialHistoryRecord | null = null;
   for (const item of history) {
     const score = similarity(currentSemanticText, historicalSemanticText(item));
@@ -552,30 +563,33 @@ export async function evaluateFounderEditorialNovelty({
       closest = item;
       closestSimilarity = score;
     }
+    const historicalCopyHash = text(item.publicCopyHash).toLowerCase();
+    if (SHA256.test(historicalCopyHash) && historicalCopyHash === identity.publicCopyFingerprint) {
+      exactCopyMatch = true;
+      exactMatch = item;
+    }
     if (historicalPatternFingerprint(item) === identity.promptOsPatternFingerprint) {
       exactPatternMatch = true;
       exactMatch ??= item;
     }
   }
-  // An exact pattern match always forces HIGH risk (see riskFor below), so
-  // whenever one is present it — not a merely higher-token-similarity but
-  // unrelated record — must be what closestMatchId/the continuity receipt
-  // point to; otherwise the audit trail names the wrong record as the
-  // reason for the block. closestSimilarity is left as the best raw
-  // token-overlap score found, a separate metric from which record is
-  // attributed as the match.
+  // Exact provider-verified copy is the strongest attribution. If none exists,
+  // an exact portfolio pattern match still forces HIGH risk. Semantic similarity
+  // remains a separate score rather than being conflated with either identity.
   if (exactMatch) closest = exactMatch;
 
-  const risk = riskFor(closestSimilarity, exactPatternMatch);
+  const risk = riskFor(closestSimilarity, exactPatternMatch, exactCopyMatch);
   const allowed = risk !== 'HIGH';
   const roundedSimilarity = Number(closestSimilarity.toFixed(4));
   const continuityCookie = hash({
     storyFingerprint: identity.storyFingerprint,
     promptOsPatternFingerprint: identity.promptOsPatternFingerprint,
+    publicCopyFingerprint: identity.publicCopyFingerprint,
     chiefAngleFingerprint: identity.chiefAngleFingerprint,
     closestMatchId: closest?.id ?? null,
     closestSimilarity: roundedSimilarity,
     exactPatternMatch,
+    exactCopyMatch,
     risk,
     comparedCount: history.length,
   });
@@ -597,6 +611,6 @@ export async function evaluateFounderEditorialNovelty({
     authority,
     reason: allowed
       ? `Editorial novelty gate accepted the candidate at ${risk.toLowerCase()} repetition risk.`
-      : 'Editorial novelty gate rejected a high-overlap or already-published thesis/hook pattern; Chief must select a materially different story angle before founder approval.',
+      : 'Editorial novelty gate rejected a high-overlap, provider-verified exact public copy, or already-published thesis/hook pattern; Chief must select materially different copy and story angle before founder approval.',
   };
 }
