@@ -30,8 +30,11 @@ describe('founder-content active copy + editorial-pattern reservation migrations
     expect(copySql).toContain('create or replace function public.issue_founder_content_approval_with_active_reservations');
     expect(copySql).toContain("'copy' || E'\\x1f'");
     expect(copySql).toContain("'pattern' || E'\\x1f'");
-    expect(copySql).toContain('pg_catalog.least(copy_lock, pattern_lock)');
-    expect(copySql).toContain('pg_catalog.greatest(copy_lock, pattern_lock)');
+    expect(copySql).toContain('elsif copy_lock < pattern_lock then');
+    expect(copySql).toContain('perform pg_catalog.pg_advisory_xact_lock(copy_lock);');
+    expect(copySql).toContain('perform pg_catalog.pg_advisory_xact_lock(pattern_lock);');
+    expect(copySql).not.toContain('pg_catalog.least');
+    expect(copySql).not.toContain('pg_catalog.greatest');
     expect(copySql).toContain('approvals.revoked_at is null');
     expect(copySql).toContain('approvals.expires_at > p_approved_at');
     expect(copySql).not.toContain('approvals.consumed_at is null');
