@@ -42,6 +42,7 @@ function input(overrides = {}) {
         checks: 'write',
         contents: 'read',
         metadata: 'read',
+        pull_requests: 'read',
       },
     },
     repository: { full_name: CHIEF_REPOSITORY },
