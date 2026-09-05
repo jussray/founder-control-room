@@ -19,6 +19,14 @@ on:
         description: 'Exact immutable Chief workers.dev preview origin'
         required: true
         type: string
+      service_client_id:
+        description: 'Optional non-secret Chief Access client ID fallback when the protected production variable is unset'
+        required: false
+        type: string
+      service_token_id:
+        description: 'Optional non-secret Chief Access service-token ID fallback when the protected production variable is unset'
+        required: false
+        type: string
       approval_reference:
         description: 'Auditable founder approval reference; required for repair'
         required: false
@@ -139,32 +147,54 @@ jobs:
           node --test scripts/chief-proofmode-access-bridge-contract.node-test.mjs
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
 
-      - name: Require configured Chief service-token identity
+      - name: Resolve configured Chief service-token identity
         env:
           CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
           CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
+          INPUT_CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ inputs.service_client_id }}
+          INPUT_CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ inputs.service_token_id }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" && -z "$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID" ]]; then
-            echo '::error title=Missing Chief service-token identity::Configure CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID or CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID as a protected variable in the FCR production environment.'
+
+          if [[ -n "$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" && -n "$INPUT_CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" && "$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" != "$INPUT_CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" ]]; then
+            echo '::error title=Chief selector conflict::service_client_id cannot override the protected production client ID.'
             exit 1
           fi
+          if [[ -n "$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID" && -n "$INPUT_CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID" && "$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID" != "$INPUT_CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID" ]]; then
+            echo '::error title=Chief selector conflict::service_token_id cannot override the protected production service-token ID.'
+            exit 1
+          fi
+
+          resolved_client_id="${CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID:-$INPUT_CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID}"
+          resolved_service_token_id="${CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID:-$INPUT_CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID}"
+
+          if [[ -z "$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" && -z "$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID" && -z "$resolved_client_id" && -z "$resolved_service_token_id" ]]; then
+            echo '::error title=Missing Chief service-token identity::Configure a protected selector variable or provide one non-secret selector input for this dispatch.'
+            exit 1
+          fi
+          if [[ -n "$resolved_client_id" && ! "$resolved_client_id" =~ ^[A-Za-z0-9._:-]{1,200}$ ]]; then
+            echo '::error title=Invalid Chief client ID::service_client_id contains unsupported characters.'
+            exit 1
+          fi
+          if [[ -n "$resolved_service_token_id" && ! "$resolved_service_token_id" =~ ^[A-Za-z0-9._:-]{1,200}$ ]]; then
+            echo '::error title=Invalid Chief service-token ID::service_token_id contains unsupported characters.'
+            exit 1
+          fi
+
+          printf 'CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID=%s\n' "$resolved_client_id" >> "$GITHUB_ENV"
+          printf 'CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID=%s\n' "$resolved_service_token_id" >> "$GITHUB_ENV"
 
       - name: Inspect current Chief Service Auth with dedicated read authority
         if: inputs.mode == 'check'
         env:
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
-          CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
         run: node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
 
       - name: Apply exact-host Chief Service Auth with dedicated admin authority
         if: inputs.mode == 'repair'
         env:
           CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
-          CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
         shell: bash
         run: |
           set -euo pipefail
@@ -176,8 +206,6 @@ jobs:
         env:
           CHIEF_ACCESS_MODE: check
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
-          CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
         run: node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
 
       - name: Return sanitized Chief Access receipt to founder control issue
