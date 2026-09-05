@@ -47,9 +47,23 @@ describe("GitHub App authentication", () => {
     expect(() => createGitHubAppJwt("99", encoded)).not.toThrow();
   });
 
+  it("accepts a base64url-encoded PEM secret", () => {
+    const encoded = Buffer.from(generatePrivatePem(), "utf8").toString("base64url");
+    expect(() => createGitHubAppJwt("99", encoded)).not.toThrow();
+  });
+
   it("accepts base64-encoded PEM with CRLF line endings", () => {
     const encoded = Buffer.from(generatePrivatePem().replace(/\n/g, "\r\n"), "utf8").toString("base64");
     expect(() => createGitHubAppJwt("99", encoded)).not.toThrow();
+  });
+
+  it("accepts an accidentally single-quoted escaped PEM transport", () => {
+    const quoted = `'${generatePrivatePem().replace(/\n/g, "\\n")}'`;
+    expect(() => createGitHubAppJwt("99", quoted)).not.toThrow();
+  });
+
+  it("accepts a UTF-8 BOM before a raw PEM", () => {
+    expect(() => createGitHubAppJwt("99", `\uFEFF${generatePrivatePem()}`)).not.toThrow();
   });
 
   it("fails closed with a configuration-safe error for malformed private-key secrets", () => {
