@@ -191,11 +191,10 @@ export async function observeGitHubRepositoryInstallation(
     throw new Error(`GitHub App installation omitted repository selection for ${repository.canonical}`);
   }
 
-  const permissions = Object.fromEntries(
-    Object.entries(installation.permissions ?? {})
-      .filter((entry): entry is [string, string] => typeof entry[1] === "string")
-      .map(([name, value]) => [name, value]),
-  );
+  const permissions: Record<string, string> = {};
+  for (const [name, value] of Object.entries(installation.permissions ?? {})) {
+    if (typeof value === "string") permissions[name] = value;
+  }
   const account = installation.account as { login?: string; slug?: string; type?: string } | null;
   const accountLogin = account?.login ?? account?.slug;
 
@@ -227,7 +226,7 @@ export async function getGitHubInstallationToken(
   const cached = tokenCache.get(cacheKey);
   if (cached && cached.expiresAtMs - Date.now() > 5 * 60_000) return cached.token;
 
-  const { appClient, installation, installationId } = await resolveGitHubRepositoryInstallation(
+  const { appClient, installation } = await resolveGitHubRepositoryInstallation(
     normalizedAppId,
     privateKey,
     repository.canonical,
