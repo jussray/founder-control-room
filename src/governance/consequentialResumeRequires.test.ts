@@ -208,8 +208,7 @@ describe('fcr/consequential-resume-requires@v1', () => {
 
   it('fails closed when runtime input invents an unsupported witness kind', () => {
     const base = input();
-    const forged = [{ ...base.independentEvidence[0], kind: 'self_verified' }]
-      as unknown as ConsequentialResumeInput['independentEvidence'];
+    const forged = ([{ ...base.independentEvidence[0], kind: 'self_verified' }] as unknown) as ConsequentialResumeInput['independentEvidence'];
     const verdict = evaluateConsequentialResume({ ...base, independentEvidence: forged });
     expect(verdict.disposition).toBe('reconfirm');
     expect(verdict.reasons.join(' ')).toContain('Independent witness kind is unsupported.');
