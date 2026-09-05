@@ -77,6 +77,8 @@ FCR can issue a separately approved, bounded product-build directive to a produc
 
 Source wiring and unit tests do **not** prove the current peer runtime is reachable or that the federation loop is green for the current FCR head. That requires exact-head runtime/browser evidence.
 
+The StoryEngine peer pin is an evidence identity, not a durable alias for “current StoryEngine.” If the separately versioned StoryEngine carrier moves, earlier FCR Playwright green remains historical for its pinned peer. FCR must bind a separately exact-head-proven StoryEngine successor and rerun the complete FCR → StoryEngine → receipt → FCR browser/runtime witness before making a current federation claim.
+
 See [`docs/REPOSITORY_FEDERATION.md`](docs/REPOSITORY_FEDERATION.md).
 
 ### Jira work automation
