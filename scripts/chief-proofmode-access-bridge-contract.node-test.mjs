@@ -38,6 +38,22 @@ test('recovery is protected by production environment and separates secrets from
   assert.match(recoveryWorkflow, /current_main.*EXPECTED_HEAD_SHA/s);
 });
 
+test('recovery permits only a bounded non-secret selector fallback and refuses protected-selector override', () => {
+  assert.match(recoveryWorkflow, /service_client_id:/);
+  assert.match(recoveryWorkflow, /service_token_id:/);
+  assert.match(recoveryWorkflow, /INPUT_CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID:\s*\$\{\{ inputs\.service_client_id \}\}/);
+  assert.match(recoveryWorkflow, /INPUT_CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID:\s*\$\{\{ inputs\.service_token_id \}\}/);
+  assert.match(recoveryWorkflow, /service_client_id cannot override the protected production client ID/);
+  assert.match(recoveryWorkflow, /service_token_id cannot override the protected production service-token ID/);
+  assert.match(recoveryWorkflow, /resolved_client_id="\$\{CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID:-\$INPUT_CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID\}"/);
+  assert.match(recoveryWorkflow, /resolved_service_token_id="\$\{CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID:-\$INPUT_CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID\}"/);
+  assert.match(recoveryWorkflow, /\^\[A-Za-z0-9\._:-\]\{1,200\}\$/);
+  assert.match(recoveryWorkflow, /CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID=%s\\n.*GITHUB_ENV/s);
+  assert.match(recoveryWorkflow, /CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID=%s\\n.*GITHUB_ENV/s);
+  assert.doesNotMatch(recoveryWorkflow, /INPUT_CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET/);
+  assert.doesNotMatch(recoveryWorkflow, /service_client_secret:/);
+});
+
 test('repair requires founder approval but never publishes the raw approval reference', () => {
   const authorityStep = recoveryWorkflow.match(
     /- name: Verify exact FCR main, target, and founder mutation approval([\s\S]*?)- name: Set up Node 24/,
