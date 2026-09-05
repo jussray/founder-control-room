@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, raw } from 'express';
 import type { FirstPartySocialPostInput } from '../../lib/firstPartySocialPublisher.js';
 import {
   type FounderOsLabAction,
@@ -28,7 +28,9 @@ import {
   type UntrustedArtifact,
   type UntrustedArtifactSource,
 } from '../../security/untrustedArtifactBoundary.js';
+import { runFounderProofAuditInternalDryRun } from '../../services/founderProofAuditDryRun.js';
 import { requireFounder } from '../middleware/requireFounder.js';
+import { requirePortfolioSwitchOn } from '../middleware/requirePortfolioSwitchOn.js';
 
 export const founderOsSkillsRouter = Router();
 founderOsSkillsRouter.use(requireFounder);
@@ -341,6 +343,45 @@ function parseUntrustedArtifacts(value: unknown): UntrustedArtifact[] | undefine
   }
   return artifacts;
 }
+
+founderOsSkillsRouter.post(
+  '/proof-audit/internal-dry-run',
+  requirePortfolioSwitchOn('fcr-privileged-execution-master'),
+  raw({ type: () => true, limit: '1kb' }),
+  async (req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+
+    if (req.body !== undefined) {
+      return res.status(400).json({
+        error: 'Founder Proof Audit internal dry run accepts no request body.',
+      });
+    }
+
+    const runtimeSha = process.env.GIT_SHA?.trim() ?? '';
+    if (!EXACT_COMMIT_SHA.test(runtimeSha)) {
+      return res.status(503).json({
+        error: 'Founder Proof Audit internal dry run requires an exact deployed GIT_SHA.',
+      });
+    }
+
+    try {
+      const result = await runFounderProofAuditInternalDryRun(runtimeSha);
+      const payload = {
+        contract: result.dryRun.contract,
+        runtimeSha: result.dryRun.runtimeSha,
+        testCase: result.dryRun.testCase,
+        sourceEventId: result.dryRun.sourceEventId,
+        inputFingerprint: result.dryRun.inputFingerprint,
+        receipt: result.dryRun.receipt,
+        guarantees: result.dryRun.guarantees,
+        persistence: result.persistence,
+      };
+      return res.status(result.persistence === 'conflict' ? 409 : 200).json(payload);
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
 
 founderOsSkillsRouter.post('/preview', (req, res) => {
   const body = req.body as unknown;
