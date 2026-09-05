@@ -243,6 +243,7 @@ export interface GovernedExecutionReceipt {
 export interface GovernedReceiptBinding {
   leaseId: string;
   idempotencyKey: string;
+  status: GovernedReceiptStatus;
   runtimeIdentity: string;
   externalRefs: readonly string[];
   receiptObservedAt: string;
@@ -278,6 +279,7 @@ function witnessBindsReceipt(
 
   return same(receipt.leaseId, witness.receiptBinding.leaseId)
     && same(receipt.idempotencyKey, witness.receiptBinding.idempotencyKey)
+    && receipt.status === witness.receiptBinding.status
     && same(receipt.runtimeIdentity, witness.receiptBinding.runtimeIdentity)
     && sameRefs(receipt.externalRefs, witness.receiptBinding.externalRefs)
     && same(receipt.observedAt, witness.receiptBinding.receiptObservedAt)
