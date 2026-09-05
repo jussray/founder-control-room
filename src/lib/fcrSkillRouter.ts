@@ -10,6 +10,7 @@ export const FCR_REQUIRED_PARALLEL_LENSES = [
   'deep-research',
 ] as const;
 
+// Keep this tuple synchronized with .control-room/humanizer-donor.contract.json; mismatches fail closed below.
 export const FCR_HUMANIZER_CAPABILITY = {
   id: 'humanizer',
   version: '2.11.2',
