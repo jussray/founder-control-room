@@ -1,5 +1,11 @@
 export const FOUNDER_PROOF_AUDIT_LIFECYCLE_CONTRACT = 'fcr/founder-proof-audit-lifecycle@v1' as const;
 
+export const FOUNDER_PROOF_AUDIT_COMMERCE_AUTHORITY = Object.freeze({
+  project: 'founder-control-room',
+  customDomain: 'foundercontrolroom.org',
+  shopDomain: 'vercel-store-93a908b0-wcrkkq76.myshopify.com',
+} as const);
+
 export type FounderProofAuditMode = 'DRY_RUN' | 'LIVE';
 export type FounderProofAuditTargetType =
   | 'WEBSITE'
@@ -13,6 +19,12 @@ export type FounderProofAuditIntakeStatus = 'MISSING' | 'VALIDATED';
 export type FounderProofAuditExecutionStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
 export type FounderProofAuditDeliveryStatus = 'NOT_DELIVERED' | 'SIMULATED' | 'DELIVERED' | 'ACKNOWLEDGED';
 export type FounderProofAuditTruthPlane = 'INTENT' | 'COMMERCE_EXECUTION' | 'AUDIT_EXECUTION' | 'DELIVERY_OUTCOME';
+
+export interface FounderProofAuditShopifyStoreIdentity {
+  project: string;
+  customDomain: string;
+  shopDomain: string;
+}
 
 export interface FounderProofAuditLifecycleInput {
   mode: FounderProofAuditMode;
@@ -28,6 +40,7 @@ export interface FounderProofAuditLifecycleInput {
     status: FounderProofAuditCommerceStatus;
     source: 'shopify' | 'none';
     evidenceRef?: string | null;
+    storeIdentity?: FounderProofAuditShopifyStoreIdentity | null;
   };
   intake: {
     status: FounderProofAuditIntakeStatus;
@@ -61,6 +74,7 @@ export interface FounderProofAuditLifecycleReceipt {
   claims: {
     commerceExecutionObserved: boolean;
     commercePaymentVerified: boolean;
+    commerceStoreAuthorityVerified: boolean;
     auditExecutionVerified: boolean;
     deliverySimulationVerified: boolean;
     deliveryOutcomeVerified: boolean;
@@ -99,6 +113,10 @@ function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function normalizedIdentity(value: unknown): string {
+  return text(value).toLowerCase();
+}
+
 function checkMax(errors: string[], field: string, value: string, max: number): void {
   if (value.length > max) errors.push(`${field} exceeds ${max} characters`);
 }
@@ -124,6 +142,10 @@ export function evaluateFounderProofAuditLifecycle(
   const authorizedEvidenceRefs = rawAuthorizedEvidenceRefs.map((item) => text(item));
   const productionMutationAuthorizationRef = text(input?.scope?.productionMutationAuthorizationRef || '') || null;
   const commerceEvidenceRef = text(input?.commerce?.evidenceRef || '') || null;
+  const commerceStoreIdentity = input?.commerce?.storeIdentity ?? null;
+  const commerceProject = normalizedIdentity(commerceStoreIdentity?.project);
+  const commerceCustomDomain = normalizedIdentity(commerceStoreIdentity?.customDomain);
+  const commerceShopDomain = normalizedIdentity(commerceStoreIdentity?.shopDomain);
   const intakeEvidenceRef = text(input?.intake?.evidenceRef || '') || null;
   const auditEvidenceRef = text(input?.audit?.evidenceRef || '') || null;
   const deliveryEvidenceRef = text(input?.delivery?.evidenceRef || '') || null;
@@ -158,6 +180,11 @@ export function evaluateFounderProofAuditLifecycle(
 
   if (productionMutationAuthorizationRef) checkMax(errors, 'scope.productionMutationAuthorizationRef', productionMutationAuthorizationRef, MAX_REF_LENGTH);
   if (commerceEvidenceRef) checkMax(errors, 'commerce.evidenceRef', commerceEvidenceRef, MAX_REF_LENGTH);
+  if (commerceStoreIdentity) {
+    checkMax(errors, 'commerce.storeIdentity.project', commerceProject, 80);
+    checkMax(errors, 'commerce.storeIdentity.customDomain', commerceCustomDomain, 255);
+    checkMax(errors, 'commerce.storeIdentity.shopDomain', commerceShopDomain, 255);
+  }
   if (intakeEvidenceRef) checkMax(errors, 'intake.evidenceRef', intakeEvidenceRef, MAX_REF_LENGTH);
   if (auditEvidenceRef) checkMax(errors, 'audit.evidenceRef', auditEvidenceRef, MAX_REF_LENGTH);
   if (deliveryEvidenceRef) checkMax(errors, 'delivery.evidenceRef', deliveryEvidenceRef, MAX_REF_LENGTH);
@@ -182,9 +209,23 @@ export function evaluateFounderProofAuditLifecycle(
   if (input.commerce.status === 'NOT_EXECUTED') {
     if (input.commerce.source !== 'none') errors.push('NOT_EXECUTED commerce must use source none');
     if (commerceEvidenceRef) errors.push('NOT_EXECUTED commerce must not carry evidenceRef');
+    if (commerceStoreIdentity) errors.push('NOT_EXECUTED commerce must not carry storeIdentity');
   } else {
     if (input.commerce.source !== 'shopify') errors.push('ORDER_CREATED and PAYMENT_VERIFIED must be certified by Shopify');
     if (!commerceEvidenceRef) errors.push('commerce evidenceRef is required once commerce execution is claimed');
+    if (!commerceStoreIdentity) {
+      errors.push('Shopify commerce requires an explicit storeIdentity');
+    } else {
+      if (commerceProject !== FOUNDER_PROOF_AUDIT_COMMERCE_AUTHORITY.project) {
+        errors.push('Shopify commerce project authority mismatch');
+      }
+      if (commerceCustomDomain !== FOUNDER_PROOF_AUDIT_COMMERCE_AUTHORITY.customDomain) {
+        errors.push('Shopify commerce custom-domain authority mismatch');
+      }
+      if (commerceShopDomain !== FOUNDER_PROOF_AUDIT_COMMERCE_AUTHORITY.shopDomain) {
+        errors.push('Shopify commerce permanent-shop authority mismatch');
+      }
+    }
   }
 
   if (input.intake.status === 'MISSING' && intakeEvidenceRef) {
@@ -230,6 +271,10 @@ export function evaluateFounderProofAuditLifecycle(
 
   const commerceExecutionObserved = input.mode === 'LIVE' && input.commerce.status !== 'NOT_EXECUTED';
   const commercePaymentVerified = input.mode === 'LIVE' && input.commerce.status === 'PAYMENT_VERIFIED';
+  const commerceStoreAuthorityVerified = commerceExecutionObserved
+    && commerceProject === FOUNDER_PROOF_AUDIT_COMMERCE_AUTHORITY.project
+    && commerceCustomDomain === FOUNDER_PROOF_AUDIT_COMMERCE_AUTHORITY.customDomain
+    && commerceShopDomain === FOUNDER_PROOF_AUDIT_COMMERCE_AUTHORITY.shopDomain;
   const auditExecutionVerified = input.audit.status === 'COMPLETED';
   const deliverySimulationVerified = input.mode === 'DRY_RUN' && input.delivery.status === 'SIMULATED';
   const deliveryOutcomeVerified = input.mode === 'LIVE'
@@ -269,16 +314,16 @@ export function evaluateFounderProofAuditLifecycle(
   } else if (input.mode === 'LIVE' && commercePaymentVerified && input.intake.status === 'VALIDATED') {
     disposition = 'READY_FOR_AUDIT';
     highestTruthPlane = 'COMMERCE_EXECUTION';
-    recognizedOutcome = 'Shopify payment execution and bounded intake were verified; audit completion and delivery are not proven.';
+    recognizedOutcome = 'Shopify payment execution from the FCR commerce authority and bounded intake were verified; audit completion and delivery are not proven.';
     nextGate = 'Execute the bounded audit without expanding authority.';
   } else if (input.mode === 'LIVE' && commercePaymentVerified) {
     highestTruthPlane = 'COMMERCE_EXECUTION';
-    recognizedOutcome = 'Shopify payment execution was verified; audit intake, completion, and delivery are not proven.';
+    recognizedOutcome = 'Shopify payment execution from the FCR commerce authority was verified; audit intake, completion, and delivery are not proven.';
     nextGate = 'Validate bounded intake without collecting secrets.';
   } else if (input.mode === 'LIVE' && commerceExecutionObserved) {
     highestTruthPlane = 'COMMERCE_EXECUTION';
-    recognizedOutcome = 'Shopify order creation was observed; payment is not verified, so audit execution is not authorized by this lifecycle.';
-    nextGate = 'Independently verify Shopify payment before starting the live audit, or preserve the unpaid/abandoned order state without upgrading it.';
+    recognizedOutcome = 'Shopify order creation from the FCR commerce authority was observed; payment is not verified, so audit execution is not authorized by this lifecycle.';
+    nextGate = 'Independently verify Shopify payment from the same FCR commerce authority before starting the live audit, or preserve the unpaid/abandoned order state without upgrading it.';
   }
 
   return Object.freeze({
@@ -291,6 +336,7 @@ export function evaluateFounderProofAuditLifecycle(
     claims: Object.freeze({
       commerceExecutionObserved,
       commercePaymentVerified,
+      commerceStoreAuthorityVerified,
       auditExecutionVerified,
       deliverySimulationVerified,
       deliveryOutcomeVerified,
