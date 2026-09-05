@@ -29,7 +29,8 @@ function blockedReceipt(
     ...bound.candidate,
     candidateFingerprint: bound.candidateFingerprint,
     candidateCookie: bound.candidateCookie,
-    founderApprovalObserved: false,
+    founderApprovalClaimCorrelated: false,
+    founderAuthorityAuthenticated: false,
     mergeAuthorized: false,
     deploymentAuthorized: false,
     providerMutationAuthorized: false,
@@ -38,17 +39,18 @@ function blockedReceipt(
 }
 
 /**
- * Durable release-proof orchestration only.
+ * Durable release-proof correlation only.
  *
- * This Workflow cannot merge, deploy, mutate Cloudflare, or treat an event as
- * execution authority. It correlates exact release/evidence/founder receipts,
- * then stops at READY_FOR_FINAL_REREAD so the repository's existing authority
- * contract can perform the final mutable provider reread and any later action.
+ * This Workflow cannot merge, deploy, mutate Cloudflare, authenticate founder
+ * authority, or treat an event as execution authority. It correlates exact
+ * release/evidence/founder-claim packets, then stops at READY_FOR_FINAL_REREAD so
+ * the repository's existing authenticated authority contract can perform the
+ * final provider reread and any later action.
  *
- * Fingerprints identify immutable subjects. Continuity cookies cryptographically
- * chain the currently valid candidate -> evidence -> founder-authority path.
- * A moved candidate or replayed predecessor cookie fails closed rather than
- * borrowing historical proof.
+ * Fingerprints identify immutable subjects. Continuity cookies are deterministic,
+ * non-authenticating correlation metadata that chain the candidate -> evidence ->
+ * claimed-authority packet. They detect stale/cross-packet replay but are not MACs,
+ * signatures, credentials, or proof of sender provenance.
  */
 export class ReleaseProofWorkflowV0 extends WorkflowEntrypoint<ReleaseProofWorkflowEnv, ReleaseProofCandidate> {
   async run(event: WorkflowEvent<ReleaseProofCandidate>, step: WorkflowStep) {
@@ -63,25 +65,27 @@ export class ReleaseProofWorkflowV0 extends WorkflowEntrypoint<ReleaseProofWorkf
       },
     );
 
-    const evidence = await step.do('validate evidence fingerprint and continuity cookie', async () =>
+    const evidence = await step.do('validate evidence fingerprint and correlation continuity', async () =>
       evaluateReleaseEvidence(bound, evidenceEvent.payload));
 
     if (evidence.state !== 'EVIDENCE_CLEAR') {
       return blockedReceipt(bound, 'BLOCKED', evidence.reason);
     }
 
+    // Event name is retained as a transport compatibility surface. Receipt truth
+    // does not treat receiving this event as authenticated founder authority.
     const founderEvent = await step.waitForEvent<FounderApprovalObservation>(
-      'await founder approval observation',
+      'await founder approval claim packet',
       {
         type: 'founder_approval_observed',
         timeout: '24 hours',
       },
     );
 
-    const founder = await step.do('validate founder fingerprint and evidence cookie chain', async () =>
+    const founder = await step.do('correlate founder approval claim to evidence packet', async () =>
       evaluateFounderApprovalObservation(bound, evidence, founderEvent.payload));
 
-    if (founder.state !== 'FOUNDER_APPROVAL_OBSERVED') {
+    if (founder.state !== 'FOUNDER_APPROVAL_CLAIM_CORRELATED') {
       return blockedReceipt(bound, 'HOLD', founder.reason);
     }
 
