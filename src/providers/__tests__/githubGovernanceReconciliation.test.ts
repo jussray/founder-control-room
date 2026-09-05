@@ -160,10 +160,9 @@ describe("Chief GitHub governance reconciliation", () => {
   });
 
   it("fails closed when bypass state is not present in provider readback", () => {
-    const readback = rulesetReadback();
-    delete readback.bypass_actors;
+    const { bypass_actors: _bypassActors, ...withoutBypassActors } = rulesetReadback();
 
-    expect(() => observe(readback)).toThrow(/bypass actors must be provider-observed/);
+    expect(() => observe(withoutBypassActors)).toThrow(/bypass actors must be provider-observed/);
   });
 
   it("fails closed on duplicate required-check contexts", () => {
