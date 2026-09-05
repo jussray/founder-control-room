@@ -66,7 +66,7 @@ function historyClient(input: {
       if (table === 'linkedin_experiments') return experiments;
       if (table === 'provider_observations') return observations;
       if (table === 'approval_executions') return executions;
-      if (table === 'founder_content_active_editorial_pattern_reservations') return patterns;
+      if (table === 'founder_content_approval_editorial_pattern_history') return patterns;
       throw new Error(`unexpected table ${table}`);
     }),
   };
@@ -93,7 +93,7 @@ describe('founder editorial publication memory', () => {
 
   it('turns a provider-readback-verified direct publication into fingerprint-only novelty memory', async () => {
     const identity = buildFounderEditorialIdentity(proposal());
-    const { client } = historyClient({
+    const { client, patterns } = historyClient({
       executions: [{
         id: 'execution-1',
         action_type: 'publish_founder_content',
@@ -117,14 +117,14 @@ describe('founder editorial publication memory', () => {
       patterns: [{
         approval_id: 'fca:verified-direct',
         pattern_fingerprint: identity.promptOsPatternFingerprint,
-        reserved_at: '2026-08-31T11:55:00.000Z',
-        expires_at: '2026-08-31T12:25:00.000Z',
+        bound_at: '2026-08-31T11:55:00.000Z',
       }],
     });
 
     const repository = supabaseFounderEditorialHistoryRepository(client as any);
     const rows = await repository.recentLinkedIn(32);
     expect(rows).toHaveLength(1);
+    expect(patterns.in).toHaveBeenCalledWith('approval_id', ['fca:verified-direct']);
     expect(rows[0]).toMatchObject({
       id: 'provider-readback:urn:li:share:123',
       historySource: 'provider_readback',
