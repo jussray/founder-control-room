@@ -6,6 +6,7 @@ export const CONTRACT = 'fcr/chief-proofmode-governance-witness@v1';
 export const CHIEF_REPOSITORY = 'jussray/chief-ai-machine';
 export const CHIEF_BASE_REF = 'main';
 export const CHIEF_OWNER = 'jussray';
+export const FOUNDER_GITHUB_USER_ID = '286642846';
 export const EXPECTED_CHIEF_BASE_SHA = '2fd4fda0cab12e52ab5096e723884d98bcfe7d10';
 export const PROOFMODE_WORKFLOW_PATH = '.github/workflows/proofmode-mcp-playwright.yml';
 export const PROOFMODE_WORKFLOW_BLOB_SHA = '9ed95711df7611ff45f0bda68884a2624b06682d';
@@ -119,6 +120,10 @@ export function evaluateChiefProofModeGovernanceEvidence({
   const prHeadSha = lower(pullRequest?.head?.sha);
   const prHeadRef = text(pullRequest?.head?.ref);
   const prBaseSha = lower(pullRequest?.base?.sha);
+  const workflowActorLogin = lower(workflowRun?.actor?.login);
+  const workflowActorId = numericId(workflowRun?.actor?.id);
+  const workflowTriggeringActorLogin = lower(workflowRun?.triggering_actor?.login);
+  const workflowTriggeringActorId = numericId(workflowRun?.triggering_actor?.id);
 
   if (!trustedAppId) {
     pushViolation(violations, 'trusted-app-id-invalid');
@@ -189,10 +194,23 @@ export function evaluateChiefProofModeGovernanceEvidence({
       observed: workflowPath(workflowRun?.path) || null,
     });
   }
-  if (lower(workflowRun?.actor?.login) !== CHIEF_OWNER) {
+  if (workflowActorLogin !== CHIEF_OWNER || workflowActorId !== FOUNDER_GITHUB_USER_ID) {
     pushViolation(violations, 'workflow-run-actor-not-founder', {
-      expected: CHIEF_OWNER,
-      observed: lower(workflowRun?.actor?.login) || null,
+      expectedLogin: CHIEF_OWNER,
+      expectedId: FOUNDER_GITHUB_USER_ID,
+      observedLogin: workflowActorLogin || null,
+      observedId: workflowActorId,
+    });
+  }
+  if (
+    workflowTriggeringActorLogin !== CHIEF_OWNER
+    || workflowTriggeringActorId !== FOUNDER_GITHUB_USER_ID
+  ) {
+    pushViolation(violations, 'workflow-run-triggering-actor-not-founder', {
+      expectedLogin: CHIEF_OWNER,
+      expectedId: FOUNDER_GITHUB_USER_ID,
+      observedLogin: workflowTriggeringActorLogin || null,
+      observedId: workflowTriggeringActorId,
     });
   }
 
@@ -283,7 +301,10 @@ export function evaluateChiefProofModeGovernanceEvidence({
     workflowBlobSha: lower(workflowFile?.sha) || null,
     workflowRunId: workflowRun?.id == null ? null : String(workflowRun.id),
     workflowRunAttempt: workflowRun?.run_attempt == null ? null : Number(workflowRun.run_attempt),
-    workflowRunActor: lower(workflowRun?.actor?.login) || null,
+    workflowRunActorLogin: workflowActorLogin || null,
+    workflowRunActorId: workflowActorId,
+    workflowRunTriggeringActorLogin: workflowTriggeringActorLogin || null,
+    workflowRunTriggeringActorId: workflowTriggeringActorId,
     runtimeJobId: runtimeJobs[0]?.id == null ? null : String(runtimeJobs[0].id),
     runtimeJobConclusion: runtimeJobs[0]?.conclusion ?? null,
     trustedAppId,
