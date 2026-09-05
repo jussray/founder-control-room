@@ -26,11 +26,29 @@ function decodeJsonQuotedString(value: string): string {
   }
 }
 
+function unwrapMatchingSingleQuotes(value: string): string {
+  if (value.length >= 2 && value.startsWith("'") && value.endsWith("'")) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
 function decodeBase64Pem(value: string): string {
   const compact = value.replace(/\s+/g, "");
-  if (!compact || !/^[A-Za-z0-9+/]+={0,2}$/.test(compact)) return value;
+  if (!compact || !/^[A-Za-z0-9+/_-]+={0,2}$/.test(compact)) return value;
+
+  const standardBase64 = compact.replace(/-/g, "+").replace(/_/g, "/");
+  if (standardBase64.length % 4 === 1) return value;
+  const padded = standardBase64.padEnd(
+    standardBase64.length + ((4 - (standardBase64.length % 4)) % 4),
+    "=",
+  );
+
   try {
-    const decoded = Buffer.from(compact, "base64").toString("utf8").trim();
+    const decoded = Buffer.from(padded, "base64")
+      .toString("utf8")
+      .replace(/^\uFEFF/, "")
+      .trim();
     return decoded.includes("-----BEGIN") && decoded.includes("PRIVATE KEY-----")
       ? decoded
       : value;
@@ -40,7 +58,8 @@ function decodeBase64Pem(value: string): string {
 }
 
 function normalizePrivateKey(value: string): string {
-  let normalized = decodeJsonQuotedString(value.trim())
+  let normalized = value.trim().replace(/^\uFEFF/, "");
+  normalized = unwrapMatchingSingleQuotes(decodeJsonQuotedString(normalized))
     .replace(/\\r\\n/g, "\n")
     .replace(/\\n/g, "\n")
     .replace(/\r\n/g, "\n")
@@ -57,7 +76,7 @@ function parseGitHubAppPrivateKey(value: string): KeyObject {
   const normalized = normalizePrivateKey(value);
   if (!/^-----BEGIN (?:RSA )?PRIVATE KEY-----\n/.test(normalized)) {
     throw new Error(
-      "GITHUB_PRIVATE_KEY must contain the complete GitHub App RSA private-key PEM (raw PEM, escaped-newline PEM, JSON-quoted PEM, or base64-encoded PEM)",
+      "GITHUB_PRIVATE_KEY must contain the complete GitHub App RSA private-key PEM (raw PEM, escaped-newline PEM, JSON-quoted PEM, base64/base64url-encoded PEM, or a matching single-quoted transport wrapper)",
     );
   }
 
