@@ -18,7 +18,8 @@ source_binding_spec.loader.exec_module(source_binding)
 
 
 CANONICAL = {
-    'contract': 'fcr/founder-content-supersession-input@v1',
+    'contract': 'fcr/founder-content-supersession-input@v2',
+    'as_of': '2026-08-30T23:59:59Z',
     'subject': {
         'platform': 'LinkedIn',
         'post_fingerprint': '7b307a1b3eb68ace',
@@ -51,6 +52,8 @@ class FounderContentSupersessionTest(unittest.TestCase):
         receipt = mod.build_supersession_receipt(copy.deepcopy(CANONICAL))
         self.assertEqual(receipt['contract'], 'fcr/founder-content-supersession@v3')
         self.assertEqual(receipt['authority'], 'observation_only')
+        self.assertEqual(receipt['as_of'], CANONICAL['as_of'])
+        self.assertEqual(receipt['observation_horizon_state'], 'ATTESTED_INPUT_V2')
         self.assertEqual(receipt['diff'], {
             'impressions': 84,
             'engagements': 0,
@@ -68,6 +71,34 @@ class FounderContentSupersessionTest(unittest.TestCase):
         self.assertEqual(receipt['predecessor_receipt_id'], 'SUP-0123456789abcdef')
         self.assertEqual(receipt['provenance']['source_digest_verification'], 'UNVERIFIED_INPUT_V3')
         self.assertEqual(receipt['provenance']['claim_source_binding'], 'NOT_LOCKED_V3')
+        self.assertEqual(receipt['provenance']['observation_horizon_verification'], 'ATTESTED_INPUT_V2')
+
+    def test_rejects_legacy_v1_input_without_observation_horizon(self):
+        payload = copy.deepcopy(CANONICAL)
+        payload['contract'] = 'fcr/founder-content-supersession-input@v1'
+        payload.pop('as_of')
+        with self.assertRaisesRegex(ValueError, 'contract must equal fcr/founder-content-supersession-input@v2'):
+            mod.build_supersession_receipt(payload)
+
+    def test_rejects_current_observation_beyond_as_of(self):
+        payload = copy.deepcopy(CANONICAL)
+        payload['current']['observed_at'] = '2062-08-30T12:00:00Z'
+        with self.assertRaisesRegex(ValueError, 'current.observed_at must not be later than as_of'):
+            mod.build_supersession_receipt(payload)
+
+    def test_rejects_prior_observation_beyond_as_of(self):
+        payload = copy.deepcopy(CANONICAL)
+        payload['prior']['observed_at'] = '2062-08-30T12:00:00Z'
+        payload['current']['observed_at'] = '2062-08-31T12:00:00Z'
+        with self.assertRaisesRegex(ValueError, 'prior.observed_at must not be later than as_of'):
+            mod.build_supersession_receipt(payload)
+
+    def test_allows_current_observation_exactly_at_as_of(self):
+        payload = copy.deepcopy(CANONICAL)
+        payload['prior']['observed_at'] = '2026-08-30T22:00:00Z'
+        payload['current']['observed_at'] = payload['as_of']
+        receipt = mod.build_supersession_receipt(payload)
+        self.assertEqual(receipt['evidence'][1]['observed_at'], payload['as_of'])
 
     def test_free_form_expectation_never_changes_factual_metric_classification(self):
         first_payload = copy.deepcopy(CANONICAL)
