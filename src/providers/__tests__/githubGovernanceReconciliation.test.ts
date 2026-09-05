@@ -6,7 +6,9 @@ import {
   planChiefProofModeRulesetMigration,
 } from "../githubGovernanceReconciliation.js";
 
-const OBSERVER_APP_ID = "85455";
+const GITHUB_ACTIONS_APP_ID = "15368";
+const CLOUDFLARE_WORKERS_APP_ID = "85455";
+const SYNTHETIC_OBSERVER_APP_ID = "900000001";
 
 function rulesetReadback(overrides: Record<string, unknown> = {}) {
   return {
@@ -14,16 +16,20 @@ function rulesetReadback(overrides: Record<string, unknown> = {}) {
     name: "governance boundary",
     target: "branch",
     enforcement: "active",
-    bypass_actors: [{ actor_type: "Integration", actor_id: 85455, bypass_mode: "pull_request" }],
+    bypass_actors: [{
+      actor_type: "Integration",
+      actor_id: Number(SYNTHETIC_OBSERVER_APP_ID),
+      bypass_mode: "pull_request",
+    }],
     conditions: { ref_name: { include: ["refs/heads/main"], exclude: [] } },
     rules: [{
       type: "required_status_checks",
       parameters: {
         strict_required_status_checks_policy: true,
         required_status_checks: [
-          { context: "Verify operational authority", integration_id: 15368 },
-          { context: "Verify live ProofMode MCP with Playwright", integration_id: 15368 },
-          { context: "Verify production ProofMode MCP with Playwright", integration_id: 15368 },
+          { context: "Verify operational authority", integration_id: Number(GITHUB_ACTIONS_APP_ID) },
+          { context: "Verify live ProofMode MCP with Playwright", integration_id: Number(GITHUB_ACTIONS_APP_ID) },
+          { context: "Verify production ProofMode MCP with Playwright", integration_id: Number(GITHUB_ACTIONS_APP_ID) },
         ],
       },
     }],
@@ -36,7 +42,7 @@ function observe(readback: Record<string, unknown>) {
     repository: CHIEF_GOVERNANCE.repository,
     rulesetId: String(readback.id),
     readback,
-    observerAppId: OBSERVER_APP_ID,
+    observerAppId: SYNTHETIC_OBSERVER_APP_ID,
     observedAt: "2026-09-05T21:15:00.000Z",
   });
 }
@@ -53,7 +59,7 @@ function pair() {
         strict_required_status_checks_policy: true,
         required_status_checks: [
           { context: "Typecheck" },
-          { context: "Verify test-ledger contract", integration_id: 15368 },
+          { context: "Verify test-ledger contract", integration_id: Number(GITHUB_ACTIONS_APP_ID) },
         ],
       },
     }],
@@ -62,6 +68,11 @@ function pair() {
 }
 
 describe("Chief GitHub governance reconciliation", () => {
+  it("keeps the observer identity explicitly synthetic instead of borrowing a real provider App id", () => {
+    expect(SYNTHETIC_OBSERVER_APP_ID).not.toBe(GITHUB_ACTIONS_APP_ID);
+    expect(SYNTHETIC_OBSERVER_APP_ID).not.toBe(CLOUDFLARE_WORKERS_APP_ID);
+  });
+
   it("fails closed before planning until an external candidate-check producer is observed", () => {
     expect(CHIEF_GOVERNANCE.candidateIntegrationId).toBeNull();
     expect(CHIEF_GOVERNANCE.candidateProducerTrust).toBe("external-github-app-check-required");
@@ -80,7 +91,7 @@ describe("Chief GitHub governance reconciliation", () => {
         type: "required_status_checks",
         parameters: {
           required_status_checks: [
-            { context: CHIEF_GOVERNANCE.candidateContext, integration_id: 15368 },
+            { context: CHIEF_GOVERNANCE.candidateContext, integration_id: Number(GITHUB_ACTIONS_APP_ID) },
           ],
         },
       }],
@@ -157,7 +168,7 @@ describe("Chief GitHub governance reconciliation", () => {
 
     expect(exactHeadGate.requiredStatusChecks).toContainEqual({
       context: "Verify test-ledger contract",
-      integrationId: "15368",
+      integrationId: GITHUB_ACTIONS_APP_ID,
     });
     expect(exactHeadGate.requiredStatusChecks).toContainEqual({
       context: "Typecheck",
@@ -178,7 +189,7 @@ describe("Chief GitHub governance reconciliation", () => {
         parameters: {
           required_status_checks: [
             { context: "Typecheck" },
-            { context: "Typecheck", integration_id: 15368 },
+            { context: "Typecheck", integration_id: Number(GITHUB_ACTIONS_APP_ID) },
           ],
         },
       }],
@@ -199,7 +210,7 @@ describe("Chief GitHub governance reconciliation", () => {
       repository: "jussray/founder-control-room",
       rulesetId: 21261587,
       readback: rulesetReadback(),
-      observerAppId: OBSERVER_APP_ID,
+      observerAppId: SYNTHETIC_OBSERVER_APP_ID,
       observedAt: "2026-09-05T21:15:00.000Z",
     })).toThrow(/pinned to jussray\/chief-ai-machine/);
 
@@ -207,7 +218,7 @@ describe("Chief GitHub governance reconciliation", () => {
       repository: CHIEF_GOVERNANCE.repository,
       rulesetId: 20818149,
       readback: rulesetReadback(),
-      observerAppId: OBSERVER_APP_ID,
+      observerAppId: SYNTHETIC_OBSERVER_APP_ID,
       observedAt: "2026-09-05T21:15:00.000Z",
     })).toThrow(/provider ruleset id mismatch/);
   });
