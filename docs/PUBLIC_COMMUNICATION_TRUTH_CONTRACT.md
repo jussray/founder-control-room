@@ -124,6 +124,8 @@ exact public-safe proposal
 → durable publication receipt
 ```
 
+For direct first-party LinkedIn publication, **complete server-side adapter configuration is part of preflight, not execution**. FCR must validate token presence, author URN, and any configured `LINKEDIN_API_VERSION` as a canonical `YYYYMM` value before creating a durable `approval_executions` reservation. Malformed adapter configuration must produce a blocked/not-configured result with zero reservation, zero approval consumption, and zero provider request. A later adapter-level validation remains defense in depth; it must not be the first place malformed configuration is discovered after durable execution state exists.
+
 Changing approved copy, evidence identity, proposal identity, source version, channel, or governing authorization fingerprint requires a fresh matching approval. A consumed approval is not replay authority after a downstream failure. Approval existence, approval issuance, successful pattern reservation, or successful approval claim is not publication truth; provider readback remains terminal evidence of the external artifact.
 
 Provider-neutral n8n execution uses the same FCR-owned one-shot approval-store membrane as direct first-party publication. The n8n authority adapter must preflight transport configuration, provider allowlisting, and provider/platform compatibility before consuming one-shot authority; it then atomically consumes the exact stored approval only while the worker's exact database-returned execution generation remains active, and injects only that server-read approval into the existing provider-neutral dispatcher. Caller-supplied approval objects are forbidden. n8n may request a provider write only after that claim, may not change approved copy, and may never mark publication complete; provider-native readback remains terminal publication evidence.
@@ -197,6 +199,7 @@ Hold the post when:
 - a founder-content `verified` proof label is missing Buffer provider binding, receipt identity, observation time, or exact deployed-SHA binding;
 - the post falls outside the approved automated publishing class or a stricter exact Current You gate is unsatisfied;
 - approval issuance cannot atomically reserve the founder/platform editorial pattern through the bounded approval/provider-readback lease without rewriting historical approval rows;
+- direct first-party provider adapter configuration is malformed or cannot be fully validated before durable execution reservation;
 - the active provider-writing route cannot atomically bind an exact matching FCR-owned approval claim to the active execution generation;
 - the post depends on a workflow that failed before executing steps;
 - private, sensitive, proprietary, or security-relevant information could be exposed;
