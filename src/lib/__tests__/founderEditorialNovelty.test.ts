@@ -75,7 +75,7 @@ describe('founder editorial novelty', () => {
     expect(result.risk).toBe('HIGH');
     expect(result.closestMatchId).toBe('prior-verification-post');
     expect(result.closestSimilarity).toBeGreaterThanOrEqual(0.55);
-    expect(result.reason).toContain('materially different story angle');
+    expect(result.reason).toContain('materially different copy and story angle');
     expect(result.roles).toEqual({
       promptos: 'editorial-pattern-grammar',
       chief: 'candidate-angle-proposal',
