@@ -13,12 +13,12 @@
 begin;
 
 create table if not exists public.founder_content_active_public_copy_reservations (
-  founder_user_id        text not null,
-  platform               text not null check (platform ~ '^[a-z0-9][a-z0-9._-]{0,79}$'),
+  founder_user_id         text not null,
+  platform                text not null check (platform ~ '^[a-z0-9][a-z0-9._-]{0,79}$'),
   public_copy_fingerprint text not null check (public_copy_fingerprint ~ '^[0-9a-f]{64}$'),
-  approval_id            text not null references public.founder_content_approvals(approval_id) on delete restrict,
-  reserved_at            timestamptz not null,
-  expires_at             timestamptz not null,
+  approval_id             text not null references public.founder_content_approvals(approval_id) on delete restrict,
+  reserved_at             timestamptz not null,
+  expires_at              timestamptz not null,
   primary key (founder_user_id, platform, public_copy_fingerprint),
   constraint founder_content_active_public_copy_reservations_expiry_check
     check (expires_at > reserved_at)
@@ -111,9 +111,12 @@ begin
 
   if copy_lock = pattern_lock then
     perform pg_catalog.pg_advisory_xact_lock(copy_lock);
+  elsif copy_lock < pattern_lock then
+    perform pg_catalog.pg_advisory_xact_lock(copy_lock);
+    perform pg_catalog.pg_advisory_xact_lock(pattern_lock);
   else
-    perform pg_catalog.pg_advisory_xact_lock(pg_catalog.least(copy_lock, pattern_lock));
-    perform pg_catalog.pg_advisory_xact_lock(pg_catalog.greatest(copy_lock, pattern_lock));
+    perform pg_catalog.pg_advisory_xact_lock(pattern_lock);
+    perform pg_catalog.pg_advisory_xact_lock(copy_lock);
   end if;
 
   -- A consumed approval remains active through its bounded lease because a
