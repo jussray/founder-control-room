@@ -53,6 +53,27 @@ This is a reviewed orientation, not permanent truth. Re-read the current README,
 
 A command listed here is a starting point, not proof it exists or applies forever. Discover current scripts and workflows first. A skipped, stale, unstarted, or older-SHA check is not a pass.
 
+## Cross-plane contradiction gate
+
+A successful lower or narrower proof plane must never cancel, conceal, average away, or upgrade a contradictory broader proof plane.
+
+Apply this ordering whenever evidence disagrees:
+
+- unit green does not cancel integration red;
+- integration green does not cancel Playwright red;
+- Playwright green does not cancel release-provenance red;
+- deployment green does not cancel runtime-identity red;
+- runtime green does not cancel independent outcome red.
+
+When narrower evidence is green and broader evidence is red or unresolved:
+
+- preserve the narrower result as `VERIFIED` at its actual scope;
+- classify the broader claim as `HOLD`, `BLOCKED`, `UNKNOWN`, or `CONTRADICTED` according to the evidence;
+- never report the aggregate state as “mostly green” or equivalent;
+- state the exact proof planes that disagree and the one next gate capable of resolving the contradiction.
+
+Historical green evidence remains valid as historical truth. It does not become current broader proof unless that broader plane is re-observed on the required exact subject.
+
 ## Output
 
 Return:
