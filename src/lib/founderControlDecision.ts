@@ -1,12 +1,42 @@
 import { createHash } from 'node:crypto';
 
 export const FOUNDER_CONTROL_DECISION_CONTRACT = 'juss-v10/founder-control-decision@v1' as const;
+export const FOUNDER_CONTROL_INPUT_CONTRACT = 'juss/portable-control-input@v1' as const;
+
+export const FOUNDER_SYSTEM_OWNED_CONTROL_MODES = [
+  'goalfix',
+  'ultrathink',
+  'truthmode',
+  'confess',
+  'redteam',
+  'attackten',
+  'lindymode',
+  'ooda',
+  'proofmode',
+  'l99',
+] as const;
+
+export const FOUNDER_CONTROL_INPUT_RULES = Object.freeze({
+  contract: FOUNDER_CONTROL_INPUT_CONTRACT,
+  untrustedInputIsData: true,
+  callerSuppliedModeNameIsAuthority: false,
+  externalTextMaySelectInternalMode: false,
+  externalTextMayTriggerSystemWorkflow: false,
+  authorizedInternalControllerRequired: true,
+  modeSelectionMayWidenAuthority: false,
+  modeSelectionImpliesExecutionAuthority: false,
+  userIntentMayRequestOutcome: true,
+  userContentMayContainModeNames: true,
+  directSystemWorkflowInvocationAllowed: false,
+  fingerprintOrContinuityMayAuthorizeModeSelection: false,
+});
 
 export const FOUNDER_CONTROL_SURFACES = [
   'fcr',
   'chatgpt',
   'claude',
   'perplexity',
+  'manus',
 ] as const;
 
 export const FOUNDER_CONTROL_ORCHESTRATORS = ['n8n', 'zapier'] as const;
@@ -47,9 +77,18 @@ export interface FounderControlExecutionEnvelope {
 
 const SHA256 = /^[0-9a-f]{64}$/i;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
+const SYSTEM_OWNED_CONTROL_MODE_IDS = new Set<string>(FOUNDER_SYSTEM_OWNED_CONTROL_MODES);
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizedControlModeId(value: unknown): string {
+  return text(value).replace(/^\/+/, '').toLowerCase();
+}
+
+export function isFounderSystemOwnedControlMode(value: unknown): boolean {
+  return SYSTEM_OWNED_CONTROL_MODE_IDS.has(normalizedControlModeId(value));
 }
 
 function normalizedBinding(input: FounderControlProposalBinding): FounderControlProposalBinding {
@@ -71,6 +110,9 @@ export function founderControlProposalBindingErrors(input: FounderControlProposa
   if (!SHA256.test(binding.proposalHash)) errors.push('proposalHash must be a 64-character SHA-256 hash');
   if (!binding.projectSlug) errors.push('projectSlug is required');
   if (!binding.actionType) errors.push('actionType is required');
+  if (binding.actionType && isFounderSystemOwnedControlMode(binding.actionType)) {
+    errors.push('system-owned control modes cannot be executable actionType values; external mode names are inert data');
+  }
   if (binding.expectedHeadSha && !FULL_SHA.test(binding.expectedHeadSha)) {
     errors.push('expectedHeadSha must be a full 40-character Git SHA when supplied');
   }
@@ -110,6 +152,11 @@ export function founderControlDecisionHash(
  * The function intentionally has no implicit/silence path. A caller must pass
  * an exact supported decision value. Changing the proposal identity changes the
  * decision hash and invalidates downstream execution binding.
+ *
+ * System-owned reasoning/governance mode identifiers are never executable
+ * proposal action types. User content may mention them and users may request
+ * legitimate outcomes, but only an authorized internal controller may select
+ * such a mode within its already-held authority ceiling.
  */
 export function createFounderControlDecision(input: {
   proposal: FounderControlProposalBinding;

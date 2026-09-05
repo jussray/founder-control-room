@@ -1,0 +1,120 @@
+name: Main Release Provenance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact current main SHA to verify
+        required: false
+        type: string
+
+concurrency:
+  group: main-release-provenance-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  TARGET_SHA: ${{ inputs.target_sha || github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  contract:
+    name: Main release provenance contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          persist-credentials: false
+      - name: Verify exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$TARGET_SHA" "$actual"
+          test "$actual" = "$TARGET_SHA"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Run provenance adversarial tests
+        run: node --test scripts/verify-main-release-provenance.node-test.mjs
+
+  provenance:
+    name: Main release provenance
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact release candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          persist-credentials: false
+      - name: Read current main and associated merged PRs
+        id: provider
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          current_main_sha="$(gh api "repos/${GITHUB_REPOSITORY}/branches/main" --jq '.commit.sha')"
+          gh api \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/${GITHUB_REPOSITORY}/commits/${TARGET_SHA}/pulls" \
+            > associated-pulls.json
+          printf 'current_main_sha=%s\n' "$current_main_sha" >> "$GITHUB_OUTPUT"
+      - name: Classify superseded push run
+        id: supersession
+        shell: bash
+        env:
+          CURRENT_MAIN_SHA: ${{ steps.provider.outputs.current_main_sha }}
+        run: |
+          set -euo pipefail
+          superseded=false
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${TARGET_SHA}" != "${CURRENT_MAIN_SHA}" ]]; then
+            superseded=true
+            mkdir -p artifacts
+            node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+
+          const receipt = {
+            ok: false,
+            reason: 'superseded_push',
+            superseded: true,
+            enforced: false,
+            targetSha: process.env.TARGET_SHA,
+            currentMainSha: process.env.CURRENT_MAIN_SHA,
+          };
+
+          writeFileSync('artifacts/main-release-provenance.json', `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
+          process.stdout.write(`${JSON.stringify(receipt)}\n`);
+          NODE
+            echo "Superseded push run: ${TARGET_SHA} is no longer current main (${CURRENT_MAIN_SHA})."
+          fi
+          echo "superseded=${superseded}" >> "$GITHUB_OUTPUT"
+      - name: Verify release provenance against live GitHub state
+        if: ${{ steps.supersession.outputs.superseded != 'true' }}
+        shell: bash
+        env:
+          CURRENT_MAIN_SHA: ${{ steps.provider.outputs.current_main_sha }}
+        run: |
+          set -euo pipefail
+          export ASSOCIATED_PULLS_JSON="$(cat associated-pulls.json)"
+          node scripts/verify-main-release-provenance.mjs
+      - name: Upload provenance receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: main-release-provenance-${{ github.run_id }}
+          path: artifacts/main-release-provenance.json
+          if-no-files-found: error
+          retention-days: 30

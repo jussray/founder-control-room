@@ -27,6 +27,15 @@ command = "node scripts/verify-worker-build-authority.mjs"
 [observability]
 enabled = true
 
+# Durable release-proof orchestration only. No route creates instances yet,
+# and the Workflow receipt explicitly grants no merge, deploy, or provider
+# mutation authority. A later trigger must use the existing FCR authority
+# membrane and preserve exact candidate/evidence fingerprints.
+[[workflows]]
+binding = "RELEASE_PROOF_WORKFLOW"
+name = "fcr-release-proof-v0"
+class_name = "ReleaseProofWorkflowV0"
+
 # Outbound transactional email capability. This binding alone sends nothing;
 # application code must explicitly invoke it. Keep the provider boundary
 # project-scoped: FCR code uses FCR_EMAIL and may send only from the checked-in
@@ -58,10 +67,14 @@ FCR_V10_RECEIPT_PERSISTENCE_REQUIRED = "true"
 MCP_EXA_URL = "https://mcp.exa.ai/mcp"
 MCP_RESEND_URL = "https://mcp.resend.com/mcp"
 
+# Runtime secrets are provider-held in Cloudflare. Canonical GitHub production
+# deployment preserves them rather than copying their values through Actions.
+# Wrangler validates these required names before a Worker deployment succeeds.
 [secrets]
 required = [
   "SUPABASE_SERVICE_ROLE_KEY",
   "SUPABASE_PUBLISHABLE_KEY",
+  "FOUNDER_SESSION_ENCRYPTION_KEY",
   "GITHUB_WEBHOOK_SECRET",
   "GITHUB_APP_ID",
   "GITHUB_PRIVATE_KEY",

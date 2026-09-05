@@ -3,6 +3,7 @@ name: Portfolio Design OS Contract
 on:
   push:
     branches:
+      - main
       - agent/design-os-registry-refresh
     paths:
       - '.github/workflows/design-os-contract.yml'

@@ -76,7 +76,7 @@
       "nextAction": "Preserve the commerce-specific constitution merged in jussbeautifulhair-site PR #25 and ensure future AGENTS.md changes retain its entrypoint."
     },
     {
-      "slug": "jbh-private",
+      "slug": "juss-beautiful-hair-private",
       "repository": "jussray/jbh-private",
       "role": "private hair operations, supplier intelligence, and commercial controls",
       "entrypoint": "AGENTS_FOUNDER_INTELLIGENCE.md",

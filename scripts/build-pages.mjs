@@ -5,6 +5,8 @@ import { constants } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
+await import('./verify-sekret-bip-control-room-bridge.mjs');
+
 const repositoryRoot = fileURLToPath(new URL('../', import.meta.url));
 const sourceDirectory = resolve(repositoryRoot, 'public');
 const outputDirectory = resolve(repositoryRoot, 'dist-pages');
@@ -13,6 +15,7 @@ const requiredAssets = [
   'index.html',
   '_headers',
   '_worker.js',
+  '.well-known/sekret-bip-control-room.json',
   'control-room/index.html',
   'control-room/app.js',
   'control-room/styles.css',
@@ -29,6 +32,7 @@ const requiredAssets = [
   'control-room/genesis.css',
   'control-room/evidence-trust.html',
   'portable-founder-console/index.html',
+  'juss-rayy/index.html',
 ];
 
 await rm(outputDirectory, { recursive: true, force: true });

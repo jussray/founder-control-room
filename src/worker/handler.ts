@@ -12,6 +12,7 @@ export interface ControlRoomWorkerEnv {
   SUPABASE_PROJECT_REF: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
   SUPABASE_PUBLISHABLE_KEY: string;
+  FOUNDER_SESSION_ENCRYPTION_KEY: string;
   GITHUB_WEBHOOK_SECRET: string;
   /** Preferred production GitHub authentication. Must be configured as a pair. */
   GITHUB_APP_ID?: string;
@@ -42,6 +43,7 @@ const REQUIRED_STRING_BINDINGS = [
   'SUPABASE_PROJECT_REF',
   'SUPABASE_SERVICE_ROLE_KEY',
   'SUPABASE_PUBLISHABLE_KEY',
+  'FOUNDER_SESSION_ENCRYPTION_KEY',
   'GITHUB_WEBHOOK_SECRET',
   'FOUNDER_ALLOWED_ORIGINS',
   'FOUNDER_API_URL',
@@ -89,6 +91,16 @@ export function validateWorkerEnv(
   // a non-empty string. TypeScript cannot derive that fact through the dynamic
   // key iteration, so narrow once at this boundary.
   const validated = env as ControlRoomWorkerEnv;
+
+  const founderSessionKey = validated.FOUNDER_SESSION_ENCRYPTION_KEY.trim();
+  if (!/^[A-Za-z0-9_-]{43}$/.test(founderSessionKey)) {
+    throw new Error(
+      'FOUNDER_SESSION_ENCRYPTION_KEY must be 43-character unpadded base64url',
+    );
+  }
+  if (Buffer.from(founderSessionKey, 'base64url').length !== 32) {
+    throw new Error('FOUNDER_SESSION_ENCRYPTION_KEY must decode to exactly 32 bytes');
+  }
 
   if (validated.FCR_EMAIL_FROM !== FCR_EMAIL_FROM) {
     throw new Error('FCR_EMAIL_FROM must match the checked-in Founder Control Room sender identity');

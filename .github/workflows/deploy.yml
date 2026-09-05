@@ -74,34 +74,16 @@ jobs:
       - name: Validate required production configuration
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
-          GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
-          GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
-          FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
-          ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL: ${{ secrets.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL }}
-          FOUNDER_REVIEW_EMAIL_INGRESS_SECRET: ${{ secrets.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET }}
         shell: bash
         run: |
           set -euo pipefail
 
           required=(
             SUPABASE_DB_URL
-            SUPABASE_SERVICE_ROLE_KEY
-            SUPABASE_PUBLISHABLE_KEY
-            GITHUB_WEBHOOK_SECRET
-            GITHUB_APP_ID
-            GITHUB_PRIVATE_KEY
             CLOUDFLARE_API_TOKEN
             CLOUDFLARE_ACCOUNT_ID
-            DEPLOY_URL
-            FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
-            ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
-            FOUNDER_REVIEW_EMAIL_INGRESS_SECRET
           )
           missing=()
 
@@ -112,11 +94,92 @@ jobs:
           done
 
           if (( ${#missing[@]} > 0 )); then
-            printf '::error title=Missing production configuration::Set these GitHub production environment secrets before deployment: %s\n' "${missing[*]}"
+            printf '::error title=Missing production deployment configuration::Set these GitHub production environment secrets before deployment: %s\n' "${missing[*]}"
             exit 1
           fi
 
-          echo "All required production configuration names are present."
+          echo "GitHub deployment-plane configuration is present. Worker runtime secrets remain provider-held and are name-read-back in the next authority-gate step."
+
+      - name: Verify provider-held Worker secret names before mutation
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import os
+          import re
+          import sys
+
+          token = os.environ.get('CLOUDFLARE_API_TOKEN', '')
+          account_id = os.environ.get('CLOUDFLARE_ACCOUNT_ID', '')
+
+          try:
+              token.encode('ascii')
+          except UnicodeEncodeError:
+              print('::error title=Malformed Cloudflare API token::CLOUDFLARE_API_TOKEN contains non-ASCII characters. Re-copy the exact Cloudflare-issued token.')
+              sys.exit(1)
+
+          if any(ord(char) < 33 or ord(char) > 126 or char.isspace() for char in token):
+              print('::error title=Malformed Cloudflare API token::CLOUDFLARE_API_TOKEN contains whitespace or non-printable characters. Re-copy the exact Cloudflare-issued token.')
+              sys.exit(1)
+
+          if not re.fullmatch(r'[0-9a-f]{32}', account_id):
+              print('::error title=Invalid Cloudflare account authority::CLOUDFLARE_ACCOUNT_ID must be a 32-character lowercase hexadecimal account ID.')
+              sys.exit(1)
+
+          print('Cloudflare production credential is header-safe and account authority is structurally valid. The token value was not printed.')
+          PY
+
+          secret_receipt="$RUNNER_TEMP/fcr-worker-secret-names.json"
+          npx --yes wrangler@4.110.0 secret list \
+            --config wrangler.worker.toml \
+            --format json > "$secret_receipt"
+
+          SECRET_RECEIPT="$secret_receipt" python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import tomllib
+
+          with open('wrangler.worker.toml', 'rb') as handle:
+              config = tomllib.load(handle)
+
+          required = set(config.get('secrets', {}).get('required', []))
+          workflow_written = {'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'}
+          if not required:
+              print('::error title=Missing Worker secret contract::wrangler.worker.toml must declare [secrets].required before production deployment.')
+              sys.exit(1)
+          if not workflow_written <= required:
+              print('::error title=Worker secret contract drift::The workflow-written Founder Signal grant must remain declared in [secrets].required.')
+              sys.exit(1)
+
+          provider_required = sorted(required - workflow_written)
+          with open(os.environ['SECRET_RECEIPT'], encoding='utf-8') as handle:
+              receipt = json.load(handle)
+
+          if not isinstance(receipt, list):
+              print('::error title=Invalid Cloudflare secret receipt::wrangler secret list did not return the expected name-only list.')
+              sys.exit(1)
+
+          present = {
+              entry.get('name')
+              for entry in receipt
+              if isinstance(entry, dict) and isinstance(entry.get('name'), str)
+          }
+          missing = [name for name in provider_required if name not in present]
+          if missing:
+              for name in missing:
+                  print(f'::error title=Missing provider-held Worker secret::{name} is not installed on founder-control-room.')
+              sys.exit(1)
+
+          print(
+              f'Provider-held Worker secret names verified: {len(provider_required)} names present; '
+              'values were not read.'
+          )
+          PY
 
       - name: Record authority receipt
         shell: bash
@@ -128,6 +191,7 @@ jobs:
             echo "- Approval reference: \`$DEPLOYMENT_APPROVAL_ID\`"
             echo "- Reason: ${DEPLOYMENT_REASON:-not supplied}"
             echo "- Trigger: manual workflow dispatch"
+            echo "- Existing Worker runtime secrets: preserved; provider-held required names read back from Cloudflare before any production mutation"
             echo "- Broad Founder Signal automation grant: disabled"
             echo "- Proof-of-ship scheduled publication: enabled with 20-minute founder review"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -253,6 +317,7 @@ jobs:
           REQUIRED_MIGRATION_VERSIONS: 20260723000000,20260803011000
         run: |
           set -euo pipefail
+          mkdir -p test-results
           supabase migration list --db-url "$SUPABASE_DB_URL" | tee "$REMOTE_MIGRATION_LIST_PATH"
           node scripts/verify-production-migration-ledger.mjs
 
@@ -313,29 +378,13 @@ jobs:
           wranglerVersion: '4.110.0'
           command: deploy --config wrangler.worker.toml --var GIT_SHA:${{ inputs.expected_head_sha }}
           secrets: |
-            SUPABASE_SERVICE_ROLE_KEY
-            SUPABASE_PUBLISHABLE_KEY
-            GITHUB_WEBHOOK_SECRET
-            GITHUB_APP_ID
-            GITHUB_PRIVATE_KEY
             FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON
-            FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
-            ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
-            FOUNDER_REVIEW_EMAIL_INGRESS_SECRET
         env:
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
-          GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
-          GITHUB_PRIVATE_KEY: ${{ secrets.GITHUB_PRIVATE_KEY }}
-          FOUNDER_SIGNAL_ENGINE_MCP_TOKEN: ${{ secrets.FOUNDER_SIGNAL_ENGINE_MCP_TOKEN }}
-          ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL: ${{ secrets.ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL }}
-          FOUNDER_REVIEW_EMAIL_INGRESS_SECRET: ${{ secrets.FOUNDER_REVIEW_EMAIL_INGRESS_SECRET }}
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CF_SESSIONS_KV_NAMESPACE_ID: ${{ secrets.CF_SESSIONS_KV_NAMESPACE_ID }}
-          CF_FEATURE_FLAGS_KV_NAMESPACE_ID: ${{ secrets.CF_FEATURE_FLAGS_KV_NAMESPACE_ID }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          # Canonical deploy preserves provider-held Worker secrets. The only
+          # runtime secret this workflow actively writes is the fail-closed
+          # publication grant below.
           FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON: >-
             {"id":"founder-signal-draft-only-v2","enabled":false,"routes":[{"channel":"linkedin","audienceSegment":"build-in-public"},{"channel":"facebook","audienceSegment":"build-in-public"}],"repositories":[],"repositoryScope":{"mode":"all_owned","owner":"jussray"},"approvedRecipientIds":[],"expiresAt":null}
 
@@ -375,7 +424,7 @@ jobs:
               raise SystemExit(f'unexpected health payload: {body!r}')
           PY
         env:
-          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          DEPLOY_URL: https://api.foundercontrolroom.org
 
       - name: Verify exact deployed commit and disabled broad automation grant
         run: |
@@ -404,7 +453,7 @@ jobs:
               raise SystemExit('broad Founder Signal automation grant fail-closed read-back failed')
           PY
         env:
-          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          DEPLOY_URL: https://api.foundercontrolroom.org
 
       - name: Verify public guardrail surface
         run: |
@@ -422,7 +471,7 @@ jobs:
               raise SystemExit('standing merge authority is not active')
           PY
         env:
-          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          DEPLOY_URL: https://api.foundercontrolroom.org
 
       - name: Verify public Pages shell and exact API proxy
         run: |
@@ -469,7 +518,7 @@ jobs:
     if: needs.smoke-test.result == 'success'
     env:
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
-      DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+      DEPLOY_URL: https://api.foundercontrolroom.org
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       ZAPIER_CATCH_HOOK_URL: ${{ secrets.ZAPIER_CATCH_HOOK_URL }}
       PROOF_OF_SHIP_STEERING_GRANT_ID: ${{ secrets.PROOF_OF_SHIP_STEERING_GRANT_ID }}

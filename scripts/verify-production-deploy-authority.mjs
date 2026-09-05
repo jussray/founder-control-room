@@ -342,18 +342,21 @@ for (const [name, value] of publicBindings) {
 const requiredWorkerSecrets = [
   'SUPABASE_SERVICE_ROLE_KEY',
   'SUPABASE_PUBLISHABLE_KEY',
+  'FOUNDER_SESSION_ENCRYPTION_KEY',
   'GITHUB_WEBHOOK_SECRET',
   'GITHUB_APP_ID',
   'GITHUB_PRIVATE_KEY',
+  'FCR_REMOTE_MCP_READ_TOKEN',
   'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
   'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
   'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
+  'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET',
 ];
 
 assert.match(
   wrangler,
   /^\[secrets\]\nrequired = \[/m,
-  'wrangler.worker.toml must declare required Worker secrets',
+  'wrangler.worker.toml must declare required provider-held Worker secrets',
 );
 
 const deploySectionStart = workflow.indexOf('  worker-deploy:');
@@ -366,24 +369,61 @@ for (const name of requiredWorkerSecrets) {
   assert.match(
     wrangler,
     new RegExp(`^  "${name}",$`, 'm'),
-    `${name} must be declared as a required Worker secret`,
-  );
-  assert.match(
-    deploySection,
-    new RegExp(`^            ${name}$`, 'm'),
-    `${name} must be listed in wrangler-action secrets`,
+    `${name} must be declared as a required provider-held Worker secret`,
   );
 }
+
+const uploadedSecretsMatch = deploySection.match(
+  /secrets:\s*\|\n((?:\s{12}[A-Z][A-Z0-9_]*\n)+)\s{8}env:/,
+);
+assert.notEqual(uploadedSecretsMatch, null, 'worker deploy must have a bounded explicit secret upload list');
+const uploadedSecrets = uploadedSecretsMatch[1].trim().split(/\s+/);
+assert.deepEqual(
+  uploadedSecrets,
+  ['FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON'],
+  'canonical deploy must preserve provider-held runtime secrets and only force the fail-closed automation grant',
+);
+assert.match(
+  deploySection,
+  /Existing Worker runtime secrets|Canonical deploy preserves provider-held Worker secrets/,
+  'canonical deploy must document preservation of provider-held runtime secrets',
+);
+assert.match(
+  deploySection,
+  /"id":"founder-signal-draft-only-v2","enabled":false/,
+  'canonical deploy must actively force the broad Founder Signal grant disabled',
+);
 
 for (const name of requiredWorkerSecrets.filter(
   (secretName) => secretName !== 'FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON',
 )) {
-  assert.match(
+  assert.doesNotMatch(
     deploySection,
-    new RegExp(`^          ${name}: \\$\\{\\{ secrets\\.${name} \\}\\}$`, 'm'),
-    `${name} must be mapped from the GitHub production environment`,
+    new RegExp(`^          ${name}: \\$\\{\\{ secrets\\.[A-Z0-9_]+ \\}\\}$`, 'm'),
+    `${name} must remain provider-held instead of being copied through GitHub Actions`,
   );
 }
+assert.doesNotMatch(
+  deploySection,
+  /^          GITHUB_APP_ID: \$\{\{ secrets\.APP_ID \}\}$/m,
+  'GitHub App runtime identity must remain provider-held during canonical deploy',
+);
+assert.doesNotMatch(
+  deploySection,
+  /^          GITHUB_PRIVATE_KEY: \$\{\{ secrets\.APP_PRIVATE_KEY \}\}$/m,
+  'GitHub App private key must remain provider-held during canonical deploy',
+);
+
+assert.match(
+  workflow,
+  /DEPLOY_URL: https:\/\/api\.foundercontrolroom\.org/,
+  'canonical API origin is public configuration and must be explicit in release proof',
+);
+assert.doesNotMatch(
+  workflow,
+  /DEPLOY_URL: \$\{\{ secrets\.DEPLOY_URL \}\}/,
+  'canonical API origin must not be duplicated as a GitHub secret',
+);
 
 const authoritySectionStart = workflow.indexOf('  authority-gate:');
 const migrationSectionStart = workflow.indexOf('  # ── 1.');
@@ -391,10 +431,10 @@ const startupValidationIndex = workflow.indexOf(
   '      - name: Validate required production configuration',
 );
 assert.notEqual(authoritySectionStart, -1, 'authority-gate section must exist');
-assert.notEqual(startupValidationIndex, -1, 'startup binding validation step must exist');
+assert.notEqual(startupValidationIndex, -1, 'startup deployment-plane validation step must exist');
 assert.ok(
   startupValidationIndex > authoritySectionStart && startupValidationIndex < migrationSectionStart,
-  'all production configuration must be validated before Supabase mutation begins',
+  'all GitHub deployment-plane configuration must be validated before Supabase mutation begins',
 );
 
 const validationStepStart = authoritySectionStart === -1
@@ -409,7 +449,7 @@ const receiptStepStart = validationStepStart === -1
       '      - name: Record authority receipt',
       validationStepStart,
     );
-assert.notEqual(validationStepStart, -1, 'startup binding validation step must exist');
+assert.notEqual(validationStepStart, -1, 'deployment-plane validation step must exist');
 assert.notEqual(receiptStepStart, -1, 'authority receipt step must follow configuration validation');
 const authoritySection = workflow.slice(authoritySectionStart, migrationSectionStart);
 const validationRelativeStart = validationStepStart - authoritySectionStart;
@@ -421,16 +461,8 @@ const validationStep = workflow.slice(validationStepStart, receiptStepStart);
 
 const requiredAuthoritySecrets = [
   'SUPABASE_DB_URL',
-  'SUPABASE_SERVICE_ROLE_KEY',
-  'SUPABASE_PUBLISHABLE_KEY',
-  'GITHUB_WEBHOOK_SECRET',
-  'GITHUB_APP_ID',
-  'GITHUB_PRIVATE_KEY',
   'CLOUDFLARE_API_TOKEN',
   'CLOUDFLARE_ACCOUNT_ID',
-  'DEPLOY_URL',
-  'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
-  'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
 ];
 const outsideSecretMapping = new RegExp(
   '^[ \\t]+(?:' + requiredAuthoritySecrets.join('|') + '): \\$\\{\\{ secrets\\.(?:' + requiredAuthoritySecrets.join('|') + ') \\}\\}$',
@@ -439,19 +471,50 @@ const outsideSecretMapping = new RegExp(
 assert.doesNotMatch(
   authorityOutsideValidation,
   outsideSecretMapping,
-  'required production secrets must be scoped only to the validation step',
+  'GitHub deployment-plane secrets must be scoped only to the validation step',
 );
 
 for (const name of requiredAuthoritySecrets) {
   assert.match(
     validationStep,
     new RegExp('^          ' + name + ': \\$\\{\\{ secrets\\.' + name + ' \\}\\}$', 'm'),
-    name + ' must be scoped to the pre-migration configuration gate',
+    name + ' must be scoped to the pre-migration deployment-plane gate',
   );
   assert.match(
     validationStep,
     new RegExp('^            ' + name + '$', 'm'),
-    name + ' must be checked by the pre-migration configuration gate',
+    name + ' must be checked by the pre-migration deployment-plane gate',
   );
 }
-console.log('Production deployment authority, privacy receipt, LinkedIn freshness, and one-Worker binding contract verified.');
+
+for (const name of [
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE_PUBLISHABLE_KEY',
+  'FOUNDER_SESSION_ENCRYPTION_KEY',
+  'GITHUB_WEBHOOK_SECRET',
+  'GITHUB_APP_ID',
+  'GITHUB_PRIVATE_KEY',
+  'FCR_REMOTE_MCP_READ_TOKEN',
+  'FOUNDER_SIGNAL_ENGINE_MCP_TOKEN',
+  'ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL',
+  'FOUNDER_REVIEW_EMAIL_INGRESS_SECRET',
+  'DEPLOY_URL',
+]) {
+  assert.doesNotMatch(
+    validationStep,
+    new RegExp('^          ' + name + ': \\$\\{\\{ secrets\\.[A-Z0-9_]+ \\}\\}$', 'm'),
+    name + ' must not be duplicated into the GitHub deployment-plane authority gate',
+  );
+  assert.doesNotMatch(
+    validationStep,
+    new RegExp('^            ' + name + '$', 'm'),
+    name + ' must not be required by the GitHub deployment-plane authority gate',
+  );
+}
+
+assert.match(
+  validationStep,
+  /Worker runtime secrets remain provider-held and are name-read-back/,
+  'authority gate must state the provider-held runtime-secret readback boundary',
+);
+console.log('Production deployment authority, provider-held Worker secrets, privacy receipt, LinkedIn freshness, and one-Worker binding contract verified.');

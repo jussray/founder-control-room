@@ -219,14 +219,14 @@ describe('Founder OS and AI Company cross-lab parity', () => {
     expect(company.receipts).toEqual([]);
   });
 
-  it('keeps sandbox execution disabled while the external Buffer firewall requires exact schedule authority', () => {
+  it('keeps sandbox execution disabled while the external Buffer firewall is draft-only', () => {
     const nowMs = Date.parse('2026-08-02T21:01:00.000Z');
-    const validSchedule = {
+    const validDraft = {
       post_text: socialPost('publish').text,
       content_field: 'linkedin_draft',
       channel: 'synthetic-founder-linkedin',
-      destination_mode: 'schedule',
-      publish_allowed: true,
+      destination_mode: 'draft',
+      publish_allowed: false,
       proof_url: PROOF_URL,
       source_commit_sha: SHA,
       generated_at: GENERATED_AT,
@@ -237,38 +237,44 @@ describe('Founder OS and AI Company cross-lab parity', () => {
       steering_grant_id: GRANT_ID,
       founder_approval_id: `standing-policy:${GRANT_ID}:${INVOCATION_ID}`,
       authorization_mode: 'standing-policy',
-      schedule_policy_id: 'buffer-20-minute-review-v1',
+      schedule_policy_id: 'buffer-draft-review-v1',
       notification_mode: 'gmail_campaign_digest',
       buffer_method: 'share_now',
       scheduled_at: '2026-08-02T21:01:01.000Z',
     };
 
-    const output = validateBufferPublishInput(validSchedule, { nowMs });
+    const output = validateBufferPublishInput(validDraft, { nowMs });
     expect(output).toMatchObject({
-      destination_mode: 'schedule',
-      publish_allowed: true,
+      destination_mode: 'draft',
+      publish_allowed: false,
       authorization_receipt_verified: true,
       buffer_action: 'buffer_add_to_queue',
-      buffer_method: 'schedule',
-      buffer_save_to_draft: false,
-      scheduled_at: '2026-08-02T21:20:00.000Z',
+      buffer_method: 'draft',
+      buffer_save_to_draft: true,
+      scheduled_at: null,
+      review_deadline: null,
       share_now_allowed: false,
     });
 
     expect(() => validateBufferPublishInput({
-      ...validSchedule,
+      ...validDraft,
       founder_approval_id: 'standing-policy:copied:or-forged',
     }, { nowMs })).toThrow(/runtime-minted receipt/);
 
-    for (const destinationMode of ['draft', 'queue', 'publish', 'share_now']) {
+    for (const destinationMode of ['queue', 'schedule', 'publish', 'share_now', 'share_next', 'schedule_draft']) {
       expect(() => validateBufferPublishInput({
-        ...validSchedule,
+        ...validDraft,
         destination_mode: destinationMode,
-      }, { nowMs })).toThrow(/destination_mode must be schedule/);
+      }, { nowMs })).toThrow(/destination_mode must be draft/);
     }
 
+    expect(() => validateBufferPublishInput({
+      ...validDraft,
+      publish_allowed: true,
+    }, { nowMs })).toThrow(/publish_allowed must be explicitly false/);
+
     const founderPlan = planFounderOsLab({
-      goal: 'Simulate a scheduled founder post without giving the lab provider access.',
+      goal: 'Simulate a founder draft without giving the lab provider access.',
       action: 'queue-social',
       approval: { id: 'founder-approved:synthetic-parity', actions: ['queue-social'] },
       evidence: zapierEvidence(),

@@ -71,6 +71,22 @@ FOUNDER_ALLOWED_ORIGINS: https://foundercontrolroom.org
 
 The canonical Worker owns the reconciliation cron because no duplicate HTTP Worker should exist.
 
+### Durable release-proof Workflow binding
+
+The canonical Worker also exports `ReleaseProofWorkflowV0` and declares the same-Worker Cloudflare Workflows binding:
+
+```text
+binding: RELEASE_PROOF_WORKFLOW
+name: fcr-release-proof-v0
+class_name: ReleaseProofWorkflowV0
+```
+
+This binding is intentionally inert from application code in this slice: no public HTTP route, cron schedule, or other runtime path creates Workflow instances. It exists so later FCR-controlled orchestration can use Cloudflare's durable step/event state without creating a parallel release authority.
+
+`ReleaseProofWorkflowV0` binds exact repository, target branch, base SHA, head SHA, optional PR identity, and a deterministic candidate fingerprint. It may correlate separately supplied evidence and founder-approval observations, but even a fully correlated run stops at `READY_FOR_FINAL_REREAD` with merge, deployment, and provider-mutation authority explicitly false. The final mutable provider/PR reread and any consequential action remain owned by the existing FCR authority membrane.
+
+Repository configuration proves only the desired Workflow class/binding contract. It does not prove that Cloudflare has accepted the binding, that an instance exists or completed, or that any release/provider action occurred. Those are separate provider/runtime evidence gates.
+
 ### Remote read MCP operator boundary
 
 The canonical Worker also owns the served remote read-only MCP endpoint at:
@@ -143,13 +159,27 @@ The sanitized receipt may prove what that provider read observed at that time. C
 
 A failing or unavailable enrichment read is `UNKNOWN`/blocked evidence in that enrichment lane, not permission to infer the missing provider state, not a reason to rewrite the core Worker Git authority verdict, and not permission to mutate DNS, routes, Access, Workers, credentials, or deployment configuration.
 
-## Required Worker secrets
+## Required Worker secrets and deployment-plane credentials
 
-Configure applicable secrets in the canonical Worker secret store and, where named by guarded workflows, in the GitHub `production` environment.
+The canonical Worker runtime secret values belong in the Cloudflare Worker secret store. Canonical `.github/workflows/deploy.yml` preserves those provider-held values instead of copying them through GitHub Actions. The required runtime secret names are declared by `wrangler.worker.toml [secrets].required`, including `FOUNDER_SESSION_ENCRYPTION_KEY`; Wrangler must fail closed when a required binding name is absent before the Worker promotion can be treated as successful.
 
-For the served remote read MCP, `FCR_REMOTE_MCP_READ_TOKEN` is a required canonical Worker secret and must be distinct from write-capable MCP/provider credentials. `FCR_REMOTE_MCP_READ_PROJECTS` is a public-safe server-held scope variable, not a secret.
+The canonical Deploy authority gate has a smaller GitHub production credential surface. It requires only the credentials needed to perform the release itself:
 
-Never copy secret values into repository files, logs, screenshots, issue comments, PR bodies, documentation, or public content. A secret name or presence check proves wiring only; provider acceptance/permission is a separate truth.
+```text
+SUPABASE_DB_URL
+CLOUDFLARE_API_TOKEN
+CLOUDFLARE_ACCOUNT_ID
+```
+
+Those deployment-plane values do not become Worker runtime bindings. Conversely, Worker runtime values such as `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PUBLISHABLE_KEY`, `FOUNDER_SESSION_ENCRYPTION_KEY`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, MCP tokens, provider hook URLs, and review-email ingress secrets are not duplicated into the canonical Deploy authority gate.
+
+The only runtime secret canonical Deploy deliberately writes is `FOUNDER_SIGNAL_AUTOMATION_GRANT_JSON`, and the checked-in value is fail-closed with `enabled:false`. This lets the release actively preserve the broad automation kill switch while leaving unrelated provider-held runtime secrets untouched.
+
+`https://api.foundercontrolroom.org` is the canonical public API origin and therefore is source configuration, not a GitHub secret. Smoke proof, proof-of-ship runtime readback, and the post-Deploy production Playwright witness use that explicit origin. The witness still requires a successful canonical Deploy and binds direct Worker plus public Pages/proxy `/version` reads to the exact Deploy run SHA before and after the browser journey.
+
+Trusted deterministic-review or other bounded workflows that actually need GitHub App execution credentials may continue to use their separately scoped Actions-facing `APP_ID` / `APP_PRIVATE_KEY` inputs. That does not make canonical Deploy responsible for re-uploading the Worker's provider-held `GITHUB_APP_ID` / `GITHUB_PRIVATE_KEY` pair.
+
+Never copy secret values into repository files, logs, screenshots, issue comments, PR bodies, documentation, or public content. A source declaration or required-name check proves only the intended boundary. Live provider secret presence, validity, permissions, deployment success, and runtime identity still require provider/runtime evidence.
 
 ## Verification gate
 
@@ -160,7 +190,7 @@ At minimum verify:
 1. `npm run build:pages` succeeds and contains required browser assets, `_headers`, and `_worker.js`;
 2. the exact Pages artifact/deployment intended for production succeeds;
 3. the canonical Worker deployment/version intended for production succeeds;
-4. required secrets/configuration are available for the authorized scope;
+4. deployment-plane credentials pass the pre-mutation authority gate and provider-held Worker required-secret names pass the Wrangler binding membrane;
 5. the Pages `FCR_API` Service Binding is provider-proven to target the canonical `founder-control-room` Worker;
 6. `https://api.foundercontrolroom.org/health` returns the expected service identity/health payload;
 7. `https://foundercontrolroom.org/health` reaches the same canonical API service through the Pages binding;
@@ -173,7 +203,7 @@ Provider build/deploy comments, preview URLs, and successful uploads are useful 
 
 ## Documentation truth
 
-When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, remote MCP scope, hostname-inventory/Request Trace behavior, Worker build-authority behavior, or runtime proof requirements change, update this document in the same bounded repository change.
+When Pages proxy behavior, Worker identity, deployment authority, Cloudflare Access behavior, service bindings, secret interfaces, remote MCP scope, hostname-inventory/Request Trace behavior, Worker build-authority behavior, Cloudflare Workflow bindings/orchestration authority, or runtime proof requirements change, update this document in the same bounded repository change.
 
 Current executable source and authoritative provider readback outrank an older version of this runbook. Preserve older deployment evidence as historical provenance rather than deleting it.
 

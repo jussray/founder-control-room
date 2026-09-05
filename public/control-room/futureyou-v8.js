@@ -1,4 +1,3 @@
-const STORAGE_KEY = 'fcr_session';
 const app = document.getElementById('app');
 const refreshButton = document.getElementById('refresh');
 const AUTHORITY_RANK = Object.freeze({ L0: 0, L1: 1, L2: 2, L3: 3, L4: 4, L5: 5, L6: 6 });
@@ -9,23 +8,12 @@ function escapeHtml(value) {
   ));
 }
 
-function loadSession() {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
 async function api(path) {
-  const session = loadSession();
-  if (!session?.access_token) throw new Error('Sign in through the main Control Room before opening FutureYou V8.');
-
   const response = await fetch(path, {
+    cache: 'no-store',
+    credentials: 'same-origin',
     headers: {
       Accept: 'application/json',
-      Authorization: `Bearer ${session.access_token}`,
     },
   });
   const body = await response.json().catch(() => null);

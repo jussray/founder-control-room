@@ -8,6 +8,7 @@ on:
   workflow_run:
     workflows: [Deploy]
     types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
@@ -20,6 +21,10 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+  STORYENGINE_PEER_SHA: abd4aab9f33e6c67d7863bd1a03c917901a00668
+  STORYENGINE_PEER_URL: http://127.0.0.1:3901
+  STORYENGINE_PEER_API_KEY: fcr-ci-product-build
 
 jobs:
   playwright:
@@ -33,15 +38,22 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: Record and verify exact head
+      - name: Record and verify exact head and base ancestry
         shell: bash
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          printf 'expected=%s\nactual=%s\nbase=%s\n' "$EXPECTED_HEAD_SHA" "$actual" "$PR_BASE_SHA"
           test "$actual" = "$EXPECTED_HEAD_SHA"
+          if [ -n "$PR_BASE_SHA" ]; then
+            if ! git merge-base --is-ancestor "$PR_BASE_SHA" "$EXPECTED_HEAD_SHA"; then
+              echo "STALE_BASE: $PR_BASE_SHA is not an ancestor of $EXPECTED_HEAD_SHA" >&2
+              exit 1
+            fi
+          fi
 
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -87,6 +99,67 @@ jobs:
           NODE_ENV: test
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+
+      - name: Check out exact StoryEngine federation peer
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: jussray/StoryEngine
+          ref: ${{ env.STORYENGINE_PEER_SHA }}
+          path: .federation/storyengine
+          persist-credentials: false
+
+      - name: Verify immutable StoryEngine federation peer
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git -C .federation/storyengine rev-parse HEAD)"
+          printf 'storyengine_expected=%s\nstoryengine_actual=%s\n' "$STORYENGINE_PEER_SHA" "$actual"
+          test "$actual" = "$STORYENGINE_PEER_SHA"
+
+      - name: Install StoryEngine federation peer
+        run: npm ci --prefix .federation/storyengine/story-engine
+
+      - name: Start exact StoryEngine federation runtime
+        shell: bash
+        env:
+          L99_API_KEYS_JSON: '[{"key":"fcr-ci-product-build","actor_id":"founder-control-room","tenant_id":"juss","role":"administrator","workspace_ids":["*"]}]'
+        run: |
+          set -euo pipefail
+          mkdir -p logs
+          export PORT=3901
+          export EXPECTED_HEAD_SHA="$STORYENGINE_PEER_SHA"
+          export L99_RELEASE_SHA="$STORYENGINE_PEER_SHA"
+          export L99_DB_PATH="$RUNNER_TEMP/storyengine-federation.db"
+          nohup node .federation/storyengine/story-engine/server.js > logs/storyengine-federation.log 2>&1 &
+          echo $! > "$RUNNER_TEMP/storyengine-federation.pid"
+
+          ready=0
+          for _ in $(seq 1 40); do
+            if curl --fail --silent "$STORYENGINE_PEER_URL/runtime-identity" > "$RUNNER_TEMP/storyengine-identity.json"; then
+              ready=1
+              break
+            fi
+            sleep 0.25
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat logs/storyengine-federation.log >&2 || true
+            exit 1
+          fi
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const identity = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + '/storyengine-identity.json', 'utf8'));
+          if (identity.service !== 'l99-story-engine') throw new Error(`unexpected StoryEngine service: ${identity.service}`);
+          if (identity.release_sha !== process.env.STORYENGINE_PEER_SHA) {
+            throw new Error(`StoryEngine release mismatch: ${identity.release_sha}`);
+          }
+          console.log(JSON.stringify(identity, null, 2));
+          NODE
+
+      - name: Prove FCR to StoryEngine receipt loop in Playwright
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright test e2e/product-build-federation.spec.ts --reporter=list 2>&1 | tee logs/product-build-federation.log
 
       - name: Prove Repository Settings canonical ruleset safety
         shell: bash
@@ -170,7 +243,7 @@ jobs:
           retention-days: 30
 
   production-release-witness:
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'workflow_dispatch' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success'
     name: Production Playwright Exact-SHA Witness
     runs-on: ubuntu-22.04
     timeout-minutes: 15
@@ -178,23 +251,24 @@ jobs:
     env:
       PRODUCTION_RELEASE_WITNESS_REQUIRED: 'true'
       EXPECTED_RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
-      DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+      DEPLOY_URL: https://api.foundercontrolroom.org
       PUBLIC_URL: https://foundercontrolroom.org
 
     steps:
-      - name: Check out the Deploy run head
+      - name: Check out trusted witness source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
 
-      - name: Record and verify witness source head
+      - name: Record trusted witness source and release evidence
         shell: bash
         run: |
           set -euo pipefail
-          actual="$(git rev-parse HEAD)"
-          printf 'deploy_run_head=%s\nchecked_out=%s\n' "$EXPECTED_RELEASE_SHA" "$actual"
-          test "$actual" = "$EXPECTED_RELEASE_SHA"
+          witness_source="$(git rev-parse HEAD)"
+          printf 'trusted_witness_source=%s\ndeploy_run_head=%s\n' "$witness_source" "$EXPECTED_RELEASE_SHA"
+          test "$witness_source" = "$GITHUB_SHA"
+          [[ "$EXPECTED_RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
 
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
