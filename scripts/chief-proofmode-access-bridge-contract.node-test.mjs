@@ -23,7 +23,7 @@ test('Chief Access command bridge is founder-only, issue-scoped, and exact-FCR-m
   assert.doesNotMatch(commandBridge, /CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
 });
 
-test('recovery is protected by production environment and normalizes canonical Chief identity aliases without secret fallback', () => {
+test('recovery keeps repair selector mandatory while check may discover one existing bound identity', () => {
   assert.match(recoveryWorkflow, /environment:\s*production/);
   assert.match(recoveryWorkflow, new RegExp(ACCOUNT_ID));
   assert.match(recoveryWorkflow, /CLOUDFLARE_ACCESS_API_TOKEN:\s*\$\{\{ secrets\.CLOUDFLARE_ACCESS_API_TOKEN \}\}/);
@@ -40,11 +40,22 @@ test('recovery is protected by production environment and normalizes canonical C
   assert.doesNotMatch(recoveryWorkflow, /secrets\.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
   assert.doesNotMatch(recoveryWorkflow, /secrets\.CLOUDFLARE_ACCESS_CLIENT_ID/);
   assert.doesNotMatch(recoveryWorkflow, /secrets\.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
-  assert.match(recoveryWorkflow, /-z "\$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" && -z "\$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID"/);
-  assert.match(recoveryWorkflow, /canonical alias CLOUDFLARE_ACCESS_CLIENT_ID/);
-  assert.match(recoveryWorkflow, /if: inputs\.mode == 'check'/);
-  assert.match(recoveryWorkflow, /if: inputs\.mode == 'repair'/);
+
+  const selectorStep = recoveryWorkflow.match(
+    /- name: Require configured Chief service-token identity before repair([\s\S]*?)- name: Inspect current Chief Service Auth with dedicated read authority/,
+  )?.[1] ?? '';
+  assert.match(selectorStep, /if: inputs\.mode == 'repair'/);
+  assert.match(selectorStep, /-z "\$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" && -z "\$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID"/);
+  assert.match(selectorStep, /repair requires CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
+
+  assert.match(recoveryWorkflow, /- name: Inspect current Chief Service Auth with dedicated read authority\n\s+if: inputs\.mode == 'check'/);
+  assert.match(recoveryWorkflow, /- name: Apply exact-host Chief Service Auth with dedicated admin authority\n\s+if: inputs\.mode == 'repair'/);
   assert.match(recoveryWorkflow, /current_main.*EXPECTED_HEAD_SHA/s);
+
+  assert.match(reconciler, /discoverBoundServiceTokenId/);
+  assert.match(reconciler, /normalizedMode === 'check' && !configuredClientId && !configuredServiceTokenId/);
+  assert.match(reconciler, /normalizedMode === 'repair' && !configuredClientId && !configuredServiceTokenId/);
+  assert.match(reconciler, /service-token identity is required before repair/);
 });
 
 test('repair requires founder approval but never publishes the raw approval reference', () => {
@@ -85,6 +96,13 @@ test('automatic repair refuses broader Access scopes and conflicting named polic
   assert.match(reconciler, /not the approved exact immutable-preview host; refusing repair/);
 });
 
+test('selector-free discovery is policy-bound and rejects zero or multiple identities', () => {
+  assert.match(reconciler, /No existing non-identity service-token binding identifies the Chief CI token/);
+  assert.match(reconciler, /Multiple service-token identities are bound to the effective Chief Access application/);
+  assert.match(reconciler, /policy\?\.decision === 'non_identity'/);
+  assert.match(reconciler, /rule\?\.service_token\?\.token_id/);
+});
+
 test('raw provider receipts stay ephemeral and provider commands are suppressed from logs', () => {
   assert.match(recoveryWorkflow, /node scripts\/reconcile-chief-proofmode-access\.mjs >\/dev\/null 2>&1/);
   const artifactStep = recoveryWorkflow.match(
@@ -109,6 +127,8 @@ test('public receipt explicitly keeps browser/runtime proof separate', () => {
 
 test('dedicated recovery documentation keeps source, provider, and browser truth separate', () => {
   assert.match(recoveryDoc, /SOURCE CONTRACT \/ PROVIDER REPAIR NOT YET EXECUTED/);
+  assert.match(recoveryDoc, /read-only `check` may discover/);
+  assert.match(recoveryDoc, /repair still requires/);
   assert.match(recoveryDoc, /CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
   assert.match(recoveryDoc, /CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID/);
   assert.match(recoveryDoc, /CLOUDFLARE_ACCESS_API_TOKEN/);
