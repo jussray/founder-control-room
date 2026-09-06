@@ -26,7 +26,7 @@ describe('account deletion SECURITY DEFINER execute boundary', () => {
     const revokeTargets = sql.match(/from public, anon, authenticated;/g) ?? [];
     expect(revokeTargets).toHaveLength(2);
 
-    expect(sql).not.toMatch(/grant\s+execute[\s\S]*?\b(?:anon|authenticated)\b/i);
+    expect(sql).not.toMatch(/grant\s+execute[^;]*\b(?:anon|authenticated)\b[^;]*;/i);
   });
 
   it('retains explicit service-role execution for server-owned maintenance', () => {
