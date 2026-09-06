@@ -141,13 +141,13 @@ jobs:
 
       - name: Require configured Chief service-token identity
         env:
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
-          CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
+          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID || vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
         shell: bash
         run: |
           set -euo pipefail
           if [[ -z "$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" && -z "$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID" ]]; then
-            echo '::error title=Missing Chief service-token identity::Configure CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID or CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID as a protected variable in the FCR production environment.'
+            echo '::error title=Missing Chief service-token identity::Configure CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID (or canonical alias CLOUDFLARE_ACCESS_CLIENT_ID) or CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID (or alias CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID) as a protected variable in the FCR production environment.'
             exit 1
           fi
 
@@ -155,16 +155,16 @@ jobs:
         if: inputs.mode == 'check'
         env:
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
-          CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
+          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID || vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
         run: node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
 
       - name: Apply exact-host Chief Service Auth with dedicated admin authority
         if: inputs.mode == 'repair'
         env:
           CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
-          CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
+          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID || vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
         shell: bash
         run: |
           set -euo pipefail
@@ -176,8 +176,8 @@ jobs:
         env:
           CHIEF_ACCESS_MODE: check
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
-          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID }}
-          CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
+          CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID || vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
         run: node scripts/reconcile-chief-proofmode-access.mjs >/dev/null 2>&1
 
       - name: Return sanitized Chief Access receipt to founder control issue
