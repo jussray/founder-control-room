@@ -30,6 +30,22 @@ export {
 } from './attack3000Fundraising.js';
 
 export {
+  ATTACK_3000_COMMERCE_ADAPTER_ID,
+  createCommerceAttack3000Assessment,
+  deriveCommerceTerms,
+  evaluateCommerceAttack3000,
+  type CommerceAttack3000Evidence,
+  type CommerceAttack3000Input,
+  type CommerceAttack3000Result,
+  type CommerceCashLockupCeiling,
+  type CommerceContributionMarginFloor,
+  type CommerceMoneyObservation,
+  type CommerceStopCondition,
+  type CommerceTermsDerivation,
+  type CommerceTermsInput,
+} from './attack3000Commerce.js';
+
+export {
   evaluateAuthorityLease,
   type AuthorityBinding,
   type AuthorityConsequence,
