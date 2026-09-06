@@ -204,7 +204,7 @@ test('provider mutation is limited to exact public Access application create/del
 });
 
 test('browser proof binds public origin and API runtime to the exact approved SHA', () => {
-  assert.match(browserProof, /https:\/\/foundercontrolroom\.org/);
+  assert.match(browserProof, /https:\/\/www\.foundercontrolroom\.org/);
   assert.match(browserProof, /https:\/\/api\.foundercontrolroom\.org\/version/);
   assert.match(browserProof, /receipt\.finalOrigin !== WEB_ORIGIN/);
   assert.match(browserProof, /versionPayload\.includes\(expectedHeadSha\)/);

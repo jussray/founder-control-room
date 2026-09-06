@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 
-const WEB_ORIGIN = 'https://foundercontrolroom.org';
+const WEB_ORIGIN = 'https://www.foundercontrolroom.org';
 const API_VERSION_URL = 'https://api.foundercontrolroom.org/version';
 const RECEIPT_PATH = 'test-results/fcr-access-front-door-browser-proof.json';
 const expectedHeadSha = process.env.EXPECTED_HEAD_SHA?.trim() ?? '';
@@ -23,6 +23,11 @@ const receipt = {
   requestedOrigin: WEB_ORIGIN,
   finalOrigin: null,
   navigationStatus: null,
+  canonicalHref: null,
+  publicDestinations: [],
+  relativePublicLinks: [],
+  publicScreens: [],
+  bottomNavItems: [],
   apiVersionStatus: null,
   apiVersionMatchesExpectedSha: false,
   state: 'unknown',
@@ -45,9 +50,65 @@ try {
     throw new Error(`Front door redirected away from ${WEB_ORIGIN} to ${receipt.finalOrigin}.`);
   }
 
-  const body = (await page.locator('body').innerText().catch(() => '')).slice(0, 4_000);
+  const body = (await page.locator('body').innerText().catch(() => '')).slice(0, 8_000);
   if (/cloudflareaccess\.com/i.test(page.url()) || /Error\s+5(?:00|02|03|04|20|21|22|23|24|25|26)/i.test(body)) {
     throw new Error('Front door still resolves to Cloudflare Access or a Cloudflare server error.');
+  }
+
+  receipt.canonicalHref = await page.locator('link[rel="canonical"]').getAttribute('href');
+  if (receipt.canonicalHref !== `${WEB_ORIGIN}/`) {
+    throw new Error(`Front door canonical URL must be ${WEB_ORIGIN}/.`);
+  }
+
+  const publicLinks = await page.locator('a[href]').evaluateAll((links) => links.map((link) => ({
+    href: link.getAttribute('href') ?? '',
+    text: link.textContent?.trim() ?? '',
+  })));
+  receipt.publicDestinations = publicLinks.map(({ href }) => href);
+  receipt.relativePublicLinks = publicLinks
+    .filter(({ href }) => href.startsWith('/'))
+    .map(({ href, text }) => ({ href, text }));
+
+  if (receipt.relativePublicLinks.length > 0) {
+    throw new Error(`Front door still contains origin-relative public links: ${JSON.stringify(receipt.relativePublicLinks)}.`);
+  }
+
+  receipt.publicScreens = await page.locator('[data-public-screen]').evaluateAll((screens) =>
+    screens.map((screen) => screen.getAttribute('data-public-screen')).filter(Boolean),
+  );
+  const expectedScreens = ['home', 'control-room', 'chief', 'promptos', 'proof'];
+  if (JSON.stringify(receipt.publicScreens) !== JSON.stringify(expectedScreens)) {
+    throw new Error(`Front door public screens must be exactly ${JSON.stringify(expectedScreens)}.`);
+  }
+
+  receipt.bottomNavItems = await page.locator('[data-bottom-nav="five-screen"] [data-nav-screen]').evaluateAll((items) =>
+    items.map((item) => item.getAttribute('data-nav-screen')).filter(Boolean),
+  );
+  if (JSON.stringify(receipt.bottomNavItems) !== JSON.stringify(expectedScreens)) {
+    throw new Error(`Bottom navigation must expose exactly ${JSON.stringify(expectedScreens)}.`);
+  }
+
+  for (const requiredHref of [
+    `${WEB_ORIGIN}/#home`,
+    `${WEB_ORIGIN}/#control-room`,
+    `${WEB_ORIGIN}/#chief`,
+    `${WEB_ORIGIN}/#promptos`,
+    `${WEB_ORIGIN}/#proof`,
+    `${WEB_ORIGIN}/control-room/`,
+    `${WEB_ORIGIN}/guardrails`,
+  ]) {
+    if (!receipt.publicDestinations.includes(requiredHref)) {
+      throw new Error(`Front door is missing required canonical HTTPS destination ${requiredHref}.`);
+    }
+  }
+
+  for (const screen of expectedScreens) {
+    await page.locator(`[data-nav-screen="${screen}"]`).first().click();
+    await page.waitForTimeout(100);
+    if (new URL(page.url()).hash !== `#${screen}`) {
+      throw new Error(`Bottom navigation did not reach #${screen}.`);
+    }
+    await page.locator(`[data-public-screen="${screen}"]`).scrollIntoViewIfNeeded();
   }
 
   const versionResponse = await context.request.get(API_VERSION_URL, { timeout: 20_000 });
