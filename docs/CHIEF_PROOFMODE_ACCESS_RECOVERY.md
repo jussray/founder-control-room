@@ -1,6 +1,6 @@
 # Chief ProofMode Access Recovery
 
-Status: `SOURCE CONTRACT / PROVIDER + RUNTIME WITNESS NOT YET EXECUTED FROM THIS PR`
+Status: `SOURCE CONTRACT / PROVIDER REPAIR NOT YET EXECUTED / RUNTIME WITNESS NOT YET EXECUTED`
 
 This lane lets Founder Control Room act as the trusted control-plane authority for the narrow Cloudflare Access recovery and exact-head runtime evidence needed by Chief ProofMode. It does not grant Chief, a pull-request workflow, a continuity cookie, a successful build, or this unmerged FCR branch permission to mutate Cloudflare Access or publish trusted Chief runtime evidence.
 
@@ -92,6 +92,8 @@ The `proofmode-access-admin` GitHub Deployment object is an evidence object requ
 
 Repair and witness publication are deliberately separate operations. A repair dispatch may never publish runtime success. After any repair, a new read-only check/runtime-witness run must independently re-observe provider state and pass the real runtime proof before evidence is published.
 
+Do not interpret this trusted path as permission to merely `rerun failed Chief ProofMode MCP Playwright job` or `rerun failed Chief capability-plan Playwright job`. Those historical candidate-source lanes remain authority-blocked for protected candidate proof and cannot substitute for the FCR-main witness.
+
 ## Receipt and proof semantics
 
 Raw Cloudflare provider receipts are ephemeral and suppressed from workflow logs. Only allowlisted identifiers, scope, target origin, configured state, and mutation boolean may enter the public Access receipt returned to founder issue `#485` and the retained artifact. The founder approval reference is represented only by a SHA-256 receipt when mutation is requested.
@@ -116,11 +118,11 @@ exact Chief PR head
 -> separate merge decision
 ```
 
-If either FCR `main` or the Chief candidate head moves, predecessor runtime/provider evidence is historical and must be reacquired.
+If the Chief head moves, the old runtime proof is stale and must not be promoted to the successor. If FCR `main` moves, the trusted-source subject must likewise be reacquired.
 
 ## Rollback
 
-This source change is reversible by reverting the focused FCR commits before merge. No live provider rollback is currently required because adding this source contract does not itself execute Cloudflare mutation or GitHub runtime-evidence publication.
+This source change is reversible by reverting the focused FCR commits before merge. No provider rollback is currently required because adding this source contract does not itself execute Cloudflare mutation or GitHub runtime-evidence publication.
 
 If a future trusted repair actually creates the exact Service Auth policy and rollback is required, delete only that exact policy after fresh provider readback and separate founder-approved mutation authority. Do not widen the rollback into application, token, DNS, Worker, route, or unrelated policy changes.
 
