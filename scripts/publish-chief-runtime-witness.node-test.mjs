@@ -102,6 +102,72 @@ function installation(overrides = {}) {
   };
 }
 
+function providerHarness({ secondRuleset = ruleset() } = {}) {
+  let check = null;
+  let deployment = null;
+  const deploymentStatuses = [];
+  const calls = [];
+  let rulesetReads = 0;
+
+  const fetchFn = async (url, options = {}) => {
+    const method = options.method || 'GET';
+    const pathname = new URL(url).pathname;
+    calls.push({ method, pathname, body: options.body ? JSON.parse(options.body) : null });
+
+    if (method === 'GET' && pathname.endsWith('/pulls/143')) return response(pr());
+    if (method === 'GET' && pathname.endsWith('/rulesets/20818149')) {
+      rulesetReads += 1;
+      return response(rulesetReads === 1 ? ruleset() : secondRuleset);
+    }
+
+    if (method === 'GET' && pathname.endsWith(`/commits/${CHIEF_HEAD}/check-runs`)) {
+      return response({
+        check_runs: check
+          ? [{ ...check, id: 42, head_sha: CHIEF_HEAD, app: { id: Number(APP_ID) } }]
+          : [],
+      });
+    }
+    if (method === 'POST' && pathname.endsWith('/check-runs')) {
+      check = { id: 42, ...JSON.parse(options.body), head_sha: CHIEF_HEAD, app: { id: Number(APP_ID) } };
+      return response(check, 201);
+    }
+    if (method === 'PATCH' && pathname.endsWith('/check-runs/42')) {
+      check = { ...check, ...JSON.parse(options.body), id: 42, head_sha: CHIEF_HEAD, app: { id: Number(APP_ID) } };
+      return response(check);
+    }
+
+    if (method === 'GET' && pathname.endsWith('/deployments')) {
+      return response(deployment
+        ? [{ id: 77, sha: CHIEF_HEAD, environment: CHIEF_RUNTIME_WITNESS.deploymentEnvironment, payload: deployment.payload }]
+        : []);
+    }
+    if (method === 'POST' && pathname.endsWith('/deployments')) {
+      deployment = JSON.parse(options.body);
+      return response({ id: 77, ...deployment, sha: CHIEF_HEAD }, 201);
+    }
+
+    if (method === 'GET' && pathname.endsWith('/deployments/77/statuses')) {
+      return response(deploymentStatuses);
+    }
+    if (method === 'POST' && pathname.endsWith('/deployments/77/statuses')) {
+      const status = { id: 88 + deploymentStatuses.length, ...JSON.parse(options.body) };
+      deploymentStatuses.unshift(status);
+      return response(status, 201);
+    }
+
+    throw new Error(`unexpected ${method} ${url}`);
+  };
+
+  return {
+    fetchFn,
+    calls,
+    getCheck: () => check,
+    getDeployment: () => deployment,
+    getDeploymentStatuses: () => deploymentStatuses,
+    getRulesetReads: () => rulesetReads,
+  };
+}
+
 test('runtime witness contract is fixed to Chief #143, the reserved context, and proofmode-access-admin', () => {
   assert.equal(CHIEF_RUNTIME_WITNESS.repository, 'jussray/chief-ai-machine');
   assert.equal(CHIEF_RUNTIME_WITNESS.pullRequestNumber, 143);
@@ -160,19 +226,11 @@ test('post-publication installation freshness rejects App installation identity 
     '7654321',
   );
   assert.throws(
-    () => validateInstallationUnchanged(
-      installation(),
-      installation({ installationId: '7654322' }),
-      APP_ID,
-    ),
+    () => validateInstallationUnchanged(installation(), installation({ installationId: '7654322' }), APP_ID),
     /installation identity changed/,
   );
   assert.throws(
-    () => validateInstallationUnchanged(
-      installation(),
-      installation({ repositorySelection: 'all' }),
-      APP_ID,
-    ),
+    () => validateInstallationUnchanged(installation(), installation({ repositorySelection: 'all' }), APP_ID),
     /repository selection changed/,
   );
 });
@@ -196,77 +254,33 @@ test('publisher performs zero GitHub mutations when App deployment authority is 
   assert.equal(calls.length, 0);
 });
 
-test('publisher creates fixed evidence and re-observes Chief PR, ruleset, and App installation before verified-published', async () => {
-  let publishedCheck = null;
-  let publishedDeployment = null;
-  let publishedStatus = null;
-  const calls = [];
+test('ruleset drift before finalization leaves no successful Check Run or deployment status', async () => {
+  const changed = ruleset();
+  changed.rules[0].parameters.required_status_checks.push({ context: 'Drifted during publication' });
+  const harness = providerHarness({ secondRuleset: changed });
+
+  await assert.rejects(
+    publishChiefRuntimeWitness({
+      env: env(),
+      readFileFn: async () => JSON.stringify(runtimeReceipt()),
+      observeInstallationFn: async () => installation(),
+      getInstallationTokenFn: async () => 'token',
+      fetchFn: harness.fetchFn,
+      writeArtifactFn: async () => {},
+    }),
+    /changed during runtime witness publication/,
+  );
+
+  assert.equal(harness.getCheck().status, 'in_progress');
+  assert.equal(harness.getCheck().conclusion, undefined);
+  assert.equal(harness.getDeploymentStatuses().length, 0);
+  assert.equal(harness.calls.some((call) => call.method === 'PATCH'), false);
+});
+
+test('successful publisher finalizes fixed check before the authority-significant deployment success', async () => {
+  const harness = providerHarness();
   let artifact = null;
   let installationReads = 0;
-  let rulesetReads = 0;
-
-  const fetchFn = async (url, options = {}) => {
-    const method = options.method || 'GET';
-    const pathname = new URL(url).pathname;
-    calls.push({ method, pathname });
-
-    if (method === 'GET' && pathname.endsWith('/pulls/143')) return response(pr());
-    if (method === 'GET' && pathname.endsWith('/rulesets/20818149')) {
-      rulesetReads += 1;
-      return response(ruleset());
-    }
-
-    if (method === 'GET' && pathname.endsWith(`/commits/${CHIEF_HEAD}/check-runs`)) {
-      return response({
-        check_runs: publishedCheck
-          ? [{
-              id: 42,
-              ...publishedCheck,
-              head_sha: publishedCheck.head_sha,
-              app: { id: Number(APP_ID) },
-            }]
-          : [],
-      });
-    }
-    if (method === 'POST' && pathname.endsWith('/check-runs')) {
-      publishedCheck = JSON.parse(options.body);
-      assert.equal(publishedCheck.name, CHIEF_RUNTIME_WITNESS.checkName);
-      assert.equal(publishedCheck.head_sha, CHIEF_HEAD);
-      assert.equal(publishedCheck.conclusion, 'success');
-      return response({ id: 42 }, 201);
-    }
-
-    if (method === 'GET' && pathname.endsWith('/deployments')) {
-      return response(publishedDeployment
-        ? [{
-            id: 77,
-            sha: CHIEF_HEAD,
-            environment: CHIEF_RUNTIME_WITNESS.deploymentEnvironment,
-            payload: publishedDeployment.payload,
-          }]
-        : []);
-    }
-    if (method === 'POST' && pathname.endsWith('/deployments')) {
-      publishedDeployment = JSON.parse(options.body);
-      assert.equal(publishedDeployment.ref, CHIEF_HEAD);
-      assert.equal(publishedDeployment.environment, CHIEF_RUNTIME_WITNESS.deploymentEnvironment);
-      assert.equal(publishedDeployment.auto_merge, false);
-      return response({ id: 77, ...publishedDeployment, sha: CHIEF_HEAD }, 201);
-    }
-
-    if (method === 'GET' && pathname.endsWith('/deployments/77/statuses')) {
-      return response(publishedStatus ? [{ id: 88, ...publishedStatus }] : []);
-    }
-    if (method === 'POST' && pathname.endsWith('/deployments/77/statuses')) {
-      publishedStatus = JSON.parse(options.body);
-      assert.equal(publishedStatus.state, 'success');
-      assert.equal(publishedStatus.environment, CHIEF_RUNTIME_WITNESS.deploymentEnvironment);
-      assert.equal(publishedStatus.environment_url, TARGET);
-      return response({ id: 88, ...publishedStatus }, 201);
-    }
-
-    throw new Error(`unexpected ${method} ${url}`);
-  };
 
   const result = await publishChiefRuntimeWitness({
     env: env(),
@@ -276,7 +290,7 @@ test('publisher creates fixed evidence and re-observes Chief PR, ruleset, and Ap
       return installation();
     },
     getInstallationTokenFn: async () => 'token',
-    fetchFn,
+    fetchFn: harness.fetchFn,
     writeArtifactFn: async (value) => { artifact = value; },
   });
 
@@ -286,11 +300,53 @@ test('publisher creates fixed evidence and re-observes Chief PR, ruleset, and Ap
   assert.equal(result.authority.rulesetMutation, false);
   assert.equal(result.check.issuerAppId, APP_ID);
   assert.equal(result.deployment.environment, 'proofmode-access-admin');
-  assert.equal(artifact.receiptHash, publishedCheck.external_id);
-  assert.equal(publishedDeployment.payload.receiptHash, publishedCheck.external_id);
-  assert.match(publishedStatus.description, new RegExp(publishedCheck.external_id.slice(0, 12)));
-  assert.equal(calls.filter((call) => call.method === 'POST').length, 3);
-  assert.equal(calls.filter((call) => call.pathname.endsWith('/pulls/143')).length, 2);
-  assert.equal(rulesetReads, 2);
+  assert.equal(artifact.receiptHash, harness.getCheck().external_id);
+  assert.equal(harness.getDeployment().payload.receiptHash, harness.getCheck().external_id);
+  assert.equal(harness.getDeploymentStatuses()[0].state, 'success');
+  assert.match(harness.getDeploymentStatuses()[0].description, new RegExp(harness.getCheck().external_id.slice(0, 12)));
+  assert.equal(harness.calls.filter((call) => call.method === 'POST').length, 3);
+  assert.equal(harness.calls.filter((call) => call.method === 'PATCH').length, 1);
+  assert.equal(harness.calls.filter((call) => call.pathname.endsWith('/pulls/143')).length, 2);
+  assert.equal(harness.getRulesetReads(), 2);
   assert.equal(installationReads, 2);
+
+  const patchIndex = harness.calls.findIndex((call) => call.method === 'PATCH' && call.pathname.endsWith('/check-runs/42'));
+  const successDeploymentIndex = harness.calls.findIndex((call) =>
+    call.method === 'POST'
+    && call.pathname.endsWith('/deployments/77/statuses')
+    && call.body?.state === 'success');
+  assert.ok(patchIndex >= 0 && successDeploymentIndex > patchIndex);
+});
+
+test('failure after provider green compensates both merge-relevant signals back to failure', async () => {
+  const harness = providerHarness();
+
+  await assert.rejects(
+    publishChiefRuntimeWitness({
+      env: env(),
+      readFileFn: async () => JSON.stringify(runtimeReceipt()),
+      observeInstallationFn: async () => installation(),
+      getInstallationTokenFn: async () => 'token',
+      fetchFn: harness.fetchFn,
+      writeArtifactFn: async () => { throw new Error('artifact persistence failed'); },
+    }),
+    /artifact persistence failed/,
+  );
+
+  assert.equal(harness.getCheck().status, 'completed');
+  assert.equal(harness.getCheck().conclusion, 'failure');
+  assert.equal(harness.getDeploymentStatuses()[0].state, 'failure');
+  assert.match(harness.getDeploymentStatuses()[0].description, /invalidated/);
+  assert.equal(harness.getDeploymentStatuses()[1].state, 'success');
+
+  const failurePatch = harness.calls.find((call) =>
+    call.method === 'PATCH'
+    && call.pathname.endsWith('/check-runs/42')
+    && call.body?.conclusion === 'failure');
+  const failureDeployment = harness.calls.find((call) =>
+    call.method === 'POST'
+    && call.pathname.endsWith('/deployments/77/statuses')
+    && call.body?.state === 'failure');
+  assert.ok(failurePatch);
+  assert.ok(failureDeployment);
 });
