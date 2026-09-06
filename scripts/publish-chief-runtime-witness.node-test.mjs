@@ -5,6 +5,8 @@ import {
   CHIEF_RUNTIME_WITNESS,
   publishChiefRuntimeWitness,
   validateChiefRuleset,
+  validateChiefRulesetUnchanged,
+  validateInstallationUnchanged,
   validateRuntimeReceipt,
 } from './publish-chief-runtime-witness.mjs';
 
@@ -140,6 +142,41 @@ test('ruleset validation fails closed on bypass, deployment drift, or premature 
   assert.throws(() => validateChiefRuleset(prematureContext), /reserved candidate runtime context/);
 });
 
+test('post-publication ruleset freshness rejects any provider-state drift even when core invariants still pass', () => {
+  const initial = ruleset();
+  const changed = structuredClone(initial);
+  changed.rules[0].parameters.required_status_checks.push({ context: 'Another still-valid check' });
+
+  assert.equal(validateChiefRulesetUnchanged(initial, structuredClone(initial)).id, 20818149);
+  assert.throws(
+    () => validateChiefRulesetUnchanged(initial, changed),
+    /changed during runtime witness publication/,
+  );
+});
+
+test('post-publication installation freshness rejects App installation identity or repository-scope drift', () => {
+  assert.equal(
+    validateInstallationUnchanged(installation(), installation(), APP_ID).installationId,
+    '7654321',
+  );
+  assert.throws(
+    () => validateInstallationUnchanged(
+      installation(),
+      installation({ installationId: '7654322' }),
+      APP_ID,
+    ),
+    /installation identity changed/,
+  );
+  assert.throws(
+    () => validateInstallationUnchanged(
+      installation(),
+      installation({ repositorySelection: 'all' }),
+      APP_ID,
+    ),
+    /repository selection changed/,
+  );
+});
+
 test('publisher performs zero GitHub mutations when App deployment authority is absent', async () => {
   const calls = [];
   await assert.rejects(
@@ -159,12 +196,14 @@ test('publisher performs zero GitHub mutations when App deployment authority is 
   assert.equal(calls.length, 0);
 });
 
-test('publisher creates one fixed Check Run, then one exact evidence deployment, and verifies readback', async () => {
+test('publisher creates fixed evidence and re-observes Chief PR, ruleset, and App installation before verified-published', async () => {
   let publishedCheck = null;
   let publishedDeployment = null;
   let publishedStatus = null;
   const calls = [];
   let artifact = null;
+  let installationReads = 0;
+  let rulesetReads = 0;
 
   const fetchFn = async (url, options = {}) => {
     const method = options.method || 'GET';
@@ -172,7 +211,10 @@ test('publisher creates one fixed Check Run, then one exact evidence deployment,
     calls.push({ method, pathname });
 
     if (method === 'GET' && pathname.endsWith('/pulls/143')) return response(pr());
-    if (method === 'GET' && pathname.endsWith('/rulesets/20818149')) return response(ruleset());
+    if (method === 'GET' && pathname.endsWith('/rulesets/20818149')) {
+      rulesetReads += 1;
+      return response(ruleset());
+    }
 
     if (method === 'GET' && pathname.endsWith(`/commits/${CHIEF_HEAD}/check-runs`)) {
       return response({
@@ -229,7 +271,10 @@ test('publisher creates one fixed Check Run, then one exact evidence deployment,
   const result = await publishChiefRuntimeWitness({
     env: env(),
     readFileFn: async () => JSON.stringify(runtimeReceipt()),
-    observeInstallationFn: async () => installation(),
+    observeInstallationFn: async () => {
+      installationReads += 1;
+      return installation();
+    },
     getInstallationTokenFn: async () => 'token',
     fetchFn,
     writeArtifactFn: async (value) => { artifact = value; },
@@ -245,4 +290,7 @@ test('publisher creates one fixed Check Run, then one exact evidence deployment,
   assert.equal(publishedDeployment.payload.receiptHash, publishedCheck.external_id);
   assert.match(publishedStatus.description, new RegExp(publishedCheck.external_id.slice(0, 12)));
   assert.equal(calls.filter((call) => call.method === 'POST').length, 3);
+  assert.equal(calls.filter((call) => call.pathname.endsWith('/pulls/143')).length, 2);
+  assert.equal(rulesetReads, 2);
+  assert.equal(installationReads, 2);
 });
