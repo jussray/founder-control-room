@@ -1,4 +1,20 @@
 export {
+  ATTACK_3000_AUTHORITY_CEILING,
+  ATTACK_3000_REQUIRED_DIMENSIONS,
+  ATTACK_3000_SCHEMA,
+  evaluateAttack3000,
+  type Attack3000Assessment,
+  type Attack3000Dimension,
+  type Attack3000Direction,
+  type Attack3000Evaluation,
+  type Attack3000Evidence,
+  type Attack3000Reality,
+  type Attack3000Subject,
+  type Attack3000Trigger,
+  type Attack3000Verdict,
+} from './attack3000.js';
+
+export {
   evaluateAuthorityLease,
   type AuthorityBinding,
   type AuthorityConsequence,
