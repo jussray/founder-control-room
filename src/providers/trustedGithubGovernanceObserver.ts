@@ -7,8 +7,8 @@ import {
 import {
   CHIEF_GOVERNANCE,
   createTrustedGithubRulesetObservation,
-  planChiefProofModeRulesetMigration,
-  type ChiefProofModeRulesetMigrationPlan,
+  verifyChiefProofModeRulesetsAsIs,
+  type ChiefProofModeRulesetVerification,
   type TrustedGithubRulesetObservation,
 } from "./githubGovernanceReconciliation.js";
 
@@ -151,12 +151,25 @@ export async function observeChiefCandidateProducerInstallationWithGitHubApp(inp
   };
 }
 
+/**
+ * Verifies the founder-approved Chief governance readback exactly as observed.
+ * This never constructs, requests, or authorizes a ruleset mutation.
+ */
+export async function verifyChiefGovernanceWithGitHubApp(input: {
+  appId: string;
+  privateKey: string;
+  now?: Date;
+}): Promise<ChiefProofModeRulesetVerification> {
+  return verifyChiefProofModeRulesetsAsIs(
+    await observeChiefGovernanceWithGitHubApp(input),
+  );
+}
+
+/** @deprecated Compatibility wrapper. No Chief ruleset migration is planned. */
 export async function planChiefGovernanceWithGitHubApp(input: {
   appId: string;
   privateKey: string;
   now?: Date;
-}): Promise<ChiefProofModeRulesetMigrationPlan> {
-  return planChiefProofModeRulesetMigration(
-    await observeChiefGovernanceWithGitHubApp(input),
-  );
+}): Promise<ChiefProofModeRulesetVerification> {
+  return verifyChiefGovernanceWithGitHubApp(input);
 }
