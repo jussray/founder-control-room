@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the current evidence-authority Playwright federation, exact StoryEngine peer-pin freshness, privileged production-witness changes, retained FCR repository-provider governance invariants, GitHub App credential transport normalization, deterministic review witness publication boundary, Chief governance observation/verification boundary, and bounded Cloudflare Access public-destination recovery authority to truthful documentation without claiming live GitHub mutation, Chief ruleset mutation, StoryEngine provider/runtime state, Cloudflare provider state, deployment, merge, publication, database, secret, billing, or destructive-action proof.",
+  "purpose": "Bind the exact #746 evidence-authority and Cloudflare Access recovery changes to documentation while preserving source, provider, runtime, merge, deploy, secret, database, billing, and publication authority as separate proof planes. This receipt documents only the changed repository contracts and does not claim live provider mutation, production equivalence, or founder authorization.",
   "domains": [
     "repository-provider",
     "evidence-authority",
