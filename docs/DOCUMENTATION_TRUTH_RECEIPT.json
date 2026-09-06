@@ -1,6 +1,6 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the current evidence-authority Playwright federation, privileged production-witness changes, retained FCR repository-provider governance invariants, GitHub App credential transport normalization, deterministic review witness publication boundary, and the Chief governance observation/reconciliation boundary to truthful documentation without claiming live GitHub, Chief ruleset mutation, StoryEngine, Cloudflare, deployment, merge, publication, database, secret, billing, or destructive-action proof.",
+  "purpose": "Bind the current evidence-authority Playwright federation, privileged production-witness changes, retained FCR repository-provider governance invariants, GitHub App credential transport normalization, deterministic review witness publication boundary, and the Chief governance observation/verification boundary to truthful documentation without claiming live GitHub mutation, Chief ruleset mutation, StoryEngine, Cloudflare provider state, deployment, merge, publication, database, secret, billing, or destructive-action proof.",
   "domains": [
     "repository-provider",
     "evidence-authority",
@@ -29,9 +29,9 @@
     {
       "path": "src/providers/githubGovernanceReconciliation.ts",
       "claims": [
-        "src/providers/githubGovernanceReconciliation.ts must keep Chief governance reconciliation pinned to jussray/chief-ai-machine and ruleset IDs 20818149 and 21261587, preserve required-check integration_id producer identity and unrelated checks, require complete bypass-state and required-deployment evidence, and refuse to describe a read-then-PUT update of existing rulesets as concurrency-safe when no atomic provider precondition is available.",
-        "src/providers/githubGovernanceReconciliation.ts must not treat GitHub Actions integration 15368 as sufficient provenance for the intended Chief candidate ProofMode workflow; candidate ruleset planning remains fail-closed until an external GitHub App/check producer unavailable to PR-authored Chief Actions is provider-observed and bound, and post-merge-only Cloudflare Production must not be required by the pre-merge candidate rulesets.",
-        "src/providers/githubGovernanceReconciliation.ts may return NO_CHANGE_REQUIRED only for already-correct observed provider state; a required live change remains BLOCKED_PROVIDER_ATOMIC_PRECONDITION_UNAVAILABLE and neither disposition grants provider mutation, merge, deploy, or execution authority."
+        "src/providers/githubGovernanceReconciliation.ts must keep Chief governance verification pinned to jussray/chief-ai-machine and ruleset IDs 20818149 and 21261587, preserve required-check integration_id producer identity, require complete bypass and required-deployment evidence, and remain observation-only rather than constructing a desired-state ruleset mutation.",
+        "Under the current founder decision, src/providers/githubGovernanceReconciliation.ts must accept Chief ruleset 20818149 exactly as observed only when zero bypass actors remain, the approved required checks remain intact, Cloudflare Production and proofmode-access-admin both remain required with no extra deployment gate, and the reserved candidate runtime context remains unbound.",
+        "External candidate-producer provenance and trusted candidate runtime/browser proof remain separate evidence gates. Missing producer/runtime proof may block those claims, but it must not be converted into permission to rewrite the founder-approved ruleset. A compliant observation returns NO_CHANGE_REQUIRED with mutationRequired false and mutation null; drift blocks verification."
       ]
     },
     {
