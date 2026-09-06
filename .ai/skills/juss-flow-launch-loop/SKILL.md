@@ -336,6 +336,12 @@ Founder-final authority does not turn founder self-review into independent revie
 
 FCR in-app deterministic-review/founder-final enforcement and the live GitHub repository ruleset are separate authority surfaces. Never claim one proves the other without provider readback.
 
+### Chief candidate-proof producer trust
+
+A Chief pre-merge required-check name plus GitHub Actions integration `15368` does not authenticate the exact workflow file or event that produced that check. A PR-authored workflow can otherwise counterfeit the expected context under the same GitHub Actions App.
+
+When reconciling Chief governance, fail closed until the candidate ProofMode context is bound to a provider-observed external GitHub App/check producer that PR-authored Chief Actions cannot mint. Also reject `Cloudflare Production` as a pre-merge required deployment because it is a post-merge production plane. Do not mutate the live rulesets, grant merge authority, or call the candidate proof trusted while either producer provenance or deployment-phase separation is unresolved.
+
 Use expected-head protection when supported. If `main` or the candidate head moves, prior green becomes historical and the candidate must be re-observed/reacquired.
 
 ## Release and launch truth

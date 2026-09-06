@@ -1,9 +1,10 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the current evidence-authority Playwright federation and privileged production-witness changes plus the retained repository-provider governance invariants to truthful documentation without claiming live GitHub, StoryEngine, Cloudflare, deployment, merge, publication, database, secret, billing, or destructive-action proof.",
+  "purpose": "Bind the current evidence-authority Playwright federation, privileged production-witness changes, retained FCR repository-provider governance invariants, GitHub App credential transport normalization, deterministic review witness publication boundary, and the Chief governance observation/verification boundary to truthful documentation without claiming live GitHub mutation, Chief ruleset mutation, StoryEngine, Cloudflare provider state, deployment, merge, publication, database, secret, billing, or destructive-action proof.",
   "domains": [
     "repository-provider",
-    "evidence-authority"
+    "evidence-authority",
+    "merge-authority"
   ],
   "changes": [
     {
@@ -16,6 +17,33 @@
       "path": "src/providers/providerFactory.ts",
       "claims": [
         "src/providers/providerFactory.ts must keep the current FCR founder-only native approving-review floor at zero while retaining the constitutional required checks and trusted GitHub App boundary, and a later deliberate positive native-review count must remain representable without weakening the existing machine or founder-final authority membrane."
+      ]
+    },
+    {
+      "path": "src/providers/githubAppAuth.ts",
+      "claims": [
+        "src/providers/githubAppAuth.ts may normalize only transport-equivalent encodings or wrappers of the same complete GitHub App private RSA key, including raw or escaped PEM, CRLF/BOM variants, JSON or matching single-quoted transport wrappers, and base64/base64url PEM; it must still parse the normalized material as a private RSA key and fail closed for malformed, incomplete, public-only, or non-RSA material.",
+        "src/providers/githubAppAuth.ts transport normalization is compatibility plumbing only and must not convert credential presence, encoding acceptance, or successful parsing into proof of GitHub App identity, installation scope, token minting, provider mutation authority, merge authority, or deploy authority."
+      ]
+    },
+    {
+      "path": "src/providers/githubGovernanceReconciliation.ts",
+      "claims": [
+        "src/providers/githubGovernanceReconciliation.ts must keep Chief governance verification pinned to jussray/chief-ai-machine and ruleset IDs 20818149 and 21261587, preserve required-check integration_id producer identity, require complete bypass and required-deployment evidence, and remain observation-only rather than constructing a desired-state ruleset mutation.",
+        "Under the current founder decision, src/providers/githubGovernanceReconciliation.ts must accept Chief ruleset 20818149 exactly as observed only when zero bypass actors remain, the approved required checks remain intact, Cloudflare Production and proofmode-access-admin both remain required with no extra deployment gate, and the reserved candidate runtime context remains unbound.",
+        "External candidate-producer provenance and trusted candidate runtime/browser proof remain separate evidence gates. Missing producer/runtime proof may block those claims, but it must not be converted into permission to rewrite the founder-approved ruleset. A compliant observation returns NO_CHANGE_REQUIRED with mutationRequired false and mutation null; drift blocks verification."
+      ]
+    },
+    {
+      "path": "src/providers/trustedGithubGovernanceObserver.ts",
+      "claims": [
+        "src/providers/trustedGithubGovernanceObserver.ts must observe only the fixed Chief repository and fixed governance rulesets through FCR's repository-scoped GitHub App installation-token path, reject caller-supplied PAT/token authority, require complete provider readback suitable for fingerprinting, and remain evidence-only rather than minting ruleset-mutation, merge, deploy, or execution authority."
+      ]
+    },
+    {
+      "path": "src/review/deterministicReviewWitnessPublisher.ts",
+      "claims": [
+        "src/review/deterministicReviewWitnessPublisher.ts may publish only a derived deterministic review witness through the repository-scoped GitHub App authority, must preserve a sanitized durable failure receipt when provider authentication/publication fails while rethrowing the original failure, and must never convert publication, credential presence, or a same-named check into founder-final, merge, deploy, provider-policy, or self-certification authority."
       ]
     },
     {
