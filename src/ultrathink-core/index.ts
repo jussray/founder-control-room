@@ -15,6 +15,21 @@ export {
 } from './attack3000.js';
 
 export {
+  ATTACK_3000_FUNDRAISING_ADAPTER_ID,
+  createFundraisingAttack3000Assessment,
+  deriveFundraisingTerms,
+  evaluateFundraisingAttack3000,
+  type FundraisingAttack3000Evidence,
+  type FundraisingAttack3000Input,
+  type FundraisingAttack3000Result,
+  type FundraisingDilutionCeiling,
+  type FundraisingMoneyObservation,
+  type FundraisingStopCondition,
+  type FundraisingTermsDerivation,
+  type FundraisingTermsInput,
+} from './attack3000Fundraising.js';
+
+export {
   evaluateAuthorityLease,
   type AuthorityBinding,
   type AuthorityConsequence,
