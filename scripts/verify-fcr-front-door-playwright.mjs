@@ -23,6 +23,9 @@ const receipt = {
   requestedOrigin: WEB_ORIGIN,
   finalOrigin: null,
   navigationStatus: null,
+  canonicalHref: null,
+  publicDestinations: [],
+  relativePublicLinks: [],
   apiVersionStatus: null,
   apiVersionMatchesExpectedSha: false,
   state: 'unknown',
@@ -48,6 +51,33 @@ try {
   const body = (await page.locator('body').innerText().catch(() => '')).slice(0, 4_000);
   if (/cloudflareaccess\.com/i.test(page.url()) || /Error\s+5(?:00|02|03|04|20|21|22|23|24|25|26)/i.test(body)) {
     throw new Error('Front door still resolves to Cloudflare Access or a Cloudflare server error.');
+  }
+
+  receipt.canonicalHref = await page.locator('link[rel="canonical"]').getAttribute('href');
+  if (receipt.canonicalHref !== `${WEB_ORIGIN}/`) {
+    throw new Error(`Front door canonical URL must be ${WEB_ORIGIN}/.`);
+  }
+
+  const publicLinks = await page.locator('a[href]').evaluateAll((links) => links.map((link) => ({
+    href: link.getAttribute('href') ?? '',
+    text: link.textContent?.trim() ?? '',
+  })));
+  receipt.publicDestinations = publicLinks.map(({ href }) => href);
+  receipt.relativePublicLinks = publicLinks
+    .filter(({ href }) => href.startsWith('/'))
+    .map(({ href, text }) => ({ href, text }));
+
+  if (receipt.relativePublicLinks.length > 0) {
+    throw new Error(`Front door still contains origin-relative public links: ${JSON.stringify(receipt.relativePublicLinks)}.`);
+  }
+
+  for (const requiredHref of [
+    `${WEB_ORIGIN}/control-room/`,
+    `${WEB_ORIGIN}/guardrails`,
+  ]) {
+    if (!receipt.publicDestinations.includes(requiredHref)) {
+      throw new Error(`Front door is missing required canonical HTTPS destination ${requiredHref}.`);
+    }
   }
 
   const versionResponse = await context.request.get(API_VERSION_URL, { timeout: 20_000 });
