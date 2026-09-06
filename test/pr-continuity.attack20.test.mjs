@@ -64,4 +64,11 @@ test('AT21 continuity compares against the live base ref instead of the PR snaps
   assert.doesNotMatch(continuitySource, /compare\(repository, pr\.base\.sha, pr\.head\.sha\)/);
   assert.doesNotMatch(continuitySource, /baseSha:\s*pr\.base\.sha/);
 });
+test('AT22 continuity CLI actually invokes audit metadata or rollover', () => {
+  assert.match(continuitySource, /const mode = process\.argv\[2\]/);
+  assert.match(continuitySource, /if \(mode === 'audit'\) return auditMode\(\)/);
+  assert.match(continuitySource, /if \(mode === 'metadata'\) return metadataMode\(\)/);
+  assert.match(continuitySource, /if \(mode === 'rollover'\) return rolloverMode\(\)/);
+  assert.match(continuitySource, /main\(\)\.catch/);
+});
 test('schema remains stable', () => assert.equal(SCHEMA, 'juss/pr-continuity@v1'));
