@@ -165,7 +165,7 @@ export async function verifyChiefGovernanceWithGitHubApp(input: {
   );
 }
 
-/** @deprecated Compatibility wrapper. No Chief ruleset migration is planned. */
+/** @deprecated Compatibility wrapper. No Chief ruleset migration is planned or authorized. */
 export async function planChiefGovernanceWithGitHubApp(input: {
   appId: string;
   privateKey: string;
