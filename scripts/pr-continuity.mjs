@@ -324,3 +324,18 @@ export async function rolloverMode() {
     throw new Error(`ROLLOVER_BLOCKED: ${blocked.map((item) => `#${item.number}:${item.state}`).join(',')}`);
   }
 }
+
+async function main() {
+  const mode = process.argv[2];
+  if (mode === 'audit') return auditMode();
+  if (mode === 'metadata') return metadataMode();
+  if (mode === 'rollover') return rolloverMode();
+  throw new Error('Usage: node scripts/pr-continuity.mjs <audit|metadata|rollover>');
+}
+
+if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+  main().catch((error) => {
+    console.error(error.stack || error.message);
+    process.exit(1);
+  });
+}
