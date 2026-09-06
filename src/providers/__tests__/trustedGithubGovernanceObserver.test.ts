@@ -29,7 +29,24 @@ const {
 
 const TEST_FCR_APP_ID = "900001";
 
-function readback(id: number, name: string, checks: Array<Record<string, unknown>>, bypassActors: Array<Record<string, unknown>>) {
+function readback(
+  id: number,
+  name: string,
+  checks: Array<Record<string, unknown>>,
+  bypassActors: Array<Record<string, unknown>>,
+  deployments: string[] = [],
+) {
+  const rules: Array<Record<string, unknown>> = [{
+    type: "required_status_checks",
+    parameters: { required_status_checks: checks },
+  }];
+  if (deployments.length > 0) {
+    rules.push({
+      type: "required_deployments",
+      parameters: { required_deployment_environments: deployments },
+    });
+  }
+
   return {
     data: {
       id,
@@ -38,10 +55,7 @@ function readback(id: number, name: string, checks: Array<Record<string, unknown
       enforcement: "active",
       bypass_actors: bypassActors,
       conditions: { ref_name: { include: ["refs/heads/main"], exclude: [] } },
-      rules: [{
-        type: "required_status_checks",
-        parameters: { required_status_checks: checks },
-      }],
+      rules,
     },
   };
 }
@@ -73,6 +87,7 @@ describe("trusted Chief governance GitHub App observer", () => {
         "Chief AI main exact-head gate",
         [{ context: "Typecheck" }],
         [],
+        ["Cloudflare Production", "proofmode-access-admin"],
       ));
   });
 
@@ -148,12 +163,25 @@ describe("trusted Chief governance GitHub App observer", () => {
     expect(result.authority.candidateCheckPublicationAuthority).toBe(false);
   });
 
-  it("refuses to plan a ruleset migration until an external candidate-check producer is observed", async () => {
-    await expect(planChiefGovernanceWithGitHubApp({
+  it("verifies the founder-approved ruleset as-is while the external candidate producer remains unbound", async () => {
+    const result = await planChiefGovernanceWithGitHubApp({
       appId: TEST_FCR_APP_ID,
       privateKey: "test-private-key",
       now: new Date("2026-09-05T21:20:00.000Z"),
-    })).rejects.toThrow(/external check producer integration is not yet observed/);
+    });
+
+    expect(result.disposition).toBe("NO_CHANGE_REQUIRED");
+    expect(result.changesRequired).toBe(false);
+    expect(result.mutationRequired).toBe(false);
+    expect(result.mutation).toBeNull();
+    expect(result.candidateProducer).toMatchObject({
+      integrationId: null,
+      requiredByRuleset: false,
+    });
+    expect(result.observedRequiredDeploymentEnvironments.exactHeadGate).toEqual([
+      "Cloudflare Production",
+      "proofmode-access-admin",
+    ]);
   });
 
   it("fails closed before token minting when App identity is malformed", async () => {
