@@ -4,6 +4,7 @@ import {
   CHIEF_GOVERNANCE,
   createTrustedGithubRulesetObservation,
   planChiefProofModeRulesetMigration,
+  verifyChiefProofModeRulesetsAsIs,
 } from "../githubGovernanceReconciliation.js";
 
 const GITHUB_ACTIONS_APP_ID = "15368";
@@ -37,6 +38,33 @@ function rulesetReadback(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function exactHeadReadback(overrides: Record<string, unknown> = {}) {
+  return rulesetReadback({
+    id: 20818149,
+    name: "Chief AI main exact-head gate",
+    bypass_actors: [],
+    rules: [
+      {
+        type: "required_status_checks",
+        parameters: {
+          strict_required_status_checks_policy: true,
+          required_status_checks: [
+            { context: "Typecheck" },
+            { context: "Verify test-ledger contract", integration_id: Number(GITHUB_ACTIONS_APP_ID) },
+          ],
+        },
+      },
+      {
+        type: "required_deployments",
+        parameters: {
+          required_deployment_environments: ["Cloudflare Production", "proofmode-access-admin"],
+        },
+      },
+    ],
+    ...overrides,
+  });
+}
+
 function observe(readback: Record<string, unknown>) {
   return createTrustedGithubRulesetObservation({
     repository: CHIEF_GOVERNANCE.repository,
@@ -48,23 +76,10 @@ function observe(readback: Record<string, unknown>) {
 }
 
 function pair() {
-  const governanceBoundary = observe(rulesetReadback());
-  const exactHeadGate = observe(rulesetReadback({
-    id: 20818149,
-    name: "Chief AI main exact-head gate",
-    bypass_actors: [],
-    rules: [{
-      type: "required_status_checks",
-      parameters: {
-        strict_required_status_checks_policy: true,
-        required_status_checks: [
-          { context: "Typecheck" },
-          { context: "Verify test-ledger contract", integration_id: Number(GITHUB_ACTIONS_APP_ID) },
-        ],
-      },
-    }],
-  }));
-  return { governanceBoundary, exactHeadGate };
+  return {
+    governanceBoundary: observe(rulesetReadback()),
+    exactHeadGate: observe(exactHeadReadback()),
+  };
 }
 
 describe("Chief GitHub governance reconciliation", () => {
@@ -73,77 +88,49 @@ describe("Chief GitHub governance reconciliation", () => {
     expect(SYNTHETIC_OBSERVER_APP_ID).not.toBe(CLOUDFLARE_WORKERS_APP_ID);
   });
 
-  it("fails closed before planning until an external candidate-check producer is observed", () => {
+  it("accepts the founder-approved exact-head ruleset exactly as observed and emits no mutation", () => {
+    const verification = verifyChiefProofModeRulesetsAsIs(pair());
+
     expect(CHIEF_GOVERNANCE.candidateIntegrationId).toBeNull();
     expect(CHIEF_GOVERNANCE.candidateProducerTrust).toBe("external-github-app-check-required");
-    expect(() => planChiefProofModeRulesetMigration(pair())).toThrow(
-      /external check producer integration is not yet observed/,
-    );
+    expect(CHIEF_GOVERNANCE.requiredExactHeadDeploymentEnvironments).toEqual([
+      "Cloudflare Production",
+      "proofmode-access-admin",
+    ]);
+    expect(verification.disposition).toBe("NO_CHANGE_REQUIRED");
+    expect(verification.changesRequired).toBe(false);
+    expect(verification.mutationRequired).toBe(false);
+    expect(verification.mutation).toBeNull();
+    expect(verification.candidateProducer.requiredByRuleset).toBe(false);
+    expect(verification.observedRequiredDeploymentEnvironments.exactHeadGate).toEqual([
+      "Cloudflare Production",
+      "proofmode-access-admin",
+    ]);
   });
 
-  it("does not accept GitHub Actions integration 15368 as proof of the intended candidate workflow", () => {
-    const input = pair();
-    input.exactHeadGate = observe(rulesetReadback({
-      id: 20818149,
-      name: "Chief AI main exact-head gate",
-      bypass_actors: [],
-      rules: [{
-        type: "required_status_checks",
-        parameters: {
-          required_status_checks: [
-            { context: CHIEF_GOVERNANCE.candidateContext, integration_id: Number(GITHUB_ACTIONS_APP_ID) },
-          ],
-        },
-      }],
-    }));
-
-    expect(() => planChiefProofModeRulesetMigration(input)).toThrow(
-      /refusing to plan a GitHub Actions-only required check/,
-    );
+  it("keeps the legacy planner name as a no-mutation compatibility wrapper", () => {
+    const verification = planChiefProofModeRulesetMigration(pair());
+    expect(verification.disposition).toBe("NO_CHANGE_REQUIRED");
+    expect(verification.mutation).toBeNull();
   });
 
-  it("does not manufacture a replacement producer when a same-named candidate check has another integration", () => {
-    const input = pair();
-    input.exactHeadGate = observe(rulesetReadback({
-      id: 20818149,
-      name: "Chief AI main exact-head gate",
-      bypass_actors: [],
-      rules: [{
-        type: "required_status_checks",
-        parameters: {
-          required_status_checks: [
-            { context: CHIEF_GOVERNANCE.candidateContext, integration_id: 99999 },
-          ],
-        },
-      }],
-    }));
-
-    expect(() => planChiefProofModeRulesetMigration(input)).toThrow(
-      /external check producer integration is not yet observed/,
-    );
+  it("does not require an external candidate producer before accepting the approved live ruleset", () => {
+    expect(CHIEF_GOVERNANCE.candidateIntegrationId).toBeNull();
+    expect(() => verifyChiefProofModeRulesetsAsIs(pair())).not.toThrow();
   });
 
-  it("fails closed when the authoritative candidate ruleset has a bypass actor before producer planning", () => {
+  it("fails closed if the reserved candidate runtime context is added to the exact-head ruleset", () => {
     const input = pair();
-    input.exactHeadGate = observe(rulesetReadback({
-      id: 20818149,
-      name: "Chief AI main exact-head gate",
-      bypass_actors: [{ actor_type: "RepositoryRole", actor_id: 5, bypass_mode: "always" }],
-    }));
-
-    expect(() => planChiefProofModeRulesetMigration(input)).toThrow(/zero bypass actors/);
-  });
-
-  it("observes required deployments and does not deadlock before external producer proof", () => {
-    const input = pair();
-    input.exactHeadGate = observe(rulesetReadback({
-      id: 20818149,
-      name: "Chief AI main exact-head gate",
-      bypass_actors: [],
+    input.exactHeadGate = observe(exactHeadReadback({
       rules: [
         {
           type: "required_status_checks",
-          parameters: { required_status_checks: [{ context: "Typecheck" }] },
+          parameters: {
+            required_status_checks: [
+              { context: "Typecheck" },
+              { context: CHIEF_GOVERNANCE.candidateContext, integration_id: Number(GITHUB_ACTIONS_APP_ID) },
+            ],
+          },
         },
         {
           type: "required_deployments",
@@ -154,28 +141,78 @@ describe("Chief GitHub governance reconciliation", () => {
       ],
     }));
 
-    expect(CHIEF_GOVERNANCE.postMergeOnlyDeploymentEnvironments).toEqual(["Cloudflare Production"]);
-    expect(input.exactHeadGate.requiredDeploymentEnvironments).toEqual([
-      "Cloudflare Production",
-      "proofmode-access-admin",
-    ]);
-    expect(() => planChiefProofModeRulesetMigration(input)).toThrow(
-      /external check producer integration is not yet observed/,
-    );
+    expect(() => verifyChiefProofModeRulesetsAsIs(input)).toThrow(/reserved candidate runtime context must remain unbound/);
   });
 
-  it("preserves observed unrelated required-check producer bindings without upgrading them to candidate authority", () => {
-    const { exactHeadGate } = pair();
+  it("fails closed when the authoritative exact-head ruleset gains a bypass actor", () => {
+    const input = pair();
+    input.exactHeadGate = observe(exactHeadReadback({
+      bypass_actors: [{ actor_type: "RepositoryRole", actor_id: 5, bypass_mode: "always" }],
+    }));
 
-    expect(exactHeadGate.requiredStatusChecks).toContainEqual({
+    expect(() => verifyChiefProofModeRulesetsAsIs(input)).toThrow(/zero bypass actors/);
+  });
+
+  it("fails closed if either founder-approved required deployment disappears", () => {
+    for (const required of CHIEF_GOVERNANCE.requiredExactHeadDeploymentEnvironments) {
+      const remaining = CHIEF_GOVERNANCE.requiredExactHeadDeploymentEnvironments.filter(
+        (environment) => environment !== required,
+      );
+      const input = pair();
+      input.exactHeadGate = observe(exactHeadReadback({
+        rules: [
+          {
+            type: "required_status_checks",
+            parameters: { required_status_checks: [{ context: "Typecheck" }] },
+          },
+          {
+            type: "required_deployments",
+            parameters: { required_deployment_environments: remaining },
+          },
+        ],
+      }));
+
+      expect(() => verifyChiefProofModeRulesetsAsIs(input)).toThrow(/required deployments drifted/);
+    }
+  });
+
+  it("fails closed if an unapproved required deployment is added", () => {
+    const input = pair();
+    input.exactHeadGate = observe(exactHeadReadback({
+      rules: [
+        {
+          type: "required_status_checks",
+          parameters: { required_status_checks: [{ context: "Typecheck" }] },
+        },
+        {
+          type: "required_deployments",
+          parameters: {
+            required_deployment_environments: [
+              "Cloudflare Production",
+              "proofmode-access-admin",
+              "unexpected-provider-gate",
+            ],
+          },
+        },
+      ],
+    }));
+
+    expect(() => verifyChiefProofModeRulesetsAsIs(input)).toThrow(/required deployments drifted/);
+  });
+
+  it("preserves observed required-check producer bindings without upgrading them to candidate authority", () => {
+    const verification = verifyChiefProofModeRulesetsAsIs(pair());
+
+    expect(verification.observedRequiredStatusChecks.exactHeadGate).toContainEqual({
       context: "Verify test-ledger contract",
       integrationId: GITHUB_ACTIONS_APP_ID,
     });
-    expect(exactHeadGate.requiredStatusChecks).toContainEqual({
+    expect(verification.observedRequiredStatusChecks.exactHeadGate).toContainEqual({
       context: "Typecheck",
       integrationId: null,
     });
-    expect(CHIEF_GOVERNANCE.candidateIntegrationId).toBeNull();
+    expect(verification.candidateProducer.integrationId).toBeNull();
+    expect(verification.candidateProducer.requiredByRuleset).toBe(false);
   });
 
   it("fails closed when bypass state is not present in provider readback", () => {
