@@ -8,10 +8,10 @@ site_identity_status: unverified
 site_origin: null
 account_owner: unverified
 chatgpt_site_url: null
-custom_domain: welcome.foundercontrolroom.org
-control_room_link: https://foundercontrolroom.org/control-room/
+custom_domain: www.foundercontrolroom.org
+control_room_link: https://www.foundercontrolroom.org/control-room/
 last_verified: "2026-09-06"
-verification_source: "founder-provided ChatGPT Sites custom-domain setup; live Site publication/readback pending"
+verification_source: "founder directive establishes www.foundercontrolroom.org as the intended public domain; ChatGPT Site identity and provider publication/readback remain pending"
 continuity_status: UNKNOWN
 ---
 
@@ -75,13 +75,13 @@ Every write must preserve unrelated work and include repository, base, branch, e
 
 A Site identity is executable only after the ChatGPT Sites runtime exposes and verifies that exact Site identity. No slug, hostname, project ID, or generated URL may be guessed from naming conventions.
 
-For this repository, the ChatGPT Site editor has supplied the custom-domain intent `welcome.foundercontrolroom.org`, but the underlying `chatgpt.site` identity and live publication readback remain unverified in repository evidence. Therefore this file authorizes no live Site mutation by itself.
+For this repository, the founder has established `www.foundercontrolroom.org` as the intended public domain. The underlying `chatgpt.site` identity, editor-account binding, and live publication readback remain unverified in repository evidence. Therefore this file authorizes no live Site mutation by itself.
 
 When a Site identity becomes verified, publication must bind to the intended exact repository state, re-read the required Markdown authority chain, apply Sauce Guard, and capture an observable Site/runtime artifact after publication. A successful repository commit, PR, merge, workflow trigger, or Site editor save is not publication proof by itself.
 
 ## Cross-project boundary
 
-Founder Control Room remains the portfolio governance, evidence, approval, and guarded execution authority. A project Site may expose only the bounded actions its own repository contract permits. No Site may promote itself into portfolio authority or use another project as an alternate source of truth.
+Founder Control Room remains the portfolio governance, evidence, approval, and guarded execution authority. Chief and PromptOS may be presented as public-safe product screens inside the Founder Control Room public face, but neither screen may expose private founder state or promote itself into portfolio authority. A project Site may expose only the bounded actions its own repository contract permits. No Site may use another project as an alternate source of truth.
 
 ## Stop conditions
 
