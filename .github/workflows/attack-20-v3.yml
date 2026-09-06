@@ -94,7 +94,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
 
-      - name: Resolve exact live base
+      - name: Resolve exact live base and registry provenance
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -123,7 +123,52 @@ jobs:
             exit 1
           fi
 
-          printf 'EXPECTED_BASE_SHA=%s\n' "$live_base_sha" >> "$GITHUB_ENV"
+          declared_from_sha="$(node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const registry = JSON.parse(readFileSync('security/portfolio-worker-security.json', 'utf8'));
+          process.stdout.write(String(registry.declaredFromMainSha ?? '').trim().toLowerCase());
+          NODE
+          )"
+
+          if ! [[ "$declared_from_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Attack-20 registry provenance failed: declaredFromMainSha must be an exact SHA." >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin "$declared_from_sha"
+          if ! git merge-base --is-ancestor "$declared_from_sha" "$live_base_sha"; then
+            echo "Attack-20 registry provenance failed: declared main is not an ancestor of the live base." >&2
+            echo "declared_from_sha=$declared_from_sha" >&2
+            echo "live_base_sha=$live_base_sha" >&2
+            exit 1
+          fi
+
+          mapfile -t registry_inputs < <(node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const registry = JSON.parse(readFileSync('security/portfolio-worker-security.json', 'utf8'));
+          const inputs = new Set(['security/attack-20-v3.policy.json']);
+          for (const worker of registry.workers ?? []) {
+            const configPath = typeof worker?.configPath === 'string' ? worker.configPath.trim() : '';
+            if (configPath) inputs.add(configPath);
+          }
+          for (const input of [...inputs].sort()) process.stdout.write(`${input}\n`);
+          NODE
+          )
+
+          if [ "${#registry_inputs[@]}" -lt 2 ]; then
+            echo "Attack-20 registry provenance failed: no canonical registry inputs were resolved." >&2
+            exit 1
+          fi
+
+          if git diff --quiet "$declared_from_sha" "$live_base_sha" -- "${registry_inputs[@]}"; then
+            printf 'EXPECTED_BASE_SHA=\n' >> "$GITHUB_ENV"
+            printf 'registry_provenance=current-through-unrelated-base-movement\n'
+          else
+            printf 'EXPECTED_BASE_SHA=%s\n' "$live_base_sha" >> "$GITHUB_ENV"
+            printf 'registry_provenance=rebind-required\n'
+          fi
+
+          printf 'declared_from_sha=%s\n' "$declared_from_sha"
           printf 'resolved_base_sha=%s\n' "$live_base_sha"
 
       - name: Set up Node

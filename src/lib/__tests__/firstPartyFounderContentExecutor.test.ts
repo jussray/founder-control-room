@@ -274,7 +274,7 @@ describe('direct first-party founder LinkedIn execution', () => {
     expect(secondFetch).not.toHaveBeenCalled();
   });
 
-  it('rejects changed confirmation, stale Current You, and missing credentials before reservation', async () => {
+  it('rejects changed confirmation, stale Current You, and incomplete LinkedIn configuration before reservation', async () => {
     const cases: Array<{
       request: FirstPartyFounderPublishInput;
       testEnv: NodeJS.ProcessEnv;
@@ -293,6 +293,15 @@ describe('direct first-party founder LinkedIn execution', () => {
       {
         request: input(),
         testEnv: { LINKEDIN_AUTHOR_URN: AUTHOR },
+        expected: 'LINKEDIN_NOT_CONFIGURED',
+      },
+      {
+        request: input(),
+        testEnv: {
+          LINKEDIN_ACCESS_TOKEN: ACCESS_TOKEN,
+          LINKEDIN_AUTHOR_URN: AUTHOR,
+          LINKEDIN_API_VERSION: '2026-07',
+        },
         expected: 'LINKEDIN_NOT_CONFIGURED',
       },
     ];

@@ -84,7 +84,10 @@ const OWNED_REPO = /^jussray\/[A-Za-z0-9._-]+$/;
 const CURRENT_LANGUAGE = /\b(currently|right now|is live|are live|is green|are green|remains|still (?:is|are|has|have)|now (?:is|are|has|have))\b/i;
 const CURRENT_STATE_GRAMMAR = /\b(?:is|are|has|have|does|supports|works|exists|runs|uses|includes|provides|allows|can|will)\b/i;
 const HISTORICAL_LANGUAGE = /\b(built|shipped|implemented|added|merged|completed|released|tested|verified|fixed|created|introduced|deployed|reached|grew|was|were|did)\b/i;
-const CURRENT_RUNTIME_LANGUAGE = /(?:\b(?:production|runtime|site|app|api|service|endpoint|deployment)\b.{0,80}\b(?:live|healthy|up|reachable|serving|available)\b)|(?:\b(?:live|healthy|up|reachable|serving|available)\b.{0,80}\b(?:production|runtime|site|app|api|service|endpoint|deployment)\b)/i;
+const CURRENT_RUNTIME_TOKEN = /\b(?:production|runtime|site|app|api|service|endpoint|deployment|live|healthy|up|reachable|serving|available)\b/gi;
+const CURRENT_RUNTIME_SUBJECTS = new Set(['production', 'runtime', 'site', 'app', 'api', 'service', 'endpoint', 'deployment']);
+const CURRENT_RUNTIME_STATES = new Set(['live', 'healthy', 'up', 'reachable', 'serving', 'available']);
+const CURRENT_RUNTIME_MAX_GAP = 80;
 const METRIC_LANGUAGE = /(?:\b\d[\d,.]*\s*(?:followers?|impressions?|users?|downloads?|signups?|customers?|sales|engagements?|views?|reactions?|comments?|shares?|clicks?|likes?|members?\s+reached|people\s+reached)\b)|(?:\breached\s+\d[\d,.]*\s+(?:members?|people)\b)|(?:\b(?:revenue|mrr|arr|gmv|conversion|engagement rate)\b.{0,30}(?:\$\s?\d|\d[\d,.]*|\d+(?:\.\d+)?%))|(?:\d+(?:\.\d+)?%)/i;
 
 function text(value: unknown): string {
@@ -97,6 +100,39 @@ function isTemporalClaimClass(value: unknown): value is TemporalClaimClass {
 
 function stableHash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+function runtimeGapWithinBound(value: string, from: number, to: number): boolean {
+  if (to < from || to - from > CURRENT_RUNTIME_MAX_GAP) return false;
+  for (let index = from; index < to; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code === 0x0a || code === 0x0d || code === 0x2028 || code === 0x2029) return false;
+  }
+  return true;
+}
+
+function hasCurrentRuntimeLanguage(value: string): boolean {
+  let lastSubjectEnd: number | null = null;
+  let lastStateEnd: number | null = null;
+
+  for (const match of value.matchAll(CURRENT_RUNTIME_TOKEN)) {
+    const start = match.index ?? 0;
+    const end = start + match[0].length;
+    const token = match[0].toLowerCase();
+
+    if (CURRENT_RUNTIME_SUBJECTS.has(token)) {
+      if (lastStateEnd !== null && runtimeGapWithinBound(value, lastStateEnd, start)) return true;
+      lastSubjectEnd = end;
+      continue;
+    }
+
+    if (CURRENT_RUNTIME_STATES.has(token)) {
+      if (lastSubjectEnd !== null && runtimeGapWithinBound(value, lastSubjectEnd, start)) return true;
+      lastStateEnd = end;
+    }
+  }
+
+  return false;
 }
 
 function canonicalDeclaration(input: TemporalClaimDeclaration): TemporalClaimDeclaration {
@@ -157,7 +193,7 @@ export function temporalClaimTextDomainErrors(input: TemporalClaimTextDomainInpu
     }
   }
 
-  if (input.temporalClass === 'current_repo_state' && CURRENT_RUNTIME_LANGUAGE.test(candidate)) {
+  if (input.temporalClass === 'current_repo_state' && hasCurrentRuntimeLanguage(candidate)) {
     errors.push(`${label} uses runtime-state language and requires current_runtime evidence`);
   }
 

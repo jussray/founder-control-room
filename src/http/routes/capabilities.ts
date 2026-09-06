@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { capabilities } from '../../capabilities/workbenchRegistry.js';
 import { enqueueReconcile } from '../../events/outbox.js';
+import { founderEditorialPatternFingerprint } from '../../lib/founderEditorialNovelty.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { requireFounder, type FounderRequest } from '../middleware/requireFounder.js';
 
@@ -11,12 +12,289 @@ capabilitiesRouter.use(requireFounder);
 
 const PROJECT_HEALTH_CAPABILITY_ID = 'project-health-refresh-v1';
 const PROJECT_HEALTH_RESOURCE_PREFIX = `capability:${PROJECT_HEALTH_CAPABILITY_ID}:invocation:`;
+const FOUNDER_CONTENT_OBSERVATION_KIND = 'fcr/founder-content-provider-observation@v1';
+const FOUNDER_CONTENT_RESOURCE_TYPE = 'founder_content_post';
+const LINKEDIN_POST_URN = /^urn:li:(share|ugcPost|activity):[A-Za-z0-9_-]+$/;
+const RFC3339_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(?:Z|([+-])(\d{2}):(\d{2}))$/;
+const SHA256 = /^[0-9a-f]{64}$/i;
+const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
+const MAX_EDITORIAL_THESIS_CHARS = 600;
+const MAX_EDITORIAL_HOOK_CHARS = 240;
 const DYNAMIC_CAPABILITIES = new Map([
   [PROJECT_HEALTH_CAPABILITY_ID, { controller: 'ProjectController', resourcePrefix: PROJECT_HEALTH_RESOURCE_PREFIX }],
 ]);
 
+type JsonRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): JsonRecord {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as JsonRecord
+    : {};
+}
+
+function asText(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function parseStrictRfc3339Timestamp(value: string): number | null {
+  const match = RFC3339_TIMESTAMP.exec(value);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  const offsetHour = match[8] === undefined ? 0 : Number(match[8]);
+  const offsetMinute = match[9] === undefined ? 0 : Number(match[9]);
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > daysInMonth[month - 1]) return null;
+  if (hour > 23 || minute > 59 || second > 59) return null;
+  if (offsetHour > 23 || offsetMinute > 59) return null;
+
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function linkedinPostIdentity(value: unknown): { postUrn: string; permalink: string } | null {
+  const raw = asText(value);
+  if (!raw) return null;
+
+  if (LINKEDIN_POST_URN.test(raw)) {
+    return {
+      postUrn: raw,
+      permalink: `https://www.linkedin.com/feed/update/${raw}/`,
+    };
+  }
+
+  try {
+    const url = new URL(raw);
+    const hostname = url.hostname.toLowerCase();
+    if (url.protocol !== 'https:' || (hostname !== 'linkedin.com' && hostname !== 'www.linkedin.com')) {
+      return null;
+    }
+    const decodedPath = decodeURIComponent(url.pathname);
+    const match = decodedPath.match(/\/feed\/update\/(urn:li:(?:share|ugcPost|activity):[A-Za-z0-9_-]+)\/?$/);
+    if (!match?.[1] || !LINKEDIN_POST_URN.test(match[1])) return null;
+    return {
+      postUrn: match[1],
+      permalink: `https://www.linkedin.com/feed/update/${match[1]}/`,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function resolveActiveProject(projectSlug: string, activeUse = 'dynamic capability runs') {
+  const { data: project, error } = await supabase
+    .from('projects')
+    .select('id, slug, status')
+    .eq('slug', projectSlug)
+    .maybeSingle();
+
+  if (error) return { project: null, error: error.message, status: 500 } as const;
+  if (!project) return { project: null, error: `No project registered with slug "${projectSlug}"`, status: 404 } as const;
+  if (project.status !== 'active') {
+    return {
+      project: null,
+      error: `Project "${projectSlug}" is ${project.status}; ${activeUse} require an active project.`,
+      status: 409,
+    } as const;
+  }
+  return { project, error: null, status: 200 } as const;
+}
+
 capabilitiesRouter.get('/', (_req, res) => {
   res.set('Cache-Control', 'no-store').json({ capabilities });
+});
+
+/**
+ * Record a LinkedIn post that was published outside FCR without pretending FCR
+ * performed or provider-verified the publication. This is an observation-only
+ * bridge for founder-attested external state. It deliberately accepts no
+ * engagement metrics and cannot mint publication or analytics authority.
+ *
+ * coreThesis/openingHook are transient inputs used only to derive the same
+ * portfolio-wide PromptOS editorial pattern fingerprint used by the novelty
+ * gate. Raw thesis/hook text is never persisted by this route.
+ */
+capabilitiesRouter.post('/founder-content/linkedin-observations', async (req: FounderRequest, res) => {
+  const body = asRecord(req.body);
+  const projectSlug = asText(body.projectSlug);
+  const identity = linkedinPostIdentity(body.post ?? body.postUrn ?? body.permalink);
+  const publicationAttested = body.publicationAttested === true;
+  const publishedAtRaw = asText(body.publishedAt);
+  const contentHashRaw = asText(body.contentHash).toLowerCase();
+  const coreThesis = asText(body.coreThesis);
+  const openingHook = asText(body.openingHook);
+  const publishedAtMs = publishedAtRaw ? parseStrictRfc3339Timestamp(publishedAtRaw) : null;
+  const observedAtMs = Date.now();
+
+  if (!projectSlug) return res.status(400).json({ error: 'projectSlug is required' });
+  if (!identity) {
+    return res.status(400).json({
+      error: 'post must be an exact LinkedIn post URN or canonical /feed/update/ permalink',
+    });
+  }
+  if (!publicationAttested) {
+    return res.status(400).json({
+      error: 'publicationAttested=true is required for a manual publication observation',
+    });
+  }
+  if (publishedAtRaw && publishedAtMs === null) {
+    return res.status(400).json({ error: 'publishedAt must be a real RFC3339 timestamp with an explicit timezone when provided' });
+  }
+  if (publishedAtMs !== null && publishedAtMs > observedAtMs + MAX_CLOCK_SKEW_MS) {
+    return res.status(400).json({ error: 'publishedAt cannot be materially future-dated' });
+  }
+  if (contentHashRaw && !SHA256.test(contentHashRaw)) {
+    return res.status(400).json({ error: 'contentHash must be a SHA-256 hex digest when provided' });
+  }
+  if (!coreThesis || coreThesis.length > MAX_EDITORIAL_THESIS_CHARS) {
+    return res.status(400).json({
+      error: `coreThesis is required for publication memory and must be at most ${MAX_EDITORIAL_THESIS_CHARS} characters`,
+    });
+  }
+  if (!openingHook || openingHook.length > MAX_EDITORIAL_HOOK_CHARS) {
+    return res.status(400).json({
+      error: `openingHook is required for publication memory and must be at most ${MAX_EDITORIAL_HOOK_CHARS} characters`,
+    });
+  }
+
+  const resolved = await resolveActiveProject(projectSlug, 'founder-content observations');
+  if (!resolved.project) return res.status(resolved.status).json({ error: resolved.error });
+  if (!req.founder) {
+    return res.status(500).json({ error: 'Founder identity binding unavailable' });
+  }
+
+  const observedAt = new Date(observedAtMs).toISOString();
+  const promptOsPatternFingerprint = founderEditorialPatternFingerprint({
+    thesis: coreThesis,
+    hook: openingHook,
+  });
+  const observedState = {
+    kind: FOUNDER_CONTENT_OBSERVATION_KIND,
+    platform: 'linkedin',
+    postUrn: identity.postUrn,
+    permalink: identity.permalink,
+    publication: {
+      state: 'USER_ATTESTED',
+      providerVerified: false,
+      publishedAt: publishedAtMs === null ? null : new Date(publishedAtMs).toISOString(),
+    },
+    editorialMemory: {
+      state: 'USER_ATTESTED_PATTERN',
+      promptOsPatternFingerprint,
+      rawTextPersisted: false,
+    },
+    metrics: {
+      state: 'UNKNOWN',
+    },
+    contentHash: contentHashRaw || null,
+    source: 'manual_founder_attestation',
+    attestation: {
+      founderUserId: req.founder.userId,
+      observedAt,
+    },
+    authority: {
+      publication: false,
+      analyticsClaim: false,
+      externalMutation: false,
+    },
+    observedAt,
+  };
+
+  const sourceEventId = `fcae:${randomUUID()}`;
+  const { error: attestationEventError } = await supabase
+    .from('founder_content_attestation_events')
+    .insert({
+      event_id: sourceEventId,
+      project_id: resolved.project.id,
+      founder_user_id: req.founder.userId,
+      provider: 'linkedin',
+      resource_type: FOUNDER_CONTENT_RESOURCE_TYPE,
+      resource_id: identity.postUrn,
+      observed_state: observedState,
+      observed_at: observedAt,
+    });
+
+  if (attestationEventError) {
+    return res.status(500).json({
+      error: `LinkedIn attestation event persistence failed: ${attestationEventError.message}`,
+    });
+  }
+
+  const { error: observationError } = await supabase
+    .from('provider_observations')
+    .upsert({
+      project_id: resolved.project.id,
+      provider: 'linkedin',
+      resource_type: FOUNDER_CONTENT_RESOURCE_TYPE,
+      resource_id: identity.postUrn,
+      observed_state: observedState,
+      observed_at: observedAt,
+      source_event_id: null,
+      attestation_event_id: sourceEventId,
+    }, { onConflict: 'project_id,provider,resource_type,resource_id' });
+
+  if (observationError) {
+    return res.status(500).json({ error: `LinkedIn observation persistence failed: ${observationError.message}` });
+  }
+
+  return res
+    .status(200)
+    .set('Cache-Control', 'no-store')
+    .json({
+      observation: observedState,
+      sourceEventId,
+      persistence: 'recorded',
+      publicationTruth: 'USER_ATTESTED',
+      providerVerified: false,
+      metricsState: 'UNKNOWN',
+      editorialMemory: {
+        state: 'USER_ATTESTED_PATTERN',
+        promptOsPatternFingerprint,
+      },
+      authorityGranted: false,
+    });
+});
+
+capabilitiesRouter.get('/founder-content/linkedin-observations', async (req: FounderRequest, res) => {
+  const projectSlug = asText(req.query.projectSlug);
+  const identity = linkedinPostIdentity(req.query.post);
+
+  if (!projectSlug) return res.status(400).json({ error: 'projectSlug is required' });
+  if (!identity) {
+    return res.status(400).json({
+      error: 'post must be an exact LinkedIn post URN or canonical /feed/update/ permalink',
+    });
+  }
+
+  const resolved = await resolveActiveProject(projectSlug, 'founder-content observations');
+  if (!resolved.project) return res.status(resolved.status).json({ error: resolved.error });
+
+  const { data: observation, error: observationError } = await supabase
+    .from('provider_observations')
+    .select('provider, resource_type, resource_id, observed_state, observed_at, source_event_id, attestation_event_id')
+    .eq('project_id', resolved.project.id)
+    .eq('provider', 'linkedin')
+    .eq('resource_type', FOUNDER_CONTENT_RESOURCE_TYPE)
+    .eq('resource_id', identity.postUrn)
+    .maybeSingle();
+
+  if (observationError) {
+    return res.status(500).json({ error: `LinkedIn observation read failed: ${observationError.message}` });
+  }
+  if (!observation) return res.status(404).json({ error: 'LinkedIn founder-content observation not found' });
+
+  return res
+    .status(200)
+    .set('Cache-Control', 'no-store')
+    .json({ observation });
 });
 
 capabilitiesRouter.post('/:capabilityId/runs', async (req: FounderRequest, res) => {
@@ -34,22 +312,13 @@ capabilitiesRouter.post('/:capabilityId/runs', async (req: FounderRequest, res) 
     return res.status(400).json({ error: 'projectSlug is required' });
   }
 
-  const { data: project, error: projectError } = await supabase
-    .from('projects')
-    .select('id, slug, status')
-    .eq('slug', projectSlug)
-    .maybeSingle();
-
-  if (projectError) return res.status(500).json({ error: projectError.message });
-  if (!project) return res.status(404).json({ error: `No project registered with slug "${projectSlug}"` });
-  if (project.status !== 'active') {
-    return res.status(409).json({ error: `Project "${projectSlug}" is ${project.status}; dynamic capability runs require an active project.` });
-  }
+  const resolved = await resolveActiveProject(projectSlug);
+  if (!resolved.project) return res.status(resolved.status).json({ error: resolved.error });
 
   try {
     const invocationResourceId = `${runtime.resourcePrefix}${randomUUID()}`;
     const runId = await enqueueReconcile({
-      projectId: String(project.id),
+      projectId: String(resolved.project.id),
       controller: runtime.controller,
       resourceId: invocationResourceId,
       reason: 'founder_triggered',

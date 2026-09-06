@@ -70,6 +70,16 @@ CRM proof, deal-associated review tasks, notes, tickets, contacts, companies, an
 
 Founder Signal Engine tasks and notes must be associated with the `Founder Signal Engine` deal rather than created as floating records. HubSpot OAuth remains provider-held; never copy access tokens, customer data, vendor intelligence, mailbox contents, payment details, or order data into Control Room storage.
 
+## Shopify
+
+Shopify commerce is a provider boundary, not a source of inherited founder authority. The source-only `src/providers/ShopifyReadOnlyProvider.ts` preflight is intentionally read-only and bound to the exact Founder Control Room store identity: permanent Shopify domain `vercel-store-93a908b0-wcrkkq76.myshopify.com` plus branded primary domain `foundercontrolroom.org`. That identity check is project-specific and must not accept another portfolio store merely because its display name, app title, product, or developer looks plausible.
+
+Child apps are reconciled by installation identity, app identity, complete scope inventory, provider-account identity, observation freshness, and founder-approved declaration evidence. Installation alone is never approval. A matching title, developer, App Store publication state, or generic Shopify parent connection cannot grant child-app authority. A reinstall under a different installation identity must surface as identity drift rather than silently inheriting an earlier declaration. Added or removed scopes surface as scope drift; partial inventory is `UNKNOWN`; expired evidence is `STALE`.
+
+Provider observation is not durable current state. FCR must re-observe Shopify at the use boundary, exhaust pagination, keep credentials server-side/provider-held, and withhold present-tense `CURRENT` when the provider is unavailable, partial, stale, identity-mismatched, or structurally incomplete. Source tests may prove the classifier contract, but they cannot prove which apps or scopes are installed now.
+
+The current source module performs no Shopify network request and introduces no runtime Shopify credential, checkout action, order mutation, app installation/removal, scope change, customer read, price change, refund, or payment action. Wiring a real runtime adapter, persisting a founder declaration, adding a production `project_connections` row, changing provider scopes, or mutating commerce remains a separate reviewed and founder-authorized gate.
+
 ## Required handoff between providers
 
 Every handoff should state:

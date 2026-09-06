@@ -126,10 +126,23 @@ function routeToControllers(
     }
     case 'pull_request': {
       const pullRequest = payload.pull_request as Record<string, unknown> | undefined;
-      return [{
+      const routes: ControllerRoute[] = [{
         controller: 'ChangeProposalController',
         resourceId: String(pullRequest?.number ?? repoFullName),
       }];
+      if (pullRequest?.merged === true) {
+        const rawMergeSha = typeof pullRequest.merge_commit_sha === 'string'
+          ? pullRequest.merge_commit_sha.trim().toLowerCase()
+          : '';
+        const mergeResource = /^[0-9a-f]{40}$/.test(rawMergeSha)
+          ? rawMergeSha
+          : `pr-${String(pullRequest.number ?? 'unknown')}`;
+        routes.push({
+          controller: 'PortfolioLedgerProjectionController',
+          resourceId: mergeResource,
+        });
+      }
+      return routes;
     }
     case 'push':
     case 'workflow_run':

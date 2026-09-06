@@ -43,7 +43,7 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(existsSync(resolve(repoRoot, 'public/portable-founder-console/index.html'))).toBe(true);
   });
 
-  it('turns the founder stack into a five-lane execution loop', () => {
+  it('turns the founder stack into a five-lane execution loop without booting closed optional surfaces', () => {
     const app = read('public/control-room/index.html');
     const stackRouter = read('public/control-room/stack-router.js');
 
@@ -66,6 +66,13 @@ describe('Founder Control Room Cloudflare topology', () => {
     expect(stackRouter).toContain("'terminal'");
     expect(stackRouter).toContain('.tabs button[data-tab=');
     expect(stackRouter).toContain('new MutationObserver');
+    expect(stackRouter).not.toContain("import { installMissionBoard } from './mission-board.js'");
+    expect(stackRouter).toContain("import('./mission-board.js')");
+    expect(stackRouter).toContain("target.closest('.tabs button[data-tab=\"missions\"]')");
+    expect(stackRouter).toContain("if (launchDock.open) void refreshConveyorReadiness()");
+    expect(stackRouter.trim().endsWith('}')).toBe(true);
+    expect(stackRouter).not.toMatch(/\nvoid refreshConveyorReadiness\(\);\s*$/);
+    expect(stackRouter).not.toMatch(/\ninstallMissionBoard\(\);\s*$/);
   });
 
   it('routes Workflows through the current proof-bound founder content lifecycle', () => {

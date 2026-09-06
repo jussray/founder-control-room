@@ -179,6 +179,12 @@ The only runtime secret canonical Deploy deliberately writes is `FOUNDER_SIGNAL_
 
 Trusted deterministic-review or other bounded workflows that actually need GitHub App execution credentials may continue to use their separately scoped Actions-facing `APP_ID` / `APP_PRIVATE_KEY` inputs. That does not make canonical Deploy responsible for re-uploading the Worker's provider-held `GITHUB_APP_ID` / `GITHUB_PRIVATE_KEY` pair.
 
+### Founder-content n8n activation boundary
+
+`wrangler.worker.toml` declares founder-content n8n as source-disabled by default with `N8N_FOUNDER_CONTENT_ENABLED="false"`, constrains the checked-in v1 provider allowlist to `buffer`, and pins the expected workflow ID and runtime version. The conditional webhook, bearer, workflow-fingerprint, and identity-HMAC bindings are intentionally not unconditional Worker requirements while the lane is disabled.
+
+This checked-in state proves only desired source configuration. Before enabling the lane, a separately authorized provider change must install the required private bindings, preserve the bounded provider allowlist, and obtain fresh Cloudflare/runtime readback. Neither a repository commit nor a successful Worker build proves that founder-content n8n is active, that its private bindings are present, or that any provider publication occurred.
+
 Never copy secret values into repository files, logs, screenshots, issue comments, PR bodies, documentation, or public content. A source declaration or required-name check proves only the intended boundary. Live provider secret presence, validity, permissions, deployment success, and runtime identity still require provider/runtime evidence.
 
 ## Verification gate

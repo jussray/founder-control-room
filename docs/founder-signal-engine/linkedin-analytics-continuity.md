@@ -15,7 +15,7 @@ LinkedIn XLSX export
 -> read TOP POSTS + ENGAGEMENT
 -> normalize publish dates separately from activity dates
 -> canonicalize LinkedIn post URLs
--> SHA-256 post fingerprint
+-> private-key HMAC post identity
 -> per-day post set
 -> deterministic day cadence cookie
 -> cadence + comparable 7-day windows
@@ -26,13 +26,24 @@ LinkedIn XLSX export
 
 ### Fingerprints
 
-A post fingerprint is the first 16 hex characters of SHA-256 over:
+Public post fingerprints are HMAC-SHA256 identifiers derived from:
 
 ```text
-linkedin|<publish-date>|<normalized-post-url>
+private runtime key
++ fcr/linkedin-post-id@v1
++ <publish-date>
++ <normalized-post-url>
 ```
 
-Tracking query parameters and URL fragments are removed before hashing. The fingerprint identifies the same visible post across later exports; it is not publication proof, approval, provider truth, or a secret.
+The public receipt stores only the first 32 lowercase hex characters of the HMAC result. Tracking query parameters and URL fragments are removed before keyed identity derivation. The private key is never persisted, so someone who merely knows the public post URL and publish date cannot recompute the repository identifier.
+
+The workflow uses dedicated `LINKEDIN_POST_ID_HMAC_KEY` secret material for identity. That key is separate from `LINKEDIN_ANALYTICS_SNAPSHOT_TOKEN`, which is source-access authority only. Do not substitute the source bearer token for the HMAC key.
+
+Every receipt also carries the non-secret `LINKEDIN_POST_ID_HMAC_EPOCH`. Keep the epoch stable while a given private HMAC key remains active. When the key is intentionally rotated, advance the epoch. A predecessor from a different or legacy/missing epoch becomes a new privacy baseline: current visible posts are `baseline_or_unknown_visible`, not fabricated `new` posts, and prior identifiers are not called missing merely because the private identity key changed.
+
+The epoch is continuity metadata only. It never grants execution, publication, provider, or approval authority.
+
+The fingerprint is observation identity only. It is not publication proof, approval, provider authority, or permission to correlate private analytics outside the authorized evidence lane.
 
 ### Cadence cookies
 
@@ -42,7 +53,7 @@ Each calendar day receives a deterministic reconciliation token:
 LI-DAY-YYYYMMDD-PNN-<12-char-digest>
 ```
 
-The digest is computed from the sorted visible post fingerprints for that day, or from an explicit empty-day identity when no visible post is present. A cadence cookie binds the observed visible set for reconciliation only. It grants no execution or publishing authority.
+The digest is computed from the sorted keyed visible post fingerprints for that day, or from an explicit empty-day identity when no visible post is present. A cadence cookie binds the observed visible set for reconciliation only. It grants no execution or publishing authority.
 
 ### Export caps
 
@@ -60,7 +71,11 @@ Posting cadence is computed from `Post Publish Date` in TOP POSTS. Daily impress
 
 ## Run
 
+Local/manual execution requires a dedicated private HMAC key plus its non-secret epoch. Do not put the key on a command line or commit it to source.
+
 ```bash
+export LINKEDIN_POST_ID_HMAC_KEY='<private 32+ byte value>'
+export LINKEDIN_POST_ID_HMAC_EPOCH='linkedin-post-id-v1'
 python3 scripts/linkedin_analytics_continuity.py \
   AggregateAnalytics.xlsx \
   --start 8/2/2026 \
@@ -71,6 +86,8 @@ python3 scripts/linkedin_analytics_continuity.py \
 To reconcile a later export against an earlier normalized receipt:
 
 ```bash
+export LINKEDIN_POST_ID_HMAC_KEY='<same private key for this epoch>'
+export LINKEDIN_POST_ID_HMAC_EPOCH='linkedin-post-id-v1'
 python3 scripts/linkedin_analytics_continuity.py \
   LaterAggregateAnalytics.xlsx \
   --start 8/2/2026 \
@@ -83,8 +100,73 @@ Focused verification:
 
 ```bash
 python3 -m unittest scripts/test_linkedin_analytics_continuity.py
+python3 -m unittest scripts/test_linkedin_post_performance.py
+```
+
+The Actions workflow fails closed if predecessor-artifact discovery errors or if the latest named artifact is malformed. A provider/API failure must never be reinterpreted as "no previous receipt" because that would silently reset continuity.
+
+## Performance supersession
+
+`scripts/founder_content_supersession.py` implements `fcr/founder-content-supersession@v3` for two cumulative observations of the same content fingerprint. It is a separate observation-only seam because the aggregate `ENGAGEMENT` worksheet can contain activity from older posts and therefore cannot be silently reinterpreted as per-post cumulative engagement.
+
+The current input contract is `fcr/founder-content-supersession-input@v2`. It requires an explicit deterministic `as_of` horizon in addition to the two observations. Both `prior.observed_at` and `current.observed_at` must be at or before that horizon, and current must still be strictly later than prior. A legacy v1 payload without the horizon fails closed instead of allowing an accidentally future-dated observation to become `ATTESTED_CURRENT`.
+
+The horizon is evidence, not clock authority. V3 records it as `observation_horizon_state: ATTESTED_INPUT_V2` and `observation_horizon_verification: ATTESTED_INPUT_V2`; it is bound into the deterministic receipt identity but is not independently verified merely because it was supplied. An orchestrator that needs stronger time truth must bind `as_of` to its own trusted clock/evidence layer.
+
+The V3 supersession contract rejects observations beyond that horizon, requires the newer observation time to be strictly later, rejects decreases in cumulative impressions or engagements, requires SHA-256-shaped source digests, preserves the prior claim as `SUPERSEDED_HISTORICAL`, emits the current claim as `ATTESTED_CURRENT`, classifies the **observed metric movement**, and binds the bounded strategy mutation into the deterministic receipt identity. V3 does not read the underlying source artifact bytes, so its source digests are caller-supplied provenance references rather than verified source bindings.
+
+The `expectation` field in V3 is narrative text, not a structured threshold/direction contract. V3 therefore must not infer `STRONGER_THAN_EXPECTED`, `WEAKER_THAN_EXPECTED`, or `AS_EXPECTED` from metric movement alone. Current receipts emit:
+
+```text
+metric_change = factual observed movement
+surprise = UNKNOWN
+expectation_evaluation = NOT_EVALUATED_UNSTRUCTURED_V3
+```
+
+`metric_change` describes only facts such as `ENGAGEMENT_RATE_UP`, `ENGAGEMENT_RATE_DOWN`, or `IMPRESSIONS_UP_WITHOUT_ENGAGEMENTS`. A future successor may evaluate expectation-relative surprise only after the expectation itself has a deterministic structured schema. Free-form prose must never be treated as if it had been parsed and compared.
+
+```text
+same post fingerprint
++ explicit as_of evidence horizon
++ prior cumulative observation at/before as_of
++ current cumulative observation at/before as_of
++ narrative expectation (retained, not evaluated by V3)
++ prior/current claims
++ bounded strategy mutation
+-> deterministic supersession receipt
+-> next creative gate
+```
+
+The V3 receipt deliberately reports `source_digest_verification: UNVERIFIED_INPUT_V3` and `claim_source_binding: NOT_LOCKED_V3`. Digest presence is not the same as proving that the supplied digest matches the source artifact or that the supplied claim was derived correctly from that source.
+
+`scripts/founder_content_source_binding.py` implements the strict `fcr/founder-content-supersession@v4` successor seam. V4 reads the supplied prior/current source bytes, recomputes SHA-256, and fails closed unless those bytes match the exact digests bound into the V3 input. A successful V4 receipt reports `source_digest_verification: VERIFIED_FROM_SOURCE_BYTES_V4` and `source_artifact_binding: LOCKED_TO_SOURCE_BYTES_V4`. Those fields prove only that the named source artifact bytes match the digest identity carried by the receipt.
+
+V4 deliberately reports `claim_source_binding: NOT_PROVEN_V4` and `metric_derivation_verification: NOT_PROVEN_V4` because digest equality does not prove that caller-supplied metrics or claims were correctly extracted from those bytes. Source artifact identity also does **not** let an executor certify itself. V4 therefore keeps both evidence observations and the current claim at the `ATTESTED` ceiling while explicitly recording `independent_witness: NOT_PRESENT_V4` and `execution_environment_attestation: NOT_LOCKED_V4`. Promotion to a `VERIFIED` claim requires separate derivation proof plus an independent witness/environment boundary; a valid digest or receipt signature alone cannot supply that authority.
+
+Run V3 without source-byte resolution:
+
+```bash
+python3 scripts/founder_content_supersession.py supersession-input.json \
+  --output supersession-receipt.json
+```
+
+Run V4 with exact source artifacts:
+
+```bash
+python3 scripts/founder_content_source_binding.py supersession-input.json \
+  --prior-source prior-source.bin \
+  --current-source current-source.bin \
+  --output supersession-source-bound-receipt.json
+```
+
+A predecessor supersession receipt may be supplied as lineage only when the complete raw identifier matches `SUP-<16 hex>` case-insensitively. The implementation validates that full shape before normalizing it to uppercase `SUP-` plus lowercase hex. Arbitrary prefixes must fail closed rather than being rewritten into valid-looking lineage. The repository implementation uses the explicit `fcr-json-v1` canonicalization for new receipt identities; lineage never authorizes publication and an older receipt ID is not regenerated under a different hash contract.
+
+Focused verification:
+
+```bash
+python3 -m unittest scripts/test_founder_content_supersession.py
 ```
 
 ## Interpretation order
 
-For content decisions, prefer qualified engagement and follower/profile conversion, then relevant reach, then raw impressions. Comparable windows and per-post fingerprints should be used before inferring that a content theme improved. Analytics conclusions remain proposals for founder review and can feed the existing `linkedin_experiments` record; they do not authorize Buffer, LinkedIn, n8n, Zapier, or another distribution provider.
+For content decisions, prefer qualified engagement and follower/profile conversion, then relevant reach, then raw impressions. Comparable windows and keyed per-post fingerprints should be used before inferring that a content theme improved. Analytics conclusions remain proposals for founder review and can feed the existing `linkedin_experiments` record; they do not authorize Buffer, LinkedIn, n8n, Zapier, or another distribution provider.

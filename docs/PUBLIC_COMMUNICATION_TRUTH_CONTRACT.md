@@ -16,7 +16,7 @@ This contract applies before publishing, scheduling, sending, announcing, promot
 → Draft
 → Review or approved automation
 → Issue exact-copy approval when the active route requires it
-→ Atomically claim that stored approval at execution
+→ Atomically bind the stored approval claim to the exact execution generation
 → Publish or hold
 → Capture the published artifact
 → Record outcome evidence
@@ -105,27 +105,36 @@ This is an internal control framework inspired by sound accounting practice. It 
 
 An approved automated publishing class defines the maximum class of communication that automation may handle. It does **not** weaken a more specific executable authority contract.
 
-Current first-party founder-content execution uses exact Current You authority and an FCR-owned approval store. Caller-supplied approval JSON is not publication authority. For the authoritative first-party route, an authenticated founder first confirms the exact copy; FCR then issues and persists a one-shot approval bound to the exact proposal hash, public-payload hash, authorization hash, channel, source repository/SHA, founder identity, approval time, and expiry. Execution must atomically claim the matching unrevoked, unconsumed, unexpired stored approval before temporal revalidation and provider mutation.
+Current founder-content execution uses exact Current You authority and an FCR-owned approval store. Caller-supplied approval JSON is not publication authority. An authenticated founder first confirms the exact copy; FCR then issues and persists a one-shot approval bound to the exact proposal hash, public-payload hash, authorization hash, channel, source repository/SHA, founder identity, approval time, and expiry. Any active provider-writing route must atomically claim the matching unrevoked, unconsumed, unexpired stored approval before provider mutation. For provider-neutral n8n execution, that approval consumption and the exact `approval_executions.started_at` generation check must succeed or fail in the same database transaction.
+
+Approval issuance has two independent anti-duplication identities. The deterministic approval ID serializes exact canonical public copy. Separately, `promptOsPatternFingerprint` serializes the founder/platform editorial thesis+hook pattern through the bounded approval/provider-readback window. FCR must persist the one-shot approval and acquire that pattern reservation in the same database transaction; if a non-revoked, unexpired approval already owns the pattern, issuance fails closed even when the candidate wording and exact-copy approval ID differ. One-shot consumption does not release the pattern early because provider execution or provider-native readback may still be pending. The reservation may move to a later approval after the prior lease expires or is explicitly revoked, without deleting or rewriting the historical approval row. Pattern reservation is authority control, not publication evidence. The source migration that implements this rule does not prove it has been applied to production.
 
 The active route therefore separates approval issuance from publication:
 
 ```text
 exact public-safe proposal
 → authenticated founder + confirm_exact_copy
-→ FCR issues and stores exact one-shot approval
-→ publish request references the exact authorization_hash
-→ FCR atomically claims the matching stored approval
-→ temporal claim revalidation
+→ FCR atomically stores exact-copy approval + bounded editorial-pattern reservation
+→ publish/orchestration request references the exact authorization_hash
+→ FCR preflights route/provider configuration without consuming approval
+→ FCR atomically binds the matching stored approval claim to the exact execution generation
+→ temporal/provider-route validation
 → provider mutation
 → provider readback
 → durable publication receipt
 ```
 
-Changing approved copy, evidence identity, proposal identity, source version, channel, or governing authorization fingerprint requires a fresh matching approval. A consumed approval is not replay authority after a downstream failure. Approval existence, approval issuance, or successful approval claim is not publication truth; provider readback remains terminal evidence of the external artifact.
+For direct first-party LinkedIn publication, **complete server-side adapter configuration is part of preflight, not execution**. FCR must validate token presence, author URN, and any configured `LINKEDIN_API_VERSION` as a canonical `YYYYMM` value before creating a durable `approval_executions` reservation. Malformed adapter configuration must produce a blocked/not-configured result with zero reservation, zero approval consumption, and zero provider request. A later adapter-level validation remains defense in depth; it must not be the first place malformed configuration is discovered after durable execution state exists.
 
-Provider-neutral contract placement does not change publication authority or prove a provider migration. Canonical founder-content contracts live under `tools/founder-content-contracts/`; legacy `tools/zapier/` compatibility exports may remain for provider-specific callers, but core approval storage, direct publication, and temporal revalidation must import the canonical provider-neutral authority directly rather than making Zapier structurally load-bearing. n8n, Zapier, Buffer, or any later adapter remains a provider boundary: it may not create founder authority, it may not turn configuration or scheduler acceptance into publication truth, and it still requires the same exact approval, temporal revalidation, provider mutation, readback, and durable receipt.
+Changing approved copy, evidence identity, proposal identity, source version, channel, or governing authorization fingerprint requires a fresh matching approval. A consumed approval is not replay authority after a downstream failure. Approval existence, approval issuance, successful pattern reservation, or successful approval claim is not publication truth; provider readback remains terminal evidence of the external artifact.
 
-A source-level move away from Zapier ownership is not an n8n cutover. A generic FCR stage-conveyor activation receipt is also not a founder-content cutover receipt. Until the checked founder-content n8n workflow is activated through its protected live path and returns canonical persisted evidence plus applicable downstream provider readback for the exact current-main target, Zapier remains an available provider-specific compatibility/fallback path and public language must not say that n8n has replaced it.
+Provider-neutral n8n execution uses the same FCR-owned one-shot approval-store membrane as direct first-party publication. The n8n authority adapter must preflight transport configuration, provider allowlisting, and provider/platform compatibility before consuming one-shot authority; it then atomically consumes the exact stored approval only while the worker's exact database-returned execution generation remains active, and injects only that server-read approval into the existing provider-neutral dispatcher. Caller-supplied approval objects are forbidden. n8n may request a provider write only after that claim, may not change approved copy, and may never mark publication complete; provider-native readback remains terminal publication evidence.
+
+Prepared n8n execution reservations use the authoritative `approval_executions.started_at` value as their lease generation. Initial reservation and rearm must consume the exact generation read back from the database. The final one-shot approval consumption and exact generation fence must occur in the same database transaction. The two-minute abandoned-reservation recovery path applies only while `approval_claimed` is not true. Pre-provider abort, provider-write acquisition, and successful receipt finalization remain fenced to the execution ID, `pending` state, and exact database-returned generation. A delayed worker from an older generation therefore cannot consume approval, rearm consumed authority, fail, dispatch, or finalize a newer worker's live reservation.
+
+Provider-neutral contract placement does not itself prove a provider migration. Canonical founder-content contracts live under `tools/founder-content-contracts/`; legacy `tools/zapier/` compatibility exports may remain for provider-specific callers, but core approval storage, direct publication, and temporal revalidation must import the canonical provider-neutral authority directly rather than making Zapier structurally load-bearing. n8n, Zapier, Buffer, or any later adapter remains a provider boundary: it may not create founder authority, it may not turn configuration or scheduler acceptance into publication truth, and it still requires exact approval, applicable temporal validation, provider mutation, readback, and durable receipt.
+
+A source-level n8n authority adapter is not an n8n cutover. A generic FCR stage-conveyor activation receipt is also not a founder-content cutover receipt. Until the checked founder-content n8n workflow is activated through its protected live path and returns canonical persisted evidence plus applicable downstream provider readback for the exact deployed target, public language must not say that n8n or Buffer is live merely because the source route exists.
 
 A standing class authorization must never be interpreted as permission to bypass that exact-proposal approval membrane when the active route requires it.
 
@@ -152,7 +161,7 @@ Every material post must have:
 - no invented metrics, testimonials, partnerships, users, revenue, deployment, or approval;
 - no implication of founder approval when only an agent drafted the content;
 - a reviewable draft or an approved automated publishing class plus every stricter route-specific authority requirement;
-- an exact stored approval claim when the active first-party route requires one;
+- an exact stored approval claim whenever the active route can request a provider write;
 - a captured URL, observable platform artifact, message ID, or equivalent evidence after publication;
 - a correction path when the post becomes inaccurate.
 
@@ -189,7 +198,9 @@ Hold the post when:
 - a generic n8n stage-conveyor receipt is being used as proof that a founder-content provider write or publication occurred;
 - a founder-content `verified` proof label is missing Buffer provider binding, receipt identity, observation time, or exact deployed-SHA binding;
 - the post falls outside the approved automated publishing class or a stricter exact Current You gate is unsatisfied;
-- the active first-party route cannot read and atomically claim an exact matching FCR-owned approval;
+- approval issuance cannot atomically reserve the founder/platform editorial pattern through the bounded approval/provider-readback lease without rewriting historical approval rows;
+- direct first-party provider adapter configuration is malformed or cannot be fully validated before durable execution reservation;
+- the active provider-writing route cannot atomically bind an exact matching FCR-owned approval claim to the active execution generation;
 - the post depends on a workflow that failed before executing steps;
 - private, sensitive, proprietary, or security-relevant information could be exposed;
 - urgency is being used to bypass truth or review;
@@ -197,6 +208,6 @@ Hold the post when:
 
 ## Completion standard
 
-A posting workflow is not complete when a draft exists, an approval is issued, a stored approval is claimed, a scheduler accepted it, or an automation was triggered.
+A posting workflow is not complete when a draft exists, an approval is issued, an editorial pattern is reserved, a stored approval is claimed, a scheduler accepted it, or an automation was triggered.
 
 It is complete only when the intended publication artifact is observable, its claims remain accurate for their declared temporal class, the platform result is reconciled, and the evidence is recorded.

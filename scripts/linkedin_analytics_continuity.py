@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import hmac
 import json
+import os
 import re
 from collections import Counter
 from datetime import date, datetime, timedelta
@@ -21,6 +23,7 @@ from xml.etree import ElementTree as ET
 NS = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main", "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships", "p": "http://schemas.openxmlformats.org/package/2006/relationships"}
 CELL_RE = re.compile(r"([A-Z]+)(\d+)")
 POST_ID_RE = re.compile(r"share-(\d+)-")
+KEY_EPOCH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
 
 
 def _col_index(ref: str) -> int:
@@ -106,9 +109,29 @@ def _normalize_url(url: str) -> str:
     return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path.rstrip("/"), "", ""))
 
 
-def post_fingerprint(publish_date: date, url: str) -> str:
-    canonical = f"linkedin|{publish_date.isoformat()}|{_normalize_url(url)}"
-    return hashlib.sha256(canonical.encode()).hexdigest()[:16]
+def _key_bytes(identity_key: str | bytes) -> bytes:
+    key = identity_key.encode() if isinstance(identity_key, str) else identity_key
+    if len(key) < 32:
+        raise ValueError("post identity HMAC key must contain at least 32 bytes")
+    return key
+
+
+def _key_epoch(value: Any) -> str:
+    epoch = str(value or "").strip()
+    if not KEY_EPOCH_RE.fullmatch(epoch):
+        raise ValueError("post_identity_key_epoch must be a 1-64 character non-secret epoch identifier")
+    return epoch
+
+
+def post_fingerprint(
+    publish_date: date,
+    url: str,
+    *,
+    identity_key: str | bytes,
+) -> str:
+    """Return a stable, dictionary-resistant public post identifier."""
+    canonical = f"fcr/linkedin-post-id@v1|{publish_date.isoformat()}|{_normalize_url(url)}"
+    return hmac.new(_key_bytes(identity_key), canonical.encode(), hashlib.sha256).hexdigest()[:32]
 
 
 def day_cookie(day: date, fingerprints: list[str]) -> str:
@@ -117,7 +140,13 @@ def day_cookie(day: date, fingerprints: list[str]) -> str:
     return f"LI-DAY-{day.strftime('%Y%m%d')}-P{len(fingerprints):02d}-{digest}"
 
 
-def _extract_posts(top_rows: list[list[str]], start: date, end: date) -> tuple[list[dict[str, Any]], int]:
+def _extract_posts(
+    top_rows: list[list[str]],
+    start: date,
+    end: date,
+    *,
+    identity_key: str | bytes,
+) -> tuple[list[dict[str, Any]], int]:
     posts: list[dict[str, Any]] = []
     provider_rows = 0
     # LinkedIn's export places the impression-ranked list in columns E:G; row 3 is header.
@@ -141,7 +170,7 @@ def _extract_posts(top_rows: list[list[str]], start: date, end: date) -> tuple[l
             "linkedin_post_id": match.group(1) if match else None,
             "post_url": normalized,
             "impressions": int(float(raw_impressions)) if raw_impressions else None,
-            "fingerprint": post_fingerprint(publish_day, normalized),
+            "fingerprint": post_fingerprint(publish_day, normalized, identity_key=identity_key),
             "evidence_state": "VERIFIED_VISIBLE",
         })
     posts.sort(key=lambda item: (item["publish_date"], item["post_url"]))
@@ -164,11 +193,26 @@ def _extract_activity(rows: list[list[str]]) -> dict[str, dict[str, int]]:
     return activity
 
 
-def analyze_export(path: str | Path, start: date, end: date, export_limit: int = 50) -> dict[str, Any]:
+def analyze_export(
+    path: str | Path,
+    start: date,
+    end: date,
+    export_limit: int = 50,
+    *,
+    identity_key: str | bytes,
+    identity_key_epoch: str,
+) -> dict[str, Any]:
     if end < start:
         raise ValueError("end must not predate start")
+    epoch = _key_epoch(identity_key_epoch)
+    _key_bytes(identity_key)
     sheets = read_export(path)
-    posts, provider_rows = _extract_posts(sheets["TOP POSTS"], start, end)
+    posts, provider_rows = _extract_posts(
+        sheets["TOP POSTS"],
+        start,
+        end,
+        identity_key=identity_key,
+    )
     activity = _extract_activity(sheets["ENGAGEMENT"])
     counts = Counter(item["publish_date"] for item in posts)
     fingerprints_by_day: dict[str, list[str]] = {}
@@ -217,6 +261,12 @@ def analyze_export(path: str | Path, start: date, end: date, export_limit: int =
     return {
         "contract": "linkedin-analytics-continuity@v1",
         "authority": "observation_only",
+        "privacy": {
+            "post_identity_scheme": "HMAC-SHA256/private-runtime-key/v1",
+            "post_identity_key_epoch": epoch,
+            "private_key_persisted": False,
+            "post_urls_redacted_before_public_persistence": True,
+        },
         "source": {"filename": Path(path).name, "top_posts_rows_visible": provider_rows, "provider_export_limit": export_limit},
         "window": {"start": start.isoformat(), "end": end.isoformat(), "calendar_days": len(days)},
         "summary": {
@@ -233,13 +283,52 @@ def analyze_export(path: str | Path, start: date, end: date, export_limit: int =
     }
 
 
-def reconcile(previous: dict[str, Any] | None, current: dict[str, Any]) -> dict[str, list[str]]:
-    previous_fps = {p["fingerprint"] for p in (previous or {}).get("posts", [])}
+def _continuity_payload(previous: dict[str, Any]) -> dict[str, Any]:
+    """Accept either the inner continuity receipt or the redacted outer evidence envelope."""
+    if previous.get("contract") == "linkedin-post-evidence@v1":
+        inner = previous.get("continuity")
+        if not isinstance(inner, dict):
+            raise ValueError("linkedin-post-evidence@v1 previous receipt must contain continuity object")
+        if inner.get("contract") != "linkedin-analytics-continuity@v1":
+            raise ValueError("nested continuity receipt contract mismatch")
+        return inner
+    if previous.get("contract") == "linkedin-analytics-continuity@v1":
+        return previous
+    raise ValueError("unsupported previous LinkedIn continuity receipt contract")
+
+
+def reconcile(previous: dict[str, Any] | None, current: dict[str, Any]) -> dict[str, Any]:
+    current_epoch = current.get("privacy", {}).get("post_identity_key_epoch")
+    _key_epoch(current_epoch)
     current_fps = {p["fingerprint"] for p in current.get("posts", [])}
+
+    if previous is None:
+        return {
+            "new": sorted(current_fps),
+            "retained": [],
+            "missing_from_current_visible_set": [],
+            "baseline_or_unknown_visible": [],
+            "baseline_reason": None,
+        }
+
+    prior = _continuity_payload(previous)
+    previous_epoch = prior.get("privacy", {}).get("post_identity_key_epoch")
+    if previous_epoch != current_epoch:
+        return {
+            "new": [],
+            "retained": [],
+            "missing_from_current_visible_set": [],
+            "baseline_or_unknown_visible": sorted(current_fps),
+            "baseline_reason": "POST_IDENTITY_KEY_EPOCH_CHANGED",
+        }
+
+    previous_fps = {p["fingerprint"] for p in prior.get("posts", [])}
     return {
         "new": sorted(current_fps - previous_fps),
         "retained": sorted(current_fps & previous_fps),
         "missing_from_current_visible_set": sorted(previous_fps - current_fps),
+        "baseline_or_unknown_visible": [],
+        "baseline_reason": None,
     }
 
 
@@ -252,7 +341,20 @@ def main() -> int:
     parser.add_argument("--output")
     args = parser.parse_args()
 
-    current = analyze_export(args.xlsx, _parse_date(args.start), _parse_date(args.end))
+    identity_key = os.environ.get("LINKEDIN_POST_ID_HMAC_KEY", "")
+    if not identity_key:
+        raise SystemExit("BLOCKED_PRIVACY_KEY: LINKEDIN_POST_ID_HMAC_KEY is required")
+    identity_key_epoch = os.environ.get("LINKEDIN_POST_ID_HMAC_EPOCH", "")
+    if not identity_key_epoch:
+        raise SystemExit("BLOCKED_PRIVACY_EPOCH: LINKEDIN_POST_ID_HMAC_EPOCH is required")
+
+    current = analyze_export(
+        args.xlsx,
+        _parse_date(args.start),
+        _parse_date(args.end),
+        identity_key=identity_key,
+        identity_key_epoch=identity_key_epoch,
+    )
     previous = None
     if args.previous_json:
         previous = json.loads(Path(args.previous_json).read_text())

@@ -15,4 +15,14 @@ describe('capability workbench registry', () => {
       expect(capability.implementation).toBeTruthy();
     }
   });
+
+  it('requires short-form video output to carry the lowest-sufficient MotionBrief contract', () => {
+    const shortForm = capabilities.find((capability) => capability.id === 'short-form-video-60s-v1');
+    expect(shortForm).toBeDefined();
+    expect(shortForm?.summary).toContain('lowest-sufficient MotionBrief');
+    expect(shortForm?.summary).toContain('generic renderer class');
+    expect(shortForm?.summary).toContain('reduced-motion fallback');
+    expect(shortForm?.implementation).toContain('MotionBrief');
+    expect(shortForm?.risk).toContain('cannot grant itself execution');
+  });
 });

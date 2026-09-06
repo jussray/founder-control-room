@@ -8,6 +8,8 @@ on:
       - 'src/lib/n8nActivationProbe.ts'
       - 'src/lib/n8nConveyor.ts'
       - 'src/lib/v10ConveyorReceiptStore.ts'
+      - 'src/lib/authoritativeN8nFounderContentPublisher.ts'
+      - 'src/lib/__tests__/authoritativeN8nFounderContentRuntimeIdentity.test.ts'
       - 'scripts/verify-n8n-conveyor-live.ts'
       - 'scripts/verify-n8n-runtime-integration.ts'
       - 'scripts/generate-n8n-runtime-proof-plan.ts'
@@ -41,9 +43,10 @@ jobs:
 
     steps:
       - name: Check out exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ env.EXACT_SHA }}
+          persist-credentials: false
 
       - name: Verify immutable target
         shell: bash
@@ -52,13 +55,15 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXACT_SHA"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
-          cache: npm
 
       - name: Install locked dependencies
         run: npm ci
+
+      - name: Verify founder-content runtime identity membrane
+        run: npx vitest run src/lib/__tests__/authoritativeN8nFounderContentRuntimeIdentity.test.ts
 
       - name: Generate exact-head Chief capability plan
         shell: bash
@@ -112,8 +117,7 @@ jobs:
             -v "$PWD:/workspace:ro" --entrypoint n8n n8n \
             import:workflow --input=/workspace/automation/n8n/founder-conveyor.workflow.json
           docker compose -f "$COMPOSE_FILE" run --rm --no-deps \
-            --entrypoint n8n n8n \
-            publish:workflow --id=fcrFounderConveyorV3
+            --entrypoint n8n n8n publish:workflow --id=fcrFounderConveyorV3
 
       - name: Start pinned n8n runtime
         shell: bash
@@ -170,7 +174,7 @@ jobs:
           npx tsx scripts/verify-n8n-runtime-integration.ts | tee n8n-runtime-integration-receipt.json
 
       - name: Upload retained runtime receipt
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: n8n-runtime-integration-${{ env.EXACT_SHA }}
           path: n8n-runtime-integration-receipt.json

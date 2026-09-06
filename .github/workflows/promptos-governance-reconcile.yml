@@ -1,0 +1,298 @@
+name: PromptOS Governance Reconcile
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  reconcile-promptos-governance:
+    if: >-
+      github.event.issue.number == 418 &&
+      github.event.comment.user.id == 286642846 &&
+      github.event.comment.user.login == 'jussray' &&
+      startsWith(github.event.comment.body, '/reconcile-promptos-governance ')
+    name: Reconcile PromptOS GitHub governance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: production
+    concurrency:
+      group: promptos-github-governance-reconcile
+      cancel-in-progress: false
+    env:
+      GITHUB_APP_ID: ${{ secrets.APP_ID }}
+      GITHUB_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+    steps:
+      - name: Parse founder governance command
+        id: command
+        env:
+          COMMAND_BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+
+          body = os.environ.get('COMMAND_BODY', '').strip()
+          parts = body.split()
+          if len(parts) != 4 or parts[0] != '/reconcile-promptos-governance':
+              raise SystemExit(
+                  'Expected exactly: /reconcile-promptos-governance <40-char-fcr-main-sha> <40-char-promptos-main-sha> <approval-reference>'
+              )
+
+          fcr_main_sha, promptos_main_sha, approval = parts[1:]
+          for label, value in (
+              ('FCR current main SHA', fcr_main_sha),
+              ('PromptOS current main SHA', promptos_main_sha),
+          ):
+              if not re.fullmatch(r'[0-9a-f]{40}', value):
+                  raise SystemExit(f'{label} must be a lowercase 40-character commit SHA.')
+          if not re.fullmatch(r'[A-Za-z0-9._:-]{8,200}', approval):
+              raise SystemExit('Approval reference must use 8-200 auditable characters: A-Z a-z 0-9 . _ : -')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'fcr_main_sha={fcr_main_sha}\n')
+              output.write(f'promptos_main_sha={promptos_main_sha}\n')
+              output.write(f'approval_reference={approval}\n')
+          PY
+
+      - name: Check out trusted FCR main only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fail closed unless trusted checkout matches approved exact current FCR main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_FCR_MAIN_SHA: ${{ steps.command.outputs.fcr_main_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          current_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
+          printf 'requested_fcr_main=%s\nchecked_out_trusted_main=%s\ncurrent_fcr_main=%s\n' \
+            "$EXPECTED_FCR_MAIN_SHA" "$actual" "$current_main"
+          test "$actual" = "$current_main"
+          test "$actual" = "$EXPECTED_FCR_MAIN_SHA"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build canonical provider implementation
+        run: npm run build
+
+      - name: Reconcile PromptOS founder-only ruleset and prove provider readback
+        env:
+          EXPECTED_PROMPTOS_MAIN_SHA: ${{ steps.command.outputs.promptos_main_sha }}
+          GOVERNANCE_APPROVAL_REFERENCE: ${{ steps.command.outputs.approval_reference }}
+          GOVERNANCE_COMMAND_COMMENT_ID: ${{ github.event.comment.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs/promises';
+          import { Octokit } from '@octokit/rest';
+          import { providerForProject } from './dist/providers/providerFactory.js';
+          import { getGitHubInstallationToken } from './dist/providers/githubAppAuth.js';
+
+          const FULL_SHA = /^[0-9a-f]{40}$/;
+          const APPROVAL = /^[A-Za-z0-9._:-]{8,200}$/;
+          const PROJECT_ID = 'promptos';
+          const REPOSITORY = 'jussray/promptos';
+          const RULESET_NAME = 'PromptOS main exact-head gate';
+          const REQUIRED_CHECKS = ['Verify PromptOS control room tests', 'CodeQL'];
+          const PROJECT = {
+            repo_provider: 'github',
+            slug: PROJECT_ID,
+            repo_identifier: REPOSITORY,
+          };
+
+          const expectedPromptosMainSha = String(process.env.EXPECTED_PROMPTOS_MAIN_SHA ?? '').trim().toLowerCase();
+          const appId = String(process.env.GITHUB_APP_ID ?? '').trim();
+          const privateKey = String(process.env.GITHUB_PRIVATE_KEY ?? '').trim();
+          const approvalReference = String(process.env.GOVERNANCE_APPROVAL_REFERENCE ?? '').trim();
+          const commandCommentId = String(process.env.GOVERNANCE_COMMAND_COMMENT_ID ?? '').trim();
+
+          let beforeMain = null;
+          let afterMain = null;
+          let result = null;
+          let readback = null;
+          let failure = null;
+          let providerMutationAttempted = false;
+
+          await fs.mkdir('artifacts', { recursive: true });
+
+          try {
+            if (!FULL_SHA.test(expectedPromptosMainSha)) throw new Error('EXPECTED_PROMPTOS_MAIN_SHA must be a lowercase full commit SHA');
+            if (!/^\d+$/.test(appId)) throw new Error('GITHUB_APP_ID must be a numeric trusted App identity');
+            if (!privateKey) throw new Error('GITHUB_PRIVATE_KEY is required');
+            if (!APPROVAL.test(approvalReference)) throw new Error('GOVERNANCE_APPROVAL_REFERENCE is invalid');
+
+            const provider = providerForProject(PROJECT);
+            beforeMain = await provider.resolveRef(PROJECT_ID, 'main');
+            if (beforeMain.toLowerCase() !== expectedPromptosMainSha) {
+              throw new Error(`PromptOS main moved before governance reconciliation: expected ${expectedPromptosMainSha}, observed ${beforeMain}`);
+            }
+            if (!provider.applyBranchRuleset) {
+              throw new Error('Canonical repository provider does not expose applyBranchRuleset');
+            }
+
+            providerMutationAttempted = true;
+            result = await provider.applyBranchRuleset(PROJECT_ID, {
+              name: RULESET_NAME,
+              enforcement: 'active',
+              targetRefs: ['main'],
+              requirePullRequest: true,
+              requiredApprovingReviewCount: 0,
+              requiredStatusCheckNames: REQUIRED_CHECKS,
+              blockForcePushes: true,
+              blockDeletion: true,
+              bypassActors: [],
+            });
+
+            afterMain = await provider.resolveRef(PROJECT_ID, 'main');
+            if (afterMain.toLowerCase() !== expectedPromptosMainSha) {
+              throw new Error(`PromptOS main moved during governance reconciliation: expected ${expectedPromptosMainSha}, observed ${afterMain}`);
+            }
+
+            const installationToken = await getGitHubInstallationToken(appId, privateKey, REPOSITORY);
+            const octokit = new Octokit({ auth: installationToken });
+            const [owner, repo] = REPOSITORY.split('/');
+            const summaries = await octokit.repos.getRepoRulesets({ owner, repo, per_page: 100 });
+            const summary = summaries.data.find((candidate) => candidate.name === RULESET_NAME);
+            if (!summary) throw new Error('PromptOS canonical ruleset missing after provider mutation');
+
+            const current = await octokit.repos.getRepoRuleset({ owner, repo, ruleset_id: summary.id });
+            const rules = current.data.rules ?? [];
+            const pull = rules.find((rule) => rule.type === 'pull_request');
+            const status = rules.find((rule) => rule.type === 'required_status_checks');
+            const ruleTypes = new Set(rules.map((rule) => rule.type));
+            const statusContexts = new Set(status?.parameters?.required_status_checks?.map((entry) => entry.context) ?? []);
+            const includesMain = current.data.conditions?.ref_name?.include?.includes('refs/heads/main') === true;
+            const bypassActors = current.data.bypass_actors ?? [];
+
+            const checks = {
+              activeRulesetAppliesToMain: current.data.enforcement === 'active' && includesMain,
+              founderOnlyPullRequestGate:
+                pull?.parameters?.required_approving_review_count === 0 &&
+                pull?.parameters?.require_code_owner_review === false &&
+                pull?.parameters?.require_last_push_approval === false &&
+                pull?.parameters?.required_review_thread_resolution === true,
+              deletionBlocked: ruleTypes.has('deletion'),
+              nonFastForwardBlocked: ruleTypes.has('non_fast_forward'),
+              strictExactHeadControlRoomCheckRequired:
+                status?.parameters?.strict_required_status_checks_policy === true &&
+                statusContexts.has('Verify PromptOS control room tests'),
+              codeQlRequired: statusContexts.has('CodeQL'),
+              zeroBypassPolicy: bypassActors.length === 0,
+            };
+            const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
+            readback = {
+              rulesetId: String(current.data.id),
+              rulesetName: current.data.name,
+              enforcement: current.data.enforcement,
+              checks,
+              failed,
+            };
+            if (failed.length > 0) {
+              throw new Error(`PromptOS provider readback failed: ${failed.join(', ')}`);
+            }
+
+            console.log(`PromptOS governance reconciliation completed at main=${expectedPromptosMainSha}`);
+            console.log(`ruleset=${result.name} (${result.id})`);
+          } catch (error) {
+            failure = {
+              name: error instanceof Error ? error.name : 'Error',
+              message: error instanceof Error ? error.message : String(error),
+            };
+            throw error;
+          } finally {
+            const providerMutationState = failure
+              ? providerMutationAttempted ? 'UNKNOWN_OR_PARTIAL' : 'NOT_ATTEMPTED'
+              : 'VERIFIED_COMPLETE';
+            await fs.writeFile(
+              'artifacts/promptos-governance-reconcile.json',
+              `${JSON.stringify({
+                schema: 'fcr/promptos-governance-reconcile@v1',
+                repository: REPOSITORY,
+                rulesetName: RULESET_NAME,
+                expectedPromptosMainSha,
+                beforeMain,
+                afterMain,
+                approvalReference,
+                commandCommentId,
+                generatedAt: new Date().toISOString(),
+                providerMutationAttempted,
+                providerMutationState,
+                result,
+                readback,
+                failure,
+                authority: {
+                  authorizesMerge: false,
+                  authorizesBypass: false,
+                  authorizesDeployment: false,
+                },
+              }, null, 2)}\n`,
+              'utf8',
+            );
+          }
+          NODE
+
+      - name: Re-read both mutable main refs after provider mutation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_FCR_MAIN_SHA: ${{ steps.command.outputs.fcr_main_sha }}
+          EXPECTED_PROMPTOS_MAIN_SHA: ${{ steps.command.outputs.promptos_main_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_fcr="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
+          current_promptos="$(gh api 'repos/jussray/promptos/git/ref/heads/main' --jq .object.sha)"
+          printf 'expected_fcr_main=%s\ncurrent_fcr_main=%s\nexpected_promptos_main=%s\ncurrent_promptos_main=%s\n' \
+            "$EXPECTED_FCR_MAIN_SHA" "$current_fcr" "$EXPECTED_PROMPTOS_MAIN_SHA" "$current_promptos"
+          test "$current_fcr" = "$EXPECTED_FCR_MAIN_SHA"
+          test "$current_promptos" = "$EXPECTED_PROMPTOS_MAIN_SHA"
+
+      - name: Retain sanitized PromptOS governance reconciliation receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: promptos-governance-reconcile-${{ steps.command.outputs.promptos_main_sha }}-${{ github.run_id }}
+          path: artifacts/promptos-governance-reconcile.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Summarize bounded PromptOS provider-policy authority
+        env:
+          EXPECTED_PROMPTOS_MAIN_SHA: ${{ steps.command.outputs.promptos_main_sha }}
+          APPROVAL_REFERENCE: ${{ steps.command.outputs.approval_reference }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        shell: bash
+        run: |
+          {
+            echo '## PromptOS GitHub governance reconciliation completed'
+            echo
+            echo "- Exact PromptOS main: \`$EXPECTED_PROMPTOS_MAIN_SHA\`"
+            echo "- Approval reference: \`$APPROVAL_REFERENCE\`"
+            echo "- Command receipt: FCR issue #418 comment \`$COMMENT_ID\`"
+            echo '- Provider mutation path: canonical `providerForProject(...).applyBranchRuleset(...)` only'
+            echo '- Founder-only phase: zero native review dependency, strict exact-head machine evidence retained'
+            echo '- Required checks: `Verify PromptOS control room tests`, `CodeQL`'
+            echo '- Zero bypass actors; deletion and non-fast-forward blocked'
+            echo '- Merge, deployment, database, secret/credential, billing, publication, and branch-deletion authority: none granted by this command'
+          } >> "$GITHUB_STEP_SUMMARY"

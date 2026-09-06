@@ -9,6 +9,7 @@ export interface FounderContentCadenceReservationInput {
   channel: string;
   contentId: string;
   requestedScheduleAt: string;
+  approvalExpiresAt: string;
 }
 
 export interface FounderContentCadenceReservation {
@@ -50,6 +51,7 @@ export interface CadenceSchedulableEnvelope {
   content_id: string;
   provider_request: {
     schedule_at: string;
+    review_deadline?: string | null;
   };
 }
 
@@ -71,12 +73,16 @@ function validateInput(input: FounderContentCadenceReservationInput) {
   const channel = clean(input.channel, 160).toLowerCase();
   const contentId = clean(input.contentId, 80).toLowerCase();
   const requestedScheduleAt = iso(input.requestedScheduleAt, 'requestedScheduleAt');
+  const approvalExpiresAt = iso(input.approvalExpiresAt, 'approvalExpiresAt');
 
   if (!IDENTIFIER.test(provider)) throw new Error('FOUNDER_CONTENT_CADENCE_INVALID: provider is invalid');
   if (!IDENTIFIER.test(channel)) throw new Error('FOUNDER_CONTENT_CADENCE_INVALID: channel is invalid');
   if (!UUID.test(contentId)) throw new Error('FOUNDER_CONTENT_CADENCE_INVALID: contentId must be a UUID');
+  if (Date.parse(requestedScheduleAt) >= Date.parse(approvalExpiresAt)) {
+    throw new Error('FOUNDER_CONTENT_CADENCE_INVALID: approvalExpiresAt must be later than requestedScheduleAt');
+  }
 
-  return { provider, channel, contentId, requestedScheduleAt };
+  return { provider, channel, contentId, requestedScheduleAt, approvalExpiresAt };
 }
 
 function firstRow(data: unknown): Record<string, unknown> | null {
@@ -95,6 +101,7 @@ export async function reserveFounderContentCadence(
     p_channel: validated.channel,
     p_content_id: validated.contentId,
     p_requested_schedule_at: validated.requestedScheduleAt,
+    p_approval_expires_at: validated.approvalExpiresAt,
   });
 
   if (error) {
@@ -114,14 +121,17 @@ export async function reserveFounderContentCadence(
   if (policyId !== FOUNDER_CONTENT_CADENCE_POLICY) {
     throw new Error('FOUNDER_CONTENT_CADENCE_RESERVATION_FAILED: cadence policy identity mismatch');
   }
-  if (requestedScheduleAt !== validated.requestedScheduleAt) {
-    throw new Error('FOUNDER_CONTENT_CADENCE_RESERVATION_FAILED: requested schedule identity mismatch');
+  if (Date.parse(requestedScheduleAt) > Date.parse(validated.requestedScheduleAt)) {
+    throw new Error('FOUNDER_CONTENT_CADENCE_RESERVATION_FAILED: reservation requested schedule may not postdate current request');
   }
   if (!Number.isInteger(deferredSeconds) || deferredSeconds < 0) {
     throw new Error('FOUNDER_CONTENT_CADENCE_RESERVATION_FAILED: deferred seconds is invalid');
   }
   if (Date.parse(reservedScheduleAt) < Date.parse(requestedScheduleAt)) {
     throw new Error('FOUNDER_CONTENT_CADENCE_RESERVATION_FAILED: reserved schedule may not predate requested schedule');
+  }
+  if (Date.parse(reservedScheduleAt) >= Date.parse(validated.approvalExpiresAt)) {
+    throw new Error('FOUNDER_CONTENT_CADENCE_RESERVATION_FAILED: reserved schedule must remain before approval expiry');
   }
 
   return Object.freeze({
@@ -144,13 +154,13 @@ export function applyFounderContentCadenceSchedule<T extends CadenceSchedulableE
   const provider = clean(envelope.provider, 80).toLowerCase();
   const channel = clean(envelope.channel, 160).toLowerCase();
   const contentId = clean(envelope.content_id, 80).toLowerCase();
-  const requestedScheduleAt = iso(envelope.provider_request?.schedule_at, 'envelope.provider_request.schedule_at');
+  const currentRequestedScheduleAt = iso(envelope.provider_request?.schedule_at, 'envelope.provider_request.schedule_at');
 
   if (provider !== reservation.provider || channel !== reservation.channel || contentId !== reservation.contentId) {
     throw new Error('FOUNDER_CONTENT_CADENCE_APPLY_REJECTED: reservation destination identity mismatch');
   }
-  if (requestedScheduleAt !== reservation.requestedScheduleAt) {
-    throw new Error('FOUNDER_CONTENT_CADENCE_APPLY_REJECTED: reservation requested schedule mismatch');
+  if (Date.parse(reservation.requestedScheduleAt) > Date.parse(currentRequestedScheduleAt)) {
+    throw new Error('FOUNDER_CONTENT_CADENCE_APPLY_REJECTED: reservation review origin may not postdate current request');
   }
 
   return {
@@ -158,6 +168,9 @@ export function applyFounderContentCadenceSchedule<T extends CadenceSchedulableE
     provider_request: {
       ...envelope.provider_request,
       schedule_at: reservation.reservedScheduleAt,
+      ...(Object.hasOwn(envelope.provider_request, 'review_deadline')
+        ? { review_deadline: reservation.reservedScheduleAt }
+        : {}),
     },
   } as T;
 }

@@ -95,6 +95,12 @@ function repository(issueResult = true): FounderContentApprovalRepository {
   };
 }
 
+function emptyEditorialHistory() {
+  return {
+    recentLinkedIn: vi.fn(async () => []),
+  };
+}
+
 describe('authoritative founder-content approval issuance', () => {
   it('server-issues an exact founder/proposal/copy/source-bound approval with a bounded TTL', () => {
     const proposalValue = proposal();
@@ -177,6 +183,7 @@ describe('authoritative founder-content approval issuance', () => {
       founderUserId: 'founder-user-1',
       now: '2026-08-19T07:30:00.000Z',
       repository: store,
+      historyRepository: emptyEditorialHistory(),
     })).rejects.toThrow(/could not be persisted/);
     expect(store.issue).toHaveBeenCalledTimes(1);
   });

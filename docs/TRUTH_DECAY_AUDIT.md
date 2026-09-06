@@ -46,6 +46,22 @@ The corrected rule keeps those roles separate: `.github/workflows/playwright.yml
 
 This remains a proof contract, not production proof by itself. The witness must actually run for the relevant release and return terminal exact-SHA evidence before a production-runtime claim becomes current.
 
+## 2026-09 control correction: merged PR identity versus proposal-head identity
+
+The GitHub BuildEvent projection exposed a truth-governance boundary that cannot be inferred from a green proposal head. A pull request can be reviewed and tested at one head SHA, while the authoritative repository identity after merge is the landed `merge_commit_sha` on the base branch. Projecting the proposal head as merged-main identity would make a historically valid review fact masquerade as the repository state that actually landed.
+
+The corrected GitHub webhook projection keeps those identities separate. For a merged pull request, `src/buildEvents/githubBuildEvent.ts` must validate and project the GitHub `merge_commit_sha` as the authoritative landed commit on the base branch while retaining the former PR head separately as `auditedCommitSha`. Non-merged pull requests remain proposal-head observations. Invalid, empty, or all-zero SHAs fail closed instead of being promoted into repository truth.
+
+This separation is still observation, not authority escalation. A webhook-derived BuildEvent may support portfolio-ledger and reconciliation evidence, but it does not by itself authorize merge, prove current `main` after time has passed, prove deployment/runtime identity, or prove publication. Current-state use still requires the appropriate repository/provider revalidation at the use boundary.
+
+## 2026-09 control correction: frozen PR base snapshot versus live base ref
+
+The PR continuity rollover exposed another repository TOCTOU failure. GitHub's pull-request object can retain the base SHA associated with the PR snapshot while the named base branch has already advanced. Comparing the head only against that frozen `pr.base.sha` can therefore report `ahead` and label the carrier `CURRENT` even though the live `base.ref` contains a newer commit that the carrier has never absorbed.
+
+The corrected continuity rule resolves the named base branch through the provider immediately before every ancestry decision. For a root PR, `main` is re-read at use time. For a stacked PR, the live parent branch is re-read at use time. The frozen `pr.base.sha` remains useful historical provenance, but it cannot decide current ancestry, populate the machine `live_base` receipt, or suppress a required rollover.
+
+Update-branch remains fenced by `expected_head_sha`, and the live base is re-observed again after provider races or asynchronous updates. A rollover still creates a new proof subject and grants no merge, deploy, publication, provider-mutation, or production authority. The repair closes a false-current classification; it does not convert continuity into an authority source.
+
 ## Root causes
 
 ### 1. Evidence lifetime was implicit
@@ -356,7 +372,9 @@ The strongest optimization is not faster claiming. It is shortening the distance
 29. A public deployment origin must not be mislabeled as a secret merely because a workflow consumes it; authority classification must follow the sensitivity and mutation boundary of the value.
 30. A predecessor Playwright success cannot prove a cross-repository federation successor after either repository head, peer proof contract, peer runtime identity, or serialized wire shape moves.
 31. A privileged `workflow_run` witness may consume an upstream release SHA as evidence, but it cannot execute that upstream checkout or treat upstream success as executable trust.
+32. A merged PR's proposal head is not the landed base-branch identity; merged-state projection must bind the validated merge commit while preserving the reviewed head separately.
+33. A frozen `pr.base.sha` cannot prove current ancestry after the named base branch moves; continuity must resolve the live `base.ref` at the use boundary.
 
 ## Rollback
 
-The Truth Lease, production-specific lease composer, temporal founder-content guards, analytics-authority guard, and Documentation Truth control are additive/fail-closed. Revert the focused contract/test/workflow/documentation change if it causes incompatibility. No database, provider credential, DNS, publication, provider ruleset, or production mutation is performed by the documentation-truth slice.
+The Truth Lease, production-specific lease composer, temporal founder-content guards, analytics-authority guard, PR continuity live-base observation rule, and Documentation Truth control are additive/fail-closed. Revert the focused contract/test/workflow/documentation change if it causes incompatibility. No database, provider credential, DNS, publication, provider ruleset, or production mutation is performed by the documentation-truth slice.

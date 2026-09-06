@@ -23,6 +23,7 @@ import { ChangeProposalController } from '../controllers/ChangeProposalControlle
 import { ManifestController } from '../controllers/ManifestController.js';
 import { MergeIntentController } from '../controllers/MergeIntentController.js';
 import { MissionController } from '../controllers/MissionController.js';
+import { PortfolioLedgerProjectionController } from '../controllers/PortfolioLedgerProjectionController.js';
 import { ProjectController } from '../controllers/ProjectController.js';
 import { ReleaseController } from '../controllers/ReleaseController.js';
 import { ProofGateController } from '../controllers/ProofGateController.js';
@@ -35,6 +36,7 @@ const CONTROLLERS = new Map<string, BaseController>([
   ["ManifestController", new ManifestController()],
   ["MergeIntentController", new MergeIntentController()],
   ["MissionController", new MissionController()],
+  ["PortfolioLedgerProjectionController", new PortfolioLedgerProjectionController()],
   ["ProjectController", new ProjectController()],
   ["ReleaseController", new ReleaseController()],
   ["ProofGateController", new ProofGateController()],

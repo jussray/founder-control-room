@@ -79,8 +79,10 @@ jobs:
     timeout-minutes: 45
     env:
       REPO_CYCLE_OPERATION: ${{ inputs.operation || 'verify' }}
-      TARGET_BRANCH: ${{ inputs.target_branch || github.head_ref || github.ref_name }}
-      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha || github.event.pull_request.head.sha || github.sha }}
+      TARGET_BRANCH: ${{ github.event_name == 'workflow_dispatch' && github.ref_name || github.head_ref || github.ref_name }}
+      EXPECTED_HEAD_SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.pull_request.head.sha || github.sha }}
+      REQUESTED_TARGET_BRANCH: ${{ inputs.target_branch || '' }}
+      REQUESTED_HEAD_SHA: ${{ inputs.expected_head_sha || '' }}
       APPROVAL_SOURCE: founder
       FOUNDER_APPROVAL_ID: ${{ inputs.founder_approval_id || '' }}
 
@@ -90,10 +92,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "Dispatch ref head: ${GITHUB_SHA}"
-          echo "Approved head:     ${EXPECTED_HEAD_SHA}"
-          if [ "${GITHUB_SHA}" != "${EXPECTED_HEAD_SHA}" ]; then
-            echo "::error title=Stale repo-cycle dispatch::Target branch moved before workflow dispatch. Reacquire the current head and dispatch again."
+          echo "Dispatch ref branch: ${TARGET_BRANCH}"
+          echo "Requested branch:    ${REQUESTED_TARGET_BRANCH}"
+          echo "Dispatch ref head:   ${EXPECTED_HEAD_SHA}"
+          echo "Requested head:      ${REQUESTED_HEAD_SHA}"
+          if [ "${REQUESTED_TARGET_BRANCH}" != "${TARGET_BRANCH}" ]; then
+            echo "::error title=Untrusted repo-cycle branch selector::target_branch must exactly match the trusted workflow dispatch ref."
+            exit 1
+          fi
+          if [ "${REQUESTED_HEAD_SHA}" != "${EXPECTED_HEAD_SHA}" ]; then
+            echo "::error title=Stale repo-cycle dispatch::expected_head_sha must exactly match the trusted workflow dispatch SHA. Reacquire the current head and dispatch again."
             exit 1
           fi
 
@@ -126,7 +134,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: npm
 
       - name: Verify Node 24 runtime authority
         run: node scripts/verify-node24-runtime-authority.mjs

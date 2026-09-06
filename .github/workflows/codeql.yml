@@ -113,3 +113,13 @@ jobs:
       uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938
       with:
         category: "/language:${{matrix.language}}"
+        output: codeql-sarif
+
+    - name: Upload exact-head CodeQL SARIF
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: codeql-sarif-${{ matrix.language }}-${{ env.EXPECTED_HEAD_SHA }}
+        path: codeql-sarif
+        if-no-files-found: error
+        retention-days: 7

@@ -64,6 +64,16 @@ FCR_V10_CONVEYOR_CONTRACT = "founder-control-room/n8n-conveyor@v3"
 FCR_V10_MAX_RUNTIME_AUTHORITY = "draft"
 FCR_V10_REGISTRY_RESOLUTION_REQUIRED = "true"
 FCR_V10_RECEIPT_PERSISTENCE_REQUIRED = "true"
+
+# Founder-approved production activation. Buffer is the only runtime-eligible
+# provider for this v1 lane; share-now remains forbidden. Canonical production
+# deployment must verify the four provider-held n8n bindings by name before any
+# Worker mutation, because they are part of [secrets].required while enabled.
+N8N_FOUNDER_CONTENT_ENABLED = "true"
+N8N_FOUNDER_CONTENT_ENABLED_PROVIDERS = "buffer"
+N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_ID = "fcrFounderContentV1"
+N8N_FOUNDER_CONTENT_EXPECTED_RUNTIME_VERSION = "2.32.6"
+
 MCP_EXA_URL = "https://mcp.exa.ai/mcp"
 MCP_RESEND_URL = "https://mcp.resend.com/mcp"
 
@@ -83,6 +93,10 @@ required = [
   "FOUNDER_SIGNAL_ENGINE_MCP_TOKEN",
   "ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL",
   "FOUNDER_REVIEW_EMAIL_INGRESS_SECRET",
+  "N8N_FOUNDER_CONTENT_WEBHOOK_URL",
+  "N8N_FOUNDER_CONTENT_BEARER_TOKEN",
+  "N8N_FOUNDER_CONTENT_EXPECTED_WORKFLOW_FINGERPRINT",
+  "N8N_FOUNDER_CONTENT_IDENTITY_HMAC_SECRET",
 ]
 
 # With the duplicate API Worker deleted, this Worker is also the sole owner of
