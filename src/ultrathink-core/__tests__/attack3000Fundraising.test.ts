@@ -8,11 +8,21 @@ import {
 import {
   ATTACK_3000_FUNDRAISING_ADAPTER_ID,
   createFundraisingAttack3000Assessment,
+  deriveFundraisingOptionality,
   deriveFundraisingTerms,
   evaluateFundraisingAttack3000,
   type FundraisingAttack3000Input,
+  type FundraisingCapitalScope,
   type FundraisingMoneyObservation,
 } from '../attack3000Fundraising.js';
+
+const SCOPE: FundraisingCapitalScope = {
+  projectId: 'project-one',
+  legalEntityId: 'entity-one',
+  capitalLaneId: 'founder-os-seed',
+};
+const OBSERVED_AT = '2026-09-05T12:00:00.000Z';
+const AS_OF = '2026-09-06T08:00:00.000Z';
 
 const verifiedSupport = (ref: string): Attack3000Evidence => ({
   classification: 'VERIFIED',
@@ -29,6 +39,9 @@ const verifiedTrigger = (statement: string, triggered = false): Attack3000Trigge
 
 const verifiedMoney = (amountCents: number, ref: string): FundraisingMoneyObservation => ({
   amountCents,
+  currency: 'USD',
+  observedAt: OBSERVED_AT,
+  scope: { ...SCOPE },
   classification: 'VERIFIED',
   evidenceRefs: [ref],
 });
@@ -43,6 +56,26 @@ function baseline(): FundraisingAttack3000Input {
     terms: {
       preMoneyValuation: verifiedMoney(1_000_000_000, 'evidence:pre-money-10m'),
       raiseAmount: verifiedMoney(300_000_000, 'evidence:raise-3m'),
+      context: {
+        expectedScope: { ...SCOPE },
+        asOf: AS_OF,
+        maxEvidenceAgeDays: 30,
+      },
+    },
+    termBurden: {
+      instrument: 'priced-equity',
+      economicRightsKnown: true,
+      controlRightsKnown: true,
+      scope: { ...SCOPE },
+      classification: 'VERIFIED',
+      evidenceRefs: ['evidence:term-sheet-rights'],
+    },
+    optionality: {
+      before: ['bootstrap', 'strategic acquisition', 'follow-on raise'],
+      after: ['strategic acquisition', 'follow-on raise'],
+      scope: { ...SCOPE },
+      classification: 'VERIFIED',
+      evidenceRefs: ['evidence:option-set-review'],
     },
     evidence: {
       valueCreated: verifiedSupport('evidence:milestone-value'),
@@ -68,6 +101,7 @@ describe('Attack 3000 fundraising evidence adapter', () => {
     const result = deriveFundraisingTerms(baseline().terms);
 
     expect(result.classification).toBe('VERIFIED');
+    expect(result.currency).toBe('USD');
     expect(result.postMoneyValuationCents).toBe(1_300_000_000);
     expect(result.impliedDilutionPct).toBeCloseTo(23.076923, 5);
     expect(result.retainedOwnershipPct).toBeCloseTo(76.923077, 5);
@@ -75,21 +109,31 @@ describe('Attack 3000 fundraising evidence adapter', () => {
   });
 
   it('maps fundraising evidence into the canonical Attack 3000 dimensions', () => {
-    const { assessment } = createFundraisingAttack3000Assessment(baseline());
+    const { assessment, optionality, termBurden } = createFundraisingAttack3000Assessment(baseline());
 
     expect(assessment.adapterId).toBe(ATTACK_3000_FUNDRAISING_ADAPTER_ID);
     expect(assessment.subject.domain).toBe('fundraising');
     expect(assessment.dimensions.value_created?.evidenceRefs).toContain('evidence:milestone-value');
     expect(assessment.dimensions.external_demand?.evidenceRefs).toContain('evidence:external-demand');
     expect(assessment.dimensions.economics?.evidenceRefs).toEqual(
-      expect.arrayContaining(['evidence:capital-efficiency', 'evidence:pre-money-10m', 'evidence:raise-3m']),
+      expect.arrayContaining([
+        'evidence:capital-efficiency',
+        'evidence:pre-money-10m',
+        'evidence:raise-3m',
+        'evidence:term-sheet-rights',
+      ]),
     );
+    expect(assessment.dimensions.opportunity_cost?.evidenceRefs).toContain('evidence:option-set-review');
+    expect(termBurden.completeness).toBe('COMPLETE');
+    expect(optionality.state).toBe('CONSTRAINED');
+    expect(optionality.weakenedOptions).toEqual(['bootstrap']);
   });
 
   it('supports a fully verified financing case but still grants zero execution authority', () => {
     const result = evaluateFundraisingAttack3000(baseline());
 
     expect(result.evaluation.verdict).toBe('SUPPORTED');
+    expect(result.optionality.state).toBe('CONSTRAINED');
     expect(result.evaluation.authority).toEqual(ATTACK_3000_AUTHORITY_CEILING);
     expect(Object.values(result.evaluation.authority).every((value) => value === false)).toBe(true);
   });
@@ -119,6 +163,7 @@ describe('Attack 3000 fundraising evidence adapter', () => {
     const result = evaluateFundraisingAttack3000(input);
 
     expect(result.terms.classification).toBe('UNKNOWN');
+    expect(result.terms.impliedDilutionPct).toBeNull();
     expect(result.terms.reasons).toContain('raise_amount:verified_without_evidence');
     expect(result.evaluation.verdict).toBe('HOLD');
     expect(result.evaluation.reasons).toContain('dimension:economics:unknown');
@@ -134,6 +179,147 @@ describe('Attack 3000 fundraising evidence adapter', () => {
     expect(result.terms.postMoneyValuationCents).toBeNull();
     expect(result.terms.impliedDilutionPct).toBeNull();
     expect(result.terms.reasons).toContain('raise_amount:invalid_amount');
+    expect(result.evaluation.verdict).toBe('HOLD');
+  });
+
+  it('fails closed when money observations use different currencies', () => {
+    const input = baseline();
+    input.terms.raiseAmount = {
+      ...input.terms.raiseAmount,
+      currency: 'EUR',
+    };
+
+    const result = evaluateFundraisingAttack3000(input);
+
+    expect(result.terms.classification).toBe('UNKNOWN');
+    expect(result.terms.currency).toBeNull();
+    expect(result.terms.impliedDilutionPct).toBeNull();
+    expect(result.terms.reasons).toContain('terms:currency_mismatch');
+    expect(result.evaluation.verdict).toBe('HOLD');
+  });
+
+  it('fails closed on stale money evidence instead of reusing old runway economics', () => {
+    const input = baseline();
+    input.terms.preMoneyValuation = {
+      ...input.terms.preMoneyValuation,
+      observedAt: '2026-01-01T00:00:00.000Z',
+    };
+
+    const result = evaluateFundraisingAttack3000(input);
+
+    expect(result.terms.classification).toBe('UNKNOWN');
+    expect(result.terms.postMoneyValuationCents).toBeNull();
+    expect(result.terms.reasons).toContain('pre_money:stale_evidence');
+    expect(result.evaluation.verdict).toBe('HOLD');
+  });
+
+  it('fails closed when financing evidence comes from a different legal entity or capital lane', () => {
+    const input = baseline();
+    input.terms.raiseAmount = {
+      ...input.terms.raiseAmount,
+      scope: {
+        ...SCOPE,
+        legalEntityId: 'entity-two',
+      },
+    };
+
+    const result = evaluateFundraisingAttack3000(input);
+
+    expect(result.terms.classification).toBe('UNKNOWN');
+    expect(result.terms.reasons).toContain('raise_amount:scope_mismatch');
+    expect(result.evaluation.verdict).toBe('HOLD');
+  });
+
+  it('fails closed when the assessment subject project does not match the capital scope', () => {
+    const input = baseline();
+    input.subject = {
+      ...input.subject,
+      projectId: 'project-two',
+    };
+
+    const result = evaluateFundraisingAttack3000(input);
+
+    expect(result.terms.classification).toBe('UNKNOWN');
+    expect(result.terms.postMoneyValuationCents).toBeNull();
+    expect(result.terms.reasons).toContain('subject:project_scope_mismatch');
+    expect(result.evaluation.verdict).toBe('HOLD');
+  });
+
+  it('holds when valuation is known but economic or control rights are not', () => {
+    const input = baseline();
+    input.termBurden = {
+      ...input.termBurden!,
+      controlRightsKnown: false,
+    };
+
+    const result = evaluateFundraisingAttack3000(input);
+
+    expect(result.termBurden.classification).toBe('UNKNOWN');
+    expect(result.termBurden.completeness).toBe('INCOMPLETE');
+    expect(result.termBurden.reasons).toContain('term_burden:control_rights_unknown');
+    expect(result.evaluation.verdict).toBe('HOLD');
+    expect(result.evaluation.reasons).toContain('dimension:economics:unknown');
+  });
+
+  it('holds when non-dilution financing terms are missing entirely', () => {
+    const input = baseline();
+    input.termBurden = undefined;
+
+    const result = evaluateFundraisingAttack3000(input);
+
+    expect(result.termBurden.classification).toBe('UNKNOWN');
+    expect(result.termBurden.reasons).toContain('term_burden:missing');
+    expect(result.evaluation.verdict).toBe('HOLD');
+  });
+
+  it('classifies option-set change without manufacturing a score or automatic financing authority', () => {
+    const input = baseline();
+    const optionality = deriveFundraisingOptionality(input.optionality, SCOPE);
+
+    expect(optionality.state).toBe('CONSTRAINED');
+    expect(optionality.preservedOptions).toEqual(['strategic acquisition', 'follow-on raise']);
+    expect(optionality.weakenedOptions).toEqual(['bootstrap']);
+    expect(optionality.addedOptions).toEqual([]);
+
+    const result = evaluateFundraisingAttack3000(input);
+    expect(result.evaluation.authority.authorizesFundraise).toBe(false);
+  });
+
+  it('holds when the future option set is missing instead of assuming optionality is preserved', () => {
+    const input = baseline();
+    input.optionality = undefined;
+
+    const result = evaluateFundraisingAttack3000(input);
+
+    expect(result.optionality.state).toBe('UNKNOWN');
+    expect(result.optionality.reasons).toContain('optionality:missing');
+    expect(result.evaluation.verdict).toBe('HOLD');
+    expect(result.evaluation.reasons).toContain('dimension:opportunity_cost:unknown');
+  });
+
+  it('holds when the option-set comparison is inferred even though the set difference is computable', () => {
+    const input = baseline();
+    input.optionality = {
+      ...input.optionality!,
+      classification: 'INFERRED',
+    };
+
+    const result = evaluateFundraisingAttack3000(input);
+
+    expect(result.optionality.state).toBe('CONSTRAINED');
+    expect(result.optionality.classification).toBe('INFERRED');
+    expect(result.evaluation.verdict).toBe('HOLD');
+    expect(result.evaluation.reasons).toContain('dimension:opportunity_cost:inferred');
+  });
+
+  it('holds when deterministic freshness context is missing', () => {
+    const input = baseline();
+    input.terms.context = undefined;
+
+    const result = evaluateFundraisingAttack3000(input);
+
+    expect(result.terms.classification).toBe('UNKNOWN');
+    expect(result.terms.reasons).toContain('terms_context:missing');
     expect(result.evaluation.verdict).toBe('HOLD');
   });
 
