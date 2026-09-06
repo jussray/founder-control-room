@@ -29,7 +29,10 @@ describe('Founder Control Room Cloudflare topology', () => {
     const app = read('public/control-room/index.html');
     const bootstrap = read('public/control-room/opaque-session-bootstrap.js');
 
-    expect(landing).toContain('href="/control-room/"');
+    expect(landing).toContain('<link rel="canonical" href="https://foundercontrolroom.org/" />');
+    expect(landing).toContain('href="https://foundercontrolroom.org/control-room/"');
+    expect(landing).toContain('href="https://foundercontrolroom.org/guardrails"');
+    expect(landing).not.toContain('href="/control-room/"');
     expect(landing).toContain('The four jobs');
     expect(landing).toContain('View safety boundary');
     expect(app).toContain('src="/control-room/opaque-session-bootstrap.js"');
