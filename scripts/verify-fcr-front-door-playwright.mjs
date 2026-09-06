@@ -16,7 +16,7 @@ const context = await browser.newContext();
 const page = await context.newPage();
 
 const receipt = {
-  schemaVersion: 2,
+  schemaVersion: 1,
   scope: 'fcr-access-front-door-browser-proof',
   observedAt: new Date().toISOString(),
   expectedHeadSha,
