@@ -1,10 +1,11 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind the current evidence-authority Playwright federation, privileged production-witness changes, retained FCR repository-provider governance invariants, GitHub App credential transport normalization, deterministic review witness publication boundary, and the Chief governance observation/verification boundary to truthful documentation without claiming live GitHub mutation, Chief ruleset mutation, StoryEngine, Cloudflare provider state, deployment, merge, publication, database, secret, billing, or destructive-action proof.",
+  "purpose": "Bind the exact #746 evidence-authority and Cloudflare Access recovery changes to documentation while preserving source, provider, runtime, merge, deploy, secret, database, billing, and publication authority as separate proof planes. This receipt documents only the changed repository contracts and does not claim live provider mutation, production equivalence, or founder authorization.",
   "domains": [
     "repository-provider",
     "evidence-authority",
-    "merge-authority"
+    "merge-authority",
+    "cloudflare-authority"
   ],
   "changes": [
     {
@@ -50,7 +51,23 @@
       "path": ".github/workflows/playwright.yml",
       "claims": [
         ".github/workflows/playwright.yml must keep the StoryEngine product-build federation witness bound to the canonical root directive wire shape, require both node-test and playwright proof, and verify the exact peer runtime identity before and after execution without granting merge, deploy, production-promotion, or provider-mutation authority.",
+        ".github/workflows/playwright.yml must treat STORYENGINE_PEER_SHA as an exact evidence dependency: when the separately versioned StoryEngine carrier advances, FCR cannot reuse predecessor green and requires rebinding to a separately exact-head-proven peer followed by a complete successor federation witness.",
         ".github/workflows/playwright.yml must keep the privileged production workflow_run witness restricted to successful Deploy workflow_dispatch runs from main, execute only trusted witness source instead of the Deploy run head, and treat workflow_run.head_sha as release evidence rather than executable authority."
+      ]
+    },
+    {
+      "path": ".github/workflows/fcr-access-front-door-recovery.yml",
+      "claims": [
+        ".github/workflows/fcr-access-front-door-recovery.yml must bind inspection and any mutation to an exact approved SHA that still equals current main, use the dedicated read credential only for inspection and the dedicated admin credential only for apply/rollback, and require an auditable founder approval reference when apply=true.",
+        ".github/workflows/fcr-access-front-door-recovery.yml may mutate only the exact foundercontrolroom.org/* public Access destination through the managed Everyone-bypass application, must preserve unrelated all-workers protection and avoid DNS, Worker-route, database, or unrelated Access mutation, and must roll back only the run-created managed application when post-apply anonymous Playwright proof fails.",
+        ".github/workflows/fcr-access-front-door-recovery.yml must publish only its bounded sanitized public receipt; raw provider/browser receipts, managed application IDs, final origins, raw errors, blockers, and approval references must not be promoted into public proof."
+      ]
+    },
+    {
+      "path": "scripts/reconcile-cloudflare-access-public-zone.mjs",
+      "claims": [
+        "scripts/reconcile-cloudflare-access-public-zone.mjs must stay pinned to the canonical FCR Cloudflare account and foundercontrolroom.org zone, fail closed on credential/provider ambiguity or existing foreign ownership of the exact public destination, and create only the named managed foundercontrolroom.org/* public Access application with an Everyone bypass policy when separately authorized.",
+        "scripts/reconcile-cloudflare-access-public-zone.mjs rollback may delete only the uniquely reacquired run-created managed application whose receipt, account, zone, application ID, name, and exact destination still match; drift or ambiguity must block rollback rather than widen deletion authority."
       ]
     }
   ]

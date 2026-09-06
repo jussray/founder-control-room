@@ -22,7 +22,8 @@ env:
   PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
-  STORYENGINE_PEER_SHA: abd4aab9f33e6c67d7863bd1a03c917901a00668
+  STORYENGINE_PEER_SHA: 9a3a1e1db4d29923138b0a6c0da3d23650f2e6bd
+  STORYENGINE_PEER_REF: refs/heads/feat/intent-aware-inbound-routing-20260825
   STORYENGINE_PEER_URL: http://127.0.0.1:3901
   STORYENGINE_PEER_API_KEY: fcr-ci-product-build
 
@@ -100,6 +101,15 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
 
+      - name: Verify live StoryEngine peer ref still pinned
+        shell: bash
+        run: |
+          set -euo pipefail
+          live="$(git ls-remote https://github.com/jussray/StoryEngine.git "$STORYENGINE_PEER_REF" | awk 'NR==1 {print $1}')"
+          printf 'storyengine_live_ref=%s\nstoryengine_expected=%s\nstoryengine_live=%s\n' "$STORYENGINE_PEER_REF" "$STORYENGINE_PEER_SHA" "$live"
+          test -n "$live"
+          test "$live" = "$STORYENGINE_PEER_SHA"
+
       - name: Check out exact StoryEngine federation peer
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -122,7 +132,7 @@ jobs:
       - name: Start exact StoryEngine federation runtime
         shell: bash
         env:
-          L99_API_KEYS_JSON: '[{"key":"fcr-ci-product-build","actor_id":"founder-control-room","tenant_id":"juss","role":"administrator","workspace_ids":["*"]}]'
+          L99_API_KEYS_JSON: '[{"key":"fcr-ci-product-build","actor_id":"fcr-storyengine-control-room","tenant_id":"founder-control-room","role":"administrator","workspace_ids":["*"]}]'
         run: |
           set -euo pipefail
           mkdir -p logs

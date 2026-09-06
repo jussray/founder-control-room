@@ -67,7 +67,7 @@ function response(value: unknown, status = 200) {
 }
 
 describe('StoryEngine product-build federation', () => {
-  it('performs one exact-head request and reconciles the returned receipt', async () => {
+  it('performs one exact-head request and reconciles the returned receipt without upgrading execution evidence to outcome proof', async () => {
     const buildDirective = directive();
     const calls: Array<{ url: string; init?: { method?: string; body?: string } }> = [];
     const results = [
@@ -94,9 +94,10 @@ describe('StoryEngine product-build federation', () => {
       fetchImpl,
     });
 
-    expect(reconciled.state).toBe('verified');
+    expect(reconciled.state).toBe('execution_reconciled');
     expect(reconciled.exactHeadVerified).toBe(true);
     expect(reconciled.receiptVerified).toBe(true);
+    expect(reconciled.outcomeVerified).toBe(false);
     expect(reconciled.receipt.changedResources).toEqual(['control-room:event-log']);
     expect(reconciled.mergePerformed).toBe(false);
     expect(reconciled.deployPerformed).toBe(false);

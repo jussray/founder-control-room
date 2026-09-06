@@ -91,7 +91,7 @@ describe('StoryEngine product-build receipt ingress', () => {
     expect(response.body.code).toBe('PRODUCT_BUILD_RECEIPT_TOKEN_INVALID');
   });
 
-  it('reconciles an exact directive/receipt/runtime identity packet without granting extra authority', async () => {
+  it('reconciles exact execution evidence without upgrading it to outcome truth or authority', async () => {
     const buildDirective = directive();
     const buildReceipt = receipt(buildDirective.directiveHash);
     const response = await request(buildApp())
@@ -110,17 +110,19 @@ describe('StoryEngine product-build receipt ingress', () => {
       ok: true,
       accepted: true,
       reconciled: true,
-      evidenceState: 'verified-in-request',
+      evidenceState: 'execution-reconciled-in-request',
+      outcomeVerified: false,
       durablePersistencePerformed: false,
       replayProtectionPerformed: false,
       mergeAuthorized: false,
       deployAuthorized: false,
       providerMutationAuthorized: false,
       reconciliation: {
-        state: 'verified',
+        state: 'execution_reconciled',
         exactHeadVerified: true,
         serviceIdentityVerified: true,
         receiptVerified: true,
+        outcomeVerified: false,
       },
     });
   });

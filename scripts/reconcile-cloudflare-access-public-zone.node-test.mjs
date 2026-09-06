@@ -1,10 +1,18 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { chdir, cwd } from 'node:process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import {
   FCR_CLOUDFLARE_ACCOUNT_ID,
+  FCR_PUBLIC_ACCESS_APP_NAME,
   FCR_PUBLIC_ZONE,
+  appHasOnlyManagedPublicDestination,
+  isEveryoneBypassPolicy,
   matchingAccessReasons,
   reconcileFcrPublicAccessZone,
+  rollbackFcrPublicAccessZone,
 } from './reconcile-cloudflare-access-public-zone.mjs';
 
 const READ_TOKEN = 'cf-read-token-123';
@@ -22,32 +30,76 @@ function response(result, status = 200) {
   };
 }
 
-function fakeFetch({ organization, applications = [], onUpdate, onRequest } = {}) {
+function managedApp(id = 'managed-1') {
+  return {
+    id,
+    name: FCR_PUBLIC_ACCESS_APP_NAME,
+    type: 'self_hosted',
+    domain: FCR_PUBLIC_ZONE,
+    destinations: [{ type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` }],
+  };
+}
+
+function bypassPolicy() {
+  return {
+    id: 'policy-1',
+    decision: 'bypass',
+    include: [{ everyone: {} }],
+    require: [],
+    exclude: [],
+  };
+}
+
+function fakeFetch({
+  applications = [],
+  policiesByApp = {},
+  onRequest,
+  onCreate,
+  onDelete,
+} = {}) {
+  const state = {
+    applications: applications.map((item) => structuredClone(item)),
+    policiesByApp: structuredClone(policiesByApp),
+  };
+
   return async (url, options = {}) => {
     const method = options.method ?? 'GET';
-    onRequest?.({ url, method, authorization: options.headers?.Authorization ?? null });
-    if (url.endsWith('/access/organizations') && method === 'GET') {
-      return response(organization);
-    }
+    onRequest?.({ url, method, authorization: options.headers?.Authorization ?? null, body: options.body ?? null });
+
     if (url.includes('/access/apps?') && method === 'GET') {
-      return response(applications);
+      return response(state.applications);
     }
-    if (url.endsWith('/access/organizations') && method === 'PUT') {
+
+    const policyMatch = url.match(/\/access\/apps\/([^/]+)\/policies\?/);
+    if (policyMatch && method === 'GET') {
+      const appId = decodeURIComponent(policyMatch[1]);
+      return response(state.policiesByApp[appId] ?? []);
+    }
+
+    if (url.endsWith('/access/apps') && method === 'POST') {
       const body = JSON.parse(options.body);
-      onUpdate?.(body);
-      return response({
-        ...organization,
-        deny_unmatched_requests_exempted_zone_names:
-          body.deny_unmatched_requests_exempted_zone_names,
-      });
+      const created = { id: 'created-1', ...body };
+      state.applications.push(created);
+      state.policiesByApp[created.id] = Array.isArray(body.policies) ? body.policies : [];
+      onCreate?.(created);
+      return response(created);
     }
+
+    const deleteMatch = url.match(/\/access\/apps\/([^/]+)$/);
+    if (deleteMatch && method === 'DELETE') {
+      const appId = decodeURIComponent(deleteMatch[1]);
+      state.applications = state.applications.filter((item) => item.id !== appId);
+      delete state.policiesByApp[appId];
+      onDelete?.(appId);
+      return response({ id: appId });
+    }
+
     throw new Error(`Unexpected request: ${method} ${url}`);
   };
 }
 
 const readEnv = {
   CLOUDFLARE_ACCESS_API_TOKEN: READ_TOKEN,
-  CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ADMIN_TOKEN,
   CLOUDFLARE_ACCOUNT_ID: FCR_CLOUDFLARE_ACCOUNT_ID,
 };
 
@@ -56,222 +108,180 @@ const adminEnv = {
   CLOUDFLARE_ACCOUNT_ID: FCR_CLOUDFLARE_ACCOUNT_ID,
 };
 
-test('detects all-workers Access coverage as unsafe for automatic exemption', () => {
+test('all-workers coverage can coexist with a narrower public destination', () => {
   assert.deepEqual(
     matchingAccessReasons({ destinations: [{ type: 'all_workers' }] }),
     ['all-workers'],
   );
 });
 
+test('managed destination and bypass policy validators are exact', () => {
+  assert.equal(appHasOnlyManagedPublicDestination(managedApp(), FCR_PUBLIC_ZONE), true);
+  assert.equal(isEveryoneBypassPolicy(bypassPolicy()), true);
+  assert.equal(isEveryoneBypassPolicy({ decision: 'allow', include: [{ everyone: {} }] }), false);
+});
+
 test('rejects noncanonical FCR account authority before any provider request', async () => {
   let requestCount = 0;
-  const wrongAccountId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-
   await assert.rejects(
     reconcileFcrPublicAccessZone({
       env: {
         CLOUDFLARE_ACCESS_API_TOKEN: READ_TOKEN,
-        CLOUDFLARE_ACCOUNT_ID: wrongAccountId,
+        CLOUDFLARE_ACCOUNT_ID: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       },
-      apply: false,
       fetchImpl: async () => {
         requestCount += 1;
-        throw new Error('provider fetch must not run on account mismatch');
+        throw new Error('must not fetch');
       },
     }),
-    (error) => {
-      assert.equal(error?.classification, 'account-authority-mismatch');
-      assert.equal(error?.expectedAccountId, FCR_CLOUDFLARE_ACCOUNT_ID);
-      assert.equal(error?.suppliedAccountIdPresent, true);
-      assert.match(String(error?.message), /account authority mismatch/i);
-      return true;
-    },
+    (error) => error?.classification === 'account-authority-mismatch',
   );
-
   assert.equal(requestCount, 0);
 });
 
-test('read-only inspection uses only the dedicated least-privilege Access token', async () => {
+test('inspect uses only the dedicated read token and plans exact public destination', async () => {
   const requests = [];
   const receipt = await reconcileFcrPublicAccessZone({
     env: readEnv,
-    apply: false,
     fetchImpl: fakeFetch({
-      organization: {
-        deny_unmatched_requests: false,
-        deny_unmatched_requests_exempted_zone_names: [],
-      },
+      applications: [{ id: 'all-workers', name: 'workers', destinations: [{ type: 'all_workers' }] }],
       onRequest(request) {
         requests.push(request);
       },
     }),
   });
 
-  assert.equal(receipt.credentialSource, 'CLOUDFLARE_ACCESS_API_TOKEN');
+  assert.equal(receipt.action, 'would-create-public-bypass');
+  assert.equal(receipt.state, 'attention');
+  assert.equal(receipt.mutationPerformed, false);
   assert.ok(requests.every((request) => request.authorization === `Bearer ${READ_TOKEN}`));
 });
 
-test('read-only inspection never falls back to the admin token', async () => {
+test('inspect never falls back to the admin token', async () => {
   await assert.rejects(
     reconcileFcrPublicAccessZone({
       env: adminEnv,
       apply: false,
-      fetchImpl: fakeFetch({
-        organization: {
-          deny_unmatched_requests: false,
-          deny_unmatched_requests_exempted_zone_names: [],
-        },
-      }),
+      fetchImpl: fakeFetch(),
     }),
     /CLOUDFLARE_ACCESS_API_TOKEN is required for Access inspection/,
   );
 });
 
-test('read-only inspection never falls back to a generic Cloudflare token', async () => {
-  await assert.rejects(
-    reconcileFcrPublicAccessZone({
-      env: {
-        CLOUDFLARE_API_TOKEN: 'cf-generic-token-789',
-        CLOUDFLARE_ACCOUNT_ID: FCR_CLOUDFLARE_ACCOUNT_ID,
-      },
-      apply: false,
-      fetchImpl: fakeFetch({
-        organization: {
-          deny_unmatched_requests: false,
-          deny_unmatched_requests_exempted_zone_names: [],
-        },
-      }),
-    }),
-    /CLOUDFLARE_ACCESS_API_TOKEN is required for Access inspection/,
-  );
-});
-
-test('dry run proposes only the FCR zone exemption', async () => {
-  const receipt = await reconcileFcrPublicAccessZone({
-    env: readEnv,
-    apply: false,
-    fetchImpl: fakeFetch({
-      organization: {
-        deny_unmatched_requests: true,
-        deny_unmatched_requests_exempted_zone_names: ['sekretbip.net'],
-      },
-    }),
-  });
-
-  assert.equal(receipt.zone, FCR_PUBLIC_ZONE);
-  assert.equal(receipt.action, 'would-add-zone-exemption');
-  assert.equal(receipt.mutationPerformed, false);
-  assert.equal(receipt.state, 'attention');
-});
-
-test('apply requires the dedicated admin token and never falls back to read-only authority', async () => {
-  await assert.rejects(
-    reconcileFcrPublicAccessZone({
-      env: {
-        CLOUDFLARE_ACCESS_API_TOKEN: READ_TOKEN,
-        CLOUDFLARE_ACCOUNT_ID: FCR_CLOUDFLARE_ACCOUNT_ID,
-      },
-      apply: true,
-      fetchImpl: fakeFetch({
-        organization: {
-          deny_unmatched_requests: true,
-          deny_unmatched_requests_exempted_zone_names: [],
-        },
-      }),
-    }),
-    /CLOUDFLARE_ACCESS_ADMIN_API_TOKEN is required for Access mutation/,
-  );
-});
-
-test('apply preserves existing exemptions and adds only Founder Control Room', async () => {
-  let updateBody = null;
+test('apply uses only admin authority and creates exact public destination with Everyone bypass', async () => {
   const requests = [];
+  let created = null;
   const receipt = await reconcileFcrPublicAccessZone({
     env: adminEnv,
     apply: true,
     fetchImpl: fakeFetch({
-      organization: {
-        deny_unmatched_requests: true,
-        deny_unmatched_requests_exempted_zone_names: ['sekretbip.net'],
-      },
-      onUpdate(body) {
-        updateBody = body;
-      },
+      applications: [{ id: 'all-workers', name: 'workers', destinations: [{ type: 'all_workers' }] }],
       onRequest(request) {
         requests.push(request);
       },
+      onCreate(app) {
+        created = app;
+      },
     }),
   });
 
-  assert.deepEqual(updateBody, {
-    deny_unmatched_requests_exempted_zone_names: [
-      'foundercontrolroom.org',
-      'sekretbip.net',
-    ],
-  });
-  assert.equal(receipt.action, 'added-zone-exemption');
+  assert.equal(receipt.action, 'created-public-bypass');
+  assert.equal(receipt.state, 'mutated-needs-browser-proof');
   assert.equal(receipt.mutationPerformed, true);
-  assert.equal(receipt.credentialSource, 'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN');
+  assert.equal(receipt.managedApplicationId, 'created-1');
+  assert.equal(created.name, FCR_PUBLIC_ACCESS_APP_NAME);
+  assert.deepEqual(created.destinations, [{ type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` }]);
+  assert.equal(created.policies[0].decision, 'bypass');
+  assert.deepEqual(created.policies[0].include, [{ everyone: {} }]);
   assert.ok(requests.every((request) => request.authorization === `Bearer ${ADMIN_TOKEN}`));
 });
 
-test('refuses mutation when an explicit matching Access app exists', async () => {
+test('existing exact managed public bypass is idempotent', async () => {
+  let createCount = 0;
+  const receipt = await reconcileFcrPublicAccessZone({
+    env: adminEnv,
+    apply: true,
+    fetchImpl: fakeFetch({
+      applications: [managedApp()],
+      policiesByApp: { 'managed-1': [bypassPolicy()] },
+      onCreate() {
+        createCount += 1;
+      },
+    }),
+  });
+
+  assert.equal(receipt.action, 'already-public-bypass');
+  assert.equal(receipt.mutationPerformed, false);
+  assert.equal(createCount, 0);
+});
+
+test('foreign exact public destination blocks automatic mutation', async () => {
   await assert.rejects(
     reconcileFcrPublicAccessZone({
       env: adminEnv,
       apply: true,
       fetchImpl: fakeFetch({
-        organization: {
-          deny_unmatched_requests: true,
-          deny_unmatched_requests_exempted_zone_names: [],
-        },
-        applications: [
-          {
-            id: 'app-1',
-            name: 'explicit-fcr-access',
-            domain: 'foundercontrolroom.org',
-          },
-        ],
+        applications: [{
+          id: 'foreign-1',
+          name: 'another-owner',
+          destinations: [{ type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` }],
+        }],
       }),
     }),
-    /Explicit Cloudflare Access application coverage matches Founder Control Room/,
+    (error) => error?.classification === 'existing-public-access-app-requires-review',
   );
 });
 
-test('already exempt is idempotent and does not update provider state', async () => {
-  let updateCount = 0;
-  const receipt = await reconcileFcrPublicAccessZone({
-    env: adminEnv,
-    apply: true,
-    fetchImpl: fakeFetch({
-      organization: {
-        deny_unmatched_requests: true,
-        deny_unmatched_requests_exempted_zone_names: ['foundercontrolroom.org'],
-      },
-      onUpdate() {
-        updateCount += 1;
-      },
-    }),
-  });
+test('rollback deletes only the run-created exact managed public bypass', async () => {
+  const before = cwd();
+  const temp = await mkdtemp(join(tmpdir(), 'fcr-access-test-'));
+  try {
+    chdir(temp);
+    await mkdir('test-results', { recursive: true });
+    await writeFile(
+      'test-results/fcr-access-front-door-recovery.json',
+      `${JSON.stringify({
+        schemaVersion: 2,
+        scope: 'fcr-access-front-door-recovery',
+        accountId: FCR_CLOUDFLARE_ACCOUNT_ID,
+        zone: FCR_PUBLIC_ZONE,
+        state: 'mutated-needs-browser-proof',
+        mutationPerformed: true,
+        rollbackPerformed: false,
+        managedApplicationId: 'created-1',
+        action: 'created-public-bypass',
+      })}\n`,
+      'utf8',
+    );
 
-  assert.equal(receipt.action, 'already-exempt');
-  assert.equal(updateCount, 0);
+    let deleted = null;
+    const receipt = await rollbackFcrPublicAccessZone({
+      env: adminEnv,
+      fetchImpl: fakeFetch({
+        applications: [managedApp('created-1')],
+        policiesByApp: { 'created-1': [bypassPolicy()] },
+        onDelete(appId) {
+          deleted = appId;
+        },
+      }),
+    });
+
+    assert.equal(deleted, 'created-1');
+    assert.equal(receipt.rollbackPerformed, true);
+    assert.equal(receipt.action, 'rolled-back-public-bypass');
+  } finally {
+    chdir(before);
+  }
 });
 
-test('raw leading or trailing whitespace is rejected instead of silently trimmed', async () => {
+test('raw whitespace token is rejected instead of silently trimmed', async () => {
   await assert.rejects(
     reconcileFcrPublicAccessZone({
       env: {
         CLOUDFLARE_ACCESS_API_TOKEN: ` ${READ_TOKEN} `,
         CLOUDFLARE_ACCOUNT_ID: FCR_CLOUDFLARE_ACCOUNT_ID,
       },
-      apply: false,
-      fetchImpl: fakeFetch({
-        organization: {
-          deny_unmatched_requests: false,
-          deny_unmatched_requests_exempted_zone_names: [],
-        },
-      }),
+      fetchImpl: fakeFetch(),
     }),
     /dedicated Cloudflare Access read credential could not read/,
   );

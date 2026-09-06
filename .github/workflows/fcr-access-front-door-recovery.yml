@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       apply:
-        description: 'Apply only the bounded foundercontrolroom.org Access exemption after inspection'
+        description: 'Apply only the exact foundercontrolroom.org public Access destination bypass'
         required: true
         type: boolean
         default: false
@@ -81,11 +81,13 @@ jobs:
             echo "- Exact current main: \`$EXPECTED_HEAD_SHA\`"
             echo "- Apply requested: \`$APPLY\`"
             echo "- Approval reference receipt: \`$approval_reference_receipt\`"
-            echo '- Mutation scope: add foundercontrolroom.org to the existing Access organization exemption list only'
-            echo '- Explicit matching Access application: blocks automatic mutation'
+            echo '- Mutation scope: create only foundercontrolroom.org/* as a public Access destination with Bypass Everyone'
+            echo '- Existing non-managed public destination: blocks automatic mutation'
+            echo '- Existing all-workers protection: preserved'
             echo '- DNS mutation: none'
             echo '- Worker route mutation: none'
             echo '- Database mutation: none'
+            echo '- Failed anonymous browser proof: rollback only the run-created managed Access application'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up Node 24
@@ -104,11 +106,12 @@ jobs:
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
 
       - name: Inspect live Access state without mutation
+        if: inputs.apply != true
         env:
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
         run: node scripts/reconcile-cloudflare-access-public-zone.mjs >/dev/null 2>&1
 
-      - name: Apply bounded Access exemption with dedicated admin authority
+      - name: Apply exact public destination with dedicated admin authority
         if: inputs.apply == true
         env:
           CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
@@ -121,6 +124,12 @@ jobs:
       - name: Verify recovered front door and exact runtime SHA with Playwright
         if: inputs.apply == true
         run: node scripts/verify-fcr-front-door-playwright.mjs >/dev/null 2>&1
+
+      - name: Roll back run-created public destination after failed proof
+        if: failure() && inputs.apply == true
+        env:
+          CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
+        run: node scripts/reconcile-cloudflare-access-public-zone.mjs --rollback >/dev/null 2>&1
 
       - name: Return sanitized recovery receipt to founder control issue
         if: always()
@@ -201,6 +210,7 @@ jobs:
                   )
                   and (.applyRequested | type == "boolean")
                   and (.mutationPerformed | type == "boolean")
+                  and (.rollbackPerformed | type == "boolean")
                   and .accountId == $accountId
                   and .zone == "foundercontrolroom.org"
                   and (.credentialSource | credential_source)
@@ -210,10 +220,10 @@ jobs:
                   and (.matchingApplicationCount == null or (.matchingApplicationCount | type == "number" and floor == . and . >= 0))
                   and (
                     .action == "none"
-                    or .action == "deny-unmatched-disabled"
-                    or .action == "already-exempt"
-                    or .action == "would-add-zone-exemption"
-                    or .action == "added-zone-exemption"
+                    or .action == "would-create-public-bypass"
+                    or .action == "already-public-bypass"
+                    or .action == "created-public-bypass"
+                    or .action == "rolled-back-public-bypass"
                   )
                   and (
                     .classification == null
@@ -222,8 +232,17 @@ jobs:
                     or .classification == "dedicated-read-credential-required"
                     or .classification == "provider-read-failed"
                     or .classification == "provider-credential-invalid"
-                    or .classification == "explicit-access-application-match"
+                    or .classification == "duplicate-managed-public-bypass"
+                    or .classification == "managed-public-bypass-drift"
+                    or .classification == "managed-public-bypass-policy-drift"
+                    or .classification == "existing-public-access-app-requires-review"
+                    or .classification == "provider-apply-failed"
                     or .classification == "provider-recovery-failed"
+                    or .classification == "rollback-scope-mismatch"
+                    or .classification == "rollback-managed-app-id-missing"
+                    or .classification == "rollback-managed-app-not-unique"
+                    or .classification == "rollback-managed-app-drift"
+                    or .classification == "rollback-failed"
                   )
                 )
               ' "$access_receipt" >/dev/null 2>&1; then
@@ -243,6 +262,7 @@ jobs:
                 state,
                 applyRequested,
                 mutationPerformed,
+                rollbackPerformed,
                 accountId,
                 zone,
                 credentialSource,

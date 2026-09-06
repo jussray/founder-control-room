@@ -24,9 +24,12 @@ test('recovery workflow is production-gated and separates read from mutation aut
   assert.match(recoveryWorkflow, new RegExp(ACCOUNT_ID));
   assert.match(recoveryWorkflow, /CLOUDFLARE_ACCESS_API_TOKEN/);
   assert.match(recoveryWorkflow, /CLOUDFLARE_ACCESS_ADMIN_API_TOKEN/);
+  assert.match(recoveryWorkflow, /if: inputs\.apply != true/);
   assert.match(recoveryWorkflow, /if: inputs\.apply == true/);
   assert.match(recoveryWorkflow, /current_main.*EXPECTED_HEAD_SHA/s);
   assert.match(recoveryWorkflow, /verify-fcr-front-door-playwright\.mjs/);
+  assert.match(recoveryWorkflow, /--rollback/);
+  assert.match(recoveryWorkflow, /failure\(\) && inputs\.apply == true/);
 });
 
 test('authority gate never publishes a raw approval reference', () => {
@@ -40,6 +43,8 @@ test('authority gate never publishes a raw approval reference', () => {
   assert.match(authorityStep, /apply=false must not carry approval_reference/);
   assert.match(authorityStep, /Approval reference receipt: \\`\$approval_reference_receipt\\`/);
   assert.doesNotMatch(authorityStep, /Approval reference: \\`\$APPROVAL_REFERENCE\\`/);
+  assert.match(authorityStep, /foundercontrolroom\.org\/\*/);
+  assert.match(authorityStep, /Existing all-workers protection: preserved/);
 });
 
 test('raw recovery receipts remain ephemeral and are suppressed from workflow logs', () => {
@@ -50,6 +55,10 @@ test('raw recovery receipts remain ephemeral and are suppressed from workflow lo
   assert.match(
     recoveryWorkflow,
     /node scripts\/reconcile-cloudflare-access-public-zone\.mjs --apply >\/dev\/null 2>&1/,
+  );
+  assert.match(
+    recoveryWorkflow,
+    /node scripts\/reconcile-cloudflare-access-public-zone\.mjs --rollback >\/dev\/null 2>&1/,
   );
   assert.match(
     recoveryWorkflow,
@@ -87,7 +96,7 @@ test('public receipt validators and projections require exactly one parsed JSON 
   assert.match(returnStep, /single-document public schema allowlist/);
 });
 
-test('Access receipt must pass a bounded field schema before any public projection', () => {
+test('Access receipt schema allows only bounded scoped public-bypass outcomes', () => {
   const returnStep = recoveryWorkflow.match(
     /- name: Return sanitized recovery receipt to founder control issue([\s\S]*?)- name: Upload sanitized recovery evidence/,
   )?.[1] ?? '';
@@ -100,17 +109,19 @@ test('Access receipt must pass a bounded field schema before any public projecti
   assert.match(returnStep, /\.state == "mutated-needs-browser-proof"/);
   assert.match(returnStep, /\.applyRequested \| type == "boolean"/);
   assert.match(returnStep, /\.mutationPerformed \| type == "boolean"/);
+  assert.match(returnStep, /\.rollbackPerformed \| type == "boolean"/);
   assert.match(returnStep, /\.credentialSource \| credential_source/);
   assert.match(returnStep, /\.credentialFailures \| type == "array" and all\(\.\[\]; credential_failure\)/);
   assert.match(returnStep, /\.source == "CLOUDFLARE_ACCESS_API_TOKEN"/);
   assert.match(returnStep, /\.source == "CLOUDFLARE_ACCESS_ADMIN_API_TOKEN"/);
   assert.match(returnStep, /\.reason == "provider-read-failed"/);
   assert.match(returnStep, /\.providerCodes \| type == "array" and all/);
-  assert.match(returnStep, /\.denyUnmatchedRequests \| bool_or_null/);
-  assert.match(returnStep, /\.alreadyExempt \| bool_or_null/);
   assert.match(returnStep, /\.matchingApplicationCount == null/);
-  assert.match(returnStep, /\.action == "would-add-zone-exemption"/);
-  assert.match(returnStep, /\.classification == "explicit-access-application-match"/);
+  assert.match(returnStep, /\.action == "would-create-public-bypass"/);
+  assert.match(returnStep, /\.action == "created-public-bypass"/);
+  assert.match(returnStep, /\.action == "rolled-back-public-bypass"/);
+  assert.match(returnStep, /\.classification == "existing-public-access-app-requires-review"/);
+  assert.match(returnStep, /\.classification == "rollback-managed-app-drift"/);
   assert.match(returnStep, /failed the single-document public schema allowlist/);
 });
 
@@ -139,7 +150,7 @@ test('browser receipt must pass a bounded field schema before derived public boo
   assert.match(returnStep, /errorPresent/);
 });
 
-test('recovery returns only bounded sanitized fields to the fixed founder control issue and summary', () => {
+test('recovery returns only bounded sanitized fields to fixed issue and summary', () => {
   const returnStep = recoveryWorkflow.match(
     /- name: Return sanitized recovery receipt to founder control issue([\s\S]*?)- name: Upload sanitized recovery evidence/,
   )?.[1] ?? '';
@@ -152,12 +163,14 @@ test('recovery returns only bounded sanitized fields to the fixed founder contro
   assert.match(returnStep, /cat "\$public_receipt" >> "\$GITHUB_STEP_SUMMARY"/);
   assert.match(returnStep, /matchingApplicationCount/);
   assert.match(returnStep, /credentialFailures/);
+  assert.match(returnStep, /rollbackPerformed/);
   assert.match(returnStep, /apiVersionMatchesExpectedSha/);
   assert.match(returnStep, /Access provider receipt: `malformed`/);
   assert.match(returnStep, /Browser proof receipt: `malformed`/);
   assert.match(returnStep, /Provider truth: `UNKNOWN`/);
   assert.match(returnStep, /Browser proof: `UNKNOWN`/);
   assert.doesNotMatch(returnStep, /matchingApplications/);
+  assert.doesNotMatch(returnStep, /\n\s*managedApplicationId,?\s*\n/);
   assert.doesNotMatch(returnStep, /\n\s*finalOrigin,\s*\n/);
   assert.doesNotMatch(returnStep, /\n\s*error\s*\n/);
   assert.doesNotMatch(returnStep, /\n\s*blocker,\s*\n/);
@@ -177,12 +190,16 @@ test('artifact persistence contains only the sanitized public receipt', () => {
   assert.doesNotMatch(artifactStep, /fcr-access-front-door-browser-proof\.json/);
 });
 
-test('provider mutation is limited to the Access organization exemption update', () => {
-  const putCalls = [...reconciliation.matchAll(/'PUT'/g)];
-  assert.equal(putCalls.length, 1);
-  assert.match(reconciliation, /\/access\/organizations/);
-  assert.match(reconciliation, /deny_unmatched_requests_exempted_zone_names: nextExemptions/);
-  assert.match(reconciliation, /explicit-access-application-match/);
+test('provider mutation is limited to exact public Access application create/delete', () => {
+  assert.doesNotMatch(reconciliation, /'PUT'/);
+  assert.match(reconciliation, /'POST'/);
+  assert.match(reconciliation, /'DELETE'/);
+  assert.match(reconciliation, /destinations: \[\{ type: 'public', uri: `\$\{zone\}\/\*` \}\]/);
+  assert.match(reconciliation, /decision: 'bypass'/);
+  assert.match(reconciliation, /include: \[\{ everyone: \{\} \}\]/);
+  assert.match(reconciliation, /existing-public-access-app-requires-review/);
+  assert.match(reconciliation, /rollbackFcrPublicAccessZone/);
+  assert.doesNotMatch(reconciliation, /deny_unmatched_requests_exempted_zone_names/);
   assert.doesNotMatch(reconciliation, /\/dns_records|\/routes|wrangler|supabase/i);
 });
 
