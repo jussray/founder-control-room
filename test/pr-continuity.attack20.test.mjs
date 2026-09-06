@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   START_MARKER,
   END_MARKER,
@@ -15,6 +16,7 @@ import {
 
 const repo = 'jussray/example';
 const baseRepo = { full_name: repo };
+const continuitySource = readFileSync(new URL('../scripts/pr-continuity.mjs', import.meta.url), 'utf8');
 
 function pr(number, baseRef, headRef, state = 'open', headRepo = baseRepo) {
   return { number, state, base: { ref: baseRef, repo: baseRepo }, head: { ref: headRef, repo: headRepo } };
@@ -57,4 +59,9 @@ test('AT17 receipt explicitly denies deploy authority', () => assert.match(conti
 test('AT18 stacked dependency graph rolls parent before child', () => assert.deepEqual(collectRolloverOrder([pr(10, 'main', 'parent'), pr(11, 'parent', 'child')]), [10, 11]));
 test('AT19 unrelated stack is excluded', () => assert.deepEqual(collectRolloverOrder([pr(10, 'other', 'child')]), []));
 test('AT20 cyclic malformed stack terminates once per pull', () => assert.deepEqual(collectRolloverOrder([pr(1, 'main', 'a'), pr(2, 'a', 'main')]), [1, 2]));
+test('AT21 continuity compares against the live base ref instead of the PR snapshot SHA', () => {
+  assert.match(continuitySource, /branchSha\(repository, pr\.base\.ref\)/);
+  assert.doesNotMatch(continuitySource, /compare\(repository, pr\.base\.sha, pr\.head\.sha\)/);
+  assert.doesNotMatch(continuitySource, /baseSha:\s*pr\.base\.sha/);
+});
 test('schema remains stable', () => assert.equal(SCHEMA, 'juss/pr-continuity@v1'));
