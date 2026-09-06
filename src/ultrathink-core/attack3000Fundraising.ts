@@ -11,10 +11,70 @@ import {
 
 export const ATTACK_3000_FUNDRAISING_ADAPTER_ID = 'fundraising-capital-milestone@v1' as const;
 
+export interface FundraisingCapitalScope {
+  projectId: string;
+  legalEntityId: string;
+  capitalLaneId: string;
+}
+
 export interface FundraisingMoneyObservation {
   amountCents: number | null;
+  currency?: string;
+  observedAt?: string;
+  scope?: FundraisingCapitalScope;
   classification: Attack3000Reality;
   evidenceRefs: readonly string[];
+}
+
+export interface FundraisingTermsContext {
+  expectedScope: FundraisingCapitalScope;
+  asOf: string;
+  maxEvidenceAgeDays: number;
+}
+
+export interface FundraisingTermBurdenObservation {
+  instrument?: string;
+  economicRightsKnown: boolean;
+  controlRightsKnown: boolean;
+  scope?: FundraisingCapitalScope;
+  classification: Attack3000Reality;
+  evidenceRefs: readonly string[];
+}
+
+export type FundraisingTermBurdenCompleteness = 'COMPLETE' | 'INCOMPLETE' | 'UNKNOWN' | 'BLOCKED';
+
+export interface FundraisingTermBurdenDerivation {
+  classification: Attack3000Reality;
+  completeness: FundraisingTermBurdenCompleteness;
+  instrument: string | null;
+  evidenceRefs: readonly string[];
+  reasons: readonly string[];
+}
+
+export interface FundraisingOptionSetObservation {
+  before: readonly string[];
+  after: readonly string[];
+  scope?: FundraisingCapitalScope;
+  classification: Attack3000Reality;
+  evidenceRefs: readonly string[];
+}
+
+export type FundraisingOptionalityState =
+  | 'PRESERVED'
+  | 'EXPANDED'
+  | 'CONSTRAINED'
+  | 'MIXED'
+  | 'UNKNOWN'
+  | 'BLOCKED';
+
+export interface FundraisingOptionalityDerivation {
+  classification: Attack3000Reality;
+  state: FundraisingOptionalityState;
+  preservedOptions: readonly string[];
+  weakenedOptions: readonly string[];
+  addedOptions: readonly string[];
+  evidenceRefs: readonly string[];
+  reasons: readonly string[];
 }
 
 export interface FundraisingDilutionCeiling {
@@ -26,10 +86,12 @@ export interface FundraisingDilutionCeiling {
 export interface FundraisingTermsInput {
   preMoneyValuation: FundraisingMoneyObservation;
   raiseAmount: FundraisingMoneyObservation;
+  context?: FundraisingTermsContext;
 }
 
 export interface FundraisingTermsDerivation {
   classification: Attack3000Reality;
+  currency: string | null;
   postMoneyValuationCents: number | null;
   impliedDilutionPct: number | null;
   retainedOwnershipPct: number | null;
@@ -62,6 +124,8 @@ export type FundraisingStopCondition =
 export interface FundraisingAttack3000Input {
   subject: Omit<Attack3000Subject, 'domain'>;
   terms: FundraisingTermsInput;
+  termBurden?: FundraisingTermBurdenObservation;
+  optionality?: FundraisingOptionSetObservation;
   evidence: FundraisingAttack3000Evidence;
   falsifier: Attack3000Trigger;
   stopCondition: FundraisingStopCondition;
@@ -69,6 +133,8 @@ export interface FundraisingAttack3000Input {
 
 export interface FundraisingAttack3000Result {
   terms: FundraisingTermsDerivation;
+  termBurden: FundraisingTermBurdenDerivation;
+  optionality: FundraisingOptionalityDerivation;
   assessment: Attack3000Assessment;
   evaluation: Attack3000Evaluation;
 }
@@ -79,6 +145,19 @@ const REALITY_RANK: Readonly<Record<Attack3000Reality, number>> = {
   UNKNOWN: 2,
   BLOCKED: 3,
 };
+
+interface TermsContextValidation {
+  classification: Attack3000Reality;
+  valid: boolean;
+  asOfMs: number | null;
+  maxEvidenceAgeMs: number | null;
+  expectedScope: FundraisingCapitalScope | null;
+}
+
+interface MoneyObservationValidation {
+  classification: Attack3000Reality;
+  usableForArithmetic: boolean;
+}
 
 function weakestReality(...values: Attack3000Reality[]): Attack3000Reality {
   return values.reduce<Attack3000Reality>((worst, current) =>
@@ -94,57 +173,198 @@ function hasEvidence(refs: readonly string[]): boolean {
   return cleanRefs(refs).length > 0;
 }
 
+function nonEmpty(value: string | undefined): boolean {
+  return Boolean(value?.trim());
+}
+
 function validMoney(amountCents: number | null, allowZero: boolean): boolean {
   if (amountCents === null || !Number.isSafeInteger(amountCents)) return false;
   return allowZero ? amountCents >= 0 : amountCents > 0;
+}
+
+function normalizeCurrency(currency: string | undefined): string | null {
+  const normalized = currency?.trim().toUpperCase();
+  return normalized && /^[A-Z]{3}$/.test(normalized) ? normalized : null;
+}
+
+function parseTimestamp(value: string | undefined): number | null {
+  if (!nonEmpty(value)) return null;
+  const parsed = Date.parse(value!);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function validScope(scope: FundraisingCapitalScope | undefined): scope is FundraisingCapitalScope {
+  return Boolean(
+    scope &&
+      nonEmpty(scope.projectId) &&
+      nonEmpty(scope.legalEntityId) &&
+      nonEmpty(scope.capitalLaneId),
+  );
+}
+
+function sameScope(left: FundraisingCapitalScope, right: FundraisingCapitalScope): boolean {
+  return (
+    left.projectId.trim() === right.projectId.trim() &&
+    left.legalEntityId.trim() === right.legalEntityId.trim() &&
+    left.capitalLaneId.trim() === right.capitalLaneId.trim()
+  );
+}
+
+function validateTermsContext(
+  context: FundraisingTermsContext | undefined,
+  reasons: Set<string>,
+): TermsContextValidation {
+  if (!context) {
+    reasons.add('terms_context:missing');
+    return {
+      classification: 'UNKNOWN',
+      valid: false,
+      asOfMs: null,
+      maxEvidenceAgeMs: null,
+      expectedScope: null,
+    };
+  }
+
+  let valid = true;
+  const asOfMs = parseTimestamp(context.asOf);
+  if (asOfMs === null) {
+    reasons.add('terms_context:invalid_as_of');
+    valid = false;
+  }
+
+  const maxEvidenceAgeDays = context.maxEvidenceAgeDays;
+  const validMaxAge = Number.isFinite(maxEvidenceAgeDays) && maxEvidenceAgeDays >= 0;
+  if (!validMaxAge) {
+    reasons.add('terms_context:invalid_max_evidence_age');
+    valid = false;
+  }
+
+  if (!validScope(context.expectedScope)) {
+    reasons.add('terms_context:invalid_expected_scope');
+    valid = false;
+  }
+
+  return {
+    classification: valid ? 'VERIFIED' : 'UNKNOWN',
+    valid,
+    asOfMs,
+    maxEvidenceAgeMs: validMaxAge ? maxEvidenceAgeDays * 24 * 60 * 60 * 1000 : null,
+    expectedScope: validScope(context.expectedScope) ? context.expectedScope : null,
+  };
 }
 
 function observationReality(
   label: 'pre_money' | 'raise_amount',
   observation: FundraisingMoneyObservation,
   allowZero: boolean,
+  context: TermsContextValidation,
   reasons: Set<string>,
-): Attack3000Reality {
+): MoneyObservationValidation {
   let classification = observation.classification;
+  let usableForArithmetic = context.valid;
 
   if (!validMoney(observation.amountCents, allowZero)) {
     reasons.add(`${label}:invalid_amount`);
     classification = weakestReality(classification, 'UNKNOWN');
+    usableForArithmetic = false;
+  }
+
+  if (normalizeCurrency(observation.currency) === null) {
+    reasons.add(`${label}:missing_or_invalid_currency`);
+    classification = weakestReality(classification, 'UNKNOWN');
+    usableForArithmetic = false;
+  }
+
+  const observedAtMs = parseTimestamp(observation.observedAt);
+  if (observedAtMs === null) {
+    reasons.add(`${label}:missing_or_invalid_observed_at`);
+    classification = weakestReality(classification, 'UNKNOWN');
+    usableForArithmetic = false;
+  } else if (context.asOfMs !== null && context.maxEvidenceAgeMs !== null) {
+    if (observedAtMs > context.asOfMs) {
+      reasons.add(`${label}:future_evidence`);
+      classification = weakestReality(classification, 'UNKNOWN');
+      usableForArithmetic = false;
+    } else if (context.asOfMs - observedAtMs > context.maxEvidenceAgeMs) {
+      reasons.add(`${label}:stale_evidence`);
+      classification = weakestReality(classification, 'UNKNOWN');
+      usableForArithmetic = false;
+    }
+  }
+
+  if (!validScope(observation.scope) || !context.expectedScope || !sameScope(observation.scope, context.expectedScope)) {
+    reasons.add(`${label}:scope_mismatch`);
+    classification = weakestReality(classification, 'UNKNOWN');
+    usableForArithmetic = false;
   }
 
   if (observation.classification === 'VERIFIED' && !hasEvidence(observation.evidenceRefs)) {
     reasons.add(`${label}:verified_without_evidence`);
     classification = weakestReality(classification, 'UNKNOWN');
+    usableForArithmetic = false;
   }
 
   if (observation.classification !== 'VERIFIED') {
     reasons.add(`${label}:${observation.classification.toLowerCase()}`);
   }
 
-  return classification;
+  return { classification, usableForArithmetic };
 }
 
 /**
- * Derives only arithmetic from the supplied financing terms. The classification
- * travels with the terms so calculated dilution cannot be mistaken for verified
- * economics when the source observations are inferred, unknown, blocked, or
- * missing evidence.
+ * Derives only arithmetic from the supplied financing terms. Attack 1000 adds
+ * currency, freshness, and legal-entity/capital-lane identity as prerequisites
+ * so cross-lane or stale observations cannot become apparently valid dilution.
  */
 export function deriveFundraisingTerms(input: FundraisingTermsInput): FundraisingTermsDerivation {
   const reasons = new Set<string>();
-  const preMoneyReality = observationReality('pre_money', input.preMoneyValuation, true, reasons);
-  const raiseReality = observationReality('raise_amount', input.raiseAmount, false, reasons);
-  const classification = weakestReality(preMoneyReality, raiseReality);
+  const context = validateTermsContext(input.context, reasons);
+  const preMoneyValidation = observationReality(
+    'pre_money',
+    input.preMoneyValuation,
+    true,
+    context,
+    reasons,
+  );
+  const raiseValidation = observationReality(
+    'raise_amount',
+    input.raiseAmount,
+    false,
+    context,
+    reasons,
+  );
+  let classification = weakestReality(
+    context.classification,
+    preMoneyValidation.classification,
+    raiseValidation.classification,
+  );
   const evidenceRefs = cleanRefs([
     ...input.preMoneyValuation.evidenceRefs,
     ...input.raiseAmount.evidenceRefs,
   ]);
 
+  const preMoneyCurrency = normalizeCurrency(input.preMoneyValuation.currency);
+  const raiseCurrency = normalizeCurrency(input.raiseAmount.currency);
+  const currency = preMoneyCurrency && raiseCurrency && preMoneyCurrency === raiseCurrency
+    ? preMoneyCurrency
+    : null;
+
+  if (preMoneyCurrency && raiseCurrency && preMoneyCurrency !== raiseCurrency) {
+    reasons.add('terms:currency_mismatch');
+    classification = weakestReality(classification, 'UNKNOWN');
+  }
+
   const preMoney = input.preMoneyValuation.amountCents;
   const raiseAmount = input.raiseAmount.amountCents;
-  if (!validMoney(preMoney, true) || !validMoney(raiseAmount, false)) {
+  const arithmeticUsable =
+    preMoneyValidation.usableForArithmetic &&
+    raiseValidation.usableForArithmetic &&
+    currency !== null;
+
+  if (!arithmeticUsable || !validMoney(preMoney, true) || !validMoney(raiseAmount, false)) {
     return {
       classification,
+      currency,
       postMoneyValuationCents: null,
       impliedDilutionPct: null,
       retainedOwnershipPct: null,
@@ -158,6 +378,7 @@ export function deriveFundraisingTerms(input: FundraisingTermsInput): Fundraisin
     reasons.add('post_money:invalid_amount');
     return {
       classification: weakestReality(classification, 'UNKNOWN'),
+      currency,
       postMoneyValuationCents: null,
       impliedDilutionPct: null,
       retainedOwnershipPct: null,
@@ -171,10 +392,192 @@ export function deriveFundraisingTerms(input: FundraisingTermsInput): Fundraisin
 
   return {
     classification,
+    currency,
     postMoneyValuationCents,
     impliedDilutionPct,
     retainedOwnershipPct,
     evidenceRefs,
+    reasons: [...reasons],
+  };
+}
+
+function bindTermsToSubject(
+  terms: FundraisingTermsDerivation,
+  context: FundraisingTermsContext | undefined,
+  subjectProjectId: string | undefined,
+): FundraisingTermsDerivation {
+  if (
+    context &&
+    validScope(context.expectedScope) &&
+    nonEmpty(subjectProjectId) &&
+    context.expectedScope.projectId.trim() === subjectProjectId!.trim()
+  ) {
+    return terms;
+  }
+
+  return {
+    ...terms,
+    classification: weakestReality(terms.classification, 'UNKNOWN'),
+    postMoneyValuationCents: null,
+    impliedDilutionPct: null,
+    retainedOwnershipPct: null,
+    reasons: [...new Set([...terms.reasons, 'subject:project_scope_mismatch'])],
+  };
+}
+
+function deriveTermBurden(
+  observation: FundraisingTermBurdenObservation | undefined,
+  expectedScope: FundraisingCapitalScope | undefined,
+): FundraisingTermBurdenDerivation {
+  if (!observation) {
+    return {
+      classification: 'UNKNOWN',
+      completeness: 'UNKNOWN',
+      instrument: null,
+      evidenceRefs: [],
+      reasons: ['term_burden:missing'],
+    };
+  }
+
+  const reasons = new Set<string>();
+  let classification = observation.classification;
+  const instrument = observation.instrument?.trim() || null;
+
+  if (!instrument) {
+    reasons.add('term_burden:missing_instrument');
+    classification = weakestReality(classification, 'UNKNOWN');
+  }
+
+  if (!observation.economicRightsKnown) {
+    reasons.add('term_burden:economic_rights_unknown');
+    classification = weakestReality(classification, 'UNKNOWN');
+  }
+
+  if (!observation.controlRightsKnown) {
+    reasons.add('term_burden:control_rights_unknown');
+    classification = weakestReality(classification, 'UNKNOWN');
+  }
+
+  if (
+    !validScope(observation.scope) ||
+    !expectedScope ||
+    !validScope(expectedScope) ||
+    !sameScope(observation.scope, expectedScope)
+  ) {
+    reasons.add('term_burden:scope_mismatch');
+    classification = weakestReality(classification, 'UNKNOWN');
+  }
+
+  if (observation.classification === 'VERIFIED' && !hasEvidence(observation.evidenceRefs)) {
+    reasons.add('term_burden:verified_without_evidence');
+    classification = weakestReality(classification, 'UNKNOWN');
+  }
+
+  if (observation.classification !== 'VERIFIED') {
+    reasons.add(`term_burden:${observation.classification.toLowerCase()}`);
+  }
+
+  const completeness: FundraisingTermBurdenCompleteness =
+    classification === 'BLOCKED'
+      ? 'BLOCKED'
+      : classification === 'VERIFIED' &&
+          instrument !== null &&
+          observation.economicRightsKnown &&
+          observation.controlRightsKnown
+        ? 'COMPLETE'
+        : 'INCOMPLETE';
+
+  return {
+    classification,
+    completeness,
+    instrument,
+    evidenceRefs: cleanRefs(observation.evidenceRefs),
+    reasons: [...reasons],
+  };
+}
+
+function normalizeOptions(options: readonly string[]): string[] {
+  return [...new Set(options.map((option) => option.trim()).filter(Boolean))];
+}
+
+export function deriveFundraisingOptionality(
+  observation: FundraisingOptionSetObservation | undefined,
+  expectedScope?: FundraisingCapitalScope,
+): FundraisingOptionalityDerivation {
+  if (!observation) {
+    return {
+      classification: 'UNKNOWN',
+      state: 'UNKNOWN',
+      preservedOptions: [],
+      weakenedOptions: [],
+      addedOptions: [],
+      evidenceRefs: [],
+      reasons: ['optionality:missing'],
+    };
+  }
+
+  const reasons = new Set<string>();
+  let classification = observation.classification;
+  const before = normalizeOptions(observation.before);
+  const after = normalizeOptions(observation.after);
+
+  if (before.length === 0) {
+    reasons.add('optionality:missing_before_set');
+    classification = weakestReality(classification, 'UNKNOWN');
+  }
+
+  if (after.length === 0) {
+    reasons.add('optionality:missing_after_set');
+    classification = weakestReality(classification, 'UNKNOWN');
+  }
+
+  if (
+    !validScope(observation.scope) ||
+    !expectedScope ||
+    !validScope(expectedScope) ||
+    !sameScope(observation.scope, expectedScope)
+  ) {
+    reasons.add('optionality:scope_mismatch');
+    classification = weakestReality(classification, 'UNKNOWN');
+  }
+
+  if (observation.classification === 'VERIFIED' && !hasEvidence(observation.evidenceRefs)) {
+    reasons.add('optionality:verified_without_evidence');
+    classification = weakestReality(classification, 'UNKNOWN');
+  }
+
+  if (observation.classification !== 'VERIFIED') {
+    reasons.add(`optionality:${observation.classification.toLowerCase()}`);
+  }
+
+  const afterSet = new Set(after);
+  const beforeSet = new Set(before);
+  const preservedOptions = before.filter((option) => afterSet.has(option));
+  const weakenedOptions = before.filter((option) => !afterSet.has(option));
+  const addedOptions = after.filter((option) => !beforeSet.has(option));
+
+  let state: FundraisingOptionalityState;
+  if (classification === 'BLOCKED') {
+    state = 'BLOCKED';
+  } else if (before.length === 0 || after.length === 0) {
+    state = 'UNKNOWN';
+  } else if (weakenedOptions.length > 0 && addedOptions.length > 0) {
+    state = 'MIXED';
+  } else if (weakenedOptions.length > 0) {
+    state = 'CONSTRAINED';
+  } else if (addedOptions.length > 0) {
+    state = 'EXPANDED';
+  } else {
+    state = 'PRESERVED';
+  }
+
+  return {
+    classification,
+    state,
+    preservedOptions,
+    weakenedOptions,
+    addedOptions,
+    evidenceRefs: cleanRefs(observation.evidenceRefs),
     reasons: [...reasons],
   };
 }
@@ -233,26 +636,72 @@ function buildDilutionStopCondition(
 function economicsEvidence(
   evidence: Attack3000Evidence,
   terms: FundraisingTermsDerivation,
+  termBurden: FundraisingTermBurdenDerivation,
 ): Attack3000Evidence {
   const termSummary =
     terms.postMoneyValuationCents !== null && terms.impliedDilutionPct !== null
-      ? `postMoneyCents=${terms.postMoneyValuationCents}; impliedDilutionPct=${terms.impliedDilutionPct}`
+      ? `currency=${terms.currency}; postMoneyCents=${terms.postMoneyValuationCents}; impliedDilutionPct=${terms.impliedDilutionPct}`
       : 'financing terms could not be fully derived';
+  const burdenSummary = `instrument=${termBurden.instrument ?? 'unknown'}; termCompleteness=${termBurden.completeness}`;
 
   return {
     ...evidence,
-    classification: weakestReality(evidence.classification, terms.classification),
-    evidenceRefs: cleanRefs([...evidence.evidenceRefs, ...terms.evidenceRefs]),
-    note: [evidence.note?.trim(), `${termSummary}; termClassification=${terms.classification}`]
+    classification: weakestReality(
+      evidence.classification,
+      terms.classification,
+      termBurden.classification,
+    ),
+    evidenceRefs: cleanRefs([
+      ...evidence.evidenceRefs,
+      ...terms.evidenceRefs,
+      ...termBurden.evidenceRefs,
+    ]),
+    note: [
+      evidence.note?.trim(),
+      `${termSummary}; termClassification=${terms.classification}`,
+      burdenSummary,
+    ]
       .filter(Boolean)
       .join(' | '),
   };
 }
 
+function opportunityCostEvidence(
+  evidence: Attack3000Evidence,
+  optionality: FundraisingOptionalityDerivation,
+): Attack3000Evidence {
+  const optionalitySummary = [
+    `optionalityState=${optionality.state}`,
+    `preserved=${optionality.preservedOptions.join(',') || 'none'}`,
+    `weakened=${optionality.weakenedOptions.join(',') || 'none'}`,
+    `added=${optionality.addedOptions.join(',') || 'none'}`,
+  ].join('; ');
+
+  return {
+    ...evidence,
+    classification: weakestReality(evidence.classification, optionality.classification),
+    evidenceRefs: cleanRefs([...evidence.evidenceRefs, ...optionality.evidenceRefs]),
+    note: [evidence.note?.trim(), optionalitySummary].filter(Boolean).join(' | '),
+  };
+}
+
 export function createFundraisingAttack3000Assessment(
   input: FundraisingAttack3000Input,
-): { terms: FundraisingTermsDerivation; assessment: Attack3000Assessment } {
-  const terms = deriveFundraisingTerms(input.terms);
+): {
+  terms: FundraisingTermsDerivation;
+  termBurden: FundraisingTermBurdenDerivation;
+  optionality: FundraisingOptionalityDerivation;
+  assessment: Attack3000Assessment;
+} {
+  const derivedTerms = deriveFundraisingTerms(input.terms);
+  const terms = bindTermsToSubject(
+    derivedTerms,
+    input.terms.context,
+    input.subject.projectId,
+  );
+  const expectedScope = input.terms.context?.expectedScope;
+  const termBurden = deriveTermBurden(input.termBurden, expectedScope);
+  const optionality = deriveFundraisingOptionality(input.optionality, expectedScope);
   const stopCondition =
     input.stopCondition.kind === 'explicit'
       ? input.stopCondition.trigger
@@ -260,6 +709,8 @@ export function createFundraisingAttack3000Assessment(
 
   return {
     terms,
+    termBurden,
+    optionality,
     assessment: {
       schema: ATTACK_3000_SCHEMA,
       subject: {
@@ -271,8 +722,8 @@ export function createFundraisingAttack3000Assessment(
         value_created: input.evidence.valueCreated,
         human_outcome: input.evidence.humanOutcome,
         external_demand: input.evidence.externalDemand,
-        economics: economicsEvidence(input.evidence.economics, terms),
-        opportunity_cost: input.evidence.opportunityCost,
+        economics: economicsEvidence(input.evidence.economics, terms, termBurden),
+        opportunity_cost: opportunityCostEvidence(input.evidence.opportunityCost, optionality),
         dependencies: input.evidence.dependencies,
         reversibility: input.evidence.reversibility,
         second_order_effects: input.evidence.secondOrderEffects,
@@ -287,9 +738,11 @@ export function createFundraisingAttack3000Assessment(
 export function evaluateFundraisingAttack3000(
   input: FundraisingAttack3000Input,
 ): FundraisingAttack3000Result {
-  const { terms, assessment } = createFundraisingAttack3000Assessment(input);
+  const { terms, termBurden, optionality, assessment } = createFundraisingAttack3000Assessment(input);
   return {
     terms,
+    termBurden,
+    optionality,
     assessment,
     evaluation: evaluateAttack3000(assessment),
   };
