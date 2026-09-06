@@ -200,15 +200,18 @@ async function githubJson(fetchFn, token, endpoint, options = {}) {
   return data;
 }
 
-function matchingCheck(runs, appId, sha, receiptHash) {
+function exactCheck(runs, appId, sha, receiptHash) {
   return (Array.isArray(runs) ? runs : []).find((run) =>
     run?.name === CHIEF_RUNTIME_WITNESS.checkName
-    && run?.status === 'completed'
-    && run?.conclusion === 'success'
     && text(run?.head_sha).toLowerCase() === sha
     && text(run?.external_id).toLowerCase() === receiptHash
     && String(run?.app?.id ?? '') === appId
   ) || null;
+}
+
+function matchingSuccessfulCheck(runs, appId, sha, receiptHash) {
+  const run = exactCheck(runs, appId, sha, receiptHash);
+  return run?.status === 'completed' && run?.conclusion === 'success' ? run : null;
 }
 
 function matchingDeployment(deployments, sha, receiptHash) {
@@ -221,13 +224,15 @@ function matchingDeployment(deployments, sha, receiptHash) {
   }) || null;
 }
 
-function matchingDeploymentStatus(statuses, targetOrigin, receiptHash) {
-  return (Array.isArray(statuses) ? statuses : []).find((status) =>
-    status?.state === 'success'
-    && status?.environment === CHIEF_RUNTIME_WITNESS.deploymentEnvironment
-    && text(status?.environment_url) === targetOrigin
-    && text(status?.description).includes(receiptHash.slice(0, 12))
-  ) || null;
+function latestMatchingDeploymentStatus(statuses, targetOrigin, receiptHash) {
+  const latest = Array.isArray(statuses) ? statuses[0] : null;
+  if (!latest) return null;
+  return latest?.state === 'success'
+    && latest?.environment === CHIEF_RUNTIME_WITNESS.deploymentEnvironment
+    && text(latest?.environment_url) === targetOrigin
+    && text(latest?.description).includes(receiptHash.slice(0, 12))
+    ? latest
+    : null;
 }
 
 async function writeArtifact(value, artifactPath = ARTIFACT_PATH) {
@@ -284,133 +289,206 @@ export async function publishChiefRuntimeWitness({
     await githubJson(fetchFn, token, `/repos/jussray/chief-ai-machine/rulesets/${CHIEF_RUNTIME_WITNESS.rulesetId}`),
   );
 
-  const checkEndpoint = `/repos/jussray/chief-ai-machine/commits/${chiefCandidateSha}/check-runs?per_page=100&filter=latest`;
-  let checkPayload = await githubJson(fetchFn, token, checkEndpoint);
-  let check = matchingCheck(checkPayload?.check_runs, appId, chiefCandidateSha, receiptHash);
+  const checkListEndpoint = `/repos/jussray/chief-ai-machine/commits/${chiefCandidateSha}/check-runs?per_page=100&filter=latest`;
+  let checkPayload = await githubJson(fetchFn, token, checkListEndpoint);
+  let check = matchingSuccessfulCheck(checkPayload?.check_runs, appId, chiefCandidateSha, receiptHash);
+  let provisionalCheckId = null;
+  let checkFinalizedByThisCall = false;
+  let deploymentSuccessPostedByThisCall = false;
+  let deployment = null;
+  let deploymentStatus = null;
 
-  if (!check) {
-    await githubJson(fetchFn, token, '/repos/jussray/chief-ai-machine/check-runs', {
-      method: 'POST',
-      body: {
-        name: CHIEF_RUNTIME_WITNESS.checkName,
-        head_sha: chiefCandidateSha,
-        status: 'completed',
-        conclusion: 'success',
-        external_id: receiptHash,
-        details_url: text(runtimeReceipt.workflowRunUrl),
-        output: {
-          title: 'Trusted FCR ProofMode runtime witness',
-          summary: [
-            `Exact Chief candidate: ${chiefCandidateSha}`,
-            `Immutable preview: ${targetOrigin}`,
-            `Trusted FCR main: ${trustedFcrMainSha}`,
-            `Runtime receipt: sha256:${receiptHash}`,
-            'Exact /version and protected ProofMode Playwright passed.',
-            'This check grants no merge, deploy, ruleset-mutation, or bypass authority.',
-          ].join('\n'),
-        },
-      },
-    });
-    checkPayload = await githubJson(fetchFn, token, checkEndpoint);
-    check = matchingCheck(checkPayload?.check_runs, appId, chiefCandidateSha, receiptHash);
-    if (!check) throw new Error('trusted Chief runtime Check Run readback missing');
-  }
-
-  const deploymentListEndpoint = `/repos/jussray/chief-ai-machine/deployments?sha=${encodeURIComponent(chiefCandidateSha)}&environment=${encodeURIComponent(CHIEF_RUNTIME_WITNESS.deploymentEnvironment)}&per_page=100`;
-  let deployments = await githubJson(fetchFn, token, deploymentListEndpoint);
-  let deployment = matchingDeployment(deployments, chiefCandidateSha, receiptHash);
-  if (!deployment) {
-    deployment = await githubJson(fetchFn, token, '/repos/jussray/chief-ai-machine/deployments', {
-      method: 'POST',
-      body: {
-        ref: chiefCandidateSha,
-        task: 'proofmode-runtime-evidence',
-        auto_merge: false,
-        required_contexts: [],
-        environment: CHIEF_RUNTIME_WITNESS.deploymentEnvironment,
-        description: 'Trusted FCR exact-head ProofMode runtime evidence',
-        transient_environment: true,
-        production_environment: false,
-        payload: {
-          contract: CHIEF_RUNTIME_WITNESS.contract,
-          receiptHash,
-          trustedFcrMainSha,
-          chiefCandidateSha,
-        },
-      },
-    });
-  }
-  if (!deployment?.id) throw new Error('trusted Chief runtime deployment id missing');
-
-  const statusEndpoint = `/repos/jussray/chief-ai-machine/deployments/${encodeURIComponent(String(deployment.id))}/statuses?per_page=100`;
-  let statuses = await githubJson(fetchFn, token, statusEndpoint);
-  let deploymentStatus = matchingDeploymentStatus(statuses, targetOrigin, receiptHash);
-  if (!deploymentStatus) {
-    await githubJson(fetchFn, token, `/repos/jussray/chief-ai-machine/deployments/${encodeURIComponent(String(deployment.id))}/statuses`, {
-      method: 'POST',
-      body: {
-        state: 'success',
-        description: `FCR runtime witness ${receiptHash.slice(0, 12)}`,
-        environment: CHIEF_RUNTIME_WITNESS.deploymentEnvironment,
-        environment_url: targetOrigin,
-        auto_inactive: false,
-      },
-    });
-    statuses = await githubJson(fetchFn, token, statusEndpoint);
-    deploymentStatus = matchingDeploymentStatus(statuses, targetOrigin, receiptHash);
-    if (!deploymentStatus) throw new Error('trusted Chief runtime deployment-status readback missing');
-  }
-
-  const finalInstallation = validateInstallationUnchanged(
-    installation,
-    await observeInstallationFn(appId, privateKey, CHIEF_RUNTIME_WITNESS.repository),
-    appId,
-  );
-  validateChiefPullRequest(
-    await githubJson(fetchFn, token, `/repos/jussray/chief-ai-machine/pulls/${CHIEF_RUNTIME_WITNESS.pullRequestNumber}`),
-    chiefCandidateSha,
-  );
-  validateChiefRulesetUnchanged(
-    initialRuleset,
-    await githubJson(fetchFn, token, `/repos/jussray/chief-ai-machine/rulesets/${CHIEF_RUNTIME_WITNESS.rulesetId}`),
-  );
-
-  const artifact = {
-    schema: CHIEF_RUNTIME_WITNESS.contract,
-    status: 'verified-published',
-    generatedAt: new Date().toISOString(),
-    trustedFcrMainSha,
-    chiefCandidateSha,
-    targetOrigin,
-    receiptHash,
-    approvalReferenceReceipt: `sha256:${sha256(approvalReference)}`,
-    githubApp: {
-      appId,
-      installationId: text(finalInstallation.installationId),
-      repositorySelection: text(finalInstallation.repositorySelection),
-      checksPermission: finalInstallation.permissions?.checks ?? null,
-      deploymentsPermission: finalInstallation.permissions?.deployments ?? null,
-    },
-    check: {
-      name: CHIEF_RUNTIME_WITNESS.checkName,
-      id: String(check.id),
-      issuerAppId: String(check.app?.id ?? ''),
-    },
-    deployment: {
-      environment: CHIEF_RUNTIME_WITNESS.deploymentEnvironment,
-      id: String(deployment.id),
-      statusId: String(deploymentStatus.id ?? ''),
-      state: deploymentStatus.state,
-    },
-    authority: {
-      merge: false,
-      deploy: false,
-      rulesetMutation: false,
-      bypass: false,
-    },
+  const checkOutput = {
+    title: 'Trusted FCR ProofMode runtime witness',
+    summary: [
+      `Exact Chief candidate: ${chiefCandidateSha}`,
+      `Immutable preview: ${targetOrigin}`,
+      `Trusted FCR main: ${trustedFcrMainSha}`,
+      `Runtime receipt: sha256:${receiptHash}`,
+      'Exact /version and protected ProofMode Playwright passed.',
+      'This check grants no merge, deploy, ruleset-mutation, or bypass authority.',
+    ].join('\n'),
   };
-  await writeArtifactFn(artifact);
-  return artifact;
+
+  try {
+    if (!check) {
+      const existing = exactCheck(checkPayload?.check_runs, appId, chiefCandidateSha, receiptHash);
+      if (existing?.id && existing.status === 'in_progress') {
+        provisionalCheckId = String(existing.id);
+      } else {
+        const createdCheck = await githubJson(fetchFn, token, '/repos/jussray/chief-ai-machine/check-runs', {
+          method: 'POST',
+          body: {
+            name: CHIEF_RUNTIME_WITNESS.checkName,
+            head_sha: chiefCandidateSha,
+            status: 'in_progress',
+            external_id: receiptHash,
+            details_url: text(runtimeReceipt.workflowRunUrl),
+            output: {
+              title: 'Trusted FCR ProofMode runtime witness pending final authority freshness',
+              summary: `Runtime proof exists for ${chiefCandidateSha}; final Chief PR, ruleset, and App freshness is still required before success.`,
+            },
+          },
+        });
+        if (!createdCheck?.id) throw new Error('provisional Chief runtime Check Run id missing');
+        provisionalCheckId = String(createdCheck.id);
+      }
+    }
+
+    const deploymentListEndpoint = `/repos/jussray/chief-ai-machine/deployments?sha=${encodeURIComponent(chiefCandidateSha)}&environment=${encodeURIComponent(CHIEF_RUNTIME_WITNESS.deploymentEnvironment)}&per_page=100`;
+    const deployments = await githubJson(fetchFn, token, deploymentListEndpoint);
+    deployment = matchingDeployment(deployments, chiefCandidateSha, receiptHash);
+    if (!deployment) {
+      deployment = await githubJson(fetchFn, token, '/repos/jussray/chief-ai-machine/deployments', {
+        method: 'POST',
+        body: {
+          ref: chiefCandidateSha,
+          task: 'proofmode-runtime-evidence',
+          auto_merge: false,
+          required_contexts: [],
+          environment: CHIEF_RUNTIME_WITNESS.deploymentEnvironment,
+          description: 'Trusted FCR exact-head ProofMode runtime evidence',
+          transient_environment: true,
+          production_environment: false,
+          payload: {
+            contract: CHIEF_RUNTIME_WITNESS.contract,
+            receiptHash,
+            trustedFcrMainSha,
+            chiefCandidateSha,
+          },
+        },
+      });
+    }
+    if (!deployment?.id) throw new Error('trusted Chief runtime deployment id missing');
+
+    const finalInstallation = validateInstallationUnchanged(
+      installation,
+      await observeInstallationFn(appId, privateKey, CHIEF_RUNTIME_WITNESS.repository),
+      appId,
+    );
+    validateChiefPullRequest(
+      await githubJson(fetchFn, token, `/repos/jussray/chief-ai-machine/pulls/${CHIEF_RUNTIME_WITNESS.pullRequestNumber}`),
+      chiefCandidateSha,
+    );
+    validateChiefRulesetUnchanged(
+      initialRuleset,
+      await githubJson(fetchFn, token, `/repos/jussray/chief-ai-machine/rulesets/${CHIEF_RUNTIME_WITNESS.rulesetId}`),
+    );
+
+    if (!check) {
+      await githubJson(fetchFn, token, `/repos/jussray/chief-ai-machine/check-runs/${encodeURIComponent(provisionalCheckId)}`, {
+        method: 'PATCH',
+        body: {
+          status: 'completed',
+          conclusion: 'success',
+          details_url: text(runtimeReceipt.workflowRunUrl),
+          output: checkOutput,
+        },
+      });
+      checkFinalizedByThisCall = true;
+      checkPayload = await githubJson(fetchFn, token, checkListEndpoint);
+      check = matchingSuccessfulCheck(checkPayload?.check_runs, appId, chiefCandidateSha, receiptHash);
+      if (!check) throw new Error('trusted Chief runtime Check Run success readback missing');
+    }
+
+    const statusEndpoint = `/repos/jussray/chief-ai-machine/deployments/${encodeURIComponent(String(deployment.id))}/statuses?per_page=100`;
+    let statuses = await githubJson(fetchFn, token, statusEndpoint);
+    deploymentStatus = latestMatchingDeploymentStatus(statuses, targetOrigin, receiptHash);
+    if (!deploymentStatus) {
+      await githubJson(fetchFn, token, `/repos/jussray/chief-ai-machine/deployments/${encodeURIComponent(String(deployment.id))}/statuses`, {
+        method: 'POST',
+        body: {
+          state: 'success',
+          description: `FCR runtime witness ${receiptHash.slice(0, 12)}`,
+          environment: CHIEF_RUNTIME_WITNESS.deploymentEnvironment,
+          environment_url: targetOrigin,
+          auto_inactive: false,
+        },
+      });
+      deploymentSuccessPostedByThisCall = true;
+      statuses = await githubJson(fetchFn, token, statusEndpoint);
+      deploymentStatus = latestMatchingDeploymentStatus(statuses, targetOrigin, receiptHash);
+      if (!deploymentStatus) throw new Error('trusted Chief runtime deployment-status success readback missing');
+    }
+
+    const artifact = {
+      schema: CHIEF_RUNTIME_WITNESS.contract,
+      status: 'verified-published',
+      generatedAt: new Date().toISOString(),
+      trustedFcrMainSha,
+      chiefCandidateSha,
+      targetOrigin,
+      receiptHash,
+      approvalReferenceReceipt: `sha256:${sha256(approvalReference)}`,
+      githubApp: {
+        appId,
+        installationId: text(finalInstallation.installationId),
+        repositorySelection: text(finalInstallation.repositorySelection),
+        checksPermission: finalInstallation.permissions?.checks ?? null,
+        deploymentsPermission: finalInstallation.permissions?.deployments ?? null,
+      },
+      check: {
+        name: CHIEF_RUNTIME_WITNESS.checkName,
+        id: String(check.id),
+        issuerAppId: String(check.app?.id ?? ''),
+      },
+      deployment: {
+        environment: CHIEF_RUNTIME_WITNESS.deploymentEnvironment,
+        id: String(deployment.id),
+        statusId: String(deploymentStatus.id ?? ''),
+        state: deploymentStatus.state,
+      },
+      authority: {
+        merge: false,
+        deploy: false,
+        rulesetMutation: false,
+        bypass: false,
+      },
+    };
+    await writeArtifactFn(artifact);
+    return artifact;
+  } catch (error) {
+    const compensationErrors = [];
+    if (deploymentSuccessPostedByThisCall && deployment?.id) {
+      try {
+        await githubJson(fetchFn, token, `/repos/jussray/chief-ai-machine/deployments/${encodeURIComponent(String(deployment.id))}/statuses`, {
+          method: 'POST',
+          body: {
+            state: 'failure',
+            description: `FCR runtime witness ${receiptHash.slice(0, 12)} invalidated`,
+            environment: CHIEF_RUNTIME_WITNESS.deploymentEnvironment,
+            environment_url: targetOrigin,
+            auto_inactive: false,
+          },
+        });
+      } catch (compensationError) {
+        compensationErrors.push(`deployment compensation failed: ${compensationError instanceof Error ? compensationError.message : String(compensationError)}`);
+      }
+    }
+    if (checkFinalizedByThisCall && provisionalCheckId) {
+      try {
+        await githubJson(fetchFn, token, `/repos/jussray/chief-ai-machine/check-runs/${encodeURIComponent(provisionalCheckId)}`, {
+          method: 'PATCH',
+          body: {
+            status: 'completed',
+            conclusion: 'failure',
+            details_url: text(runtimeReceipt.workflowRunUrl),
+            output: {
+              title: 'Trusted FCR ProofMode runtime witness invalidated',
+              summary: `The witness failed after provisional provider publication. Runtime receipt sha256:${receiptHash} must not remain green.`,
+            },
+          },
+        });
+      } catch (compensationError) {
+        compensationErrors.push(`check compensation failed: ${compensationError instanceof Error ? compensationError.message : String(compensationError)}`);
+      }
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    if (compensationErrors.length > 0) {
+      throw new Error(`${message}; ${compensationErrors.join('; ')}`);
+    }
+    throw error;
+  }
 }
 
 async function direct() {
