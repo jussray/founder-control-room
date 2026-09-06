@@ -22,7 +22,7 @@ env:
   PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
-  STORYENGINE_PEER_SHA: 8d6f408f16633be2f27d5526e4ed3f358f6f6bfd
+  STORYENGINE_PEER_SHA: 9a3a1e1db4d29923138b0a6c0da3d23650f2e6bd
   STORYENGINE_PEER_REF: refs/heads/feat/intent-aware-inbound-routing-20260825
   STORYENGINE_PEER_URL: http://127.0.0.1:3901
   STORYENGINE_PEER_API_KEY: fcr-ci-product-build
