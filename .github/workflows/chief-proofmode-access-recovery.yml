@@ -139,7 +139,8 @@ jobs:
           node --test scripts/chief-proofmode-access-bridge-contract.node-test.mjs
           node --test scripts/fcr-cloudflare-bridge-contract.node-test.mjs
 
-      - name: Require configured Chief service-token identity
+      - name: Require configured Chief service-token identity before repair
+        if: inputs.mode == 'repair'
         env:
           CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID || vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
           CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: ${{ vars.CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID || vars.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID }}
@@ -147,7 +148,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "$CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID" && -z "$CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID" ]]; then
-            echo '::error title=Missing Chief service-token identity::Configure CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID (or canonical alias CLOUDFLARE_ACCESS_CLIENT_ID) or CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID (or alias CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID) as a protected variable in the FCR production environment.'
+            echo '::error title=Missing Chief service-token identity::repair requires CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID (or canonical alias CLOUDFLARE_ACCESS_CLIENT_ID) or CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID (or alias CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID) as a protected variable in the FCR production environment.'
             exit 1
           fi
 
