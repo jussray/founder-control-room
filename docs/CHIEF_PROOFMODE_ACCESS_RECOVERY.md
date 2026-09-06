@@ -48,7 +48,7 @@ FCR uses its existing dedicated Access credentials:
 - `CLOUDFLARE_ACCESS_API_TOKEN` for read-only `check` mode.
 - `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN` only for founder-approved `repair` mode.
 - A read-only `check` may discover the Chief service-token identity only from exactly one existing `non_identity` service-token binding on the provider-resolved effective Chief Access application. It never selects a token merely because that token exists elsewhere in the account, and zero or multiple bound identities fail closed.
-- `repair` still requires at least one protected, non-secret identity selector for the already-existing Chief CI service token: `CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID` or `CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID`. Source presence does not prove either value exists or matches the intended live token.
+- repair still requires at least one protected, non-secret identity selector for the already-existing Chief CI service token: `CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID` or `CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID`. Source presence does not prove either value exists or matches the intended live token.
 - If both identity selectors are configured, FCR requires them to resolve to the same live Cloudflare service token and fails closed on mismatch.
 
 Neither identity selector is authentication authority. The Chief client secret is not copied into FCR for policy repair. Browser/runtime verification remains on Chief's own exact-head Playwright workflows, which already hold their protected service-auth pair after switching to trusted runtime-proof source.
