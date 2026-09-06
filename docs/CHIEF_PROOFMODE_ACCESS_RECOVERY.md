@@ -47,7 +47,8 @@ FCR uses its existing dedicated Access credentials:
 
 - `CLOUDFLARE_ACCESS_API_TOKEN` for read-only `check` mode.
 - `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN` only for founder-approved `repair` mode.
-- At least one protected, non-secret identity selector must identify the already-existing Chief CI service token: `CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID` or `CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID`. Source presence does not prove either value exists or matches the intended live token.
+- A read-only `check` may discover the Chief service-token identity only from exactly one existing `non_identity` service-token binding on the provider-resolved effective Chief Access application. It never selects a token merely because that token exists elsewhere in the account, and zero or multiple bound identities fail closed.
+- `repair` still requires at least one protected, non-secret identity selector for the already-existing Chief CI service token: `CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID` or `CHIEF_CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID`. Source presence does not prove either value exists or matches the intended live token.
 - If both identity selectors are configured, FCR requires them to resolve to the same live Cloudflare service token and fails closed on mismatch.
 
 Neither identity selector is authentication authority. The Chief client secret is not copied into FCR for policy repair. Browser/runtime verification remains on Chief's own exact-head Playwright workflows, which already hold their protected service-auth pair after switching to trusted runtime-proof source.
@@ -55,6 +56,8 @@ Neither identity selector is authentication authority. The Chief client secret i
 ## Receipt and proof semantics
 
 Raw provider receipts are ephemeral and suppressed from workflow logs. Only allowlisted identifiers, scope, target origin, configured state, and mutation boolean may enter the public receipt returned to founder issue `#485` and the retained artifact. The founder approval reference is represented only by a SHA-256 receipt when mutation is requested.
+
+A successful read-only discovery proves only that the observed effective application already has one unambiguous, live service-token binding. It grants no mutation authority and does not create or overwrite policy state.
 
 A successful policy repair proves only that the bounded provider policy exists after provider reread. It does not prove Chief runtime equivalence, `/version` identity, MCP behavior, capability-plan behavior, or browser success.
 
