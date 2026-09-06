@@ -56,6 +56,23 @@ function hasSpecificServiceToken(policy, serviceTokenId) {
     && policy.include.some((rule) => rule?.service_token?.token_id === serviceTokenId);
 }
 
+function discoverBoundServiceTokenId(policies) {
+  const ids = [...new Set(
+    policies
+      .filter((policy) => policy?.decision === 'non_identity' && Array.isArray(policy.include))
+      .flatMap((policy) => policy.include)
+      .map((rule) => (typeof rule?.service_token?.token_id === 'string' ? rule.service_token.token_id.trim() : ''))
+      .filter(Boolean),
+  )];
+  if (ids.length === 0) {
+    throw new Error('No existing non-identity service-token binding identifies the Chief CI token; configure an exact protected selector before repair.');
+  }
+  if (ids.length !== 1) {
+    throw new Error(`Multiple service-token identities are bound to the effective Chief Access application; found ${ids.length}; refusing ambiguous discovery.`);
+  }
+  return ids[0];
+}
+
 async function cloudflareJson(fetchImpl, apiToken, path, init = {}) {
   const response = await fetchImpl(`${API}${path}`, {
     ...init,
@@ -225,14 +242,31 @@ export async function ensureChiefProofModeAccessPolicy({
   const token = required(apiToken, normalizedMode === 'repair' ? 'CLOUDFLARE_ACCESS_ADMIN_API_TOKEN' : 'CLOUDFLARE_ACCESS_API_TOKEN');
   const appName = required(applicationName, 'CHIEF_ACCESS_APP_NAME');
   const target = validateTargetUrl(targetUrl);
+  const configuredClientId = typeof serviceClientId === 'string' ? serviceClientId.trim() : '';
+  const configuredServiceTokenId = typeof serviceTokenId === 'string' ? serviceTokenId.trim() : '';
 
-  const serviceTokens = await listAll(fetchImpl, token, `/accounts/${encodeURIComponent(account)}/access/service_tokens`, 'List Access service tokens');
-  const serviceId = resolveServiceToken(serviceTokens, { serviceClientId, serviceTokenId, nowMs });
+  if (normalizedMode === 'repair' && !configuredClientId && !configuredServiceTokenId) {
+    throw new Error('Chief Access service-token identity is required before repair.');
+  }
+
   const apps = await listAll(fetchImpl, token, `/accounts/${encodeURIComponent(account)}/access/apps`, 'List Access applications');
   const effective = resolveEffectiveApplication(apps, target.hostname, appName);
   const appId = required(effective.app?.id, 'Resolved Cloudflare Access application ID');
   const policyPath = `/accounts/${encodeURIComponent(account)}/access/apps/${encodeURIComponent(appId)}/policies`;
   const policies = await listAll(fetchImpl, token, policyPath, 'List Access application policies');
+
+  let identityTokenId = configuredServiceTokenId;
+  if (normalizedMode === 'check' && !configuredClientId && !configuredServiceTokenId) {
+    identityTokenId = discoverBoundServiceTokenId(policies);
+  }
+
+  const serviceTokens = await listAll(fetchImpl, token, `/accounts/${encodeURIComponent(account)}/access/service_tokens`, 'List Access service tokens');
+  const serviceId = resolveServiceToken(serviceTokens, {
+    serviceClientId: configuredClientId,
+    serviceTokenId: identityTokenId,
+    nowMs,
+  });
+
   const exact = policies.find((policy) => hasSpecificServiceToken(policy, serviceId));
   if (exact) {
     return { state: 'configured', changed: false, appId, policyId: exact.id || null, scope: effective.scope, serviceTokenId: serviceId, targetOrigin: target.origin };
