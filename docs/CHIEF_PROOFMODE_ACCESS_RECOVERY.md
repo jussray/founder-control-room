@@ -52,6 +52,19 @@ FCR uses distinct capabilities for distinct truth planes:
 - The separate trusted runtime-witness workflow requires the protected Access client credential pair in FCR's `production` environment. Source references do not prove those protected values exist, are current, or correspond to the provider-observed service token.
 - GitHub evidence publication uses FCR's repository-scoped GitHub App identity (`APP_ID` + `APP_PRIVATE_KEY`) only after provider installation readback proves `checks: write` and `deployments: write` for `jussray/chief-ai-machine`.
 
+### Read credential setup contract
+
+`CLOUDFLARE_ACCESS_API_TOKEN` belongs in the protected GitHub Actions `production` environment secret plane. Its value must never be committed, pasted into an issue, returned in a receipt, or reused as a browser/runtime service-token secret.
+
+The Cloudflare API token behind that GitHub secret is account-scoped read authority only. For the current recovery implementation it requires exactly the read capabilities needed by the endpoints it calls:
+
+- `Access: Apps and Policies Read` for Access application and policy discovery;
+- `Access: Service Tokens Read` for service-token identity and enabled/expiry readback.
+
+Do not add Access Edit/Write, DNS Edit/Write, Workers Edit/Write, or unrelated account mutation permissions merely to make `check` green. Do not substitute `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, an MCP token, or a runtime `CF-Access-Client-Secret` for the dedicated read token.
+
+Configuration is not proof. After the secret is installed, rerun the founder-only `check` command on the exact current FCR `main` and exact immutable Chief preview. Only the resulting sanitized provider receipt can establish whether Access app, policy, and service-token state are readable and unambiguous. Browser/runtime proof remains a later separate gate.
+
 In plain terms, repair still requires the explicit selector and its separate founder mutation authority; runtime-witness approval cannot substitute for repair approval.
 
 No secret value is accepted as a workflow input, written to a PR, returned in a public receipt, or copied into candidate-authored Chief workflows.
