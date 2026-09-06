@@ -46,6 +46,21 @@ export {
 } from './attack3000Commerce.js';
 
 export {
+  ATTACK_3000_DEMAND_ADAPTER_ID,
+  createDemandAttack3000Assessment,
+  deriveDemandTerms,
+  evaluateDemandAttack3000,
+  type DemandAttack3000Evidence,
+  type DemandAttack3000Input,
+  type DemandAttack3000Result,
+  type DemandCountObservation,
+  type DemandRateFloor,
+  type DemandStopCondition,
+  type DemandTermsDerivation,
+  type DemandTermsInput,
+} from './attack3000Demand.js';
+
+export {
   evaluateAuthorityLease,
   type AuthorityBinding,
   type AuthorityConsequence,
