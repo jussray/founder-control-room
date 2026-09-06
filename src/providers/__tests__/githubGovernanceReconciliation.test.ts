@@ -111,6 +111,8 @@ describe("Chief GitHub governance reconciliation", () => {
   it("keeps the legacy planner name as a no-mutation compatibility wrapper", () => {
     const verification = planChiefProofModeRulesetMigration(pair());
     expect(verification.disposition).toBe("NO_CHANGE_REQUIRED");
+    expect(verification.changesRequired).toBe(false);
+    expect(verification.mutationRequired).toBe(false);
     expect(verification.mutation).toBeNull();
   });
 
