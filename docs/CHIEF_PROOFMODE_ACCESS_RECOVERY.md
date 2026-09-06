@@ -52,6 +52,8 @@ FCR uses distinct capabilities for distinct truth planes:
 - The separate trusted runtime-witness workflow requires the protected Access client credential pair in FCR's `production` environment. Source references do not prove those protected values exist, are current, or correspond to the provider-observed service token.
 - GitHub evidence publication uses FCR's repository-scoped GitHub App identity (`APP_ID` + `APP_PRIVATE_KEY`) only after provider installation readback proves `checks: write` and `deployments: write` for `jussray/chief-ai-machine`.
 
+In plain terms, repair still requires the explicit selector and its separate founder mutation authority; runtime-witness approval cannot substitute for repair approval.
+
 No secret value is accepted as a workflow input, written to a PR, returned in a public receipt, or copied into candidate-authored Chief workflows.
 
 ## Trusted runtime witness
