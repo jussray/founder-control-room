@@ -75,7 +75,7 @@ export const capabilities = [
     ['content-pillar-builder-v1', 'Create five authority-building pillars with educational, entertaining, and inspirational executions.'],
     ['content-calendar-30-day-v1', 'Produce a balanced 30-day calendar with topic, hook, format, goal, and CTA.'],
     ['scroll-stopping-post-v1', 'Write one clear post with a strong hook, useful body, honest close, and one CTA.'],
-    ['short-form-video-60s-v1', 'Create a 60-second Dialogue and Visuals/B-roll script with retention beats plus a lowest-sufficient MotionBrief: intent, level, generic renderer class, selection reason, focal point, timing, preservation, and reduced-motion fallback.'],
+    ['short-form-video-60s-v1', 'Create a 60-second Dialogue and Visuals/B-roll script with retention beats.'],
     ['community-growth-system-v1', 'Build sustainable engagement habits, conversations, challenges, and advocate loops.'],
     ['social-performance-analyzer-v1', 'Diagnose post performance from supplied metrics and recommend evidence-backed changes.'],
   ].map(([id, summary], index) => ({
