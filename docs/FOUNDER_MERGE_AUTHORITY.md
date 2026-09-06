@@ -106,7 +106,7 @@ Do not claim repository-wide GitHub governance is fixed merely because the FCR s
 
 For Chief pre-merge ProofMode authority, a required status-check name plus GitHub Actions integration `15368` is **not** sufficient evidence of the workflow file or event that produced the check. PR-controlled Chief Actions could otherwise manufacture the same context under the same GitHub Actions App.
 
-FCR governance reconciliation therefore remains fail-closed until the candidate ProofMode context is bound to a provider-observed external GitHub App/check producer that is unavailable to PR-authored Chief Actions. It must also reject a pre-merge ruleset that requires the post-merge-only `Cloudflare Production` deployment environment. Observation or planning does not itself grant GitHub ruleset mutation, merge, deploy, or provider authority.
+Under the current founder decision, Chief ruleset `20818149` is the approved governance object **as-is**. FCR must therefore verify that the exact live topology remains unchanged: zero bypass actors, the approved source checks, `Cloudflare Production`, and `proofmode-access-admin` all remain present, while the reserved candidate runtime context remains unbound. External candidate-producer provenance and trusted runtime/browser proof are separate evidence gates; their absence blocks those claims but does not authorize FCR to rewrite the approved ruleset. Observation, a same-named check, deployment acceptance, or producer capability never grants GitHub ruleset mutation, merge, deploy, provider-policy, or self-certification authority.
 
 ## Documentation truth
 
