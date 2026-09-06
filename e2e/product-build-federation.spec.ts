@@ -5,6 +5,7 @@ import {
   createFounderControlDecision,
   type FounderControlProposalBinding,
 } from '../src/lib/founderControlDecision.js';
+import { createFounderContentMotionBrief } from '../src/lib/founderContentMotionBrief.js';
 import { createProductBuildDirective } from '../src/lib/productBuildDirective.js';
 import { dispatchStoryEngineProductBuildDirective } from '../src/lib/productBuildFederation.js';
 import {
@@ -87,7 +88,7 @@ function directive() {
   });
 }
 
-test('FCR drives exact live StoryEngine peer, proves replay safety, and reconciles execution evidence without outcome promotion', async ({ page, request }) => {
+test('FCR drives exact live StoryEngine peer, proves MotionBrief compatibility and replay safety without outcome promotion', async ({ page, request }) => {
   await expectLivePeerStillPinned(request);
 
   const identityResponse = await page.goto(`${peerUrl}/runtime-identity`);
@@ -95,6 +96,33 @@ test('FCR drives exact live StoryEngine peer, proves replay safety, and reconcil
   const browserIdentity = await identityResponse?.json() as { service?: string; release_sha?: string };
   expect(browserIdentity.service).toBe('l99-story-engine');
   expect(browserIdentity.release_sha).toBe(peerSha);
+
+  const motionOptionsResponse = await request.get(`${peerUrl}/api/video-engine/options`, {
+    headers: { 'x-api-key': peerApiKey },
+  });
+  expect(motionOptionsResponse.status()).toBe(200);
+  const motionOptions = await motionOptionsResponse.json() as {
+    motion?: {
+      policy?: string;
+      vendor_binding_allowed?: boolean;
+      renderer_classes?: string[];
+      ladder?: Record<string, { name?: string; renderers?: string[] }>;
+    };
+  };
+  const founderMotionBrief = createFounderContentMotionBrief({
+    intent: 'explanation',
+    needs: { cameraMotionRequired: true, layerMotionRequired: true, composedCinemaRequired: true },
+    selectionReason: 'Proof inserts, captions, and scene sequencing require deterministic programmatic cinema without regenerating source pixels.',
+    aspectRatio: '9:16',
+    durationSeconds: 30,
+  });
+  expect(founderMotionBrief.level).toBe(3);
+  expect(founderMotionBrief.renderer).toBe('ffmpeg');
+  expect(founderMotionBrief.vendor_binding).toBeNull();
+  expect(motionOptions.motion?.policy).toBe(founderMotionBrief.policy);
+  expect(motionOptions.motion?.vendor_binding_allowed).toBe(false);
+  expect(motionOptions.motion?.renderer_classes).toContain(founderMotionBrief.renderer);
+  expect(motionOptions.motion?.ladder?.[String(founderMotionBrief.level)]?.renderers).toContain(founderMotionBrief.renderer);
 
   const buildDirective = directive();
   const reconciliation = await dispatchStoryEngineProductBuildDirective(buildDirective, {
