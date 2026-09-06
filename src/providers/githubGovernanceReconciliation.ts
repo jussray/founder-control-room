@@ -217,7 +217,7 @@ export function createTrustedGithubRulesetObservation(input: {
   if (!rulesetId) throw new Error("trusted governance observation requires a numeric ruleset id");
   if (!observerAppId) throw new Error("trusted governance observation requires a numeric GitHub App observer id");
   if (!input.observedAt || Number.isNaN(Date.parse(input.observedAt))) {
-    throw new Error("trusted Chief governance observation requires a valid observedAt timestamp");
+    throw new Error("trusted governance observation requires a valid observedAt timestamp");
   }
   if (!isObject(input.readback)) throw new Error("trusted governance observation requires provider readback");
 
