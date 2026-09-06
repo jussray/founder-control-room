@@ -6,11 +6,24 @@ canonical_branch: main
 authority_repository: jussray/founder-control-room
 site_identity_status: unverified
 site_origin: null
+account_owner: unverified
+chatgpt_site_url: null
+custom_domain: welcome.foundercontrolroom.org
+control_room_link: https://foundercontrolroom.org/control-room/
+last_verified: "2026-09-06"
+verification_source: "founder-provided ChatGPT Sites custom-domain setup; live Site publication/readback pending"
+continuity_status: UNKNOWN
 ---
 
 # ChatGPT Sites repository binding — Founder Control Room
 
 This file defines the repository-side contract for a ChatGPT `@Sites` surface representing Founder Control Room. It does not create a Site, prove a Site is connected, or prove a publication occurred.
+
+## Cross-account continuity
+
+The frontmatter is the repository-side continuity record for this Site. `account_owner` identifies only a verified editor-account binding and must not expose private account-holder identity. `chatgpt_site_url`, `custom_domain`, `control_room_link`, `last_verified`, and `verification_source` must come from the authority that can actually observe them. `continuity_status` is one of `VERIFIED`, `UNKNOWN`, `STALE`, or `SUPERSEDED`.
+
+Unknown stays unknown. Chat memory, another phone/account, a naming convention, DNS intent, or a repository guess must never upgrade an unverified field. The Site editor/account is authoritative for Site identity/publication, the canonical repository for project/source truth, Cloudflare for DNS/deployment truth, and Founder Control Room for cross-project authority/evidence registry truth.
 
 ## Canonical source
 
@@ -62,7 +75,7 @@ Every write must preserve unrelated work and include repository, base, branch, e
 
 A Site identity is executable only after the ChatGPT Sites runtime exposes and verifies that exact Site identity. No slug, hostname, project ID, or generated URL may be guessed from naming conventions.
 
-For this repository, the Site identity is currently `UNVERIFIED` in repository evidence. Therefore this file authorizes no live Site mutation by itself.
+For this repository, the ChatGPT Site editor has supplied the custom-domain intent `welcome.foundercontrolroom.org`, but the underlying `chatgpt.site` identity and live publication readback remain unverified in repository evidence. Therefore this file authorizes no live Site mutation by itself.
 
 When a Site identity becomes verified, publication must bind to the intended exact repository state, re-read the required Markdown authority chain, apply Sauce Guard, and capture an observable Site/runtime artifact after publication. A successful repository commit, PR, merge, workflow trigger, or Site editor save is not publication proof by itself.
 
