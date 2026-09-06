@@ -61,6 +61,23 @@ export {
 } from './attack3000Demand.js';
 
 export {
+  ATTACK_3000_RELEASE_ADAPTER_ID,
+  RELEASE_STAGE_ORDER,
+  createReleaseAttack3000Assessment,
+  deriveReleaseTerms,
+  evaluateReleaseAttack3000,
+  type ReleaseAttack3000Evidence,
+  type ReleaseAttack3000Input,
+  type ReleaseAttack3000Result,
+  type ReleaseStage,
+  type ReleaseStageObservation,
+  type ReleaseStageRequirement,
+  type ReleaseStopCondition,
+  type ReleaseTermsDerivation,
+  type ReleaseTermsInput,
+} from './attack3000Release.js';
+
+export {
   evaluateAuthorityLease,
   type AuthorityBinding,
   type AuthorityConsequence,
