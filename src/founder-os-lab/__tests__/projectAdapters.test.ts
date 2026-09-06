@@ -32,7 +32,7 @@ describe('Se’kret Bip Founder OS project adapter', () => {
       adapterId: 'sekret-bip-project-preview',
       name: 'Se’kret Bip',
       repository: 'jussray/Sekret-Bip',
-      auditedSourceHead: 'aeacd00379dbe3b3c457d140ab5b89210f8afeda',
+      auditedSourceHead: '9b3fef2633071628c0e158c043d096deede8c6ff',
       authorityOwner: 'founder-control-room',
       mode: 'preview',
       executionAllowed: false,
@@ -55,8 +55,8 @@ describe('Se’kret Bip Founder OS project adapter', () => {
     ]);
     expect(ADAPTER.auditedContractBlobs).toMatchObject({
       'app/index.tsx': '299da021482968e415ab1016b19f52daeeec497a',
-      'screens/WebWelcomeScreen.tsx': '5f1dafb209a9e8aee050b61fe38ace808e99f4b1',
-      'test/dual-front-door-contract.test.mjs': '1ceb267d7d20136d38fce95f2418fe22b6a1468e',
+      'screens/WebWelcomeScreen.tsx': '3228a5c997ac3a72e8d15dd37d5fb029c993607e',
+      'test/dual-front-door-contract.test.mjs': '459ccf28ffe785e725c20a72542a3b18780c28c8',
     });
   });
 

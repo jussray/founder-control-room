@@ -190,6 +190,10 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] FCR_CLOUDFLARE_BUILDS_USER_TOKEN for read-only FCR Workers Builds inspection
 [ ] FCR_CLOUDFLARE_MCP_READ_TOKEN for official Cloudflare API MCP GET-only provider proof
 [ ] CLOUDFLARE_ACCOUNT_ID
+[ ] CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID when the trusted Chief runtime witness is activated; name presence here does not prove configuration
+[ ] CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET when the trusted Chief runtime witness is activated; never expose the value
+[ ] CLOUDFLARE_ACCESS_CLIENT_ID only as the documented backward-compatible runtime-witness alias when the Chief-specific name is absent
+[ ] CLOUDFLARE_ACCESS_CLIENT_SECRET only as the documented backward-compatible runtime-witness alias when the Chief-specific name is absent
 [ ] DEPLOY_URL=https://api.foundercontrolroom.org
 [ ] FOUNDER_SIGNAL_ENGINE_MCP_TOKEN
 [ ] ZAPIER_FOUNDER_SIGNAL_ENGINE_HOOK_URL
@@ -197,6 +201,8 @@ Never commit, log, or expose this value through a `NEXT_PUBLIC_*` variable.
 [ ] PROOF_OF_SHIP_STEERING_GRANT_ID for scheduled proof-of-ship publication
 [ ] RECONCILE_SHARED_SECRET where enabled
 ```
+
+The four Chief runtime-witness credential names above document **workflow wiring only**. This source registry does not assert that any corresponding secret exists in the protected `production` environment. A trusted FCR-main witness run must fail closed when the required client credential pair cannot be resolved.
 
 ### `founder-control-room` Worker
 
@@ -235,5 +241,9 @@ This table covers GitHub Actions secret names that are referenced outside the ca
 | `CLOUDFLARE_DEPLOY_HOOK_URL` | `pages-production-release.yml` | Required reusable-workflow secret used to trigger the exact-SHA Pages release. |
 | `FCR_CLOUDFLARE_REQUEST_TRACER_TOKEN` | `cloudflare-build-diagnostic.yml` | Optional read credential for request-trace enrichment; does not authorize Worker mutation. |
 | `FCR_CLOUDFLARE_DNS_INVENTORY_TOKEN` | `cloudflare-build-diagnostic.yml` | Optional read credential for DNS inventory enrichment; does not authorize DNS mutation. |
-| `CLOUDFLARE_ACCESS_API_TOKEN` | `fcr-access-front-door-recovery.yml` | Dedicated read credential for Access inspection. It must not inherit admin mutation authority. |
-| `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN` | `fcr-access-front-door-recovery.yml` | Dedicated Access mutation credential used only when the founder-approved `apply=true` recovery path is invoked. |
+| `CLOUDFLARE_ACCESS_API_TOKEN` | `fcr-access-front-door-recovery.yml`, `chief-proofmode-access-recovery.yml`, `chief-proofmode-runtime-witness.yml` | Dedicated read credential for Access inspection. It must not inherit admin mutation authority. |
+| `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN` | `fcr-access-front-door-recovery.yml`, `chief-proofmode-access-recovery.yml` | Dedicated Access mutation credential used only when the founder-approved repair/apply path is invoked. The runtime-witness workflow must not reference it. |
+| `CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID` | `chief-proofmode-runtime-witness.yml` | Preferred protected Chief Access client identifier for the trusted runtime witness. Its documented name is not proof that a value exists. |
+| `CHIEF_CLOUDFLARE_ACCESS_CLIENT_SECRET` | `chief-proofmode-runtime-witness.yml` | Preferred protected Chief Access client secret for the trusted runtime witness. Never log, echo, or copy the value into source or receipts. |
+| `CLOUDFLARE_ACCESS_CLIENT_ID` | `chief-proofmode-runtime-witness.yml` | Backward-compatible protected alias used only if the Chief-specific client-ID name is absent. It is not Access provider-administration authority. |
+| `CLOUDFLARE_ACCESS_CLIENT_SECRET` | `chief-proofmode-runtime-witness.yml` | Backward-compatible protected alias used only if the Chief-specific client-secret name is absent. Never expose the value; alias presence alone is not runtime proof. |
