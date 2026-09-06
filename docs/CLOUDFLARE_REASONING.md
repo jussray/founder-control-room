@@ -223,6 +223,32 @@ This is durable orchestration, not release authority. No HTTP route, cron schedu
 
 Its final receipt deliberately keeps `mergeAuthorized`, `deploymentAuthorized`, and `providerMutationAuthorized` false. A Workflow event or completed instance cannot replace authenticated Founder Final, the final mutable provider/PR reread, expected-head protection, or the existing guarded deployment path. Repository source proves only the intended class/binding contract. Cloudflare provider configuration, instance state, and runtime behavior require their own readback evidence.
 
+## Bounded FCR Access front-door recovery
+
+The manual `FCR Access Front Door Recovery` workflow is a narrowly scoped provider-recovery lane, not general Cloudflare administration authority. Its requested `expected_head_sha` must be a lowercase 40-character SHA, the workflow checks out that exact SHA, and provider inspection or mutation proceeds only when the same SHA still equals current `main`.
+
+Read and mutation authority are intentionally split. `apply=false` uses only `CLOUDFLARE_ACCESS_API_TOKEN` for Access application inspection and rejects an unnecessary approval reference. `apply=true` requires a fresh auditable `approval_reference`, records only its SHA-256 receipt, and uses only `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN` for the provider write path. Neither credential is a fallback for the other.
+
+The mutation surface is exact:
+
+```text
+Cloudflare account: canonical FCR account only
+Access destination: foundercontrolroom.org/*
+managed application: foundercontrolroom.org - public apex bypass
+application type: self_hosted
+policy: Bypass / Everyone
+DNS mutation: none
+Worker route mutation: none
+database mutation: none
+unrelated Access application mutation: none
+```
+
+If the exact managed public-destination application already exists, its destination and Everyone-bypass policy must match before it can be treated as clear. Multiple managed matches, destination/policy drift, or any non-managed Access application already owning the exact public destination fails closed for manual review. The recovery code does not rewrite the account-level `deny_unmatched_requests_exempted_zone_names` setting and does not alter existing all-workers protection.
+
+A successful create is not production proof. It enters `mutated-needs-browser-proof`, then the workflow runs anonymous Playwright against the public front door and exact runtime SHA. If that post-apply proof fails, rollback may delete only the run-created managed application after reacquiring exactly one application with the same receipt-bound account, zone, application ID, managed name, and destination. Missing identity, ambiguity, or drift blocks rollback instead of widening deletion authority.
+
+Only the bounded sanitized public receipt is returned to the fixed founder control issue and retained artifact. Raw Access/browser receipts, raw approval references, managed application IDs, final origins, raw errors, and blockers are not promoted into public proof. Source code for this workflow proves the recovery contract only; current Access state, credential validity, provider mutation success, and public runtime identity still require fresh provider/browser evidence.
+
 ## Verification
 
 ```bash
