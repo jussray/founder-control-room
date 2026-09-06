@@ -131,6 +131,15 @@ export function validateChiefRuleset(readback) {
   return readback;
 }
 
+export function validateChiefRulesetUnchanged(before, after) {
+  const initial = validateChiefRuleset(before);
+  const current = validateChiefRuleset(after);
+  if (sha256(initial) !== sha256(current)) {
+    throw new Error('Chief ruleset changed during runtime witness publication');
+  }
+  return current;
+}
+
 export function validateChiefPullRequest(readback, expectedSha) {
   if (!readback || typeof readback !== 'object') throw new Error('Chief PR readback missing');
   if (Number(readback.number) !== CHIEF_RUNTIME_WITNESS.pullRequestNumber) throw new Error('Chief PR number drifted');
@@ -154,6 +163,18 @@ function requireInstallationAuthority(observation, expectedAppId) {
   if (permissions.checks !== 'write') throw new Error('GitHub App lacks checks:write');
   if (permissions.deployments !== 'write') throw new Error('GitHub App lacks deployments:write');
   return observation;
+}
+
+export function validateInstallationUnchanged(before, after, expectedAppId) {
+  const initial = requireInstallationAuthority(before, expectedAppId);
+  const current = requireInstallationAuthority(after, expectedAppId);
+  if (text(initial.installationId) !== text(current.installationId)) {
+    throw new Error('GitHub App installation identity changed during runtime witness publication');
+  }
+  if (text(initial.repositorySelection) !== text(current.repositorySelection)) {
+    throw new Error('GitHub App repository selection changed during runtime witness publication');
+  }
+  return current;
 }
 
 async function githubJson(fetchFn, token, endpoint, options = {}) {
@@ -259,7 +280,7 @@ export async function publishChiefRuntimeWitness({
     await githubJson(fetchFn, token, `/repos/jussray/chief-ai-machine/pulls/${CHIEF_RUNTIME_WITNESS.pullRequestNumber}`),
     chiefCandidateSha,
   );
-  validateChiefRuleset(
+  const initialRuleset = validateChiefRuleset(
     await githubJson(fetchFn, token, `/repos/jussray/chief-ai-machine/rulesets/${CHIEF_RUNTIME_WITNESS.rulesetId}`),
   );
 
@@ -340,9 +361,18 @@ export async function publishChiefRuntimeWitness({
     if (!deploymentStatus) throw new Error('trusted Chief runtime deployment-status readback missing');
   }
 
+  const finalInstallation = validateInstallationUnchanged(
+    installation,
+    await observeInstallationFn(appId, privateKey, CHIEF_RUNTIME_WITNESS.repository),
+    appId,
+  );
   validateChiefPullRequest(
     await githubJson(fetchFn, token, `/repos/jussray/chief-ai-machine/pulls/${CHIEF_RUNTIME_WITNESS.pullRequestNumber}`),
     chiefCandidateSha,
+  );
+  validateChiefRulesetUnchanged(
+    initialRuleset,
+    await githubJson(fetchFn, token, `/repos/jussray/chief-ai-machine/rulesets/${CHIEF_RUNTIME_WITNESS.rulesetId}`),
   );
 
   const artifact = {
@@ -356,10 +386,10 @@ export async function publishChiefRuntimeWitness({
     approvalReferenceReceipt: `sha256:${sha256(approvalReference)}`,
     githubApp: {
       appId,
-      installationId: text(installation.installationId),
-      repositorySelection: text(installation.repositorySelection),
-      checksPermission: installation.permissions?.checks ?? null,
-      deploymentsPermission: installation.permissions?.deployments ?? null,
+      installationId: text(finalInstallation.installationId),
+      repositorySelection: text(finalInstallation.repositorySelection),
+      checksPermission: finalInstallation.permissions?.checks ?? null,
+      deploymentsPermission: finalInstallation.permissions?.deployments ?? null,
     },
     check: {
       name: CHIEF_RUNTIME_WITNESS.checkName,
