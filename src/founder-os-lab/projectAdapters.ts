@@ -50,15 +50,15 @@ interface NormalizedContractUrls {
 
 const EXACT_COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const SEKRET_BIP_REPOSITORY = 'jussray/Sekret-Bip';
-const SEKRET_BIP_AUDITED_HEAD = 'aeacd00379dbe3b3c457d140ab5b89210f8afeda';
+const SEKRET_BIP_AUDITED_HEAD = '9b3fef2633071628c0e158c043d096deede8c6ff';
 const SEKRET_BIP_AUDITED_CONTRACT_BLOBS = {
   'app/index.tsx': '299da021482968e415ab1016b19f52daeeec497a',
-  'screens/WebWelcomeScreen.tsx': '5f1dafb209a9e8aee050b61fe38ace808e99f4b1',
+  'screens/WebWelcomeScreen.tsx': '3228a5c997ac3a72e8d15dd37d5fb029c993607e',
   'constants/frontDoorTheme.ts': '0c331d30058ad21ea3cbb51e0788165008992d2f',
   'docs/COMPANION_NAME_CANON.md': 'fec910ecd3c99b08f1305225cfe3d1b1e82aa171',
   'docs/FRONT_DOOR_VARIANTS.md': '171db3a64822a46d052b290b55ebc890dc7a8d76',
   'implementation-ledger.extensions/human-ai-identity-contract.json': '2266fb7f8bf51506011d976f5907e9656da5a67b',
-  'test/dual-front-door-contract.test.mjs': '1ceb267d7d20136d38fce95f2418fe22b6a1468e',
+  'test/dual-front-door-contract.test.mjs': '459ccf28ffe785e725c20a72542a3b18780c28c8',
 } as const;
 const CHIEF_AI_REPOSITORY = 'jussray/chief-ai-machine';
 const CHIEF_AI_AUDITED_HEAD = '2fd4fda0cab12e52ab5096e723884d98bcfe7d10';

@@ -130,6 +130,25 @@ This checked-in binding and sender allowlist prove repository intent only. They 
 
 Repository source contains a founder-gated Cloudflare Access inspection/recovery lane. Its existence does **not** prove current Access application state, exemption state, token permissions, or production front-door availability.
 
+The current recovery contract is intentionally narrower than general Access administration. The `FCR Access Front Door Recovery` workflow requires an exact requested SHA that still equals current `main`. Read-only inspection uses only `CLOUDFLARE_ACCESS_API_TOKEN`. Any apply or rollback uses only `CLOUDFLARE_ACCESS_ADMIN_API_TOKEN`, and `apply=true` additionally requires a fresh auditable founder approval reference whose raw value is not published.
+
+The only permitted create target is:
+
+```text
+account: canonical FCR Cloudflare account
+zone: foundercontrolroom.org
+destination: foundercontrolroom.org/*
+managed app: foundercontrolroom.org - public apex bypass
+type: self_hosted
+policy: Bypass / Everyone
+```
+
+The recovery does not mutate DNS, Worker routes, the database, account-level `deny_unmatched_requests_exempted_zone_names`, unrelated Access applications, or existing all-workers protection. If a non-managed application already owns the exact public destination, or the managed application is duplicated or has destination/policy drift, automatic repair fails closed for manual review.
+
+A newly created public destination is only `mutated-needs-browser-proof`. Anonymous Playwright must then verify the recovered front door and exact runtime SHA. If that proof fails, rollback may delete only the run-created managed application after the receipt-bound account, zone, application ID, managed name, and exact destination are uniquely reacquired and still match. Ambiguity or drift blocks deletion rather than widening rollback authority.
+
+Only a bounded sanitized recovery receipt may be returned to the fixed founder-control issue or retained as an artifact. Raw provider/browser receipts, raw approval references, managed application IDs, final origins, raw errors, and blockers remain outside public proof.
+
 Keep these truths separate:
 
 ```text
@@ -213,6 +232,6 @@ Current executable source and authoritative provider readback outrank an older v
 - API Worker: redeploy the prior exact Worker SHA through the authorized Worker release path.
 - Proxy: revert the focused `public/_worker.js` change and matching deployment contract together; do not silently point the browser at an unverified origin.
 - Service binding: revert only the affected Pages binding through separately authorized provider mutation; preserve unrelated bindings/configuration.
-- Access: remove only the bounded exemption/change that was separately authorized, preserving unrelated Access policy.
+- Access: remove only the run-created managed `foundercontrolroom.org/*` public-bypass application when its receipt-bound identity and scope still match; otherwise stop for manual review.
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.

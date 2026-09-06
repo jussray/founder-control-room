@@ -38,6 +38,8 @@ A unit test, source declaration, reachable endpoint, or earlier successful Playw
 
 This is why the exact-head Playwright workflow is registered as `evidence-authority`: changing what the browser witness sends or accepts can change what future operators believe has been proven even when the underlying actuator remains intentionally bounded.
 
+A September peer-rollover incident made the freshness rule concrete. FCR `af87c67e05584203b04610eb25e6f89ad8c1e7a0` completed a real federation lap against its pinned StoryEngine peer `abd4aab9f33e6c67d7863bd1a03c917901a00668`, but StoryEngine PR #89 had already advanced to separately exact-head-proven `f78492230e88c66b04d4d8c9d6210c6380ba0db1`. The earlier FCR green therefore remains historical for the old peer rather than current integration authority. Refreshing the peer pin is only the start of recovery: the successor FCR head must rerun the entire browser/runtime/receipt witness against the newly bound StoryEngine SHA, and movement on either side expires that successor proof again.
+
 ## 2026-09 control correction: privileged production witness isolation
 
 A post-Deploy `workflow_run` witness is privileged even when its purpose is read-only verification. Treating the triggering workflow's `head_sha` as both the release identity to observe and the code to execute collapses evidence identity into executable authority. A successful upstream workflow must not make its checkout trusted merely by becoming a completed run.

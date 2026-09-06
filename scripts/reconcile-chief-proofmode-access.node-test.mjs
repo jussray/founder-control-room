@@ -82,17 +82,17 @@ const baseArgs = {
   nowMs: Date.parse('2026-08-30T00:00:00Z'),
 };
 
+const configuredPolicy = {
+  id: 'policy-1',
+  decision: 'non_identity',
+  include: [{ service_token: { token_id: SERVICE_ID } }],
+};
+
 test('accepts only the configured service token on an existing exact-host Service Auth policy', async () => {
   const { fetchImpl, calls } = routeFetch({
     serviceTokens: [activeToken],
     apps: [workerApp, exactPublicApp],
-    policiesByApp: {
-      [exactPublicApp.id]: [{
-        id: 'policy-1',
-        decision: 'non_identity',
-        include: [{ service_token: { token_id: SERVICE_ID } }],
-      }],
-    },
+    policiesByApp: { [exactPublicApp.id]: [configuredPolicy] },
   });
 
   const result = await ensureChiefProofModeAccessPolicy({ ...baseArgs, fetchImpl });
@@ -108,17 +108,96 @@ test('accepts only the configured service token on an existing exact-host Servic
   assert.equal(calls.length, 3);
 });
 
+test('check discovers exactly one existing bound service-token identity when selectors are absent', async () => {
+  const { fetchImpl, calls } = routeFetch({
+    serviceTokens: [activeToken],
+    apps: [workerApp, exactPublicApp],
+    policiesByApp: { [exactPublicApp.id]: [configuredPolicy] },
+  });
+
+  const result = await ensureChiefProofModeAccessPolicy({
+    ...baseArgs,
+    serviceClientId: undefined,
+    serviceTokenId: undefined,
+    fetchImpl,
+  });
+
+  assert.equal(result.changed, false);
+  assert.equal(result.serviceTokenId, SERVICE_ID);
+  assert.equal(result.policyId, 'policy-1');
+  assert.equal(calls.length, 3);
+  assert.equal(calls.filter(({ init }) => init.method === 'POST').length, 0);
+});
+
+test('selector-free check fails closed when effective policy binds zero or multiple token identities', async () => {
+  const none = routeFetch({
+    serviceTokens: [activeToken],
+    apps: [exactPublicApp],
+    policiesByApp: { [exactPublicApp.id]: [] },
+  });
+  await assert.rejects(
+    ensureChiefProofModeAccessPolicy({
+      ...baseArgs,
+      serviceClientId: undefined,
+      serviceTokenId: undefined,
+      fetchImpl: none.fetchImpl,
+    }),
+    /No existing non-identity service-token binding/,
+  );
+  assert.equal(none.calls.filter(({ init }) => init.method === 'POST').length, 0);
+
+  const multiple = routeFetch({
+    serviceTokens: [activeToken, { ...activeToken, id: 'service-token-2', client_id: 'other.access' }],
+    apps: [exactPublicApp],
+    policiesByApp: {
+      [exactPublicApp.id]: [
+        configuredPolicy,
+        {
+          id: 'policy-2',
+          decision: 'non_identity',
+          include: [{ service_token: { token_id: 'service-token-2' } }],
+        },
+      ],
+    },
+  });
+  await assert.rejects(
+    ensureChiefProofModeAccessPolicy({
+      ...baseArgs,
+      serviceClientId: undefined,
+      serviceTokenId: undefined,
+      fetchImpl: multiple.fetchImpl,
+    }),
+    /Multiple service-token identities.*refusing ambiguous discovery/,
+  );
+  assert.equal(multiple.calls.filter(({ init }) => init.method === 'POST').length, 0);
+});
+
+test('repair without an exact service-token selector fails before provider access', async () => {
+  const { fetchImpl, calls } = routeFetch({
+    serviceTokens: [activeToken],
+    apps: [exactPublicApp],
+    policiesByApp: { [exactPublicApp.id]: [configuredPolicy] },
+  });
+
+  await assert.rejects(
+    ensureChiefProofModeAccessPolicy({
+      ...baseArgs,
+      mode: 'repair',
+      apiToken: ADMIN_TOKEN,
+      serviceClientId: undefined,
+      serviceTokenId: undefined,
+      fetchImpl,
+    }),
+    /service-token identity is required before repair/,
+  );
+  assert.equal(calls.length, 0);
+});
+
 test('accepts the configured service-token ID without requiring a client ID', async () => {
   const { fetchImpl, calls } = routeFetch({
     serviceTokens: [activeToken],
     apps: [workerApp, exactPublicApp],
-    policiesByApp: {
-      [exactPublicApp.id]: [{
-        id: 'policy-1',
-        decision: 'non_identity',
-        include: [{ service_token: { token_id: SERVICE_ID } }],
-      }],
-    },
+    policiesByApp: { [exactPublicApp.id]: [configuredPolicy] },
   });
 
   const result = await ensureChiefProofModeAccessPolicy({
@@ -136,6 +215,7 @@ test('fails closed when configured token ID and client ID identify different ser
   const { fetchImpl, calls } = routeFetch({
     serviceTokens: [{ ...activeToken, client_id: 'different-client.access' }],
     apps: [exactPublicApp],
+    policiesByApp: { [exactPublicApp.id]: [configuredPolicy] },
   });
   await assert.rejects(
     ensureChiefProofModeAccessPolicy({
@@ -145,7 +225,7 @@ test('fails closed when configured token ID and client ID identify different ser
     }),
     /does not match the configured client ID/,
   );
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 3);
 });
 
 test('rejects non-immutable or path-bearing targets before provider access', async () => {
@@ -162,22 +242,27 @@ test('rejects non-immutable or path-bearing targets before provider access', asy
 });
 
 test('fails closed for disabled and expired service tokens', async () => {
-  const disabled = routeFetch({ serviceTokens: [{ ...activeToken, enabled: false }], apps: [exactPublicApp] });
+  const disabled = routeFetch({
+    serviceTokens: [{ ...activeToken, enabled: false }],
+    apps: [exactPublicApp],
+    policiesByApp: { [exactPublicApp.id]: [configuredPolicy] },
+  });
   await assert.rejects(
     ensureChiefProofModeAccessPolicy({ ...baseArgs, fetchImpl: disabled.fetchImpl }),
     /disabled/,
   );
-  assert.equal(disabled.calls.length, 1);
+  assert.equal(disabled.calls.length, 3);
 
   const expired = routeFetch({
     serviceTokens: [{ ...activeToken, expires_at: '2026-08-29T23:59:59Z' }],
     apps: [exactPublicApp],
+    policiesByApp: { [exactPublicApp.id]: [configuredPolicy] },
   });
   await assert.rejects(
     ensureChiefProofModeAccessPolicy({ ...baseArgs, fetchImpl: expired.fetchImpl }),
     /expired/,
   );
-  assert.equal(expired.calls.length, 1);
+  assert.equal(expired.calls.length, 3);
 });
 
 test('refuses repair on preview_worker or broad public scope', async () => {
@@ -283,13 +368,7 @@ test('provider credential appears only in Authorization header', async () => {
   const { fetchImpl, calls } = routeFetch({
     serviceTokens: [activeToken],
     apps: [exactPublicApp],
-    policiesByApp: {
-      [exactPublicApp.id]: [{
-        id: 'policy-1',
-        decision: 'non_identity',
-        include: [{ service_token: { token_id: SERVICE_ID } }],
-      }],
-    },
+    policiesByApp: { [exactPublicApp.id]: [configuredPolicy] },
   });
   await ensureChiefProofModeAccessPolicy({ ...baseArgs, fetchImpl });
   for (const call of calls) {
