@@ -8,6 +8,11 @@ const runtimeTest = readFileSync('e2e/chief-proofmode-runtime.pw.mjs', 'utf8');
 
 const FULL_SHA = /\^\[0-9a-f\]\{40\}\$/;
 
+function workflowEnvValue(name) {
+  const match = workflow.match(new RegExp(`^\\s{6}${name}:\\s*(.+)$`, 'm'));
+  return match?.[1]?.trim() ?? '';
+}
+
 test('trusted runtime witness executes only from exact FCR main under founder identity', () => {
   assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
   assert.match(workflow, /github\.actor == 'jussray'/);
@@ -26,6 +31,17 @@ test('witness lane is read-only for Cloudflare Access and cannot perform repair'
   assert.doesNotMatch(workflow, /CHIEF_ACCESS_MODE:\s*repair/);
   assert.doesNotMatch(workflow, /Apply exact-host Chief Service Auth/);
   assert.match(workflow, /node scripts\/reconcile-chief-proofmode-access\.mjs >\/dev\/null 2>&1/);
+});
+
+test('Access check and protected Playwright use the exact same Chief client identity source', () => {
+  const checkedClientId = workflowEnvValue('CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID');
+  const runtimeClientId = workflowEnvValue('CHIEF_RUNTIME_ACCESS_CLIENT_ID');
+  assert.ok(checkedClientId);
+  assert.equal(checkedClientId, runtimeClientId);
+  assert.match(checkedClientId, /secrets\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
+  assert.match(checkedClientId, /secrets\.CLOUDFLARE_ACCESS_CLIENT_ID/);
+  assert.match(checkedClientId, /vars\.CHIEF_CLOUDFLARE_ACCESS_CLIENT_ID/);
+  assert.match(checkedClientId, /vars\.CLOUDFLARE_ACCESS_CLIENT_ID/);
 });
 
 test('protected runtime credentials stay in the FCR production secret lane', () => {
@@ -64,9 +80,19 @@ test('publisher re-observes #208 and forbids bypass or ruleset mutation', () => 
   assert.match(publisher, /Chief ruleset must preserve zero bypass actors/);
   assert.match(publisher, /reserved candidate runtime context must remain unbound/);
   assert.match(publisher, /Chief required deployment missing/);
+  assert.match(publisher, /Chief ruleset changed during runtime witness publication/);
   assert.doesNotMatch(publisher, /method:\s*'PUT'.*rulesets/s);
   assert.doesNotMatch(publisher, /method:\s*'PATCH'.*rulesets/s);
   assert.doesNotMatch(publisher, /\/merges|merge_pull_request|updateRepoRuleset/i);
+});
+
+test('failed witness cannot leave merge-relevant evidence green without compensation', () => {
+  assert.match(publisher, /status:\s*'in_progress'/);
+  assert.match(publisher, /conclusion:\s*'failure'/);
+  assert.match(publisher, /state:\s*'failure'/);
+  assert.match(publisher, /invalidated/);
+  assert.match(publisher, /deploymentSuccessPostedByThisCall/);
+  assert.match(publisher, /checkFinalizedByThisCall/);
 });
 
 test('evidence deployment cannot auto-merge or claim production deployment authority', () => {
