@@ -283,15 +283,26 @@ function externalDemandEvidence(
   terms: ContentTermsDerivation,
   impressions: number | null,
 ): Attack3000Evidence {
-  const observedDistribution = terms.published && impressions !== null && impressions > 0;
+  const observedDemandSignal =
+    terms.published &&
+    impressions !== null &&
+    impressions > 0 &&
+    ((terms.visitRatePct !== null && terms.visitRatePct > 0) ||
+      (terms.qualifiedConversationRatePct !== null && terms.qualifiedConversationRatePct > 0) ||
+      (terms.dealConversionPct !== null && terms.dealConversionPct > 0));
+  const directDemandClassification =
+    evidence.classification === 'VERIFIED' && !hasEvidence(evidence.evidenceRefs)
+      ? 'UNKNOWN'
+      : evidence.classification;
+
   return {
     ...evidence,
-    classification: weakestReality(evidence.classification, terms.classification),
-    direction: observedDistribution ? evidence.direction : 'NEUTRAL',
+    classification: weakestReality(directDemandClassification, terms.classification),
+    direction: observedDemandSignal ? evidence.direction : 'NEUTRAL',
     evidenceRefs: cleanRefs([...evidence.evidenceRefs, ...terms.evidenceRefs]),
     note: [
       evidence.note?.trim(),
-      `published=${terms.published}; engagementRatePct=${terms.engagementRatePct ?? 'unknown'}; visitRatePct=${terms.visitRatePct ?? 'unknown'}; qualifiedConversationRatePct=${terms.qualifiedConversationRatePct ?? 'unknown'}; dealConversionPct=${terms.dealConversionPct ?? 'unknown'}; termClassification=${terms.classification}`,
+      `published=${terms.published}; demandSignal=${observedDemandSignal}; engagementRatePct=${terms.engagementRatePct ?? 'unknown'}; visitRatePct=${terms.visitRatePct ?? 'unknown'}; qualifiedConversationRatePct=${terms.qualifiedConversationRatePct ?? 'unknown'}; dealConversionPct=${terms.dealConversionPct ?? 'unknown'}; termClassification=${terms.classification}`,
     ]
       .filter(Boolean)
       .join(' | '),

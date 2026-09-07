@@ -111,6 +111,32 @@ describe('Attack 3000 content adapter', () => {
     expect(result.evaluation.verdict).toBe('HOLD');
   });
 
+  it('does not treat publication and reach alone as external demand', () => {
+    const input = baseline();
+    input.terms.attributedVisits = verifiedMetric(0, 'zero-visits-ref');
+    input.terms.qualifiedConversations = verifiedMetric(0, 'zero-conversations-ref');
+    input.terms.attributedContacts = verifiedMetric(0, 'zero-contacts-ref');
+    input.terms.attributedDeals = verifiedMetric(0, 'zero-deals-ref');
+
+    const result = evaluateContentAttack3000(input);
+    expect(result.assessment.dimensions.external_demand?.direction).toBe('NEUTRAL');
+    expect(result.evaluation.verdict).toBe('HOLD');
+  });
+
+  it('does not launder generic metric refs into a missing direct demand witness', () => {
+    const input = baseline();
+    input.evidence.externalDemand = {
+      classification: 'VERIFIED',
+      direction: 'SUPPORTS',
+      evidenceRefs: [],
+    };
+
+    const result = evaluateContentAttack3000(input);
+    expect(result.assessment.dimensions.external_demand?.classification).toBe('UNKNOWN');
+    expect(result.evaluation.reasons).toContain('dimension:external_demand:unknown');
+    expect(result.evaluation.verdict).toBe('HOLD');
+  });
+
   it('downgrades VERIFIED metrics that have no evidence refs', () => {
     const input = baseline();
     input.terms.attributedDeals = {
