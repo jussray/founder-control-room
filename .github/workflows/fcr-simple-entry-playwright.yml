@@ -1,0 +1,65 @@
+name: FCR Simple Entry Playwright
+
+on:
+  push:
+    branches: [ui/fcr-simple-welcome-login]
+    paths:
+      - public/index.html
+      - public/control-room/index.html
+      - public/control-room/styles.css
+      - public/control-room/entry-flow.js
+      - e2e/fcr-welcome-login-proof.mjs
+      - .github/workflows/fcr-simple-entry-playwright.yml
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.sha }}
+
+jobs:
+  proof:
+    name: Simple entry browser proof
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify Cloudflare and Supabase auth bridge contracts
+        run: >-
+          npx vitest run
+          src/http/routes/__tests__/auth.integration.test.ts
+          src/http/routes/__tests__/auth.onboarding.test.ts
+          src/http/__tests__/pagesEdgeProxy.test.ts
+          src/http/__tests__/opaqueBrowserAuthSurfaces.test.ts
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+      - name: Run focused Playwright proof
+        run: |
+          mkdir -p test-results/fcr-welcome-login
+          node e2e/fcr-welcome-login-proof.mjs
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fcr-simple-entry-${{ env.EXPECTED_HEAD_SHA }}
+          path: test-results/fcr-welcome-login/
+          if-no-files-found: warn
+          retention-days: 30
