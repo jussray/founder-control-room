@@ -1,0 +1,81 @@
+name: Tenant Boundary Proof
+
+on:
+  push:
+    branches:
+      - feat/fcr-tenant-boundary-v1
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tenant-boundary-proof-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.sha }}
+
+jobs:
+  tenant-boundary:
+    name: Tenant Boundary Exact-Head
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run focused tenant tests
+        run: >-
+          npx vitest run
+          src/http/middleware/__tests__/requireFounderWorkspace.test.ts
+          src/http/middleware/__tests__/projectReadAudit.test.ts
+          src/http/routes/__tests__/founderOnboarding.integration.test.ts
+
+      - name: Build exact head
+        run: npm run build
+
+      - name: Run Playwright tenant attack
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p logs
+          node e2e/tenant-isolation-proof.mjs 2>&1 | tee logs/tenant-isolation-proof.log
+          grep -q 'TENANT_ISOLATION_PLAYWRIGHT_PROOF=PASS' logs/tenant-isolation-proof.log
+
+      - name: Upload tenant proof artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tenant-boundary-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            logs/tenant-isolation-proof.log
+            test-results/tenant-isolation-mobile.png
+          if-no-files-found: warn
