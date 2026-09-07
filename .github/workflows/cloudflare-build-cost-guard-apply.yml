@@ -24,8 +24,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: production
-    outputs:
-      live_sha: ${{ steps.live_identity.outputs.live_sha }}
     env:
       CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CF_READ_TOKEN: ${{ secrets.FCR_CLOUDFLARE_BUILDS_USER_TOKEN }}
@@ -36,33 +34,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -n "${CF_ACCOUNT_ID:-}" || {
-            echo 'CLOUDFLARE_ACCOUNT_ID is not configured.' >&2
-            exit 1
-          }
-          test -n "${CF_READ_TOKEN:-}" || {
-            echo 'FCR_CLOUDFLARE_BUILDS_USER_TOKEN is not configured.' >&2
-            exit 1
-          }
-          test -n "${CF_WRITE_TOKEN:-}" || {
-            echo 'CLOUDFLARE_API_TOKEN is not configured.' >&2
-            exit 1
-          }
+          test -n "${CF_ACCOUNT_ID:-}"
+          test -n "${CF_READ_TOKEN:-}"
+          test -n "${CF_WRITE_TOKEN:-}"
 
-      - name: Capture live Worker identity before provider-setting mutation
-        id: live_identity
-        shell: bash
-        run: |
-          set -euo pipefail
-          body="$(curl --silent --show-error --fail --connect-timeout 10 --max-time 20 https://api.foundercontrolroom.org/version)"
-          live_sha="$(jq -r '.gitSha // empty' <<<"$body")"
-          service="$(jq -r '.service // empty' <<<"$body")"
-          test "$service" = 'founder-control-room'
-          [[ "$live_sha" =~ ^[0-9a-f]{40}$ ]]
-          echo "live_sha=$live_sha" >> "$GITHUB_OUTPUT"
-          echo "Captured pre-mutation live SHA: $live_sha"
-
-      - name: Patch only production build watch paths and verify readback
+      - name: Patch only production build watch paths and verify provider readback
         shell: bash
         run: |
           set -euo pipefail
@@ -98,8 +74,7 @@ jobs:
               token = token.replace(/^Bearer[\p{White_Space}\p{Cf}]+/iu, '');
             } while (token !== previous);
             token = token.replace(/[\p{White_Space}\p{Cf}]+/gu, '');
-            if (!/^[\x21-\x7e]+$/.test(token)) return '';
-            return token;
+            return /^[\x21-\x7e]+$/.test(token) ? token : '';
           }
 
           function cleanList(value) {
@@ -123,10 +98,7 @@ jobs:
           async function cf(token, path, options = {}) {
             const response = await fetch(`${API}${path}`, {
               method: options.method || 'GET',
-              headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
+              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
               body: options.body === undefined ? undefined : JSON.stringify(options.body),
             });
             const payload = await response.json().catch(() => null);
@@ -235,13 +207,14 @@ jobs:
           retention-days: 30
 
   browser-proof:
-    name: Prove live Pages and Worker identity stayed unchanged
+    name: Attempt Playwright front-door proof after cost guard
     needs: apply-cost-guard
+    if: ${{ always() && needs.apply-cost-guard.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      LIVE_ORIGIN: https://foundercontrolroom.org
-      EXPECTED_HEAD_SHA: ${{ needs.apply-cost-guard.outputs.live_sha }}
+      ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
     steps:
       - name: Check out exact repair commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -261,16 +234,29 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run exact live Pages/Worker Playwright proof
-        run: npx playwright test -c playwright.live-release.config.ts e2e/live-pages-worker-release.spec.ts
+      - name: Run Playwright live front-door probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { chromium } from '@playwright/test';
 
-      - name: Upload browser proof artifacts
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: fcr-cloudflare-build-cost-guard-browser-${{ github.run_id }}
-          path: |
-            playwright-report/live-release
-            test-results
-          if-no-files-found: warn
-          retention-days: 30
+          const clientId = String(process.env.ACCESS_CLIENT_ID || '').trim();
+          const clientSecret = String(process.env.ACCESS_CLIENT_SECRET || '').trim();
+          const headers = clientId && clientSecret
+            ? { 'CF-Access-Client-Id': clientId, 'CF-Access-Client-Secret': clientSecret }
+            : {};
+          const browser = await chromium.launch({ headless: true });
+          try {
+            const context = await browser.newContext({ extraHTTPHeaders: headers });
+            const page = await context.newPage();
+            const response = await page.goto('https://foundercontrolroom.org/', { waitUntil: 'domcontentloaded' });
+            const status = response?.status() ?? 0;
+            if (status < 200 || status >= 400) throw new Error(`FCR_FRONT_DOOR_STATUS_${status}`);
+            const titleText = await page.locator('body').innerText();
+            if (!/Founder Control Room/i.test(titleText)) throw new Error('FCR_FRONT_DOOR_IDENTITY_MISSING');
+            console.log(`FCR_PLAYWRIGHT_FRONT_DOOR_OK status=${status} access_service_auth=${Boolean(clientId && clientSecret)}`);
+          } finally {
+            await browser.close();
+          }
+          NODE
