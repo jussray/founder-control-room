@@ -322,6 +322,20 @@ jobs:
                 matchingApplicationCount,
                 action,
                 classification,
+                destinationShape: (
+                  if .classification != "existing-public-access-app-requires-review" then null
+                  elif .blocker != "An existing non-managed Access application targets the FCR apex with broader or different destination scope; manual review is required before mutation." then null
+                  else
+                    (.matchingApplications | if type == "array" then . else [] end) as $apps
+                    | if ($apps | length) != 1 then null
+                      else (($apps[0].destinations // []) | if type == "array" then . else [] end) as $destinations
+                      | if ($destinations | length) == 1 then "single-subpath"
+                        elif ($destinations | length) > 1 then "multi-destination"
+                        else null
+                        end
+                      end
+                  end
+                ),
                 reviewReason: (
                   if .classification != "existing-public-access-app-requires-review" then null
                   elif .blocker == "More than one Access application targets the FCR public apex; refusing to infer ownership or mutate automatically." then "multiple-matching-apps"
