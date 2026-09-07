@@ -23,19 +23,20 @@ jobs:
     name: Apply and verify FCR Worker build watch-path cost guard
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: production
     env:
       CF_ACCOUNT_ID: 9b59861bd1747cf7525571b4c51d2aa0
       CF_READ_TOKEN: ${{ secrets.FCR_CLOUDFLARE_BUILDS_USER_TOKEN }}
       CF_WRITE_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CF_WORKER_NAME: founder-control-room
     steps:
-      - name: Require read authority and account identity
+      - name: Require founder branch and repository credentials
         shell: bash
         run: |
           set -euo pipefail
+          test "$GITHUB_ACTOR" = "jussray"
+          test "$GITHUB_REF" = "refs/heads/fix/cloudflare-build-cost-guard"
           [[ "$CF_ACCOUNT_ID" =~ ^[0-9a-f]{32}$ ]]
-          test -n "${CF_READ_TOKEN:-}"
+          test -n "${CF_READ_TOKEN:-}${CF_WRITE_TOKEN:-}"
 
       - name: Read, repair if required, and verify build watch paths
         shell: bash
@@ -48,50 +49,41 @@ jobs:
           const API = 'https://api.cloudflare.com/client/v4';
           const accountId = String(process.env.CF_ACCOUNT_ID || '').trim();
           const workerName = String(process.env.CF_WORKER_NAME || '').trim();
-          const desiredPathIncludes = ['*'];
-          const desiredPathExcludes = [
-            '.agents/**',
-            '.ai/**',
-            '.github/**',
-            'artifacts/**',
-            'docs/**',
-            'e2e/**',
-            'skills/**',
-            'test/**',
-            '*.md',
-          ];
+          const desired = {
+            pathIncludes: ['*'],
+            pathExcludes: [
+              '.agents/**',
+              '.ai/**',
+              '.github/**',
+              'artifacts/**',
+              'docs/**',
+              'e2e/**',
+              'skills/**',
+              'test/**',
+              '*.md',
+            ],
+          };
 
-          function unwrap(value) {
-            let token = String(value || '').trim().normalize('NFKC');
-            let previous;
-            do {
-              previous = token;
-              token = token.trim();
-              token = token.replace(/^[A-Z_][A-Z0-9_]*[\p{White_Space}\p{Cf}]*=[\p{White_Space}\p{Cf}]*/u, '');
-              const quoted = token.match(/^(["'])([\s\S]*)\1$/u);
-              if (quoted) token = quoted[2].trim();
-              token = token.replace(/^Bearer[\p{White_Space}\p{Cf}]+/iu, '');
-            } while (token !== previous);
-            token = token.replace(/[\p{White_Space}\p{Cf}]+/gu, '');
-            return /^[\x21-\x7e]+$/.test(token) ? token : '';
-          }
-
-          function cleanList(value) {
-            return [...new Set((Array.isArray(value) ? value : [])
-              .map((item) => String(item || '').trim())
-              .filter(Boolean))];
-          }
-
-          function sameSet(left, right) {
-            const a = [...cleanList(left)].sort();
-            const b = [...cleanList(right)].sort();
+          const cleanList = (value) => [...new Set((Array.isArray(value) ? value : [])
+            .map((item) => String(item || '').trim()).filter(Boolean))];
+          const sameSet = (left, right) => {
+            const a = cleanList(left).sort();
+            const b = cleanList(right).sort();
             return a.length === b.length && a.every((value, index) => value === b[index]);
-          }
+          };
+          const normalize = (value) => {
+            let token = String(value || '').trim().normalize('NFKC');
+            token = token.replace(/^Bearer\s+/iu, '').replace(/[\p{White_Space}\p{Cf}]+/gu, '');
+            return /^[\x21-\x7e]+$/.test(token) ? token : '';
+          };
+          const tokenCandidates = [...new Set([
+            normalize(process.env.CF_READ_TOKEN),
+            normalize(process.env.CF_WRITE_TOKEN),
+          ].filter(Boolean))];
 
           function providerError(payload, status) {
             const errors = Array.isArray(payload?.errors) ? payload.errors : [];
-            return errors.map((entry) => `${entry?.code ?? 'unknown'}:${entry?.message ?? 'provider error'}`).join('; ')
-              || `HTTP ${status}`;
+            return errors.map((entry) => `${entry?.code ?? 'unknown'}:${entry?.message ?? 'provider error'}`).join('; ') || `HTTP ${status}`;
           }
 
           async function cf(token, path, options = {}) {
@@ -101,68 +93,66 @@ jobs:
               body: options.body === undefined ? undefined : JSON.stringify(options.body),
             });
             const payload = await response.json().catch(() => null);
-            if (!response.ok || payload?.success === false) {
-              throw new Error(providerError(payload, response.status));
-            }
+            if (!response.ok || payload?.success === false) throw new Error(providerError(payload, response.status));
             return payload?.result;
           }
 
-          const readToken = unwrap(process.env.CF_READ_TOKEN);
-          const writeToken = unwrap(process.env.CF_WRITE_TOKEN);
-          if (!readToken) throw new Error('FCR read credential has invalid transport.');
-
-          async function inspect() {
-            const scripts = await cf(readToken, `/accounts/${accountId}/workers/scripts?per_page=100`);
+          async function inspect(token) {
+            const scripts = await cf(token, `/accounts/${accountId}/workers/scripts?per_page=100`);
             const matches = (Array.isArray(scripts) ? scripts : []).filter((row) => row?.id === workerName);
-            if (matches.length !== 1 || !matches[0]?.tag) {
-              throw new Error(`Expected one ${workerName} Worker with a script tag.`);
-            }
-            const triggers = await cf(readToken, `/accounts/${accountId}/builds/workers/${matches[0].tag}/triggers`);
+            if (matches.length !== 1 || !matches[0]?.tag) throw new Error(`Expected one ${workerName} Worker with a script tag.`);
+            const triggers = await cf(token, `/accounts/${accountId}/builds/workers/${matches[0].tag}/triggers`);
             const active = (Array.isArray(triggers) ? triggers : []).filter((row) => !row?.deleted_on);
             const production = active.filter((row) => {
               const includes = cleanList(row?.branch_includes);
               const excludes = cleanList(row?.branch_excludes);
               return includes.includes('main') && !excludes.includes('main') && !excludes.includes('*');
             });
-            if (production.length !== 1) {
-              throw new Error(`Expected one active main production trigger, found ${production.length}.`);
-            }
+            if (production.length !== 1) throw new Error(`Expected one active main production trigger, found ${production.length}.`);
             return {
               trigger: production[0],
               nonProductionTriggerCount: active.filter((row) => row?.trigger_uuid !== production[0]?.trigger_uuid).length,
             };
           }
 
-          const beforeState = await inspect();
+          let readToken = null;
+          let beforeState = null;
+          const readFailures = [];
+          for (const token of tokenCandidates) {
+            try {
+              beforeState = await inspect(token);
+              readToken = token;
+              break;
+            } catch (error) {
+              readFailures.push(error instanceof Error ? error.message : String(error));
+            }
+          }
+          if (!readToken || !beforeState) throw new Error(`No refreshed repository token could read FCR Workers Builds state: ${readFailures.join(' | ')}`);
+
           const triggerUuid = String(beforeState.trigger?.trigger_uuid || '').trim();
           if (!triggerUuid) throw new Error('Production trigger UUID is missing.');
           const before = {
             pathIncludes: cleanList(beforeState.trigger?.path_includes),
             pathExcludes: cleanList(beforeState.trigger?.path_excludes),
           };
-          const changeRequired = !sameSet(before.pathIncludes, desiredPathIncludes)
-            || !sameSet(before.pathExcludes, desiredPathExcludes);
-
+          const changeRequired = !sameSet(before.pathIncludes, desired.pathIncludes)
+            || !sameSet(before.pathExcludes, desired.pathExcludes);
           const receipt = {
-            schema: 'fcr/cloudflare-build-cost-guard@v1',
+            schema: 'fcr/cloudflare-build-cost-guard@v2',
             generatedAt: new Date().toISOString(),
             worker: workerName,
             branchPolicy: 'main production trigger only',
             before,
-            desired: { pathIncludes: desiredPathIncludes, pathExcludes: desiredPathExcludes },
+            desired,
             after: null,
             applied: false,
             verified: false,
             changeRequired,
-            writeCredentialTransportValid: Boolean(writeToken),
             nonProductionTriggerCount: beforeState.nonProductionTriggerCount,
             buildRequested: false,
             deploymentRequested: false,
           };
-          const persist = () => fs.writeFileSync(
-            'artifacts/cloudflare-build-cost-guard.json',
-            `${JSON.stringify(receipt, null, 2)}\n`,
-          );
+          const persist = () => fs.writeFileSync('artifacts/cloudflare-build-cost-guard.json', `${JSON.stringify(receipt, null, 2)}\n`);
           persist();
 
           if (!changeRequired) {
@@ -173,46 +163,46 @@ jobs:
             process.exit(0);
           }
 
-          if (!writeToken) {
-            console.error('FCR_COST_GUARD_WRITE_CREDENTIAL_REPAIR_REQUIRED');
-            throw new Error('FCR write credential has invalid transport; provider state was read but not mutated.');
+          let writeToken = null;
+          const writeFailures = [];
+          for (const token of tokenCandidates) {
+            try {
+              await cf(token, `/accounts/${accountId}/builds/triggers/${triggerUuid}`, {
+                method: 'PATCH',
+                body: { path_includes: desired.pathIncludes, path_excludes: desired.pathExcludes },
+              });
+              writeToken = token;
+              break;
+            } catch (error) {
+              writeFailures.push(error instanceof Error ? error.message : String(error));
+            }
           }
+          if (!writeToken) throw new Error(`No refreshed repository token could write FCR Workers Builds state: ${writeFailures.join(' | ')}`);
 
-          let mutationStarted = false;
           try {
-            mutationStarted = true;
-            await cf(writeToken, `/accounts/${accountId}/builds/triggers/${triggerUuid}`, {
-              method: 'PATCH',
-              body: { path_includes: desiredPathIncludes, path_excludes: desiredPathExcludes },
-            });
-
-            const afterState = await inspect();
+            const afterState = await inspect(readToken);
             const after = {
               pathIncludes: cleanList(afterState.trigger?.path_includes),
               pathExcludes: cleanList(afterState.trigger?.path_excludes),
             };
-            if (!sameSet(after.pathIncludes, desiredPathIncludes)
-              || !sameSet(after.pathExcludes, desiredPathExcludes)) {
+            if (!sameSet(after.pathIncludes, desired.pathIncludes) || !sameSet(after.pathExcludes, desired.pathExcludes)) {
               throw new Error('FCR Cloudflare watch-path readback mismatch.');
             }
-
             receipt.after = after;
             receipt.applied = true;
             receipt.verified = true;
             receipt.nonProductionTriggerCount = afterState.nonProductionTriggerCount;
             persist();
-            console.log(`FCR_COST_GUARD_VERIFIED applied=true non_production_triggers=${receipt.nonProductionTriggerCount}`);
+            console.log(`FCR_COST_GUARD_VERIFIED non_production_triggers=${receipt.nonProductionTriggerCount}`);
           } catch (error) {
-            if (mutationStarted) {
-              try {
-                await cf(writeToken, `/accounts/${accountId}/builds/triggers/${triggerUuid}`, {
-                  method: 'PATCH',
-                  body: { path_includes: before.pathIncludes, path_excludes: before.pathExcludes },
-                });
-                console.error('FCR_COST_GUARD_ROLLBACK_SUCCEEDED');
-              } catch {
-                console.error('FCR_COST_GUARD_ROLLBACK_FAILED');
-              }
+            try {
+              await cf(writeToken, `/accounts/${accountId}/builds/triggers/${triggerUuid}`, {
+                method: 'PATCH',
+                body: { path_includes: before.pathIncludes, path_excludes: before.pathExcludes },
+              });
+              console.error('FCR_COST_GUARD_ROLLBACK_SUCCEEDED');
+            } catch {
+              console.error('FCR_COST_GUARD_ROLLBACK_FAILED');
             }
             persist();
             throw error;
@@ -243,19 +233,15 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
           cache: npm
-
       - name: Install dependencies
         run: npm ci
-
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-
       - name: Run Playwright live front-door probe
         shell: bash
         run: |
@@ -275,8 +261,8 @@ jobs:
             const response = await page.goto('https://foundercontrolroom.org/', { waitUntil: 'domcontentloaded' });
             const status = response?.status() ?? 0;
             if (status < 200 || status >= 400) throw new Error(`FCR_FRONT_DOOR_STATUS_${status}`);
-            const titleText = await page.locator('body').innerText();
-            if (!/Founder Control Room/i.test(titleText)) throw new Error('FCR_FRONT_DOOR_IDENTITY_MISSING');
+            const text = await page.locator('body').innerText();
+            if (!/Founder Control Room/i.test(text)) throw new Error('FCR_FRONT_DOOR_IDENTITY_MISSING');
             console.log(`FCR_PLAYWRIGHT_FRONT_DOOR_OK status=${status} access_service_auth=${Boolean(clientId && clientSecret)}`);
           } finally {
             await browser.close();
