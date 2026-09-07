@@ -157,6 +157,7 @@ try {
       await mutate(`/approvals/${missionId}/execute`),
       await read(`/terminal/${projectSlug}/commands`),
       await read(`/terminal/runs/${runId}`),
+      await read(`/command-bridge/${projectSlug}/commands`),
     ];
   }, {
     projectSlug: FOREIGN_PROJECT_SLUG,
@@ -171,6 +172,21 @@ try {
       `${check.path} returns the tenant-safe not-found boundary`,
     );
   }
+
+  const foreignCommandRequest = await page.evaluate(async ({ projectSlug }) => {
+    const response = await fetch('/command-bridge/requests', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ projectSlug }),
+    });
+    return { status: response.status, body: await response.json() };
+  }, { projectSlug: FOREIGN_PROJECT_SLUG });
+  assert(foreignCommandRequest.status === 404, 'Command Bridge body-carried foreign project is rejected before command validation');
+  assert(
+    /resource not found in the active workspace/i.test(String(foreignCommandRequest.body?.error ?? '')),
+    'Command Bridge foreign project body uses the tenant-safe not-found boundary',
+  );
 
   await page.goto(`${BASE_URL}/control-room/`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#new-project-form');
