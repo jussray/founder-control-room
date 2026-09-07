@@ -57,6 +57,7 @@ jobs:
           npx vitest run
           src/http/middleware/__tests__/requireFounderWorkspace.test.ts
           src/http/middleware/__tests__/projectReadAudit.test.ts
+          src/http/middleware/__tests__/commandBridgeWorkspace.test.ts
           src/http/routes/__tests__/founderOnboarding.integration.test.ts
 
       - name: Build exact head
