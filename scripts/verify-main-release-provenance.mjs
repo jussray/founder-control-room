@@ -45,7 +45,10 @@ export function classifyMainReleaseProvenance({
   const [pull] = matches;
   return {
     ok: true,
-    reason: 'reviewed_pr_merge_provenance',
+    reason: 'pr_merge_provenance',
+    evidenceScope: 'pr_merge_only',
+    reviewAuthority: 'not_evaluated',
+    mergeAuthorization: 'not_evaluated',
     targetSha: target,
     pullRequestNumber: pull.number,
     mergedAt: pull.merged_at,
