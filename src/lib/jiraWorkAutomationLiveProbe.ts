@@ -10,6 +10,8 @@ const ISSUE_KEY = /^[A-Z][A-Z0-9_]{1,19}-[1-9][0-9]*$/;
 const RECEIPT_ID = /^fcr-jira-receipt-v1:[0-9a-f]{64}$/i;
 const MIN_INGRESS_TOKEN_LENGTH = 32;
 const REQUIRED_INGRESS_PATH = '/ingest/jira-work-automation';
+const RUNTIME_VERSION_PATH = '/version';
+const EXPECTED_SERVICE = 'founder-control-room';
 
 export interface JiraWorkAutomationLiveProbeOptions {
   expectedHeadSha: string;
@@ -41,6 +43,11 @@ type ProbeResponse = {
   runtimeHeadSha?: unknown;
 };
 
+type RuntimeVersionResponse = {
+  service?: unknown;
+  gitSha?: unknown;
+};
+
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -61,6 +68,14 @@ function validateIngressUrl(value: string): string | null {
   } catch {
     return 'probe ingress URL must be a valid absolute URL';
   }
+}
+
+function runtimeVersionUrl(ingressUrl: string): string {
+  const url = new URL(ingressUrl);
+  url.pathname = RUNTIME_VERSION_PATH;
+  url.search = '';
+  url.hash = '';
+  return url.toString();
 }
 
 export function validateJiraWorkAutomationLiveProbeOptions(
@@ -110,6 +125,32 @@ export async function runJiraWorkAutomationLiveProbe(
 
   const expectedHeadSha = normalizeSha(options.expectedHeadSha);
   const fetchImpl = options.fetchImpl ?? fetch;
+
+  const runtimeResponse = await fetchImpl(runtimeVersionUrl(options.ingressUrl), {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      'Cache-Control': 'no-cache',
+    },
+  });
+
+  let runtimeBody: RuntimeVersionResponse;
+  try {
+    runtimeBody = await runtimeResponse.json() as RuntimeVersionResponse;
+  } catch {
+    throw new Error(`JIRA_WORK_AUTOMATION_LIVE_PROBE_RUNTIME_PRECHECK_FAILED: non-JSON response (${runtimeResponse.status})`);
+  }
+
+  const preflightRuntimeHeadSha = normalizeSha(text(runtimeBody.gitSha));
+  if (
+    runtimeResponse.status !== 200
+    || text(runtimeBody.service) !== EXPECTED_SERVICE
+    || !FULL_SHA.test(preflightRuntimeHeadSha)
+    || preflightRuntimeHeadSha !== expectedHeadSha
+  ) {
+    throw new Error('JIRA_WORK_AUTOMATION_LIVE_PROBE_RUNTIME_MISMATCH: pre-dispatch runtime is not the exact requested main SHA');
+  }
+
   const response = await fetchImpl(options.ingressUrl, {
     method: 'POST',
     headers: {
@@ -138,7 +179,7 @@ export async function runJiraWorkAutomationLiveProbe(
 
   const runtimeHeadSha = normalizeSha(text(body.runtimeHeadSha));
   if (!FULL_SHA.test(runtimeHeadSha) || runtimeHeadSha !== expectedHeadSha) {
-    throw new Error('JIRA_WORK_AUTOMATION_LIVE_PROBE_RUNTIME_MISMATCH: provider runtime is not the exact requested main SHA');
+    throw new Error('JIRA_WORK_AUTOMATION_LIVE_PROBE_RUNTIME_MISMATCH: post-dispatch runtime is not the exact requested main SHA');
   }
 
   return {
