@@ -235,9 +235,3 @@ Current executable source and authoritative provider readback outrank an older v
 - Access: remove only the run-created managed `foundercontrolroom.org/*` public-bypass application when its receipt-bound identity and scope still match; otherwise stop for manual review.
 - Credentials: remove/revoke only the affected credential; do not rotate unrelated keys to repair binding drift.
 - Preserve build logs, deployment IDs, provider readback, browser traces, and runtime receipts.
-
-## Canonical public browser-proof origin
-
-The public browser-proof origin and the Cloudflare Access destination intentionally have different scopes. The canonical anonymous browser origin is `https://www.foundercontrolroom.org`, while the bounded Access recovery destination remains the zone-wide `foundercontrolroom.org/*` target.
-
-The FCR Access recovery receipt must therefore require `requestedOrigin` to equal `https://www.foundercontrolroom.org` exactly. An apex redirect or any other final-origin mismatch remains unproven browser truth rather than being normalized into success. This source contract does not change DNS, Worker routes, Access configuration, or provider authority, and it cannot prove the live redirect or Access state without fresh provider and browser evidence.
