@@ -8,6 +8,7 @@ import { chromium } from 'playwright';
 const PORT = 8814;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 const FOUNDER_EMAIL = 'founder@example.com';
+const E2E_SESSION_ENCRYPTION_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const BRIDGE_FILE = new URL('./.capital-auth-bridge.json', import.meta.url).pathname;
 const REPO_ROOT = dirname(fileURLToPath(new URL('.', import.meta.url)));
 
@@ -60,6 +61,7 @@ const server = spawn(
       FOUNDER_EMAIL,
       E2E_SEED_FOUNDER_EMAIL: FOUNDER_EMAIL,
       E2E_AUTH_BRIDGE_FILE: BRIDGE_FILE,
+      FOUNDER_SESSION_ENCRYPTION_KEY: E2E_SESSION_ENCRYPTION_KEY,
       PORT: String(PORT),
       NODE_ENV: 'development',
       FOUNDER_API_URL: BASE_URL,

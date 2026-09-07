@@ -124,7 +124,7 @@ describe('Founder deploy command authority contract', () => {
     expect(reviewEmailReconcileWorkflow).toContain('workflow_dispatch:');
     expect(reviewEmailReconcileWorkflow).toContain('environment: production');
     expect(reviewEmailReconcileWorkflow).toContain('test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"');
-    expect(reviewEmailReconcileWorkflow).toContain('wrangler deploy --config wrangler.email.toml');
+    expect(reviewEmailReconcileWorkflow).toContain('npx --yes wrangler@4.129.0 deploy --config wrangler.email.toml');
     expect(reviewEmailReconcileWorkflow).toContain("'FOUNDER_CONTROL_ROOM_API (founder-control-room)'");
     expect(reviewEmailReconcileWorkflow).not.toContain('wrangler deploy --config wrangler.worker.toml');
     expect(reviewEmailReconcileWorkflow).not.toContain('wrangler deploy --config wrangler.deletion-queue.toml');
