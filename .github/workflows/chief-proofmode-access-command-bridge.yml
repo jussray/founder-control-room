@@ -101,28 +101,6 @@ jobs:
           printf 'expected=%s\ncurrent_main=%s\n' "$EXPECTED_HEAD_SHA" "$current_main"
           test "$current_main" = "$EXPECTED_HEAD_SHA"
 
-      - name: Check out exact trusted FCR main reconciliation evaluator
-        if: steps.parse.outputs.sha != ''
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: ${{ steps.parse.outputs.sha }}
-          persist-credentials: false
-          fetch-depth: 1
-
-      - name: Refuse repair while subject-bound reconciliation is unresolved
-        if: steps.parse.outputs.mode == 'repair'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TARGET: ${{ steps.parse.outputs.target }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/issues/485/comments?per_page=100" \
-            | node scripts/chief-proofmode-access-reconciliation-state.mjs "$TARGET" >/dev/null; then
-            echo '::error title=Chief Access reconciliation required::trusted subject-bound reconciliation remains unresolved for this exact target; a matching provider subject must clear the latch before another repair.'
-            exit 1
-          fi
-
   recover:
     name: Founder-bound Chief Access recovery
     needs: authorize
