@@ -86,6 +86,61 @@ function providerErrorMessage(provider: StructuredProviderName, payload: unknown
   return `${provider} request failed with status ${status}`;
 }
 
+function responseTooLargeError(
+  provider: StructuredProviderName,
+  status: number,
+): StructuredProviderError {
+  return new StructuredProviderError(
+    `${provider} response exceeded the allowed size`,
+    provider,
+    `${prefix(provider)}_RESPONSE_TOO_LARGE`,
+    status,
+  );
+}
+
+async function readResponseTextBounded(
+  response: globalThis.Response,
+  maxResponseBytes: number,
+  provider: StructuredProviderName,
+): Promise<string> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const raw = await response.text();
+    if (Buffer.byteLength(raw, 'utf8') > maxResponseBytes) {
+      throw responseTooLargeError(provider, response.status);
+    }
+    return raw;
+  }
+
+  const decoder = new TextDecoder();
+  const parts: string[] = [];
+  let receivedBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+
+      receivedBytes += value.byteLength;
+      if (receivedBytes > maxResponseBytes) {
+        try {
+          await reader.cancel();
+        } catch {
+          // Cancellation is best-effort; the bounded-read error remains authoritative.
+        }
+        throw responseTooLargeError(provider, response.status);
+      }
+
+      parts.push(decoder.decode(value, { stream: true }));
+    }
+    parts.push(decoder.decode());
+    return parts.join('');
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 function openAiOutputText(payload: JsonRecord): string | null {
   if (typeof payload.output_text === 'string' && payload.output_text.trim()) {
     return payload.output_text.trim();
@@ -216,15 +271,10 @@ async function runProvider(
 
     const declaredLength = Number(response.headers.get('content-length'));
     if (Number.isFinite(declaredLength) && declaredLength > maxResponseBytes) {
-      throw new StructuredProviderError(
-        `${config.provider} response exceeded the allowed size`,
-        config.provider,
-        `${prefix(config.provider)}_RESPONSE_TOO_LARGE`,
-        response.status,
-      );
+      throw responseTooLargeError(config.provider, response.status);
     }
 
-    raw = await response.text();
+    raw = await readResponseTextBounded(response, maxResponseBytes, config.provider);
   } catch (error) {
     if (error instanceof StructuredProviderError) throw error;
     if (error instanceof Error && error.name === 'AbortError') {
@@ -248,12 +298,7 @@ async function runProvider(
   }
 
   if (Buffer.byteLength(raw, 'utf8') > maxResponseBytes) {
-    throw new StructuredProviderError(
-      `${config.provider} response exceeded the allowed size`,
-      config.provider,
-      `${prefix(config.provider)}_RESPONSE_TOO_LARGE`,
-      response.status,
-    );
+    throw responseTooLargeError(config.provider, response.status);
   }
 
   let payload: unknown;
