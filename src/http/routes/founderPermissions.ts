@@ -72,14 +72,31 @@ function statusFrom(value: unknown): FounderPermissionStatus | null {
 }
 function actionTargetFrom(value: unknown): FounderPermissionActionTarget {
   if (value == null) return null;
-  if (!isRecord(value) || text(value.type) !== 'merge') return null;
-  return {
-    type: 'merge',
-    repo: text(value.repo),
-    pullRequestNumber: Number(value.pullRequestNumber),
-    baseSha: text(value.baseSha),
-    headSha: text(value.headSha),
-  };
+  if (!isRecord(value)) return null;
+  const type = text(value.type);
+  if (type === 'merge') {
+    return {
+      type: 'merge',
+      repo: text(value.repo),
+      pullRequestNumber: Number(value.pullRequestNumber),
+      baseSha: text(value.baseSha),
+      headSha: text(value.headSha),
+    };
+  }
+  if (type === 'promptos_workflow_registry_promote') {
+    return {
+      type: 'promptos_workflow_registry_promote',
+      repo: text(value.repo),
+      branch: text(value.branch),
+      headSha: text(value.headSha),
+      workflowId: text(value.workflowId),
+      workflowVersion: text(value.workflowVersion),
+      workflowContentHash: text(value.workflowContentHash),
+      registryPath: text(value.registryPath),
+      workflowPath: text(value.workflowPath),
+    };
+  }
+  return null;
 }
 function errorCode(value: unknown): string {
   return isRecord(value) ? text(value.code) : '';
