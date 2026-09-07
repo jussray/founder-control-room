@@ -1,3 +1,8 @@
+import {
+  compileAnthropicStructuredSchema,
+  StructuredSchemaError,
+} from './schemaCompiler.js';
+
 export type StructuredProviderName = 'openai' | 'anthropic';
 
 export interface StructuredProviderConfig {
@@ -30,6 +35,12 @@ export interface StructuredProviderDependencies {
 
 interface JsonRecord {
   [key: string]: unknown;
+}
+
+interface ProviderRequestShape {
+  url: string;
+  headers: Record<string, string>;
+  body: Record<string, unknown>;
 }
 
 const DEFAULT_TIMEOUT_MS = 25_000;
@@ -65,7 +76,7 @@ function normalizeBaseUrl(config: StructuredProviderConfig): string {
 }
 
 function retryableStatus(status: number): boolean {
-  return status === 408 || status === 429 || status >= 500;
+  return status === 408 || status === 409 || status === 429 || status >= 500;
 }
 
 function providerErrorMessage(provider: StructuredProviderName, payload: unknown, status: number): string {
@@ -93,6 +104,13 @@ function openAiOutputText(payload: JsonRecord): string | null {
   return null;
 }
 
+function openAiRefused(payload: JsonRecord): boolean {
+  if (!Array.isArray(payload.output)) return false;
+  return payload.output.some((item) => isRecord(item)
+    && Array.isArray(item.content)
+    && item.content.some((content) => isRecord(content) && content.type === 'refusal'));
+}
+
 function anthropicOutputText(payload: JsonRecord): string | null {
   if (!Array.isArray(payload.content)) return null;
   for (const block of payload.content) {
@@ -104,7 +122,7 @@ function anthropicOutputText(payload: JsonRecord): string | null {
   return null;
 }
 
-function requestShape(config: StructuredProviderConfig, request: StructuredJsonRequest) {
+function requestShape(config: StructuredProviderConfig, request: StructuredJsonRequest): ProviderRequestShape {
   if (config.provider === 'openai') {
     return {
       url: `${normalizeBaseUrl(config)}/responses`,
@@ -153,7 +171,7 @@ function requestShape(config: StructuredProviderConfig, request: StructuredJsonR
       output_config: {
         format: {
           type: 'json_schema',
-          schema: request.schema,
+          schema: compileAnthropicStructuredSchema(request.schema),
         },
       },
     },
@@ -168,7 +186,21 @@ async function runProvider(
   const fetchFn = dependencies.fetchFn ?? fetch;
   const timeoutMs = dependencies.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maxResponseBytes = dependencies.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES;
-  const shape = requestShape(config, request);
+
+  let shape: ProviderRequestShape;
+  try {
+    shape = requestShape(config, request);
+  } catch (error) {
+    if (error instanceof StructuredSchemaError) {
+      throw new StructuredProviderError(
+        error.message,
+        config.provider,
+        `${prefix(config.provider)}_SCHEMA_UNSUPPORTED`,
+      );
+    }
+    throw error;
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -253,6 +285,22 @@ async function runProvider(
       `${prefix(config.provider)}_INVALID_RESPONSE`,
       response.status,
     );
+  }
+
+  if (config.provider === 'anthropic') {
+    if (payload.stop_reason === 'refusal') {
+      throw new StructuredProviderError('Anthropic refused the structured request', 'anthropic', 'ANTHROPIC_REFUSAL', response.status);
+    }
+    if (payload.stop_reason === 'max_tokens') {
+      throw new StructuredProviderError('Anthropic structured output hit the token limit', 'anthropic', 'ANTHROPIC_INCOMPLETE_OUTPUT', response.status);
+    }
+  } else {
+    if (payload.status === 'incomplete') {
+      throw new StructuredProviderError('OpenAI structured output was incomplete', 'openai', 'OPENAI_INCOMPLETE_OUTPUT', response.status);
+    }
+    if (openAiRefused(payload)) {
+      throw new StructuredProviderError('OpenAI refused the structured request', 'openai', 'OPENAI_REFUSAL', response.status);
+    }
   }
 
   const outputText = config.provider === 'openai'
