@@ -40,7 +40,6 @@ export function classifyFcrPublicWorkerSplit(application, zone = FCR_PUBLIC_ZONE
   const otherDestinations = destinations.filter(
     (destination) => !['public', 'worker'].includes(destinationType(destination)),
   );
-
   const wholeSitePublic = publicDestinations.filter((destination) =>
     isWholeSitePublicDestination(destination, zone));
 
@@ -212,6 +211,75 @@ async function readSourceState({ token, fetchImpl, sourceId, zone }) {
   return { applications, source, managed };
 }
 
+function isWorkerOnly(application) {
+  const destinations = Array.isArray(application?.destinations) ? application.destinations : [];
+  return destinations.length === 1 && destinationType(destinations[0]) === 'worker';
+}
+
+async function proveSourceIdentity({
+  token,
+  fetchImpl,
+  source,
+  sourceId,
+  expectedIdentityFingerprint,
+  expectedPolicyFingerprint,
+}) {
+  if (applicationIdentityFingerprint(source) !== expectedIdentityFingerprint) return false;
+  const policies = await listPolicies({ token, fetchImpl, appId: sourceId });
+  return policyFingerprint(policies) === expectedPolicyFingerprint;
+}
+
+async function restoreOriginalDestinations({
+  token,
+  fetchImpl,
+  sourceId,
+  zone,
+  originalDestinations,
+  sourceIdentityFingerprint,
+  sourcePolicyFingerprint,
+}) {
+  try {
+    await updateDestinations({
+      token,
+      fetchImpl,
+      appId: sourceId,
+      destinations: originalDestinations,
+    });
+  } catch {
+    // A failed write response is never evidence that the write did not happen.
+    // Re-read below and classify only from provider state.
+  }
+
+  let readback;
+  try {
+    readback = await readSourceState({ token, fetchImpl, sourceId, zone });
+  } catch {
+    throw errorWith(
+      'split-rollback-reconcile-required',
+      'The original-destination restore has an unknown provider outcome; no further write is allowed.',
+      { mutationOutcome: 'unknown', sourceApplicationId: sourceId },
+    );
+  }
+
+  const restored = classifyFcrPublicWorkerSplit(readback.source, zone).eligible;
+  const identityPreserved = restored && await proveSourceIdentity({
+    token,
+    fetchImpl,
+    source: readback.source,
+    sourceId,
+    expectedIdentityFingerprint: sourceIdentityFingerprint,
+    expectedPolicyFingerprint: sourcePolicyFingerprint,
+  });
+  if (!restored || !identityPreserved) {
+    throw errorWith(
+      'split-rollback-reconcile-required',
+      'Provider readback did not prove restoration of the original mixed Access application.',
+      { mutationOutcome: 'unknown', sourceApplicationId: sourceId },
+    );
+  }
+  return readback.source;
+}
+
 export async function executeFcrPublicWorkerSplit({
   env = process.env,
   fetchImpl = fetch,
@@ -266,7 +334,6 @@ export async function executeFcrPublicWorkerSplit({
   const sourceIdentityBefore = applicationIdentityFingerprint(source);
   const policyFingerprintBefore = policyFingerprint(policiesBefore);
 
-  let sourceNarrowed = false;
   try {
     await updateDestinations({
       token,
@@ -274,8 +341,7 @@ export async function executeFcrPublicWorkerSplit({
       appId: sourceId,
       destinations: [topology.workerDestination],
     });
-    sourceNarrowed = true;
-  } catch (writeError) {
+  } catch {
     let readback;
     try {
       readback = await readSourceState({ token, fetchImpl, sourceId, zone });
@@ -286,14 +352,8 @@ export async function executeFcrPublicWorkerSplit({
         { mutationOutcome: 'unknown', sourceApplicationId: sourceId },
       );
     }
-    const postTopology = classifyFcrPublicWorkerSplit(readback.source, zone);
-    const sourceDestinations = Array.isArray(readback.source?.destinations)
-      ? readback.source.destinations
-      : [];
-    const workerOnly = sourceDestinations.length === 1
-      && destinationType(sourceDestinations[0]) === 'worker';
-    if (!workerOnly) {
-      if (postTopology.eligible) {
+    if (!isWorkerOnly(readback.source)) {
+      if (classifyFcrPublicWorkerSplit(readback.source, zone).eligible) {
         throw errorWith(
           'split-source-update-not-performed',
           'Provider readback proves the Worker-only destination update did not occur; retry requires a new authorized run.',
@@ -306,24 +366,24 @@ export async function executeFcrPublicWorkerSplit({
         { mutationOutcome: 'unknown', sourceApplicationId: sourceId },
       );
     }
-    sourceNarrowed = true;
   }
 
   const afterNarrow = await readSourceState({ token, fetchImpl, sourceId, zone });
-  const narrowedSource = afterNarrow.source;
-  const narrowedDestinations = Array.isArray(narrowedSource?.destinations)
-    ? narrowedSource.destinations
-    : [];
-  if (!sourceNarrowed || narrowedDestinations.length !== 1 || destinationType(narrowedDestinations[0]) !== 'worker') {
-    throw errorWith('split-source-narrowing-unverified', 'Worker-only destination state was not independently verified.', {
-      mutationOutcome: sourceNarrowed ? 'performed' : 'unknown',
-      sourceApplicationId: sourceId,
-    });
+  if (!isWorkerOnly(afterNarrow.source)) {
+    throw errorWith(
+      'split-source-narrowing-unverified',
+      'Worker-only destination state was not independently verified.',
+      { mutationOutcome: 'unknown', sourceApplicationId: sourceId },
+    );
   }
-
-  const policiesAfterNarrow = await listPolicies({ token, fetchImpl, appId: sourceId });
-  if (applicationIdentityFingerprint(narrowedSource) !== sourceIdentityBefore
-    || policyFingerprint(policiesAfterNarrow) !== policyFingerprintBefore) {
+  if (!(await proveSourceIdentity({
+    token,
+    fetchImpl,
+    source: afterNarrow.source,
+    sourceId,
+    expectedIdentityFingerprint: sourceIdentityBefore,
+    expectedPolicyFingerprint: policyFingerprintBefore,
+  }))) {
     throw errorWith(
       'split-source-identity-drift',
       'The source Access application changed beyond its destination list; public-app creation is blocked pending reconciliation.',
@@ -348,15 +408,18 @@ export async function executeFcrPublicWorkerSplit({
     if (readback.managed.length === 1) {
       [managedApp] = readback.managed;
     } else if (readback.managed.length === 0) {
-      await updateDestinations({
+      await restoreOriginalDestinations({
         token,
         fetchImpl,
-        appId: sourceId,
-        destinations: originalDestinations,
+        sourceId,
+        zone,
+        originalDestinations,
+        sourceIdentityFingerprint: sourceIdentityBefore,
+        sourcePolicyFingerprint: policyFingerprintBefore,
       });
       throw errorWith(
         'split-public-create-not-performed',
-        'Provider readback proves the public app was not created; the original mixed destinations were restored.',
+        'Provider readback proves the public app was not created; independent readback proves the original mixed destinations were restored.',
         { mutationOutcome: 'none', rollbackPerformed: true, sourceApplicationId: sourceId },
       );
     } else {
@@ -386,15 +449,15 @@ export async function executeFcrPublicWorkerSplit({
   }
 
   const finalState = await readSourceState({ token, fetchImpl, sourceId, zone });
-  const finalSource = finalState.source;
-  const finalSourceDestinations = Array.isArray(finalSource?.destinations)
-    ? finalSource.destinations
-    : [];
-  const finalPolicies = await listPolicies({ token, fetchImpl, appId: sourceId });
-  if (finalSourceDestinations.length !== 1
-    || destinationType(finalSourceDestinations[0]) !== 'worker'
-    || applicationIdentityFingerprint(finalSource) !== sourceIdentityBefore
-    || policyFingerprint(finalPolicies) !== policyFingerprintBefore
+  if (!isWorkerOnly(finalState.source)
+    || !(await proveSourceIdentity({
+      token,
+      fetchImpl,
+      source: finalState.source,
+      sourceId,
+      expectedIdentityFingerprint: sourceIdentityBefore,
+      expectedPolicyFingerprint: policyFingerprintBefore,
+    }))
     || finalState.managed.length !== 1
     || clean(finalState.managed[0]?.id) !== managedId) {
     throw errorWith(
@@ -445,13 +508,19 @@ export async function rollbackFcrPublicWorkerSplit({
     ? receipt.originalDestinations
     : [];
   if (!sourceId || !managedId || originalDestinations.length !== 2) {
-    throw errorWith('split-rollback-receipt-invalid', 'Rollback receipt is missing exact provider identities or original destinations.');
+    throw errorWith(
+      'split-rollback-receipt-invalid',
+      'Rollback receipt is missing exact provider identities or original destinations.',
+    );
   }
 
   let state = await readSourceState({ token, fetchImpl, sourceId, zone: receipt.zone });
   const managed = state.managed.filter((application) => clean(application?.id) === managedId);
   if (managed.length > 1) {
-    throw errorWith('split-rollback-managed-app-ambiguous', 'Rollback cannot uniquely identify the run-created public application.');
+    throw errorWith(
+      'split-rollback-managed-app-ambiguous',
+      'Rollback cannot uniquely identify the run-created public application.',
+    );
   }
 
   if (managed.length === 1) {
@@ -479,34 +548,35 @@ export async function rollbackFcrPublicWorkerSplit({
 
   state = await readSourceState({ token, fetchImpl, sourceId, zone: receipt.zone });
   if (state.managed.some((application) => clean(application?.id) === managedId)) {
-    throw errorWith('split-rollback-public-delete-unverified', 'Public application removal is not proven; source restoration is blocked.');
+    throw errorWith(
+      'split-rollback-public-delete-unverified',
+      'Public application removal is not proven; source restoration is blocked.',
+    );
+  }
+  if (!isWorkerOnly(state.source)
+    || !(await proveSourceIdentity({
+      token,
+      fetchImpl,
+      source: state.source,
+      sourceId,
+      expectedIdentityFingerprint: receipt.sourceIdentityFingerprint,
+      expectedPolicyFingerprint: receipt.sourcePolicyFingerprint,
+    }))) {
+    throw errorWith(
+      'split-rollback-source-drift',
+      'The protected Worker application drifted after the split; rollback refuses to overwrite it.',
+    );
   }
 
-  const source = state.source;
-  const sourceDestinations = Array.isArray(source?.destinations) ? source.destinations : [];
-  const policies = await listPolicies({ token, fetchImpl, appId: sourceId });
-  if (sourceDestinations.length !== 1
-    || destinationType(sourceDestinations[0]) !== 'worker'
-    || applicationIdentityFingerprint(source) !== receipt.sourceIdentityFingerprint
-    || policyFingerprint(policies) !== receipt.sourcePolicyFingerprint) {
-    throw errorWith('split-rollback-source-drift', 'The protected Worker application drifted after the split; rollback refuses to overwrite it.');
-  }
-
-  await updateDestinations({
+  await restoreOriginalDestinations({
     token,
     fetchImpl,
-    appId: sourceId,
-    destinations: originalDestinations,
+    sourceId,
+    zone: receipt.zone,
+    originalDestinations,
+    sourceIdentityFingerprint: receipt.sourceIdentityFingerprint,
+    sourcePolicyFingerprint: receipt.sourcePolicyFingerprint,
   });
-
-  const restored = await readSourceState({ token, fetchImpl, sourceId, zone: receipt.zone });
-  const restoredTopology = classifyFcrPublicWorkerSplit(restored.source, receipt.zone);
-  const restoredPolicies = await listPolicies({ token, fetchImpl, appId: sourceId });
-  if (!restoredTopology.eligible
-    || applicationIdentityFingerprint(restored.source) !== receipt.sourceIdentityFingerprint
-    || policyFingerprint(restoredPolicies) !== receipt.sourcePolicyFingerprint) {
-    throw errorWith('split-rollback-readback-failed', 'Provider readback did not prove restoration of the original mixed application.');
-  }
 
   return {
     ...receipt,
