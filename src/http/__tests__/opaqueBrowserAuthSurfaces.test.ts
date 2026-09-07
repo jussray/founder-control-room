@@ -11,6 +11,7 @@ const SURFACES = [
   'public/control-room/command-bridge.html',
   'public/control-room/repository-settings.html',
   'public/control-room/founder-signal-engine.html',
+  'public/control-room/capital-decision.js',
 ] as const;
 
 describe('opaque founder browser auth surfaces', () => {
