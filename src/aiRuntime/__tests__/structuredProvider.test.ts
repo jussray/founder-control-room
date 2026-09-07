@@ -40,7 +40,7 @@ function anthropicConfig(): StructuredProviderConfig {
 
 describe('runStructuredJson', () => {
   it('uses OpenAI Responses structured output without leaking provider shape to callers', async () => {
-    const fetchFn = vi.fn(async () => fakeResponse({
+    const fetchFn = vi.fn<typeof fetch>(async () => fakeResponse({
       id: 'resp_1',
       output_text: JSON.stringify({ answer: 'ok' }),
     }));
@@ -65,7 +65,7 @@ describe('runStructuredJson', () => {
   });
 
   it('uses Anthropic JSON structured outputs through the same contract', async () => {
-    const fetchFn = vi.fn(async () => fakeResponse({
+    const fetchFn = vi.fn<typeof fetch>(async () => fakeResponse({
       id: 'msg_1',
       content: [{ type: 'text', text: JSON.stringify({ answer: 'ok' }) }],
     }));
