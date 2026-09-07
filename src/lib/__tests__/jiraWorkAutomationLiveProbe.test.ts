@@ -118,7 +118,7 @@ describe('Jira work automation live probe', () => {
   });
 
   it('blocks the mutation when the pre-dispatch runtime is not the exact requested main SHA', async () => {
-    const fetchImpl = vi.fn(async () => versionResponse('c'.repeat(40)));
+    const fetchImpl = vi.fn(async (_url: string | URL | Request) => versionResponse('c'.repeat(40)));
 
     await expect(runJiraWorkAutomationLiveProbe({
       ...options(),
