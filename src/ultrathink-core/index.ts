@@ -78,6 +78,24 @@ export {
 } from './attack3000Release.js';
 
 export {
+  ATTACK_3000_VENDOR_ADAPTER_ID,
+  createVendorAttack3000Assessment,
+  deriveVendorPartnershipTerms,
+  evaluateVendorAttack3000,
+  type VendorAttack3000Evidence,
+  type VendorAttack3000Input,
+  type VendorAttack3000Result,
+  type VendorBooleanObservation,
+  type VendorBooleanRequirement,
+  type VendorBoundary,
+  type VendorCountObservation,
+  type VendorNumberObservation,
+  type VendorPartnershipTermsDerivation,
+  type VendorPartnershipTermsInput,
+  type VendorStopCondition,
+} from './attack3000Vendor.js';
+
+export {
   evaluateAuthorityLease,
   type AuthorityBinding,
   type AuthorityConsequence,
