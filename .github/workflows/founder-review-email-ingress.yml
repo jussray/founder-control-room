@@ -7,6 +7,7 @@ on:
       - '.github/workflows/founder-review-email-ingress.yml'
       - 'package.json'
       - 'scripts/verify-founder-review-email-ingress.mjs'
+      - 'scripts/verify-founder-review-email-routing.mjs'
       - 'scripts/verify-rls-contract.mjs'
       - 'src/founderSignalEmailIngress/**'
       - 'src/http/routes/founderSignalReviewContexts.ts'
@@ -78,6 +79,10 @@ jobs:
       - name: Verify TypeScript contracts
         if: steps.scope.outputs.in_scope == 'true'
         run: npm run typecheck
+
+      - name: Verify email routing trigger contract
+        if: steps.scope.outputs.in_scope == 'true'
+        run: node scripts/verify-founder-review-email-routing.mjs
 
       - name: Verify intake isolation, bounded execution bridge, tests, and email Worker bundle
         if: steps.scope.outputs.in_scope == 'true'
