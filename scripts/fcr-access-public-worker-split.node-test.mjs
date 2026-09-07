@@ -77,7 +77,8 @@ function fakeProvider({
 
   const fetchImpl = async (url, options = {}) => {
     const method = options.method ?? 'GET';
-    state.requests.push({ method, url, body: options.body ? JSON.parse(options.body) : null });
+    const parsedBody = options.body ? JSON.parse(options.body) : null;
+    state.requests.push({ method, url, body: parsedBody });
 
     if (url.includes('/access/apps?') && method === 'GET') {
       return success(structuredClone(state.applications));
@@ -90,11 +91,21 @@ function fakeProvider({
     }
 
     const appMatch = url.match(/\/access\/apps\/([^/]+)$/);
+    if (appMatch && method === 'GET') {
+      const appId = decodeURIComponent(appMatch[1]);
+      const application = state.applications.find((item) => item.id === appId) ?? null;
+      return success(structuredClone(application));
+    }
+
     if (appMatch && method === 'PUT') {
       const appId = decodeURIComponent(appMatch[1]);
-      const body = JSON.parse(options.body);
+      const body = parsedBody;
       const index = state.applications.findIndex((application) => application.id === appId);
       assert.notEqual(index, -1);
+      assert.equal(body.domain, state.applications[index].domain);
+      assert.equal(body.type, state.applications[index].type);
+      assert.equal(body.type, 'self_hosted');
+      assert.ok(Array.isArray(body.destinations));
       state.applications[index] = {
         ...state.applications[index],
         destinations: structuredClone(body.destinations),
@@ -103,7 +114,7 @@ function fakeProvider({
     }
 
     if (url.endsWith('/access/apps') && method === 'POST') {
-      const body = JSON.parse(options.body);
+      const body = parsedBody;
       const created = { id: 'public-1', ...body };
       state.applications.push(structuredClone(created));
       state.policiesByApp['public-1'] = structuredClone(body.policies ?? []);
@@ -158,6 +169,11 @@ test('split preserves the existing Worker app and policies while creating one de
   assert.deepEqual(managed.destinations, [{ type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` }]);
   assert.equal(provider.state.policiesByApp['public-1'][0].decision, 'bypass');
   assert.deepEqual(provider.state.policiesByApp['public-1'][0].include, [{ everyone: {} }]);
+
+  const destinationWrites = provider.state.requests.filter((request) => request.method === 'PUT');
+  assert.equal(destinationWrites.length, 1);
+  assert.equal(destinationWrites[0].body.domain, FCR_PUBLIC_ZONE);
+  assert.equal(destinationWrites[0].body.type, 'self_hosted');
 });
 
 test('ambiguous Worker-only PUT is reconciled by readback and never blindly retried', async () => {
