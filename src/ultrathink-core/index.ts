@@ -87,6 +87,8 @@ export {
   type ContentAttack3000Result,
   type ContentCountFloor,
   type ContentMetricObservation,
+  type ContentObservationContext,
+  type ContentObservationFreshness,
   type ContentPublicationObservation,
   type ContentRateFloor,
   type ContentStopCondition,

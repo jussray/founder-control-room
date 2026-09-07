@@ -14,13 +14,20 @@ import {
   type ContentMetricObservation,
 } from '../attack3000Content.js';
 
+const OBSERVATION_ID = 'li-post-1-window-7d';
+
 const verifiedSupport = (ref: string): Attack3000Evidence => ({
   classification: 'VERIFIED',
   direction: 'SUPPORTS',
   evidenceRefs: [ref],
 });
 
-const verifiedMetric = (count: number, ref: string): ContentMetricObservation => ({
+const verifiedMetric = (
+  count: number,
+  ref: string,
+  observationId = OBSERVATION_ID,
+): ContentMetricObservation => ({
+  observationId,
   count,
   classification: 'VERIFIED',
   evidenceRefs: [ref],
@@ -37,7 +44,20 @@ function baseline(): ContentAttack3000Input {
   return {
     subject: { decisionId: 'content-wave-1', projectId: 'fcr' },
     terms: {
+      observation: {
+        observationId: OBSERVATION_ID,
+        contentFingerprint: '7c4c0474120e8f5a',
+        provider: 'linkedin',
+        windowStart: '2026-08-31T00:00:00Z',
+        windowEnd: '2026-09-07T00:00:00Z',
+        observedAt: '2026-09-07T00:05:00Z',
+        measurementComplete: true,
+        freshness: 'CURRENT',
+        classification: 'VERIFIED',
+        evidenceRefs: ['analytics-window-receipt'],
+      },
       publication: {
+        observationId: OBSERVATION_ID,
         published: true,
         classification: 'VERIFIED',
         evidenceRefs: ['publish-receipt'],
@@ -74,11 +94,14 @@ describe('Attack 3000 content adapter', () => {
     expect(assessment.subject.domain).toBe('content');
   });
 
-  it('derives distribution-to-outcome rates from observed counters', () => {
+  it('derives distribution-to-outcome rates from one current observation window', () => {
     const terms = deriveContentTerms(baseline().terms);
     expect(terms.classification).toBe('VERIFIED');
+    expect(terms.observation.observationId).toBe(OBSERVATION_ID);
+    expect(terms.observation.freshness).toBe('CURRENT');
     expect(terms.published).toBe(true);
     expect(terms.engagementRatePct).toBe(10);
+    expect(terms.profileViewRatePct).toBe(6);
     expect(terms.visitRatePct).toBe(5);
     expect(terms.qualifiedConversationRatePct).toBe(20);
     expect(terms.dealConversionPct).toBe(25);
@@ -90,13 +113,38 @@ describe('Attack 3000 content adapter', () => {
     expect(result.evaluation.authority).toEqual(ATTACK_3000_AUTHORITY_CEILING);
   });
 
+  it('holds when a metric belongs to a different outcome observation', () => {
+    const input = baseline();
+    input.terms.comments = verifiedMetric(20, 'other-comments-ref', 'different-window');
+    const result = evaluateContentAttack3000(input);
+    expect(result.terms.classification).toBe('UNKNOWN');
+    expect(result.terms.reasons).toContain('comments:observation_identity_mismatch');
+    expect(result.evaluation.verdict).toBe('HOLD');
+  });
+
+  it('preserves stale historical observation identity while refusing a current verdict', () => {
+    const input = baseline();
+    input.terms.observation.freshness = 'STALE';
+    const result = evaluateContentAttack3000(input);
+    expect(result.terms.observation.freshness).toBe('STALE');
+    expect(result.terms.classification).toBe('UNKNOWN');
+    expect(result.terms.reasons).toContain('observation:freshness_stale');
+    expect(result.evaluation.verdict).toBe('HOLD');
+  });
+
+  it('holds when the observation predates completion of its own window', () => {
+    const input = baseline();
+    input.terms.observation.observedAt = '2026-09-06T23:59:59Z';
+    const result = evaluateContentAttack3000(input);
+    expect(result.terms.classification).toBe('UNKNOWN');
+    expect(result.terms.reasons).toContain('observation:observed_before_window_end');
+    expect(result.evaluation.verdict).toBe('HOLD');
+  });
+
   it('does not treat an unpublished artifact as external-demand proof', () => {
     const input = baseline();
-    input.terms.publication = {
-      published: false,
-      classification: 'VERIFIED',
-      evidenceRefs: ['draft-receipt'],
-    };
+    input.terms.publication.published = false;
+    input.terms.publication.evidenceRefs = ['draft-receipt'];
     const result = evaluateContentAttack3000(input);
     expect(result.evaluation.verdict).toBe('HOLD');
     expect(result.assessment.dimensions.external_demand?.direction).toBe('NEUTRAL');
@@ -107,6 +155,7 @@ describe('Attack 3000 content adapter', () => {
     input.terms.impressions = verifiedMetric(0, 'zero-impressions-ref');
     const result = evaluateContentAttack3000(input);
     expect(result.terms.engagementRatePct).toBeNull();
+    expect(result.terms.profileViewRatePct).toBeNull();
     expect(result.terms.visitRatePct).toBeNull();
     expect(result.evaluation.verdict).toBe('HOLD');
   });
@@ -133,6 +182,7 @@ describe('Attack 3000 content adapter', () => {
 
     const result = evaluateContentAttack3000(input);
     expect(result.assessment.dimensions.external_demand?.classification).toBe('UNKNOWN');
+    expect(result.assessment.dimensions.external_demand?.evidenceRefs).toEqual([]);
     expect(result.evaluation.reasons).toContain('dimension:external_demand:unknown');
     expect(result.evaluation.verdict).toBe('HOLD');
   });
@@ -140,6 +190,7 @@ describe('Attack 3000 content adapter', () => {
   it('downgrades VERIFIED metrics that have no evidence refs', () => {
     const input = baseline();
     input.terms.attributedDeals = {
+      observationId: OBSERVATION_ID,
       count: 2,
       classification: 'VERIFIED',
       evidenceRefs: [],
@@ -152,6 +203,7 @@ describe('Attack 3000 content adapter', () => {
   it('downgrades invalid metric counts instead of manufacturing a rate', () => {
     const input = baseline();
     input.terms.attributedVisits = {
+      observationId: OBSERVATION_ID,
       count: -1,
       classification: 'VERIFIED',
       evidenceRefs: ['invalid-visits-ref'],
@@ -160,6 +212,52 @@ describe('Attack 3000 content adapter', () => {
     expect(result.terms.classification).toBe('UNKNOWN');
     expect(result.terms.visitRatePct).toBeNull();
     expect(result.evaluation.verdict).toBe('HOLD');
+  });
+
+  it('does not falsify a metric floor before verified publication', () => {
+    const input = baseline();
+    input.terms.publication.published = false;
+    input.terms.impressions = verifiedMetric(0, 'prepublish-impressions-ref');
+    input.stopCondition = {
+      kind: 'minimum_impressions',
+      floor: { minCount: 1500, classification: 'VERIFIED', evidenceRefs: ['impression-floor-ref'] },
+    };
+    const result = evaluateContentAttack3000(input);
+    expect(result.assessment.stopCondition.triggered).toBe(false);
+    expect(result.assessment.stopCondition.classification).toBe('UNKNOWN');
+    expect(result.evaluation.verdict).toBe('HOLD');
+  });
+
+  it('does not falsify a metric floor before the measurement window is complete', () => {
+    const input = baseline();
+    input.terms.observation.measurementComplete = false;
+    input.terms.impressions = verifiedMetric(0, 'incomplete-impressions-ref');
+    input.stopCondition = {
+      kind: 'minimum_impressions',
+      floor: { minCount: 1500, classification: 'VERIFIED', evidenceRefs: ['impression-floor-ref'] },
+    };
+    const result = evaluateContentAttack3000(input);
+    expect(result.assessment.stopCondition.triggered).toBe(false);
+    expect(result.assessment.stopCondition.classification).toBe('UNKNOWN');
+    expect(result.evaluation.verdict).toBe('HOLD');
+  });
+
+  it('falsifies a verified impression floor even when an unrelated deal metric is unknown', () => {
+    const input = baseline();
+    input.terms.attributedDeals = {
+      observationId: OBSERVATION_ID,
+      count: null,
+      classification: 'UNKNOWN',
+      evidenceRefs: [],
+    };
+    input.stopCondition = {
+      kind: 'minimum_impressions',
+      floor: { minCount: 1500, classification: 'VERIFIED', evidenceRefs: ['impression-floor-ref'] },
+    };
+    const result = evaluateContentAttack3000(input);
+    expect(result.assessment.stopCondition.classification).toBe('VERIFIED');
+    expect(result.assessment.stopCondition.triggered).toBe(true);
+    expect(result.evaluation.verdict).toBe('FALSIFIED');
   });
 
   it('falsifies when impressions miss a verified founder-defined floor', () => {
@@ -180,6 +278,17 @@ describe('Attack 3000 content adapter', () => {
       floor: { minRatePct: 12, classification: 'VERIFIED', evidenceRefs: ['engagement-floor-ref'] },
     };
     expect(evaluateContentAttack3000(input).evaluation.verdict).toBe('FALSIFIED');
+  });
+
+  it('holds rather than falsifying an impossible engagement floor', () => {
+    const input = baseline();
+    input.stopCondition = {
+      kind: 'minimum_engagement_rate',
+      floor: { minRatePct: 120, classification: 'VERIFIED', evidenceRefs: ['bad-floor-ref'] },
+    };
+    const result = evaluateContentAttack3000(input);
+    expect(result.assessment.stopCondition.classification).toBe('UNKNOWN');
+    expect(result.evaluation.verdict).toBe('HOLD');
   });
 
   it('falsifies when qualified conversations miss a verified floor', () => {
