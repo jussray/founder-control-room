@@ -145,11 +145,25 @@ async function listPolicies({ token, fetchImpl, appId }) {
 }
 
 async function updateDestinations({ token, fetchImpl, appId, destinations }) {
+  const current = await cloudflareJson(
+    { token, fetchImpl },
+    'GET',
+    `/accounts/${FCR_CLOUDFLARE_ACCOUNT_ID}/access/apps/${encodeURIComponent(appId)}`,
+  );
+  const domain = clean(current?.domain);
+  const type = clean(current?.type);
+  if (!domain || type !== 'self_hosted') {
+    throw errorWith(
+      'split-source-update-shape-unsupported',
+      'Destination mutation requires a provider-read self-hosted application with a stable domain and type.',
+      { mutationOutcome: 'none', sourceApplicationId: appId },
+    );
+  }
   return cloudflareJson(
     { token, fetchImpl },
     'PUT',
     `/accounts/${FCR_CLOUDFLARE_ACCOUNT_ID}/access/apps/${encodeURIComponent(appId)}`,
-    { destinations },
+    { domain, type, destinations },
   );
 }
 
