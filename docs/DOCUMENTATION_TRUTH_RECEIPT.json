@@ -1,12 +1,14 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Bind FCR's canonical GitHub governance source contract to exactly main while preserving the existing provider, evidence, merge, Cloudflare, and publishing invariants. This receipt documents source enforcement only: it does not claim the live GitHub ruleset is reconciled, provider state is READY, or any merge or deploy authority exists.",
+  "purpose": "Bind FCR's current governance and Chief ProofMode Access authority source contracts to their exact operational surfaces while preserving provider, evidence, merge, Cloudflare, publishing, and truth-governance invariants. This receipt proves documentation/source traceability only: it does not claim live GitHub governance is reconciled, Cloudflare Access is repaired, provider state is READY, runtime proof exists, or any merge or deploy authority is granted.",
   "domains": [
     "repository-provider",
     "evidence-authority",
     "merge-authority",
     "cloudflare-authority",
-    "publishing"
+    "publishing",
+    "truth-governance",
+    "chief-access-authority"
   ],
   "changes": [
     {
@@ -70,6 +72,48 @@
       "claims": [
         "scripts/reconcile-cloudflare-access-public-zone.mjs must stay pinned to the canonical FCR Cloudflare account and foundercontrolroom.org zone, fail closed on credential/provider ambiguity or existing foreign ownership of the exact public destination, and create only the named managed foundercontrolroom.org/* public Access application with an Everyone bypass policy when separately authorized.",
         "scripts/reconcile-cloudflare-access-public-zone.mjs rollback may delete only the uniquely reacquired run-created managed application whose receipt, account, zone, application ID, name, and exact destination still match; drift or ambiguity must block rollback rather than widen deletion authority."
+      ]
+    },
+    {
+      "path": "scripts/verify-documentation-truth.mjs",
+      "claims": [
+        "scripts/verify-documentation-truth.mjs must classify the Chief Access command bridge, reusable recovery workflow, runtime witness, provider reconciler, selector resolver, and reconciliation evaluator as chief-access-authority, and must require docs/CHIEF_PROOFMODE_ACCESS_RECOVERY.md plus a current path-bound receipt whenever those operational authority sources move."
+      ]
+    },
+    {
+      "path": ".github/workflows/chief-proofmode-access-command-bridge.yml",
+      "claims": [
+        ".github/workflows/chief-proofmode-access-command-bridge.yml must remain issue-#485 and founder-identity bound, must not hold direct Actions-dispatch authority, and may invoke recovery only through the local reusable workflow while carrying the exact founder authority comment ID."
+      ]
+    },
+    {
+      "path": ".github/workflows/chief-proofmode-access-recovery.yml",
+      "claims": [
+        ".github/workflows/chief-proofmode-access-recovery.yml must remain workflow_call-only with no direct workflow_dispatch entrypoint, and must rebind the original founder issue_comment identity, body, exact main SHA, mode, target, and repair approval before any provider credential can be used."
+      ]
+    },
+    {
+      "path": ".github/workflows/chief-proofmode-runtime-witness.yml",
+      "claims": [
+        ".github/workflows/chief-proofmode-runtime-witness.yml must keep the trusted runtime witness read-only for Cloudflare Access, consume the same canonical Chief selector contract as recovery, and cannot turn browser evidence publication into Cloudflare repair, merge, or deploy authority."
+      ]
+    },
+    {
+      "path": "scripts/reconcile-chief-proofmode-access.mjs",
+      "claims": [
+        "scripts/reconcile-chief-proofmode-access.mjs must preserve exact-host-only Service Auth repair, three-valued mutation truth, provider-subject fingerprints, and fail closed on ambiguous provider read or write outcomes rather than manufacturing no-mutation or retry authority."
+      ]
+    },
+    {
+      "path": "scripts/resolve-chief-proofmode-access-selector.mjs",
+      "claims": [
+        "scripts/resolve-chief-proofmode-access-selector.mjs must resolve Chief-specific selectors before generic fallbacks across storage classes and must fail closed when populated selectors disagree; it cannot expose raw selector values merely to prove resolution."
+      ]
+    },
+    {
+      "path": "scripts/chief-proofmode-access-reconciliation-state.mjs",
+      "claims": [
+        "scripts/chief-proofmode-access-reconciliation-state.mjs must keep unresolved repair state bound to trusted subject-aware v2 markers and must never let same-target evidence for a different provider subject clear the prior unresolved subject."
       ]
     },
     {
