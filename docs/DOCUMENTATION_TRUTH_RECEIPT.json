@@ -1,11 +1,75 @@
 {
   "contract": "fcr/documentation-truth-receipt@v1",
-  "purpose": "Close inherited documentation drift around the Founder Capital Decision evidence-authority surface and record the focused current-main sandbox and ATTACK-20 source repairs without converting repository edits into provider, runtime, security, financing, merge, deploy, publication, or outcome proof.",
+  "purpose": "Preserve the existing #746 evidence-authority and Cloudflare Access recovery invariants while closing inherited Founder Capital Decision documentation drift and recording the focused current-main sandbox and ATTACK-20 source repairs. This receipt preserves source, provider, runtime, security, financing, merge, deploy, secret, database, billing, publication, and outcome authority as separate proof planes and does not claim live provider mutation, production equivalence, financing activity, or founder authorization.",
   "domains": [
+    "repository-provider",
     "evidence-authority",
+    "merge-authority",
     "cloudflare-authority"
   ],
   "changes": [
+    {
+      "path": "src/providers/GitHubProvider.ts",
+      "claims": [
+        "src/providers/GitHubProvider.ts must derive Code Owner and last-push human-review requirements from whether the canonical native approving-review count is greater than zero, while preserving pull-request enforcement, review-thread resolution, CodeQL, trusted-App bypass limits, force-push/deletion protection, strict-freshness separation, and provider readback."
+      ]
+    },
+    {
+      "path": "src/providers/providerFactory.ts",
+      "claims": [
+        "src/providers/providerFactory.ts must keep the current FCR founder-only native approving-review floor at zero while retaining the constitutional required checks and trusted GitHub App boundary, and a later deliberate positive native-review count must remain representable without weakening the existing machine or founder-final authority membrane."
+      ]
+    },
+    {
+      "path": "src/providers/githubAppAuth.ts",
+      "claims": [
+        "src/providers/githubAppAuth.ts may normalize only transport-equivalent encodings or wrappers of the same complete GitHub App private RSA key, including raw or escaped PEM, CRLF/BOM variants, JSON or matching single-quoted transport wrappers, and base64/base64url PEM; it must still parse the normalized material as a private RSA key and fail closed for malformed, incomplete, public-only, or non-RSA material.",
+        "src/providers/githubAppAuth.ts transport normalization is compatibility plumbing only and must not convert credential presence, encoding acceptance, or successful parsing into proof of GitHub App identity, installation scope, token minting, provider mutation authority, merge authority, or deploy authority."
+      ]
+    },
+    {
+      "path": "src/providers/githubGovernanceReconciliation.ts",
+      "claims": [
+        "src/providers/githubGovernanceReconciliation.ts must keep Chief governance verification pinned to jussray/chief-ai-machine and ruleset IDs 20818149 and 21261587, preserve required-check integration_id producer identity, require complete bypass and required-deployment evidence, and remain observation-only rather than constructing a desired-state ruleset mutation.",
+        "Under the current founder decision, src/providers/githubGovernanceReconciliation.ts must accept Chief ruleset 20818149 exactly as observed only when zero bypass actors remain, the approved required checks remain intact, Cloudflare Production and proofmode-access-admin both remain required with no extra deployment gate, and the reserved candidate runtime context remains unbound.",
+        "External candidate-producer provenance and trusted candidate runtime/browser proof remain separate evidence gates. Missing producer/runtime proof may block those claims, but it must not be converted into permission to rewrite the founder-approved ruleset. A compliant observation returns NO_CHANGE_REQUIRED with mutationRequired false and mutation null; drift blocks verification."
+      ]
+    },
+    {
+      "path": "src/providers/trustedGithubGovernanceObserver.ts",
+      "claims": [
+        "src/providers/trustedGithubGovernanceObserver.ts must observe only the fixed Chief repository and fixed governance rulesets through FCR's repository-scoped GitHub App installation-token path, reject caller-supplied PAT/token authority, require complete provider readback suitable for fingerprinting, and remain evidence-only rather than minting ruleset-mutation, merge, deploy, or execution authority."
+      ]
+    },
+    {
+      "path": "src/review/deterministicReviewWitnessPublisher.ts",
+      "claims": [
+        "src/review/deterministicReviewWitnessPublisher.ts may publish only a derived deterministic review witness through the repository-scoped GitHub App authority, must preserve a sanitized durable failure receipt when provider authentication/publication fails while rethrowing the original failure, and must never convert publication, credential presence, or a same-named check into founder-final, merge, deploy, provider-policy, or self-certification authority."
+      ]
+    },
+    {
+      "path": ".github/workflows/playwright.yml",
+      "claims": [
+        ".github/workflows/playwright.yml must keep the StoryEngine product-build federation witness bound to the canonical root directive wire shape, require both node-test and playwright proof, and verify the exact peer runtime identity before and after execution without granting merge, deploy, production-promotion, or provider-mutation authority.",
+        ".github/workflows/playwright.yml must treat STORYENGINE_PEER_SHA as an exact evidence dependency: when the separately versioned StoryEngine carrier advances, FCR cannot reuse predecessor green and requires rebinding to a separately exact-head-proven peer followed by a complete successor federation witness.",
+        ".github/workflows/playwright.yml must keep the privileged production workflow_run witness restricted to successful Deploy workflow_dispatch runs from main, execute only trusted witness source instead of the Deploy run head, and treat workflow_run.head_sha as release evidence rather than executable authority."
+      ]
+    },
+    {
+      "path": ".github/workflows/fcr-access-front-door-recovery.yml",
+      "claims": [
+        ".github/workflows/fcr-access-front-door-recovery.yml must bind inspection and any mutation to an exact approved SHA that still equals current main, use the dedicated read credential only for inspection and the dedicated admin credential only for apply/rollback, and require an auditable founder approval reference when apply=true.",
+        ".github/workflows/fcr-access-front-door-recovery.yml may mutate only the exact foundercontrolroom.org/* public Access destination through the managed Everyone-bypass application, must preserve unrelated all-workers protection and avoid DNS, Worker-route, database, or unrelated Access mutation, and must roll back only the run-created managed application when post-apply anonymous Playwright proof fails.",
+        ".github/workflows/fcr-access-front-door-recovery.yml must publish only its bounded sanitized public receipt; raw provider/browser receipts, managed application IDs, final origins, raw errors, blockers, and approval references must not be promoted into public proof."
+      ]
+    },
+    {
+      "path": "scripts/reconcile-cloudflare-access-public-zone.mjs",
+      "claims": [
+        "scripts/reconcile-cloudflare-access-public-zone.mjs must stay pinned to the canonical FCR Cloudflare account and foundercontrolroom.org zone, fail closed on credential/provider ambiguity or existing foreign ownership of the exact public destination, and create only the named managed foundercontrolroom.org/* public Access application with an Everyone bypass policy when separately authorized.",
+        "scripts/reconcile-cloudflare-access-public-zone.mjs rollback may delete only the uniquely reacquired run-created managed application whose receipt, account, zone, application ID, name, and exact destination still match; drift or ambiguity must block rollback rather than widen deletion authority."
+      ]
+    },
     {
       "path": "src/http/routes/founderCapitalDecision.ts",
       "claims": [
