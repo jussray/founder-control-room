@@ -172,6 +172,25 @@ describe('runGovernedReadOnlyAttempt', () => {
     expect(activeAdapter.invoke).not.toHaveBeenCalled();
   });
 
+  it('blocks adapter substitution even when both tools look read-only', async () => {
+    const activeLease = lease();
+    const activeAdapter = adapter(activeLease);
+
+    const result = await runGovernedReadOnlyAttempt({
+      lease: activeLease,
+      world: world(),
+      proposal: {
+        toolName: 'simulated.different_observation',
+        requestedCapabilities: ['provider.observation.read'],
+      },
+      adapter: activeAdapter,
+    });
+
+    expect(result.state).toBe('DENIED');
+    expect(result.decision.reasons).toEqual(['adapter_name_mismatch']);
+    expect(activeAdapter.invoke).not.toHaveBeenCalled();
+  });
+
   it('routes an unknown previous outcome to reconciliation without replay', async () => {
     const activeLease = lease();
     const activeAdapter = adapter(activeLease);
