@@ -6,27 +6,36 @@ on:
 
 permissions:
   contents: read
-  issues: read
-  actions: write
+  issues: write
 
 jobs:
-  dispatch:
-    if: ${{ github.event.issue.number == 485 && github.event.comment.user.login == 'jussray' }}
+  authorize:
+    if: >-
+      github.event.issue.number == 485 &&
+      github.event.comment.user.login == 'jussray' &&
+      github.event.comment.user.id == 286642846
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.parse.outputs.sha }}
+      mode: ${{ steps.parse.outputs.mode }}
+      target: ${{ steps.parse.outputs.target }}
+      approval_reference: ${{ steps.parse.outputs.approval_reference }}
+      authority_comment_id: ${{ steps.parse.outputs.authority_comment_id }}
 
     steps:
       - name: Parse exact founder Chief Access command
         id: parse
         env:
           COMMENT_BODY: ${{ github.event.comment.body }}
+          AUTHORITY_COMMENT_ID: ${{ github.event.comment.id }}
         shell: bash
         run: |
           set -euo pipefail
           read -r command mode sha target approval extra <<< "$COMMENT_BODY"
 
           if [[ "$command" != '/cloudflare-chief-access' ]]; then
-            echo 'Not a Chief Access command; exiting without dispatch.'
+            echo 'Not a Chief Access command; exiting without recovery.'
             exit 0
           fi
           if [[ "$mode" != 'check' && "$mode" != 'repair' ]]; then
@@ -78,6 +87,7 @@ jobs:
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           echo "target=$target_origin" >> "$GITHUB_OUTPUT"
           echo "approval_reference=$approval_reference" >> "$GITHUB_OUTPUT"
+          echo "authority_comment_id=$AUTHORITY_COMMENT_ID" >> "$GITHUB_OUTPUT"
 
       - name: Verify command SHA is exact FCR current main
         if: steps.parse.outputs.sha != ''
@@ -99,7 +109,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
-      - name: Refuse repair dispatch while subject-bound reconciliation is unresolved
+      - name: Refuse repair while subject-bound reconciliation is unresolved
         if: steps.parse.outputs.mode == 'repair'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -109,39 +119,19 @@ jobs:
           set -euo pipefail
           if ! gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/issues/485/comments?per_page=100" \
             | node scripts/chief-proofmode-access-reconciliation-state.mjs "$TARGET" >/dev/null; then
-            echo '::error title=Chief Access reconciliation required::trusted subject-bound reconciliation remains unresolved for this exact target; a matching provider subject must clear the latch before another repair dispatch.'
+            echo '::error title=Chief Access reconciliation required::trusted subject-bound reconciliation remains unresolved for this exact target; a matching provider subject must clear the latch before another repair.'
             exit 1
           fi
 
-      - name: Dispatch bounded Chief Access recovery
-        if: steps.parse.outputs.sha != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EXPECTED_HEAD_SHA: ${{ steps.parse.outputs.sha }}
-          MODE: ${{ steps.parse.outputs.mode }}
-          TARGET: ${{ steps.parse.outputs.target }}
-          APPROVAL_REFERENCE: ${{ steps.parse.outputs.approval_reference }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          payload="$(jq -n \
-            --arg ref main \
-            --arg sha "$EXPECTED_HEAD_SHA" \
-            --arg mode "$MODE" \
-            --arg target "$TARGET" \
-            --arg approval "$APPROVAL_REFERENCE" \
-            '{ref:$ref, inputs:{expected_head_sha:$sha, mode:$mode, target_url:$target, approval_reference:$approval}}')"
-
-          gh api \
-            --method POST \
-            "repos/${GITHUB_REPOSITORY}/actions/workflows/chief-proofmode-access-recovery.yml/dispatches" \
-            --input - <<< "$payload"
-
-          {
-            echo '## Chief ProofMode Access command dispatched'
-            echo
-            echo "- Exact FCR current main: \`$EXPECTED_HEAD_SHA\`"
-            echo "- Mode: \`$MODE\`"
-            echo "- Target: \`$TARGET\`"
-            echo '- Scope: one exact immutable Chief preview Service Auth policy only'
-          } >> "$GITHUB_STEP_SUMMARY"
+  recover:
+    name: Founder-bound Chief Access recovery
+    needs: authorize
+    if: needs.authorize.outputs.sha != ''
+    uses: ./.github/workflows/chief-proofmode-access-recovery.yml
+    with:
+      expected_head_sha: ${{ needs.authorize.outputs.sha }}
+      mode: ${{ needs.authorize.outputs.mode }}
+      target_url: ${{ needs.authorize.outputs.target }}
+      approval_reference: ${{ needs.authorize.outputs.approval_reference }}
+      authority_comment_id: ${{ needs.authorize.outputs.authority_comment_id }}
+    secrets: inherit
