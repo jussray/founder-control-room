@@ -174,8 +174,9 @@ export async function verifyZoneScopedAccessInventory({
   };
 }
 
-function blockedReceipt(error, { apply, accountId, zone }) {
-  const matchingApplications = Array.isArray(error?.matchingApplications)
+function blockedReceipt(error, { apply, zone }) {
+  const matchingApplicationsObserved = Array.isArray(error?.matchingApplications);
+  const matchingApplications = matchingApplicationsObserved
     ? error.matchingApplications
     : [];
   return {
@@ -189,14 +190,14 @@ function blockedReceipt(error, { apply, accountId, zone }) {
     applyRequested: apply,
     mutationPerformed: false,
     rollbackPerformed: false,
-    accountId,
+    accountId: FCR_CLOUDFLARE_ACCOUNT_ID,
     zone,
     credentialSource: error?.credentialSource ?? null,
     credentialFailures: Array.isArray(error?.credentialFailures) ? error.credentialFailures : [],
     denyUnmatchedRequests: null,
     alreadyExempt: null,
     matchingApplications,
-    matchingApplicationCount: matchingApplications.length,
+    matchingApplicationCount: matchingApplicationsObserved ? matchingApplications.length : null,
     action: 'none',
     blocker: error instanceof Error ? error.message : String(error),
     classification: error?.classification || 'provider-recovery-failed',
@@ -234,7 +235,6 @@ if (invokedDirectly) {
       .catch(async (error) => {
         const receipt = blockedReceipt(error, {
           apply,
-          accountId: clean(process.env.CLOUDFLARE_ACCOUNT_ID) || FCR_CLOUDFLARE_ACCOUNT_ID,
           zone: FCR_PUBLIC_ZONE,
         });
         await writeReceipt(receipt);
