@@ -25,9 +25,15 @@ export function parseRepository(value) {
   return { owner, repo };
 }
 
-function branchTargets(ruleset) {
-  const include = ruleset?.conditions?.ref_name?.include;
-  return Array.isArray(include) ? include.filter((value) => typeof value === 'string') : [];
+function branchTargetConditions(ruleset) {
+  const refName = ruleset?.conditions?.ref_name ?? {};
+  const include = Array.isArray(refName.include)
+    ? refName.include.filter((value) => typeof value === 'string')
+    : [];
+  const exclude = Array.isArray(refName.exclude)
+    ? refName.exclude.filter((value) => typeof value === 'string')
+    : [];
+  return { include, exclude };
 }
 
 function ruleOfType(ruleset, type) {
@@ -75,10 +81,12 @@ export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = tar
         bypassMode: text(actor?.bypass_mode),
       })).sort((a, b) => `${a.actorType}:${a.actorId}:${a.bypassMode}`.localeCompare(`${b.actorType}:${b.actorId}:${b.bypassMode}`))
     : null;
-  const targets = branchTargets(ruleset);
+  const { include: targets, exclude: excludedTargets } = branchTargetConditions(ruleset);
   const targetTokens = new Set([`refs/heads/${targetRef}`]);
   if (text(defaultBranch) === text(targetRef)) targetTokens.add('~DEFAULT_BRANCH');
-  const targetsRequestedRef = targets.some((target) => targetTokens.has(target));
+  const requestedRefExplicitlyIncluded = targets.some((target) => targetTokens.has(target));
+  const requestedRefExcluded = excludedTargets.some((target) => target === '~ALL' || targetTokens.has(target));
+  const targetsRequestedRef = requestedRefExplicitlyIncluded && !requestedRefExcluded;
   const targetsOnlyRequestedRef = targetsRequestedRef
     && targets.every((target) => targetTokens.has(target));
 
@@ -88,6 +96,9 @@ export function rulesetSnapshot(ruleset, targetRef = 'main', defaultBranch = tar
     enforcement: text(ruleset?.enforcement),
     target: text(ruleset?.target),
     targetRefs: targets,
+    excludedTargetRefs: excludedTargets,
+    requestedRefExplicitlyIncluded,
+    requestedRefExcluded,
     targetsRequestedRef,
     targetsOnlyRequestedRef,
     ruleTypes,
@@ -155,6 +166,7 @@ export function canonicalFloorSatisfied(
     && snapshot.target === 'branch'
     && snapshot.targetsRequestedRef === true
     && snapshot.targetsOnlyRequestedRef === true
+    && snapshot.requestedRefExcluded === false
     && exactRuleTypesMatch(snapshot, ['pull_request', 'code_scanning', 'non_fast_forward', 'deletion'])
     && snapshot.requirePullRequest === true
     && snapshot.requiredApprovingReviewCount === requiredNativeApprovals
@@ -177,6 +189,7 @@ export function freshnessFloorSatisfied(snapshot, expectedName = canonicalFreshn
     && snapshot.target === 'branch'
     && snapshot.targetsRequestedRef === true
     && snapshot.targetsOnlyRequestedRef === true
+    && snapshot.requestedRefExcluded === false
     && exactRuleTypesMatch(snapshot, ['required_status_checks'])
     && snapshot.requirePullRequest === false
     && snapshot.strictRequiredStatusChecks === true
