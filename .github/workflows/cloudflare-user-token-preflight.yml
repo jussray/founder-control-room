@@ -30,6 +30,13 @@ jobs:
           if (!token) throw new Error('TOKEN_MISSING');
           if (!/^[0-9a-f]{32}$/.test(accountId)) throw new Error('ACCOUNT_ID_INVALID_FORMAT');
 
+          const tokenClass = token.startsWith('cfut_') ? 'user-token'
+            : token.startsWith('cfat_') ? 'account-token'
+              : token.startsWith('cfk_') ? 'global-key'
+                : /^[0-9a-f]{32}$/i.test(token) ? 'likely-token-id'
+                  : 'legacy-or-unknown';
+          console.log(`TOKEN_FORMAT class=${tokenClass} length=${token.length} contains_equals=${token.includes('=')} contains_whitespace=${/\\s/u.test(token)}`);
+
           const request = async (path) => {
             const response = await fetch(`${API}${path}`, {
               headers: { Authorization: `Bearer ${token}` },
