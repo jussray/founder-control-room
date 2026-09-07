@@ -177,16 +177,20 @@ Provider error details are not echoed to clients or written into public audit me
 
 ## Tool-call and failover boundary
 
-The structured Mirror/QuickScan paths do not execute external tools. Shared tool-runtime primitives exist for future agentic consumers, with these invariants:
+The structured Mirror/QuickScan paths do not execute external tools. The shared tool-runtime primitives now also have one concrete bounded consumer: `runGovernedRepositoryRead` in `src/aiRuntime/repositoryReadAttempt.ts`. Its invariants are:
 
 1. streamed tool arguments are accumulated by `(provider, callId)`, byte-bounded, and parsed only after completion;
 2. a completed final argument payload replaces, rather than duplicates, accumulated deltas;
 3. a provider failure before tool execution may fail over safely;
 4. a successful write may be reused for fallback answer synthesis but is never replayed merely because the model connection failed;
 5. an unknown write outcome blocks model failover and tool replay until the authoritative FCR execution ledger and external provider outcome are reconciled;
-6. idempotent write replay is permitted only after non-application is confirmed and the external provider guarantees deduplication for the same idempotency key.
+6. idempotent write replay is permitted only after non-application is confirmed and the external provider guarantees deduplication for the same idempotency key;
+7. the first repository-read vertical slice fixes provider selection to FCR's server-owned GitHub `RepositoryProvider`, resolves the mutable ref to an immutable SHA, and executes the file read only after the lease membrane admits the exact repository/ref/path subject;
+8. repository content remains withheld after execution until a separately constructed FCR provider instance re-resolves the ref and independently re-reads the exact file; only a stable ref plus identical content hash may create the W1 readback witness that promotes the result to `VERIFIED`;
+9. ref movement, byte disagreement, readback failure, target/capability substitution, path traversal, stale lease identity, or oversized content never releases the unverified file body;
+10. the generic donor-runtime loop still does not accept caller-authored witness authority. The concrete repository wrapper creates the provider readback internally and exposes no witness/provider injection parameter.
 
-`src/aiRuntime/toolFailover.ts` is policy only. It does not invent a second journal. Existing FCR mission/project/action idempotency and provider receipts remain the write authority.
+`src/aiRuntime/toolFailover.ts` is policy only. It does not invent a second journal. Existing FCR mission/project/action idempotency and provider receipts remain the write authority. The repository-read vertical slice is read-only and does not add merge, deploy, provider mutation, secret, billing, or publication authority.
 
 ## Fact-check gate
 
