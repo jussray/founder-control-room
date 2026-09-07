@@ -260,6 +260,22 @@ function attachCredentialFailure(error, credential) {
   return error;
 }
 
+function providerPolicyReadFailure(error, credential) {
+  error.classification = 'provider-read-failed';
+  error.credentialSource = credential.source;
+  error.credentialFailures = [
+    ...credential.failures,
+    {
+      source: credential.source,
+      reason: 'provider-read-failed',
+      status: Number.isInteger(error?.providerStatus) ? error.providerStatus : null,
+      providerCodes: Array.isArray(error?.providerCodes) ? error.providerCodes : [],
+      nextAction: 'grant the dedicated FCR Access credential Access Apps and Policies read authority, then rerun inspection',
+    },
+  ];
+  return error;
+}
+
 export async function reconcileFcrPublicAccessZone({
   env = process.env,
   fetchImpl = fetch,
@@ -277,10 +293,8 @@ export async function reconcileFcrPublicAccessZone({
 
   const exactPublicApps = credential.applications
     .filter((application) => appHasExactPublicDestination(application, zone));
-  const managedApps = exactPublicApps
+  const namedManagedApps = exactPublicApps
     .filter((application) => clean(application?.name) === FCR_PUBLIC_ACCESS_APP_NAME);
-  const foreignPublicApps = exactPublicApps
-    .filter((application) => clean(application?.name) !== FCR_PUBLIC_ACCESS_APP_NAME);
 
   const receipt = {
     ...receiptBase({ apply, accountId: canonicalAccountId, zone }),
@@ -289,51 +303,67 @@ export async function reconcileFcrPublicAccessZone({
     matchingApplicationCount: exactPublicApps.length,
   };
 
-  if (managedApps.length > 1) {
-    const error = new Error('More than one managed FCR public-bypass Access application exists; refusing automatic repair.');
-    error.classification = 'duplicate-managed-public-bypass';
-    error.matchingApplications = managedApps;
+  if (exactPublicApps.length > 1) {
+    const error = new Error('More than one Access application targets the FCR public apex; refusing to infer ownership or mutate automatically.');
+    error.classification = namedManagedApps.length > 1
+      ? 'duplicate-managed-public-bypass'
+      : 'existing-public-access-app-requires-review';
+    error.matchingApplications = exactPublicApps;
     throw attachCredentialFailure(error, credential);
   }
 
-  const existingManaged = managedApps[0] || null;
-  if (existingManaged) {
-    if (!appHasOnlyManagedPublicDestination(existingManaged, zone)) {
-      const error = new Error('The managed FCR public-bypass application destination drifted from the exact public apex scope.');
-      error.classification = 'managed-public-bypass-drift';
-      error.matchingApplications = [existingManaged];
+  const existingPublic = exactPublicApps[0] || null;
+  if (existingPublic) {
+    const isNamedManaged = clean(existingPublic?.name) === FCR_PUBLIC_ACCESS_APP_NAME;
+
+    if (!appHasOnlyManagedPublicDestination(existingPublic, zone)) {
+      const error = new Error(
+        isNamedManaged
+          ? 'The managed FCR public-bypass application destination drifted from the exact public apex scope.'
+          : 'An existing non-managed Access application targets the FCR apex with broader or different destination scope; manual review is required before mutation.',
+      );
+      error.classification = isNamedManaged
+        ? 'managed-public-bypass-drift'
+        : 'existing-public-access-app-requires-review';
+      error.matchingApplications = [existingPublic];
       throw attachCredentialFailure(error, credential);
     }
 
-    const policies = await listPolicies({
-      token: credential.token,
-      fetchImpl,
-      accountId: canonicalAccountId,
-      appId: existingManaged.id,
-    });
+    let policies;
+    try {
+      policies = await listPolicies({
+        token: credential.token,
+        fetchImpl,
+        accountId: canonicalAccountId,
+        appId: existingPublic.id,
+      });
+    } catch (error) {
+      throw providerPolicyReadFailure(error, credential);
+    }
+
     if (!policies.some(isEveryoneBypassPolicy)) {
-      const error = new Error('The managed FCR public-bypass application is missing the required Everyone bypass policy.');
-      error.classification = 'managed-public-bypass-policy-drift';
-      error.matchingApplications = [existingManaged];
+      const error = new Error(
+        isNamedManaged
+          ? 'The managed FCR public-bypass application is missing the required Everyone bypass policy.'
+          : 'An existing non-managed Access application owns the exact FCR public destination but is not an Everyone bypass; manual review is required before mutation.',
+      );
+      error.classification = isNamedManaged
+        ? 'managed-public-bypass-policy-drift'
+        : 'existing-public-access-app-requires-review';
+      error.matchingApplications = [existingPublic];
       throw attachCredentialFailure(error, credential);
     }
 
     return {
       ...receipt,
       state: 'clear',
+      alreadyExempt: true,
       action: 'already-public-bypass',
-      managedApplicationId: clean(existingManaged.id) || null,
+      // A semantically equivalent foreign-named app is accepted as provider truth,
+      // but is never adopted as a managed rollback target.
+      managedApplicationId: isNamedManaged ? (clean(existingPublic.id) || null) : null,
       nextAction: 'run exact-head anonymous Playwright and verify the public front door',
     };
-  }
-
-  if (foreignPublicApps.length > 0) {
-    const error = new Error(
-      'An existing non-managed Access application already owns the Founder Control Room public destination; manual review is required before mutation.',
-    );
-    error.classification = 'existing-public-access-app-requires-review';
-    error.matchingApplications = foreignPublicApps;
-    throw attachCredentialFailure(error, credential);
   }
 
   if (!apply) {

@@ -211,11 +211,37 @@ test('existing exact managed public bypass is idempotent', async () => {
   });
 
   assert.equal(receipt.action, 'already-public-bypass');
+  assert.equal(receipt.alreadyExempt, true);
   assert.equal(receipt.mutationPerformed, false);
   assert.equal(createCount, 0);
 });
 
-test('foreign exact public destination blocks automatic mutation', async () => {
+test('foreign-named exact public bypass is accepted by semantics without being adopted for rollback', async () => {
+  const requests = [];
+  const receipt = await reconcileFcrPublicAccessZone({
+    env: readEnv,
+    fetchImpl: fakeFetch({
+      applications: [{
+        id: 'foreign-1',
+        name: 'existing FCR public app',
+        destinations: [{ type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` }],
+      }],
+      policiesByApp: { 'foreign-1': [bypassPolicy()] },
+      onRequest(request) {
+        requests.push(request);
+      },
+    }),
+  });
+
+  assert.equal(receipt.state, 'clear');
+  assert.equal(receipt.action, 'already-public-bypass');
+  assert.equal(receipt.alreadyExempt, true);
+  assert.equal(receipt.mutationPerformed, false);
+  assert.equal(receipt.managedApplicationId, null);
+  assert.ok(requests.every((request) => request.authorization === `Bearer ${READ_TOKEN}`));
+});
+
+test('foreign exact public destination without Everyone bypass blocks automatic mutation', async () => {
   await assert.rejects(
     reconcileFcrPublicAccessZone({
       env: adminEnv,
@@ -226,6 +252,29 @@ test('foreign exact public destination blocks automatic mutation', async () => {
           name: 'another-owner',
           destinations: [{ type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` }],
         }],
+        policiesByApp: {
+          'foreign-1': [{ decision: 'allow', include: [{ everyone: {} }], require: [], exclude: [] }],
+        },
+      }),
+    }),
+    (error) => error?.classification === 'existing-public-access-app-requires-review',
+  );
+});
+
+test('multiple exact public destinations remain ambiguous and block automatic mutation', async () => {
+  await assert.rejects(
+    reconcileFcrPublicAccessZone({
+      env: adminEnv,
+      apply: true,
+      fetchImpl: fakeFetch({
+        applications: [
+          managedApp('managed-1'),
+          {
+            id: 'foreign-1',
+            name: 'another-owner',
+            destinations: [{ type: 'public', uri: `${FCR_PUBLIC_ZONE}/*` }],
+          },
+        ],
       }),
     }),
     (error) => error?.classification === 'existing-public-access-app-requires-review',

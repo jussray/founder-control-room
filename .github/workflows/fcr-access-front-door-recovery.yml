@@ -82,7 +82,7 @@ jobs:
             echo "- Apply requested: \`$APPLY\`"
             echo "- Approval reference receipt: \`$approval_reference_receipt\`"
             echo '- Mutation scope: create only foundercontrolroom.org/* as a public Access destination with Bypass Everyone'
-            echo '- Existing non-managed public destination: blocks automatic mutation'
+            echo '- Existing non-managed public destination: accepted only when exact destination and Everyone bypass semantics are independently verified'
             echo '- Existing all-workers protection: preserved'
             echo '- DNS mutation: none'
             echo '- Worker route mutation: none'
@@ -117,12 +117,10 @@ jobs:
           CLOUDFLARE_ACCESS_ADMIN_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_ADMIN_API_TOKEN }}
         run: node scripts/reconcile-cloudflare-access-public-zone.mjs --apply >/dev/null 2>&1
 
-      - name: Install Chromium for post-apply proof
-        if: inputs.apply == true
+      - name: Install Chromium for front-door proof
         run: npx playwright install --with-deps chromium
 
-      - name: Verify recovered front door and exact runtime SHA with Playwright
-        if: inputs.apply == true
+      - name: Verify front door and exact runtime SHA with Playwright
         run: node scripts/verify-fcr-front-door-playwright.mjs >/dev/null 2>&1
 
       - name: Roll back run-created public destination after failed proof
