@@ -69,10 +69,23 @@ function receiptMatchesLease(
   lease: GovernedExecutionLease,
   receipt: GovernedExecutionReceipt,
 ): boolean {
+  const observedAt = Date.parse(receipt.observedAt);
+  const issuedAt = Date.parse(lease.authority.issuedAt);
+  const expiresAt = lease.authority.expiresAt
+    ? Date.parse(lease.authority.expiresAt)
+    : undefined;
+  const observedWithinLease = Number.isFinite(observedAt)
+    && Number.isFinite(issuedAt)
+    && observedAt >= issuedAt
+    && (
+      expiresAt === undefined
+      || (Number.isFinite(expiresAt) && observedAt < expiresAt)
+    );
+
   return receipt.leaseId === lease.authority.id
     && receipt.idempotencyKey === lease.execution.idempotencyKey
     && receipt.runtimeIdentity === runtimeIdentityForLease(lease)
-    && Number.isFinite(Date.parse(receipt.observedAt));
+    && observedWithinLease;
 }
 
 /**
@@ -136,7 +149,7 @@ export async function runGovernedReadOnlyAttempt(
       state: 'RECEIPT_REJECTED',
       decision,
       receipt,
-      reason: 'The runtime receipt does not bind to the exact lease, idempotency key, runtime identity, and observation time.',
+      reason: 'The runtime receipt does not bind to the exact lease, idempotency key, runtime identity, and lease observation window.',
     };
   }
 

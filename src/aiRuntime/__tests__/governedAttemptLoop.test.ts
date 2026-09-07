@@ -296,6 +296,58 @@ describe('runGovernedReadOnlyAttempt', () => {
     expect(witnessFn).not.toHaveBeenCalled();
   });
 
+  it('rejects a runtime receipt observed before the lease was issued', async () => {
+    const activeLease = lease();
+    const activeAdapter = adapter(activeLease, {
+      invoke: vi.fn(async () => ({
+        ...receipt(activeLease),
+        observedAt: '2026-09-07T18:59:59.999Z',
+      })),
+    });
+    const witnessFn = vi.fn(async (value: GovernedExecutionReceipt) => witness(value));
+
+    const result = await runGovernedReadOnlyAttempt({
+      lease: activeLease,
+      world: world(),
+      proposal: {
+        toolName: activeAdapter.name,
+        requestedCapabilities: ['provider.observation.read'],
+      },
+      adapter: activeAdapter,
+      witness: witnessFn,
+    });
+
+    expect(result.state).toBe('RECEIPT_REJECTED');
+    expect(result.reason).toContain('lease observation window');
+    expect(witnessFn).not.toHaveBeenCalled();
+  });
+
+  it('rejects a runtime receipt observed at or after lease expiry', async () => {
+    const activeLease = lease();
+    const activeAdapter = adapter(activeLease, {
+      invoke: vi.fn(async () => ({
+        ...receipt(activeLease),
+        observedAt: activeLease.authority.expiresAt!,
+      })),
+    });
+    const witnessFn = vi.fn(async (value: GovernedExecutionReceipt) => witness(value));
+
+    const result = await runGovernedReadOnlyAttempt({
+      lease: activeLease,
+      world: world(),
+      proposal: {
+        toolName: activeAdapter.name,
+        requestedCapabilities: ['provider.observation.read'],
+      },
+      adapter: activeAdapter,
+      witness: witnessFn,
+    });
+
+    expect(result.state).toBe('RECEIPT_REJECTED');
+    expect(result.reason).toContain('lease observation window');
+    expect(witnessFn).not.toHaveBeenCalled();
+  });
+
   it('promotes only a lease-bound read-only receipt with a sufficient independent witness', async () => {
     const activeLease = lease();
     const activeAdapter = adapter(activeLease);
