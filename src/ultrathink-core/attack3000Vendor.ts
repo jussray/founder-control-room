@@ -127,11 +127,11 @@ function hasEvidence(refs: readonly string[]): boolean {
   return cleanRefs(refs).length > 0;
 }
 
-function validNumber(value: number | null): boolean {
+function validNumber(value: number | null): value is number {
   return value !== null && Number.isFinite(value) && value >= 0;
 }
 
-function validCount(value: number | null): boolean {
+function validCount(value: number | null): value is number {
   return value !== null && Number.isSafeInteger(value) && value >= 0;
 }
 
