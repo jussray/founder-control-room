@@ -269,7 +269,15 @@ jobs:
                 alreadyExempt,
                 matchingApplicationCount,
                 action,
-                classification
+                classification,
+                reviewReason: (
+                  if .classification != "existing-public-access-app-requires-review" then null
+                  elif .blocker == "More than one Access application targets the FCR public apex; refusing to infer ownership or mutate automatically." then "multiple-matching-apps"
+                  elif .blocker == "An existing non-managed Access application targets the FCR apex with broader or different destination scope; manual review is required before mutation." then "destination-scope"
+                  elif .blocker == "An existing non-managed Access application owns the exact FCR public destination but is not an Everyone bypass; manual review is required before mutation." then "missing-everyone-bypass"
+                  else "unspecified"
+                  end
+                )
               }' "$access_receipt"
               echo '```'
             fi
