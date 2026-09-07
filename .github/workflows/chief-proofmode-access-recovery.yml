@@ -1,20 +1,16 @@
 name: Chief ProofMode Access Recovery
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       expected_head_sha:
-        description: 'Exact current FCR main SHA approved to control the Chief Access repair'
+        description: 'Exact current FCR main SHA approved to control the Chief Access recovery'
         required: true
         type: string
       mode:
         description: 'Inspect or repair only the exact immutable Chief preview Service Auth policy'
         required: true
-        default: check
-        type: choice
-        options:
-          - check
-          - repair
+        type: string
       target_url:
         description: 'Exact immutable Chief workers.dev preview origin'
         required: true
@@ -22,6 +18,10 @@ on:
       approval_reference:
         description: 'Auditable founder approval reference; required for repair'
         required: false
+        type: string
+      authority_comment_id:
+        description: 'Exact founder issue-comment event ID that authorized this recovery call'
+        required: true
         type: string
 
 permissions:
@@ -48,6 +48,70 @@ jobs:
     environment: production
 
     steps:
+      - name: Verify founder-bound bridge invocation before provider capability
+        env:
+          AUTHORITY_COMMENT_ID: ${{ inputs.authority_comment_id }}
+          APPROVAL_REFERENCE: ${{ inputs.approval_reference }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
+          EVENT_COMMENT_ID: ${{ github.event.comment.id }}
+          EVENT_COMMENT_LOGIN: ${{ github.event.comment.user.login }}
+          EVENT_COMMENT_USER_ID: ${{ github.event.comment.user.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = 'issue_comment'
+          test "$GITHUB_ACTOR" = 'jussray'
+          test "$EVENT_ISSUE_NUMBER" = '485'
+          test "$EVENT_COMMENT_LOGIN" = 'jussray'
+          test "$EVENT_COMMENT_USER_ID" = '286642846'
+          [[ "$AUTHORITY_COMMENT_ID" =~ ^[0-9]+$ ]]
+          test "$EVENT_COMMENT_ID" = "$AUTHORITY_COMMENT_ID"
+
+          read -r command mode sha target approval extra <<< "$COMMENT_BODY"
+          test "$command" = '/cloudflare-chief-access'
+          test "$mode" = "$CHIEF_ACCESS_MODE"
+          test "$sha" = "$EXPECTED_HEAD_SHA"
+          test -z "${extra:-}"
+
+          target_origin="$(node -e '
+            try {
+              const url = new URL(process.argv[1]);
+              if (
+                url.protocol !== "https:"
+                || url.username
+                || url.password
+                || url.search
+                || url.hash
+                || (url.pathname !== "/" && url.pathname !== "")
+                || !/^[0-9a-f]{8}-chief-ai\.mcgill-raylene\.workers\.dev$/i.test(url.hostname)
+              ) process.exit(1);
+              process.stdout.write(url.origin);
+            } catch { process.exit(1); }
+          ' "$target")" || {
+            echo '::error title=Invalid founder authority target::founder comment target must be one immutable Chief workers.dev preview origin.'
+            exit 1
+          }
+          test "$target_origin" = "$CHIEF_ACCESS_TARGET_URL"
+
+          if [[ "$CHIEF_ACCESS_MODE" == 'repair' ]]; then
+            test "$approval" = "$APPROVAL_REFERENCE"
+            [[ "$APPROVAL_REFERENCE" =~ ^[A-Za-z0-9._:-]{8,200}$ ]]
+          else
+            test -z "${approval:-}"
+            test -z "$APPROVAL_REFERENCE"
+          fi
+
+          {
+            echo '## Founder bridge authority'
+            echo
+            echo '- Event: `issue_comment`'
+            echo '- Issue: `#485`'
+            echo '- Founder identity: `jussray` / `286642846`'
+            echo "- Authority comment ID: \`$AUTHORITY_COMMENT_ID\`"
+            echo '- Recovery is not directly dispatchable; inputs were rebound to the original founder comment.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Check out exact approved FCR current main
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
