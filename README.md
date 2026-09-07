@@ -186,6 +186,12 @@ Current source includes receipt/evaluator foundations that can classify whether 
 
 Even a valid current receipt cannot by itself authorize merge, deploy, production promotion, issue closure, secret mutation, policy mutation, billing, publication, or deletion.
 
+### Founder Capital Decision
+
+The Founder Capital Decision surface is an evidence-evaluation capability, not a financing actuator. It can turn founder-supplied and verified fundraising context into a decision card, surface dilution and option tradeoffs, and return `HOLD` when required evidence is stale, missing, or insufficient.
+
+Its authority ceiling is explicit: a capital decision card, score, option set, or browser rendering **does not grant financing, spend, investor-contact, fundraise, merge, deploy, publication, or execution authority**. Missing or stale evidence removes derived certainty rather than preserving an earlier recommendation. Browser and route tests prove only the source behavior they exercise; they do not prove that financing occurred, that an investor was contacted, or that a current external outcome exists.
+
 ### Guarded terminal
 
 The terminal executes only registered commands against an exact verified checkout. It does not accept arbitrary shell strings, caller-selected executables, redirections, pipes, or unreviewed environment mutation.
