@@ -3,7 +3,6 @@ import { chromium } from 'playwright';
 
 const APEX_ORIGIN = 'https://foundercontrolroom.org';
 const PUBLIC_ORIGIN = 'https://www.foundercontrolroom.org';
-const WEB_ORIGIN = PUBLIC_ORIGIN;
 const CONTROL_ROOM_URL = `${PUBLIC_ORIGIN}/control-room/`;
 const AUTH_ME_URL = `${PUBLIC_ORIGIN}/auth/me`;
 const API_VERSION_URL = 'https://api.foundercontrolroom.org/version';
@@ -40,77 +39,123 @@ const receipt = {
   state: 'unknown',
 };
 
-function assertNoCloudflareIntercept(url, body) {
-  if (/cloudflareaccess\.com/i.test(url) || /Error\s+5(?:00|02|03|04|20|21|22|23|24|25|26)/i.test(body)) {
-    throw new Error('Random stranger was intercepted by Cloudflare Access or a Cloudflare server error before reaching FCR.');
-  }
+function cloudflareInterceptDetected(url, body) {
+  return /cloudflareaccess\.com/i.test(url)
+    || /Error\s+5(?:00|02|03|04|20|21|22|23|24|25|26)/i.test(body);
+}
+
+const failures = [];
+function fail(message) {
+  failures.push(message);
 }
 
 try {
-  const response = await page.goto(APEX_ORIGIN, {
-    waitUntil: 'domcontentloaded',
-    timeout: 30_000,
-  });
-  if (!response) throw new Error('Founder Control Room returned no public-front-door navigation response.');
-
-  receipt.navigationStatus = response.status();
-  if (response.status() >= 500) {
-    throw new Error(`Founder Control Room public front door returned HTTP ${response.status()}.`);
+  try {
+    const apexResponse = await page.goto(APEX_ORIGIN, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30_000,
+    });
+    if (!apexResponse) {
+      fail('Founder Control Room returned no apex navigation response.');
+    } else {
+      receipt.navigationStatus = apexResponse.status();
+      receipt.finalOrigin = new URL(page.url()).origin;
+      if (apexResponse.status() >= 400) {
+        fail(`Founder Control Room apex returned HTTP ${apexResponse.status()}.`);
+      }
+      if (receipt.finalOrigin !== APEX_ORIGIN && receipt.finalOrigin !== PUBLIC_ORIGIN) {
+        fail(`Apex redirected outside FCR to ${receipt.finalOrigin}.`);
+      }
+      const apexBody = (await page.locator('body').innerText().catch(() => '')).slice(0, 8_000);
+      if (cloudflareInterceptDetected(page.url(), apexBody)) {
+        fail('Apex was intercepted by Cloudflare Access or a Cloudflare server error before reaching FCR.');
+      }
+    }
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
   }
 
-  receipt.finalOrigin = new URL(page.url()).origin;
-  if (receipt.finalOrigin !== APEX_ORIGIN && receipt.finalOrigin !== WEB_ORIGIN) {
-    throw new Error(`Public front door redirected outside FCR to ${receipt.finalOrigin}.`);
+  // Always probe the canonical public origin independently. A broken apex must
+  // not prevent us from learning whether the random-stranger path and founder
+  // containment are healthy at the canonical FCR surface.
+  try {
+    const publicResponse = await page.goto(PUBLIC_ORIGIN, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30_000,
+    });
+    if (!publicResponse) {
+      fail('Founder Control Room returned no canonical public-front-door response.');
+    } else {
+      receipt.finalOrigin = new URL(page.url()).origin;
+      if (publicResponse.status() >= 400) {
+        fail(`Canonical public front door returned HTTP ${publicResponse.status()}.`);
+      }
+      if (receipt.finalOrigin !== PUBLIC_ORIGIN) {
+        fail(`Canonical public front door redirected outside FCR to ${receipt.finalOrigin}.`);
+      }
+      const publicBody = (await page.locator('body').innerText().catch(() => '')).slice(0, 8_000);
+      if (cloudflareInterceptDetected(page.url(), publicBody)) {
+        fail('Canonical public front door was intercepted by Cloudflare Access or a Cloudflare server error.');
+      }
+      receipt.publicCanonicalHref = await page.locator('link[rel="canonical"]').getAttribute('href').catch(() => null);
+      if (receipt.publicCanonicalHref !== `${PUBLIC_ORIGIN}/`) {
+        fail(`Public front door canonical URL must be ${PUBLIC_ORIGIN}/.`);
+      }
+      const enterLinkCount = await page.getByRole('link', { name: /Enter authenticated Control Room/i }).count().catch(() => 0);
+      if (enterLinkCount !== 1) {
+        fail('Public front door must expose exactly one authenticated Control Room entry link.');
+      }
+    }
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
   }
 
-  const publicBody = (await page.locator('body').innerText().catch(() => '')).slice(0, 8_000);
-  assertNoCloudflareIntercept(page.url(), publicBody);
+  try {
+    const controlRoomResponse = await page.goto(CONTROL_ROOM_URL, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30_000,
+    });
+    if (!controlRoomResponse) {
+      fail('Founder Control Room returned no Control Room navigation response.');
+    } else {
+      receipt.controlRoomStatus = controlRoomResponse.status();
+      if (controlRoomResponse.status() >= 400) {
+        fail(`Control Room entry surface returned HTTP ${controlRoomResponse.status()}.`);
+      }
+      const controlRoomBody = (await page.locator('body').innerText().catch(() => '')).slice(0, 8_000);
+      if (cloudflareInterceptDetected(page.url(), controlRoomBody)) {
+        fail('Control Room entry surface was intercepted by Cloudflare Access or a Cloudflare server error.');
+      }
 
-  receipt.publicCanonicalHref = await page.locator('link[rel="canonical"]').getAttribute('href');
-  if (receipt.publicCanonicalHref !== `${PUBLIC_ORIGIN}/`) {
-    throw new Error(`Public front door canonical URL must be ${PUBLIC_ORIGIN}/.`);
+      const signIn = page.locator('.sign-in-wrap');
+      receipt.founderSignInVisible = await signIn.isVisible().catch(() => false);
+      receipt.founderShellVisible = await page.locator('.shell').isVisible().catch(() => false);
+      const signInCopy = receipt.founderSignInVisible
+        ? (await signIn.innerText().catch(() => '')).slice(0, 4_000)
+        : '';
+      const magicLinkVisible = await page.locator('#magic-link-form').isVisible().catch(() => false);
+      if (!receipt.founderSignInVisible
+          || !/Sign in with your founder email/i.test(signInCopy)
+          || !/allowlist/i.test(signInCopy)
+          || !magicLinkVisible) {
+        fail('Random stranger did not reach the founder-gated sign-in surface.');
+      }
+      if (receipt.founderShellVisible) {
+        fail('Random stranger reached the authenticated Founder Control Room shell without founder authority.');
+      }
+    }
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
   }
 
-  const enterLink = page.getByRole('link', { name: /Enter authenticated Control Room/i });
-  if (await enterLink.count() !== 1) {
-    throw new Error('Public front door must expose exactly one authenticated Control Room entry link.');
-  }
-
-  const controlRoomResponse = await page.goto(CONTROL_ROOM_URL, {
-    waitUntil: 'domcontentloaded',
-    timeout: 30_000,
-  });
-  if (!controlRoomResponse) throw new Error('Founder Control Room returned no Control Room navigation response.');
-
-  receipt.controlRoomStatus = controlRoomResponse.status();
-  if (controlRoomResponse.status() >= 500) {
-    throw new Error(`Control Room entry surface returned HTTP ${controlRoomResponse.status()}.`);
-  }
-
-  const controlRoomBody = (await page.locator('body').innerText().catch(() => '')).slice(0, 8_000);
-  assertNoCloudflareIntercept(page.url(), controlRoomBody);
-
-  const signIn = page.locator('.sign-in-wrap');
-  await signIn.waitFor({ state: 'visible', timeout: 20_000 });
-  receipt.founderSignInVisible = await signIn.isVisible().catch(() => false);
-  receipt.founderShellVisible = await page.locator('.shell').isVisible().catch(() => false);
-
-  const signInCopy = (await signIn.innerText().catch(() => '')).slice(0, 4_000);
-  if (!receipt.founderSignInVisible
-      || !/Sign in with your founder email/i.test(signInCopy)
-      || !/allowlist/i.test(signInCopy)
-      || !await page.locator('#magic-link-form').isVisible().catch(() => false)) {
-    throw new Error('Random stranger did not reach the founder-gated sign-in surface.');
-  }
-
-  if (receipt.founderShellVisible) {
-    throw new Error('Random stranger reached the authenticated Founder Control Room shell without founder authority.');
-  }
-
-  const authMeResponse = await context.request.get(AUTH_ME_URL, { timeout: 20_000 });
-  receipt.authMeStatus = authMeResponse.status();
-  if (receipt.authMeStatus !== 401) {
-    throw new Error(`Founder identity endpoint must reject a random stranger with HTTP 401, received ${receipt.authMeStatus}.`);
+  try {
+    const authMeResponse = await context.request.get(AUTH_ME_URL, { timeout: 20_000 });
+    receipt.authMeStatus = authMeResponse.status();
+    if (receipt.authMeStatus !== 401) {
+      fail(`Founder identity endpoint must reject a random stranger with HTTP 401, received ${receipt.authMeStatus}.`);
+    }
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
   }
 
   receipt.founderAuthorityContained = (
@@ -119,19 +164,27 @@ try {
     && receipt.authMeStatus === 401
   );
   if (!receipt.founderAuthorityContained) {
-    throw new Error('Founder authority containment was not proven for a random stranger.');
+    fail('Founder authority containment was not proven for a random stranger.');
   }
 
-  const versionResponse = await context.request.get(API_VERSION_URL, { timeout: 20_000 });
-  receipt.apiVersionStatus = versionResponse.status();
-  if (!versionResponse.ok()) {
-    throw new Error(`${API_VERSION_URL} returned HTTP ${versionResponse.status()}.`);
+  try {
+    const versionResponse = await context.request.get(API_VERSION_URL, { timeout: 20_000 });
+    receipt.apiVersionStatus = versionResponse.status();
+    if (!versionResponse.ok()) {
+      fail(`${API_VERSION_URL} returned HTTP ${versionResponse.status()}.`);
+    } else {
+      const versionPayload = await versionResponse.text();
+      receipt.apiVersionMatchesExpectedSha = versionPayload.includes(expectedHeadSha);
+      if (!receipt.apiVersionMatchesExpectedSha) {
+        fail('API /version is not serving the exact approved current-main SHA.');
+      }
+    }
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
   }
 
-  const versionPayload = await versionResponse.text();
-  receipt.apiVersionMatchesExpectedSha = versionPayload.includes(expectedHeadSha);
-  if (!receipt.apiVersionMatchesExpectedSha) {
-    throw new Error('API /version is not serving the exact approved current-main SHA.');
+  if (failures.length > 0) {
+    throw new Error(failures.join(' | '));
   }
 
   receipt.state = 'proven';
