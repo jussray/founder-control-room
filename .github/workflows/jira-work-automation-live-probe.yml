@@ -69,6 +69,15 @@ jobs:
       - name: Install locked trusted dependencies
         run: npm ci
 
+      - name: Re-read current main immediately before mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          live_main_sha="$(git ls-remote origin 'refs/heads/main' | awk 'NR == 1 { print $1 }')"
+          test -n "$live_main_sha"
+          printf 'target_sha=%s\nlive_main_sha=%s\n' "$JIRA_AUTOMATION_PROBE_HEAD_SHA" "$live_main_sha"
+          test "$live_main_sha" = "$JIRA_AUTOMATION_PROBE_HEAD_SHA"
+
       - name: Run bounded Jira provider dispatch probe
         shell: bash
         run: |
