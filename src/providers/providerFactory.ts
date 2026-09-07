@@ -76,9 +76,10 @@ export function assertFounderControlRoomTrustedBypassActor(
  * including evaluate-only or zero-review rulesets when their own policy allows
  * it. FCR main is the constitutional authority surface: an active policy must
  * retain the complete minimum floor, and the canonical ruleset may not be
- * disabled, demoted to evaluate mode, or retargeted away from main through the
- * generic repository-administration route. Repository identity, not a mutable
- * project slug alias, determines whether that constitutional floor applies.
+ * disabled, demoted to evaluate mode, retargeted away from main, or broadened
+ * beyond main through the generic repository-administration route. Repository
+ * identity, not a mutable project slug alias, determines whether that
+ * constitutional floor applies.
  */
 export function assertRulesetGovernancePolicy(
   projectId: string,
@@ -95,8 +96,12 @@ export function assertRulesetGovernancePolicy(
     if (config.enforcement !== "active") {
       throw new Error("Founder Control Room canonical main governance must remain actively enforced");
     }
-    if (!targetsFounderControlRoomMain) {
-      throw new Error("Founder Control Room canonical main governance must continue targeting main");
+    const canonicalTargets = config.targetRefs.map((ref) => ref.trim());
+    if (
+      canonicalTargets.length !== 1
+      || canonicalTargets[0] !== FOUNDER_CONTROL_ROOM_PROTECTED_BRANCH
+    ) {
+      throw new Error("Founder Control Room canonical main governance must target exactly main with no additional refs");
     }
   }
 
