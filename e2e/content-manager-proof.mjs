@@ -52,7 +52,7 @@ function mime(pathname) {
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url || '/', 'http://127.0.0.1');
-  if (url.pathname === lifecycleBase && req.method === 'GET') {
+  if ((url.pathname === lifecycleBase || url.pathname === `${lifecycleBase}/`) && req.method === 'GET') {
     return json(res, 200, {
       contract: 'fcr/founder-content-lifecycle@v1',
       operations: [],
